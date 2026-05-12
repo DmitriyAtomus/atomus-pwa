@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atomus — вход</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #F4F6FA;
+    color: #1B2030;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 40px;
+  }
+  .brand {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-circle {
+    width: 72px;
+    height: 72px;
+    background: #2D5F8B;
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 32px;
+  }
+  .brand h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .brand p {
+    color: #6E7689;
+    font-size: 14px;
+  }
+  .card {
+    background: white;
+    border: 1px solid #E5E9F0;
+    border-radius: 16px;
+    padding: 28px 24px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .card p {
+    color: #6E7689;
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .login-area {
+    display: flex;
+    justify-content: center;
+    margin: 24px 0 8px;
+    min-height: 50px;
+  }
+  .status {
+    text-align: center;
+    color: #6E7689;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+  .status.error {
+    color: #B5260C;
+  }
+  .user-info {
+    background: white;
+    border: 1px solid #E5E9F0;
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .user-info .name {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .user-info .roles {
+    color: #6E7689;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .kpi {
+    background: #F4F6FA;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .kpi .label {
+    font-size: 11px;
+    color: #6E7689;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 4px;
+  }
+  .kpi .value {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1B2030;
+    line-height: 1.1;
+  }
+  .kpi .trend {
+    font-size: 12px;
+    color: #6E7689;
+    margin-top: 4px;
+  }
+  .kpi .trend.up { color: #1F7B3F; }
+  .kpi .trend.down { color: #B5260C; }
+  .recent {
+    margin-top: 24px;
+  }
+  .recent h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1B2030;
+  }
+  .record {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #E5E9F0;
+  }
+  .record:last-child { border-bottom: none; }
+  .record-info { flex: 1; min-width: 0; }
+  .record-title {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .record-meta {
+    font-size: 12px;
+    color: #6E7689;
+    margin-top: 2px;
+  }
+  .record-qty {
+    font-weight: 600;
+    font-size: 14px;
+    margin-left: 12px;
+  }
+  .record-qty small {
+    font-weight: 400;
+    font-size: 11px;
+    color: #6E7689;
+  }
+  .logout {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #E5E9F0;
+    border-radius: 12px;
+    color: #6E7689;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .logout:hover {
+    background: #F4F6FA;
+  }
+  .debug {
+    margin-top: 16px;
+    background: #1B2030;
+    color: #B5C0CC;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-family: monospace;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .debug-toggle {
+    background: none;
+    border: none;
+    color: #6E7689;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 12px;
+    text-decoration: underline;
+    font-family: inherit;
+  }
+  .footer {
+    text-align: center;
+    color: #9AA1B0;
+    font-size: 12px;
+    margin-top: 32px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="brand">
+    <div class="logo-circle">A</div>
+    <h1>Atomus</h1>
+    <p>производственный учёт · вход в кабинет</p>
+  </div>
+
+  <div id="login-screen">
+    <div class="card">
+      <h2>Войдите через Telegram</h2>
+      <p>Это первый рабочий прототип PWA-кабинета. Нажмите кнопку ниже — авторизуетесь тем же аккаунтом, что и в Telegram-боте.</p>
+
+      <div class="login-area" id="login-area">
+        <script async src="https://telegram.org/js/telegram-widget.js?22"
+                data-telegram-login="AtomusgroupBot"
+                data-size="large"
+                data-radius="10"
+                data-onauth="onTelegramAuth(user)"
+                data-request-access="write"></script>
+      </div>
+
+      <div class="status" id="login-status"></div>
+    </div>
+  </div>
+
+  <div id="dashboard-screen" style="display:none;">
+    <div class="user-info">
+      <div class="name" id="user-name">—</div>
+      <div class="roles" id="user-roles">—</div>
+
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi">
+          <div class="label">сегодня</div>
+          <div class="value" id="kpi-today">—</div>
+          <div class="trend" id="kpi-today-trend">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">за неделю</div>
+          <div class="value" id="kpi-week">—</div>
+          <div class="trend" id="kpi-week-trend">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">за месяц</div>
+          <div class="value" id="kpi-month">—</div>
+          <div class="trend" id="kpi-month-trend">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">сборщиков</div>
+          <div class="value" id="kpi-employees">—</div>
+          <div class="trend">за месяц</div>
+        </div>
+      </div>
+
+      <div class="recent">
+        <h3>Последние записи</h3>
+        <div id="recent-list">
+          <div style="color:#6E7689; font-size:13px; text-align:center; padding:20px 0;">загрузка…</div>
+        </div>
+      </div>
+
+      <button class="logout" onclick="logout()">Выйти</button>
+
+      <button class="debug-toggle" onclick="toggleDebug()">показать debug</button>
+      <pre class="debug" id="debug-pre" style="display:none;"></pre>
+    </div>
+  </div>
+
+  <div class="footer">
+    Atomus PWA · v0.1 · proof of concept
+  </div>
+</div>
+
+<script>
+const API_BASE = "https://worker-production-9b70.up.railway.app";
+const TOKEN_KEY = "atomus_token";
+
+const debug = {
+  log: [],
+  add(msg, data) {
+    const line = "[" + new Date().toISOString().substr(11, 8) + "] " + msg +
+                 (data ? "\n  " + JSON.stringify(data, null, 2).split("\n").join("\n  ") : "");
+    debug.log.push(line);
+    const pre = document.getElementById("debug-pre");
+    if (pre) pre.textContent = debug.log.join("\n\n");
+  }
+};
+
+function toggleDebug() {
+  const pre = document.getElementById("debug-pre");
+  pre.style.display = pre.style.display === "none" ? "block" : "none";
+}
+
+function showLogin() {
+  document.getElementById("login-screen").style.display = "block";
+  document.getElementById("dashboard-screen").style.display = "none";
+}
+
+function showDashboard() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("dashboard-screen").style.display = "block";
+}
+
+function logout() {
+  localStorage.removeItem(TOKEN_KEY);
+  debug.add("logout");
+  showLogin();
+}
+
+async function onTelegramAuth(user) {
+  debug.add("Telegram widget вернул данные", user);
+  setStatus("Авторизуемся…");
+
+  try {
+    const response = await fetch(API_BASE + "/api/auth/telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user),
+    });
+    const data = await response.json();
+    debug.add("Ответ /api/auth/telegram", data);
+
+    if (!response.ok) {
+      setStatus(data.message || data.error || "Ошибка авторизации", true);
+      return;
+    }
+
+    localStorage.setItem(TOKEN_KEY, data.token);
+    await loadDashboard();
+  } catch (e) {
+    debug.add("Ошибка fetch /api/auth/telegram", { error: String(e) });
+    setStatus("Ошибка соединения с API: " + String(e), true);
+  }
+}
+
+function setStatus(msg, isError) {
+  const el = document.getElementById("login-status");
+  el.textContent = msg;
+  el.className = "status" + (isError ? " error" : "");
+}
+
+async function apiGet(path) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) throw new Error("Нет токена");
+  const response = await fetch(API_BASE + path, {
+    headers: { "Authorization": "Bearer " + token },
+  });
+  if (response.status === 401 || response.status === 403) {
+    debug.add(path + " вернул " + response.status, await response.json().catch(() => ({})));
+    logout();
+    throw new Error("Сессия истекла");
+  }
+  const data = await response.json();
+  debug.add("GET " + path, data);
+  return data;
+}
+
+async function loadDashboard() {
+  showDashboard();
+  try {
+    const me = await apiGet("/api/me");
+    document.getElementById("user-name").textContent = me.full_name || me.short_name || "—";
+
+    const rolesMap = { director: "Директор", accountant: "Бухгалтер", master: "Мастер" };
+    const rolesRu = (me.roles || []).map(r => rolesMap[r] || r).join(", ");
+    document.getElementById("user-roles").textContent = rolesRu || "без роли";
+
+    const d = await apiGet("/api/dashboard");
+
+    document.getElementById("kpi-today").textContent = d.today.qty;
+    document.getElementById("kpi-today-trend").textContent = d.today.records + " записей";
+
+    document.getElementById("kpi-week").textContent = d.week.qty;
+    const wt = d.week.trend_pct;
+    setTrend("kpi-week-trend", wt);
+
+    document.getElementById("kpi-month").textContent = d.month.qty;
+    const mt = d.month.trend_pct;
+    setTrend("kpi-month-trend", mt);
+
+    document.getElementById("kpi-employees").textContent = d.month.employees;
+
+    const recentEl = document.getElementById("recent-list");
+    if (!d.recent || d.recent.length === 0) {
+      recentEl.innerHTML = '<div style="color:#6E7689; font-size:13px; text-align:center; padding:20px 0;">записей пока нет</div>';
+    } else {
+      recentEl.innerHTML = "";
+      d.recent.slice(0, 5).forEach(r => {
+        const row = document.createElement("div");
+        row.className = "record";
+        const meta = [];
+        if (r.workers && r.workers.length) meta.push(r.workers.join(", "));
+        if (r.execution) meta.push(r.execution);
+        if (r.ip_class) meta.push(r.ip_class);
+        const dateStr = formatDate(r.date);
+        row.innerHTML =
+          '<div class="record-info">' +
+            '<div class="record-title">' + escapeHtml(r.model_name + (r.model_extra ? " · " + r.model_extra : "")) + '</div>' +
+            '<div class="record-meta">' + dateStr + (meta.length ? " · " + escapeHtml(meta.join(" · ")) : "") + '</div>' +
+          '</div>' +
+          '<div class="record-qty">' + r.qty + '<small> шт.</small></div>';
+        recentEl.appendChild(row);
+      });
+    }
+  } catch (e) {
+    debug.add("Ошибка loadDashboard", { error: String(e) });
+    setStatus("Не удалось загрузить данные: " + String(e), true);
+  }
+}
+
+function setTrend(id, pct) {
+  const el = document.getElementById(id);
+  if (pct === null || pct === undefined) {
+    el.textContent = "";
+    el.className = "trend";
+    return;
+  }
+  if (pct === 0) {
+    el.textContent = "= 0%";
+    el.className = "trend";
+  } else if (pct > 0) {
+    el.textContent = "▲ +" + pct + "%";
+    el.className = "trend up";
+  } else {
+    el.textContent = "▼ " + pct + "%";
+    el.className = "trend down";
+  }
+}
+
+function formatDate(iso) {
+  try {
+    const [y, m, d] = iso.split("-");
+    return d + "." + m;
+  } catch (e) {
+    return iso;
+  }
+}
+
+function escapeHtml(s) {
+  if (!s) return "";
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// При загрузке — если есть сохранённый токен, пробуем войти
+(function init() {
+  debug.add("Загрузка страницы", { api: API_BASE });
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    debug.add("Найден сохранённый токен, пробуем авторизоваться");
+    loadDashboard();
+  } else {
+    showLogin();
+  }
+})();
+</script>
+
+</body>
+</html>
