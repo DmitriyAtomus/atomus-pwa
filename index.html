@@ -2920,7 +2920,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.1.0-stage14b";
+const APP_VERSION = "v1.2.0-stage14c";
 const APP_VERSION_DATE = "13.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4813,6 +4813,15 @@ function renderOfferDetail(o) {
   }
   html += '</div>';
 
+  // Кнопка «Скачать PDF» (для всех авторизованных)
+  html += '<div style="padding: 12px 18px 0;">';
+  html += '<button class="btn btn-primary" onclick="downloadOfferPdf()" style="width: 100%; justify-content: center;">' +
+          '<i class="ti ti-file-download"></i> Скачать PDF</button>';
+  html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; margin-top: 6px;">' +
+          'Сгенерированный PDF можно отправить клиенту' +
+          '</div>';
+  html += '</div>';
+
   // Версионирование — кнопка «Создать новую версию» (если canEdit)
   if (canEdit) {
     html += '<div style="padding: 12px 18px;">';
@@ -4825,6 +4834,35 @@ function renderOfferDetail(o) {
   }
 
   container.innerHTML = html;
+}
+
+async function downloadOfferPdf() {
+  if (!state.currentOfferId) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  showToast('Готовим PDF…', 'success');
+  try {
+    const r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId + '/pdf', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось получить PDF';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    // Открываем в новой вкладке (мобильный браузер сам предложит скачать)
+    window.open(url, '_blank');
+    // Освобождаем память через минуту
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
 }
 
 async function changeOfferStatus(offerId, newStatus) {
