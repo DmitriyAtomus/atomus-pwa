@@ -1,0 +1,2106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2D5F8B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Atomus">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Atomus — производственный учёт. Веб-кабинет для мастеров, директора и бухгалтерии.">
+
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+
+<title>Atomus — производственный учёт</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css">
+<style>
+  :root {
+    --brand: #2D5F8B;
+    --brand-light: #4A7FB5;
+    --brand-bg: #EAF2FA;
+    --brand-bg-strong: #D5E4F2;
+    --text-dark: #1B2030;
+    --text-mid: #4A5061;
+    --text-light: #6E7689;
+    --text-faint: #9AA1B0;
+    --bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --border: #E5E9F0;
+    --border-strong: #D5DAE5;
+    --success: #1F7B3F;
+    --success-bg: #E8F4ED;
+    --danger: #B5260C;
+    --danger-bg: #FCE8E2;
+    --warning: #B5710C;
+    --warning-bg: #FBF1DD;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text-dark);
+    min-height: 100vh;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select, textarea { font-family: inherit; font-size: inherit; }
+  a { color: inherit; text-decoration: none; }
+  input, textarea { -webkit-appearance: none; appearance: none; }
+
+  /* ============ ЛОГИН ============ */
+  .login-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+  .login-content { width: 100%; max-width: 480px; margin-top: 40px; }
+  .brand { text-align: center; margin-bottom: 32px; }
+  .logo-circle {
+    width: 72px; height: 72px; background: var(--brand); border-radius: 50%;
+    margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 32px;
+  }
+  .brand h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+  .brand p { color: var(--text-light); font-size: 14px; }
+  .login-card {
+    background: white; border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px 24px;
+  }
+  .login-card h2 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .login-card p { color: var(--text-light); font-size: 14px; margin-bottom: 16px; line-height: 1.5; }
+  .steps {
+    background: var(--bg); border-radius: 10px; padding: 14px 16px;
+    margin: 16px 0 20px; font-size: 13px; line-height: 1.7; color: var(--text-mid);
+  }
+  .steps code {
+    background: white; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px;
+  }
+  .code-input {
+    width: 100%; padding: 16px; font-size: 22px; font-weight: 600;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    text-align: center; border: 2px solid var(--border); border-radius: 12px;
+    letter-spacing: 4px; color: var(--text-dark); outline: none; background: white;
+  }
+  .code-input:focus { border-color: var(--brand); }
+  .code-input::placeholder { color: #C0C5D0; font-weight: 400; }
+  .btn {
+    width: 100%; padding: 14px; margin-top: 12px; border-radius: 12px;
+    font-size: 15px; font-weight: 600; cursor: pointer; border: none;
+  }
+  .btn-primary { background: var(--brand); color: white; }
+  .btn-primary:hover { background: #345d8d; }
+  .btn-primary:disabled { background: #B0B6C3; cursor: not-allowed; }
+  .btn-secondary { background: white; color: var(--text-mid); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--bg); }
+  .status { text-align: center; color: var(--text-light); font-size: 13px; margin-top: 14px; min-height: 18px; }
+  .status.error { color: var(--danger); }
+  .status.success { color: var(--success); }
+  .telegram-link { color: var(--brand); font-weight: 600; }
+  .telegram-link:hover { text-decoration: underline; }
+
+  /* ============ LAYOUT ============ */
+  .app { min-height: 100vh; display: none; }
+  .app.mobile-layout { max-width: 460px; margin: 0 auto; background: var(--bg); padding-bottom: 84px; position: relative; }
+  .app.mobile-layout .sidebar { display: none; }
+  .app.mobile-layout .tab-bar { display: flex; }
+  .app.desktop-layout {
+    display: grid; grid-template-columns: 260px 1fr;
+    min-height: 100vh; max-width: 1400px; margin: 0 auto; background: var(--bg);
+  }
+  .app.desktop-layout .tab-bar { display: none; }
+  .app.desktop-layout .sidebar { display: flex; }
+  .app.desktop-layout .main-area { overflow-x: hidden; }
+
+  /* ============ HEADER (mobile) ============ */
+  .app-header {
+    background: white; padding: 14px 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .app-header .logo { display: flex; align-items: center; gap: 10px; }
+  .app-header .logo-mini {
+    width: 32px; height: 32px; background: var(--brand); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 15px;
+  }
+  .app-header .logo-text { font-weight: 600; font-size: 15px; line-height: 1.2; }
+  .app-header .logo-text small { display: block; font-weight: 400; color: var(--text-light); font-size: 11px; }
+  .desktop-layout .app-header { display: none; }
+  .icon-btn {
+    background: none; border: none; color: var(--text-mid);
+    width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .icon-btn:hover { background: var(--bg); }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    display: none; flex-direction: column;
+    background: white; border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .sidebar .sidebar-brand { display: flex; align-items: center; gap: 12px; margin: 0 4px 28px; }
+  .sidebar .sidebar-brand .logo-mini {
+    width: 40px; height: 40px; background: var(--brand); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 18px; flex-shrink: 0;
+  }
+  .sidebar .sidebar-brand .brand-text { font-size: 17px; font-weight: 600; line-height: 1.2; }
+  .sidebar .sidebar-brand .brand-text small {
+    display: block; font-weight: 400; color: var(--text-light); font-size: 11.5px; margin-top: 2px;
+  }
+  .sidebar .sidebar-nav { flex: 1; }
+  .sidebar .nav-section {
+    font-size: 11px; color: var(--text-light); text-transform: uppercase;
+    letter-spacing: 0.5px; font-weight: 600; padding: 16px 12px 8px;
+  }
+  .sidebar .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: 10px; color: var(--text-mid); cursor: pointer;
+    font-size: 14px; font-weight: 500; border: none; background: none;
+    width: 100%; text-align: left; margin-bottom: 2px;
+  }
+  .sidebar .nav-item i { font-size: 19px; }
+  .sidebar .nav-item:hover { background: var(--bg); }
+  .sidebar .nav-item.active { background: var(--brand-bg); color: var(--brand); }
+  .sidebar .nav-item.new-btn {
+    background: var(--brand); color: white; margin: 12px 0 8px;
+  }
+  .sidebar .nav-item.new-btn:hover { background: #345d8d; }
+  .sidebar-footer {
+    margin: 16px -16px -24px; padding: 16px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-footer .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--brand-bg); color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .sidebar-footer .user-text { flex: 1; min-width: 0; }
+  .sidebar-footer .user-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-footer .user-role { font-size: 11px; color: var(--text-light); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-footer .icon-btn { width: 32px; height: 32px; }
+
+  /* ============ TAB BAR ============ */
+  .tab-bar {
+    display: none; position: fixed; bottom: 0; left: 50%;
+    transform: translateX(-50%); width: 100%; max-width: 460px;
+    background: white; border-top: 1px solid var(--border);
+    padding: 6px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); z-index: 100;
+  }
+  .tab {
+    flex: 1; background: none; border: none; padding: 6px 2px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    color: var(--text-light); font-size: 10.5px; cursor: pointer;
+  }
+  .tab i { font-size: 22px; }
+  .tab.active { color: var(--brand); }
+  .tab.plus-btn i {
+    font-size: 36px;
+    background: var(--brand);
+    color: white;
+    border-radius: 50%;
+    padding: 0;
+    line-height: 1;
+  }
+
+  /* ============ ЭКРАНЫ ============ */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .screen-header {
+    background: white; padding: 16px 18px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .screen-header h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; }
+  .back-btn {
+    background: none; border: none; color: var(--text-mid);
+    font-size: 24px; cursor: pointer; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .desktop-layout .screen-header { display: none; }
+
+  .page-header {
+    display: none; padding: 24px 32px 16px;
+    border-bottom: 1px solid var(--border); background: white;
+    align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .page-header h1 { font-size: 22px; font-weight: 600; }
+  .page-header .page-subtitle { color: var(--text-light); font-size: 13px; margin-top: 2px; }
+  .desktop-layout .page-header { display: flex; }
+
+  .content-inner { padding: 0; }
+  .desktop-layout .content-inner { padding: 24px 32px; max-width: 1140px; }
+
+  .greeting { padding: 20px 18px 4px; }
+  .desktop-layout .greeting { display: none; }
+  .greeting h1 { font-size: 22px; font-weight: 600; }
+  .greeting p { margin-top: 4px; color: var(--text-light); font-size: 13px; }
+
+  .kpi-grid {
+    padding: 16px 18px 8px; display: grid;
+    grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .desktop-layout .kpi-grid { padding: 0 0 24px; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .kpi-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 14px 14px 12px; }
+  .desktop-layout .kpi-card { padding: 18px 20px; }
+  .kpi-card .label {
+    font-size: 11.5px; color: var(--text-light); text-transform: uppercase;
+    letter-spacing: 0.4px; margin-bottom: 4px;
+  }
+  .kpi-card .value { font-size: 26px; font-weight: 600; line-height: 1.1; }
+  .desktop-layout .kpi-card .value { font-size: 32px; }
+  .kpi-card .trend { font-size: 12px; margin-top: 4px; color: var(--text-light); }
+  .kpi-card .trend.up { color: var(--success); }
+  .kpi-card .trend.down { color: var(--danger); }
+
+  .section { margin: 16px 18px 0; }
+  .desktop-layout .section { margin: 0 0 24px; }
+  .section-title {
+    font-size: 15px; font-weight: 600; margin: 0 0 10px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .desktop-layout .section-title { font-size: 17px; margin-bottom: 14px; }
+  .section-title a { color: var(--brand); font-size: 12.5px; font-weight: 500; cursor: pointer; }
+  .card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .desktop-layout .card { padding: 18px 20px; border-radius: 16px; }
+
+  .row-2 { display: block; }
+  .desktop-layout .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .row-2 > .section { margin: 16px 18px 0; }
+  .desktop-layout .row-2 > .section { margin: 0; }
+
+  .chart-wrap { height: 100px; position: relative; }
+  .desktop-layout .chart-wrap { height: 180px; }
+  .chart-bars { display: flex; align-items: flex-end; height: 100%; gap: 3px; }
+  .chart-bars .bar {
+    flex: 1; background: var(--brand-light); border-radius: 3px 3px 0 0;
+    min-height: 2px; transition: all 0.2s; position: relative;
+  }
+  .chart-bars .bar.today { background: var(--brand); }
+  .chart-bars .bar .bar-val {
+    position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: var(--text-light); font-weight: 500; white-space: nowrap;
+  }
+  .desktop-layout .chart-bars .bar .bar-val { font-size: 11px; top: -18px; }
+  .chart-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-light); margin-top: 6px; }
+  .desktop-layout .chart-labels { font-size: 11px; }
+
+  .top-list .row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .top-list .row:last-child { border-bottom: none; }
+  .top-list .rank { width: 22px; color: var(--text-light); font-size: 13px; font-weight: 500; }
+  .top-list .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--brand-bg); color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 600; margin-right: 10px;
+  }
+  .top-list .name { flex: 1; font-size: 14px; font-weight: 500; }
+  .top-list .qty { font-weight: 600; font-size: 14px; }
+  .top-list .qty small { font-weight: 400; color: var(--text-light); font-size: 11px; margin-left: 2px; }
+
+  .record {
+    display: flex; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .record:last-child { border-bottom: none; }
+  .record-icon {
+    width: 38px; height: 38px; background: var(--brand-bg); color: var(--brand);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; margin-right: 10px; flex-shrink: 0;
+  }
+  .record-body { flex: 1; min-width: 0; }
+  .record-title { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-qty { text-align: right; font-weight: 600; font-size: 14px; margin-left: 8px; }
+  .record-qty small { display: block; font-weight: 400; color: var(--text-light); font-size: 11px; margin-top: 2px; }
+
+  .filter-row {
+    display: flex; gap: 8px; padding: 12px 18px;
+    background: white; border-bottom: 1px solid var(--border);
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .desktop-layout .filter-row { background: none; border: none; padding: 0 0 20px; }
+  .filter-chip {
+    background: var(--bg); color: var(--text-mid);
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; white-space: nowrap;
+    cursor: pointer; border: none; flex-shrink: 0;
+  }
+  .desktop-layout .filter-chip { background: white; border: 1px solid var(--border); padding: 8px 16px; }
+  .filter-chip.active { background: var(--brand); color: white; }
+  .desktop-layout .filter-chip.active { border-color: var(--brand); }
+
+  .day-header {
+    padding: 14px 18px 6px; font-size: 11.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .desktop-layout .day-header { padding: 14px 0 8px; }
+  .day-header b { text-transform: none; font-size: 13px; color: var(--text-mid); font-weight: 600; letter-spacing: 0; }
+
+  .pie { display: flex; gap: 16px; align-items: center; }
+  .desktop-layout .pie { gap: 24px; }
+  .pie svg { width: 110px; height: 110px; flex-shrink: 0; }
+  .desktop-layout .pie svg { width: 150px; height: 150px; }
+  .pie-legend { flex: 1; }
+  .legend-row { display: flex; align-items: center; margin-bottom: 6px; font-size: 13px; }
+  .desktop-layout .legend-row { margin-bottom: 8px; font-size: 14px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; flex-shrink: 0; }
+  .legend-name { color: var(--text-mid); flex: 1; }
+  .legend-val { color: var(--text-dark); font-weight: 500; }
+
+  .menu-item {
+    background: white; padding: 14px 18px;
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .desktop-layout .menu-item {
+    background: white; padding: 18px 20px;
+    border: 1px solid var(--border); border-radius: 14px; margin-bottom: 10px;
+  }
+  .menu-item:hover { background: var(--bg); }
+  .menu-icon {
+    width: 36px; height: 36px; background: var(--brand-bg); color: var(--brand);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; margin-right: 12px; flex-shrink: 0;
+  }
+  .menu-body { flex: 1; }
+  .menu-title { font-size: 14.5px; font-weight: 500; }
+  .menu-meta { font-size: 12px; color: var(--text-light); margin-top: 1px; }
+  .menu-arrow { color: var(--text-light); }
+  .section-label {
+    padding: 18px 18px 8px; font-size: 11.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .desktop-layout .section-label { padding: 18px 0 10px; }
+
+  .loading-block { text-align: center; padding: 24px; color: var(--text-light); font-size: 13px; }
+  .empty-block { text-align: center; padding: 32px 18px; color: var(--text-light); font-size: 13px; }
+  .empty-block i { display: block; font-size: 36px; color: var(--text-faint); margin-bottom: 8px; }
+
+  .user-info {
+    background: white; border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; margin: 16px 18px 0;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .desktop-layout .user-info { margin: 0 0 24px; padding: 20px 24px; }
+  .user-info .big-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--brand-bg); color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 700; flex-shrink: 0;
+  }
+  .user-info .ui-body { flex: 1; }
+  .user-info .ui-name { font-size: 15px; font-weight: 600; }
+  .user-info .ui-roles { font-size: 12.5px; color: var(--text-light); margin-top: 2px; }
+
+  .footer { text-align: center; color: var(--text-faint); font-size: 11px; margin: 24px 0 16px; }
+  .desktop-layout .footer { text-align: left; margin: 0 0 16px; }
+
+  .report-buttons { display: flex; gap: 8px; padding: 0 18px 16px; }
+  .desktop-layout .report-buttons { padding: 0; max-width: 400px; }
+  .report-buttons button {
+    flex: 1; padding: 12px; background: white; color: var(--text-mid);
+    border: 1px solid var(--border); border-radius: 12px; font-size: 13px;
+    font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .report-buttons button i { font-size: 16px; color: var(--brand); }
+  .report-buttons button:hover { background: var(--bg); }
+
+  .hbar-list .hbar-row { display: flex; align-items: center; margin-bottom: 10px; }
+  .hbar-list .hbar-row:last-child { margin-bottom: 0; }
+  .hbar-name { flex: 1; font-size: 13px; color: var(--text-dark); margin-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-track { flex: 1.4; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-right: 8px; }
+  .hbar-fill { height: 100%; background: var(--brand); border-radius: 4px; }
+  .hbar-qty { width: 40px; text-align: right; font-size: 13px; font-weight: 600; }
+
+  .employee-row { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .employee-row:last-child { border-bottom: none; }
+  .emp-info { flex: 1; min-width: 0; }
+  .emp-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .emp-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  .emp-badge {
+    background: var(--bg); color: var(--text-mid);
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 500; margin-left: 4px; text-transform: lowercase;
+  }
+  .emp-badge.director { background: var(--brand-bg); color: var(--brand); }
+  .emp-badge.accountant { background: var(--warning-bg); color: var(--warning); }
+  .emp-badge.master { background: var(--success-bg); color: var(--success); }
+  .emp-inactive { opacity: 0.5; }
+
+  .list-container { padding: 4px 18px 24px; }
+  .desktop-layout .list-container { padding: 0; }
+
+  /* ============ ЭКРАН НОВОЙ СБОРКИ ============ */
+  .new-screen { padding: 0; }
+  .desktop-layout .new-screen { padding: 0; }
+  .form-section {
+    background: white; padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .desktop-layout .form-section {
+    background: white; padding: 18px 20px;
+    border: 1px solid var(--border); border-radius: 14px; margin-bottom: 16px;
+  }
+  .form-label {
+    display: block; font-size: 11.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .form-label .required { color: var(--danger); margin-left: 4px; }
+  .form-label .hint { text-transform: none; color: var(--text-light); font-weight: 400; font-size: 11px; margin-left: 6px; letter-spacing: 0; }
+
+  /* Селектор модели */
+  .model-selector {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .model-selector:hover { background: #ECEEF2; }
+  .model-selector .selected-model {
+    flex: 1; min-width: 0;
+  }
+  .model-selector .selected-title { font-size: 14.5px; font-weight: 500; }
+  .model-selector .selected-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  .model-selector .placeholder { color: var(--text-light); font-size: 14px; }
+  .model-selector i { font-size: 20px; color: var(--text-light); }
+
+  /* Chips для выбора */
+  .chips-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip-option {
+    background: var(--bg); color: var(--text-mid);
+    padding: 10px 16px; border-radius: 12px;
+    font-size: 14px; font-weight: 500;
+    cursor: pointer; border: 2px solid transparent;
+    flex: 1; min-width: 100px; text-align: center;
+  }
+  .chip-option:hover { background: #E5E8F0; }
+  .chip-option.selected {
+    background: var(--brand-bg); color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  /* Stepper количества */
+  .qty-stepper {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; padding: 8px 0;
+  }
+  .qty-btn {
+    width: 44px; height: 44px;
+    background: white; border: 1px solid var(--border);
+    border-radius: 10px; font-size: 22px; font-weight: 600;
+    color: var(--brand); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qty-btn:hover { background: var(--brand-bg); }
+  .qty-btn:disabled { color: var(--text-faint); cursor: not-allowed; }
+  .qty-btn:disabled:hover { background: white; }
+  .qty-input {
+    width: 80px; height: 44px;
+    text-align: center; font-size: 22px; font-weight: 600;
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text-dark); background: white; outline: none;
+  }
+  .qty-input:focus { border-color: var(--brand); }
+  .qty-suffix { font-size: 14px; color: var(--text-light); }
+
+  /* Список выбора сборщиков */
+  .worker-row {
+    display: flex; align-items: center; padding: 12px 0;
+    border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .worker-row:last-child { border-bottom: none; }
+  .worker-row .check {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 12px; flex-shrink: 0;
+    color: white; background: white; font-size: 14px;
+  }
+  .worker-row.selected .check {
+    background: var(--brand); border-color: var(--brand);
+  }
+  .worker-row .w-name { flex: 1; font-size: 14px; }
+  .worker-row .w-badge {
+    font-size: 10.5px; color: var(--text-light);
+    background: var(--bg); padding: 2px 8px; border-radius: 999px;
+    margin-left: 8px;
+  }
+  .worker-row.master-row .w-badge { background: var(--success-bg); color: var(--success); }
+
+  /* Дата */
+  .date-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .date-input-wrap {
+    margin-top: 12px;
+    display: none;
+  }
+  .date-input-wrap.visible { display: block; }
+  .date-input {
+    width: 100%; padding: 12px 14px;
+    border: 1px solid var(--border); border-radius: 10px;
+    font-size: 14px; color: var(--text-dark); background: white; outline: none;
+  }
+  .date-input:focus { border-color: var(--brand); }
+
+  /* Комментарий */
+  .comment-input {
+    width: 100%; padding: 12px 14px; min-height: 80px;
+    border: 1px solid var(--border); border-radius: 10px;
+    font-size: 14px; color: var(--text-dark); background: white;
+    outline: none; resize: vertical; font-family: inherit;
+  }
+  .comment-input:focus { border-color: var(--brand); }
+  .comment-counter {
+    text-align: right; font-size: 11px; color: var(--text-faint); margin-top: 4px;
+  }
+
+  /* Submit bar */
+  .submit-bar {
+    background: white;
+    padding: 16px 18px 24px;
+    border-top: 1px solid var(--border);
+    position: sticky; bottom: 0;
+    z-index: 5;
+  }
+  .desktop-layout .submit-bar {
+    position: static; padding: 16px 0; border: none;
+    background: none; max-width: 500px;
+  }
+  .submit-bar .btn-primary {
+    margin-top: 0;
+    padding: 16px;
+    font-size: 16px;
+  }
+  .submit-error {
+    color: var(--danger); font-size: 13px; text-align: center; margin-top: 10px;
+  }
+
+  /* Модалка выбора модели */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 200;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+  @media (min-width: 700px) { .modal-overlay { align-items: center; } }
+  .modal {
+    background: white;
+    width: 100%; max-width: 540px;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  @media (min-width: 700px) {
+    .modal { border-radius: 16px; max-height: 80vh; }
+  }
+  .modal-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .modal-header h3 { flex: 1; font-size: 16px; font-weight: 600; }
+  .modal-search { padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .modal-search input {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; font-size: 14px; outline: none;
+  }
+  .modal-search input:focus { border-color: var(--brand); background: white; }
+  .modal-body {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+  }
+  .modal-group-title {
+    padding: 14px 18px 8px;
+    font-size: 11.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .modal-item {
+    padding: 12px 18px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-item:hover { background: var(--bg); }
+  .modal-item .mi-icon {
+    width: 32px; height: 32px;
+    background: var(--brand-bg); color: var(--brand);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .modal-item .mi-text { flex: 1; min-width: 0; }
+  .modal-item .mi-title { font-size: 14px; font-weight: 500; }
+  .modal-item .mi-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+
+  /* Toast / уведомление */
+  .toast {
+    position: fixed; top: 24px; left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: white; color: var(--text-dark);
+    padding: 14px 20px; border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    display: flex; align-items: center; gap: 10px;
+    z-index: 300;
+    transition: transform 0.25s, opacity 0.25s;
+    opacity: 0;
+    max-width: calc(100% - 40px);
+  }
+  .toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast i { font-size: 22px; }
+  .toast.success { border-color: var(--success); }
+  .toast.success i { color: var(--success); }
+  .toast.error { border-color: var(--danger); }
+  .toast.error i { color: var(--danger); }
+  .toast .toast-text {
+    font-size: 14px; font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ ЛОГИН ============ -->
+<div id="login-page" class="login-page">
+  <div class="login-content">
+    <div class="brand">
+      <div class="logo-circle">A</div>
+      <h1>Atomus</h1>
+      <p>производственный учёт · вход в кабинет</p>
+    </div>
+    <div class="login-card">
+      <h2>Войдите с помощью кода</h2>
+      <p>Получите одноразовый код у нашего Telegram-бота и введите его ниже.</p>
+      <div class="steps">
+        1. Откройте <a href="https://t.me/AtomusgroupBot" target="_blank" class="telegram-link">@AtomusgroupBot</a><br/>
+        2. Отправьте команду <code>/login</code><br/>
+        3. Бот пришлёт код — введите его ниже
+      </div>
+      <input type="text" id="code-input" class="code-input"
+             placeholder="000000" maxlength="6"
+             inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*">
+      <button class="btn btn-primary" id="submit-btn" onclick="submitCode()">Войти</button>
+      <div class="status" id="login-status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ПРИЛОЖЕНИЕ ============ -->
+<div id="app" class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo-mini">A</div>
+      <div class="brand-text">
+        Atomus
+        <small>производственный учёт</small>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <button class="nav-item new-btn" id="nav-new" onclick="openNewAssembly()">
+        <i class="ti ti-circle-plus"></i>
+        <span>Новая сборка</span>
+      </button>
+      <div class="nav-section">Учёт</div>
+      <button class="nav-item" data-nav="dashboard"><i class="ti ti-home"></i><span>Главная</span></button>
+      <button class="nav-item" data-nav="history"><i class="ti ti-list-details"></i><span>История</span></button>
+      <button class="nav-item" data-nav="summary"><i class="ti ti-chart-bar"></i><span>Сводки</span></button>
+      <div class="nav-section">Справочники</div>
+      <button class="nav-item" data-nav="employees" id="nav-employees"><i class="ti ti-users"></i><span>Сотрудники</span></button>
+      <button class="nav-item" data-nav="models"><i class="ti ti-package"></i><span>Номенклатура</span></button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="avatar" id="sidebar-avatar">—</div>
+      <div class="user-text">
+        <div class="user-name" id="sidebar-username">—</div>
+        <div class="user-role" id="sidebar-userrole">—</div>
+      </div>
+      <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <div class="app-header" id="main-header">
+      <div class="logo">
+        <div class="logo-mini">A</div>
+        <div class="logo-text">Atomus<small>производственный учёт</small></div>
+      </div>
+      <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+    </div>
+
+    <!-- ДАШБОРД -->
+    <div class="screen active" data-screen="dashboard">
+      <div class="page-header">
+        <div>
+          <h1 id="page-greeting-name">—</h1>
+          <div class="page-subtitle" id="page-greeting-date">—</div>
+        </div>
+        <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="greeting">
+        <h1 id="greeting-name">—</h1>
+        <p id="greeting-date">—</p>
+      </div>
+      <div class="content-inner" id="dashboard-content">
+        <div class="loading-block">Загружаем данные…</div>
+      </div>
+    </div>
+
+    <!-- ИСТОРИЯ -->
+    <div class="screen" data-screen="history">
+      <div class="screen-header"><h2>История сборок</h2>
+        <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="page-header"><div><h1>История сборок</h1><div class="page-subtitle">Все записи по дням</div></div>
+        <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="content-inner">
+        <div class="filter-row" id="history-filters">
+          <button class="filter-chip" data-hf="today">Сегодня</button>
+          <button class="filter-chip" data-hf="week">Неделя</button>
+          <button class="filter-chip active" data-hf="month">Месяц</button>
+          <button class="filter-chip" data-hf="all">Всё</button>
+        </div>
+        <div id="history-content"><div class="loading-block">Загружаем историю…</div></div>
+      </div>
+    </div>
+
+    <!-- СВОДКИ -->
+    <div class="screen" data-screen="summary">
+      <div class="screen-header"><h2>Сводки и отчёты</h2>
+        <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="page-header"><div><h1>Сводки и отчёты</h1><div class="page-subtitle">Производственные показатели</div></div>
+        <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="content-inner">
+        <div class="filter-row" id="summary-filters">
+          <button class="filter-chip" data-sf="day">День</button>
+          <button class="filter-chip" data-sf="week">Неделя</button>
+          <button class="filter-chip active" data-sf="month">Месяц</button>
+          <button class="filter-chip" data-sf="prev_month">Прошлый</button>
+        </div>
+        <div id="summary-content"><div class="loading-block">Считаем сводки…</div></div>
+      </div>
+    </div>
+
+    <!-- ЕЩЁ / Админка (mobile) -->
+    <div class="screen" data-screen="admin">
+      <div class="screen-header"><h2>Ещё</h2></div>
+      <div class="content-inner">
+        <div class="user-info">
+          <div class="big-avatar" id="profile-avatar">—</div>
+          <div class="ui-body">
+            <div class="ui-name" id="profile-name">—</div>
+            <div class="ui-roles" id="profile-roles">—</div>
+          </div>
+        </div>
+        <div class="section-label">Просмотр</div>
+        <div class="menu-item" onclick="openEmployees()">
+          <div class="menu-icon"><i class="ti ti-users"></i></div>
+          <div class="menu-body">
+            <div class="menu-title">Сотрудники</div>
+            <div class="menu-meta" id="employees-meta">—</div>
+          </div>
+          <i class="ti ti-chevron-right menu-arrow"></i>
+        </div>
+        <div class="menu-item" onclick="openModels()">
+          <div class="menu-icon"><i class="ti ti-package"></i></div>
+          <div class="menu-body">
+            <div class="menu-title">Номенклатура</div>
+            <div class="menu-meta" id="models-meta">—</div>
+          </div>
+          <i class="ti ti-chevron-right menu-arrow"></i>
+        </div>
+        <div class="section-label">Аккаунт</div>
+        <div class="menu-item" onclick="logout()">
+          <div class="menu-icon" style="background:var(--danger-bg); color:var(--danger);"><i class="ti ti-logout"></i></div>
+          <div class="menu-body"><div class="menu-title">Выйти</div><div class="menu-meta">Закрыть сессию</div></div>
+        </div>
+        <div class="footer">Atomus PWA · v0.6 · установлен как приложение</div>
+      </div>
+    </div>
+
+    <!-- Сотрудники -->
+    <div class="screen" data-screen="employees">
+      <div class="screen-header">
+        <button class="back-btn" onclick="selectScreen('admin')"><i class="ti ti-arrow-left"></i></button>
+        <h2>Сотрудники</h2>
+        <button class="icon-btn" onclick="loadEmployees()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="page-header"><div><h1>Сотрудники</h1><div class="page-subtitle">Активные и деактивированные</div></div>
+        <button class="icon-btn" onclick="loadEmployees()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="content-inner">
+        <div id="employees-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
+      </div>
+    </div>
+
+    <!-- Модели -->
+    <div class="screen" data-screen="models">
+      <div class="screen-header">
+        <button class="back-btn" onclick="selectScreen('admin')"><i class="ti ti-arrow-left"></i></button>
+        <h2>Номенклатура</h2>
+        <button class="icon-btn" onclick="loadModels()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="page-header"><div><h1>Номенклатура</h1><div class="page-subtitle">Справочник моделей по направлениям</div></div>
+        <button class="icon-btn" onclick="loadModels()"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div class="content-inner">
+        <div id="models-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
+      </div>
+    </div>
+
+    <!-- ============ НОВАЯ СБОРКА ============ -->
+    <div class="screen new-screen" data-screen="new-assembly">
+      <div class="screen-header">
+        <button class="back-btn" onclick="cancelNewAssembly()"><i class="ti ti-arrow-left"></i></button>
+        <h2>Новая сборка</h2>
+      </div>
+      <div class="page-header">
+        <div>
+          <h1>Новая сборка</h1>
+          <div class="page-subtitle">Внесение записи в журнал производства</div>
+        </div>
+        <button class="icon-btn" onclick="cancelNewAssembly()" title="Отмена"><i class="ti ti-x"></i></button>
+      </div>
+
+      <div class="content-inner">
+        <div id="new-assembly-form">
+          <!-- 1. Модель -->
+          <div class="form-section">
+            <label class="form-label">Модель <span class="required">*</span></label>
+            <div class="model-selector" onclick="openModelModal()">
+              <div class="selected-model" id="selected-model-display">
+                <div class="placeholder">Выберите модель…</div>
+              </div>
+              <i class="ti ti-chevron-right"></i>
+            </div>
+          </div>
+
+          <!-- 2. Исполнение (только если у модели exec_mode = choice) -->
+          <div class="form-section" id="execution-section" style="display:none;">
+            <label class="form-label">Исполнение <span class="required">*</span></label>
+            <div class="chips-row" id="execution-chips"></div>
+          </div>
+
+          <!-- 3. IP-класс (только если у модели needs_ip) -->
+          <div class="form-section" id="ip-section" style="display:none;">
+            <label class="form-label">IP-класс <span class="required">*</span></label>
+            <div class="chips-row">
+              <button class="chip-option" data-ip="IP54">IP54</button>
+              <button class="chip-option" data-ip="IP55">IP55</button>
+              <button class="chip-option" data-ip="IP65">IP65</button>
+            </div>
+          </div>
+
+          <!-- 4. Количество -->
+          <div class="form-section">
+            <label class="form-label">Количество <span class="required">*</span></label>
+            <div class="qty-stepper">
+              <button class="qty-btn" onclick="changeQty(-1)" id="qty-minus">−</button>
+              <input type="number" class="qty-input" id="qty-input" value="1" min="1" max="1000">
+              <button class="qty-btn" onclick="changeQty(1)">+</button>
+              <span class="qty-suffix">шт.</span>
+            </div>
+          </div>
+
+          <!-- 5. Сборщики -->
+          <div class="form-section">
+            <label class="form-label">Кто собирал <span class="required">*</span>
+              <span class="hint" id="workers-hint">(можно несколько)</span>
+            </label>
+            <div id="workers-list">
+              <div class="loading-block">Загружаем список…</div>
+            </div>
+          </div>
+
+          <!-- 6. Дата -->
+          <div class="form-section">
+            <label class="form-label">Дата сборки <span class="required">*</span></label>
+            <div class="date-row">
+              <button class="chip-option selected" data-date="today">Сегодня</button>
+              <button class="chip-option" data-date="yesterday">Вчера</button>
+              <button class="chip-option" data-date="custom">Выбрать…</button>
+            </div>
+            <div class="date-input-wrap" id="date-input-wrap">
+              <input type="date" class="date-input" id="date-input">
+            </div>
+          </div>
+
+          <!-- 7. Комментарий -->
+          <div class="form-section">
+            <label class="form-label">Комментарий <span class="hint">(необязательно)</span></label>
+            <textarea class="comment-input" id="comment-input" maxlength="500"
+                      placeholder="Например: брак на крышке, доделать завтра…"></textarea>
+            <div class="comment-counter"><span id="comment-counter-text">0</span> / 500</div>
+          </div>
+        </div>
+
+        <div class="submit-bar">
+          <button class="btn btn-primary" id="submit-assembly-btn" onclick="submitAssembly()">
+            <i class="ti ti-check" style="margin-right:6px;"></i> Записать
+          </button>
+          <div class="submit-error" id="submit-error"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <nav class="tab-bar" id="tab-bar">
+    <button class="tab" data-tab="dashboard"><i class="ti ti-home"></i><span>Главная</span></button>
+    <button class="tab" data-tab="history"><i class="ti ti-list-details"></i><span>История</span></button>
+    <button class="tab plus-btn" onclick="openNewAssembly()"><i class="ti ti-circle-plus-filled"></i></button>
+    <button class="tab" data-tab="summary"><i class="ti ti-chart-bar"></i><span>Сводки</span></button>
+    <button class="tab" data-tab="admin"><i class="ti ti-menu-2"></i><span>Ещё</span></button>
+  </nav>
+</div>
+
+<!-- ============ МОДАЛКА ВЫБОРА МОДЕЛИ ============ -->
+<div class="modal-overlay" id="model-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Выберите модель</h3>
+      <button class="icon-btn" onclick="closeModelModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-search">
+      <input type="text" id="model-search" placeholder="Поиск по названию или артикулу…">
+    </div>
+    <div class="modal-body" id="model-modal-body">
+      <div class="loading-block">Загружаем модели…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast">
+  <i class="ti ti-check" id="toast-icon"></i>
+  <div class="toast-text" id="toast-text">—</div>
+</div>
+
+<script>
+const API_BASE = "https://worker-production-9b70.up.railway.app";
+const TOKEN_KEY = "atomus_token";
+
+const state = {
+  user: null,
+  currentScreen: "dashboard",
+  historyFilter: "month",
+  summaryFilter: "month",
+  isDesktop: false,
+  // Состояние формы новой сборки
+  newAssembly: {
+    model: null,         // объект модели
+    execution: null,     // "st" | "ne"
+    ipClass: null,       // "IP54" | "IP55" | "IP65"
+    quantity: 1,
+    workerIds: [],       // [id, id]
+    dateMode: "today",   // "today" | "yesterday" | "custom"
+    customDate: null,    // "YYYY-MM-DD"
+    comment: "",
+  },
+};
+
+const cache = {
+  dashboard: null,
+  history: {},
+  summary: {},
+  employees: null,
+  models: null,
+  activeEmployees: null,
+};
+
+// ============ LAYOUT ============
+
+function detectLayout() {
+  const w = window.innerWidth;
+  const newIsDesktop = w >= 1000;
+  if (newIsDesktop !== state.isDesktop) {
+    state.isDesktop = newIsDesktop;
+    applyLayout();
+  }
+}
+
+function applyLayout() {
+  const app = document.getElementById("app");
+  if (state.isDesktop) { app.classList.add("desktop-layout"); app.classList.remove("mobile-layout"); }
+  else { app.classList.add("mobile-layout"); app.classList.remove("desktop-layout"); }
+}
+
+window.addEventListener("resize", detectLayout);
+
+// ============ HELPERS ============
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function formatDate(iso) { try { const [y, m, d] = iso.split("-"); return d + "." + m; } catch (e) { return iso; } }
+
+function formatDateLong(iso) {
+  try {
+    const [y, m, d] = iso.split("-");
+    const months = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+    return d + " " + months[parseInt(m) - 1];
+  } catch (e) { return iso; }
+}
+
+function isToday(iso) { return iso === new Date().toISOString().slice(0, 10); }
+
+function plural(n, one, few, many) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+function getCurrentDateLine() {
+  const days = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+  const months = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+  const d = new Date();
+  const day = days[d.getDay()];
+  return day.charAt(0).toUpperCase() + day.slice(1) + ", " + d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
+}
+
+function getDirectionIcon(directionCode, modelName) {
+  const code = (directionCode || "").toLowerCase();
+  if (code.includes("klm") || code.includes("klim") || code === "1") return "ti-snowflake";
+  if (code.includes("def")) return "ti-temperature";
+  if (code.includes("chi")) return "ti-snow";
+  if (code.includes("uvl")) return "ti-droplet";
+  if (code.includes("vnt") || code.includes("vent")) return "ti-wind";
+  if (code.includes("shi") || code.includes("scu") || code === "6") return "ti-box";
+  return "ti-package";
+}
+
+function todayIso() { return new Date().toISOString().slice(0, 10); }
+
+function yesterdayIso() {
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// ============ API ============
+
+async function apiPost(path, body) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const response = await fetch(API_BASE + path, {
+    method: "POST", headers, body: JSON.stringify(body),
+  });
+  return { ok: response.ok, status: response.status, data: await response.json() };
+}
+
+async function apiGet(path) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) throw new Error("Нет токена");
+  const response = await fetch(API_BASE + path, {
+    headers: { "Authorization": "Bearer " + token },
+  });
+  if (response.status === 401 || response.status === 403) {
+    logout();
+    throw new Error("Сессия истекла");
+  }
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return response.json();
+}
+
+// ============ ЛОГИН ============
+
+function setStatus(msg, type) {
+  const el = document.getElementById("login-status");
+  el.textContent = msg || "";
+  el.className = "status" + (type ? " " + type : "");
+}
+
+async function submitCode() {
+  const input = document.getElementById("code-input");
+  const code = input.value.trim();
+  const btn = document.getElementById("submit-btn");
+  if (!code) { setStatus("Введите код", "error"); return; }
+  if (!/^\d{6}$/.test(code)) { setStatus("Код должен быть 6 цифр", "error"); return; }
+  btn.disabled = true;
+  setStatus("Проверяем код…");
+  try {
+    const r = await apiPost("/api/auth/code", { code });
+    if (!r.ok) {
+      setStatus(r.data.message || r.data.error || "Ошибка", "error");
+      btn.disabled = false;
+      return;
+    }
+    localStorage.setItem(TOKEN_KEY, r.data.token);
+    state.user = r.data.user;
+    setStatus("Готово!", "success");
+    setTimeout(showApp, 300);
+  } catch (e) {
+    setStatus("Ошибка соединения: " + String(e), "error");
+    btn.disabled = false;
+  }
+}
+
+function logout() {
+  localStorage.removeItem(TOKEN_KEY);
+  state.user = null;
+  document.getElementById("login-page").style.display = "flex";
+  document.getElementById("app").style.display = "none";
+  const input = document.getElementById("code-input");
+  if (input) { input.value = ""; input.focus(); }
+  document.getElementById("submit-btn").disabled = false;
+  setStatus("");
+}
+
+// ============ ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ============
+
+function showApp() {
+  document.getElementById("login-page").style.display = "none";
+  document.getElementById("app").style.display = state.isDesktop ? "grid" : "block";
+  applyLayout();
+  if (!state.user) {
+    apiGet("/api/me").then(me => { state.user = me; renderProfile(); })
+      .catch(() => logout());
+  } else {
+    renderProfile();
+  }
+  selectScreen("dashboard");
+}
+
+function renderProfile() {
+  if (!state.user) return;
+  const name = state.user.full_name || state.user.short_name || "—";
+  const rolesMap = { director: "Директор", accountant: "Бухгалтер", master: "Мастер" };
+  const roles = (state.user.roles || []).map(r => rolesMap[r] || r).join(", ");
+  const firstName = name.split(/\s+/)[0];
+  const greeting = "Привет, " + firstName;
+  document.getElementById("greeting-name").textContent = greeting;
+  document.getElementById("greeting-date").textContent = getCurrentDateLine();
+  document.getElementById("page-greeting-name").textContent = greeting;
+  document.getElementById("page-greeting-date").textContent = getCurrentDateLine();
+  document.getElementById("profile-avatar").textContent = getInitials(name);
+  document.getElementById("profile-name").textContent = name;
+  document.getElementById("profile-roles").textContent = roles || "без роли";
+  document.getElementById("sidebar-avatar").textContent = getInitials(name);
+  document.getElementById("sidebar-username").textContent = name;
+  document.getElementById("sidebar-userrole").textContent = roles || "без роли";
+
+  const navEmp = document.getElementById("nav-employees");
+  if (navEmp) {
+    if (state.user.roles && state.user.roles.includes("director")) navEmp.style.display = "";
+    else navEmp.style.display = "none";
+  }
+
+  // Кнопка "Новая сборка" — только мастеру или директору
+  const navNew = document.getElementById("nav-new");
+  if (navNew) {
+    if (canCreateAssembly()) navNew.style.display = "";
+    else navNew.style.display = "none";
+  }
+}
+
+function canCreateAssembly() {
+  if (!state.user || !state.user.roles) return false;
+  return state.user.roles.includes("master") || state.user.roles.includes("director");
+}
+
+function selectScreen(name) {
+  state.currentScreen = name;
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  const screen = document.querySelector('.screen[data-screen="' + name + '"]');
+  if (screen) screen.classList.add("active");
+
+  document.querySelectorAll(".tab[data-tab]").forEach(t => t.classList.remove("active"));
+  const tabMap = { "employees": "admin", "models": "admin", "new-assembly": null };
+  const tabName = (name in tabMap) ? tabMap[name] : name;
+  if (tabName) {
+    const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
+    if (tab) tab.classList.add("active");
+  }
+
+  document.querySelectorAll(".sidebar .nav-item[data-nav]").forEach(t => t.classList.remove("active"));
+  let navName = name;
+  if (name === "admin") navName = "dashboard";
+  const navItem = document.querySelector('.sidebar .nav-item[data-nav="' + navName + '"]');
+  if (navItem) navItem.classList.add("active");
+
+  if (!state.isDesktop) {
+    const screensWithOwnHeader = ["history","summary","admin","employees","models","new-assembly"];
+    document.getElementById("main-header").style.display =
+      screensWithOwnHeader.includes(name) ? "none" : "flex";
+  }
+
+  if (state.isDesktop && name === "admin") {
+    if (state.user && state.user.roles && state.user.roles.includes("director")) selectScreen("employees");
+    else selectScreen("models");
+    return;
+  }
+
+  window.scrollTo({ top: 0, behavior: "instant" });
+
+  if (name === "dashboard") loadDashboard();
+  if (name === "history") loadHistory();
+  if (name === "summary") loadSummary();
+  if (name === "admin") loadAdminMeta();
+  if (name === "employees") loadEmployees();
+  if (name === "models") loadModels();
+  if (name === "new-assembly") initNewAssemblyForm();
+}
+
+function refreshCurrentScreen() {
+  const s = state.currentScreen;
+  if (s === "dashboard") cache.dashboard = null;
+  if (s === "history") cache.history = {};
+  if (s === "summary") cache.summary = {};
+  if (s === "employees") cache.employees = null;
+  if (s === "models") cache.models = null;
+  selectScreen(s);
+}
+
+// ============ ДАШБОРД ============
+
+async function loadDashboard() {
+  const container = document.getElementById("dashboard-content");
+  if (cache.dashboard) { renderDashboard(cache.dashboard); return; }
+  container.innerHTML = '<div class="loading-block">Загружаем данные…</div>';
+  try {
+    const d = await apiGet("/api/dashboard");
+    cache.dashboard = d;
+    renderDashboard(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderDashboard(d) {
+  const container = document.getElementById("dashboard-content");
+  let html = "";
+  html += '<div class="kpi-grid">';
+  html += kpiCard("сегодня", d.today.qty, d.today.records + " " + plural(d.today.records, "запись", "записи", "записей"));
+  html += kpiCard("за неделю", d.week.qty, trendText(d.week.trend_pct), trendClass(d.week.trend_pct));
+  html += kpiCard("за месяц", d.month.qty, trendText(d.month.trend_pct), trendClass(d.month.trend_pct));
+  html += kpiCard("сборщиков", d.month.employees, "за месяц");
+  html += "</div>";
+
+  html += '<div class="row-2">';
+  if (d.daily_14d && d.daily_14d.length) {
+    const maxQty = Math.max(1, ...d.daily_14d.map(x => x.qty));
+    html += '<div class="section"><h3 class="section-title">Динамика 14 дней</h3>';
+    html += '<div class="card"><div class="chart-wrap"><div class="chart-bars">';
+    d.daily_14d.forEach((day, idx) => {
+      const h = (day.qty / maxQty * 100);
+      const today = isToday(day.date);
+      const showVal = day.qty > 0 && (idx === d.daily_14d.length - 1 || day.qty === maxQty);
+      html += '<div class="bar' + (today ? ' today' : '') + '" style="height: ' + h + '%;" title="' + formatDate(day.date) + ': ' + day.qty + '">' +
+              (showVal ? '<div class="bar-val">' + day.qty + '</div>' : '') + '</div>';
+    });
+    html += '</div></div>';
+    if (d.daily_14d.length > 0) {
+      const f = formatDate(d.daily_14d[0].date);
+      const m = formatDate(d.daily_14d[Math.floor(d.daily_14d.length / 2)].date);
+      const l = formatDate(d.daily_14d[d.daily_14d.length - 1].date);
+      html += '<div class="chart-labels"><span>' + f + '</span><span>' + m + '</span><span>' + l + '</span></div>';
+    }
+    html += '</div></div>';
+  }
+  if (d.top_employees && d.top_employees.length) {
+    html += '<div class="section"><h3 class="section-title">Топ сборщиков (неделя)</h3>';
+    html += '<div class="card"><div class="top-list">';
+    d.top_employees.forEach((e, i) => {
+      html += '<div class="row">';
+      html += '<div class="rank">' + (i + 1) + '.</div>';
+      html += '<div class="avatar">' + getInitials(e.name || "?") + '</div>';
+      html += '<div class="name">' + escapeHtml(e.name || "—") + '</div>';
+      html += '<div class="qty">' + e.qty + '<small>шт.</small></div>';
+      html += '</div>';
+    });
+    html += '</div></div></div>';
+  }
+  html += '</div>';
+
+  html += '<div class="section"><h3 class="section-title">Последние записи <a onclick="selectScreen(\'history\')">История</a></h3>';
+  html += '<div class="card">';
+  if (!d.recent || d.recent.length === 0) {
+    html += '<div class="empty-block" style="padding:20px 0;"><i class="ti ti-inbox"></i>Записей пока нет</div>';
+  } else {
+    d.recent.slice(0, 8).forEach(r => html += renderRecordHtml(r));
+  }
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function kpiCard(label, value, trendStr, trendCls) {
+  return '<div class="kpi-card">' +
+    '<div class="label">' + escapeHtml(label) + '</div>' +
+    '<div class="value">' + escapeHtml(String(value)) + '</div>' +
+    '<div class="trend ' + (trendCls || "") + '">' + escapeHtml(trendStr || "—") + '</div>' + '</div>';
+}
+
+function trendText(pct) {
+  if (pct === null || pct === undefined) return "—";
+  if (pct === 0) return "= 0%";
+  if (pct > 0) return "▲ +" + pct + "%";
+  return "▼ " + pct + "%";
+}
+
+function trendClass(pct) {
+  if (pct === null || pct === undefined || pct === 0) return "";
+  return pct > 0 ? "up" : "down";
+}
+
+function renderRecordHtml(r) {
+  const meta = [];
+  if (r.workers && r.workers.length) meta.push(r.workers.join(", "));
+  if (r.execution) meta.push(r.execution);
+  if (r.ip_class) meta.push(r.ip_class);
+  const title = r.model_name + (r.model_extra ? " · " + r.model_extra : "");
+  const dateStr = isToday(r.date) ? "сегодня" : formatDate(r.date);
+  const iconCls = getDirectionIcon(r.direction_code, r.model_name);
+  return '<div class="record">' +
+    '<div class="record-icon"><i class="ti ' + iconCls + '"></i></div>' +
+    '<div class="record-body">' +
+      '<div class="record-title">' + escapeHtml(title) + '</div>' +
+      '<div class="record-meta">' + dateStr + (meta.length ? " · " + escapeHtml(meta.join(" · ")) : "") + '</div>' +
+    '</div>' +
+    '<div class="record-qty">' + r.qty + '<small>шт.</small></div>' +
+    '</div>';
+}
+
+// ============ ИСТОРИЯ ============
+
+function getPeriodRange(filter) {
+  const today = new Date();
+  const toDate = today.toISOString().slice(0, 10);
+  if (filter === "today") return [toDate, toDate];
+  if (filter === "week") { const d = new Date(today); d.setDate(d.getDate() - 6); return [d.toISOString().slice(0, 10), toDate]; }
+  if (filter === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return [d.toISOString().slice(0, 10), toDate]; }
+  if (filter === "all") return ["2020-01-01", toDate];
+  return [toDate, toDate];
+}
+
+async function loadHistory() {
+  const filter = state.historyFilter;
+  const container = document.getElementById("history-content");
+  if (cache.history[filter]) { renderHistory(cache.history[filter]); return; }
+  container.innerHTML = '<div class="loading-block">Загружаем историю…</div>';
+  try {
+    const [from, to] = getPeriodRange(filter);
+    const limit = filter === "all" ? 500 : 200;
+    const d = await apiGet("/api/history?from=" + from + "&to=" + to + "&limit=" + limit);
+    cache.history[filter] = d;
+    renderHistory(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderHistory(d) {
+  const container = document.getElementById("history-content");
+  if (!d.records || d.records.length === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-inbox"></i>В этом периоде нет записей</div>';
+    return;
+  }
+  const groups = {};
+  d.records.forEach(r => { if (!groups[r.date]) groups[r.date] = []; groups[r.date].push(r); });
+  const sortedDates = Object.keys(groups).sort().reverse();
+  let html = "";
+  sortedDates.forEach(date => {
+    const records = groups[date];
+    const totalQty = records.reduce((sum, r) => sum + r.qty, 0);
+    const todayLabel = isToday(date) ? " · сегодня" : "";
+    html += '<div class="day-header"><b>' + formatDateLong(date) + '</b>' + todayLabel + ' · ' + totalQty + ' шт.</div>';
+    html += '<div class="card">';
+    records.forEach(r => html += renderRecordHtml(r));
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+document.querySelectorAll('#history-filters .filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#history-filters .filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.historyFilter = chip.dataset.hf;
+    loadHistory();
+  });
+});
+
+// ============ СВОДКИ ============
+
+async function loadSummary() {
+  const period = state.summaryFilter;
+  const container = document.getElementById("summary-content");
+  if (cache.summary[period]) { renderSummary(cache.summary[period]); return; }
+  container.innerHTML = '<div class="loading-block">Считаем сводки…</div>';
+  try {
+    const d = await apiGet("/api/summary?period=" + period);
+    cache.summary[period] = d;
+    renderSummary(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSummary(d) {
+  const container = document.getElementById("summary-content");
+  const t = d.total;
+  if (!t || t.total_records === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-chart-bar"></i>За этот период нет данных</div>';
+    return;
+  }
+  let html = "";
+  html += '<div class="kpi-grid">';
+  html += kpiCard("записей", t.total_records, "—");
+  html += kpiCard("штук", t.total_qty, "—");
+  html += kpiCard("моделей", t.unique_models, "—");
+  html += kpiCard("сборщиков", t.unique_employees, "—");
+  html += "</div>";
+
+  html += '<div class="row-2">';
+  if (d.by_direction && d.by_direction.length > 1) {
+    html += '<div class="section"><h3 class="section-title">По направлениям</h3>';
+    html += '<div class="card">' + renderPieChart(d.by_direction, t.total_qty) + '</div></div>';
+  }
+  if (d.by_model && d.by_model.length) {
+    const top = d.by_model.slice(0, 8);
+    const maxQty = top[0].qty;
+    html += '<div class="section"><h3 class="section-title">Топ моделей</h3>';
+    html += '<div class="card"><div class="hbar-list">';
+    top.forEach(m => {
+      const title = m.model_name + (m.model_extra ? " · " + m.model_extra : "");
+      const pct = (m.qty / maxQty * 100);
+      html += '<div class="hbar-row">';
+      html += '<div class="hbar-name">' + escapeHtml(title) + '</div>';
+      html += '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;"></div></div>';
+      html += '<div class="hbar-qty">' + m.qty + '</div></div>';
+    });
+    html += '</div></div></div>';
+  }
+  html += '</div>';
+
+  if (d.by_employee && d.by_employee.length) {
+    html += '<div class="section"><h3 class="section-title">Топ сборщиков</h3>';
+    html += '<div class="card"><div class="top-list">';
+    d.by_employee.slice(0, 10).forEach((e, i) => {
+      const name = e.short_name || e.full_name || "—";
+      html += '<div class="row">';
+      html += '<div class="rank">' + (i + 1) + '.</div>';
+      html += '<div class="avatar">' + getInitials(name) + '</div>';
+      html += '<div class="name">' + escapeHtml(name) + '</div>';
+      html += '<div class="qty">' + e.qty + '<small>шт.</small></div></div>';
+    });
+    html += '</div></div></div>';
+  }
+
+  html += '<div class="section"><h3 class="section-title">Скачать отчёт</h3></div>';
+  html += '<div class="report-buttons">';
+  html += '<button onclick="alert(\'Excel-отчёт скачивается через Telegram-бот. На следующем этапе добавим прямую кнопку.\')"><i class="ti ti-file-spreadsheet"></i>Excel</button>';
+  html += '<button onclick="alert(\'PDF-отчёт скачивается через Telegram-бот. На следующем этапе добавим прямую кнопку.\')"><i class="ti ti-file-text"></i>PDF</button>';
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderPieChart(byDir, totalQty) {
+  const palette = ["#2D5F8B","#4A7FB5","#7AA3CF","#A8C5E3","#5FB3C9","#85A0AD","#3D8AA9"];
+  let acc = 0, svgArcs = "", legendHtml = "";
+  byDir.forEach((d, idx) => {
+    const pct = d.qty / totalQty * 100;
+    const color = palette[idx % palette.length];
+    svgArcs += '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + color + '" stroke-width="3.2" ' +
+               'stroke-dasharray="' + pct.toFixed(2) + ' ' + (100 - pct).toFixed(2) + '" ' +
+               'stroke-dashoffset="' + (-acc).toFixed(2) + '" ' +
+               'transform="rotate(-90 18 18)"/>';
+    acc += pct;
+    legendHtml += '<div class="legend-row">' +
+      '<span class="legend-dot" style="background:' + color + '"></span>' +
+      '<span class="legend-name">' + escapeHtml(d.direction) + '</span>' +
+      '<span class="legend-val">' + d.qty + ' (' + Math.round(pct) + '%)</span></div>';
+  });
+  return '<div class="pie"><svg viewBox="0 0 36 36">' + svgArcs +
+    '<text x="18" y="20" text-anchor="middle" style="font-size:6px; font-weight:600; fill:#1B2030;">' + totalQty + '</text>' +
+    '</svg><div class="pie-legend">' + legendHtml + '</div></div>';
+}
+
+document.querySelectorAll('#summary-filters .filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#summary-filters .filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.summaryFilter = chip.dataset.sf;
+    loadSummary();
+  });
+});
+
+// ============ АДМИНКА / СОТРУДНИКИ / МОДЕЛИ ============
+
+function loadAdminMeta() {
+  if (cache.employees) {
+    const active = cache.employees.employees.filter(e => e.is_active).length;
+    const total = cache.employees.employees.length;
+    document.getElementById("employees-meta").textContent = active + " активн., " + total + " всего";
+  } else if (state.user && state.user.roles && state.user.roles.includes("director")) {
+    apiGet("/api/employees?include_inactive=true").then(d => {
+      cache.employees = d;
+      const active = d.employees.filter(e => e.is_active).length;
+      const total = d.employees.length;
+      document.getElementById("employees-meta").textContent = active + " активн., " + total + " всего";
+    }).catch(() => { document.getElementById("employees-meta").textContent = "—"; });
+  } else {
+    document.getElementById("employees-meta").textContent = "только для директора";
+  }
+  if (cache.models) {
+    document.getElementById("models-meta").textContent =
+      cache.models.models.length + " моделей · " + cache.models.directions.length + " направлений";
+  } else {
+    apiGet("/api/models").then(d => {
+      cache.models = d;
+      document.getElementById("models-meta").textContent =
+        d.models.length + " моделей · " + d.directions.length + " направлений";
+    }).catch(() => { document.getElementById("models-meta").textContent = "—"; });
+  }
+}
+
+function openEmployees() {
+  if (!state.user || !state.user.roles || !state.user.roles.includes("director")) {
+    alert("Список сотрудников доступен только директору."); return;
+  }
+  selectScreen("employees");
+}
+
+function openModels() { selectScreen("models"); }
+
+async function loadEmployees() {
+  const container = document.getElementById("employees-list");
+  if (cache.employees) { renderEmployees(cache.employees); return; }
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try { const d = await apiGet("/api/employees?include_inactive=true"); cache.employees = d; renderEmployees(d); }
+  catch (e) { container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>'; }
+}
+
+function renderEmployees(d) {
+  const container = document.getElementById("employees-list");
+  const active = d.employees.filter(e => e.is_active);
+  const inactive = d.employees.filter(e => !e.is_active);
+  let html = "";
+  if (active.length === 0 && inactive.length === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-users"></i>Сотрудников нет</div>'; return;
+  }
+  if (active.length) {
+    html += '<div class="section-label">Активные · ' + active.length + '</div><div class="card">';
+    active.forEach(e => html += renderEmployeeRow(e));
+    html += '</div>';
+  }
+  if (inactive.length) {
+    html += '<div class="section-label">Деактивированные · ' + inactive.length + '</div><div class="card">';
+    inactive.forEach(e => html += renderEmployeeRow(e));
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function renderEmployeeRow(e) {
+  const rolesMap = { director: "директор", accountant: "бухгалтер", master: "мастер" };
+  const badges = e.roles.map(r => '<span class="emp-badge ' + r + '">' + (rolesMap[r] || r) + '</span>').join("");
+  const meta = [];
+  if (e.position) meta.push(e.position);
+  if (e.phone) meta.push(e.phone);
+  if (e.tab_number) meta.push("таб. " + e.tab_number);
+  const inactiveClass = e.is_active ? "" : " emp-inactive";
+  return '<div class="employee-row' + inactiveClass + '">' +
+    '<div class="emp-info"><div class="emp-name">' + escapeHtml(e.full_name || e.short_name || "—") + '</div>' +
+    '<div class="emp-meta">' + escapeHtml(meta.join(" · ") || "—") + ' ' + badges + '</div></div></div>';
+}
+
+async function loadModels() {
+  const container = document.getElementById("models-list");
+  if (cache.models) { renderModels(cache.models); return; }
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try { const d = await apiGet("/api/models"); cache.models = d; renderModels(d); }
+  catch (e) { container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>'; }
+}
+
+function renderModels(d) {
+  const container = document.getElementById("models-list");
+  if (!d.models || d.models.length === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-package"></i>Моделей нет</div>'; return;
+  }
+  const dirMap = {};
+  d.directions.forEach(dir => { dirMap[dir.id] = dir; });
+  const groups = {};
+  d.models.forEach(m => {
+    const dirId = m.direction_id || 0;
+    if (!groups[dirId]) groups[dirId] = [];
+    groups[dirId].push(m);
+  });
+  let html = "";
+  Object.keys(groups).sort().forEach(dirId => {
+    const dir = dirMap[dirId];
+    const dirName = dir ? dir.name : "—";
+    const models = groups[dirId];
+    html += '<div class="section-label">' + escapeHtml(dirName) + ' · ' + models.length + '</div><div class="card">';
+    models.forEach(m => {
+      const title = m.name + (m.extra ? " · " + m.extra : "");
+      const meta = [];
+      if (m.article) meta.push(m.article);
+      if (m.exec_mode === "choice") meta.push("испол.: " + m.exec_label_st + " / " + m.exec_label_ne);
+      else if (m.exec_mode === "fixed" && m.exec_fixed) meta.push("испол.: " + m.exec_fixed);
+      if (m.needs_ip) meta.push("IP");
+      const inactiveCls = m.is_active ? "" : " emp-inactive";
+      html += '<div class="employee-row' + inactiveCls + '">' +
+        '<div class="emp-info"><div class="emp-name">' + escapeHtml(title) + '</div>' +
+        '<div class="emp-meta">' + escapeHtml(meta.join(" · ") || "—") + '</div></div></div>';
+    });
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+// ============ НАВИГАЦИЯ ============
+
+document.querySelectorAll('.tab[data-tab]').forEach(t => {
+  t.addEventListener('click', () => selectScreen(t.dataset.tab));
+});
+document.querySelectorAll('.sidebar .nav-item[data-nav]').forEach(t => {
+  t.addEventListener('click', () => selectScreen(t.dataset.nav));
+});
+
+// ============ ВВОД КОДА ============
+
+const codeInput = document.getElementById("code-input");
+if (codeInput) {
+  codeInput.addEventListener("input", function() {
+    this.value = this.value.replace(/\D/g, "");
+    if (this.value.length === 6) submitCode();
+  });
+  codeInput.addEventListener("keypress", function(e) { if (e.key === "Enter") submitCode(); });
+}
+
+// ============ TOAST ============
+
+function showToast(message, type) {
+  const toast = document.getElementById("toast");
+  const icon = document.getElementById("toast-icon");
+  const text = document.getElementById("toast-text");
+  text.textContent = message;
+  toast.className = "toast " + (type || "");
+  if (type === "success") icon.className = "ti ti-check";
+  else if (type === "error") icon.className = "ti ti-alert-circle";
+  else icon.className = "ti ti-info-circle";
+  toast.classList.add("visible");
+  setTimeout(() => toast.classList.remove("visible"), 3000);
+}
+
+// ========================================================================
+// ============ НОВАЯ СБОРКА — основная логика этапа 4 ====================
+// ========================================================================
+
+function openNewAssembly() {
+  if (!canCreateAssembly()) {
+    alert("Внесение сборок доступно только мастерам и директору."); return;
+  }
+  selectScreen("new-assembly");
+}
+
+function cancelNewAssembly() {
+  selectScreen("dashboard");
+}
+
+function initNewAssemblyForm() {
+  // Сбрасываем форму
+  state.newAssembly = {
+    model: null, execution: null, ipClass: null,
+    quantity: 1, workerIds: [], dateMode: "today", customDate: null, comment: "",
+  };
+  document.getElementById("submit-error").textContent = "";
+  document.getElementById("qty-input").value = 1;
+  document.getElementById("comment-input").value = "";
+  document.getElementById("comment-counter-text").textContent = "0";
+  document.getElementById("date-input-wrap").classList.remove("visible");
+  document.getElementById("date-input").value = "";
+  document.getElementById("execution-section").style.display = "none";
+  document.getElementById("ip-section").style.display = "none";
+
+  // Сброс модели в селекторе
+  document.getElementById("selected-model-display").innerHTML =
+    '<div class="placeholder">Выберите модель…</div>';
+
+  // Сброс чипсов
+  document.querySelectorAll('#ip-section .chip-option').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.date-row .chip-option').forEach(c => c.classList.remove('selected'));
+  document.querySelector('.date-row .chip-option[data-date="today"]').classList.add('selected');
+
+  // Загружаем модели и сборщиков
+  ensureModelsLoaded();
+  loadActiveEmployees();
+}
+
+async function ensureModelsLoaded() {
+  if (cache.models) return;
+  try { cache.models = await apiGet("/api/models"); } catch (e) {}
+}
+
+async function loadActiveEmployees() {
+  const container = document.getElementById("workers-list");
+  if (cache.activeEmployees) { renderWorkersList(cache.activeEmployees); return; }
+  container.innerHTML = '<div class="loading-block">Загружаем список…</div>';
+  try {
+    const d = await apiGet("/api/employees/active");
+    cache.activeEmployees = d;
+    renderWorkersList(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderWorkersList(d) {
+  const container = document.getElementById("workers-list");
+  if (!d.employees || d.employees.length === 0) {
+    container.innerHTML = '<div class="empty-block">Активных сотрудников нет</div>'; return;
+  }
+  // Мастера сверху
+  const sorted = [...d.employees].sort((a, b) => {
+    if (a.is_master !== b.is_master) return b.is_master - a.is_master;
+    return (a.short_name || a.full_name || "").localeCompare(b.short_name || b.full_name || "");
+  });
+  let html = "";
+  sorted.forEach(emp => {
+    const name = emp.short_name || emp.full_name || "—";
+    const masterCls = emp.is_master ? " master-row" : "";
+    html += '<div class="worker-row' + masterCls + '" data-wid="' + emp.id + '">' +
+      '<div class="check"><i class="ti ti-check"></i></div>' +
+      '<div class="w-name">' + escapeHtml(name) + '</div>' +
+      (emp.is_master ? '<span class="w-badge">мастер</span>' : '') +
+      '</div>';
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('.worker-row').forEach(row => {
+    row.addEventListener('click', () => toggleWorker(parseInt(row.dataset.wid), row));
+  });
+}
+
+function toggleWorker(wid, row) {
+  const idx = state.newAssembly.workerIds.indexOf(wid);
+  if (idx >= 0) {
+    state.newAssembly.workerIds.splice(idx, 1);
+    row.classList.remove("selected");
+  } else {
+    state.newAssembly.workerIds.push(wid);
+    row.classList.add("selected");
+  }
+}
+
+// ===== Выбор модели через модалку =====
+
+function openModelModal() {
+  document.getElementById("model-modal").classList.add("visible");
+  document.getElementById("model-search").value = "";
+  renderModelModalList("");
+  setTimeout(() => document.getElementById("model-search").focus(), 100);
+}
+
+function closeModelModal() {
+  document.getElementById("model-modal").classList.remove("visible");
+}
+
+document.getElementById("model-search").addEventListener("input", function() {
+  renderModelModalList(this.value.trim().toLowerCase());
+});
+
+document.getElementById("model-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeModelModal();
+});
+
+function renderModelModalList(query) {
+  const container = document.getElementById("model-modal-body");
+  if (!cache.models) {
+    container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+    apiGet("/api/models").then(d => { cache.models = d; renderModelModalList(query); });
+    return;
+  }
+  const all = cache.models.models.filter(m => m.is_active);
+  const dirMap = {};
+  cache.models.directions.forEach(d => { dirMap[d.id] = d; });
+
+  // Фильтрация
+  let filtered = all;
+  if (query) {
+    filtered = all.filter(m => {
+      const title = (m.name + " " + (m.extra || "") + " " + (m.article || "")).toLowerCase();
+      return title.includes(query);
+    });
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-search"></i>Ничего не найдено</div>';
+    return;
+  }
+
+  // Группировка по направлениям
+  const groups = {};
+  filtered.forEach(m => {
+    const dirId = m.direction_id || 0;
+    if (!groups[dirId]) groups[dirId] = [];
+    groups[dirId].push(m);
+  });
+
+  let html = "";
+  Object.keys(groups).sort().forEach(dirId => {
+    const dir = dirMap[dirId];
+    const dirName = dir ? dir.name : "—";
+    const dirCode = dir ? dir.code : "";
+    const iconCls = getDirectionIcon(dirCode, "");
+    html += '<div class="modal-group-title">' + escapeHtml(dirName) + ' · ' + groups[dirId].length + '</div>';
+    groups[dirId].forEach(m => {
+      const title = m.name + (m.extra ? " · " + m.extra : "");
+      const meta = [];
+      if (m.article) meta.push(m.article);
+      if (m.exec_mode === "choice") meta.push("исполнение");
+      if (m.needs_ip) meta.push("IP-класс");
+      html += '<div class="modal-item" data-mid="' + m.id + '">' +
+        '<div class="mi-icon"><i class="ti ' + iconCls + '"></i></div>' +
+        '<div class="mi-text">' +
+          '<div class="mi-title">' + escapeHtml(title) + '</div>' +
+          '<div class="mi-meta">' + escapeHtml(meta.join(" · ") || "&nbsp;") + '</div>' +
+        '</div></div>';
+    });
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('.modal-item').forEach(item => {
+    item.addEventListener('click', () => selectModel(parseInt(item.dataset.mid)));
+  });
+}
+
+function selectModel(modelId) {
+  if (!cache.models) return;
+  const model = cache.models.models.find(m => m.id === modelId);
+  if (!model) return;
+  state.newAssembly.model = model;
+  state.newAssembly.execution = null;
+  state.newAssembly.ipClass = null;
+
+  // Обновляем селектор
+  const title = model.name + (model.extra ? " · " + model.extra : "");
+  const dirName = (cache.models.directions.find(d => d.id === model.direction_id) || {}).name || "";
+  const meta = [];
+  if (model.article) meta.push(model.article);
+  if (dirName) meta.push(dirName);
+
+  document.getElementById("selected-model-display").innerHTML =
+    '<div class="selected-title">' + escapeHtml(title) + '</div>' +
+    '<div class="selected-meta">' + escapeHtml(meta.join(" · ")) + '</div>';
+
+  // Показываем/скрываем секции исполнения и IP
+  const execSection = document.getElementById("execution-section");
+  if (model.exec_mode === "choice") {
+    execSection.style.display = "block";
+    const chips = document.getElementById("execution-chips");
+    chips.innerHTML =
+      '<button class="chip-option" data-exec="st">' + escapeHtml(model.exec_label_st || "Стандарт") + '</button>' +
+      '<button class="chip-option" data-exec="ne">' + escapeHtml(model.exec_label_ne || "Нерж. AISI") + '</button>';
+    chips.querySelectorAll('.chip-option').forEach(c => {
+      c.addEventListener('click', () => {
+        chips.querySelectorAll('.chip-option').forEach(x => x.classList.remove('selected'));
+        c.classList.add('selected');
+        state.newAssembly.execution = c.dataset.exec;
+      });
+    });
+  } else {
+    execSection.style.display = "none";
+    state.newAssembly.execution = null;
+  }
+
+  const ipSection = document.getElementById("ip-section");
+  ipSection.style.display = model.needs_ip ? "block" : "none";
+  if (!model.needs_ip) state.newAssembly.ipClass = null;
+  document.querySelectorAll('#ip-section .chip-option').forEach(c => c.classList.remove('selected'));
+
+  closeModelModal();
+}
+
+// IP-класс обработчики (один раз вешаем)
+document.querySelectorAll('#ip-section .chip-option').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('#ip-section .chip-option').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    state.newAssembly.ipClass = c.dataset.ip;
+  });
+});
+
+// ===== Количество =====
+
+function changeQty(delta) {
+  const input = document.getElementById("qty-input");
+  let v = parseInt(input.value) || 1;
+  v += delta;
+  if (v < 1) v = 1;
+  if (v > 1000) v = 1000;
+  input.value = v;
+  state.newAssembly.quantity = v;
+  document.getElementById("qty-minus").disabled = v <= 1;
+}
+
+document.getElementById("qty-input").addEventListener("input", function() {
+  let v = parseInt(this.value);
+  if (isNaN(v) || v < 1) v = 1;
+  if (v > 1000) v = 1000;
+  state.newAssembly.quantity = v;
+});
+
+document.getElementById("qty-input").addEventListener("blur", function() {
+  let v = parseInt(this.value);
+  if (isNaN(v) || v < 1) { v = 1; this.value = 1; }
+  state.newAssembly.quantity = v;
+});
+
+// ===== Дата =====
+
+document.querySelectorAll('.date-row .chip-option').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.date-row .chip-option').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    state.newAssembly.dateMode = c.dataset.date;
+    const wrap = document.getElementById("date-input-wrap");
+    if (c.dataset.date === "custom") {
+      wrap.classList.add("visible");
+      const dateInput = document.getElementById("date-input");
+      if (!dateInput.value) dateInput.value = todayIso();
+      state.newAssembly.customDate = dateInput.value;
+    } else {
+      wrap.classList.remove("visible");
+    }
+  });
+});
+
+document.getElementById("date-input").addEventListener("change", function() {
+  state.newAssembly.customDate = this.value;
+});
+
+// ===== Комментарий =====
+
+document.getElementById("comment-input").addEventListener("input", function() {
+  state.newAssembly.comment = this.value;
+  document.getElementById("comment-counter-text").textContent = this.value.length;
+});
+
+// ===== Submit =====
+
+async function submitAssembly() {
+  const errEl = document.getElementById("submit-error");
+  const btn = document.getElementById("submit-assembly-btn");
+  errEl.textContent = "";
+
+  // Валидация на клиенте
+  const a = state.newAssembly;
+  if (!a.model) { errEl.textContent = "Выберите модель"; return; }
+  if (a.model.exec_mode === "choice" && !a.execution) { errEl.textContent = "Укажите исполнение"; return; }
+  if (a.model.needs_ip && !a.ipClass) { errEl.textContent = "Укажите IP-класс"; return; }
+  if (!a.quantity || a.quantity < 1) { errEl.textContent = "Укажите количество"; return; }
+  if (a.workerIds.length === 0) { errEl.textContent = "Выберите хотя бы одного сборщика"; return; }
+
+  // Дата
+  let assemblyDate;
+  if (a.dateMode === "today") assemblyDate = todayIso();
+  else if (a.dateMode === "yesterday") assemblyDate = yesterdayIso();
+  else if (a.dateMode === "custom") {
+    if (!a.customDate) { errEl.textContent = "Выберите дату"; return; }
+    assemblyDate = a.customDate;
+  }
+
+  const payload = {
+    model_id: a.model.id,
+    quantity: a.quantity,
+    assembly_date: assemblyDate,
+    worker_ids: a.workerIds,
+    execution: a.model.exec_mode === "choice" ? a.execution : null,
+    ip_class: a.model.needs_ip ? a.ipClass : null,
+    comment: a.comment || "",
+  };
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader" style="margin-right:6px;"></i> Записываем…';
+
+  try {
+    const r = await apiPost("/api/assemblies", payload);
+    if (!r.ok) {
+      errEl.textContent = (r.data && (r.data.message || r.data.error)) || "Ошибка записи";
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check" style="margin-right:6px;"></i> Записать';
+      return;
+    }
+    showToast("Сборка записана! ID " + r.data.id, "success");
+    // Сбрасываем кэш чтобы новые экраны показали свежие данные
+    cache.dashboard = null;
+    cache.history = {};
+    cache.summary = {};
+    // Возвращаемся на дашборд
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check" style="margin-right:6px;"></i> Записать';
+      selectScreen("dashboard");
+    }, 800);
+  } catch (e) {
+    errEl.textContent = "Ошибка соединения: " + String(e);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-check" style="margin-right:6px;"></i> Записать';
+  }
+}
+
+// ============ INIT ============
+
+(function init() {
+  detectLayout();
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) showApp();
+  else {
+    document.getElementById("login-page").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+    if (codeInput) codeInput.focus();
+  }
+})();
+
+// ============ SERVICE WORKER (PWA) ============
+// Регистрируем SW после загрузки, чтобы не задерживать первую отрисовку.
+// SW кэширует приложение для офлайн-режима. При обновлении PWA — версия в sw.js
+// меняется, и старые кэши сбрасываются автоматически.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        // Слушаем обновления — если появилась новая версия, перезагружаем при следующей навигации
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Новая версия готова. Покажем тост (если есть пользователь в системе)
+                if (typeof showToast === 'function' && state.user) {
+                  showToast('Доступна новая версия. Обновите страницу.', 'success');
+                }
+              }
+            });
+          }
+        });
+      })
+      .catch((err) => console.warn('SW registration failed:', err));
+  });
+}
+</script>
+
+</body>
+</html>
