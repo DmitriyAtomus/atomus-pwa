@@ -144,7 +144,8 @@
     padding-bottom: 84px;
     position: relative;
   }
-  .app.mobile-layout .sidebar { display: none; }
+  /* На мобильном все сайдбары скрыты (есть mobile tab-bar) */
+  .app.mobile-layout .sidebar { display: none !important; }
   .app.mobile-layout .tab-bar { display: flex; }
   .app.mobile-layout .top-bar .section-switcher { display: none; }
   .app.mobile-layout .top-bar .user-block { display: none; }
@@ -161,7 +162,9 @@
     grid-template-columns: 240px 1fr;
     min-height: calc(100vh - 64px);
   }
-  .app.desktop-layout .sidebar { display: flex; flex-direction: column; }
+  /* На десктопе показываем только активный сайдбар (с data-visible="1") */
+  .app.desktop-layout .sidebar { display: none; }
+  .app.desktop-layout .sidebar[data-visible="1"] { display: flex; flex-direction: column; }
 
   /* ============ ШАПКА с шариком ============ */
   .top-bar {
@@ -1360,7 +1363,7 @@
     <!-- ============ SIDEBAR (десктоп) - меняется в зависимости от раздела ============ -->
 
     <!-- SIDEBAR ПРОИЗВОДСТВО -->
-    <aside class="sidebar" id="sidebar-production" data-section="production">
+    <aside class="sidebar" id="sidebar-production" data-section="production" data-visible="1">
       <div class="sidebar-title">
         <i class="ti ti-tool"></i> Производство
       </div>
@@ -1398,7 +1401,7 @@
     </aside>
 
     <!-- SIDEBAR ПОМОЩЬ -->
-    <aside class="sidebar" id="sidebar-help" data-section="help" style="display:none;">
+    <aside class="sidebar" id="sidebar-help" data-section="help" data-visible="0">
       <div class="sidebar-title">
         <i class="ti ti-help-circle"></i> Помощь
       </div>
@@ -1421,7 +1424,7 @@
     </aside>
 
     <!-- SIDEBAR ПРОДАЖИ -->
-    <aside class="sidebar" id="sidebar-sales" data-section="sales" style="display:none;">
+    <aside class="sidebar" id="sidebar-sales" data-section="sales" data-visible="0">
       <div class="sidebar-title">
         <i class="ti ti-briefcase"></i> Продажи
       </div>
@@ -1453,7 +1456,7 @@
     </aside>
 
     <!-- SIDEBAR заглушки для остальных разделов (без меню, пустой) -->
-    <aside class="sidebar" id="sidebar-coming" data-section="coming" style="display:none;">
+    <aside class="sidebar" id="sidebar-coming" data-section="coming" data-visible="0">
       <div class="sidebar-title">
         <i class="ti ti-clock"></i> Раздел в разработке
       </div>
@@ -2479,18 +2482,15 @@ function selectSection(sectionName) {
   document.querySelectorAll('.m-section-tabs button').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.m-section-tabs button[data-section="' + sectionName + '"]').forEach(t => t.classList.add('active'));
 
-  // Показываем нужный сайдбар
-  document.querySelectorAll('.sidebar').forEach(s => s.style.display = 'none');
+  // Показываем нужный сайдбар (через data-атрибут, чтобы CSS-правила мобильной раскладки работали)
+  document.querySelectorAll('.sidebar').forEach(s => { s.dataset.visible = '0'; });
   const sidebar = document.getElementById(config.sidebar);
-  if (sidebar) sidebar.style.display = 'flex';
+  if (sidebar) sidebar.dataset.visible = '1';
 
-  // Скрываем/показываем tab-bar (в разделах кроме Производства tab-bar скрыт)
-  const tabBar = document.getElementById('tab-bar');
-  if (sectionName === 'production') {
-    if (tabBar) tabBar.style.display = '';
-  } else {
-    if (tabBar) tabBar.style.display = 'none';
-  }
+  // Скрываем/показываем tab-bar.
+  // На десктопе tab-bar всегда скрыт (CSS), на мобильном — показываем для всех разделов.
+  // Раньше прятали для нечего-делать разделов, но это ломало навигацию на мобильном.
+  // Tab-bar теперь всегда виден на мобильном.
 
   // Открываем экран раздела по умолчанию
   selectSidebarItem(config.defaultScreen);
