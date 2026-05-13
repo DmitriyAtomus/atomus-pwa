@@ -1464,6 +1464,242 @@
     border-color: var(--brand); font-weight: 600;
   }
 
+  /* ============ КП (Этап 14Б) ============ */
+
+  /* Статусы КП */
+  .offer-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .offer-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+  .offer-status-draft { background: var(--bg); color: var(--text-mid); }
+  .offer-status-draft::before { background: var(--text-light); }
+  .offer-status-sent { background: var(--info-bg); color: var(--info); }
+  .offer-status-sent::before { background: var(--info); }
+  .offer-status-accepted { background: var(--success-bg); color: var(--success); }
+  .offer-status-accepted::before { background: var(--success); }
+  .offer-status-rejected { background: var(--danger-bg); color: var(--danger); }
+  .offer-status-rejected::before { background: var(--danger); }
+
+  /* Бейдж версии */
+  .version-badge {
+    display: inline-block;
+    background: #F0EAFA; color: #6A4B9C;
+    padding: 1px 7px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+    margin-left: 6px;
+  }
+
+  /* Таблица КП на десктопе */
+  .offers-table {
+    background: white; border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .offers-table .oft-header {
+    background: #F8F9FB; padding: 11px 18px;
+    font-size: 11px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600;
+    display: grid;
+    grid-template-columns: 180px 1fr 120px 140px 130px 36px;
+    gap: 12px; align-items: center;
+  }
+  .offers-table .oft-row {
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: 180px 1fr 120px 140px 130px 36px;
+    gap: 12px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .offers-table .oft-row:hover { background: var(--bg); }
+  .offers-table .oft-num { font-weight: 600; color: var(--brand); font-size: 13px; }
+  .offers-table .oft-name { font-weight: 500; font-size: 14px; }
+  .offers-table .oft-name small {
+    display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 2px;
+  }
+  .offers-table .oft-sum { font-weight: 600; font-size: 13.5px; text-align: right; }
+  .offers-table .oft-manager { font-size: 13px; color: var(--text-mid); }
+  .offers-table .oft-arrow { color: var(--text-light); font-size: 18px; text-align: right; }
+
+  /* Карточки КП на мобильном */
+  .offer-card {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    cursor: pointer;
+  }
+  .offer-card .oc-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 6px; gap: 8px;
+  }
+  .offer-card .oc-num { font-size: 13px; font-weight: 600; color: var(--brand); }
+  .offer-card .oc-name { font-weight: 500; margin-bottom: 4px; font-size: 14px; }
+  .offer-card .oc-meta {
+    display: flex; gap: 10px; font-size: 12px; color: var(--text-light); flex-wrap: wrap;
+  }
+  .offer-card .oc-meta b { color: var(--text-mid); font-weight: 500; }
+
+  /* Позиции КП — таблица */
+  .offer-items-table {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .offer-items-table .oit-header {
+    background: #F8F9FB; padding: 10px 14px;
+    font-size: 11px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600;
+    display: grid;
+    grid-template-columns: 40px 1fr 70px 110px 70px 110px;
+    gap: 8px; align-items: center;
+  }
+  .offer-items-table .oit-row {
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 40px 1fr 70px 110px 70px 110px;
+    gap: 8px; align-items: center;
+    border-top: 1px solid var(--border);
+  }
+  .offer-items-table .oit-num { color: var(--text-light); font-size: 12px; }
+  .offer-items-table .oit-name { font-size: 13.5px; font-weight: 500; }
+  .offer-items-table .oit-name small {
+    display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 2px;
+  }
+  .offer-items-table .oit-qty { font-size: 13px; text-align: right; }
+  .offer-items-table .oit-price { font-size: 13px; text-align: right; }
+  .offer-items-table .oit-discount { font-size: 13px; text-align: right; color: var(--text-light); }
+  .offer-items-table .oit-total { font-size: 13.5px; font-weight: 600; text-align: right; }
+  .offer-items-table .oit-footer {
+    padding: 12px 14px;
+    background: var(--brand-bg);
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 600;
+  }
+  .offer-items-table .oit-footer .label {
+    font-size: 13px; color: var(--brand);
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .offer-items-table .oit-footer .value {
+    font-size: 18px; color: var(--brand);
+  }
+
+  /* Карточка позиции в форме (редактирование) */
+  .item-row-edit {
+    background: white; border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .item-row-edit .ire-handle {
+    color: var(--text-light); font-size: 22px;
+    flex-shrink: 0;
+  }
+  .item-row-edit .ire-body {
+    flex: 1; min-width: 0;
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+  }
+  .desktop-layout .item-row-edit .ire-body {
+    grid-template-columns: 2fr 80px 100px 70px 100px;
+  }
+  .item-row-edit .ire-body input,
+  .item-row-edit .ire-body textarea {
+    width: 100%; padding: 8px 10px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13.5px;
+  }
+  .item-row-edit .ire-body input:focus,
+  .item-row-edit .ire-body textarea:focus { border-color: var(--brand); outline: none; }
+  .item-row-edit .ire-remove {
+    background: none; border: none; color: var(--text-light);
+    cursor: pointer; padding: 6px;
+    flex-shrink: 0; font-size: 18px;
+  }
+  .item-row-edit .ire-remove:hover { color: var(--danger); }
+  .item-row-edit .ire-label {
+    display: block; font-size: 10.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .item-row-edit .ire-line-total {
+    font-size: 14px; font-weight: 600; color: var(--brand);
+    padding: 8px 10px; text-align: right;
+    align-self: end;
+  }
+  .item-row-edit .ire-no-product { color: var(--text-light); font-style: italic; }
+
+  /* Меню «Ещё» (мобильное) — плитки */
+  .more-menu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 18px 16px;
+  }
+  .desktop-layout .more-menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 0 0 24px;
+  }
+  .more-menu-card {
+    background: white; border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 14px;
+    text-align: center;
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    transition: all 0.1s;
+  }
+  .more-menu-card:hover { background: var(--bg); border-color: var(--brand-light); }
+  .more-menu-card .mmc-icon {
+    width: 44px; height: 44px;
+    background: var(--brand-bg); color: var(--brand);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .more-menu-card.danger .mmc-icon { background: var(--danger-bg); color: var(--danger); }
+  .more-menu-card .mmc-title { font-size: 14px; font-weight: 500; }
+  .more-menu-card .mmc-desc { font-size: 11.5px; color: var(--text-light); line-height: 1.3; }
+  .more-section-title {
+    font-size: 11px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600;
+    padding: 16px 18px 8px;
+  }
+
+  /* Быстрый доступ — плитки на дашборде Продаж */
+  .quick-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 16px 18px 0;
+  }
+  .desktop-layout .quick-tiles {
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0 0 16px;
+  }
+  .quick-tile {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .quick-tile:hover { background: var(--bg); }
+  .quick-tile .qt-icon {
+    width: 36px; height: 36px;
+    background: var(--brand-bg); color: var(--brand);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .quick-tile .qt-body { flex: 1; min-width: 0; }
+  .quick-tile .qt-title { font-size: 13.5px; font-weight: 500; }
+  .quick-tile .qt-meta { font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+
   /* ============ ФОРМА СОТРУДНИКА (Этап 13В) ============ */
 
   /* Чекбокс роли */
@@ -1742,6 +1978,9 @@
         <button class="nav-item" data-nav="sales-contracts" onclick="selectSidebarItem('sales-contracts')">
           <i class="ti ti-file-text"></i><span>Договоры</span>
         </button>
+        <button class="nav-item" data-nav="sales-offers" onclick="selectSidebarItem('sales-offers')">
+          <i class="ti ti-file-invoice"></i><span>КП</span>
+        </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
           <button class="nav-item" data-nav="sales-contractors" onclick="selectSidebarItem('sales-contractors')">
@@ -1937,6 +2176,17 @@
         </div>
         <div class="content-inner">
           <div id="models-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ ЕЩЁ (мобильное меню Производства) ============ -->
+      <div class="screen" data-screen="production-more" data-section="production">
+        <div class="screen-header"><h2>Ещё</h2></div>
+        <div class="page-header">
+          <div><h1>Ещё в Производстве</h1><div class="page-subtitle">Справочники и настройки</div></div>
+        </div>
+        <div class="content-inner" id="production-more-content">
+          <!-- наполняется через renderProductionMore() -->
         </div>
       </div>
 
@@ -2225,6 +2475,95 @@
         </div>
       </div>
 
+      <!-- ============ КП: СПИСОК ============ -->
+      <div class="screen" data-screen="sales-offers" data-section="sales">
+        <div class="screen-header">
+          <h2>КП</h2>
+          <button class="icon-btn" id="so-mobile-new" onclick="openNewOffer()"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="page-header">
+          <div><h1>Коммерческие предложения</h1><div class="page-subtitle" id="so-subtitle">—</div></div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="so-new-btn" onclick="openNewOffer()">
+              <i class="ti ti-plus"></i> Новое КП
+            </button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div class="search-box" style="padding: 12px 18px 0;">
+            <i class="ti ti-search"></i>
+            <input type="text" id="so-search-input" placeholder="Поиск по номеру, контрагенту…">
+          </div>
+          <div class="filter-row" id="so-filters">
+            <button class="filter-chip active" data-sof="all">Все</button>
+            <button class="filter-chip" data-sof="draft">Черновики</button>
+            <button class="filter-chip" data-sof="sent">Отправлены</button>
+            <button class="filter-chip" data-sof="accepted">Приняты</button>
+            <button class="filter-chip" data-sof="rejected">Отклонены</button>
+          </div>
+          <div id="so-content"><div class="loading-block">Загружаем КП…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ КП: КАРТОЧКА ============ -->
+      <div class="screen" data-screen="sales-offer-detail" data-section="sales">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('sales-offers')"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="sod-mobile-title">КП</h2>
+          <button class="icon-btn" id="sod-mobile-edit" onclick="openEditOffer()"><i class="ti ti-edit"></i></button>
+        </div>
+        <div class="page-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button class="icon-btn" onclick="selectSidebarItem('sales-offers')"><i class="ti ti-arrow-left"></i></button>
+            <div>
+              <h1 id="sod-title">—</h1>
+              <div class="page-subtitle" id="sod-subtitle">—</div>
+            </div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" onclick="openEditOffer()"><i class="ti ti-edit"></i> Редактировать</button>
+            <button class="btn btn-secondary" id="sod-delete-btn" onclick="deleteCurrentOffer()" style="color: var(--danger);">
+              <i class="ti ti-trash"></i> Удалить
+            </button>
+          </div>
+        </div>
+        <div class="content-inner" id="sod-content">
+          <div class="loading-block">Загружаем КП…</div>
+        </div>
+      </div>
+
+      <!-- ============ КП: ФОРМА (новое / редактирование) ============ -->
+      <div class="screen" data-screen="sales-offer-form" data-section="sales">
+        <div class="screen-header">
+          <button class="back-btn" onclick="cancelOfferForm()"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="sof-form-mobile-title">Новое КП</h2>
+        </div>
+        <div class="page-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button class="icon-btn" onclick="cancelOfferForm()"><i class="ti ti-arrow-left"></i></button>
+            <div>
+              <h1 id="sof-form-title">Новое КП</h1>
+              <div class="page-subtitle" id="sof-form-subtitle">Заполните данные предложения</div>
+            </div>
+          </div>
+        </div>
+        <div class="content-inner" id="sof-form-content">
+          <!-- наполняется через initOfferForm() -->
+        </div>
+      </div>
+
+      <!-- ============ ЕЩЁ (мобильное меню разделов) ============ -->
+      <div class="screen" data-screen="sales-more" data-section="sales">
+        <div class="screen-header"><h2>Ещё</h2></div>
+        <div class="page-header">
+          <div><h1>Ещё в Продажах</h1><div class="page-subtitle">Справочники и настройки</div></div>
+        </div>
+        <div class="content-inner" id="sales-more-content">
+          <!-- наполняется через renderSalesMore() -->
+        </div>
+      </div>
+
       <!-- ============================================================ -->
       <!-- ============ КОНЕЦ РАЗДЕЛА ПРОДАЖИ ============ -->
       <!-- ============================================================ -->
@@ -2448,7 +2787,7 @@
     <button class="tab" data-tab="summary" onclick="selectSidebarItem('summary')">
       <i class="ti ti-chart-bar"></i><span>Сводки</span>
     </button>
-    <button class="tab" data-tab="account" onclick="selectSidebarItem('account')">
+    <button class="tab" data-tab="production-more" onclick="selectSidebarItem('production-more')">
       <i class="ti ti-menu-2"></i><span>Ещё</span>
     </button>
   </nav>
@@ -2464,10 +2803,10 @@
     <button class="tab plus-btn" id="tab-plus-sales" onclick="openNewContract()">
       <i class="ti ti-circle-plus-filled"></i>
     </button>
-    <button class="tab" data-tab="sales-contractors" onclick="selectSidebarItem('sales-contractors')">
-      <i class="ti ti-briefcase"></i><span>Контрагенты</span>
+    <button class="tab" data-tab="sales-offers" onclick="selectSidebarItem('sales-offers')">
+      <i class="ti ti-file-invoice"></i><span>КП</span>
     </button>
-    <button class="tab" data-tab="account" onclick="selectSidebarItem('account')">
+    <button class="tab" data-tab="sales-more" onclick="selectSidebarItem('sales-more')">
       <i class="ti ti-menu-2"></i><span>Ещё</span>
     </button>
   </nav>
@@ -2550,6 +2889,27 @@
   </div>
 </div>
 
+<!-- ============ МОДАЛКА ВЫБОРА ПРОДАЖНОЙ ПОЗИЦИИ (для добавления в КП) ============ -->
+<div class="modal-overlay" id="sale-product-pick-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Выберите позицию из каталога</h3>
+      <button class="icon-btn" onclick="closeSaleProductPickModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-search">
+      <input type="text" id="sp-pick-search" placeholder="Поиск по названию…">
+    </div>
+    <div class="modal-body" id="sp-pick-body">
+      <div class="loading-block">Загружаем…</div>
+    </div>
+    <div style="padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg);">
+      <button class="btn btn-secondary" onclick="addCustomOfferItem()" style="width: 100%; justify-content: center;">
+        <i class="ti ti-plus"></i> Добавить произвольную позицию (без каталога)
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -2560,7 +2920,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.0.0-stage14a";
+const APP_VERSION = "v1.1.0-stage14b";
 const APP_VERSION_DATE = "13.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -2891,20 +3251,26 @@ function renderProfile() {
     if (tabPlus) tabPlus.style.display = 'none';
   }
 
-  // Условный показ кнопок «Новый договор» / «Новый контрагент» (только sales-роли)
+  // Условный показ кнопок «Новый договор» / «Новый контрагент» / «Новое КП» (только sales-роли)
   const canSales = canManageSales();
   const navSalesNew = document.getElementById('nav-sales-new');
   const scNewBtn = document.getElementById('sc-new-btn');
   const scMobileNew = document.getElementById('sc-mobile-new');
   const dashNewBtn = document.getElementById('sales-dashboard-new-btn');
   const tabPlusSales = document.getElementById('tab-plus-sales');
-  [navSalesNew, scNewBtn, scMobileNew, dashNewBtn, tabPlusSales].forEach(el => {
+  const soNewBtn = document.getElementById('so-new-btn');
+  const soMobileNew = document.getElementById('so-mobile-new');
+  [navSalesNew, scNewBtn, scMobileNew, dashNewBtn, tabPlusSales, soNewBtn, soMobileNew].forEach(el => {
     if (el) el.style.display = canSales ? '' : 'none';
   });
-  // Кнопка «Удалить» в карточке договора — только директор
+  // Кнопка «Удалить» в карточке договора и КП — только директор
   const delBtn = document.getElementById('scd-delete-btn');
   if (delBtn) {
     delBtn.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
+  }
+  const delOfferBtn = document.getElementById('sod-delete-btn');
+  if (delOfferBtn) {
+    delOfferBtn.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 }
 
@@ -2990,6 +3356,13 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sales-contractor-form') initContractorForm();
   if (screenName === 'sale-products') loadSaleProducts();
   if (screenName === 'sale-product-form') initSaleProductForm();
+  // КП (14Б)
+  if (screenName === 'sales-offers') loadOffers();
+  if (screenName === 'sales-offer-detail') loadCurrentOffer();
+  if (screenName === 'sales-offer-form') initOfferForm();
+  // «Ещё»
+  if (screenName === 'production-more') renderProductionMore();
+  if (screenName === 'sales-more') renderSalesMore();
 }
 
 function goHome() {
@@ -3008,6 +3381,7 @@ function refreshCurrentScreen() {
   if (s === 'sales-contracts') { cache.contracts = null; cache.contractsCounts = null; }
   if (s === 'sales-contractors') cache.contractors = null;
   if (s === 'sale-products') cache.saleProducts = null;
+  if (s === 'sales-offers') { cache.offers = null; cache.offersCounts = null; }
   selectSidebarItem(s);
 }
 
@@ -4119,6 +4493,1021 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ============ КОНЕЦ ЭТАПА 14А ============
 
+// ============================================================================
+// ============ ЭТАП 14Б: КП — КОММЕРЧЕСКИЕ ПРЕДЛОЖЕНИЯ =====================
+// ============================================================================
+
+// Состояние КП
+state.offersFilter = 'all';                   // all/draft/sent/accepted/rejected
+state.offersSearch = '';
+state.currentOfferId = null;                  // ID открытого КП
+state.offerFormMode = 'new';                  // 'new' или 'edit'
+state.offerForm = {
+  manager_id: null,
+  manager_name: '',
+  contractor_id: null,
+  contractor_name: '',
+  contractor_inn: '',
+  legal_entity: 'ooo_atomus',
+  valid_until: '',
+  production_term: '',
+  payment_terms: '',
+  delivery_terms: '',
+  comment_internal: '',
+  comment_client: '',
+  items: [],   // массив { sale_product_id, name, description, unit, qty, price, discount_pct }
+};
+
+cache.offers = null;
+cache.offersCounts = null;
+
+// --------- ХЕЛПЕРЫ ----------
+
+function offerStatusBadge(status, label) {
+  return '<span class="offer-status offer-status-' + status + '">' + escapeHtml(label || '—') + '</span>';
+}
+
+function calcItemTotal(it) {
+  const qty = Number(it.qty) || 0;
+  const price = Number(it.price) || 0;
+  const d = Math.max(0, Math.min(100, Number(it.discount_pct) || 0));
+  return qty * price * (1 - d / 100);
+}
+
+function calcOfferTotal(items) {
+  let total = 0;
+  (items || []).forEach(it => { total += calcItemTotal(it); });
+  return total;
+}
+
+function addDaysIso(daysAhead) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  return d.toISOString().slice(0, 10);
+}
+
+// --------- СПИСОК КП ----------
+
+async function loadOffers() {
+  const container = document.getElementById('so-content');
+  if (cache.offers) {
+    renderOffersList();
+  } else {
+    container.innerHTML = '<div class="loading-block">Загружаем КП…</div>';
+  }
+  try {
+    const d = await apiGet('/api/sale-offers?limit=500');
+    cache.offers = d.offers || [];
+    cache.offersCounts = d.counts || {};
+    renderOffersList();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderOffersList() {
+  const container = document.getElementById('so-content');
+  const counts = cache.offersCounts || {};
+  const filter = state.offersFilter;
+  const search = (state.offersSearch || '').toLowerCase().trim();
+
+  // Чипсы
+  document.querySelectorAll('#so-filters .filter-chip').forEach(chip => {
+    const k = chip.dataset.sof;
+    const baseLabels = {
+      'all': 'Все', 'draft': 'Черновики', 'sent': 'Отправлены',
+      'accepted': 'Приняты', 'rejected': 'Отклонены',
+    };
+    let count = 0;
+    if (k === 'all') count = counts.total || 0;
+    else count = counts[k] || 0;
+    chip.textContent = baseLabels[k] + (count ? ' · ' + count : '');
+    chip.classList.toggle('active', k === filter);
+  });
+
+  // Подзаголовок
+  const sub = document.getElementById('so-subtitle');
+  if (sub) {
+    if (counts.total) sub.textContent = 'Всего ' + counts.total + ' · в работе ' + ((counts.draft || 0) + (counts.sent || 0));
+    else sub.textContent = 'КП пока нет';
+  }
+
+  // Фильтрация
+  let list = cache.offers || [];
+  if (filter !== 'all') list = list.filter(o => o.status === filter);
+  if (search) {
+    list = list.filter(o =>
+      (o.number || '').toLowerCase().includes(search) ||
+      (o.contractor_name || '').toLowerCase().includes(search)
+    );
+  }
+
+  if (!list.length) {
+    let h = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Нет КП под этот фильтр';
+    if (canManageSales() && filter === 'all' && !search) {
+      h += '<br><br><button class="btn btn-primary" onclick="openNewOffer()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первое</button>';
+    }
+    h += '</div>';
+    container.innerHTML = h;
+    return;
+  }
+
+  if (state.isDesktop) {
+    let html = '<div style="padding: 0 0 16px;"><div class="offers-table">';
+    html += '<div class="oft-header">' +
+      '<div>Номер</div><div>Контрагент</div><div>Статус</div>' +
+      '<div style="text-align: right;">Сумма</div>' +
+      '<div>Менеджер</div><div></div></div>';
+    list.forEach(o => {
+      const versionBadge = (o.version && o.version > 1) ? '<span class="version-badge">v' + o.version + '</span>' : '';
+      html += '<div class="oft-row" onclick="openOffer(' + o.id + ')">' +
+        '<div class="oft-num">' + escapeHtml(o.number) + versionBadge + '</div>' +
+        '<div class="oft-name">' + escapeHtml(o.contractor_name || '—') +
+          (o.contractor_inn ? '<small>ИНН ' + escapeHtml(o.contractor_inn) + '</small>' : '') +
+        '</div>' +
+        '<div>' + offerStatusBadge(o.status, o.status_label) + '</div>' +
+        '<div class="oft-sum">' + formatMoney(o.total_sum) + '</div>' +
+        '<div class="oft-manager">' + escapeHtml(o.manager_name || '—') + '</div>' +
+        '<div class="oft-arrow"><i class="ti ti-chevron-right"></i></div>' +
+        '</div>';
+    });
+    html += '</div></div>';
+    container.innerHTML = html;
+  } else {
+    let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
+    list.forEach(o => {
+      const versionBadge = (o.version && o.version > 1) ? '<span class="version-badge">v' + o.version + '</span>' : '';
+      html += '<div class="offer-card" onclick="openOffer(' + o.id + ')">' +
+        '<div class="oc-top">' +
+          '<span class="oc-num">' + escapeHtml(o.number) + versionBadge + '</span>' +
+          offerStatusBadge(o.status, o.status_label) +
+        '</div>' +
+        '<div class="oc-name">' + escapeHtml(o.contractor_name || '—') + '</div>' +
+        '<div class="oc-meta">' +
+          '<span><b>сумма</b> ' + formatMoney(o.total_sum) + '</span>' +
+          '<span><b>менеджер</b> ' + escapeHtml(o.manager_name || '—') + '</span>' +
+        '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+}
+
+// --------- КАРТОЧКА КП ----------
+
+function openOffer(offerId) {
+  state.currentOfferId = offerId;
+  selectSidebarItem('sales-offer-detail');
+}
+
+async function loadCurrentOffer() {
+  const container = document.getElementById('sod-content');
+  const oid = state.currentOfferId;
+  if (!oid) { container.innerHTML = '<div class="empty-block">КП не выбрано</div>'; return; }
+  container.innerHTML = '<div class="loading-block">Загружаем КП…</div>';
+  try {
+    const o = await apiGet('/api/sale-offers/' + oid);
+    renderOfferDetail(o);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderOfferDetail(o) {
+  document.getElementById('sod-title').textContent = o.number;
+  document.getElementById('sod-mobile-title').textContent = o.number;
+  const subParts = [];
+  if (o.created_at) subParts.push('от ' + formatDateLong(o.created_at.slice(0, 10)));
+  if (o.version > 1) subParts.push('версия ' + o.version);
+  document.getElementById('sod-subtitle').textContent = subParts.join(' · ');
+
+  const container = document.getElementById('sod-content');
+  const canEdit = canManageSales();
+
+  let html = '';
+
+  // Шапка с контрагентом и статусом
+  html += '<div class="contract-header-card">';
+  html += '<div class="ch-top">';
+  html += '<div>';
+  html += '<div class="ch-contractor-label">КОНТРАГЕНТ</div>';
+  html += '<div class="ch-contractor-name">' + escapeHtml(o.contractor_name || '—') + '</div>';
+  const meta = [];
+  if (o.contractor_inn) meta.push('ИНН ' + escapeHtml(o.contractor_inn));
+  if (o.contractor_phone) meta.push('☎ ' + escapeHtml(o.contractor_phone));
+  if (o.contractor_contact_person) meta.push(escapeHtml(o.contractor_contact_person));
+  if (meta.length) html += '<div class="ch-contractor-meta">' + meta.join(' · ') + '</div>';
+  html += '</div>';
+  html += '<div>' + offerStatusBadge(o.status, o.status_label) + '</div>';
+  html += '</div>';
+
+  // Переключатель статуса
+  if (canEdit) {
+    html += '<div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 16px; margin-bottom: 4px;">ИЗМЕНИТЬ СТАТУС</div>';
+    const steps = [
+      { code: 'draft', label: 'Черновик' },
+      { code: 'sent', label: 'Отправлено' },
+      { code: 'accepted', label: 'Принято' },
+      { code: 'rejected', label: 'Отклонено' },
+    ];
+    const currentIdx = steps.findIndex(s => s.code === o.status);
+    html += '<div class="status-changer">';
+    steps.forEach((s, i) => {
+      let cls = 'status-step';
+      // «Отклонено» — отдельная ветка, не «пройденная»
+      if (s.code === 'rejected') {
+        if (o.status === 'rejected') cls += ' current';
+      } else {
+        if (i < currentIdx) cls += ' passed';
+        else if (i === currentIdx) cls += ' current';
+      }
+      html += '<button class="' + cls + '" onclick="changeOfferStatus(' + o.id + ', \'' + s.code + '\')">' +
+        escapeHtml(s.label) + '</button>';
+    });
+    html += '</div>';
+  }
+
+  // Детали
+  html += '<div class="detail-grid">';
+  html += '<div class="detail-item"><div class="detail-label">Юрлицо</div>' +
+          '<div class="detail-value">' + escapeHtml(legalEntityShortName(o.legal_entity)) +
+          (o.legal_entity_with_vat ? ' <small style="color:var(--text-light); font-weight:400;">(с НДС ' + (o.legal_entity_vat_rate || 22) + '%)</small>' : ' <small style="color:var(--text-light); font-weight:400;">(без НДС)</small>') +
+          '</div></div>';
+  html += '<div class="detail-item"><div class="detail-label">Менеджер</div>' +
+          '<div class="detail-value">' + escapeHtml(o.manager_name || '—') + '</div></div>';
+  html += '<div class="detail-item"><div class="detail-label">Срок действия</div>' +
+          '<div class="detail-value' + (o.valid_until ? '' : ' muted') + '">' +
+          (o.valid_until ? formatDateLong(o.valid_until) : 'не указан') + '</div></div>';
+  html += '<div class="detail-item"><div class="detail-label">Срок изготовления</div>' +
+          '<div class="detail-value' + (o.production_term ? '' : ' muted') + '">' +
+          escapeHtml(o.production_term || 'не указан') + '</div></div>';
+  if (o.payment_terms) {
+    html += '<div class="detail-item span-2"><div class="detail-label">Условия оплаты</div>' +
+            '<div class="detail-value">' + escapeHtml(o.payment_terms) + '</div></div>';
+  }
+  if (o.delivery_terms) {
+    html += '<div class="detail-item span-2"><div class="detail-label">Условия доставки</div>' +
+            '<div class="detail-value">' + escapeHtml(o.delivery_terms) + '</div></div>';
+  }
+  if (o.comment_client) {
+    html += '<div class="detail-item span-2"><div class="detail-label">Комментарий клиенту</div>' +
+            '<div class="detail-value muted">' + escapeHtml(o.comment_client).replace(/\\n/g, '<br>') + '</div></div>';
+  }
+  if (o.comment_internal) {
+    html += '<div class="detail-item span-2"><div class="detail-label">Внутренний комментарий</div>' +
+            '<div class="detail-value muted" style="background: var(--bg); padding: 8px 10px; border-radius: 8px;">' + escapeHtml(o.comment_internal).replace(/\\n/g, '<br>') + '</div></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Позиции КП
+  html += '<div style="padding: 0 18px;">';
+  html += '<h3 style="font-size: 15px; margin-bottom: 10px;">Состав КП</h3>';
+  if (state.isDesktop) {
+    html += '<div class="offer-items-table">';
+    html += '<div class="oit-header">' +
+      '<div>№</div><div>Наименование</div>' +
+      '<div style="text-align: right;">Кол-во</div>' +
+      '<div style="text-align: right;">Цена</div>' +
+      '<div style="text-align: right;">Скидка</div>' +
+      '<div style="text-align: right;">Сумма</div>' +
+      '</div>';
+    (o.items || []).forEach((it, idx) => {
+      html += '<div class="oit-row">' +
+        '<div class="oit-num">' + (idx + 1) + '</div>' +
+        '<div class="oit-name">' + escapeHtml(it.name) +
+          (it.description ? '<small>' + escapeHtml(it.description) + '</small>' : '') +
+        '</div>' +
+        '<div class="oit-qty">' + formatNumberShort(it.qty) + ' ' + escapeHtml(it.unit) + '</div>' +
+        '<div class="oit-price">' + formatMoney(it.price) + '</div>' +
+        '<div class="oit-discount">' + (it.discount_pct > 0 ? '−' + it.discount_pct + '%' : '—') + '</div>' +
+        '<div class="oit-total">' + formatMoney(it.line_total) + '</div>' +
+        '</div>';
+    });
+    html += '<div class="oit-footer">';
+    html += '<span class="label">Итого</span>';
+    html += '<span class="value">' + formatMoney(o.total_sum) + '</span>';
+    html += '</div>';
+    html += '</div>';
+  } else {
+    // Мобильный — карточки
+    html += '<div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">';
+    (o.items || []).forEach((it, idx) => {
+      html += '<div style="background: white; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;">';
+      html += '<div style="font-size: 13.5px; font-weight: 500;">' + (idx + 1) + '. ' + escapeHtml(it.name) + '</div>';
+      if (it.description) html += '<div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">' + escapeHtml(it.description) + '</div>';
+      html += '<div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: var(--text-mid);">' +
+        '<span>' + formatNumberShort(it.qty) + ' ' + escapeHtml(it.unit) + ' × ' + formatMoney(it.price) +
+          (it.discount_pct > 0 ? ' <span style="color:var(--text-light);">−' + it.discount_pct + '%</span>' : '') +
+        '</span>' +
+        '<span style="font-weight: 600; color: var(--brand);">' + formatMoney(it.line_total) + '</span>' +
+        '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<div style="background: var(--brand-bg); padding: 14px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">' +
+      '<span style="font-weight: 600; color: var(--brand); text-transform: uppercase; letter-spacing: 0.4px; font-size: 13px;">Итого</span>' +
+      '<span style="font-weight: 700; color: var(--brand); font-size: 20px;">' + formatMoney(o.total_sum) + '</span>' +
+      '</div>';
+  }
+  html += '</div>';
+
+  // Версионирование — кнопка «Создать новую версию» (если canEdit)
+  if (canEdit) {
+    html += '<div style="padding: 12px 18px;">';
+    html += '<button class="btn btn-secondary" onclick="createNewVersionOfCurrentOffer()" style="width: 100%; justify-content: center;">' +
+            '<i class="ti ti-versions"></i> Создать новую версию (v' + (o.version + 1) + ')</button>';
+    html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; margin-top: 6px;">' +
+            'Если клиент попросил переделать — сохраним текущее как архив и продолжим работу с новой версией' +
+            '</div>';
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+async function changeOfferStatus(offerId, newStatus) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-offers/' + offerId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (!r.ok) {
+      const d = await r.json();
+      showToast(d.message || 'Не удалось изменить статус', 'error');
+      return;
+    }
+    showToast('Статус изменён', 'success');
+    cache.offers = null;
+    cache.offersCounts = null;
+    loadCurrentOffer();
+  } catch (e) {
+    showToast('Ошибка: ' + String(e), 'error');
+  }
+}
+
+async function deleteCurrentOffer() {
+  if (!state.currentOfferId) return;
+  if (!confirm('Удалить эту версию КП? Другие версии (если есть) останутся.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json();
+      showToast(d.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    showToast('КП удалено', 'success');
+    cache.offers = null;
+    cache.offersCounts = null;
+    selectSidebarItem('sales-offers');
+  } catch (e) {
+    showToast('Ошибка: ' + String(e), 'error');
+  }
+}
+
+async function createNewVersionOfCurrentOffer() {
+  if (!state.currentOfferId) return;
+  if (!confirm('Создать новую версию этого КП? Текущая останется в архиве, откроется форма редактирования новой версии.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId + '/new-version', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({}),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast(data.message || 'Не удалось создать версию', 'error');
+      return;
+    }
+    showToast('Версия v' + data.version + ' создана', 'success');
+    cache.offers = null;
+    cache.offersCounts = null;
+    state.currentOfferId = data.id;
+    // Сразу открываем форму редактирования новой версии
+    openEditOffer();
+  } catch (e) {
+    showToast('Ошибка: ' + String(e), 'error');
+  }
+}
+
+// --------- ФОРМА КП ----------
+
+function openNewOffer() {
+  if (!canManageSales()) {
+    showToast('Создавать КП может директор, зам или менеджер', 'error');
+    return;
+  }
+  state.offerFormMode = 'new';
+  state.currentOfferId = null;
+  // По умолчанию менеджер — текущий пользователь (если есть в employees)
+  let defaultManagerId = null;
+  let defaultManagerName = '';
+  // Попытаемся найти себя в списке менеджеров
+  if (cache.managersForPicker && state.user) {
+    const myEmp = cache.managersForPicker.find(e => e.id === (state.user && state.user.employee_id));
+    if (myEmp) {
+      defaultManagerId = myEmp.id;
+      defaultManagerName = myEmp.short_name || myEmp.full_name;
+    }
+  }
+  state.offerForm = {
+    manager_id: defaultManagerId,
+    manager_name: defaultManagerName,
+    contractor_id: null, contractor_name: '', contractor_inn: '',
+    legal_entity: 'ooo_atomus',
+    valid_until: addDaysIso(14),
+    production_term: '',
+    payment_terms: '',
+    delivery_terms: '',
+    comment_internal: '',
+    comment_client: '',
+    items: [],
+  };
+  selectSidebarItem('sales-offer-form');
+}
+
+async function openEditOffer() {
+  if (!canManageSales()) {
+    showToast('Редактировать может директор, зам или менеджер', 'error');
+    return;
+  }
+  state.offerFormMode = 'edit';
+  try {
+    const o = await apiGet('/api/sale-offers/' + state.currentOfferId);
+    state.offerForm = {
+      manager_id: o.manager_id,
+      manager_name: o.manager_name || o.manager_full_name || '',
+      contractor_id: o.contractor_id,
+      contractor_name: o.contractor_name || '',
+      contractor_inn: o.contractor_inn || '',
+      legal_entity: o.legal_entity || 'ooo_atomus',
+      valid_until: o.valid_until || '',
+      production_term: o.production_term || '',
+      payment_terms: o.payment_terms || '',
+      delivery_terms: o.delivery_terms || '',
+      comment_internal: o.comment_internal || '',
+      comment_client: o.comment_client || '',
+      items: (o.items || []).map(it => ({
+        sale_product_id: it.sale_product_id,
+        name: it.name,
+        description: it.description || '',
+        unit: it.unit || 'шт.',
+        qty: it.qty,
+        price: it.price,
+        discount_pct: it.discount_pct,
+      })),
+      _offerNumber: o.number,
+    };
+    selectSidebarItem('sales-offer-form');
+  } catch (e) {
+    showToast('Не удалось загрузить: ' + String(e), 'error');
+  }
+}
+
+function cancelOfferForm() {
+  if (state.offerFormMode === 'edit' && state.currentOfferId) {
+    selectSidebarItem('sales-offer-detail');
+  } else {
+    selectSidebarItem('sales-offers');
+  }
+}
+
+function initOfferForm() {
+  const isEdit = state.offerFormMode === 'edit';
+  document.getElementById('sof-form-title').textContent =
+    isEdit ? ('Редактирование ' + (state.offerForm._offerNumber || 'КП')) : 'Новое КП';
+  document.getElementById('sof-form-mobile-title').textContent =
+    isEdit ? 'Редактирование' : 'Новое КП';
+  document.getElementById('sof-form-subtitle').textContent =
+    isEdit ? 'Изменения сохранятся в текущей версии' : 'Номер сгенерируется автоматически после сохранения';
+  renderOfferForm();
+}
+
+function renderOfferForm() {
+  const container = document.getElementById('sof-form-content');
+  const f = state.offerForm;
+  const isEdit = state.offerFormMode === 'edit';
+
+  let html = '';
+
+  // Менеджер
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Менеджер <span class="req">*</span></div>';
+  html += '<div class="contractor-selector" onclick="openManagerModalForOffer()">';
+  if (f.manager_id) {
+    html += '<div class="selected-text"><div class="selected-name">' + escapeHtml(f.manager_name || '—') + '</div></div>';
+  } else {
+    html += '<div class="selected-text"><div class="placeholder">Выберите менеджера…</div></div>';
+  }
+  html += '<i class="ti ti-chevron-right chev"></i>';
+  html += '</div></div>';
+
+  // Контрагент
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Контрагент <span class="req">*</span></div>';
+  html += '<div class="contractor-selector" onclick="openContractorModalForOffer()">';
+  if (f.contractor_id) {
+    html += '<div class="selected-text">' +
+            '<div class="selected-name">' + escapeHtml(f.contractor_name || '—') + '</div>' +
+            (f.contractor_inn ? '<div class="selected-meta">ИНН ' + escapeHtml(f.contractor_inn) + '</div>' : '') +
+            '</div>';
+  } else {
+    html += '<div class="selected-text"><div class="placeholder">Выберите контрагента…</div></div>';
+  }
+  html += '<i class="ti ti-chevron-right chev"></i>';
+  html += '</div></div>';
+
+  // Юрлицо
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Юрлицо <span class="req">*</span></div>';
+  html += '<div class="radio-chips column">';
+  html += '<button type="button" class="' + (f.legal_entity === 'ooo_atomus' ? 'selected' : '') + '" onclick="setOfferLegalEntity(\'ooo_atomus\')">' +
+          '<i class="ti ti-building"></i><div><b>ООО «Атомус Групп»</b><small>с НДС 22% · ИНН 7415103479</small></div></button>';
+  html += '<button type="button" class="' + (f.legal_entity === 'ooo_td_atomus' ? 'selected' : '') + '" onclick="setOfferLegalEntity(\'ooo_td_atomus\')">' +
+          '<i class="ti ti-building-skyscraper"></i><div><b>ООО ТД «Атомус Групп»</b><small>без НДС · ИНН 7415110363</small></div></button>';
+  html += '</div></div>';
+
+  // Сроки
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Сроки и условия</div>';
+  html += '<div class="sales-form-row">';
+  html += '<div><label>КП действительно до</label>' +
+          '<input type="date" id="sof-valid-until" value="' + escapeHtml(f.valid_until) + '"></div>';
+  html += '<div><label>Срок изготовления <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(текстом)</span></label>' +
+          '<input type="text" id="sof-production-term" value="' + escapeHtml(f.production_term) + '" placeholder="напр. 3-4 недели"></div>';
+  html += '</div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Условия оплаты</label>' +
+          '<input type="text" id="sof-payment-terms" value="' + escapeHtml(f.payment_terms) + '" placeholder="напр. 30% предоплата, 70% по готовности"></div></div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Условия доставки</label>' +
+          '<input type="text" id="sof-delivery-terms" value="' + escapeHtml(f.delivery_terms) + '" placeholder="напр. Самовывоз / доставка ТК"></div></div>';
+  html += '</div>';
+
+  // Позиции
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Состав КП <span class="req">*</span></div>';
+  if (f.items.length === 0) {
+    html += '<div style="padding: 18px; text-align: center; color: var(--text-light); font-size: 13px;">Позиций пока нет. Добавьте хотя бы одну.</div>';
+  } else {
+    f.items.forEach((it, idx) => {
+      const lineTotal = calcItemTotal(it);
+      html += '<div class="item-row-edit">';
+      html += '<div style="flex:1; min-width:0;">';
+      html += '<div style="font-size:13px; font-weight:500; margin-bottom:8px;">' + (idx + 1) + '. ' + escapeHtml(it.name);
+      if (!it.sale_product_id) {
+        html += ' <span class="ire-no-product" style="font-size:11px;">(не из каталога)</span>';
+      }
+      html += '</div>';
+      html += '<div class="ire-body">';
+      html += '<div><label class="ire-label">Описание</label>' +
+              '<input type="text" value="' + escapeHtml(it.description || '') + '" oninput="updateOfferItem(' + idx + ', \'description\', this.value)" placeholder="доп. описание"></div>';
+      html += '<div><label class="ire-label">Кол-во</label>' +
+              '<input type="number" step="0.01" min="0" value="' + (it.qty || 1) + '" oninput="updateOfferItem(' + idx + ', \'qty\', this.value)"></div>';
+      html += '<div><label class="ire-label">Цена ₽</label>' +
+              '<input type="number" step="100" min="0" value="' + (it.price || 0) + '" oninput="updateOfferItem(' + idx + ', \'price\', this.value)"></div>';
+      html += '<div><label class="ire-label">Скидка %</label>' +
+              '<input type="number" step="1" min="0" max="100" value="' + (it.discount_pct || 0) + '" oninput="updateOfferItem(' + idx + ', \'discount_pct\', this.value)"></div>';
+      html += '<div><label class="ire-label">Сумма</label>' +
+              '<div class="ire-line-total">' + formatMoney(lineTotal) + '</div></div>';
+      html += '</div></div>';
+      html += '<button class="ire-remove" onclick="removeOfferItem(' + idx + ')" title="Убрать"><i class="ti ti-x"></i></button>';
+      html += '</div>';
+    });
+    // Итого
+    const total = calcOfferTotal(f.items);
+    html += '<div style="background: var(--brand-bg); padding: 12px 14px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">' +
+      '<span style="font-weight:600; color: var(--brand); text-transform: uppercase; letter-spacing: 0.4px; font-size: 12px;">Итого</span>' +
+      '<span style="font-weight:700; color: var(--brand); font-size: 18px;">' + formatMoney(total) + '</span>' +
+      '</div>';
+  }
+  html += '<button class="btn btn-secondary" onclick="openSaleProductPickModal()" style="width: 100%; justify-content: center; margin-top: 12px;">' +
+          '<i class="ti ti-plus"></i> Добавить позицию</button>';
+  html += '</div>';
+
+  // Комментарии
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Комментарии</div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Комментарий клиенту <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(попадёт в PDF)</span></label>' +
+          '<textarea id="sof-comment-client" placeholder="Доп. условия, особенности для клиента">' + escapeHtml(f.comment_client) + '</textarea></div></div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Внутренний комментарий <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(не попадёт в PDF)</span></label>' +
+          '<textarea id="sof-comment-internal" placeholder="Заметки для своих">' + escapeHtml(f.comment_internal) + '</textarea></div></div>';
+  html += '</div>';
+
+  // Кнопки
+  html += '<div class="sales-action-bar">';
+  html += '<button class="btn btn-secondary" onclick="cancelOfferForm()">Отмена</button>';
+  html += '<button class="btn btn-primary" id="sof-submit" onclick="submitOfferForm()">' +
+          '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать КП') + '</button>';
+  html += '</div>';
+  html += '<div id="sof-error"></div>';
+
+  container.innerHTML = html;
+
+  // Подвязка полей
+  document.getElementById('sof-valid-until').addEventListener('change', e => { state.offerForm.valid_until = e.target.value; });
+  document.getElementById('sof-production-term').addEventListener('input', e => { state.offerForm.production_term = e.target.value; });
+  document.getElementById('sof-payment-terms').addEventListener('input', e => { state.offerForm.payment_terms = e.target.value; });
+  document.getElementById('sof-delivery-terms').addEventListener('input', e => { state.offerForm.delivery_terms = e.target.value; });
+  document.getElementById('sof-comment-client').addEventListener('input', e => { state.offerForm.comment_client = e.target.value; });
+  document.getElementById('sof-comment-internal').addEventListener('input', e => { state.offerForm.comment_internal = e.target.value; });
+}
+
+function setOfferLegalEntity(le) {
+  state.offerForm.legal_entity = le;
+  renderOfferForm();
+}
+
+function updateOfferItem(idx, field, value) {
+  if (!state.offerForm.items[idx]) return;
+  if (field === 'qty' || field === 'price' || field === 'discount_pct') {
+    state.offerForm.items[idx][field] = Number(value) || 0;
+  } else {
+    state.offerForm.items[idx][field] = value;
+  }
+  // Не делаем полный renderOfferForm() при каждом keystroke — обновляем только сумму этой позиции и итог
+  if (field === 'qty' || field === 'price' || field === 'discount_pct') {
+    // Перерисуем чтобы пересчитать
+    renderOfferForm();
+  }
+}
+
+function removeOfferItem(idx) {
+  state.offerForm.items.splice(idx, 1);
+  renderOfferForm();
+}
+
+async function submitOfferForm() {
+  const errEl = document.getElementById('sof-error');
+  const btn = document.getElementById('sof-submit');
+  errEl.innerHTML = '';
+
+  const f = state.offerForm;
+  if (!f.manager_id) { errEl.innerHTML = '<div class="sales-error">Выберите менеджера</div>'; return; }
+  if (!f.contractor_id) { errEl.innerHTML = '<div class="sales-error">Выберите контрагента</div>'; return; }
+  if (f.items.length === 0) { errEl.innerHTML = '<div class="sales-error">Добавьте хотя бы одну позицию</div>'; return; }
+  for (const it of f.items) {
+    if (!(it.name || '').trim()) { errEl.innerHTML = '<div class="sales-error">У всех позиций должно быть название</div>'; return; }
+    if (Number(it.qty) <= 0) { errEl.innerHTML = '<div class="sales-error">Количество в позиции «' + escapeHtml(it.name) + '» должно быть больше 0</div>'; return; }
+  }
+
+  const payload = {
+    manager_id: f.manager_id,
+    contractor_id: f.contractor_id,
+    legal_entity: f.legal_entity,
+    valid_until: f.valid_until || null,
+    production_term: f.production_term.trim() || null,
+    payment_terms: f.payment_terms.trim() || null,
+    delivery_terms: f.delivery_terms.trim() || null,
+    comment_internal: f.comment_internal.trim() || null,
+    comment_client: f.comment_client.trim() || null,
+    items: f.items.map(it => ({
+      sale_product_id: it.sale_product_id || null,
+      name: it.name,
+      description: it.description || null,
+      unit: it.unit || 'шт.',
+      qty: Number(it.qty) || 1,
+      price: Number(it.price) || 0,
+      discount_pct: Number(it.discount_pct) || 0,
+    })),
+  };
+
+  const isEdit = state.offerFormMode === 'edit';
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
+
+  try {
+    let r;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (isEdit) {
+      r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      r = await fetch(API_BASE + '/api/sale-offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    }
+    const data = await r.json();
+    if (!r.ok) {
+      errEl.innerHTML = '<div class="sales-error">' + escapeHtml(data.message || data.error || 'Ошибка') + '</div>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать КП');
+      return;
+    }
+    showToast(isEdit ? 'КП обновлено' : 'КП ' + data.number + ' создано', 'success');
+    cache.offers = null;
+    cache.offersCounts = null;
+    state.currentOfferId = data.id;
+    setTimeout(() => selectSidebarItem('sales-offer-detail'), 200);
+  } catch (e) {
+    errEl.innerHTML = '<div class="sales-error">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать КП');
+  }
+}
+
+// --------- МОДАЛКА МЕНЕДЖЕРА ДЛЯ КП ----------
+
+function openManagerModalForOffer() {
+  state._managerModalContext = 'offer';
+  openManagerModal();
+}
+
+// Переопределим selectManager чтобы он мог писать и в contractForm, и в offerForm
+const _origSelectManager = typeof selectManager === 'function' ? selectManager : null;
+window.selectManager = function(managerId) {
+  if (state._managerModalContext === 'offer') {
+    if (managerId === null) {
+      state.offerForm.manager_id = null;
+      state.offerForm.manager_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.manager_id = managerId;
+        state.offerForm.manager_name = m.short_name || m.full_name || '';
+      }
+    }
+    state._managerModalContext = null;
+    closeManagerModal();
+    renderOfferForm();
+    return;
+  }
+  // Для договоров — старая логика
+  if (managerId === null) {
+    state.contractForm.manager_id = null;
+    state.contractForm._manager_name = '';
+  } else {
+    const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+    if (!m) return;
+    state.contractForm.manager_id = managerId;
+    state.contractForm._manager_name = m.short_name || m.full_name || '';
+  }
+  closeManagerModal();
+  renderContractForm();
+};
+
+// --------- МОДАЛКА КОНТРАГЕНТА ДЛЯ КП ----------
+
+function openContractorModalForOffer() {
+  state._contractorModalContext = 'offer';
+  openContractorModal();
+}
+
+// Переопределим selectContractor — поддержка двух контекстов
+window.selectContractor = function(contractorId) {
+  const c = (cache.contractors || []).find(x => x.id === contractorId);
+  if (!c) return;
+  if (state._contractorModalContext === 'offer') {
+    state.offerForm.contractor_id = contractorId;
+    state.offerForm.contractor_name = c.name;
+    state.offerForm.contractor_inn = c.inn || '';
+    state._contractorModalContext = null;
+    closeContractorModal();
+    renderOfferForm();
+    return;
+  }
+  // Для договоров — старая логика
+  state.contractForm.contractor_id = contractorId;
+  state.contractForm._contractor_name = c.name;
+  state.contractForm._contractor_inn = c.inn || '';
+  closeContractorModal();
+  renderContractForm();
+};
+
+// --------- МОДАЛКА ВЫБОРА ПРОДАЖНОЙ ПОЗИЦИИ ----------
+
+function openSaleProductPickModal() {
+  document.getElementById('sale-product-pick-modal').classList.add('visible');
+  document.getElementById('sp-pick-search').value = '';
+  loadSaleProductsForPickModal('');
+  setTimeout(() => document.getElementById('sp-pick-search').focus(), 100);
+}
+
+function closeSaleProductPickModal() {
+  document.getElementById('sale-product-pick-modal').classList.remove('visible');
+}
+
+async function loadSaleProductsForPickModal(query) {
+  const container = document.getElementById('sp-pick-body');
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    if (!cache.saleProducts) {
+      const d = await apiGet('/api/sale-products');
+      cache.saleProducts = d;
+    }
+    let list = ((cache.saleProducts && cache.saleProducts.products) || []).filter(p => p.is_active);
+    if (query) {
+      const q = query.toLowerCase();
+      list = list.filter(p =>
+        (p.name || '').toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (!list.length) {
+      container.innerHTML = '<div class="empty-block"><i class="ti ti-search"></i>Не найдено. Можно добавить произвольную позицию (без каталога) кнопкой внизу.</div>';
+      return;
+    }
+    let html = '';
+    list.forEach(p => {
+      const isService = p.product_type === 'service';
+      const iconCls = isService ? 'ti-tools' : 'ti-package';
+      const priceText = (p.base_price !== null && p.base_price !== undefined)
+        ? formatMoney(p.base_price) + ' / ' + p.unit
+        : 'цена по запросу';
+      html += '<div class="modal-item" onclick="pickSaleProductForOffer(' + p.id + ')">' +
+        '<div class="mi-icon"' + (isService ? ' style="background:#F0EAFA; color:#6A4B9C;"' : '') + '><i class="ti ' + iconCls + '"></i></div>' +
+        '<div class="mi-text">' +
+          '<div class="mi-title">' + escapeHtml(p.name) + '</div>' +
+          '<div class="mi-meta">' + escapeHtml(p.product_type_label) + ' · ' + escapeHtml(priceText) + '</div>' +
+        '</div></div>';
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function pickSaleProductForOffer(productId) {
+  const p = ((cache.saleProducts && cache.saleProducts.products) || []).find(x => x.id === productId);
+  if (!p) return;
+  // Добавляем позицию в КП с базовой ценой
+  state.offerForm.items.push({
+    sale_product_id: p.id,
+    name: p.name,
+    description: p.description || '',
+    unit: p.unit || 'шт.',
+    qty: 1,
+    price: Number(p.base_price) || 0,
+    discount_pct: 0,
+  });
+  closeSaleProductPickModal();
+  renderOfferForm();
+}
+
+function addCustomOfferItem() {
+  // Произвольная позиция без привязки к каталогу
+  const name = prompt('Название позиции:');
+  if (!name || !name.trim()) return;
+  state.offerForm.items.push({
+    sale_product_id: null,
+    name: name.trim(),
+    description: '',
+    unit: 'шт.',
+    qty: 1,
+    price: 0,
+    discount_pct: 0,
+  });
+  closeSaleProductPickModal();
+  renderOfferForm();
+}
+
+// --------- МЕНЮ «ЕЩЁ» ----------
+
+function renderProductionMore() {
+  const container = document.getElementById('production-more-content');
+  if (!container || !state.user) return;
+  const isDirector = (state.user.roles || []).includes('director');
+
+  let html = '';
+  // Профиль вверху (как в Аккаунте)
+  html += '<div class="user-info">' +
+    '<div class="big-avatar" id="more-prod-avatar">' + escapeHtml(getInitials(state.user.full_name || state.user.short_name || '')) + '</div>' +
+    '<div class="ui-body">' +
+      '<div class="ui-name">' + escapeHtml(state.user.full_name || state.user.short_name || '—') + '</div>' +
+      '<div class="ui-roles">' + escapeHtml(document.getElementById('top-userrole').textContent || 'без роли') + '</div>' +
+    '</div></div>';
+
+  // Плитки разделов
+  html += '<div class="more-section-title">СПРАВОЧНИКИ</div>';
+  html += '<div class="more-menu-grid">';
+  if (isDirector) {
+    html += '<div class="more-menu-card" onclick="selectSidebarItem(\'employees\')">' +
+      '<div class="mmc-icon"><i class="ti ti-users"></i></div>' +
+      '<div class="mmc-title">Сотрудники</div>' +
+      '<div class="mmc-desc">Управление командой</div></div>';
+  }
+  html += '<div class="more-menu-card" onclick="selectSidebarItem(\'models\')">' +
+    '<div class="mmc-icon"><i class="ti ti-package"></i></div>' +
+    '<div class="mmc-title">Номенклатура</div>' +
+    '<div class="mmc-desc">Сборочные позиции</div></div>';
+  html += '</div>';
+
+  // Выход
+  html += '<div class="more-section-title">ПРОФИЛЬ</div>';
+  html += '<div class="more-menu-grid">';
+  html += '<div class="more-menu-card danger" onclick="logout()">' +
+    '<div class="mmc-icon"><i class="ti ti-logout"></i></div>' +
+    '<div class="mmc-title">Выйти</div>' +
+    '<div class="mmc-desc">Закрыть сессию</div></div>';
+  html += '</div>';
+
+  // Версия
+  html += '<div class="version-block">' +
+    '<div class="version-ball"></div>' +
+    '<div class="version-text">' +
+      '<div class="version-line"><b>Atomus group</b></div>' +
+      '<div class="version-line">' + APP_VERSION + ' · ' + APP_VERSION_DATE + '</div>' +
+    '</div></div>';
+
+  container.innerHTML = html;
+}
+
+function renderSalesMore() {
+  const container = document.getElementById('sales-more-content');
+  if (!container || !state.user) return;
+  const isDirector = (state.user.roles || []).includes('director');
+
+  let html = '';
+  html += '<div class="user-info">' +
+    '<div class="big-avatar">' + escapeHtml(getInitials(state.user.full_name || state.user.short_name || '')) + '</div>' +
+    '<div class="ui-body">' +
+      '<div class="ui-name">' + escapeHtml(state.user.full_name || state.user.short_name || '—') + '</div>' +
+      '<div class="ui-roles">' + escapeHtml(document.getElementById('top-userrole').textContent || 'без роли') + '</div>' +
+    '</div></div>';
+
+  html += '<div class="more-section-title">СПРАВОЧНИКИ</div>';
+  html += '<div class="more-menu-grid">';
+  html += '<div class="more-menu-card" onclick="selectSidebarItem(\'sales-contractors\')">' +
+    '<div class="mmc-icon"><i class="ti ti-briefcase"></i></div>' +
+    '<div class="mmc-title">Контрагенты</div>' +
+    '<div class="mmc-desc">База клиентов</div></div>';
+  html += '<div class="more-menu-card" onclick="selectSidebarItem(\'sale-products\')">' +
+    '<div class="mmc-icon"><i class="ti ti-shopping-cart"></i></div>' +
+    '<div class="mmc-title">Продажная номенклатура</div>' +
+    '<div class="mmc-desc">Каталог для КП</div></div>';
+  if (isDirector) {
+    html += '<div class="more-menu-card" onclick="selectSidebarItem(\'employees\')">' +
+      '<div class="mmc-icon"><i class="ti ti-users"></i></div>' +
+      '<div class="mmc-title">Сотрудники</div>' +
+      '<div class="mmc-desc">Управление командой</div></div>';
+  }
+  html += '</div>';
+
+  html += '<div class="more-section-title">ПРОФИЛЬ</div>';
+  html += '<div class="more-menu-grid">';
+  html += '<div class="more-menu-card danger" onclick="logout()">' +
+    '<div class="mmc-icon"><i class="ti ti-logout"></i></div>' +
+    '<div class="mmc-title">Выйти</div>' +
+    '<div class="mmc-desc">Закрыть сессию</div></div>';
+  html += '</div>';
+
+  html += '<div class="version-block">' +
+    '<div class="version-ball"></div>' +
+    '<div class="version-text">' +
+      '<div class="version-line"><b>Atomus group</b></div>' +
+      '<div class="version-line">' + APP_VERSION + ' · ' + APP_VERSION_DATE + '</div>' +
+    '</div></div>';
+
+  container.innerHTML = html;
+}
+
+// --------- ОБРАБОТЧИКИ ----------
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Фильтры КП
+  document.querySelectorAll('#so-filters .filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.offersFilter = chip.dataset.sof;
+      renderOffersList();
+    });
+  });
+  const soSearch = document.getElementById('so-search-input');
+  if (soSearch) {
+    soSearch.addEventListener('input', e => {
+      state.offersSearch = e.target.value;
+      renderOffersList();
+    });
+  }
+
+  // Модалка выбора продажной позиции — поиск и клик-вне-закрывает
+  const spp = document.getElementById('sp-pick-search');
+  if (spp) spp.addEventListener('input', e => loadSaleProductsForPickModal(e.target.value));
+  const sppm = document.getElementById('sale-product-pick-modal');
+  if (sppm) sppm.addEventListener('click', e => { if (e.target === sppm) closeSaleProductPickModal(); });
+});
+
+// Хелпер для форматирования чисел (например количества)
+function formatNumberShort(n) {
+  if (n === null || n === undefined) return '0';
+  const v = Number(n);
+  if (!isFinite(v)) return '0';
+  if (v % 1 === 0) return String(v);
+  return v.toFixed(2).replace(/\.?0+$/, '');
+}
+
+// ============ КОНЕЦ ЭТАПА 14Б ============
+
 // ============ МОДЕЛИ ============
 
 async function loadModels() {
@@ -4599,6 +5988,29 @@ function renderSalesDashboard() {
   html += kpiCard('к отгрузке', counts.ready || 0, '');
   html += kpiCard('отгружено', counts.shipped || 0, '');
   html += '</div>';
+
+  // Плитки быстрого доступа (только на мобильном — на десктопе всё в сайдбаре)
+  if (!state.isDesktop) {
+    html += '<div class="more-section-title" style="padding: 14px 18px 4px;">БЫСТРЫЙ ДОСТУП</div>';
+    html += '<div class="quick-tiles">';
+    html += '<div class="quick-tile" onclick="selectSidebarItem(\'sales-offers\')">' +
+      '<div class="qt-icon"><i class="ti ti-file-invoice"></i></div>' +
+      '<div class="qt-body"><div class="qt-title">КП</div><div class="qt-meta">Коммерческие предложения</div></div>' +
+      '</div>';
+    html += '<div class="quick-tile" onclick="selectSidebarItem(\'sales-contractors\')">' +
+      '<div class="qt-icon"><i class="ti ti-briefcase"></i></div>' +
+      '<div class="qt-body"><div class="qt-title">Контрагенты</div><div class="qt-meta">База клиентов</div></div>' +
+      '</div>';
+    html += '<div class="quick-tile" onclick="selectSidebarItem(\'sale-products\')">' +
+      '<div class="qt-icon"><i class="ti ti-shopping-cart"></i></div>' +
+      '<div class="qt-body"><div class="qt-title">Каталог</div><div class="qt-meta">Продажная номенклатура</div></div>' +
+      '</div>';
+    html += '<div class="quick-tile" onclick="selectSidebarItem(\'sales-more\')">' +
+      '<div class="qt-icon"><i class="ti ti-menu-2"></i></div>' +
+      '<div class="qt-body"><div class="qt-title">Ещё</div><div class="qt-meta">Профиль и настройки</div></div>' +
+      '</div>';
+    html += '</div>';
+  }
 
   // Срочные — те у которых delivery_date близко (в течение 7 дней) и не закрыты
   const today = new Date();
