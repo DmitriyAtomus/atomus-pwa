@@ -146,7 +146,9 @@
   }
   /* На мобильном все сайдбары скрыты (есть mobile tab-bar) */
   .app.mobile-layout .sidebar { display: none !important; }
-  .app.mobile-layout .tab-bar { display: flex; }
+  /* На мобильном видим только активный tab-bar (data-active="1") */
+  .app.mobile-layout .tab-bar { display: none; }
+  .app.mobile-layout .tab-bar[data-active="1"] { display: flex; }
   .app.mobile-layout .top-bar .section-switcher { display: none; }
   .app.mobile-layout .top-bar .user-block { display: none; }
   .app.mobile-layout .m-section-tabs { display: flex; }
@@ -246,9 +248,7 @@
     gap: 4px;
     overflow-x: auto;
     scrollbar-width: none;
-    position: sticky;
-    top: 60px;
-    z-index: 25;
+    /* Не sticky — конфликтовало со screen-header. Лента просто наверху страницы, скроллится с контентом. */
   }
   .m-section-tabs::-webkit-scrollbar { display: none; }
   .m-section-tabs button {
@@ -385,9 +385,8 @@
     background: white; padding: 14px 18px;
     display: flex; align-items: center; gap: 12px;
     border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 60px;
-    z-index: 20;
+    /* Не sticky — конфликтовал с m-section-tabs (тоже sticky на top:60). Пусть скроллится с контентом. */
+    z-index: 5;
   }
   .screen-header h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; }
   .back-btn {
@@ -1286,6 +1285,185 @@
     display: block; font-size: 32px; color: var(--text-faint); margin-bottom: 6px;
   }
 
+  /* ============ БЛОК ВЕРСИИ (Этап 14А) ============ */
+  .version-block {
+    margin: 32px 18px 0;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg);
+    border-radius: 12px;
+    opacity: 0.7;
+  }
+  .desktop-layout .version-block { margin: 32px 0 0; }
+  .version-block .version-ball {
+    width: 28px; height: 28px;
+    background: var(--brand-bg);
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .version-block .version-ball::after {
+    content: "A";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand);
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .version-block .version-text { flex: 1; min-width: 0; }
+  .version-block .version-line {
+    font-size: 12px; color: var(--text-light); line-height: 1.5;
+  }
+  .version-block .version-line b { color: var(--text-mid); font-weight: 600; }
+
+  /* Версия в сайдбаре десктопа */
+  .sidebar-version {
+    padding: 8px 14px 12px;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    line-height: 1.4;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  /* ============ ПРОДАЖНАЯ НОМЕНКЛАТУРА (Этап 14А) ============ */
+
+  /* Строка в таблице/списке продажных позиций */
+  .sale-product-row {
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: 44px 1fr 130px 140px 100px 36px;
+    gap: 12px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .sale-product-row:hover { background: var(--bg); }
+  .sale-product-row.header {
+    background: #F8F9FB;
+    cursor: default;
+    padding: 11px 18px;
+    font-size: 11px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600;
+    border-top: none;
+  }
+  .sale-product-row.header:hover { background: #F8F9FB; }
+  .sale-product-row .sp-icon {
+    width: 38px; height: 38px;
+    background: var(--brand-bg); color: var(--brand);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .sale-product-row .sp-icon.service {
+    background: #F0EAFA; color: #6A4B9C;
+  }
+  .sale-product-row .sp-name { font-weight: 500; font-size: 14px; }
+  .sale-product-row .sp-name small {
+    display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+  }
+  .sale-product-row .sp-type { font-size: 13px; color: var(--text-mid); }
+  .sale-product-row .sp-price {
+    font-weight: 600; font-size: 13.5px; text-align: right;
+  }
+  .sale-product-row .sp-price.empty { color: var(--text-light); font-weight: 400; font-style: italic; }
+  .sale-product-row .sp-links {
+    font-size: 12px; color: var(--text-light);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .sale-product-row .sp-links b { color: var(--brand); font-weight: 600; }
+
+  /* Карточки на мобильном */
+  .sale-product-card {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    cursor: pointer;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .sale-product-card .spc-icon {
+    width: 38px; height: 38px;
+    background: var(--brand-bg); color: var(--brand);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .sale-product-card .spc-icon.service { background: #F0EAFA; color: #6A4B9C; }
+  .sale-product-card .spc-body { flex: 1; min-width: 0; }
+  .sale-product-card .spc-name { font-weight: 500; font-size: 14px; }
+  .spc-meta {
+    font-size: 12px; color: var(--text-light); margin-top: 4px; line-height: 1.5;
+  }
+  .spc-price { font-weight: 600; color: var(--brand); }
+
+  /* Привязанные сборки — превью в форме */
+  .linked-models-list {
+    background: var(--bg); border-radius: 10px;
+    padding: 8px;
+    display: flex; flex-direction: column; gap: 4px;
+    min-height: 40px;
+  }
+  .linked-model-chip {
+    background: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .linked-model-chip i { color: var(--brand); font-size: 16px; }
+  .linked-model-chip .lm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .linked-model-chip .lm-direction { color: var(--text-light); font-size: 11.5px; }
+  .linked-model-chip .lm-remove {
+    background: none; border: none; color: var(--text-light); cursor: pointer;
+    padding: 4px; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .linked-model-chip .lm-remove:hover { color: var(--danger); }
+  .linked-empty {
+    text-align: center; color: var(--text-light); font-size: 13px;
+    padding: 12px;
+  }
+
+  /* Чекбокс в модалке выбора моделей */
+  .modal-item.checkbox-item {
+    cursor: pointer;
+  }
+  .modal-item.checkbox-item .check {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border); border-radius: 6px;
+    background: white;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: white; font-size: 14px;
+  }
+  .modal-item.checkbox-item.selected .check {
+    background: var(--brand); border-color: var(--brand);
+  }
+  .modal-item.checkbox-item.selected { background: var(--brand-bg); }
+
+  /* Селектор единиц */
+  .unit-selector {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .unit-selector button {
+    padding: 8px 14px;
+    background: white; border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px; color: var(--text-mid);
+    cursor: pointer;
+  }
+  .unit-selector button.selected {
+    background: var(--brand-bg); color: var(--brand);
+    border-color: var(--brand); font-weight: 600;
+  }
+
   /* ============ ФОРМА СОТРУДНИКА (Этап 13В) ============ */
 
   /* Чекбокс роли */
@@ -1516,6 +1694,10 @@
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
     </aside>
 
     <!-- SIDEBAR ПОМОЩЬ -->
@@ -1539,6 +1721,10 @@
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
     </aside>
 
     <!-- SIDEBAR ПРОДАЖИ -->
@@ -1561,6 +1747,9 @@
           <button class="nav-item" data-nav="sales-contractors" onclick="selectSidebarItem('sales-contractors')">
             <i class="ti ti-briefcase"></i><span>Контрагенты</span>
           </button>
+          <button class="nav-item" data-nav="sale-products" onclick="selectSidebarItem('sale-products')">
+            <i class="ti ti-shopping-cart"></i><span>Продажная номенклатура</span>
+          </button>
         </div>
       </div>
       <div class="sidebar-footer">
@@ -1570,6 +1759,10 @@
           <div class="ur" id="sb-userrole-sales">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
       </div>
     </aside>
 
@@ -1588,6 +1781,10 @@
           <div class="ur" id="sb-userrole-coming">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
       </div>
     </aside>
 
@@ -1674,6 +1871,14 @@
           <div class="menu-item" onclick="logout()">
             <div class="menu-icon" style="background:var(--danger-bg); color:var(--danger);"><i class="ti ti-logout"></i></div>
             <div class="menu-body"><div class="menu-title">Выйти</div><div class="menu-meta">Закрыть сессию</div></div>
+          </div>
+
+          <div class="version-block">
+            <div class="version-ball"></div>
+            <div class="version-text">
+              <div class="version-line"><b>Atomus group</b></div>
+              <div class="version-line" id="version-info-mobile">—</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1968,6 +2173,58 @@
         </div>
       </div>
 
+      <!-- ПРОДАЖНАЯ НОМЕНКЛАТУРА: СПИСОК -->
+      <div class="screen" data-screen="sale-products" data-section="sales">
+        <div class="screen-header">
+          <h2>Продажная номенклатура</h2>
+          <button class="icon-btn" id="sp-mobile-new" onclick="openNewSaleProduct()"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Продажная номенклатура</h1>
+            <div class="page-subtitle" id="sp-subtitle">Каталог для составления КП</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="sp-new-btn" onclick="openNewSaleProduct()">
+              <i class="ti ti-plus"></i> Новая позиция
+            </button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div class="search-box" style="padding: 12px 18px 0;">
+            <i class="ti ti-search"></i>
+            <input type="text" id="sp-search-input" placeholder="Поиск по названию или описанию…">
+          </div>
+          <div class="filter-row" id="sp-filters">
+            <button class="filter-chip active" data-spf="all">Все</button>
+            <button class="filter-chip" data-spf="goods">Товары</button>
+            <button class="filter-chip" data-spf="service">Услуги</button>
+          </div>
+          <div id="sp-content"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+
+      <!-- ПРОДАЖНАЯ НОМЕНКЛАТУРА: ФОРМА (новая / редактирование) -->
+      <div class="screen" data-screen="sale-product-form" data-section="sales">
+        <div class="screen-header">
+          <button class="back-btn" onclick="cancelSaleProductForm()"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="spf-mobile-title">Новая позиция</h2>
+        </div>
+        <div class="page-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button class="icon-btn" onclick="cancelSaleProductForm()"><i class="ti ti-arrow-left"></i></button>
+            <div>
+              <h1 id="spf-title">Новая позиция</h1>
+              <div class="page-subtitle">Каталог для КП — отдельный от сборочного</div>
+            </div>
+          </div>
+        </div>
+        <div class="content-inner" id="spf-content">
+          <!-- Наполняется через initSaleProductForm() -->
+        </div>
+      </div>
+
       <!-- ============================================================ -->
       <!-- ============ КОНЕЦ РАЗДЕЛА ПРОДАЖИ ============ -->
       <!-- ============================================================ -->
@@ -2177,7 +2434,8 @@
   </footer>
 
   <!-- ============ TAB BAR (мобильный) ============ -->
-  <nav class="tab-bar" id="tab-bar">
+  <!-- Tab-bar Производства (показывается когда раздел = production, help, или раздел в разработке) -->
+  <nav class="tab-bar" id="tab-bar-production" data-active="1">
     <button class="tab" data-tab="dashboard" onclick="selectSidebarItem('dashboard')">
       <i class="ti ti-home"></i><span>Главная</span>
     </button>
@@ -2189,6 +2447,25 @@
     </button>
     <button class="tab" data-tab="summary" onclick="selectSidebarItem('summary')">
       <i class="ti ti-chart-bar"></i><span>Сводки</span>
+    </button>
+    <button class="tab" data-tab="account" onclick="selectSidebarItem('account')">
+      <i class="ti ti-menu-2"></i><span>Ещё</span>
+    </button>
+  </nav>
+
+  <!-- Tab-bar Продаж (показывается когда раздел = sales) -->
+  <nav class="tab-bar" id="tab-bar-sales" data-active="0">
+    <button class="tab" data-tab="sales-dashboard" onclick="selectSidebarItem('sales-dashboard')">
+      <i class="ti ti-home"></i><span>Главная</span>
+    </button>
+    <button class="tab" data-tab="sales-contracts" onclick="selectSidebarItem('sales-contracts')">
+      <i class="ti ti-file-text"></i><span>Договоры</span>
+    </button>
+    <button class="tab plus-btn" id="tab-plus-sales" onclick="openNewContract()">
+      <i class="ti ti-circle-plus-filled"></i>
+    </button>
+    <button class="tab" data-tab="sales-contractors" onclick="selectSidebarItem('sales-contractors')">
+      <i class="ti ti-briefcase"></i><span>Контрагенты</span>
     </button>
     <button class="tab" data-tab="account" onclick="selectSidebarItem('account')">
       <i class="ti ti-menu-2"></i><span>Ещё</span>
@@ -2251,6 +2528,28 @@
   </div>
 </div>
 
+<!-- ============ МОДАЛКА ВЫБОРА СБОРОЧНЫХ МОДЕЛЕЙ (для привязки к продажной позиции) ============ -->
+<div class="modal-overlay" id="models-link-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Привязать сборочные позиции</h3>
+      <button class="icon-btn" onclick="closeModelsLinkModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-search">
+      <input type="text" id="models-link-search" placeholder="Поиск по названию или артикулу…">
+    </div>
+    <div class="modal-body" id="models-link-body">
+      <div class="loading-block">Загружаем модели…</div>
+    </div>
+    <div style="padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 8px;">
+      <button class="btn btn-secondary" onclick="closeModelsLinkModal()" style="flex: 1; justify-content: center;">Отмена</button>
+      <button class="btn btn-primary" onclick="applyModelsLink()" style="flex: 2; justify-content: center;">
+        <i class="ti ti-check"></i> Применить
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -2260,6 +2559,9 @@
 <script>
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
+// Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
+const APP_VERSION = "v1.0.0-stage14a";
+const APP_VERSION_DATE = "13.05.2026";
 
 // ============ Архитектура «под расширения» ============
 // Структура: section → sidebar item → screen
@@ -2563,6 +2865,14 @@ function renderProfile() {
     const el = document.getElementById(id); if (el) el.textContent = roles || 'без роли';
   });
 
+  // Версия приложения (в Аккаунте и в сайдбаре десктопа)
+  const versionText = APP_VERSION + ' · ' + APP_VERSION_DATE;
+  const vMobile = document.getElementById('version-info-mobile');
+  if (vMobile) vMobile.textContent = versionText;
+  document.querySelectorAll('.sidebar-version-text').forEach(el => {
+    el.textContent = versionText;
+  });
+
   // Условный показ «Сотрудники» только директору
   const navEmp = document.getElementById('nav-employees');
   if (navEmp) {
@@ -2587,7 +2897,8 @@ function renderProfile() {
   const scNewBtn = document.getElementById('sc-new-btn');
   const scMobileNew = document.getElementById('sc-mobile-new');
   const dashNewBtn = document.getElementById('sales-dashboard-new-btn');
-  [navSalesNew, scNewBtn, scMobileNew, dashNewBtn].forEach(el => {
+  const tabPlusSales = document.getElementById('tab-plus-sales');
+  [navSalesNew, scNewBtn, scMobileNew, dashNewBtn, tabPlusSales].forEach(el => {
     if (el) el.style.display = canSales ? '' : 'none';
   });
   // Кнопка «Удалить» в карточке договора — только директор
@@ -2630,10 +2941,15 @@ function selectSection(sectionName) {
   const sidebar = document.getElementById(config.sidebar);
   if (sidebar) sidebar.dataset.visible = '1';
 
-  // Скрываем/показываем tab-bar.
-  // На десктопе tab-bar всегда скрыт (CSS), на мобильном — показываем для всех разделов.
-  // Раньше прятали для нечего-делать разделов, но это ломало навигацию на мобильном.
-  // Tab-bar теперь всегда виден на мобильном.
+  // Переключаем tab-bar (мобильный). У Продаж — свой, у остальных — производственный.
+  document.querySelectorAll('.tab-bar').forEach(tb => { tb.dataset.active = '0'; });
+  if (sectionName === 'sales') {
+    const tbSales = document.getElementById('tab-bar-sales');
+    if (tbSales) tbSales.dataset.active = '1';
+  } else {
+    const tbProd = document.getElementById('tab-bar-production');
+    if (tbProd) tbProd.dataset.active = '1';
+  }
 
   // Открываем экран раздела по умолчанию
   selectSidebarItem(config.defaultScreen);
@@ -2672,6 +2988,8 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sales-contract-form') initContractForm();
   if (screenName === 'sales-contractors') loadContractors();
   if (screenName === 'sales-contractor-form') initContractorForm();
+  if (screenName === 'sale-products') loadSaleProducts();
+  if (screenName === 'sale-product-form') initSaleProductForm();
 }
 
 function goHome() {
@@ -2689,6 +3007,7 @@ function refreshCurrentScreen() {
   if (s === 'sales-dashboard') { cache.contracts = null; cache.contractsCounts = null; }
   if (s === 'sales-contracts') { cache.contracts = null; cache.contractsCounts = null; }
   if (s === 'sales-contractors') cache.contractors = null;
+  if (s === 'sale-products') cache.saleProducts = null;
   selectSidebarItem(s);
 }
 
@@ -3310,6 +3629,495 @@ async function toggleEmployeeActive(makeActive) {
 }
 
 // ============ КОНЕЦ ЭТАПА 13В ============
+
+// ============================================================================
+// ============ ЭТАП 14А: ПРОДАЖНАЯ НОМЕНКЛАТУРА ============================
+// ============================================================================
+
+// Состояние продажной номенклатуры
+state.saleProductsFilter = 'all';      // 'all' / 'goods' / 'service'
+state.saleProductsSearch = '';
+state.saleProductFormMode = 'new';     // 'new' / 'edit'
+state.currentSaleProductId = null;
+state.saleProductForm = {
+  name: '',
+  description: '',
+  product_type: 'goods',
+  base_price: '',
+  unit: 'шт.',
+  linkedModels: [],     // массив объектов {model_id, model_name, model_extra, model_article, direction_name}
+};
+state._modelsLinkSelection = [];       // временная выборка во время открытой модалки
+
+cache.saleProducts = null;
+
+// --------- ЗАГРУЗКА ----------
+
+async function loadSaleProducts() {
+  const container = document.getElementById('sp-content');
+  if (cache.saleProducts) {
+    renderSaleProductsList();
+  } else {
+    container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  }
+  try {
+    const d = await apiGet('/api/sale-products');
+    cache.saleProducts = d;
+    renderSaleProductsList();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSaleProductsList() {
+  const container = document.getElementById('sp-content');
+  const d = cache.saleProducts;
+  if (!d) return;
+  const all = d.products || [];
+  const counts = d.counts || {};
+  const filter = state.saleProductsFilter;
+  const search = (state.saleProductsSearch || '').toLowerCase().trim();
+
+  // Обновляем чипсы
+  document.querySelectorAll('#sp-filters .filter-chip').forEach(chip => {
+    const k = chip.dataset.spf;
+    const baseLabels = { 'all': 'Все', 'goods': 'Товары', 'service': 'Услуги' };
+    let count = 0;
+    if (k === 'all') count = counts.total || 0;
+    else count = counts[k] || 0;
+    chip.textContent = baseLabels[k] + (count ? ' · ' + count : '');
+    chip.classList.toggle('active', k === filter);
+  });
+
+  // Подзаголовок
+  const sub = document.getElementById('sp-subtitle');
+  if (sub) sub.textContent = (counts.goods || 0) + ' товаров · ' + (counts.service || 0) + ' услуг';
+
+  // Фильтрация
+  let list = all;
+  if (filter !== 'all') list = list.filter(p => p.product_type === filter);
+  if (search) {
+    list = list.filter(p =>
+      (p.name || '').toLowerCase().includes(search) ||
+      (p.description || '').toLowerCase().includes(search)
+    );
+  }
+
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-shopping-cart"></i>Пока нет позиций' +
+      (canManageSales() ? '<br><br><button class="btn btn-primary" onclick="openNewSaleProduct()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первую</button>' : '') +
+      '</div>';
+    return;
+  }
+
+  if (state.isDesktop) {
+    let html = '<div style="padding: 0;"><div class="contracts-table">';
+    html += '<div class="sale-product-row header">' +
+      '<div></div>' +
+      '<div>Название</div>' +
+      '<div>Тип</div>' +
+      '<div style="text-align: right;">Цена</div>' +
+      '<div>Сборки</div>' +
+      '<div></div>' +
+      '</div>';
+    list.forEach(p => {
+      const isService = p.product_type === 'service';
+      const iconCls = isService ? 'ti-tools' : 'ti-package';
+      const colorCls = isService ? 'service' : '';
+      const priceHtml = (p.base_price !== null && p.base_price !== undefined)
+        ? formatMoney(p.base_price) + ' <small style="color:var(--text-light); font-weight:400;">/ ' + escapeHtml(p.unit) + '</small>'
+        : '<span class="sp-price empty">по запросу</span>';
+      html += '<div class="sale-product-row ' + (isService ? 'service' : '') + '" onclick="openEditSaleProduct(' + p.id + ')">' +
+        '<div class="sp-icon ' + colorCls + '"><i class="ti ' + iconCls + '"></i></div>' +
+        '<div class="sp-name">' + escapeHtml(p.name) +
+          (p.description ? '<small>' + escapeHtml(p.description) + '</small>' : '') +
+        '</div>' +
+        '<div class="sp-type">' + escapeHtml(p.product_type_label) + '</div>' +
+        '<div class="sp-price">' + priceHtml + '</div>' +
+        '<div class="sp-links"><i class="ti ti-link"></i><span>—</span></div>' +
+        '<div class="ct-arrow"><i class="ti ti-chevron-right"></i></div>' +
+        '</div>';
+    });
+    html += '</div></div>';
+    container.innerHTML = html;
+  } else {
+    let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
+    list.forEach(p => {
+      const isService = p.product_type === 'service';
+      const iconCls = isService ? 'ti-tools' : 'ti-package';
+      const colorCls = isService ? 'service' : '';
+      const priceText = (p.base_price !== null && p.base_price !== undefined)
+        ? formatMoney(p.base_price) + ' / ' + p.unit
+        : 'по запросу';
+      html += '<div class="sale-product-card" onclick="openEditSaleProduct(' + p.id + ')">' +
+        '<div class="spc-icon ' + colorCls + '"><i class="ti ' + iconCls + '"></i></div>' +
+        '<div class="spc-body">' +
+          '<div class="spc-name">' + escapeHtml(p.name) + '</div>' +
+          '<div class="spc-meta">' + escapeHtml(p.product_type_label) +
+          ' · <span class="spc-price">' + escapeHtml(priceText) + '</span></div>' +
+        '</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+}
+
+// --------- ФОРМА ----------
+
+function openNewSaleProduct() {
+  if (!canManageSales()) {
+    showToast('Создавать позиции может директор, зам или менеджер', 'error');
+    return;
+  }
+  state.saleProductFormMode = 'new';
+  state.currentSaleProductId = null;
+  state.saleProductForm = {
+    name: '', description: '', product_type: 'goods', base_price: '', unit: 'шт.', linkedModels: [],
+  };
+  selectSidebarItem('sale-product-form');
+}
+
+async function openEditSaleProduct(productId) {
+  if (!canManageSales()) {
+    showToast('Редактировать может директор, зам или менеджер', 'error');
+    return;
+  }
+  state.saleProductFormMode = 'edit';
+  state.currentSaleProductId = productId;
+  try {
+    const p = await apiGet('/api/sale-products/' + productId);
+    state.saleProductForm = {
+      name: p.name || '',
+      description: p.description || '',
+      product_type: p.product_type || 'goods',
+      base_price: p.base_price !== null && p.base_price !== undefined ? p.base_price : '',
+      unit: p.unit || 'шт.',
+      linkedModels: (p.linked_models || []).map(lm => ({
+        model_id: lm.model_id,
+        model_name: lm.model_name,
+        model_extra: lm.model_extra,
+        model_article: lm.model_article,
+        direction_name: lm.direction_name,
+      })),
+    };
+    selectSidebarItem('sale-product-form');
+  } catch (e) {
+    showToast('Не удалось загрузить позицию: ' + String(e), 'error');
+  }
+}
+
+function cancelSaleProductForm() {
+  selectSidebarItem('sale-products');
+}
+
+function initSaleProductForm() {
+  const isEdit = state.saleProductFormMode === 'edit';
+  document.getElementById('spf-title').textContent = isEdit ? 'Редактирование позиции' : 'Новая позиция';
+  document.getElementById('spf-mobile-title').textContent = isEdit ? 'Редактирование' : 'Новая позиция';
+  renderSaleProductForm();
+}
+
+function renderSaleProductForm() {
+  const container = document.getElementById('spf-content');
+  const f = state.saleProductForm;
+  const isEdit = state.saleProductFormMode === 'edit';
+  const isGoods = f.product_type === 'goods';
+
+  // Список единиц
+  const units = ['шт.', 'усл.', 'компл.', 'м', 'м²', 'м³', 'кг', 'л', 'ч'];
+
+  let html = '';
+
+  // Блок 1: Основные данные
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Позиция</div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Название <span class="req">*</span></label>' +
+          '<input type="text" id="spf-name" value="' + escapeHtml(f.name) + '" placeholder="напр. Увлажнитель промышленный УУЗ-300"></div></div>';
+
+  // Тип
+  html += '<div class="sales-form-row cols-1"><div><label>Тип <span class="req">*</span></label>';
+  html += '<div class="radio-chips">';
+  html += '<button type="button" class="' + (isGoods ? 'selected' : '') + '" onclick="setSaleProductType(\'goods\')">' +
+          '<i class="ti ti-package"></i> Товар</button>';
+  html += '<button type="button" class="' + (!isGoods ? 'selected' : '') + '" onclick="setSaleProductType(\'service\')">' +
+          '<i class="ti ti-tools"></i> Услуга</button>';
+  html += '</div></div></div>';
+
+  // Описание
+  html += '<div class="sales-form-row cols-1"><div><label>Описание <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(попадёт в PDF КП)</span></label>' +
+          '<textarea id="spf-description" placeholder="Подробное описание для клиента — что входит, технические характеристики, особенности">' + escapeHtml(f.description) + '</textarea></div></div>';
+
+  html += '</div>';
+
+  // Блок 2: Цена
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Цена</div>';
+  html += '<div class="sales-form-row">';
+  html += '<div><label>Базовая цена, ₽ <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(без НДС, можно пустую)</span></label>' +
+          '<input type="number" id="spf-price" value="' + (f.base_price !== '' ? f.base_price : '') + '" placeholder="напр. 50000" min="0" step="100"></div>';
+  html += '<div><label>Единица измерения</label>';
+  html += '<div class="unit-selector">';
+  units.forEach(u => {
+    html += '<button type="button" class="' + (f.unit === u ? 'selected' : '') + '" onclick="setSaleProductUnit(\'' + u + '\')">' + escapeHtml(u) + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div></div>';
+
+  // Блок 3: Привязка к сборкам
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Связанные сборочные позиции <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально, можно не привязывать — для услуг)</span></div>';
+  html += '<div class="linked-models-list" id="spf-linked-list">';
+  if (f.linkedModels.length === 0) {
+    html += '<div class="linked-empty">Не привязано ни одной сборки</div>';
+  } else {
+    f.linkedModels.forEach(lm => {
+      const name = lm.model_name + (lm.model_extra ? ' · ' + lm.model_extra : '');
+      html += '<div class="linked-model-chip">' +
+        '<i class="ti ti-package-import"></i>' +
+        '<div class="lm-name">' + escapeHtml(name) + ' <span class="lm-direction">(' + escapeHtml(lm.direction_name || '—') + ')</span></div>' +
+        '<button class="lm-remove" onclick="removeLinkedModel(' + lm.model_id + ')" title="Убрать">' +
+          '<i class="ti ti-x"></i></button>' +
+        '</div>';
+    });
+  }
+  html += '</div>';
+  html += '<button class="btn btn-secondary" onclick="openModelsLinkModal()" style="width: 100%; justify-content: center; margin-top: 10px;">' +
+          '<i class="ti ti-link"></i> Привязать сборки</button>';
+  html += '</div>';
+
+  // Кнопки
+  html += '<div class="sales-action-bar">';
+  html += '<button class="btn btn-secondary" onclick="cancelSaleProductForm()">Отмена</button>';
+  html += '<button class="btn btn-primary" id="spf-submit" onclick="submitSaleProductForm()">' +
+          '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать позицию') + '</button>';
+  html += '</div>';
+  if (isEdit) {
+    html += '<div style="padding: 0 18px;"><button class="danger-btn-text" onclick="deleteCurrentSaleProduct()">' +
+            '<i class="ti ti-trash"></i> Удалить позицию</button></div>';
+  }
+  html += '<div id="spf-error"></div>';
+
+  container.innerHTML = html;
+
+  // Подвязка input → state
+  document.getElementById('spf-name').addEventListener('input', e => { state.saleProductForm.name = e.target.value; });
+  document.getElementById('spf-description').addEventListener('input', e => { state.saleProductForm.description = e.target.value; });
+  document.getElementById('spf-price').addEventListener('input', e => { state.saleProductForm.base_price = e.target.value; });
+}
+
+function setSaleProductType(t) {
+  state.saleProductForm.product_type = t;
+  renderSaleProductForm();
+}
+
+function setSaleProductUnit(u) {
+  state.saleProductForm.unit = u;
+  renderSaleProductForm();
+}
+
+function removeLinkedModel(modelId) {
+  state.saleProductForm.linkedModels = state.saleProductForm.linkedModels.filter(lm => lm.model_id !== modelId);
+  renderSaleProductForm();
+}
+
+async function submitSaleProductForm() {
+  const errEl = document.getElementById('spf-error');
+  const btn = document.getElementById('spf-submit');
+  errEl.innerHTML = '';
+
+  const f = state.saleProductForm;
+  if (!f.name.trim()) {
+    errEl.innerHTML = '<div class="sales-error">Укажите название</div>';
+    return;
+  }
+
+  const payload = {
+    name: f.name.trim(),
+    description: f.description.trim(),
+    product_type: f.product_type,
+    unit: f.unit,
+    linked_model_ids: f.linkedModels.map(lm => lm.model_id),
+  };
+
+  if (f.base_price !== '' && f.base_price !== null) {
+    const n = Number(f.base_price);
+    if (isNaN(n) || n < 0) {
+      errEl.innerHTML = '<div class="sales-error">Некорректная цена</div>';
+      return;
+    }
+    payload.base_price = n;
+  } else {
+    payload.base_price = null;
+  }
+
+  const isEdit = state.saleProductFormMode === 'edit';
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
+
+  try {
+    let r;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (isEdit) {
+      r = await fetch(API_BASE + '/api/sale-products/' + state.currentSaleProductId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      r = await fetch(API_BASE + '/api/sale-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    }
+    const data = await r.json();
+    if (!r.ok) {
+      errEl.innerHTML = '<div class="sales-error">' + escapeHtml(data.message || data.error || 'Ошибка') + '</div>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать позицию');
+      return;
+    }
+    showToast(isEdit ? 'Позиция обновлена' : 'Позиция создана', 'success');
+    cache.saleProducts = null;
+    setTimeout(() => selectSidebarItem('sale-products'), 200);
+  } catch (e) {
+    errEl.innerHTML = '<div class="sales-error">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать позицию');
+  }
+}
+
+async function deleteCurrentSaleProduct() {
+  if (!state.currentSaleProductId) return;
+  if (!confirm('Удалить позицию из каталога? Это soft-delete — позиция станет архивной.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-products/' + state.currentSaleProductId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json();
+      showToast(d.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    showToast('Позиция удалена', 'success');
+    cache.saleProducts = null;
+    selectSidebarItem('sale-products');
+  } catch (e) {
+    showToast('Ошибка: ' + String(e), 'error');
+  }
+}
+
+// --------- МОДАЛКА ПРИВЯЗКИ МОДЕЛЕЙ ----------
+
+function openModelsLinkModal() {
+  // Запоминаем уже выбранные id
+  state._modelsLinkSelection = state.saleProductForm.linkedModels.map(lm => lm.model_id);
+  document.getElementById('models-link-modal').classList.add('visible');
+  document.getElementById('models-link-search').value = '';
+  loadModelsForLinkModal('');
+}
+
+function closeModelsLinkModal() {
+  document.getElementById('models-link-modal').classList.remove('visible');
+}
+
+async function loadModelsForLinkModal(query) {
+  const container = document.getElementById('models-link-body');
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    if (!cache.models) {
+      const d = await apiGet('/api/models');
+      cache.models = d;
+    }
+    let all = (cache.models && cache.models.models) || [];
+    if (query) {
+      const q = query.toLowerCase();
+      all = all.filter(m =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.article || '').toLowerCase().includes(q) ||
+        (m.extra || '').toLowerCase().includes(q)
+      );
+    }
+    if (!all.length) {
+      container.innerHTML = '<div class="empty-block"><i class="ti ti-search"></i>Не найдено</div>';
+      return;
+    }
+    let html = '';
+    all.forEach(m => {
+      const selected = state._modelsLinkSelection.includes(m.id);
+      const fullName = m.name + (m.extra ? ' · ' + m.extra : '');
+      html += '<div class="modal-item checkbox-item' + (selected ? ' selected' : '') + '" onclick="toggleModelLink(' + m.id + ')">' +
+        '<div class="check">' + (selected ? '<i class="ti ti-check"></i>' : '') + '</div>' +
+        '<div class="mi-text">' +
+          '<div class="mi-title">' + escapeHtml(fullName) + '</div>' +
+          '<div class="mi-meta">' + escapeHtml(m.article || '—') +
+          (m.direction_name ? ' · ' + escapeHtml(m.direction_name) : '') + '</div>' +
+        '</div></div>';
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function toggleModelLink(modelId) {
+  const idx = state._modelsLinkSelection.indexOf(modelId);
+  if (idx >= 0) state._modelsLinkSelection.splice(idx, 1);
+  else state._modelsLinkSelection.push(modelId);
+  // Перерисуем чекбоксы (но не перезагружая модели)
+  const search = document.getElementById('models-link-search').value;
+  loadModelsForLinkModal(search);
+}
+
+function applyModelsLink() {
+  // Сохраняем выбор в saleProductForm.linkedModels
+  const all = (cache.models && cache.models.models) || [];
+  state.saleProductForm.linkedModels = state._modelsLinkSelection.map(mid => {
+    const m = all.find(x => x.id === mid);
+    if (!m) return null;
+    return {
+      model_id: m.id,
+      model_name: m.name,
+      model_extra: m.extra || '',
+      model_article: m.article || '',
+      direction_name: m.direction_name || '',
+    };
+  }).filter(Boolean);
+  closeModelsLinkModal();
+  renderSaleProductForm();
+}
+
+// --------- ОБРАБОТЧИКИ ----------
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Фильтры продажной номенклатуры
+  document.querySelectorAll('#sp-filters .filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.saleProductsFilter = chip.dataset.spf;
+      renderSaleProductsList();
+    });
+  });
+  // Поиск продажной номенклатуры
+  const spSearch = document.getElementById('sp-search-input');
+  if (spSearch) {
+    spSearch.addEventListener('input', e => {
+      state.saleProductsSearch = e.target.value;
+      renderSaleProductsList();
+    });
+  }
+  // Поиск в модалке моделей
+  const mlSearch = document.getElementById('models-link-search');
+  if (mlSearch) {
+    mlSearch.addEventListener('input', e => loadModelsForLinkModal(e.target.value));
+  }
+  // Клик вне модалки моделей закрывает
+  const mlm = document.getElementById('models-link-modal');
+  if (mlm) mlm.addEventListener('click', e => { if (e.target === mlm) closeModelsLinkModal(); });
+});
+
+// ============ КОНЕЦ ЭТАПА 14А ============
 
 // ============ МОДЕЛИ ============
 
