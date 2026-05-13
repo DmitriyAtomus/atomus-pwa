@@ -1285,6 +1285,124 @@
   .sub-section-body.empty i {
     display: block; font-size: 32px; color: var(--text-faint); margin-bottom: 6px;
   }
+
+  /* ============ ФОРМА СОТРУДНИКА (Этап 13В) ============ */
+
+  /* Чекбокс роли */
+  .role-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: all 0.1s;
+  }
+  .role-checkbox:hover { background: var(--bg); }
+  .role-checkbox.selected {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .role-checkbox .check {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    background: white;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: white;
+    font-size: 14px;
+    transition: all 0.1s;
+  }
+  .role-checkbox.selected .check {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  .role-checkbox .role-body { flex: 1; min-width: 0; }
+  .role-checkbox .role-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+  .role-checkbox.selected .role-name {
+    color: var(--brand);
+    font-weight: 600;
+  }
+  .role-checkbox .role-desc {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  /* Раскрывашка «Расширенные настройки» */
+  .advanced-toggle {
+    background: none;
+    border: none;
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 8px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .advanced-toggle:hover { text-decoration: underline; }
+  .advanced-block { display: none; margin-top: 12px; }
+  .advanced-block.visible { display: block; }
+
+  /* Кликабельный ряд сотрудника */
+  .employee-row {
+    cursor: pointer;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .employee-row:last-child { border-bottom: none; }
+  .employee-row:hover { background: var(--bg); }
+  .employee-row .emp-arrow {
+    color: var(--text-light);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Кнопка деактивации/активации */
+  .danger-btn-text {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+  }
+  .danger-btn-text:hover { background: var(--danger-bg); }
+  .success-btn-text {
+    background: none;
+    border: none;
+    color: var(--success);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+  }
+  .success-btn-text:hover { background: var(--success-bg); }
 </style>
 </head>
 <body>
@@ -1565,14 +1683,39 @@
         <div class="screen-header">
           <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
           <h2>Сотрудники</h2>
-          <button class="icon-btn" onclick="loadEmployees()"><i class="ti ti-refresh"></i></button>
+          <button class="icon-btn" id="emp-mobile-new" onclick="openNewEmployee()"><i class="ti ti-plus"></i></button>
         </div>
         <div class="page-header">
-          <div><h1>Сотрудники</h1><div class="page-subtitle">Активные и деактивированные</div></div>
-          <button class="icon-btn" onclick="loadEmployees()"><i class="ti ti-refresh"></i></button>
+          <div><h1>Сотрудники</h1><div class="page-subtitle" id="emp-subtitle">Активные и деактивированные</div></div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="emp-new-btn" onclick="openNewEmployee()">
+              <i class="ti ti-plus"></i> Новый сотрудник
+            </button>
+          </div>
         </div>
         <div class="content-inner">
           <div id="employees-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ ФОРМА СОТРУДНИКА (новый / редактирование) ============ -->
+      <div class="screen" data-screen="employee-form" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="cancelEmployeeForm()"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="empf-mobile-title">Новый сотрудник</h2>
+        </div>
+        <div class="page-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button class="icon-btn" onclick="cancelEmployeeForm()"><i class="ti ti-arrow-left"></i></button>
+            <div>
+              <h1 id="empf-title">Новый сотрудник</h1>
+              <div class="page-subtitle" id="empf-subtitle">Заполните данные и выберите роли</div>
+            </div>
+          </div>
+        </div>
+        <div class="content-inner" id="empf-content">
+          <!-- наполняется через initEmployeeForm() -->
         </div>
       </div>
 
@@ -2519,6 +2662,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'history') loadHistory();
   if (screenName === 'summary') loadSummary();
   if (screenName === 'employees') loadEmployees();
+  if (screenName === 'employee-form') initEmployeeForm();
   if (screenName === 'models') loadModels();
   if (screenName === 'new-assembly') initNewAssemblyForm();
   // Продажи
@@ -2818,26 +2962,40 @@ function renderEmployees(d) {
   const container = document.getElementById('employees-list');
   const active = d.employees.filter(e => e.is_active);
   const inactive = d.employees.filter(e => !e.is_active);
+
+  // Обновляем подзаголовок и видимость кнопок «Новый сотрудник»
+  const isDirector = state.user && (state.user.roles || []).includes('director');
+  const subtitle = document.getElementById('emp-subtitle');
+  if (subtitle) subtitle.textContent = active.length + ' активных · ' + inactive.length + ' деактивированных';
+  const newBtn = document.getElementById('emp-new-btn');
+  const mobileNewBtn = document.getElementById('emp-mobile-new');
+  [newBtn, mobileNewBtn].forEach(b => { if (b) b.style.display = isDirector ? '' : 'none'; });
+
   let html = '';
   if (active.length === 0 && inactive.length === 0) {
-    container.innerHTML = '<div class="empty-block"><i class="ti ti-users"></i>Сотрудников нет</div>'; return;
+    let emptyHtml = '<div class="empty-block"><i class="ti ti-users"></i>Сотрудников нет';
+    if (isDirector) {
+      emptyHtml += '<br><br><button class="btn btn-primary" onclick="openNewEmployee()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первого</button>';
+    }
+    emptyHtml += '</div>';
+    container.innerHTML = emptyHtml;
+    return;
   }
   if (active.length) {
     html += '<div class="section-label">Активные · ' + active.length + '</div><div class="card">';
-    active.forEach(e => html += renderEmployeeRow(e));
+    active.forEach(e => html += renderEmployeeRow(e, isDirector));
     html += '</div>';
   }
   if (inactive.length) {
     html += '<div class="section-label">Деактивированные · ' + inactive.length + '</div><div class="card">';
-    inactive.forEach(e => html += renderEmployeeRow(e));
+    inactive.forEach(e => html += renderEmployeeRow(e, isDirector));
     html += '</div>';
   }
   container.innerHTML = html;
 }
 
-function renderEmployeeRow(e) {
+function renderEmployeeRow(e, isDirector) {
   // 6 ролей со строчных букв (для badge на карточке).
-  // Бэк пока возвращает только director/accountant/master, остальные появятся в Этапе 13.
   const rolesMap = {
     director:   'директор',
     zam:        'зам директора',
@@ -2852,10 +3010,306 @@ function renderEmployeeRow(e) {
   if (e.phone) meta.push(e.phone);
   if (e.tab_number) meta.push('таб. ' + e.tab_number);
   const inactiveClass = e.is_active ? '' : ' emp-inactive';
-  return '<div class="employee-row' + inactiveClass + '">' +
+  const clickAttr = isDirector ? ' onclick="openEditEmployee(' + e.id + ')"' : '';
+  const arrow = isDirector ? '<div class="emp-arrow"><i class="ti ti-chevron-right"></i></div>' : '';
+  return '<div class="employee-row' + inactiveClass + '"' + clickAttr + '>' +
     '<div class="emp-info"><div class="emp-name">' + escapeHtml(e.full_name || e.short_name || '—') + '</div>' +
-    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + ' ' + badges + '</div></div></div>';
+    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + ' ' + badges + '</div></div>' +
+    arrow + '</div>';
 }
+
+// ============================================================================
+// ЭТАП 13В: УПРАВЛЕНИЕ СОТРУДНИКАМИ ЧЕРЕЗ PWA
+// ============================================================================
+
+// Состояние формы сотрудника
+state.employeeFormMode = 'new';       // 'new' или 'edit'
+state.currentEmployeeId = null;
+state.employeeForm = {
+  full_name: '',
+  position: '',
+  phone: '',
+  tab_number: '',
+  telegram_id: '',
+  roles: [],            // массив строк, напр. ['director','master']
+  _is_active: true,     // для режима редактирования: показывать ли кнопку «Деактивировать»
+};
+
+// Список 6 ролей — теперь синхронизирован с бэком (фронт может рендерить независимо).
+const ROLES_LIST = [
+  { code: 'director',   label: 'Директор',       desc: 'Полный доступ ко всему' },
+  { code: 'zam',        label: 'Зам директора',  desc: 'Управление продажами, договорами, ценами' },
+  { code: 'manager',    label: 'Менеджер',       desc: 'Ведение клиентов, договоров, КП' },
+  { code: 'engineer',   label: 'Инженер',        desc: 'Согласование ТЗ, технические задачи' },
+  { code: 'master',     label: 'Мастер',         desc: 'Внесение сборок в производстве' },
+  { code: 'accountant', label: 'Бухгалтер',      desc: 'Просмотр финансовых отчётов' },
+];
+
+function openNewEmployee() {
+  if (!state.user || !(state.user.roles || []).includes('director')) {
+    showToast('Создавать сотрудников может только директор', 'error');
+    return;
+  }
+  state.employeeFormMode = 'new';
+  state.currentEmployeeId = null;
+  state.employeeForm = {
+    full_name: '', position: '', phone: '', tab_number: '', telegram_id: '',
+    roles: [], _is_active: true,
+  };
+  selectSidebarItem('employee-form');
+}
+
+function openEditEmployee(empId) {
+  if (!state.user || !(state.user.roles || []).includes('director')) {
+    showToast('Редактировать может только директор', 'error');
+    return;
+  }
+  // Берём сотрудника из кэша
+  const emp = (cache.employees && cache.employees.employees || []).find(e => e.id === empId);
+  if (!emp) {
+    showToast('Сотрудник не найден', 'error');
+    return;
+  }
+  state.employeeFormMode = 'edit';
+  state.currentEmployeeId = empId;
+  state.employeeForm = {
+    full_name: emp.full_name || '',
+    position: emp.position || '',
+    phone: emp.phone || '',
+    tab_number: emp.tab_number || '',
+    telegram_id: emp.telegram_id ? String(emp.telegram_id) : '',
+    roles: [...(emp.roles || [])],
+    _is_active: !!emp.is_active,
+  };
+  selectSidebarItem('employee-form');
+}
+
+function cancelEmployeeForm() {
+  selectSidebarItem('employees');
+}
+
+function initEmployeeForm() {
+  document.getElementById('empf-title').textContent =
+    state.employeeFormMode === 'edit' ? 'Редактирование сотрудника' : 'Новый сотрудник';
+  document.getElementById('empf-mobile-title').textContent =
+    state.employeeFormMode === 'edit' ? 'Редактирование' : 'Новый сотрудник';
+  document.getElementById('empf-subtitle').textContent =
+    state.employeeFormMode === 'edit'
+      ? 'Изменение данных и ролей'
+      : 'После создания сотрудник зайдёт в систему через /login в Telegram-боте';
+  renderEmployeeForm();
+}
+
+function renderEmployeeForm() {
+  const container = document.getElementById('empf-content');
+  const f = state.employeeForm;
+  const isEdit = state.employeeFormMode === 'edit';
+
+  let html = '';
+
+  // Блок 1: Основные данные
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Основные данные</div>';
+  html += '<div class="sales-form-row cols-1"><div><label>ФИО <span class="req">*</span></label>' +
+          '<input type="text" id="empf-full-name" value="' + escapeHtml(f.full_name) + '" placeholder="напр. Иванов Иван Иванович"></div></div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Должность <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(свободный текст)</span></label>' +
+          '<input type="text" id="empf-position" value="' + escapeHtml(f.position) + '" placeholder="напр. Менеджер по продажам"></div></div>';
+  html += '<div class="sales-form-row">';
+  html += '<div><label>Телефон</label>' +
+          '<input type="tel" id="empf-phone" value="' + escapeHtml(f.phone) + '" placeholder="+7 ..."></div>';
+  html += '<div><label>Табельный номер</label>' +
+          '<input type="text" id="empf-tab-number" value="' + escapeHtml(f.tab_number) + '" placeholder="напр. 0034"></div>';
+  html += '</div>';
+  html += '</div>';
+
+  // Блок 2: Роли (галочки)
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Роли в системе <span class="req" style="color:var(--danger);">*</span> <span style="font-weight:400; font-size:12px; color:var(--text-light); margin-left:4px;">можно выбрать несколько</span></div>';
+  ROLES_LIST.forEach(r => {
+    const selected = f.roles.includes(r.code);
+    html += '<div class="role-checkbox' + (selected ? ' selected' : '') + '" onclick="toggleEmployeeRole(\'' + r.code + '\')">' +
+      '<div class="check">' + (selected ? '<i class="ti ti-check"></i>' : '') + '</div>' +
+      '<div class="role-body">' +
+        '<div class="role-name">' + escapeHtml(r.label) + '</div>' +
+        '<div class="role-desc">' + escapeHtml(r.desc) + '</div>' +
+      '</div></div>';
+  });
+  html += '</div>';
+
+  // Блок 3: Расширенные настройки (скрыто по умолчанию, разворачивается)
+  html += '<div class="sales-form-section">';
+  html += '<button class="advanced-toggle" onclick="toggleAdvancedSettings()">' +
+          '<i class="ti ti-chevron-down" id="empf-adv-icon"></i> Расширенные настройки</button>';
+  html += '<div class="advanced-block" id="empf-advanced">';
+  html += '<div class="sales-form-row cols-1"><div><label>Telegram ID <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(необязательно — обычно сотрудник входит через /login)</span></label>' +
+          '<input type="text" id="empf-telegram-id" value="' + escapeHtml(f.telegram_id) + '" placeholder="напр. 123456789" inputmode="numeric"></div></div>';
+  html += '<div style="background: var(--bg); padding: 12px 14px; border-radius: 8px; font-size: 12.5px; color: var(--text-mid); line-height: 1.6; margin-top: 6px;">' +
+          '<b>Как сотрудник войдёт в систему:</b><br>' +
+          '1. Откроет бота <code style="background:white; padding:1px 5px; border-radius:4px; border:1px solid var(--border);">@AtomusgroupBot</code><br>' +
+          '2. Отправит команду <code style="background:white; padding:1px 5px; border-radius:4px; border:1px solid var(--border);">/login</code><br>' +
+          '3. Получит 6-значный код и введёт его на странице входа PWA<br>' +
+          '4. Telegram-аккаунт автоматически привяжется к карточке сотрудника' +
+          '</div>';
+  html += '</div></div>';
+
+  // Блок 4: Активация/деактивация (только в режиме редактирования)
+  if (isEdit) {
+    html += '<div class="sales-form-section">';
+    html += '<div class="sales-form-title">Статус сотрудника</div>';
+    if (f._is_active) {
+      html += '<button class="danger-btn-text" onclick="toggleEmployeeActive(false)">' +
+              '<i class="ti ti-user-off"></i> Деактивировать сотрудника</button>';
+      html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; line-height: 1.5; padding: 0 12px;">' +
+              'Сотрудник перестанет видеть систему и не будет показываться в списках для назначения. Данные сохранятся.' +
+              '</div>';
+    } else {
+      html += '<button class="success-btn-text" onclick="toggleEmployeeActive(true)">' +
+              '<i class="ti ti-user-check"></i> Активировать сотрудника</button>';
+      html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; line-height: 1.5; padding: 0 12px;">' +
+              'Сотрудник снова сможет входить в систему.' +
+              '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Кнопки
+  html += '<div class="sales-action-bar">';
+  html += '<button class="btn btn-secondary" onclick="cancelEmployeeForm()">Отмена</button>';
+  html += '<button class="btn btn-primary" id="empf-submit" onclick="submitEmployeeForm()">' +
+          '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать сотрудника') + '</button>';
+  html += '</div>';
+  html += '<div id="empf-error"></div>';
+
+  container.innerHTML = html;
+
+  // Подвязка input → state
+  document.getElementById('empf-full-name').addEventListener('input', e => { state.employeeForm.full_name = e.target.value; });
+  document.getElementById('empf-position').addEventListener('input', e => { state.employeeForm.position = e.target.value; });
+  document.getElementById('empf-phone').addEventListener('input', e => { state.employeeForm.phone = e.target.value; });
+  document.getElementById('empf-tab-number').addEventListener('input', e => { state.employeeForm.tab_number = e.target.value; });
+  const tgEl = document.getElementById('empf-telegram-id');
+  if (tgEl) tgEl.addEventListener('input', e => { state.employeeForm.telegram_id = e.target.value.replace(/\D/g, ''); });
+}
+
+function toggleEmployeeRole(roleCode) {
+  const idx = state.employeeForm.roles.indexOf(roleCode);
+  if (idx >= 0) state.employeeForm.roles.splice(idx, 1);
+  else state.employeeForm.roles.push(roleCode);
+  renderEmployeeForm();
+}
+
+function toggleAdvancedSettings() {
+  const block = document.getElementById('empf-advanced');
+  const icon = document.getElementById('empf-adv-icon');
+  if (!block) return;
+  if (block.classList.contains('visible')) {
+    block.classList.remove('visible');
+    if (icon) icon.className = 'ti ti-chevron-down';
+  } else {
+    block.classList.add('visible');
+    if (icon) icon.className = 'ti ti-chevron-up';
+  }
+}
+
+async function submitEmployeeForm() {
+  const errEl = document.getElementById('empf-error');
+  const btn = document.getElementById('empf-submit');
+  errEl.innerHTML = '';
+
+  const f = state.employeeForm;
+  if (!f.full_name.trim()) {
+    errEl.innerHTML = '<div class="sales-error">Укажите ФИО</div>';
+    return;
+  }
+  if (f.roles.length === 0) {
+    errEl.innerHTML = '<div class="sales-error">Выберите хотя бы одну роль</div>';
+    return;
+  }
+
+  const payload = {
+    full_name: f.full_name.trim(),
+    position: f.position.trim(),
+    phone: f.phone.trim(),
+    tab_number: f.tab_number.trim(),
+    roles: f.roles,
+  };
+  if (f.telegram_id) {
+    const tg = parseInt(f.telegram_id);
+    if (isNaN(tg) || tg <= 0) {
+      errEl.innerHTML = '<div class="sales-error">Telegram ID должен быть числом</div>';
+      return;
+    }
+    payload.telegram_id = tg;
+  }
+
+  const isEdit = state.employeeFormMode === 'edit';
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
+
+  try {
+    let r;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (isEdit) {
+      r = await fetch(API_BASE + '/api/employees/' + state.currentEmployeeId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      r = await fetch(API_BASE + '/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    }
+    const data = await r.json();
+    if (!r.ok) {
+      errEl.innerHTML = '<div class="sales-error">' + escapeHtml(data.message || data.error || 'Ошибка') + '</div>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать сотрудника');
+      return;
+    }
+    showToast(isEdit ? 'Сотрудник обновлён' : 'Сотрудник создан', 'success');
+    cache.employees = null;
+    cache.activeEmployees = null;
+    cache.managersForPicker = null;
+    setTimeout(() => selectSidebarItem('employees'), 200);
+  } catch (e) {
+    errEl.innerHTML = '<div class="sales-error">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать сотрудника');
+  }
+}
+
+async function toggleEmployeeActive(makeActive) {
+  if (!state.currentEmployeeId) return;
+  const verb = makeActive ? 'активировать' : 'деактивировать';
+  if (!confirm('Точно ' + verb + ' сотрудника?')) return;
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/employees/' + state.currentEmployeeId + '/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ is_active: makeActive }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast(makeActive ? 'Сотрудник активирован' : 'Сотрудник деактивирован', 'success');
+    cache.employees = null;
+    cache.activeEmployees = null;
+    cache.managersForPicker = null;
+    state.employeeForm._is_active = makeActive;
+    renderEmployeeForm();
+  } catch (e) {
+    showToast('Ошибка: ' + String(e), 'error');
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 13В ============
 
 // ============ МОДЕЛИ ============
 
