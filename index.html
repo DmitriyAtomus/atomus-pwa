@@ -1629,6 +1629,109 @@
     padding: 0 2px;
   }
 
+  /* ============ ЭТАП 16Г: ОТГРУЗКИ + АКТИВНОСТИ ============ */
+
+  /* Карточка предстоящей отгрузки */
+  .shipment-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .shipment-row:hover { background: var(--bg); }
+  .shipment-row .sr-day-cell {
+    flex: 0 0 auto;
+    min-width: 56px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+  .shipment-row .sr-day-num {
+    font-size: 18px; font-weight: 700;
+    line-height: 1;
+    color: var(--text-dark);
+  }
+  .shipment-row .sr-day-month {
+    font-size: 10.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-top: 2px;
+  }
+  .shipment-row.urgent .sr-day-num { color: var(--danger); }
+  .shipment-row.soon .sr-day-num { color: var(--warning, #C18B00); }
+
+  .shipment-row .sr-body { flex: 1; min-width: 0; }
+  .shipment-row .sr-num {
+    font-size: 13px; font-weight: 600; color: var(--brand);
+    margin-bottom: 2px;
+  }
+  .shipment-row .sr-contractor {
+    font-size: 13px; color: var(--text-dark);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .shipment-row .sr-meta {
+    font-size: 11.5px; color: var(--text-light);
+    margin-top: 2px;
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .shipment-row .sr-meta .sr-deadline-pill {
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: var(--bg);
+    font-size: 11px; font-weight: 500;
+  }
+  .shipment-row.urgent .sr-deadline-pill {
+    background: #FEE5E5; color: var(--danger);
+  }
+  .shipment-row.soon .sr-deadline-pill {
+    background: #FFF4E6; color: var(--warning, #C18B00);
+  }
+
+  /* Лента активностей */
+  .activity-feed {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .activity-row {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .activity-row:first-child { border-top: none; }
+  .activity-row .ar-icon {
+    flex: 0 0 28px;
+    width: 28px; height: 28px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .activity-row .ar-body { flex: 1; min-width: 0; }
+  .activity-row .ar-text {
+    font-size: 13px;
+    color: var(--text-dark);
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .activity-row .ar-time {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .activity-empty {
+    padding: 22px 16px;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+
   /* ============ ЭТАП 16В: ЗАДАЧИ ============ */
 
   .task-row {
@@ -3795,7 +3898,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.6.0-stage16v";
+const APP_VERSION = "v1.7.0-stage16g";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4255,7 +4358,7 @@ function goHome() {
 
 function refreshCurrentScreen() {
   const s = state.currentScreen;
-  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; }   // ЭТАП 16Б+В
+  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; cache.upcomingShipments = null; cache.recentActivity = null; }   // ЭТАП 16Б+В+Г
   if (s === 'dashboard') cache.dashboard = null;
   if (s === 'history') cache.history = {};
   if (s === 'summary') cache.summary = {};
@@ -6991,14 +7094,16 @@ state.calcExpanded = false;
 // ---------- Главная: загрузка и рендер ----------
 
 async function loadHomeDashboard() {
-  // Параллельно — KPI, курс, мои задачи. Калькулятор не нуждается в API.
+  // Параллельно — KPI, курс, мои задачи, отгрузки, активности. Калькулятор не нуждается в API.
   const container = document.getElementById('home-content');
   // Сначала рендерим скелет (приветствие + плейсхолдеры)
   renderHomeSkeleton();
   // Дальше — независимые загрузки
   loadHomeKpi();
   loadCbrRates();
-  loadHomeMyTasks();   // ЭТАП 16В
+  loadHomeMyTasks();      // ЭТАП 16В
+  loadHomeShipments();    // ЭТАП 16Г
+  loadHomeActivity();     // ЭТАП 16Г
 }
 
 function renderHomeSkeleton() {
@@ -7026,9 +7131,17 @@ function renderHomeSkeleton() {
   html += '<div class="home-kpi-title" style="margin-top: 20px;">Мои задачи</div>';
   html += '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
+  // ЭТАП 16Г: «Ближайшие отгрузки»
+  html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 20px;">Ближайшие отгрузки</div>';
+  html += '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+
   // Курс валют placeholder
   html += '<div class="home-kpi-title" style="margin-top: 20px;">Курсы ЦБ РФ</div>';
   html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
+
+  // ЭТАП 16Г: «Последние действия»
+  html += '<div class="home-kpi-title" style="margin-top: 20px;">Последние действия</div>';
+  html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // Калькулятор
   html += '<div class="home-kpi-title" style="margin-top: 20px;">Инструменты</div>';
@@ -8156,6 +8269,156 @@ function renderHomeMyTasks() {
 }
 
 // ============ КОНЕЦ ЭТАПА 16В ============
+
+// ============================================================================
+// ============ ЭТАП 16Г: ОТГРУЗКИ + АКТИВНОСТИ НА ГЛАВНОЙ ====================
+// ============================================================================
+
+cache.upcomingShipments = null;
+cache.recentActivity = null;
+
+async function loadHomeShipments() {
+  try {
+    const d = await apiGet('/api/home/upcoming-shipments');
+    cache.upcomingShipments = d;
+    renderHomeShipments();
+  } catch (e) {
+    const el = document.getElementById('home-shipments-block');
+    if (el) el.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить отгрузки</div>';
+  }
+}
+
+function renderHomeShipments() {
+  const el = document.getElementById('home-shipments-block');
+  if (!el) return;
+  const d = cache.upcomingShipments || { contracts: [] };
+  const list = d.contracts || [];
+
+  // Если список пустой и пользователь — мастер/etc — просто скрываем секцию
+  if (!list.length) {
+    const titleEl = document.getElementById('home-shipments-title');
+    if (titleEl) titleEl.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  list.forEach(c => { html += renderShipmentRow(c); });
+  el.innerHTML = html;
+}
+
+function renderShipmentRow(c) {
+  const diff = c.days_to_deadline;
+  let cls = '';
+  let pillText = '';
+  if (diff !== null && diff !== undefined) {
+    if (diff < 0) {
+      cls = 'urgent';
+      pillText = 'просрочен ' + Math.abs(diff) + ' дн.';
+    } else if (diff === 0) {
+      cls = 'urgent';
+      pillText = 'сегодня';
+    } else if (diff === 1) {
+      cls = 'soon';
+      pillText = 'завтра';
+    } else if (diff <= 3) {
+      cls = 'soon';
+      pillText = 'через ' + diff + ' дн.';
+    } else {
+      pillText = 'через ' + diff + ' дн.';
+    }
+  }
+
+  // Дата
+  let dayNum = '—', dayMon = '';
+  if (c.delivery_date) {
+    try {
+      const d = new Date(c.delivery_date);
+      if (!isNaN(d.getTime())) {
+        dayNum = d.getDate();
+        const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+        dayMon = months[d.getMonth()];
+      }
+    } catch (e) {}
+  }
+
+  const meta = [];
+  if (pillText) meta.push('<span class="sr-deadline-pill">' + escapeHtml(pillText) + '</span>');
+  meta.push('<span>' + escapeHtml(c.status_label || '—') + '</span>');
+  if (c.manager_name) meta.push('<span>· ' + escapeHtml(c.manager_name) + '</span>');
+
+  return '<div class="shipment-row ' + cls + '" onclick="openContractDetail(' + c.id + ')">' +
+    '<div class="sr-day-cell">' +
+      '<div class="sr-day-num">' + escapeHtml(String(dayNum)) + '</div>' +
+      '<div class="sr-day-month">' + escapeHtml(dayMon) + '</div>' +
+    '</div>' +
+    '<div class="sr-body">' +
+      '<div class="sr-num">' + escapeHtml(c.number || '—') + '</div>' +
+      '<div class="sr-contractor">' + escapeHtml(c.contractor_name || '—') + '</div>' +
+      '<div class="sr-meta">' + meta.join('') + '</div>' +
+    '</div></div>';
+}
+
+// ---- Лента активностей ----
+
+async function loadHomeActivity() {
+  try {
+    const d = await apiGet('/api/home/recent-activity');
+    cache.recentActivity = d;
+    renderHomeActivity();
+  } catch (e) {
+    const el = document.getElementById('home-activity-block');
+    if (el) el.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить активности</div>';
+  }
+}
+
+function renderHomeActivity() {
+  const el = document.getElementById('home-activity-block');
+  if (!el) return;
+  const d = cache.recentActivity || { activity: [] };
+  const list = d.activity || [];
+
+  if (!list.length) {
+    el.innerHTML = '<div class="activity-feed"><div class="activity-empty">' +
+                   '<i class="ti ti-history" style="display:block; font-size:28px; color:var(--text-faint); margin-bottom:6px;"></i>' +
+                   'Пока активностей нет</div></div>';
+    return;
+  }
+
+  let html = '<div class="activity-feed">';
+  list.forEach(a => {
+    html += '<div class="activity-row">' +
+      '<div class="ar-icon"><i class="ti ' + escapeHtml(a.icon || 'ti-circle') + '"></i></div>' +
+      '<div class="ar-body">' +
+        '<div class="ar-text">' + escapeHtml(a.text || '') + '</div>' +
+        '<div class="ar-time">' + escapeHtml(formatActivityTime(a.created_at)) + '</div>' +
+      '</div></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function formatActivityTime(iso) {
+  if (!iso) return '';
+  try {
+    // SQLite отдаёт UTC время в формате "2026-05-14 09:30:15"
+    const d = new Date(iso.replace(' ', 'T') + 'Z');
+    if (isNaN(d.getTime())) return iso;
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'только что';
+    if (diffMin < 60) return diffMin + ' мин. назад';
+    const diffH = Math.round(diffMin / 60);
+    if (diffH < 24) return diffH + ' ч. назад';
+    const diffD = Math.round(diffH / 24);
+    if (diffD < 7) return diffD + ' дн. назад';
+    // Иначе показываем дату
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  } catch (e) { return iso; }
+}
+
+// ============ КОНЕЦ ЭТАПА 16Г ============
 
 // ============ МОДЕЛИ ============
 
