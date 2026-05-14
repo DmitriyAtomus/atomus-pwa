@@ -1629,6 +1629,179 @@
     padding: 0 2px;
   }
 
+  /* ============ ЭТАП 16В: ЗАДАЧИ ============ */
+
+  .task-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex; gap: 12px; align-items: flex-start;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .task-row:hover { background: var(--bg); }
+  .task-row.task-done { opacity: 0.6; }
+  .task-row.task-done .task-row-title { text-decoration: line-through; }
+
+  .task-row-priority {
+    flex: 0 0 4px;
+    align-self: stretch;
+    border-radius: 2px;
+    background: var(--text-faint);
+    min-height: 38px;
+  }
+  .task-row-priority.urgent { background: var(--danger); }
+  .task-row-priority.low { background: var(--success); }
+
+  .task-row-body { flex: 1; min-width: 0; }
+  .task-row-title {
+    font-size: 14px; font-weight: 600; color: var(--text-dark);
+    line-height: 1.35;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .task-row-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-size: 11.5px; color: var(--text-light);
+  }
+  .task-row-meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .task-row-meta .task-meta-deadline.urgent {
+    color: var(--danger); font-weight: 500;
+  }
+  .task-row-meta .task-meta-deadline.soon {
+    color: var(--warning, #C18B00); font-weight: 500;
+  }
+
+  .task-status-pill {
+    flex: 0 0 auto;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    background: var(--bg); color: var(--text-mid);
+    white-space: nowrap;
+    align-self: center;
+  }
+  .task-status-pill.new { background: var(--brand-bg); color: var(--brand); }
+  .task-status-pill.in_progress { background: #FFF4E6; color: #C18B00; }
+  .task-status-pill.done { background: #E8F5E9; color: var(--success); }
+  .task-status-pill.cancelled { background: #F4F4F5; color: var(--text-faint); }
+
+  /* Карточка задачи (detail) */
+  .task-detail-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin: 0 18px 12px;
+  }
+  .task-detail-status-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .task-detail-status-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text-mid);
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .task-detail-status-btn:hover { background: var(--bg); }
+  .task-detail-status-btn.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .task-detail-status-btn.active.done {
+    background: var(--success); border-color: var(--success);
+  }
+  .task-detail-status-btn.active.cancelled {
+    background: var(--text-faint); border-color: var(--text-faint);
+  }
+
+  .task-detail-description {
+    background: var(--bg);
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.5;
+    margin-bottom: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Виджет «Мои задачи» на главной */
+  .home-tasks-widget {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .home-tasks-widget .htw-head {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .home-tasks-widget .htw-head i:first-child {
+    color: var(--brand); font-size: 18px;
+  }
+  .home-tasks-widget .htw-title {
+    flex: 1;
+    font-size: 13px; font-weight: 600;
+  }
+  .home-tasks-widget .htw-link {
+    font-size: 12px; color: var(--brand);
+    text-decoration: none; cursor: pointer;
+  }
+  .home-tasks-widget .htw-list .task-row {
+    border: none; border-radius: 0;
+    border-top: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .home-tasks-widget .htw-list .task-row:first-child { border-top: none; }
+  .home-tasks-widget .htw-empty {
+    padding: 22px 16px;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+  .home-tasks-widget .htw-empty i {
+    display: block; font-size: 28px; margin-bottom: 6px; color: var(--text-faint);
+  }
+
+  /* Радио-кнопки приоритета в форме */
+  .priority-row {
+    display: flex; gap: 6px;
+  }
+  .priority-row .priority-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text-mid);
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .priority-row .priority-btn i { font-size: 14px; }
+  .priority-row .priority-btn.active.urgent {
+    background: #FEE5E5; color: var(--danger); border-color: var(--danger);
+  }
+  .priority-row .priority-btn.active.normal {
+    background: var(--brand-bg); color: var(--brand); border-color: var(--brand);
+  }
+  .priority-row .priority-btn.active.low {
+    background: #E8F5E9; color: var(--success); border-color: var(--success);
+  }
+
   /* Выбор «На склад / Под договор» в форме сборки */
   .dest-choice {
     display: grid;
@@ -2344,6 +2517,9 @@
       <button class="section-tab" data-section="sales">
         <i class="ti ti-briefcase"></i>Продажи
       </button>
+      <button class="section-tab" data-section="tasks">
+        <i class="ti ti-checklist"></i>Задачи
+      </button>
       <button class="section-tab" data-section="warehouse">
         <i class="ti ti-building-warehouse"></i>Склад<span class="soon-badge">скоро</span>
       </button>
@@ -2371,6 +2547,7 @@
     <button class="active" data-section="home"><i class="ti ti-home"></i>Главная</button>
     <button data-section="production"><i class="ti ti-tool"></i>Производство</button>
     <button data-section="sales"><i class="ti ti-briefcase"></i>Продажи</button>
+    <button data-section="tasks"><i class="ti ti-checklist"></i>Задачи</button>
     <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
     <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
     <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
@@ -2438,6 +2615,39 @@
         <div class="user-info-block">
           <div class="un" id="sb-username">—</div>
           <div class="ur" id="sb-userrole">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- SIDEBAR ЗАДАЧИ (Этап 16В) -->
+    <aside class="sidebar" id="sidebar-tasks" data-section="tasks" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-checklist"></i> Задачи
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item new-btn" id="nav-tasks-new" onclick="openNewTask()">
+          <i class="ti ti-circle-plus"></i><span>Новая задача</span>
+        </button>
+        <button class="nav-item active" data-nav="tasks-list" onclick="selectSidebarItem('tasks-list')">
+          <i class="ti ti-list-check"></i><span>Все задачи</span>
+        </button>
+        <button class="nav-item" data-nav="tasks-mine" onclick="selectSidebarItem('tasks-mine')">
+          <i class="ti ti-user-check"></i><span>Назначенные мне</span>
+        </button>
+        <button class="nav-item" data-nav="tasks-created" onclick="selectSidebarItem('tasks-created')">
+          <i class="ti ti-user-edit"></i><span>Поставленные мной</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-tasks">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-tasks">—</div>
+          <div class="ur" id="sb-userrole-tasks">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
@@ -3236,6 +3446,93 @@
         </div>
       </div>
 
+      <!-- ============ ЭТАП 16В: ЗАДАЧИ ============ -->
+
+      <!-- Список всех задач -->
+      <div class="screen" data-screen="tasks-list" data-section="tasks">
+        <div class="screen-header">
+          <h2>Все задачи</h2>
+          <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div><h1>Задачи</h1><div class="page-subtitle" id="tasks-list-subtitle">—</div></div>
+          <button class="btn btn-primary" id="tasks-new-btn" onclick="openNewTask()">
+            <i class="ti ti-plus"></i> Новая задача
+          </button>
+        </div>
+        <div class="filters-row" id="tasks-filters">
+          <button class="filter-chip active" data-tf="open">Открытые</button>
+          <button class="filter-chip" data-tf="new">Новые</button>
+          <button class="filter-chip" data-tf="in_progress">В работе</button>
+          <button class="filter-chip" data-tf="done">Готовые</button>
+          <button class="filter-chip" data-tf="all">Все</button>
+        </div>
+        <div class="content-inner" id="tasks-list-content">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- Назначенные мне (только assigned_to_me) -->
+      <div class="screen" data-screen="tasks-mine" data-section="tasks">
+        <div class="screen-header">
+          <h2>Назначенные мне</h2>
+          <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div><h1>Назначенные мне</h1><div class="page-subtitle">Задачи где я исполнитель</div></div>
+        </div>
+        <div class="content-inner" id="tasks-mine-content">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- Поставленные мной (mine=1) -->
+      <div class="screen" data-screen="tasks-created" data-section="tasks">
+        <div class="screen-header">
+          <h2>Поставленные мной</h2>
+          <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div><h1>Поставленные мной</h1><div class="page-subtitle">Задачи которые я создал</div></div>
+          <button class="btn btn-primary" onclick="openNewTask()">
+            <i class="ti ti-plus"></i> Новая задача
+          </button>
+        </div>
+        <div class="content-inner" id="tasks-created-content">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- Карточка задачи -->
+      <div class="screen" data-screen="task-detail" data-section="tasks">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('tasks-list')"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="task-detail-mob-title">Задача</h2>
+        </div>
+        <div class="page-header">
+          <button class="icon-btn" onclick="selectSidebarItem('tasks-list')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+          <div><h1 id="task-detail-title">—</h1><div class="page-subtitle" id="task-detail-subtitle">—</div></div>
+        </div>
+        <div class="content-inner" id="task-detail-content">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- Форма создания/редактирования задачи -->
+      <div class="screen new-screen" data-screen="task-form" data-section="tasks">
+        <div class="screen-header">
+          <button class="back-btn" onclick="cancelTaskForm()"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="task-form-mob-title">Новая задача</h2>
+        </div>
+        <div class="page-header">
+          <div><h1 id="task-form-title">Новая задача</h1><div class="page-subtitle">Заполните данные и сохраните</div></div>
+          <button class="icon-btn" onclick="cancelTaskForm()" title="Отмена"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="content-inner" id="task-form-content">
+          <div class="loading-block">—</div>
+        </div>
+      </div>
+
       <!-- ============ ПОМОЩЬ: База знаний ============ -->
       <div class="screen" data-screen="help-knowledge" data-section="help">
         <div class="screen-header">
@@ -3498,7 +3795,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.5.0-stage16b";
+const APP_VERSION = "v1.6.0-stage16v";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -3512,6 +3809,7 @@ const SECTION_CONFIG = {
   home:       { sidebar: 'sidebar-home',       defaultScreen: 'home-dashboard' },   // ЭТАП 16Б
   production: { sidebar: 'sidebar-production', defaultScreen: 'dashboard' },
   sales:      { sidebar: 'sidebar-sales',      defaultScreen: 'sales-dashboard' },
+  tasks:      { sidebar: 'sidebar-tasks',      defaultScreen: 'tasks-list' },       // ЭТАП 16В
   warehouse:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-warehouse', comingSoon: true },
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
   supply:     { sidebar: 'sidebar-coming',     defaultScreen: 'coming-supply',    comingSoon: true },
@@ -3921,6 +4219,12 @@ function selectSidebarItem(screenName) {
   // Загрузка данных под экран
   if (screenName === 'home-dashboard') loadHomeDashboard();  // ЭТАП 16Б
   if (screenName === 'dashboard') loadDashboard();
+  // ЭТАП 16В: задачи
+  if (screenName === 'tasks-list') loadTasksList();
+  if (screenName === 'tasks-mine') loadTasksMine();
+  if (screenName === 'tasks-created') loadTasksCreated();
+  if (screenName === 'task-detail') loadTaskDetail();
+  if (screenName === 'task-form') initTaskForm();
   if (screenName === 'history') loadHistory();
   if (screenName === 'summary') loadSummary();
   if (screenName === 'employees') loadEmployees();
@@ -3951,12 +4255,15 @@ function goHome() {
 
 function refreshCurrentScreen() {
   const s = state.currentScreen;
-  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; }   // ЭТАП 16Б
+  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; }   // ЭТАП 16Б+В
   if (s === 'dashboard') cache.dashboard = null;
   if (s === 'history') cache.history = {};
   if (s === 'summary') cache.summary = {};
   if (s === 'employees') cache.employees = null;
   if (s === 'models') cache.models = null;
+  // ЭТАП 16В: задачи
+  if (s === 'tasks-list' || s === 'tasks-mine' || s === 'tasks-created') cache.tasks = {};
+  if (s === 'task-detail') { /* загрузим заново */ }
   // Продажи
   if (s === 'sales-dashboard') { cache.contracts = null; cache.contractsCounts = null; }
   if (s === 'sales-contracts') { cache.contracts = null; cache.contractsCounts = null; }
@@ -6684,13 +6991,14 @@ state.calcExpanded = false;
 // ---------- Главная: загрузка и рендер ----------
 
 async function loadHomeDashboard() {
-  // Параллельно — KPI и курс. Калькулятор не нуждается в API.
+  // Параллельно — KPI, курс, мои задачи. Калькулятор не нуждается в API.
   const container = document.getElementById('home-content');
   // Сначала рендерим скелет (приветствие + плейсхолдеры)
   renderHomeSkeleton();
   // Дальше — независимые загрузки
   loadHomeKpi();
   loadCbrRates();
+  loadHomeMyTasks();   // ЭТАП 16В
 }
 
 function renderHomeSkeleton() {
@@ -6713,6 +7021,10 @@ function renderHomeSkeleton() {
   // KPI placeholder
   html += '<div class="home-kpi-title">Сегодня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
+
+  // ЭТАП 16В: «Мои задачи»
+  html += '<div class="home-kpi-title" style="margin-top: 20px;">Мои задачи</div>';
+  html += '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // Курс валют placeholder
   html += '<div class="home-kpi-title" style="margin-top: 20px;">Курсы ЦБ РФ</div>';
@@ -7273,6 +7585,578 @@ function _updateFxResult() {
 
 // ============ КОНЕЦ ЭТАПА 16Б ============
 
+// ============================================================================
+// ============ ЭТАП 16В: ЗАДАЧИ С ПЛАНЁРКИ ===================================
+// ============================================================================
+
+cache.tasks = {};            // {tab: {tasks:[], counts:{}}}
+cache.myTasks = null;        // виджет на главной
+
+state.tasksFilter = 'open';
+state.currentTaskId = null;
+state.taskFormMode = 'new';
+state.taskForm = {
+  title: '',
+  description: '',
+  assignee_id: null,
+  assignee_name: '',
+  deadline: '',
+  priority: 'normal',
+  source: '',
+};
+
+const TASK_PRIORITIES = [
+  { code: 'low',    label: 'Низкий',  icon: 'ti-arrow-down' },
+  { code: 'normal', label: 'Обычный', icon: 'ti-equal' },
+  { code: 'urgent', label: 'Срочный', icon: 'ti-flame' },
+];
+const TASK_STATUSES = [
+  { code: 'new',         label: 'Новая' },
+  { code: 'in_progress', label: 'В работе' },
+  { code: 'done',        label: 'Готова' },
+  { code: 'cancelled',   label: 'Отменена' },
+];
+
+function canManageTasks() {
+  if (!state.user) return false;
+  const r = state.user.roles || [];
+  return r.includes('director') || r.includes('zam') || r.includes('manager');
+}
+
+// ---- Список задач (общий рендер для трёх экранов) ----
+
+async function loadTasksList() {
+  const filter = state.tasksFilter;
+  const container = document.getElementById('tasks-list-content');
+  if (cache.tasks[filter]) { renderTasksList(cache.tasks[filter]); return; }
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const q = (filter === 'all') ? '' : '?status=' + filter;
+    const d = await apiGet('/api/tasks' + q);
+    cache.tasks[filter] = d;
+    renderTasksList(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderTasksList(d) {
+  const container = document.getElementById('tasks-list-content');
+  const subtitleEl = document.getElementById('tasks-list-subtitle');
+  if (subtitleEl) {
+    const c = d.counts || {};
+    subtitleEl.textContent = (c.open || 0) + ' открытых · ' + (c.done || 0) + ' готовых';
+  }
+  const newBtnEl = document.getElementById('tasks-new-btn');
+  if (newBtnEl) newBtnEl.style.display = canManageTasks() ? '' : 'none';
+
+  const tasks = d.tasks || [];
+  if (!tasks.length) {
+    let html = '<div class="empty-block"><i class="ti ti-checklist"></i>';
+    html += state.tasksFilter === 'open' ? 'Открытых задач нет.' : 'В этом фильтре нет задач.';
+    if (canManageTasks()) {
+      html += '<br><br><button class="btn btn-primary" onclick="openNewTask()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать задачу</button>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+  let html = '<div style="padding: 0 18px;">';
+  tasks.forEach(t => { html += renderTaskRow(t); });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderTaskRow(t) {
+  const isDone = t.status === 'done' || t.status === 'cancelled';
+  const priorityCls = t.priority || 'normal';
+  const meta = [];
+  if (t.assignee_name) meta.push('<span><i class="ti ti-user"></i>' + escapeHtml(t.assignee_name) + '</span>');
+  // Дедлайн с подсветкой
+  if (t.deadline) {
+    let cls = '';
+    try {
+      const diff = Math.round((new Date(t.deadline) - new Date()) / 86400000);
+      if (!isDone && diff < 0) cls = ' urgent';
+      else if (!isDone && diff <= 1) cls = ' soon';
+    } catch (e) {}
+    meta.push('<span class="task-meta-deadline' + cls + '"><i class="ti ti-clock"></i>' +
+              escapeHtml(formatTaskDeadline(t.deadline)) + '</span>');
+  }
+  if (t.source) meta.push('<span><i class="ti ti-tag"></i>' + escapeHtml(t.source) + '</span>');
+
+  return '<div class="task-row ' + (isDone ? 'task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
+    '<div class="task-row-priority ' + priorityCls + '"></div>' +
+    '<div class="task-row-body">' +
+      '<div class="task-row-title">' + escapeHtml(t.title) + '</div>' +
+      (meta.length ? '<div class="task-row-meta">' + meta.join('') + '</div>' : '') +
+    '</div>' +
+    '<div class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</div>' +
+    '</div>';
+}
+
+function formatTaskDeadline(iso) {
+  if (!iso) return '';
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const diff = Math.round((d - today) / 86400000);
+    if (diff === 0) return 'сегодня';
+    if (diff === 1) return 'завтра';
+    if (diff === -1) return 'вчера';
+    if (diff < 0) return 'просрочен ' + Math.abs(diff) + ' дн.';
+    if (diff < 7) return 'через ' + diff + ' дн.';
+    return formatDateLong(iso);
+  } catch (e) { return iso; }
+}
+
+// ---- «Назначенные мне» ----
+
+async function loadTasksMine() {
+  const container = document.getElementById('tasks-mine-content');
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/tasks?assigned_to_me=1&status=open');
+    if (!d.tasks || !d.tasks.length) {
+      container.innerHTML = '<div class="empty-block"><i class="ti ti-user-check"></i>Назначенных вам задач нет</div>';
+      return;
+    }
+    let html = '<div style="padding: 0 18px;">';
+    d.tasks.forEach(t => { html += renderTaskRow(t); });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+// ---- «Поставленные мной» ----
+
+async function loadTasksCreated() {
+  const container = document.getElementById('tasks-created-content');
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/tasks?mine=1&status=open');
+    if (!d.tasks || !d.tasks.length) {
+      container.innerHTML = '<div class="empty-block"><i class="ti ti-clipboard-plus"></i>Вы пока не создавали задач</div>';
+      return;
+    }
+    let html = '<div style="padding: 0 18px;">';
+    d.tasks.forEach(t => { html += renderTaskRow(t); });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+// ---- Карточка задачи ----
+
+function openTaskDetail(taskId) {
+  state.currentTaskId = taskId;
+  selectSidebarItem('task-detail');
+}
+
+async function loadTaskDetail() {
+  const tid = state.currentTaskId;
+  const container = document.getElementById('task-detail-content');
+  if (!tid) {
+    container.innerHTML = '<div class="empty-block">Задача не выбрана</div>';
+    return;
+  }
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const t = await apiGet('/api/tasks/' + tid);
+    renderTaskDetail(t);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderTaskDetail(t) {
+  document.getElementById('task-detail-title').textContent = t.title || '—';
+  document.getElementById('task-detail-mob-title').textContent = t.title || 'Задача';
+  const sub = [];
+  if (t.assignee_name) sub.push('Исполнитель: ' + t.assignee_name);
+  if (t.priority === 'urgent') sub.push('🔥 срочно');
+  document.getElementById('task-detail-subtitle').textContent = sub.join(' · ') || '—';
+
+  const container = document.getElementById('task-detail-content');
+  const canEdit = canManageTasks();
+  // Кто может менять статус: создатель, исполнитель, директор/зам/менеджер
+  const myChatId = state.user && state.user.chat_id;
+  const myEmpId = state.user && state.user.employee_id;
+  const isCreator = t.creator_chat_id === myChatId;
+  const isAssignee = t.assignee_id === myEmpId;
+  const canChangeStatus = canEdit || isCreator || isAssignee;
+  const canEditFully = canEdit || isCreator;
+
+  let html = '';
+
+  // Карточка
+  html += '<div class="task-detail-card">';
+
+  // Переключатель статуса
+  if (canChangeStatus) {
+    html += '<div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; font-weight: 600;">СТАТУС</div>';
+    html += '<div class="task-detail-status-row">';
+    TASK_STATUSES.forEach(s => {
+      const active = s.code === t.status;
+      const extraCls = active ? (' active ' + s.code) : '';
+      html += '<button class="task-detail-status-btn' + extraCls + '" onclick="changeTaskStatus(' + t.id + ', \'' + s.code + '\')">' +
+        escapeHtml(s.label) + '</button>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="margin-bottom: 14px;">' +
+            '<span class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</span></div>';
+  }
+
+  // Описание
+  if (t.description) {
+    html += '<div class="task-detail-description">' + escapeHtml(t.description).replace(/\n/g, '<br>') + '</div>';
+  }
+
+  // Сетка деталей
+  html += '<div class="detail-grid">';
+  html += '<div class="detail-item"><div class="detail-label">Приоритет</div>' +
+          '<div class="detail-value">' +
+            (t.priority === 'urgent' ? '🔥 ' : '') +
+            escapeHtml(t.priority_label) + '</div></div>';
+  html += '<div class="detail-item"><div class="detail-label">Исполнитель</div>' +
+          '<div class="detail-value' + (t.assignee_name ? '' : ' muted') + '">' +
+          escapeHtml(t.assignee_name || 'не назначен') + '</div></div>';
+  html += '<div class="detail-item"><div class="detail-label">Дедлайн</div>' +
+          '<div class="detail-value' + (t.deadline ? '' : ' muted') + '">' +
+          escapeHtml(t.deadline ? formatTaskDeadline(t.deadline) : 'не указан') + '</div></div>';
+  if (t.source) {
+    html += '<div class="detail-item"><div class="detail-label">Источник</div>' +
+            '<div class="detail-value">' + escapeHtml(t.source) + '</div></div>';
+  }
+  if (t.created_at) {
+    html += '<div class="detail-item"><div class="detail-label">Создана</div>' +
+            '<div class="detail-value muted">' + escapeHtml(formatTaskDateTime(t.created_at)) + '</div></div>';
+  }
+  if (t.done_at) {
+    html += '<div class="detail-item"><div class="detail-label">Завершена</div>' +
+            '<div class="detail-value muted">' + escapeHtml(formatTaskDateTime(t.done_at)) + '</div></div>';
+  }
+  html += '</div>';
+
+  // Действия
+  html += '<div style="margin-top: 16px; display: flex; gap: 8px;">';
+  if (canEditFully) {
+    html += '<button class="btn btn-secondary" onclick="openEditTask()"><i class="ti ti-edit"></i> Редактировать</button>';
+    html += '<button class="btn btn-secondary" onclick="deleteCurrentTask()" style="color:var(--danger);"><i class="ti ti-trash"></i> Удалить</button>';
+  }
+  html += '</div>';
+
+  html += '</div>';   // task-detail-card
+
+  container.innerHTML = html;
+}
+
+function formatTaskDateTime(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso.replace(' ', 'T') + 'Z');
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return iso; }
+}
+
+async function changeTaskStatus(taskId, newStatus) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/' + taskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось изменить статус', 'error');
+      return;
+    }
+    showToast('Статус изменён', 'success');
+    cache.tasks = {};
+    cache.myTasks = null;
+    cache.homeKpi = null;
+    if (state.currentScreen === 'task-detail') loadTaskDetail();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteCurrentTask() {
+  if (!state.currentTaskId) return;
+  if (!confirm('Удалить эту задачу?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/' + state.currentTaskId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    showToast('Задача удалена', 'success');
+    cache.tasks = {};
+    cache.myTasks = null;
+    selectSidebarItem('tasks-list');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// ---- Форма задачи ----
+
+function openNewTask() {
+  if (!canManageTasks()) {
+    showToast('Создавать задачи может директор, зам или менеджер', 'error');
+    return;
+  }
+  state.taskFormMode = 'new';
+  state.currentTaskId = null;
+  state.taskForm = {
+    title: '', description: '', assignee_id: null, assignee_name: '',
+    deadline: '', priority: 'normal', source: '',
+  };
+  selectSidebarItem('task-form');
+}
+
+async function openEditTask() {
+  state.taskFormMode = 'edit';
+  if (!state.currentTaskId) return;
+  try {
+    const t = await apiGet('/api/tasks/' + state.currentTaskId);
+    state.taskForm = {
+      title: t.title || '',
+      description: t.description || '',
+      assignee_id: t.assignee_id,
+      assignee_name: t.assignee_name || '',
+      deadline: t.deadline || '',
+      priority: t.priority || 'normal',
+      source: t.source || '',
+    };
+    selectSidebarItem('task-form');
+  } catch (e) {
+    showToast('Не удалось загрузить задачу', 'error');
+  }
+}
+
+function cancelTaskForm() {
+  if (state.taskFormMode === 'edit' && state.currentTaskId) {
+    selectSidebarItem('task-detail');
+  } else {
+    selectSidebarItem('tasks-list');
+  }
+}
+
+function initTaskForm() {
+  const isEdit = state.taskFormMode === 'edit';
+  document.getElementById('task-form-title').textContent = isEdit ? 'Редактирование задачи' : 'Новая задача';
+  document.getElementById('task-form-mob-title').textContent = isEdit ? 'Редактирование' : 'Новая задача';
+  renderTaskForm();
+  // Сотрудников подтянем чтобы выбрать исполнителя
+  ensureEmployeesLoaded();
+}
+
+async function ensureEmployeesLoaded() {
+  if (cache.activeEmployees) return;
+  try {
+    const d = await apiGet('/api/employees/active');
+    cache.activeEmployees = d.employees || [];
+  } catch (e) {
+    cache.activeEmployees = [];
+  }
+}
+
+function renderTaskForm() {
+  const f = state.taskForm;
+  const container = document.getElementById('task-form-content');
+  let html = '<div class="sales-form">';
+
+  // Название
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-row cols-1"><div>' +
+          '<label>Название задачи <span class="req">*</span></label>' +
+          '<input type="text" id="tf-title" value="' + escapeHtml(f.title) + '" maxlength="200" placeholder="Кратко: что нужно сделать">' +
+          '</div></div>';
+  html += '<div class="sales-form-row cols-1"><div>' +
+          '<label>Описание <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
+          '<textarea id="tf-description" rows="3" placeholder="Подробности задачи">' + escapeHtml(f.description) + '</textarea>' +
+          '</div></div>';
+  html += '</div>';
+
+  // Исполнитель + дедлайн
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-row">';
+  html += '<div><label>Исполнитель</label>' + renderAssigneeSelect(f.assignee_id) + '</div>';
+  html += '<div><label>Дедлайн <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
+          '<input type="date" id="tf-deadline" value="' + escapeHtml(f.deadline) + '"></div>';
+  html += '</div>';
+
+  // Приоритет
+  html += '<div class="sales-form-row cols-1"><div>' +
+          '<label>Приоритет</label>' +
+          '<div class="priority-row">';
+  TASK_PRIORITIES.forEach(p => {
+    const active = p.code === f.priority;
+    html += '<button type="button" class="priority-btn' + (active ? ' active ' + p.code : '') + '" onclick="setTaskPriority(\'' + p.code + '\')">' +
+            '<i class="ti ' + p.icon + '"></i>' + p.label + '</button>';
+  });
+  html += '</div></div></div>';
+
+  // Источник
+  html += '<div class="sales-form-row cols-1"><div>' +
+          '<label>Источник <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(напр. «Планёрка 14.05.2026» или «Звонок клиента»)</span></label>' +
+          '<input type="text" id="tf-source" value="' + escapeHtml(f.source) + '" placeholder="Откуда задача">' +
+          '</div></div>';
+  html += '</div>';
+
+  // Кнопки
+  html += '<div class="sales-action-bar">';
+  html += '<button class="btn btn-secondary" onclick="cancelTaskForm()">Отмена</button>';
+  html += '<button class="btn btn-primary" id="tf-submit" onclick="submitTaskForm()">' +
+          '<i class="ti ti-check"></i> ' + (state.taskFormMode === 'edit' ? 'Сохранить' : 'Создать задачу') + '</button>';
+  html += '</div>';
+  html += '<div id="tf-error"></div>';
+
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Подвязка
+  document.getElementById('tf-title').addEventListener('input', e => { state.taskForm.title = e.target.value; });
+  document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; });
+  document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; });
+  document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; });
+  const assigneeSel = document.getElementById('tf-assignee');
+  if (assigneeSel) {
+    assigneeSel.addEventListener('change', e => {
+      const v = e.target.value;
+      state.taskForm.assignee_id = v ? parseInt(v) : null;
+      const opt = assigneeSel.selectedOptions[0];
+      state.taskForm.assignee_name = opt ? opt.textContent : '';
+    });
+  }
+}
+
+function renderAssigneeSelect(currentId) {
+  const list = cache.activeEmployees || [];
+  let html = '<select id="tf-assignee"><option value="">— не назначен —</option>';
+  list.forEach(e => {
+    const sel = (e.id === currentId) ? ' selected' : '';
+    html += '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.full_name || e.short_name || '—') + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+function setTaskPriority(p) {
+  state.taskForm.priority = p;
+  // Обновим только кнопки приоритета — без полной перерисовки
+  document.querySelectorAll('.priority-row .priority-btn').forEach(b => {
+    b.className = 'priority-btn';
+  });
+  // Подсветим выбранную: ищем по индексу в TASK_PRIORITIES
+  const idx = TASK_PRIORITIES.findIndex(x => x.code === p);
+  const btns = document.querySelectorAll('.priority-row .priority-btn');
+  if (btns[idx]) btns[idx].className = 'priority-btn active ' + p;
+}
+
+async function submitTaskForm() {
+  const errEl = document.getElementById('tf-error');
+  const btn = document.getElementById('tf-submit');
+  errEl.innerHTML = '';
+
+  const f = state.taskForm;
+  if (!f.title.trim()) {
+    errEl.innerHTML = '<div class="sales-error">Укажите название задачи</div>';
+    return;
+  }
+
+  const payload = {
+    title: f.title.trim(),
+    description: f.description.trim(),
+    assignee_id: f.assignee_id || null,
+    deadline: f.deadline || null,
+    priority: f.priority || 'normal',
+    source: f.source.trim(),
+  };
+
+  const isEdit = state.taskFormMode === 'edit';
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = isEdit
+      ? API_BASE + '/api/tasks/' + state.currentTaskId
+      : API_BASE + '/api/tasks';
+    const r = await fetch(url, {
+      method: isEdit ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      errEl.innerHTML = '<div class="sales-error">' + escapeHtml(d.message || 'Не удалось сохранить') + '</div>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать задачу');
+      return;
+    }
+    const created = await r.json();
+    showToast(isEdit ? 'Задача обновлена' : 'Задача создана', 'success');
+    cache.tasks = {};
+    cache.myTasks = null;
+    cache.homeKpi = null;
+    state.currentTaskId = created.id;
+    selectSidebarItem('task-detail');
+  } catch (e) {
+    errEl.innerHTML = '<div class="sales-error">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать задачу');
+  }
+}
+
+// ---- Виджет «Мои задачи» на главной ----
+
+async function loadHomeMyTasks() {
+  try {
+    const d = await apiGet('/api/home/my-tasks');
+    cache.myTasks = d;
+    renderHomeMyTasks();
+  } catch (e) {
+    // тихо
+  }
+}
+
+function renderHomeMyTasks() {
+  const el = document.getElementById('home-tasks-block');
+  if (!el) return;
+  const d = cache.myTasks || { tasks: [], total_open: 0 };
+  let html = '<div class="home-tasks-widget">';
+  html += '<div class="htw-head">';
+  html += '<i class="ti ti-checklist"></i>';
+  html += '<div class="htw-title">Мои задачи · ' + (d.total_open || 0) + ' открытых</div>';
+  html += '<a class="htw-link" onclick="goToSection(\'tasks\', \'tasks-mine\')">все →</a>';
+  html += '</div>';
+  if (!d.tasks || !d.tasks.length) {
+    html += '<div class="htw-empty"><i class="ti ti-circle-check"></i>Нет активных задач</div>';
+  } else {
+    html += '<div class="htw-list">';
+    d.tasks.forEach(t => { html += renderTaskRow(t); });
+    html += '</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ============ КОНЕЦ ЭТАПА 16В ============
+
 // ============ МОДЕЛИ ============
 
 async function loadModels() {
@@ -7680,6 +8564,16 @@ document.querySelectorAll('#summary-filters .filter-chip').forEach(chip => {
     chip.classList.add('active');
     state.summaryFilter = chip.dataset.sf;
     loadSummary();
+  });
+});
+
+// ЭТАП 16В: фильтры задач
+document.querySelectorAll('#tasks-filters .filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#tasks-filters .filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.tasksFilter = chip.dataset.tf;
+    loadTasksList();
   });
 });
 
