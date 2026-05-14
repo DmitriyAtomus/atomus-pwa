@@ -1335,13 +1335,25 @@
 
   /* ЭТАП 16А: двойное поле «число + единица» для срока действия */
   .duration-row {
-    display: flex; gap: 8px;
+    display: flex; gap: 8px; align-items: stretch;
   }
   .duration-row input[type="number"] {
     flex: 1; min-width: 0;
   }
   .duration-row select {
     flex: 1.2; min-width: 0;
+  }
+  /* ЭТАП 16А-2: суффикс «рабочих дней» рядом с полем */
+  .duration-row .duration-suffix {
+    flex: 1.2; min-width: 0;
+    display: flex; align-items: center;
+    padding: 0 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-mid);
+    white-space: nowrap;
   }
 
   /* Выбор «На склад / Под договор» в форме сборки */
@@ -3165,7 +3177,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.4.0-stage16a";
+const APP_VERSION = "v1.4.1-stage16a2";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4790,6 +4802,7 @@ state.offerForm = {
   valid_duration_value: 14,           // ЭТАП 16А: число (по умолч. 14)
   valid_duration_unit: 'days',        // ЭТАП 16А: 'days'|'weeks'|'months'
   production_term: '',
+  production_days: null,              // ЭТАП 16А-2: срок изготовления в рабочих днях
   payment_terms: '',
   delivery_terms: '',
   comment_internal: '',
@@ -5029,9 +5042,19 @@ function renderOfferDetail(o) {
   html += '<div class="detail-item"><div class="detail-label">Срок действия</div>' +
           '<div class="detail-value' + (validHasValue ? '' : ' muted') + '">' +
           escapeHtml(validText) + '</div></div>';
+  // ЭТАП 16А-2: срок изготовления — приоритет у числа рабочих дней
+  let prodText = 'не указан';
+  let prodHasValue = false;
+  if (o.production_days) {
+    prodText = productionDaysLabel(o.production_days);
+    prodHasValue = true;
+  } else if (o.production_term) {
+    prodText = o.production_term;
+    prodHasValue = true;
+  }
   html += '<div class="detail-item"><div class="detail-label">Срок изготовления</div>' +
-          '<div class="detail-value' + (o.production_term ? '' : ' muted') + '">' +
-          escapeHtml(o.production_term || 'не указан') + '</div></div>';
+          '<div class="detail-value' + (prodHasValue ? '' : ' muted') + '">' +
+          escapeHtml(prodText) + '</div></div>';
   if (o.payment_terms) {
     html += '<div class="detail-item span-2"><div class="detail-label">Условия оплаты</div>' +
             '<div class="detail-value">' + escapeHtml(o.payment_terms) + '</div></div>';
@@ -5255,7 +5278,8 @@ function openNewOffer() {
     valid_duration_value: 14,              // ЭТАП 16А: 14 дней по умолчанию
     valid_duration_unit: 'days',
     production_term: '',
-    payment_terms: '',
+    production_days: 20,                  // ЭТАП 16А-2: 20 рабочих дней по умолчанию
+    payment_terms: '50% при изготовлении, 50% перед отгрузкой',  // ЭТАП 16А-2: шаблон по умолч.
     delivery_terms: '',
     comment_internal: '',
     comment_client: '',
@@ -5283,6 +5307,7 @@ async function openEditOffer() {
       valid_duration_value: o.valid_duration_value || 14,
       valid_duration_unit: o.valid_duration_unit || 'days',
       production_term: o.production_term || '',
+      production_days: o.production_days || null,
       payment_terms: o.payment_terms || '',
       delivery_terms: o.delivery_terms || '',
       comment_internal: o.comment_internal || '',
@@ -5381,11 +5406,17 @@ function renderOfferForm() {
           '<option value="months"' + (f.valid_duration_unit === 'months' ? ' selected' : '') + '>месяцев</option>' +
           '</select>' +
           '</div></div>';
-  html += '<div><label>Срок изготовления <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(текстом)</span></label>' +
-          '<input type="text" id="sof-production-term" value="' + escapeHtml(f.production_term) + '" placeholder="напр. 3-4 недели"></div>';
+  // ЭТАП 16А-2: срок изготовления — число + «рабочих дней»
+  html += '<div><label>Срок изготовления</label>' +
+          '<div class="duration-row">' +
+          '<input type="number" id="sof-production-days" min="0" max="365" value="' + (f.production_days || '') + '" placeholder="20">' +
+          '<div class="duration-suffix">рабочих дней</div>' +
+          '</div></div>';
   html += '</div>';
-  html += '<div class="sales-form-row cols-1"><div><label>Условия оплаты</label>' +
-          '<input type="text" id="sof-payment-terms" value="' + escapeHtml(f.payment_terms) + '" placeholder="напр. 30% предоплата, 70% по готовности"></div></div>';
+
+  // ЭТАП 16А-2: Условия оплаты — выпадашка с шаблонами + «свой вариант»
+  html += renderPaymentTermsField(f.payment_terms);
+
   html += '<div class="sales-form-row cols-1"><div><label>Условия доставки</label>' +
           '<input type="text" id="sof-delivery-terms" value="' + escapeHtml(f.delivery_terms) + '" placeholder="напр. Самовывоз / доставка ТК"></div></div>';
   html += '</div>';
@@ -5458,8 +5489,19 @@ function renderOfferForm() {
   document.getElementById('sof-valid-duration-unit').addEventListener('change', e => {
     state.offerForm.valid_duration_unit = e.target.value;
   });
-  document.getElementById('sof-production-term').addEventListener('input', e => { state.offerForm.production_term = e.target.value; });
-  document.getElementById('sof-payment-terms').addEventListener('input', e => { state.offerForm.payment_terms = e.target.value; });
+  // ЭТАП 16А-2: production_days
+  const pdEl = document.getElementById('sof-production-days');
+  if (pdEl) {
+    pdEl.addEventListener('input', e => {
+      const v = parseInt(e.target.value);
+      state.offerForm.production_days = (isNaN(v) || v <= 0) ? null : Math.min(365, v);
+    });
+  }
+  // ЭТАП 16А-2: условия оплаты — либо select, либо textarea (зависит от состояния)
+  const ptInput = document.getElementById('sof-payment-terms-input');
+  if (ptInput) {
+    ptInput.addEventListener('input', e => { state.offerForm.payment_terms = e.target.value; });
+  }
   document.getElementById('sof-delivery-terms').addEventListener('input', e => { state.offerForm.delivery_terms = e.target.value; });
   document.getElementById('sof-comment-client').addEventListener('input', e => { state.offerForm.comment_client = e.target.value; });
   document.getElementById('sof-comment-internal').addEventListener('input', e => { state.offerForm.comment_internal = e.target.value; });
@@ -5511,6 +5553,7 @@ async function submitOfferForm() {
     valid_duration_value: f.valid_duration_value || 14,
     valid_duration_unit: f.valid_duration_unit || 'days',
     production_term: f.production_term.trim() || null,
+    production_days: f.production_days || null,         // ЭТАП 16А-2
     payment_terms: f.payment_terms.trim() || null,
     delivery_terms: f.delivery_terms.trim() || null,
     comment_internal: f.comment_internal.trim() || null,
@@ -6089,6 +6132,61 @@ function pluralAssemblies(n) {
   return 'сборок';
 }
 
+// ЭТАП 16А-2: шаблоны условий оплаты
+const PAYMENT_TERMS_PRESETS = [
+  '50% при подписании договора, 50% перед отгрузкой',
+  '50% при изготовлении, 50% перед отгрузкой',
+  '30% предоплата, 70% по готовности',
+  '100% предоплата',
+  'По факту отгрузки',
+];
+
+// ЭТАП 16А-2: рендер поля «Условия оплаты» с выпадашкой шаблонов
+function renderPaymentTermsField(currentValue) {
+  const v = currentValue || '';
+  const isPreset = PAYMENT_TERMS_PRESETS.includes(v);
+  // Если значение пустое или совпадает с шаблоном — показываем select
+  // Если значение свой вариант — показываем textarea + кнопку "вернуть к шаблонам"
+  let html = '<div class="sales-form-row cols-1"><div>';
+  html += '<label>Условия оплаты</label>';
+  if (!v || isPreset) {
+    html += '<select id="sof-payment-terms-select" onchange="onPaymentTermsSelectChange(this.value)">';
+    html += '<option value="">— не указано —</option>';
+    PAYMENT_TERMS_PRESETS.forEach(p => {
+      html += '<option value="' + escapeHtml(p) + '"' + (v === p ? ' selected' : '') + '>' + escapeHtml(p) + '</option>';
+    });
+    html += '<option value="__custom__">✏ Свой вариант…</option>';
+    html += '</select>';
+  } else {
+    // Свой вариант — показываем textarea и кнопку «вернуть к шаблонам»
+    html += '<textarea id="sof-payment-terms-input" rows="2" placeholder="Введите свой вариант">' + escapeHtml(v) + '</textarea>';
+    html += '<button type="button" class="btn-link" onclick="resetPaymentTermsToPresets()" style="background:none; border:none; color:var(--brand); padding:6px 0; cursor:pointer; font-size:12px; text-align:left;">' +
+            '<i class="ti ti-arrow-back-up"></i> Выбрать из шаблонов</button>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function onPaymentTermsSelectChange(value) {
+  if (value === '__custom__') {
+    // Переключаемся в режим свободного ввода
+    state.offerForm.payment_terms = state.offerForm.payment_terms || ' ';
+    renderOfferForm();
+    // Фокус в textarea
+    setTimeout(() => {
+      const ta = document.getElementById('sof-payment-terms-input');
+      if (ta) { ta.value = ''; ta.focus(); state.offerForm.payment_terms = ''; }
+    }, 50);
+    return;
+  }
+  state.offerForm.payment_terms = value;
+}
+
+function resetPaymentTermsToPresets() {
+  state.offerForm.payment_terms = '';
+  renderOfferForm();
+}
+
 // ЭТАП 16А: человекочитаемое «14 дней / 2 недели / 1 месяц»
 function validDurationLabel(value, unit) {
   const v = parseInt(value) || 0;
@@ -6111,6 +6209,17 @@ function validDurationLabel(value, unit) {
   if (a === 1) return v + ' день';
   if (a >= 2 && a <= 4) return v + ' дня';
   return v + ' дней';
+}
+
+// ЭТАП 16А-2: «20 рабочих дней» / «1 рабочий день»
+function productionDaysLabel(days) {
+  const v = parseInt(days) || 0;
+  if (v <= 0) return '';
+  const a = v % 10, b = v % 100;
+  if (b >= 11 && b <= 14) return v + ' рабочих дней';
+  if (a === 1) return v + ' рабочий день';
+  if (a >= 2 && a <= 4) return v + ' рабочих дня';
+  return v + ' рабочих дней';
 }
 
 function openContractDetail(contractId) {
