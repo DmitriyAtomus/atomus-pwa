@@ -4004,7 +4004,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.8.0-stage17";
+const APP_VERSION = "v1.8.1-fix1";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4250,7 +4250,9 @@ function showApp() {
 
 function renderProfile() {
   if (!state.user) return;
-  const name = state.user.full_name || state.user.short_name || '—';
+  // FIX v1.8.1-fix1: fallback на state.user.name для совместимости с ответом /api/auth/code,
+  // где бэк возвращает поле "name", а не "full_name"/"short_name" (как в /api/me).
+  const name = state.user.full_name || state.user.short_name || state.user.name || '—';
   // 6 ролей в системе (полный набор для будущих этапов).
   // Сейчас бэк поддерживает только 3 первых (director/accountant/master),
   // остальные (zam/manager/engineer) появятся в Этапе 13 с разделом «Продажи».
@@ -6945,10 +6947,11 @@ function renderProductionMore() {
 
   let html = '';
   // Профиль вверху (как в Аккаунте)
+  // FIX v1.8.1-fix1: fallback на state.user.name (см. renderProfile)
   html += '<div class="user-info">' +
-    '<div class="big-avatar" id="more-prod-avatar">' + escapeHtml(getInitials(state.user.full_name || state.user.short_name || '')) + '</div>' +
+    '<div class="big-avatar" id="more-prod-avatar">' + escapeHtml(getInitials(state.user.full_name || state.user.short_name || state.user.name || '')) + '</div>' +
     '<div class="ui-body">' +
-      '<div class="ui-name">' + escapeHtml(state.user.full_name || state.user.short_name || '—') + '</div>' +
+      '<div class="ui-name">' + escapeHtml(state.user.full_name || state.user.short_name || state.user.name || '—') + '</div>' +
       '<div class="ui-roles">' + escapeHtml(document.getElementById('top-userrole').textContent || 'без роли') + '</div>' +
     '</div></div>';
 
@@ -6993,10 +6996,11 @@ function renderSalesMore() {
   const isDirector = (state.user.roles || []).includes('director');
 
   let html = '';
+  // FIX v1.8.1-fix1: fallback на state.user.name (см. renderProfile)
   html += '<div class="user-info">' +
-    '<div class="big-avatar">' + escapeHtml(getInitials(state.user.full_name || state.user.short_name || '')) + '</div>' +
+    '<div class="big-avatar">' + escapeHtml(getInitials(state.user.full_name || state.user.short_name || state.user.name || '')) + '</div>' +
     '<div class="ui-body">' +
-      '<div class="ui-name">' + escapeHtml(state.user.full_name || state.user.short_name || '—') + '</div>' +
+      '<div class="ui-name">' + escapeHtml(state.user.full_name || state.user.short_name || state.user.name || '—') + '</div>' +
       '<div class="ui-roles">' + escapeHtml(document.getElementById('top-userrole').textContent || 'без роли') + '</div>' +
     '</div></div>';
 
