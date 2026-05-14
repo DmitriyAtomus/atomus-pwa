@@ -1907,6 +1907,91 @@
   .task-row-meta .task-meta-deadline.soon {
     color: var(--warning, #C18B00); font-weight: 500;
   }
+  /* ЭТАП 16В-2: бейдж договора в строке задачи */
+  .task-row-meta .task-meta-contract {
+    background: var(--brand-bg, #E8EEF7);
+    color: var(--brand, #2C5282);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .task-row-meta .task-meta-contract:hover {
+    background: #D6E0EE;
+  }
+  .task-row-meta .task-meta-contract.archived {
+    background: var(--bg);
+    color: var(--text-light);
+    opacity: 0.7;
+  }
+
+  /* ЭТАП 16В-2: пикер договора (display-вариант) в форме задачи */
+  .picker-display {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .picker-display-value {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 500; color: var(--text);
+    min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .picker-display-actions { display: flex; gap: 12px; flex-shrink: 0; }
+  .btn-link {
+    background: none; border: none; padding: 0;
+    color: var(--brand); font-size: 13px; cursor: pointer;
+    font-weight: 500;
+  }
+  .btn-link:hover { text-decoration: underline; }
+  .btn-link.btn-link-danger { color: var(--danger); }
+  .picker-empty-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* ЭТАП 16В-2: ссылка на договор в детальной карточке задачи */
+  .contract-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--brand); text-decoration: none; font-weight: 500;
+  }
+  .contract-link:hover { text-decoration: underline; }
+
+  /* ЭТАП 16В-2: блок задач в карточке договора */
+  .contract-block {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 20px;
+    overflow: hidden;
+  }
+  .contract-block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .contract-block-title {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; color: var(--text);
+  }
+  .contract-block-title i { color: var(--brand); }
+  .contract-block-counter {
+    background: var(--brand-bg, #E8EEF7);
+    color: var(--brand);
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    margin-left: 4px;
+  }
+  .btn-small {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+  }
 
   .task-status-pill {
     flex: 0 0 auto;
@@ -4043,7 +4128,7 @@
       <div class="loading-block">Загружаем активные договоры…</div>
     </div>
     <div style="padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg);">
-      <button class="btn btn-secondary" onclick="pickAssemblyToWarehouse()" style="width: 100%; justify-content: center;">
+      <button class="btn btn-secondary" id="contract-picker-skip" onclick="pickAssemblyToWarehouse()" style="width: 100%; justify-content: center;">
         <i class="ti ti-building-warehouse"></i> Без договора (на склад)
       </button>
     </div>
@@ -4060,7 +4145,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.8.1-fix5";
+const APP_VERSION = "v1.9.0-stage16B2";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -7192,8 +7277,23 @@ function renderAssemblyDestination() {
 // --- Модалка выбора договора ---
 
 function openContractPickerModal() {
+  // ЭТАП 16В-2: режим по умолчанию — assembly (старое поведение)
+  state.contractPickerMode = 'assembly';
+  _showContractPickerModal();
+}
+
+// ЭТАП 16В-2: открыть пикер в режиме выбора договора для задачи
+function openContractPickerForTask() {
+  state.contractPickerMode = 'task';
+  _showContractPickerModal();
+}
+
+function _showContractPickerModal() {
   document.getElementById('contract-picker-modal').classList.add('visible');
   document.getElementById('contract-picker-search').value = '';
+  // Скрываем кнопку "Без договора (на склад)" для режима task
+  const wasteBtn = document.getElementById('contract-picker-skip');
+  if (wasteBtn) wasteBtn.style.display = (state.contractPickerMode === 'task') ? 'none' : '';
   loadContractsForPicker('');
   setTimeout(() => {
     const s = document.getElementById('contract-picker-search');
@@ -7233,7 +7333,7 @@ async function loadContractsForPicker(query) {
     let html = '';
     list.forEach(c => {
       const deadlineHtml = formatContractDeadline(c.delivery_date);
-      html += '<div class="modal-item" onclick="pickAssemblyContract(' + c.id + ')">' +
+      html += '<div class="modal-item" onclick="pickContract(' + c.id + ')">' +
         '<div class="mi-icon"><i class="ti ti-file-text"></i></div>' +
         '<div class="mi-text">' +
           '<div class="mi-title">' + escapeHtml(c.number) + ' · ' + escapeHtml(c.contractor_name || '—') + '</div>' +
@@ -7247,6 +7347,16 @@ async function loadContractsForPicker(query) {
     container.innerHTML = html;
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+// ЭТАП 16В-2: универсальный обработчик клика по договору в пикере.
+// Роутит выбор в зависимости от режима.
+function pickContract(contractId) {
+  if (state.contractPickerMode === 'task') {
+    pickTaskContract(contractId);
+  } else {
+    pickAssemblyContract(contractId);
   }
 }
 
@@ -7265,6 +7375,25 @@ function pickAssemblyToWarehouse() {
   state.newAssembly.contractLabel = '';
   closeContractPickerModal();
   renderAssemblyDestination();
+}
+
+// ЭТАП 16В-2: выбор договора для формы задачи
+function pickTaskContract(contractId) {
+  const c = (cache.contractsForPicker || []).find(x => x.id === contractId);
+  if (!c) return;
+  state.taskForm.contract_id = contractId;
+  state.taskForm.contract_label =
+    c.number + (c.contractor_name ? ' · ' + c.contractor_name : '');
+  closeContractPickerModal();
+  // Перерисуем форму, чтобы показать новое значение
+  if (state.currentScreen === 'task-form') renderTaskForm();
+}
+
+// ЭТАП 16В-2: очистить привязку к договору в форме задачи
+function clearTaskContract() {
+  state.taskForm.contract_id = null;
+  state.taskForm.contract_label = '';
+  if (state.currentScreen === 'task-form') renderTaskForm();
 }
 
 // --- Хелпер форматирования дедлайна договора ---
@@ -8215,7 +8344,16 @@ state.taskForm = {
   deadline: '',
   priority: 'normal',
   source: '',
+  // ЭТАП 16В-2: привязка к договору
+  contract_id: null,
+  contract_label: '',
 };
+// ЭТАП 16В-2: если задача создаётся из карточки договора, прокидываем сюда id —
+// чтобы openNewTask подставил договор в форму автоматически.
+state.taskFromContractId = null;
+state.taskFromContractLabel = '';
+// ЭТАП 16В-2: режим работы контракт-пикера ('assembly' — старый, 'task' — новый).
+state.contractPickerMode = 'assembly';
 
 const TASK_PRIORITIES = [
   { code: 'low',    label: 'Низкий',  icon: 'ti-arrow-down' },
@@ -8296,6 +8434,17 @@ function renderTaskRow(t) {
               escapeHtml(formatTaskDeadline(t.deadline)) + '</span>');
   }
   if (t.source) meta.push('<span><i class="ti ti-tag"></i>' + escapeHtml(t.source) + '</span>');
+  // ЭТАП 16В-2: бейдж договора
+  if (t.contract_id && t.contract_number) {
+    const archived = !t.contract_is_active;
+    const label = t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '');
+    meta.push(
+      '<span class="task-meta-contract' + (archived ? ' archived' : '') +
+      '" onclick="event.stopPropagation(); openContractFromTask(' + t.contract_id + ')" title="' +
+      escapeHtml(archived ? 'Договор в архиве' : 'Перейти в договор') + '">' +
+      '<i class="ti ti-file-text"></i>' + escapeHtml(label) + '</span>'
+    );
+  }
 
   return '<div class="task-row ' + (isDone ? 'task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
     '<div class="task-row-priority ' + priorityCls + '"></div>' +
@@ -8305,6 +8454,14 @@ function renderTaskRow(t) {
     '</div>' +
     '<div class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</div>' +
     '</div>';
+}
+
+// ЭТАП 16В-2: переход в договор из бейджа задачи
+function openContractFromTask(contractId) {
+  if (!contractId) return;
+  state.currentContractId = contractId;
+  selectSection('sales');
+  selectSidebarItem('sales-contract-detail');
 }
 
 function formatTaskDeadline(iso) {
@@ -8446,6 +8603,19 @@ function renderTaskDetail(t) {
     html += '<div class="detail-item"><div class="detail-label">Источник</div>' +
             '<div class="detail-value">' + escapeHtml(t.source) + '</div></div>';
   }
+  // ЭТАП 16В-2: договор
+  if (t.contract_id && t.contract_number) {
+    const archived = !t.contract_is_active;
+    const lbl = t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '');
+    html += '<div class="detail-item span-2"><div class="detail-label">Договор' +
+            (archived ? ' <span style="color:var(--text-light); text-transform:none; font-weight:400;">(в архиве)</span>' : '') +
+            '</div>' +
+            '<div class="detail-value">' +
+              '<a href="#" class="contract-link" onclick="event.preventDefault(); openContractFromTask(' + t.contract_id + ')">' +
+                '<i class="ti ti-file-text"></i> ' + escapeHtml(lbl) +
+              '</a>' +
+            '</div></div>';
+  }
   if (t.created_at) {
     html += '<div class="detail-item"><div class="detail-label">Создана</div>' +
             '<div class="detail-value muted">' + escapeHtml(formatTaskDateTime(t.created_at)) + '</div></div>';
@@ -8494,6 +8664,7 @@ async function changeTaskStatus(taskId, newStatus) {
     cache.tasks = {};
     cache.myTasks = null;
     cache.homeKpi = null;
+    cache.contractTasks = {};                          // ЭТАП 16В-2
     if (state.currentScreen === 'task-detail') loadTaskDetail();
   } catch (e) {
     showToast('Ошибка соединения', 'error');
@@ -8517,6 +8688,7 @@ async function deleteCurrentTask() {
     showToast('Задача удалена', 'success');
     cache.tasks = {};
     cache.myTasks = null;
+    cache.contractTasks = {};                          // ЭТАП 16В-2
     selectSidebarItem('tasks-list');
   } catch (e) {
     showToast('Ошибка соединения', 'error');
@@ -8532,9 +8704,15 @@ function openNewTask() {
   }
   state.taskFormMode = 'new';
   state.currentTaskId = null;
+  // ЭТАП 16В-2: если задача создаётся из карточки договора — подставим привязку
+  const preContractId = state.taskFromContractId || null;
+  const preContractLabel = state.taskFromContractLabel || '';
+  state.taskFromContractId = null;
+  state.taskFromContractLabel = '';
   state.taskForm = {
     title: '', description: '', assignee_id: null, assignee_name: '',
     deadline: '', priority: 'normal', source: '',
+    contract_id: preContractId, contract_label: preContractLabel,
   };
   selectSidebarItem('task-form');
 }
@@ -8544,6 +8722,10 @@ async function openEditTask() {
   if (!state.currentTaskId) return;
   try {
     const t = await apiGet('/api/tasks/' + state.currentTaskId);
+    // ЭТАП 16В-2: загружаем привязку к договору
+    const contractLabel = t.contract_id
+      ? (t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : ''))
+      : '';
     state.taskForm = {
       title: t.title || '',
       description: t.description || '',
@@ -8552,6 +8734,8 @@ async function openEditTask() {
       deadline: t.deadline || '',
       priority: t.priority || 'normal',
       source: t.source || '',
+      contract_id: t.contract_id || null,
+      contract_label: contractLabel,
     };
     selectSidebarItem('task-form');
   } catch (e) {
@@ -8610,6 +8794,27 @@ function renderTaskForm() {
   html += '<div><label>Дедлайн <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
           '<input type="date" id="tf-deadline" value="' + escapeHtml(f.deadline) + '"></div>';
   html += '</div>';
+
+  // ЭТАП 16В-2: привязка к договору (опционально)
+  html += '<div class="sales-form-row cols-1"><div>' +
+          '<label>Договор <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>';
+  if (f.contract_id) {
+    html += '<div class="picker-display">' +
+            '<div class="picker-display-value">' +
+              '<i class="ti ti-file-text" style="color:var(--brand);"></i> ' +
+              escapeHtml(f.contract_label || '№ ' + f.contract_id) +
+            '</div>' +
+            '<div class="picker-display-actions">' +
+              '<button type="button" class="btn-link" onclick="openContractPickerForTask()">Сменить</button>' +
+              '<button type="button" class="btn-link btn-link-danger" onclick="clearTaskContract()">Очистить</button>' +
+            '</div>' +
+          '</div>';
+  } else {
+    html += '<button type="button" class="btn btn-secondary picker-empty-btn" onclick="openContractPickerForTask()">' +
+            '<i class="ti ti-link"></i> Привязать к договору' +
+          '</button>';
+  }
+  html += '</div></div>';
 
   // Приоритет
   html += '<div class="sales-form-row cols-1"><div>' +
@@ -8697,6 +8902,7 @@ async function submitTaskForm() {
     deadline: f.deadline || null,
     priority: f.priority || 'normal',
     source: f.source.trim(),
+    contract_id: f.contract_id || null,        // ЭТАП 16В-2
   };
 
   const isEdit = state.taskFormMode === 'edit';
@@ -8725,6 +8931,7 @@ async function submitTaskForm() {
     cache.tasks = {};
     cache.myTasks = null;
     cache.homeKpi = null;
+    cache.contractTasks = {};                          // ЭТАП 16В-2: инвалидация задач договора
     state.currentTaskId = created.id;
     selectSidebarItem('task-detail');
   } catch (e) {
@@ -9639,6 +9846,8 @@ async function loadCurrentContract() {
 }
 
 function renderContractDetail(c) {
+  // ЭТАП 16В-2: запоминаем для openNewTaskForContract
+  state.lastLoadedContract = c;
   // Заголовки
   document.getElementById('scd-title').textContent = c.number || '—';
   document.getElementById('scd-mobile-title').textContent = c.number || 'Договор';
@@ -9715,7 +9924,94 @@ function renderContractDetail(c) {
   // ЭТАП 15: реальный блок «Готовность по сборкам»
   html += renderContractAssembliesBlock(c);
 
+  // ЭТАП 16В-2: блок задач по договору (контейнер, заполняется асинхронно)
+  html += '<div id="scd-tasks-block"><div class="loading-block">Загружаем задачи…</div></div>';
+
   container.innerHTML = html;
+
+  // Загрузим задачи по договору
+  loadContractTasks(c.id);
+}
+
+// ============ ЭТАП 16В-2: задачи по договору ============
+
+cache.contractTasks = {};
+
+async function loadContractTasks(contractId) {
+  const container = document.getElementById('scd-tasks-block');
+  if (!container) return;
+  try {
+    // Кеш на договор, инвалидируется при создании/редактировании задачи
+    if (!cache.contractTasks[contractId]) {
+      const d = await apiGet('/api/contracts/' + contractId + '/tasks');
+      cache.contractTasks[contractId] = d;
+    }
+    renderContractTasksBlock(contractId, cache.contractTasks[contractId]);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить задачи: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderContractTasksBlock(contractId, d) {
+  const container = document.getElementById('scd-tasks-block');
+  if (!container) return;
+  const tasks = (d && d.tasks) || [];
+  const counts = (d && d.counts) || {};
+  const canAdd = canManageTasks();
+
+  let html = '<div class="contract-block">';
+  html += '<div class="contract-block-header">';
+  html += '<div class="contract-block-title"><i class="ti ti-checklist"></i> Задачи по договору';
+  if (counts.total) {
+    html += ' <span class="contract-block-counter">' + counts.total + '</span>';
+  }
+  html += '</div>';
+  if (canAdd) {
+    html += '<button class="btn btn-secondary btn-small" onclick="openNewTaskForContract(' + contractId + ')">' +
+            '<i class="ti ti-plus"></i> Новая задача</button>';
+  }
+  html += '</div>';
+
+  if (!tasks.length) {
+    html += '<div class="empty-block" style="padding: 20px 12px;">' +
+            '<i class="ti ti-checklist" style="font-size: 28px;"></i>' +
+            'По этому договору задач пока нет' +
+            (canAdd ? '<br><br><button class="btn btn-primary btn-small" onclick="openNewTaskForContract(' + contractId + ')"><i class="ti ti-plus"></i> Создать первую</button>' : '') +
+            '</div>';
+  } else {
+    // Маленькая сводка по статусам
+    if (counts.open || counts.done) {
+      html += '<div style="padding: 0 12px 8px; color: var(--text-light); font-size: 12.5px;">' +
+              (counts.open ? counts.open + ' открытых' : '') +
+              (counts.open && counts.done ? ' · ' : '') +
+              (counts.done ? counts.done + ' готовых' : '') +
+              '</div>';
+    }
+    html += '<div style="padding: 0 4px;">';
+    tasks.forEach(t => { html += renderTaskRow(t); });
+    html += '</div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ЭТАП 16В-2: создать задачу с предзаполненной привязкой к договору
+function openNewTaskForContract(contractId) {
+  if (!canManageTasks()) {
+    showToast('Создавать задачи может директор, зам или менеджер', 'error');
+    return;
+  }
+  // Найдём контрагента для красивой подписи
+  const c = state.lastLoadedContract;
+  let label = 'договор #' + contractId;
+  if (c && c.id === contractId) {
+    label = c.number + (c.contractor_name ? ' · ' + c.contractor_name : '');
+  }
+  state.taskFromContractId = contractId;
+  state.taskFromContractLabel = label;
+  selectSection('tasks');
+  // Небольшая задержка, чтобы переключение раздела завершилось
+  setTimeout(() => openNewTask(), 50);
 }
 
 async function changeContractStatus(contractId, newStatus) {
