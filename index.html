@@ -528,6 +528,14 @@
   }
   .filter-row::-webkit-scrollbar { display: none; }
   .desktop-layout .filter-row { background: none; border: none; padding: 0 0 20px; }
+  /* FIX v1.8.1-fix3: на десктопе чипы (категории/фильтры) переносятся на несколько
+     строк, а не обрезаются за границей экрана. На мобиле остаётся горизонтальный
+     скролл — там переноса нет, чтобы фильтры не съедали высоту. */
+  .desktop-layout .filter-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    row-gap: 8px;
+  }
   .filter-chip {
     background: var(--bg); color: var(--text-mid);
     padding: 6px 14px; border-radius: 999px;
@@ -4042,7 +4050,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.8.1-fix2";
+const APP_VERSION = "v1.8.1-fix3";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
