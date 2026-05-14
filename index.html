@@ -1356,6 +1356,279 @@
     white-space: nowrap;
   }
 
+  /* ============ ЭТАП 16Б: ГЛАВНАЯ ============ */
+
+  /* Курс валют */
+  .cbr-widget {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px;
+    margin-bottom: 8px;
+  }
+  .cbr-widget .cbr-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .cbr-widget .cbr-title {
+    font-size: 13px; font-weight: 600; color: var(--text-dark);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .cbr-widget .cbr-title i {
+    color: var(--brand); font-size: 16px;
+  }
+  .cbr-widget .cbr-date {
+    font-size: 11.5px; color: var(--text-light);
+  }
+  .cbr-widget .cbr-date.stale {
+    color: var(--warning, #C18B00);
+  }
+  .cbr-widget .cbr-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .cbr-widget .cbr-cell {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .cbr-widget .cbr-code {
+    font-size: 11px; color: var(--text-light); font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .cbr-widget .cbr-value {
+    font-size: 18px; font-weight: 700; color: var(--text-dark);
+    margin: 4px 0 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cbr-widget .cbr-diff {
+    font-size: 11.5px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 2px;
+  }
+  .cbr-widget .cbr-diff.up { color: var(--success); }
+  .cbr-widget .cbr-diff.down { color: var(--danger); }
+  .cbr-widget .cbr-diff.zero { color: var(--text-light); }
+
+  /* Калькулятор */
+  .calc-widget {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .calc-widget .calc-head {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .calc-widget .calc-head:hover { background: var(--bg); }
+  .calc-widget .calc-head i:first-child {
+    color: var(--brand); font-size: 20px;
+  }
+  .calc-widget .calc-head .calc-title {
+    flex: 1;
+    font-size: 13px; font-weight: 600; color: var(--text-dark);
+  }
+  .calc-widget .calc-head .calc-chevron {
+    color: var(--text-light); font-size: 16px;
+    transition: transform 0.15s;
+  }
+  .calc-widget[data-expanded="1"] .calc-head .calc-chevron {
+    transform: rotate(180deg);
+  }
+  .calc-widget .calc-body {
+    display: none;
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--border);
+  }
+  .calc-widget[data-expanded="1"] .calc-body {
+    display: block;
+  }
+
+  /* Tabs внутри калькулятора */
+  .calc-tabs {
+    display: flex; gap: 4px;
+    background: var(--bg); border-radius: 8px;
+    padding: 3px;
+    margin: 14px 0;
+  }
+  .calc-tab {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: none; background: transparent;
+    color: var(--text-mid);
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .calc-tab i { font-size: 14px; }
+  .calc-tab.active {
+    background: white; color: var(--brand);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  /* Калькулятор: математика — кнопочки */
+  .calc-display {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 22px; font-weight: 600;
+    color: var(--text-dark);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 10px;
+    min-height: 30px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .calc-display .calc-expr {
+    font-size: 12px; color: var(--text-light); font-weight: 400;
+    margin-bottom: 2px;
+    min-height: 16px;
+  }
+  .calc-keys {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .calc-key {
+    background: var(--bg); color: var(--text-dark);
+    border: none; border-radius: 8px;
+    padding: 14px 0;
+    font-size: 16px; font-weight: 500;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .calc-key:hover { background: #E1E5EE; }
+  .calc-key.op { background: var(--brand-bg); color: var(--brand); font-weight: 600; }
+  .calc-key.op:hover { background: #D8E5F1; }
+  .calc-key.eq { background: var(--brand); color: white; font-weight: 600; }
+  .calc-key.eq:hover { background: var(--brand-light); }
+  .calc-key.clear { background: #FEE5E5; color: var(--danger); }
+
+  /* НДС калькулятор */
+  .calc-vat-row {
+    display: flex; gap: 8px; margin-bottom: 10px;
+  }
+  .calc-vat-row .calc-mode-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg); color: var(--text-mid);
+    border: 1.5px solid transparent;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+  }
+  .calc-vat-row .calc-mode-btn.active {
+    background: var(--brand-bg); color: var(--brand); border-color: var(--brand);
+  }
+  .calc-input-row {
+    display: flex; align-items: stretch;
+    margin-bottom: 12px;
+  }
+  .calc-input-row input {
+    flex: 1; border-radius: 8px 0 0 8px;
+    border-right: none;
+    font-size: 16px; font-weight: 500;
+    text-align: right;
+    padding: 0 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-input-row .calc-suffix {
+    padding: 0 14px; display: flex; align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border); border-left: none;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px; color: var(--text-mid);
+    font-weight: 500;
+  }
+  .calc-result {
+    background: var(--bg); border-radius: 8px;
+    padding: 10px 14px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .calc-result-label { color: var(--text-mid); }
+  .calc-result-value {
+    font-weight: 600; color: var(--text-dark);
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-result.highlight {
+    background: var(--brand-bg);
+  }
+  .calc-result.highlight .calc-result-label {
+    color: var(--brand);
+  }
+  .calc-result.highlight .calc-result-value {
+    color: var(--brand); font-size: 16px;
+  }
+
+  /* Валютный калькулятор */
+  .calc-fx-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px; align-items: stretch;
+    margin-bottom: 10px;
+  }
+  .calc-fx-cell {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .calc-fx-cell label {
+    font-size: 11px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+  }
+  .calc-fx-cell .calc-fx-input-wrap {
+    display: flex;
+  }
+  .calc-fx-cell input {
+    flex: 1; min-width: 0;
+    border-radius: 8px 0 0 8px;
+    border-right: none;
+    font-size: 16px; font-weight: 500;
+    text-align: right;
+    padding: 0 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-fx-cell select {
+    flex: 0 0 64px;
+    border-radius: 0 8px 8px 0;
+    border-left: none;
+    background: var(--bg);
+    font-size: 13px; font-weight: 500;
+    text-align: center;
+  }
+  .calc-fx-arrow {
+    display: flex; align-items: center; justify-content: center;
+    padding-top: 26px;
+    color: var(--brand); font-size: 18px;
+  }
+  .calc-fx-rate-note {
+    font-size: 11.5px; color: var(--text-light);
+    text-align: center; padding: 6px 0 0;
+  }
+
+  /* На мобильном валюта схлопывается в одну колонку */
+  .mobile-layout .calc-fx-row {
+    grid-template-columns: 1fr;
+  }
+  .mobile-layout .calc-fx-arrow {
+    transform: rotate(90deg);
+    padding-top: 0;
+    padding: 4px 0;
+  }
+
+  /* KPI секция «Сегодня» */
+  .home-kpi-title {
+    font-size: 11px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    margin: 4px 0 8px;
+    padding: 0 2px;
+  }
+
   /* Выбор «На склад / Под договор» в форме сборки */
   .dest-choice {
     display: grid;
@@ -2062,7 +2335,10 @@
   <header class="top-bar">
     <div class="brand-ball" onclick="goHome()" title="На главную"></div>
     <nav class="section-switcher" id="section-switcher">
-      <button class="section-tab active" data-section="production">
+      <button class="section-tab active" data-section="home">
+        <i class="ti ti-home"></i>Главная
+      </button>
+      <button class="section-tab" data-section="production">
         <i class="ti ti-tool"></i>Производство
       </button>
       <button class="section-tab" data-section="sales">
@@ -2092,7 +2368,8 @@
 
   <!-- Мобильные табы разделов -->
   <nav class="m-section-tabs" id="m-section-tabs">
-    <button class="active" data-section="production"><i class="ti ti-tool"></i>Производство</button>
+    <button class="active" data-section="home"><i class="ti ti-home"></i>Главная</button>
+    <button data-section="production"><i class="ti ti-tool"></i>Производство</button>
     <button data-section="sales"><i class="ti ti-briefcase"></i>Продажи</button>
     <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
     <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
@@ -2104,8 +2381,32 @@
 
     <!-- ============ SIDEBAR (десктоп) - меняется в зависимости от раздела ============ -->
 
+    <!-- SIDEBAR ГЛАВНАЯ (Этап 16Б) -->
+    <aside class="sidebar" id="sidebar-home" data-section="home" data-visible="1">
+      <div class="sidebar-title">
+        <i class="ti ti-home"></i> Главная
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="home-dashboard" onclick="selectSidebarItem('home-dashboard')">
+          <i class="ti ti-layout-dashboard"></i><span>Обзор</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-home">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-home">—</div>
+          <div class="ur" id="sb-userrole-home">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
     <!-- SIDEBAR ПРОИЗВОДСТВО -->
-    <aside class="sidebar" id="sidebar-production" data-section="production" data-visible="1">
+    <aside class="sidebar" id="sidebar-production" data-section="production" data-visible="0">
       <div class="sidebar-title">
         <i class="ti ti-tool"></i> Производство
       </div>
@@ -2240,8 +2541,28 @@
     <!-- ============ MAIN AREA ============ -->
     <main class="main-area">
 
+      <!-- ============ ГЛАВНАЯ (Этап 16Б) ============ -->
+      <div class="screen active" data-screen="home-dashboard" data-section="home">
+        <div class="page-header">
+          <div>
+            <h1 id="home-greeting-name">Здравствуйте!</h1>
+            <div class="page-subtitle" id="home-greeting-date">—</div>
+          </div>
+          <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить">
+            <i class="ti ti-refresh"></i>
+          </button>
+        </div>
+        <div class="greeting">
+          <h1 id="home-greeting-name-mob">—</h1>
+          <p id="home-greeting-date-mob">—</p>
+        </div>
+        <div class="content-inner" id="home-content">
+          <div class="loading-block">Загружаем главную…</div>
+        </div>
+      </div>
+
       <!-- ============ ДАШБОРД ============ -->
-      <div class="screen active" data-screen="dashboard" data-section="production">
+      <div class="screen" data-screen="dashboard" data-section="production">
         <div class="page-header">
           <div>
             <h1 id="page-greeting-name">—</h1>
@@ -3177,7 +3498,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.4.1-stage16a2";
+const APP_VERSION = "v1.5.0-stage16b";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -3188,6 +3509,7 @@ const APP_VERSION_DATE = "14.05.2026";
 //   3. Создать экраны с data-section="<name>"
 //   4. (опционально) Кастомизировать SECTION_CONFIG
 const SECTION_CONFIG = {
+  home:       { sidebar: 'sidebar-home',       defaultScreen: 'home-dashboard' },   // ЭТАП 16Б
   production: { sidebar: 'sidebar-production', defaultScreen: 'dashboard' },
   sales:      { sidebar: 'sidebar-sales',      defaultScreen: 'sales-dashboard' },
   warehouse:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-warehouse', comingSoon: true },
@@ -3198,8 +3520,8 @@ const SECTION_CONFIG = {
 
 const state = {
   user: null,
-  currentSection: 'production',
-  currentScreen: 'dashboard',
+  currentSection: 'home',          // ЭТАП 16Б: главная — по умолчанию
+  currentScreen: 'home-dashboard',
   historyFilter: 'month',
   summaryFilter: 'month',
   isDesktop: false,
@@ -3597,6 +3919,7 @@ function selectSidebarItem(screenName) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   // Загрузка данных под экран
+  if (screenName === 'home-dashboard') loadHomeDashboard();  // ЭТАП 16Б
   if (screenName === 'dashboard') loadDashboard();
   if (screenName === 'history') loadHistory();
   if (screenName === 'summary') loadSummary();
@@ -3623,11 +3946,12 @@ function selectSidebarItem(screenName) {
 }
 
 function goHome() {
-  selectSection('production');
+  selectSection('home');   // ЭТАП 16Б: главная — новый раздел
 }
 
 function refreshCurrentScreen() {
   const s = state.currentScreen;
+  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; }   // ЭТАП 16Б
   if (s === 'dashboard') cache.dashboard = null;
   if (s === 'history') cache.history = {};
   if (s === 'summary') cache.summary = {};
@@ -6329,6 +6653,625 @@ function formatDateShort(iso) {
 }
 
 // ============ КОНЕЦ ЭТАПА 15 ============
+
+// ============================================================================
+// ============ ЭТАП 16Б: ГЛАВНАЯ — KPI / КУРС ВАЛЮТ / КАЛЬКУЛЯТОР ============
+// ============================================================================
+
+cache.homeKpi = null;        // {kpi:{...}, user_roles:[...]}
+cache.cbrRates = null;       // {date, rates:{USD:{value,prev,diff}, EUR:{...}, CNY:{...}}, is_stale}
+
+state.calc = {
+  mode: 'math',              // 'math' | 'vat' | 'fx'
+  // Математика
+  mathDisplay: '0',
+  mathExpr: '',
+  mathPrev: null,
+  mathOp: null,
+  mathReset: false,           // флаг: следующая цифра обнулит дисплей
+  // НДС
+  vatRate: 22,
+  vatMode: 'add',             // 'add' = из суммы без НДС, 'extract' = из суммы с НДС
+  vatInput: '',
+  // Валюты
+  fxFromValue: '',
+  fxFromCurrency: 'USD',
+  fxToCurrency: 'RUB',
+};
+
+state.calcExpanded = false;
+
+// ---------- Главная: загрузка и рендер ----------
+
+async function loadHomeDashboard() {
+  // Параллельно — KPI и курс. Калькулятор не нуждается в API.
+  const container = document.getElementById('home-content');
+  // Сначала рендерим скелет (приветствие + плейсхолдеры)
+  renderHomeSkeleton();
+  // Дальше — независимые загрузки
+  loadHomeKpi();
+  loadCbrRates();
+}
+
+function renderHomeSkeleton() {
+  // Заголовок-приветствие
+  const name = state.user && (state.user.short_name || state.user.full_name || '') || '';
+  const greetEl = document.getElementById('home-greeting-name');
+  const dateEl = document.getElementById('home-greeting-date');
+  const greetMobEl = document.getElementById('home-greeting-name-mob');
+  const dateMobEl = document.getElementById('home-greeting-date-mob');
+  if (greetEl) greetEl.textContent = name ? ('Здравствуйте, ' + escapeText(name.split(' ')[0] || name) + '!') : 'Здравствуйте!';
+  if (greetMobEl) greetMobEl.textContent = greetEl ? greetEl.textContent : 'Здравствуйте!';
+  const dateStr = todayHumanRu();
+  if (dateEl) dateEl.textContent = 'Сегодня — ' + dateStr;
+  if (dateMobEl) dateMobEl.textContent = 'Сегодня — ' + dateStr;
+
+  const container = document.getElementById('home-content');
+  if (!container) return;
+  let html = '';
+
+  // KPI placeholder
+  html += '<div class="home-kpi-title">Сегодня</div>';
+  html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
+
+  // Курс валют placeholder
+  html += '<div class="home-kpi-title" style="margin-top: 20px;">Курсы ЦБ РФ</div>';
+  html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
+
+  // Калькулятор
+  html += '<div class="home-kpi-title" style="margin-top: 20px;">Инструменты</div>';
+  html += '<div id="home-calc-block"></div>';
+
+  container.innerHTML = html;
+
+  // Рендер калькулятора (он не зависит от сети)
+  renderCalculator();
+}
+
+function escapeText(s) {
+  return escapeHtml(String(s || ''));
+}
+
+function todayHumanRu() {
+  const d = new Date();
+  const months = ['января','февраля','марта','апреля','мая','июня',
+                  'июля','августа','сентября','октября','ноября','декабря'];
+  const days = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+  return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + days[d.getDay()];
+}
+
+// ---------- KPI ----------
+
+async function loadHomeKpi() {
+  try {
+    const d = await apiGet('/api/home/kpi');
+    cache.homeKpi = d;
+    renderHomeKpi();
+  } catch (e) {
+    const el = document.getElementById('home-kpi-block');
+    if (el) el.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить показатели</div>';
+  }
+}
+
+function renderHomeKpi() {
+  const el = document.getElementById('home-kpi-block');
+  if (!el) return;
+  const data = (cache.homeKpi && cache.homeKpi.kpi) || {};
+  const tiles = [];
+  if ('contracts_active' in data) {
+    tiles.push({
+      label: 'договоров', value: data.contracts_active, trend: 'в производстве',
+      icon: 'ti-file-text', action: () => goToSection('sales', 'sales-contracts')
+    });
+  }
+  if ('offers_active' in data) {
+    tiles.push({
+      label: 'КП в работе', value: data.offers_active, trend: 'черновики и отправленные',
+      icon: 'ti-file-invoice', action: () => goToSection('sales', 'sales-offers')
+    });
+  }
+  if ('assemblies_today' in data) {
+    tiles.push({
+      label: 'сборок сегодня', value: data.assemblies_today, trend: 'шт.',
+      icon: 'ti-tool', action: () => goToSection('production', 'history')
+    });
+  }
+  if ('offers_accepted_month_sum' in data) {
+    tiles.push({
+      label: 'принято КП', value: formatMoneyShort(data.offers_accepted_month_sum), trend: 'за месяц',
+      icon: 'ti-coin'
+    });
+  }
+  if (!tiles.length) {
+    el.innerHTML = '<div class="empty-block"><i class="ti ti-info-circle"></i>Для вашей роли нет показателей на главной</div>';
+    return;
+  }
+  let html = '<div class="kpi-grid">';
+  tiles.forEach((t, i) => {
+    const clickable = t.action ? ' style="cursor:pointer;" onclick="homeKpiClick(' + i + ')"' : '';
+    html += '<div class="kpi-card"' + clickable + '>' +
+      '<div class="label">' + escapeText(t.label) + '</div>' +
+      '<div class="value">' + escapeText(String(t.value)) + '</div>' +
+      '<div class="trend">' + escapeText(t.trend) + '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+  // Сохраняем actions для клика
+  window._homeKpiActions = tiles.map(t => t.action || null);
+}
+
+function homeKpiClick(idx) {
+  const fn = (window._homeKpiActions || [])[idx];
+  if (typeof fn === 'function') fn();
+}
+
+function goToSection(sectionCode, navItem) {
+  // Переход в раздел production/sales и выбор пункта внутри
+  const tab = document.querySelector('.section-tab[data-section="' + sectionCode + '"]')
+           || document.querySelector('.m-section-tabs button[data-section="' + sectionCode + '"]');
+  if (tab) tab.click();
+  setTimeout(() => {
+    if (navItem) selectSidebarItem(navItem);
+  }, 50);
+}
+
+function formatMoneyShort(amount) {
+  // Короткое представление: 1.2 млн ₽ / 850 тыс. ₽ / 450 ₽
+  const v = Number(amount) || 0;
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace('.', ',') + ' млн ₽';
+  if (v >= 10_000) return Math.round(v / 1000) + ' тыс. ₽';
+  return Math.round(v).toLocaleString('ru-RU') + ' ₽';
+}
+
+// ---------- Курс валют ЦБ ----------
+
+async function loadCbrRates() {
+  try {
+    const d = await apiGet('/api/home/cbr-rates');
+    cache.cbrRates = d;
+    renderCbrRates();
+  } catch (e) {
+    const el = document.getElementById('home-cbr-block');
+    if (el) el.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Курс валют недоступен</div>';
+  }
+}
+
+function renderCbrRates() {
+  const el = document.getElementById('home-cbr-block');
+  if (!el) return;
+  const d = cache.cbrRates;
+  if (!d || !d.rates) {
+    el.innerHTML = '<div class="empty-block"><i class="ti ti-info-circle"></i>Курс валют недоступен</div>';
+    return;
+  }
+  const isStale = !!d.is_stale;
+  const dateText = d.date ? formatCbrDate(d.date) : '';
+  let html = '<div class="cbr-widget">';
+  html += '<div class="cbr-head">';
+  html += '<div class="cbr-title"><i class="ti ti-currency-ruble"></i>Курс ЦБ РФ</div>';
+  html += '<div class="cbr-date' + (isStale ? ' stale' : '') + '">' +
+          (isStale ? '⚠ ' : '') +
+          escapeText(dateText) +
+          (isStale ? ' (офлайн)' : '') +
+          '</div>';
+  html += '</div>';
+  html += '<div class="cbr-grid">';
+  ['USD','EUR','CNY'].forEach(code => {
+    const r = d.rates[code];
+    if (!r) return;
+    const diff = Number(r.diff) || 0;
+    const cls = diff > 0.001 ? 'up' : (diff < -0.001 ? 'down' : 'zero');
+    const arrow = diff > 0.001 ? '↑' : (diff < -0.001 ? '↓' : '·');
+    const absDiff = Math.abs(diff);
+    html += '<div class="cbr-cell">' +
+      '<div class="cbr-code">' + code + '</div>' +
+      '<div class="cbr-value">' + formatCbrValue(r.value) + ' ₽</div>' +
+      '<div class="cbr-diff ' + cls + '">' + arrow + ' ' +
+        (cls === 'zero' ? '0,00' : absDiff.toFixed(2).replace('.', ',')) +
+      '</div>' +
+      '</div>';
+  });
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function formatCbrValue(v) {
+  const n = Number(v) || 0;
+  return n.toFixed(2).replace('.', ',');
+}
+
+function formatCbrDate(iso) {
+  // iso = "2026-05-14"
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return 'на ' + dd + '.' + mm + '.' + d.getFullYear();
+  } catch (e) {
+    return iso;
+  }
+}
+
+// ---------- Калькулятор ----------
+
+function renderCalculator() {
+  const el = document.getElementById('home-calc-block');
+  if (!el) return;
+  const expanded = state.calcExpanded ? '1' : '0';
+  let html = '<div class="calc-widget" data-expanded="' + expanded + '" id="calc-widget">';
+  html += '<div class="calc-head" onclick="toggleCalculator()">';
+  html += '<i class="ti ti-calculator"></i>';
+  html += '<div class="calc-title">Калькулятор</div>';
+  html += '<i class="ti ti-chevron-down calc-chevron"></i>';
+  html += '</div>';
+  html += '<div class="calc-body">';
+  // Tabs
+  html += '<div class="calc-tabs">';
+  [['math','ti-math-symbols','Математика'],
+   ['vat','ti-percentage','НДС'],
+   ['fx','ti-currency-dollar','Валюты']].forEach(([code,icon,label]) => {
+    html += '<button class="calc-tab' + (state.calc.mode === code ? ' active' : '') + '" onclick="setCalcMode(\'' + code + '\')">' +
+            '<i class="ti ' + icon + '"></i>' + label + '</button>';
+  });
+  html += '</div>';
+  // Тело
+  html += '<div id="calc-tab-content">' + renderCalcTabContent() + '</div>';
+  html += '</div></div>';
+  el.innerHTML = html;
+  // Подвязка обработчиков
+  bindCalcHandlers();
+}
+
+function toggleCalculator() {
+  state.calcExpanded = !state.calcExpanded;
+  const w = document.getElementById('calc-widget');
+  if (w) w.setAttribute('data-expanded', state.calcExpanded ? '1' : '0');
+}
+
+function setCalcMode(mode) {
+  state.calc.mode = mode;
+  const inner = document.getElementById('calc-tab-content');
+  if (inner) inner.innerHTML = renderCalcTabContent();
+  // Обновим active в табах
+  document.querySelectorAll('#calc-widget .calc-tab').forEach(t => t.classList.remove('active'));
+  const activeTab = document.querySelector('#calc-widget .calc-tab[onclick*="\'' + mode + '\'"]');
+  if (activeTab) activeTab.classList.add('active');
+  bindCalcHandlers();
+}
+
+function renderCalcTabContent() {
+  if (state.calc.mode === 'math') return renderCalcMath();
+  if (state.calc.mode === 'vat') return renderCalcVat();
+  if (state.calc.mode === 'fx') return renderCalcFx();
+  return '';
+}
+
+// ---- Калькулятор: математика ----
+
+function renderCalcMath() {
+  let html = '';
+  html += '<div class="calc-display">';
+  html += '<div class="calc-expr">' + escapeText(state.calc.mathExpr || '\u00A0') + '</div>';
+  html += escapeText(state.calc.mathDisplay);
+  html += '</div>';
+  html += '<div class="calc-keys">';
+  const keys = [
+    ['C','clear','clearMath'],
+    ['±','op','negateMath'],
+    ['%','op','percentMath'],
+    ['÷','op','opMath','/'],
+    ['7','','digitMath','7'],['8','','digitMath','8'],['9','','digitMath','9'],
+    ['×','op','opMath','*'],
+    ['4','','digitMath','4'],['5','','digitMath','5'],['6','','digitMath','6'],
+    ['−','op','opMath','-'],
+    ['1','','digitMath','1'],['2','','digitMath','2'],['3','','digitMath','3'],
+    ['+','op','opMath','+'],
+    ['0','','digitMath','0'],['.','','dotMath'],
+    ['⌫','clear','backMath'],
+    ['=','eq','equalsMath'],
+  ];
+  keys.forEach(k => {
+    const [label, cls, fn, arg] = [k[0], k[1], k[2], k[3]];
+    const argStr = arg !== undefined ? "'" + arg + "'" : '';
+    html += '<button class="calc-key ' + cls + '" onclick="' + fn + '(' + argStr + ')">' + label + '</button>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function _updateMathDisplay() {
+  // Перерисовка только области математики
+  const inner = document.getElementById('calc-tab-content');
+  if (!inner) return;
+  inner.innerHTML = renderCalcMath();
+}
+
+function digitMath(d) {
+  if (state.calc.mathReset) {
+    state.calc.mathDisplay = '0';
+    state.calc.mathReset = false;
+  }
+  if (state.calc.mathDisplay === '0') state.calc.mathDisplay = d;
+  else if (state.calc.mathDisplay.length < 14) state.calc.mathDisplay += d;
+  _updateMathDisplay();
+}
+
+function dotMath() {
+  if (state.calc.mathReset) {
+    state.calc.mathDisplay = '0';
+    state.calc.mathReset = false;
+  }
+  if (!state.calc.mathDisplay.includes('.')) state.calc.mathDisplay += '.';
+  _updateMathDisplay();
+}
+
+function clearMath() {
+  state.calc.mathDisplay = '0';
+  state.calc.mathExpr = '';
+  state.calc.mathPrev = null;
+  state.calc.mathOp = null;
+  state.calc.mathReset = false;
+  _updateMathDisplay();
+}
+
+function backMath() {
+  if (state.calc.mathReset) { clearMath(); return; }
+  if (state.calc.mathDisplay.length <= 1) state.calc.mathDisplay = '0';
+  else state.calc.mathDisplay = state.calc.mathDisplay.slice(0, -1);
+  _updateMathDisplay();
+}
+
+function negateMath() {
+  if (state.calc.mathDisplay === '0') return;
+  if (state.calc.mathDisplay.startsWith('-')) state.calc.mathDisplay = state.calc.mathDisplay.slice(1);
+  else state.calc.mathDisplay = '-' + state.calc.mathDisplay;
+  _updateMathDisplay();
+}
+
+function percentMath() {
+  const v = parseFloat(state.calc.mathDisplay) || 0;
+  state.calc.mathDisplay = String(v / 100);
+  _updateMathDisplay();
+}
+
+function opMath(op) {
+  // Если уже был оператор и есть prev — посчитать сначала
+  if (state.calc.mathPrev !== null && state.calc.mathOp && !state.calc.mathReset) {
+    equalsMath();
+  }
+  state.calc.mathPrev = parseFloat(state.calc.mathDisplay) || 0;
+  state.calc.mathOp = op;
+  state.calc.mathExpr = _formatMathNum(state.calc.mathPrev) + ' ' + _opSym(op);
+  state.calc.mathReset = true;
+  _updateMathDisplay();
+}
+
+function _opSym(op) {
+  return op === '*' ? '×' : op === '/' ? '÷' : op === '-' ? '−' : '+';
+}
+
+function _formatMathNum(n) {
+  const s = Number(n).toString();
+  if (s.length > 14) return Number(n).toExponential(4);
+  return s;
+}
+
+function equalsMath() {
+  if (state.calc.mathPrev === null || !state.calc.mathOp) return;
+  const a = state.calc.mathPrev;
+  const b = parseFloat(state.calc.mathDisplay) || 0;
+  let result = 0;
+  switch (state.calc.mathOp) {
+    case '+': result = a + b; break;
+    case '-': result = a - b; break;
+    case '*': result = a * b; break;
+    case '/': result = b === 0 ? NaN : a / b; break;
+  }
+  state.calc.mathExpr = _formatMathNum(a) + ' ' + _opSym(state.calc.mathOp) + ' ' + _formatMathNum(b) + ' =';
+  state.calc.mathDisplay = isNaN(result) ? 'Ошибка' : _formatMathNum(Math.round(result * 1e10) / 1e10);
+  state.calc.mathPrev = null;
+  state.calc.mathOp = null;
+  state.calc.mathReset = true;
+  _updateMathDisplay();
+}
+
+// ---- Калькулятор: НДС ----
+
+function renderCalcVat() {
+  const rate = state.calc.vatRate;
+  let html = '';
+  html += '<div class="calc-vat-row">';
+  html += '<button class="calc-mode-btn' + (state.calc.vatMode === 'add' ? ' active' : '') + '" onclick="setVatMode(\'add\')">Из суммы без НДС</button>';
+  html += '<button class="calc-mode-btn' + (state.calc.vatMode === 'extract' ? ' active' : '') + '" onclick="setVatMode(\'extract\')">Из суммы с НДС</button>';
+  html += '</div>';
+  html += '<div class="calc-input-row">';
+  html += '<input type="text" inputmode="decimal" id="calc-vat-input" value="' + escapeText(state.calc.vatInput) + '" placeholder="0">';
+  html += '<div class="calc-suffix">₽</div>';
+  html += '</div>';
+  // Расчёт
+  const num = parseFloat((state.calc.vatInput || '').replace(',', '.')) || 0;
+  let netto = 0, vatSum = 0, brutto = 0;
+  if (state.calc.vatMode === 'add') {
+    netto = num;
+    vatSum = num * rate / 100;
+    brutto = num + vatSum;
+  } else {
+    brutto = num;
+    netto = num / (1 + rate / 100);
+    vatSum = brutto - netto;
+  }
+  html += '<div class="calc-result">' +
+    '<span class="calc-result-label">Без НДС</span>' +
+    '<span class="calc-result-value">' + formatMoneyCalc(netto) + '</span></div>';
+  html += '<div class="calc-result">' +
+    '<span class="calc-result-label">НДС ' + rate + '%</span>' +
+    '<span class="calc-result-value">' + formatMoneyCalc(vatSum) + '</span></div>';
+  html += '<div class="calc-result highlight">' +
+    '<span class="calc-result-label">С НДС</span>' +
+    '<span class="calc-result-value">' + formatMoneyCalc(brutto) + '</span></div>';
+  html += '<div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:8px; font-size:11.5px; color:var(--text-light);">' +
+    '<span>Ставка НДС:</span>' +
+    '<select id="calc-vat-rate-select" style="padding:2px 6px; font-size:11.5px;">' +
+    '<option value="22"' + (rate === 22 ? ' selected' : '') + '>22%</option>' +
+    '<option value="20"' + (rate === 20 ? ' selected' : '') + '>20%</option>' +
+    '<option value="10"' + (rate === 10 ? ' selected' : '') + '>10%</option>' +
+    '<option value="0"' + (rate === 0 ? ' selected' : '') + '>0%</option>' +
+    '</select></div>';
+  return html;
+}
+
+function setVatMode(mode) {
+  state.calc.vatMode = mode;
+  setCalcMode('vat');
+}
+
+function formatMoneyCalc(v) {
+  const n = Number(v) || 0;
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
+}
+
+// ---- Калькулятор: валюты ----
+
+function renderCalcFx() {
+  const rates = cache.cbrRates && cache.cbrRates.rates;
+  if (!rates) {
+    return '<div class="empty-block" style="padding:18px;"><i class="ti ti-currency-ruble"></i>Курс валют ещё загружается…</div>';
+  }
+  const from = state.calc.fxFromCurrency;
+  const to = state.calc.fxToCurrency;
+  const valFrom = parseFloat((state.calc.fxFromValue || '').replace(',', '.')) || 0;
+  // Конвертация: RUB ↔ X. Считаем через RUB как опору.
+  const fxToRub = (cur, amt) => cur === 'RUB' ? amt : amt * (rates[cur]?.value || 0);
+  const fxFromRub = (cur, amtRub) => cur === 'RUB' ? amtRub : (rates[cur]?.value ? amtRub / rates[cur].value : 0);
+  const rub = fxToRub(from, valFrom);
+  const result = fxFromRub(to, rub);
+
+  let html = '<div class="calc-fx-row">';
+  html += '<div class="calc-fx-cell"><label>Сумма</label><div class="calc-fx-input-wrap">' +
+    '<input type="text" inputmode="decimal" id="calc-fx-input" value="' + escapeText(state.calc.fxFromValue) + '" placeholder="0">' +
+    '<select id="calc-fx-from-cur">' +
+      currencyOptions(from) +
+    '</select></div></div>';
+  html += '<div class="calc-fx-arrow"><i class="ti ti-arrows-right-left"></i></div>';
+  html += '<div class="calc-fx-cell"><label>=</label><div class="calc-fx-input-wrap">' +
+    '<input type="text" readonly value="' + (result ? result.toLocaleString('ru-RU', {maximumFractionDigits: 2}) : '0') + '" style="background:var(--brand-bg); color:var(--brand); font-weight:600;">' +
+    '<select id="calc-fx-to-cur">' +
+      currencyOptions(to) +
+    '</select></div></div>';
+  html += '</div>';
+  // Курсовая подсказка
+  let note = '';
+  if (from !== to && valFrom > 0) {
+    const oneFrom = fxFromRub(to, fxToRub(from, 1));
+    note = '1 ' + from + ' = ' + oneFrom.toFixed(4).replace('.', ',') + ' ' + to + ' (по курсу ЦБ)';
+  } else if (from === to) {
+    note = 'Выберите разные валюты';
+  } else {
+    note = 'Введите сумму';
+  }
+  html += '<div class="calc-fx-rate-note">' + escapeText(note) + '</div>';
+  return html;
+}
+
+function currencyOptions(selected) {
+  return ['RUB','USD','EUR','CNY'].map(c =>
+    '<option value="' + c + '"' + (c === selected ? ' selected' : '') + '>' + c + '</option>'
+  ).join('');
+}
+
+// ---- Подвязка обработчиков калькулятора ----
+
+function bindCalcHandlers() {
+  // НДС
+  const vatInput = document.getElementById('calc-vat-input');
+  if (vatInput) {
+    vatInput.addEventListener('input', e => {
+      state.calc.vatInput = e.target.value;
+      _updateVatResults();
+    });
+  }
+  const vatRateSelect = document.getElementById('calc-vat-rate-select');
+  if (vatRateSelect) {
+    vatRateSelect.addEventListener('change', e => {
+      state.calc.vatRate = parseInt(e.target.value) || 22;
+      _updateVatResults();
+    });
+  }
+  // Валюты
+  const fxInput = document.getElementById('calc-fx-input');
+  if (fxInput) {
+    fxInput.addEventListener('input', e => {
+      state.calc.fxFromValue = e.target.value;
+      _updateFxResult();
+    });
+  }
+  const fxFrom = document.getElementById('calc-fx-from-cur');
+  if (fxFrom) fxFrom.addEventListener('change', e => {
+    state.calc.fxFromCurrency = e.target.value;
+    _updateFxResult();
+  });
+  const fxTo = document.getElementById('calc-fx-to-cur');
+  if (fxTo) fxTo.addEventListener('change', e => {
+    state.calc.fxToCurrency = e.target.value;
+    _updateFxResult();
+  });
+}
+
+// Частичный пересчёт НДС — не пересоздаёт input
+function _updateVatResults() {
+  const rate = state.calc.vatRate;
+  const num = parseFloat((state.calc.vatInput || '').replace(',', '.')) || 0;
+  let netto = 0, vatSum = 0, brutto = 0;
+  if (state.calc.vatMode === 'add') {
+    netto = num; vatSum = num * rate / 100; brutto = num + vatSum;
+  } else {
+    brutto = num; netto = num / (1 + rate / 100); vatSum = brutto - netto;
+  }
+  // Обновляем три плашки
+  const resEls = document.querySelectorAll('#calc-tab-content .calc-result .calc-result-value');
+  if (resEls.length >= 3) {
+    resEls[0].textContent = formatMoneyCalc(netto);
+    resEls[1].textContent = formatMoneyCalc(vatSum);
+    resEls[2].textContent = formatMoneyCalc(brutto);
+  }
+  // Обновим лейбл НДС-строки (вдруг ставку поменяли)
+  const labelEls = document.querySelectorAll('#calc-tab-content .calc-result .calc-result-label');
+  if (labelEls.length >= 2) labelEls[1].textContent = 'НДС ' + rate + '%';
+}
+
+// Частичный пересчёт валют — не пересоздаёт input
+function _updateFxResult() {
+  const rates = cache.cbrRates && cache.cbrRates.rates;
+  if (!rates) return;
+  const from = state.calc.fxFromCurrency;
+  const to = state.calc.fxToCurrency;
+  const valFrom = parseFloat((state.calc.fxFromValue || '').replace(',', '.')) || 0;
+  const fxToRub = (cur, amt) => cur === 'RUB' ? amt : amt * (rates[cur]?.value || 0);
+  const fxFromRub = (cur, amtRub) => cur === 'RUB' ? amtRub : (rates[cur]?.value ? amtRub / rates[cur].value : 0);
+  const rub = fxToRub(from, valFrom);
+  const result = fxFromRub(to, rub);
+
+  const resultInput = document.querySelector('#calc-tab-content .calc-fx-cell:last-of-type input[readonly]');
+  if (resultInput) {
+    resultInput.value = result ? result.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) : '0';
+  }
+  const noteEl = document.querySelector('#calc-tab-content .calc-fx-rate-note');
+  if (noteEl) {
+    if (from !== to && valFrom > 0) {
+      const oneFrom = fxFromRub(to, fxToRub(from, 1));
+      noteEl.textContent = '1 ' + from + ' = ' + oneFrom.toFixed(4).replace('.', ',') + ' ' + to + ' (по курсу ЦБ)';
+    } else if (from === to) {
+      noteEl.textContent = 'Выберите разные валюты';
+    } else {
+      noteEl.textContent = 'Введите сумму';
+    }
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 16Б ============
 
 // ============ МОДЕЛИ ============
 
