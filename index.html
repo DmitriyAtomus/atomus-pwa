@@ -1629,6 +1629,81 @@
     padding: 0 2px;
   }
 
+  /* ============ ЭТАП 17: КАТЕГОРИИ НОМЕНКЛАТУРЫ ============ */
+
+  /* Заголовок группы товаров (в списке номенклатуры) */
+  .sale-product-group-header {
+    padding: 14px 18px 6px;
+    font-size: 12px; font-weight: 700;
+    color: var(--brand);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    display: flex; align-items: center; gap: 6px;
+    background: var(--brand-bg);
+    margin: 0 0 4px;
+    border-radius: 8px;
+  }
+  .sale-product-group-header i { font-size: 14px; }
+  .sale-product-group-header .cnt {
+    margin-left: 6px;
+    background: white;
+    color: var(--brand);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  /* Чипы категорий — горизонтальный скролл */
+  #sp-categories-filters {
+    display: flex; gap: 6px;
+    overflow-x: auto;
+    align-items: center;
+    flex-wrap: nowrap;
+    padding-top: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  #sp-categories-filters::-webkit-scrollbar { height: 4px; }
+  #sp-categories-filters .filter-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  #sp-categories-filters .cat-edit-link {
+    background: transparent;
+    color: var(--text-light);
+    border-color: var(--border);
+  }
+  #sp-categories-filters .cat-edit-link:hover {
+    color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  /* Список категорий — строки в справочнике */
+  .category-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .category-row .cat-row-icon {
+    flex: 0 0 36px; height: 36px;
+    background: var(--brand-bg); color: var(--brand);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .category-row .cat-row-body { flex: 1; min-width: 0; }
+  .category-row .cat-row-name {
+    font-size: 14px; font-weight: 600; color: var(--text-dark);
+    margin-bottom: 2px;
+  }
+  .category-row .cat-row-meta {
+    font-size: 12px; color: var(--text-light);
+  }
+  .category-row .cat-row-actions {
+    display: flex; gap: 4px;
+  }
+
   /* ============ ЭТАП 16Г: ОТГРУЗКИ + АКТИВНОСТИ ============ */
 
   /* Карточка предстоящей отгрузки */
@@ -2813,6 +2888,9 @@
           <button class="nav-item" data-nav="sale-products" onclick="selectSidebarItem('sale-products')">
             <i class="ti ti-shopping-cart"></i><span>Продажная номенклатура</span>
           </button>
+          <button class="nav-item" data-nav="sale-categories" onclick="selectSidebarItem('sale-categories')">
+            <i class="ti ti-folders"></i><span>Категории</span>
+          </button>
         </div>
       </div>
       <div class="sidebar-footer">
@@ -3321,6 +3399,14 @@
             <button class="filter-chip" data-spf="goods">Товары</button>
             <button class="filter-chip" data-spf="service">Услуги</button>
           </div>
+          <!-- ЭТАП 17: фильтр по категории + ссылка на справочник -->
+          <div class="filter-row" id="sp-categories-filters" style="padding: 0 18px 8px;">
+            <button class="filter-chip active" data-spcat="">Все категории</button>
+            <!-- остальные чипы добавятся динамически -->
+            <button class="filter-chip cat-edit-link" onclick="selectSidebarItem('sale-categories')" style="margin-left: auto;">
+              <i class="ti ti-settings"></i> Категории
+            </button>
+          </div>
           <div id="sp-content"><div class="loading-block">Загружаем…</div></div>
         </div>
       </div>
@@ -3342,6 +3428,26 @@
         </div>
         <div class="content-inner" id="spf-content">
           <!-- Наполняется через initSaleProductForm() -->
+        </div>
+      </div>
+
+      <!-- ============ ЭТАП 17: СПРАВОЧНИК КАТЕГОРИЙ ============ -->
+      <div class="screen" data-screen="sale-categories" data-section="sales">
+        <div class="screen-header">
+          <h2>Категории</h2>
+          <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Категории номенклатуры</h1>
+            <div class="page-subtitle" id="sc-subtitle">Группировка товаров в каталоге</div>
+          </div>
+          <button class="btn btn-primary" id="sc-new-btn" onclick="openNewCategory()">
+            <i class="ti ti-plus"></i> Новая категория
+          </button>
+        </div>
+        <div class="content-inner" id="sc-content">
+          <div class="loading-block">Загружаем…</div>
         </div>
       </div>
 
@@ -3898,7 +4004,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.7.0-stage16g";
+const APP_VERSION = "v1.8.0-stage17";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4342,6 +4448,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sales-contractors') loadContractors();
   if (screenName === 'sales-contractor-form') initContractorForm();
   if (screenName === 'sale-products') loadSaleProducts();
+  if (screenName === 'sale-categories') loadSaleCategories();   // ЭТАП 17
   if (screenName === 'sale-product-form') initSaleProductForm();
   // КП (14Б)
   if (screenName === 'sales-offers') loadOffers();
@@ -4371,7 +4478,8 @@ function refreshCurrentScreen() {
   if (s === 'sales-dashboard') { cache.contracts = null; cache.contractsCounts = null; }
   if (s === 'sales-contracts') { cache.contracts = null; cache.contractsCounts = null; }
   if (s === 'sales-contractors') cache.contractors = null;
-  if (s === 'sale-products') cache.saleProducts = null;
+  if (s === 'sale-products') { cache.saleProducts = null; cache.saleCategories = null; }   // ЭТАП 17
+  if (s === 'sale-categories') cache.saleCategories = null;   // ЭТАП 17
   if (s === 'sales-offers') { cache.offers = null; cache.offersCounts = null; }
   selectSidebarItem(s);
 }
@@ -5042,11 +5150,26 @@ state.saleProductForm = {
   product_type: 'goods',
   base_price: '',
   unit: 'шт.',
+  category_id: null,    // ЭТАП 17
   linkedModels: [],     // массив объектов {model_id, model_name, model_extra, model_article, direction_name}
 };
 state._modelsLinkSelection = [];       // временная выборка во время открытой модалки
 
 cache.saleProducts = null;
+cache.saleCategories = null;          // ЭТАП 17: справочник категорий
+state.saleCategoryFilter = '';        // ЭТАП 17: фильтр по категории ('' = все, '0' = без категории, 'N' = id)
+
+// ЭТАП 17: ленивая загрузка категорий
+async function ensureSaleCategoriesLoaded() {
+  if (cache.saleCategories !== null) return cache.saleCategories;
+  try {
+    const d = await apiGet('/api/sale-categories');
+    cache.saleCategories = d.categories || [];
+  } catch (e) {
+    cache.saleCategories = [];
+  }
+  return cache.saleCategories;
+}
 
 // --------- ЗАГРУЗКА ----------
 
@@ -5057,6 +5180,8 @@ async function loadSaleProducts() {
   } else {
     container.innerHTML = '<div class="loading-block">Загружаем…</div>';
   }
+  // ЭТАП 17: подгрузим категории параллельно
+  await ensureSaleCategoriesLoaded();
   try {
     const d = await apiGet('/api/sale-products');
     cache.saleProducts = d;
@@ -5073,9 +5198,10 @@ function renderSaleProductsList() {
   const all = d.products || [];
   const counts = d.counts || {};
   const filter = state.saleProductsFilter;
+  const catFilter = state.saleCategoryFilter || '';   // ЭТАП 17
   const search = (state.saleProductsSearch || '').toLowerCase().trim();
 
-  // Обновляем чипсы
+  // Обновляем чипсы типа
   document.querySelectorAll('#sp-filters .filter-chip').forEach(chip => {
     const k = chip.dataset.spf;
     const baseLabels = { 'all': 'Все', 'goods': 'Товары', 'service': 'Услуги' };
@@ -5086,6 +5212,9 @@ function renderSaleProductsList() {
     chip.classList.toggle('active', k === filter);
   });
 
+  // ЭТАП 17: чипсы категорий
+  renderSaleCategoryChips(catFilter);
+
   // Подзаголовок
   const sub = document.getElementById('sp-subtitle');
   if (sub) sub.textContent = (counts.goods || 0) + ' товаров · ' + (counts.service || 0) + ' услуг';
@@ -5093,6 +5222,13 @@ function renderSaleProductsList() {
   // Фильтрация
   let list = all;
   if (filter !== 'all') list = list.filter(p => p.product_type === filter);
+  // ЭТАП 17: фильтр по категории
+  if (catFilter === '0') {
+    list = list.filter(p => !p.category_id);
+  } else if (catFilter) {
+    const cid = parseInt(catFilter);
+    list = list.filter(p => p.category_id === cid);
+  }
   if (search) {
     list = list.filter(p =>
       (p.name || '').toLowerCase().includes(search) ||
@@ -5107,56 +5243,144 @@ function renderSaleProductsList() {
     return;
   }
 
+  // ЭТАП 17: группировка по категории если включен «Все категории»
+  const showGroups = !catFilter;
+
   if (state.isDesktop) {
     let html = '<div style="padding: 0;"><div class="contracts-table">';
-    html += '<div class="sale-product-row header">' +
-      '<div></div>' +
-      '<div>Название</div>' +
-      '<div>Тип</div>' +
-      '<div style="text-align: right;">Цена</div>' +
-      '<div>Сборки</div>' +
-      '<div></div>' +
-      '</div>';
-    list.forEach(p => {
-      const isService = p.product_type === 'service';
-      const iconCls = isService ? 'ti-tools' : 'ti-package';
-      const colorCls = isService ? 'service' : '';
-      const priceHtml = (p.base_price !== null && p.base_price !== undefined)
-        ? formatMoney(p.base_price) + ' <small style="color:var(--text-light); font-weight:400;">/ ' + escapeHtml(p.unit) + '</small>'
-        : '<span class="sp-price empty">по запросу</span>';
-      html += '<div class="sale-product-row ' + (isService ? 'service' : '') + '" onclick="openEditSaleProduct(' + p.id + ')">' +
-        '<div class="sp-icon ' + colorCls + '"><i class="ti ' + iconCls + '"></i></div>' +
-        '<div class="sp-name">' + escapeHtml(p.name) +
-          (p.description ? '<small>' + escapeHtml(p.description) + '</small>' : '') +
-        '</div>' +
-        '<div class="sp-type">' + escapeHtml(p.product_type_label) + '</div>' +
-        '<div class="sp-price">' + priceHtml + '</div>' +
-        '<div class="sp-links"><i class="ti ti-link"></i><span>—</span></div>' +
-        '<div class="ct-arrow"><i class="ti ti-chevron-right"></i></div>' +
+    if (!showGroups) {
+      html += '<div class="sale-product-row header">' +
+        '<div></div>' +
+        '<div>Название</div>' +
+        '<div>Тип</div>' +
+        '<div style="text-align: right;">Цена</div>' +
+        '<div>Сборки</div>' +
+        '<div></div>' +
         '</div>';
-    });
+      list.forEach(p => { html += _saleProductRowHtml(p); });
+    } else {
+      // Группируем по category_name
+      const groups = _groupProductsByCategory(list);
+      groups.forEach(grp => {
+        html += '<div class="sale-product-group-header">' +
+          '<i class="ti ti-folder"></i> ' + escapeHtml(grp.name) +
+          ' <span class="cnt">' + grp.items.length + '</span></div>';
+        grp.items.forEach(p => { html += _saleProductRowHtml(p); });
+      });
+    }
     html += '</div></div>';
     container.innerHTML = html;
   } else {
     let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
-    list.forEach(p => {
-      const isService = p.product_type === 'service';
-      const iconCls = isService ? 'ti-tools' : 'ti-package';
-      const colorCls = isService ? 'service' : '';
-      const priceText = (p.base_price !== null && p.base_price !== undefined)
-        ? formatMoney(p.base_price) + ' / ' + p.unit
-        : 'по запросу';
-      html += '<div class="sale-product-card" onclick="openEditSaleProduct(' + p.id + ')">' +
-        '<div class="spc-icon ' + colorCls + '"><i class="ti ' + iconCls + '"></i></div>' +
-        '<div class="spc-body">' +
-          '<div class="spc-name">' + escapeHtml(p.name) + '</div>' +
-          '<div class="spc-meta">' + escapeHtml(p.product_type_label) +
-          ' · <span class="spc-price">' + escapeHtml(priceText) + '</span></div>' +
-        '</div></div>';
-    });
+    if (!showGroups) {
+      list.forEach(p => { html += _saleProductCardHtml(p); });
+    } else {
+      const groups = _groupProductsByCategory(list);
+      groups.forEach(grp => {
+        html += '<div class="sale-product-group-header"><i class="ti ti-folder"></i> ' +
+                escapeHtml(grp.name) + ' <span class="cnt">' + grp.items.length + '</span></div>';
+        grp.items.forEach(p => { html += _saleProductCardHtml(p); });
+      });
+    }
     html += '</div>';
     container.innerHTML = html;
   }
+}
+
+// ЭТАП 17: чипсы категорий вверху
+function renderSaleCategoryChips(activeKey) {
+  const wrap = document.getElementById('sp-categories-filters');
+  if (!wrap) return;
+  // Удаляем все .filter-chip кроме «Все категории» и кнопки настроек
+  const editLink = wrap.querySelector('.cat-edit-link');
+  // Очищаем содержимое
+  wrap.innerHTML = '';
+  // Кнопка «Все категории»
+  const allBtn = document.createElement('button');
+  allBtn.className = 'filter-chip' + (activeKey === '' ? ' active' : '');
+  allBtn.dataset.spcat = '';
+  allBtn.textContent = 'Все категории';
+  allBtn.onclick = () => setSaleCategoryFilter('');
+  wrap.appendChild(allBtn);
+  // Реальные категории
+  const cats = cache.saleCategories || [];
+  cats.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-chip' + (activeKey === String(c.id) ? ' active' : '');
+    btn.dataset.spcat = String(c.id);
+    btn.textContent = c.name + (c.products_count ? ' · ' + c.products_count : '');
+    btn.onclick = () => setSaleCategoryFilter(String(c.id));
+    wrap.appendChild(btn);
+  });
+  // «Без категории»
+  const noCatBtn = document.createElement('button');
+  noCatBtn.className = 'filter-chip' + (activeKey === '0' ? ' active' : '');
+  noCatBtn.dataset.spcat = '0';
+  noCatBtn.textContent = 'Без категории';
+  noCatBtn.onclick = () => setSaleCategoryFilter('0');
+  wrap.appendChild(noCatBtn);
+  // Кнопка «Категории» (ссылка на справочник)
+  if (editLink) wrap.appendChild(editLink);
+  else {
+    const link = document.createElement('button');
+    link.className = 'filter-chip cat-edit-link';
+    link.style.marginLeft = 'auto';
+    link.innerHTML = '<i class="ti ti-settings"></i> Категории';
+    link.onclick = () => selectSidebarItem('sale-categories');
+    wrap.appendChild(link);
+  }
+}
+
+function setSaleCategoryFilter(key) {
+  state.saleCategoryFilter = key;
+  renderSaleProductsList();
+}
+
+function _groupProductsByCategory(list) {
+  // Возвращает массив групп {name, sort, items[]}
+  const map = new Map();
+  list.forEach(p => {
+    const key = p.category_id ? 'c_' + p.category_id : 'none';
+    const name = p.category_name || 'Без категории';
+    if (!map.has(key)) map.set(key, { name, sort: p.category_id || 9999, items: [] });
+    map.get(key).items.push(p);
+  });
+  return Array.from(map.values()).sort((a, b) => a.sort - b.sort);
+}
+
+function _saleProductRowHtml(p) {
+  const isService = p.product_type === 'service';
+  const iconCls = isService ? 'ti-tools' : 'ti-package';
+  const colorCls = isService ? 'service' : '';
+  const priceHtml = (p.base_price !== null && p.base_price !== undefined)
+    ? formatMoney(p.base_price) + ' <small style="color:var(--text-light); font-weight:400;">/ ' + escapeHtml(p.unit) + '</small>'
+    : '<span class="sp-price empty">по запросу</span>';
+  return '<div class="sale-product-row ' + (isService ? 'service' : '') + '" onclick="openEditSaleProduct(' + p.id + ')">' +
+    '<div class="sp-icon ' + colorCls + '"><i class="ti ' + iconCls + '"></i></div>' +
+    '<div class="sp-name">' + escapeHtml(p.name) +
+      (p.description ? '<small>' + escapeHtml(p.description) + '</small>' : '') +
+    '</div>' +
+    '<div class="sp-type">' + escapeHtml(p.product_type_label) + '</div>' +
+    '<div class="sp-price">' + priceHtml + '</div>' +
+    '<div class="sp-links"><i class="ti ti-link"></i><span>—</span></div>' +
+    '<div class="ct-arrow"><i class="ti ti-chevron-right"></i></div>' +
+    '</div>';
+}
+
+function _saleProductCardHtml(p) {
+  const isService = p.product_type === 'service';
+  const iconCls = isService ? 'ti-tools' : 'ti-package';
+  const colorCls = isService ? 'service' : '';
+  const priceText = (p.base_price !== null && p.base_price !== undefined)
+    ? formatMoney(p.base_price) + ' / ' + p.unit
+    : 'по запросу';
+  return '<div class="sale-product-card" onclick="openEditSaleProduct(' + p.id + ')">' +
+    '<div class="spc-icon ' + colorCls + '"><i class="ti ' + iconCls + '"></i></div>' +
+    '<div class="spc-body">' +
+      '<div class="spc-name">' + escapeHtml(p.name) + '</div>' +
+      '<div class="spc-meta">' + escapeHtml(p.product_type_label) +
+      ' · <span class="spc-price">' + escapeHtml(priceText) + '</span></div>' +
+    '</div></div>';
 }
 
 // --------- ФОРМА ----------
@@ -5169,7 +5393,9 @@ function openNewSaleProduct() {
   state.saleProductFormMode = 'new';
   state.currentSaleProductId = null;
   state.saleProductForm = {
-    name: '', description: '', product_type: 'goods', base_price: '', unit: 'шт.', linkedModels: [],
+    name: '', description: '', product_type: 'goods', base_price: '', unit: 'шт.',
+    category_id: null,    // ЭТАП 17
+    linkedModels: [],
   };
   selectSidebarItem('sale-product-form');
 }
@@ -5189,6 +5415,7 @@ async function openEditSaleProduct(productId) {
       product_type: p.product_type || 'goods',
       base_price: p.base_price !== null && p.base_price !== undefined ? p.base_price : '',
       unit: p.unit || 'шт.',
+      category_id: p.category_id || null,    // ЭТАП 17
       linkedModels: (p.linked_models || []).map(lm => ({
         model_id: lm.model_id,
         model_name: lm.model_name,
@@ -5207,10 +5434,12 @@ function cancelSaleProductForm() {
   selectSidebarItem('sale-products');
 }
 
-function initSaleProductForm() {
+async function initSaleProductForm() {
   const isEdit = state.saleProductFormMode === 'edit';
   document.getElementById('spf-title').textContent = isEdit ? 'Редактирование позиции' : 'Новая позиция';
   document.getElementById('spf-mobile-title').textContent = isEdit ? 'Редактирование' : 'Новая позиция';
+  // ЭТАП 17: подгрузим категории, чтобы при первом рендере выпадашка была заполнена
+  await ensureSaleCategoriesLoaded();
   renderSaleProductForm();
 }
 
@@ -5243,6 +5472,17 @@ function renderSaleProductForm() {
   // Описание
   html += '<div class="sales-form-row cols-1"><div><label>Описание <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(попадёт в PDF КП)</span></label>' +
           '<textarea id="spf-description" placeholder="Подробное описание для клиента — что входит, технические характеристики, особенности">' + escapeHtml(f.description) + '</textarea></div></div>';
+
+  // ЭТАП 17: Категория
+  html += '<div class="sales-form-row cols-1"><div><label>Категория <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(для группировки в каталоге)</span></label>';
+  const cats = cache.saleCategories || [];
+  html += '<select id="spf-category">';
+  html += '<option value="">— без категории —</option>';
+  cats.forEach(c => {
+    const sel = (c.id === f.category_id) ? ' selected' : '';
+    html += '<option value="' + c.id + '"' + sel + '>' + escapeHtml(c.name) + '</option>';
+  });
+  html += '</select></div></div>';
 
   html += '</div>';
 
@@ -5300,6 +5540,14 @@ function renderSaleProductForm() {
   document.getElementById('spf-name').addEventListener('input', e => { state.saleProductForm.name = e.target.value; });
   document.getElementById('spf-description').addEventListener('input', e => { state.saleProductForm.description = e.target.value; });
   document.getElementById('spf-price').addEventListener('input', e => { state.saleProductForm.base_price = e.target.value; });
+  // ЭТАП 17: категория
+  const catSel = document.getElementById('spf-category');
+  if (catSel) {
+    catSel.addEventListener('change', e => {
+      const v = e.target.value;
+      state.saleProductForm.category_id = v ? parseInt(v) : null;
+    });
+  }
 }
 
 function setSaleProductType(t) {
@@ -5333,6 +5581,7 @@ async function submitSaleProductForm() {
     description: f.description.trim(),
     product_type: f.product_type,
     unit: f.unit,
+    category_id: f.category_id || null,    // ЭТАП 17
     linked_model_ids: f.linkedModels.map(lm => lm.model_id),
   };
 
@@ -5405,6 +5654,155 @@ async function deleteCurrentSaleProduct() {
     showToast('Ошибка: ' + String(e), 'error');
   }
 }
+
+// ============================================================================
+// ============ ЭТАП 17: СПРАВОЧНИК КАТЕГОРИЙ =================================
+// ============================================================================
+
+async function loadSaleCategories() {
+  const container = document.getElementById('sc-content');
+  if (cache.saleCategories) {
+    renderSaleCategoriesList();
+  } else {
+    container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  }
+  try {
+    const d = await apiGet('/api/sale-categories');
+    cache.saleCategories = d.categories || [];
+    renderSaleCategoriesList();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSaleCategoriesList() {
+  const container = document.getElementById('sc-content');
+  const cats = cache.saleCategories || [];
+  const newBtnEl = document.getElementById('sc-new-btn');
+  if (newBtnEl) newBtnEl.style.display = canManageSales() ? '' : 'none';
+  const sub = document.getElementById('sc-subtitle');
+  if (sub) sub.textContent = cats.length + (cats.length === 1 ? ' категория' : ' категорий');
+
+  if (!cats.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-folders"></i>Категорий пока нет' +
+      (canManageSales() ? '<br><br><button class="btn btn-primary" onclick="openNewCategory()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первую</button>' : '') +
+      '</div>';
+    return;
+  }
+
+  let html = '<div style="padding: 0 18px;">';
+  cats.forEach(c => {
+    const canEdit = canManageSales();
+    html += '<div class="category-row">' +
+      '<div class="cat-row-icon"><i class="ti ti-folder"></i></div>' +
+      '<div class="cat-row-body">' +
+        '<div class="cat-row-name">' + escapeHtml(c.name) + '</div>' +
+        '<div class="cat-row-meta">' + c.products_count + (c.products_count === 1 ? ' товар' : ' товаров/услуг') + '</div>' +
+      '</div>';
+    if (canEdit) {
+      html += '<div class="cat-row-actions">' +
+        '<button class="icon-btn" onclick="openEditCategory(' + c.id + ')" title="Редактировать"><i class="ti ti-edit"></i></button>' +
+        '<button class="icon-btn" onclick="deleteCategory(' + c.id + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+        '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function openNewCategory() {
+  if (!canManageSales()) {
+    showToast('Управлять категориями может директор, зам или менеджер', 'error');
+    return;
+  }
+  const name = prompt('Название категории:');
+  if (!name || !name.trim()) return;
+  _createCategory(name.trim());
+}
+
+async function _createCategory(name) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name: name }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось создать категорию', 'error');
+      return;
+    }
+    showToast('Категория создана', 'success');
+    cache.saleCategories = null;
+    cache.saleProducts = null;
+    loadSaleCategories();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+function openEditCategory(catId) {
+  if (!canManageSales()) return;
+  const cat = (cache.saleCategories || []).find(c => c.id === catId);
+  if (!cat) return;
+  const newName = prompt('Новое название категории:', cat.name);
+  if (!newName || !newName.trim() || newName.trim() === cat.name) return;
+  _updateCategory(catId, newName.trim());
+}
+
+async function _updateCategory(catId, name) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-categories/' + catId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name: name }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось обновить', 'error');
+      return;
+    }
+    showToast('Категория обновлена', 'success');
+    cache.saleCategories = null;
+    cache.saleProducts = null;
+    loadSaleCategories();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteCategory(catId) {
+  if (!canManageSales()) return;
+  const cat = (cache.saleCategories || []).find(c => c.id === catId);
+  if (!cat) return;
+  const msg = cat.products_count > 0
+    ? 'В этой категории ' + cat.products_count + ' товар(ов). После удаления они станут «Без категории». Продолжить?'
+    : 'Удалить категорию «' + cat.name + '»?';
+  if (!confirm(msg)) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-categories/' + catId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    showToast('Категория удалена', 'success');
+    cache.saleCategories = null;
+    cache.saleProducts = null;
+    loadSaleCategories();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 17 ============
 
 // --------- МОДАЛКА ПРИВЯЗКИ МОДЕЛЕЙ ----------
 
@@ -5860,12 +6258,16 @@ function renderOfferDetail(o) {
   }
   html += '</div>';
 
-  // Кнопка «Скачать PDF» (для всех авторизованных)
+  // Кнопка «Скачать PDF» + «Скачать Word» (для всех авторизованных) — ЭТАП 17
   html += '<div style="padding: 12px 18px 0;">';
-  html += '<button class="btn btn-primary" onclick="downloadOfferPdf()" style="width: 100%; justify-content: center;">' +
-          '<i class="ti ti-file-download"></i> Скачать PDF</button>';
+  html += '<div style="display: flex; gap: 8px;">';
+  html += '<button class="btn btn-primary" onclick="downloadOfferPdf()" style="flex: 1; justify-content: center;">' +
+          '<i class="ti ti-file-download"></i> PDF</button>';
+  html += '<button class="btn btn-secondary" onclick="downloadOfferDocx()" style="flex: 1; justify-content: center;">' +
+          '<i class="ti ti-file-type-doc"></i> Word</button>';
+  html += '</div>';
   html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; margin-top: 6px;">' +
-          'Сгенерированный PDF можно отправить клиенту' +
+          'PDF — для отправки клиенту, Word — для редактирования' +
           '</div>';
   html += '</div>';
 
@@ -5906,6 +6308,43 @@ async function downloadOfferPdf() {
     // Открываем в новой вкладке (мобильный браузер сам предложит скачать)
     window.open(url, '_blank');
     // Освобождаем память через минуту
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
+// ЭТАП 17: Word-экспорт КП
+async function downloadOfferDocx() {
+  if (!state.currentOfferId) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  showToast('Готовим Word…', 'success');
+  try {
+    const r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId + '/docx', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось получить Word';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    // Word всегда скачиваем (не открываем в браузере)
+    const a = document.createElement('a');
+    a.href = url;
+    // Имя из Content-Disposition или дефолт
+    const cd = r.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="([^"]+)"/);
+    a.download = match ? match[1] : 'КП.docx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     showToast('Ошибка соединения: ' + String(e), 'error');
