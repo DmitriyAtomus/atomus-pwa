@@ -1333,6 +1333,17 @@
 
   /* ============ ЭТАП 15: СВЯЗЬ СБОРОК С ДОГОВОРАМИ ============ */
 
+  /* ЭТАП 16А: двойное поле «число + единица» для срока действия */
+  .duration-row {
+    display: flex; gap: 8px;
+  }
+  .duration-row input[type="number"] {
+    flex: 1; min-width: 0;
+  }
+  .duration-row select {
+    flex: 1.2; min-width: 0;
+  }
+
   /* Выбор «На склад / Под договор» в форме сборки */
   .dest-choice {
     display: grid;
@@ -3154,7 +3165,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.3.0-stage15";
+const APP_VERSION = "v1.4.0-stage16a";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -3951,6 +3962,7 @@ function renderEmployeeRow(e, isDirector) {
   const meta = [];
   if (e.position) meta.push(e.position);
   if (e.phone) meta.push(e.phone);
+  if (e.email) meta.push(e.email);
   if (e.tab_number) meta.push('таб. ' + e.tab_number);
   const inactiveClass = e.is_active ? '' : ' emp-inactive';
   const clickAttr = isDirector ? ' onclick="openEditEmployee(' + e.id + ')"' : '';
@@ -3972,6 +3984,7 @@ state.employeeForm = {
   full_name: '',
   position: '',
   phone: '',
+  email: '',                    // ЭТАП 16А
   tab_number: '',
   telegram_id: '',
   roles: [],            // массив строк, напр. ['director','master']
@@ -3996,7 +4009,7 @@ function openNewEmployee() {
   state.employeeFormMode = 'new';
   state.currentEmployeeId = null;
   state.employeeForm = {
-    full_name: '', position: '', phone: '', tab_number: '', telegram_id: '',
+    full_name: '', position: '', phone: '', email: '', tab_number: '', telegram_id: '',
     roles: [], _is_active: true,
   };
   selectSidebarItem('employee-form');
@@ -4019,6 +4032,7 @@ function openEditEmployee(empId) {
     full_name: emp.full_name || '',
     position: emp.position || '',
     phone: emp.phone || '',
+    email: emp.email || '',
     tab_number: emp.tab_number || '',
     telegram_id: emp.telegram_id ? String(emp.telegram_id) : '',
     roles: [...(emp.roles || [])],
@@ -4060,6 +4074,10 @@ function renderEmployeeForm() {
   html += '<div class="sales-form-row">';
   html += '<div><label>Телефон</label>' +
           '<input type="tel" id="empf-phone" value="' + escapeHtml(f.phone) + '" placeholder="+7 ..."></div>';
+  html += '<div><label>Email</label>' +
+          '<input type="email" id="empf-email" value="' + escapeHtml(f.email || '') + '" placeholder="ivanov@example.com"></div>';
+  html += '</div>';
+  html += '<div class="sales-form-row cols-1">';
   html += '<div><label>Табельный номер</label>' +
           '<input type="text" id="empf-tab-number" value="' + escapeHtml(f.tab_number) + '" placeholder="напр. 0034"></div>';
   html += '</div>';
@@ -4129,6 +4147,7 @@ function renderEmployeeForm() {
   document.getElementById('empf-full-name').addEventListener('input', e => { state.employeeForm.full_name = e.target.value; });
   document.getElementById('empf-position').addEventListener('input', e => { state.employeeForm.position = e.target.value; });
   document.getElementById('empf-phone').addEventListener('input', e => { state.employeeForm.phone = e.target.value; });
+  document.getElementById('empf-email').addEventListener('input', e => { state.employeeForm.email = e.target.value; });
   document.getElementById('empf-tab-number').addEventListener('input', e => { state.employeeForm.tab_number = e.target.value; });
   const tgEl = document.getElementById('empf-telegram-id');
   if (tgEl) tgEl.addEventListener('input', e => { state.employeeForm.telegram_id = e.target.value.replace(/\D/g, ''); });
@@ -4169,10 +4188,18 @@ async function submitEmployeeForm() {
     return;
   }
 
+  // ЭТАП 16А: лёгкая валидация email — если пустой, ок; если введён, должен содержать @
+  const emailValue = (f.email || '').trim();
+  if (emailValue && emailValue.indexOf('@') === -1) {
+    errEl.innerHTML = '<div class="sales-error">Email должен содержать символ @</div>';
+    return;
+  }
+
   const payload = {
     full_name: f.full_name.trim(),
     position: f.position.trim(),
     phone: f.phone.trim(),
+    email: emailValue,
     tab_number: f.tab_number.trim(),
     roles: f.roles,
   };
@@ -4760,6 +4787,8 @@ state.offerForm = {
   contractor_inn: '',
   legal_entity: 'ooo_atomus',
   valid_until: '',
+  valid_duration_value: 14,           // ЭТАП 16А: число (по умолч. 14)
+  valid_duration_unit: 'days',        // ЭТАП 16А: 'days'|'weeks'|'months'
   production_term: '',
   payment_terms: '',
   delivery_terms: '',
@@ -4986,9 +5015,20 @@ function renderOfferDetail(o) {
           '</div></div>';
   html += '<div class="detail-item"><div class="detail-label">Менеджер</div>' +
           '<div class="detail-value">' + escapeHtml(o.manager_name || '—') + '</div></div>';
+  // ЭТАП 16А: срок действия — приоритет у длительности
+  let validText = 'не указан';
+  let validHasValue = false;
+  if (o.valid_duration_value) {
+    validText = validDurationLabel(o.valid_duration_value, o.valid_duration_unit || 'days');
+    if (o.valid_until) validText += ' (до ' + formatDateLong(o.valid_until) + ')';
+    validHasValue = true;
+  } else if (o.valid_until) {
+    validText = formatDateLong(o.valid_until);
+    validHasValue = true;
+  }
   html += '<div class="detail-item"><div class="detail-label">Срок действия</div>' +
-          '<div class="detail-value' + (o.valid_until ? '' : ' muted') + '">' +
-          (o.valid_until ? formatDateLong(o.valid_until) : 'не указан') + '</div></div>';
+          '<div class="detail-value' + (validHasValue ? '' : ' muted') + '">' +
+          escapeHtml(validText) + '</div></div>';
   html += '<div class="detail-item"><div class="detail-label">Срок изготовления</div>' +
           '<div class="detail-value' + (o.production_term ? '' : ' muted') + '">' +
           escapeHtml(o.production_term || 'не указан') + '</div></div>';
@@ -5211,7 +5251,9 @@ function openNewOffer() {
     manager_name: defaultManagerName,
     contractor_id: null, contractor_name: '', contractor_inn: '',
     legal_entity: 'ooo_atomus',
-    valid_until: addDaysIso(14),
+    valid_until: '',                       // ЭТАП 16А: считается на бэке
+    valid_duration_value: 14,              // ЭТАП 16А: 14 дней по умолчанию
+    valid_duration_unit: 'days',
     production_term: '',
     payment_terms: '',
     delivery_terms: '',
@@ -5238,6 +5280,8 @@ async function openEditOffer() {
       contractor_inn: o.contractor_inn || '',
       legal_entity: o.legal_entity || 'ooo_atomus',
       valid_until: o.valid_until || '',
+      valid_duration_value: o.valid_duration_value || 14,
+      valid_duration_unit: o.valid_duration_unit || 'days',
       production_term: o.production_term || '',
       payment_terms: o.payment_terms || '',
       delivery_terms: o.delivery_terms || '',
@@ -5327,8 +5371,16 @@ function renderOfferForm() {
   html += '<div class="sales-form-section">';
   html += '<div class="sales-form-title">Сроки и условия</div>';
   html += '<div class="sales-form-row">';
-  html += '<div><label>КП действительно до</label>' +
-          '<input type="date" id="sof-valid-until" value="' + escapeHtml(f.valid_until) + '"></div>';
+  // ЭТАП 16А: срок действия КП — число + единица измерения
+  html += '<div><label>Срок действия КП <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(от даты создания)</span></label>' +
+          '<div class="duration-row">' +
+          '<input type="number" id="sof-valid-duration-value" min="1" max="365" value="' + (f.valid_duration_value || 14) + '">' +
+          '<select id="sof-valid-duration-unit">' +
+          '<option value="days"' + (f.valid_duration_unit === 'days' ? ' selected' : '') + '>дней</option>' +
+          '<option value="weeks"' + (f.valid_duration_unit === 'weeks' ? ' selected' : '') + '>недель</option>' +
+          '<option value="months"' + (f.valid_duration_unit === 'months' ? ' selected' : '') + '>месяцев</option>' +
+          '</select>' +
+          '</div></div>';
   html += '<div><label>Срок изготовления <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(текстом)</span></label>' +
           '<input type="text" id="sof-production-term" value="' + escapeHtml(f.production_term) + '" placeholder="напр. 3-4 недели"></div>';
   html += '</div>';
@@ -5399,7 +5451,13 @@ function renderOfferForm() {
   container.innerHTML = html;
 
   // Подвязка полей
-  document.getElementById('sof-valid-until').addEventListener('change', e => { state.offerForm.valid_until = e.target.value; });
+  document.getElementById('sof-valid-duration-value').addEventListener('input', e => {
+    const v = parseInt(e.target.value) || 0;
+    state.offerForm.valid_duration_value = (v >= 1 && v <= 365) ? v : 14;
+  });
+  document.getElementById('sof-valid-duration-unit').addEventListener('change', e => {
+    state.offerForm.valid_duration_unit = e.target.value;
+  });
   document.getElementById('sof-production-term').addEventListener('input', e => { state.offerForm.production_term = e.target.value; });
   document.getElementById('sof-payment-terms').addEventListener('input', e => { state.offerForm.payment_terms = e.target.value; });
   document.getElementById('sof-delivery-terms').addEventListener('input', e => { state.offerForm.delivery_terms = e.target.value; });
@@ -5449,7 +5507,9 @@ async function submitOfferForm() {
     manager_id: f.manager_id,
     contractor_id: f.contractor_id,
     legal_entity: f.legal_entity,
-    valid_until: f.valid_until || null,
+    // ЭТАП 16А: длительность вместо явной даты — valid_until посчитается на бэке
+    valid_duration_value: f.valid_duration_value || 14,
+    valid_duration_unit: f.valid_duration_unit || 'days',
     production_term: f.production_term.trim() || null,
     payment_terms: f.payment_terms.trim() || null,
     delivery_terms: f.delivery_terms.trim() || null,
@@ -6027,6 +6087,30 @@ function pluralAssemblies(n) {
   if (a === 1) return 'сборка';
   if (a >= 2 && a <= 4) return 'сборки';
   return 'сборок';
+}
+
+// ЭТАП 16А: человекочитаемое «14 дней / 2 недели / 1 месяц»
+function validDurationLabel(value, unit) {
+  const v = parseInt(value) || 0;
+  if (v <= 0) return '';
+  const a = v % 10, b = v % 100;
+  if (unit === 'weeks') {
+    if (b >= 11 && b <= 14) return v + ' недель';
+    if (a === 1) return v + ' неделя';
+    if (a >= 2 && a <= 4) return v + ' недели';
+    return v + ' недель';
+  }
+  if (unit === 'months') {
+    if (b >= 11 && b <= 14) return v + ' месяцев';
+    if (a === 1) return v + ' месяц';
+    if (a >= 2 && a <= 4) return v + ' месяца';
+    return v + ' месяцев';
+  }
+  // days
+  if (b >= 11 && b <= 14) return v + ' дней';
+  if (a === 1) return v + ' день';
+  if (a >= 2 && a <= 4) return v + ' дня';
+  return v + ' дней';
 }
 
 function openContractDetail(contractId) {
