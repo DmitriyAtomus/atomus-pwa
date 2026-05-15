@@ -7233,7 +7233,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.2-defect-from-crm";
+const APP_VERSION = "v2.5.3-defect-no-target";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -18448,8 +18448,15 @@ async function submitDefectReport() {
   if (s.location) fd.append('location', s.location);
   s.photos.forEach((p, i) => fd.append('photo_' + (i + 1), p.file, p.file.name));
 
+  // Если сотрудник авторизован — используем защищённый эндпоинт.
+  // Он позволяет создавать замечания «без привязки» и сразу проставляет имя из профиля.
+  const token = localStorage.getItem(TOKEN_KEY);
+  const isInternal = (s.targetType === 'internal') || !!token;
+  const url = isInternal ? '/api/defects' : '/api/public/defects';
+  const headers = isInternal && token ? { 'Authorization': 'Bearer ' + token } : {};
+
   try {
-    const r = await fetch(API_BASE + '/api/public/defects', { method: 'POST', body: fd });
+    const r = await fetch(API_BASE + url, { method: 'POST', body: fd, headers });
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
       showToast(e.message || 'Не удалось отправить', 'error');
@@ -18466,11 +18473,19 @@ async function submitDefectReport() {
         '</div>' +
       '</div>' +
       '<div class="modal-footer">' +
-        '<button class="btn btn-primary" onclick="closeDefectForm()" style="width: 100%;">Закрыть</button>' +
+        '<button class="btn btn-primary" onclick="closeDefectFormAndRefresh()" style="width: 100%;">Закрыть</button>' +
       '</div>' +
     '</div>';
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+  }
+}
+
+/** Закрыть форму и обновить список замечаний если мы в этом разделе. */
+function closeDefectFormAndRefresh() {
+  closeDefectForm();
+  if (state.currentSection === 'defects' && state.currentScreen && state.currentScreen.startsWith('defects-list')) {
+    loadDefectsList();
   }
 }
 
@@ -18800,7 +18815,7 @@ function openNewDefectFromCRM() {
   const m = document.getElementById('qr-modal');
   if (!m) return;
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width: 440px;">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width: 460px;">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-alert-circle"></i> Новая доработка</h3>' +
         '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
@@ -18819,8 +18834,33 @@ function openNewDefectFromCRM() {
           '<div class="dt-meta">Выбрать из активных договоров</div></div>' +
           '<i class="ti ti-chevron-right dt-chev"></i>' +
         '</button>' +
+        '<button class="defect-target-btn" onclick="openInternalDefectForm()">' +
+          '<i class="ti ti-note"></i>' +
+          '<div><div class="dt-title">Без привязки</div>' +
+          '<div class="dt-meta">Общее замечание или идея</div></div>' +
+          '<i class="ti ti-chevron-right dt-chev"></i>' +
+        '</button>' +
       '</div>' +
     '</div>';
+  m.classList.add('visible');
+}
+
+/** Форма замечания «без привязки» (внутренняя). */
+function openInternalDefectForm() {
+  closeQrModal();
+  state._defectFormState = {
+    targetType: 'internal',
+    token: '',
+    type: 'defect',
+    description: '',
+    author_name: (state.user && (state.user.short_name || state.user.full_name)) || '',
+    author_phone: (state.user && state.user.phone) || '',
+    location: '',
+    photos: [],
+  };
+  const m = document.getElementById('defect-form-modal');
+  if (!m) return;
+  m.innerHTML = renderDefectFormHtml();
   m.classList.add('visible');
 }
 
