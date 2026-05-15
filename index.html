@@ -5140,6 +5140,79 @@
   .defects-widget-cell.s-in_progress .num { color: #B25E00; }
   .defects-widget-cell.s-resolved .num    { color: #15803D; }
   .defects-widget-cell.s-rejected .num    { color: var(--text-light); }
+  /* ============ ЭТАП 23+: МОБИЛЬНЫЕ УЛУЧШЕНИЯ РАЗДЕЛА ДОРАБОТКИ ============ */
+
+  /* Floating Action Button — главная кнопка действия на мобильной */
+  .fab {
+    display: none;       /* скрыт на десктопе */
+  }
+  .app.mobile-layout .fab {
+    display: flex;
+    position: fixed;
+    bottom: 22px;        /* tab-bar в разделе Доработки скрыт — FAB у самого низа */
+    right: 18px;
+    z-index: 50;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: white;
+    border: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(44, 82, 130, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.15s;
+  }
+  .app.mobile-layout .fab i { font-size: 26px; }
+  .app.mobile-layout .fab:active {
+    transform: scale(0.93);
+    box-shadow: 0 2px 8px rgba(44, 82, 130, 0.45);
+  }
+
+  /* Мобильные фильтр-чипсы (горизонтальный скролл) — для defects-list и т.д. */
+  .m-filter-chips {
+    display: none;
+  }
+  .app.mobile-layout .m-filter-chips {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .m-filter-chips::-webkit-scrollbar { display: none; }
+  .m-filter-chip {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text-mid);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .m-filter-chip:hover { border-color: var(--brand); color: var(--brand); }
+  .m-filter-chip.active {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: white;
+  }
+
+  /* Скрыть page-header на мобильной (его роль играет screen-header + m-filter-chips) */
+  .app.mobile-layout [data-screen="defects-list"] .page-header { display: none; }
+  /* Добавить нормальные отступы для контента списка */
+  .app.mobile-layout [data-screen="defects-list"] #defects-list-content {
+    padding: 14px;
+  }
+
+  /* ============ КОНЕЦ МОБИЛЬНЫХ УЛУЧШЕНИЙ ============ */
+
   /* ЭТАП 23+: Кнопки выбора цели для замечания (К сборке / К договору) */
   .defect-target-btn {
     display: flex;
@@ -6802,6 +6875,23 @@
 
       <!-- СПИСОК ЗАМЕЧАНИЙ -->
       <div class="screen" data-screen="defects-list" data-section="defects">
+        <!-- Мобильный header (только на мобильной) -->
+        <div class="screen-header">
+          <h2 id="defects-list-mobile-title">Доработки</h2>
+          <div style="display: flex; gap: 6px;">
+            <button class="icon-btn" onclick="openShareForInstallerFromCRM()" title="Отправить монтажнику" style="color: #15803D;">
+              <i class="ti ti-send"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Мобильные чипсы-фильтры (только на мобильной) -->
+        <div class="m-filter-chips" id="m-defects-filter-chips">
+          <button class="m-filter-chip active" data-filter="all"         onclick="setMobileDefectFilter('all', this)">Все</button>
+          <button class="m-filter-chip"        data-filter="new"         onclick="setMobileDefectFilter('new', this)">Новые</button>
+          <button class="m-filter-chip"        data-filter="in_progress" onclick="setMobileDefectFilter('in_progress', this)">В работе</button>
+          <button class="m-filter-chip"        data-filter="resolved"    onclick="setMobileDefectFilter('resolved', this)">Решённые</button>
+          <button class="m-filter-chip"        data-filter="rejected"    onclick="setMobileDefectFilter('rejected', this)">Отклонённые</button>
+        </div>
         <div class="content-inner" style="max-width: 100%;">
           <div class="page-header">
             <div class="page-header-title">
@@ -6822,6 +6912,10 @@
             <div class="loading-block">Загружаем…</div>
           </div>
         </div>
+        <!-- Floating Action Button (только на мобильной) — Новая доработка -->
+        <button class="fab fab-defects" onclick="openNewDefectFromCRM()" aria-label="Новая доработка">
+          <i class="ti ti-plus"></i>
+        </button>
       </div>
 
       <!-- ДЕТАЛИ ЗАМЕЧАНИЯ -->
@@ -7239,7 +7333,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.5-feedback-link";
+const APP_VERSION = "v2.5.6-mobile-defects";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -7637,10 +7731,13 @@ function selectSection(sectionName) {
   if (sidebar) sidebar.dataset.visible = '1';
 
   // Переключаем tab-bar (мобильный). У Продаж — свой, у остальных — производственный.
+  // ЭТАП 23+: в разделах с FAB (Доработки) скрываем нижний tab-bar полностью.
   document.querySelectorAll('.tab-bar').forEach(tb => { tb.dataset.active = '0'; });
   if (sectionName === 'sales') {
     const tbSales = document.getElementById('tab-bar-sales');
     if (tbSales) tbSales.dataset.active = '1';
+  } else if (sectionName === 'defects') {
+    // Не показываем ни один tab-bar — у Доработок свой FAB
   } else {
     const tbProd = document.getElementById('tab-bar-production');
     if (tbProd) tbProd.dataset.active = '1';
@@ -18551,6 +18648,7 @@ async function loadDefectsList() {
   if (!container) return;
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
   const titleEl = document.getElementById('defects-list-title');
+  const mobileTitleEl = document.getElementById('defects-list-mobile-title');
   const counter = document.getElementById('defects-counter');
 
   const filter = state.defectsFilter || 'all';
@@ -18562,6 +18660,12 @@ async function loadDefectsList() {
     rejected: 'Отклонённые',
   };
   if (titleEl) titleEl.textContent = titles[filter] || 'Замечания';
+  if (mobileTitleEl) mobileTitleEl.textContent = titles[filter] || 'Доработки';
+
+  // Синхронизуем мобильные фильтр-чипсы
+  document.querySelectorAll('#m-defects-filter-chips .m-filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.filter === filter);
+  });
 
   try {
     const q = filter === 'all' ? '' : '?status=' + filter;
@@ -18576,6 +18680,19 @@ async function loadDefectsList() {
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
   }
+}
+
+/** Мобильный клик по фильтр-чипсу — синхронизирует с сайдбаром. */
+function setMobileDefectFilter(filter, btnEl) {
+  const map = {
+    all: 'defects-list',
+    new: 'defects-list-new',
+    in_progress: 'defects-list-progress',
+    resolved: 'defects-list-resolved',
+    rejected: 'defects-list-rejected',
+  };
+  const screen = map[filter] || 'defects-list';
+  selectSidebarItem(screen);
 }
 
 function renderDefectRow(d) {
