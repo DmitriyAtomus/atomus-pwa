@@ -2722,6 +2722,59 @@
   }
   /* ============ КОНЕЦ ПОМОЩЬ ============ */
 
+  /* ============ ОБЩИЕ СТИЛИ ДЛЯ НОВЫХ МОДАЛОК (Этапы 18, 19, помощь) ============ */
+  /* Раньше мои модалки использовали .modal-body как обёртку — это была ошибка.
+     Правильная структура: .modal-overlay > .modal > .modal-header + .modal-content */
+  .modal-wide { max-width: 640px !important; }
+  .modal-content {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-close {
+    background: none; border: none; padding: 6px;
+    font-size: 22px; cursor: pointer;
+    color: var(--text-light);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: var(--bg); color: var(--text); }
+  .modal-actions {
+    display: flex; gap: 10px; justify-content: flex-end;
+    padding-top: 14px;
+    margin-top: 4px;
+  }
+  /* В модалках для форм — выровнять элементы */
+  .modal-content .form-group { margin-bottom: 14px; }
+  .modal-content .form-group label {
+    display: block;
+    font-size: 11.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    color: var(--text-light);
+    margin-bottom: 5px;
+  }
+  .modal-content .form-group input,
+  .modal-content .form-group select,
+  .modal-content .form-group textarea {
+    width: 100%;
+    padding: 9px 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    color: var(--text);
+    font-family: inherit;
+  }
+  .modal-content .form-group input:focus,
+  .modal-content .form-group select:focus,
+  .modal-content .form-group textarea:focus {
+    border-color: var(--brand);
+  }
+  .modal-content .form-group textarea { resize: vertical; min-height: 60px; }
+  /* ============ КОНЕЦ ОБЩИЕ СТИЛИ МОДАЛОК ============ */
+
   .task-status-pill {
     flex: 0 0 auto;
     padding: 3px 10px;
@@ -5084,13 +5137,13 @@
 </div>
 
 <!-- ============ ЭТАП 18: МОДАЛКА КАРТОЧКИ СБОРКИ ============ -->
-<div class="modal-overlay" id="assembly-stock-modal"></div>
+<div class="modal-overlay" id="assembly-stock-modal" onclick="closeAssemblyStockModal()"></div>
 
 <!-- ============ ЭТАП 19: МОДАЛКА СНАБЖЕНИЯ ============ -->
-<div class="modal-overlay" id="supply-modal"></div>
+<div class="modal-overlay" id="supply-modal" onclick="closeSupplyModal()"></div>
 
 <!-- ============ МОДАЛКА ПОМОЩИ (статьи базы знаний) ============ -->
-<div class="modal-overlay" id="help-modal"></div>
+<div class="modal-overlay" id="help-modal" onclick="closeHelpModal()"></div>
 
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
@@ -5102,7 +5155,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.1.1-help";
+const APP_VERSION = "v2.1.2-help-fix";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -11250,8 +11303,8 @@ function showAssemblyStockModal(d) {
 
   const m = document.getElementById('assembly-stock-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeAssemblyStockModal()"></div>' +
-    '<div class="modal-body" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name) + '</h3>' +
         '<button class="modal-close" onclick="closeAssemblyStockModal()"><i class="ti ti-x"></i></button>' +
@@ -11495,8 +11548,8 @@ function showSupplierModal(s) {
   const canManage = canManageSupply();
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
-    '<div class="modal-body" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-truck-loading"></i> ' + (isEdit ? 'Редактировать поставщика' : 'Новый поставщик') + '</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
@@ -11650,8 +11703,8 @@ function showSupplyItemModal(i) {
   const canManage = canManageSupply();
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
-    '<div class="modal-body" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-package"></i> ' + (isEdit ? 'Редактировать позицию' : 'Новая позиция каталога') + '</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
@@ -11818,8 +11871,8 @@ async function showSupplyRequestModal(r) {
   const items = cache.supplyCatalog;
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
-    '<div class="modal-body" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-clipboard-list"></i> ' + (isEdit ? 'Заявка #' + r.id : 'Новая заявка на закупку') + '</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
@@ -11971,8 +12024,8 @@ async function openNewSupplyOrder() {
   }
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
-    '<div class="modal-body" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-file-invoice"></i> Новый заказ поставщику</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
@@ -12145,8 +12198,8 @@ async function openAddOrderItem(orderId) {
   } catch (e) {}
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
-    '<div class="modal-body" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-plus"></i> Добавить позицию в заказ</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
@@ -12275,8 +12328,8 @@ async function openReceiveOrder(orderId) {
   const today = new Date().toISOString().substring(0, 10);
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
-    '<div class="modal-body modal-body-wide" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-package-import"></i> Приёмка заказа #' + o.id + '</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
@@ -13108,8 +13161,8 @@ function openHelpArticle(articleId) {
 
   const m = document.getElementById('help-modal');
   m.innerHTML =
-    '<div class="modal-overlay" onclick="closeHelpModal()"></div>' +
-    '<div class="modal-body modal-body-wide" onclick="event.stopPropagation()">' +
+    
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ' + a.icon + '"></i> ' + escapeHtml(a.title) + '</h3>' +
         '<button class="modal-close" onclick="closeHelpModal()"><i class="ti ti-x"></i></button>' +
