@@ -1257,6 +1257,46 @@
     outline: none; resize: vertical; font-family: inherit;
   }
   .comment-input:focus { border-color: var(--brand); }
+
+  /* ЭТАП 23: широкий текстовый input на всю ширину секции */
+  .text-input-fw {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--text-dark);
+    background: white;
+    outline: none;
+    font-family: inherit;
+  }
+  .text-input-fw:focus { border-color: var(--brand); }
+
+  /* Узкий input для числа часов + суффикс */
+  .text-input-narrow {
+    width: 110px;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--text-dark);
+    background: white;
+    outline: none;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  .text-input-narrow:focus { border-color: var(--brand); }
+  .hours-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hours-suffix {
+    color: var(--text-light);
+    font-size: 13.5px;
+  }
   .comment-counter {
     text-align: right; font-size: 11px; color: var(--text-faint); margin-top: 4px;
   }
@@ -5292,7 +5332,7 @@
       </div>
       <div class="sidebar-nav">
         <button class="nav-item new-btn" id="nav-new-assembly" onclick="openNewAssembly()">
-          <i class="ti ti-circle-plus"></i><span>Новая сборка</span>
+          <i class="ti ti-circle-plus"></i><span>Новая работа</span>
         </button>
         <button class="nav-item active" data-nav="dashboard" onclick="selectSidebarItem('dashboard')">
           <i class="ti ti-home"></i><span>Главная</span>
@@ -5801,10 +5841,10 @@
       <div class="screen new-screen" data-screen="new-assembly" data-section="production">
         <div class="screen-header">
           <button class="back-btn" onclick="cancelNewAssembly()"><i class="ti ti-arrow-left"></i></button>
-          <h2>Новая сборка</h2>
+          <h2>Новая работа</h2>
         </div>
         <div class="page-header">
-          <div><h1>Новая сборка</h1><div class="page-subtitle">Внесение записи в журнал производства</div></div>
+          <div><h1>Новая работа</h1><div class="page-subtitle">Внесение записи в журнал производства</div></div>
           <button class="icon-btn" onclick="cancelNewAssembly()" title="Отмена"><i class="ti ti-x"></i></button>
         </div>
 
@@ -5856,28 +5896,33 @@
             <!-- Описание работы — для не-сборок -->
             <div class="form-section" id="work-description-section" style="display: none;">
               <label class="form-label">Что было сделано <span class="required">*</span></label>
-              <textarea id="na-description" rows="3" placeholder="Например: «Замена сгоревшего УЗО в щите автоматики», «Запуск приточной установки», «Замеры сопротивления изоляции»"
+              <textarea id="na-description" class="comment-input" rows="3"
+                        placeholder="Например: «Замена сгоревшего УЗО в щите автоматики», «Запуск приточной установки», «Замеры сопротивления изоляции»"
                         oninput="state.newAssemblyForm.description = this.value"></textarea>
             </div>
 
             <!-- Локация — для всех типов кроме классической сборки -->
             <div class="form-section" id="work-location-section" style="display: none;">
               <label class="form-label">Где (объект, адрес)</label>
-              <input type="text" id="na-location" placeholder="Например: ТРЦ Невский Атриум, ТП-3"
+              <input type="text" id="na-location" class="text-input-fw"
+                     placeholder="Например: ТРЦ Невский Атриум, ТП-3"
                      oninput="state.newAssemblyForm.location = this.value">
             </div>
 
             <!-- Часы работы — для не-сборок -->
             <div class="form-section" id="work-hours-section" style="display: none;">
-              <label class="form-label">Часы работы (опционально)</label>
-              <input type="number" id="na-hours" min="0.25" max="24" step="0.25" placeholder="2.5"
-                     oninput="state.newAssemblyForm.hours_spent = parseFloat(this.value)">
+              <label class="form-label">Часы работы <span class="hint">(опционально)</span></label>
+              <div class="hours-input-wrap">
+                <input type="number" id="na-hours" class="text-input-narrow" min="0.25" max="24" step="0.25" placeholder="2.5"
+                       oninput="state.newAssemblyForm.hours_spent = parseFloat(this.value)">
+                <span class="hours-suffix">часов</span>
+              </div>
             </div>
 
             <!-- ЭТАП 15: Назначение сборки — под договор или на склад -->
-            <div class="form-section">
-              <label class="form-label">Куда идёт сборка</label>
-              <div class="dest-choice">
+            <div class="form-section" id="destination-section">
+              <label class="form-label" id="destination-label">Куда идёт сборка</label>
+              <div class="dest-choice" id="destination-choice">
                 <button type="button" class="dest-option" data-dest="warehouse"
                         onclick="setAssemblyDestination('warehouse')">
                   <i class="ti ti-building-warehouse"></i>
@@ -5893,6 +5938,27 @@
                   <div class="do-body">
                     <div class="do-title">Под договор</div>
                     <div class="do-meta" id="na-contract-meta">Выбрать активный договор</div>
+                  </div>
+                  <i class="ti ti-check do-check"></i>
+                </button>
+              </div>
+              <!-- Упрощённый выбор договора для не-сборок (только Под договор / без договора) -->
+              <div class="dest-choice" id="destination-choice-work" style="display: none;">
+                <button type="button" class="dest-option active" data-dest-w="none"
+                        onclick="setWorkContract(null)">
+                  <i class="ti ti-circle-dashed"></i>
+                  <div class="do-body">
+                    <div class="do-title">Без привязки</div>
+                    <div class="do-meta">Внутренняя работа, без договора</div>
+                  </div>
+                  <i class="ti ti-check do-check"></i>
+                </button>
+                <button type="button" class="dest-option" data-dest-w="contract"
+                        onclick="openContractPickerForWork()">
+                  <i class="ti ti-file-text"></i>
+                  <div class="do-body">
+                    <div class="do-title">По договору</div>
+                    <div class="do-meta" id="na-work-contract-meta">Выбрать договор</div>
                   </div>
                   <i class="ti ti-check do-check"></i>
                 </button>
@@ -5914,7 +5980,7 @@
               </div>
             </div>
 
-            <div class="form-section">
+            <div class="form-section" id="quantity-section">
               <label class="form-label">Количество <span class="required">*</span></label>
               <div class="qty-stepper">
                 <button class="qty-btn" onclick="changeQty(-1)" id="qty-minus">−</button>
@@ -5925,7 +5991,8 @@
             </div>
 
             <div class="form-section">
-              <label class="form-label">Кто собирал <span class="required">*</span>
+              <label class="form-label">
+                <span id="workers-label-text">Кто собирал</span> <span class="required">*</span>
                 <span class="hint" id="workers-hint">(можно несколько)</span>
               </label>
               <div id="workers-list">
@@ -5934,7 +6001,7 @@
             </div>
 
             <div class="form-section">
-              <label class="form-label">Дата сборки <span class="required">*</span></label>
+              <label class="form-label"><span id="date-label-text">Дата сборки</span> <span class="required">*</span></label>
               <div class="date-row">
                 <button class="chip-option selected" data-date="today">Сегодня</button>
                 <button class="chip-option" data-date="yesterday">Вчера</button>
@@ -7084,7 +7151,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.0-work-types";
+const APP_VERSION = "v2.5.1-work-form-ui";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -12521,17 +12588,36 @@ function setWorkType(wt) {
   const hoursSec   = document.getElementById('work-hours-section');
   const execSec    = document.getElementById('execution-section');
   const ipSec      = document.getElementById('ip-section');
+  const qtySec     = document.getElementById('quantity-section');
   if (modelSec) modelSec.style.display = isAssembly ? '' : 'none';
   if (descSec)  descSec.style.display  = isAssembly ? 'none' : '';
   if (locSec)   locSec.style.display   = isAssembly ? 'none' : '';
   if (hoursSec) hoursSec.style.display = isAssembly ? 'none' : '';
+  if (qtySec)   qtySec.style.display   = isAssembly ? '' : 'none';
   // Для не-сборок прячем исполнение/IP даже если ранее выбраны
   if (!isAssembly) {
     if (execSec) execSec.style.display = 'none';
     if (ipSec)   ipSec.style.display   = 'none';
+    // Количество всегда 1 для услуги
+    state.newAssembly.quantity = 1;
+    const qtyInp = document.getElementById('qty-input');
+    if (qtyInp) qtyInp.value = 1;
   }
-  // Обновим заголовки/тексты
-  const headers = document.querySelectorAll('[data-screen="new-assembly"] h1, [data-screen="new-assembly"] h2');
+  // Назначение: «Куда идёт сборка» — для сборки. Для работ — упрощённый «Без привязки / По договору»
+  const destLabel  = document.getElementById('destination-label');
+  const destChoice = document.getElementById('destination-choice');
+  const destChoiceW = document.getElementById('destination-choice-work');
+  if (destLabel)  destLabel.textContent = isAssembly ? 'Куда идёт сборка' : 'Привязка к договору';
+  if (destChoice)  destChoice.style.display  = isAssembly ? '' : 'none';
+  if (destChoiceW) destChoiceW.style.display = isAssembly ? 'none' : '';
+
+  // Лейбл «Кто собирал» / «Кто делал» / «Исполнители»
+  const workersLabel = document.getElementById('workers-label-text');
+  const dateLabel    = document.getElementById('date-label-text');
+  if (workersLabel) workersLabel.textContent = isAssembly ? 'Кто собирал' : 'Кто делал';
+  if (dateLabel)    dateLabel.textContent    = isAssembly ? 'Дата сборки' : 'Дата работы';
+
+  // Заголовки h1 и h2 на экране — у них нет id, ставим напрямую
   const titles = {
     assembly: 'Новая сборка', repair: 'Новый ремонт',
     commissioning: 'Новая пусконаладка', installation: 'Новый монтаж',
@@ -12539,12 +12625,54 @@ function setWorkType(wt) {
     maintenance: 'Новое ТО', other: 'Новая работа',
   };
   const title = titles[wt] || 'Новая работа';
-  headers.forEach(h => { if (h.id !== 'na-contract-meta') h.textContent = title; });
-  // Подпись «куда идёт сборка» — только для assembly
-  const destLabel = document.querySelector('[data-screen="new-assembly"] label[for]');
+  document.querySelectorAll('[data-screen="new-assembly"] .screen-header h2, [data-screen="new-assembly"] .page-header h1').forEach(h => {
+    h.textContent = title;
+  });
   // Кнопка отправки текст
   const submitBtn = document.querySelector('[data-screen="new-assembly"] .btn-primary');
   if (submitBtn) submitBtn.innerHTML = '<i class="ti ti-check"></i> Сохранить';
+}
+
+// Привязка работы к договору (упрощённо — «Без привязки» / «По договору»)
+function setWorkContract(contractId) {
+  if (!state.newAssembly) return;
+  state.newAssembly.contractId = contractId || null;
+  document.querySelectorAll('#destination-choice-work .dest-option').forEach(b => b.classList.remove('active'));
+  if (contractId) {
+    const btn = document.querySelector('#destination-choice-work .dest-option[data-dest-w="contract"]');
+    if (btn) btn.classList.add('active');
+  } else {
+    const btn = document.querySelector('#destination-choice-work .dest-option[data-dest-w="none"]');
+    if (btn) btn.classList.add('active');
+    const meta = document.getElementById('na-work-contract-meta');
+    if (meta) meta.textContent = 'Выбрать договор';
+  }
+}
+
+// Открыть подбор договора (переиспользуем модалку «Под договор» обычной сборки)
+async function openContractPickerForWork() {
+  // Делегируем существующей функции подбора договора (она устанавливает state.newAssembly.contractId)
+  try {
+    if (typeof openContractPicker === 'function') {
+      openContractPicker((c) => {
+        if (c && c.id) {
+          state.newAssembly.contractId = c.id;
+          state.newAssembly.contractLabel = (c.number || '') + (c.contractor_name ? ' · ' + c.contractor_name : '');
+          // Подсветим вариант
+          document.querySelectorAll('#destination-choice-work .dest-option').forEach(b => b.classList.remove('active'));
+          const btn = document.querySelector('#destination-choice-work .dest-option[data-dest-w="contract"]');
+          if (btn) btn.classList.add('active');
+          const meta = document.getElementById('na-work-contract-meta');
+          if (meta) meta.textContent = state.newAssembly.contractLabel;
+        }
+      });
+    } else {
+      // Fallback: вызовем существующий обработчик "Под договор" из обычной сборки
+      setAssemblyDestination('contract');
+    }
+  } catch (e) {
+    showToast('Не удалось открыть выбор договора', 'error');
+  }
 }
 
 async function ensureModelsLoaded() {
