@@ -161,24 +161,25 @@
   .app.desktop-layout .m-section-tabs { display: none; }
   .app.desktop-layout .body-layout {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 210px 1fr;
     min-height: calc(100vh - 64px);
   }
   /* На десктопе показываем только активный сайдбар (с data-visible="1") */
   .app.desktop-layout .sidebar { display: none; }
   .app.desktop-layout .sidebar[data-visible="1"] { display: flex; flex-direction: column; }
 
-  /* ============ ШАПКА с шариком ============ */
+  /* ============ ШАПКА с шариком + Atom CRM ============ */
   .top-bar {
-    background: white;
+    background: linear-gradient(180deg, #F5F8FB 0%, #EEF2F7 100%);
     border-bottom: 1px solid var(--border);
-    padding: 10px 18px;
+    padding: 10px 20px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
     position: sticky;
     top: 0;
     z-index: 30;
+    box-shadow: 0 1px 3px rgba(15, 30, 60, 0.04);
   }
   .top-bar .brand-ball {
     width: 40px; height: 40px;
@@ -191,28 +192,77 @@
   }
 
   .section-switcher {
-    display: flex; gap: 4px; flex: 1;
+    display: flex; gap: 6px; flex: 1;
     overflow-x: auto;
     scrollbar-width: none;
   }
   .section-switcher::-webkit-scrollbar { display: none; }
   .section-tab {
-    padding: 9px 16px; border: none; background: transparent;
-    color: var(--text-mid); font-size: 14px; font-weight: 600;
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-mid);
+    font-size: 13.5px; font-weight: 600;
     cursor: pointer; border-radius: 10px;
     display: flex; align-items: center; gap: 8px;
     white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
   }
   .section-tab i { font-size: 18px; }
-  .section-tab:hover { background: var(--bg); }
-  .section-tab.active { background: var(--brand-bg); color: var(--brand); }
+  .section-tab:hover {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: var(--border);
+    color: var(--brand);
+  }
+  .section-tab.active {
+    background: white;
+    color: var(--brand);
+    border-color: var(--brand);
+    box-shadow: 0 1px 4px rgba(44, 82, 130, 0.12);
+  }
   .section-tab.disabled { color: var(--text-faint); cursor: not-allowed; opacity: 0.7; }
-  .section-tab.disabled:hover { background: transparent; }
+  .section-tab.disabled:hover { background: transparent; border-color: transparent; }
   .section-tab .soon-badge {
     background: var(--warning-bg); color: var(--warning);
     font-size: 9px; padding: 1px 6px; border-radius: 999px;
     font-weight: 700; margin-left: 4px;
     text-transform: uppercase; letter-spacing: 0.3px;
+  }
+
+  /* Логотип Atom CRM рядом с шариком */
+  .brand-wrap {
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .brand-name {
+    font-family: ui-rounded, -apple-system, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--brand);
+    line-height: 1;
+    white-space: nowrap;
+    user-select: none;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .brand-name .brand-name-accent {
+    font-size: 14px;
+    color: var(--text-mid);
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    padding: 3px 8px;
+    background: var(--brand-bg);
+    border-radius: 6px;
+    text-transform: uppercase;
+  }
+  @media (max-width: 700px) {
+    .brand-name { font-size: 15px; gap: 4px; }
+    .brand-name .brand-name-accent { font-size: 10px; padding: 2px 6px; letter-spacing: 1px; }
+  }
+  @media (max-width: 500px) {
+    .brand-name .brand-name-accent { display: none; }
   }
 
   .user-block {
@@ -263,54 +313,76 @@
 
   /* ============ SIDEBAR ============ */
   .sidebar {
-    background: white;
-    border-right: 1px solid var(--border);
-    padding: 18px 12px;
+    background: linear-gradient(180deg, #1E3A5F 0%, #15294A 100%);
+    border-right: 1px solid #0F1F3D;
+    padding: 18px 10px;
     position: sticky;
     top: 64px;
     height: calc(100vh - 64px);
     overflow-y: auto;
+    color: #E2E8F0;
   }
+  /* Скроллбар тонкий для тёмной темы */
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+  .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
   .sidebar-title {
     font-size: 10.5px;
-    color: var(--text-light);
+    color: rgba(255,255,255,0.55);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.7px;
     font-weight: 700;
-    padding: 8px 14px 12px;
+    padding: 6px 14px 10px;
     display: flex;
     align-items: center;
     gap: 6px;
   }
-  .sidebar-title i { font-size: 16px; }
+  .sidebar-title i { font-size: 16px; color: rgba(255,255,255,0.65); }
   .sidebar-nav { flex: 1; }
   .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    border-radius: 10px;
-    color: var(--text-mid);
+    gap: 11px;
+    padding: 9px 13px;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.78);
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 500;
     border: none;
     background: none;
     width: 100%;
     text-align: left;
     margin-bottom: 2px;
+    transition: background 0.15s, color 0.15s;
   }
-  .nav-item i { font-size: 18px; }
-  .nav-item:hover { background: var(--bg); }
-  .nav-item.active { background: var(--brand-bg); color: var(--brand); font-weight: 600; }
+  .nav-item i { font-size: 17px; opacity: 0.85; }
+  .nav-item:hover {
+    background: rgba(255,255,255,0.07);
+    color: white;
+  }
+  .nav-item:hover i { opacity: 1; }
+  .nav-item.active {
+    background: rgba(255,255,255,0.14);
+    color: white;
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 #5B9CFF;
+  }
+  .nav-item.active i { color: #5B9CFF; opacity: 1; }
   .nav-item.new-btn {
-    background: var(--brand); color: white; margin-bottom: 14px;
+    background: #2C5282; color: white; margin-bottom: 14px;
+    box-shadow: 0 2px 6px rgba(44, 82, 130, 0.4);
   }
-  .nav-item.new-btn:hover { background: #345d8d; }
+  .nav-item.new-btn:hover { background: #345d8d; box-shadow: 0 3px 8px rgba(44, 82, 130, 0.5); }
   .sub-nav { margin: 18px 0 8px; }
   .sub-nav-title {
     font-size: 10.5px;
-    color: var(--text-light);
+    color: rgba(255,255,255,0.5);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 600;
@@ -318,20 +390,29 @@
   }
   .sidebar-footer {
     margin-top: auto; padding: 12px 8px 4px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid rgba(255,255,255,0.12);
     display: flex; align-items: center; gap: 10px;
   }
   .sidebar-footer .small-avatar {
     width: 32px; height: 32px; border-radius: 50%;
-    background: var(--brand-bg); color: var(--brand);
+    background: rgba(255,255,255,0.12); color: white;
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 700;
   }
   .sidebar-footer .user-info-block {
     flex: 1; min-width: 0; line-height: 1.2;
   }
-  .sidebar-footer .un { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sidebar-footer .ur { font-size: 10.5px; color: var(--text-light); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-footer .un { font-size: 12.5px; font-weight: 600; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-footer .ur { font-size: 10.5px; color: rgba(255,255,255,0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-footer .icon-btn {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.75);
+  }
+  .sidebar-footer .icon-btn:hover {
+    background: rgba(255,255,255,0.18);
+    color: white;
+  }
 
   /* ============ TAB BAR ============ */
   .tab-bar {
@@ -1470,10 +1551,14 @@
   .sidebar-version {
     padding: 8px 14px 12px;
     font-size: 10.5px;
-    color: var(--text-faint);
+    color: rgba(255,255,255,0.4);
     line-height: 1.4;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid rgba(255,255,255,0.08);
     margin-top: 8px;
+  }
+  .sidebar-version .sidebar-version-text {
+    color: rgba(255,255,255,0.55);
+    font-weight: 500;
   }
 
   /* ============ ЭТАП 15: СВЯЗЬ СБОРОК С ДОГОВОРАМИ ============ */
@@ -2324,11 +2409,11 @@
 
   /* Лейбл секции в сайдбаре */
   .nav-section-label {
-    padding: 14px 16px 6px;
+    padding: 14px 14px 6px;
     font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: var(--text-faint);
+    color: rgba(255,255,255,0.45);
     font-weight: 600;
   }
 
@@ -2541,6 +2626,309 @@
   .modal-body-wide { max-width: 640px !important; }
 
   /* ============ КОНЕЦ ЭТАП 19 ============ */
+
+  /* ============ ЭТАП 20: ВИДЖЕТЫ САЙДБАРА ГЛАВНОЙ ============ */
+
+  /* Внешние ссылки (Max / Почта / Диск) — слегка отличаются от nav-item */
+  .nav-item.ext-link {
+    text-decoration: none;
+    color: rgba(255,255,255,0.78);
+    position: relative;
+    padding-right: 30px;
+  }
+  .nav-item.ext-link .ext-arrow {
+    position: absolute;
+    right: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    opacity: 0.4;
+  }
+  .nav-item.ext-link:hover .ext-arrow { opacity: 1; }
+
+  /* Мини-календарь в сайдбаре */
+  .sb-minical-wrap {
+    margin: 12px 8px;
+    padding: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .sb-minical-wrap:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.18);
+  }
+  .sb-minical-month {
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.92);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+  }
+  .sb-minical-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+  }
+  .sb-minical-dow {
+    text-align: center;
+    font-size: 9px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 600;
+    padding-bottom: 3px;
+    text-transform: uppercase;
+  }
+  .sb-minical-day {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px;
+    color: rgba(255,255,255,0.7);
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sb-minical-day.is-outside { color: rgba(255,255,255,0.25); }
+  .sb-minical-day.is-weekend { color: rgba(255,170,170,0.7); }
+  .sb-minical-day.is-today {
+    background: #5B9CFF;
+    color: white;
+    font-weight: 700;
+  }
+
+  /* Большой календарь на главной */
+  .cal-nav { display: flex; gap: 8px; align-items: center; }
+  .bigcal {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    overflow: hidden;
+  }
+  .bigcal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+  .bigcal-dow {
+    text-align: center;
+    font-size: 10.5px;
+    color: var(--text-light);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 0 8px;
+  }
+  .bigcal-day {
+    min-height: 92px;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .bigcal-day:hover { border-color: var(--brand); }
+  .bigcal-day.is-outside {
+    background: transparent;
+    opacity: 0.4;
+  }
+  .bigcal-day.is-today {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .bigcal-day-num {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .bigcal-day.is-weekend .bigcal-day-num { color: var(--danger); }
+  .bigcal-event {
+    font-size: 10.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .bigcal-event.ev-task     { background: #FFF4E6; color: #B25E00; }
+  .bigcal-event.ev-shipment { background: #DCEEFF; color: #1C5BA5; }
+  .bigcal-event.ev-supply   { background: #E8F5E9; color: #15803D; }
+  .bigcal-event.ev-vacation { background: #F3E8FF; color: #6B21A8; }
+  .bigcal-day-more {
+    font-size: 9.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+  }
+
+  /* Виджет «кто в отпуске» на Главной */
+  .vacation-widget {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .vac-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .vac-row:first-child { border-top: none; padding-top: 4px; }
+  .vac-row-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #F3E8FF; color: #6B21A8;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .vac-row-body { flex: 1; min-width: 0; }
+  .vac-row-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .vac-row-dates {
+    font-size: 11.5px; color: var(--text-light);
+    margin-top: 1px;
+  }
+  .vac-row-tag {
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+  .vac-row-tag.is-current { background: #F3E8FF; color: #6B21A8; }
+  .vac-row-tag.is-upcoming { background: #FFF4E6; color: #B25E00; }
+  /* ============ КОНЕЦ ЭТАП 20 ============ */
+
+  /* ============ ЭТАП 20: КАДРЫ — ВИДЫ ============ */
+
+  /* Таймлайн отпусков (Gantt-like) */
+  .hr-tl-nav { display: flex; gap: 8px; align-items: center; }
+  .hr-timeline {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    overflow-x: auto;
+  }
+  .hr-tl-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 800px;
+  }
+  .hr-tl-table th, .hr-tl-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+    font-size: 12.5px;
+  }
+  .hr-tl-table thead th {
+    background: var(--bg);
+    color: var(--text-light);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 10.5px;
+    position: sticky; top: 0;
+  }
+  .hr-tl-emp-col {
+    width: 200px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .hr-tl-emp-pos { font-size: 11px; color: var(--text-light); font-weight: 400; margin-top: 1px; }
+  .hr-tl-grid-cell {
+    padding: 0 !important;
+    height: 36px;
+    min-width: 32px;
+    position: relative;
+    border-right: 1px dashed rgba(0,0,0,0.05);
+  }
+  .hr-tl-grid-cell.is-weekend { background: rgba(220, 60, 60, 0.04); }
+  .hr-tl-grid-cell.is-today { background: rgba(91, 156, 255, 0.18); }
+  .hr-tl-bar {
+    position: absolute;
+    top: 6px; bottom: 6px;
+    background: linear-gradient(180deg, #C084FC 0%, #A855F7 100%);
+    border-radius: 6px;
+    padding: 0 8px;
+    display: flex; align-items: center;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(168, 85, 247, 0.3);
+    transition: transform 0.12s;
+    z-index: 1;
+  }
+  .hr-tl-bar:hover { transform: scaleY(1.05); z-index: 2; }
+  .hr-tl-month-header {
+    background: var(--bg);
+    color: var(--text-light);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .hr-tl-day-header {
+    font-size: 9.5px;
+    text-align: center;
+    color: var(--text-light);
+    padding: 4px 0;
+    font-weight: 500;
+  }
+  .hr-tl-day-header.is-weekend { color: var(--danger); }
+
+  /* Календарь отпусков */
+  .hr-cal-wrap {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  /* Строка в списке отпуска */
+  .vac-list-row {
+    display: flex; align-items: center; gap: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .vac-list-row.is-current { border-left: 4px solid #A855F7; }
+  .vac-list-row.is-planned { border-left: 4px solid #F59E0B; }
+  .vac-list-row.is-finished { border-left: 4px solid var(--border); opacity: 0.7; }
+  .vac-list-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #F3E8FF; color: #6B21A8;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .vac-list-body { flex: 1; min-width: 0; }
+  .vac-list-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .vac-list-meta {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    font-size: 12px; color: var(--text-light);
+    margin-top: 2px;
+  }
+  .vac-list-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  /* ============ КОНЕЦ КАДРЫ ============ */
 
   /* ============ ПОМОЩЬ: База знаний / FAQ / Changelog ============ */
 
@@ -3726,9 +4114,12 @@
 <!-- ============ ПРИЛОЖЕНИЕ ============ -->
 <div id="app" class="app">
 
-  <!-- ШАПКА: шарик + переключатель разделов + профиль -->
+  <!-- ШАПКА: шарик + Atom CRM + переключатель разделов + профиль -->
   <header class="top-bar">
-    <div class="brand-ball" onclick="goHome()" title="На главную"></div>
+    <div class="brand-wrap" onclick="goHome()" title="На главную" style="cursor: pointer;">
+      <div class="brand-ball"></div>
+      <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
+    </div>
     <nav class="section-switcher" id="section-switcher">
       <button class="section-tab active" data-section="home">
         <i class="ti ti-home"></i>Главная
@@ -3750,6 +4141,9 @@
       </button>
       <button class="section-tab" data-section="supply">
         <i class="ti ti-shopping-cart"></i>Снабжение
+      </button>
+      <button class="section-tab" data-section="hr">
+        <i class="ti ti-id-badge"></i>Кадры
       </button>
       <button class="section-tab" data-section="help">
         <i class="ti ti-help-circle"></i>Помощь
@@ -3773,6 +4167,7 @@
     <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
     <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
     <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
+    <button data-section="hr"><i class="ti ti-id-badge"></i>Кадры</button>
     <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
   </nav>
 
@@ -3789,7 +4184,29 @@
         <button class="nav-item active" data-nav="home-dashboard" onclick="selectSidebarItem('home-dashboard')">
           <i class="ti ti-layout-dashboard"></i><span>Обзор</span>
         </button>
+        <button class="nav-item" data-nav="home-calendar" onclick="selectSidebarItem('home-calendar')">
+          <i class="ti ti-calendar"></i><span>Календарь</span>
+        </button>
       </div>
+
+      <!-- Мини-календарь -->
+      <div class="sb-minical-wrap" id="sb-minical-wrap" onclick="openBigCalendarFromMini()" title="Открыть календарь"></div>
+
+      <!-- Внешние сервисы -->
+      <div class="nav-section-label">СЕРВИСЫ</div>
+      <a class="nav-item ext-link" href="https://web.max.ru" target="_blank" rel="noopener">
+        <i class="ti ti-message-circle-2"></i><span>Max</span>
+        <i class="ti ti-external-link ext-arrow"></i>
+      </a>
+      <a class="nav-item ext-link" href="https://mail.yandex.ru" target="_blank" rel="noopener">
+        <i class="ti ti-mail"></i><span>Почта</span>
+        <i class="ti ti-external-link ext-arrow"></i>
+      </a>
+      <a class="nav-item ext-link" href="https://disk.yandex.ru" target="_blank" rel="noopener">
+        <i class="ti ti-cloud"></i><span>Диск</span>
+        <i class="ti ti-external-link ext-arrow"></i>
+      </a>
+
       <div class="sidebar-footer">
         <div class="small-avatar" id="sb-avatar-home">—</div>
         <div class="user-info-block">
@@ -3799,7 +4216,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -3841,7 +4258,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -3874,7 +4291,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -3901,7 +4318,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -3938,7 +4355,41 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- SIDEBAR КАДРЫ (Этап 20) -->
+    <aside class="sidebar" id="sidebar-hr" data-section="hr" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-id-badge"></i> Кадры
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item new-btn" id="nav-hr-new" onclick="openNewVacation()">
+          <i class="ti ti-circle-plus"></i><span>Новый отпуск</span>
+        </button>
+        <div class="nav-section-label">ОТПУСКА</div>
+        <button class="nav-item active" data-nav="hr-vacations-timeline" onclick="selectSidebarItem('hr-vacations-timeline')">
+          <i class="ti ti-chart-bar"></i><span>Таймлайн</span>
+        </button>
+        <button class="nav-item" data-nav="hr-vacations-list" onclick="selectSidebarItem('hr-vacations-list')">
+          <i class="ti ti-list"></i><span>Список</span>
+        </button>
+        <button class="nav-item" data-nav="hr-vacations-calendar" onclick="selectSidebarItem('hr-vacations-calendar')">
+          <i class="ti ti-calendar"></i><span>Календарь</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-hr">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-hr">—</div>
+          <div class="ur" id="sb-userrole-hr">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -3971,7 +4422,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -4016,7 +4467,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -4038,7 +4489,7 @@
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
       <div class="sidebar-version">
-        Atomus group<br>
+        Atom CRM<br>
         <span class="sidebar-version-text">—</span>
       </div>
     </aside>
@@ -4063,6 +4514,25 @@
         </div>
         <div class="content-inner" id="home-content">
           <div class="loading-block">Загружаем главную…</div>
+        </div>
+      </div>
+
+      <!-- ЭТАП 20: Большой календарь -->
+      <div class="screen" data-screen="home-calendar" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <i class="ti ti-calendar"></i>
+            <h1 id="cal-title">Календарь</h1>
+          </div>
+          <div class="cal-nav">
+            <button class="icon-btn" onclick="bigCalPrev()" title="Предыдущий месяц"><i class="ti ti-chevron-left"></i></button>
+            <button class="btn btn-secondary btn-small" onclick="bigCalToday()">Сегодня</button>
+            <button class="icon-btn" onclick="bigCalNext()" title="Следующий месяц"><i class="ti ti-chevron-right"></i></button>
+          </div>
+        </div>
+        <div class="content-inner" id="big-cal-body" style="max-width: 100%;">
+          <div class="loading-block">Загружаем календарь…</div>
         </div>
       </div>
 
@@ -5001,6 +5471,76 @@
         </div>
       </div>
 
+      <!-- ============ РАЗДЕЛ КАДРЫ (Этап 20) ============ -->
+
+      <!-- ТАЙМЛАЙН -->
+      <div class="screen" data-screen="hr-vacations-timeline" data-section="hr">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-chart-bar"></i>
+              <h1>График отпусков</h1>
+            </div>
+            <div class="hr-tl-nav">
+              <button class="icon-btn" onclick="hrTimelinePrev()" title="Назад"><i class="ti ti-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-small" onclick="hrTimelineToday()">К текущему</button>
+              <button class="icon-btn" onclick="hrTimelineNext()" title="Вперёд"><i class="ti ti-chevron-right"></i></button>
+            </div>
+          </div>
+          <div id="hr-timeline-body">
+            <div class="loading-block">Загружаем график…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- СПИСОК -->
+      <div class="screen" data-screen="hr-vacations-list" data-section="hr">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-list"></i>
+              <h1>Все отпуска</h1>
+              <span class="page-counter" id="hr-list-counter">0</span>
+            </div>
+          </div>
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-hr-list="all"      onclick="setHrListFilter('all')">Все</button>
+                <button class="filter-tab"        data-hr-list="current"  onclick="setHrListFilter('current')">Сейчас</button>
+                <button class="filter-tab"        data-hr-list="planned"  onclick="setHrListFilter('planned')">Запланированы</button>
+                <button class="filter-tab"        data-hr-list="finished" onclick="setHrListFilter('finished')">Завершены</button>
+              </div>
+            </div>
+          </div>
+          <div id="hr-list-body" class="sup-list">
+            <div class="loading-block">Загружаем список…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- КАЛЕНДАРЬ -->
+      <div class="screen" data-screen="hr-vacations-calendar" data-section="hr">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-calendar"></i>
+              <h1 id="hr-cal-title">Календарь отпусков</h1>
+            </div>
+            <div class="cal-nav">
+              <button class="icon-btn" onclick="hrCalPrev()" title="Предыдущий месяц"><i class="ti ti-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-small" onclick="hrCalToday()">Сегодня</button>
+              <button class="icon-btn" onclick="hrCalNext()" title="Следующий месяц"><i class="ti ti-chevron-right"></i></button>
+            </div>
+          </div>
+          <div id="hr-cal-body">
+            <div class="loading-block">Загружаем календарь…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ КОНЕЦ РАЗДЕЛА КАДРЫ ============ -->
+
       <!-- ============ ПОМОЩЬ: База знаний ============ -->
       <!-- ============ ПОМОЩЬ: База знаний (динамический рендеринг) ============ -->
       <div class="screen" data-screen="help-knowledge" data-section="help">
@@ -5266,6 +5806,9 @@
 <!-- ============ МОДАЛКА ПОМОЩИ (статьи базы знаний) ============ -->
 <div class="modal-overlay" id="help-modal" onclick="closeHelpModal()"></div>
 
+<!-- ============ МОДАЛКА КАДРОВ (форма отпуска) ============ -->
+<div class="modal-overlay" id="hr-modal" onclick="closeHrModal()"></div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -5276,7 +5819,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.1.4-home-design";
+const APP_VERSION = "v2.2.0-design-overhaul";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -5294,6 +5837,7 @@ const SECTION_CONFIG = {
   warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-stock' },     // ЭТАП 18
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
   supply:     { sidebar: 'sidebar-supply',     defaultScreen: 'supply-requests' },    // ЭТАП 19
+  hr:         { sidebar: 'sidebar-hr',         defaultScreen: 'hr-vacations-timeline' }, // ЭТАП 20
   help:       { sidebar: 'sidebar-help',       defaultScreen: 'help-knowledge' },
 };
 
@@ -5512,11 +6056,11 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   applyLayout();
   if (!state.user) {
-    apiGet('/api/me').then(me => { state.user = me; renderProfile(); selectSection('production'); })
+    apiGet('/api/me').then(me => { state.user = me; renderProfile(); selectSection('home'); })
       .catch(() => logout());
   } else {
     renderProfile();
-    selectSection('production');
+    selectSection('home');
   }
 }
 
@@ -5741,6 +6285,12 @@ function selectSidebarItem(screenName) {
   if (screenName === 'help-knowledge')      loadHelpKnowledge();
   if (screenName === 'help-faq')            loadHelpFaq();
   if (screenName === 'help-changelog')      loadHelpChangelog();
+  // ЭТАП 20: большой календарь
+  if (screenName === 'home-calendar')       loadBigCalendar();
+  // ЭТАП 20: Кадры
+  if (screenName === 'hr-vacations-timeline') loadHrTimeline();
+  if (screenName === 'hr-vacations-list')     loadHrList();
+  if (screenName === 'hr-vacations-calendar') loadHrCalendar();
   if (screenName === 'sales-offer-form') initOfferForm();
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
@@ -8889,6 +9439,8 @@ async function loadHomeDashboard() {
   loadHomeMyTasks();      // ЭТАП 16В
   loadHomeShipments();    // ЭТАП 16Г
   loadHomeActivity();     // ЭТАП 16Г
+  loadHomeVacations();    // ЭТАП 20
+  renderSidebarMiniCalendar(); // ЭТАП 20: мини-календарь в сайдбаре
 }
 
 function renderHomeSkeleton() {
@@ -8920,6 +9472,10 @@ function renderHomeSkeleton() {
   html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 24px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
   html += '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
+  // ЭТАП 20: «Кто в отпуске»
+  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-beach"></i>Отпуска</div>';
+  html += '<div id="home-vacations-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+
   // Курс валют placeholder
   html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
   html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
@@ -8941,6 +9497,274 @@ function renderHomeSkeleton() {
 function escapeText(s) {
   return escapeHtml(String(s || ''));
 }
+
+// ============================================================
+// ============ ЭТАП 20: МИНИ-КАЛЕНДАРЬ + БОЛЬШОЙ КАЛЕНДАРЬ ============
+// ============================================================
+
+state.bigCalMonth = null;  // {year, month} — текущий просматриваемый месяц
+cache.bigCalEvents = null; // события для текущего просматриваемого месяца
+cache.homeVacations = null;
+
+const MONTH_NAMES_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                        'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MONTH_GENITIVE = ['января','февраля','марта','апреля','мая','июня',
+                        'июля','августа','сентября','октября','ноября','декабря'];
+const DOW_NAMES_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function isoDate(d) { return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+
+// ---- Мини-календарь в сайдбаре ----
+function renderSidebarMiniCalendar() {
+  const wrap = document.getElementById('sb-minical-wrap');
+  if (!wrap) return;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-11
+  const today = now.getDate();
+
+  // Первый день месяца, день недели (понедельник = 0)
+  const firstOfMonth = new Date(year, month, 1);
+  let firstDow = firstOfMonth.getDay() - 1; // вс=0 → -1, пн=1 → 0
+  if (firstDow < 0) firstDow = 6;
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  let html = '<div class="sb-minical-month">' + MONTH_NAMES_RU[month] + ' ' + year + '</div>';
+  html += '<div class="sb-minical-grid">';
+  // Заголовки дней недели
+  DOW_NAMES_SHORT.forEach(d => {
+    html += '<div class="sb-minical-dow">' + d + '</div>';
+  });
+  // Дни предыдущего месяца (из их хвоста)
+  for (let i = firstDow - 1; i >= 0; i--) {
+    html += '<div class="sb-minical-day is-outside">' + (daysInPrevMonth - i) + '</div>';
+  }
+  // Дни текущего месяца
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = (firstDow + d - 1) % 7;
+    const cls = ['sb-minical-day'];
+    if (d === today) cls.push('is-today');
+    else if (dow >= 5) cls.push('is-weekend');
+    html += '<div class="' + cls.join(' ') + '">' + d + '</div>';
+  }
+  // Заполнение пустых клеток после последнего дня (до 6 рядов = 42 клеток)
+  const totalShown = firstDow + daysInMonth;
+  const trailing = (totalShown % 7 === 0) ? 0 : (7 - (totalShown % 7));
+  for (let i = 1; i <= trailing; i++) {
+    html += '<div class="sb-minical-day is-outside">' + i + '</div>';
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function openBigCalendarFromMini() {
+  const now = new Date();
+  state.bigCalMonth = { year: now.getFullYear(), month: now.getMonth() };
+  selectSidebarItem('home-calendar');
+}
+
+// ---- Большой календарь ----
+async function loadBigCalendar() {
+  if (!state.bigCalMonth) {
+    const now = new Date();
+    state.bigCalMonth = { year: now.getFullYear(), month: now.getMonth() };
+  }
+  const { year, month } = state.bigCalMonth;
+  const titleEl = document.getElementById('cal-title');
+  if (titleEl) titleEl.textContent = MONTH_NAMES_RU[month] + ' ' + year;
+  // Окно дат для запроса событий: на 6 строк (42 дня)
+  const firstOfMonth = new Date(year, month, 1);
+  let firstDow = firstOfMonth.getDay() - 1;
+  if (firstDow < 0) firstDow = 6;
+  const gridStart = new Date(year, month, 1 - firstDow);
+  const gridEnd = new Date(gridStart);
+  gridEnd.setDate(gridEnd.getDate() + 41);
+  const dateFrom = isoDate(gridStart);
+  const dateTo   = isoDate(gridEnd);
+
+  // Параллельная загрузка событий
+  let events = { tasks: [], shipments: [], supplyOrders: [], vacations: [] };
+  try {
+    const [tRes, sRes, oRes, vRes] = await Promise.allSettled([
+      apiGet('/api/tasks?status=open'),
+      apiGet('/api/contracts?status=production'),
+      apiGet('/api/supply-orders?status=open'),
+      apiGet('/api/vacations?date_from=' + dateFrom + '&date_to=' + dateTo),
+    ]);
+    if (tRes.status === 'fulfilled') events.tasks = (tRes.value.tasks || []).filter(t => t.deadline);
+    if (sRes.status === 'fulfilled') events.shipments = (sRes.value.contracts || []).filter(c => c.delivery_date);
+    if (oRes.status === 'fulfilled') events.supplyOrders = (oRes.value.orders || []).filter(o => o.expected_date);
+    if (vRes.status === 'fulfilled') events.vacations = vRes.value.vacations || [];
+  } catch (e) {
+    console.error('Big calendar load:', e);
+  }
+  cache.bigCalEvents = events;
+  renderBigCalendar();
+}
+
+function renderBigCalendar() {
+  const el = document.getElementById('big-cal-body');
+  if (!el) return;
+  const { year, month } = state.bigCalMonth;
+  const firstOfMonth = new Date(year, month, 1);
+  let firstDow = firstOfMonth.getDay() - 1;
+  if (firstDow < 0) firstDow = 6;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const gridStart = new Date(year, month, 1 - firstDow);
+  const today = new Date();
+  const todayIso = isoDate(today);
+
+  // Группируем события по дате
+  const evByDate = {}; // iso → [{type, title, ...}]
+  function addEv(iso, type, title, eventId) {
+    if (!evByDate[iso]) evByDate[iso] = [];
+    evByDate[iso].push({ type, title, eventId });
+  }
+  const ev = cache.bigCalEvents || { tasks: [], shipments: [], supplyOrders: [], vacations: [] };
+  (ev.tasks || []).forEach(t => addEv(t.deadline, 'task', t.title || 'Задача', t.id));
+  (ev.shipments || []).forEach(c => {
+    const label = 'Отгрузка ' + (c.number || '#' + c.id) + (c.contractor_name ? ' · ' + c.contractor_name : '');
+    addEv(c.delivery_date, 'shipment', label, c.id);
+  });
+  (ev.supplyOrders || []).forEach(o => {
+    addEv(o.expected_date, 'supply', 'Приёмка #' + o.id + (o.supplier_name ? ' · ' + o.supplier_name : ''), o.id);
+  });
+  // Отпуска — растянутые на диапазон, проставляем на каждый день
+  (ev.vacations || []).forEach(v => {
+    const s = new Date(v.start_date);
+    const e = new Date(v.end_date);
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const iso = isoDate(d);
+      addEv(iso, 'vacation', (v.employee_short_name || v.employee_full_name || 'Отпуск') + ' в отпуске', v.id);
+    }
+  });
+
+  let html = '<div class="bigcal">';
+  html += '<div class="bigcal-grid">';
+  DOW_NAMES_SHORT.forEach(d => html += '<div class="bigcal-dow">' + d + '</div>');
+  // 6 строк по 7 дней = 42 клетки
+  const cell = new Date(gridStart);
+  for (let i = 0; i < 42; i++) {
+    const iso = isoDate(cell);
+    const dayNum = cell.getDate();
+    const dow = (i % 7);
+    const isOutside = cell.getMonth() !== month;
+    const isToday = iso === todayIso;
+    const isWeekend = dow >= 5;
+    const cls = ['bigcal-day'];
+    if (isOutside) cls.push('is-outside');
+    if (isToday) cls.push('is-today');
+    if (isWeekend) cls.push('is-weekend');
+    html += '<div class="' + cls.join(' ') + '">';
+    html += '<div class="bigcal-day-num">' + dayNum + '</div>';
+    const evs = evByDate[iso] || [];
+    const maxShow = 3;
+    evs.slice(0, maxShow).forEach(e => {
+      html += '<div class="bigcal-event ev-' + e.type + '" title="' + escapeHtml(e.title) + '">' + escapeHtml(e.title) + '</div>';
+    });
+    if (evs.length > maxShow) {
+      html += '<div class="bigcal-day-more">+ ещё ' + (evs.length - maxShow) + '</div>';
+    }
+    html += '</div>';
+    cell.setDate(cell.getDate() + 1);
+  }
+  html += '</div></div>';
+
+  // Легенда
+  html += '<div style="display: flex; gap: 16px; padding: 12px 4px 0; flex-wrap: wrap; font-size: 12px; color: var(--text-light);">';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#FFF4E6;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>задачи</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#DCEEFF;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>отгрузки</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#E8F5E9;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>приёмки</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#F3E8FF;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>отпуска</span>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function bigCalPrev() {
+  if (!state.bigCalMonth) return;
+  let { year, month } = state.bigCalMonth;
+  month--;
+  if (month < 0) { month = 11; year--; }
+  state.bigCalMonth = { year, month };
+  loadBigCalendar();
+}
+function bigCalNext() {
+  if (!state.bigCalMonth) return;
+  let { year, month } = state.bigCalMonth;
+  month++;
+  if (month > 11) { month = 0; year++; }
+  state.bigCalMonth = { year, month };
+  loadBigCalendar();
+}
+function bigCalToday() {
+  const now = new Date();
+  state.bigCalMonth = { year: now.getFullYear(), month: now.getMonth() };
+  loadBigCalendar();
+}
+
+// ---- Виджет «Отпуска» на Главной ----
+async function loadHomeVacations() {
+  try {
+    const d = await apiGet('/api/vacations/current');
+    cache.homeVacations = d;
+    renderHomeVacations();
+  } catch (e) {
+    const el = document.getElementById('home-vacations-block');
+    if (el) el.innerHTML = '<div class="empty-block"><i class="ti ti-info-circle"></i>Не удалось загрузить отпуска</div>';
+  }
+}
+
+function renderHomeVacations() {
+  const el = document.getElementById('home-vacations-block');
+  if (!el) return;
+  const d = cache.homeVacations || { current: [], upcoming: [] };
+  const current = d.current || [];
+  const upcoming = d.upcoming || [];
+  if (!current.length && !upcoming.length) {
+    el.innerHTML = '<div class="empty-block" style="padding: 18px;"><i class="ti ti-beach"></i>Сейчас никто не в отпуске. Ближайших на 2 недели — тоже нет.</div>';
+    return;
+  }
+  let html = '<div class="vacation-widget">';
+  current.forEach(v => {
+    const initials = (v.employee_full_name || '').split(' ').map(w => (w[0] || '').toUpperCase()).slice(0, 2).join('');
+    html += '<div class="vac-row">' +
+      '<div class="vac-row-avatar">' + escapeHtml(initials || '?') + '</div>' +
+      '<div class="vac-row-body">' +
+        '<div class="vac-row-name">' + escapeHtml(v.employee_full_name || '—') + '</div>' +
+        '<div class="vac-row-dates">' + escapeHtml(formatVacDates(v.start_date, v.end_date)) + ' · ' + v.days_total + ' дн.</div>' +
+      '</div>' +
+      '<div class="vac-row-tag is-current">в отпуске</div>' +
+      '</div>';
+  });
+  upcoming.forEach(v => {
+    const initials = (v.employee_full_name || '').split(' ').map(w => (w[0] || '').toUpperCase()).slice(0, 2).join('');
+    html += '<div class="vac-row">' +
+      '<div class="vac-row-avatar">' + escapeHtml(initials || '?') + '</div>' +
+      '<div class="vac-row-body">' +
+        '<div class="vac-row-name">' + escapeHtml(v.employee_full_name || '—') + '</div>' +
+        '<div class="vac-row-dates">с ' + escapeHtml(formatVacDates(v.start_date, v.end_date)) + ' · ' + v.days_total + ' дн.</div>' +
+      '</div>' +
+      '<div class="vac-row-tag is-upcoming">скоро</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function formatVacDates(start, end) {
+  // 2026-05-15 → 15 мая
+  function fmt(iso) {
+    const parts = (iso || '').split('-');
+    if (parts.length !== 3) return iso;
+    return parseInt(parts[2], 10) + ' ' + MONTH_GENITIVE[parseInt(parts[1], 10) - 1];
+  }
+  return fmt(start) + ' — ' + fmt(end);
+}
+
 
 function todayHumanRu() {
   const d = new Date();
@@ -13213,6 +14037,492 @@ const HELP_CATEGORIES = [
 
 state.helpSearch = '';
 state.helpSearchTimer = null;
+
+// ============================================================
+// ============ ЭТАП 20: КАДРЫ — ОТПУСКА (фронт) ============
+// ============================================================
+
+cache.vacationsAll = null;
+cache.employeesAll = null;
+state.hrListFilter = 'all';       // all | current | planned | finished
+state.hrCalMonth = null;          // {year, month}
+state.hrTlAnchor = null;          // {year, month} — начало просматриваемого окна (3 месяца)
+
+function canManageHr() {
+  if (!state.user) return false;
+  const roles = state.user.roles || [];
+  return roles.includes('director') || roles.includes('accountant');
+}
+
+async function ensureEmployeesLoaded() {
+  if (cache.employeesAll) return cache.employeesAll;
+  try {
+    const d = await apiGet('/api/employees/active');
+    cache.employeesAll = d.employees || [];
+  } catch (e) {
+    cache.employeesAll = [];
+  }
+  return cache.employeesAll;
+}
+
+async function loadAllVacations() {
+  try {
+    const d = await apiGet('/api/vacations');
+    cache.vacationsAll = d.vacations || [];
+  } catch (e) {
+    cache.vacationsAll = [];
+  }
+  return cache.vacationsAll;
+}
+
+// ---- Таймлайн (Gantt) ----
+async function loadHrTimeline() {
+  const body = document.getElementById('hr-timeline-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем график…</div>';
+  if (!state.hrTlAnchor) {
+    const now = new Date();
+    state.hrTlAnchor = { year: now.getFullYear(), month: now.getMonth() };
+  }
+  await Promise.all([ensureEmployeesLoaded(), loadAllVacations()]);
+  renderHrTimeline();
+}
+
+function renderHrTimeline() {
+  const body = document.getElementById('hr-timeline-body');
+  if (!body) return;
+  const { year, month } = state.hrTlAnchor;
+  const start = new Date(year, month, 1);
+  const monthsToShow = 3;
+  const end = new Date(year, month + monthsToShow, 0);
+  const totalDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+  // Заголовок месяцев и дней
+  let html = '<div class="hr-timeline"><table class="hr-tl-table">';
+  html += '<thead>';
+  // Строка месяцев
+  html += '<tr><th class="hr-tl-emp-col">Сотрудник</th>';
+  let d = new Date(start);
+  let currentMonth = -1;
+  let mSpan = 0;
+  let mLabels = [];
+  while (d <= end) {
+    if (d.getMonth() !== currentMonth) {
+      if (mSpan > 0) mLabels.push({ month: currentMonth, year: d.getFullYear(), span: mSpan });
+      currentMonth = d.getMonth();
+      mSpan = 1;
+    } else mSpan++;
+    d.setDate(d.getDate() + 1);
+  }
+  // Последний месяц
+  if (mSpan > 0) mLabels.push({ month: currentMonth, year: end.getFullYear(), span: mSpan });
+  // Восстановим years правильно
+  let dd = new Date(start);
+  mLabels = [];
+  let curM = dd.getMonth(), curY = dd.getFullYear(), span = 0;
+  while (dd <= end) {
+    if (dd.getMonth() !== curM) {
+      mLabels.push({ month: curM, year: curY, span });
+      curM = dd.getMonth(); curY = dd.getFullYear(); span = 1;
+    } else span++;
+    dd.setDate(dd.getDate() + 1);
+  }
+  if (span > 0) mLabels.push({ month: curM, year: curY, span });
+
+  mLabels.forEach(m => {
+    html += '<th colspan="' + m.span + '" class="hr-tl-month-header">' + MONTH_NAMES_RU[m.month] + ' ' + m.year + '</th>';
+  });
+  html += '</tr>';
+  // Строка дней
+  html += '<tr><th class="hr-tl-emp-col"></th>';
+  let dCur = new Date(start);
+  while (dCur <= end) {
+    const dow = (dCur.getDay() + 6) % 7;
+    const cls = dow >= 5 ? 'hr-tl-day-header is-weekend' : 'hr-tl-day-header';
+    html += '<th class="' + cls + '">' + dCur.getDate() + '</th>';
+    dCur.setDate(dCur.getDate() + 1);
+  }
+  html += '</tr></thead><tbody>';
+
+  // Строки сотрудников (показываем только тех, у кого есть отпуска в окне)
+  const today = new Date();
+  const todayIso = isoDate(today);
+  const employees = cache.employeesAll || [];
+  const allVac = cache.vacationsAll || [];
+  // Сгруппируем отпуска по сотруднику и оставим только тех, кто пересекается с окном
+  const vacByEmp = {};
+  allVac.forEach(v => {
+    const s = new Date(v.start_date);
+    const e = new Date(v.end_date);
+    if (e < start || s > end) return; // вне окна
+    if (!vacByEmp[v.employee_id]) vacByEmp[v.employee_id] = [];
+    vacByEmp[v.employee_id].push(v);
+  });
+  const empList = employees.filter(e => vacByEmp[e.id]);
+  if (!empList.length) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-beach"></i>В этом периоде нет запланированных отпусков</div>';
+    return;
+  }
+  empList.forEach(emp => {
+    html += '<tr>';
+    html += '<td class="hr-tl-emp-col">' + escapeHtml(emp.short_name || emp.full_name || '—');
+    if (emp.position) html += '<div class="hr-tl-emp-pos">' + escapeHtml(emp.position) + '</div>';
+    html += '</td>';
+    // Клетки дней
+    let dayCells = '';
+    let dD = new Date(start);
+    for (let i = 0; i < totalDays; i++) {
+      const dow = (dD.getDay() + 6) % 7;
+      const iso = isoDate(dD);
+      const cls = ['hr-tl-grid-cell'];
+      if (dow >= 5) cls.push('is-weekend');
+      if (iso === todayIso) cls.push('is-today');
+      dayCells += '<td class="' + cls.join(' ') + '"></td>';
+      dD.setDate(dD.getDate() + 1);
+    }
+    html += dayCells;
+    html += '</tr>';
+    // Добавим бары внутрь строки через JS после рендера (или inline через absolute со script-замером)
+    // Проще: вставлю бары inline через colSpan trick — да нет, лучше через positioned overlay
+  });
+  html += '</tbody></table></div>';
+
+  body.innerHTML = html;
+
+  // Теперь рисуем бары поверх клеток с position: absolute
+  // Перебираем строки tbody и для каждого emp находим клетки
+  const tbody = body.querySelector('tbody');
+  if (!tbody) return;
+  Array.from(tbody.children).forEach((tr, rowIdx) => {
+    const emp = empList[rowIdx];
+    if (!emp) return;
+    const vacs = vacByEmp[emp.id] || [];
+    const cells = tr.querySelectorAll('.hr-tl-grid-cell');
+    vacs.forEach(v => {
+      const vs = new Date(v.start_date);
+      const ve = new Date(v.end_date);
+      const startIdx = Math.max(0, Math.round((vs - start) / (1000 * 60 * 60 * 24)));
+      const endIdx = Math.min(totalDays - 1, Math.round((ve - start) / (1000 * 60 * 60 * 24)));
+      if (startIdx > endIdx) return;
+      // Бар стоит на первой клетке диапазона и тянется через flexibility
+      // Используем абсолютное позиционирование: подсчитываем left/width по колонкам
+      const startCell = cells[startIdx];
+      const endCell = cells[endIdx];
+      if (!startCell || !endCell) return;
+      const startLeft = startCell.offsetLeft;
+      const endLeft = endCell.offsetLeft + endCell.offsetWidth;
+      const width = endLeft - startLeft;
+      const bar = document.createElement('div');
+      bar.className = 'hr-tl-bar';
+      bar.style.left = startLeft + 'px';
+      bar.style.width = width + 'px';
+      bar.textContent = v.days_total + ' дн.';
+      bar.title = (v.employee_full_name || '') + ': ' + v.start_date + ' — ' + v.end_date + (v.comment ? ' (' + v.comment + ')' : '');
+      if (canManageHr()) {
+        bar.onclick = () => openEditVacation(v.id);
+        bar.style.cursor = 'pointer';
+      }
+      startCell.appendChild(bar);
+    });
+  });
+}
+
+function hrTimelinePrev() {
+  if (!state.hrTlAnchor) return;
+  let { year, month } = state.hrTlAnchor;
+  month -= 3;
+  while (month < 0) { month += 12; year--; }
+  state.hrTlAnchor = { year, month };
+  loadHrTimeline();
+}
+function hrTimelineNext() {
+  if (!state.hrTlAnchor) return;
+  let { year, month } = state.hrTlAnchor;
+  month += 3;
+  while (month > 11) { month -= 12; year++; }
+  state.hrTlAnchor = { year, month };
+  loadHrTimeline();
+}
+function hrTimelineToday() {
+  const now = new Date();
+  state.hrTlAnchor = { year: now.getFullYear(), month: now.getMonth() };
+  loadHrTimeline();
+}
+
+// ---- Список ----
+async function loadHrList() {
+  const body = document.getElementById('hr-list-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  await loadAllVacations();
+  renderHrList();
+}
+
+function renderHrList() {
+  const body = document.getElementById('hr-list-body');
+  if (!body) return;
+  let list = cache.vacationsAll || [];
+  if (state.hrListFilter !== 'all') {
+    list = list.filter(v => v.status === state.hrListFilter);
+  }
+  document.getElementById('hr-list-counter').textContent = list.length;
+  if (!list.length) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-beach"></i>Под этот фильтр отпусков нет</div>';
+    return;
+  }
+  let html = '';
+  const canEdit = canManageHr();
+  list.forEach(v => {
+    const initials = (v.employee_full_name || '').split(' ').map(w => (w[0] || '').toUpperCase()).slice(0, 2).join('');
+    const rowCls = 'vac-list-row is-' + v.status;
+    html += '<div class="' + rowCls + '">' +
+      '<div class="vac-list-avatar">' + escapeHtml(initials || '?') + '</div>' +
+      '<div class="vac-list-body">' +
+        '<div class="vac-list-name">' + escapeHtml(v.employee_full_name || '—') +
+          (v.employee_position ? ' <span style="font-weight: 400; color: var(--text-light); font-size: 12px;">· ' + escapeHtml(v.employee_position) + '</span>' : '') +
+        '</div>' +
+        '<div class="vac-list-meta">' +
+          '<span><i class="ti ti-calendar"></i> ' + escapeHtml(formatVacDates(v.start_date, v.end_date)) + '</span>' +
+          '<span><i class="ti ti-clock"></i> ' + v.days_total + ' дн.</span>' +
+          (v.comment ? '<span><i class="ti ti-message"></i> ' + escapeHtml(v.comment) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      (canEdit
+        ? '<div class="vac-list-actions">' +
+            '<button class="btn-icon-action" onclick="openEditVacation(' + v.id + ')" title="Редактировать"><i class="ti ti-edit"></i></button>' +
+            '<button class="btn-icon-warning" onclick="deleteVacation(' + v.id + ')" title="Удалить"><i class="ti ti-trash"></i></button>' +
+          '</div>'
+        : '') +
+      '</div>';
+  });
+  body.innerHTML = html;
+}
+
+function setHrListFilter(f) {
+  state.hrListFilter = f;
+  document.querySelectorAll('[data-hr-list]').forEach(b => b.classList.toggle('active', b.dataset.hrList === f));
+  renderHrList();
+}
+
+// ---- Календарь Кадров ----
+async function loadHrCalendar() {
+  const body = document.getElementById('hr-cal-body');
+  if (!body) return;
+  if (!state.hrCalMonth) {
+    const now = new Date();
+    state.hrCalMonth = { year: now.getFullYear(), month: now.getMonth() };
+  }
+  body.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  await loadAllVacations();
+  renderHrCalendar();
+}
+
+function renderHrCalendar() {
+  const el = document.getElementById('hr-cal-body');
+  if (!el) return;
+  const { year, month } = state.hrCalMonth;
+  const titleEl = document.getElementById('hr-cal-title');
+  if (titleEl) titleEl.textContent = 'Отпуска · ' + MONTH_NAMES_RU[month] + ' ' + year;
+
+  const firstOfMonth = new Date(year, month, 1);
+  let firstDow = firstOfMonth.getDay() - 1;
+  if (firstDow < 0) firstDow = 6;
+  const gridStart = new Date(year, month, 1 - firstDow);
+  const today = new Date();
+  const todayIso = isoDate(today);
+
+  // События отпусков на диапазон
+  const evByDate = {};
+  (cache.vacationsAll || []).forEach(v => {
+    const s = new Date(v.start_date);
+    const e = new Date(v.end_date);
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const iso = isoDate(d);
+      if (!evByDate[iso]) evByDate[iso] = [];
+      evByDate[iso].push(v);
+    }
+  });
+
+  let html = '<div class="hr-cal-wrap"><div class="bigcal-grid">';
+  DOW_NAMES_SHORT.forEach(d => html += '<div class="bigcal-dow">' + d + '</div>');
+  const cell = new Date(gridStart);
+  for (let i = 0; i < 42; i++) {
+    const iso = isoDate(cell);
+    const dayNum = cell.getDate();
+    const dow = (i % 7);
+    const isOutside = cell.getMonth() !== month;
+    const isToday = iso === todayIso;
+    const isWeekend = dow >= 5;
+    const cls = ['bigcal-day'];
+    if (isOutside) cls.push('is-outside');
+    if (isToday) cls.push('is-today');
+    if (isWeekend) cls.push('is-weekend');
+    html += '<div class="' + cls.join(' ') + '">';
+    html += '<div class="bigcal-day-num">' + dayNum + '</div>';
+    const evs = evByDate[iso] || [];
+    const maxShow = 3;
+    evs.slice(0, maxShow).forEach(v => {
+      const label = v.employee_short_name || v.employee_full_name || '?';
+      html += '<div class="bigcal-event ev-vacation" title="' + escapeHtml(v.employee_full_name) + '" onclick="openEditVacation(' + v.id + ')">' + escapeHtml(label) + '</div>';
+    });
+    if (evs.length > maxShow) html += '<div class="bigcal-day-more">+ ещё ' + (evs.length - maxShow) + '</div>';
+    html += '</div>';
+    cell.setDate(cell.getDate() + 1);
+  }
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function hrCalPrev() {
+  if (!state.hrCalMonth) return;
+  let { year, month } = state.hrCalMonth;
+  month--;
+  if (month < 0) { month = 11; year--; }
+  state.hrCalMonth = { year, month };
+  renderHrCalendar();
+}
+function hrCalNext() {
+  if (!state.hrCalMonth) return;
+  let { year, month } = state.hrCalMonth;
+  month++;
+  if (month > 11) { month = 0; year++; }
+  state.hrCalMonth = { year, month };
+  renderHrCalendar();
+}
+function hrCalToday() {
+  const now = new Date();
+  state.hrCalMonth = { year: now.getFullYear(), month: now.getMonth() };
+  renderHrCalendar();
+}
+
+// ---- Создание/редактирование отпуска ----
+async function openNewVacation() {
+  if (!canManageHr()) { showToast('Доступно только бухгалтеру или директору', 'error'); return; }
+  await ensureEmployeesLoaded();
+  showVacationModal(null);
+}
+
+async function openEditVacation(vacId) {
+  if (!canManageHr()) {
+    // Просто просмотр
+    try {
+      const r = await fetch(API_BASE + '/api/vacations', {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY) },
+      });
+      const d = await r.json();
+      const v = (d.vacations || []).find(x => x.id === vacId);
+      if (!v) return;
+      showVacationModal(v);
+    } catch (e) {}
+    return;
+  }
+  await ensureEmployeesLoaded();
+  // Найти отпуск из кэша или загрузить
+  let v = (cache.vacationsAll || []).find(x => x.id === vacId);
+  if (!v) {
+    try {
+      const r = await fetch(API_BASE + '/api/vacations', {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY) },
+      });
+      const d = await r.json();
+      v = (d.vacations || []).find(x => x.id === vacId);
+    } catch (e) {}
+  }
+  if (!v) { showToast('Не удалось загрузить', 'error'); return; }
+  showVacationModal(v);
+}
+
+function showVacationModal(v) {
+  const isEdit = !!v;
+  const canManage = canManageHr();
+  const employees = cache.employeesAll || [];
+  const m = document.getElementById('hr-modal');
+  m.innerHTML =
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-beach"></i> ' + (isEdit ? 'Отпуск #' + v.id : 'Новый отпуск') + '</h3>' +
+        '<button class="modal-close" onclick="closeHrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Сотрудник *</label>' +
+          '<select id="vac-employee" ' + (canManage ? '' : 'disabled') + '>' +
+            '<option value="">— выбрать —</option>' +
+            employees.map(e => '<option value="' + e.id + '"' + (isEdit && v.employee_id === e.id ? ' selected' : '') + '>' +
+              escapeHtml(e.full_name) + (e.position ? ' · ' + escapeHtml(e.position) : '') + '</option>').join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group form-row-2">' +
+          '<div><label>Начало *</label><input type="date" id="vac-start" value="' + escapeHtml(isEdit ? v.start_date : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+          '<div><label>Конец *</label><input type="date" id="vac-end" value="' + escapeHtml(isEdit ? v.end_date : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '</div>' +
+        '<div class="form-group"><label>Комментарий</label><textarea id="vac-comment" rows="2" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? v.comment : '') + '</textarea></div>' +
+        (canManage ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveVacation(' + (isEdit ? v.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>' : '') +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeHrModal() {
+  document.getElementById('hr-modal').classList.remove('visible');
+}
+
+async function saveVacation(vacId) {
+  const payload = {
+    employee_id: parseInt(document.getElementById('vac-employee').value || '0') || null,
+    start_date:  document.getElementById('vac-start').value,
+    end_date:    document.getElementById('vac-end').value,
+    comment:     document.getElementById('vac-comment').value.trim(),
+  };
+  if (!payload.employee_id) { showToast('Выберите сотрудника', 'error'); return; }
+  if (!payload.start_date || !payload.end_date) { showToast('Укажите обе даты', 'error'); return; }
+  if (payload.start_date > payload.end_date) { showToast('Дата начала позже конца', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = vacId ? '/api/vacations/' + vacId : '/api/vacations';
+    const method = vacId ? 'PATCH' : 'POST';
+    const r = await fetch(API_BASE + url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось', 'error');
+      return;
+    }
+    showToast(vacId ? 'Сохранено' : 'Отпуск создан', 'success');
+    closeHrModal();
+    cache.vacationsAll = null;
+    cache.homeVacations = null;
+    // Перезагружаем текущий экран
+    if (state.currentScreen === 'hr-vacations-timeline') loadHrTimeline();
+    else if (state.currentScreen === 'hr-vacations-list') loadHrList();
+    else if (state.currentScreen === 'hr-vacations-calendar') loadHrCalendar();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function deleteVacation(vacId) {
+  if (!confirm('Удалить этот отпуск?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/vacations/' + vacId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось', 'error'); return; }
+    showToast('Удалено', 'success');
+    cache.vacationsAll = null;
+    cache.homeVacations = null;
+    if (state.currentScreen === 'hr-vacations-timeline') loadHrTimeline();
+    else if (state.currentScreen === 'hr-vacations-list') loadHrList();
+    else if (state.currentScreen === 'hr-vacations-calendar') loadHrCalendar();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
 
 function loadHelpKnowledge() {
   state.helpSearch = '';
