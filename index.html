@@ -502,6 +502,17 @@
   .page-actions { display: flex; gap: 8px; align-items: center; }
   .desktop-layout .page-header { display: flex; }
 
+  /* Если page-header лежит внутри .content-inner (Снабжение, Кадры, Помощь и т.д.),
+     растягиваем его на всю ширину контейнера и добавляем отступ перед содержимым. */
+  .desktop-layout .content-inner > .page-header {
+    margin-left: -30px;
+    margin-right: -30px;
+    margin-top: -22px;
+    margin-bottom: 22px;
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+
   /* Title-блок: иконка + заголовок + счётчик в одну строку */
   .page-header-title {
     display: flex;
@@ -5876,7 +5887,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.2.3-page-header";
+const APP_VERSION = "v2.2.4-spacing-fix";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
