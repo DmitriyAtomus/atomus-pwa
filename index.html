@@ -368,6 +368,8 @@
     gap: 4px;
     overflow-x: auto;
     scrollbar-width: none;
+    scroll-behavior: smooth;
+    position: relative;
     /* Не sticky — конфликтовало со screen-header. Лента просто наверху страницы, скроллится с контентом. */
   }
   .m-section-tabs::-webkit-scrollbar { display: none; }
@@ -376,10 +378,60 @@
     color: var(--text-mid); font-size: 12.5px; font-weight: 600;
     border-radius: 8px; cursor: pointer; white-space: nowrap;
     display: flex; align-items: center; gap: 5px;
+    flex-shrink: 0;
   }
   .m-section-tabs button i { font-size: 14px; }
   .m-section-tabs button.active { background: var(--brand-bg); color: var(--brand); }
   .m-section-tabs button.disabled { color: var(--text-faint); opacity: 0.7; }
+  /* Обёртка для fade-эффектов и стрелки */
+  .m-section-tabs-wrap {
+    position: relative;
+    display: block;
+  }
+  .app.mobile-layout .m-section-tabs-wrap { display: block; }
+  .app.desktop-layout .m-section-tabs-wrap { display: none; }
+  /* Fade слева/справа на мобильной полосе */
+  .m-section-tabs-wrap::before,
+  .m-section-tabs-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 24px;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .m-section-tabs-wrap::before {
+    left: 0;
+    background: linear-gradient(90deg, white, transparent);
+  }
+  .m-section-tabs-wrap::after {
+    right: 0;
+    background: linear-gradient(270deg, white, transparent);
+  }
+  .m-section-tabs-wrap.fade-left::before { opacity: 1; }
+  .m-section-tabs-wrap.fade-right::after { opacity: 1; }
+  /* Маленькая кнопка "ещё →" для мобильного, появляется если есть скрытое */
+  .m-section-tabs-next {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 28px; height: 28px;
+    background: var(--brand);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  }
+  .m-section-tabs-next i { font-size: 16px; }
+  .m-section-tabs-next.visible { display: flex; }
 
   /* ============ SIDEBAR ============ */
   .sidebar {
@@ -5111,18 +5163,23 @@
   </header>
 
   <!-- Мобильные табы разделов -->
-  <nav class="m-section-tabs" id="m-section-tabs">
-    <button class="active" data-section="home"><i class="ti ti-home"></i>Главная</button>
-    <button data-section="production"><i class="ti ti-tool"></i>Производство</button>
-    <button data-section="sales"><i class="ti ti-briefcase"></i>Продажи</button>
-    <button data-section="tasks"><i class="ti ti-checklist"></i>Задачи</button>
-    <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
-    <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
-    <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
-    <button data-section="defects"><i class="ti ti-alert-circle"></i>Доработки</button>
-    <button data-section="hr"><i class="ti ti-id-badge"></i>Кадры</button>
-    <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
-  </nav>
+  <div class="m-section-tabs-wrap" id="m-section-tabs-wrap">
+    <nav class="m-section-tabs" id="m-section-tabs">
+      <button class="active" data-section="home"><i class="ti ti-home"></i>Главная</button>
+      <button data-section="production"><i class="ti ti-tool"></i>Производство</button>
+      <button data-section="sales"><i class="ti ti-briefcase"></i>Продажи</button>
+      <button data-section="tasks"><i class="ti ti-checklist"></i>Задачи</button>
+      <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
+      <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
+      <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
+      <button data-section="defects"><i class="ti ti-alert-circle"></i>Доработки</button>
+      <button data-section="hr"><i class="ti ti-id-badge"></i>Кадры</button>
+      <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
+    </nav>
+    <button class="m-section-tabs-next" id="m-section-tabs-next" onclick="scrollMobileTabs(1)" aria-label="Прокрутить">
+      <i class="ti ti-chevron-right"></i>
+    </button>
+  </div>
 
   <div class="body-layout">
 
@@ -6910,7 +6967,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.4.3-help-content";
+const APP_VERSION = "v2.4.4-mobile-tabs";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -7296,6 +7353,7 @@ function selectSection(sectionName) {
 
   // ЭТАП 22.1: автоскролл к активному табу + обновляем стрелки/fade
   scrollActiveTabIntoView();
+  scrollActiveMobileTabIntoView();
 
   // Обновляем мобильные табы разделов
   document.querySelectorAll('.m-section-tabs button').forEach(t => t.classList.remove('active'));
@@ -17334,6 +17392,51 @@ function attachSectionTabsWheelHandler() {
   }, { passive: false });
   nav.addEventListener('scroll', updateSectionScrollState, { passive: true });
   window.addEventListener('resize', updateSectionScrollState);
+
+  // ЭТАП 22.1+: Аналогичная логика для мобильных табов
+  const mNav = document.getElementById('m-section-tabs');
+  if (mNav) {
+    mNav.addEventListener('scroll', updateMobileTabsScrollState, { passive: true });
+    window.addEventListener('resize', updateMobileTabsScrollState);
+    setTimeout(updateMobileTabsScrollState, 100);
+  }
+}
+
+function updateMobileTabsScrollState() {
+  const nav  = document.getElementById('m-section-tabs');
+  const wrap = document.getElementById('m-section-tabs-wrap');
+  const next = document.getElementById('m-section-tabs-next');
+  if (!nav || !wrap) return;
+  const scrollLeft = nav.scrollLeft;
+  const maxScroll  = nav.scrollWidth - nav.clientWidth;
+  const hasLeft    = scrollLeft > 2;
+  const hasRight   = scrollLeft < maxScroll - 2;
+  wrap.classList.toggle('fade-left',  hasLeft);
+  wrap.classList.toggle('fade-right', hasRight);
+  if (next) next.classList.toggle('visible', hasRight);
+}
+
+function scrollMobileTabs(direction) {
+  const nav = document.getElementById('m-section-tabs');
+  if (!nav) return;
+  const step = Math.max(140, Math.floor(nav.clientWidth * 0.6)) * direction;
+  nav.scrollBy({ left: step, behavior: 'smooth' });
+}
+
+function scrollActiveMobileTabIntoView() {
+  const nav    = document.getElementById('m-section-tabs');
+  if (!nav) return;
+  const active = nav.querySelector('button.active');
+  if (!active) { updateMobileTabsScrollState(); return; }
+  const navRect = nav.getBoundingClientRect();
+  const tabRect = active.getBoundingClientRect();
+  const margin = 24;
+  if (tabRect.left < navRect.left + margin) {
+    nav.scrollBy({ left: tabRect.left - navRect.left - margin, behavior: 'smooth' });
+  } else if (tabRect.right > navRect.right - margin) {
+    nav.scrollBy({ left: tabRect.right - navRect.right + margin, behavior: 'smooth' });
+  }
+  setTimeout(updateMobileTabsScrollState, 350);
 }
 
 // ============================================================
