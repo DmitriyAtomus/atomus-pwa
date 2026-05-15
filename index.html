@@ -5547,6 +5547,9 @@
         <button class="nav-item new-btn" id="nav-defects-new" onclick="openNewDefectFromCRM()">
           <i class="ti ti-circle-plus"></i><span>Новая доработка</span>
         </button>
+        <button class="nav-item" onclick="openShareForInstallerFromCRM()" style="background: rgba(34, 197, 94, 0.15); color: #BBF7D0; margin-top: 4px;">
+          <i class="ti ti-send"></i><span>Отправить монтажнику</span>
+        </button>
         <div class="nav-section-label">ЗАМЕЧАНИЯ</div>
         <button class="nav-item active" data-nav="defects-list" onclick="selectSidebarItem('defects-list')">
           <i class="ti ti-list"></i><span>Все</span>
@@ -6807,6 +6810,9 @@
               <span class="page-counter" id="defects-counter">0</span>
             </div>
             <div class="page-actions">
+              <button class="btn btn-secondary" onclick="openShareForInstallerFromCRM()" style="color: #15803D;">
+                <i class="ti ti-send"></i> Отправить монтажнику
+              </button>
               <button class="btn btn-primary" onclick="openNewDefectFromCRM()">
                 <i class="ti ti-plus"></i> Новая доработка
               </button>
@@ -7233,7 +7239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.3-defect-no-target";
+const APP_VERSION = "v2.5.4-share-from-defects";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -18812,6 +18818,7 @@ function showShareInstallerModal(url, label) {
  * Открывает простую модалку выбора привязки: к сборке / к договору / без привязки.
  */
 function openNewDefectFromCRM() {
+  state._defectPickerMode = 'defect';     // ЭТАП 23+: режим — создать замечание
   const m = document.getElementById('qr-modal');
   if (!m) return;
   m.innerHTML =
@@ -18845,6 +18852,39 @@ function openNewDefectFromCRM() {
   m.classList.add('visible');
 }
 
+/**
+ * Кнопка «Отправить монтажнику» из раздела Доработок.
+ * Выбираем объект → получаем QR + ссылку + Telegram-share.
+ */
+function openShareForInstallerFromCRM() {
+  state._defectPickerMode = 'share';      // ЭТАП 23+: режим — отправить ссылку монтажнику
+  const m = document.getElementById('qr-modal');
+  if (!m) return;
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width: 460px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-send"></i> Отправить монтажнику</h3>' +
+        '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="display: flex; flex-direction: column; gap: 10px;">' +
+        '<div style="color: var(--text-light); font-size: 13.5px; margin-bottom: 4px;">Выберите по какому объекту нужна ссылка для монтажника</div>' +
+        '<button class="defect-target-btn" onclick="pickAssemblyForDefect()">' +
+          '<i class="ti ti-package"></i>' +
+          '<div><div class="dt-title">Ссылка на сборку / работу</div>' +
+          '<div class="dt-meta">Выбрать из журнала производства</div></div>' +
+          '<i class="ti ti-chevron-right dt-chev"></i>' +
+        '</button>' +
+        '<button class="defect-target-btn" onclick="pickContractForDefect()">' +
+          '<i class="ti ti-file-text"></i>' +
+          '<div><div class="dt-title">Ссылка на договор</div>' +
+          '<div class="dt-meta">Выбрать из активных договоров</div></div>' +
+          '<i class="ti ti-chevron-right dt-chev"></i>' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
 /** Форма замечания «без привязки» (внутренняя). */
 function openInternalDefectForm() {
   closeQrModal();
@@ -18866,13 +18906,16 @@ function openInternalDefectForm() {
 
 /** Выбор сборки для замечания — список из API. */
 async function pickAssemblyForDefect() {
+  const mode = state._defectPickerMode || 'defect';
+  const backFn = mode === 'share' ? 'openShareForInstallerFromCRM()' : 'openNewDefectFromCRM()';
+  const title  = mode === 'share' ? 'Выбрать сборку для ссылки' : 'Выбрать сборку / работу';
   const m = document.getElementById('qr-modal');
   if (!m) return;
   m.innerHTML =
     '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
-        '<button class="icon-btn" onclick="openNewDefectFromCRM()" title="Назад"><i class="ti ti-arrow-left"></i></button>' +
-        '<h3 style="margin-left: 4px;"><i class="ti ti-package"></i> Выбрать сборку / работу</h3>' +
+        '<button class="icon-btn" onclick="' + backFn + '" title="Назад"><i class="ti ti-arrow-left"></i></button>' +
+        '<h3 style="margin-left: 4px;"><i class="ti ti-package"></i> ' + title + '</h3>' +
         '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
@@ -18884,7 +18927,6 @@ async function pickAssemblyForDefect() {
     '</div>';
   m.classList.add('visible');
   try {
-    // Берём остатки склада — там все сборки/работы свежие
     const d = await apiGet('/api/warehouse/stock');
     state._defectAsmList = d.items || d.assemblies || [];
     renderDefectAssemblyList();
@@ -18932,6 +18974,13 @@ async function chooseAssemblyForDefect(assemblyId) {
   try {
     const r = await apiGet('/api/assemblies/' + assemblyId + '/public-token');
     if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    // Режим «share» — открываем модалку с QR + Telegram-share, форму замечания не показываем
+    if (state._defectPickerMode === 'share') {
+      const url = window.location.origin + '/a/' + r.public_token;
+      showShareInstallerModal(url, 'сборки');
+      return;
+    }
+    // Режим «defect» — открываем форму создания замечания (как раньше)
     closeQrModal();
     state._defectFormState = {
       targetType: 'assembly',
@@ -18953,13 +19002,16 @@ async function chooseAssemblyForDefect(assemblyId) {
 }
 
 async function pickContractForDefect() {
+  const mode = state._defectPickerMode || 'defect';
+  const backFn = mode === 'share' ? 'openShareForInstallerFromCRM()' : 'openNewDefectFromCRM()';
+  const title  = mode === 'share' ? 'Выбрать договор для ссылки' : 'Выбрать договор';
   const m = document.getElementById('qr-modal');
   if (!m) return;
   m.innerHTML =
     '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
-        '<button class="icon-btn" onclick="openNewDefectFromCRM()" title="Назад"><i class="ti ti-arrow-left"></i></button>' +
-        '<h3 style="margin-left: 4px;"><i class="ti ti-file-text"></i> Выбрать договор</h3>' +
+        '<button class="icon-btn" onclick="' + backFn + '" title="Назад"><i class="ti ti-arrow-left"></i></button>' +
+        '<h3 style="margin-left: 4px;"><i class="ti ti-file-text"></i> ' + title + '</h3>' +
         '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
@@ -19010,6 +19062,11 @@ async function chooseContractForDefect(contractId) {
   try {
     const r = await apiGet('/api/contracts/' + contractId + '/public-token');
     if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    if (state._defectPickerMode === 'share') {
+      const url = window.location.origin + '/c/' + r.public_token;
+      showShareInstallerModal(url, 'договора');
+      return;
+    }
     closeQrModal();
     state._defectFormState = {
       targetType: 'contract',
