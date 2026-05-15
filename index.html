@@ -6367,7 +6367,12 @@
     <div class="qr-scanner-title">
       <i class="ti ti-scan"></i> Сканирование QR-кода
     </div>
-    <button class="qr-scanner-close" onclick="closeQrScanner()" title="Закрыть"><i class="ti ti-x"></i></button>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button class="qr-scanner-close" onclick="openQrManualEntry()" title="Ввести вручную" style="width: auto; padding: 0 12px; font-size: 13px; border-radius: 18px;">
+        <i class="ti ti-keyboard"></i>
+      </button>
+      <button class="qr-scanner-close" onclick="closeQrScanner()" title="Закрыть"><i class="ti ti-x"></i></button>
+    </div>
   </div>
   <div class="qr-scanner-body">
     <div id="qr-reader"></div>
@@ -6390,7 +6395,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.3.4-qr-quality";
+const APP_VERSION = "v2.3.5-qr-manual";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -16502,13 +16507,7 @@ async function openQrScanner() {
           facingMode: 'environment',
           width:  { ideal: 1920 },
           height: { ideal: 1080 },
-          // continuous autofocus — большинство устройств поддерживают
-          advanced: [{ focusMode: 'continuous' }],
         },
-        // Все поддерживаемые форматы (но в основном QR_CODE)
-        formatsToSupport: (typeof Html5QrcodeSupportedFormats !== 'undefined')
-          ? [Html5QrcodeSupportedFormats.QR_CODE]
-          : undefined,
         // Используем нативный BarcodeDetector если есть (быстрее и точнее)
         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       },
@@ -16519,10 +16518,70 @@ async function openQrScanner() {
         // ignore — это просто кадр без QR
       }
     );
+    // Включаем непрерывный автофокус (если поддерживается)
+    try {
+      const videoTrack = scanner.getRunningTrackCameraCapabilities &&
+        scanner.getRunningTrackCameraCapabilities();
+      // Применяем focusMode через applyConstraints
+      const v = document.querySelector('#qr-reader video');
+      if (v && v.srcObject) {
+        const track = v.srcObject.getVideoTracks()[0];
+        if (track && track.applyConstraints) {
+          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+        }
+      }
+    } catch (e) { /* ignore */ }
   } catch (e) {
     console.error('QR scanner error:', e);
     showQrScannerError(e && e.message ? e.message : 'Не удалось запустить камеру');
   }
+}
+
+/**
+ * Ручной ввод URL/токена — fallback на случай если камера не справляется.
+ * Распарсит наш формат /a/{token} или /c/{token} либо чистый токен.
+ */
+function openQrManualEntry() {
+  const input = prompt('Введите ссылку или токен с наклейки:\n\nПример: https://atomus-pwa.vercel.app/a/abc123\nили просто: abc123');
+  if (!input) return;
+  const text = input.trim();
+  if (!text) return;
+  // Сначала пробуем как URL
+  try {
+    const url = new URL(text);
+    handleQrScanResult(text);
+    return;
+  } catch (e) { /* не URL */ }
+  // Похоже на чистый токен (только символы URL-safe base64)
+  if (/^[A-Za-z0-9_\-]+$/.test(text)) {
+    // Не знаем — assembly или contract. Сначала пробуем сборку, потом договор.
+    closeQrScanner();
+    (async () => {
+      let r = await fetch(API_BASE + '/api/public/assembly/' + encodeURIComponent(text));
+      if (r.ok) {
+        const data = await r.json();
+        if (data.id) {
+          selectSection('warehouse');
+          selectSidebarItem('warehouse-stock');
+          setTimeout(() => openAssemblyStock(data.id), 200);
+          return;
+        }
+      }
+      r = await fetch(API_BASE + '/api/public/contract/' + encodeURIComponent(text));
+      if (r.ok) {
+        const data = await r.json();
+        if (data.id) {
+          state.currentContractId = data.id;
+          selectSection('sales');
+          selectSidebarItem('sales-contract-detail');
+          return;
+        }
+      }
+      showToast('Не найдена сборка/договор с таким токеном', 'error');
+    })();
+    return;
+  }
+  showToast('Не похоже на ссылку или токен', 'error');
 }
 
 function showQrScannerError(msg) {
