@@ -202,8 +202,65 @@
     display: flex; gap: 4px; flex: 1;
     overflow-x: auto;
     scrollbar-width: none;
+    scroll-behavior: smooth;
   }
   .section-switcher::-webkit-scrollbar { display: none; }
+
+  /* ============ ЭТАП 22.1: ОБЁРТКА С СТРЕЛКАМИ + FADE ============ */
+  .section-switcher-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;             /* критично: позволяет flex-сжать обёртку */
+    display: flex;
+    align-items: center;
+  }
+  /* Стрелки появляются только когда есть скрытое содержимое */
+  .section-scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 32px; height: 32px;
+    background: rgba(30, 58, 95, 0.92);    /* совпадает с шапкой */
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+    display: none;             /* по умолчанию скрыты; JS показывает */
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.12s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+  .section-scroll-btn:hover { background: rgba(44, 82, 130, 1); }
+  .section-scroll-btn:active { transform: translateY(-50%) scale(0.92); }
+  .section-scroll-btn i { font-size: 18px; }
+  .section-scroll-btn.left  { left: -6px; }
+  .section-scroll-btn.right { right: -6px; }
+  .section-scroll-btn.visible { display: flex; }
+
+  /* Fade-эффекты по краям — намёк на скрытый контент */
+  .section-switcher-wrap::before,
+  .section-switcher-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 28px;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .section-switcher-wrap::before {
+    left: 0;
+    background: linear-gradient(90deg, #1E3A5F, transparent);
+  }
+  .section-switcher-wrap::after {
+    right: 0;
+    background: linear-gradient(270deg, #2C5282, transparent);
+  }
+  .section-switcher-wrap.fade-left::before { opacity: 1; }
+  .section-switcher-wrap.fade-right::after { opacity: 1; }
   .section-tab {
     padding: 8px 12px;
     border: 1px solid transparent;
@@ -5000,38 +5057,46 @@
       <div class="brand-ball"></div>
       <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
     </div>
-    <nav class="section-switcher" id="section-switcher">
-      <button class="section-tab active" data-section="home">
-        <i class="ti ti-home"></i>Главная
+    <div class="section-switcher-wrap" id="section-switcher-wrap">
+      <button class="section-scroll-btn left" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
+        <i class="ti ti-chevron-left"></i>
       </button>
-      <button class="section-tab" data-section="production">
-        <i class="ti ti-tool"></i>Производство
+      <nav class="section-switcher" id="section-switcher">
+        <button class="section-tab active" data-section="home">
+          <i class="ti ti-home"></i>Главная
+        </button>
+        <button class="section-tab" data-section="production">
+          <i class="ti ti-tool"></i>Производство
+        </button>
+        <button class="section-tab" data-section="sales">
+          <i class="ti ti-briefcase"></i>Продажи
+        </button>
+        <button class="section-tab" data-section="tasks">
+          <i class="ti ti-checklist"></i>Задачи
+        </button>
+        <button class="section-tab" data-section="warehouse">
+          <i class="ti ti-building-warehouse"></i>Склад
+        </button>
+        <button class="section-tab" data-section="logistics">
+          <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
+        </button>
+        <button class="section-tab" data-section="supply">
+          <i class="ti ti-shopping-cart"></i>Снабжение
+        </button>
+        <button class="section-tab" data-section="defects">
+          <i class="ti ti-alert-circle"></i>Доработки
+        </button>
+        <button class="section-tab" data-section="hr">
+          <i class="ti ti-id-badge"></i>Кадры
+        </button>
+        <button class="section-tab" data-section="help">
+          <i class="ti ti-help-circle"></i>Помощь
+        </button>
+      </nav>
+      <button class="section-scroll-btn right" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
+        <i class="ti ti-chevron-right"></i>
       </button>
-      <button class="section-tab" data-section="sales">
-        <i class="ti ti-briefcase"></i>Продажи
-      </button>
-      <button class="section-tab" data-section="tasks">
-        <i class="ti ti-checklist"></i>Задачи
-      </button>
-      <button class="section-tab" data-section="warehouse">
-        <i class="ti ti-building-warehouse"></i>Склад
-      </button>
-      <button class="section-tab" data-section="logistics">
-        <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
-      </button>
-      <button class="section-tab" data-section="supply">
-        <i class="ti ti-shopping-cart"></i>Снабжение
-      </button>
-      <button class="section-tab" data-section="defects">
-        <i class="ti ti-alert-circle"></i>Доработки
-      </button>
-      <button class="section-tab" data-section="hr">
-        <i class="ti ti-id-badge"></i>Кадры
-      </button>
-      <button class="section-tab" data-section="help">
-        <i class="ti ti-help-circle"></i>Помощь
-      </button>
-    </nav>
+    </div>
     <button class="scan-btn" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">Скан</span>
@@ -6845,7 +6910,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.4.1-tabs-fit";
+const APP_VERSION = "v2.4.2-tabs-scroll";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -7228,6 +7293,9 @@ function selectSection(sectionName) {
   // Обновляем шапку
   document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.section-tab[data-section="' + sectionName + '"]').forEach(t => t.classList.add('active'));
+
+  // ЭТАП 22.1: автоскролл к активному табу + обновляем стрелки/fade
+  scrollActiveTabIntoView();
 
   // Обновляем мобильные табы разделов
   document.querySelectorAll('.m-section-tabs button').forEach(t => t.classList.remove('active'));
@@ -16913,6 +16981,70 @@ function clearWarehouseSelection() {
 
 
 // ============================================================
+// ============ ЭТАП 22.1: ПРОКРУТКА ТАБОВ В ШАПКЕ ============
+// ============================================================
+
+function updateSectionScrollState() {
+  const nav  = document.getElementById('section-switcher');
+  const wrap = document.getElementById('section-switcher-wrap');
+  const btnL = document.getElementById('section-scroll-left');
+  const btnR = document.getElementById('section-scroll-right');
+  if (!nav || !wrap) return;
+  // Сколько скрыто слева/справа
+  const scrollLeft = nav.scrollLeft;
+  const maxScroll  = nav.scrollWidth - nav.clientWidth;
+  const hasLeft    = scrollLeft > 2;
+  const hasRight   = scrollLeft < maxScroll - 2;
+  // Стрелки видны только если есть что прокручивать
+  if (btnL) btnL.classList.toggle('visible', hasLeft);
+  if (btnR) btnR.classList.toggle('visible', hasRight);
+  // Fade-эффекты
+  wrap.classList.toggle('fade-left',  hasLeft);
+  wrap.classList.toggle('fade-right', hasRight);
+}
+
+function scrollSectionTabs(direction) {
+  const nav = document.getElementById('section-switcher');
+  if (!nav) return;
+  // Скроллим на 60% видимой ширины
+  const step = Math.max(160, Math.floor(nav.clientWidth * 0.6)) * direction;
+  nav.scrollBy({ left: step, behavior: 'smooth' });
+}
+
+function scrollActiveTabIntoView() {
+  const nav    = document.getElementById('section-switcher');
+  if (!nav) return;
+  const active = nav.querySelector('.section-tab.active');
+  if (!active) { updateSectionScrollState(); return; }
+  // Считаем позицию: если таб уже виден — не трогаем
+  const navRect = nav.getBoundingClientRect();
+  const tabRect = active.getBoundingClientRect();
+  const margin = 24;  // отступ от края чтобы таб не прижимался
+  if (tabRect.left < navRect.left + margin) {
+    nav.scrollBy({ left: tabRect.left - navRect.left - margin, behavior: 'smooth' });
+  } else if (tabRect.right > navRect.right - margin) {
+    nav.scrollBy({ left: tabRect.right - navRect.right + margin, behavior: 'smooth' });
+  }
+  // Обновим стрелки после анимации
+  setTimeout(updateSectionScrollState, 350);
+}
+
+// Колесо мыши → горизонтальный скролл (только над nav)
+function attachSectionTabsWheelHandler() {
+  const nav = document.getElementById('section-switcher');
+  if (!nav) return;
+  nav.addEventListener('wheel', (e) => {
+    // Если есть вертикальное направление — конвертируем в горизонтальное
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      nav.scrollBy({ left: e.deltaY, behavior: 'auto' });
+    }
+  }, { passive: false });
+  nav.addEventListener('scroll', updateSectionScrollState, { passive: true });
+  window.addEventListener('resize', updateSectionScrollState);
+}
+
+// ============================================================
 // ============ ЭТАП 21: СКАНЕР QR-КОДОВ ============
 // ============================================================
 
@@ -17605,6 +17737,9 @@ function closePhotoLightbox() {
 
 (function init() {
   detectLayout();
+  // ЭТАП 22.1: подключаем обработчики прокрутки табов
+  attachSectionTabsWheelHandler();
+  setTimeout(updateSectionScrollState, 50);
   // ЭТАП 21: проверяем — если URL это /a/{token} или /c/{token},
   // показываем публичную страницу БЕЗ требования логина
   const path = window.location.pathname;
