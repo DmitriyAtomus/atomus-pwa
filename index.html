@@ -199,23 +199,24 @@
   }
 
   .section-switcher {
-    display: flex; gap: 6px; flex: 1;
+    display: flex; gap: 4px; flex: 1;
     overflow-x: auto;
     scrollbar-width: none;
   }
   .section-switcher::-webkit-scrollbar { display: none; }
   .section-tab {
-    padding: 9px 16px;
+    padding: 8px 12px;
     border: 1px solid transparent;
     background: transparent;
     color: rgba(255, 255, 255, 0.75);
-    font-size: 13.5px; font-weight: 600;
-    cursor: pointer; border-radius: 10px;
-    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; border-radius: 9px;
+    display: flex; align-items: center; gap: 6px;
     white-space: nowrap;
     transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
   }
-  .section-tab i { font-size: 18px; }
+  .section-tab i { font-size: 17px; }
   .section-tab:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.25);
@@ -4158,13 +4159,13 @@
     background: rgba(255, 255, 255, 0.18);
     border: 1px solid rgba(255, 255, 255, 0.25);
     color: white;
-    padding: 8px 14px;
-    border-radius: 10px;
+    padding: 7px 11px;
+    border-radius: 9px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 13.5px;
+    gap: 5px;
+    font-size: 13px;
     font-weight: 600;
     transition: background 0.15s, border-color 0.15s;
     flex-shrink: 0;
@@ -4173,10 +4174,10 @@
     background: rgba(255, 255, 255, 0.28);
     border-color: rgba(255, 255, 255, 0.4);
   }
-  .scan-btn i { font-size: 18px; }
-  @media (max-width: 700px) {
+  .scan-btn i { font-size: 17px; }
+  @media (max-width: 1100px) {
     .scan-btn-text { display: none; }
-    .scan-btn { padding: 8px 10px; }
+    .scan-btn { padding: 7px 9px; }
   }
 
   /* Фуллскрин-оверлей сканера QR */
@@ -6844,7 +6845,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.4.0-defects";
+const APP_VERSION = "v2.4.1-tabs-fit";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
