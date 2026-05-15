@@ -1,14 +1,6 @@
 {
-  "version": 2,
-  "trailingSlash": false,
-  "cleanUrls": true,
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
-      ]
-    }
+  "rewrites": [
+    { "source": "/a/(.*)", "destination": "/index.html" },
+    { "source": "/c/(.*)", "destination": "/index.html" }
   ]
 }

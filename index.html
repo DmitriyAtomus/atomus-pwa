@@ -4150,11 +4150,326 @@
     justify-content: center;
   }
   .success-btn-text:hover { background: var(--success-bg); }
+
+  /* ============ ЭТАП 21: QR, ПУБЛИЧНЫЕ СТРАНИЦЫ, ПЕЧАТЬ НАКЛЕЕК ============ */
+
+  /* Публичная страница (показывается ДО логина) */
+  .public-page {
+    min-height: 100vh;
+    background: #15294A;
+    padding: 24px 16px;
+    display: flex;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .public-card {
+    background: white;
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    align-self: flex-start;
+  }
+  .public-header {
+    background: linear-gradient(135deg, #1E3A5F 0%, #2C5282 100%);
+    color: white;
+    padding: 20px 24px;
+  }
+  .public-header-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+  }
+  .public-header-sub {
+    font-size: 13px;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+  .public-brand {
+    font-family: ui-rounded, -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0.85;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .public-brand .brand-name-accent {
+    font-size: 10px;
+    background: rgba(255,255,255,0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+  .public-body { padding: 20px 24px; }
+  .public-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .public-row:last-child { border-bottom: none; }
+  .public-row-label {
+    color: var(--text-light);
+    font-size: 12.5px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .public-row-value {
+    text-align: right;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .public-status-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .public-status-pill.s-ready, .public-status-pill.s-production { background: var(--brand-bg); color: var(--brand); }
+  .public-status-pill.s-shipped { background: #E8F5E9; color: #15803D; }
+  .public-status-pill.s-closed, .public-status-pill.s-written_off { background: var(--bg); color: var(--text-light); }
+  .public-status-pill.s-in_progress { background: #FFF4E6; color: #B25E00; }
+  .public-section-title {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+    margin: 22px 0 10px;
+  }
+  .public-asm-row {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+  .public-asm-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .public-asm-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-size: 11.5px; color: var(--text-light);
+    margin-top: 3px;
+  }
+  .public-footer {
+    background: var(--bg);
+    padding: 14px 24px;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--text-light);
+  }
+  .public-footer a { color: var(--brand); font-weight: 600; }
+
+  /* QR-модалка для сборки/договора */
+  .qr-modal-body { text-align: center; padding: 24px; }
+  .qr-canvas-wrap {
+    display: inline-block;
+    padding: 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  .qr-canvas-wrap canvas, .qr-canvas-wrap img {
+    display: block;
+    max-width: 100%;
+  }
+  .qr-url-display {
+    background: var(--bg);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 12px;
+    color: var(--text-mid);
+    margin-bottom: 16px;
+    word-break: break-all;
+    user-select: all;
+  }
+  .qr-actions {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  }
+
+  /* Кнопка-иконка с QR (в шапке карточки) */
+  .btn-icon-qr {
+    background: var(--brand-bg);
+    color: var(--brand);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 7px 9px;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .btn-icon-qr:hover { background: var(--brand); color: white; }
+  .btn-icon-qr i { font-size: 16px; }
+
+  /* Печать наклеек: панель массового выбора */
+  .bulk-action-bar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 20;
+    background: white;
+    border: 1px solid var(--brand);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin: 12px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 6px 20px rgba(15, 30, 60, 0.18);
+  }
+  .bulk-action-bar.hidden { display: none; }
+  .bulk-action-count {
+    background: var(--brand);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .bulk-action-spacer { flex: 1; }
+
+  /* Чекбокс выбора в строке */
+  .wh-stock-row .wh-select-cell {
+    flex: 0 0 32px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .wh-stock-row input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--brand);
+    cursor: pointer;
+  }
+
+  /* ============ ПЕЧАТЬ НАКЛЕЕК 58×60мм для термопринтера ============ */
+  .labels-print-page {
+    background: white;
+    padding: 0;
+  }
+  .label-58x60 {
+    width: 58mm;
+    height: 60mm;
+    box-sizing: border-box;
+    padding: 3mm;
+    page-break-after: always;
+    page-break-inside: avoid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    color: #000;
+  }
+  .label-58x60:last-child { page-break-after: auto; }
+  .label-58x60 .lbl-brand {
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #444;
+    text-transform: uppercase;
+  }
+  .label-58x60 .lbl-qr-wrap {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    margin: 1mm 0;
+  }
+  .label-58x60 .lbl-qr-wrap canvas, .label-58x60 .lbl-qr-wrap img {
+    display: block;
+  }
+  .label-58x60 .lbl-model {
+    font-size: 11pt;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.1;
+    margin-bottom: 0.5mm;
+    max-width: 100%;
+    overflow-wrap: break-word;
+  }
+  .label-58x60 .lbl-article {
+    font-size: 8pt;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 0.5mm;
+  }
+  .label-58x60 .lbl-date {
+    font-size: 7pt;
+    color: #555;
+  }
+  /* Print rules — только наклейки, без шапки/футера */
+  @media print {
+    @page {
+      size: 58mm 60mm;
+      margin: 0;
+    }
+    body * { visibility: hidden; }
+    .labels-print-page, .labels-print-page * { visibility: visible; }
+    .labels-print-page { position: absolute; top: 0; left: 0; }
+    .label-58x60 { margin: 0; }
+  }
+  /* На экране печать-страница показывается как набор карточек */
+  .labels-preview-screen {
+    background: var(--bg);
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .labels-preview-header {
+    background: white;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .labels-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .label-preview-card {
+    border: 1px dashed var(--border);
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
 </style>
+
+<!-- QRCode generation library (small, ~9KB) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
 <!-- ============ ЛОГИН с полным логотипом Atomus group ============ -->
+<!-- ============ ЭТАП 21: Публичная страница (показывается ДО логина по URL /a/{token} или /c/{token}) ============ -->
+<div id="public-page" class="public-page" style="display: none;">
+  <div class="public-card" id="public-card-body">
+    <!-- Контент рендерится из JS -->
+  </div>
+</div>
+
+<!-- Печать наклеек (отдельный вид) -->
+<div id="labels-page" class="labels-preview-screen" style="display: none;">
+  <div class="labels-preview-header">
+    <div>
+      <h2 style="margin: 0; font-size: 17px;">Печать наклеек 58×60мм</h2>
+      <div style="color: var(--text-light); font-size: 12.5px; margin-top: 3px;" id="labels-count-info">—</div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-secondary" onclick="closeLabelsView()"><i class="ti ti-arrow-left"></i> Назад</button>
+      <button class="btn btn-primary" onclick="window.print()"><i class="ti ti-printer"></i> Печать</button>
+    </div>
+  </div>
+  <div class="labels-print-page" id="labels-print-body">
+    <!-- Заполняется из JS -->
+  </div>
+</div>
+
 <div id="login-page" class="login-page">
   <div class="login-content">
     <div class="brand-login">
@@ -4940,6 +5255,9 @@
             </div>
           </div>
           <div class="page-actions">
+            <button class="btn-icon-qr" id="scd-qr-btn" onclick="showContractQrFromDetail()" title="QR-код договора">
+              <i class="ti ti-qrcode"></i> QR
+            </button>
             <button class="btn btn-secondary" onclick="openEditContract()"><i class="ti ti-edit"></i> Редактировать</button>
             <button class="btn btn-secondary" id="scd-delete-btn" onclick="deleteCurrentContract()" style="color: var(--danger);">
               <i class="ti ti-trash"></i> Удалить
@@ -5230,6 +5548,18 @@
           <!-- Контейнер списка -->
           <div id="wh-stock-list" class="wh-stock-list">
             <div class="loading-block">Загружаем остатки…</div>
+          </div>
+
+          <!-- ЭТАП 21: Панель массовой печати наклеек -->
+          <div class="bulk-action-bar hidden" id="wh-bulk-bar">
+            <div>Выбрано: <span class="bulk-action-count" id="wh-bulk-count">0</span></div>
+            <div class="bulk-action-spacer"></div>
+            <button class="btn btn-secondary btn-small" onclick="clearWarehouseSelection()">
+              <i class="ti ti-x"></i> Снять выделение
+            </button>
+            <button class="btn btn-primary btn-small" onclick="printSelectedLabels()">
+              <i class="ti ti-printer"></i> Печать наклеек
+            </button>
           </div>
         </div>
       </div>
@@ -5877,6 +6207,9 @@
 <!-- ============ МОДАЛКА КАДРОВ (форма отпуска) ============ -->
 <div class="modal-overlay" id="hr-modal" onclick="closeHrModal()"></div>
 
+<!-- ============ ЭТАП 21: МОДАЛКА QR-КОДА ============ -->
+<div class="modal-overlay" id="qr-modal" onclick="closeQrModal()"></div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -5887,7 +6220,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.2.4-spacing-fix";
+const APP_VERSION = "v2.3.0-qr-codes";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -12162,7 +12495,14 @@ function renderStockRow(s) {
                '<i class="ti ti-trash"></i></button>';
   }
 
+  // ЭТАП 21: чекбокс выбора для массовой печати наклеек
+  const isChecked = state.warehouseSelected && state.warehouseSelected.has(s.id);
+  const checkboxHtml = '<div class="wh-select-cell" onclick="event.stopPropagation()">' +
+    '<input type="checkbox" ' + (isChecked ? 'checked' : '') +
+    ' onchange="toggleWarehouseSelect(' + s.id + ', this.checked)"></div>';
+
   return '<div class="wh-stock-row" onclick="openAssemblyStock(' + s.id + ')">' +
+    checkboxHtml +
     '<div class="wh-stock-icon"><i class="ti ti-package"></i></div>' +
     '<div class="wh-stock-body">' +
       '<div class="wh-stock-title">' + escapeHtml(s.model_name) +
@@ -12184,6 +12524,9 @@ function setWarehouseFilter(f) {
   document.querySelectorAll('[data-wh-filter]').forEach(b => {
     b.classList.toggle('active', b.dataset.whFilter === f);
   });
+  // ЭТАП 21: очищаем выбор при смене фильтра
+  if (state.warehouseSelected) state.warehouseSelected.clear();
+  updateBulkActionBar();
   loadWarehouseStock();
 }
 
@@ -12325,12 +12668,21 @@ function showAssemblyStockModal(d) {
   }
 
   const m = document.getElementById('assembly-stock-modal');
+  // ЭТАП 21: данные для QR (экранируем для inline JS)
+  const qrModelName = JSON.stringify(a.model_name || '').replace(/"/g, '&quot;');
+  const qrArticle   = JSON.stringify(a.model_article || '').replace(/"/g, '&quot;');
+  const qrDate      = JSON.stringify(a.assembly_date || '').replace(/"/g, '&quot;');
   m.innerHTML =
     
     '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name) + '</h3>' +
-        '<button class="modal-close" onclick="closeAssemblyStockModal()"><i class="ti ti-x"></i></button>' +
+        '<div style="display: flex; gap: 6px; align-items: center;">' +
+          '<button class="btn-icon-qr" onclick="showAssemblyQr(' + a.id + ', ' + qrModelName + ', ' + qrArticle + ', ' + qrDate + ')" title="QR-код сборки">' +
+            '<i class="ti ti-qrcode"></i> QR' +
+          '</button>' +
+          '<button class="modal-close" onclick="closeAssemblyStockModal()"><i class="ti ti-x"></i></button>' +
+        '</div>' +
       '</div>' +
       '<div class="modal-content">' +
         '<div class="as-info-grid">' +
@@ -14772,6 +15124,16 @@ function openNewContract() {
   selectSidebarItem('sales-contract-form');
 }
 
+// ЭТАП 21: QR из карточки договора (вызывается из шапки sales-contract-detail)
+function showContractQrFromDetail() {
+  const c = state.lastLoadedContract;
+  if (!c || !c.id) {
+    showToast('Договор не загружен', 'error');
+    return;
+  }
+  showContractQr(c.id, c.number || '#' + c.id, c.contractor_name || '');
+}
+
 async function openEditContract() {
   if (!canManageSales()) {
     showToast('Редактировать может директор, зам или менеджер', 'error');
@@ -15511,10 +15873,411 @@ document.addEventListener('DOMContentLoaded', () => {
   if (mm) mm.addEventListener('click', e => { if (e.target === mm) closeManagerModal(); });
 });
 
-// ============ INIT ============
+// ============================================================
+// ============ ЭТАП 21: ПУБЛИЧНЫЕ СТРАНИЦЫ + QR + ПЕЧАТЬ НАКЛЕЕК ============
+// ============================================================
 
-(function init() {
+// ---- Публичная страница сборки ----
+
+async function showPublicAssembly(token) {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  const page = document.getElementById('public-page');
+  page.style.display = 'flex';
+  const body = document.getElementById('public-card-body');
+  body.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-light);">Загружаем…</div>';
+  try {
+    const r = await fetch(API_BASE + '/api/public/assembly/' + encodeURIComponent(token));
+    if (!r.ok) {
+      body.innerHTML = renderPublicError(r.status);
+      return;
+    }
+    const a = await r.json();
+    body.innerHTML = renderPublicAssemblyCard(a);
+  } catch (e) {
+    body.innerHTML = renderPublicError('network');
+  }
+}
+
+function renderPublicAssemblyCard(a) {
+  const headerSub = a.contract_number
+    ? '<i class="ti ti-link"></i> По договору ' + escapeHtml(a.contract_number) +
+      (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : '')
+    : '<i class="ti ti-building-warehouse"></i> На склад (свободная)';
+
+  let rows = '';
+  const addRow = (label, value) => {
+    if (!value) return;
+    rows += '<div class="public-row"><span class="public-row-label">' + label +
+      '</span><span class="public-row-value">' + value + '</span></div>';
+  };
+  addRow('Артикул',     '<code>' + escapeHtml(a.model_article || '—') + '</code>');
+  addRow('Исполнение',  a.execution ? escapeHtml(a.execution) : null);
+  addRow('IP класс',    a.ip_class ? escapeHtml(a.ip_class) : null);
+  addRow('Количество',  a.quantity + ' шт.');
+  addRow('Дата сборки', escapeHtml(a.assembly_date || ''));
+  if (a.status) {
+    const cls = 's-' + a.status;
+    addRow('Статус', '<span class="public-status-pill ' + cls + '">' + escapeHtml(a.status_label || a.status) + '</span>');
+  }
+  if (a.workers && a.workers.length) {
+    const names = a.workers.map(w => escapeHtml(w.short_name || w.full_name || '')).join(', ');
+    addRow('Собрали', names);
+  }
+  if (a.contract_delivery_date) {
+    addRow('Срок отгрузки', escapeHtml(a.contract_delivery_date));
+  }
+  if (a.comment) {
+    addRow('Комментарий', '<span style="font-style: italic; color: var(--text-light);">' + escapeHtml(a.comment) + '</span>');
+  }
+
+  // История
+  let movHtml = '';
+  if (a.movements && a.movements.length) {
+    movHtml = '<div class="public-section-title">История движений</div>';
+    a.movements.slice().reverse().forEach(m => {
+      const sign = m.direction === 'in' ? '+' : '−';
+      const color = m.direction === 'in' ? '#15803D' : (m.direction === 'out' ? '#2C5282' : '#B25E00');
+      movHtml += '<div class="public-asm-row">' +
+        '<div class="public-asm-name"><span style="color:' + color + '; font-weight: 700;">' + sign + m.qty + '</span> ' + escapeHtml(m.direction_label) + '</div>' +
+        '<div class="public-asm-meta">' +
+          (m.reason ? '<span>' + escapeHtml(m.reason) + '</span>' : '') +
+          (m.created_at ? '<span><i class="ti ti-clock"></i>' + escapeHtml((m.created_at || '').replace('T', ' ').slice(0, 16)) + '</span>' : '') +
+        '</div></div>';
+    });
+  }
+
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">' + escapeHtml(a.model_name || 'Сборка') + '</h1>' +
+    '<div class="public-header-sub">' + headerSub + '</div>' +
+  '</div>' +
+  '<div class="public-body">' + rows + movHtml + '</div>' +
+  '<div class="public-footer">' +
+    'Внутренняя CRM-система ООО «Атомус Групп»' +
+  '</div>';
+}
+
+// ---- Публичная страница договора ----
+
+async function showPublicContract(token) {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  const page = document.getElementById('public-page');
+  page.style.display = 'flex';
+  const body = document.getElementById('public-card-body');
+  body.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-light);">Загружаем…</div>';
+  try {
+    const r = await fetch(API_BASE + '/api/public/contract/' + encodeURIComponent(token));
+    if (!r.ok) {
+      body.innerHTML = renderPublicError(r.status);
+      return;
+    }
+    const c = await r.json();
+    body.innerHTML = renderPublicContractCard(c);
+  } catch (e) {
+    body.innerHTML = renderPublicError('network');
+  }
+}
+
+function renderPublicContractCard(c) {
+  let rows = '';
+  const addRow = (label, value) => {
+    if (!value) return;
+    rows += '<div class="public-row"><span class="public-row-label">' + label +
+      '</span><span class="public-row-value">' + value + '</span></div>';
+  };
+  addRow('Контрагент',     escapeHtml(c.contractor_name || ''));
+  addRow('Дата подписания', escapeHtml(c.sign_date || ''));
+  addRow('Срок отгрузки',  c.delivery_date ? escapeHtml(c.delivery_date) : '—');
+  if (c.delivery_address) addRow('Адрес доставки', escapeHtml(c.delivery_address));
+  if (c.manager_name) addRow('Менеджер', escapeHtml(c.manager_name));
+  const cls = 's-' + (c.status || 'production');
+  addRow('Статус', '<span class="public-status-pill ' + cls + '">' + escapeHtml(c.status_label || '') + '</span>');
+
+  // Сборки
+  let asmHtml = '';
+  if (c.assemblies && c.assemblies.length) {
+    asmHtml = '<div class="public-section-title">Состав договора (' + c.assemblies.length + ')</div>';
+    c.assemblies.forEach(a => {
+      const acls = 's-' + (a.status || '');
+      asmHtml += '<div class="public-asm-row">' +
+        '<div class="public-asm-name">' + escapeHtml(a.model_name || 'Сборка') + 
+        (a.model_article ? ' <span style="color: var(--text-light); font-weight: 500;">· ' + escapeHtml(a.model_article) + '</span>' : '') + 
+        '</div>' +
+        '<div class="public-asm-meta">' +
+          '<span>' + a.quantity + ' шт.</span>' +
+          (a.execution ? '<span>' + escapeHtml(a.execution) + '</span>' : '') +
+          (a.ip_class ? '<span>' + escapeHtml(a.ip_class) + '</span>' : '') +
+          '<span class="public-status-pill ' + acls + '" style="margin-left: auto;">' + escapeHtml(a.status_label || '') + '</span>' +
+        '</div></div>';
+    });
+  }
+
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">Договор ' + escapeHtml(c.number || '') + '</h1>' +
+    '<div class="public-header-sub"><i class="ti ti-file-text"></i> ' + escapeHtml(c.contractor_name || '') + '</div>' +
+  '</div>' +
+  '<div class="public-body">' + rows + asmHtml + '</div>' +
+  '<div class="public-footer">' +
+    'Внутренняя CRM-система ООО «Атомус Групп»' +
+  '</div>';
+}
+
+function renderPublicError(status) {
+  const msg = status === 404
+    ? 'Запись не найдена. Возможно, токен устарел или ссылка неверна.'
+    : status === 'network'
+      ? 'Не удалось загрузить данные. Проверьте подключение.'
+      : 'Произошла ошибка (код ' + status + ').';
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">Ошибка</h1>' +
+  '</div>' +
+  '<div class="public-body" style="text-align: center; padding: 32px 24px;">' +
+    '<i class="ti ti-mood-sad" style="font-size: 48px; color: var(--text-light); display: block; margin-bottom: 12px;"></i>' +
+    '<p style="color: var(--text); font-size: 14px;">' + escapeHtml(msg) + '</p>' +
+  '</div>';
+}
+
+// ---- QR-модалка для сборки/договора ----
+
+async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate) {
+  try {
+    const r = await apiGet('/api/assemblies/' + assemblyId + '/public-token');
+    const url = window.location.origin + '/a/' + r.public_token;
+    openQrModal({
+      title: 'QR-код · ' + (modelName || 'Сборка #' + assemblyId),
+      subtitle: modelArticle ? 'Артикул: ' + modelArticle : '',
+      url: url,
+      type: 'assembly',
+      data: { assemblyId, modelName, modelArticle, assemblyDate, token: r.public_token },
+    });
+  } catch (e) {
+    showToast('Не удалось получить QR', 'error');
+  }
+}
+
+async function showContractQr(contractId, number, contractorName) {
+  try {
+    const r = await apiGet('/api/contracts/' + contractId + '/public-token');
+    const url = window.location.origin + '/c/' + r.public_token;
+    openQrModal({
+      title: 'QR-код · Договор ' + (number || '#' + contractId),
+      subtitle: contractorName || '',
+      url: url,
+      type: 'contract',
+    });
+  } catch (e) {
+    showToast('Не удалось получить QR', 'error');
+  }
+}
+
+function openQrModal(opts) {
+  const m = document.getElementById('qr-modal');
+  m.innerHTML =
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-qrcode"></i> ' + escapeHtml(opts.title) + '</h3>' +
+        '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="qr-modal-body">' +
+        (opts.subtitle ? '<div style="color: var(--text-light); margin-bottom: 12px; font-size: 13px;">' + escapeHtml(opts.subtitle) + '</div>' : '') +
+        '<div class="qr-canvas-wrap" id="qr-canvas-wrap"></div>' +
+        '<div class="qr-url-display">' + escapeHtml(opts.url) + '</div>' +
+        '<div class="qr-actions">' +
+          '<button class="btn btn-secondary" onclick="downloadQrPng(' + JSON.stringify(opts.url).replace(/"/g,'&quot;') + ', ' + JSON.stringify(opts.title).replace(/"/g,'&quot;') + ')"><i class="ti ti-download"></i> Скачать PNG</button>' +
+          (opts.type === 'assembly' && opts.data
+            ? '<button class="btn btn-primary" onclick=\'printSingleLabel(' + JSON.stringify(opts.data) + ')\'><i class="ti ti-printer"></i> Печать наклейки</button>'
+            : '') +
+          '<button class="btn btn-secondary" onclick="copyQrUrl(' + JSON.stringify(opts.url).replace(/"/g,'&quot;') + ')"><i class="ti ti-copy"></i> Копировать ссылку</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  // Генерируем QR
+  setTimeout(() => {
+    const wrap = document.getElementById('qr-canvas-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    new QRCode(wrap, {
+      text: opts.url,
+      width: 220,
+      height: 220,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  }, 50);
+}
+
+function closeQrModal() {
+  document.getElementById('qr-modal').classList.remove('visible');
+}
+
+function copyQrUrl(url) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => showToast('Ссылка скопирована', 'success'));
+  } else {
+    // fallback
+    const t = document.createElement('textarea');
+    t.value = url; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); showToast('Ссылка скопирована', 'success'); }
+    catch (e) { showToast('Не удалось скопировать', 'error'); }
+    document.body.removeChild(t);
+  }
+}
+
+function downloadQrPng(url, title) {
+  // Найдём канвас в qr-canvas-wrap
+  const wrap = document.getElementById('qr-canvas-wrap');
+  const canvas = wrap && wrap.querySelector('canvas');
+  if (!canvas) {
+    // Fallback: библиотека может рендерить img — извлекаем src
+    const img = wrap && wrap.querySelector('img');
+    if (!img) { showToast('QR не готов', 'error'); return; }
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = (title || 'qr') + '.png';
+    a.click();
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = (title || 'qr').replace(/[^а-яА-Я\w\s-]/g, '').slice(0, 64) + '.png';
+  a.click();
+}
+
+// ---- Печать наклеек ----
+
+// Одна наклейка
+function printSingleLabel(data) {
+  state._labelsToPrint = [data];
+  renderLabelsForPrint();
+}
+
+// Массовая печать (вызывается с экрана Склад → Остатки)
+function printSelectedLabels() {
+  const stockList = (cache.warehouseStock && cache.warehouseStock.stock) || [];
+  const selected = stockList.filter(s => state.warehouseSelected && state.warehouseSelected.has(s.id));
+  if (!selected.length) {
+    showToast('Не выбрано ни одной сборки', 'error');
+    return;
+  }
+  // Соберём данные для каждой
+  Promise.all(selected.map(async (s) => {
+    try {
+      const r = await apiGet('/api/assemblies/' + s.id + '/public-token');
+      return {
+        assemblyId: s.id,
+        modelName: s.model_name,
+        modelArticle: s.model_article,
+        assemblyDate: s.assembly_date,
+        token: r.public_token,
+      };
+    } catch (e) { return null; }
+  })).then(items => {
+    state._labelsToPrint = items.filter(Boolean);
+    renderLabelsForPrint();
+  });
+}
+
+function renderLabelsForPrint() {
+  const items = state._labelsToPrint || [];
+  if (!items.length) { showToast('Нечего печатать', 'error'); return; }
+  // Скрываем app, показываем labels-page
+  document.getElementById('app').style.display = 'none';
+  const labelsPage = document.getElementById('labels-page');
+  labelsPage.style.display = 'block';
+  document.getElementById('labels-count-info').textContent = 'Выбрано наклеек: ' + items.length;
+  const grid = document.getElementById('labels-print-body');
+  grid.innerHTML = '';
+  // Класс labels-preview-grid накладываем на body на экране, а на печати — каждая наклейка page-break
+  grid.classList.add('labels-preview-grid');
+  // Рендерим каждую наклейку
+  items.forEach((item, i) => {
+    const url = window.location.origin + '/a/' + item.token;
+    const label = document.createElement('div');
+    label.className = 'label-58x60 label-preview-card';
+    label.innerHTML =
+      '<div class="lbl-brand">Atom CRM</div>' +
+      '<div class="lbl-qr-wrap" id="lbl-qr-' + i + '"></div>' +
+      '<div style="text-align: center; width: 100%;">' +
+        '<div class="lbl-model">' + escapeHtml(item.modelName || '—') + '</div>' +
+        (item.modelArticle ? '<div class="lbl-article">' + escapeHtml(item.modelArticle) + '</div>' : '') +
+        (item.assemblyDate ? '<div class="lbl-date">от ' + escapeHtml(item.assemblyDate) + '</div>' : '') +
+      '</div>';
+    grid.appendChild(label);
+    // QR в данной наклейке
+    setTimeout(() => {
+      const qrWrap = document.getElementById('lbl-qr-' + i);
+      if (qrWrap) {
+        qrWrap.innerHTML = '';
+        new QRCode(qrWrap, {
+          text: url,
+          width: 130,
+          height: 130,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+      }
+    }, 10);
+  });
+}
+
+function closeLabelsView() {
+  document.getElementById('labels-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+// ---- Селект сборок в Складе ----
+
+state.warehouseSelected = new Set();
+
+function toggleWarehouseSelect(assemblyId, checked) {
+  if (!state.warehouseSelected) state.warehouseSelected = new Set();
+  if (checked) state.warehouseSelected.add(assemblyId);
+  else state.warehouseSelected.delete(assemblyId);
+  updateBulkActionBar();
+}
+
+function updateBulkActionBar() {
+  const bar = document.getElementById('wh-bulk-bar');
+  if (!bar) return;
+  const n = state.warehouseSelected ? state.warehouseSelected.size : 0;
+  if (n > 0) {
+    bar.classList.remove('hidden');
+    const countEl = document.getElementById('wh-bulk-count');
+    if (countEl) countEl.textContent = n;
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function clearWarehouseSelection() {
+  state.warehouseSelected = new Set();
+  document.querySelectorAll('.wh-stock-row input[type="checkbox"]').forEach(cb => cb.checked = false);
+  updateBulkActionBar();
+}
+
+
   detectLayout();
+  // ЭТАП 21: проверяем — если URL это /a/{token} или /c/{token},
+  // показываем публичную страницу БЕЗ требования логина
+  const path = window.location.pathname;
+  const publicAsmMatch = path.match(/^\/a\/([A-Za-z0-9_\-]+)$/);
+  const publicContractMatch = path.match(/^\/c\/([A-Za-z0-9_\-]+)$/);
+  if (publicAsmMatch) {
+    showPublicAssembly(publicAsmMatch[1]);
+    return;
+  }
+  if (publicContractMatch) {
+    showPublicContract(publicContractMatch[1]);
+    return;
+  }
+  // Обычный flow
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) showApp();
   else {
