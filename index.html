@@ -4153,6 +4153,152 @@
 
   /* ============ ЭТАП 21: QR, ПУБЛИЧНЫЕ СТРАНИЦЫ, ПЕЧАТЬ НАКЛЕЕК ============ */
 
+  /* Кнопка «Сканировать» в шапке */
+  .scan-btn {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: white;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .scan-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+  .scan-btn i { font-size: 18px; }
+  @media (max-width: 700px) {
+    .scan-btn-text { display: none; }
+    .scan-btn { padding: 8px 10px; }
+  }
+
+  /* Фуллскрин-оверлей сканера QR */
+  .qr-scanner-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+  }
+  .qr-scanner-overlay.visible { display: flex; }
+  .qr-scanner-header {
+    position: relative;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 2;
+  }
+  .qr-scanner-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .qr-scanner-close {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .qr-scanner-close:hover { background: rgba(255, 255, 255, 0.25); }
+  .qr-scanner-body {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+  }
+  /* Контейнер библиотеки html5-qrcode внутри тела сканера */
+  #qr-reader {
+    width: 100%; height: 100%;
+    position: absolute; inset: 0;
+  }
+  #qr-reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+  }
+  /* Прицельная рамка поверх видео */
+  .qr-scanner-frame {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(70vmin, 280px);
+    height: min(70vmin, 280px);
+    pointer-events: none;
+    z-index: 3;
+  }
+  .qr-scanner-frame::before,
+  .qr-scanner-frame::after,
+  .qr-scanner-frame .br::before,
+  .qr-scanner-frame .br::after {
+    content: '';
+    position: absolute;
+    width: 30px; height: 30px;
+    border: 3px solid #5B9CFF;
+  }
+  .qr-scanner-frame::before {
+    top: 0; left: 0;
+    border-right: none; border-bottom: none;
+    border-top-left-radius: 8px;
+  }
+  .qr-scanner-frame::after {
+    top: 0; right: 0;
+    border-left: none; border-bottom: none;
+    border-top-right-radius: 8px;
+  }
+  .qr-scanner-frame .br::before {
+    bottom: 0; left: 0;
+    border-right: none; border-top: none;
+    border-bottom-left-radius: 8px;
+  }
+  .qr-scanner-frame .br::after {
+    bottom: 0; right: 0;
+    border-left: none; border-top: none;
+    border-bottom-right-radius: 8px;
+  }
+  .qr-scanner-hint {
+    position: absolute;
+    bottom: 32px; left: 0; right: 0;
+    text-align: center;
+    color: white;
+    font-size: 14px;
+    padding: 0 24px;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+    z-index: 3;
+  }
+  .qr-scanner-error {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 20px 24px;
+    border-radius: 12px;
+    max-width: 320px;
+    text-align: center;
+    z-index: 4;
+  }
+  .qr-scanner-error i {
+    font-size: 36px;
+    color: var(--danger);
+    display: block;
+    margin-bottom: 8px;
+  }
+
   /* Публичная страница (показывается ДО логина) */
   .public-page {
     min-height: 100vh;
@@ -4442,6 +4588,8 @@
 
 <!-- QRCode generation library (small, ~9KB) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- QR scanner (~150KB) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
@@ -4531,6 +4679,10 @@
         <i class="ti ti-help-circle"></i>Помощь
       </button>
     </nav>
+    <button class="scan-btn" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
+      <i class="ti ti-scan"></i>
+      <span class="scan-btn-text">Скан</span>
+    </button>
     <div class="user-block" onclick="selectSidebarItem('account')">
       <div class="user-text">
         <div class="user-name" id="top-username">—</div>
@@ -6210,6 +6362,25 @@
 <!-- ============ ЭТАП 21: МОДАЛКА QR-КОДА ============ -->
 <div class="modal-overlay" id="qr-modal" onclick="closeQrModal()"></div>
 
+<!-- ============ Фуллскрин сканер QR ============ -->
+<div class="qr-scanner-overlay" id="qr-scanner-overlay">
+  <div class="qr-scanner-header">
+    <div class="qr-scanner-title">
+      <i class="ti ti-scan"></i> Сканирование QR-кода
+    </div>
+    <button class="qr-scanner-close" onclick="closeQrScanner()" title="Закрыть"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="qr-scanner-body">
+    <div id="qr-reader"></div>
+    <div class="qr-scanner-frame"><span class="br"></span></div>
+    <div class="qr-scanner-hint" id="qr-scanner-hint">Наведите камеру на QR-код наклейки</div>
+    <div class="qr-scanner-error" id="qr-scanner-error" style="display: none;">
+      <i class="ti ti-camera-off"></i>
+      <div id="qr-scanner-error-text">Не удалось получить доступ к камере</div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -6220,7 +6391,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.3.1-qr-hotfix";
+const APP_VERSION = "v2.3.2-qr-scanner";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -16260,6 +16431,171 @@ function clearWarehouseSelection() {
   state.warehouseSelected = new Set();
   document.querySelectorAll('.wh-stock-row input[type="checkbox"]').forEach(cb => cb.checked = false);
   updateBulkActionBar();
+}
+
+
+// ============================================================
+// ============ ЭТАП 21: СКАНЕР QR-КОДОВ ============
+// ============================================================
+
+state._qrScannerInstance = null;
+
+async function openQrScanner() {
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('Сканер не загрузился. Проверьте подключение к интернету.', 'error');
+    return;
+  }
+  const overlay = document.getElementById('qr-scanner-overlay');
+  overlay.classList.add('visible');
+  document.getElementById('qr-scanner-error').style.display = 'none';
+  document.getElementById('qr-scanner-hint').style.display = '';
+
+  // Создаём инстанс сканера
+  try {
+    const scanner = new Html5Qrcode('qr-reader');
+    state._qrScannerInstance = scanner;
+    await scanner.start(
+      { facingMode: 'environment' },           // задняя камера
+      {
+        fps: 10,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.floor(minEdge * 0.7);
+          return { width: size, height: size };
+        },
+        aspectRatio: 1.0,
+      },
+      (decodedText) => {
+        // Успешное распознавание
+        handleQrScanResult(decodedText);
+      },
+      (errorMessage) => {
+        // Не страшно — это просто кадр без QR; либрари вызывает часто
+      }
+    );
+  } catch (e) {
+    console.error('QR scanner error:', e);
+    showQrScannerError(e && e.message ? e.message : 'Не удалось запустить камеру');
+  }
+}
+
+function showQrScannerError(msg) {
+  const err = document.getElementById('qr-scanner-error');
+  const txt = document.getElementById('qr-scanner-error-text');
+  if (txt) {
+    if (/permission|denied|notallowed/i.test(msg)) {
+      txt.textContent = 'Доступ к камере заблокирован. Разрешите его в настройках браузера.';
+    } else if (/no.*camera|notfound/i.test(msg)) {
+      txt.textContent = 'Камера не найдена на этом устройстве.';
+    } else {
+      txt.textContent = 'Не удалось запустить камеру: ' + msg;
+    }
+  }
+  if (err) err.style.display = '';
+  document.getElementById('qr-scanner-hint').style.display = 'none';
+}
+
+async function closeQrScanner() {
+  const overlay = document.getElementById('qr-scanner-overlay');
+  overlay.classList.remove('visible');
+  // Останавливаем камеру
+  if (state._qrScannerInstance) {
+    try {
+      await state._qrScannerInstance.stop();
+      await state._qrScannerInstance.clear();
+    } catch (e) {
+      // ignore
+    }
+    state._qrScannerInstance = null;
+  }
+}
+
+async function handleQrScanResult(decodedText) {
+  // Не дёргать handler многократно — закрываем сразу
+  if (state._qrScanProcessing) return;
+  state._qrScanProcessing = true;
+  try {
+    // Парсим URL
+    const text = String(decodedText || '').trim();
+    let url;
+    try { url = new URL(text); } catch (e) { url = null; }
+
+    if (url) {
+      // /a/{token} — сборка, /c/{token} — договор
+      const aMatch = url.pathname.match(/^\/a\/([A-Za-z0-9_\-]+)$/);
+      const cMatch = url.pathname.match(/^\/c\/([A-Za-z0-9_\-]+)$/);
+      if (aMatch) {
+        await closeQrScanner();
+        // Сотрудник залогинен → открываем карточку сборки внутри CRM
+        await openAssemblyByPublicToken(aMatch[1]);
+        state._qrScanProcessing = false;
+        return;
+      }
+      if (cMatch) {
+        await closeQrScanner();
+        await openContractByPublicToken(cMatch[1]);
+        state._qrScanProcessing = false;
+        return;
+      }
+      // Это URL, но не наш — спросим
+      if (confirm('Распознана ссылка:\n\n' + text + '\n\nОткрыть в новой вкладке?')) {
+        window.open(text, '_blank', 'noopener');
+      }
+      await closeQrScanner();
+      state._qrScanProcessing = false;
+      return;
+    }
+
+    // Не URL — просто покажем
+    alert('Распознан QR-код:\n\n' + text);
+    await closeQrScanner();
+  } finally {
+    setTimeout(() => { state._qrScanProcessing = false; }, 500);
+  }
+}
+
+// Сотрудник отсканировал QR сборки → открываем карточку в CRM
+async function openAssemblyByPublicToken(token) {
+  try {
+    // Достаём публичные данные → получаем ID
+    const r = await fetch(API_BASE + '/api/public/assembly/' + encodeURIComponent(token));
+    if (!r.ok) {
+      showToast('Сборка не найдена', 'error');
+      return;
+    }
+    const data = await r.json();
+    if (!data.id) {
+      showToast('Не удалось определить сборку', 'error');
+      return;
+    }
+    // Открываем модалку склада с этой сборкой
+    selectSection('warehouse');
+    selectSidebarItem('warehouse-stock');
+    setTimeout(() => openAssemblyStock(data.id), 200);
+  } catch (e) {
+    showToast('Ошибка загрузки', 'error');
+  }
+}
+
+// Сотрудник отсканировал QR договора → открываем карточку договора
+async function openContractByPublicToken(token) {
+  try {
+    const r = await fetch(API_BASE + '/api/public/contract/' + encodeURIComponent(token));
+    if (!r.ok) {
+      showToast('Договор не найден', 'error');
+      return;
+    }
+    const data = await r.json();
+    if (!data.id) {
+      showToast('Не удалось определить договор', 'error');
+      return;
+    }
+    state.currentContractId = data.id;
+    selectSection('sales');
+    selectSidebarItem('sales-contract-detail');
+  } catch (e) {
+    showToast('Ошибка загрузки', 'error');
+  }
 }
 
 
