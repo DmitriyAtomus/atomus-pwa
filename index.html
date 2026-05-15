@@ -522,41 +522,115 @@
 
   /* Filter chips */
   .filter-row {
-    display: flex; gap: 8px; padding: 12px 18px;
+    display: flex; gap: 10px; padding: 12px 18px;
     background: white; border-bottom: 1px solid var(--border);
     overflow-x: auto; scrollbar-width: none;
+    align-items: center;                         /* выравнивание чипов и поиска по вертикали */
   }
   .filter-row::-webkit-scrollbar { display: none; }
-  .desktop-layout .filter-row { background: none; border: none; padding: 0 0 20px; }
-  /* FIX v1.8.1-fix3: на десктопе чипы (категории/фильтры) переносятся на несколько
-     строк, а не обрезаются за границей экрана. На мобиле остаётся горизонтальный
-     скролл — там переноса нет, чтобы фильтры не съедали высоту. */
-  /* FIX v1.8.1-fix4: усилили специфичность через !important + вынесли кнопку
-     "Категории" (она имеет inline margin-left:auto, который мешал переносу). */
   .desktop-layout .filter-row {
+    background: none; border: none;
+    padding: 0 0 20px;
     flex-wrap: wrap !important;
     overflow-x: visible !important;
-    row-gap: 8px;
+    row-gap: 10px;
     position: relative;
-    padding-right: 140px !important;     /* место под абсолютную кнопку справа */
   }
-  .desktop-layout .filter-row .cat-edit-link {
+  /* Контекст "Продажная номенклатура" — там есть абсолютная кнопка "Категории" справа */
+  .desktop-layout #sp-categories-filters {
+    padding-right: 140px !important;
+  }
+  .desktop-layout #sp-categories-filters .cat-edit-link {
     position: absolute;
-    right: 0;
-    top: 0;
-    margin-left: 0 !important;            /* перебиваем inline-style */
+    right: 0; top: 0;
+    margin-left: 0 !important;
   }
-  .filter-chip {
+
+  /* Обёртка для группы фильтр-кнопок (используется на Складе, Снабжении). */
+  .filter-tabs {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* .filter-chip и .filter-tab — стилистически одно и то же. */
+  .filter-chip,
+  .filter-tab {
     background: var(--bg); color: var(--text-mid);
-    padding: 6px 14px; border-radius: 999px;
-    font-size: 13px; font-weight: 500; white-space: nowrap;
-    cursor: pointer; border: none; flex-shrink: 0;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid transparent;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    font-family: inherit;
+    line-height: 1.2;
   }
-  .desktop-layout .filter-chip {
-    background: white; border: 1px solid var(--border); padding: 8px 16px;
+  .desktop-layout .filter-chip,
+  .desktop-layout .filter-tab {
+    background: white;
+    border-color: var(--border);
   }
-  .filter-chip.active { background: var(--brand); color: white; }
-  .desktop-layout .filter-chip.active { border-color: var(--brand); }
+  .filter-chip:hover,
+  .filter-tab:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+  .filter-chip.active,
+  .filter-tab.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .filter-chip.active:hover,
+  .filter-tab.active:hover {
+    color: white;
+  }
+
+  /* FIX v1.8.1-fix2: общий стиль для поиска в списках (Договоры, Контрагенты,
+     Продажная номенклатура, КП и т.д.). До этого CSS отсутствовал → инпут
+     не имел ширины 100% и текст placeholder обрезался. */
+  .search-box {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .search-box input {
+    width: 100%;
+    padding: 10px 14px 10px 42px;          /* левый отступ под иконку */
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 20px;
+    outline: none;
+    box-sizing: border-box;
+    color: var(--text);
+    text-overflow: ellipsis;
+    height: 40px;                          /* фиксируем высоту = чипы для выравнивания */
+    transition: border-color 0.15s;
+  }
+  .desktop-layout .search-box input {
+    background: white;
+  }
+  .search-box input::placeholder {
+    color: var(--text-light);
+    opacity: 1;
+  }
+  .search-box input:focus {
+    border-color: var(--brand);
+  }
+  /* Иконка лупы — теперь позиционируется относительно самого .search-box,
+     а не относительно произвольного контейнера. Работает везде одинаково. */
+  .search-box .ti-search {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    font-size: 18px;
+    pointer-events: none;
+  }
 
   .day-header {
     padding: 14px 18px 6px;
@@ -922,44 +996,6 @@
     width: 100%; padding: 10px 14px;
     background: var(--bg); border: 1px solid var(--border);
     border-radius: 10px; font-size: 14px; outline: none;
-  }
-  /* FIX v1.8.1-fix2: общий стиль для поиска в списках (Договоры, Контрагенты,
-     Продажная номенклатура, КП и т.д.). До этого CSS отсутствовал → инпут
-     не имел ширины 100% и текст placeholder обрезался. */
-  .search-box {
-    position: relative;
-  }
-  .search-box input {
-    width: 100%;
-    padding: 10px 14px 10px 42px;          /* левый отступ под иконку */
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-size: 14px;
-    line-height: 20px;
-    outline: none;
-    box-sizing: border-box;
-    color: var(--text);
-    text-overflow: ellipsis;
-  }
-  .search-box input::placeholder {
-    color: var(--text-light);
-    opacity: 1;
-  }
-  .search-box input:focus {
-    border-color: var(--primary);
-  }
-  .search-box .ti-search {
-    position: absolute;
-    /* контейнер имеет inline-style="padding: 12px 18px 0", поэтому:
-       left = 18px (внешний отступ) + 14px (паддинг по краю инпута) = 32px;
-       top  = 12px (внешний отступ) + 20px (полвысоты инпута 40px) = 32px */
-    left: 32px;
-    top: 32px;
-    transform: translateY(-50%);
-    color: var(--text-light);
-    font-size: 18px;
-    pointer-events: none;
   }
   .modal-body { flex: 1; overflow-y: auto; padding: 8px 0; }
   .modal-group-title {
@@ -5155,7 +5191,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.1.2-help-fix";
+const APP_VERSION = "v2.1.3-design-fix1";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
