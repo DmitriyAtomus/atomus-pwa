@@ -2421,6 +2421,307 @@
 
   /* ============ КОНЕЦ ЭТАП 19 ============ */
 
+  /* ============ ПОМОЩЬ: База знаний / FAQ / Changelog ============ */
+
+  /* Заголовок секции (по категориям) */
+  .help-section-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-light);
+    margin: 18px 0 12px;
+  }
+  .help-section-title:first-child { margin-top: 0; }
+  .help-section-title i { color: var(--brand); font-size: 16px; }
+
+  /* Сетка карточек статей */
+  .help-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .help-card {
+    display: flex; gap: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .help-card:hover {
+    border-color: var(--brand);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  .help-card .hc-icon {
+    flex: 0 0 38px;
+    width: 38px; height: 38px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .help-card .hc-body { flex: 1; min-width: 0; }
+  .help-card h4 {
+    font-size: 14.5px; font-weight: 600;
+    margin-bottom: 4px; color: var(--text);
+  }
+  .help-card p {
+    font-size: 12.5px; color: var(--text-light);
+    line-height: 1.5;
+  }
+
+  /* Модалка статьи */
+  .help-cat-label {
+    display: inline-block;
+    background: var(--brand-bg);
+    color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-bottom: 14px;
+  }
+  .help-article-body {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.65;
+  }
+  .help-article-body p { margin-bottom: 12px; }
+  .help-h {
+    font-size: 14px; font-weight: 600;
+    color: var(--text);
+    margin: 18px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .help-ol, .help-ul {
+    margin: 0 0 14px;
+    padding-left: 24px;
+  }
+  .help-ol li, .help-ul li {
+    margin-bottom: 6px;
+    line-height: 1.55;
+  }
+  .help-ol li { padding-left: 4px; }
+  .help-note {
+    display: flex; gap: 10px;
+    background: #FFF8E6;
+    border: 1px solid #F0E0B0;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    color: #7a5a00;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .help-note i {
+    flex: 0 0 auto;
+    color: #C18B00;
+    font-size: 18px;
+    margin-top: 1px;
+  }
+  .help-article-body code {
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    color: var(--brand);
+  }
+
+  /* FAQ — раскрывающиеся пункты */
+  .faq-list { display: flex; flex-direction: column; gap: 8px; }
+  .faq-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .faq-item[open] { border-color: var(--brand); }
+  .faq-item summary {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::marker { display: none; }
+  .faq-q-num {
+    flex: 0 0 28px;
+    width: 28px; height: 28px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12.5px; font-weight: 700;
+  }
+  .faq-q-text {
+    flex: 1;
+    font-size: 14.5px; font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .faq-chevron {
+    color: var(--text-light);
+    transition: transform 0.2s;
+  }
+  .faq-item[open] .faq-chevron { transform: rotate(180deg); }
+  .faq-answer {
+    padding: 0 18px 16px 56px;
+    font-size: 13.5px;
+    color: var(--text-mid);
+    line-height: 1.65;
+  }
+
+  /* Changelog — таймлайн */
+  .cl-timeline {
+    position: relative;
+    padding-left: 32px;
+  }
+  .cl-timeline::before {
+    content: '';
+    position: absolute;
+    left: 16px; top: 6px; bottom: 6px;
+    width: 2px;
+    background: var(--border);
+  }
+  .cl-entry {
+    position: relative;
+    margin-bottom: 24px;
+  }
+  .cl-marker {
+    position: absolute;
+    left: -32px; top: 0;
+    width: 34px; height: 34px;
+    background: var(--brand);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 3px solid white;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .cl-body {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  .cl-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 4px;
+  }
+  .cl-version {
+    background: var(--brand-bg); color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 700;
+    font-family: ui-monospace, monospace;
+  }
+  .cl-date {
+    color: var(--text-light); font-size: 12px;
+  }
+  .cl-title {
+    font-size: 15px; font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .cl-list {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .cl-list li {
+    margin-bottom: 4px;
+    line-height: 1.55;
+    font-size: 13.5px;
+    color: var(--text-mid);
+  }
+
+  /* Контактная карточка */
+  .contact-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    max-width: 540px;
+  }
+  .contact-card-header {
+    display: flex; align-items: center; gap: 16px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+  }
+  .contact-avatar {
+    width: 56px; height: 56px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .contact-name {
+    font-size: 17px; font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .contact-role {
+    font-size: 13px;
+    color: var(--text-light);
+  }
+  .contact-rows {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .contact-link-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  .contact-link-row:hover {
+    background: var(--brand-bg);
+  }
+  .contact-link-row i {
+    font-size: 22px;
+    color: var(--brand);
+    flex: 0 0 auto;
+  }
+  .cl-label {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .cl-value {
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .contact-note {
+    display: flex; gap: 10px;
+    margin-top: 18px;
+    padding: 12px 14px;
+    background: var(--brand-bg);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--brand);
+    line-height: 1.55;
+  }
+  .contact-note i {
+    flex: 0 0 auto;
+    font-size: 18px;
+    margin-top: 1px;
+  }
+  /* ============ КОНЕЦ ПОМОЩЬ ============ */
+
   .task-status-pill {
     flex: 0 0 auto;
     padding: 3px 10px;
@@ -3477,6 +3778,12 @@
         <button class="nav-item active" data-nav="help-knowledge" onclick="selectSidebarItem('help-knowledge')">
           <i class="ti ti-book"></i><span>База знаний</span>
         </button>
+        <button class="nav-item" data-nav="help-faq" onclick="selectSidebarItem('help-faq')">
+          <i class="ti ti-question-mark"></i><span>Частые вопросы</span>
+        </button>
+        <button class="nav-item" data-nav="help-changelog" onclick="selectSidebarItem('help-changelog')">
+          <i class="ti ti-sparkles"></i><span>Что нового</span>
+        </button>
         <button class="nav-item" data-nav="help-contact" onclick="selectSidebarItem('help-contact')">
           <i class="ti ti-message-circle"></i><span>Связаться</span>
         </button>
@@ -4521,84 +4828,88 @@
       </div>
 
       <!-- ============ ПОМОЩЬ: База знаний ============ -->
+      <!-- ============ ПОМОЩЬ: База знаний (динамический рендеринг) ============ -->
       <div class="screen" data-screen="help-knowledge" data-section="help">
-        <div class="screen-header">
-          <h2>База знаний</h2>
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-book"></i>
+              <h1>База знаний</h1>
+            </div>
+          </div>
+          <div style="padding: 0 18px 14px;">
+            <div class="search-box" style="max-width: 460px;">
+              <i class="ti ti-search"></i>
+              <input type="text" id="help-search" placeholder="Найти инструкцию — например, «договор» или «сборка»…" oninput="onHelpSearchInput()">
+            </div>
+          </div>
+          <div id="help-knowledge-body"></div>
         </div>
-        <div class="page-header">
-          <div>
-            <h1>База знаний</h1>
-            <div class="page-subtitle">Инструкции и регламенты для сотрудников Atomus group</div>
+      </div>
+
+      <!-- ============ ПОМОЩЬ: FAQ ============ -->
+      <div class="screen" data-screen="help-faq" data-section="help">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-question-mark"></i>
+              <h1>Частые вопросы</h1>
+            </div>
           </div>
+          <div id="help-faq-body" style="padding: 0 18px 18px;"></div>
         </div>
-        <div class="content-inner">
-          <div class="section-label" style="padding: 0 18px 12px;">Производство</div>
-          <div class="help-grid">
-            <div class="help-card" onclick="alert('Инструкцию мы наполним содержимым позже.')">
-              <div class="hc-icon"><i class="ti ti-circle-plus"></i></div>
-              <h4>Как внести новую сборку</h4>
-              <p>Пошагово: выбор модели, исполнения, IP, количества, сборщиков, даты, комментария.</p>
-            </div>
-            <div class="help-card" onclick="alert('Инструкцию мы наполним содержимым позже.')">
-              <div class="hc-icon"><i class="ti ti-list-details"></i></div>
-              <h4>Как посмотреть свои сборки</h4>
-              <p>Где смотреть журнал, фильтры по дням, как сделать сводку за период.</p>
-            </div>
-            <div class="help-card" onclick="alert('Инструкцию мы наполним содержимым позже.')">
-              <div class="hc-icon"><i class="ti ti-chart-bar"></i></div>
-              <h4>Что показывают сводки</h4>
-              <p>Как читать графики по направлениям, топ моделей и сборщиков.</p>
-            </div>
-          </div>
+      </div>
 
-          <div class="section-label" style="padding: 18px 18px 12px;">Общее</div>
-          <div class="help-grid">
-            <div class="help-card" onclick="alert('Инструкцию мы наполним содержимым позже.')">
-              <div class="hc-icon"><i class="ti ti-key"></i></div>
-              <h4>Как войти в систему</h4>
-              <p>Через Telegram-бот @AtomusgroupBot командой /login. Код одноразовый, действует 5 минут.</p>
-            </div>
-            <div class="help-card" onclick="alert('Инструкцию мы наполним содержимым позже.')">
-              <div class="hc-icon"><i class="ti ti-device-mobile"></i></div>
-              <h4>Как поставить приложение на телефон</h4>
-              <p>На Android — через Chrome «Установить приложение». На iPhone — через Safari «На экран Домой».</p>
-            </div>
-            <div class="help-card" onclick="alert('Инструкцию мы наполним содержимым позже.')">
-              <div class="hc-icon"><i class="ti ti-users"></i></div>
-              <h4>Роли и доступы</h4>
-              <p>Кто что может делать в системе. Сейчас: директор, бухгалтер, мастер.</p>
+      <!-- ============ ПОМОЩЬ: Что нового ============ -->
+      <div class="screen" data-screen="help-changelog" data-section="help">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-sparkles"></i>
+              <h1>Что нового</h1>
             </div>
           </div>
-
-          <div class="section-label" style="padding: 18px 18px 12px;">Что появится позже</div>
-          <div class="help-grid">
-            <div class="help-card" style="opacity: 0.6;" onclick="alert('Появится с разделом Продажи.')">
-              <div class="hc-icon"><i class="ti ti-file-invoice"></i></div>
-              <h4>Составление КП</h4>
-              <p>Появится когда запустим раздел «Продажи». Включая выбор юрлица и НДС.</p>
-            </div>
-            <div class="help-card" style="opacity: 0.6;" onclick="alert('Появится с разделом Склад.')">
-              <div class="hc-icon"><i class="ti ti-qrcode"></i></div>
-              <h4>QR-наклейки на изделия</h4>
-              <p>Появится с разделом «Склад». Как печатать и использовать.</p>
-            </div>
-          </div>
+          <div id="help-changelog-body" style="padding: 0 18px 18px;"></div>
         </div>
       </div>
 
       <!-- ============ ПОМОЩЬ: Связаться ============ -->
       <div class="screen" data-screen="help-contact" data-section="help">
-        <div class="screen-header"><h2>Связаться</h2></div>
-        <div class="page-header"><div><h1>Связаться</h1><div class="page-subtitle">Если что-то не работает или нужна доработка</div></div></div>
-        <div class="content-inner">
-          <div class="card" style="margin: 16px 18px; padding: 24px;">
-            <h3 style="margin-bottom: 12px; font-size: 16px;">Atomus group</h3>
-            <p style="color: var(--text-mid); line-height: 1.7; font-size: 14px;">
-              <b>Директор:</b> Подкорытов Дмитрий Сергеевич<br>
-              <b>Telegram-бот:</b> <a href="https://t.me/AtomusgroupBot" target="_blank" class="telegram-link">@AtomusgroupBot</a><br>
-              <b>Email:</b> atomusgroup174@yandex.ru<br>
-              <b>Телефон:</b> +7 (912) 326-30-03
-            </p>
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-message-circle"></i>
+              <h1>Связаться</h1>
+            </div>
+          </div>
+          <div style="padding: 0 18px 18px;">
+            <div class="contact-card">
+              <div class="contact-card-header">
+                <div class="contact-avatar"><i class="ti ti-user"></i></div>
+                <div>
+                  <div class="contact-name">Подкорытов Дмитрий Сергеевич</div>
+                  <div class="contact-role">Директор Atomus group</div>
+                </div>
+              </div>
+              <div class="contact-rows">
+                <a class="contact-link-row" href="https://t.me/AtomusgroupBot" target="_blank">
+                  <i class="ti ti-brand-telegram"></i>
+                  <div><div class="cl-label">Telegram-бот</div><div class="cl-value">@AtomusgroupBot</div></div>
+                </a>
+                <a class="contact-link-row" href="mailto:atomusgroup174@yandex.ru">
+                  <i class="ti ti-mail"></i>
+                  <div><div class="cl-label">Email</div><div class="cl-value">atomusgroup174@yandex.ru</div></div>
+                </a>
+                <a class="contact-link-row" href="tel:+79123263003">
+                  <i class="ti ti-phone"></i>
+                  <div><div class="cl-label">Телефон</div><div class="cl-value">+7 (912) 326-30-03</div></div>
+                </a>
+              </div>
+              <div class="contact-note">
+                <i class="ti ti-info-circle"></i>
+                Если в системе что-то сломалось или нужна доработка — напиши в Telegram или на почту. Постараемся ответить в течение рабочего дня.
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -4778,6 +5089,9 @@
 <!-- ============ ЭТАП 19: МОДАЛКА СНАБЖЕНИЯ ============ -->
 <div class="modal-overlay" id="supply-modal"></div>
 
+<!-- ============ МОДАЛКА ПОМОЩИ (статьи базы знаний) ============ -->
+<div class="modal-overlay" id="help-modal"></div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -4788,7 +5102,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.1.0-stage19";
+const APP_VERSION = "v2.1.1-help";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -5249,6 +5563,10 @@ function selectSidebarItem(screenName) {
   if (screenName === 'supply-receipts')     loadSupplyReceipts();
   if (screenName === 'supply-suppliers')    loadSuppliers();
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
+  // Помощь
+  if (screenName === 'help-knowledge')      loadHelpKnowledge();
+  if (screenName === 'help-faq')            loadHelpFaq();
+  if (screenName === 'help-changelog')      loadHelpChangelog();
   if (screenName === 'sales-offer-form') initOfferForm();
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
@@ -12064,6 +12382,788 @@ function renderSupplyReceipts() {
         (rec.comment ? '<div class="sup-row-comment">' + escapeHtml(rec.comment) + '</div>' : '') +
       '</div></div>';
   });
+  container.innerHTML = html;
+}
+
+
+// ============================================================
+// ============ ПОМОЩЬ: База знаний, FAQ, Что нового ============
+// ============================================================
+
+// Статьи базы знаний. Сгруппированы по категориям.
+// id — стабильный, body — массив параграфов/списков.
+const HELP_ARTICLES = [
+  // ---------- Старт ----------
+  {
+    id: 'start-login',
+    cat: 'start', cat_label: 'Старт', icon: 'ti-key',
+    title: 'Как войти в систему',
+    summary: 'Через Telegram-бот @AtomusgroupBot, кодом из 6 цифр.',
+    body: [
+      { p: 'Atomus group — это веб-приложение. Чтобы попасть внутрь, нужно подтвердить, что ты — наш сотрудник. Делается это через Telegram-бот.' },
+      { h: 'Шаги входа' },
+      { ol: [
+        'Открой Telegram и найди бота <b>@AtomusgroupBot</b>',
+        'Напиши ему команду <code>/login</code>',
+        'Бот пришлёт код из 6 цифр (например, <code>483102</code>)',
+        'На странице входа в приложении нажми «Войти кодом» и введи этот код',
+        'Готово — ты в системе',
+      ] },
+      { note: 'Код одноразовый и действует 5 минут. Если не успел — запроси новый командой <code>/login</code> ещё раз.' },
+      { h: 'Если не получается войти' },
+      { ul: [
+        'Проверь что бот в Telegram именно <b>@AtomusgroupBot</b>, без опечаток',
+        'Убедись что директор уже добавил тебя в систему',
+        'Если код не приходит — напиши директору, что-то могло слететь',
+      ] },
+    ],
+  },
+  {
+    id: 'start-install',
+    cat: 'start', cat_label: 'Старт', icon: 'ti-device-mobile',
+    title: 'Как поставить приложение на телефон',
+    summary: 'PWA-установка на Android и iPhone, чтобы открывать как обычное приложение.',
+    body: [
+      { p: 'Atomus group — это <b>PWA</b> (Progressive Web App). Ты можешь поставить его на телефон, и оно будет выглядеть и работать как обычное приложение. Никаких магазинов, никаких apk.' },
+      { h: 'На Android (через Chrome)' },
+      { ol: [
+        'Открой приложение в Chrome — <b>atomus-pwa.vercel.app</b>',
+        'Нажми меню (три точки сверху справа)',
+        'Выбери «<b>Установить приложение</b>» или «Добавить на главный экран»',
+        'Иконка появится на рабочем столе телефона',
+      ] },
+      { h: 'На iPhone (через Safari)' },
+      { ol: [
+        'Открой <b>atomus-pwa.vercel.app</b> в <b>Safari</b> (не Chrome!)',
+        'Нажми кнопку «Поделиться» (квадрат со стрелочкой вверх)',
+        'Прокрути вниз и выбери «<b>На экран Домой</b>»',
+        'Подтверди — иконка появится',
+      ] },
+      { note: 'После установки приложение работает быстрее и без адресной строки браузера. Логин сохраняется — заново код вводить не нужно.' },
+    ],
+  },
+  {
+    id: 'start-roles',
+    cat: 'start', cat_label: 'Старт', icon: 'ti-users',
+    title: 'Роли и доступы',
+    summary: 'Кто что может делать: директор, зам, менеджер, мастер, инженер, бухгалтер.',
+    body: [
+      { p: 'В системе 6 ролей. У одного человека может быть несколько ролей одновременно (например, директор + менеджер).' },
+      { h: 'Директор' },
+      { ul: [
+        'Видит и может всё',
+        'Управляет сотрудниками и их ролями',
+        'Доступ ко всем разделам и настройкам',
+      ] },
+      { h: 'Заместитель директора' },
+      { ul: [
+        'Управляет Продажами (договоры, КП, контрагенты)',
+        'Управляет Снабжением (заявки, заказы, поставщики)',
+        'Видит Производство и Склад',
+      ] },
+      { h: 'Менеджер' },
+      { ul: [
+        'То же что зам по Продажам и Снабжению',
+        'Создаёт договоры, КП, заявки на закупку',
+      ] },
+      { h: 'Мастер' },
+      { ul: [
+        'Вносит сборки в Производстве',
+        'Управляет статусами сборок (готова / списана)',
+        'Видит склад',
+      ] },
+      { h: 'Инженер' },
+      { ul: [
+        'Только просмотр Производства, без внесения сборок',
+      ] },
+      { h: 'Бухгалтер' },
+      { ul: [
+        'Просмотр сводок и финансовой информации',
+      ] },
+      { note: 'Роли назначает только директор через раздел «Сотрудники» в Производстве.' },
+    ],
+  },
+
+  // ---------- Главная ----------
+  {
+    id: 'home-overview',
+    cat: 'home', cat_label: 'Главная', icon: 'ti-home',
+    title: 'Что показывает Главная страница',
+    summary: 'Виджеты с задачами, KPI производства, обзор по продажам.',
+    body: [
+      { p: 'Главная — это твой обзор дня. Тут собрано самое важное по всем разделам, чтобы быстро понять что происходит.' },
+      { h: 'Виджеты на Главной' },
+      { ul: [
+        '<b>Мои задачи</b> — задачи, назначенные на тебя, со статусами и дедлайнами',
+        '<b>KPI Производства</b> — сколько собрано сегодня, за неделю, за месяц',
+        '<b>Динамика 14 дней</b> — график сборок по дням',
+        '<b>Топ сборщиков</b> — кто больше всего собрал за неделю',
+        '<b>Последние записи</b> — недавно внесённые сборки',
+      ] },
+      { note: 'Виджеты подстраиваются под твою роль. Например, мастер видит свои сборки, директор — общие KPI.' },
+    ],
+  },
+
+  // ---------- Производство ----------
+  {
+    id: 'prod-new-assembly',
+    cat: 'production', cat_label: 'Производство', icon: 'ti-circle-plus',
+    title: 'Как внести новую сборку',
+    summary: 'Пошагово: модель, исполнение, IP, количество, сборщики, дата.',
+    body: [
+      { p: 'Сборку вносишь когда уже собрал изделие. Это не «план», а факт — то что реально готово.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой <b>Производство → Новая сборка</b> (или кнопка «+» в шапке)',
+        'Выбери <b>модель</b> из каталога (можно искать по названию или артикулу)',
+        'Если у модели есть варианты исполнения — выбери <b>Стандарт</b> или <b>Нерж. AISI</b>',
+        'Если нужен IP-класс — выбери его (IP54, IP55 и т.п.)',
+        'Укажи <b>количество</b> (обычно 1, но может быть больше)',
+        'Отметь <b>кто собирал</b> — одного или нескольких сборщиков',
+        'Поставь <b>дату</b> сборки (по умолчанию сегодня)',
+        'Если нужно — добавь <b>комментарий</b>',
+        'Выбери куда сборка пойдёт: <b>«На склад»</b> (свободная) или <b>«По договору»</b> (зарезервированная)',
+        'Нажми <b>«Сохранить»</b>',
+      ] },
+      { note: 'После сохранения сборка автоматически попадает на склад со статусом «готова». Если выбрал договор — она зарезервирована за ним и видна в карточке этого договора.' },
+      { h: 'Что если ошибся' },
+      { p: 'Открой нужную сборку в журнале и поправь. Если уже списали или отгрузили — нужно сначала откатить движение со склада.' },
+    ],
+  },
+  {
+    id: 'prod-journal',
+    cat: 'production', cat_label: 'Производство', icon: 'ti-list-details',
+    title: 'Журнал сборок и фильтры',
+    summary: 'Где смотреть свои сборки, как найти нужную запись.',
+    body: [
+      { p: 'Все сборки попадают в журнал. Производство → Сборки.' },
+      { h: 'Фильтры' },
+      { ul: [
+        '<b>Период</b> — день / неделя / месяц / произвольная дата',
+        '<b>Направление</b> — отопление, вентиляция и т.д.',
+        '<b>Сборщик</b> — фильтр по конкретному сотруднику',
+        '<b>Поиск</b> — по модели или артикулу',
+      ] },
+      { h: 'Что видно в строке' },
+      { ul: [
+        'Дата сборки',
+        'Модель + артикул',
+        'Исполнение и IP-класс',
+        'Сборщики',
+        'Бейдж «склад» (свободная) или номер договора (зарезервирована)',
+      ] },
+    ],
+  },
+  {
+    id: 'prod-summary',
+    cat: 'production', cat_label: 'Производство', icon: 'ti-chart-bar',
+    title: 'Что показывают сводки',
+    summary: 'Графики по направлениям, топ моделей и сборщиков.',
+    body: [
+      { p: 'Раздел <b>Производство → Сводки</b> показывает аналитику за выбранный период.' },
+      { h: 'Что есть' },
+      { ul: [
+        '<b>По направлениям</b> — сколько собрано каждого типа',
+        '<b>Топ моделей</b> — что собирали чаще всего',
+        '<b>Топ сборщиков</b> — кто больше всего работал',
+        '<b>Динамика</b> — график по дням',
+      ] },
+      { note: 'Период переключается в шапке: день / неделя / месяц / произвольный диапазон.' },
+    ],
+  },
+
+  // ---------- Продажи ----------
+  {
+    id: 'sales-new-contract',
+    cat: 'sales', cat_label: 'Продажи', icon: 'ti-file-plus',
+    title: 'Как создать новый договор',
+    summary: 'Контрагент, номер, дата, тип, юрлицо, менеджер, доставка.',
+    body: [
+      { p: 'Договор — это центральная сущность Продаж. К нему привязываются сборки, задачи, заявки на закупку.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой <b>Продажи → Новый договор</b>',
+        'Выбери <b>контрагента</b> (или создай нового через «+» рядом с полем)',
+        'Укажи <b>номер договора</b> — как у вас принято в учёте',
+        'Поставь <b>дату подписания</b>',
+        'Выбери <b>тип</b>: «Поставка» или «Поставка + монтаж»',
+        'Выбери <b>юрлицо</b>, от которого работаем (ООО Атомус или ООО ТД Атомус)',
+        'Укажи <b>сумму</b> (опционально)',
+        'Поставь <b>дату доставки</b> и адрес',
+        'Назначь <b>менеджера</b> (по умолчанию — ты)',
+        'При необходимости добавь комментарий',
+        'Сохрани',
+      ] },
+      { note: 'Новый договор сразу попадает в статус «В производстве». Если есть готовые сборки — их можно сразу к нему привязать.' },
+    ],
+  },
+  {
+    id: 'sales-offers',
+    cat: 'sales', cat_label: 'Продажи', icon: 'ti-file-invoice',
+    title: 'Как составить КП (коммерческое предложение)',
+    summary: 'Подбор позиций из каталога, скидки, экспорт в PDF и Word.',
+    body: [
+      { p: 'КП собирается из <b>продажной номенклатуры</b>. Это не модели сборок, а готовый каталог товаров с ценами.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой <b>Продажи → КП → Новое КП</b>',
+        'Выбери контрагента (или впиши потенциального клиента)',
+        'Добавь позиции из каталога: модель/товар, количество, цена',
+        'При нужде укажи скидку (в % или сумму)',
+        'Выбери юрлицо и ставку НДС',
+        'Сохрани',
+      ] },
+      { h: 'Экспорт' },
+      { ul: [
+        'Открой готовое КП → кнопка <b>«Скачать PDF»</b> — выгрузит документ с логотипом для отправки клиенту',
+        'Или <b>«Скачать DOCX»</b> — Word-файл для правок',
+      ] },
+      { note: 'Если КП согласовали — можно создать договор «на основе КП» одной кнопкой, перенесутся контрагент и сумма.' },
+    ],
+  },
+  {
+    id: 'sales-contractors',
+    cat: 'sales', cat_label: 'Продажи', icon: 'ti-users',
+    title: 'Контрагенты',
+    summary: 'Справочник клиентов: реквизиты, контакты, история договоров.',
+    body: [
+      { p: 'Контрагенты — это клиенты. Раздел <b>Продажи → Контрагенты</b>.' },
+      { h: 'Что хранится' },
+      { ul: [
+        'Название (юр. + краткое)',
+        'ИНН',
+        'Контактные лица, телефоны, email',
+        'Адрес',
+        'Комментарий',
+      ] },
+      { h: 'Карточка контрагента' },
+      { p: 'В карточке видно всю историю — какие договоры были, статусы, суммы. Удобно для звонка повторному клиенту.' },
+    ],
+  },
+  {
+    id: 'sales-products',
+    cat: 'sales', cat_label: 'Продажи', icon: 'ti-package',
+    title: 'Продажная номенклатура',
+    summary: 'Каталог товаров и услуг для КП — категории, цены, описания.',
+    body: [
+      { p: 'Это не то же что модели сборок! Это <b>продажный каталог</b> — то, что продаём клиентам.' },
+      { h: 'Структура' },
+      { ul: [
+        '<b>Категории</b> — например, «Шкафы», «Кабели», «Услуги монтажа»',
+        '<b>Позиции</b> — в каждой категории свой набор товаров',
+        'У позиции: название, артикул, единица измерения, цена, описание',
+      ] },
+      { h: 'Связь с моделями сборок' },
+      { p: 'Позицию каталога можно <b>связать</b> с моделью сборки — тогда при добавлении в КП будет ясно «эту позицию мы собираем сами».' },
+    ],
+  },
+
+  // ---------- Задачи ----------
+  {
+    id: 'tasks-new',
+    cat: 'tasks', cat_label: 'Задачи', icon: 'ti-circle-plus',
+    title: 'Как поставить задачу',
+    summary: 'Название, исполнитель, дедлайн, приоритет, привязка к договору.',
+    body: [
+      { p: 'Задачи — для всего что нужно сделать вручную: позвонить клиенту, согласовать спецификацию, выехать на объект.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой <b>Задачи → Новая задача</b>',
+        'Напиши <b>название</b> (коротко, до 200 символов)',
+        'Опционально — подробное <b>описание</b>',
+        'Выбери <b>исполнителя</b>',
+        'Поставь <b>дедлайн</b> (если есть)',
+        'Выбери <b>приоритет</b>: обычный / срочный / низкий',
+        'Если задача по конкретному договору — <b>привяжи к нему</b>',
+        'Сохрани',
+      ] },
+      { note: 'Исполнитель получит уведомление в Telegram-бот. За день до дедлайна — ещё одно напоминание.' },
+    ],
+  },
+  {
+    id: 'tasks-contracts',
+    cat: 'tasks', cat_label: 'Задачи', icon: 'ti-link',
+    title: 'Привязка задач к договорам',
+    summary: 'Как создать задачу из карточки договора и видеть все задачи по нему.',
+    body: [
+      { p: 'Если задача относится к конкретному договору — привяжи её. Это упорядочит работу.' },
+      { h: 'Как создать задачу из договора' },
+      { ol: [
+        'Открой нужный договор в <b>Продажах</b>',
+        'Прокрути вниз до блока «Задачи по договору»',
+        'Нажми «<b>+ Новая задача</b>»',
+        'Привязка к договору заполнится автоматически',
+      ] },
+      { h: 'Как видеть задачи договора' },
+      { ul: [
+        'В карточке договора — блок «Задачи по договору» со счётчиком',
+        'В строке задачи — синий бейдж с номером договора, клик ведёт в договор',
+      ] },
+    ],
+  },
+
+  // ---------- Склад ----------
+  {
+    id: 'wh-stock',
+    cat: 'warehouse', cat_label: 'Склад', icon: 'ti-stack-2',
+    title: 'Остатки на складе',
+    summary: 'Что лежит, что свободно, что зарезервировано.',
+    body: [
+      { p: 'На складе лежат <b>готовые сборки</b>. Каждая сборка после внесения автоматически попадает сюда.' },
+      { h: 'Фильтры остатков' },
+      { ul: [
+        '<b>Все</b> — все готовые сборки',
+        '<b>Свободные</b> — не привязаны к договору, можно отгрузить куда угодно',
+        '<b>Зарезервированные</b> — привязаны к договору, ждут отгрузки именно по нему',
+      ] },
+      { h: 'Сводка сверху' },
+      { p: 'Три цифры в шапке: <b>Всего на складе</b>, <b>Свободных</b>, <b>Зарезервировано</b>.' },
+      { note: 'Клик по строке открывает карточку сборки с историей всех движений.' },
+    ],
+  },
+  {
+    id: 'wh-ship',
+    cat: 'warehouse', cat_label: 'Склад', icon: 'ti-truck-delivery',
+    title: 'Как отгрузить сборки по договору',
+    summary: 'Кнопка «Отгрузить по договору» в карточке договора.',
+    body: [
+      { p: 'Когда договор готов к отгрузке — все зарезервированные сборки можно списать одной кнопкой.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой нужный <b>договор</b> в Продажах',
+        'В блоке «Готовность по сборкам» появится зелёная кнопка <b>«Отгрузить по договору (готово N)»</b>',
+        'Жми → подтверди',
+        'Все готовые сборки этого договора уйдут со склада, статус сборок изменится на «отгружена»',
+      ] },
+      { note: 'В Журнале движений склада появится запись о расходе с привязкой к договору.' },
+    ],
+  },
+  {
+    id: 'wh-writeoff',
+    cat: 'warehouse', cat_label: 'Склад', icon: 'ti-trash',
+    title: 'Как списать брак',
+    summary: 'Удаление сборки со склада с указанием причины.',
+    body: [
+      { p: 'Если сборку повредили, обнаружили брак или потеряли — её нужно списать.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой <b>Склад → Остатки</b>',
+        'Кликни на нужную сборку → откроется модалка',
+        'Нажми <b>«Списать»</b> (красная иконка корзины)',
+        'Укажи <b>причину</b> (брак, потеря, бой и т.п.)',
+        'Подтверди',
+      ] },
+      { note: 'Списание попадёт в Журнал движений с пометкой причины и автора. Откатить нельзя — будь внимателен.' },
+    ],
+  },
+  {
+    id: 'wh-journal',
+    cat: 'warehouse', cat_label: 'Склад', icon: 'ti-history',
+    title: 'Журнал движений склада',
+    summary: 'История приходов, расходов и списаний.',
+    body: [
+      { p: 'Все события склада записываются в журнал. Это полная история «что и когда произошло».' },
+      { h: 'Типы движений' },
+      { ul: [
+        '<span style="color:#16a34a;"><b>+ Приход</b></span> — сборка пришла на склад (автоматически при внесении)',
+        '<span style="color:#dc2626;"><b>− Расход</b></span> — сборка отгружена по договору',
+        '<span style="color:#C18B00;"><b>− Списание</b></span> — сборка списана (брак, бой)',
+      ] },
+      { note: 'Клик по строке журнала открывает карточку сборки с её полной историей.' },
+    ],
+  },
+
+  // ---------- Снабжение ----------
+  {
+    id: 'sup-flow',
+    cat: 'supply', cat_label: 'Снабжение', icon: 'ti-arrow-narrow-right',
+    title: 'Общий процесс снабжения',
+    summary: 'Заявка → Заказ → Приёмка. Как всё связано.',
+    body: [
+      { p: 'Снабжение работает по цепочке: <b>заявка → заказ → приёмка</b>. Каждый шаг автоматически тянет статусы дальше.' },
+      { h: 'Этап 1: Заявка' },
+      { p: 'Кому-то что-то нужно купить. Менеджер создаёт заявку: «нужно 50 м² листа 1.5мм к 20 мая». Статус заявки — <b>«новая»</b>.' },
+      { h: 'Этап 2: Заказ' },
+      { p: 'Снабженец собирает заявки и формирует заказ конкретному поставщику. При добавлении заявки в заказ статус заявки меняется на <b>«в заказе»</b>.' },
+      { h: 'Этап 3: Отправка' },
+      { p: 'Когда в заказе всё нужное — жмёшь «Отправить поставщику». Статус заказа: <b>«отправлен»</b>.' },
+      { h: 'Этап 4: Приёмка' },
+      { p: 'Поставщик привёз — оформляешь приёмку. Указываешь сколько и чего реально приехало. Статусы пересчитываются автоматически.' },
+      { note: 'Если приёмка частичная — заказ остаётся открытым в статусе «частично», можно потом доприходовать остаток.' },
+    ],
+  },
+  {
+    id: 'sup-supplier',
+    cat: 'supply', cat_label: 'Снабжение', icon: 'ti-truck-loading',
+    title: 'Добавить поставщика',
+    summary: 'Справочник поставщиков с контактами и ИНН.',
+    body: [
+      { h: 'Шаги' },
+      { ol: [
+        'Открой <b>Снабжение → Поставщики</b>',
+        'Нажми <b>«+ Добавить поставщика»</b>',
+        'Заполни обязательное поле — название',
+        'Опционально: ИНН, контактное лицо, телефон, email, комментарий',
+        'Сохрани',
+      ] },
+      { note: 'Поставщик нужен чтобы оформлять заказы. Без него заказ не создать.' },
+    ],
+  },
+  {
+    id: 'sup-catalog',
+    cat: 'supply', cat_label: 'Снабжение', icon: 'ti-list-details',
+    title: 'Каталог закупаемой номенклатуры',
+    summary: 'Что закупаем: комплектующие и товары для перепродажи.',
+    body: [
+      { p: 'Каталог закупок — это <b>не</b> модели сборок и не продажная номенклатура. Это отдельный список того что мы покупаем у поставщиков.' },
+      { h: 'Два типа' },
+      { ul: [
+        '<b>Комплектующие</b> — для сборок (металл, кабели, реле, корпуса)',
+        '<b>Товары для перепродажи</b> — то что покупаем и продаём как есть',
+      ] },
+      { h: 'Как добавить позицию' },
+      { ol: [
+        'Снабжение → Каталог → «+ Добавить позицию»',
+        'Название (например, «Лист стальной 1.5мм»)',
+        'Тип: Комплектующее или Для перепродажи',
+        'Единица измерения (шт, м, м², кг и т.п.)',
+        'Опциональный комментарий',
+      ] },
+    ],
+  },
+  {
+    id: 'sup-request',
+    cat: 'supply', cat_label: 'Снабжение', icon: 'ti-clipboard-list',
+    title: 'Создать заявку на закупку',
+    summary: 'Что нужно купить, в каком количестве, к какой дате.',
+    body: [
+      { p: 'Заявка — это «хотелка»: что и когда нужно. Сама по себе заявка ничего не покупает — её ещё надо включить в заказ поставщику.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Снабжение → Заявки → «+ Новая заявка»',
+        'Выбери <b>позицию</b> из каталога (если её нет — сначала добавь в каталог)',
+        'Укажи <b>количество</b>',
+        'Поставь <b>дату «нужно к»</b> (опционально)',
+        'Опционально привяжи к <b>договору</b> — будет видно, под какой проект',
+        'Сохрани',
+      ] },
+      { note: 'Свежие заявки видны с бейджем «новая». Когда снабженец добавит их в заказ — станут «в заказе».' },
+    ],
+  },
+  {
+    id: 'sup-order',
+    cat: 'supply', cat_label: 'Снабжение', icon: 'ti-file-invoice',
+    title: 'Создать заказ поставщику',
+    summary: 'Собрать заявки в один заказ и отправить поставщику.',
+    body: [
+      { h: 'Шаги' },
+      { ol: [
+        'Снабжение → Заказы → «+ Новый заказ»',
+        'Выбери <b>поставщика</b>',
+        'Укажи ожидаемую дату приёмки и комментарий',
+        'Жми <b>«Создать черновик»</b> — откроется карточка заказа',
+        'В карточке нажми <b>«+ Добавить»</b> в блоке позиций',
+        'В модалке можешь выбрать <b>«Закрыть заявку»</b> из выпадающего списка — позиция и количество подставятся автоматически. Или добавь позицию вручную.',
+        'Укажи цену за единицу (опционально)',
+        'Когда все позиции добавлены — нажми <b>«Отправить поставщику»</b>',
+      ] },
+      { note: 'После отправки заказ нельзя «откатить», но можно добавлять/убирать позиции пока он не принят.' },
+    ],
+  },
+  {
+    id: 'sup-receipt',
+    cat: 'supply', cat_label: 'Снабжение', icon: 'ti-package-import',
+    title: 'Оформить приёмку',
+    summary: 'Зафиксировать что и сколько реально приехало.',
+    body: [
+      { p: 'Когда товар привезли — фиксируем приёмку. Это закрывает заявки и обновляет статус заказа.' },
+      { h: 'Шаги' },
+      { ol: [
+        'Открой нужный заказ в <b>Снабжение → Заказы</b>',
+        'Нажми <b>«Принять приёмку»</b>',
+        'Поставь <b>дату приёмки</b> (по умолчанию сегодня)',
+        'Для каждой позиции укажи <b>сколько реально приехало</b>',
+        '   • Если позиция приехала вся — оставь подставленное число',
+        '   • Если приехала частично — впиши сколько по факту',
+        '   • Если совсем не приехала — поставь 0',
+        'Нажми <b>«Принять»</b>',
+      ] },
+      { h: 'Что произойдёт автоматически' },
+      { ul: [
+        'Если весь заказ закрыт — статус заказа станет <b>«получен»</b>',
+        'Если что-то не приехало — статус станет <b>«частично»</b>, можно потом доприходовать',
+        'Связанные заявки перейдут в <b>«получена»</b>',
+        'В Журнале приёмок появится новая запись',
+      ] },
+    ],
+  },
+];
+
+// FAQ
+const HELP_FAQ = [
+  {
+    q: 'Я случайно списал не ту сборку, можно откатить?',
+    a: 'Нет, движения склада необратимы — это сделано специально для целостности учёта. Но ты можешь внести точно такую же сборку заново (Производство → Новая сборка). Тогда она снова появится на складе.',
+  },
+  {
+    q: 'Что если поставщик привёз меньше чем заказывали?',
+    a: 'Просто впиши фактическое количество в приёмке. Заказ останется в статусе «частично», заявки — в «в заказе» (не «получены»). Когда довезут — оформи ещё одну приёмку на остаток.',
+  },
+  {
+    q: 'Как поменять менеджера у договора?',
+    a: 'Открой договор → нажми «Редактировать» → смени менеджера → сохрани. Делать это может директор, зам или текущий менеджер договора.',
+  },
+  {
+    q: 'У меня не пришёл код для входа',
+    a: 'Проверь что бот в Telegram именно <b>@AtomusgroupBot</b>. Иногда Telegram задерживает сообщения — подожди 30 секунд, потом запроси /login ещё раз. Если код всё равно не приходит — напиши директору, возможно тебя ещё не добавили в систему.',
+  },
+  {
+    q: 'Можно ли работать без интернета?',
+    a: 'Частично. PWA сохраняет в кэш то что ты уже открывал — можно читать. Но создать/изменить что-то без интернета не получится — данные не сохранятся на сервере.',
+  },
+  {
+    q: 'Где взять PDF коммерческого предложения?',
+    a: 'Открой нужное КП в Продажи → КП. Нажми «Скачать PDF» — выгрузится файл с логотипом, готовый для отправки клиенту. Также есть «Скачать DOCX» для правок в Word.',
+  },
+  {
+    q: 'В чём разница между «продажной номенклатурой» и «каталогом закупок»?',
+    a: '<b>Продажная номенклатура</b> — это то, что продаём клиентам (используется в КП). <b>Каталог закупок</b> — это то, что покупаем у поставщиков. Это два разных списка, могут пересекаться (например, кабель мы и продаём, и закупаем) — но ведутся отдельно.',
+  },
+  {
+    q: 'Зачем привязывать сборку к договору?',
+    a: 'Чтобы сборка была <b>зарезервирована</b> именно за этим договором. Тогда её нельзя случайно отгрузить по другому. И в карточке договора всегда видно, что уже готово.',
+  },
+  {
+    q: 'Удалил поставщика — куда делись заказы?',
+    a: 'Поставщики удаляются «мягко» (архивируются). Все исторические заказы остаются на месте, просто новый заказ на такого поставщика создать нельзя. Если нужно вернуть — обратись к директору.',
+  },
+  {
+    q: 'Сколько раз можно править КП после создания?',
+    a: 'Сколько угодно, пока договор по нему не создан. После создания договора КП фиксируется и редактирование не рекомендуется.',
+  },
+];
+
+// Changelog — что нового, от свежего к старому
+const HELP_CHANGELOG = [
+  {
+    version: 'v2.1.0',
+    date: '15.05.2026',
+    title: 'Снабжение',
+    features: [
+      'Раздел <b>Снабжение</b> с полным циклом: заявки → заказы → приёмки',
+      'Справочник поставщиков с контактами и ИНН',
+      'Каталог закупок (комплектующие + товары для перепродажи)',
+      'Связь заявок с договорами (опционально)',
+      'Автоматическое обновление статусов: заявка «в заказе» → «получена» после приёмки',
+      'Частичные приёмки — можно довезти позже',
+    ],
+  },
+  {
+    version: 'v2.0.0',
+    date: '14.05.2026',
+    title: 'Склад',
+    features: [
+      'Новый раздел <b>Склад</b> с остатками и журналом движений',
+      'Статусы сборок: «готова» / «отгружена» / «списана»',
+      'Резервирование сборок за договорами',
+      'Кнопка <b>«Отгрузить по договору»</b> в карточке договора — одним кликом',
+      'Списание брака с указанием причины',
+      'Сводка по складу: всего / свободных / зарезервировано',
+    ],
+  },
+  {
+    version: 'v1.9.0',
+    date: '14.05.2026',
+    title: 'Связь задач с договорами',
+    features: [
+      'Опциональная привязка задачи к договору',
+      'В карточке договора — блок <b>«Задачи по договору»</b> со счётчиком',
+      'Кнопка «+ Новая задача» из карточки договора — привязка подставляется автоматически',
+      'Бейдж договора в строке задачи (кликабельный)',
+    ],
+  },
+  {
+    version: 'v1.8.1',
+    date: '14.05.2026',
+    title: 'Пакет хотфиксов',
+    features: [
+      'Новый логотип Atomus group в шапке и на странице входа',
+      'Прозрачный логотип в PDF коммерческого предложения',
+      'Имя пользователя корректно отображается в шапке',
+      'Категории не обрезаются на узких экранах',
+      'Поле поиска не залазит на иконку',
+    ],
+  },
+  {
+    version: 'v1.8.0',
+    date: '13.05.2026',
+    title: 'Категории продажной номенклатуры + Word-экспорт КП',
+    features: [
+      'Категории в продажном каталоге',
+      'Экспорт КП в формат <b>.docx</b> (Word) — для дальнейших правок',
+    ],
+  },
+  {
+    version: 'v1.7.0',
+    date: '12.05.2026',
+    title: 'Задачи',
+    features: [
+      'Полноценный модуль <b>Задачи</b>: создание, исполнители, дедлайны, приоритеты',
+      'Уведомления в Telegram о назначении и приближающихся дедлайнах',
+      'Виджет «Мои задачи» на Главной',
+    ],
+  },
+];
+
+// ---------- Категории сайдбара для группировки ----------
+const HELP_CATEGORIES = [
+  { id: 'start',      label: 'Старт',         icon: 'ti-rocket' },
+  { id: 'home',       label: 'Главная',       icon: 'ti-home' },
+  { id: 'production', label: 'Производство',  icon: 'ti-tool' },
+  { id: 'sales',      label: 'Продажи',       icon: 'ti-briefcase' },
+  { id: 'tasks',      label: 'Задачи',        icon: 'ti-checklist' },
+  { id: 'warehouse',  label: 'Склад',         icon: 'ti-building-warehouse' },
+  { id: 'supply',     label: 'Снабжение',     icon: 'ti-shopping-cart' },
+];
+
+state.helpSearch = '';
+state.helpSearchTimer = null;
+
+function loadHelpKnowledge() {
+  state.helpSearch = '';
+  const input = document.getElementById('help-search');
+  if (input) input.value = '';
+  renderHelpKnowledge();
+}
+
+function onHelpSearchInput() {
+  const input = document.getElementById('help-search');
+  if (!input) return;
+  clearTimeout(state.helpSearchTimer);
+  state.helpSearchTimer = setTimeout(() => {
+    state.helpSearch = input.value.trim().toLowerCase();
+    renderHelpKnowledge();
+  }, 200);
+}
+
+function renderHelpKnowledge() {
+  const container = document.getElementById('help-knowledge-body');
+  if (!container) return;
+  const q = state.helpSearch;
+  // Если идёт поиск — показываем плоский список совпадений
+  if (q) {
+    const matches = HELP_ARTICLES.filter(a =>
+      a.title.toLowerCase().includes(q) ||
+      a.summary.toLowerCase().includes(q) ||
+      a.cat_label.toLowerCase().includes(q)
+    );
+    let html = '<div style="padding: 0 18px 16px;">';
+    if (!matches.length) {
+      html += '<div class="empty-block"><i class="ti ti-search-off"></i>Ничего не найдено по запросу «' + escapeHtml(q) + '»</div>';
+    } else {
+      html += '<div class="help-section-title">Найдено: ' + matches.length + '</div>';
+      html += '<div class="help-grid">';
+      matches.forEach(a => { html += renderHelpCard(a); });
+      html += '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+  // Обычный режим — по категориям
+  let html = '<div style="padding: 0 18px 18px;">';
+  HELP_CATEGORIES.forEach(cat => {
+    const list = HELP_ARTICLES.filter(a => a.cat === cat.id);
+    if (!list.length) return;
+    html += '<div class="help-section-title"><i class="ti ' + cat.icon + '"></i>' + escapeHtml(cat.label) + '</div>';
+    html += '<div class="help-grid">';
+    list.forEach(a => { html += renderHelpCard(a); });
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderHelpCard(a) {
+  return '<div class="help-card" onclick="openHelpArticle(\'' + a.id + '\')">' +
+    '<div class="hc-icon"><i class="ti ' + a.icon + '"></i></div>' +
+    '<div class="hc-body">' +
+      '<h4>' + escapeHtml(a.title) + '</h4>' +
+      '<p>' + escapeHtml(a.summary) + '</p>' +
+    '</div>' +
+    '</div>';
+}
+
+function openHelpArticle(articleId) {
+  const a = HELP_ARTICLES.find(x => x.id === articleId);
+  if (!a) return;
+  let bodyHtml = '';
+  a.body.forEach(b => {
+    if (b.p)    bodyHtml += '<p>' + b.p + '</p>';
+    if (b.h)    bodyHtml += '<h4 class="help-h">' + escapeHtml(b.h) + '</h4>';
+    if (b.ol)   bodyHtml += '<ol class="help-ol">' + b.ol.map(x => '<li>' + x + '</li>').join('') + '</ol>';
+    if (b.ul)   bodyHtml += '<ul class="help-ul">' + b.ul.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+    if (b.note) bodyHtml += '<div class="help-note"><i class="ti ti-info-circle"></i><div>' + b.note + '</div></div>';
+  });
+
+  const m = document.getElementById('help-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeHelpModal()"></div>' +
+    '<div class="modal-body modal-body-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ' + a.icon + '"></i> ' + escapeHtml(a.title) + '</h3>' +
+        '<button class="modal-close" onclick="closeHelpModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content help-article-body">' +
+        '<div class="help-cat-label">' + escapeHtml(a.cat_label) + '</div>' +
+        bodyHtml +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeHelpModal() {
+  document.getElementById('help-modal').classList.remove('visible');
+}
+
+// FAQ
+function loadHelpFaq() {
+  const container = document.getElementById('help-faq-body');
+  if (!container) return;
+  let html = '<div class="faq-list">';
+  HELP_FAQ.forEach((f, idx) => {
+    html += '<details class="faq-item">' +
+      '<summary>' +
+        '<span class="faq-q-num">' + (idx + 1) + '</span>' +
+        '<span class="faq-q-text">' + escapeHtml(f.q) + '</span>' +
+        '<i class="ti ti-chevron-down faq-chevron"></i>' +
+      '</summary>' +
+      '<div class="faq-answer">' + f.a + '</div>' +
+      '</details>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// Changelog
+function loadHelpChangelog() {
+  const container = document.getElementById('help-changelog-body');
+  if (!container) return;
+  let html = '<div class="cl-timeline">';
+  HELP_CHANGELOG.forEach(v => {
+    html += '<div class="cl-entry">' +
+      '<div class="cl-marker"><i class="ti ti-sparkles"></i></div>' +
+      '<div class="cl-body">' +
+        '<div class="cl-head">' +
+          '<span class="cl-version">' + escapeHtml(v.version) + '</span>' +
+          '<span class="cl-date">' + escapeHtml(v.date) + '</span>' +
+        '</div>' +
+        '<div class="cl-title">' + escapeHtml(v.title) + '</div>' +
+        '<ul class="cl-list">' + v.features.map(f => '<li>' + f + '</li>').join('') + '</ul>' +
+      '</div>' +
+      '</div>';
+  });
+  html += '</div>';
   container.innerHTML = html;
 }
 
