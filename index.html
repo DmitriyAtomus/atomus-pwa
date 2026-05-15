@@ -5142,6 +5142,34 @@
   .defects-widget-cell.s-rejected .num    { color: var(--text-light); }
   /* ============ ЭТАП 23+: МОБИЛЬНЫЕ УЛУЧШЕНИЯ РАЗДЕЛА ДОРАБОТКИ ============ */
 
+  /* ===== ГЛОБАЛЬНЫЕ МОБИЛЬНЫЕ ОТСТУПЫ ===== */
+  /* Между навигацией разделов и контентом нужно пространство */
+  .app.mobile-layout .screen-header {
+    margin-top: 6px;       /* небольшой отступ от m-section-tabs */
+  }
+  /* Если у screen есть и screen-header И filter-chips, между ними тоже отступ */
+  .app.mobile-layout .m-filter-chips {
+    margin-top: 0;
+  }
+  /* Если на screen НЕТ screen-header — то контент прижат к навигации.
+     Добавим автоматический padding-top для всех экранов в мобильной без header. */
+  .app.mobile-layout .screen > .content-inner:first-child {
+    padding-top: 14px;
+  }
+  /* Если на screen есть фильтры в самом верху (filter-row внутри content-inner), они должны иметь padding */
+  .app.mobile-layout .screen > .content-inner > .filter-row:first-child,
+  .app.mobile-layout .screen > .filter-row {
+    padding: 12px 14px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+  }
+  /* На мобильной desktop-layout-обёртка скрывает фильтры — но через них на мобильной фильтры рендерятся JS-ом в виде filter-tabs.
+     Добавим отступы для этих контейнеров. */
+  .app.mobile-layout .content-inner > .filter-tabs:first-child,
+  .app.mobile-layout .filter-tabs {
+    padding: 0 4px;        /* минимальный внутренний отступ */
+  }
+
   /* Floating Action Button — главная кнопка действия на мобильной */
   .fab {
     display: none;       /* скрыт на десктопе */
@@ -5149,7 +5177,7 @@
   .app.mobile-layout .fab {
     display: flex;
     position: fixed;
-    bottom: 22px;        /* tab-bar в разделе Доработки скрыт — FAB у самого низа */
+    bottom: 22px;
     right: 18px;
     z-index: 50;
     width: 56px;
@@ -5163,6 +5191,11 @@
     box-shadow: 0 4px 14px rgba(44, 82, 130, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
     cursor: pointer;
     transition: transform 0.12s, box-shadow 0.15s;
+  }
+  /* Если в разделе есть нижний tab-bar — FAB поднять выше */
+  .app.mobile-layout .tab-bar[data-active="1"] ~ .body-layout .fab,
+  .app.mobile-layout .body-layout:has(.tab-bar[data-active="1"]) .fab {
+    bottom: 76px;
   }
   .app.mobile-layout .fab i { font-size: 26px; }
   .app.mobile-layout .fab:active {
@@ -6664,6 +6697,9 @@
             <div class="loading-block">Загружаем заявки…</div>
           </div>
         </div>
+        <button class="fab" onclick="openNewSupplyRequest()" aria-label="Новая заявка">
+          <i class="ti ti-plus"></i>
+        </button>
       </div>
 
       <!-- ЗАКАЗЫ -->
@@ -6695,6 +6731,9 @@
             <div class="loading-block">Загружаем заказы…</div>
           </div>
         </div>
+        <button class="fab" onclick="openNewSupplyOrder()" aria-label="Новый заказ">
+          <i class="ti ti-plus"></i>
+        </button>
       </div>
 
       <!-- КАРТОЧКА ЗАКАЗА -->
@@ -6808,6 +6847,9 @@
             <div class="loading-block">Загружаем…</div>
           </div>
         </div>
+        <button class="fab" onclick="openNewTask()" aria-label="Новая задача">
+          <i class="ti ti-plus"></i>
+        </button>
       </div>
 
       <!-- Назначенные мне (только assigned_to_me) -->
@@ -7333,7 +7375,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.6-mobile-defects";
+const APP_VERSION = "v2.5.7-mobile-fab-padding";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
