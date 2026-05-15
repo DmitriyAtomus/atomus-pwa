@@ -7239,7 +7239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.4-share-from-defects";
+const APP_VERSION = "v2.5.5-feedback-link";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -17648,6 +17648,51 @@ function renderPublicError(status) {
   '</div>';
 }
 
+// ============ ЭТАП 23+: ОБЩАЯ ПУБЛИЧНАЯ ФОРМА ЗАМЕЧАНИЙ /feedback ============
+
+function showPublicFeedbackPage() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  const page = document.getElementById('public-page');
+  page.style.display = 'flex';
+  const body = document.getElementById('public-card-body');
+  body.innerHTML =
+    '<div class="public-header">' +
+      '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+      '<h1 class="public-header-title">Обратная связь</h1>' +
+      '<div class="public-header-sub"><i class="ti ti-message-circle"></i> ООО «Атомус Групп»</div>' +
+    '</div>' +
+    '<div class="public-body" style="padding: 24px;">' +
+      '<p style="color: var(--text); font-size: 14px; line-height: 1.5; margin-bottom: 18px;">' +
+        'Здесь вы можете оставить замечание, идею или вопрос. Мы рассмотрим и при необходимости свяжемся.' +
+      '</p>' +
+      '<button class="public-add-defect-btn" onclick="openGeneralDefectForm()" style="margin-top: 0;">' +
+        '<i class="ti ti-alert-circle"></i> Оставить замечание' +
+      '</button>' +
+    '</div>' +
+    '<div class="public-footer">' +
+      'Внутренняя CRM-система ООО «Атомус Групп»' +
+    '</div>';
+}
+
+/** Открывает форму общего замечания (публично, без авторизации). */
+function openGeneralDefectForm() {
+  state._defectFormState = {
+    targetType: 'general',     // ← новый режим: публичная форма без привязки
+    token: '',
+    type: 'defect',
+    description: '',
+    author_name: '',
+    author_phone: '',
+    location: '',
+    photos: [],
+  };
+  const m = document.getElementById('defect-form-modal');
+  if (!m) return;
+  m.innerHTML = renderDefectFormHtml();
+  m.classList.add('visible');
+}
+
 // ---- QR-модалка для сборки/договора ----
 
 async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate) {
@@ -18449,17 +18494,21 @@ async function submitDefectReport() {
   fd.append('type', s.type);
   if (s.targetType === 'assembly') fd.append('assembly_token', s.token);
   else if (s.targetType === 'contract') fd.append('contract_token', s.token);
+  else if (s.targetType === 'general') fd.append('general', '1');     // ЭТАП 23+: общая публичная форма
   if (s.author_name) fd.append('author_name', s.author_name);
   if (s.author_phone) fd.append('author_phone', s.author_phone);
   if (s.location) fd.append('location', s.location);
   s.photos.forEach((p, i) => fd.append('photo_' + (i + 1), p.file, p.file.name));
 
-  // Если сотрудник авторизован — используем защищённый эндпоинт.
-  // Он позволяет создавать замечания «без привязки» и сразу проставляет имя из профиля.
+  // Маршрутизация:
+  // - 'general' (публичная общая форма) → /api/public/defects с general=1
+  // - 'internal' (CRM без привязки) → /api/defects с авторизацией
+  // - 'assembly'/'contract' → /api/defects если залогинен, иначе /api/public/defects
   const token = localStorage.getItem(TOKEN_KEY);
-  const isInternal = (s.targetType === 'internal') || !!token;
-  const url = isInternal ? '/api/defects' : '/api/public/defects';
-  const headers = isInternal && token ? { 'Authorization': 'Bearer ' + token } : {};
+  const isPublic = (s.targetType === 'general');
+  const isInternal = !isPublic && ((s.targetType === 'internal') || !!token);
+  const url = (isInternal && !isPublic) ? '/api/defects' : '/api/public/defects';
+  const headers = isInternal && token && !isPublic ? { 'Authorization': 'Bearer ' + token } : {};
 
   try {
     const r = await fetch(API_BASE + url, { method: 'POST', body: fd, headers });
@@ -18880,9 +18929,21 @@ function openShareForInstallerFromCRM() {
           '<div class="dt-meta">Выбрать из активных договоров</div></div>' +
           '<i class="ti ti-chevron-right dt-chev"></i>' +
         '</button>' +
+        '<button class="defect-target-btn" onclick="shareGeneralFeedbackLink()">' +
+          '<i class="ti ti-note"></i>' +
+          '<div><div class="dt-title">Общая ссылка (без привязки)</div>' +
+          '<div class="dt-meta">Форма для любых замечаний и идей</div></div>' +
+          '<i class="ti ti-chevron-right dt-chev"></i>' +
+        '</button>' +
       '</div>' +
     '</div>';
   m.classList.add('visible');
+}
+
+/** Открывает QR + share для общей публичной ссылки /feedback. */
+function shareGeneralFeedbackLink() {
+  const url = window.location.origin + '/feedback';
+  showShareInstallerModal(url, 'обратной связи');
 }
 
 /** Форма замечания «без привязки» (внутренняя). */
@@ -19106,6 +19167,11 @@ async function chooseContractForDefect(contractId) {
   }
   if (publicContractMatch) {
     showPublicContract(publicContractMatch[1]);
+    return;
+  }
+  // ЭТАП 23+: общая публичная форма замечаний /feedback
+  if (path === '/feedback' || path === '/feedback/') {
+    showPublicFeedbackPage();
     return;
   }
   // Обычный flow
