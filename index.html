@@ -5156,15 +5156,16 @@
   .app.mobile-layout .screen > .content-inner:first-child {
     padding-top: 14px;
   }
-  /* Если на screen есть фильтры в самом верху (filter-row внутри content-inner), они должны иметь padding */
-  .app.mobile-layout .screen > .content-inner > .filter-row:first-child,
-  .app.mobile-layout .screen > .filter-row {
+  /* Внутри content-inner фильтр-чипсы первые — пусть будут с белым фоном и отступом */
+  .app.mobile-layout .content-inner > .filter-row:first-child,
+  .app.mobile-layout .content-inner > div:first-child > .filter-row:first-child {
     padding: 12px 14px;
+    margin: -14px -14px 12px -14px;   /* растянуть от края до края, перекрыв padding content-inner */
     background: white;
     border-bottom: 1px solid var(--border);
   }
-  /* На мобильной desktop-layout-обёртка скрывает фильтры — но через них на мобильной фильтры рендерятся JS-ом в виде filter-tabs.
-     Добавим отступы для этих контейнеров. */
+  /* На .desktop-layout-обёртка скрывается на мобильной — фильтры рендерятся не там.
+     Но если они есть на верхнем уровне content-inner — стилизуем. */
   .app.mobile-layout .content-inner > .filter-tabs:first-child,
   .app.mobile-layout .filter-tabs {
     padding: 0 4px;        /* минимальный внутренний отступ */
@@ -5177,7 +5178,7 @@
   .app.mobile-layout .fab {
     display: flex;
     position: fixed;
-    bottom: 22px;
+    bottom: 80px;        /* Всегда поднят над возможным tab-bar (60px высота + 20px зазор) */
     right: 18px;
     z-index: 50;
     width: 56px;
@@ -5192,10 +5193,9 @@
     cursor: pointer;
     transition: transform 0.12s, box-shadow 0.15s;
   }
-  /* Если в разделе есть нижний tab-bar — FAB поднять выше */
-  .app.mobile-layout .tab-bar[data-active="1"] ~ .body-layout .fab,
-  .app.mobile-layout .body-layout:has(.tab-bar[data-active="1"]) .fab {
-    bottom: 76px;
+  /* В разделах БЕЗ tab-bar (например, Доработки) FAB у самого низа */
+  .app.mobile-layout.no-tabbar .fab {
+    bottom: 22px;
   }
   .app.mobile-layout .fab i { font-size: 26px; }
   .app.mobile-layout .fab:active {
@@ -7375,7 +7375,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.7-mobile-fab-padding";
+const APP_VERSION = "v2.5.8-fab-fix";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -7775,14 +7775,18 @@ function selectSection(sectionName) {
   // Переключаем tab-bar (мобильный). У Продаж — свой, у остальных — производственный.
   // ЭТАП 23+: в разделах с FAB (Доработки) скрываем нижний tab-bar полностью.
   document.querySelectorAll('.tab-bar').forEach(tb => { tb.dataset.active = '0'; });
+  const appEl = document.getElementById('app');
   if (sectionName === 'sales') {
     const tbSales = document.getElementById('tab-bar-sales');
     if (tbSales) tbSales.dataset.active = '1';
+    if (appEl) appEl.classList.remove('no-tabbar');
   } else if (sectionName === 'defects') {
     // Не показываем ни один tab-bar — у Доработок свой FAB
+    if (appEl) appEl.classList.add('no-tabbar');
   } else {
     const tbProd = document.getElementById('tab-bar-production');
     if (tbProd) tbProd.dataset.active = '1';
+    if (appEl) appEl.classList.remove('no-tabbar');
   }
 
   // Открываем экран раздела по умолчанию
