@@ -10393,7 +10393,7 @@ function renderStockRow(s) {
     '<div class="wh-stock-icon"><i class="ti ti-package"></i></div>' +
     '<div class="wh-stock-body">' +
       '<div class="wh-stock-title">' + escapeHtml(s.model_name) +
-        (s.model_code ? ' <span class="wh-code">' + escapeHtml(s.model_code) + '</span>' : '') +
+        (s.model_article ? ' <span class="wh-code">' + escapeHtml(s.model_article) + '</span>' : '') +
       '</div>' +
       '<div class="wh-stock-meta">' +
         (label ? '<span><i class="ti ti-tag"></i>' + escapeHtml(label) + '</span>' : '') +
@@ -10474,7 +10474,7 @@ function renderMovementRow(m) {
     '<div class="wh-mov-icon"><i class="ti ' + ico + '"></i></div>' +
     '<div class="wh-mov-body">' +
       '<div class="wh-mov-title">' + escapeHtml(m.model_name) +
-        (m.model_code ? ' <span class="wh-code">' + escapeHtml(m.model_code) + '</span>' : '') +
+        (m.model_article ? ' <span class="wh-code">' + escapeHtml(m.model_article) + '</span>' : '') +
       '</div>' +
       '<div class="wh-mov-meta">' +
         '<span class="wh-mov-dir-pill ' + cls + '">' + escapeHtml(m.direction_label) + '</span>' +
