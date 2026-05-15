@@ -1993,6 +1993,212 @@
     font-size: 13px !important;
   }
 
+  /* ============ ЭТАП 18: СКЛАД ============ */
+
+  /* Сводка-карточки */
+  .wh-summary {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .wh-sum-card {
+    flex: 1; min-width: 140px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  .wh-sum-num {
+    font-size: 28px; font-weight: 700;
+    color: var(--brand); line-height: 1.1;
+  }
+  .wh-sum-lbl {
+    color: var(--text-light); font-size: 12.5px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-top: 4px;
+  }
+
+  /* Строка остатка */
+  .wh-stock-list, .wh-mov-list {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .wh-stock-row, .wh-mov-row {
+    display: flex; align-items: center; gap: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .wh-stock-row:hover, .wh-mov-row:hover {
+    border-color: var(--brand);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  }
+  .wh-stock-icon, .wh-mov-icon {
+    width: 36px; height: 36px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex: 0 0 36px;
+    font-size: 18px;
+  }
+  .wh-mov-row.mov-out .wh-mov-icon { background: #FFE8E8; color: var(--danger); }
+  .wh-mov-row.mov-write_off .wh-mov-icon { background: #FFF4E6; color: #C18B00; }
+  .wh-mov-row.mov-in .wh-mov-icon { background: #E8F5E9; color: var(--success); }
+
+  .wh-stock-body, .wh-mov-body {
+    flex: 1; min-width: 0;
+  }
+  .wh-stock-title, .wh-mov-title {
+    font-size: 14.5px; font-weight: 600; color: var(--text);
+    margin-bottom: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .wh-code {
+    color: var(--text-light); font-weight: 500; font-size: 12.5px;
+  }
+  .wh-stock-meta, .wh-mov-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-size: 12px; color: var(--text-light);
+  }
+  .wh-stock-meta span, .wh-mov-meta span {
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .wh-stock-qty {
+    flex: 0 0 auto;
+    font-size: 15px; font-weight: 600; color: var(--text);
+    white-space: nowrap;
+  }
+  .wh-stock-actions {
+    display: flex; gap: 6px; flex: 0 0 auto;
+  }
+  .btn-icon-warning {
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--danger); cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-icon-warning:hover { background: #FFE8E8; }
+
+  /* Бейджи "зарезервировано" / "свободна" */
+  .wh-reserve-badge {
+    background: var(--brand-bg); color: var(--brand);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .wh-reserve-badge:hover { background: #D6E0EE; }
+  .wh-reserve-badge.archived { background: var(--bg); color: var(--text-light); opacity: 0.7; }
+  .wh-free-badge {
+    background: #E8F5E9; color: var(--success);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+
+  /* Знак движения */
+  .wh-mov-qty {
+    flex: 0 0 auto;
+    font-size: 17px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .wh-mov-qty.in  { color: var(--success); }
+  .wh-mov-qty.out { color: var(--danger); }
+  .wh-mov-qty.write_off { color: #C18B00; }
+
+  /* Pill-метка направления */
+  .wh-mov-dir-pill {
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    background: var(--bg); color: var(--text-mid);
+  }
+  .wh-mov-dir-pill.in { background: #E8F5E9; color: var(--success); }
+  .wh-mov-dir-pill.out { background: #FFE8E8; color: var(--danger); }
+  .wh-mov-dir-pill.write_off { background: #FFF4E6; color: #C18B00; }
+
+  /* Pill статуса сборки */
+  .status-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    background: var(--bg); color: var(--text-mid);
+  }
+  .status-pill.st-in_progress { background: #FFF4E6; color: #C18B00; }
+  .status-pill.st-ready       { background: #E8F5E9; color: var(--success); }
+  .status-pill.st-shipped     { background: var(--brand-bg); color: var(--brand); }
+  .status-pill.st-written_off { background: #F4F4F5; color: var(--text-faint); }
+
+  /* Карточка сборки в модалке */
+  .as-info-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px;
+    padding: 4px 0 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .as-info-grid > div { font-size: 13.5px; line-height: 1.5; }
+  .as-lbl {
+    color: var(--text-light); text-transform: uppercase;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    margin-right: 4px;
+  }
+  .as-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 0 0 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .as-history-title {
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    color: var(--text-light);
+    margin-bottom: 8px;
+  }
+  .as-history-list {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 340px; overflow-y: auto;
+  }
+  .mov-mini {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+  .mov-mini-sign {
+    font-weight: 700; font-size: 14px;
+    min-width: 32px; text-align: right;
+  }
+  .mov-mini.mov-in .mov-mini-sign { color: var(--success); }
+  .mov-mini.mov-out .mov-mini-sign { color: var(--danger); }
+  .mov-mini.mov-write_off .mov-mini-sign { color: #C18B00; }
+  .mov-mini-body { flex: 1; min-width: 0; }
+  .mov-mini-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .mov-mini-meta  { font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+
+  /* Счётчик в шапке страницы */
+  .page-counter {
+    background: var(--brand-bg); color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 13px; font-weight: 600;
+    margin-left: 8px;
+  }
+
+  /* Адаптация модалки сборки для мобилы */
+  @media (max-width: 720px) {
+    .as-info-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ КОНЕЦ ЭТАП 18 ============ */
+
   .task-status-pill {
     flex: 0 0 auto;
     padding: 3px 10px;
@@ -2840,7 +3046,7 @@
         <i class="ti ti-checklist"></i>Задачи
       </button>
       <button class="section-tab" data-section="warehouse">
-        <i class="ti ti-building-warehouse"></i>Склад<span class="soon-badge">скоро</span>
+        <i class="ti ti-building-warehouse"></i>Склад
       </button>
       <button class="section-tab" data-section="logistics">
         <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
@@ -2967,6 +3173,33 @@
         <div class="user-info-block">
           <div class="un" id="sb-username-tasks">—</div>
           <div class="ur" id="sb-userrole-tasks">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- SIDEBAR СКЛАД (Этап 18) -->
+    <aside class="sidebar" id="sidebar-warehouse" data-section="warehouse" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-building-warehouse"></i> Склад
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="warehouse-stock" onclick="selectSidebarItem('warehouse-stock')">
+          <i class="ti ti-stack-2"></i><span>Остатки</span>
+        </button>
+        <button class="nav-item" data-nav="warehouse-movements" onclick="selectSidebarItem('warehouse-movements')">
+          <i class="ti ti-history"></i><span>Журнал движений</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-warehouse">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-warehouse">—</div>
+          <div class="ur" id="sb-userrole-warehouse">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
@@ -3685,42 +3918,77 @@
       <!-- ============ КОНЕЦ РАЗДЕЛА ПРОДАЖИ ============ -->
       <!-- ============================================================ -->
 
-      <!-- ============ ЗАГЛУШКА: СКЛАД ============ -->
-      <div class="screen" data-screen="coming-warehouse" data-section="warehouse">
+      <!-- ============ РАЗДЕЛ СКЛАД (Этап 18) ============ -->
+
+      <!-- Остатки -->
+      <div class="screen" data-screen="warehouse-stock" data-section="warehouse">
         <div class="content-inner" style="max-width: 100%;">
-          <div class="coming-soon">
-            <div class="cs-icon"><i class="ti ti-building-warehouse"></i></div>
-            <h2>Склад — раздел в разработке</h2>
-            <div class="cs-desc">
-              Куда попадают собранные изделия с уникальным QR-кодом.
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-stack-2"></i>
+              <h1>Остатки на складе</h1>
+              <span class="page-counter" id="wh-stock-counter">0</span>
             </div>
-            <div class="cs-features">
-              <div class="cs-feature">
-                <i class="ti ti-qrcode"></i>
-                <div>
-                  <div class="feat-title">QR-наклейки на изделия</div>
-                  <div class="feat-desc">Каждой собранной единице — свой код, печать наклейки</div>
-                </div>
+          </div>
+
+          <!-- Сводка -->
+          <div class="wh-summary" id="wh-summary">
+            <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-total">—</div><div class="wh-sum-lbl">всего на складе</div></div>
+            <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-free">—</div><div class="wh-sum-lbl">свободных</div></div>
+            <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-reserved">—</div><div class="wh-sum-lbl">зарезервировано</div></div>
+          </div>
+
+          <!-- Фильтры -->
+          <div class="desktop-layout">
+            <div class="filter-row" style="position: relative;">
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-wh-filter="all" onclick="setWarehouseFilter('all')">Все</button>
+                <button class="filter-tab" data-wh-filter="free" onclick="setWarehouseFilter('free')">Свободные</button>
+                <button class="filter-tab" data-wh-filter="reserved" onclick="setWarehouseFilter('reserved')">Зарезервированные</button>
               </div>
-              <div class="cs-feature">
-                <i class="ti ti-package"></i>
-                <div>
-                  <div class="feat-title">Остатки на складе</div>
-                  <div class="feat-desc">Что лежит, для какого договора, как долго</div>
-                </div>
-              </div>
-              <div class="cs-feature">
-                <i class="ti ti-arrows-left-right"></i>
-                <div>
-                  <div class="feat-title">Перемещение между договорами</div>
-                  <div class="feat-desc">Освободить со склада или перевязать на другой договор</div>
-                </div>
+              <div class="search-box" style="margin-left: 12px; flex: 1; max-width: 340px;">
+                <i class="ti ti-search"></i>
+                <input type="text" id="wh-search" placeholder="Поиск по модели или исполнению…" oninput="onWarehouseSearchInput()">
               </div>
             </div>
-            <div class="cs-eta">После Производства и Продаж</div>
+          </div>
+
+          <!-- Контейнер списка -->
+          <div id="wh-stock-list" class="wh-stock-list">
+            <div class="loading-block">Загружаем остатки…</div>
           </div>
         </div>
       </div>
+
+      <!-- Журнал движений -->
+      <div class="screen" data-screen="warehouse-movements" data-section="warehouse">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-history"></i>
+              <h1>Журнал движений</h1>
+            </div>
+          </div>
+
+          <!-- Фильтры по направлению -->
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-wh-mov="all" onclick="setMovementsFilter('all')">Все</button>
+                <button class="filter-tab" data-wh-mov="in" onclick="setMovementsFilter('in')">Приходы</button>
+                <button class="filter-tab" data-wh-mov="out" onclick="setMovementsFilter('out')">Расходы</button>
+                <button class="filter-tab" data-wh-mov="write_off" onclick="setMovementsFilter('write_off')">Списания</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Контейнер журнала -->
+          <div id="wh-movements-list" class="wh-mov-list">
+            <div class="loading-block">Загружаем журнал…</div>
+          </div>
+        </div>
+      </div>
+      <!-- ============ КОНЕЦ РАЗДЕЛА СКЛАД ============ -->
 
       <!-- ============ ЗАГЛУШКА: ЛОГИСТИКА ============ -->
       <div class="screen" data-screen="coming-logistics" data-section="logistics">
@@ -4135,6 +4403,9 @@
   </div>
 </div>
 
+<!-- ============ ЭТАП 18: МОДАЛКА КАРТОЧКИ СБОРКИ ============ -->
+<div class="modal-overlay" id="assembly-stock-modal"></div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -4145,7 +4416,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v1.9.0-stage16B2";
+const APP_VERSION = "v2.0.0-stage18";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4160,7 +4431,7 @@ const SECTION_CONFIG = {
   production: { sidebar: 'sidebar-production', defaultScreen: 'dashboard' },
   sales:      { sidebar: 'sidebar-sales',      defaultScreen: 'sales-dashboard' },
   tasks:      { sidebar: 'sidebar-tasks',      defaultScreen: 'tasks-list' },       // ЭТАП 16В
-  warehouse:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-warehouse', comingSoon: true },
+  warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-stock' },     // ЭТАП 18
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
   supply:     { sidebar: 'sidebar-coming',     defaultScreen: 'coming-supply',    comingSoon: true },
   help:       { sidebar: 'sidebar-help',       defaultScreen: 'help-knowledge' },
@@ -4596,6 +4867,9 @@ function selectSidebarItem(screenName) {
   // КП (14Б)
   if (screenName === 'sales-offers') loadOffers();
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
+  // ЭТАП 18: склад
+  if (screenName === 'warehouse-stock')     loadWarehouseStock();
+  if (screenName === 'warehouse-movements') loadWarehouseMovements();
   if (screenName === 'sales-offer-form') initOfferForm();
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
@@ -7640,6 +7914,18 @@ function renderContractAssembliesBlock(c) {
     '<i class="ti ti-package" style="font-size: 32px; color: var(--brand); opacity: 0.5;"></i>' +
     '</div>';
 
+  // ЭТАП 18: кнопка отгрузки по договору (если есть готовые сборки)
+  // Считаем сколько сборок имеет потенциальный шанс быть отгруженными
+  const readyCount = (c.assemblies || []).filter(a => a.status === 'ready').length;
+  const canShip = canManageSales();
+  if (readyCount > 0 && canShip) {
+    html += '<div style="margin-bottom: 14px;">' +
+      '<button class="btn btn-primary" onclick="shipByContract(' + c.id + ')" style="width: 100%; justify-content: center;">' +
+        '<i class="ti ti-truck-delivery"></i> Отгрузить по договору (готово ' + readyCount + ')' +
+      '</button>' +
+      '</div>';
+  }
+
   if (assemblies.length) {
     html += '<div class="contract-assemblies-list">';
     if (state.isDesktop) {
@@ -10012,6 +10298,384 @@ function openNewTaskForContract(contractId) {
   selectSection('tasks');
   // Небольшая задержка, чтобы переключение раздела завершилось
   setTimeout(() => openNewTask(), 50);
+}
+
+// ============================================================
+// ============ ЭТАП 18: СКЛАД ============
+// ============================================================
+
+cache.warehouseStock = null;     // {stock:[], summary:{}, filter:'all', search:''}
+cache.warehouseMovements = null; // {movements:[], filter:'all'}
+
+state.warehouseFilter = 'all';   // 'all' | 'free' | 'reserved'
+state.warehouseSearch = '';
+state.warehouseSearchTimer = null;
+state.movementsFilter = 'all';   // 'all' | 'in' | 'out' | 'write_off'
+
+const ASSEMBLY_STATUS_LABELS = {
+  in_progress: 'в работе',
+  ready:       'готова',
+  shipped:     'отгружена',
+  written_off: 'списана',
+};
+
+const ASSEMBLY_STATUS_ORDER = ['in_progress', 'ready', 'shipped', 'written_off'];
+
+// --- Загрузка остатков ---
+
+async function loadWarehouseStock() {
+  const container = document.getElementById('wh-stock-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем остатки…</div>';
+
+  try {
+    const params = new URLSearchParams();
+    if (state.warehouseFilter === 'free')     params.set('contract_id', 'free');
+    if (state.warehouseFilter === 'reserved') params.set('contract_id', 'reserved');
+    if (state.warehouseSearch)                params.set('search', state.warehouseSearch);
+    const d = await apiGet('/api/warehouse/stock' + (params.toString() ? '?' + params.toString() : ''));
+    cache.warehouseStock = d;
+    renderWarehouseStock(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить остатки: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderWarehouseStock(d) {
+  const container = document.getElementById('wh-stock-list');
+  if (!container) return;
+
+  // Сводка
+  const sum = d.summary || {};
+  document.getElementById('wh-sum-total').textContent    = sum.total ?? 0;
+  document.getElementById('wh-sum-free').textContent     = sum.free ?? 0;
+  document.getElementById('wh-sum-reserved').textContent = sum.reserved ?? 0;
+
+  const list = d.stock || [];
+  document.getElementById('wh-stock-counter').textContent = list.length;
+
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>Под выбранный фильтр сборок нет</div>';
+    return;
+  }
+
+  let html = '';
+  list.forEach(s => { html += renderStockRow(s); });
+  container.innerHTML = html;
+}
+
+function renderStockRow(s) {
+  const reserved = !!s.contract_id;
+  const label = (s.execution || '') + (s.execution && s.ip_class ? ' · ' : '') + (s.ip_class || '');
+  const stateCanManage = canManageAssemblies();
+
+  let badge = '';
+  if (reserved) {
+    const archived = !s.contract_is_active;
+    badge = '<span class="wh-reserve-badge' + (archived ? ' archived' : '') +
+            '" onclick="event.stopPropagation(); openContractFromWarehouse(' + s.contract_id + ')" title="' +
+            escapeHtml(archived ? 'Договор в архиве' : 'Перейти в договор') + '">' +
+            '<i class="ti ti-link"></i>' + escapeHtml(s.contract_number) +
+            (s.contractor_name ? ' · ' + escapeHtml(s.contractor_name) : '') +
+            '</span>';
+  } else {
+    badge = '<span class="wh-free-badge"><i class="ti ti-unlink"></i>свободна</span>';
+  }
+
+  // Действия — список зависит от прав и резерва
+  let actions = '';
+  if (stateCanManage) {
+    actions += '<button class="btn-icon-warning" onclick="event.stopPropagation(); promptWriteOff(' + s.id + ', ' + s.stock_qty + ')" title="Списать">' +
+               '<i class="ti ti-trash"></i></button>';
+  }
+
+  return '<div class="wh-stock-row" onclick="openAssemblyStock(' + s.id + ')">' +
+    '<div class="wh-stock-icon"><i class="ti ti-package"></i></div>' +
+    '<div class="wh-stock-body">' +
+      '<div class="wh-stock-title">' + escapeHtml(s.model_name) +
+        (s.model_code ? ' <span class="wh-code">' + escapeHtml(s.model_code) + '</span>' : '') +
+      '</div>' +
+      '<div class="wh-stock-meta">' +
+        (label ? '<span><i class="ti ti-tag"></i>' + escapeHtml(label) + '</span>' : '') +
+        '<span><i class="ti ti-calendar"></i>' + escapeHtml(s.assembly_date || '') + '</span>' +
+        badge +
+      '</div>' +
+    '</div>' +
+    '<div class="wh-stock-qty">' + s.stock_qty + ' шт.</div>' +
+    (actions ? '<div class="wh-stock-actions">' + actions + '</div>' : '') +
+    '</div>';
+}
+
+function setWarehouseFilter(f) {
+  state.warehouseFilter = f;
+  document.querySelectorAll('[data-wh-filter]').forEach(b => {
+    b.classList.toggle('active', b.dataset.whFilter === f);
+  });
+  loadWarehouseStock();
+}
+
+function onWarehouseSearchInput() {
+  const input = document.getElementById('wh-search');
+  if (!input) return;
+  clearTimeout(state.warehouseSearchTimer);
+  state.warehouseSearchTimer = setTimeout(() => {
+    state.warehouseSearch = input.value.trim();
+    loadWarehouseStock();
+  }, 300);
+}
+
+// Право управлять складом: мастер + директор (по аналогии с require_master_or_director)
+function canManageAssemblies() {
+  if (!state.user) return false;
+  const roles = state.user.roles || [];
+  return roles.includes('master') || roles.includes('director');
+}
+
+// --- Журнал движений ---
+
+async function loadWarehouseMovements() {
+  const container = document.getElementById('wh-movements-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем журнал…</div>';
+
+  try {
+    const params = new URLSearchParams();
+    if (state.movementsFilter !== 'all') params.set('direction', state.movementsFilter);
+    const d = await apiGet('/api/warehouse/movements' + (params.toString() ? '?' + params.toString() : ''));
+    cache.warehouseMovements = d;
+    renderWarehouseMovements(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить журнал: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderWarehouseMovements(d) {
+  const container = document.getElementById('wh-movements-list');
+  if (!container) return;
+  const list = d.movements || [];
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-history"></i>Под этот фильтр движений нет</div>';
+    return;
+  }
+  let html = '';
+  list.forEach(m => { html += renderMovementRow(m); });
+  container.innerHTML = html;
+}
+
+function renderMovementRow(m) {
+  const sign = m.direction === 'in' ? '+' : '−';
+  const cls = m.direction;
+  const ico = m.direction === 'in'        ? 'ti-arrow-down-right'
+           : m.direction === 'out'       ? 'ti-arrow-up-right'
+           : 'ti-trash';
+  const label = (m.a_execution || '') + (m.a_execution && m.a_ip_class ? ' · ' : '') + (m.a_ip_class || '');
+
+  return '<div class="wh-mov-row mov-' + cls + '" onclick="openAssemblyStock(' + m.assembly_id + ')">' +
+    '<div class="wh-mov-icon"><i class="ti ' + ico + '"></i></div>' +
+    '<div class="wh-mov-body">' +
+      '<div class="wh-mov-title">' + escapeHtml(m.model_name) +
+        (m.model_code ? ' <span class="wh-code">' + escapeHtml(m.model_code) + '</span>' : '') +
+      '</div>' +
+      '<div class="wh-mov-meta">' +
+        '<span class="wh-mov-dir-pill ' + cls + '">' + escapeHtml(m.direction_label) + '</span>' +
+        (label ? '<span><i class="ti ti-tag"></i>' + escapeHtml(label) + '</span>' : '') +
+        (m.contract_id ? '<span class="wh-reserve-badge" onclick="event.stopPropagation(); openContractFromWarehouse(' + m.contract_id + ')"><i class="ti ti-link"></i>' + escapeHtml(m.contract_number || '') + (m.contractor_name ? ' · ' + escapeHtml(m.contractor_name) : '') + '</span>' : '') +
+        (m.reason ? '<span><i class="ti ti-info-circle"></i>' + escapeHtml(m.reason) + '</span>' : '') +
+        '<span><i class="ti ti-clock"></i>' + escapeHtml((m.created_at || '').replace('T', ' ').substring(0, 16)) + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="wh-mov-qty ' + cls + '">' + sign + m.qty + '</div>' +
+    '</div>';
+}
+
+function setMovementsFilter(f) {
+  state.movementsFilter = f;
+  document.querySelectorAll('[data-wh-mov]').forEach(b => {
+    b.classList.toggle('active', b.dataset.whMov === f);
+  });
+  loadWarehouseMovements();
+}
+
+// --- Действия со склада ---
+
+function openContractFromWarehouse(contractId) {
+  if (!contractId) return;
+  state.currentContractId = contractId;
+  selectSection('sales');
+  selectSidebarItem('sales-contract-detail');
+}
+
+async function openAssemblyStock(assemblyId) {
+  // Открываем модалку с историей движений (минималистично, без отдельного экрана)
+  try {
+    const d = await apiGet('/api/assemblies/' + assemblyId + '/stock');
+    showAssemblyStockModal(d);
+  } catch (e) {
+    showToast('Не удалось загрузить карточку сборки', 'error');
+  }
+}
+
+function showAssemblyStockModal(d) {
+  const a = d.assembly;
+  const movs = d.movements || [];
+  const stateCanManage = canManageAssemblies();
+
+  let movsHtml = '';
+  if (!movs.length) {
+    movsHtml = '<div class="empty-block" style="padding: 16px;"><i class="ti ti-history"></i>История пуста</div>';
+  } else {
+    movs.forEach(m => {
+      const sign = m.direction === 'in' ? '+' : '−';
+      movsHtml += '<div class="mov-mini mov-' + m.direction + '">' +
+        '<div class="mov-mini-sign">' + sign + m.qty + '</div>' +
+        '<div class="mov-mini-body">' +
+          '<div class="mov-mini-title">' + escapeHtml(m.direction_label) +
+            (m.contract_number ? ' · договор ' + escapeHtml(m.contract_number) : '') +
+          '</div>' +
+          '<div class="mov-mini-meta">' +
+            (m.reason ? escapeHtml(m.reason) + ' · ' : '') +
+            escapeHtml((m.created_at || '').replace('T', ' ').substring(0, 16)) +
+          '</div>' +
+        '</div></div>';
+    });
+  }
+
+  let actionsHtml = '';
+  if (stateCanManage) {
+    // Переключение статуса: показываем кнопки в зависимости от текущего состояния
+    if (a.status === 'in_progress') {
+      actionsHtml += '<button class="btn btn-primary" onclick="changeAssemblyStatus(' + a.id + ', \'ready\')"><i class="ti ti-check"></i> Перевести в Готова (на склад)</button>';
+    }
+    if (a.stock_qty > 0) {
+      actionsHtml += '<button class="btn btn-danger btn-secondary" onclick="promptWriteOff(' + a.id + ', ' + a.stock_qty + ')"><i class="ti ti-trash"></i> Списать</button>';
+    }
+  }
+
+  const m = document.getElementById('assembly-stock-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeAssemblyStockModal()"></div>' +
+    '<div class="modal-body" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name) + '</h3>' +
+        '<button class="modal-close" onclick="closeAssemblyStockModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="as-info-grid">' +
+          '<div><span class="as-lbl">Статус:</span> <span class="status-pill st-' + a.status + '">' + escapeHtml(a.status_label) + '</span></div>' +
+          '<div><span class="as-lbl">Остаток:</span> <strong>' + a.stock_qty + ' шт.</strong></div>' +
+          (a.execution ? '<div><span class="as-lbl">Исполнение:</span> ' + escapeHtml(a.execution) + '</div>' : '') +
+          (a.ip_class ? '<div><span class="as-lbl">IP-класс:</span> ' + escapeHtml(a.ip_class) + '</div>' : '') +
+          '<div><span class="as-lbl">Дата сборки:</span> ' + escapeHtml(a.assembly_date || '—') + '</div>' +
+          (a.contract_id
+            ? '<div><span class="as-lbl">Договор:</span> <a href="#" onclick="event.preventDefault(); closeAssemblyStockModal(); openContractFromWarehouse(' + a.contract_id + ')" class="contract-link">' + escapeHtml(a.contract_number) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : '') + '</a></div>'
+            : '<div><span class="as-lbl">Договор:</span> <em>не привязан</em></div>') +
+        '</div>' +
+        (actionsHtml ? '<div class="as-actions">' + actionsHtml + '</div>' : '') +
+        '<div class="as-history-title">История движений</div>' +
+        '<div class="as-history-list">' + movsHtml + '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeAssemblyStockModal() {
+  document.getElementById('assembly-stock-modal').classList.remove('visible');
+}
+
+async function changeAssemblyStatus(assemblyId, newStatus) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/assemblies/' + assemblyId + '/status', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось изменить статус', 'error');
+      return;
+    }
+    showToast('Статус изменён', 'success');
+    closeAssemblyStockModal();
+    cache.warehouseStock = null;
+    cache.warehouseMovements = null;
+    if (state.currentScreen === 'warehouse-stock')     loadWarehouseStock();
+    if (state.currentScreen === 'warehouse-movements') loadWarehouseMovements();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function promptWriteOff(assemblyId, currentStock) {
+  const reason = prompt('Укажите причину списания (брак, бой и т.п.):');
+  if (reason === null) return;
+  if (!reason.trim()) {
+    showToast('Без причины списать нельзя', 'error');
+    return;
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/warehouse/movements', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({
+        assembly_id: assemblyId,
+        direction:   'write_off',
+        qty:         currentStock,
+        reason:      reason.trim(),
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось списать', 'error');
+      return;
+    }
+    showToast('Списано', 'success');
+    closeAssemblyStockModal();
+    cache.warehouseStock = null;
+    cache.warehouseMovements = null;
+    if (state.currentScreen === 'warehouse-stock')     loadWarehouseStock();
+    if (state.currentScreen === 'warehouse-movements') loadWarehouseMovements();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// --- Кнопка "Отгрузить по договору" — вызывается из карточки договора ---
+
+async function shipByContract(contractId) {
+  if (!confirm('Отгрузить все готовые сборки по этому договору?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/ship', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось отгрузить', 'error');
+      return;
+    }
+    const result = await r.json();
+    if (result.shipped > 0) {
+      showToast('Отгружено: ' + result.shipped + ' шт.' + (result.skipped > 0 ? ' (пропущено ' + result.skipped + ')' : ''), 'success');
+    } else {
+      showToast('На складе по этому договору ничего нет', 'info');
+    }
+    // Инвалидация всех связанных кешей и перерисовка
+    cache.warehouseStock = null;
+    cache.warehouseMovements = null;
+    if (cache.contractAssemblies) cache.contractAssemblies = {};
+    if (state.currentContractId) loadCurrentContract();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 async function changeContractStatus(contractId, newStatus) {
