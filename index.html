@@ -4584,6 +4584,356 @@
     background: white;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
+
+  /* ============ ЭТАП 22: ДОРАБОТКИ — ЗАМЕЧАНИЯ ============ */
+
+  /* Кнопка "Добавить замечание" на публичной странице */
+  .public-add-defect-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    color: white;
+    border: none;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 18px;
+    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+    transition: transform 0.12s, box-shadow 0.15s;
+  }
+  .public-add-defect-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.4);
+  }
+  .public-add-defect-btn i { font-size: 18px; }
+
+  /* Форма замечания */
+  .defect-form {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .defect-form .form-group label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin-bottom: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .defect-type-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .defect-type-pill {
+    border: 1.5px solid var(--border);
+    background: white;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .defect-type-pill:hover { border-color: var(--brand); color: var(--brand); }
+  .defect-type-pill.active.t-defect      { background: #FFEBEE; border-color: #DC2626; color: #DC2626; }
+  .defect-type-pill.active.t-issue       { background: #FFF4E6; border-color: #C18B00; color: #B25E00; }
+  .defect-type-pill.active.t-improvement { background: #E8F5E9; border-color: #16A34A; color: #15803D; }
+  .defect-type-pill.active.t-question    { background: #E8EEF7; border-color: #2C5282; color: #2C5282; }
+
+  /* Загрузка фото */
+  .photo-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .photo-upload-area:hover {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .photo-upload-area i {
+    font-size: 32px;
+    color: var(--text-light);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .photo-upload-area .upload-hint {
+    color: var(--text-light);
+    font-size: 12.5px;
+  }
+  .photo-previews {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .photo-preview {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .photo-preview img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .photo-preview-remove {
+    position: absolute;
+    top: 4px; right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 22px; height: 22px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .photo-preview-remove:hover { background: var(--danger); }
+
+  /* Success-сообщение */
+  .defect-form-success {
+    text-align: center;
+    padding: 24px 16px;
+  }
+  .defect-form-success i {
+    font-size: 56px;
+    color: #16A34A;
+    display: block;
+    margin-bottom: 12px;
+  }
+  .defect-form-success h3 {
+    font-size: 16px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .defect-form-success p {
+    color: var(--text-light);
+    font-size: 13.5px;
+    line-height: 1.4;
+  }
+
+  /* Список замечаний в CRM */
+  .defect-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .defect-row:hover {
+    border-color: var(--brand);
+    box-shadow: 0 2px 8px rgba(15, 30, 60, 0.06);
+  }
+  .defect-row-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .defect-type-badge,
+  .defect-status-badge {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .defect-type-badge.t-defect      { background: #FFEBEE; color: #DC2626; }
+  .defect-type-badge.t-issue       { background: #FFF4E6; color: #B25E00; }
+  .defect-type-badge.t-improvement { background: #E8F5E9; color: #15803D; }
+  .defect-type-badge.t-question    { background: #E8EEF7; color: #2C5282; }
+  .defect-status-badge.s-new         { background: var(--brand); color: white; }
+  .defect-status-badge.s-in_progress { background: #FFF4E6; color: #B25E00; }
+  .defect-status-badge.s-resolved    { background: #E8F5E9; color: #15803D; }
+  .defect-status-badge.s-rejected    { background: var(--bg); color: var(--text-light); }
+  .defect-row-target {
+    font-size: 13px;
+    color: var(--text-light);
+    flex: 1;
+    min-width: 0;
+  }
+  .defect-row-desc {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .defect-row-meta {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  .defect-row-meta i { font-size: 13px; vertical-align: -2px; }
+
+  /* Детальная карточка */
+  .defect-detail {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 16px;
+  }
+  .defect-detail-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .defect-detail-desc {
+    background: var(--bg);
+    padding: 14px 16px;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin-bottom: 16px;
+  }
+  .defect-detail-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .defect-detail-info-item {
+    background: var(--bg);
+    padding: 10px 14px;
+    border-radius: 8px;
+  }
+  .defect-detail-info-label {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .defect-detail-info-value {
+    font-size: 13.5px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .defect-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .defect-photo-thumb {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    transition: transform 0.12s, box-shadow 0.15s;
+  }
+  .defect-photo-thumb:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .defect-photo-thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .defect-status-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Лайтбокс для фото */
+  .photo-lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .photo-lightbox.visible { display: flex; }
+  .photo-lightbox img {
+    max-width: 95vw;
+    max-height: 90vh;
+    border-radius: 8px;
+  }
+  .photo-lightbox-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Виджет на Главной */
+  .defects-widget {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .defects-widget-cell {
+    text-align: center;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .defects-widget-cell:hover { background: var(--bg); }
+  .defects-widget-cell .num {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .defects-widget-cell .lbl {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+  }
+  .defects-widget-cell.s-new .num         { color: var(--brand); }
+  .defects-widget-cell.s-in_progress .num { color: #B25E00; }
+  .defects-widget-cell.s-resolved .num    { color: #15803D; }
+  .defects-widget-cell.s-rejected .num    { color: var(--text-light); }
+  /* ============ КОНЕЦ ДОРАБОТКИ ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -4671,6 +5021,9 @@
       <button class="section-tab" data-section="supply">
         <i class="ti ti-shopping-cart"></i>Снабжение
       </button>
+      <button class="section-tab" data-section="defects">
+        <i class="ti ti-alert-circle"></i>Доработки
+      </button>
       <button class="section-tab" data-section="hr">
         <i class="ti ti-id-badge"></i>Кадры
       </button>
@@ -4700,6 +5053,7 @@
     <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
     <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
     <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
+    <button data-section="defects"><i class="ti ti-alert-circle"></i>Доработки</button>
     <button data-section="hr"><i class="ti ti-id-badge"></i>Кадры</button>
     <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
   </nav>
@@ -4881,6 +5235,43 @@
         <div class="user-info-block">
           <div class="un" id="sb-username-supply">—</div>
           <div class="ur" id="sb-userrole-supply">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atom CRM<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- SIDEBAR ДОРАБОТКИ (Этап 22) -->
+    <aside class="sidebar" id="sidebar-defects" data-section="defects" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-alert-circle"></i> Доработки
+      </div>
+      <div class="sidebar-nav">
+        <div class="nav-section-label">ЗАМЕЧАНИЯ</div>
+        <button class="nav-item active" data-nav="defects-list" onclick="selectSidebarItem('defects-list')">
+          <i class="ti ti-list"></i><span>Все</span>
+        </button>
+        <button class="nav-item" data-nav="defects-list-new" onclick="selectSidebarItem('defects-list-new')">
+          <i class="ti ti-bell"></i><span>Новые</span>
+        </button>
+        <button class="nav-item" data-nav="defects-list-progress" onclick="selectSidebarItem('defects-list-progress')">
+          <i class="ti ti-progress"></i><span>В работе</span>
+        </button>
+        <button class="nav-item" data-nav="defects-list-resolved" onclick="selectSidebarItem('defects-list-resolved')">
+          <i class="ti ti-check"></i><span>Решённые</span>
+        </button>
+        <button class="nav-item" data-nav="defects-list-rejected" onclick="selectSidebarItem('defects-list-rejected')">
+          <i class="ti ti-x"></i><span>Отклонённые</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-defects">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-defects">—</div>
+          <div class="ur" id="sb-userrole-defects">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
@@ -6020,6 +6411,51 @@
         </div>
       </div>
 
+      <!-- ============ РАЗДЕЛ ДОРАБОТКИ (Этап 22) ============ -->
+
+      <!-- СПИСОК ЗАМЕЧАНИЙ -->
+      <div class="screen" data-screen="defects-list" data-section="defects">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-alert-circle"></i>
+              <h1 id="defects-list-title">Все замечания</h1>
+              <span class="page-counter" id="defects-counter">0</span>
+            </div>
+          </div>
+          <div id="defects-list-content">
+            <div class="loading-block">Загружаем…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ДЕТАЛИ ЗАМЕЧАНИЯ -->
+      <div class="screen" data-screen="defects-detail" data-section="defects">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('defects-list')"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="dd-mobile-title">Замечание</h2>
+        </div>
+        <div class="page-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button class="icon-btn" onclick="selectSidebarItem('defects-list')"><i class="ti ti-arrow-left"></i></button>
+            <div>
+              <h1 id="dd-title">Замечание</h1>
+              <div class="page-subtitle" id="dd-subtitle">—</div>
+            </div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" id="dd-delete-btn" onclick="deleteCurrentDefect()" style="color: var(--danger);">
+              <i class="ti ti-trash"></i> Удалить
+            </button>
+          </div>
+        </div>
+        <div class="content-inner" id="dd-content" style="max-width: 900px;">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- ============ КОНЕЦ РАЗДЕЛА ДОРАБОТКИ ============ -->
+
       <!-- ============ РАЗДЕЛ КАДРЫ (Этап 20) ============ -->
 
       <!-- ТАЙМЛАЙН -->
@@ -6361,6 +6797,15 @@
 <!-- ============ ЭТАП 21: МОДАЛКА QR-КОДА ============ -->
 <div class="modal-overlay" id="qr-modal" onclick="closeQrModal()"></div>
 
+<!-- ============ ЭТАП 22: МОДАЛКА ФОРМЫ ЗАМЕЧАНИЯ (публичная) ============ -->
+<div class="modal-overlay" id="defect-form-modal" onclick="closeDefectForm()"></div>
+
+<!-- Лайтбокс для просмотра фото -->
+<div class="photo-lightbox" id="photo-lightbox" onclick="closePhotoLightbox()">
+  <button class="photo-lightbox-close" onclick="closePhotoLightbox()"><i class="ti ti-x"></i></button>
+  <img id="photo-lightbox-img" src="" alt="">
+</div>
+
 <!-- ============ Фуллскрин сканер QR ============ -->
 <div class="qr-scanner-overlay" id="qr-scanner-overlay">
   <div class="qr-scanner-header">
@@ -6399,7 +6844,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.3.6-qr-fallbacks";
+const APP_VERSION = "v2.4.0-defects";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -6417,6 +6862,7 @@ const SECTION_CONFIG = {
   warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-stock' },     // ЭТАП 18
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
   supply:     { sidebar: 'sidebar-supply',     defaultScreen: 'supply-requests' },    // ЭТАП 19
+  defects:    { sidebar: 'sidebar-defects',    defaultScreen: 'defects-list' },       // ЭТАП 22
   hr:         { sidebar: 'sidebar-hr',         defaultScreen: 'hr-vacations-timeline' }, // ЭТАП 20
   help:       { sidebar: 'sidebar-help',       defaultScreen: 'help-knowledge' },
 };
@@ -6808,9 +7254,18 @@ function selectSection(sectionName) {
 function selectSidebarItem(screenName) {
   state.currentScreen = screenName;
 
+  // ЭТАП 22: алиасы для экранов с фильтрами (все varианты defects-list-* идут на один экран)
+  const SCREEN_ALIASES = {
+    'defects-list-new':      'defects-list',
+    'defects-list-progress': 'defects-list',
+    'defects-list-resolved': 'defects-list',
+    'defects-list-rejected': 'defects-list',
+  };
+  const targetScreen = SCREEN_ALIASES[screenName] || screenName;
+
   // Скрываем все экраны
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const screen = document.querySelector('.screen[data-screen="' + screenName + '"]');
+  const screen = document.querySelector('.screen[data-screen="' + targetScreen + '"]');
   if (screen) screen.classList.add('active');
 
   // Подсветка sidebar (только нужного раздела)
@@ -6872,6 +7327,12 @@ function selectSidebarItem(screenName) {
   if (screenName === 'hr-vacations-list')     loadHrList();
   if (screenName === 'hr-vacations-calendar') loadHrCalendar();
   if (screenName === 'sales-offer-form') initOfferForm();
+  // ЭТАП 22: Доработки
+  if (screenName === 'defects-list')          { state.defectsFilter = 'all';         loadDefectsList(); }
+  if (screenName === 'defects-list-new')      { state.defectsFilter = 'new';         loadDefectsList(); }
+  if (screenName === 'defects-list-progress') { state.defectsFilter = 'in_progress'; loadDefectsList(); }
+  if (screenName === 'defects-list-resolved') { state.defectsFilter = 'resolved';    loadDefectsList(); }
+  if (screenName === 'defects-list-rejected') { state.defectsFilter = 'rejected';    loadDefectsList(); }
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
   if (screenName === 'sales-more') renderSalesMore();
@@ -16072,13 +16533,13 @@ async function showPublicAssembly(token) {
       return;
     }
     const a = await r.json();
-    body.innerHTML = renderPublicAssemblyCard(a);
+    body.innerHTML = renderPublicAssemblyCard(a, token);
   } catch (e) {
     body.innerHTML = renderPublicError('network');
   }
 }
 
-function renderPublicAssemblyCard(a) {
+function renderPublicAssemblyCard(a, token) {
   const headerSub = a.contract_number
     ? '<i class="ti ti-link"></i> По договору ' + escapeHtml(a.contract_number) +
       (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : '')
@@ -16131,7 +16592,11 @@ function renderPublicAssemblyCard(a) {
     '<h1 class="public-header-title">' + escapeHtml(a.model_name || 'Сборка') + '</h1>' +
     '<div class="public-header-sub">' + headerSub + '</div>' +
   '</div>' +
-  '<div class="public-body">' + rows + movHtml + '</div>' +
+  '<div class="public-body">' + rows + movHtml +
+    '<button class="public-add-defect-btn" onclick="openDefectForm(\'assembly\', \'' + token + '\')">' +
+      '<i class="ti ti-alert-circle"></i> Сообщить о замечании' +
+    '</button>' +
+  '</div>' +
   '<div class="public-footer">' +
     'Внутренняя CRM-система ООО «Атомус Групп»' +
   '</div>';
@@ -16153,13 +16618,13 @@ async function showPublicContract(token) {
       return;
     }
     const c = await r.json();
-    body.innerHTML = renderPublicContractCard(c);
+    body.innerHTML = renderPublicContractCard(c, token);
   } catch (e) {
     body.innerHTML = renderPublicError('network');
   }
 }
 
-function renderPublicContractCard(c) {
+function renderPublicContractCard(c, token) {
   let rows = '';
   const addRow = (label, value) => {
     if (!value) return;
@@ -16198,7 +16663,11 @@ function renderPublicContractCard(c) {
     '<h1 class="public-header-title">Договор ' + escapeHtml(c.number || '') + '</h1>' +
     '<div class="public-header-sub"><i class="ti ti-file-text"></i> ' + escapeHtml(c.contractor_name || '') + '</div>' +
   '</div>' +
-  '<div class="public-body">' + rows + asmHtml + '</div>' +
+  '<div class="public-body">' + rows + asmHtml +
+    '<button class="public-add-defect-btn" onclick="openDefectForm(\'contract\', \'' + token + '\')">' +
+      '<i class="ti ti-alert-circle"></i> Сообщить о замечании' +
+    '</button>' +
+  '</div>' +
   '<div class="public-footer">' +
     'Внутренняя CRM-система ООО «Атомус Групп»' +
   '</div>';
@@ -16731,6 +17200,403 @@ async function openContractByPublicToken(token) {
   } catch (e) {
     showToast('Ошибка загрузки', 'error');
   }
+}
+
+
+// ============================================================
+// ============ ЭТАП 22: ДОРАБОТКИ (замечания) ============
+// ============================================================
+
+state.defectsFilter = 'all';  // all | new | in_progress | resolved | rejected
+state._defectFormState = null;
+state.currentDefectId = null;
+
+const DEFECT_TYPE_LABELS = {
+  defect:      { label: 'Дефект',    icon: 'ti-bug',          cls: 't-defect' },
+  issue:       { label: 'Замечание', icon: 'ti-alert-circle', cls: 't-issue' },
+  improvement: { label: 'Улучшение', icon: 'ti-bulb',         cls: 't-improvement' },
+  question:    { label: 'Вопрос',    icon: 'ti-help-circle',  cls: 't-question' },
+};
+
+// --------- Публичная форма (вызывается с публичной страницы) ---------
+
+function openDefectForm(targetType, token) {
+  // targetType: 'assembly' | 'contract'
+  state._defectFormState = {
+    targetType,
+    token,
+    type: 'defect',
+    description: '',
+    author_name: '',
+    author_phone: '',
+    location: '',
+    photos: [],   // [{file, dataUrl}]
+  };
+  const m = document.getElementById('defect-form-modal');
+  if (!m) return;
+  m.innerHTML = renderDefectFormHtml();
+  m.classList.add('visible');
+}
+
+function closeDefectForm() {
+  const m = document.getElementById('defect-form-modal');
+  if (m) m.classList.remove('visible');
+  state._defectFormState = null;
+}
+
+function renderDefectFormHtml() {
+  const s = state._defectFormState;
+  if (!s) return '';
+  let typeTabs = '';
+  Object.entries(DEFECT_TYPE_LABELS).forEach(([k, v]) => {
+    const active = s.type === k ? ' active ' + v.cls : '';
+    typeTabs += '<button class="defect-type-pill' + active + '" onclick="setDefectType(\'' + k + '\')"><i class="ti ' + v.icon + '"></i>' + v.label + '</button>';
+  });
+
+  let photoPreviews = '';
+  s.photos.forEach((p, i) => {
+    photoPreviews += '<div class="photo-preview">' +
+      '<img src="' + p.dataUrl + '" alt="">' +
+      '<button class="photo-preview-remove" onclick="removeDefectPhoto(' + i + ')" type="button">×</button>' +
+    '</div>';
+  });
+
+  return '<div class="modal" onclick="event.stopPropagation()" style="max-width: 520px;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-alert-circle"></i> Новое замечание</h3>' +
+      '<button class="modal-close" onclick="closeDefectForm()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div class="modal-content">' +
+      '<div class="defect-form">' +
+        '<div class="form-group"><label>Тип</label><div class="defect-type-tabs">' + typeTabs + '</div></div>' +
+        '<div class="form-group"><label>Описание *</label>' +
+          '<textarea id="def-description" rows="4" placeholder="Что не так? Например: «Не хватает заземляющего болта»" oninput="state._defectFormState.description = this.value">' + escapeHtml(s.description) + '</textarea>' +
+        '</div>' +
+        '<div class="form-group"><label>Фото (до 5)</label>' +
+          '<label class="photo-upload-area">' +
+            '<input type="file" accept="image/*" multiple style="display:none;" onchange="addDefectPhotos(this)">' +
+            '<i class="ti ti-camera-plus"></i>' +
+            '<div>Добавить фото</div>' +
+            '<div class="upload-hint">JPG/PNG/HEIC, до 8 МБ</div>' +
+          '</label>' +
+          (photoPreviews ? '<div class="photo-previews">' + photoPreviews + '</div>' : '') +
+        '</div>' +
+        '<div class="form-group"><label>Где найдено (опционально)</label>' +
+          '<input type="text" placeholder="например: ТП-3 на объекте Невский" value="' + escapeHtml(s.location) + '" oninput="state._defectFormState.location = this.value">' +
+        '</div>' +
+        '<div class="form-group"><label>Ваше имя (опционально)</label>' +
+          '<input type="text" placeholder="Иванов И.И." value="' + escapeHtml(s.author_name) + '" oninput="state._defectFormState.author_name = this.value">' +
+        '</div>' +
+        '<div class="form-group"><label>Телефон (опционально)</label>' +
+          '<input type="tel" placeholder="+7..." value="' + escapeHtml(s.author_phone) + '" oninput="state._defectFormState.author_phone = this.value">' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="closeDefectForm()">Отмена</button>' +
+      '<button class="btn btn-primary" onclick="submitDefectReport()"><i class="ti ti-send"></i> Отправить</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function setDefectType(t) {
+  if (!state._defectFormState) return;
+  state._defectFormState.type = t;
+  // Перерисуем только tabs (а не всю модалку — чтобы текст в полях сохранился)
+  const m = document.getElementById('defect-form-modal');
+  if (!m) return;
+  const tabs = m.querySelector('.defect-type-tabs');
+  if (!tabs) return;
+  let html = '';
+  Object.entries(DEFECT_TYPE_LABELS).forEach(([k, v]) => {
+    const active = state._defectFormState.type === k ? ' active ' + v.cls : '';
+    html += '<button class="defect-type-pill' + active + '" onclick="setDefectType(\'' + k + '\')"><i class="ti ' + v.icon + '"></i>' + v.label + '</button>';
+  });
+  tabs.innerHTML = html;
+}
+
+function addDefectPhotos(input) {
+  if (!input.files || !input.files.length) return;
+  if (!state._defectFormState) return;
+  const remaining = 5 - state._defectFormState.photos.length;
+  const files = Array.from(input.files).slice(0, remaining);
+  let processed = 0;
+  files.forEach(file => {
+    if (file.size > 8 * 1024 * 1024) {
+      alert('Фото "' + file.name + '" слишком большое (макс 8 МБ)');
+      processed++;
+      if (processed === files.length) input.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state._defectFormState.photos.push({ file, dataUrl: e.target.result });
+      processed++;
+      if (processed === files.length) {
+        input.value = '';
+        // Перерисуем превью
+        rerenderDefectPhotoPreviews();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeDefectPhoto(idx) {
+  if (!state._defectFormState) return;
+  state._defectFormState.photos.splice(idx, 1);
+  rerenderDefectPhotoPreviews();
+}
+
+function rerenderDefectPhotoPreviews() {
+  const m = document.getElementById('defect-form-modal');
+  if (!m) return;
+  const area = m.querySelector('.photo-upload-area');
+  if (!area || !area.parentNode) return;
+  // Удалим существующее .photo-previews если есть
+  const existing = area.parentNode.querySelector('.photo-previews');
+  if (existing) existing.remove();
+  const s = state._defectFormState;
+  if (!s.photos.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'photo-previews';
+  s.photos.forEach((p, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'photo-preview';
+    cell.innerHTML = '<img src="' + p.dataUrl + '" alt="">' +
+      '<button class="photo-preview-remove" onclick="removeDefectPhoto(' + i + ')" type="button">×</button>';
+    wrap.appendChild(cell);
+  });
+  area.parentNode.appendChild(wrap);
+}
+
+async function submitDefectReport() {
+  const s = state._defectFormState;
+  if (!s) return;
+  const desc = (s.description || '').trim();
+  if (!desc) { showToast('Опишите замечание', 'error'); return; }
+
+  const fd = new FormData();
+  fd.append('description', desc);
+  fd.append('type', s.type);
+  if (s.targetType === 'assembly') fd.append('assembly_token', s.token);
+  else if (s.targetType === 'contract') fd.append('contract_token', s.token);
+  if (s.author_name) fd.append('author_name', s.author_name);
+  if (s.author_phone) fd.append('author_phone', s.author_phone);
+  if (s.location) fd.append('location', s.location);
+  s.photos.forEach((p, i) => fd.append('photo_' + (i + 1), p.file, p.file.name));
+
+  try {
+    const r = await fetch(API_BASE + '/api/public/defects', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось отправить', 'error');
+      return;
+    }
+    // Успех — показываем благодарность
+    const m = document.getElementById('defect-form-modal');
+    m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width: 420px;">' +
+      '<div class="modal-content">' +
+        '<div class="defect-form-success">' +
+          '<i class="ti ti-circle-check-filled"></i>' +
+          '<h3>Замечание отправлено</h3>' +
+          '<p>Спасибо! Мы рассмотрим замечание и при необходимости свяжемся с вами.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-primary" onclick="closeDefectForm()" style="width: 100%;">Закрыть</button>' +
+      '</div>' +
+    '</div>';
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// --------- Раздел Доработки в CRM ---------
+
+async function loadDefectsList() {
+  const container = document.getElementById('defects-list-content');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  const titleEl = document.getElementById('defects-list-title');
+  const counter = document.getElementById('defects-counter');
+
+  const filter = state.defectsFilter || 'all';
+  const titles = {
+    all: 'Все замечания',
+    new: 'Новые',
+    in_progress: 'В работе',
+    resolved: 'Решённые',
+    rejected: 'Отклонённые',
+  };
+  if (titleEl) titleEl.textContent = titles[filter] || 'Замечания';
+
+  try {
+    const q = filter === 'all' ? '' : '?status=' + filter;
+    const d = await apiGet('/api/defects' + q);
+    const list = d.defects || [];
+    if (counter) counter.textContent = list.length;
+    if (!list.length) {
+      container.innerHTML = '<div class="empty-block"><i class="ti ti-mood-empty"></i>Замечаний пока нет</div>';
+      return;
+    }
+    container.innerHTML = list.map(renderDefectRow).join('');
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
+  }
+}
+
+function renderDefectRow(d) {
+  const typeInfo = DEFECT_TYPE_LABELS[d.type] || DEFECT_TYPE_LABELS.defect;
+  const target = d.assembly_id
+    ? '🔧 ' + escapeHtml(d.model_name || 'Сборка #' + d.assembly_id) + (d.model_article ? ' · ' + escapeHtml(d.model_article) : '')
+    : (d.contract_id ? '📄 Договор ' + escapeHtml(d.contract_number || '#' + d.contract_id) : '—');
+  const date = (d.created_at || '').replace('T', ' ').slice(0, 16);
+  return '<div class="defect-row" onclick="openDefectDetail(' + d.id + ')">' +
+    '<div class="defect-row-head">' +
+      '<span class="defect-type-badge ' + typeInfo.cls + '">' + typeInfo.label + '</span>' +
+      '<span class="defect-status-badge s-' + d.status + '">' + escapeHtml(d.status_label) + '</span>' +
+      '<span class="defect-row-target">' + target + '</span>' +
+    '</div>' +
+    '<div class="defect-row-desc">' + escapeHtml(d.description) + '</div>' +
+    '<div class="defect-row-meta">' +
+      (d.author_name ? '<span><i class="ti ti-user"></i> ' + escapeHtml(d.author_name) + '</span>' : '') +
+      (d.author_phone ? '<span><i class="ti ti-phone"></i> ' + escapeHtml(d.author_phone) + '</span>' : '') +
+      (d.location ? '<span><i class="ti ti-map-pin"></i> ' + escapeHtml(d.location) + '</span>' : '') +
+      (d.photos_count ? '<span><i class="ti ti-photo"></i> ' + d.photos_count + ' фото</span>' : '') +
+      '<span><i class="ti ti-clock"></i> ' + escapeHtml(date) + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
+async function openDefectDetail(id) {
+  state.currentDefectId = id;
+  selectSidebarItem('defects-detail');
+  const content = document.getElementById('dd-content');
+  if (content) content.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/defects/' + id);
+    renderDefectDetail(d);
+  } catch (e) {
+    if (content) content.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
+  }
+}
+
+function renderDefectDetail(d) {
+  const titleEl = document.getElementById('dd-title');
+  const subEl = document.getElementById('dd-subtitle');
+  const mobileTitle = document.getElementById('dd-mobile-title');
+  if (titleEl) titleEl.textContent = (DEFECT_TYPE_LABELS[d.type] || {label: 'Замечание'}).label + ' #' + d.id;
+  if (mobileTitle) mobileTitle.textContent = (DEFECT_TYPE_LABELS[d.type] || {label: 'Замечание'}).label;
+  if (subEl) subEl.textContent = (d.created_at || '').replace('T', ' ').slice(0, 16);
+
+  const typeInfo = DEFECT_TYPE_LABELS[d.type] || DEFECT_TYPE_LABELS.defect;
+  const content = document.getElementById('dd-content');
+  if (!content) return;
+
+  // Поля
+  let info = '';
+  const addInfo = (label, value) => {
+    if (!value) return;
+    info += '<div class="defect-detail-info-item">' +
+      '<div class="defect-detail-info-label">' + label + '</div>' +
+      '<div class="defect-detail-info-value">' + value + '</div>' +
+    '</div>';
+  };
+  if (d.assembly_id) addInfo('Сборка', '<a href="#" onclick="event.preventDefault(); openAssemblyStock(' + d.assembly_id + ')" style="color: var(--brand); font-weight: 600;">' + escapeHtml(d.model_name || ('#' + d.assembly_id)) + (d.model_article ? ' · ' + escapeHtml(d.model_article) : '') + '</a>');
+  if (d.contract_id) addInfo('Договор', '<a href="#" onclick="event.preventDefault(); state.currentContractId=' + d.contract_id + '; selectSection(\'sales\'); selectSidebarItem(\'sales-contract-detail\');" style="color: var(--brand); font-weight: 600;">' + escapeHtml(d.contract_number || '#' + d.contract_id) + (d.contractor_name ? ' · ' + escapeHtml(d.contractor_name) : '') + '</a>');
+  if (d.location) addInfo('Где найдено', escapeHtml(d.location));
+  if (d.author_name) addInfo('Имя', escapeHtml(d.author_name));
+  if (d.author_phone) addInfo('Телефон', escapeHtml(d.author_phone));
+  if (d.assignee_name) addInfo('Ответственный', escapeHtml(d.assignee_name));
+
+  let photos = '';
+  if (d.photos && d.photos.length) {
+    photos = '<div class="defect-photos-grid">' +
+      d.photos.map(p => '<div class="defect-photo-thumb" onclick="openPhotoLightbox(\'' + (API_BASE + p.url) + '\')"><img src="' + API_BASE + p.url + '" loading="lazy" alt=""></div>').join('') +
+    '</div>';
+  }
+
+  // Кнопки смены статуса
+  const canManage = state.user && (state.user.is_director || state.user.role === 'director' || state.user.role === 'zam' ||
+    (state.user.roles && (state.user.roles.includes('director') || state.user.roles.includes('zam'))));
+  let actions = '';
+  if (canManage) {
+    const buttons = [];
+    if (d.status !== 'in_progress') buttons.push('<button class="btn btn-secondary" onclick="changeDefectStatus(\'in_progress\')"><i class="ti ti-progress"></i> В работу</button>');
+    if (d.status !== 'resolved') buttons.push('<button class="btn btn-success" onclick="changeDefectStatus(\'resolved\')"><i class="ti ti-check"></i> Решено</button>');
+    if (d.status !== 'rejected') buttons.push('<button class="btn btn-secondary" onclick="changeDefectStatus(\'rejected\')" style="color: var(--danger);"><i class="ti ti-x"></i> Отклонить</button>');
+    if (d.status !== 'new') buttons.push('<button class="btn btn-secondary" onclick="changeDefectStatus(\'new\')"><i class="ti ti-rewind-backward-5"></i> Вернуть в Новые</button>');
+    actions = '<div class="defect-status-actions">' + buttons.join('') + '</div>';
+  }
+
+  content.innerHTML =
+    '<div class="defect-detail">' +
+      '<div class="defect-detail-head">' +
+        '<span class="defect-type-badge ' + typeInfo.cls + '">' + typeInfo.label + '</span>' +
+        '<span class="defect-status-badge s-' + d.status + '">' + escapeHtml(d.status_label) + '</span>' +
+      '</div>' +
+      '<div class="defect-detail-desc">' + escapeHtml(d.description) + '</div>' +
+      (info ? '<div class="defect-detail-info">' + info + '</div>' : '') +
+      (photos ? '<div class="defect-detail-info-label" style="margin-top: 16px; margin-bottom: 10px;">ФОТО</div>' + photos : '') +
+      (d.resolution_note ? '<div class="defect-detail-info-label" style="margin-top: 16px; margin-bottom: 6px;">КОММЕНТАРИЙ</div><div class="defect-detail-desc" style="background: #FFF4E6;">' + escapeHtml(d.resolution_note) + '</div>' : '') +
+      actions +
+    '</div>';
+}
+
+async function changeDefectStatus(newStatus) {
+  if (!state.currentDefectId) return;
+  let note = '';
+  if (newStatus === 'resolved' || newStatus === 'rejected') {
+    note = prompt(newStatus === 'resolved' ? 'Комментарий что сделано (опционально):' : 'Причина отклонения (опционально):') || '';
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/defects/' + state.currentDefectId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ status: newStatus, resolution_note: note }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось изменить статус', 'error');
+      return;
+    }
+    showToast('Статус изменён', 'success');
+    openDefectDetail(state.currentDefectId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteCurrentDefect() {
+  if (!state.currentDefectId) return;
+  if (!confirm('Удалить замечание?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/defects/' + state.currentDefectId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    showToast('Удалено', 'success');
+    state.currentDefectId = null;
+    selectSidebarItem('defects-list');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// Лайтбокс
+function openPhotoLightbox(url) {
+  const lb = document.getElementById('photo-lightbox');
+  const img = document.getElementById('photo-lightbox-img');
+  if (img) img.src = url;
+  if (lb) lb.classList.add('visible');
+}
+function closePhotoLightbox() {
+  const lb = document.getElementById('photo-lightbox');
+  if (lb) lb.classList.remove('visible');
 }
 
 
