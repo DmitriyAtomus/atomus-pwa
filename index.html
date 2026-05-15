@@ -4697,6 +4697,63 @@
 
   /* ============ ЭТАП 22: ДОРАБОТКИ — ЗАМЕЧАНИЯ ============ */
 
+  /* ЭТАП 23: переключатель типа работы в форме */
+  .work-type-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  .work-type-pill {
+    border: 1.5px solid var(--border);
+    background: white;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .work-type-pill:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+  .work-type-pill.active {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+    color: var(--brand);
+    box-shadow: 0 1px 3px rgba(44, 82, 130, 0.1);
+  }
+  .work-type-pill i { font-size: 16px; }
+
+  /* Бейдж типа работы в карточке/списке */
+  .work-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    background: var(--brand-bg);
+    color: var(--brand);
+  }
+  .work-type-badge i { font-size: 12px; }
+  .work-type-badge.wt-repair        { background: #FFF4E6; color: #B25E00; }
+  .work-type-badge.wt-commissioning { background: #E8F5E9; color: #15803D; }
+  .work-type-badge.wt-installation  { background: #FFEBEE; color: #DC2626; }
+  .work-type-badge.wt-diagnostics   { background: #F3E8FF; color: #7C3AED; }
+  .work-type-badge.wt-design        { background: #DBEAFE; color: #1D4ED8; }
+  .work-type-badge.wt-maintenance   { background: #FEF3C7; color: #B45309; }
+  .work-type-badge.wt-other         { background: var(--bg); color: var(--text-light); }
+
   /* Кнопка "Добавить замечание" на публичной странице */
   .public-add-defect-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -5753,7 +5810,40 @@
 
         <div class="content-inner">
           <div id="new-assembly-form">
+
+            <!-- ЭТАП 23: Тип работы -->
             <div class="form-section">
+              <label class="form-label">Тип работы <span class="required">*</span></label>
+              <div class="work-type-tabs" id="work-type-tabs">
+                <button type="button" class="work-type-pill active" data-wt="assembly" onclick="setWorkType('assembly')">
+                  <i class="ti ti-tool"></i>Сборка
+                </button>
+                <button type="button" class="work-type-pill" data-wt="repair" onclick="setWorkType('repair')">
+                  <i class="ti ti-wrench"></i>Ремонт
+                </button>
+                <button type="button" class="work-type-pill" data-wt="commissioning" onclick="setWorkType('commissioning')">
+                  <i class="ti ti-settings-bolt"></i>Пусконаладка
+                </button>
+                <button type="button" class="work-type-pill" data-wt="installation" onclick="setWorkType('installation')">
+                  <i class="ti ti-hammer"></i>Монтаж
+                </button>
+                <button type="button" class="work-type-pill" data-wt="diagnostics" onclick="setWorkType('diagnostics')">
+                  <i class="ti ti-search"></i>Диагностика
+                </button>
+                <button type="button" class="work-type-pill" data-wt="design" onclick="setWorkType('design')">
+                  <i class="ti ti-ruler-measure"></i>Проектирование
+                </button>
+                <button type="button" class="work-type-pill" data-wt="maintenance" onclick="setWorkType('maintenance')">
+                  <i class="ti ti-tools"></i>ТО
+                </button>
+                <button type="button" class="work-type-pill" data-wt="other" onclick="setWorkType('other')">
+                  <i class="ti ti-dots"></i>Прочее
+                </button>
+              </div>
+            </div>
+
+            <!-- Модель — только для сборки -->
+            <div class="form-section" id="model-section">
               <label class="form-label">Модель <span class="required">*</span></label>
               <div class="model-selector" onclick="openModelModal()">
                 <div class="selected-model" id="selected-model-display">
@@ -5761,6 +5851,27 @@
                 </div>
                 <i class="ti ti-chevron-right"></i>
               </div>
+            </div>
+
+            <!-- Описание работы — для не-сборок -->
+            <div class="form-section" id="work-description-section" style="display: none;">
+              <label class="form-label">Что было сделано <span class="required">*</span></label>
+              <textarea id="na-description" rows="3" placeholder="Например: «Замена сгоревшего УЗО в щите автоматики», «Запуск приточной установки», «Замеры сопротивления изоляции»"
+                        oninput="state.newAssemblyForm.description = this.value"></textarea>
+            </div>
+
+            <!-- Локация — для всех типов кроме классической сборки -->
+            <div class="form-section" id="work-location-section" style="display: none;">
+              <label class="form-label">Где (объект, адрес)</label>
+              <input type="text" id="na-location" placeholder="Например: ТРЦ Невский Атриум, ТП-3"
+                     oninput="state.newAssemblyForm.location = this.value">
+            </div>
+
+            <!-- Часы работы — для не-сборок -->
+            <div class="form-section" id="work-hours-section" style="display: none;">
+              <label class="form-label">Часы работы (опционально)</label>
+              <input type="number" id="na-hours" min="0.25" max="24" step="0.25" placeholder="2.5"
+                     oninput="state.newAssemblyForm.hours_spent = parseFloat(this.value)">
             </div>
 
             <!-- ЭТАП 15: Назначение сборки — под договор или на склад -->
@@ -5922,6 +6033,12 @@
           <div class="page-actions">
             <button class="btn-icon-qr" id="scd-qr-btn" onclick="showContractQrFromDetail()" title="QR-код договора">
               <i class="ti ti-qrcode"></i> QR
+            </button>
+            <button class="btn-icon-qr" style="background: #FFF4E6; color: #B25E00;" onclick="openDefectFormForContract()" title="Добавить замечание по договору">
+              <i class="ti ti-alert-circle"></i> Доработка
+            </button>
+            <button class="btn-icon-qr" style="background: #E8F5E9; color: #15803D;" onclick="openShareWithInstallerForContract()" title="Отправить монтажнику">
+              <i class="ti ti-send"></i> Монтажнику
             </button>
             <button class="btn btn-secondary" onclick="openEditContract()"><i class="ti ti-edit"></i> Редактировать</button>
             <button class="btn btn-secondary" id="scd-delete-btn" onclick="deleteCurrentContract()" style="color: var(--danger);">
@@ -6967,7 +7084,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.4.4-mobile-tabs";
+const APP_VERSION = "v2.5.0-work-types";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -12350,7 +12467,14 @@ function initNewAssemblyForm() {
     quantity: 1, workerIds: [], dateMode: 'today', customDate: null, comment: '',
     contractId: null,            // ЭТАП 15: ID договора (NULL = на склад)
     contractLabel: '',           // короткое описание для UI: «№12-Д · ООО Иванов»
+    // ЭТАП 23: универсальные работы
+    workType: 'assembly',        // assembly | repair | commissioning | installation | diagnostics | design | maintenance | other
+    description: '',             // что было сделано (для не-сборок)
+    location: '',                // адрес/объект
+    hours_spent: null,           // часы
   };
+  // алиас для inline-обработчиков
+  state.newAssemblyForm = state.newAssembly;
   document.getElementById('submit-error').textContent = '';
   document.getElementById('qty-input').value = 1;
   document.getElementById('comment-input').value = '';
@@ -12370,8 +12494,57 @@ function initNewAssemblyForm() {
   document.querySelectorAll('.date-row .chip-option').forEach(c => c.classList.remove('selected'));
   document.querySelector('.date-row .chip-option[data-date="today"]').classList.add('selected');
 
+  // ЭТАП 23: сброс типа работы на «Сборка»
+  setWorkType('assembly');
+  const naDesc = document.getElementById('na-description'); if (naDesc) naDesc.value = '';
+  const naLoc  = document.getElementById('na-location');    if (naLoc)  naLoc.value = '';
+  const naHrs  = document.getElementById('na-hours');       if (naHrs)  naHrs.value = '';
+
   ensureModelsLoaded();
   loadActiveEmployees();
+}
+
+// ЭТАП 23: переключение типа работы
+function setWorkType(wt) {
+  if (!state.newAssembly) return;
+  state.newAssembly.workType = wt;
+  state.newAssemblyForm = state.newAssembly;
+  // Подсветка таблеток
+  document.querySelectorAll('.work-type-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.wt === wt);
+  });
+  const isAssembly = (wt === 'assembly');
+  // Показ/скрытие секций
+  const modelSec   = document.getElementById('model-section');
+  const descSec    = document.getElementById('work-description-section');
+  const locSec     = document.getElementById('work-location-section');
+  const hoursSec   = document.getElementById('work-hours-section');
+  const execSec    = document.getElementById('execution-section');
+  const ipSec      = document.getElementById('ip-section');
+  if (modelSec) modelSec.style.display = isAssembly ? '' : 'none';
+  if (descSec)  descSec.style.display  = isAssembly ? 'none' : '';
+  if (locSec)   locSec.style.display   = isAssembly ? 'none' : '';
+  if (hoursSec) hoursSec.style.display = isAssembly ? 'none' : '';
+  // Для не-сборок прячем исполнение/IP даже если ранее выбраны
+  if (!isAssembly) {
+    if (execSec) execSec.style.display = 'none';
+    if (ipSec)   ipSec.style.display   = 'none';
+  }
+  // Обновим заголовки/тексты
+  const headers = document.querySelectorAll('[data-screen="new-assembly"] h1, [data-screen="new-assembly"] h2');
+  const titles = {
+    assembly: 'Новая сборка', repair: 'Новый ремонт',
+    commissioning: 'Новая пусконаладка', installation: 'Новый монтаж',
+    diagnostics: 'Новая диагностика', design: 'Новое проектирование',
+    maintenance: 'Новое ТО', other: 'Новая работа',
+  };
+  const title = titles[wt] || 'Новая работа';
+  headers.forEach(h => { if (h.id !== 'na-contract-meta') h.textContent = title; });
+  // Подпись «куда идёт сборка» — только для assembly
+  const destLabel = document.querySelector('[data-screen="new-assembly"] label[for]');
+  // Кнопка отправки текст
+  const submitBtn = document.querySelector('[data-screen="new-assembly"] .btn-primary');
+  if (submitBtn) submitBtn.innerHTML = '<i class="ti ti-check"></i> Сохранить';
 }
 
 async function ensureModelsLoaded() {
@@ -12606,11 +12779,19 @@ async function submitAssembly() {
   errEl.textContent = '';
 
   const a = state.newAssembly;
-  if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
-  if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
-  if (a.model.needs_ip && !a.ipClass) { errEl.textContent = 'Укажите IP-класс'; return; }
+  const isAssembly = (a.workType || 'assembly') === 'assembly';
+  if (isAssembly) {
+    if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
+    if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
+    if (a.model.needs_ip && !a.ipClass) { errEl.textContent = 'Укажите IP-класс'; return; }
+  } else {
+    if (!a.description || !a.description.trim()) {
+      errEl.textContent = 'Опишите что было сделано';
+      return;
+    }
+  }
   if (!a.quantity || a.quantity < 1) { errEl.textContent = 'Укажите количество'; return; }
-  if (a.workerIds.length === 0) { errEl.textContent = 'Выберите хотя бы одного сборщика'; return; }
+  if (a.workerIds.length === 0) { errEl.textContent = 'Выберите хотя бы одного исполнителя'; return; }
 
   let assemblyDate;
   if (a.dateMode === 'today') assemblyDate = todayIso();
@@ -12621,14 +12802,18 @@ async function submitAssembly() {
   }
 
   const payload = {
-    model_id: a.model.id,
+    work_type: a.workType || 'assembly',
+    model_id: isAssembly && a.model ? a.model.id : null,
     quantity: a.quantity,
     assembly_date: assemblyDate,
     worker_ids: a.workerIds,
-    execution: a.model.exec_mode === 'choice' ? a.execution : null,
-    ip_class: a.model.needs_ip ? a.ipClass : null,
+    execution: isAssembly && a.model && a.model.exec_mode === 'choice' ? a.execution : null,
+    ip_class: isAssembly && a.model && a.model.needs_ip ? a.ipClass : null,
     comment: a.comment || '',
-    contract_id: a.contractId || null,   // ЭТАП 15: NULL = на склад
+    contract_id: a.contractId || null,
+    description: a.description || null,
+    location: a.location || null,
+    hours_spent: a.hours_spent || null,
   };
 
   btn.disabled = true;
@@ -12642,7 +12827,7 @@ async function submitAssembly() {
       btn.innerHTML = '<i class="ti ti-check"></i> Записать';
       return;
     }
-    showToast('Сборка записана: ID ' + r.data.id, 'success');
+    showToast('Запись сохранена: ID ' + r.data.id, 'success');
     cache.dashboard = null;
     cache.history = {};
     cache.summary = {};
@@ -13443,24 +13628,45 @@ function showAssemblyStockModal(d) {
     
     '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name) + '</h3>' +
-        '<div style="display: flex; gap: 6px; align-items: center;">' +
+        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name || (a.work_type && a.work_type !== 'assembly' ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[a.work_type] || 'Работа') : 'Работа')) +
+          (a.work_type && a.work_type !== 'assembly'
+            ? ' <span class="work-type-badge wt-' + a.work_type + '" style="margin-left: 6px;">' + escapeHtml({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[a.work_type] || a.work_type) + '</span>'
+            : '') +
+        '</h3>' +
+        '<div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">' +
           '<button class="btn-icon-qr" onclick="showAssemblyQr(' + a.id + ', ' + qrModelName + ', ' + qrArticle + ', ' + qrDate + ')" title="QR-код сборки">' +
             '<i class="ti ti-qrcode"></i> QR' +
+          '</button>' +
+          '<button class="btn-icon-qr" style="background: #FFF4E6; color: #B25E00;" onclick="openDefectFormForAssembly(' + a.id + ')" title="Добавить замечание">' +
+            '<i class="ti ti-alert-circle"></i> Доработка' +
+          '</button>' +
+          '<button class="btn-icon-qr" style="background: #E8F5E9; color: #15803D;" onclick="openShareWithInstaller(' + a.id + ', \'assembly\')" title="Отправить ссылку монтажнику">' +
+            '<i class="ti ti-send"></i> Монтажнику' +
           '</button>' +
           '<button class="modal-close" onclick="closeAssemblyStockModal()"><i class="ti ti-x"></i></button>' +
         '</div>' +
       '</div>' +
       '<div class="modal-content">' +
+        // ЭТАП 23: блок описания работы (для не-сборок) — крупно, заметно
+        (a.work_type && a.work_type !== 'assembly' && a.description
+          ? '<div style="background: #FFF4E6; border-left: 3px solid #B25E00; padding: 12px 14px; border-radius: 8px; margin-bottom: 14px;">' +
+              '<div style="font-size: 11px; color: #B25E00; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px;">Что было сделано</div>' +
+              '<div style="font-size: 14px; color: var(--text); line-height: 1.5; white-space: pre-wrap;">' + escapeHtml(a.description) + '</div>' +
+            '</div>'
+          : '') +
         '<div class="as-info-grid">' +
           '<div><span class="as-lbl">Статус:</span> <span class="status-pill st-' + a.status + '">' + escapeHtml(a.status_label) + '</span></div>' +
-          '<div><span class="as-lbl">Остаток:</span> <strong>' + a.stock_qty + ' шт.</strong></div>' +
+          (a.work_type === 'assembly' || !a.work_type
+            ? '<div><span class="as-lbl">Остаток:</span> <strong>' + (a.stock_qty || 0) + ' шт.</strong></div>'
+            : '') +
           (a.execution ? '<div><span class="as-lbl">Исполнение:</span> ' + escapeHtml(a.execution) + '</div>' : '') +
           (a.ip_class ? '<div><span class="as-lbl">IP-класс:</span> ' + escapeHtml(a.ip_class) + '</div>' : '') +
-          '<div><span class="as-lbl">Дата сборки:</span> ' + escapeHtml(a.assembly_date || '—') + '</div>' +
+          '<div><span class="as-lbl">Дата:</span> ' + escapeHtml(a.assembly_date || '—') + '</div>' +
+          (a.location ? '<div><span class="as-lbl">Где:</span> ' + escapeHtml(a.location) + '</div>' : '') +
+          (a.hours_spent ? '<div><span class="as-lbl">Часов:</span> <strong>' + a.hours_spent + ' ч</strong></div>' : '') +
           (a.contract_id
             ? '<div><span class="as-lbl">Договор:</span> <a href="#" onclick="event.preventDefault(); closeAssemblyStockModal(); openContractFromWarehouse(' + a.contract_id + ')" class="contract-link">' + escapeHtml(a.contract_number) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : '') + '</a></div>'
-            : '<div><span class="as-lbl">Договор:</span> <em>не привязан</em></div>') +
+            : (a.work_type === 'assembly' || !a.work_type ? '<div><span class="as-lbl">Договор:</span> <em>не привязан</em></div>' : '')) +
         '</div>' +
         (actionsHtml ? '<div class="as-actions">' + actionsHtml + '</div>' : '') +
         '<div class="as-history-title">История движений</div>' +
@@ -15285,6 +15491,89 @@ const HELP_ARTICLES = [
       { note: 'В Таймлайне сразу видно пересечения — если у двух мастеров отпуск в одно время, цветные плашки наложатся. Можно сразу скорректировать.' },
     ],
   },
+
+  // ============ ПРОИЗВОДСТВО — ТИПЫ РАБОТ (Этап 23) ============
+  {
+    id: 'production-work-types', cat: 'production', cat_label: 'Производство', icon: 'ti-list-check',
+    title: 'Типы работ: не только сборки',
+    summary: 'В Производстве теперь регистрируют 8 типов работ. Кто что и где делал — полная картина.',
+    body: [
+      { p: 'Раньше в Производстве были только <b>сборки</b> — записи о собранных щитах с моделями. Теперь учитываем все типы работ: от ремонта на объекте до пусконаладки. Это позволяет видеть полную картину занятости сотрудников и считать рабочие часы по объектам/договорам.' },
+      { h: '8 типов работ' },
+      { ul: [
+        '🔧 <b>Сборка</b> — классика. Сборка щита, увлажнителя и т.п. Привязана к модели. <i>Идёт на склад автоматически</i>.',
+        '🔨 <b>Ремонт</b> — починка, замена компонентов на объекте или в мастерской',
+        '⚡ <b>Пусконаладка</b> — запуск оборудования, прошивка, настройка',
+        '🛠 <b>Монтаж</b> — установка щита на объекте, протяжка кабелей',
+        '🔍 <b>Диагностика</b> — замеры, проверки, инспекция (без правок)',
+        '📐 <b>Проектирование</b> — разработка схем, чертежей',
+        '🔧 <b>ТО</b> — плановое тех. обслуживание',
+        '➕ <b>Прочее</b> — всё что не подходит под другие категории',
+      ] },
+      { h: 'Чем отличаются от сборки' },
+      { ul: [
+        '<b>Не привязаны к модели</b> — модель опциональна',
+        '<b>Не идут на склад</b> — это услуга, а не товар',
+        '<b>Есть поле «Что было сделано»</b> — обязательное описание',
+        '<b>Есть поле «Где»</b> — адрес объекта',
+        '<b>Есть поле «Часы»</b> — можно учитывать рабочее время',
+      ] },
+      { h: 'Зачем это нужно' },
+      { ol: [
+        'Видеть кто чем занимался за неделю/месяц (не только сборщики)',
+        'Считать часы по договорам и объектам',
+        'История работ привязана к сотруднику и договору',
+        'Монтажник может через QR на сборке зарегистрировать «Ремонт» прямо с поля',
+      ] },
+      { note: 'Сборки и работы лежат в одном журнале, но в карточке видно тип работы (бейдж цветной). На главной отображаются обе категории.' },
+    ],
+  },
+  {
+    id: 'production-create-work', cat: 'production', cat_label: 'Производство', icon: 'ti-plus',
+    title: 'Как зарегистрировать работу (не сборку)',
+    summary: 'Пример: бригада сделала пусконаладку на объекте. Заносим в систему.',
+    body: [
+      { h: 'Шаги' },
+      { ol: [
+        'Производство → <b>«+ Новая сборка»</b> (кнопка осталась той же — она для всех типов)',
+        'Сверху появится переключатель <b>«Тип работы»</b> — выбери нужный (например, «Пусконаладка»)',
+        'Поле «Модель» <i>исчезнет</i> — вместо неё появятся «Что было сделано», «Где», «Часы»',
+        'Заполни <b>описание работы</b>: «Запуск приточной установки ПУ-1, прошивка контроллера»',
+        'Укажи <b>где</b>: «ТРЦ Невский Атриум, помещение венткамеры»',
+        'Опционально <b>часы</b>: 4.5',
+        'Дальше как обычно: дата, исполнители, договор/объект (опционально)',
+        'Сохрани',
+      ] },
+      { h: 'Пример хорошего описания' },
+      { p: '<b>Тип:</b> Пусконаладка<br><b>Что сделано:</b> «Запустили приточную установку ПУ-1. Прошили контроллер на конфигурацию заказчика, проверили работу всех режимов (зима/лето/межсезонье), настроили часы работы 7:00–22:00. Согласовали параметры с инженером объекта.»<br><b>Где:</b> «ТРЦ Невский Атриум, венткамера 2 этажа»<br><b>Часы:</b> 4.5<br><b>Исполнители:</b> Иванов А.А., Петров П.С.' },
+      { note: 'Не-сборки <b>не отображаются на складе</b> — это услуга. В журнале Производства они видны рядом со сборками с цветным бейджем типа.' },
+    ],
+  },
+
+  // ============ ДОРАБОТКИ — РАСШИРЕНИЕ ============
+  {
+    id: 'defects-share-installer', cat: 'defects', cat_label: 'Доработки', icon: 'ti-send',
+    title: 'Отправить ссылку монтажнику',
+    summary: 'Как поделиться ссылкой на сборку/договор с подрядчиком. Telegram-share, QR, копирование.',
+    body: [
+      { p: 'Часто на объект едет монтажник без логина в нашу систему. Надо чтобы он видел всю информацию по сборке и мог оставить замечание прямо с поля. Кнопка <b>«Монтажнику»</b> делает именно это.' },
+      { h: 'Где кнопка' },
+      { ul: [
+        'В карточке сборки (открой её через Склад → Остатки → клик)',
+        'В шапке карточки договора (раздел Продажи)',
+        'Цвет — <i>зелёный</i>, рядом с QR',
+      ] },
+      { h: 'Три способа отправить' },
+      { ol: [
+        '<b>📨 Telegram</b> — открывается стандартное окно Telegram, выбираешь чат, ссылка отправляется',
+        '<b>📋 Копировать</b> — ссылка в буфере обмена, вставляешь куда угодно (WhatsApp, email, SMS)',
+        '<b>📷 QR на экране</b> — монтажник наводит свой телефон, сканирует',
+      ] },
+      { h: 'Что увидит монтажник' },
+      { p: 'По ссылке открывается <i>публичная страница</i> сборки/договора с базовой информацией: модель, артикул, договор, статус, история. Без секретных данных. Внизу — оранжевая кнопка <b>«🔔 Сообщить о замечании»</b>. Если что-то не так — он может прямо там оставить замечание с фото.' },
+      { note: 'Внутри CRM у сотрудников есть та же возможность — кнопка <b>«🟠 Доработка»</b> (оранжевая) в карточке. Имя предзаполнено из профиля, не надо заново вводить.' },
+    ],
+  },
 ];
 
 // FAQ
@@ -15365,6 +15654,41 @@ const HELP_FAQ = [
 
 // Changelog — что нового, от свежего к старому
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.5.0',
+    date: '15.05.2026',
+    title: 'Универсальные работы + кнопки доработки и отправки',
+    features: [
+      'В Производстве теперь не только сборки — <b>8 типов работ</b>: Сборка / Ремонт / Пусконаладка / Монтаж / Диагностика / Проектирование / ТО / Прочее',
+      'Для не-сборок: поля <b>«Что было сделано»</b>, <b>«Где»</b> (объект), <b>«Часы работы»</b>',
+      'Не-сборки <b>не попадают на склад</b> — это услуга, а не товар',
+      'В карточке сборки/работы кнопка <b>«🟠 Доработка»</b> — сотрудник может сам зарегистрировать замечание (имя предзаполнено)',
+      'Кнопка <b>«🟢 Монтажнику»</b> — копирование ссылки, Telegram-share или QR для отправки монтажнику',
+      'Цветной бейдж типа работы в шапке карточки',
+      'Поле "Описание работы" заметно подсвечено в карточке (оранжевая полоса слева)',
+    ],
+  },
+  {
+    version: 'v2.4.4',
+    date: '15.05.2026',
+    title: 'Мобильные табы — прокрутка с индикатором',
+    features: [
+      'Синяя круглая кнопка <b>→</b> на мобильных табах когда есть скрытые разделы',
+      'Fade-эффект по краям подсказывает что можно листать',
+      'Автоскролл активного раздела в видимую зону',
+    ],
+  },
+  {
+    version: 'v2.4.3',
+    date: '15.05.2026',
+    title: 'Расширенная База знаний',
+    features: [
+      'Новые категории: <b>QR-коды</b>, <b>Доработки</b>, <b>Кадры</b>',
+      '7 новых пошаговых статей с реальными примерами',
+      '9 новых вопросов в FAQ',
+      'Подробное «Что нового» с timeline-релизов',
+    ],
+  },
   {
     version: 'v2.4.2',
     date: '15.05.2026',
@@ -18125,6 +18449,132 @@ function openPhotoLightbox(url) {
 function closePhotoLightbox() {
   const lb = document.getElementById('photo-lightbox');
   if (lb) lb.classList.remove('visible');
+}
+
+
+// ============================================================
+// ============ ЭТАП 23: Кнопки «Доработка» и «Отправить монтажнику» ============
+// ============================================================
+
+/**
+ * Открывает форму добавления замечания (для сборки) из карточки внутри CRM.
+ * Получает публичный токен и открывает ту же форму что и публичная страница,
+ * но с предзаполненным именем сотрудника.
+ */
+async function openDefectFormForAssembly(assemblyId) {
+  try {
+    const r = await apiGet('/api/assemblies/' + assemblyId + '/public-token');
+    if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    closeAssemblyStockModal();
+    state._defectFormState = {
+      targetType: 'assembly',
+      token: r.public_token,
+      type: 'defect',
+      description: '',
+      author_name: (state.user && (state.user.short_name || state.user.full_name)) || '',
+      author_phone: (state.user && state.user.phone) || '',
+      location: '',
+      photos: [],
+    };
+    const m = document.getElementById('defect-form-modal');
+    if (!m) return;
+    m.innerHTML = renderDefectFormHtml();
+    m.classList.add('visible');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function openDefectFormForContract() {
+  if (!state.currentContractId) return;
+  try {
+    const r = await apiGet('/api/contracts/' + state.currentContractId + '/public-token');
+    if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    state._defectFormState = {
+      targetType: 'contract',
+      token: r.public_token,
+      type: 'defect',
+      description: '',
+      author_name: (state.user && (state.user.short_name || state.user.full_name)) || '',
+      author_phone: (state.user && state.user.phone) || '',
+      location: '',
+      photos: [],
+    };
+    const m = document.getElementById('defect-form-modal');
+    if (!m) return;
+    m.innerHTML = renderDefectFormHtml();
+    m.classList.add('visible');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+/**
+ * Модалка «Отправить монтажнику» — копирование ссылки, Telegram-share, QR-код.
+ */
+async function openShareWithInstaller(assemblyId, type) {
+  try {
+    const r = await apiGet('/api/assemblies/' + assemblyId + '/public-token');
+    if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    const url = window.location.origin + '/a/' + r.public_token;
+    showShareInstallerModal(url, 'сборки');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function openShareWithInstallerForContract() {
+  if (!state.currentContractId) return;
+  try {
+    const r = await apiGet('/api/contracts/' + state.currentContractId + '/public-token');
+    if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    const url = window.location.origin + '/c/' + r.public_token;
+    showShareInstallerModal(url, 'договора');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+function showShareInstallerModal(url, label) {
+  const m = document.getElementById('qr-modal');
+  if (!m) return;
+  const tgText = encodeURIComponent('Ссылка на ' + label + ': ' + url + '\n\nНа этой странице ты можешь увидеть всю информацию и оставить замечание с фото.');
+  const tgUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent('Информация по ' + label + '. По ссылке можно увидеть детали и оставить замечание.');
+  const urlEscaped = JSON.stringify(url).replace(/"/g, '&quot;');
+  m.innerHTML =
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-send"></i> Отправить монтажнику</h3>' +
+        '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="qr-modal-body">' +
+        '<div style="color: var(--text); margin-bottom: 12px; font-size: 14px;">' +
+          'По этой ссылке монтажник увидит всю информацию по ' + label + ' и сможет оставить замечание с фото.' +
+        '</div>' +
+        '<div class="qr-canvas-wrap" id="qr-canvas-wrap"></div>' +
+        '<div class="qr-url-display">' + escapeHtml(url) + '</div>' +
+        '<div class="qr-actions">' +
+          '<a class="btn btn-primary" href="' + tgUrl + '" target="_blank" rel="noopener">' +
+            '<i class="ti ti-brand-telegram"></i> Отправить в Telegram' +
+          '</a>' +
+          '<button class="btn btn-secondary" onclick="copyQrUrl(' + urlEscaped + ')">' +
+            '<i class="ti ti-copy"></i> Копировать ссылку' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  // Генерируем QR — монтажник может его отсканировать с экрана
+  setTimeout(() => {
+    const wrap = document.getElementById('qr-canvas-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    new QRCode(wrap, {
+      text: url, width: 220, height: 220,
+      colorDark: '#000000', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  }, 50);
 }
 
 
