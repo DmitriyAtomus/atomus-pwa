@@ -5140,6 +5140,80 @@
   .defects-widget-cell.s-in_progress .num { color: #B25E00; }
   .defects-widget-cell.s-resolved .num    { color: #15803D; }
   .defects-widget-cell.s-rejected .num    { color: var(--text-light); }
+  /* ЭТАП 23+: Кнопки выбора цели для замечания (К сборке / К договору) */
+  .defect-target-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    text-align: left;
+  }
+  .defect-target-btn:hover {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .defect-target-btn:active { transform: scale(0.99); }
+  .defect-target-btn > i:first-child {
+    font-size: 22px;
+    color: var(--brand);
+    flex-shrink: 0;
+  }
+  .defect-target-btn > div { flex: 1; min-width: 0; }
+  .defect-target-btn .dt-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .defect-target-btn .dt-meta {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .defect-target-btn .dt-chev {
+    color: var(--text-light);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Строки в списке выбора сборки/договора */
+  .defect-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .defect-picker-row:hover {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .defect-picker-row > i:first-child {
+    font-size: 18px;
+    color: var(--brand);
+    flex-shrink: 0;
+  }
+  .defect-picker-row > div { flex: 1; min-width: 0; }
+  .defect-picker-row .dp-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .defect-picker-row .dp-meta {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
   /* ============ КОНЕЦ ДОРАБОТКИ ============ */
 </style>
 
@@ -5470,6 +5544,9 @@
         <i class="ti ti-alert-circle"></i> Доработки
       </div>
       <div class="sidebar-nav">
+        <button class="nav-item new-btn" id="nav-defects-new" onclick="openNewDefectFromCRM()">
+          <i class="ti ti-circle-plus"></i><span>Новая доработка</span>
+        </button>
         <div class="nav-section-label">ЗАМЕЧАНИЯ</div>
         <button class="nav-item active" data-nav="defects-list" onclick="selectSidebarItem('defects-list')">
           <i class="ti ti-list"></i><span>Все</span>
@@ -6729,6 +6806,11 @@
               <h1 id="defects-list-title">Все замечания</h1>
               <span class="page-counter" id="defects-counter">0</span>
             </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" onclick="openNewDefectFromCRM()">
+                <i class="ti ti-plus"></i> Новая доработка
+              </button>
+            </div>
           </div>
           <div id="defects-list-content">
             <div class="loading-block">Загружаем…</div>
@@ -7151,7 +7233,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.5.1-work-form-ui";
+const APP_VERSION = "v2.5.2-defect-from-crm";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -18703,6 +18785,209 @@ function showShareInstallerModal(url, label) {
       correctLevel: QRCode.CorrectLevel.M,
     });
   }, 50);
+}
+
+
+// ============================================================
+// ============ ЭТАП 23+: «+ Новая доработка» из CRM ============
+// ============================================================
+
+/**
+ * Кнопка «+ Новая доработка» в разделе Доработок и в шапке списка.
+ * Открывает простую модалку выбора привязки: к сборке / к договору / без привязки.
+ */
+function openNewDefectFromCRM() {
+  const m = document.getElementById('qr-modal');
+  if (!m) return;
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width: 440px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-alert-circle"></i> Новая доработка</h3>' +
+        '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="display: flex; flex-direction: column; gap: 10px;">' +
+        '<div style="color: var(--text-light); font-size: 13.5px; margin-bottom: 4px;">К чему привязать замечание?</div>' +
+        '<button class="defect-target-btn" onclick="pickAssemblyForDefect()">' +
+          '<i class="ti ti-package"></i>' +
+          '<div><div class="dt-title">К сборке / работе</div>' +
+          '<div class="dt-meta">Выбрать из журнала производства</div></div>' +
+          '<i class="ti ti-chevron-right dt-chev"></i>' +
+        '</button>' +
+        '<button class="defect-target-btn" onclick="pickContractForDefect()">' +
+          '<i class="ti ti-file-text"></i>' +
+          '<div><div class="dt-title">К договору</div>' +
+          '<div class="dt-meta">Выбрать из активных договоров</div></div>' +
+          '<i class="ti ti-chevron-right dt-chev"></i>' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+/** Выбор сборки для замечания — список из API. */
+async function pickAssemblyForDefect() {
+  const m = document.getElementById('qr-modal');
+  if (!m) return;
+  m.innerHTML =
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<button class="icon-btn" onclick="openNewDefectFromCRM()" title="Назад"><i class="ti ti-arrow-left"></i></button>' +
+        '<h3 style="margin-left: 4px;"><i class="ti ti-package"></i> Выбрать сборку / работу</h3>' +
+        '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<input type="text" class="text-input-fw" id="defect-asm-search" placeholder="Поиск по модели или артикулу…" oninput="filterDefectAssemblyList()">' +
+        '<div id="defect-asm-list" style="margin-top: 12px;">' +
+          '<div class="loading-block">Загружаем…</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  try {
+    // Берём остатки склада — там все сборки/работы свежие
+    const d = await apiGet('/api/warehouse/stock');
+    state._defectAsmList = d.items || d.assemblies || [];
+    renderDefectAssemblyList();
+  } catch (e) {
+    const list = document.getElementById('defect-asm-list');
+    if (list) list.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
+  }
+}
+
+function filterDefectAssemblyList() {
+  renderDefectAssemblyList();
+}
+
+function renderDefectAssemblyList() {
+  const list = document.getElementById('defect-asm-list');
+  if (!list) return;
+  const q = (document.getElementById('defect-asm-search')?.value || '').toLowerCase().trim();
+  const items = (state._defectAsmList || []).filter(s => {
+    if (!q) return true;
+    const txt = ((s.model_name || '') + ' ' + (s.model_article || '') + ' ' + (s.description || '')).toLowerCase();
+    return txt.includes(q);
+  });
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-block"><i class="ti ti-mood-empty"></i>Ничего не найдено</div>';
+    return;
+  }
+  list.innerHTML = items.slice(0, 100).map(s => {
+    const wt = s.work_type && s.work_type !== 'assembly';
+    const wtLabel = wt ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[s.work_type] || s.work_type) : '';
+    const title = s.model_name || (wtLabel || 'Запись #' + s.id);
+    const meta  = [
+      s.model_article || '',
+      s.assembly_date || '',
+      wt ? ('<span class="work-type-badge wt-' + s.work_type + '" style="margin-left:6px;">' + escapeHtml(wtLabel) + '</span>') : '',
+    ].filter(Boolean).join(' · ');
+    return '<div class="defect-picker-row" onclick="chooseAssemblyForDefect(' + s.id + ')">' +
+      '<i class="ti ti-package"></i>' +
+      '<div><div class="dp-title">' + escapeHtml(title) + '</div>' +
+      '<div class="dp-meta">' + meta + '</div></div>' +
+    '</div>';
+  }).join('');
+}
+
+async function chooseAssemblyForDefect(assemblyId) {
+  try {
+    const r = await apiGet('/api/assemblies/' + assemblyId + '/public-token');
+    if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    closeQrModal();
+    state._defectFormState = {
+      targetType: 'assembly',
+      token: r.public_token,
+      type: 'defect',
+      description: '',
+      author_name: (state.user && (state.user.short_name || state.user.full_name)) || '',
+      author_phone: (state.user && state.user.phone) || '',
+      location: '',
+      photos: [],
+    };
+    const m = document.getElementById('defect-form-modal');
+    if (!m) return;
+    m.innerHTML = renderDefectFormHtml();
+    m.classList.add('visible');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function pickContractForDefect() {
+  const m = document.getElementById('qr-modal');
+  if (!m) return;
+  m.innerHTML =
+    '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<button class="icon-btn" onclick="openNewDefectFromCRM()" title="Назад"><i class="ti ti-arrow-left"></i></button>' +
+        '<h3 style="margin-left: 4px;"><i class="ti ti-file-text"></i> Выбрать договор</h3>' +
+        '<button class="modal-close" onclick="closeQrModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<input type="text" class="text-input-fw" id="defect-c-search" placeholder="Поиск по номеру или контрагенту…" oninput="filterDefectContractList()">' +
+        '<div id="defect-c-list" style="margin-top: 12px;">' +
+          '<div class="loading-block">Загружаем…</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  try {
+    const d = await apiGet('/api/contracts');
+    state._defectContractList = d.contracts || [];
+    renderDefectContractList();
+  } catch (e) {
+    const list = document.getElementById('defect-c-list');
+    if (list) list.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
+  }
+}
+
+function filterDefectContractList() {
+  renderDefectContractList();
+}
+
+function renderDefectContractList() {
+  const list = document.getElementById('defect-c-list');
+  if (!list) return;
+  const q = (document.getElementById('defect-c-search')?.value || '').toLowerCase().trim();
+  const items = (state._defectContractList || []).filter(c => {
+    if (!q) return true;
+    const txt = ((c.number || '') + ' ' + (c.contractor_name || '')).toLowerCase();
+    return txt.includes(q);
+  });
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-block"><i class="ti ti-mood-empty"></i>Ничего не найдено</div>';
+    return;
+  }
+  list.innerHTML = items.slice(0, 100).map(c => {
+    return '<div class="defect-picker-row" onclick="chooseContractForDefect(' + c.id + ')">' +
+      '<i class="ti ti-file-text"></i>' +
+      '<div><div class="dp-title">' + escapeHtml(c.number || '#' + c.id) + '</div>' +
+      '<div class="dp-meta">' + escapeHtml(c.contractor_name || '') + (c.sum_amount ? ' · ' + Number(c.sum_amount).toLocaleString('ru-RU') + ' ₽' : '') + '</div></div>' +
+    '</div>';
+  }).join('');
+}
+
+async function chooseContractForDefect(contractId) {
+  try {
+    const r = await apiGet('/api/contracts/' + contractId + '/public-token');
+    if (!r.public_token) { showToast('Не удалось получить токен', 'error'); return; }
+    closeQrModal();
+    state._defectFormState = {
+      targetType: 'contract',
+      token: r.public_token,
+      type: 'defect',
+      description: '',
+      author_name: (state.user && (state.user.short_name || state.user.full_name)) || '',
+      author_phone: (state.user && state.user.phone) || '',
+      location: '',
+      photos: [],
+    };
+    const m = document.getElementById('defect-form-modal');
+    if (!m) return;
+    m.innerHTML = renderDefectFormHtml();
+    m.classList.add('visible');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
 }
 
 
