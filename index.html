@@ -2199,6 +2199,228 @@
 
   /* ============ КОНЕЦ ЭТАП 18 ============ */
 
+  /* ============ ЭТАП 19: СНАБЖЕНИЕ ============ */
+
+  /* Лейбл секции в сайдбаре */
+  .nav-section-label {
+    padding: 14px 16px 6px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+
+  /* Кнопка возврата */
+  .back-btn {
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text-mid);
+    margin-right: 12px;
+  }
+  .back-btn:hover { background: var(--bg); color: var(--text); }
+
+  /* Общий список (используется для всех экранов снабжения) */
+  .sup-list { display: flex; flex-direction: column; gap: 8px; }
+  .sup-row {
+    display: flex; align-items: center; gap: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .sup-row:hover { border-color: var(--brand); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04); }
+  .sup-row-icon {
+    width: 36px; height: 36px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex: 0 0 36px;
+    font-size: 18px;
+  }
+  .sup-row-body { flex: 1; min-width: 0; }
+  .sup-row-title {
+    font-size: 14.5px; font-weight: 600; color: var(--text);
+    margin-bottom: 4px;
+  }
+  .sup-row-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-size: 12px; color: var(--text-light);
+  }
+  .sup-row-meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .sup-row-comment {
+    font-size: 12.5px; color: var(--text-light);
+    margin-top: 4px;
+    font-style: italic;
+  }
+  .sup-row-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+
+  /* Pill статуса заявки */
+  .sup-status-pill {
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    background: var(--bg); color: var(--text-mid);
+  }
+  .sup-status-pill.st-new       { background: var(--brand-bg); color: var(--brand); }
+  .sup-status-pill.st-ordered   { background: #FFF4E6; color: #C18B00; }
+  .sup-status-pill.st-received  { background: #E8F5E9; color: var(--success); }
+  .sup-status-pill.st-cancelled { background: #F4F4F5; color: var(--text-faint); }
+  /* статусы заказа */
+  .sup-status-pill.ord-draft     { background: var(--bg); color: var(--text-mid); }
+  .sup-status-pill.ord-sent      { background: var(--brand-bg); color: var(--brand); }
+  .sup-status-pill.ord-partial   { background: #FFF4E6; color: #C18B00; }
+  .sup-status-pill.ord-received  { background: #E8F5E9; color: var(--success); }
+  .sup-status-pill.ord-cancelled { background: #F4F4F5; color: var(--text-faint); }
+
+  /* Pill kind (material/product) */
+  .sup-kind-pill {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+  }
+  .sup-kind-pill.kind-material { background: #E8EEF7; color: #2C5282; }
+  .sup-kind-pill.kind-product  { background: #FFF4E6; color: #C18B00; }
+
+  /* Бейдж договора в заявке */
+  .sup-contract-badge {
+    background: var(--brand-bg); color: var(--brand);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .sup-contract-badge:hover { background: #D6E0EE; }
+
+  /* Дедлайн заявки */
+  .sup-req-deadline.urgent { color: var(--danger); font-weight: 500; }
+  .sup-req-deadline.soon   { color: var(--warning, #C18B00); font-weight: 500; }
+
+  /* Карточка заказа: detail-block / oi-list */
+  .detail-block {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .detail-block-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; color: var(--text);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-block-title i { color: var(--brand); }
+  .detail-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px;
+  }
+  .detail-item .detail-label {
+    color: var(--text-light); text-transform: uppercase;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.3px;
+    margin-bottom: 2px;
+  }
+  .detail-item .detail-value { font-size: 14px; color: var(--text); }
+  .detail-comment {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-light);
+    font-style: italic;
+  }
+
+  .oi-list {
+    display: flex; flex-direction: column; gap: 4px;
+    margin-bottom: 12px;
+  }
+  .oi-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+  .oi-body { flex: 1; min-width: 0; }
+  .oi-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .oi-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-size: 12px; color: var(--text-light);
+  }
+  .oi-received {
+    background: #E8F5E9; color: var(--success);
+    padding: 1px 7px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+  }
+  .oi-comment { font-size: 12px; color: var(--text-light); margin-top: 3px; font-style: italic; }
+  .oi-total {
+    flex: 0 0 auto;
+    font-size: 14px; font-weight: 600; color: var(--text);
+  }
+  .oi-actions { flex: 0 0 auto; }
+  .oi-total-row {
+    text-align: right;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 15px; color: var(--text-mid);
+  }
+  .oi-total-row strong { font-size: 17px; color: var(--brand); }
+
+  .detail-actions {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  /* Приёмка — список позиций */
+  .rec-items-title {
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    color: var(--text-light);
+    margin-bottom: 8px; margin-top: 8px;
+  }
+  .rec-items-list {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 360px; overflow-y: auto;
+    margin-bottom: 12px;
+  }
+  .rec-item-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+  .rec-item-name { flex: 1; font-size: 13.5px; }
+  .rec-item-note { color: var(--text-light); font-size: 12px; font-weight: 400; }
+  .rec-item-qty { width: 100px; }
+
+  /* Универсальная заметка под модалкой */
+  .modal-note {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+  /* Двух-колоночная форма в модалке */
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 720px) {
+    .form-row-2 { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+  }
+  /* Широкая модалка для приёмки */
+  .modal-body-wide { max-width: 640px !important; }
+
+  /* ============ КОНЕЦ ЭТАП 19 ============ */
+
   .task-status-pill {
     flex: 0 0 auto;
     padding: 3px 10px;
@@ -3052,7 +3274,7 @@
         <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
       </button>
       <button class="section-tab" data-section="supply">
-        <i class="ti ti-shopping-cart"></i>Снабжение<span class="soon-badge">скоро</span>
+        <i class="ti ti-shopping-cart"></i>Снабжение
       </button>
       <button class="section-tab" data-section="help">
         <i class="ti ti-help-circle"></i>Помощь
@@ -3200,6 +3422,43 @@
         <div class="user-info-block">
           <div class="un" id="sb-username-warehouse">—</div>
           <div class="ur" id="sb-userrole-warehouse">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atomus group<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- SIDEBAR СНАБЖЕНИЕ (Этап 19) -->
+    <aside class="sidebar" id="sidebar-supply" data-section="supply" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-shopping-cart"></i> Снабжение
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="supply-requests" onclick="selectSidebarItem('supply-requests')">
+          <i class="ti ti-clipboard-list"></i><span>Заявки</span>
+        </button>
+        <button class="nav-item" data-nav="supply-orders" onclick="selectSidebarItem('supply-orders')">
+          <i class="ti ti-file-invoice"></i><span>Заказы</span>
+        </button>
+        <button class="nav-item" data-nav="supply-receipts" onclick="selectSidebarItem('supply-receipts')">
+          <i class="ti ti-package-import"></i><span>Приёмки</span>
+        </button>
+        <div class="nav-section-label">СПРАВОЧНИКИ</div>
+        <button class="nav-item" data-nav="supply-suppliers" onclick="selectSidebarItem('supply-suppliers')">
+          <i class="ti ti-truck-loading"></i><span>Поставщики</span>
+        </button>
+        <button class="nav-item" data-nav="supply-catalog" onclick="selectSidebarItem('supply-catalog')">
+          <i class="ti ti-list-details"></i><span>Каталог</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-supply">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-supply">—</div>
+          <div class="ur" id="sb-userrole-supply">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
@@ -4027,42 +4286,152 @@
         </div>
       </div>
 
-      <!-- ============ ЗАГЛУШКА: СНАБЖЕНИЕ ============ -->
-      <div class="screen" data-screen="coming-supply" data-section="supply">
+      <!-- ============ РАЗДЕЛ СНАБЖЕНИЕ (Этап 19) ============ -->
+
+      <!-- ЗАЯВКИ -->
+      <div class="screen" data-screen="supply-requests" data-section="supply">
         <div class="content-inner" style="max-width: 100%;">
-          <div class="coming-soon">
-            <div class="cs-icon"><i class="ti ti-shopping-cart"></i></div>
-            <h2>Снабжение — раздел в разработке</h2>
-            <div class="cs-desc">
-              Поставщики, закупки комплектующих и материалов.
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-clipboard-list"></i>
+              <h1>Заявки на закупку</h1>
+              <span class="page-counter" id="sup-req-counter">0</span>
             </div>
-            <div class="cs-features">
-              <div class="cs-feature">
-                <i class="ti ti-truck-loading"></i>
-                <div>
-                  <div class="feat-title">База поставщиков</div>
-                  <div class="feat-desc">Контакты, что у кого берём, цены, сроки поставки</div>
-                </div>
-              </div>
-              <div class="cs-feature">
-                <i class="ti ti-clipboard-check"></i>
-                <div>
-                  <div class="feat-title">Заявки на закупку</div>
-                  <div class="feat-desc">Что и когда нужно купить, по каким договорам</div>
-                </div>
-              </div>
-              <div class="cs-feature">
-                <i class="ti ti-robot"></i>
-                <div>
-                  <div class="feat-title">Автоматические заказы</div>
-                  <div class="feat-desc">В перспективе — автоматическая отправка заявок поставщикам</div>
-                </div>
+            <button class="btn btn-primary" id="sup-req-new-btn" onclick="openNewSupplyRequest()">
+              <i class="ti ti-plus"></i> Новая заявка
+            </button>
+          </div>
+          <!-- Фильтры -->
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-sup-req="open"      onclick="setSupplyReqFilter('open')">Открытые</button>
+                <button class="filter-tab"        data-sup-req="new"       onclick="setSupplyReqFilter('new')">Новые</button>
+                <button class="filter-tab"        data-sup-req="ordered"   onclick="setSupplyReqFilter('ordered')">В заказе</button>
+                <button class="filter-tab"        data-sup-req="received"  onclick="setSupplyReqFilter('received')">Получены</button>
+                <button class="filter-tab"        data-sup-req="all"       onclick="setSupplyReqFilter('all')">Все</button>
               </div>
             </div>
-            <div class="cs-eta">Параллельно с Логистикой</div>
+          </div>
+          <div id="sup-req-list" class="sup-list">
+            <div class="loading-block">Загружаем заявки…</div>
           </div>
         </div>
       </div>
+
+      <!-- ЗАКАЗЫ -->
+      <div class="screen" data-screen="supply-orders" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-file-invoice"></i>
+              <h1>Заказы поставщикам</h1>
+              <span class="page-counter" id="sup-ord-counter">0</span>
+            </div>
+            <button class="btn btn-primary" id="sup-ord-new-btn" onclick="openNewSupplyOrder()">
+              <i class="ti ti-plus"></i> Новый заказ
+            </button>
+          </div>
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-sup-ord="open"      onclick="setSupplyOrdFilter('open')">Открытые</button>
+                <button class="filter-tab"        data-sup-ord="draft"     onclick="setSupplyOrdFilter('draft')">Черновики</button>
+                <button class="filter-tab"        data-sup-ord="sent"      onclick="setSupplyOrdFilter('sent')">Отправленные</button>
+                <button class="filter-tab"        data-sup-ord="partial"   onclick="setSupplyOrdFilter('partial')">Частично</button>
+                <button class="filter-tab"        data-sup-ord="received"  onclick="setSupplyOrdFilter('received')">Получены</button>
+                <button class="filter-tab"        data-sup-ord="all"       onclick="setSupplyOrdFilter('all')">Все</button>
+              </div>
+            </div>
+          </div>
+          <div id="sup-ord-list" class="sup-list">
+            <div class="loading-block">Загружаем заказы…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- КАРТОЧКА ЗАКАЗА -->
+      <div class="screen" data-screen="supply-order-detail" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;" id="sup-ord-detail">
+          <div class="loading-block">Загружаем заказ…</div>
+        </div>
+      </div>
+
+      <!-- ПРИЁМКИ -->
+      <div class="screen" data-screen="supply-receipts" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-package-import"></i>
+              <h1>Приёмки</h1>
+              <span class="page-counter" id="sup-rec-counter">0</span>
+            </div>
+          </div>
+          <div id="sup-rec-list" class="sup-list">
+            <div class="loading-block">Загружаем приёмки…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ПОСТАВЩИКИ -->
+      <div class="screen" data-screen="supply-suppliers" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-truck-loading"></i>
+              <h1>Поставщики</h1>
+              <span class="page-counter" id="sup-sup-counter">0</span>
+            </div>
+            <button class="btn btn-primary" id="sup-sup-new-btn" onclick="openNewSupplier()">
+              <i class="ti ti-plus"></i> Добавить поставщика
+            </button>
+          </div>
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="search-box" style="flex: 1; max-width: 340px;">
+                <i class="ti ti-search"></i>
+                <input type="text" id="sup-sup-search" placeholder="Поиск по названию или ИНН…" oninput="onSupplierSearchInput()">
+              </div>
+            </div>
+          </div>
+          <div id="sup-sup-list" class="sup-list">
+            <div class="loading-block">Загружаем поставщиков…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- КАТАЛОГ ЗАКУПАЕМОЙ НОМЕНКЛАТУРЫ -->
+      <div class="screen" data-screen="supply-catalog" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-list-details"></i>
+              <h1>Каталог закупок</h1>
+              <span class="page-counter" id="sup-cat-counter">0</span>
+            </div>
+            <button class="btn btn-primary" id="sup-cat-new-btn" onclick="openNewSupplyItem()">
+              <i class="ti ti-plus"></i> Добавить позицию
+            </button>
+          </div>
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-sup-cat="all"      onclick="setSupplyCatKindFilter('all')">Все</button>
+                <button class="filter-tab"        data-sup-cat="material" onclick="setSupplyCatKindFilter('material')">Комплектующие</button>
+                <button class="filter-tab"        data-sup-cat="product"  onclick="setSupplyCatKindFilter('product')">Для перепродажи</button>
+              </div>
+              <div class="search-box" style="margin-left: 12px; flex: 1; max-width: 340px;">
+                <i class="ti ti-search"></i>
+                <input type="text" id="sup-cat-search" placeholder="Поиск по названию…" oninput="onSupplyCatSearchInput()">
+              </div>
+            </div>
+          </div>
+          <div id="sup-cat-list" class="sup-list">
+            <div class="loading-block">Загружаем каталог…</div>
+          </div>
+        </div>
+      </div>
+      <!-- ============ КОНЕЦ РАЗДЕЛА СНАБЖЕНИЕ ============ -->
 
       <!-- ============ ЭТАП 16В: ЗАДАЧИ ============ -->
 
@@ -4406,6 +4775,9 @@
 <!-- ============ ЭТАП 18: МОДАЛКА КАРТОЧКИ СБОРКИ ============ -->
 <div class="modal-overlay" id="assembly-stock-modal"></div>
 
+<!-- ============ ЭТАП 19: МОДАЛКА СНАБЖЕНИЯ ============ -->
+<div class="modal-overlay" id="supply-modal"></div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast">
   <i class="ti ti-check" id="toast-icon"></i>
@@ -4416,7 +4788,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.0.0-stage18";
+const APP_VERSION = "v2.1.0-stage19";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -4433,7 +4805,7 @@ const SECTION_CONFIG = {
   tasks:      { sidebar: 'sidebar-tasks',      defaultScreen: 'tasks-list' },       // ЭТАП 16В
   warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-stock' },     // ЭТАП 18
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
-  supply:     { sidebar: 'sidebar-coming',     defaultScreen: 'coming-supply',    comingSoon: true },
+  supply:     { sidebar: 'sidebar-supply',     defaultScreen: 'supply-requests' },    // ЭТАП 19
   help:       { sidebar: 'sidebar-help',       defaultScreen: 'help-knowledge' },
 };
 
@@ -4870,6 +5242,13 @@ function selectSidebarItem(screenName) {
   // ЭТАП 18: склад
   if (screenName === 'warehouse-stock')     loadWarehouseStock();
   if (screenName === 'warehouse-movements') loadWarehouseMovements();
+  // ЭТАП 19: снабжение
+  if (screenName === 'supply-requests')     loadSupplyRequests();
+  if (screenName === 'supply-orders')       loadSupplyOrders();
+  if (screenName === 'supply-order-detail') loadSupplyOrderDetail();
+  if (screenName === 'supply-receipts')     loadSupplyReceipts();
+  if (screenName === 'supply-suppliers')    loadSuppliers();
+  if (screenName === 'supply-catalog')      loadSupplyCatalog();
   if (screenName === 'sales-offer-form') initOfferForm();
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
@@ -10677,6 +11056,1017 @@ async function shipByContract(contractId) {
     showToast('Ошибка соединения', 'error');
   }
 }
+
+// ============================================================
+// ============ ЭТАП 19: СНАБЖЕНИЕ ============
+// ============================================================
+
+cache.suppliers = null;
+cache.supplyCatalog = null;
+cache.supplyRequests = null;
+cache.supplyOrders = null;
+cache.supplyReceipts = null;
+cache.currentSupplyOrder = null;
+
+state.supplyReqFilter = 'open';        // open | new | ordered | received | all
+state.supplyOrdFilter = 'open';        // open | draft | sent | partial | received | all
+state.supplyCatKindFilter = 'all';     // all | material | product
+state.supplyCatSearch = '';
+state.supplyCatSearchTimer = null;
+state.supplierSearch = '';
+state.supplierSearchTimer = null;
+state.currentSupplyOrderId = null;
+
+const SUPPLY_ITEM_KIND_LABELS = {
+  material: 'Комплектующее',
+  product:  'Товар для перепродажи',
+};
+
+const SUPPLY_REQUEST_STATUS_LABELS = {
+  new:       'новая',
+  ordered:   'в заказе',
+  received:  'получена',
+  cancelled: 'отменена',
+};
+
+const SUPPLY_ORDER_STATUS_LABELS = {
+  draft:     'черновик',
+  sent:      'отправлен',
+  partial:   'частично',
+  received:  'получен',
+  cancelled: 'отменён',
+};
+
+function canManageSupply() {
+  if (!state.user) return false;
+  const roles = state.user.roles || [];
+  return roles.includes('director') || roles.includes('zam') || roles.includes('manager');
+}
+
+// ========== ПОСТАВЩИКИ ==========
+
+async function loadSuppliers() {
+  const container = document.getElementById('sup-sup-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем поставщиков…</div>';
+  try {
+    const params = new URLSearchParams();
+    if (state.supplierSearch) params.set('search', state.supplierSearch);
+    const d = await apiGet('/api/suppliers' + (params.toString() ? '?' + params.toString() : ''));
+    cache.suppliers = d.suppliers || [];
+    renderSuppliers();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSuppliers() {
+  const container = document.getElementById('sup-sup-list');
+  const list = cache.suppliers || [];
+  document.getElementById('sup-sup-counter').textContent = list.length;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-truck-loading"></i>Поставщиков пока нет</div>';
+    return;
+  }
+  const canManage = canManageSupply();
+  let html = '';
+  list.forEach(s => {
+    const lines = [];
+    if (s.contact_person) lines.push('<i class="ti ti-user"></i>' + escapeHtml(s.contact_person));
+    if (s.phone)          lines.push('<i class="ti ti-phone"></i>' + escapeHtml(s.phone));
+    if (s.email)          lines.push('<i class="ti ti-mail"></i>' + escapeHtml(s.email));
+    if (s.inn)            lines.push('<i class="ti ti-id"></i>ИНН ' + escapeHtml(s.inn));
+    html += '<div class="sup-row" onclick="openEditSupplier(' + s.id + ')">' +
+      '<div class="sup-row-icon"><i class="ti ti-truck-loading"></i></div>' +
+      '<div class="sup-row-body">' +
+        '<div class="sup-row-title">' + escapeHtml(s.name) + '</div>' +
+        (lines.length ? '<div class="sup-row-meta">' + lines.map(l => '<span>' + l + '</span>').join('') + '</div>' : '') +
+        (s.comment ? '<div class="sup-row-comment">' + escapeHtml(s.comment) + '</div>' : '') +
+      '</div>' +
+      (canManage ? '<div class="sup-row-actions"><button class="btn-icon-warning" onclick="event.stopPropagation(); deleteSupplier(' + s.id + ')" title="Удалить"><i class="ti ti-trash"></i></button></div>' : '') +
+      '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function onSupplierSearchInput() {
+  const input = document.getElementById('sup-sup-search');
+  clearTimeout(state.supplierSearchTimer);
+  state.supplierSearchTimer = setTimeout(() => {
+    state.supplierSearch = input.value.trim();
+    loadSuppliers();
+  }, 300);
+}
+
+function openNewSupplier() {
+  if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
+  showSupplierModal(null);
+}
+
+async function openEditSupplier(supplierId) {
+  try {
+    const s = await apiGet('/api/suppliers/' + supplierId);
+    showSupplierModal(s);
+  } catch (e) {
+    showToast('Не удалось загрузить', 'error');
+  }
+}
+
+function showSupplierModal(s) {
+  const isEdit = !!s;
+  const canManage = canManageSupply();
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
+    '<div class="modal-body" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-truck-loading"></i> ' + (isEdit ? 'Редактировать поставщика' : 'Новый поставщик') + '</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Название *</label><input type="text" id="sm-name" value="' + escapeHtml(isEdit ? s.name : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '<div class="form-group"><label>ИНН</label><input type="text" id="sm-inn" value="' + escapeHtml(isEdit ? s.inn : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '<div class="form-group"><label>Контактное лицо</label><input type="text" id="sm-contact" value="' + escapeHtml(isEdit ? s.contact_person : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '<div class="form-group form-row-2">' +
+          '<div><label>Телефон</label><input type="text" id="sm-phone" value="' + escapeHtml(isEdit ? s.phone : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+          '<div><label>Email</label><input type="email" id="sm-email" value="' + escapeHtml(isEdit ? s.email : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '</div>' +
+        '<div class="form-group"><label>Комментарий</label><textarea id="sm-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? s.comment : '') + '</textarea></div>' +
+        (canManage ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveSupplier(' + (isEdit ? s.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>' : '') +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeSupplyModal() {
+  document.getElementById('supply-modal').classList.remove('visible');
+}
+
+async function saveSupplier(supplierId) {
+  const payload = {
+    name:           document.getElementById('sm-name').value.trim(),
+    inn:            document.getElementById('sm-inn').value.trim(),
+    contact_person: document.getElementById('sm-contact').value.trim(),
+    phone:          document.getElementById('sm-phone').value.trim(),
+    email:          document.getElementById('sm-email').value.trim(),
+    comment:        document.getElementById('sm-comment').value.trim(),
+  };
+  if (!payload.name) { showToast('Укажите название', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = supplierId ? '/api/suppliers/' + supplierId : '/api/suppliers';
+    const method = supplierId ? 'PATCH' : 'POST';
+    const r = await fetch(API_BASE + url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось сохранить', 'error');
+      return;
+    }
+    showToast(supplierId ? 'Сохранено' : 'Поставщик добавлен', 'success');
+    closeSupplyModal();
+    cache.suppliers = null;
+    if (state.currentScreen === 'supply-suppliers') loadSuppliers();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteSupplier(supplierId) {
+  if (!confirm('Архивировать этого поставщика?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/suppliers/' + supplierId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось', 'error'); return; }
+    showToast('Архивирован', 'success');
+    cache.suppliers = null;
+    if (state.currentScreen === 'supply-suppliers') loadSuppliers();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ========== КАТАЛОГ ЗАКУПОК ==========
+
+async function loadSupplyCatalog() {
+  const container = document.getElementById('sup-cat-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем каталог…</div>';
+  try {
+    const params = new URLSearchParams();
+    if (state.supplyCatKindFilter !== 'all') params.set('kind', state.supplyCatKindFilter);
+    if (state.supplyCatSearch)               params.set('search', state.supplyCatSearch);
+    const d = await apiGet('/api/supply-items' + (params.toString() ? '?' + params.toString() : ''));
+    cache.supplyCatalog = d.items || [];
+    renderSupplyCatalog();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSupplyCatalog() {
+  const container = document.getElementById('sup-cat-list');
+  const list = cache.supplyCatalog || [];
+  document.getElementById('sup-cat-counter').textContent = list.length;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-list-details"></i>Под этот фильтр позиций нет</div>';
+    return;
+  }
+  const canManage = canManageSupply();
+  let html = '';
+  list.forEach(i => {
+    const kindCls = i.kind === 'product' ? 'kind-product' : 'kind-material';
+    html += '<div class="sup-row" onclick="openEditSupplyItem(' + i.id + ')">' +
+      '<div class="sup-row-icon"><i class="ti ti-package"></i></div>' +
+      '<div class="sup-row-body">' +
+        '<div class="sup-row-title">' + escapeHtml(i.name) + '</div>' +
+        '<div class="sup-row-meta">' +
+          '<span class="sup-kind-pill ' + kindCls + '">' + escapeHtml(i.kind_label) + '</span>' +
+          '<span><i class="ti ti-ruler"></i>' + escapeHtml(i.unit) + '</span>' +
+        '</div>' +
+        (i.comment ? '<div class="sup-row-comment">' + escapeHtml(i.comment) + '</div>' : '') +
+      '</div>' +
+      (canManage ? '<div class="sup-row-actions"><button class="btn-icon-warning" onclick="event.stopPropagation(); deleteSupplyItem(' + i.id + ')" title="Удалить"><i class="ti ti-trash"></i></button></div>' : '') +
+      '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function setSupplyCatKindFilter(f) {
+  state.supplyCatKindFilter = f;
+  document.querySelectorAll('[data-sup-cat]').forEach(b => b.classList.toggle('active', b.dataset.supCat === f));
+  loadSupplyCatalog();
+}
+
+function onSupplyCatSearchInput() {
+  const input = document.getElementById('sup-cat-search');
+  clearTimeout(state.supplyCatSearchTimer);
+  state.supplyCatSearchTimer = setTimeout(() => {
+    state.supplyCatSearch = input.value.trim();
+    loadSupplyCatalog();
+  }, 300);
+}
+
+function openNewSupplyItem() {
+  if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
+  showSupplyItemModal(null);
+}
+
+async function openEditSupplyItem(itemId) {
+  try {
+    const i = await apiGet('/api/supply-items/' + itemId);
+    showSupplyItemModal(i);
+  } catch (e) {
+    showToast('Не удалось загрузить', 'error');
+  }
+}
+
+function showSupplyItemModal(i) {
+  const isEdit = !!i;
+  const canManage = canManageSupply();
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
+    '<div class="modal-body" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package"></i> ' + (isEdit ? 'Редактировать позицию' : 'Новая позиция каталога') + '</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Название *</label><input type="text" id="si-name" value="' + escapeHtml(isEdit ? i.name : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '<div class="form-group form-row-2">' +
+          '<div><label>Тип *</label>' +
+            '<select id="si-kind" ' + (canManage ? '' : 'disabled') + '>' +
+              '<option value="material"' + (isEdit && i.kind === 'material' ? ' selected' : '') + '>Комплектующее для сборки</option>' +
+              '<option value="product"'  + (isEdit && i.kind === 'product'  ? ' selected' : '') + '>Товар для перепродажи</option>' +
+            '</select>' +
+          '</div>' +
+          '<div><label>Ед. изм.</label><input type="text" id="si-unit" value="' + escapeHtml(isEdit ? i.unit : 'шт.') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '</div>' +
+        '<div class="form-group"><label>Комментарий</label><textarea id="si-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? i.comment : '') + '</textarea></div>' +
+        (canManage ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveSupplyItem(' + (isEdit ? i.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>' : '') +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function saveSupplyItem(itemId) {
+  const payload = {
+    name:    document.getElementById('si-name').value.trim(),
+    kind:    document.getElementById('si-kind').value,
+    unit:    document.getElementById('si-unit').value.trim() || 'шт.',
+    comment: document.getElementById('si-comment').value.trim(),
+  };
+  if (!payload.name) { showToast('Укажите название', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = itemId ? '/api/supply-items/' + itemId : '/api/supply-items';
+    const method = itemId ? 'PATCH' : 'POST';
+    const r = await fetch(API_BASE + url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось сохранить', 'error');
+      return;
+    }
+    showToast(itemId ? 'Сохранено' : 'Позиция добавлена', 'success');
+    closeSupplyModal();
+    cache.supplyCatalog = null;
+    if (state.currentScreen === 'supply-catalog') loadSupplyCatalog();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function deleteSupplyItem(itemId) {
+  if (!confirm('Архивировать эту позицию?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-items/' + itemId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось', 'error'); return; }
+    showToast('Архивирована', 'success');
+    cache.supplyCatalog = null;
+    if (state.currentScreen === 'supply-catalog') loadSupplyCatalog();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ========== ЗАЯВКИ ==========
+
+async function loadSupplyRequests() {
+  const container = document.getElementById('sup-req-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем заявки…</div>';
+  try {
+    const params = new URLSearchParams();
+    if (state.supplyReqFilter !== 'all') params.set('status', state.supplyReqFilter);
+    const d = await apiGet('/api/supply-requests' + (params.toString() ? '?' + params.toString() : ''));
+    cache.supplyRequests = d.requests || [];
+    renderSupplyRequests();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSupplyRequests() {
+  const container = document.getElementById('sup-req-list');
+  const list = cache.supplyRequests || [];
+  document.getElementById('sup-req-counter').textContent = list.length;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-clipboard-list"></i>Под этот фильтр заявок нет</div>';
+    return;
+  }
+  const canManage = canManageSupply();
+  let html = '';
+  list.forEach(r => { html += renderSupplyRequestRow(r, canManage); });
+  container.innerHTML = html;
+}
+
+function renderSupplyRequestRow(r, canManage) {
+  const meta = [];
+  meta.push('<span class="sup-status-pill st-' + r.status + '">' + escapeHtml(r.status_label) + '</span>');
+  if (r.needed_by) {
+    const d = new Date(r.needed_by);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((d - today) / (1000 * 60 * 60 * 24));
+    let cls = '';
+    let txt = 'к ' + r.needed_by;
+    if (r.status === 'new' || r.status === 'ordered') {
+      if (diff < 0) { cls = 'urgent'; txt = 'просрочена ' + Math.abs(diff) + ' дн.'; }
+      else if (diff <= 3) cls = 'soon';
+    }
+    meta.push('<span class="sup-req-deadline ' + cls + '"><i class="ti ti-calendar"></i>' + escapeHtml(txt) + '</span>');
+  }
+  if (r.contract_id && r.contract_number) {
+    meta.push('<span class="sup-contract-badge" onclick="event.stopPropagation(); openContractFromSupply(' + r.contract_id + ')"><i class="ti ti-link"></i>' +
+      escapeHtml(r.contract_number) + (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : '') + '</span>');
+  }
+  const actions = canManage && r.status !== 'received'
+    ? '<div class="sup-row-actions"><button class="btn-icon-warning" onclick="event.stopPropagation(); deleteSupplyRequest(' + r.id + ')" title="Удалить"><i class="ti ti-trash"></i></button></div>'
+    : '';
+  return '<div class="sup-row" onclick="openEditSupplyRequest(' + r.id + ')">' +
+    '<div class="sup-row-icon"><i class="ti ti-clipboard-list"></i></div>' +
+    '<div class="sup-row-body">' +
+      '<div class="sup-row-title">' + escapeHtml(r.item_name) + ' — <strong>' + r.qty + ' ' + escapeHtml(r.item_unit) + '</strong></div>' +
+      '<div class="sup-row-meta">' + meta.join('') + '</div>' +
+      (r.comment ? '<div class="sup-row-comment">' + escapeHtml(r.comment) + '</div>' : '') +
+    '</div>' + actions + '</div>';
+}
+
+function setSupplyReqFilter(f) {
+  state.supplyReqFilter = f;
+  document.querySelectorAll('[data-sup-req]').forEach(b => b.classList.toggle('active', b.dataset.supReq === f));
+  loadSupplyRequests();
+}
+
+function openNewSupplyRequest() {
+  if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
+  showSupplyRequestModal(null);
+}
+
+async function openEditSupplyRequest(rid) {
+  try {
+    const r = await apiGet('/api/supply-requests/' + rid);
+    showSupplyRequestModal(r);
+  } catch (e) {
+    showToast('Не удалось загрузить', 'error');
+  }
+}
+
+async function showSupplyRequestModal(r) {
+  const isEdit = !!r;
+  const canManage = canManageSupply();
+  // Загружаем каталог если ещё не закеширован
+  if (!cache.supplyCatalog) {
+    try {
+      const d = await apiGet('/api/supply-items');
+      cache.supplyCatalog = d.items || [];
+    } catch (e) { cache.supplyCatalog = []; }
+  }
+  const items = cache.supplyCatalog;
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
+    '<div class="modal-body" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-clipboard-list"></i> ' + (isEdit ? 'Заявка #' + r.id : 'Новая заявка на закупку') + '</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Позиция *</label>' +
+          '<select id="sr-item" ' + (canManage ? '' : 'disabled') + '>' +
+            '<option value="">— выбрать —</option>' +
+            items.map(i => '<option value="' + i.id + '"' + (isEdit && r.item_id === i.id ? ' selected' : '') + '>' +
+              escapeHtml(i.name) + ' (' + escapeHtml(i.unit) + ')</option>').join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group form-row-2">' +
+          '<div><label>Количество *</label><input type="number" id="sr-qty" min="0.001" step="any" value="' + (isEdit ? r.qty : '1') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+          '<div><label>Нужно к дате</label><input type="date" id="sr-needed-by" value="' + escapeHtml(isEdit ? (r.needed_by || '') : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        '</div>' +
+        (isEdit && r.contract_number
+          ? '<div class="form-group"><label>Договор</label><div class="picker-display"><div class="picker-display-value"><i class="ti ti-file-text"></i> ' + escapeHtml(r.contract_number) + (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : '') + '</div></div></div>'
+          : '') +
+        '<div class="form-group"><label>Комментарий</label><textarea id="sr-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? r.comment : '') + '</textarea></div>' +
+        (isEdit
+          ? '<div class="form-group"><label>Статус</label><div><span class="sup-status-pill st-' + r.status + '">' + escapeHtml(r.status_label) + '</span></div></div>'
+          : '') +
+        (canManage
+          ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveSupplyRequest(' + (isEdit ? r.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>'
+          : '') +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function saveSupplyRequest(requestId) {
+  const payload = {
+    item_id:   parseInt(document.getElementById('sr-item').value || '0') || null,
+    qty:       parseFloat(document.getElementById('sr-qty').value || '0'),
+    needed_by: document.getElementById('sr-needed-by').value || null,
+    comment:   document.getElementById('sr-comment').value.trim(),
+  };
+  if (!payload.item_id) { showToast('Выберите позицию', 'error'); return; }
+  if (!payload.qty || payload.qty <= 0) { showToast('Укажите количество', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = requestId ? '/api/supply-requests/' + requestId : '/api/supply-requests';
+    const method = requestId ? 'PATCH' : 'POST';
+    const r = await fetch(API_BASE + url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось', 'error');
+      return;
+    }
+    showToast(requestId ? 'Сохранено' : 'Заявка создана', 'success');
+    closeSupplyModal();
+    cache.supplyRequests = null;
+    if (state.currentScreen === 'supply-requests') loadSupplyRequests();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function deleteSupplyRequest(rid) {
+  if (!confirm('Удалить эту заявку?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-requests/' + rid, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось', 'error'); return; }
+    showToast('Удалено', 'success');
+    cache.supplyRequests = null;
+    if (state.currentScreen === 'supply-requests') loadSupplyRequests();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+function openContractFromSupply(contractId) {
+  if (!contractId) return;
+  state.currentContractId = contractId;
+  selectSection('sales');
+  selectSidebarItem('sales-contract-detail');
+}
+
+// ========== ЗАКАЗЫ (список) ==========
+
+async function loadSupplyOrders() {
+  const container = document.getElementById('sup-ord-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем заказы…</div>';
+  try {
+    const params = new URLSearchParams();
+    if (state.supplyOrdFilter !== 'all') params.set('status', state.supplyOrdFilter);
+    const d = await apiGet('/api/supply-orders' + (params.toString() ? '?' + params.toString() : ''));
+    cache.supplyOrders = d.orders || [];
+    renderSupplyOrders();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSupplyOrders() {
+  const container = document.getElementById('sup-ord-list');
+  const list = cache.supplyOrders || [];
+  document.getElementById('sup-ord-counter').textContent = list.length;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Под этот фильтр заказов нет</div>';
+    return;
+  }
+  let html = '';
+  list.forEach(o => {
+    const total = o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '';
+    html += '<div class="sup-row" onclick="openSupplyOrder(' + o.id + ')">' +
+      '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
+      '<div class="sup-row-body">' +
+        '<div class="sup-row-title">Заказ #' + o.id + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+        '<div class="sup-row-meta">' +
+          '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
+          '<span><i class="ti ti-list"></i>' + o.items_count + ' позиций</span>' +
+          (total ? '<span><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
+          (o.expected_date ? '<span><i class="ti ti-calendar"></i>ожидаем ' + escapeHtml(o.expected_date) + '</span>' : '') +
+        '</div>' +
+      '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function setSupplyOrdFilter(f) {
+  state.supplyOrdFilter = f;
+  document.querySelectorAll('[data-sup-ord]').forEach(b => b.classList.toggle('active', b.dataset.supOrd === f));
+  loadSupplyOrders();
+}
+
+async function openNewSupplyOrder() {
+  if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
+  // Подгружаем поставщиков
+  if (!cache.suppliers) {
+    try {
+      const d = await apiGet('/api/suppliers');
+      cache.suppliers = d.suppliers || [];
+    } catch (e) { cache.suppliers = []; }
+  }
+  if (!cache.suppliers.length) {
+    showToast('Сначала добавьте хотя бы одного поставщика', 'error');
+    return;
+  }
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
+    '<div class="modal-body" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-invoice"></i> Новый заказ поставщику</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Поставщик *</label>' +
+          '<select id="so-supplier">' +
+            '<option value="">— выбрать —</option>' +
+            cache.suppliers.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group"><label>Ожидаемая дата приёмки</label><input type="date" id="so-expected"></div>' +
+        '<div class="form-group"><label>Комментарий</label><textarea id="so-comment" rows="3"></textarea></div>' +
+        '<div class="modal-actions"><button class="btn btn-primary" onclick="saveNewSupplyOrder()"><i class="ti ti-check"></i> Создать черновик</button></div>' +
+        '<div class="modal-note">После создания заказа добавьте в него позиции и отправьте поставщику.</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function saveNewSupplyOrder() {
+  const payload = {
+    supplier_id:   parseInt(document.getElementById('so-supplier').value || '0') || null,
+    expected_date: document.getElementById('so-expected').value || null,
+    comment:       document.getElementById('so-comment').value.trim(),
+  };
+  if (!payload.supplier_id) { showToast('Выберите поставщика', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось', 'error');
+      return;
+    }
+    const created = await r.json();
+    showToast('Заказ #' + created.id + ' создан', 'success');
+    closeSupplyModal();
+    cache.supplyOrders = null;
+    state.currentSupplyOrderId = created.id;
+    selectSidebarItem('supply-order-detail');
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ========== КАРТОЧКА ЗАКАЗА ==========
+
+function openSupplyOrder(orderId) {
+  state.currentSupplyOrderId = orderId;
+  selectSidebarItem('supply-order-detail');
+}
+
+async function loadSupplyOrderDetail() {
+  if (!state.currentSupplyOrderId) {
+    selectSidebarItem('supply-orders');
+    return;
+  }
+  const container = document.getElementById('sup-ord-detail');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем заказ…</div>';
+  try {
+    const o = await apiGet('/api/supply-orders/' + state.currentSupplyOrderId);
+    cache.currentSupplyOrder = o;
+    renderSupplyOrderDetail(o);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSupplyOrderDetail(o) {
+  const container = document.getElementById('sup-ord-detail');
+  const canManage = canManageSupply();
+  const canEdit = canManage && ['draft', 'sent', 'partial'].includes(o.status);
+  const canSend = canManage && o.status === 'draft' && (o.items || []).length > 0;
+  const canReceive = canManage && ['sent', 'partial'].includes(o.status);
+
+  let html = '';
+  // Шапка с возвратом
+  html += '<div class="page-header">' +
+    '<button class="back-btn" onclick="selectSidebarItem(\'supply-orders\')"><i class="ti ti-arrow-left"></i></button>' +
+    '<div class="page-header-title">' +
+      '<i class="ti ti-file-invoice"></i>' +
+      '<h1>Заказ #' + o.id + '</h1>' +
+      '<span class="sup-status-pill ord-' + o.status + '" style="margin-left: 8px;">' + escapeHtml(o.status_label) + '</span>' +
+    '</div>' +
+    '</div>';
+
+  // Сведения о поставщике
+  html += '<div class="detail-block">' +
+    '<div class="detail-block-title"><i class="ti ti-truck-loading"></i> Поставщик</div>' +
+    '<div class="detail-grid">' +
+      '<div class="detail-item"><div class="detail-label">Название</div><div class="detail-value">' + escapeHtml(o.supplier_name) + '</div></div>' +
+      (o.supplier_contact ? '<div class="detail-item"><div class="detail-label">Контакт</div><div class="detail-value">' + escapeHtml(o.supplier_contact) + '</div></div>' : '') +
+      (o.supplier_phone ? '<div class="detail-item"><div class="detail-label">Телефон</div><div class="detail-value">' + escapeHtml(o.supplier_phone) + '</div></div>' : '') +
+      (o.supplier_email ? '<div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">' + escapeHtml(o.supplier_email) + '</div></div>' : '') +
+      (o.expected_date ? '<div class="detail-item"><div class="detail-label">Ожидаем</div><div class="detail-value">' + escapeHtml(o.expected_date) + '</div></div>' : '') +
+      (o.sent_at ? '<div class="detail-item"><div class="detail-label">Отправлен</div><div class="detail-value">' + escapeHtml((o.sent_at || '').replace('T', ' ').substring(0, 16)) + '</div></div>' : '') +
+    '</div>' +
+    (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
+    '</div>';
+
+  // Позиции заказа
+  html += '<div class="detail-block">' +
+    '<div class="detail-block-title">' +
+      '<i class="ti ti-list"></i> Позиции' +
+      (canEdit ? '<button class="btn btn-secondary btn-small" style="margin-left: auto;" onclick="openAddOrderItem(' + o.id + ')"><i class="ti ti-plus"></i> Добавить</button>' : '') +
+    '</div>';
+
+  const items = o.items || [];
+  if (!items.length) {
+    html += '<div class="empty-block" style="padding: 24px;"><i class="ti ti-package-off"></i>В заказе пока нет позиций' +
+      (canEdit ? '<br><br><button class="btn btn-primary btn-small" onclick="openAddOrderItem(' + o.id + ')"><i class="ti ti-plus"></i> Добавить первую</button>' : '') +
+      '</div>';
+  } else {
+    html += '<div class="oi-list">';
+    items.forEach(oi => {
+      const totalLine = (oi.price !== null && oi.price !== undefined) ? Math.round(oi.amount).toLocaleString('ru-RU') + ' ₽' : '';
+      const receivedTag = oi.received_qty > 0
+        ? '<span class="oi-received">принято ' + oi.received_qty + ' из ' + oi.qty + '</span>'
+        : '';
+      html += '<div class="oi-row">' +
+        '<div class="oi-body">' +
+          '<div class="oi-title">' + escapeHtml(oi.item_name) + '</div>' +
+          '<div class="oi-meta">' +
+            '<span>' + oi.qty + ' ' + escapeHtml(oi.item_unit) + '</span>' +
+            (oi.price !== null && oi.price !== undefined ? '<span>' + oi.price + ' ₽/шт</span>' : '') +
+            (oi.contract_number ? '<span class="sup-contract-badge" onclick="openContractFromSupply(' + oi.request_contract_id + ')"><i class="ti ti-link"></i>' + escapeHtml(oi.contract_number) + '</span>' : '') +
+            receivedTag +
+          '</div>' +
+          (oi.comment ? '<div class="oi-comment">' + escapeHtml(oi.comment) + '</div>' : '') +
+        '</div>' +
+        '<div class="oi-total">' + totalLine + '</div>' +
+        (canEdit && o.status === 'draft' ? '<div class="oi-actions"><button class="btn-icon-warning" onclick="removeOrderItem(' + oi.id + ')" title="Убрать"><i class="ti ti-x"></i></button></div>' : '') +
+        '</div>';
+    });
+    html += '</div>';
+    // Итого
+    html += '<div class="oi-total-row">Итого: <strong>' + Math.round(o.total_amount || 0).toLocaleString('ru-RU') + ' ₽</strong></div>';
+  }
+  html += '</div>';
+
+  // Кнопки действий
+  let actions = [];
+  if (canSend)    actions.push('<button class="btn btn-primary" onclick="sendOrder(' + o.id + ')"><i class="ti ti-send"></i> Отправить поставщику</button>');
+  if (canReceive) actions.push('<button class="btn btn-primary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Принять приёмку</button>');
+  if (actions.length) {
+    html += '<div class="detail-actions">' + actions.join('') + '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+async function openAddOrderItem(orderId) {
+  if (!cache.supplyCatalog) {
+    try {
+      const d = await apiGet('/api/supply-items');
+      cache.supplyCatalog = d.items || [];
+    } catch (e) { cache.supplyCatalog = []; }
+  }
+  // Загрузим заявки в статусе 'new' для возможной привязки
+  let openRequests = [];
+  try {
+    const d = await apiGet('/api/supply-requests?status=new');
+    openRequests = d.requests || [];
+  } catch (e) {}
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
+    '<div class="modal-body" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-plus"></i> Добавить позицию в заказ</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        (openRequests.length > 0
+          ? '<div class="form-group"><label>Закрыть заявку (опционально)</label>' +
+              '<select id="oi-request" onchange="onPickRequestForOrderItem()">' +
+                '<option value="">— заявку не привязывать —</option>' +
+                openRequests.map(r => '<option value="' + r.id + '" data-item-id="' + r.item_id + '" data-qty="' + r.qty + '">#' + r.id + ' · ' + escapeHtml(r.item_name) + ' — ' + r.qty + ' ' + escapeHtml(r.item_unit) + (r.contract_number ? ' · ' + escapeHtml(r.contract_number) : '') + '</option>').join('') +
+              '</select>' +
+            '</div>'
+          : '') +
+        '<div class="form-group"><label>Позиция *</label>' +
+          '<select id="oi-item">' +
+            '<option value="">— выбрать —</option>' +
+            cache.supplyCatalog.map(i => '<option value="' + i.id + '">' + escapeHtml(i.name) + ' (' + escapeHtml(i.unit) + ')</option>').join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group form-row-2">' +
+          '<div><label>Количество *</label><input type="number" id="oi-qty" min="0.001" step="any" value="1"></div>' +
+          '<div><label>Цена за единицу</label><input type="number" id="oi-price" min="0" step="any" placeholder="опц."></div>' +
+        '</div>' +
+        '<div class="form-group"><label>Комментарий</label><input type="text" id="oi-comment"></div>' +
+        '<div class="modal-actions"><button class="btn btn-primary" onclick="saveOrderItem(' + orderId + ')"><i class="ti ti-check"></i> Добавить</button></div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function onPickRequestForOrderItem() {
+  const sel = document.getElementById('oi-request');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  const itemId = opt.dataset.itemId;
+  const qty = opt.dataset.qty;
+  if (itemId) document.getElementById('oi-item').value = itemId;
+  if (qty)    document.getElementById('oi-qty').value = qty;
+}
+
+async function saveOrderItem(orderId) {
+  const payload = {
+    item_id: parseInt(document.getElementById('oi-item').value || '0') || null,
+    qty:     parseFloat(document.getElementById('oi-qty').value || '0'),
+    price:   parseFloat(document.getElementById('oi-price').value || '') || null,
+    request_id: (function() {
+      const el = document.getElementById('oi-request');
+      return el && el.value ? parseInt(el.value) : null;
+    })(),
+    comment: document.getElementById('oi-comment').value.trim(),
+  };
+  if (!payload.item_id) { showToast('Выберите позицию', 'error'); return; }
+  if (!payload.qty || payload.qty <= 0) { showToast('Укажите количество', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось', 'error');
+      return;
+    }
+    showToast('Позиция добавлена', 'success');
+    closeSupplyModal();
+    cache.supplyOrders = null;
+    cache.supplyRequests = null;
+    loadSupplyOrderDetail();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function removeOrderItem(oiId) {
+  if (!confirm('Убрать эту позицию из заказа?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + oiId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось', 'error'); return; }
+    showToast('Позиция убрана', 'success');
+    cache.supplyOrders = null;
+    cache.supplyRequests = null;
+    loadSupplyOrderDetail();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+async function sendOrder(orderId) {
+  if (!confirm('Перевести заказ в статус "Отправлен"?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/send', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось', 'error');
+      return;
+    }
+    showToast('Заказ отправлен', 'success');
+    cache.supplyOrders = null;
+    loadSupplyOrderDetail();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ========== ПРИЁМКА ==========
+
+async function openReceiveOrder(orderId) {
+  // Загружаем заказ заново чтобы было актуальное received_qty
+  let o;
+  try {
+    o = await apiGet('/api/supply-orders/' + orderId);
+  } catch (e) {
+    showToast('Не удалось загрузить заказ', 'error');
+    return;
+  }
+  const today = new Date().toISOString().substring(0, 10);
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal-overlay" onclick="closeSupplyModal()"></div>' +
+    '<div class="modal-body modal-body-wide" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package-import"></i> Приёмка заказа #' + o.id + '</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Дата приёмки *</label><input type="date" id="rec-date" value="' + today + '"></div>' +
+        '<div class="form-group"><label>Комментарий</label><input type="text" id="rec-comment" placeholder="опционально"></div>' +
+        '<div class="rec-items-title">Что приехало:</div>' +
+        '<div class="rec-items-list">' +
+          (o.items || []).map(oi => {
+            const remaining = oi.qty - (oi.received_qty || 0);
+            if (remaining <= 0) return '';
+            return '<div class="rec-item-row" data-oi-id="' + oi.id + '">' +
+              '<div class="rec-item-name">' + escapeHtml(oi.item_name) +
+                ' <span class="rec-item-note">из ' + oi.qty + ' ' + escapeHtml(oi.item_unit) +
+                (oi.received_qty > 0 ? ' (ещё ждём ' + remaining + ')' : '') +
+                '</span>' +
+              '</div>' +
+              '<input type="number" class="rec-item-qty" min="0" max="' + remaining + '" step="any" value="' + remaining + '" data-oi-id="' + oi.id + '">' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div class="modal-actions"><button class="btn btn-primary" onclick="saveReceipt(' + orderId + ')"><i class="ti ti-check"></i> Принять</button></div>' +
+        '<div class="modal-note">Поставь 0 для позиций, которые ещё не приехали — они останутся открытыми.</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function saveReceipt(orderId) {
+  const items = [];
+  document.querySelectorAll('.rec-item-qty').forEach(input => {
+    const qty = parseFloat(input.value || '0');
+    if (qty > 0) {
+      items.push({ order_item_id: parseInt(input.dataset.oiId), qty });
+    }
+  });
+  if (!items.length) { showToast('Не указано что приехало', 'error'); return; }
+  const payload = {
+    order_id:      orderId,
+    received_date: document.getElementById('rec-date').value,
+    comment:       document.getElementById('rec-comment').value.trim(),
+    items,
+  };
+  if (!payload.received_date) { showToast('Укажите дату', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось', 'error');
+      return;
+    }
+    showToast('Приёмка зарегистрирована', 'success');
+    closeSupplyModal();
+    cache.supplyOrders = null;
+    cache.supplyReceipts = null;
+    cache.supplyRequests = null;
+    loadSupplyOrderDetail();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ========== ПРИЁМКИ (журнал) ==========
+
+async function loadSupplyReceipts() {
+  const container = document.getElementById('sup-rec-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем приёмки…</div>';
+  try {
+    const d = await apiGet('/api/supply-receipts');
+    cache.supplyReceipts = d.receipts || [];
+    renderSupplyReceipts();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderSupplyReceipts() {
+  const container = document.getElementById('sup-rec-list');
+  const list = cache.supplyReceipts || [];
+  document.getElementById('sup-rec-counter').textContent = list.length;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-package-import"></i>Приёмок пока нет</div>';
+    return;
+  }
+  let html = '';
+  list.forEach(rec => {
+    html += '<div class="sup-row" onclick="openSupplyOrder(' + rec.order_id + ')">' +
+      '<div class="sup-row-icon"><i class="ti ti-package-import"></i></div>' +
+      '<div class="sup-row-body">' +
+        '<div class="sup-row-title">Приёмка #' + rec.id + ' · заказ #' + rec.order_id + '</div>' +
+        '<div class="sup-row-meta">' +
+          '<span><i class="ti ti-calendar"></i>' + escapeHtml(rec.received_date) + '</span>' +
+          '<span><i class="ti ti-truck-loading"></i>' + escapeHtml(rec.supplier_name || '—') + '</span>' +
+          '<span><i class="ti ti-list"></i>' + rec.items_count + ' позиций</span>' +
+        '</div>' +
+        (rec.comment ? '<div class="sup-row-comment">' + escapeHtml(rec.comment) + '</div>' : '') +
+      '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
 
 async function changeContractStatus(contractId, newStatus) {
   try {
