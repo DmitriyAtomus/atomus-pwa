@@ -4588,8 +4588,7 @@
 
 <!-- QRCode generation library (small, ~9KB) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<!-- QR scanner (~150KB) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<!-- html5-qrcode (~150KB) грузится лениво, только при первом нажатии «Скан». -->
 </head>
 <body>
 
@@ -6391,7 +6390,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.3.2-qr-scanner";
+const APP_VERSION = "v2.3.3-qr-lazy-load";
 const APP_VERSION_DATE = "14.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -16439,16 +16438,49 @@ function clearWarehouseSelection() {
 // ============================================================
 
 state._qrScannerInstance = null;
+state._qrScannerLibLoading = null;
+
+/**
+ * Лениво подгружает библиотеку html5-qrcode. Возвращает Promise.
+ * Кэширует результат — при повторных вызовах сразу резолвится.
+ */
+function loadQrScannerLib() {
+  if (typeof Html5Qrcode !== 'undefined') return Promise.resolve(true);
+  if (state._qrScannerLibLoading) return state._qrScannerLibLoading;
+  state._qrScannerLibLoading = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => {
+      state._qrScannerLibLoading = null; // дать ретрай
+      reject(new Error('Не удалось загрузить библиотеку сканера'));
+    };
+    document.head.appendChild(script);
+  });
+  return state._qrScannerLibLoading;
+}
 
 async function openQrScanner() {
-  if (typeof Html5Qrcode === 'undefined') {
-    showToast('Сканер не загрузился. Проверьте подключение к интернету.', 'error');
-    return;
-  }
   const overlay = document.getElementById('qr-scanner-overlay');
   overlay.classList.add('visible');
   document.getElementById('qr-scanner-error').style.display = 'none';
   document.getElementById('qr-scanner-hint').style.display = '';
+  document.getElementById('qr-scanner-hint').textContent = 'Загружаем сканер…';
+
+  // Лениво грузим библиотеку
+  try {
+    await loadQrScannerLib();
+  } catch (e) {
+    showQrScannerError('Не удалось загрузить сканер. Проверьте интернет и попробуйте снова.');
+    return;
+  }
+  document.getElementById('qr-scanner-hint').textContent = 'Наведите камеру на QR-код наклейки';
+
+  if (typeof Html5Qrcode === 'undefined') {
+    showQrScannerError('Сканер недоступен');
+    return;
+  }
 
   // Создаём инстанс сканера
   try {
