@@ -214,9 +214,8 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
   }
-  /* Стрелки — отдельные flex-элементы, не поверх ленты */
+  /* Стрелки — отдельные элементы шапки (за пределами ленты) */
   .section-scroll-btn {
     flex-shrink: 0;
     width: 32px; height: 32px;
@@ -236,6 +235,9 @@
   .section-scroll-btn:active { transform: scale(0.92); }
   .section-scroll-btn i { font-size: 18px; }
   .section-scroll-btn.visible { display: flex; }
+  /* Отступы наружных стрелок (между лого/лентой и лентой/Скан) */
+  .section-scroll-btn.outer.left  { margin: 0 8px 0 4px; }
+  .section-scroll-btn.outer.right { margin: 0 4px 0 8px; }
 
   /* Fade-эффекты по краям ленты — намёк на скрытый контент */
   .section-switcher-wrap::before,
@@ -250,7 +252,6 @@
     transition: opacity 0.2s;
   }
   .section-switcher-wrap::before {
-    /* отступ от левой стрелки (32px + gap 6px) когда она видна, иначе 0 */
     left: 0;
     background: linear-gradient(90deg, #1E3A5F, transparent);
   }
@@ -258,9 +259,8 @@
     right: 0;
     background: linear-gradient(270deg, #2C5282, transparent);
   }
-  /* Fade гасим когда стрелка видна (она перекроет визуально край) */
-  .section-switcher-wrap.fade-left:not(.has-left-btn)::before { opacity: 1; }
-  .section-switcher-wrap.fade-right:not(.has-right-btn)::after { opacity: 1; }
+  .section-switcher-wrap.fade-left::before { opacity: 1; }
+  .section-switcher-wrap.fade-right::after { opacity: 1; }
   .section-tab {
     padding: 8px 12px;
     border: 1px solid transparent;
@@ -414,24 +414,10 @@
   .m-section-tabs-wrap.fade-right::after { opacity: 1; }
   /* Маленькая кнопка "ещё →" для мобильного, появляется если есть скрытое */
   .m-section-tabs-next {
-    position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 3;
-    width: 28px; height: 28px;
-    background: var(--brand);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    display: none !important;  /* ЭТАП 25.0: убрана по запросу */
   }
   .m-section-tabs-next i { font-size: 16px; }
-  .m-section-tabs-next.visible { display: flex; }
+  .m-section-tabs-next.visible { display: none !important; }
 
   /* ============ SIDEBAR ============ */
   .sidebar {
@@ -5967,10 +5953,10 @@
       <div class="brand-ball"></div>
       <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
     </div>
+    <button class="section-scroll-btn outer left" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
+      <i class="ti ti-chevron-left"></i>
+    </button>
     <div class="section-switcher-wrap" id="section-switcher-wrap">
-      <button class="section-scroll-btn left" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
-        <i class="ti ti-chevron-left"></i>
-      </button>
       <nav class="section-switcher" id="section-switcher">
         <button class="section-tab active" data-section="home">
           <i class="ti ti-home"></i>Главная
@@ -6003,10 +5989,10 @@
           <i class="ti ti-help-circle"></i>Помощь
         </button>
       </nav>
-      <button class="section-scroll-btn right" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
-        <i class="ti ti-chevron-right"></i>
-      </button>
     </div>
+    <button class="section-scroll-btn outer right" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
+      <i class="ti ti-chevron-right"></i>
+    </button>
     <button class="scan-btn" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">Скан</span>
