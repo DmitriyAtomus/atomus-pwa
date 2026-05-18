@@ -6077,6 +6077,293 @@
   }
   /* ============ КОНЕЦ ЭТАПА 25.1 ============ */
 
+  /* ============================================================
+     ЭТАП 26: ОТГРУЗКА ПО QR
+     ============================================================ */
+
+  /* ===== Continuous-режим qr-scanner ===== */
+  .qr-scanner-overlay.continuous-mode .qr-scanner-frame {
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+  /* Зелёная вспышка после успеха */
+  .qr-flash {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .qr-flash.success { background: rgba(22, 163, 74, 0.5); }
+  .qr-flash.error   { background: rgba(220, 38, 38, 0.5); }
+  .qr-flash.visible { opacity: 1; }
+
+  /* Counter поверх сканера */
+  .ship-counter {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 4;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 32px);
+  }
+  .ship-counter.visible { display: flex; }
+  .ship-counter .ship-counter-num {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .ship-counter .ship-counter-progress {
+    width: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .ship-counter .ship-counter-fill {
+    height: 100%;
+    background: var(--success);
+    transition: width 0.3s ease;
+  }
+  .ship-counter .ship-counter-name {
+    font-size: 13px;
+    opacity: 0.85;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+  }
+
+  /* Тост последнего скана (внизу) */
+  .ship-last {
+    position: absolute;
+    bottom: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 16px;
+    z-index: 4;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+    min-width: 200px;
+    max-width: calc(100% - 32px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    animation: shipLastIn 0.25s ease;
+  }
+  .ship-last.visible { display: flex; }
+  .ship-last.success { background: rgba(22, 163, 74, 0.95); }
+  .ship-last.error   { background: rgba(220, 38, 38, 0.95); }
+  .ship-last .ship-last-title { font-size: 14px; font-weight: 700; }
+  .ship-last .ship-last-sub { font-size: 12.5px; opacity: 0.9; }
+  @keyframes shipLastIn {
+    from { transform: translateX(-50%) translateY(10px); opacity: 0; }
+    to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+  }
+
+  /* Кнопка "Завершить" в continuous-режиме */
+  .ship-finish-btn {
+    position: absolute;
+    bottom: max(70px, calc(env(safe-area-inset-bottom) + 70px));
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--brand);
+    color: white;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 4;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(45, 95, 139, 0.4);
+  }
+  .ship-finish-btn.visible { display: flex; }
+  .ship-finish-btn:active { transform: translateX(-50%) scale(0.96); }
+
+  /* ===== Экран отгрузки (вне сканера — список позиций) ===== */
+  .ship-screen-wrap { padding: 14px; }
+  .ship-progress-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
+  }
+  .ship-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .ship-progress-title {
+    font-size: 14px;
+    color: var(--text-light);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .ship-progress-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+  .ship-progress-num .total {
+    color: var(--text-light);
+    font-weight: 500;
+  }
+  .ship-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .ship-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--c-prod-25), var(--success));
+    transition: width 0.4s ease;
+  }
+  .ship-progress-fill.complete {
+    background: var(--success);
+  }
+  .ship-start-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--brand);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .ship-start-btn:active { transform: scale(0.98); }
+  .ship-start-btn i { font-size: 20px; }
+  .ship-start-btn.complete {
+    background: var(--success);
+  }
+  .ship-start-btn.complete::before {
+    content: '✓ ';
+  }
+
+  .ship-items-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 8px 0 10px;
+  }
+  .ship-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
+  }
+  .ship-item.shipped {
+    background: var(--success-bg, #E8F5E9);
+    border-color: rgba(22, 163, 74, 0.25);
+  }
+  .ship-item-check {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: white;
+  }
+  .ship-item.shipped .ship-item-check {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+  }
+  .ship-item.shipped .ship-item-check::after {
+    content: '';
+    width: 7px; height: 11px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+  .ship-item-type-icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: var(--surface-soft, #F8FAFC);
+    color: var(--text-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+  }
+  .ship-item.shipped .ship-item-type-icon {
+    background: rgba(22, 163, 74, 0.15);
+    color: var(--success);
+  }
+  .ship-item-body { flex: 1; min-width: 0; }
+  .ship-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ship-item-sub {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .ship-item.shipped .ship-item-sub {
+    color: var(--success);
+  }
+  .ship-item-qty {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .ship-empty {
+    text-align: center;
+    padding: 30px 16px;
+    color: var(--text-light);
+    background: white;
+    border: 1px dashed var(--border-strong);
+    border-radius: 14px;
+  }
+
+  /* ============ КОНЕЦ ЭТАПА 26 ============ */
+
   /* ===== ЗУМ В QR-СКАНЕРЕ ===== */
   .qr-zoom-bar {
     position: absolute;
@@ -8200,6 +8487,23 @@
   <div class="qr-scanner-body">
     <div id="qr-reader"></div>
     <div class="qr-scanner-frame"><span class="br"></span></div>
+    <!-- ЭТАП 26: цветная вспышка после скана -->
+    <div class="qr-flash" id="qr-flash"></div>
+    <!-- ЭТАП 26: счётчик прогресса в continuous-режиме -->
+    <div class="ship-counter" id="ship-counter">
+      <span class="ship-counter-num"><span id="ship-counter-shipped">0</span>/<span id="ship-counter-total">0</span></span>
+      <div class="ship-counter-progress"><div class="ship-counter-fill" id="ship-counter-fill" style="width:0%"></div></div>
+      <span class="ship-counter-name" id="ship-counter-name">—</span>
+    </div>
+    <!-- ЭТАП 26: тост с результатом последнего скана -->
+    <div class="ship-last" id="ship-last">
+      <div class="ship-last-title" id="ship-last-title">—</div>
+      <div class="ship-last-sub" id="ship-last-sub">—</div>
+    </div>
+    <!-- ЭТАП 26: кнопка "Завершить" -->
+    <button class="ship-finish-btn" id="ship-finish-btn" onclick="finishShipmentScan()">
+      <i class="ti ti-check"></i> Завершить
+    </button>
     <div class="qr-scanner-hint" id="qr-scanner-hint">Наведите камеру на QR-код наклейки</div>
     <div class="qr-scanner-error" id="qr-scanner-error" style="display: none;">
       <i class="ti ti-camera-off"></i>
@@ -8224,7 +8528,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.6.0-mobile";
+const APP_VERSION = "v2.6.1-shipping";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -14567,6 +14871,9 @@ function renderContractDetail(c) {
   // ЭТАП 15: реальный блок «Готовность по сборкам»
   html += renderContractAssembliesBlock(c);
 
+  // ЭТАП 26: кнопка перехода в режим отгрузки + прогресс
+  html += '<div id="scd-shipment-block" style="margin-top: 16px;"><div class="loading-block" style="padding:14px;">Загружаем прогресс отгрузки…</div></div>';
+
   // ЭТАП 16В-2: блок задач по договору (контейнер, заполняется асинхронно)
   html += '<div id="scd-tasks-block"><div class="loading-block">Загружаем задачи…</div></div>';
 
@@ -14574,6 +14881,45 @@ function renderContractDetail(c) {
 
   // Загрузим задачи по договору
   loadContractTasks(c.id);
+  // ЭТАП 26: загружаем прогресс отгрузки
+  loadContractShipmentBlock(c.id);
+}
+
+// ============ ЭТАП 26: блок отгрузки в карточке договора ============
+
+async function loadContractShipmentBlock(contractId) {
+  const container = document.getElementById('scd-shipment-block');
+  if (!container) return;
+  try {
+    const s = await apiGet('/api/contracts/' + contractId + '/shipment-status');
+    const total = s.total || 0;
+    const shipped = s.shipped || 0;
+    const pct = total > 0 ? Math.round(shipped / total * 100) : 0;
+    const isComplete = s.is_complete;
+
+    let html = '<div class="ship-progress-card" style="margin: 0;">';
+    html += '<div class="ship-progress-head">';
+    html += '<div class="ship-progress-title"><i class="ti ti-truck-delivery" style="color: var(--c-prod-25); margin-right: 4px;"></i> Отгрузка по QR</div>';
+    if (total > 0) {
+      html += '<div class="ship-progress-num">' + shipped + ' <span class="total">/ ' + total + '</span></div>';
+    }
+    html += '</div>';
+    if (total > 0) {
+      html += '<div class="ship-progress-bar"><div class="ship-progress-fill ' + (isComplete ? 'complete' : '') + '" style="width:' + pct + '%"></div></div>';
+      if (isComplete) {
+        html += '<button class="ship-start-btn complete" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-check-circle"></i> Всё отгружено · открыть</button>';
+      } else {
+        html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Начать отгрузку</button>';
+      }
+    } else {
+      html += '<div style="font-size:13px;color:var(--text-light);padding:8px 0;text-align:center;">К договору не привязано ни одной сборки или коробки.<br>Добавьте сборки или создайте коробки.</div>';
+      html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Открыть отгрузку</button>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Не удалось загрузить прогресс отгрузки</div>';
+  }
 }
 
 // ============ ЭТАП 16В-2: задачи по договору ============
@@ -19310,6 +19656,14 @@ async function closeQrScanner() {
   const zb = document.getElementById('qr-zoom-bar');
   if (zb) zb.style.display = 'none';
   state._qrZoomTrack = null;
+  // ЭТАП 26.2: сбрасываем continuous-режим если был
+  if (state._qrContinuousMode) {
+    state._qrContinuousMode = false;
+    overlay.classList.remove('continuous-mode');
+    const cnt = document.getElementById('ship-counter');    if (cnt) cnt.classList.remove('visible');
+    const fb  = document.getElementById('ship-finish-btn'); if (fb)  fb.classList.remove('visible');
+    const last = document.getElementById('ship-last');      if (last) last.classList.remove('visible');
+  }
   // Останавливаем камеру
   if (state._qrScannerInstance) {
     try {
@@ -19389,6 +19743,19 @@ async function handleQrScanResult(decodedText) {
   // Не дёргать handler многократно — закрываем сразу
   if (state._qrScanProcessing) return;
   state._qrScanProcessing = true;
+
+  // ЭТАП 26.2: если включен continuous-режим (отгрузка) — отдельная обработка
+  if (state._qrContinuousMode) {
+    try {
+      await handleContinuousShipmentScan(String(decodedText || '').trim());
+    } catch (e) {
+      console.error('continuous scan error:', e);
+    }
+    // Снимаем процессинг через 800мс (дебаунс) чтобы не зачитать ту же коробку дважды
+    setTimeout(() => { state._qrScanProcessing = false; }, 800);
+    return;
+  }
+
   try {
     // Парсим URL
     const text = String(decodedText || '').trim();
@@ -20824,6 +21191,331 @@ function renderQuickActions25() {
 }
 
 // ============ КОНЕЦ ЭТАПА 25.0 ============
+
+
+// ============================================================
+// ============ ЭТАП 26.2: ОТГРУЗКА ПО QR =====================
+// ============================================================
+
+// Состояние сессии отгрузки
+state._shipContractId = null;
+state._shipContract = null;
+state._shipProgress = { total: 0, shipped: 0 };
+
+// ===== Звуки через Web Audio API =====
+let _audioCtx = null;
+function _ensureAudioCtx() {
+  if (_audioCtx) return _audioCtx;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    _audioCtx = new Ctx();
+  } catch (e) {}
+  return _audioCtx;
+}
+
+function playBeep(type) {
+  const ctx = _ensureAudioCtx();
+  if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') ctx.resume();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    if (type === 'success') {
+      o.type = 'sine';
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.18, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      o.start();
+      o.stop(ctx.currentTime + 0.22);
+    } else {
+      // error — двойной низкий
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(220, ctx.currentTime);
+      o.frequency.setValueAtTime(180, ctx.currentTime + 0.12);
+      g.gain.setValueAtTime(0.18, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.32);
+      o.start();
+      o.stop(ctx.currentTime + 0.34);
+    }
+  } catch (e) {}
+}
+
+function vibrate(pattern) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  } catch (e) {}
+}
+
+function flashScanner(type) {
+  const f = document.getElementById('qr-flash');
+  if (!f) return;
+  f.classList.remove('success', 'error');
+  f.classList.add(type === 'success' ? 'success' : 'error');
+  f.classList.add('visible');
+  setTimeout(() => f.classList.remove('visible'), 350);
+}
+
+function showShipLast(type, title, sub) {
+  const el = document.getElementById('ship-last');
+  if (!el) return;
+  const t = document.getElementById('ship-last-title');
+  const s = document.getElementById('ship-last-sub');
+  if (t) t.textContent = title || '';
+  if (s) s.textContent = sub || '';
+  el.classList.remove('success', 'error');
+  el.classList.add(type === 'success' ? 'success' : 'error');
+  el.classList.add('visible');
+  clearTimeout(state._shipLastTimer);
+  state._shipLastTimer = setTimeout(() => el.classList.remove('visible'), 2200);
+}
+
+function updateShipCounter(shipped, total, lastName) {
+  state._shipProgress = { shipped: shipped, total: total };
+  const sNum = document.getElementById('ship-counter-shipped');
+  const tNum = document.getElementById('ship-counter-total');
+  const fill = document.getElementById('ship-counter-fill');
+  const nm = document.getElementById('ship-counter-name');
+  if (sNum) sNum.textContent = String(shipped);
+  if (tNum) tNum.textContent = String(total);
+  if (fill) {
+    const pct = total > 0 ? Math.round(shipped / total * 100) : 0;
+    fill.style.width = pct + '%';
+  }
+  if (nm && lastName) nm.textContent = lastName;
+}
+
+// ===== Открытие экрана отгрузки по договору =====
+
+async function openShipmentMode(contractId) {
+  if (!contractId) return;
+  state._shipContractId = contractId;
+
+  // Загружаем статус отгрузки
+  let status;
+  try {
+    status = await apiGet('/api/contracts/' + contractId + '/shipment-status');
+  } catch (e) {
+    alert('Не удалось загрузить статус отгрузки: ' + e);
+    return;
+  }
+
+  // Загружаем договор для заголовка
+  try {
+    state._shipContract = await apiGet('/api/contracts/' + contractId);
+  } catch (e) {
+    state._shipContract = null;
+  }
+
+  renderShipmentScreen(status);
+}
+
+function renderShipmentScreen(status) {
+  // Используем общий screen механизм через временный overlay
+  // Делаем модальное окно поверх контента
+  let overlay = document.getElementById('shipment-screen-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'shipment-screen-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:150;background:var(--bg);overflow-y:auto;';
+    document.body.appendChild(overlay);
+  }
+
+  const c = state._shipContract || {};
+  const contractTitle = c.number ? ('№' + c.number) : ('Договор #' + state._shipContractId);
+  const contractor = c.contractor_name || '';
+  const total = status.total || 0;
+  const shipped = status.shipped || 0;
+  const pct = total > 0 ? Math.round(shipped / total * 100) : 0;
+  const isComplete = status.is_complete;
+
+  let html = '';
+  // Шапка
+  html += '<div style="position:sticky;top:0;z-index:5;background:var(--brand);color:white;padding:14px 16px;display:flex;align-items:center;gap:12px;">';
+  html += '<button onclick="closeShipmentScreen()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>';
+  html += '<div style="flex:1;min-width:0;">';
+  html += '<div style="font-size:15px;font-weight:700;">Отгрузка ' + escapeHtml(contractTitle) + '</div>';
+  if (contractor) html += '<div style="font-size:12px;opacity:0.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(contractor) + '</div>';
+  html += '</div>';
+  html += '<button onclick="reloadShipmentStatus()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;" title="Обновить"><i class="ti ti-refresh" style="font-size:18px;"></i></button>';
+  html += '</div>';
+
+  html += '<div class="ship-screen-wrap">';
+
+  // Прогресс
+  html += '<div class="ship-progress-card">';
+  html += '<div class="ship-progress-head">';
+  html += '<div class="ship-progress-title">Отгружено</div>';
+  html += '<div class="ship-progress-num">' + shipped + ' <span class="total">/ ' + total + '</span></div>';
+  html += '</div>';
+  html += '<div class="ship-progress-bar"><div class="ship-progress-fill ' + (isComplete ? 'complete' : '') + '" style="width:' + pct + '%"></div></div>';
+  if (total === 0) {
+    html += '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:8px 0;">К договору не привязано ни одной сборки или коробки</div>';
+  } else if (isComplete) {
+    html += '<button class="ship-start-btn complete" onclick="onShipmentAllDone()"><i class="ti ti-check-circle"></i> Всё отгружено</button>';
+  } else {
+    html += '<button class="ship-start-btn" onclick="startShipmentScan()"><i class="ti ti-scan"></i> Сканировать QR</button>';
+  }
+  html += '</div>';
+
+  // Список позиций
+  if (total > 0) {
+    const items = status.items || [];
+    const shippedItems = items.filter(x => x.shipped);
+    const pendingItems = items.filter(x => !x.shipped);
+
+    if (pendingItems.length) {
+      html += '<div class="ship-items-title">Ожидают отгрузки (' + pendingItems.length + ')</div>';
+      pendingItems.forEach(it => { html += renderShipItem(it); });
+    }
+    if (shippedItems.length) {
+      html += '<div class="ship-items-title">Отгружено (' + shippedItems.length + ')</div>';
+      shippedItems.forEach(it => { html += renderShipItem(it); });
+    }
+  }
+
+  html += '</div>';
+
+  overlay.innerHTML = html;
+  overlay.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function renderShipItem(it) {
+  const iconCls = it.type === 'box' ? 'ti-package' : 'ti-tool';
+  const typeLabel = it.type === 'box' ? 'Коробка' : 'Сборка';
+  let sub = typeLabel;
+  if (it.shipped && it.shipped_at) {
+    sub += ' · отгружено ' + (String(it.shipped_at).slice(0, 16).replace('T', ' '));
+  }
+  return '<div class="ship-item ' + (it.shipped ? 'shipped' : '') + '">' +
+    '<div class="ship-item-check"></div>' +
+    '<div class="ship-item-type-icon"><i class="ti ' + iconCls + '"></i></div>' +
+    '<div class="ship-item-body">' +
+      '<div class="ship-item-name">' + escapeHtml(it.name || '—') + '</div>' +
+      '<div class="ship-item-sub">' + escapeHtml(sub) + '</div>' +
+    '</div>' +
+    (it.qty && it.qty > 1 ? '<div class="ship-item-qty">' + it.qty + ' шт.</div>' : '') +
+  '</div>';
+}
+
+async function reloadShipmentStatus() {
+  if (!state._shipContractId) return;
+  try {
+    const status = await apiGet('/api/contracts/' + state._shipContractId + '/shipment-status');
+    renderShipmentScreen(status);
+  } catch (e) {}
+}
+
+function closeShipmentScreen() {
+  const ov = document.getElementById('shipment-screen-overlay');
+  if (ov) ov.style.display = 'none';
+  document.body.style.overflow = '';
+  state._shipContractId = null;
+  state._shipContract = null;
+}
+
+function onShipmentAllDone() {
+  // Просто моргнуть successом
+  if (typeof toast === 'function') toast('Всё уже отгружено по этому договору');
+  else alert('Всё уже отгружено по этому договору');
+}
+
+// ===== Continuous-режим сканера =====
+
+async function startShipmentScan() {
+  if (!state._shipContractId) {
+    alert('Не выбран договор для отгрузки');
+    return;
+  }
+  // Загружаем актуальный прогресс для счётчика
+  try {
+    const status = await apiGet('/api/contracts/' + state._shipContractId + '/shipment-status');
+    updateShipCounter(status.shipped || 0, status.total || 0, '');
+  } catch (e) {}
+
+  // Включаем continuous-режим
+  state._qrContinuousMode = true;
+  // Показываем UI continuous
+  const overlay = document.getElementById('qr-scanner-overlay');
+  if (overlay) overlay.classList.add('continuous-mode');
+  const cnt = document.getElementById('ship-counter');     if (cnt) cnt.classList.add('visible');
+  const fb  = document.getElementById('ship-finish-btn');  if (fb)  fb.classList.add('visible');
+  // Готовим контекст звука по жесту пользователя
+  _ensureAudioCtx();
+
+  await openQrScanner();
+}
+
+async function handleContinuousShipmentScan(decodedText) {
+  if (!state._shipContractId) return;
+  // Извлекаем токен из URL если это полная ссылка
+  let token = decodedText;
+  try {
+    const url = new URL(decodedText);
+    const m = url.pathname.match(/\/[ac]\/([A-Za-z0-9_\-]+)/);
+    if (m) token = m[1];
+  } catch (e) { /* не URL — оставляем как есть */ }
+  token = String(token || '').trim();
+  if (!token) return;
+
+  let resp;
+  try {
+    resp = await apiPost('/api/shipments/scan', {
+      qr_token: token,
+      contract_id: state._shipContractId,
+    });
+  } catch (e) {
+    flashScanner('error');
+    playBeep('error');
+    vibrate([100, 50, 100]);
+    showShipLast('error', 'Ошибка связи', String(e));
+    return;
+  }
+
+  // Обновляем прогресс
+  if (resp.progress) {
+    const name = (resp.item && resp.item.name) || '';
+    updateShipCounter(resp.progress.shipped || 0, resp.progress.total || 0, name);
+  }
+
+  if (resp.ok) {
+    flashScanner('success');
+    playBeep('success');
+    vibrate(80);
+    const item = resp.item || {};
+    showShipLast('success', '✓ ' + (item.name || 'Отгружено'),
+      (resp.progress ? (resp.progress.shipped + ' из ' + resp.progress.total) : ''));
+  } else {
+    flashScanner('error');
+    playBeep('error');
+    vibrate([100, 50, 100]);
+    const reasonText = {
+      'unknown':         'QR не распознан',
+      'no_contract':     'Объект не привязан к договору',
+      'wrong_contract':  'Объект из другого договора',
+      'already_shipped': 'Уже отгружено',
+    }[resp.reason] || 'Ошибка';
+    const item = resp.item || {};
+    showShipLast('error', reasonText, item.name || '');
+  }
+}
+
+function finishShipmentScan() {
+  state._qrContinuousMode = false;
+  // Прячем continuous UI
+  const overlay = document.getElementById('qr-scanner-overlay');
+  if (overlay) overlay.classList.remove('continuous-mode');
+  const cnt = document.getElementById('ship-counter');     if (cnt) cnt.classList.remove('visible');
+  const fb  = document.getElementById('ship-finish-btn');  if (fb)  fb.classList.remove('visible');
+  const last = document.getElementById('ship-last');       if (last) last.classList.remove('visible');
+  closeQrScanner();
+  // Перерисовываем экран отгрузки (актуальный список)
+  setTimeout(reloadShipmentStatus, 200);
+}
+
+// ============ КОНЕЦ ЭТАПА 26.2 ============
 
 
 // ============ INIT ============
