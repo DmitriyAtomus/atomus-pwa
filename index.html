@@ -4386,8 +4386,9 @@
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: min(70vmin, 280px);
-    height: min(70vmin, 280px);
+    width: min(60vmin, 240px);
+    height: min(60vmin, 240px);
+    aspect-ratio: 1 / 1;
     pointer-events: none;
     z-index: 3;
   }
@@ -5834,7 +5835,63 @@
   /* Блоки на Главной, видимые только на мобилке */
   .m25-mobile-only { display: none; }
   .app.mobile-layout .m25-mobile-only { display: block; }
-  /* Скрываем устаревший блок календаря/курсов на мобилке (необязательно — оставим работать) */
+
+  /* ===== ЗУМ В QR-СКАНЕРЕ ===== */
+  .qr-zoom-bar {
+    position: absolute;
+    left: 50%;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 8px 12px;
+    border-radius: 999px;
+    z-index: 4;
+    max-width: calc(100% - 32px);
+    width: 280px;
+  }
+  .qr-zoom-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    color: white;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .qr-zoom-btn:active { background: rgba(255, 255, 255, 0.32); }
+  .qr-zoom-btn i { font-size: 18px; }
+  .qr-zoom-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 2px;
+    outline: none;
+  }
+  .qr-zoom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .qr-zoom-slider::-moz-range-thumb {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
   /* ============ КОНЕЦ ЭТАПА 25.0 ============ */
 </style>
 
@@ -7900,6 +7957,12 @@
     <div class="qr-scanner-error" id="qr-scanner-error" style="display: none;">
       <i class="ti ti-camera-off"></i>
       <div id="qr-scanner-error-text">Не удалось получить доступ к камере</div>
+    </div>
+    <!-- ЭТАП 25.0: контрол зума камеры -->
+    <div class="qr-zoom-bar" id="qr-zoom-bar" style="display: none;">
+      <button class="qr-zoom-btn" id="qr-zoom-out" onclick="changeQrZoom(-1)" aria-label="Уменьшить"><i class="ti ti-minus"></i></button>
+      <input type="range" class="qr-zoom-slider" id="qr-zoom-slider" min="1" max="10" step="0.1" value="1" oninput="onQrZoomSlider(this.value)">
+      <button class="qr-zoom-btn" id="qr-zoom-in" onclick="changeQrZoom(1)" aria-label="Увеличить"><i class="ti ti-plus"></i></button>
     </div>
   </div>
 </div>
@@ -18788,7 +18851,7 @@ async function openQrScanner() {
         fps: 10,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
           const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const size = Math.floor(minEdge * 0.75);
+          const size = Math.floor(minEdge * 0.6);
           return { width: size, height: size };
         },
         aspectRatio: 1.0,
@@ -18814,6 +18877,8 @@ async function openQrScanner() {
         if (track && track.applyConstraints) {
           await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
         }
+        // ЭТАП 25.0: проверяем поддержку zoom и подключаем slider
+        setupQrZoom(track);
       }
     } catch (e) { /* ignore */ }
   } catch (e) {
@@ -18920,6 +18985,10 @@ function showQrScannerError(msg) {
 async function closeQrScanner() {
   const overlay = document.getElementById('qr-scanner-overlay');
   overlay.classList.remove('visible');
+  // ЭТАП 25.0: скрыть зум-bar
+  const zb = document.getElementById('qr-zoom-bar');
+  if (zb) zb.style.display = 'none';
+  state._qrZoomTrack = null;
   // Останавливаем камеру
   if (state._qrScannerInstance) {
     try {
@@ -18931,6 +19000,69 @@ async function closeQrScanner() {
     state._qrScannerInstance = null;
   }
 }
+
+// ============ ЭТАП 25.0: ЗУМ КАМЕРЫ В QR-СКАНЕРЕ ============
+
+function setupQrZoom(track) {
+  const bar = document.getElementById('qr-zoom-bar');
+  const slider = document.getElementById('qr-zoom-slider');
+  if (!bar || !slider || !track) return;
+  state._qrZoomTrack = null;
+  try {
+    const caps = (typeof track.getCapabilities === 'function') ? track.getCapabilities() : null;
+    if (!caps || typeof caps.zoom === 'undefined') {
+      // Зум не поддерживается этим устройством/браузером — прячем slider
+      bar.style.display = 'none';
+      return;
+    }
+    const minZ = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
+    const maxZ = (typeof caps.zoom.max === 'number') ? caps.zoom.max : 10;
+    const stepZ = (typeof caps.zoom.step === 'number' && caps.zoom.step > 0) ? caps.zoom.step : 0.1;
+    let curZ = minZ;
+    try {
+      const s = track.getSettings && track.getSettings();
+      if (s && typeof s.zoom === 'number') curZ = s.zoom;
+    } catch (e) {}
+    slider.min = String(minZ);
+    slider.max = String(maxZ);
+    slider.step = String(stepZ);
+    slider.value = String(curZ);
+    state._qrZoomTrack = track;
+    state._qrZoomMin = minZ;
+    state._qrZoomMax = maxZ;
+    state._qrZoomStep = stepZ;
+    bar.style.display = 'flex';
+  } catch (e) {
+    bar.style.display = 'none';
+  }
+}
+
+async function onQrZoomSlider(value) {
+  const track = state._qrZoomTrack;
+  if (!track) return;
+  const v = Number(value);
+  try {
+    await track.applyConstraints({ advanced: [{ zoom: v }] });
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function changeQrZoom(delta) {
+  const track = state._qrZoomTrack;
+  const slider = document.getElementById('qr-zoom-slider');
+  if (!track || !slider) return;
+  const step = Math.max(state._qrZoomStep || 0.1, 0.5);
+  const min = state._qrZoomMin || 1;
+  const max = state._qrZoomMax || 10;
+  let v = Number(slider.value) + delta * step;
+  if (v < min) v = min;
+  if (v > max) v = max;
+  slider.value = String(v);
+  onQrZoomSlider(v);
+}
+
+// ============ КОНЕЦ ЗУМА QR ============
 
 async function handleQrScanResult(decodedText) {
   // Не дёргать handler многократно — закрываем сразу
