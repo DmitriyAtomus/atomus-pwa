@@ -8549,7 +8549,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.6.1-shipping";
+const APP_VERSION = "v2.6.2-tasks-fix";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -13602,15 +13602,20 @@ async function initTaskForm() {
 
 async function ensureEmployeesLoaded() {
   // ЭТАП 26.x фикс: пустой массив не считается валидным кэшем (пере-загружаем)
-  if (cache.activeEmployees && cache.activeEmployees.length > 0) return;
+  if (cache.activeEmployees && cache.activeEmployees.length > 0) {
+    console.log('[employees] кэш есть:', cache.activeEmployees.length);
+    return;
+  }
   try {
-    // Используем тот же endpoint что и страница "Сотрудники" — он точно работает
+    console.log('[employees] загружаем /api/employees?include_inactive=true...');
     const d = await apiGet('/api/employees?include_inactive=true');
+    console.log('[employees] получено:', d);
     const all = (d && d.employees) || [];
-    // Фильтруем только активных
     cache.activeEmployees = all.filter(e => e.is_active);
+    console.log('[employees] активных:', cache.activeEmployees.length);
   } catch (e) {
-    cache.activeEmployees = null;  // null → следующая попытка снова загрузит
+    console.error('[employees] ошибка загрузки:', e);
+    cache.activeEmployees = null;
   }
 }
 
@@ -17536,7 +17541,7 @@ function canManageHr() {
   return roles.includes('director') || roles.includes('accountant');
 }
 
-async function ensureEmployeesLoaded() {
+async function ensureAllEmployeesForVacationsLoaded() {
   if (cache.employeesAll) return cache.employeesAll;
   try {
     const d = await apiGet('/api/employees/active');
@@ -17566,7 +17571,7 @@ async function loadHrTimeline() {
     const now = new Date();
     state.hrTlAnchor = { year: now.getFullYear(), month: now.getMonth() };
   }
-  await Promise.all([ensureEmployeesLoaded(), loadAllVacations()]);
+  await Promise.all([ensureAllEmployeesForVacationsLoaded(), loadAllVacations()]);
   renderHrTimeline();
 }
 
