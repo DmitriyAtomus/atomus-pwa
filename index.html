@@ -13601,12 +13601,13 @@ async function initTaskForm() {
 }
 
 async function ensureEmployeesLoaded() {
-  if (cache.activeEmployees) return;
+  // ЭТАП 26.x фикс: пустой массив не считается валидным кэшем (пере-загружаем)
+  if (cache.activeEmployees && cache.activeEmployees.length > 0) return;
   try {
     const d = await apiGet('/api/employees/active');
     cache.activeEmployees = d.employees || [];
   } catch (e) {
-    cache.activeEmployees = [];
+    cache.activeEmployees = null;  // null → следующая попытка снова загрузит
   }
 }
 
