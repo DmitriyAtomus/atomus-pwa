@@ -6638,6 +6638,203 @@
     font-size: 13px;
     color: var(--text-light);
   }
+
+  /* Кнопка "обзор номенклатуры" — рядом с полем поиска */
+  .spec-browse-btn {
+    position: absolute;
+    right: 8px;
+    top: 28px;
+    bottom: auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--brand);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    z-index: 2;
+  }
+  .spec-browse-btn:hover { opacity: 0.88; }
+  .spec-browse-btn i { font-size: 16px; }
+
+  /* Модалка выбора номенклатуры */
+  .nom-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 33, 61, 0.55);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(2px);
+  }
+  .nom-picker-overlay.visible { display: flex; }
+  .nom-picker {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 700px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  .nom-picker-header {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .nom-picker-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .nom-picker-close {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--surface-soft, #F8FAFC);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-light);
+  }
+  .nom-picker-close:hover { background: var(--border); color: var(--text); }
+
+  .nom-picker-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-soft, #F8FAFC);
+  }
+  .nom-picker-tab {
+    flex: 1;
+    padding: 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-light);
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
+  }
+  .nom-picker-tab.active {
+    color: var(--brand);
+    background: white;
+    border-bottom-color: var(--brand);
+  }
+  .nom-picker-tab:hover:not(.active) { background: rgba(45, 95, 139, 0.05); }
+
+  .nom-picker-search {
+    padding: 12px 18px 0;
+  }
+  .nom-picker-search input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .nom-picker-search input:focus { outline: none; border-color: var(--brand); }
+
+  .nom-picker-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 18px 18px;
+  }
+
+  /* Дерево направлений/категорий */
+  .nom-group { margin-bottom: 12px; }
+  .nom-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface-soft, #F8FAFC);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .nom-group-header:hover { background: rgba(45, 95, 139, 0.08); }
+  .nom-group-header .name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nom-group-header .count {
+    font-size: 12px;
+    color: var(--text-light);
+    background: white;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+  }
+  .nom-group-header .chevron {
+    transition: transform 0.2s;
+    color: var(--text-light);
+  }
+  .nom-group.open .chevron { transform: rotate(90deg); }
+  .nom-group-items {
+    display: none;
+    margin-top: 6px;
+    padding-left: 12px;
+  }
+  .nom-group.open .nom-group-items { display: block; }
+
+  .nom-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-left: 2px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .nom-item:hover {
+    background: rgba(45, 95, 139, 0.08);
+    border-left-color: var(--brand);
+  }
+  .nom-item-title {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .nom-item-title b {
+    color: var(--brand);
+    font-weight: 700;
+    margin-right: 6px;
+  }
+  .nom-item-meta {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+
+  .nom-empty {
+    text-align: center;
+    padding: 30px 16px;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+  .nom-loading {
+    text-align: center;
+    padding: 30px 16px;
+    color: var(--text-light);
+    font-size: 13px;
+  }
   /* ============ КОНЕЦ ЭТАПА 27 ============ */
 
   /* ===== ЗУМ В QR-СКАНЕРЕ ===== */
@@ -8804,7 +9001,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.7.1-spec-nom";
+const APP_VERSION = "v2.7.2-spec-picker";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -15300,7 +15497,9 @@ function renderSpecForm(contractId, existing) {
   html += '<input type="hidden" id="spec-form-name" value="' + escapeHtml(e.name || '') + '">';
   html += '<input type="text" id="spec-form-search" value="' + escapeHtml(modelLabel) +
           '" placeholder="Начните вводить название или артикул…" autocomplete="off" ' +
-          'oninput="onSpecSearchInput(this.value)" onfocus="onSpecSearchInput(this.value)">';
+          'oninput="onSpecSearchInput(this.value)" onfocus="onSpecSearchInput(this.value)" ' +
+          'style="padding-right: 46px;">';
+  html += '<button class="spec-browse-btn" onclick="openNomPicker(' + contractId + ',' + (isEdit ? existing.id : 'null') + ')" title="Обзор номенклатуры" type="button"><i class="ti ti-layout-grid"></i></button>';
   html += '<div id="spec-search-results" class="spec-search-results" style="display:none;"></div>';
   html += '</div>';
   // Кол-во + ед.изм.
@@ -15497,6 +15696,321 @@ async function deleteSpecItem(contractId, itemId) {
   } catch (e) {
     showToast('Ошибка', 'error');
   }
+}
+
+// ============ ЭТАП 27.2: МОДАЛКА ВЫБОРА НОМЕНКЛАТУРЫ ============
+
+state._nomPicker = {
+  contractId: null,
+  itemId: null,
+  tab: 'production',          // 'production' | 'sale'
+  productionData: null,       // {models, directions} — кэш
+  saleData: null,             // {products, categories} — кэш
+  filter: '',
+  openGroups: {},             // ключ "tab:groupId" → bool
+};
+
+function openNomPicker(contractId, itemId) {
+  state._nomPicker.contractId = contractId;
+  state._nomPicker.itemId = itemId;
+  state._nomPicker.tab = 'production';
+  state._nomPicker.filter = '';
+  state._nomPicker.openGroups = {};
+
+  const ov = document.getElementById('nom-picker-overlay');
+  if (ov) ov.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+
+  // Сброс поискового поля
+  const si = document.getElementById('nom-picker-search-input');
+  if (si) si.value = '';
+
+  // Активируем нужный таб визуально
+  document.querySelectorAll('.nom-picker-tab').forEach(t => t.classList.remove('active'));
+  const activeTab = document.querySelector('.nom-picker-tab[data-nom-tab="production"]');
+  if (activeTab) activeTab.classList.add('active');
+
+  loadNomTab('production');
+}
+
+function closeNomPicker() {
+  const ov = document.getElementById('nom-picker-overlay');
+  if (ov) ov.classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+function switchNomTab(tab) {
+  if (state._nomPicker.tab === tab) return;
+  state._nomPicker.tab = tab;
+  state._nomPicker.openGroups = {};
+  document.querySelectorAll('.nom-picker-tab').forEach(t => t.classList.remove('active'));
+  const btn = document.querySelector('.nom-picker-tab[data-nom-tab="' + tab + '"]');
+  if (btn) btn.classList.add('active');
+  loadNomTab(tab);
+}
+
+async function loadNomTab(tab) {
+  const body = document.getElementById('nom-picker-body');
+  if (!body) return;
+
+  if (tab === 'production') {
+    if (!state._nomPicker.productionData) {
+      body.innerHTML = '<div class="nom-loading">Загружаем номенклатуру…</div>';
+      try {
+        const d = await apiGet('/api/models');
+        state._nomPicker.productionData = {
+          models: (d && d.models) || [],
+          directions: (d && d.directions) || [],
+        };
+      } catch (e) {
+        body.innerHTML = '<div class="nom-empty">Ошибка загрузки: ' + escapeHtml(String(e)) + '</div>';
+        return;
+      }
+    }
+    renderProductionTree();
+  } else if (tab === 'sale') {
+    if (!state._nomPicker.saleData) {
+      body.innerHTML = '<div class="nom-loading">Загружаем продажную номенклатуру…</div>';
+      try {
+        const [pr, cat] = await Promise.all([
+          apiGet('/api/sale-products?include_inactive=false'),
+          apiGet('/api/sale-categories'),
+        ]);
+        state._nomPicker.saleData = {
+          products: (pr && pr.products) || [],
+          categories: (cat && cat.categories) || cat || [],
+        };
+      } catch (e) {
+        body.innerHTML = '<div class="nom-empty">Ошибка загрузки: ' + escapeHtml(String(e)) + '</div>';
+        return;
+      }
+    }
+    renderSaleTree();
+  }
+}
+
+function onNomPickerFilter(value) {
+  state._nomPicker.filter = (value || '').toLowerCase().trim();
+  if (state._nomPicker.tab === 'production') renderProductionTree();
+  else renderSaleTree();
+}
+
+function renderProductionTree() {
+  const body = document.getElementById('nom-picker-body');
+  if (!body) return;
+  const d = state._nomPicker.productionData;
+  if (!d) return;
+
+  const filter = state._nomPicker.filter;
+  // Фильтруем модели
+  const filteredModels = d.models.filter(m => {
+    if (!m.is_active) return false;
+    if (!filter) return true;
+    return (m.name || '').toLowerCase().includes(filter) ||
+           (m.article || '').toLowerCase().includes(filter) ||
+           (m.extra || '').toLowerCase().includes(filter);
+  });
+
+  // Группируем по направлениям
+  const byDir = {};
+  filteredModels.forEach(m => {
+    const did = m.direction_id || 0;
+    if (!byDir[did]) byDir[did] = [];
+    byDir[did].push(m);
+  });
+
+  if (!filteredModels.length) {
+    body.innerHTML = '<div class="nom-empty"><i class="ti ti-search-off" style="font-size:24px; display:block; margin-bottom:6px;"></i>' +
+      (filter ? 'По запросу ничего не найдено' : 'Номенклатура пуста') + '</div>';
+    return;
+  }
+
+  // Авто-разворачиваем группы при поиске
+  const autoOpen = !!filter;
+  let html = '';
+  d.directions.forEach(dir => {
+    const list = byDir[dir.id] || [];
+    if (!list.length) return;
+    const key = 'production:' + dir.id;
+    const isOpen = autoOpen || state._nomPicker.openGroups[key];
+    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
+    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
+    html += '<div class="name"><i class="ti ti-folder"></i>' + escapeHtml(dir.name) + '</div>';
+    html += '<div style="display:flex; align-items:center; gap:8px;">';
+    html += '<div class="count">' + list.length + '</div>';
+    html += '<i class="ti ti-chevron-right chevron"></i>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="nom-group-items">';
+    list.forEach(m => {
+      const article = m.article || '';
+      const name = m.name || '';
+      const extra = m.extra ? ' · ' + escapeHtml(m.extra) : '';
+      const label = (article ? article + ' · ' : '') + name;
+      html += '<div class="nom-item" onclick="pickNomModel(' + m.id + ',' + JSON.stringify(label).replace(/"/g, '&quot;') + ')">';
+      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
+      if (extra) html += '<div class="nom-item-meta">' + extra.replace(/^ · /, '') + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '</div>';
+  });
+
+  // Модели без направления
+  const noDir = byDir[0] || [];
+  if (noDir.length) {
+    const key = 'production:0';
+    const isOpen = autoOpen || state._nomPicker.openGroups[key];
+    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
+    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
+    html += '<div class="name"><i class="ti ti-folder-off"></i>Без направления</div>';
+    html += '<div style="display:flex; align-items:center; gap:8px;">';
+    html += '<div class="count">' + noDir.length + '</div>';
+    html += '<i class="ti ti-chevron-right chevron"></i>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="nom-group-items">';
+    noDir.forEach(m => {
+      const article = m.article || '';
+      const name = m.name || '';
+      const label = (article ? article + ' · ' : '') + name;
+      html += '<div class="nom-item" onclick="pickNomModel(' + m.id + ',' + JSON.stringify(label).replace(/"/g, '&quot;') + ')">';
+      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function renderSaleTree() {
+  const body = document.getElementById('nom-picker-body');
+  if (!body) return;
+  const d = state._nomPicker.saleData;
+  if (!d) return;
+
+  const filter = state._nomPicker.filter;
+  const filteredProducts = d.products.filter(p => {
+    if (!filter) return true;
+    return (p.name || '').toLowerCase().includes(filter) ||
+           (p.article || '').toLowerCase().includes(filter) ||
+           (p.description || '').toLowerCase().includes(filter);
+  });
+
+  if (!filteredProducts.length) {
+    body.innerHTML = '<div class="nom-empty"><i class="ti ti-search-off" style="font-size:24px; display:block; margin-bottom:6px;"></i>' +
+      (filter ? 'По запросу ничего не найдено' : 'Продажная номенклатура пуста') + '</div>';
+    return;
+  }
+
+  // Группируем по category_id
+  const byCat = {};
+  filteredProducts.forEach(p => {
+    const cid = p.category_id || 0;
+    if (!byCat[cid]) byCat[cid] = [];
+    byCat[cid].push(p);
+  });
+
+  const autoOpen = !!filter;
+  let html = '';
+  (d.categories || []).forEach(c => {
+    const list = byCat[c.id] || [];
+    if (!list.length) return;
+    const key = 'sale:' + c.id;
+    const isOpen = autoOpen || state._nomPicker.openGroups[key];
+    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
+    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
+    html += '<div class="name"><i class="ti ti-folder"></i>' + escapeHtml(c.name) + '</div>';
+    html += '<div style="display:flex; align-items:center; gap:8px;">';
+    html += '<div class="count">' + list.length + '</div>';
+    html += '<i class="ti ti-chevron-right chevron"></i>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="nom-group-items">';
+    list.forEach(p => {
+      const article = p.article || '';
+      const name = p.name || '';
+      const unit = p.unit_name || p.unit || '';
+      const label = (article ? article + ' · ' : '') + name;
+      html += '<div class="nom-item" onclick="pickNomSaleProduct(' + JSON.stringify(label).replace(/"/g, '&quot;') + ',' + JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;') + ')">';
+      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
+      if (unit) html += '<div class="nom-item-meta">ед.изм.: ' + escapeHtml(unit) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '</div>';
+  });
+
+  // Товары без категории
+  const noCat = byCat[0] || [];
+  if (noCat.length) {
+    const key = 'sale:0';
+    const isOpen = autoOpen || state._nomPicker.openGroups[key];
+    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
+    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
+    html += '<div class="name"><i class="ti ti-folder-off"></i>Без категории</div>';
+    html += '<div style="display:flex; align-items:center; gap:8px;">';
+    html += '<div class="count">' + noCat.length + '</div>';
+    html += '<i class="ti ti-chevron-right chevron"></i>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="nom-group-items">';
+    noCat.forEach(p => {
+      const article = p.article || '';
+      const name = p.name || '';
+      const unit = p.unit_name || p.unit || '';
+      const label = (article ? article + ' · ' : '') + name;
+      html += '<div class="nom-item" onclick="pickNomSaleProduct(' + JSON.stringify(label).replace(/"/g, '&quot;') + ',' + JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;') + ')">';
+      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
+      if (unit) html += '<div class="nom-item-meta">ед.изм.: ' + escapeHtml(unit) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function toggleNomGroup(key) {
+  state._nomPicker.openGroups[key] = !state._nomPicker.openGroups[key];
+  if (state._nomPicker.tab === 'production') renderProductionTree();
+  else renderSaleTree();
+}
+
+// Выбор модели из производства — заполняет model_id и name
+function pickNomModel(modelId, label) {
+  const mid = document.getElementById('spec-form-model-id');
+  const nm = document.getElementById('spec-form-name');
+  const search = document.getElementById('spec-form-search');
+  if (mid) mid.value = modelId;
+  if (nm) nm.value = label;
+  if (search) search.value = label;
+  const results = document.getElementById('spec-search-results');
+  if (results) results.style.display = 'none';
+  closeNomPicker();
+  // Фокус на количество
+  const qty = document.getElementById('spec-form-qty');
+  if (qty) { qty.focus(); qty.select(); }
+}
+
+// Выбор продажного товара — заполняет только name (без model_id) + подставляет unit
+function pickNomSaleProduct(label, unit) {
+  const mid = document.getElementById('spec-form-model-id');
+  const nm = document.getElementById('spec-form-name');
+  const search = document.getElementById('spec-form-search');
+  const unitEl = document.getElementById('spec-form-unit');
+  if (mid) mid.value = '';   // нет model_id для sale-products
+  if (nm) nm.value = label;
+  if (search) search.value = label;
+  if (unitEl && unit) unitEl.value = unit;
+  const results = document.getElementById('spec-search-results');
+  if (results) results.style.display = 'none';
+  closeNomPicker();
+  const qty = document.getElementById('spec-form-qty');
+  if (qty) { qty.focus(); qty.select(); }
 }
 
 // ============ КОНЕЦ ЭТАПА 27 ============
@@ -22295,6 +22809,30 @@ if ('serviceWorker' in navigator) {
       <i class="ti ti-bell-off big"></i>
       <div class="title">Пока тихо</div>
       <div class="hint">Новые уведомления появятся здесь.<br>Раздел в разработке.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ЭТАП 27.2: МОДАЛКА ВЫБОРА НОМЕНКЛАТУРЫ ============ -->
+<div class="nom-picker-overlay" id="nom-picker-overlay" onclick="if(event.target===this) closeNomPicker()">
+  <div class="nom-picker">
+    <div class="nom-picker-header">
+      <div class="nom-picker-title"><i class="ti ti-list-search" style="color: var(--brand); margin-right: 6px;"></i>Выбор позиции</div>
+      <button class="nom-picker-close" onclick="closeNomPicker()" aria-label="Закрыть"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="nom-picker-tabs">
+      <button class="nom-picker-tab active" data-nom-tab="production" onclick="switchNomTab('production')">
+        <i class="ti ti-tool" style="margin-right: 4px;"></i> Производство
+      </button>
+      <button class="nom-picker-tab" data-nom-tab="sale" onclick="switchNomTab('sale')">
+        <i class="ti ti-shopping-cart" style="margin-right: 4px;"></i> Продажи
+      </button>
+    </div>
+    <div class="nom-picker-search">
+      <input type="text" id="nom-picker-search-input" placeholder="Фильтр по названию или артикулу…" oninput="onNomPickerFilter(this.value)">
+    </div>
+    <div class="nom-picker-body" id="nom-picker-body">
+      <div class="nom-loading">Загружаем…</div>
     </div>
   </div>
 </div>
