@@ -227,7 +227,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.15s, transform 0.12s;
+    transition: background 0.15s, transform 0.12s, opacity 0.15s;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
     padding: 0;
   }
@@ -235,6 +235,19 @@
   .section-scroll-btn:active { transform: scale(0.92); }
   .section-scroll-btn i { font-size: 18px; }
   .section-scroll-btn.visible { display: flex; }
+  /* ЭТАП 25.0: стрелки в паре всегда видны */
+  .section-scroll-pair .section-scroll-btn { display: flex; opacity: 1; }
+  /* Приглушены когда некуда скроллить */
+  .section-scroll-pair .section-scroll-btn.disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .section-scroll-pair .section-scroll-btn.disabled:hover {
+    background: rgba(30, 58, 95, 0.92);
+  }
+  .section-scroll-pair .section-scroll-btn.disabled:active {
+    transform: none;
+  }
   /* Отступы наружных стрелок (между лого/лентой и лентой/Скан) */
   .section-scroll-btn.outer.left  { margin: 0 8px 0 4px; }
   .section-scroll-btn.outer.right { margin: 0 4px 0 8px; }
@@ -18707,13 +18720,16 @@ function updateSectionScrollState() {
   const maxScroll  = nav.scrollWidth - nav.clientWidth;
   const hasLeft    = scrollLeft > 2;
   const hasRight   = scrollLeft < maxScroll - 2;
-  // Стрелки видны только если есть что прокручивать
-  if (btnL) btnL.classList.toggle('visible', hasLeft);
-  if (btnR) btnR.classList.toggle('visible', hasRight);
-  // Классы для fade (чтобы fade не дублировал стрелку)
-  wrap.classList.toggle('has-left-btn',  hasLeft);
-  wrap.classList.toggle('has-right-btn', hasRight);
-  // Fade-эффекты по краям
+  // ЭТАП 25.0: стрелки всегда видны (visible), приглушаем когда некуда скроллить
+  if (btnL) {
+    btnL.classList.add('visible');
+    btnL.classList.toggle('disabled', !hasLeft);
+  }
+  if (btnR) {
+    btnR.classList.add('visible');
+    btnR.classList.toggle('disabled', !hasRight);
+  }
+  // Fade-эффекты по краям ленты
   wrap.classList.toggle('fade-left',  hasLeft);
   wrap.classList.toggle('fade-right', hasRight);
 }
