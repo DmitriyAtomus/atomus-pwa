@@ -238,6 +238,9 @@
   /* Отступы наружных стрелок (между лого/лентой и лентой/Скан) */
   .section-scroll-btn.outer.left  { margin: 0 8px 0 4px; }
   .section-scroll-btn.outer.right { margin: 0 4px 0 8px; }
+  /* ЭТАП 25.0: стрелки на самых краях шапки (рядом с лого / после аватара) */
+  .section-scroll-btn.outer.edge.left  { margin: 0 10px 0 0; }
+  .section-scroll-btn.outer.edge.right { margin: 0 0 0 10px; }
 
   /* Fade-эффекты по краям ленты — намёк на скрытый контент */
   .section-switcher-wrap::before,
@@ -5949,13 +5952,13 @@
 
   <!-- ШАПКА: шарик + Atom CRM + переключатель разделов + профиль -->
   <header class="top-bar">
+    <button class="section-scroll-btn outer left edge" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
+      <i class="ti ti-chevron-left"></i>
+    </button>
     <div class="brand-wrap" onclick="goHome()" title="На главную" style="cursor: pointer;">
       <div class="brand-ball"></div>
       <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
     </div>
-    <button class="section-scroll-btn outer left" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
-      <i class="ti ti-chevron-left"></i>
-    </button>
     <div class="section-switcher-wrap" id="section-switcher-wrap">
       <nav class="section-switcher" id="section-switcher">
         <button class="section-tab active" data-section="home">
@@ -5990,9 +5993,6 @@
         </button>
       </nav>
     </div>
-    <button class="section-scroll-btn outer right" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
-      <i class="ti ti-chevron-right"></i>
-    </button>
     <button class="scan-btn" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">Скан</span>
@@ -6004,6 +6004,9 @@
       </div>
       <div class="avatar" id="top-avatar">—</div>
     </div>
+    <button class="section-scroll-btn outer right edge" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
+      <i class="ti ti-chevron-right"></i>
+    </button>
   </header>
 
   <!-- Мобильные табы разделов -->
