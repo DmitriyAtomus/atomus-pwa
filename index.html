@@ -5347,12 +5347,22 @@
     color: white !important;
     width: 38px;
     height: 38px;
-    padding: 0;
+    padding: 0 !important;
+    border: none !important;
     border-radius: 50%;
     box-shadow: var(--shadow-sm-25);
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
   }
   .app.mobile-layout .scan-btn .scan-btn-text { display: none; }
-  .app.mobile-layout .scan-btn i { font-size: 20px; color: white; }
+  .app.mobile-layout .scan-btn i {
+    font-size: 20px;
+    color: white;
+    margin: 0;
+    line-height: 1;
+  }
   .app.mobile-layout .scan-btn:active { background: var(--brand-light) !important; }
 
   /* ===== СКРЫВАЕМ СТАРЫЕ TAB-BAR НА МОБИЛЕ ===== */
@@ -7940,6 +7950,9 @@
       <i class="ti ti-scan"></i> Сканирование QR-кода
     </div>
     <div style="display: flex; gap: 8px; align-items: center;">
+      <button class="qr-scanner-close" id="qr-switch-camera-btn" onclick="switchQrCamera()" title="Сменить камеру" style="width: auto; padding: 0 12px; border-radius: 18px; display: none;">
+        <i class="ti ti-camera-rotate"></i>
+      </button>
       <label class="qr-scanner-close" title="Открыть фото с QR" style="width: auto; padding: 0 12px; border-radius: 18px; cursor: pointer;">
         <i class="ti ti-photo"></i>
         <input type="file" accept="image/*" style="display: none;" onchange="scanQrFromFile(this)">
@@ -18845,8 +18858,28 @@ async function openQrScanner() {
   try {
     const scanner = new Html5Qrcode('qr-reader', { verbose: false });
     state._qrScannerInstance = scanner;
+
+    // ЭТАП 25.0: получаем список камер для возможности переключения (wide/обычная)
+    let cameraId = null;
+    try {
+      const cams = await Html5Qrcode.getCameras();
+      if (cams && cams.length) {
+        state._qrCameras = cams;
+        // Если ранее выбирали — берём выбранную, иначе последнюю (часто это обычная задняя)
+        let idx = (typeof state._qrCameraIndex === 'number') ? state._qrCameraIndex : (cams.length - 1);
+        if (idx < 0 || idx >= cams.length) idx = cams.length - 1;
+        state._qrCameraIndex = idx;
+        cameraId = cams[idx].id;
+        // Показываем кнопку переключения только если камер >1
+        const swBtn = document.getElementById('qr-switch-camera-btn');
+        if (swBtn) swBtn.style.display = (cams.length > 1) ? '' : 'none';
+      }
+    } catch (e) { /* ignore — fallback на facingMode */ }
+
+    const cameraSpec = cameraId ? { deviceId: { exact: cameraId } } : { facingMode: 'environment' };
+
     await scanner.start(
-      { facingMode: 'environment' },
+      cameraSpec,
       {
         fps: 10,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -18857,7 +18890,6 @@ async function openQrScanner() {
         aspectRatio: 1.0,
         // Среднее разрешение — 1280×720. Высокие (1920×1080) могут глючить на Huawei.
         videoConstraints: {
-          facingMode: 'environment',
           width:  { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -19063,6 +19095,33 @@ async function changeQrZoom(delta) {
 }
 
 // ============ КОНЕЦ ЗУМА QR ============
+
+// ============ ЭТАП 25.0: ПЕРЕКЛЮЧЕНИЕ КАМЕР В QR ============
+
+async function switchQrCamera() {
+  const cams = state._qrCameras;
+  if (!cams || cams.length < 2) return;
+  // Останавливаем текущий
+  if (state._qrScannerInstance) {
+    try {
+      await state._qrScannerInstance.stop();
+      await state._qrScannerInstance.clear();
+    } catch (e) {}
+    state._qrScannerInstance = null;
+  }
+  // Сбрасываем zoom-bar
+  const zb = document.getElementById('qr-zoom-bar');
+  if (zb) zb.style.display = 'none';
+  state._qrZoomTrack = null;
+  // Переключаем на следующую
+  let idx = (state._qrCameraIndex || 0) + 1;
+  if (idx >= cams.length) idx = 0;
+  state._qrCameraIndex = idx;
+  // Запускаем заново
+  openQrScanner();
+}
+
+// ============ КОНЕЦ ПЕРЕКЛЮЧЕНИЯ КАМЕР ============
 
 async function handleQrScanResult(decodedText) {
   // Не дёргать handler многократно — закрываем сразу
