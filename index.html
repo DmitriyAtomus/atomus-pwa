@@ -5855,6 +5855,176 @@
   .m25-mobile-only { display: none; }
   .app.mobile-layout .m25-mobile-only { display: block; }
 
+  /* ЭТАП 25.1: на мобиле скрываем десктопные блоки production dashboard
+     (они заменены мобильными m25-блоками выше) */
+  .app.mobile-layout #dashboard-content > .kpi-grid,
+  .app.mobile-layout #dashboard-content > .row-2,
+  .app.mobile-layout #dashboard-content > .section:not(.m25-mobile-only),
+  .app.mobile-layout #dashboard-content > #production-contracts-block {
+    display: none;
+  }
+
+  /* ===== ЭТАП 25.1: DRAWER (мобильный sidebar-выезд) ===== */
+  /* Гамбургер в мобильной шапке */
+  .app.mobile-layout .hamburger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-right: 4px;
+    transition: background 0.15s;
+  }
+  .app.mobile-layout .hamburger-btn:active { background: rgba(255, 255, 255, 0.28); }
+  .app.mobile-layout .hamburger-btn i { font-size: 22px; }
+  /* Скрыт когда раздел home (drawer не нужен) */
+  .app.mobile-layout[data-section="home"] .hamburger-btn { display: none; }
+  /* Скрыт на десктопе */
+  .app.desktop-layout .hamburger-btn { display: none; }
+
+  /* Overlay подложки drawer */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 240;
+    display: none;
+    animation: fadeIn25 0.2s ease;
+  }
+  .drawer-overlay.visible { display: block; }
+
+  /* Sidebar в режиме drawer (только на мобиле) */
+  .app.mobile-layout .sidebar.drawer-mode {
+    display: flex !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 250;
+    height: 100vh;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+  }
+  .app.mobile-layout .sidebar.drawer-mode.open {
+    transform: translateX(0);
+  }
+  /* Закрывающая кнопка X в шапке drawer'а */
+  .drawer-close-btn {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+  }
+  .drawer-close-btn:active { background: rgba(255, 255, 255, 0.28); }
+
+  /* ===== ЭТАП 25.1: ПРОИЗВОДСТВО (мобильный dashboard) ===== */
+  .prod25-active-row {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin: 0 14px 8px;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
+  }
+  .prod25-active-row .av {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--c-prod-bg-25);
+    color: var(--c-prod-25);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .prod25-active-row .body { flex: 1; min-width: 0; }
+  .prod25-active-row .title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .prod25-active-row .sub {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+  }
+  .prod25-active-row .qty-pill {
+    background: var(--c-prod-bg-25);
+    color: var(--c-prod-25);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  /* Плитки-ссылки на подразделы Производства */
+  .prod25-links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 14px;
+  }
+  .prod25-link-tile {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
+    transition: transform 0.12s;
+    width: 100%;
+  }
+  .prod25-link-tile:active { transform: scale(0.97); }
+  .prod25-link-tile .ico {
+    width: 36px; height: 36px;
+    border-radius: 12px;
+    background: var(--c-prod-bg-25);
+    color: var(--c-prod-25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px;
+  }
+  .prod25-link-tile .ttl {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .prod25-link-tile .sub {
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  /* ============ КОНЕЦ ЭТАПА 25.1 ============ */
+
   /* ===== ЗУМ В QR-СКАНЕРЕ ===== */
   .qr-zoom-bar {
     position: absolute;
@@ -5973,6 +6143,9 @@
 
   <!-- ШАПКА: шарик + Atom CRM + переключатель разделов + профиль -->
   <header class="top-bar">
+    <button class="hamburger-btn" onclick="openSectionDrawer()" aria-label="Меню раздела">
+      <i class="ti ti-menu-2"></i>
+    </button>
     <div class="brand-wrap" onclick="goHome()" title="На главную" style="cursor: pointer;">
       <div class="brand-ball"></div>
       <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
@@ -8379,6 +8552,10 @@ function selectSection(sectionName) {
 
   state.currentSection = sectionName;
 
+  // ЭТАП 25.1: data-section на app — для CSS-селекторов (гамбургер видим/скрыт и т.д.)
+  const appEl0 = document.getElementById('app');
+  if (appEl0) appEl0.dataset.section = sectionName;
+
   // Обновляем шапку
   document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.section-tab[data-section="' + sectionName + '"]').forEach(t => t.classList.add('active'));
@@ -8552,6 +8729,90 @@ async function loadDashboard() {
 function renderDashboard(d) {
   const container = document.getElementById('dashboard-content');
   let html = '';
+
+  // ============ ЭТАП 25.1: МОБИЛЬНЫЕ БЛОКИ ============
+  html += '<div class="m25-mobile-only" style="margin: 0 -18px 0;">';
+
+  // 1. KPI Производства — горизонтальный скролл (используем существующий .kpi-strip)
+  html += '<div class="qa25-section-label">Сегодня в производстве</div>';
+  html += '<div class="kpi-strip">';
+  html += '<div class="kpi-pill c-prod"><div class="kpi-value">' + (d.today.qty || 0) + '</div><div class="kpi-label">собрано</div></div>';
+  html += '<div class="kpi-pill c-prod"><div class="kpi-value">' + (d.today.records || 0) + '</div><div class="kpi-label">записей</div></div>';
+  html += '<div class="kpi-pill"><div class="kpi-value">' + (d.week.qty || 0) + '</div><div class="kpi-label">за неделю</div></div>';
+  html += '<div class="kpi-pill"><div class="kpi-value">' + (d.month.qty || 0) + '</div><div class="kpi-label">за месяц</div></div>';
+  html += '<div class="kpi-pill"><div class="kpi-value">' + (d.month.employees || 0) + '</div><div class="kpi-label">сборщиков</div></div>';
+  html += '</div>';
+
+  // 2. Активные сборки (используем recent, статус in_progress если есть)
+  const active = (d.recent || []).filter(r => {
+    const st = (r.status || '').toLowerCase();
+    return st === 'in_progress' || st === 'in-progress' || st === 'active' || st === 'started';
+  }).slice(0, 5);
+  if (active.length) {
+    html += '<div class="qa25-section-label">Активные сборки</div>';
+    active.forEach(r => {
+      const name = r.employee_name || r.worker_name || '?';
+      const model = r.model_name || r.model || '—';
+      const qty = r.qty || 1;
+      html += '<div class="prod25-active-row">' +
+        '<div class="av">' + escapeHtml(getInitials(name)) + '</div>' +
+        '<div class="body">' +
+          '<div class="title">' + escapeHtml(model) + '</div>' +
+          '<div class="sub">' + escapeHtml(name) + '</div>' +
+        '</div>' +
+        '<div class="qty-pill">' + qty + ' шт.</div>' +
+      '</div>';
+    });
+  }
+
+  // 3. Журнал работ за сегодня (последние записи, до 5)
+  if (d.recent && d.recent.length) {
+    html += '<div class="qa25-section-label">Журнал за сегодня <a onclick="selectSidebarItem(\'history\')">все →</a></div>';
+    d.recent.slice(0, 5).forEach(r => {
+      const name = r.employee_name || r.worker_name || '?';
+      const model = r.model_name || r.model || '—';
+      const qty = r.qty || 1;
+      const dt = r.created_at ? (function(s) {
+        try { const m = String(s).match(/(\d{2}:\d{2})/); return m ? m[1] : ''; } catch(e) { return ''; }
+      })(r.created_at) : '';
+      html += '<div class="prod25-active-row">' +
+        '<div class="av">' + escapeHtml(getInitials(name)) + '</div>' +
+        '<div class="body">' +
+          '<div class="title">' + escapeHtml(model) + '</div>' +
+          '<div class="sub">' + escapeHtml(name) + (dt ? ' · ' + dt : '') + '</div>' +
+        '</div>' +
+        '<div class="qty-pill">' + qty + '</div>' +
+      '</div>';
+    });
+  }
+
+  // 4. Плитки-ссылки на подразделы
+  html += '<div class="qa25-section-label">Разделы</div>';
+  html += '<div class="prod25-links">';
+  html += '<button class="prod25-link-tile" onclick="selectSidebarItem(\'history\')">' +
+    '<div class="ico"><i class="ti ti-list-details"></i></div>' +
+    '<div class="ttl">Сборки</div>' +
+    '<div class="sub">Журнал работ</div>' +
+  '</button>';
+  html += '<button class="prod25-link-tile" onclick="selectSidebarItem(\'summary\')">' +
+    '<div class="ico"><i class="ti ti-chart-bar"></i></div>' +
+    '<div class="ttl">Сводки</div>' +
+    '<div class="sub">Аналитика</div>' +
+  '</button>';
+  html += '<button class="prod25-link-tile" onclick="selectSidebarItem(\'employees\')">' +
+    '<div class="ico"><i class="ti ti-users"></i></div>' +
+    '<div class="ttl">Сотрудники</div>' +
+    '<div class="sub">Справочник</div>' +
+  '</button>';
+  html += '<button class="prod25-link-tile" onclick="selectSidebarItem(\'models\')">' +
+    '<div class="ico"><i class="ti ti-package"></i></div>' +
+    '<div class="ttl">Номенклатура</div>' +
+    '<div class="sub">Модели</div>' +
+  '</button>';
+  html += '</div>';
+
+  html += '</div>';
+  // ============ КОНЕЦ ЭТАПА 25.1 ============
 
   html += '<div class="kpi-grid">';
   html += kpiCard('сегодня', d.today.qty, d.today.records + ' ' + plural(d.today.records, 'запись', 'записи', 'записей'));
@@ -20035,6 +20296,66 @@ async function chooseContractForDefect(contractId) {
 
 
 // ============================================================
+// ============ ЭТАП 25.1: DRAWER (мобильный sidebar) ==========
+// ============================================================
+
+/**
+ * Открывает drawer-меню текущего раздела (мобила).
+ * Берёт активный sidebar (по data-visible="1") и показывает его как drawer.
+ */
+function openSectionDrawer() {
+  // Находим активный sidebar (тот что data-visible="1" для текущего раздела)
+  const sidebar = document.querySelector('.sidebar[data-visible="1"]');
+  if (!sidebar) return;
+
+  // Закрываем все другие drawer'ы (на всякий)
+  document.querySelectorAll('.sidebar.drawer-mode').forEach(s => {
+    s.classList.remove('drawer-mode', 'open');
+  });
+
+  sidebar.classList.add('drawer-mode');
+  // Добавляем кнопку закрытия если её ещё нет
+  if (!sidebar.querySelector('.drawer-close-btn')) {
+    const btn = document.createElement('button');
+    btn.className = 'drawer-close-btn';
+    btn.innerHTML = '<i class="ti ti-x"></i>';
+    btn.setAttribute('aria-label', 'Закрыть меню');
+    btn.onclick = closeSectionDrawer;
+    sidebar.appendChild(btn);
+  }
+  // Открываем с анимацией
+  requestAnimationFrame(() => {
+    sidebar.classList.add('open');
+  });
+  const ov = document.getElementById('drawer-overlay');
+  if (ov) ov.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSectionDrawer() {
+  const sidebar = document.querySelector('.sidebar.drawer-mode');
+  if (sidebar) {
+    sidebar.classList.remove('open');
+    setTimeout(() => sidebar.classList.remove('drawer-mode'), 280);
+  }
+  const ov = document.getElementById('drawer-overlay');
+  if (ov) ov.classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+// Перехватываем клики по пунктам sidebar внутри drawer — закрываем drawer
+document.addEventListener('click', function(e) {
+  const navItem = e.target.closest && e.target.closest('.sidebar.drawer-mode .nav-item');
+  if (navItem) {
+    // Даём клику обработаться, потом закрываем drawer
+    setTimeout(closeSectionDrawer, 50);
+  }
+}, true);
+
+// ============ КОНЕЦ DRAWER ============
+
+
+// ============================================================
 // ============ ЭТАП 25.0: НОВАЯ МОБИЛЬНАЯ НАВИГАЦИЯ ===========
 // ============================================================
 
@@ -20627,6 +20948,9 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
 </div>
+
+<!-- ============ ЭТАП 25.1: DRAWER OVERLAY ============ -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeSectionDrawer()"></div>
 
 </body>
 </html>
