@@ -6385,6 +6385,217 @@
 
   /* ============ КОНЕЦ ЭТАПА 26 ============ */
 
+  /* ============================================================
+     ЭТАП 27: СПЕЦИФИКАЦИЯ ДОГОВОРА
+     ============================================================ */
+  .spec-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 16px 0;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
+  }
+  .spec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .spec-title {
+    font-size: 14px;
+    color: var(--text-light);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .spec-total {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .spec-total small {
+    font-size: 11px;
+    color: var(--text-light);
+    font-weight: 500;
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  .spec-list { display: flex; flex-direction: column; gap: 6px; }
+  .spec-item {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--surface-soft, #F8FAFC);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .spec-item-no {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: white;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-light);
+    flex-shrink: 0;
+  }
+  .spec-item-body { min-width: 0; }
+  .spec-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .spec-item-meta {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .spec-item-sum {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .spec-item-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+  }
+  .spec-item-act-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .spec-item-act-btn:hover { background: var(--surface-soft, #F8FAFC); color: var(--text); }
+  .spec-item-act-btn.danger:hover { background: #FEE; color: var(--danger); border-color: rgba(220, 38, 38, 0.3); }
+
+  .spec-empty {
+    padding: 18px;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 13px;
+    background: var(--surface-soft, #F8FAFC);
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+  }
+
+  .spec-add-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 12px;
+    background: white;
+    color: var(--brand);
+    border: 1px dashed var(--brand);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .spec-add-btn:hover { background: rgba(45, 95, 139, 0.05); }
+  .spec-add-btn i { font-size: 18px; }
+
+  /* Форма добавления/редактирования позиции (inline) */
+  .spec-form {
+    background: white;
+    border: 2px solid var(--brand);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 110px;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .spec-form-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .spec-form-field label {
+    font-size: 10px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .spec-form-field input, .spec-form-field select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    width: 100%;
+    min-width: 0;
+  }
+  .spec-form-field input:focus, .spec-form-field select:focus {
+    outline: none;
+    border-color: var(--brand);
+  }
+  .spec-form-row-2 {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+  .spec-form-row-2 .spec-form-sum {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .spec-form-actions { display: flex; gap: 8px; }
+  .spec-form-actions button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text);
+  }
+  .spec-form-actions button.primary {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .spec-form-actions button:active { transform: scale(0.97); }
+
+  /* Мобильная адаптация формы */
+  @media (max-width: 600px) {
+    .spec-form { grid-template-columns: 1fr 1fr; }
+    .spec-form-field:nth-child(1) { grid-column: 1 / -1; }
+  }
+  /* ============ КОНЕЦ ЭТАПА 27 ============ */
+
   /* ===== ЗУМ В QR-СКАНЕРЕ ===== */
   .qr-zoom-bar {
     position: absolute;
@@ -8549,7 +8760,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.6.2-tasks-fix";
+const APP_VERSION = "v2.7.0-spec";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -14902,6 +15113,9 @@ function renderContractDetail(c) {
   // ЭТАП 15: реальный блок «Готовность по сборкам»
   html += renderContractAssembliesBlock(c);
 
+  // ЭТАП 27: блок Спецификация
+  html += '<div id="scd-items-block"><div class="loading-block" style="padding:14px;">Загружаем спецификацию…</div></div>';
+
   // ЭТАП 26: кнопка перехода в режим отгрузки + прогресс
   html += '<div id="scd-shipment-block" style="margin-top: 16px;"><div class="loading-block" style="padding:14px;">Загружаем прогресс отгрузки…</div></div>';
 
@@ -14914,7 +15128,250 @@ function renderContractDetail(c) {
   loadContractTasks(c.id);
   // ЭТАП 26: загружаем прогресс отгрузки
   loadContractShipmentBlock(c.id);
+  // ЭТАП 27: загружаем спецификацию
+  loadContractItemsBlock(c.id);
 }
+
+// ============================================================
+// ============ ЭТАП 27: СПЕЦИФИКАЦИЯ ДОГОВОРА ================
+// ============================================================
+
+// Состояние: словарь contractId → { items, total, addingMode, editingId }
+state._specByContract = {};
+
+async function loadContractItemsBlock(contractId) {
+  const container = document.getElementById('scd-items-block');
+  if (!container) return;
+  try {
+    const d = await apiGet('/api/contracts/' + contractId + '/items');
+    state._specByContract[contractId] = {
+      items: d.items || [],
+      total: d.total || 0,
+      addingMode: false,
+      editingId: null,
+    };
+    renderContractItemsBlock(contractId);
+  } catch (e) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+  }
+}
+
+function renderContractItemsBlock(contractId) {
+  const container = document.getElementById('scd-items-block');
+  if (!container) return;
+  const st = state._specByContract[contractId] || { items: [], total: 0, addingMode: false, editingId: null };
+  const items = st.items;
+  const total = st.total;
+  const canEdit = canManageSales();
+
+  let html = '<div class="spec-card">';
+  html += '<div class="spec-head">';
+  html += '<div class="spec-title"><i class="ti ti-list-details" style="color: var(--brand);"></i> Спецификация ' +
+          (items.length ? '(' + items.length + ')' : '') + '</div>';
+  if (items.length) {
+    html += '<div class="spec-total"><small>Итого:</small>' + formatMoney(total) + '</div>';
+  }
+  html += '</div>';
+
+  // Список позиций
+  if (items.length) {
+    html += '<div class="spec-list">';
+    items.forEach((it, idx) => {
+      if (st.editingId === it.id) {
+        html += renderSpecForm(contractId, it);
+      } else {
+        const qty = it.qty || 0;
+        const price = it.price || 0;
+        const sum = it.sum_amount || 0;
+        const unit = it.unit || 'шт.';
+        html += '<div class="spec-item">' +
+          '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
+          '<div class="spec-item-body">' +
+            '<div class="spec-item-name">' + escapeHtml(it.name) + '</div>' +
+            '<div class="spec-item-meta">' +
+              qty + ' ' + escapeHtml(unit) +
+              (price > 0 ? ' × ' + formatMoney(price) : '') +
+              (it.description ? ' · ' + escapeHtml(it.description) : '') +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex; align-items:center; gap:8px;">' +
+            (sum > 0 ? '<div class="spec-item-sum">' + formatMoney(sum) + '</div>' : '') +
+            (canEdit ? '<div class="spec-item-actions">' +
+              '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
+              '<button class="spec-item-act-btn danger" title="Удалить" onclick="deleteSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-trash"></i></button>' +
+            '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }
+    });
+    html += '</div>';
+  } else if (!st.addingMode) {
+    html += '<div class="spec-empty">Спецификация пока пуста. Добавьте позиции, которые поставляются по договору.</div>';
+  }
+
+  // Форма добавления новой позиции
+  if (st.addingMode) {
+    html += renderSpecForm(contractId, null);
+  } else if (canEdit) {
+    html += '<button class="spec-add-btn" onclick="startAddSpecItem(' + contractId + ')"><i class="ti ti-plus"></i> Добавить позицию</button>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  container.style.display = '';
+
+  // Фокус на поле name если форма открыта
+  setTimeout(() => {
+    const f = document.getElementById('spec-form-name');
+    if (f) f.focus();
+  }, 50);
+}
+
+function renderSpecForm(contractId, existing) {
+  // existing = null для новой позиции, объект для редактирования
+  const e = existing || { name: '', qty: 1, unit: 'шт.', price: 0, description: '' };
+  const isEdit = !!existing;
+  const formId = isEdit ? ('spec-form-edit-' + existing.id) : 'spec-form-new';
+
+  let html = '<div class="spec-form" id="' + formId + '">';
+  html += '<div class="spec-form-field"><label>Наименование *</label>' +
+          '<input type="text" id="spec-form-name" value="' + escapeHtml(e.name) + '" maxlength="300" placeholder="Например: Шкаф управления УУЗ-300">' +
+          '</div>';
+  html += '<div class="spec-form-field"><label>Кол-во</label>' +
+          '<input type="number" id="spec-form-qty" value="' + (e.qty || 1) + '" min="0" step="0.01" oninput="updateSpecFormSum()">' +
+          '</div>';
+  html += '<div class="spec-form-field"><label>Ед.изм.</label>' +
+          '<input type="text" id="spec-form-unit" value="' + escapeHtml(e.unit || 'шт.') + '" maxlength="30" list="spec-units">' +
+          '<datalist id="spec-units">' +
+            '<option value="шт.">' +
+            '<option value="м">' +
+            '<option value="м²">' +
+            '<option value="кг">' +
+            '<option value="т">' +
+            '<option value="л">' +
+            '<option value="компл.">' +
+            '<option value="упак.">' +
+          '</datalist>' +
+          '</div>';
+  html += '<div class="spec-form-field"><label>Цена за ед., ₽</label>' +
+          '<input type="number" id="spec-form-price" value="' + (e.price || 0) + '" min="0" step="0.01" oninput="updateSpecFormSum()">' +
+          '</div>';
+  // Расширенное описание (опционально)
+  html += '<div class="spec-form-field" style="grid-column: 1 / -1;"><label>Описание (опционально)</label>' +
+          '<input type="text" id="spec-form-desc" value="' + escapeHtml(e.description || '') + '" maxlength="1000" placeholder="Артикул, размеры, доп. условия">' +
+          '</div>';
+  // Сумма + кнопки
+  const initialSum = (e.qty || 1) * (e.price || 0);
+  html += '<div class="spec-form-row-2">';
+  html += '<div class="spec-form-sum">Сумма: <span id="spec-form-sum">' + formatMoney(initialSum) + '</span></div>';
+  html += '<div class="spec-form-actions">';
+  html += '<button onclick="cancelSpecForm(' + contractId + ')">Отмена</button>';
+  html += '<button class="primary" onclick="submitSpecForm(' + contractId + ',' + (isEdit ? existing.id : 'null') + ')"><i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Добавить') + '</button>';
+  html += '</div>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function updateSpecFormSum() {
+  const qty = parseFloat(document.getElementById('spec-form-qty').value) || 0;
+  const price = parseFloat(document.getElementById('spec-form-price').value) || 0;
+  const sumEl = document.getElementById('spec-form-sum');
+  if (sumEl) sumEl.textContent = formatMoney(qty * price);
+}
+
+function startAddSpecItem(contractId) {
+  if (!state._specByContract[contractId]) {
+    state._specByContract[contractId] = { items: [], total: 0, addingMode: false, editingId: null };
+  }
+  state._specByContract[contractId].addingMode = true;
+  state._specByContract[contractId].editingId = null;
+  renderContractItemsBlock(contractId);
+}
+
+function startEditSpecItem(contractId, itemId) {
+  if (!state._specByContract[contractId]) return;
+  state._specByContract[contractId].editingId = itemId;
+  state._specByContract[contractId].addingMode = false;
+  renderContractItemsBlock(contractId);
+}
+
+function cancelSpecForm(contractId) {
+  if (!state._specByContract[contractId]) return;
+  state._specByContract[contractId].addingMode = false;
+  state._specByContract[contractId].editingId = null;
+  renderContractItemsBlock(contractId);
+}
+
+async function submitSpecForm(contractId, itemId) {
+  const name = (document.getElementById('spec-form-name').value || '').trim();
+  if (!name) {
+    showToast('Введите наименование', 'error');
+    return;
+  }
+  const payload = {
+    name: name,
+    qty: parseFloat(document.getElementById('spec-form-qty').value) || 0,
+    unit: (document.getElementById('spec-form-unit').value || 'шт.').trim() || 'шт.',
+    price: parseFloat(document.getElementById('spec-form-price').value) || 0,
+    description: (document.getElementById('spec-form-desc').value || '').trim(),
+  };
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    let r;
+    if (itemId) {
+      // Update
+      r = await fetch(API_BASE + '/api/contracts/items/' + itemId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      // Create
+      r = await fetch(API_BASE + '/api/contracts/' + contractId + '/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
+      });
+    }
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось сохранить', 'error');
+      return;
+    }
+    showToast(itemId ? 'Позиция обновлена' : 'Позиция добавлена', 'success');
+    // Сбрасываем режимы и перезагружаем блок
+    state._specByContract[contractId].addingMode = false;
+    state._specByContract[contractId].editingId = null;
+    loadContractItemsBlock(contractId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteSpecItem(contractId, itemId) {
+  if (!confirm('Удалить позицию из спецификации?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/items/' + itemId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      showToast('Не удалось удалить', 'error');
+      return;
+    }
+    showToast('Удалено', 'success');
+    loadContractItemsBlock(contractId);
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 27 ============
+
 
 // ============ ЭТАП 26: блок отгрузки в карточке договора ============
 
