@@ -262,6 +262,8 @@
   .section-scroll-pair .section-scroll-btn {
     margin: 0;
   }
+  /* ЭТАП 25.1: на мобиле стрелки не нужны (есть свой скролл табов сверху) */
+  .app.mobile-layout .section-scroll-pair { display: none; }
 
   /* Fade-эффекты по краям ленты — намёк на скрытый контент */
   .section-switcher-wrap::before,
@@ -5855,6 +5857,56 @@
   .m25-mobile-only { display: none; }
   .app.mobile-layout .m25-mobile-only { display: block; }
 
+  /* ===== Базовый KPI-strip (горизонтальный скролл) ===== */
+  .kpi-strip {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 0 14px 8px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .kpi-strip::-webkit-scrollbar { display: none; }
+  .kpi-pill {
+    flex: 0 0 auto;
+    min-width: 130px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-pill::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--kpi-c, var(--brand));
+  }
+  .kpi-pill.c-prod   { --kpi-c: var(--c-prod-25); }
+  .kpi-pill.c-sales  { --kpi-c: var(--c-sales-25); }
+  .kpi-pill.c-tasks  { --kpi-c: var(--c-tasks-25); }
+  .kpi-pill.c-defect { --kpi-c: var(--c-defect-25); }
+  .kpi-pill .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .kpi-pill .kpi-label {
+    font-size: 12px;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+  /* Внутри m25-mobile-only — без отрицательного margin */
+  .m25-mobile-only .kpi-strip { margin: 0; padding: 0 14px 8px; }
+
   /* ЭТАП 25.1: на мобиле скрываем десктопные блоки production dashboard
      (они заменены мобильными m25-блоками выше) */
   .app.mobile-layout #dashboard-content > .kpi-grid,
@@ -8731,9 +8783,9 @@ function renderDashboard(d) {
   let html = '';
 
   // ============ ЭТАП 25.1: МОБИЛЬНЫЕ БЛОКИ ============
-  html += '<div class="m25-mobile-only" style="margin: 0 -18px 0;">';
+  html += '<div class="m25-mobile-only">';
 
-  // 1. KPI Производства — горизонтальный скролл (используем существующий .kpi-strip)
+  // 1. KPI Производства — горизонтальный скролл
   html += '<div class="qa25-section-label">Сегодня в производстве</div>';
   html += '<div class="kpi-strip">';
   html += '<div class="kpi-pill c-prod"><div class="kpi-value">' + (d.today.qty || 0) + '</div><div class="kpi-label">собрано</div></div>';
@@ -8743,50 +8795,30 @@ function renderDashboard(d) {
   html += '<div class="kpi-pill"><div class="kpi-value">' + (d.month.employees || 0) + '</div><div class="kpi-label">сборщиков</div></div>';
   html += '</div>';
 
-  // 2. Активные сборки (используем recent, статус in_progress если есть)
-  const active = (d.recent || []).filter(r => {
-    const st = (r.status || '').toLowerCase();
-    return st === 'in_progress' || st === 'in-progress' || st === 'active' || st === 'started';
-  }).slice(0, 5);
-  if (active.length) {
-    html += '<div class="qa25-section-label">Активные сборки</div>';
-    active.forEach(r => {
-      const name = r.employee_name || r.worker_name || '?';
-      const model = r.model_name || r.model || '—';
+  // 2. Журнал работ за сегодня (последние записи, до 6)
+  if (d.recent && d.recent.length) {
+    html += '<div class="qa25-section-label">Последние записи <a onclick="selectSidebarItem(\'history\')">все →</a></div>';
+    d.recent.slice(0, 6).forEach(r => {
+      const workers = (r.workers && r.workers.length) ? r.workers.join(', ') : '—';
+      const model = (r.model_name || '—') + (r.model_extra ? ' · ' + r.model_extra : '');
       const qty = r.qty || 1;
+      const dateStr = (typeof isToday === 'function' && isToday(r.date)) ? 'сегодня' : (r.date || '');
       html += '<div class="prod25-active-row">' +
-        '<div class="av">' + escapeHtml(getInitials(name)) + '</div>' +
+        '<div class="av">' + escapeHtml(getInitials(workers)) + '</div>' +
         '<div class="body">' +
           '<div class="title">' + escapeHtml(model) + '</div>' +
-          '<div class="sub">' + escapeHtml(name) + '</div>' +
+          '<div class="sub">' + escapeHtml(workers) + ' · ' + escapeHtml(dateStr) + '</div>' +
         '</div>' +
         '<div class="qty-pill">' + qty + ' шт.</div>' +
       '</div>';
     });
+  } else {
+    html += '<div class="qa25-section-label">Последние записи</div>';
+    html += '<div style="margin: 0 14px; padding: 24px; background: white; border: 1px solid var(--border); border-radius: 16px; text-align: center; color: var(--text-light); font-size: 13px;">' +
+      'Сегодня записей пока нет</div>';
   }
 
-  // 3. Журнал работ за сегодня (последние записи, до 5)
-  if (d.recent && d.recent.length) {
-    html += '<div class="qa25-section-label">Журнал за сегодня <a onclick="selectSidebarItem(\'history\')">все →</a></div>';
-    d.recent.slice(0, 5).forEach(r => {
-      const name = r.employee_name || r.worker_name || '?';
-      const model = r.model_name || r.model || '—';
-      const qty = r.qty || 1;
-      const dt = r.created_at ? (function(s) {
-        try { const m = String(s).match(/(\d{2}:\d{2})/); return m ? m[1] : ''; } catch(e) { return ''; }
-      })(r.created_at) : '';
-      html += '<div class="prod25-active-row">' +
-        '<div class="av">' + escapeHtml(getInitials(name)) + '</div>' +
-        '<div class="body">' +
-          '<div class="title">' + escapeHtml(model) + '</div>' +
-          '<div class="sub">' + escapeHtml(name) + (dt ? ' · ' + dt : '') + '</div>' +
-        '</div>' +
-        '<div class="qty-pill">' + qty + '</div>' +
-      '</div>';
-    });
-  }
-
-  // 4. Плитки-ссылки на подразделы
+  // 3. Плитки-ссылки на подразделы
   html += '<div class="qa25-section-label">Разделы</div>';
   html += '<div class="prod25-links">';
   html += '<button class="prod25-link-tile" onclick="selectSidebarItem(\'history\')">' +
