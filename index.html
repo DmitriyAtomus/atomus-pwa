@@ -5362,20 +5362,25 @@
   #tab-bar-main { display: none; }
   .app.mobile-layout #tab-bar-main {
     position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 40;
+    bottom: 0;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 100%;
     max-width: 460px;
-    margin: 0 auto;
-    background: rgba(255, 255, 255, 0.92);
+    margin: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border-top: 1px solid var(--border);
-    padding: 6px 8px calc(6px + var(--safe-bottom-25));
+    padding: 6px 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     align-items: end;
   }
-  /* Скрываем new tab-bar в разделе Доработки (там есть FAB) — НЕТ, теперь показываем всегда */
+  /* Всегда показываем main tab-bar на мобиле (даже в no-tabbar разделах вроде Доработок) */
   .app.mobile-layout.no-tabbar #tab-bar-main { display: grid; }
 
   .tab25 {
@@ -11561,7 +11566,7 @@ async function loadHomeDashboard() {
   loadHomeMyTasks();      // ЭТАП 16В
   loadHomeShipments();    // ЭТАП 16Г
   loadHomeActivity();     // ЭТАП 16Г
-  loadHomeVacations();    // ЭТАП 20
+  // loadHomeVacations() — отключено в v25.0 (блок убран с Главной)
 }
 
 function renderHomeSkeleton() {
@@ -11609,10 +11614,6 @@ function renderHomeSkeleton() {
   // ЭТАП 16Г: «Ближайшие отгрузки»
   html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 24px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
   html += '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
-  // ЭТАП 20: «Кто в отпуске»
-  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-beach"></i>Отпуска</div>';
-  html += '<div id="home-vacations-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // Курс валют placeholder
   html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
