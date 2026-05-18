@@ -4386,8 +4386,8 @@
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: min(60vmin, 240px);
-    height: min(60vmin, 240px);
+    width: min(80vmin, 320px);
+    height: min(80vmin, 320px);
     aspect-ratio: 1 / 1;
     pointer-events: none;
     z-index: 3;
@@ -18864,15 +18864,20 @@ async function openQrScanner() {
     try {
       const cams = await Html5Qrcode.getCameras();
       if (cams && cams.length) {
-        state._qrCameras = cams;
-        // Если ранее выбирали — берём выбранную, иначе последнюю (часто это обычная задняя)
-        let idx = (typeof state._qrCameraIndex === 'number') ? state._qrCameraIndex : (cams.length - 1);
-        if (idx < 0 || idx >= cams.length) idx = cams.length - 1;
+        // Фильтруем только задние — фронтальные обычно содержат "front"/"user"/"selfie" в label
+        const frontPatterns = /(front|user|selfie|фронт|передн|селфи)/i;
+        const backCams = cams.filter(c => !frontPatterns.test(c.label || ''));
+        // Если по label ничего не отфильтровалось (labels пустые) — берём все
+        const useCams = backCams.length ? backCams : cams;
+        state._qrCameras = useCams;
+        // Если ранее выбирали — берём выбранную, иначе последнюю (обычно это обычная задняя)
+        let idx = (typeof state._qrCameraIndex === 'number') ? state._qrCameraIndex : (useCams.length - 1);
+        if (idx < 0 || idx >= useCams.length) idx = useCams.length - 1;
         state._qrCameraIndex = idx;
-        cameraId = cams[idx].id;
-        // Показываем кнопку переключения только если камер >1
+        cameraId = useCams[idx].id;
+        // Показываем кнопку переключения только если задних камер >1
         const swBtn = document.getElementById('qr-switch-camera-btn');
-        if (swBtn) swBtn.style.display = (cams.length > 1) ? '' : 'none';
+        if (swBtn) swBtn.style.display = (useCams.length > 1) ? '' : 'none';
       }
     } catch (e) { /* ignore — fallback на facingMode */ }
 
@@ -18884,7 +18889,7 @@ async function openQrScanner() {
         fps: 10,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
           const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const size = Math.floor(minEdge * 0.6);
+          const size = Math.floor(minEdge * 0.85);
           return { width: size, height: size };
         },
         aspectRatio: 1.0,
