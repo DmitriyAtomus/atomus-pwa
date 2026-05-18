@@ -203,55 +203,54 @@
     overflow-x: auto;
     scrollbar-width: none;
     scroll-behavior: smooth;
+    min-width: 0;
   }
   .section-switcher::-webkit-scrollbar { display: none; }
 
-  /* ============ ЭТАП 22.1: ОБЁРТКА С СТРЕЛКАМИ + FADE ============ */
+  /* ============ ЭТАП 22.1 / 25.0: ОБЁРТКА С ОТДЕЛЬНЫМИ СТРЕЛКАМИ ============ */
   .section-switcher-wrap {
     position: relative;
     flex: 1;
-    min-width: 0;             /* критично: позволяет flex-сжать обёртку */
+    min-width: 0;
     display: flex;
     align-items: center;
+    gap: 6px;
   }
-  /* Стрелки появляются только когда есть скрытое содержимое */
+  /* Стрелки — отдельные flex-элементы, не поверх ленты */
   .section-scroll-btn {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 3;
+    flex-shrink: 0;
     width: 32px; height: 32px;
-    background: rgba(30, 58, 95, 0.92);    /* совпадает с шапкой */
+    background: rgba(30, 58, 95, 0.92);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 50%;
-    display: none;             /* по умолчанию скрыты; JS показывает */
+    display: none;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background 0.15s, transform 0.12s;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    padding: 0;
   }
   .section-scroll-btn:hover { background: rgba(44, 82, 130, 1); }
-  .section-scroll-btn:active { transform: translateY(-50%) scale(0.92); }
+  .section-scroll-btn:active { transform: scale(0.92); }
   .section-scroll-btn i { font-size: 18px; }
-  .section-scroll-btn.left  { left: -6px; }
-  .section-scroll-btn.right { right: -6px; }
   .section-scroll-btn.visible { display: flex; }
 
-  /* Fade-эффекты по краям — намёк на скрытый контент */
+  /* Fade-эффекты по краям ленты — намёк на скрытый контент */
   .section-switcher-wrap::before,
   .section-switcher-wrap::after {
     content: '';
     position: absolute;
     top: 0; bottom: 0;
-    width: 28px;
+    width: 24px;
     pointer-events: none;
     z-index: 2;
     opacity: 0;
     transition: opacity 0.2s;
   }
   .section-switcher-wrap::before {
+    /* отступ от левой стрелки (32px + gap 6px) когда она видна, иначе 0 */
     left: 0;
     background: linear-gradient(90deg, #1E3A5F, transparent);
   }
@@ -259,8 +258,9 @@
     right: 0;
     background: linear-gradient(270deg, #2C5282, transparent);
   }
-  .section-switcher-wrap.fade-left::before { opacity: 1; }
-  .section-switcher-wrap.fade-right::after { opacity: 1; }
+  /* Fade гасим когда стрелка видна (она перекроет визуально край) */
+  .section-switcher-wrap.fade-left:not(.has-left-btn)::before { opacity: 1; }
+  .section-switcher-wrap.fade-right:not(.has-right-btn)::after { opacity: 1; }
   .section-tab {
     padding: 8px 12px;
     border: 1px solid transparent;
@@ -18710,7 +18710,10 @@ function updateSectionScrollState() {
   // Стрелки видны только если есть что прокручивать
   if (btnL) btnL.classList.toggle('visible', hasLeft);
   if (btnR) btnR.classList.toggle('visible', hasRight);
-  // Fade-эффекты
+  // Классы для fade (чтобы fade не дублировал стрелку)
+  wrap.classList.toggle('has-left-btn',  hasLeft);
+  wrap.classList.toggle('has-right-btn', hasRight);
+  // Fade-эффекты по краям
   wrap.classList.toggle('fade-left',  hasLeft);
   wrap.classList.toggle('fade-right', hasRight);
 }
@@ -18718,8 +18721,8 @@ function updateSectionScrollState() {
 function scrollSectionTabs(direction) {
   const nav = document.getElementById('section-switcher');
   if (!nav) return;
-  // Скроллим на 60% видимой ширины
-  const step = Math.max(160, Math.floor(nav.clientWidth * 0.6)) * direction;
+  // ЭТАП 25.0: уменьшен шаг до ~одного таба за клик (раньше было 60% ширины)
+  const step = 200 * direction;
   nav.scrollBy({ left: step, behavior: 'smooth' });
 }
 
