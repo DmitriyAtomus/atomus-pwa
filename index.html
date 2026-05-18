@@ -238,9 +238,17 @@
   /* Отступы наружных стрелок (между лого/лентой и лентой/Скан) */
   .section-scroll-btn.outer.left  { margin: 0 8px 0 4px; }
   .section-scroll-btn.outer.right { margin: 0 4px 0 8px; }
-  /* ЭТАП 25.0: стрелки на самых краях шапки (рядом с лого / после аватара) */
-  .section-scroll-btn.outer.edge.left  { margin: 0 10px 0 0; }
-  .section-scroll-btn.outer.edge.right { margin: 0 0 0 10px; }
+  /* ЭТАП 25.0: пара стрелок в правом углу шапки */
+  .section-scroll-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+    flex-shrink: 0;
+  }
+  .section-scroll-pair .section-scroll-btn {
+    margin: 0;
+  }
 
   /* Fade-эффекты по краям ленты — намёк на скрытый контент */
   .section-switcher-wrap::before,
@@ -5952,9 +5960,6 @@
 
   <!-- ШАПКА: шарик + Atom CRM + переключатель разделов + профиль -->
   <header class="top-bar">
-    <button class="section-scroll-btn outer left edge" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
-      <i class="ti ti-chevron-left"></i>
-    </button>
     <div class="brand-wrap" onclick="goHome()" title="На главную" style="cursor: pointer;">
       <div class="brand-ball"></div>
       <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
@@ -6004,9 +6009,15 @@
       </div>
       <div class="avatar" id="top-avatar">—</div>
     </div>
-    <button class="section-scroll-btn outer right edge" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
-      <i class="ti ti-chevron-right"></i>
-    </button>
+    <!-- ЭТАП 25.0: обе стрелки скролла табов — в правом углу -->
+    <div class="section-scroll-pair">
+      <button class="section-scroll-btn outer left edge" id="section-scroll-left" onclick="scrollSectionTabs(-1)" aria-label="Прокрутить влево">
+        <i class="ti ti-chevron-left"></i>
+      </button>
+      <button class="section-scroll-btn outer right edge" id="section-scroll-right" onclick="scrollSectionTabs(1)" aria-label="Прокрутить вправо">
+        <i class="ti ti-chevron-right"></i>
+      </button>
+    </div>
   </header>
 
   <!-- Мобильные табы разделов -->
