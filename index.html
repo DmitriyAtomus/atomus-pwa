@@ -18859,29 +18859,30 @@ async function openQrScanner() {
     const scanner = new Html5Qrcode('qr-reader', { verbose: false });
     state._qrScannerInstance = scanner;
 
-    // ЭТАП 25.0: получаем список камер для возможности переключения (wide/обычная)
-    let cameraId = null;
+    // ЭТАП 25.0: выбор камеры
+    // По умолчанию используем facingMode: 'environment' (задняя) — самый надёжный способ.
+    // Кнопку переключения камер показываем ТОЛЬКО если через getCameras() удалось
+    // явно отфильтровать несколько задних (например, обычная + wide).
+    let cameraSpec = { facingMode: 'environment' };
+    state._qrCameras = [];
     try {
       const cams = await Html5Qrcode.getCameras();
       if (cams && cams.length) {
-        // Фильтруем только задние — фронтальные обычно содержат "front"/"user"/"selfie" в label
         const frontPatterns = /(front|user|selfie|фронт|передн|селфи)/i;
-        const backCams = cams.filter(c => !frontPatterns.test(c.label || ''));
-        // Если по label ничего не отфильтровалось (labels пустые) — берём все
-        const useCams = backCams.length ? backCams : cams;
-        state._qrCameras = useCams;
-        // Если ранее выбирали — берём выбранную, иначе последнюю (обычно это обычная задняя)
-        let idx = (typeof state._qrCameraIndex === 'number') ? state._qrCameraIndex : (useCams.length - 1);
-        if (idx < 0 || idx >= useCams.length) idx = useCams.length - 1;
-        state._qrCameraIndex = idx;
-        cameraId = useCams[idx].id;
-        // Показываем кнопку переключения только если задних камер >1
-        const swBtn = document.getElementById('qr-switch-camera-btn');
-        if (swBtn) swBtn.style.display = (useCams.length > 1) ? '' : 'none';
+        const backCams = cams.filter(c => frontPatterns.test(c.label || '') === false && (c.label || '').length > 0);
+        // Используем фильтр только если labels непустые и среди них есть явно не-фронтальные
+        if (backCams.length >= 2 && backCams.length < cams.length) {
+          state._qrCameras = backCams;
+          let idx = state._qrCameraIndex;
+          if (typeof idx !== 'number' || idx < 0 || idx >= backCams.length) idx = 0;
+          state._qrCameraIndex = idx;
+          cameraSpec = { deviceId: { exact: backCams[idx].id } };
+        }
       }
-    } catch (e) { /* ignore — fallback на facingMode */ }
-
-    const cameraSpec = cameraId ? { deviceId: { exact: cameraId } } : { facingMode: 'environment' };
+      // Показываем кнопку переключения только если у нас 2+ задних камер
+      const swBtn = document.getElementById('qr-switch-camera-btn');
+      if (swBtn) swBtn.style.display = (state._qrCameras.length > 1) ? '' : 'none';
+    } catch (e) { /* fallback на facingMode */ }
 
     await scanner.start(
       cameraSpec,
@@ -19022,10 +19023,11 @@ function showQrScannerError(msg) {
 async function closeQrScanner() {
   const overlay = document.getElementById('qr-scanner-overlay');
   overlay.classList.remove('visible');
-  // ЭТАП 25.0: скрыть зум-bar
+  // ЭТАП 25.0: скрыть зум-bar и сбросить выбор камеры
   const zb = document.getElementById('qr-zoom-bar');
   if (zb) zb.style.display = 'none';
   state._qrZoomTrack = null;
+  state._qrCameraIndex = null;  // следующее открытие начнёт с задней (environment)
   // Останавливаем камеру
   if (state._qrScannerInstance) {
     try {
