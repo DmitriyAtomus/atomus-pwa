@@ -624,6 +624,27 @@
   .page-actions { display: flex; gap: 8px; align-items: center; }
   .desktop-layout .page-header { display: flex; }
 
+  /* ЭТАП 26.x фикс: на мобиле для календаря показываем page-header с кнопками навигации месяцев */
+  .app.mobile-layout [data-screen="home-calendar"] .page-header {
+    display: flex;
+    padding: 12px 14px 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .app.mobile-layout [data-screen="home-calendar"] .page-header h1 {
+    font-size: 18px;
+  }
+  .app.mobile-layout [data-screen="home-calendar"] .cal-nav {
+    margin-left: auto;
+  }
+  .app.mobile-layout [data-screen="home-calendar"] .cal-nav .btn-small {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
   /* Если page-header лежит внутри .content-inner (Снабжение, Кадры, Помощь и т.д.),
      растягиваем его на всю ширину контейнера и добавляем отступ перед содержимым. */
   .desktop-layout .content-inner > .page-header {
@@ -13569,13 +13590,14 @@ function cancelTaskForm() {
   }
 }
 
-function initTaskForm() {
+async function initTaskForm() {
   const isEdit = state.taskFormMode === 'edit';
   document.getElementById('task-form-title').textContent = isEdit ? 'Редактирование задачи' : 'Новая задача';
   document.getElementById('task-form-mob-title').textContent = isEdit ? 'Редактирование' : 'Новая задача';
+  // ЭТАП 26.x фикс: сначала ждём загрузку сотрудников, потом рендерим форму
+  // (раньше рендер шёл синхронно — dropdown оказывался пустой)
+  await ensureEmployeesLoaded();
   renderTaskForm();
-  // Сотрудников подтянем чтобы выбрать исполнителя
-  ensureEmployeesLoaded();
 }
 
 async function ensureEmployeesLoaded() {
@@ -14892,6 +14914,12 @@ async function loadContractShipmentBlock(contractId) {
   if (!container) return;
   try {
     const s = await apiGet('/api/contracts/' + contractId + '/shipment-status');
+    // Если бэк не задеплоен / endpoint отсутствует / total = 0 без коробок и сборок — блок не показываем
+    if (!s || typeof s.total === 'undefined') {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
     const total = s.total || 0;
     const shipped = s.shipped || 0;
     const pct = total > 0 ? Math.round(shipped / total * 100) : 0;
@@ -14917,8 +14945,11 @@ async function loadContractShipmentBlock(contractId) {
     }
     html += '</div>';
     container.innerHTML = html;
+    container.style.display = '';
   } catch (e) {
-    container.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Не удалось загрузить прогресс отгрузки</div>';
+    // Бэк недоступен или endpoint ещё не задеплоен — просто скрываем блок без видимой ошибки
+    container.style.display = 'none';
+    container.innerHTML = '';
   }
 }
 
