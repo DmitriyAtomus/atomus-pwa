@@ -13604,8 +13604,11 @@ async function ensureEmployeesLoaded() {
   // ЭТАП 26.x фикс: пустой массив не считается валидным кэшем (пере-загружаем)
   if (cache.activeEmployees && cache.activeEmployees.length > 0) return;
   try {
-    const d = await apiGet('/api/employees/active');
-    cache.activeEmployees = d.employees || [];
+    // Используем тот же endpoint что и страница "Сотрудники" — он точно работает
+    const d = await apiGet('/api/employees?include_inactive=true');
+    const all = (d && d.employees) || [];
+    // Фильтруем только активных
+    cache.activeEmployees = all.filter(e => e.is_active);
   } catch (e) {
     cache.activeEmployees = null;  // null → следующая попытка снова загрузит
   }
