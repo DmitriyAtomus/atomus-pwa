@@ -18859,54 +18859,74 @@ async function openQrScanner() {
     const scanner = new Html5Qrcode('qr-reader', { verbose: false });
     state._qrScannerInstance = scanner;
 
-    // ЭТАП 25.0: выбор камеры
-    // По умолчанию используем facingMode: 'environment' (задняя) — самый надёжный способ.
-    // Кнопку переключения камер показываем ТОЛЬКО если через getCameras() удалось
-    // явно отфильтровать несколько задних (например, обычная + wide).
-    let cameraSpec = { facingMode: 'environment' };
+    // ЭТАП 25.0: выбор камеры с надёжным fallback
+    // На некоторых Android (особенно Huawei без GMS) facingMode игнорируется
+    // и запускается фронталка. Делаем многоэтапный выбор.
     state._qrCameras = [];
+    let allCams = [];
     try {
-      const cams = await Html5Qrcode.getCameras();
-      if (cams && cams.length) {
-        const frontPatterns = /(front|user|selfie|фронт|передн|селфи)/i;
-        const backCams = cams.filter(c => frontPatterns.test(c.label || '') === false && (c.label || '').length > 0);
-        // Используем фильтр только если labels непустые и среди них есть явно не-фронтальные
-        if (backCams.length >= 2 && backCams.length < cams.length) {
-          state._qrCameras = backCams;
-          let idx = state._qrCameraIndex;
-          if (typeof idx !== 'number' || idx < 0 || idx >= backCams.length) idx = 0;
-          state._qrCameraIndex = idx;
-          cameraSpec = { deviceId: { exact: backCams[idx].id } };
+      allCams = await Html5Qrcode.getCameras() || [];
+    } catch (e) {}
+    state._qrCameras = allCams;
+
+    // Показываем кнопку переключения если камер >1 (без фильтра, чтобы пользователь
+    // мог вручную перебирать пока не найдёт нужную)
+    const swBtn = document.getElementById('qr-switch-camera-btn');
+    if (swBtn) swBtn.style.display = (allCams.length > 1) ? '' : 'none';
+
+    // Если пользователь уже выбирал камеру через кнопку — используем её
+    let cameraSpec;
+    if (typeof state._qrCameraIndex === 'number' && allCams[state._qrCameraIndex]) {
+      cameraSpec = { deviceId: { exact: allCams[state._qrCameraIndex].id } };
+    } else {
+      // Старт по умолчанию: пробуем EXACT environment (даст ошибку если задней нет)
+      cameraSpec = { facingMode: { exact: 'environment' } };
+    }
+
+    // Попытка 1: с тем что выбрали
+    const startConfig = {
+      fps: 10,
+      qrbox: function(viewfinderWidth, viewfinderHeight) {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const size = Math.floor(minEdge * 0.85);
+        return { width: size, height: size };
+      },
+      aspectRatio: 1.0,
+      videoConstraints: {
+        width:  { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    };
+
+    const onResult = (decodedText) => { handleQrScanResult(decodedText); };
+    const onErr = (errorMessage) => { /* ignore */ };
+
+    let started = false;
+    try {
+      await scanner.start(cameraSpec, startConfig, onResult, onErr);
+      started = true;
+    } catch (e1) {
+      // Попытка 2: ideal вместо exact
+      try {
+        await scanner.start({ facingMode: 'environment' }, startConfig, onResult, onErr);
+        started = true;
+      } catch (e2) {
+        // Попытка 3: последняя камера из списка (часто это задняя на Android)
+        if (allCams.length) {
+          try {
+            await scanner.start({ deviceId: { exact: allCams[allCams.length - 1].id } }, startConfig, onResult, onErr);
+            started = true;
+          } catch (e3) {
+            console.error('QR scanner: все попытки запуска провалились', e1, e2, e3);
+            showQrScannerError('Не удалось запустить камеру. Проверьте разрешения в настройках браузера.');
+            return;
+          }
+        } else {
+          showQrScannerError('Камера недоступна. Проверьте разрешения в настройках браузера.');
+          return;
         }
       }
-      // Показываем кнопку переключения только если у нас 2+ задних камер
-      const swBtn = document.getElementById('qr-switch-camera-btn');
-      if (swBtn) swBtn.style.display = (state._qrCameras.length > 1) ? '' : 'none';
-    } catch (e) { /* fallback на facingMode */ }
-
-    await scanner.start(
-      cameraSpec,
-      {
-        fps: 10,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const size = Math.floor(minEdge * 0.85);
-          return { width: size, height: size };
-        },
-        aspectRatio: 1.0,
-        // Среднее разрешение — 1280×720. Высокие (1920×1080) могут глючить на Huawei.
-        videoConstraints: {
-          width:  { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        // BarcodeDetector НЕ включаем — на части Android (особенно Huawei) он падает молча
-        // и html5-qrcode не делает fallback. JS-декодер (jsQR) работает везде.
-      },
-      (decodedText) => {
-        handleQrScanResult(decodedText);
-      },
-      (errorMessage) => { /* ignore */ }
-    );
+    }
     // Включаем непрерывный автофокус (если поддерживается)
     try {
       const v = document.querySelector('#qr-reader video');
@@ -18917,6 +18937,16 @@ async function openQrScanner() {
         }
         // ЭТАП 25.0: проверяем поддержку zoom и подключаем slider
         setupQrZoom(track);
+
+        // ЭТАП 25.0: если запустилась фронтальная и есть выбор — подсказываем
+        try {
+          const s = (track && track.getSettings) ? track.getSettings() : {};
+          if (s.facingMode === 'user' && state._qrCameras.length > 1) {
+            // Намекаем пользователю переключить камеру
+            const hint = document.getElementById('qr-scanner-hint');
+            if (hint) hint.textContent = 'Похоже включилась фронтальная — нажмите ⟲ чтобы переключить';
+          }
+        } catch (e) {}
       }
     } catch (e) { /* ignore */ }
   } catch (e) {
