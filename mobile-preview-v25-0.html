@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2D5F8B">
+<title>Atom CRM — Mobile Preview v25.0</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css">
+<style>
+/* ============================================================
+   ATOM CRM — MOBILE v25.0 PREVIEW
+   Этот файл — прототип. После одобрения мерджится в index.html
+   ============================================================ */
+
+:root {
+  /* Brand */
+  --brand: #2D5F8B;
+  --brand-light: #4A7FB5;
+  --brand-bg: #EAF2FA;
+  --brand-bg-strong: #D5E4F2;
+
+  /* Текст */
+  --text: #1A2138;
+  --text-mid: #5A6275;
+  --text-light: #8B92A3;
+  --text-faint: #B5BAC7;
+
+  /* Поверхности */
+  --bg: #F4F6FA;
+  --surface: #FFFFFF;
+  --surface-soft: #F8FAFC;
+
+  /* Границы */
+  --border: #EEF1F6;
+  --border-strong: #DDE2EC;
+
+  /* Семантика */
+  --success: #16A34A;
+  --success-bg: #E8F5E9;
+  --warning: #C18B00;
+  --warning-bg: #FFF4E6;
+  --danger:  #DC2626;
+  --danger-bg: #FEE2E2;
+  --info: #2D5F8B;
+  --info-bg: #EAF2FA;
+
+  /* Акцент-палитра для quick actions / отделов */
+  --c-prod:   #2D5F8B;   --c-prod-bg:   #EAF2FA;
+  --c-sales:  #7E22CE;   --c-sales-bg:  #F3E8FF;
+  --c-tasks:  #16A34A;   --c-tasks-bg:  #E8F5E9;
+  --c-defect: #EA580C;   --c-defect-bg: #FFEDD5;
+  --c-warehouse: #0891B2; --c-warehouse-bg: #CFFAFE;
+  --c-supply:  #475569;   --c-supply-bg:  #F1F5F9;
+
+  /* Радиусы */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
+
+  /* Тени */
+  --shadow-sm: 0 1px 2px rgba(20, 33, 61, 0.04);
+  --shadow-md: 0 2px 8px rgba(20, 33, 61, 0.06), 0 1px 2px rgba(20, 33, 61, 0.04);
+  --shadow-lg: 0 8px 24px rgba(20, 33, 61, 0.10), 0 2px 6px rgba(20, 33, 61, 0.05);
+  --shadow-fab: 0 6px 18px rgba(45, 95, 139, 0.35), 0 2px 6px rgba(20, 33, 61, 0.12);
+
+  /* Spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+
+  /* Safe area bottom */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* ============ PHONE FRAME (для десктопа — рамка телефона; на мобилке — fullscreen) ============ */
+
+.frame {
+  width: 100%;
+  max-width: 440px;
+  min-height: 100vh;
+  margin: 0 auto;
+  background: var(--bg);
+  position: relative;
+  padding-bottom: calc(80px + var(--safe-bottom));
+}
+
+/* ============ ШАПКА ============ */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: var(--s-3) var(--s-4);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.app-header .logo {
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  background: var(--brand);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.5px;
+}
+.app-header .title-block { flex: 1; min-width: 0; }
+.app-header .title { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.2px; }
+.app-header .subtitle { font-size: 12px; color: var(--text-light); margin-top: 1px; }
+
+.app-header .header-actions { display: flex; gap: var(--s-2); }
+.icon-circle-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-mid);
+  position: relative;
+  transition: background 0.15s;
+}
+.icon-circle-btn:active { background: var(--brand-bg); }
+.icon-circle-btn i { font-size: 19px; }
+.icon-circle-btn.scan-btn {
+  background: var(--brand);
+  color: white;
+  width: 38px; height: 38px;
+  box-shadow: var(--shadow-sm);
+}
+.icon-circle-btn.scan-btn:active { background: var(--brand-light); }
+.icon-circle-btn.scan-btn i { font-size: 20px; }
+.icon-circle-btn .badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  background: var(--danger);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--surface);
+}
+
+/* ============ SCREEN ============ */
+
+.screen {
+  display: none;
+  padding: var(--s-4) var(--s-4) var(--s-6);
+}
+.screen.active { display: block; }
+
+.screen-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  margin-bottom: var(--s-5);
+  color: var(--text);
+}
+
+/* ============ HOME ============ */
+
+.greeting {
+  margin-bottom: var(--s-5);
+}
+.greeting-name {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.greeting-date {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: var(--s-6) 0 var(--s-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-label.first { margin-top: 0; }
+.section-label a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ============ QUICK ACTIONS — большие плитки 2x2 ============ */
+
+.qa-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+.qa-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  min-height: 100px;
+  transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.qa-tile:active { transform: scale(0.97); }
+.qa-tile .qa-icon {
+  width: 38px; height: 38px;
+  border-radius: var(--r-md);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  background: var(--qa-bg);
+  color: var(--qa-color);
+}
+.qa-tile .qa-text { width: 100%; }
+.qa-tile .qa-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+.qa-tile .qa-hint {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+/* Цветовые варианты плиток */
+.qa-tile.c-prod      { --qa-color: var(--c-prod);      --qa-bg: var(--c-prod-bg); }
+.qa-tile.c-sales     { --qa-color: var(--c-sales);     --qa-bg: var(--c-sales-bg); }
+.qa-tile.c-tasks     { --qa-color: var(--c-tasks);     --qa-bg: var(--c-tasks-bg); }
+.qa-tile.c-defect    { --qa-color: var(--c-defect);    --qa-bg: var(--c-defect-bg); }
+
+/* ============ MY TASKS ============ */
+
+.tasks-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--s-2);
+  box-shadow: var(--shadow-sm);
+}
+.task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.task-row + .task-row { border-top: 1px solid var(--border); }
+.task-row:active { background: var(--surface-soft); }
+.task-check {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  transition: all 0.15s;
+}
+.task-check.done {
+  background: var(--success);
+  border-color: var(--success);
+}
+.task-check.done::after {
+  content: '';
+  width: 6px; height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.task-body { flex: 1; min-width: 0; }
+.task-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.35;
+}
+.task-title.done {
+  color: var(--text-light);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.task-meta {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: 4px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-light);
+}
+.task-meta .deadline-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+}
+.task-meta .deadline-pill.urgent { background: var(--danger-bg); color: var(--danger); }
+.task-meta .deadline-pill.soon { background: var(--warning-bg); color: var(--warning); }
+.task-meta .deadline-pill.done { background: var(--success-bg); color: var(--success); }
+
+/* ============ KPI STRIP — горизонтальный скролл ============ */
+
+.kpi-strip {
+  display: flex;
+  gap: var(--s-3);
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--s-4));
+  padding: 0 var(--s-4) var(--s-2);
+  scrollbar-width: none;
+}
+.kpi-strip::-webkit-scrollbar { display: none; }
+.kpi-pill {
+  flex: 0 0 auto;
+  min-width: 130px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-3) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+.kpi-pill::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--kpi-c, var(--brand));
+}
+.kpi-pill.c-prod   { --kpi-c: var(--c-prod); }
+.kpi-pill.c-sales  { --kpi-c: var(--c-sales); }
+.kpi-pill.c-defect { --kpi-c: var(--c-defect); }
+.kpi-pill.c-tasks  { --kpi-c: var(--c-tasks); }
+.kpi-pill .kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.kpi-pill .kpi-label {
+  font-size: 12px;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+/* ============ SHIPMENT / EVENT ROW ============ */
+
+.event-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.event-row {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  align-items: center;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.event-row + .event-row { border-top: 1px solid var(--border); }
+.event-row:active { background: var(--surface-soft); }
+.event-day {
+  width: 44px;
+  flex-shrink: 0;
+  background: var(--surface-soft);
+  border-radius: var(--r-md);
+  padding: 6px 0;
+  text-align: center;
+}
+.event-day .num {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.event-day .mon {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+  font-weight: 600;
+}
+.event-day.urgent {
+  background: var(--danger-bg);
+}
+.event-day.urgent .num { color: var(--danger); }
+.event-day.urgent .mon { color: var(--danger); }
+.event-day.soon {
+  background: var(--warning-bg);
+}
+.event-day.soon .num { color: var(--warning); }
+.event-day.soon .mon { color: var(--warning); }
+.event-body { flex: 1; min-width: 0; }
+.event-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.event-sub {
+  font-size: 12.5px;
+  color: var(--text-light);
+  margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.event-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.event-pill.urgent { background: var(--danger-bg); color: var(--danger); }
+.event-pill.soon { background: var(--warning-bg); color: var(--warning); }
+
+/* ============ SEARCH SCREEN ============ */
+
+.search-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 0 var(--s-4);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 48px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--s-4);
+}
+.search-bar i { color: var(--text-light); font-size: 19px; }
+.search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 15px;
+  color: var(--text);
+}
+.search-bar input::placeholder { color: var(--text-light); }
+.search-bar .clear-btn {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.search-bar .clear-btn i { font-size: 14px; color: white; }
+
+.chip-row {
+  display: flex;
+  gap: var(--s-2);
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--s-4));
+  padding: 0 var(--s-4) var(--s-3);
+  scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-mid);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.chip.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: white;
+}
+
+.search-empty {
+  text-align: center;
+  padding: var(--s-7) var(--s-4);
+  color: var(--text-light);
+}
+.search-empty i { font-size: 48px; color: var(--text-faint); margin-bottom: var(--s-3); display: inline-block; }
+.search-empty .title { font-size: 16px; font-weight: 600; color: var(--text-mid); margin-bottom: 6px; }
+.search-empty .hint { font-size: 13px; line-height: 1.5; }
+
+.result-row {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: var(--s-2);
+  align-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s;
+}
+.result-row:active { transform: scale(0.98); }
+.result-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r-md);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qa-bg, var(--brand-bg));
+  color: var(--qa-color, var(--brand));
+  flex-shrink: 0;
+}
+.result-icon.c-prod    { --qa-bg: var(--c-prod-bg);    --qa-color: var(--c-prod); }
+.result-icon.c-sales   { --qa-bg: var(--c-sales-bg);   --qa-color: var(--c-sales); }
+.result-icon.c-tasks   { --qa-bg: var(--c-tasks-bg);   --qa-color: var(--c-tasks); }
+.result-icon.c-defect  { --qa-bg: var(--c-defect-bg);  --qa-color: var(--c-defect); }
+.result-body { flex: 1; min-width: 0; }
+.result-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.result-sub {
+  font-size: 12.5px;
+  color: var(--text-light);
+  margin-top: 1px;
+}
+.result-row > i.ti-chevron-right {
+  color: var(--text-faint);
+  font-size: 18px;
+}
+
+/* ============ NOTIFICATIONS ============ */
+
+.notif-row {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: var(--s-2);
+  align-items: flex-start;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  cursor: pointer;
+}
+.notif-row.unread::before {
+  content: '';
+  position: absolute;
+  left: -4px; top: 50%;
+  transform: translateY(-50%);
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.notif-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r-md);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--n-bg, var(--brand-bg));
+  color: var(--n-color, var(--brand));
+  flex-shrink: 0;
+}
+.notif-icon.t-defect { --n-bg: var(--c-defect-bg); --n-color: var(--c-defect); }
+.notif-icon.t-task   { --n-bg: var(--c-tasks-bg);  --n-color: var(--c-tasks); }
+.notif-icon.t-sale   { --n-bg: var(--c-sales-bg);  --n-color: var(--c-sales); }
+.notif-icon.t-warn   { --n-bg: var(--warning-bg);  --n-color: var(--warning); }
+.notif-body { flex: 1; min-width: 0; }
+.notif-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.notif-text {
+  font-size: 13px;
+  color: var(--text-mid);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.notif-time {
+  font-size: 11.5px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
+/* ============ ACCOUNT ============ */
+
+.profile-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--s-4);
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  margin-bottom: var(--s-4);
+  box-shadow: var(--shadow-sm);
+}
+.profile-avatar {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-light), var(--brand));
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.profile-info { flex: 1; min-width: 0; }
+.profile-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.profile-role {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.menu-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  margin-bottom: var(--s-4);
+  box-shadow: var(--shadow-sm);
+}
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.menu-row:active { background: var(--surface-soft); }
+.menu-row + .menu-row { border-top: 1px solid var(--border); }
+.menu-row .menu-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-soft);
+  color: var(--text-mid);
+  flex-shrink: 0;
+}
+.menu-row .menu-icon i { font-size: 18px; }
+.menu-row.danger .menu-icon { background: var(--danger-bg); color: var(--danger); }
+.menu-row .menu-label {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.menu-row.danger .menu-label { color: var(--danger); }
+.menu-row > i.ti-chevron-right {
+  color: var(--text-faint);
+  font-size: 18px;
+}
+
+.version-block {
+  text-align: center;
+  padding: var(--s-5) var(--s-4);
+  color: var(--text-light);
+  font-size: 12px;
+}
+.version-block .brand-mini {
+  font-weight: 700;
+  color: var(--text-mid);
+  margin-bottom: 2px;
+}
+
+/* ============ TAB BAR ============ */
+
+.tab-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 40;
+  max-width: 440px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--border);
+  padding: 6px var(--s-2) calc(6px + var(--safe-bottom));
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+}
+.tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  color: var(--text-light);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  transition: color 0.15s;
+  position: relative;
+}
+.tab-btn i { font-size: 22px; }
+.tab-btn.active { color: var(--brand); }
+.tab-btn .tab-badge {
+  position: absolute;
+  top: 2px; right: calc(50% - 18px);
+  background: var(--danger);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--surface);
+}
+.tab-btn.plus-tab {
+  align-self: center;
+}
+.plus-tab .plus-fab {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -16px;
+  box-shadow: var(--shadow-fab);
+  transition: transform 0.15s;
+}
+.plus-tab .plus-fab i { font-size: 28px; }
+.plus-tab:active .plus-fab { transform: scale(0.93); }
+
+/* ============ ACTION SHEET (для +) ============ */
+
+.sheet-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.sheet-overlay.visible { display: flex; }
+@keyframes fadeIn {
+  from { background: rgba(0, 0, 0, 0); }
+  to { background: rgba(0, 0, 0, 0.4); }
+}
+.sheet {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  padding: var(--s-2) var(--s-4) calc(var(--s-4) + var(--safe-bottom));
+  animation: slideUp 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet-handle {
+  width: 40px; height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  margin: 6px auto var(--s-3);
+}
+.sheet-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: var(--s-3);
+  text-align: center;
+}
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.sheet-action {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+.sheet-action:active { transform: scale(0.98); background: var(--brand-bg); }
+.sheet-action .sa-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--r-md);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sa-bg, var(--brand-bg));
+  color: var(--sa-color, var(--brand));
+  flex-shrink: 0;
+}
+.sheet-action .sa-icon i { font-size: 21px; }
+.sheet-action .sa-body { flex: 1; min-width: 0; }
+.sheet-action .sa-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sheet-action .sa-hint {
+  font-size: 12.5px;
+  color: var(--text-light);
+  margin-top: 1px;
+}
+.sheet-action.c-prod   { --sa-bg: var(--c-prod-bg);   --sa-color: var(--c-prod); }
+.sheet-action.c-sales  { --sa-bg: var(--c-sales-bg);  --sa-color: var(--c-sales); }
+.sheet-action.c-tasks  { --sa-bg: var(--c-tasks-bg);  --sa-color: var(--c-tasks); }
+.sheet-action.c-defect { --sa-bg: var(--c-defect-bg); --sa-color: var(--c-defect); }
+.sheet-cancel {
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--brand);
+  border-radius: var(--r-lg);
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+.sheet-cancel:active { background: var(--brand-bg); }
+
+/* ============ WEEK CALENDAR (на Главной) ============ */
+
+.week-cal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--s-3) var(--s-2) var(--s-2);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--s-3);
+}
+.week-cal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--s-2) var(--s-3);
+}
+.week-cal-month {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.week-cal-month i { color: var(--brand); font-size: 17px; }
+.week-cal-link {
+  font-size: 13px;
+  color: var(--brand);
+  font-weight: 500;
+}
+.week-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.week-cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+}
+.week-cal-day:active { background: var(--surface-soft); }
+.week-cal-day .dow {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  letter-spacing: 0.4px;
+  font-weight: 600;
+}
+.week-cal-day .num {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.week-cal-day.weekend .dow { color: var(--text-faint); }
+.week-cal-day.weekend .num { color: var(--text-mid); }
+.week-cal-day.today .num {
+  background: var(--brand);
+  color: white;
+}
+.week-cal-day.selected .num {
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 700;
+}
+.week-cal-day.today.selected .num {
+  background: var(--brand);
+  color: white;
+  box-shadow: 0 0 0 3px var(--brand-bg);
+}
+.week-cal-day .markers {
+  position: absolute;
+  bottom: 3px;
+  display: flex;
+  gap: 2px;
+}
+.week-cal-day .marker-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--m-color, var(--brand));
+}
+.marker-dot.m-prod   { --m-color: var(--c-prod); }
+.marker-dot.m-sales  { --m-color: var(--c-sales); }
+.marker-dot.m-tasks  { --m-color: var(--c-tasks); }
+.marker-dot.m-defect { --m-color: var(--c-defect); }
+
+/* ============ TOAST ============ */
+
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 500;
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============ MEDIA ============ */
+
+@media (min-width: 768px) {
+  body { background: #15294A; padding: 20px 0; }
+  .frame {
+    min-height: calc(100vh - 40px);
+    border-radius: var(--r-2xl);
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ============ ШАПКА ============ -->
+  <header class="app-header">
+    <div class="logo">Az</div>
+    <div class="title-block">
+      <div class="title">Atom CRM</div>
+      <div class="subtitle">Атомус групп · мобильная</div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-circle-btn scan-btn" title="Сканировать QR" onclick="toast('Открываю сканер QR…')">
+        <i class="ti ti-scan"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       SCREEN: HOME
+       ============================================================ -->
+  <section class="screen active" data-screen="home">
+
+    <div class="greeting">
+      <div class="greeting-name">Здравствуйте, Дмитрий 👋</div>
+      <div class="greeting-date">18 мая 2026 · понедельник</div>
+    </div>
+
+    <!-- НЕДЕЛЬНЫЙ КАЛЕНДАРЬ -->
+    <div class="week-cal-card">
+      <div class="week-cal-head">
+        <div class="week-cal-month">
+          <i class="ti ti-calendar"></i>
+          <span>Май 2026</span>
+        </div>
+        <a class="week-cal-link" onclick="toast('Открываю календарь…')">Открыть →</a>
+      </div>
+      <div class="week-cal-grid" id="week-cal-grid">
+        <!-- генерируется JS -->
+      </div>
+    </div>
+
+    <!-- БЫСТРЫЕ ДЕЙСТВИЯ -->
+    <div class="section-label first">
+      Быстрые действия
+    </div>
+    <div class="qa-grid">
+      <button class="qa-tile c-prod" onclick="toast('Открываю форму новой работы…')">
+        <div class="qa-icon"><i class="ti ti-tool"></i></div>
+        <div class="qa-text">
+          <div class="qa-label">Новая работа</div>
+          <div class="qa-hint">сборка / ремонт / монтаж</div>
+        </div>
+      </button>
+      <button class="qa-tile c-sales" onclick="toast('Открываю форму договора…')">
+        <div class="qa-icon"><i class="ti ti-file-text"></i></div>
+        <div class="qa-text">
+          <div class="qa-label">Новый договор</div>
+          <div class="qa-hint">или КП</div>
+        </div>
+      </button>
+      <button class="qa-tile c-tasks" onclick="toast('Открываю форму задачи…')">
+        <div class="qa-icon"><i class="ti ti-checklist"></i></div>
+        <div class="qa-text">
+          <div class="qa-label">Новая задача</div>
+          <div class="qa-hint">кому-то поручить</div>
+        </div>
+      </button>
+      <button class="qa-tile c-defect" onclick="toast('Открываю форму доработки…')">
+        <div class="qa-icon"><i class="ti ti-alert-triangle"></i></div>
+        <div class="qa-text">
+          <div class="qa-label">Доработка</div>
+          <div class="qa-hint">замечание с фото</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- МОИ ЗАДАЧИ -->
+    <div class="section-label">
+      На вас 3 задачи
+      <a onclick="toast('Все задачи →')">все →</a>
+    </div>
+    <div class="tasks-card">
+      <div class="task-row" onclick="toggleTask(event)">
+        <div class="task-check"></div>
+        <div class="task-body">
+          <div class="task-title">Подготовить КП для ООО «Холодсервис»</div>
+          <div class="task-meta">
+            <span class="deadline-pill urgent">просрочена 1 дн.</span>
+            <span>· договор №27-К</span>
+          </div>
+        </div>
+      </div>
+      <div class="task-row" onclick="toggleTask(event)">
+        <div class="task-check"></div>
+        <div class="task-body">
+          <div class="task-title">Согласовать смету на установку</div>
+          <div class="task-meta">
+            <span class="deadline-pill soon">сегодня</span>
+          </div>
+        </div>
+      </div>
+      <div class="task-row" onclick="toggleTask(event)">
+        <div class="task-check"></div>
+        <div class="task-body">
+          <div class="task-title">Заказать комплектующие для МСП-3</div>
+          <div class="task-meta">
+            <span class="deadline-pill">через 2 дн.</span>
+            <span>· снабжение</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI STRIP -->
+    <div class="section-label">
+      Сегодня
+    </div>
+    <div class="kpi-strip">
+      <div class="kpi-pill c-prod">
+        <div class="kpi-value">3</div>
+        <div class="kpi-label">сборок</div>
+      </div>
+      <div class="kpi-pill c-sales">
+        <div class="kpi-value">12</div>
+        <div class="kpi-label">договоров в работе</div>
+      </div>
+      <div class="kpi-pill c-tasks">
+        <div class="kpi-value">7</div>
+        <div class="kpi-label">задач открытых</div>
+      </div>
+      <div class="kpi-pill c-defect">
+        <div class="kpi-value">2</div>
+        <div class="kpi-label">новых доработки</div>
+      </div>
+      <div class="kpi-pill">
+        <div class="kpi-value">450 тыс.</div>
+        <div class="kpi-label">принято КП за месяц</div>
+      </div>
+    </div>
+
+    <!-- БЛИЖАЙШИЕ ОТГРУЗКИ -->
+    <div class="section-label">
+      Ближайшие отгрузки
+      <a onclick="toast('Все отгрузки →')">все →</a>
+    </div>
+    <div class="event-card">
+      <div class="event-row" onclick="toast('Открываю договор…')">
+        <div class="event-day urgent">
+          <div class="num">19</div>
+          <div class="mon">мая</div>
+        </div>
+        <div class="event-body">
+          <div class="event-title">№27-К · ООО «Холодсервис»</div>
+          <div class="event-sub">Доставка в Челябинск · готова</div>
+        </div>
+        <span class="event-pill urgent">завтра</span>
+      </div>
+      <div class="event-row" onclick="toast('Открываю договор…')">
+        <div class="event-day soon">
+          <div class="num">21</div>
+          <div class="mon">мая</div>
+        </div>
+        <div class="event-body">
+          <div class="event-title">№30-К · ИП Петров А.С.</div>
+          <div class="event-sub">Самовывоз · в работе</div>
+        </div>
+        <span class="event-pill soon">через 3 дн.</span>
+      </div>
+      <div class="event-row" onclick="toast('Открываю договор…')">
+        <div class="event-day">
+          <div class="num">28</div>
+          <div class="mon">мая</div>
+        </div>
+        <div class="event-body">
+          <div class="event-title">№31-К · ООО «АгроХолод»</div>
+          <div class="event-sub">Доставка в Курган · в работе</div>
+        </div>
+        <span class="event-pill">через 10 дн.</span>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============================================================
+       SCREEN: SEARCH
+       ============================================================ -->
+  <section class="screen" data-screen="search">
+    <h1 class="screen-title">Поиск</h1>
+
+    <div class="search-bar">
+      <i class="ti ti-search"></i>
+      <input type="text" id="search-input" placeholder="Договоры, задачи, доработки, контрагенты…" oninput="onSearchInput()">
+      <button class="clear-btn" id="search-clear" style="display:none;" onclick="clearSearch()">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+
+    <div class="chip-row">
+      <button class="chip active" data-filter="all">Всё</button>
+      <button class="chip" data-filter="contracts">Договоры</button>
+      <button class="chip" data-filter="tasks">Задачи</button>
+      <button class="chip" data-filter="defects">Доработки</button>
+      <button class="chip" data-filter="contractors">Контрагенты</button>
+    </div>
+
+    <div id="search-results">
+      <div class="search-empty">
+        <i class="ti ti-search"></i>
+        <div class="title">Что ищем?</div>
+        <div class="hint">Введите номер договора, ФИО, название контрагента<br>или просто слово из задачи</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SCREEN: NOTIFICATIONS
+       ============================================================ -->
+  <section class="screen" data-screen="notifications">
+    <h1 class="screen-title">Уведомления</h1>
+
+    <div class="chip-row">
+      <button class="chip active">Все</button>
+      <button class="chip">Непрочитанные</button>
+    </div>
+
+    <div class="notif-row unread" onclick="toast('Открываю доработку…')">
+      <div class="notif-icon t-defect"><i class="ti ti-alert-triangle"></i></div>
+      <div class="notif-body">
+        <div class="notif-title">Новая доработка с поля</div>
+        <div class="notif-text">По договору №27-К: «Не работает компрессор после монтажа»</div>
+        <div class="notif-time">12 минут назад</div>
+      </div>
+    </div>
+
+    <div class="notif-row unread" onclick="toast('Открываю задачу…')">
+      <div class="notif-icon t-task"><i class="ti ti-checklist"></i></div>
+      <div class="notif-body">
+        <div class="notif-title">Задача просрочена</div>
+        <div class="notif-text">«Подготовить КП для ООО Холодсервис» — дедлайн вчера</div>
+        <div class="notif-time">2 часа назад</div>
+      </div>
+    </div>
+
+    <div class="notif-row" onclick="toast('Открываю договор…')">
+      <div class="notif-icon t-sale"><i class="ti ti-file-text"></i></div>
+      <div class="notif-body">
+        <div class="notif-title">Договор готов к отгрузке</div>
+        <div class="notif-text">№30-К · ИП Петров А.С.</div>
+        <div class="notif-time">сегодня в 09:12</div>
+      </div>
+    </div>
+
+    <div class="notif-row" onclick="toast('Открываю…')">
+      <div class="notif-icon t-warn"><i class="ti ti-clock-exclamation"></i></div>
+      <div class="notif-body">
+        <div class="notif-title">Завтра отгрузка</div>
+        <div class="notif-text">№27-К · ООО «Холодсервис» — Челябинск</div>
+        <div class="notif-time">вчера</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SCREEN: ACCOUNT
+       ============================================================ -->
+  <section class="screen" data-screen="account">
+    <h1 class="screen-title">Аккаунт</h1>
+
+    <div class="profile-card">
+      <div class="profile-avatar">ДА</div>
+      <div class="profile-info">
+        <div class="profile-name">Дмитрий Атомусов</div>
+        <div class="profile-role">Директор</div>
+      </div>
+    </div>
+
+    <div class="menu-card">
+      <div class="menu-row" onclick="toast('Сотрудники')">
+        <div class="menu-icon"><i class="ti ti-users"></i></div>
+        <div class="menu-label">Сотрудники</div>
+        <i class="ti ti-chevron-right"></i>
+      </div>
+      <div class="menu-row" onclick="toast('Справочники')">
+        <div class="menu-icon"><i class="ti ti-library"></i></div>
+        <div class="menu-label">Справочники</div>
+        <i class="ti ti-chevron-right"></i>
+      </div>
+      <div class="menu-row" onclick="toast('Помощь')">
+        <div class="menu-icon"><i class="ti ti-help-circle"></i></div>
+        <div class="menu-label">Помощь и FAQ</div>
+        <i class="ti ti-chevron-right"></i>
+      </div>
+    </div>
+
+    <div class="menu-card">
+      <div class="menu-row danger" onclick="toast('Выход…')">
+        <div class="menu-icon"><i class="ti ti-logout"></i></div>
+        <div class="menu-label">Выйти</div>
+      </div>
+    </div>
+
+    <div class="version-block">
+      <div class="brand-mini">Atom CRM</div>
+      v25.0-preview · 18.05.2026
+    </div>
+  </section>
+
+</div>
+
+<!-- ============ TAB BAR ============ -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="home" onclick="switchTab('home')">
+    <i class="ti ti-home"></i>
+    <span>Главная</span>
+  </button>
+  <button class="tab-btn" data-tab="search" onclick="switchTab('search')">
+    <i class="ti ti-search"></i>
+    <span>Поиск</span>
+  </button>
+  <button class="tab-btn plus-tab" onclick="openActionSheet()">
+    <div class="plus-fab"><i class="ti ti-plus"></i></div>
+  </button>
+  <button class="tab-btn" data-tab="notifications" onclick="switchTab('notifications')">
+    <i class="ti ti-bell"></i>
+    <span>Уведомления</span>
+    <span class="tab-badge">2</span>
+  </button>
+  <button class="tab-btn" data-tab="account" onclick="switchTab('account')">
+    <i class="ti ti-user"></i>
+    <span>Аккаунт</span>
+  </button>
+</nav>
+
+<!-- ============ ACTION SHEET ============ -->
+<div class="sheet-overlay" id="action-sheet" onclick="closeActionSheet(event)">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Что создать?</div>
+    <div class="sheet-actions">
+      <button class="sheet-action c-prod" onclick="closeActionSheet(); toast('Открываю сканер QR…')">
+        <div class="sa-icon" style="background: var(--brand-bg); color: var(--brand);"><i class="ti ti-scan"></i></div>
+        <div class="sa-body">
+          <div class="sa-title">Сканировать QR-код</div>
+          <div class="sa-hint">Открыть камеру</div>
+        </div>
+      </button>
+      <button class="sheet-action c-prod" onclick="closeActionSheet(); toast('Новая работа…')">
+        <div class="sa-icon"><i class="ti ti-tool"></i></div>
+        <div class="sa-body">
+          <div class="sa-title">Работа</div>
+          <div class="sa-hint">Сборка, ремонт, монтаж, пусконаладка</div>
+        </div>
+      </button>
+      <button class="sheet-action c-sales" onclick="closeActionSheet(); toast('Новый договор…')">
+        <div class="sa-icon"><i class="ti ti-file-text"></i></div>
+        <div class="sa-body">
+          <div class="sa-title">Договор</div>
+          <div class="sa-hint">С контрагентом</div>
+        </div>
+      </button>
+      <button class="sheet-action c-sales" onclick="closeActionSheet(); toast('Новое КП…')">
+        <div class="sa-icon"><i class="ti ti-file-invoice"></i></div>
+        <div class="sa-body">
+          <div class="sa-title">Коммерческое предложение</div>
+          <div class="sa-hint">КП для клиента</div>
+        </div>
+      </button>
+      <button class="sheet-action c-tasks" onclick="closeActionSheet(); toast('Новая задача…')">
+        <div class="sa-icon"><i class="ti ti-checklist"></i></div>
+        <div class="sa-body">
+          <div class="sa-title">Задача</div>
+          <div class="sa-hint">Поручить сотруднику</div>
+        </div>
+      </button>
+      <button class="sheet-action c-defect" onclick="closeActionSheet(); toast('Новая доработка…')">
+        <div class="sa-icon"><i class="ti ti-alert-triangle"></i></div>
+        <div class="sa-body">
+          <div class="sa-title">Доработка</div>
+          <div class="sa-hint">Замечание с фото</div>
+        </div>
+      </button>
+    </div>
+    <div class="sheet-cancel" onclick="closeActionSheet()">Отмена</div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast">—</div>
+
+<script>
+// ============ WEEK CALENDAR ============
+function renderWeekCalendar() {
+  // Демо-данные: текущая неделя (Пн-Вс), сегодня 18 мая (пн), выбран сегодняшний день
+  // Маркеры событий по дням: классы m-prod / m-sales / m-tasks / m-defect
+  const days = [
+    { dow: 'ПН', num: 18, today: true,  selected: true, weekend: false, markers: ['m-prod', 'm-sales', 'm-tasks'] },
+    { dow: 'ВТ', num: 19, today: false, selected: false, weekend: false, markers: ['m-sales', 'm-defect'] },
+    { dow: 'СР', num: 20, today: false, selected: false, weekend: false, markers: ['m-tasks'] },
+    { dow: 'ЧТ', num: 21, today: false, selected: false, weekend: false, markers: ['m-sales'] },
+    { dow: 'ПТ', num: 22, today: false, selected: false, weekend: false, markers: [] },
+    { dow: 'СБ', num: 23, today: false, selected: false, weekend: true,  markers: [] },
+    { dow: 'ВС', num: 24, today: false, selected: false, weekend: true,  markers: [] },
+  ];
+  let html = '';
+  days.forEach((d, i) => {
+    const cls = [
+      'week-cal-day',
+      d.today    ? 'today'    : '',
+      d.selected ? 'selected' : '',
+      d.weekend  ? 'weekend'  : '',
+    ].filter(Boolean).join(' ');
+    let markers = '';
+    if (d.markers.length) {
+      markers = '<div class="markers">' +
+        d.markers.map(m => '<span class="marker-dot ' + m + '"></span>').join('') +
+        '</div>';
+    }
+    html += '<div class="' + cls + '" onclick="selectWeekDay(' + i + ')">' +
+      '<div class="dow">' + d.dow + '</div>' +
+      '<div class="num">' + d.num + '</div>' +
+      markers +
+    '</div>';
+  });
+  const grid = document.getElementById('week-cal-grid');
+  if (grid) grid.innerHTML = html;
+}
+
+function selectWeekDay(idx) {
+  document.querySelectorAll('.week-cal-day').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+  });
+  const labels = ['Пн 18 мая', 'Вт 19 мая', 'Ср 20 мая', 'Чт 21 мая', 'Пт 22 мая', 'Сб 23 мая', 'Вс 24 мая'];
+  toast('Выбран день: ' + labels[idx]);
+}
+
+renderWeekCalendar();
+
+// ============ TAB SWITCHING ============
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector('.tab-btn[data-tab="' + name + '"]');
+  if (btn) btn.classList.add('active');
+
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const sc = document.querySelector('.screen[data-screen="' + name + '"]');
+  if (sc) sc.classList.add('active');
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+// ============ ACTION SHEET ============
+function openActionSheet() {
+  document.getElementById('action-sheet').classList.add('visible');
+}
+function closeActionSheet(e) {
+  if (e && e.target && !e.target.classList.contains('sheet-overlay') && !e.target.classList.contains('sheet-cancel')) return;
+  document.getElementById('action-sheet').classList.remove('visible');
+}
+
+// ============ TOAST ============
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('visible'), 1800);
+}
+
+// ============ TASK CHECK ============
+function toggleTask(e) {
+  const row = e.currentTarget;
+  const check = row.querySelector('.task-check');
+  const title = row.querySelector('.task-title');
+  check.classList.toggle('done');
+  title.classList.toggle('done');
+}
+
+// ============ SEARCH ============
+function onSearchInput() {
+  const input = document.getElementById('search-input');
+  const clear = document.getElementById('search-clear');
+  const val = input.value.trim();
+  clear.style.display = val ? 'flex' : 'none';
+  renderSearchResults(val);
+}
+
+function clearSearch() {
+  const input = document.getElementById('search-input');
+  input.value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  renderSearchResults('');
+}
+
+function renderSearchResults(q) {
+  const container = document.getElementById('search-results');
+  if (!q) {
+    container.innerHTML = '<div class="search-empty"><i class="ti ti-search"></i>' +
+      '<div class="title">Что ищем?</div>' +
+      '<div class="hint">Введите номер договора, ФИО, название контрагента<br>или просто слово из задачи</div></div>';
+    return;
+  }
+  // Моки для прототипа
+  const mocks = [
+    { type: 'contract', cls: 'c-sales', icon: 'ti-file-text', title: '№27-К · ООО «Холодсервис»', sub: 'Договор · сумма 450 000 ₽ · готова' },
+    { type: 'task', cls: 'c-tasks', icon: 'ti-checklist', title: 'Подготовить КП для ООО «Холодсервис»', sub: 'Задача · просрочена 1 дн.' },
+    { type: 'defect', cls: 'c-defect', icon: 'ti-alert-triangle', title: 'Не работает компрессор', sub: 'Доработка · № 145 · новая' },
+    { type: 'contractor', cls: 'c-sales', icon: 'ti-briefcase', title: 'ООО «Холодсервис»', sub: 'Контрагент · 4 договора' },
+  ];
+  let html = '';
+  mocks.forEach(m => {
+    html += '<div class="result-row" onclick="toast(\'Открываю результат…\')">' +
+      '<div class="result-icon ' + m.cls + '"><i class="ti ' + m.icon + '"></i></div>' +
+      '<div class="result-body">' +
+        '<div class="result-title">' + m.title + '</div>' +
+        '<div class="result-sub">' + m.sub + '</div>' +
+      '</div>' +
+      '<i class="ti ti-chevron-right"></i>' +
+    '</div>';
+  });
+  container.innerHTML = html;
+}
+
+// ============ CHIPS ============
+document.querySelectorAll('.chip-row').forEach(row => {
+  row.addEventListener('click', e => {
+    if (!e.target.classList.contains('chip')) return;
+    row.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    e.target.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>
