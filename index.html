@@ -3352,23 +3352,92 @@
     color: var(--text-light);
     margin-bottom: 6px;
     letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .access-perm-group-title:hover { background: rgba(0,0,0,0.04); color: var(--text-dark); }
+  .access-perm-group-title .group-toggle {
+    width: 16px; height: 16px; min-width: 16px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.12s;
+  }
+  .access-perm-group-title .group-toggle i {
+    color: white;
+    font-size: 11px;
+    display: none;
+  }
+  /* «Всё включено» — синий с галочкой */
+  .access-perm-group-title.all .group-toggle {
+    background: var(--brand, #4A90E2);
+    border-color: var(--brand, #4A90E2);
+  }
+  .access-perm-group-title.all .group-toggle i { display: block; }
+  /* «Частично включено» — синяя рамка, белый внутри, с маленькой полоской */
+  .access-perm-group-title.some .group-toggle {
+    border-color: var(--brand, #4A90E2);
+    position: relative;
+  }
+  .access-perm-group-title.some .group-toggle::after {
+    content: '';
+    width: 8px; height: 2px;
+    background: var(--brand, #4A90E2);
+    border-radius: 1px;
+  }
+  .access-perm-group-title .group-count {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--text-light);
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
   }
   .access-perm-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 7px 10px;
+    padding: 9px 10px;
     border-radius: 6px;
     cursor: pointer;
     user-select: none;
     transition: background 0.1s;
   }
-  .access-perm-row:hover { background: rgba(0,0,0,0.03); }
-  .access-perm-row input[type="checkbox"] {
-    width: 16px; height: 16px;
-    cursor: pointer;
-    accent-color: var(--brand);
+  .access-perm-row:hover { background: rgba(0,0,0,0.04); }
+  /* Свой кастомный чекбокс — native input не отображался в некоторых браузерах */
+  .access-perm-row .perm-check {
+    width: 20px; height: 20px;
+    min-width: 20px;
+    border: 2px solid var(--border);
+    border-radius: 5px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.12s;
   }
+  .access-perm-row .perm-check i {
+    color: white;
+    font-size: 14px;
+    display: none;
+  }
+  .access-perm-row.checked .perm-check {
+    background: var(--brand, #4A90E2);
+    border-color: var(--brand, #4A90E2);
+  }
+  .access-perm-row.checked .perm-check i { display: block; }
+  .access-perm-row:hover .perm-check { border-color: var(--brand, #4A90E2); }
   .access-perm-label {
     font-size: 13.5px;
     color: var(--text-dark);
@@ -9317,7 +9386,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.9.1-director-fallback";
+const APP_VERSION = "v2.9.3-group-toggle";
 const APP_VERSION_DATE = "19.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10640,16 +10709,30 @@ function renderAccessLevelCard(level) {
     });
 
     groups.forEach(g => {
+      // v2.9.2: счётчик "сколько отмечено / всего в группе" + состояние all/some/none
+      const total = g.items.length;
+      const onCount = g.items.filter(p => draft.permissions.has(p.key)).length;
+      let stateClass = '';
+      if (onCount === total && total > 0) stateClass = ' all';
+      else if (onCount > 0) stateClass = ' some';
+      const groupKeysJson = JSON.stringify(g.items.map(p => p.key)).replace(/"/g, '&quot;');
+
       html += '<div class="access-perm-group">';
-      html += '<div class="access-perm-group-title">' + escapeHtml(g.name) + '</div>';
+      html += '<div class="access-perm-group-title' + stateClass + '" ' +
+              'onclick="event.stopPropagation(); toggleAccessGroup(' + level.id + ', &quot;' + escapeHtml(g.name) + '&quot;, ' + groupKeysJson + ')">' +
+              '<div class="group-toggle"><i class="ti ti-check"></i></div>' +
+              '<span>' + escapeHtml(g.name) + '</span>' +
+              '<span class="group-count">' + onCount + ' / ' + total + '</span>' +
+              '</div>';
+
       g.items.forEach(p => {
         const checked = draft.permissions.has(p.key);
         const safeKey = p.key.replace(/'/g, "\\'");
-        html += '<label class="access-perm-row" onclick="event.stopPropagation();">' +
-                '<input type="checkbox"' + (checked ? ' checked' : '') +
-                  ' onchange="onAccessPermToggle(' + level.id + ', \'' + safeKey + '\', this.checked)">' +
+        html += '<div class="access-perm-row' + (checked ? ' checked' : '') + '"' +
+                ' onclick="event.stopPropagation(); onAccessPermToggle(' + level.id + ', \'' + safeKey + '\', ' + (!checked) + ')">' +
+                '<div class="perm-check"><i class="ti ti-check"></i></div>' +
                 '<span class="access-perm-label">' + escapeHtml(p.label) + '</span>' +
-                '</label>';
+                '</div>';
       });
       html += '</div>';
     });
@@ -10689,6 +10772,20 @@ function onAccessPermToggle(levelId, permKey, checked) {
   if (checked) draft.permissions.add(permKey);
   else draft.permissions.delete(permKey);
   // Перерисуем чтобы счётчик в шапке обновился
+  renderAccessLevels();
+}
+
+// v2.9.2: групповое переключение — клик на заголовок группы
+// Логика: если в группе все включены — снимаем все; иначе включаем все.
+function toggleAccessGroup(levelId, groupName, keys) {
+  const draft = state.accessLevelsDraft[levelId];
+  if (!draft || !Array.isArray(keys)) return;
+  const allOn = keys.every(k => draft.permissions.has(k));
+  if (allOn) {
+    keys.forEach(k => draft.permissions.delete(k));
+  } else {
+    keys.forEach(k => draft.permissions.add(k));
+  }
   renderAccessLevels();
 }
 
