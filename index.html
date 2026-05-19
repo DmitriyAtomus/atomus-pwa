@@ -7407,6 +7407,9 @@
         <button class="nav-item" data-nav="employees" onclick="selectSidebarItem('employees')">
           <i class="ti ti-users"></i><span>Сотрудники</span>
         </button>
+        <button class="nav-item" data-nav="positions" id="nav-positions" onclick="selectSidebarItem('positions')">
+          <i class="ti ti-briefcase"></i><span>Должности</span>
+        </button>
         <div class="nav-section-label">ОТПУСКА</div>
         <button class="nav-item active" data-nav="hr-vacations-timeline" onclick="selectSidebarItem('hr-vacations-timeline')">
           <i class="ti ti-chart-bar"></i><span>Таймлайн</span>
@@ -7706,6 +7709,28 @@
           <!-- наполняется через initEmployeeForm() -->
         </div>
       </div>
+
+      <!-- ============ v2.8.2: СПРАВОЧНИК ДОЛЖНОСТЕЙ ============ -->
+      <div class="screen" data-screen="positions" data-section="hr">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('employees')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Должности</h2>
+          <button class="icon-btn" id="positions-mobile-new" onclick="openNewPositionPrompt()"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="page-header">
+          <div><h1>Должности</h1><div class="page-subtitle" id="positions-subtitle">Справочник для выпадающего списка в карточке сотрудника</div></div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="positions-new-btn" onclick="openNewPositionPrompt()">
+              <i class="ti ti-plus"></i> Новая должность
+            </button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="positions-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+      <!-- ============ КОНЕЦ СПРАВОЧНИКА ДОЛЖНОСТЕЙ ============ -->
 
       <!-- ============ МОДЕЛИ ============ -->
       <div class="screen" data-screen="models" data-section="production">
@@ -9156,8 +9181,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.8.1-hr-people-nav";
-const APP_VERSION_DATE = "18.05.2026";
+const APP_VERSION = "v2.8.2-positions-keep-screen";
+const APP_VERSION_DATE = "19.05.2026";
 
 // ============ Архитектура «под расширения» ============
 // Структура: section → sidebar item → screen
@@ -9427,6 +9452,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function logout() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('atomus_last_view');  // v2.8.2
   state.user = null;
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -9462,12 +9488,46 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   applyLayout();
   if (!state.user) {
-    apiGet('/api/me').then(me => { state.user = me; renderProfile(); selectSection('home'); _showWelcomeIfFresh(); })
+    apiGet('/api/me').then(me => { state.user = me; renderProfile(); _restoreLastView(); _showWelcomeIfFresh(); })
       .catch(() => logout());
   } else {
     renderProfile();
-    selectSection('home');
+    _restoreLastView();
     _showWelcomeIfFresh();
+  }
+}
+
+// v2.8.2: восстановление последнего открытого экрана при F5/перезагрузке
+function _restoreLastView() {
+  // Если есть свежий приветственный тост (т.е. только что вошли) — на главную
+  if (state._loginWelcome) {
+    selectSection('home');
+    return;
+  }
+  let last = null;
+  try {
+    const raw = localStorage.getItem('atomus_last_view');
+    if (raw) last = JSON.parse(raw);
+  } catch (e) {}
+  // Срок жизни — сутки. Дальше — на главную, иначе странно если открыл через 2 недели
+  const MAX_AGE = 24 * 3600 * 1000;
+  if (!last || !last.section || !last.screen || (Date.now() - (last.ts || 0)) > MAX_AGE) {
+    selectSection('home');
+    return;
+  }
+  // Проверяем что раздел вообще существует в SECTION_CONFIG
+  if (!SECTION_CONFIG[last.section]) {
+    selectSection('home');
+    return;
+  }
+  // Восстанавливаем: сначала раздел (он откроет defaultScreen), потом меняем на сохранённый экран
+  selectSection(last.section);
+  if (last.screen !== SECTION_CONFIG[last.section].defaultScreen) {
+    // Дополнительная проверка — есть ли элемент экрана в DOM
+    const screenEl = document.querySelector('.screen[data-screen="' + last.screen + '"]');
+    if (screenEl) {
+      selectSidebarItem(last.screen);
+    }
   }
 }
 
@@ -9659,6 +9719,23 @@ function selectSection(sectionName) {
 function selectSidebarItem(screenName) {
   state.currentScreen = screenName;
 
+  // v2.8.2: сохраняем текущий раздел+экран чтобы при F5 вернуться сюда
+  try {
+    const TRANSIENT_SCREENS = [
+      'employee-form', 'task-form', 'contract-form', 'sale-offer-form',
+      'sale-product-form', 'task-detail', 'contract-detail', 'sale-offer-detail',
+      'defect-form', 'defect-detail', 'model-form', 'vacation-form',
+      'wh-ship-qr',
+    ];
+    if (!TRANSIENT_SCREENS.includes(screenName)) {
+      localStorage.setItem('atomus_last_view', JSON.stringify({
+        section: state.currentSection || 'home',
+        screen: screenName,
+        ts: Date.now(),
+      }));
+    }
+  } catch (e) { /* localStorage может быть отключён — игнор */ }
+
   // ЭТАП 25.0: синхронизируем подсветку нижнего таб-бара
   if (typeof syncMainTabFromSection === 'function') {
     syncMainTabFromSection(state.currentSection, screenName);
@@ -9701,6 +9778,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'summary') loadSummary();
   if (screenName === 'employees') loadEmployees();
   if (screenName === 'employee-form') initEmployeeForm();
+  if (screenName === 'positions') loadPositions();   // v2.8.2
   if (screenName === 'models') loadModels();
   if (screenName === 'new-assembly') initNewAssemblyForm();
   // Продажи
@@ -10111,6 +10189,194 @@ function renderPieChart(byDir, totalQty) {
 
 // ============ СОТРУДНИКИ ============
 
+// ============================================================================
+// v2.8.2: СПРАВОЧНИК ДОЛЖНОСТЕЙ
+// ============================================================================
+
+async function loadPositions() {
+  const container = document.getElementById('positions-list');
+  if (!container) return;
+  const isDirector = state.user && (state.user.roles || []).includes('director');
+  if (!isDirector) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-lock"></i>Доступно только директору</div>';
+    return;
+  }
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/positions?include_inactive=true');
+    cache.positions = d;
+    renderPositions(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderPositions(d) {
+  const container = document.getElementById('positions-list');
+  if (!container) return;
+  const positions = d.positions || [];
+  const active = positions.filter(p => p.is_active);
+  const inactive = positions.filter(p => !p.is_active);
+
+  const subtitle = document.getElementById('positions-subtitle');
+  if (subtitle) subtitle.textContent = active.length + ' активных · ' + inactive.length + ' скрытых';
+
+  if (active.length === 0 && inactive.length === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-briefcase"></i>Должностей нет<br><br><button class="btn btn-primary" onclick="openNewPositionPrompt()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первую</button></div>';
+    return;
+  }
+
+  let html = '';
+  if (active.length) {
+    html += '<div class="section-label">Активные · ' + active.length + '</div><div class="card">';
+    active.forEach(p => html += renderPositionRow(p));
+    html += '</div>';
+  }
+  if (inactive.length) {
+    html += '<div class="section-label">Скрытые · ' + inactive.length + '</div><div class="card">';
+    inactive.forEach(p => html += renderPositionRow(p));
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function renderPositionRow(p) {
+  const usage = (p.usage_count || 0);
+  const usageText = usage > 0
+    ? '<span style="color: var(--text-light); font-size: 12.5px;">используется у ' + usage + ' сотр.</span>'
+    : '<span style="color: var(--text-light); font-size: 12.5px;">никто не использует</span>';
+  const inactiveCls = p.is_active ? '' : ' emp-inactive';
+  let actions = '';
+  if (p.is_active) {
+    actions = '<button class="icon-btn" onclick="event.stopPropagation(); renamePosition(' + p.id + ')" title="Переименовать"><i class="ti ti-pencil"></i></button>' +
+              '<button class="icon-btn" onclick="event.stopPropagation(); deletePositionConfirm(' + p.id + ')" title="Скрыть"><i class="ti ti-archive"></i></button>';
+  } else {
+    actions = '<button class="icon-btn" onclick="event.stopPropagation(); restorePosition(' + p.id + ')" title="Восстановить"><i class="ti ti-rotate"></i></button>';
+  }
+  return '<div class="employee-row' + inactiveCls + '" style="cursor: default;">' +
+    '<div class="emp-info">' +
+      '<div class="emp-name">' + escapeHtml(p.name) + '</div>' +
+      '<div class="emp-meta">' + usageText + '</div>' +
+    '</div>' +
+    '<div style="display:flex; gap:4px; align-items:center;">' + actions + '</div>' +
+  '</div>';
+}
+
+async function openNewPositionPrompt() {
+  const name = (window.prompt('Название должности (напр. «Электромонтажник»):') || '').trim();
+  if (!name) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Должность создана', 'success');
+    cache.positions = null;
+    cache.positionsActive = null;
+    loadPositions();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function renamePosition(posId) {
+  const current = ((cache.positions && cache.positions.positions) || []).find(p => p.id === posId);
+  if (!current) return;
+  const name = (window.prompt('Новое название должности:', current.name) || '').trim();
+  if (!name || name === current.name) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/positions/' + posId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Должность переименована', 'success');
+    cache.positions = null;
+    cache.positionsActive = null;
+    loadPositions();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deletePositionConfirm(posId) {
+  const current = ((cache.positions && cache.positions.positions) || []).find(p => p.id === posId);
+  if (!current) return;
+  let msg = 'Скрыть должность «' + current.name + '»?';
+  if (current.usage_count > 0) {
+    msg += '\n\nЕё используют ' + current.usage_count + ' сотр. — у них поле «Должность» останется как есть, но из выпадающего списка должность пропадёт.';
+  }
+  if (!confirm(msg)) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/positions/' + posId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Должность скрыта', 'success');
+    cache.positions = null;
+    cache.positionsActive = null;
+    loadPositions();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function restorePosition(posId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/positions/' + posId + '?restore=true', {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Должность восстановлена', 'success');
+    cache.positions = null;
+    cache.positionsActive = null;
+    loadPositions();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// Загружаем активные должности и кладём в кэш — для datalist в форме сотрудника
+async function ensurePositionsLoaded() {
+  if (cache.positionsActive) return cache.positionsActive;
+  try {
+    const d = await apiGet('/api/positions');
+    cache.positionsActive = d;
+    return d;
+  } catch (e) {
+    return { positions: [] };
+  }
+}
+
+// ============================================================================
+// КОНЕЦ СПРАВОЧНИКА ДОЛЖНОСТЕЙ
+// ============================================================================
+
 async function loadEmployees() {
   const container = document.getElementById('employees-list');
   if (cache.employees) { renderEmployees(cache.employees); return; }
@@ -10286,8 +10552,10 @@ function renderEmployeeForm() {
   html += '<div class="sales-form-title">Основные данные</div>';
   html += '<div class="sales-form-row cols-1"><div><label>ФИО <span class="req">*</span></label>' +
           '<input type="text" id="empf-full-name" value="' + escapeHtml(f.full_name) + '" placeholder="напр. Иванов Иван Иванович"></div></div>';
-  html += '<div class="sales-form-row cols-1"><div><label>Должность <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(свободный текст)</span></label>' +
-          '<input type="text" id="empf-position" value="' + escapeHtml(f.position) + '" placeholder="напр. Менеджер по продажам"></div></div>';
+  html += '<div class="sales-form-row cols-1"><div><label>Должность <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(выберите из списка или впишите своё)</span></label>' +
+          '<input type="text" id="empf-position" list="empf-position-list" value="' + escapeHtml(f.position) + '" placeholder="напр. Электромонтажник">' +
+          '<datalist id="empf-position-list"></datalist>' +
+          '</div></div>';
   html += '<div class="sales-form-row">';
   html += '<div><label>Телефон</label>' +
           '<input type="tel" id="empf-phone" value="' + escapeHtml(f.phone) + '" placeholder="+7 ..."></div>';
@@ -10426,6 +10694,12 @@ function renderEmployeeForm() {
   // Подвязка input → state
   document.getElementById('empf-full-name').addEventListener('input', e => { state.employeeForm.full_name = e.target.value; });
   document.getElementById('empf-position').addEventListener('input', e => { state.employeeForm.position = e.target.value; });
+  // v2.8.2: подгружаем варианты должностей в datalist
+  ensurePositionsLoaded().then(d => {
+    const dl = document.getElementById('empf-position-list');
+    if (!dl) return;
+    dl.innerHTML = (d.positions || []).map(p => '<option value="' + escapeHtml(p.name) + '"></option>').join('');
+  });
   document.getElementById('empf-phone').addEventListener('input', e => { state.employeeForm.phone = e.target.value; });
   document.getElementById('empf-email').addEventListener('input', e => { state.employeeForm.email = e.target.value; });
   document.getElementById('empf-tab-number').addEventListener('input', e => { state.employeeForm.tab_number = e.target.value; });
@@ -13102,7 +13376,10 @@ async function loadHomeDashboard() {
   loadCbrRates();
   loadHomeMyTasks();      // ЭТАП 16В
   loadHomeShipments();    // ЭТАП 16Г
-  loadHomeActivity();     // ЭТАП 16Г
+  // v2.8.2: лента «Последние действия» — только для директора
+  if (state.user && (state.user.roles || []).includes('director')) {
+    loadHomeActivity();
+  }
   // loadHomeVacations() — отключено в v25.0 (блок убран с Главной)
 }
 
@@ -13156,9 +13433,12 @@ function renderHomeSkeleton() {
   html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
   html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
 
-  // ЭТАП 16Г: «Последние действия»
-  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-history"></i>Последние действия</div>';
-  html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // ЭТАП 16Г: «Последние действия» — только для директора (v2.8.2)
+  const _isDirector = state.user && (state.user.roles || []).includes('director');
+  if (_isDirector) {
+    html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-history"></i>Последние действия</div>';
+    html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  }
 
   // Калькулятор
   html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-calculator"></i>Инструменты</div>';
