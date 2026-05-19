@@ -1273,6 +1273,49 @@
   }
   .worker-row.master-row .w-badge { background: var(--success-bg); color: var(--success); }
 
+  /* v2.7.5: Пикер «Кто собирал» — вместо открытого списка */
+  .workers-picker-empty {
+    width: 100%;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px; color: var(--text-light);
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .workers-picker-empty:hover { border-color: var(--brand); color: var(--brand); background: white; }
+  .workers-picker-empty .wpe-left { display: inline-flex; align-items: center; gap: 8px; }
+  .workers-picker-empty .wpe-left i { font-size: 18px; }
+  .workers-picker-empty .wpe-chev { color: var(--text-light); }
+  .workers-picker-selected { /* реюз .picker-display, доп. правил не надо */ }
+  .workers-picker-selected .wps-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    min-width: 0;
+  }
+  .workers-picker-selected .wps-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--brand-bg); color: var(--brand);
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 500;
+  }
+  .workers-picker-selected .wps-chip i { font-size: 11px; opacity: 0.85; }
+  .workers-picker-selected .wps-more {
+    font-size: 12.5px; color: var(--text-light); align-self: center;
+  }
+
+  /* Футер модалки сотрудников */
+  .modal-footer-actions {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    display: flex; gap: 10px; justify-content: space-between; align-items: center;
+  }
+  .modal-footer-actions .mfa-count { font-size: 13px; color: var(--text-light); }
+  .modal-footer-actions .mfa-buttons { display: flex; gap: 8px; }
+
   .date-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .date-input-wrap { margin-top: 12px; display: none; }
   .date-input-wrap.visible { display: block; }
@@ -8822,6 +8865,29 @@
   </div>
 </div>
 
+<!-- ============ v2.7.5: МОДАЛКА ВЫБОРА СОТРУДНИКОВ (Кто собирал) ============ -->
+<div class="modal-overlay" id="workers-modal" onclick="if(event.target===this) closeWorkersModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="workers-modal-title">Кто собирал</h3>
+      <button class="icon-btn" onclick="closeWorkersModal()" aria-label="Закрыть"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-search">
+      <input type="text" id="workers-modal-search" placeholder="Поиск по имени…" oninput="onWorkersModalSearch(this.value)">
+    </div>
+    <div class="modal-body" id="workers-modal-body" style="padding: 8px 18px;">
+      <div class="loading-block">Загружаем список…</div>
+    </div>
+    <div class="modal-footer-actions">
+      <span class="mfa-count" id="workers-modal-count">Выбрано: 0</span>
+      <div class="mfa-buttons">
+        <button class="btn btn-secondary" type="button" onclick="clearWorkersSelection()">Очистить</button>
+        <button class="btn btn-primary" type="button" onclick="closeWorkersModal()"><i class="ti ti-check"></i> Готово</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ МОДАЛКА ВЫБОРА КОНТРАГЕНТА (для формы договора) ============ -->
 <div class="modal-overlay" id="contractor-modal">
   <div class="modal">
@@ -9008,7 +9074,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.7.4-spec-btn-flex";
+const APP_VERSION = "v2.7.5-workers-picker";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -14659,38 +14725,185 @@ async function loadActiveEmployees() {
 }
 
 function renderWorkersList(d) {
+  // v2.7.5: вместо открытого списка — компактная плашка-пикер.
+  // Сам выбор делается в модалке #workers-modal.
   const container = document.getElementById('workers-list');
-  if (!d.employees || d.employees.length === 0) {
-    container.innerHTML = '<div class="empty-block">Активных сотрудников нет</div>'; return;
+  if (!container) return;
+
+  if (!d || !d.employees || d.employees.length === 0) {
+    container.innerHTML = '<div class="empty-block">Активных сотрудников нет</div>';
+    return;
   }
-  const sorted = [...d.employees].sort((a, b) => {
-    if (a.is_master !== b.is_master) return b.is_master - a.is_master;
+
+  const all = d.employees;
+  const selectedIds = (state.newAssembly && state.newAssembly.workerIds) || [];
+  const selected = all.filter(e => selectedIds.indexOf(e.id) >= 0);
+
+  let html = '';
+  if (selected.length === 0) {
+    // Пусто — большая кнопка-плашка
+    html =
+      '<button type="button" class="workers-picker-empty" onclick="openWorkersModal()">' +
+        '<span class="wpe-left"><i class="ti ti-users"></i> Выбрать сотрудников</span>' +
+        '<i class="ti ti-chevron-right wpe-chev"></i>' +
+      '</button>';
+  } else {
+    // Выбраны — picker-display со списком чипов
+    const MAX_CHIPS = 5;
+    const shown = selected.slice(0, MAX_CHIPS);
+    const more = selected.length - shown.length;
+
+    let chips = '';
+    shown.forEach(emp => {
+      const name = emp.short_name || emp.full_name || '—';
+      chips += '<span class="wps-chip">' +
+                 (emp.is_master ? '<i class="ti ti-tool"></i>' : '<i class="ti ti-user"></i>') +
+                 escapeHtml(name) +
+               '</span>';
+    });
+    if (more > 0) {
+      chips += '<span class="wps-more">+ ещё ' + more + '</span>';
+    }
+
+    html =
+      '<div class="picker-display workers-picker-selected" onclick="openWorkersModal()" style="cursor:pointer;">' +
+        '<div class="picker-display-value" style="flex:1; white-space:normal; overflow:visible;">' +
+          '<div class="wps-chips">' + chips + '</div>' +
+        '</div>' +
+        '<div class="picker-display-actions" onclick="event.stopPropagation();">' +
+          '<button type="button" class="btn-link" onclick="openWorkersModal()">Изменить</button>' +
+          '<button type="button" class="btn-link btn-link-danger" onclick="clearWorkersSelection()">Очистить</button>' +
+        '</div>' +
+      '</div>';
+  }
+  container.innerHTML = html;
+}
+
+// v2.7.5: открыть модалку выбора сотрудников
+function openWorkersModal() {
+  const ov = document.getElementById('workers-modal');
+  if (!ov) return;
+  ov.classList.add('visible');
+  const si = document.getElementById('workers-modal-search');
+  if (si) si.value = '';
+  renderWorkersInModal('');
+  updateWorkersModalCount();
+  // На десктопе — автофокус в поиск, на мобиле — нет (иначе клавиатура мешает)
+  setTimeout(() => {
+    if (si && window.innerWidth > 700) si.focus();
+  }, 100);
+}
+
+function closeWorkersModal() {
+  const ov = document.getElementById('workers-modal');
+  if (ov) ov.classList.remove('visible');
+}
+
+function onWorkersModalSearch(query) {
+  renderWorkersInModal(query || '');
+}
+
+function renderWorkersInModal(query) {
+  const body = document.getElementById('workers-modal-body');
+  if (!body) return;
+
+  // Источник данных — тот же кэш. cache.activeEmployees от loadActiveEmployees
+  // приходит как объект {employees:[...]}, но в др. местах кода — как массив.
+  // Поддерживаем оба варианта на всякий случай.
+  let employees = null;
+  if (cache.activeEmployees) {
+    if (Array.isArray(cache.activeEmployees)) employees = cache.activeEmployees;
+    else if (cache.activeEmployees.employees) employees = cache.activeEmployees.employees;
+  }
+  if (!employees) {
+    body.innerHTML = '<div class="loading-block">Загружаем…</div>';
+    apiGet('/api/employees/active').then(d => {
+      cache.activeEmployees = d;
+      renderWorkersInModal(query);
+    }).catch(e => {
+      body.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>' + escapeHtml(String(e)) + '</div>';
+    });
+    return;
+  }
+
+  let list = employees.filter(e => e.is_active !== false);
+  const q = (query || '').trim().toLowerCase();
+  if (q) {
+    list = list.filter(e => {
+      const a = (e.short_name || '').toLowerCase();
+      const b = (e.full_name || '').toLowerCase();
+      return a.indexOf(q) >= 0 || b.indexOf(q) >= 0;
+    });
+  }
+  // Сортировка: сначала мастера, потом алфавит
+  list.sort((a, b) => {
+    if (a.is_master !== b.is_master) return (b.is_master ? 1 : 0) - (a.is_master ? 1 : 0);
     return (a.short_name || a.full_name || '').localeCompare(b.short_name || b.full_name || '');
   });
+
+  if (!list.length) {
+    body.innerHTML = '<div class="empty-block">Никого не найдено</div>';
+    return;
+  }
+
+  const selectedIds = (state.newAssembly && state.newAssembly.workerIds) || [];
   let html = '';
-  sorted.forEach(emp => {
+  list.forEach(emp => {
     const name = emp.short_name || emp.full_name || '—';
+    const isSel = selectedIds.indexOf(emp.id) >= 0;
     const masterCls = emp.is_master ? ' master-row' : '';
-    html += '<div class="worker-row' + masterCls + '" data-wid="' + emp.id + '">' +
+    html += '<div class="worker-row' + masterCls + (isSel ? ' selected' : '') + '" data-wid="' + emp.id + '">' +
       '<div class="check"><i class="ti ti-check"></i></div>' +
       '<div class="w-name">' + escapeHtml(name) + '</div>' +
       (emp.is_master ? '<span class="w-badge">мастер</span>' : '') +
       '</div>';
   });
-  container.innerHTML = html;
-  container.querySelectorAll('.worker-row').forEach(row => {
+  body.innerHTML = html;
+  body.querySelectorAll('.worker-row').forEach(row => {
     row.addEventListener('click', () => toggleWorker(parseInt(row.dataset.wid), row));
   });
 }
 
+function updateWorkersModalCount() {
+  const el = document.getElementById('workers-modal-count');
+  if (!el) return;
+  const n = ((state.newAssembly && state.newAssembly.workerIds) || []).length;
+  el.textContent = 'Выбрано: ' + n;
+}
+
+function clearWorkersSelection() {
+  if (!state.newAssembly) return;
+  state.newAssembly.workerIds = [];
+  // Обновим модалку (если открыта) и плашку
+  const ov = document.getElementById('workers-modal');
+  if (ov && ov.classList.contains('visible')) {
+    const si = document.getElementById('workers-modal-search');
+    renderWorkersInModal(si ? si.value : '');
+  }
+  updateWorkersModalCount();
+  if (cache.activeEmployees) {
+    const d = cache.activeEmployees.employees ? cache.activeEmployees : { employees: cache.activeEmployees };
+    renderWorkersList(d);
+  }
+}
+
 function toggleWorker(wid, row) {
+  // v2.7.5: row может быть из модалки. Сохраняем контракт с старым кодом
+  // (где row передавался из открытого списка) — просто обновляем класс если row есть.
+  if (!state.newAssembly) return;
   const idx = state.newAssembly.workerIds.indexOf(wid);
   if (idx >= 0) {
     state.newAssembly.workerIds.splice(idx, 1);
-    row.classList.remove('selected');
+    if (row) row.classList.remove('selected');
   } else {
     state.newAssembly.workerIds.push(wid);
-    row.classList.add('selected');
+    if (row) row.classList.add('selected');
+  }
+  // Обновим счётчик в футере модалки и плашку под формой
+  updateWorkersModalCount();
+  if (cache.activeEmployees) {
+    const d = cache.activeEmployees.employees ? cache.activeEmployees : { employees: cache.activeEmployees };
+    renderWorkersList(d);
   }
 }
 
