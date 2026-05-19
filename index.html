@@ -9581,7 +9581,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.11.8-summary-export";
+const APP_VERSION = "v2.11.9-activity-cleanup";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16181,10 +16181,12 @@ function renderHomeActivity() {
 
   let html = '<div class="activity-feed">';
   shown.forEach(a => {
+    // ЭТАП 31.10: чистка от JSON-мусора в text (страховка от старых записей в БД)
+    const cleanText = _cleanActivityText(a.text || '');
     html += '<div class="activity-row">' +
       '<div class="ar-icon"><i class="ti ' + escapeHtml(a.icon || 'ti-circle') + '"></i></div>' +
       '<div class="ar-body">' +
-        '<div class="ar-text">' + escapeHtml(a.text || '') + '</div>' +
+        '<div class="ar-text">' + escapeHtml(cleanText) + '</div>' +
         '<div class="ar-time">' + escapeHtml(formatActivityTime(a.created_at)) + '</div>' +
       '</div></div>';
   });
@@ -16208,6 +16210,19 @@ function renderHomeActivity() {
 function toggleHomeActivity() {
   state.homeActivityExpanded = !state.homeActivityExpanded;
   renderHomeActivity();
+}
+
+// ЭТАП 31.10: убираем JSON-объекты из текста активности (старые записи в БД)
+function _cleanActivityText(text) {
+  if (!text) return '';
+  let s = String(text);
+  // Убираем JSON-объекты вида «{...}» или просто {...} — заменяем на читаемое
+  s = s.replace(/«\s*\{[^}]*\}\s*»/g, '').replace(/\{[^{}]*"[^{}]*\}/g, '');
+  // Сжимаем пробелы
+  s = s.replace(/\s+/g, ' ').trim();
+  // Убираем висящие пустые кавычки/тире
+  s = s.replace(/«\s*»/g, '').replace(/\s*·\s*$/, '').trim();
+  return s;
 }
 
 function formatActivityTime(iso) {
