@@ -3274,6 +3274,117 @@
   .vac-list-actions { display: flex; gap: 6px; flex-shrink: 0; }
   /* ============ КОНЕЦ КАДРЫ ============ */
 
+  /* ============ ЭТАП 29: УРОВНИ ДОСТУПА ============ */
+  .access-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .access-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .access-card-header:hover { background: var(--bg); }
+  .access-card-chevron {
+    color: var(--text-light);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .access-card.open .access-card-chevron { transform: rotate(90deg); }
+  .access-card-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 15px;
+  }
+  .access-card-meta {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin-top: 2px;
+    font-weight: 400;
+  }
+  .access-card-badge {
+    display: inline-block;
+    background: var(--bg);
+    color: var(--text-mid);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    margin-left: 6px;
+  }
+  .access-card-body {
+    border-top: 1px solid var(--border);
+    padding: 16px;
+    display: none;
+    background: #FAFBFC;
+  }
+  .access-card.open .access-card-body { display: block; }
+  .access-name-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    margin-bottom: 12px;
+  }
+  .access-name-input:disabled {
+    background: var(--bg);
+    color: var(--text-light);
+    cursor: not-allowed;
+  }
+  .access-perm-group {
+    margin-bottom: 14px;
+  }
+  .access-perm-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-light);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .access-perm-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .access-perm-row:hover { background: rgba(0,0,0,0.03); }
+  .access-perm-row input[type="checkbox"] {
+    width: 16px; height: 16px;
+    cursor: pointer;
+    accent-color: var(--brand);
+  }
+  .access-perm-label {
+    font-size: 13.5px;
+    color: var(--text-dark);
+    flex: 1;
+  }
+  .access-card-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  /* ============ КОНЕЦ УРОВНЕЙ ДОСТУПА ============ */
+
   /* ============ ПОМОЩЬ: База знаний / FAQ / Changelog ============ */
 
   /* Заголовок секции (по категориям) */
@@ -7410,6 +7521,9 @@
         <button class="nav-item" data-nav="positions" id="nav-positions" onclick="selectSidebarItem('positions')">
           <i class="ti ti-briefcase"></i><span>Должности</span>
         </button>
+        <button class="nav-item" data-nav="access-levels" id="nav-access-levels" onclick="selectSidebarItem('access-levels')">
+          <i class="ti ti-shield-lock"></i><span>Уровни доступа</span>
+        </button>
         <div class="nav-section-label">ОТПУСКА</div>
         <button class="nav-item active" data-nav="hr-vacations-timeline" onclick="selectSidebarItem('hr-vacations-timeline')">
           <i class="ti ti-chart-bar"></i><span>Таймлайн</span>
@@ -7731,6 +7845,28 @@
         </div>
       </div>
       <!-- ============ КОНЕЦ СПРАВОЧНИКА ДОЛЖНОСТЕЙ ============ -->
+
+      <!-- ============ ЭТАП 29: УРОВНИ ДОСТУПА ============ -->
+      <div class="screen" data-screen="access-levels" data-section="hr">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('employees')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Уровни доступа</h2>
+          <button class="icon-btn" id="access-mobile-new" onclick="openNewAccessLevel()"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="page-header">
+          <div><h1>Уровни доступа</h1><div class="page-subtitle" id="access-subtitle">Кто что видит и может делать</div></div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="access-new-btn" onclick="openNewAccessLevel()">
+              <i class="ti ti-plus"></i> Новый уровень
+            </button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="access-levels-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+      <!-- ============ КОНЕЦ УРОВНЕЙ ДОСТУПА ============ -->
 
       <!-- ============ МОДЕЛИ ============ -->
       <div class="screen" data-screen="models" data-section="production">
@@ -9181,8 +9317,30 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.8.2-positions-keep-screen";
+const APP_VERSION = "v2.9.0-access-levels";
 const APP_VERSION_DATE = "19.05.2026";
+
+// ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
+// hasPermission(key) — true если у текущего пользователя есть указанный permission.
+// state.user.permissions заполняется бэком при логине и в /api/me.
+// Старый код продолжает использовать state.user.roles — для обратной совместимости
+// бэк его тоже отдаёт (derive из permissions уровня доступа).
+function hasPermission(key) {
+  if (!state.user) return false;
+  const perms = state.user.permissions;
+  if (!Array.isArray(perms)) {
+    // Старый формат — falsy. Fallback на роли (если permissions ещё не пришли)
+    return false;
+  }
+  return perms.indexOf(key) >= 0;
+}
+// Удобная shortcut для проверки списка разрешений (любое из):
+function hasAnyPermission(/* ...keys */) {
+  for (let i = 0; i < arguments.length; i++) {
+    if (hasPermission(arguments[i])) return true;
+  }
+  return false;
+}
 
 // ============ Архитектура «под расширения» ============
 // Структура: section → sidebar item → screen
@@ -9488,10 +9646,11 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   applyLayout();
   if (!state.user) {
-    apiGet('/api/me').then(me => { state.user = me; renderProfile(); _restoreLastView(); _showWelcomeIfFresh(); })
+    apiGet('/api/me').then(me => { state.user = me; renderProfile(); applyPermissionsToUI(); _restoreLastView(); _showWelcomeIfFresh(); })
       .catch(() => logout());
   } else {
     renderProfile();
+    applyPermissionsToUI();
     _restoreLastView();
     _showWelcomeIfFresh();
   }
@@ -9779,6 +9938,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'employees') loadEmployees();
   if (screenName === 'employee-form') initEmployeeForm();
   if (screenName === 'positions') loadPositions();   // v2.8.2
+  if (screenName === 'access-levels') loadAccessLevels();   // ЭТАП 29
   if (screenName === 'models') loadModels();
   if (screenName === 'new-assembly') initNewAssemblyForm();
   // Продажи
@@ -10377,6 +10537,281 @@ async function ensurePositionsLoaded() {
 // КОНЕЦ СПРАВОЧНИКА ДОЛЖНОСТЕЙ
 // ============================================================================
 
+// ============================================================================
+// ЭТАП 29: УРОВНИ ДОСТУПА
+// ============================================================================
+
+// Открытые карточки уровней (id → bool). Состояние раскрытия.
+state.accessLevelsOpen = {};
+// Локальные изменения в карточках (id → { name, permissions: Set })
+state.accessLevelsDraft = {};
+
+async function loadAccessLevels() {
+  const container = document.getElementById('access-levels-list');
+  if (!container) return;
+  if (!hasPermission('hr.manage_access')) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-lock"></i>Доступ к этой странице есть только у тех, у кого включено «Настраивать уровни доступа»</div>';
+    return;
+  }
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    // Грузим уровни и реестр разрешений параллельно
+    const [levelsData, permsData] = await Promise.all([
+      apiGet('/api/access-levels?include_inactive=true'),
+      apiGet('/api/access-levels/permissions'),
+    ]);
+    cache.accessLevels = levelsData;
+    cache.permissionsRegistry = permsData;
+    state.accessLevelsDraft = {};  // сбрасываем черновики
+    renderAccessLevels();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderAccessLevels() {
+  const container = document.getElementById('access-levels-list');
+  if (!container) return;
+  const levels = (cache.accessLevels && cache.accessLevels.levels) || [];
+  const subtitle = document.getElementById('access-subtitle');
+  if (subtitle) {
+    const sysCnt = levels.filter(l => l.is_system).length;
+    subtitle.textContent = levels.length + ' уровней · ' + sysCnt + ' системных';
+  }
+  if (levels.length === 0) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-shield-lock"></i>Уровней нет</div>';
+    return;
+  }
+  container.innerHTML = levels.map(renderAccessLevelCard).join('');
+}
+
+function renderAccessLevelCard(level) {
+  const isOpen = !!state.accessLevelsOpen[level.id];
+  const draft = state.accessLevelsDraft[level.id] || {
+    name: level.name,
+    permissions: new Set(level.permissions || []),
+  };
+  // Сохраним в state на случай первого рендера
+  state.accessLevelsDraft[level.id] = draft;
+
+  const usage = (level.usage_count || 0);
+  const usageText = usage > 0 ? (usage + ' сотр.') : 'не используется';
+
+  let html = '<div class="access-card' + (isOpen ? ' open' : '') + '" id="access-card-' + level.id + '">';
+
+  // Header
+  html += '<div class="access-card-header" onclick="toggleAccessCard(' + level.id + ')">';
+  html += '<i class="ti ti-chevron-right access-card-chevron"></i>';
+  html += '<div style="flex:1;">';
+  html += '<div class="access-card-name">' + escapeHtml(level.name);
+  if (level.is_system) {
+    html += '<span class="access-card-badge">системный</span>';
+  }
+  html += '</div>';
+  html += '<div class="access-card-meta">' + escapeHtml(usageText) + ' · ' +
+          (draft.permissions.size) + ' разрешений</div>';
+  html += '</div></div>';
+
+  // Body
+  if (isOpen) {
+    html += '<div class="access-card-body">';
+
+    // Имя
+    html += '<label style="display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; color:var(--text-light); margin-bottom:6px; letter-spacing:0.5px;">Название</label>';
+    html += '<input type="text" class="access-name-input" value="' + escapeHtml(draft.name) +
+            '"' + (level.is_system ? ' disabled title="Системный уровень — название менять нельзя"' : '') +
+            ' oninput="onAccessNameChange(' + level.id + ', this.value)">';
+
+    // Группы permissions
+    const registry = (cache.permissionsRegistry && cache.permissionsRegistry.permissions) || [];
+    // Группируем по полю group, сохраняя порядок из registry
+    const groups = [];
+    const groupMap = {};
+    registry.forEach(p => {
+      if (!groupMap[p.group]) {
+        groupMap[p.group] = { name: p.group, items: [] };
+        groups.push(groupMap[p.group]);
+      }
+      groupMap[p.group].items.push(p);
+    });
+
+    groups.forEach(g => {
+      html += '<div class="access-perm-group">';
+      html += '<div class="access-perm-group-title">' + escapeHtml(g.name) + '</div>';
+      g.items.forEach(p => {
+        const checked = draft.permissions.has(p.key);
+        const safeKey = p.key.replace(/'/g, "\\'");
+        html += '<label class="access-perm-row" onclick="event.stopPropagation();">' +
+                '<input type="checkbox"' + (checked ? ' checked' : '') +
+                  ' onchange="onAccessPermToggle(' + level.id + ', \'' + safeKey + '\', this.checked)">' +
+                '<span class="access-perm-label">' + escapeHtml(p.label) + '</span>' +
+                '</label>';
+      });
+      html += '</div>';
+    });
+
+    // Кнопки
+    html += '<div class="access-card-actions">';
+    if (!level.is_system) {
+      const canDelete = usage === 0;
+      html += '<button class="btn btn-secondary" onclick="deleteAccessLevel(' + level.id + ')"' +
+              (canDelete ? '' : ' disabled title="Уровень привязан к ' + usage + ' сотр. — сначала переназначьте их"') +
+              '><i class="ti ti-trash"></i> Удалить</button>';
+    }
+    html += '<button class="btn btn-primary" onclick="saveAccessLevel(' + level.id + ')"><i class="ti ti-check"></i> Сохранить</button>';
+    html += '</div>';
+
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function toggleAccessCard(levelId) {
+  state.accessLevelsOpen[levelId] = !state.accessLevelsOpen[levelId];
+  renderAccessLevels();
+}
+
+function onAccessNameChange(levelId, value) {
+  const draft = state.accessLevelsDraft[levelId];
+  if (!draft) return;
+  draft.name = value;
+}
+
+function onAccessPermToggle(levelId, permKey, checked) {
+  const draft = state.accessLevelsDraft[levelId];
+  if (!draft) return;
+  if (checked) draft.permissions.add(permKey);
+  else draft.permissions.delete(permKey);
+  // Перерисуем чтобы счётчик в шапке обновился
+  renderAccessLevels();
+}
+
+async function saveAccessLevel(levelId) {
+  const draft = state.accessLevelsDraft[levelId];
+  if (!draft) return;
+  const level = ((cache.accessLevels && cache.accessLevels.levels) || []).find(l => l.id === levelId);
+  if (!level) return;
+  const payload = { permissions: Array.from(draft.permissions) };
+  if (!level.is_system && draft.name && draft.name.trim() !== level.name) {
+    payload.name = draft.name.trim();
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/access-levels/' + levelId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Уровень сохранён', 'success');
+    cache.accessLevels = null;
+    cache.accessLevelsActive = null;        // выпадашка в форме сотрудника пере-подтянет
+    cache.employees = null;                 // список сотрудников — теперь могут другие effective roles
+    // Если редактировали свой собственный уровень — перезагружаем /api/me, иначе UI рассинхронизирован
+    if (state.user && state.user.access_level_id === levelId) {
+      apiGet('/api/me').then(me => { state.user = me; renderProfile(); applyPermissionsToUI(); });
+    }
+    loadAccessLevels();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function openNewAccessLevel() {
+  if (!hasPermission('hr.manage_access')) return;
+  const name = (window.prompt('Название нового уровня (напр. «Кладовщик»):') || '').trim();
+  if (!name) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/access-levels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name, permissions: [] }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Уровень создан — настройте права галочками', 'success');
+    cache.accessLevels = null;
+    cache.accessLevelsActive = null;
+    state.accessLevelsOpen[data.id] = true;  // сразу раскрыть карточку
+    loadAccessLevels();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteAccessLevel(levelId) {
+  const level = ((cache.accessLevels && cache.accessLevels.levels) || []).find(l => l.id === levelId);
+  if (!level) return;
+  if (!confirm('Удалить уровень «' + level.name + '»?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/access-levels/' + levelId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Уровень удалён', 'success');
+    cache.accessLevels = null;
+    cache.accessLevelsActive = null;
+    delete state.accessLevelsOpen[levelId];
+    delete state.accessLevelsDraft[levelId];
+    loadAccessLevels();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// Загружает активные уровни — для выпадашки в форме сотрудника
+async function ensureAccessLevelsLoaded() {
+  if (cache.accessLevelsActive) return cache.accessLevelsActive;
+  try {
+    const d = await apiGet('/api/access-levels');
+    cache.accessLevelsActive = d;
+    return d;
+  } catch (e) {
+    return { levels: [] };
+  }
+}
+
+// Применяет права к UI: скрывает пункты меню, кнопки и т.д.
+function applyPermissionsToUI() {
+  // Сотрудники в Кадрах — только если hr.manage_employees
+  const navEmps = document.querySelector('#sidebar-hr .nav-item[data-nav="employees"]');
+  if (navEmps) navEmps.style.display = hasPermission('hr.manage_employees') ? '' : 'none';
+
+  // Должности — только если hr.manage_positions
+  const navPos = document.getElementById('nav-positions');
+  if (navPos) navPos.style.display = hasPermission('hr.manage_positions') ? '' : 'none';
+
+  // Уровни доступа — только если hr.manage_access
+  const navAcc = document.getElementById('nav-access-levels');
+  if (navAcc) navAcc.style.display = hasPermission('hr.manage_access') ? '' : 'none';
+
+  // Раздел Кадры в шапке — если есть хоть одно право в Кадрах
+  const hrTabs = document.querySelectorAll('.section-tab[data-section="hr"], .m-section-tabs button[data-section="hr"]');
+  const canSeeHR = hasAnyPermission('hr.view_vacations', 'hr.create_vacations',
+    'hr.manage_employees', 'hr.manage_positions', 'hr.manage_access');
+  hrTabs.forEach(t => { t.style.display = canSeeHR ? '' : 'none'; });
+}
+
+// ============================================================================
+// КОНЕЦ ЭТАПА 29
+// ============================================================================
+
 async function loadEmployees() {
   const container = document.getElementById('employees-list');
   if (cache.employees) { renderEmployees(cache.employees); return; }
@@ -10422,17 +10857,9 @@ function renderEmployees(d) {
 }
 
 function renderEmployeeRow(e, isDirector) {
-  // 6 ролей со строчных букв (для badge на карточке).
-  const rolesMap = {
-    director:   'директор',
-    zam:        'зам директора',
-    manager:    'менеджер',
-    engineer:   'инженер',
-    master:     'мастер',
-    accountant: 'бухгалтер',
-  };
-  const badges = e.roles.map(r => '<span class="emp-badge ' + r + '">' + (rolesMap[r] || r) + '</span>').join('');
   const meta = [];
+  // ЭТАП 29: основной маркер — уровень доступа (а не legacy-роли)
+  if (e.access_level_name) meta.push(e.access_level_name);
   if (e.position) meta.push(e.position);
   if (e.phone) meta.push(e.phone);
   if (e.email) meta.push(e.email);
@@ -10444,7 +10871,7 @@ function renderEmployeeRow(e, isDirector) {
     '<div class="emp-info"><div class="emp-name">' + escapeHtml(e.full_name || e.short_name || '—') +
        (e.has_password ? ' <i class="ti ti-key" title="Установлен пароль для входа без Telegram" style="font-size:13px; color:var(--text-light); margin-left:4px; vertical-align:middle;"></i>' : '') +
     '</div>' +
-    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + ' ' + badges + '</div></div>' +
+    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div></div>' +
     arrow + '</div>';
 }
 
@@ -10462,14 +10889,15 @@ state.employeeForm = {
   email: '',                    // ЭТАП 16А
   tab_number: '',
   telegram_id: '',
-  roles: [],            // массив строк, напр. ['director','master']
-  _is_active: true,     // для режима редактирования: показывать ли кнопку «Деактивировать»
-  password: '',         // ЭТАП 28: пароль (только при создании / явной смене)
-  _has_password: false, // ЭТАП 28: текущий статус (для edit)
-  _password_action: 'keep', // ЭТАП 28 (edit): 'keep' | 'set' | 'clear'
+  roles: [],            // массив строк (legacy — для обратной совместимости)
+  _is_active: true,
+  password: '',
+  _has_password: false,
+  _password_action: 'keep',
+  access_level_id: null,        // ЭТАП 29: основной способ задания прав
 };
 
-// Список 6 ролей — теперь синхронизирован с бэком (фронт может рендерить независимо).
+// Legacy-список ролей оставлен для совместимости (нигде в форме теперь не используется)
 const ROLES_LIST = [
   { code: 'director',   label: 'Директор',       desc: 'Полный доступ ко всему' },
   { code: 'zam',        label: 'Зам директора',  desc: 'Управление продажами, договорами, ценами' },
@@ -10480,8 +10908,8 @@ const ROLES_LIST = [
 ];
 
 function openNewEmployee() {
-  if (!state.user || !(state.user.roles || []).includes('director')) {
-    showToast('Создавать сотрудников может только директор', 'error');
+  if (!state.user || !hasPermission('hr.manage_employees')) {
+    showToast('Создавать сотрудников нельзя — нет прав', 'error');
     return;
   }
   state.employeeFormMode = 'new';
@@ -10489,14 +10917,15 @@ function openNewEmployee() {
   state.employeeForm = {
     full_name: '', position: '', phone: '', email: '', tab_number: '', telegram_id: '',
     roles: [], _is_active: true,
-    password: '', _has_password: false, _password_action: 'set',  // ЭТАП 28
+    password: '', _has_password: false, _password_action: 'set',
+    access_level_id: null,
   };
   selectSidebarItem('employee-form');
 }
 
 function openEditEmployee(empId) {
-  if (!state.user || !(state.user.roles || []).includes('director')) {
-    showToast('Редактировать может только директор', 'error');
+  if (!state.user || !hasPermission('hr.manage_employees')) {
+    showToast('Редактировать нельзя — нет прав', 'error');
     return;
   }
   // Берём сотрудника из кэша
@@ -10516,10 +10945,10 @@ function openEditEmployee(empId) {
     telegram_id: emp.telegram_id ? String(emp.telegram_id) : '',
     roles: [...(emp.roles || [])],
     _is_active: !!emp.is_active,
-    // ЭТАП 28
     password: '',
     _has_password: !!emp.has_password,
     _password_action: 'keep',
+    access_level_id: emp.access_level_id || null,
   };
   selectSidebarItem('employee-form');
 }
@@ -10568,18 +10997,63 @@ function renderEmployeeForm() {
   html += '</div>';
   html += '</div>';
 
-  // Блок 2: Роли (галочки)
+  // Блок 2 (ЭТАП 29): Уровень доступа (заменяет блок «Роли в системе»)
   html += '<div class="sales-form-section">';
-  html += '<div class="sales-form-title">Роли в системе <span class="req" style="color:var(--danger);">*</span> <span style="font-weight:400; font-size:12px; color:var(--text-light); margin-left:4px;">можно выбрать несколько</span></div>';
-  ROLES_LIST.forEach(r => {
-    const selected = f.roles.includes(r.code);
-    html += '<div class="role-checkbox' + (selected ? ' selected' : '') + '" onclick="toggleEmployeeRole(\'' + r.code + '\')">' +
-      '<div class="check">' + (selected ? '<i class="ti ti-check"></i>' : '') + '</div>' +
-      '<div class="role-body">' +
-        '<div class="role-name">' + escapeHtml(r.label) + '</div>' +
-        '<div class="role-desc">' + escapeHtml(r.desc) + '</div>' +
-      '</div></div>';
+  html += '<div class="sales-form-title">Уровень доступа <span class="req" style="color:var(--danger);">*</span> <span style="font-weight:400; font-size:12px; color:var(--text-light); margin-left:4px;">определяет что видит и может делать сотрудник</span></div>';
+
+  // Список уровней из кэша
+  const levelsList = (cache.accessLevelsActive && cache.accessLevelsActive.levels) || [];
+  const currentLevel = levelsList.find(l => l.id === f.access_level_id) || null;
+
+  html += '<div class="sales-form-row cols-1"><div>';
+  html += '<label>Уровень</label>';
+  html += '<select id="empf-access-level" style="width:100%;">';
+  html += '<option value="">— Выберите уровень —</option>';
+  levelsList.forEach(l => {
+    const sel = (l.id === f.access_level_id) ? ' selected' : '';
+    html += '<option value="' + l.id + '"' + sel + '>' + escapeHtml(l.name) + '</option>';
   });
+  html += '</select>';
+  html += '</div></div>';
+
+  // Подсказка о содержимом выбранного уровня
+  if (currentLevel) {
+    const perms = currentLevel.permissions || [];
+    if (perms.length === 0) {
+      html += '<div style="font-size: 12.5px; color: var(--danger); margin-top: 8px; padding: 8px 12px; background: rgba(244,67,54,0.06); border-radius: 8px;">' +
+              '<i class="ti ti-alert-triangle"></i> У этого уровня не выбрано ни одного разрешения — сотрудник не сможет работать в системе.</div>';
+    } else {
+      // Группируем разрешения для красивого вывода
+      const registry = (cache.permissionsRegistry && cache.permissionsRegistry.permissions) || null;
+      let summaryHtml = '';
+      if (registry) {
+        const groups = {};
+        const groupOrder = [];
+        registry.forEach(p => {
+          if (perms.indexOf(p.key) >= 0) {
+            if (!groups[p.group]) { groups[p.group] = []; groupOrder.push(p.group); }
+            groups[p.group].push(p.label);
+          }
+        });
+        summaryHtml = groupOrder.map(g =>
+          '<div style="margin-bottom: 4px;"><b>' + escapeHtml(g) + ':</b> ' +
+          escapeHtml(groups[g].join(', ').toLowerCase()) + '</div>'
+        ).join('');
+      } else {
+        summaryHtml = perms.length + ' разрешений';
+      }
+      html += '<div style="font-size: 12px; color: var(--text-mid); margin-top: 8px; padding: 10px 12px; background: var(--bg); border-radius: 8px; line-height: 1.6;">' +
+              '<div style="font-weight: 600; color: var(--text-dark); margin-bottom: 6px;">Что включает «' + escapeHtml(currentLevel.name) + '»:</div>' +
+              summaryHtml + '</div>';
+    }
+  }
+
+  // Ссылка на редактор уровней (если есть право)
+  if (hasPermission('hr.manage_access')) {
+    html += '<div style="font-size: 12px; color: var(--text-light); margin-top: 8px; text-align: right;">' +
+            '<a href="#" onclick="event.preventDefault(); selectSidebarItem(\'access-levels\');" style="color: var(--brand); text-decoration: none;">→ Настроить уровни доступа</a></div>';
+  }
+
   html += '</div>';
 
   // Блок 3 (ЭТАП 28): пароль для входа без Telegram
@@ -10705,6 +11179,31 @@ function renderEmployeeForm() {
   document.getElementById('empf-tab-number').addEventListener('input', e => { state.employeeForm.tab_number = e.target.value; });
   const tgEl = document.getElementById('empf-telegram-id');
   if (tgEl) tgEl.addEventListener('input', e => { state.employeeForm.telegram_id = e.target.value.replace(/\D/g, ''); });
+
+  // ЭТАП 29: подгрузка списка уровней доступа и подвязка select
+  const accSel = document.getElementById('empf-access-level');
+  if (accSel) {
+    accSel.addEventListener('change', e => {
+      const v = e.target.value;
+      state.employeeForm.access_level_id = v ? parseInt(v) : null;
+      // Перерисуем — поменяется подсказка «что включает»
+      renderEmployeeForm();
+    });
+  }
+  // Если кэш уровней пустой — подгрузим
+  if (!cache.accessLevelsActive) {
+    ensureAccessLevelsLoaded().then(() => {
+      // если экран всё ещё на форме сотрудника — перерисуем
+      if (state.currentScreen === 'employee-form') renderEmployeeForm();
+    });
+  }
+  // Если реестра permissions ещё нет (для рендера саммари) — загрузим
+  if (!cache.permissionsRegistry) {
+    apiGet('/api/access-levels/permissions').then(d => {
+      cache.permissionsRegistry = d;
+      if (state.currentScreen === 'employee-form') renderEmployeeForm();
+    }).catch(() => {});
+  }
   // ЭТАП 28: подвязка поля пароля
   const pwEl = document.getElementById('empf-password');
   if (pwEl) pwEl.addEventListener('input', e => { state.employeeForm.password = e.target.value; });
@@ -10769,8 +11268,9 @@ async function submitEmployeeForm() {
     errEl.innerHTML = '<div class="sales-error">Укажите ФИО</div>';
     return;
   }
-  if (f.roles.length === 0) {
-    errEl.innerHTML = '<div class="sales-error">Выберите хотя бы одну роль</div>';
+  // ЭТАП 29: валидация уровня доступа вместо ролей
+  if (!f.access_level_id) {
+    errEl.innerHTML = '<div class="sales-error">Выберите уровень доступа</div>';
     return;
   }
 
@@ -10802,7 +11302,7 @@ async function submitEmployeeForm() {
     phone: f.phone.trim(),
     email: emailValue,
     tab_number: f.tab_number.trim(),
-    roles: f.roles,
+    access_level_id: f.access_level_id,                // ЭТАП 29
   };
   if (f.telegram_id) {
     const tg = parseInt(f.telegram_id);
@@ -19434,10 +19934,110 @@ const HELP_FAQ = [
       { note: 'В списке «Сотрудники» рядом с именем тех, у кого установлен пароль, показывается иконка <i class="ti ti-key"></i>.' },
     ],
   },
+
+  {
+    id: 'team-access-levels',
+    cat: 'start', cat_label: 'Старт', icon: 'ti-shield-lock',
+    title: 'Уровни доступа (v2.9)',
+    summary: 'Как настроить кто что видит и может делать в системе.',
+    body: [
+      { p: 'С версии 2.9 в системе нет фиксированных ролей. Вместо этого директор сам собирает галочками <b>уровни доступа</b> — наборы прав. Каждому сотруднику назначается один уровень, и от него зависит абсолютно всё: какие разделы он видит в шапке, какие кнопки доступны, что можно создавать и редактировать.' },
+      { h: 'Где это всё' },
+      { p: 'Кадры → ЛЮДИ → <b>Уровни доступа</b>. Пункт виден только тем, у кого есть право «Настраивать уровни доступа» (по умолчанию — у директора).' },
+      { h: 'Базовые уровни (создаются автоматически)' },
+      { ul: [
+        '<b>Директор</b> — все права без исключений',
+        '<b>Заместитель директора</b> — почти всё, кроме настройки самих уровней доступа',
+        '<b>Менеджер по продажам</b> — Продажи, контрагенты, договоры, КП, плюс просмотр Производства и Склада',
+        '<b>Бухгалтер</b> — финансовые KPI на Главной, просмотр договоров и контрагентов',
+        '<b>Работник производства</b> — внесение сборок, просмотр Склада, замечания',
+      ] },
+      { note: 'Базовые уровни <b>нельзя удалить</b> и нельзя переименовать (на них завязан системный код), но галочки внутри менять можно.' },
+      { h: 'Создать свой уровень' },
+      { p: 'Кнопка <b>«Новый уровень»</b> сверху. Например: «Электромонтажник», «Кладовщик», «Снабженец». После создания раскрой карточку — там 25 галочек, разбитых на 9 групп. Поставь нужные, нажми «Сохранить».' },
+      { h: 'Группы прав' },
+      { ul: [
+        '<b>Главная</b> — видеть «Последние действия», видеть финансовые KPI',
+        '<b>Производство</b> — видеть, создавать сборки, редактировать/удалять',
+        '<b>Продажи</b> — видеть (договоры, КП, контрагенты), создавать, управлять ценами',
+        '<b>Склад</b> — видеть, отгружать/принимать',
+        '<b>Логистика</b> — видеть, управлять',
+        '<b>Снабжение</b> — видеть, управлять',
+        '<b>Доработки</b> — видеть, создавать замечания, решать',
+        '<b>Задачи</b> — видеть задачи всех (иначе только свои), создавать другим',
+        '<b>Кадры</b> — отпуска (видеть/создавать), сотрудники, должности, уровни доступа',
+      ] },
+      { h: 'Назначить уровень сотруднику' },
+      { p: 'В карточке сотрудника блок <b>«Уровень доступа»</b> — выпадашка с списком всех активных уровней. Под выпадашкой автоматически показывается сводка «Что включает» — какие именно разрешения у этого уровня.' },
+      { h: 'Что произошло с моими ролями?' },
+      { p: 'При обновлении до v2.9 все сотрудники автоматически получили базовый уровень по своим старым ролям:' },
+      { ul: [
+        'Был «Директор» → стал «Директор»',
+        'Был «Зам директора» → стал «Заместитель директора»',
+        'Был «Менеджер» → стал «Менеджер по продажам»',
+        'Был «Бухгалтер» → стал «Бухгалтер»',
+        'Был «Мастер» или «Инженер» → стал «Работник производства»',
+      ] },
+      { h: 'Защита от блокировки доступа' },
+      { ul: [
+        'Нельзя снять «Настраивать уровни доступа» с уровня, если в системе это последний сотрудник с такой галочкой',
+        'Нельзя удалить системный уровень (Директор, Зам, и т.д.)',
+        'Нельзя удалить уровень, если к нему привязан хотя бы один активный сотрудник — сначала переназначь их на другой уровень',
+      ] },
+      { note: 'Если случайно убрал у себя право «Настраивать уровни доступа» — пункт меню «Уровни доступа» исчезнет. Попроси другого сотрудника с этим правом вернуть тебе галочку (или сделай это до выхода через F5).' },
+    ],
+  },
+
+  {
+    id: 'team-positions',
+    cat: 'start', cat_label: 'Старт', icon: 'ti-briefcase',
+    title: 'Справочник должностей (v2.8.2)',
+    summary: 'Как пополнить список должностей для выпадашки в карточке сотрудника.',
+    body: [
+      { p: 'С версии 2.8.2 в Кадрах появился справочник должностей. Должность — это просто <b>надпись</b> в карточке сотрудника (например «Электромонтажник» или «Сборщик-слесарь»). На права не влияет (за права отвечает уровень доступа), но удобно для понимания «кто чем занимается».' },
+      { h: 'Где это' },
+      { p: 'Кадры → ЛЮДИ → <b>Должности</b>.' },
+      { h: 'Что можно делать' },
+      { ul: [
+        '<b>Создать</b> новую должность — кнопка «+» сверху или внизу пустого списка',
+        '<b>Переименовать</b> — иконка карандаша на строке',
+        '<b>Скрыть</b> — иконка архива. Сотрудники, у кого она уже стоит, не теряют надпись, просто из выпадашки она пропадёт',
+        '<b>Восстановить</b> — иконка обновления у скрытых',
+      ] },
+      { h: 'Где должности используются' },
+      { p: 'В форме сотрудника поле «Должность» теперь с автоподсказкой — печатаешь, появляются варианты из справочника. Но при этом можно и вписать своё (например для разового сотрудника). То что вписал руками, не попадает в справочник автоматически.' },
+    ],
+  },
 ];
 
 // Changelog — что нового, от свежего к старому
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.9.0',
+    date: '19.05.2026',
+    title: 'Уровни доступа',
+    features: [
+      '<b>Полная переделка системы прав:</b> вместо фиксированных 6 ролей теперь настраиваемые «Уровни доступа» — директор сам собирает галочками что видит и может делать каждый сотрудник',
+      'Новый экран <b>Кадры → Уровни доступа</b> — список уровней с раскрывающимися карточками. В каждом 25 разрешений по группам: Главная, Производство, Продажи, Склад, Логистика, Снабжение, Доработки, Задачи, Кадры',
+      '5 базовых системных уровней создаются автоматически: Директор / Заместитель директора / Менеджер по продажам / Бухгалтер / Работник производства. Их можно редактировать (галочки), но не удалить',
+      'Можно создавать свои уровни (Электромонтажник, Сборщик-слесарь, Кладовщик, Снабженец и т.д.) — копируешь подходящий, переименовываешь, доконфигурируешь',
+      'В карточке сотрудника убран блок «Роли в системе» (6 чекбоксов), вместо него — выпадашка <b>«Уровень доступа»</b> + сводка что включает',
+      '<b>Защита от потери доступа:</b> нельзя снять себе галочку «настраивать уровни доступа», если ты последний у кого она есть. Системные уровни нельзя удалить. Уровни с привязанными сотрудниками удалить нельзя',
+      'Миграция произошла автоматически: всем существующим сотрудникам по их старым ролям выдан соответствующий системный уровень',
+      'Все существующие проверки прав в коде продолжают работать через обратную совместимость (legacy-роли derive-ятся из permissions уровня)',
+    ],
+  },
+  {
+    version: 'v2.8.2',
+    date: '19.05.2026',
+    title: 'Справочник должностей и память экрана',
+    features: [
+      'Новый справочник <b>Должности</b> в Кадрах: создавать, переименовывать, скрывать. Сидинг 12 базовых: директор, заместитель, менеджер по продажам, главбух, бухгалтер, инженер-проектировщик, мастер производства, электромонтажник, сборщик-слесарь, кладовщик, снабженец, монтажник на выезде',
+      'В карточке сотрудника поле <b>«Должность»</b> теперь с автоподсказкой из справочника + можно вписать своё',
+      'При <b>F5/обновлении страницы</b> система запоминает где ты был и возвращает туда же (раньше всегда падало на Главную). Срок памяти — сутки. Формы создания/редактирования из памяти исключены чтобы не возвращать в незаконченный черновик',
+      'Блок <b>«Последние действия»</b> на Главной теперь видит только директор',
+    ],
+  },
   {
     version: 'v2.8.0',
     date: '19.05.2026',
