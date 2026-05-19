@@ -9386,8 +9386,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.9.4-owner-can-save";
-const APP_VERSION_DATE = "19.05.2026";
+const APP_VERSION = "v2.10.0-shipment-finalize";
+const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -16797,6 +16797,9 @@ function renderContractDetail(c) {
   // ЭТАП 26: кнопка перехода в режим отгрузки + прогресс
   html += '<div id="scd-shipment-block" style="margin-top: 16px;"><div class="loading-block" style="padding:14px;">Загружаем прогресс отгрузки…</div></div>';
 
+  // ЭТАП 26: блок управления коробками договора
+  html += '<div id="scd-boxes-block" style="margin-top: 12px;"></div>';
+
   // ЭТАП 16В-2: блок задач по договору (контейнер, заполняется асинхронно)
   html += '<div id="scd-tasks-block"><div class="loading-block">Загружаем задачи…</div></div>';
 
@@ -16806,6 +16809,8 @@ function renderContractDetail(c) {
   loadContractTasks(c.id);
   // ЭТАП 26: загружаем прогресс отгрузки
   loadContractShipmentBlock(c.id);
+  // ЭТАП 26: загружаем список коробок
+  loadContractBoxesBlock(c.id);
   // ЭТАП 27: загружаем спецификацию
   loadContractItemsBlock(c.id);
 }
@@ -17497,6 +17502,214 @@ async function loadContractShipmentBlock(contractId) {
     // Бэк недоступен или endpoint ещё не задеплоен — просто скрываем блок без видимой ошибки
     container.style.display = 'none';
     container.innerHTML = '';
+  }
+}
+
+// ============ ЭТАП 26: блок коробок договора ============
+
+async function loadContractBoxesBlock(contractId) {
+  const container = document.getElementById('scd-boxes-block');
+  if (!container) return;
+  try {
+    const r = await apiGet('/api/contracts/' + contractId + '/boxes');
+    renderContractBoxesBlock(contractId, r.boxes || []);
+  } catch (e) {
+    // Бэк может не отвечать — просто скрываем без видимой ошибки
+    container.style.display = 'none';
+    container.innerHTML = '';
+  }
+}
+
+function renderContractBoxesBlock(contractId, boxes) {
+  const container = document.getElementById('scd-boxes-block');
+  if (!container) return;
+  const canEdit = canManageSales();
+  const total = boxes.length;
+  const shippedCnt = boxes.filter(b => b.is_shipped).length;
+
+  let html = '<div class="contract-block">';
+  html += '<div class="contract-block-header">';
+  html += '<div class="contract-block-title"><i class="ti ti-package"></i> Коробки';
+  if (total) html += ' <span class="contract-block-counter">' + total + '</span>';
+  html += '</div>';
+  if (canEdit) {
+    html += '<button class="btn btn-primary btn-small" onclick="createBoxForContract(' + contractId + ')">' +
+      '<i class="ti ti-plus"></i> Добавить</button>';
+  }
+  html += '</div>';
+
+  if (!total) {
+    html += '<div class="empty-block" style="padding: 18px;">' +
+      '<i class="ti ti-package-off"></i>Коробок пока нет.<br>' +
+      'Добавьте коробку — получите QR-код для печати на наклейку.' +
+    '</div>';
+  } else {
+    html += '<div style="padding: 6px 14px 14px;">';
+    boxes.forEach(b => {
+      const shipped = !!b.is_shipped;
+      const meta = [];
+      if (b.description) meta.push(escapeHtml(b.description));
+      if (shipped && b.shipped_at) meta.push('отгружено ' + String(b.shipped_at).slice(0, 16).replace('T', ' '));
+      html += '<div class="box-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      html += '<div style="width:32px;height:32px;border-radius:8px;background:' +
+        (shipped ? '#E8F5E9' : 'var(--brand-bg)') + ';color:' +
+        (shipped ? '#15803D' : 'var(--brand)') +
+        ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+        '<i class="ti ' + (shipped ? 'ti-package-export' : 'ti-package') + '"></i></div>';
+      html += '<div style="flex:1;min-width:0;">';
+      html += '<div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        escapeHtml(b.name || ('Коробка #' + b.id)) + '</div>';
+      if (meta.length) {
+        html += '<div style="font-size:12px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+          meta.join(' · ') + '</div>';
+      }
+      html += '</div>';
+      // Действия
+      html += '<div style="display:flex;gap:4px;flex-shrink:0;">';
+      html += '<button class="btn btn-secondary btn-small" title="QR-код / печать" onclick="showBoxQr(' +
+        b.id + ', ' + JSON.stringify(b.name || ('Коробка #' + b.id)).replace(/"/g, '&quot;') +
+        ', ' + JSON.stringify(b.qr_token || '').replace(/"/g, '&quot;') +
+        ', ' + JSON.stringify(b.contract_number || '').replace(/"/g, '&quot;') +
+        ', ' + JSON.stringify(b.contractor_name || '').replace(/"/g, '&quot;') + ')">' +
+        '<i class="ti ti-qrcode"></i></button>';
+      if (canEdit && !shipped) {
+        html += '<button class="btn btn-secondary btn-small" title="Переименовать" onclick="renameBox(' +
+          b.id + ', ' + JSON.stringify(b.name || '').replace(/"/g, '&quot;') + ', ' + contractId + ')">' +
+          '<i class="ti ti-edit"></i></button>';
+        html += '<button class="btn btn-secondary btn-small" title="Удалить" onclick="confirmDeleteBox(' +
+          b.id + ', ' + contractId + ')" style="color:var(--danger);">' +
+          '<i class="ti ti-trash"></i></button>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  container.style.display = '';
+}
+
+async function createBoxForContract(contractId) {
+  if (!canManageSales()) {
+    showToast('Создавать коробки может директор, зам или менеджер', 'error');
+    return;
+  }
+  // Опциональное имя; пустое = автоимя «Коробка #N» на бэке
+  const customName = prompt(
+    'Имя коробки (необязательно):\n\nОставь пустым — будет автоматически «Коробка #N».',
+    ''
+  );
+  if (customName === null) return; // отмена
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/boxes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({ name: (customName || '').trim() }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось создать коробку', 'error');
+      return;
+    }
+    const box = await r.json();
+    showToast('Коробка создана', 'success');
+    // Обновляем блок коробок и прогресс отгрузки
+    loadContractBoxesBlock(contractId);
+    loadContractShipmentBlock(contractId);
+    // Сразу открываем модалку с QR-кодом — чтобы можно было распечатать
+    setTimeout(() => {
+      showBoxQr(
+        box.id,
+        box.name || ('Коробка #' + box.id),
+        box.qr_token,
+        box.contract_number || '',
+        box.contractor_name || ''
+      );
+    }, 200);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+function showBoxQr(boxId, boxName, qrToken, contractNumber, contractorName) {
+  if (!qrToken) {
+    showToast('У коробки нет QR-токена', 'error');
+    return;
+  }
+  const url = window.location.origin + '/b/' + qrToken;
+  const subtitle = [
+    contractNumber ? 'Договор № ' + contractNumber : '',
+    contractorName || '',
+  ].filter(Boolean).join(' · ');
+  openQrModal({
+    title: 'QR-код · ' + boxName,
+    subtitle: subtitle,
+    url: url,
+    type: 'box',
+    data: {
+      boxId: boxId,
+      boxName: boxName,
+      token: qrToken,
+      contractNumber: contractNumber,
+      contractorName: contractorName,
+    },
+  });
+}
+
+async function renameBox(boxId, currentName, contractId) {
+  const newName = prompt('Новое имя коробки:', currentName || '');
+  if (newName === null) return;
+  const trimmed = String(newName || '').trim();
+  if (!trimmed) {
+    showToast('Имя не может быть пустым', 'error');
+    return;
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/boxes/' + boxId, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось переименовать', 'error');
+      return;
+    }
+    showToast('Переименовано', 'success');
+    loadContractBoxesBlock(contractId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function confirmDeleteBox(boxId, contractId) {
+  if (!confirm('Удалить коробку? Это действие нельзя отменить (но восстановить через БД можно).')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/boxes/' + boxId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось удалить коробку', 'error');
+      return;
+    }
+    showToast('Коробка удалена', 'success');
+    loadContractBoxesBlock(contractId);
+    loadContractShipmentBlock(contractId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
   }
 }
 
@@ -21010,6 +21223,35 @@ function loadHelpChangelog() {
 
 
 async function changeContractStatus(contractId, newStatus) {
+  // ЭТАП 26.1: если закрываем — проверяем прогресс отгрузки, чтобы дать понятное предупреждение
+  let forceClose = false;
+  if (newStatus === 'closed') {
+    try {
+      const s = await apiGet('/api/contracts/' + contractId + '/shipment-status');
+      const total = (s && s.total) || 0;
+      const shipped = (s && s.shipped) || 0;
+      if (total > 0 && shipped < total) {
+        showToast(
+          'Нельзя закрыть: отгружено ' + shipped + ' из ' + total +
+          '. Сначала отгрузите остаток.',
+          'error'
+        );
+        return;
+      }
+      if (total === 0) {
+        // Договор без сборок/коробок — спрашиваем подтверждение, разрешаем закрыть
+        if (!confirm(
+          'У договора нет сборок или коробок к отгрузке.\n\n' +
+          'Точно закрыть договор?'
+        )) {
+          return;
+        }
+        forceClose = true; // на всякий случай — чтобы бэк не блокировал даже теоретически
+      }
+    } catch (e) {
+      // Если статус-endpoint не отвечает — продолжаем, бэк отвалидирует сам
+    }
+  }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/contracts/' + contractId, {
@@ -21018,10 +21260,17 @@ async function changeContractStatus(contractId, newStatus) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify(forceClose
+        ? { status: newStatus, force_close: true }
+        : { status: newStatus }),
     });
     if (!r.ok) {
-      const d = await r.json();
+      const d = await r.json().catch(() => ({}));
+      // ЭТАП 26.1: 409 с error=shipment_incomplete — отдельное понятное сообщение
+      if (r.status === 409 && d.error === 'shipment_incomplete') {
+        showToast(d.message || 'Сначала отгрузите остаток', 'error');
+        return;
+      }
       showToast(d.message || 'Не удалось изменить статус', 'error');
       return;
     }
@@ -21960,6 +22209,59 @@ function renderPublicContractCard(c, token) {
   '</div>';
 }
 
+// ============ ЭТАП 26: ПУБЛИЧНАЯ СТРАНИЦА КОРОБКИ ============
+
+async function showPublicBox(token) {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  const page = document.getElementById('public-page');
+  page.style.display = 'flex';
+  const body = document.getElementById('public-card-body');
+  body.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-light);">Загружаем…</div>';
+  try {
+    const r = await fetch(API_BASE + '/api/public/box/' + encodeURIComponent(token));
+    if (!r.ok) {
+      body.innerHTML = renderPublicError(r.status);
+      return;
+    }
+    const b = await r.json();
+    body.innerHTML = renderPublicBoxCard(b, token);
+  } catch (e) {
+    body.innerHTML = renderPublicError('network');
+  }
+}
+
+function renderPublicBoxCard(b, token) {
+  let rows = '';
+  const addRow = (label, value) => {
+    if (!value) return;
+    rows += '<div class="public-row"><span class="public-row-label">' + label +
+      '</span><span class="public-row-value">' + value + '</span></div>';
+  };
+  addRow('Договор',    escapeHtml(b.contract_number ? '№' + b.contract_number : ''));
+  addRow('Контрагент', escapeHtml(b.contractor_name || ''));
+  if (b.description) addRow('Содержимое', escapeHtml(b.description));
+  if (b.created_at)  addRow('Создана',    escapeHtml(String(b.created_at).slice(0, 10)));
+
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">' + escapeHtml(b.name || ('Коробка #' + (b.id || ''))) + '</h1>' +
+    '<div class="public-header-sub"><i class="ti ti-package"></i> Контейнер для отгрузки</div>' +
+  '</div>' +
+  '<div class="public-body">' + rows +
+    (b.contract_id ? (
+      '<button class="public-add-defect-btn" onclick="openDefectForm(\'contract\', \'' +
+      escapeHtml(b.contract_id) + '\')">' +
+      '<i class="ti ti-alert-circle"></i> Сообщить о замечании' +
+    '</button>'
+    ) : '') +
+  '</div>' +
+  '<div class="public-footer">' +
+    'Внутренняя CRM-система ООО «Атомус Групп»' +
+  '</div>';
+}
+
+
 function renderPublicError(status) {
   const msg = status === 404
     ? 'Запись не найдена. Возможно, токен устарел или ссылка неверна.'
@@ -22056,6 +22358,11 @@ async function showContractQr(contractId, number, contractorName) {
 
 function openQrModal(opts) {
   const m = document.getElementById('qr-modal');
+  // ЭТАП 26: для коробок тоже показываем кнопку «Печать наклейки»
+  const showPrintBtn = (opts.type === 'assembly' || opts.type === 'box') && opts.data;
+  const printOnclick = opts.type === 'box'
+    ? "printSingleBoxLabel(" + JSON.stringify(opts.data) + ")"
+    : "printSingleLabel(" + JSON.stringify(opts.data) + ")";
   m.innerHTML =
     '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
@@ -22068,8 +22375,8 @@ function openQrModal(opts) {
         '<div class="qr-url-display">' + escapeHtml(opts.url) + '</div>' +
         '<div class="qr-actions">' +
           '<button class="btn btn-secondary" onclick="downloadQrPng(' + JSON.stringify(opts.url).replace(/"/g,'&quot;') + ', ' + JSON.stringify(opts.title).replace(/"/g,'&quot;') + ')"><i class="ti ti-download"></i> Скачать PNG</button>' +
-          (opts.type === 'assembly' && opts.data
-            ? '<button class="btn btn-primary" onclick=\'printSingleLabel(' + JSON.stringify(opts.data) + ')\'><i class="ti ti-printer"></i> Печать наклейки</button>'
+          (showPrintBtn
+            ? '<button class="btn btn-primary" onclick=\'' + printOnclick + '\'><i class="ti ti-printer"></i> Печать наклейки</button>'
             : '') +
           '<button class="btn btn-secondary" onclick="copyQrUrl(' + JSON.stringify(opts.url).replace(/"/g,'&quot;') + ')"><i class="ti ti-copy"></i> Копировать ссылку</button>' +
         '</div>' +
@@ -22133,7 +22440,13 @@ function downloadQrPng(url, title) {
 
 // Одна наклейка
 function printSingleLabel(data) {
-  state._labelsToPrint = [data];
+  state._labelsToPrint = [Object.assign({ kind: 'assembly' }, data)];
+  renderLabelsForPrint();
+}
+
+// ЭТАП 26: одна наклейка коробки
+function printSingleBoxLabel(data) {
+  state._labelsToPrint = [Object.assign({ kind: 'box' }, data)];
   renderLabelsForPrint();
 }
 
@@ -22150,6 +22463,7 @@ function printSelectedLabels() {
     try {
       const r = await apiGet('/api/assemblies/' + s.id + '/public-token');
       return {
+        kind: 'assembly',
         assemblyId: s.id,
         modelName: s.model_name,
         modelArticle: s.model_article,
@@ -22177,17 +22491,32 @@ function renderLabelsForPrint() {
   grid.classList.add('labels-preview-grid');
   // Рендерим каждую наклейку
   items.forEach((item, i) => {
-    const url = window.location.origin + '/a/' + item.token;
+    // ЭТАП 26: тип элемента — assembly (по умолчанию, обратная совместимость) или box
+    const kind = item.kind || 'assembly';
+    const prefix = kind === 'box' ? '/b/' : '/a/';
+    const url = window.location.origin + prefix + item.token;
     const label = document.createElement('div');
     label.className = 'label-58x60 label-preview-card';
+
+    let bodyHtml = '';
+    if (kind === 'box') {
+      // Наклейка коробки: имя коробки + номер договора + контрагент
+      bodyHtml =
+        '<div class="lbl-model">' + escapeHtml(item.boxName || 'Коробка') + '</div>' +
+        (item.contractNumber ? '<div class="lbl-article">Договор № ' + escapeHtml(item.contractNumber) + '</div>' : '') +
+        (item.contractorName ? '<div class="lbl-date">' + escapeHtml(item.contractorName) + '</div>' : '');
+    } else {
+      // Наклейка сборки (старый шаблон)
+      bodyHtml =
+        '<div class="lbl-model">' + escapeHtml(item.modelName || '—') + '</div>' +
+        (item.modelArticle ? '<div class="lbl-article">' + escapeHtml(item.modelArticle) + '</div>' : '') +
+        (item.assemblyDate ? '<div class="lbl-date">от ' + escapeHtml(item.assemblyDate) + '</div>' : '');
+    }
+
     label.innerHTML =
       '<div class="lbl-brand">Atom CRM</div>' +
       '<div class="lbl-qr-wrap" id="lbl-qr-' + i + '"></div>' +
-      '<div style="text-align: center; width: 100%;">' +
-        '<div class="lbl-model">' + escapeHtml(item.modelName || '—') + '</div>' +
-        (item.modelArticle ? '<div class="lbl-article">' + escapeHtml(item.modelArticle) + '</div>' : '') +
-        (item.assemblyDate ? '<div class="lbl-date">от ' + escapeHtml(item.assemblyDate) + '</div>' : '') +
-      '</div>';
+      '<div style="text-align: center; width: 100%;">' + bodyHtml + '</div>';
     grid.appendChild(label);
     // QR в данной наклейке
     setTimeout(() => {
@@ -22494,42 +22823,9 @@ function openQrManualEntry() {
   if (!input) return;
   const text = input.trim();
   if (!text) return;
-  // Сначала пробуем как URL
-  try {
-    const url = new URL(text);
-    handleQrScanResult(text);
-    return;
-  } catch (e) { /* не URL */ }
-  // Похоже на чистый токен (только символы URL-safe base64)
-  if (/^[A-Za-z0-9_\-]+$/.test(text)) {
-    // Не знаем — assembly или contract. Сначала пробуем сборку, потом договор.
-    closeQrScanner();
-    (async () => {
-      let r = await fetch(API_BASE + '/api/public/assembly/' + encodeURIComponent(text));
-      if (r.ok) {
-        const data = await r.json();
-        if (data.id) {
-          selectSection('warehouse');
-          selectSidebarItem('warehouse-stock');
-          setTimeout(() => openAssemblyStock(data.id), 200);
-          return;
-        }
-      }
-      r = await fetch(API_BASE + '/api/public/contract/' + encodeURIComponent(text));
-      if (r.ok) {
-        const data = await r.json();
-        if (data.id) {
-          state.currentContractId = data.id;
-          selectSection('sales');
-          selectSidebarItem('sales-contract-detail');
-          return;
-        }
-      }
-      showToast('Не найдена сборка/договор с таким токеном', 'error');
-    })();
-    return;
-  }
-  showToast('Не похоже на ссылку или токен', 'error');
+  // ЭТАП 26.3: пускаем через общий обработчик — он сам разберёт URL/токен через /api/qr/lookup
+  closeQrScanner();
+  handleQrScanResult(text);
 }
 
 function showQrScannerError(msg) {
@@ -22656,42 +22952,117 @@ async function handleQrScanResult(decodedText) {
   }
 
   try {
-    // Парсим URL
     const text = String(decodedText || '').trim();
+    // ЭТАП 26.3: Сначала пробуем распарсить URL → достать токен
+    let token = '';
     let url;
     try { url = new URL(text); } catch (e) { url = null; }
 
     if (url) {
-      // /a/{token} — сборка, /c/{token} — договор
-      const aMatch = url.pathname.match(/^\/a\/([A-Za-z0-9_\-]+)$/);
-      const cMatch = url.pathname.match(/^\/c\/([A-Za-z0-9_\-]+)$/);
-      if (aMatch) {
+      // /a/{token} | /b/{token} | /c/{token}
+      const m = url.pathname.match(/^\/[abc]\/([A-Za-z0-9_\-]+)$/);
+      if (m) {
+        token = m[1];
+      } else {
+        // Это URL, но не наш — спросим
+        if (confirm('Распознана ссылка:\n\n' + text + '\n\nОткрыть в новой вкладке?')) {
+          window.open(text, '_blank', 'noopener');
+        }
         await closeQrScanner();
-        // Сотрудник залогинен → открываем карточку сборки внутри CRM
-        await openAssemblyByPublicToken(aMatch[1]);
         state._qrScanProcessing = false;
         return;
       }
-      if (cMatch) {
-        await closeQrScanner();
-        await openContractByPublicToken(cMatch[1]);
-        state._qrScanProcessing = false;
-        return;
-      }
-      // Это URL, но не наш — спросим
-      if (confirm('Распознана ссылка:\n\n' + text + '\n\nОткрыть в новой вкладке?')) {
-        window.open(text, '_blank', 'noopener');
-      }
+    } else if (/^[A-Za-z0-9_\-]+$/.test(text) && text.length >= 6 && text.length <= 40) {
+      // Похоже на чистый токен (URL-safe base64)
+      token = text;
+    }
+
+    if (token) {
       await closeQrScanner();
+      await routeScannedToken(token);
       state._qrScanProcessing = false;
       return;
     }
 
-    // Не URL — просто покажем
+    // Не URL и не похоже на токен — просто покажем
     alert('Распознан QR-код:\n\n' + text);
     await closeQrScanner();
   } finally {
     setTimeout(() => { state._qrScanProcessing = false; }, 500);
+  }
+}
+
+// ЭТАП 26.3: универсальный маршрутизатор по токену через /api/qr/lookup
+async function routeScannedToken(token) {
+  let info;
+  try {
+    const r = await fetch(API_BASE + '/api/qr/lookup/' + encodeURIComponent(token), {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (r.status === 404) {
+      showToast('QR не найден в системе', 'error');
+      return;
+    }
+    if (!r.ok) {
+      showToast('Не удалось распознать QR', 'error');
+      return;
+    }
+    info = await r.json();
+  } catch (e) {
+    showToast('Ошибка связи', 'error');
+    return;
+  }
+  if (!info || !info.type) {
+    showToast('QR не распознан', 'error');
+    return;
+  }
+
+  // Договор → открываем карточку (как и раньше)
+  if (info.type === 'contract') {
+    state.currentContractId = info.id;
+    selectSection('sales');
+    selectSidebarItem('sales-contract-detail');
+    return;
+  }
+
+  // Сборка с привязанным договором, ещё не отгружена → предлагаем отгрузку
+  if (info.type === 'assembly' && info.contract_id && !info.is_shipped) {
+    const cNum = info.contract_number || ('#' + info.contract_id);
+    const cName = info.contractor_name ? ' · ' + info.contractor_name : '';
+    if (confirm(
+      'Сборка «' + (info.name || '') + '» из договора ' + cNum + cName +
+      '.\n\nОткрыть отгрузку по договору?'
+    )) {
+      openShipmentMode(info.contract_id);
+      return;
+    }
+    // Если отказался — открываем сборку
+    selectSection('warehouse');
+    selectSidebarItem('warehouse-stock');
+    setTimeout(() => openAssemblyStock(info.id), 200);
+    return;
+  }
+
+  // Сборка без договора / уже отгружена → стандартное поведение (карточка сборки)
+  if (info.type === 'assembly') {
+    selectSection('warehouse');
+    selectSidebarItem('warehouse-stock');
+    setTimeout(() => openAssemblyStock(info.id), 200);
+    return;
+  }
+
+  // Коробка → если есть договор и не отгружена — сразу в отгрузку договора
+  if (info.type === 'box') {
+    if (!info.contract_id) {
+      showToast('Коробка не привязана к договору', 'error');
+      return;
+    }
+    if (info.is_shipped) {
+      showToast('Эта коробка уже отгружена', 'info');
+      // Всё равно открываем экран отгрузки — там видно когда и кем
+    }
+    openShipmentMode(info.contract_id);
+    return;
   }
 }
 
@@ -24353,7 +24724,8 @@ async function handleContinuousShipmentScan(decodedText) {
   let token = decodedText;
   try {
     const url = new URL(decodedText);
-    const m = url.pathname.match(/\/[ac]\/([A-Za-z0-9_\-]+)/);
+    // ЭТАП 26.3: /a/ (сборка), /b/ (коробка), /c/ (договор)
+    const m = url.pathname.match(/\/[abc]\/([A-Za-z0-9_\-]+)/);
     if (m) token = m[1];
   } catch (e) { /* не URL — оставляем как есть */ }
   token = String(token || '').trim();
@@ -24429,12 +24801,18 @@ function finishShipmentScan() {
   const path = window.location.pathname;
   const publicAsmMatch = path.match(/^\/a\/([A-Za-z0-9_\-]+)$/);
   const publicContractMatch = path.match(/^\/c\/([A-Za-z0-9_\-]+)$/);
+  // ЭТАП 26: публичная страница коробки /b/{token}
+  const publicBoxMatch = path.match(/^\/b\/([A-Za-z0-9_\-]+)$/);
   if (publicAsmMatch) {
     showPublicAssembly(publicAsmMatch[1]);
     return;
   }
   if (publicContractMatch) {
     showPublicContract(publicContractMatch[1]);
+    return;
+  }
+  if (publicBoxMatch) {
+    showPublicBox(publicBoxMatch[1]);
     return;
   }
   // ЭТАП 23+: общая публичная форма замечаний /feedback
