@@ -9391,7 +9391,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.11.0-boxes-content";
+const APP_VERSION = "v2.11.1-box-detail-fix";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17536,6 +17536,8 @@ async function loadContractBoxesBlock(contractId) {
   if (!container) return;
   try {
     const r = await apiGet('/api/contracts/' + contractId + '/boxes');
+    // ЭТАП 30.1-fix: сохраняем список локально, чтобы openBoxDetail брал контекст коробки без /full
+    state._currentContractBoxes = r.boxes || [];
     renderContractBoxesBlock(contractId, r.boxes || []);
   } catch (e) {
     // Бэк может не отвечать — просто скрываем без видимой ошибки
@@ -17639,7 +17641,9 @@ async function createBoxForContract(contractId) {
     }
     const box = await r.json();
     showToast('Коробка создана', 'success');
-    loadContractBoxesBlock(contractId);
+    // ЭТАП 30.1-fix: чтобы экран коробки сразу открылся без падений,
+    // дожидаемся загрузки списка (там обновится state._currentContractBoxes)
+    await loadContractBoxesBlock(contractId);
     loadContractShipmentBlock(contractId);
     // Сразу открываем экран коробки для добавления позиций
     openBoxDetail(box.id);
@@ -17740,20 +17744,50 @@ async function openBoxDetail(boxId) {
   m.classList.add('visible');
   state._currentBoxId = boxId;
 
+  // ЭТАП 30.1-fix: НЕ дёргаем /full (он может падать на сложных JOIN'ах в проде).
+  // Берём контекст коробки из локального кэша списка коробок текущего договора,
+  // а содержимое — через простой /items. Если ничего не нашли — fallback на /full.
+  let box = null;
   try {
+    if (state._currentContractBoxes && state._currentContractBoxes.length) {
+      box = state._currentContractBoxes.find(b => b.id === boxId);
+    }
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/boxes/' + boxId + '/full', {
-      headers: { 'Authorization': 'Bearer ' + token },
-    });
-    if (!r.ok) {
-      m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div style="padding:40px;text-align:center;color:var(--danger);">Не удалось загрузить коробку</div></div>';
+    const auth = { 'Authorization': 'Bearer ' + token };
+
+    // Если в локальном кэше нет (например, открыли по ссылке) — пробуем сначала /full,
+    // потом fallback на список коробок договора.
+    if (!box) {
+      try {
+        const rFull = await fetch(API_BASE + '/api/boxes/' + boxId + '/full', { headers: auth });
+        if (rFull.ok) {
+          box = await rFull.json();
+        }
+      } catch (e) { /* fallback ниже */ }
+    }
+
+    // Получаем содержимое отдельным запросом (всегда — может измениться)
+    let items = [];
+    try {
+      const rItems = await fetch(API_BASE + '/api/boxes/' + boxId + '/items', { headers: auth });
+      if (rItems.ok) {
+        const d = await rItems.json();
+        items = d.items || [];
+      }
+    } catch (e) { /* пустой список — не критично */ }
+
+    if (!box) {
+      // Совсем не получилось — заглушка
+      m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div class="modal-header"><h3>Коробка</h3><button class="modal-close" onclick="closeBoxDetail()"><i class="ti ti-x"></i></button></div><div style="padding:40px;text-align:center;color:var(--danger);">Не удалось загрузить данные коробки.<br><br>Обновите страницу (Ctrl+Shift+R).</div></div>';
       return;
     }
-    const box = await r.json();
+
+    box.items = items;
     state._currentBox = box;
     renderBoxDetail(box);
   } catch (e) {
-    m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div style="padding:40px;text-align:center;color:var(--danger);">Ошибка соединения</div></div>';
+    console.error('openBoxDetail error:', e);
+    m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div class="modal-header"><h3>Коробка</h3><button class="modal-close" onclick="closeBoxDetail()"><i class="ti ti-x"></i></button></div><div style="padding:40px;text-align:center;color:var(--danger);">Ошибка: ' + (e.message || e) + '</div></div>';
   }
 }
 
