@@ -8497,6 +8497,11 @@
               <h1>Остатки на складе</h1>
               <span class="page-counter" id="wh-stock-counter">0</span>
             </div>
+            <div class="page-header-actions">
+              <button class="btn btn-primary btn-small" onclick="openShipmentEntry()">
+                <i class="ti ti-truck-delivery"></i> Произвести отгрузку
+              </button>
+            </div>
           </div>
 
           <!-- Сводка -->
@@ -9386,7 +9391,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.10.0-shipment-finalize";
+const APP_VERSION = "v2.11.0-boxes-content";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9814,8 +9819,17 @@ function renderProfile() {
   document.getElementById('top-avatar').textContent = initials;
 
   // Дашборд
-  const firstName = name.split(/\s+/)[0];
-  const greeting = 'Привет, ' + firstName;
+  // ПРАВКА: имя+отчество вместо первого слова ФИО
+  const _parts = name.trim().split(/\s+/).filter(Boolean);
+  let _displayName = '';
+  if (_parts.length >= 3) {
+    _displayName = _parts[1] + ' ' + _parts[2];
+  } else if (_parts.length === 2) {
+    _displayName = _parts[1];
+  } else if (_parts.length === 1) {
+    _displayName = _parts[0];
+  }
+  const greeting = 'Привет, ' + _displayName;
   document.getElementById('greeting-name').textContent = greeting;
   document.getElementById('greeting-date').textContent = getCurrentDateLine();
   document.getElementById('page-greeting-name').textContent = greeting;
@@ -13986,12 +14000,22 @@ async function loadHomeDashboard() {
 
 function renderHomeSkeleton() {
   // Заголовок-приветствие
-  const name = state.user && (state.user.short_name || state.user.full_name || '') || '';
+  // ПРАВКА: вместо фамилии (1-е слово) — имя+отчество (2-е и 3-е слова)
+  const fullName = state.user && (state.user.full_name || state.user.short_name || '') || '';
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  let greetName = '';
+  if (parts.length >= 3) {
+    greetName = parts[1] + ' ' + parts[2];        // "Дмитрий Сергеевич"
+  } else if (parts.length === 2) {
+    greetName = parts[1];                          // только имя
+  } else if (parts.length === 1) {
+    greetName = parts[0];                          // как было
+  }
   const greetEl = document.getElementById('home-greeting-name');
   const dateEl = document.getElementById('home-greeting-date');
   const greetMobEl = document.getElementById('home-greeting-name-mob');
   const dateMobEl = document.getElementById('home-greeting-date-mob');
-  if (greetEl) greetEl.textContent = name ? ('Здравствуйте, ' + escapeText(name.split(' ')[0] || name) + '!') : 'Здравствуйте!';
+  if (greetEl) greetEl.textContent = greetName ? ('Здравствуйте, ' + escapeText(greetName) + '!') : 'Здравствуйте!';
   if (greetMobEl) greetMobEl.textContent = greetEl ? greetEl.textContent : 'Здравствуйте!';
   const dateStr = todayHumanRu();
   if (dateEl) dateEl.textContent = 'Сегодня — ' + dateStr;
@@ -17550,7 +17574,7 @@ function renderContractBoxesBlock(contractId, boxes) {
       const meta = [];
       if (b.description) meta.push(escapeHtml(b.description));
       if (shipped && b.shipped_at) meta.push('отгружено ' + String(b.shipped_at).slice(0, 16).replace('T', ' '));
-      html += '<div class="box-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      html += '<div class="box-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openBoxDetail(' + b.id + ')">';
       html += '<div style="width:32px;height:32px;border-radius:8px;background:' +
         (shipped ? '#E8F5E9' : 'var(--brand-bg)') + ';color:' +
         (shipped ? '#15803D' : 'var(--brand)') +
@@ -17564,8 +17588,8 @@ function renderContractBoxesBlock(contractId, boxes) {
           meta.join(' · ') + '</div>';
       }
       html += '</div>';
-      // Действия
-      html += '<div style="display:flex;gap:4px;flex-shrink:0;">';
+      // Действия — не должны провоцировать клик по строке
+      html += '<div style="display:flex;gap:4px;flex-shrink:0;" onclick="event.stopPropagation()">';
       html += '<button class="btn btn-secondary btn-small" title="QR-код / печать" onclick="showBoxQr(' +
         b.id + ', ' + JSON.stringify(b.name || ('Коробка #' + b.id)).replace(/"/g, '&quot;') +
         ', ' + JSON.stringify(b.qr_token || '').replace(/"/g, '&quot;') +
@@ -17596,12 +17620,8 @@ async function createBoxForContract(contractId) {
     showToast('Создавать коробки может директор, зам или менеджер', 'error');
     return;
   }
-  // Опциональное имя; пустое = автоимя «Коробка #N» на бэке
-  const customName = prompt(
-    'Имя коробки (необязательно):\n\nОставь пустым — будет автоматически «Коробка #N».',
-    ''
-  );
-  if (customName === null) return; // отмена
+  // ЭТАП 30: имя задаётся автоматически («Коробка #N»), после создания
+  // сразу открывается экран коробки для наполнения содержимым.
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/boxes', {
@@ -17610,7 +17630,7 @@ async function createBoxForContract(contractId) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify({ name: (customName || '').trim() }),
+      body: JSON.stringify({ name: '' }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -17619,19 +17639,10 @@ async function createBoxForContract(contractId) {
     }
     const box = await r.json();
     showToast('Коробка создана', 'success');
-    // Обновляем блок коробок и прогресс отгрузки
     loadContractBoxesBlock(contractId);
     loadContractShipmentBlock(contractId);
-    // Сразу открываем модалку с QR-кодом — чтобы можно было распечатать
-    setTimeout(() => {
-      showBoxQr(
-        box.id,
-        box.name || ('Коробка #' + box.id),
-        box.qr_token,
-        box.contract_number || '',
-        box.contractor_name || ''
-      );
-    }, 200);
+    // Сразу открываем экран коробки для добавления позиций
+    openBoxDetail(box.id);
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
@@ -17711,6 +17722,540 @@ async function confirmDeleteBox(boxId, contractId) {
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
+}
+
+// ============ ЭТАП 30.1: ЭКРАН КОРОБКИ С СОДЕРЖИМЫМ ============
+
+async function openBoxDetail(boxId) {
+  // Открываем модалку с прелоадом
+  let m = document.getElementById('box-detail-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'box-detail-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeBoxDetail(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div class="loading-block" style="padding:40px;">Загружаем коробку…</div></div>';
+  m.classList.add('visible');
+  state._currentBoxId = boxId;
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/boxes/' + boxId + '/full', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div style="padding:40px;text-align:center;color:var(--danger);">Не удалось загрузить коробку</div></div>';
+      return;
+    }
+    const box = await r.json();
+    state._currentBox = box;
+    renderBoxDetail(box);
+  } catch (e) {
+    m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()"><div style="padding:40px;text-align:center;color:var(--danger);">Ошибка соединения</div></div>';
+  }
+}
+
+function closeBoxDetail() {
+  const m = document.getElementById('box-detail-modal');
+  if (m) m.classList.remove('visible');
+  state._currentBoxId = null;
+  state._currentBox = null;
+}
+
+function renderBoxDetail(box) {
+  const m = document.getElementById('box-detail-modal');
+  if (!m) return;
+  const canEdit = canManageSales() && !box.is_shipped;
+  const items = box.items || [];
+  let totalQty = 0;
+  items.forEach(i => { totalQty += Number(i.qty) || 0; });
+
+  let itemsHtml = '';
+  if (!items.length) {
+    itemsHtml = '<div style="padding: 30px 14px;text-align:center;color:var(--text-light);">' +
+      '<i class="ti ti-package-off" style="font-size:32px;display:block;margin-bottom:8px;"></i>' +
+      'Коробка пуста. Добавь позиции ниже.' +
+      '</div>';
+  } else {
+    itemsHtml = '<div style="padding:6px 14px;">';
+    items.forEach((it, idx) => {
+      const srcIcon = it.source_type === 'assembly' ? 'ti-tool' :
+                      (it.source_type === 'contract_item' ? 'ti-list' : 'ti-edit');
+      const srcLabel = it.source_type === 'assembly' ? 'из сборок' :
+                       (it.source_type === 'contract_item' ? 'из спецификации' : 'вручную');
+      itemsHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      itemsHtml += '<div style="width:26px;text-align:center;color:var(--text-light);font-size:13px;">' + (idx + 1) + '</div>';
+      itemsHtml += '<div style="flex:1;min-width:0;">';
+      itemsHtml += '<div style="font-size:14px;font-weight:600;color:var(--text);">' + escapeHtml(it.name || '—') + '</div>';
+      itemsHtml += '<div style="font-size:12px;color:var(--text-light);">' +
+                   '<i class="ti ' + srcIcon + '" style="vertical-align:middle;"></i> ' + srcLabel +
+                   (it.comment ? ' · ' + escapeHtml(it.comment) : '') +
+                   '</div>';
+      itemsHtml += '</div>';
+      itemsHtml += '<div style="font-weight:600;font-size:14px;white-space:nowrap;">' +
+                   (Number(it.qty) % 1 === 0 ? Number(it.qty) : Number(it.qty).toFixed(2)) +
+                   ' ' + escapeHtml(it.unit || 'шт.') + '</div>';
+      if (canEdit) {
+        itemsHtml += '<button class="btn btn-secondary btn-small" title="Удалить" onclick="removeBoxItem(' +
+                     it.id + ')" style="color:var(--danger);"><i class="ti ti-trash"></i></button>';
+      }
+      itemsHtml += '</div>';
+    });
+    itemsHtml += '</div>';
+  }
+
+  const header =
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-package"></i> ' + escapeHtml(box.name || ('Коробка #' + box.id)) +
+        (box.is_shipped ? ' <span style="color:#15803D;font-size:13px;font-weight:500;">· отгружено</span>' : '') +
+      '</h3>' +
+      '<button class="modal-close" onclick="closeBoxDetail()"><i class="ti ti-x"></i></button>' +
+    '</div>';
+
+  const subtitle =
+    '<div style="padding:12px 18px 14px;border-bottom:1px solid var(--border);">' +
+      '<div style="font-size:13px;color:var(--text-light);">' +
+        (box.contract_number ? 'Договор № ' + escapeHtml(box.contract_number) : '—') +
+        (box.contractor_name ? ' · ' + escapeHtml(box.contractor_name) : '') +
+      '</div>' +
+    '</div>';
+
+  const itemsBlock =
+    '<div style="padding:6px 0;">' +
+      '<div style="padding:12px 18px 6px;font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;">' +
+        'Содержимое' + (items.length ? ' (' + items.length + ')' : '') +
+      '</div>' +
+      itemsHtml +
+    '</div>';
+
+  const addBtns = canEdit ?
+    '<div style="padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border);">' +
+      '<button class="btn btn-primary btn-small" onclick="openAddBoxItemFromCatalog(' + box.id + ')">' +
+        '<i class="ti ti-list-search"></i> Из номенклатуры</button>' +
+      '<button class="btn btn-secondary btn-small" onclick="openAddBoxItemManual(' + box.id + ')">' +
+        '<i class="ti ti-edit"></i> Вручную</button>' +
+    '</div>' : '';
+
+  const actionsBlock =
+    '<div style="padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;background:var(--bg);border-top:1px solid var(--border);">' +
+      (items.length ? '<button class="btn btn-primary btn-small" onclick="printPackingList(' + box.id + ')">' +
+                      '<i class="ti ti-printer"></i> Упаковочный лист (A4)</button>' : '') +
+      '<button class="btn btn-secondary btn-small" onclick="showBoxQr(' + box.id + ', ' +
+        JSON.stringify(box.name || ('Коробка #' + box.id)).replace(/"/g, '&quot;') + ', ' +
+        JSON.stringify(box.qr_token || '').replace(/"/g, '&quot;') + ', ' +
+        JSON.stringify(box.contract_number || '').replace(/"/g, '&quot;') + ', ' +
+        JSON.stringify(box.contractor_name || '').replace(/"/g, '&quot;') + ')">' +
+        '<i class="ti ti-qrcode"></i> QR / наклейка</button>' +
+      (canEdit ? '<button class="btn btn-secondary btn-small" onclick="renameBoxFromDetail(' + box.id + ', ' +
+                 JSON.stringify(box.name || '').replace(/"/g, '&quot;') + ')">' +
+                 '<i class="ti ti-edit"></i> Переименовать</button>' : '') +
+      (totalQty ? '<div style="margin-left:auto;font-size:13px;color:var(--text-light);align-self:center;">Всего: <b style="color:var(--text);">' + (totalQty % 1 === 0 ? totalQty : totalQty.toFixed(2)) + '</b></div>' : '') +
+    '</div>';
+
+  m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()" style="max-width:680px;">' +
+    header + subtitle + itemsBlock + addBtns + actionsBlock +
+  '</div>';
+}
+
+async function removeBoxItem(itemId) {
+  if (!confirm('Удалить позицию из коробки?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/box-items/' + itemId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    showToast('Позиция удалена', 'success');
+    // Перезагружаем коробку
+    if (state._currentBoxId) openBoxDetail(state._currentBoxId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function renameBoxFromDetail(boxId, currentName) {
+  const newName = prompt('Новое имя коробки:', currentName || '');
+  if (newName === null) return;
+  const trimmed = String(newName || '').trim();
+  if (!trimmed) {
+    showToast('Имя не может быть пустым', 'error');
+    return;
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/boxes/' + boxId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось переименовать', 'error');
+      return;
+    }
+    showToast('Переименовано', 'success');
+    openBoxDetail(boxId);
+    // Обновим блок коробок в карточке договора
+    if (state._currentBox && state._currentBox.contract_id) {
+      loadContractBoxesBlock(state._currentBox.contract_id);
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// ============ Добавление позиций в коробку ============
+
+// Из номенклатуры/сборок/спецификации
+async function openAddBoxItemFromCatalog(boxId) {
+  const box = state._currentBox;
+  if (!box) return;
+  const contractId = box.contract_id;
+  // Параллельно тянем: сборки этого договора + позиции спецификации + общий каталог моделей
+  let assemblies = [], specItems = [], models = [];
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const auth = { 'Authorization': 'Bearer ' + token };
+    if (contractId) {
+      const [aR, sR] = await Promise.all([
+        fetch(API_BASE + '/api/contracts/' + contractId + '/assemblies', { headers: auth }).catch(() => null),
+        fetch(API_BASE + '/api/contracts/' + contractId + '/items', { headers: auth }).catch(() => null),
+      ]);
+      if (aR && aR.ok) { const d = await aR.json(); assemblies = d.assemblies || d.items || []; }
+      if (sR && sR.ok) { const d = await sR.json(); specItems = d.items || []; }
+    }
+    const mR = await fetch(API_BASE + '/api/sales-models', { headers: auth }).catch(() => null);
+    if (mR && mR.ok) { const d = await mR.json(); models = d.models || d.items || []; }
+  } catch (e) {
+    // не критично
+  }
+
+  // Рендерим модалку поверх детали коробки
+  let pick = document.getElementById('box-item-picker');
+  if (!pick) {
+    pick = document.createElement('div');
+    pick.id = 'box-item-picker';
+    pick.className = 'modal-overlay';
+    pick.style.zIndex = 10500;
+    pick.onclick = (e) => { if (e.target === pick) closeBoxItemPicker(); };
+    document.body.appendChild(pick);
+  }
+
+  let optsHtml = '';
+
+  // Сборки договора
+  if (assemblies && assemblies.length) {
+    optsHtml += '<div style="padding:10px 16px 4px;font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;">Сборки этого договора</div>';
+    assemblies.forEach(a => {
+      const mn = a.model_name || '—';
+      const ma = a.model_article ? ' · ' + a.model_article : '';
+      optsHtml += '<div class="pick-row" onclick="addBoxItemFromAssembly(' + boxId + ', ' + a.id + ', ' +
+                  JSON.stringify(mn + ma).replace(/"/g, '&quot;') + ', ' + (a.quantity || 1) + ')">' +
+                  '<i class="ti ti-tool" style="color:var(--brand);"></i>' +
+                  '<div style="flex:1;"><div style="font-weight:600;">' + escapeHtml(mn) + '</div>' +
+                  '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(a.model_article || '') +
+                  ' · ' + (a.quantity || 1) + ' шт.</div></div>' +
+                  '</div>';
+    });
+  }
+
+  // Спецификация договора
+  if (specItems && specItems.length) {
+    optsHtml += '<div style="padding:10px 16px 4px;font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;">Позиции спецификации</div>';
+    specItems.forEach(si => {
+      optsHtml += '<div class="pick-row" onclick="addBoxItemFromSpec(' + boxId + ', ' + si.id + ', ' +
+                  JSON.stringify(si.name || '').replace(/"/g, '&quot;') + ', ' + (si.qty || 1) + ', ' +
+                  JSON.stringify(si.unit || 'шт.').replace(/"/g, '&quot;') + ')">' +
+                  '<i class="ti ti-list" style="color:var(--brand);"></i>' +
+                  '<div style="flex:1;"><div style="font-weight:600;">' + escapeHtml(si.name || '—') + '</div>' +
+                  '<div style="font-size:12px;color:var(--text-light);">' +
+                  (si.qty || 1) + ' ' + escapeHtml(si.unit || 'шт.') + '</div></div>' +
+                  '</div>';
+    });
+  }
+
+  // Общая номенклатура (модели)
+  if (models && models.length) {
+    optsHtml += '<div style="padding:10px 16px 4px;font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;">Номенклатура (' + models.length + ')</div>';
+    optsHtml += '<input type="text" id="box-item-search" placeholder="Поиск по названию или артикулу…" onkeyup="filterBoxItemPicker(this.value)" style="margin:6px 16px;padding:8px 12px;width:calc(100% - 32px);border:1px solid var(--border);border-radius:8px;font-size:13px;">';
+    models.forEach(mdl => {
+      optsHtml += '<div class="pick-row pick-model" data-search="' +
+                  escapeHtml((mdl.name + ' ' + (mdl.article || '')).toLowerCase()) + '" ' +
+                  'onclick="addBoxItemFromModel(' + boxId + ', ' +
+                  JSON.stringify(mdl.name || '').replace(/"/g, '&quot;') + ', ' +
+                  JSON.stringify(mdl.article || '').replace(/"/g, '&quot;') + ')">' +
+                  '<i class="ti ti-box" style="color:var(--brand);"></i>' +
+                  '<div style="flex:1;"><div style="font-weight:600;">' + escapeHtml(mdl.name || '—') + '</div>' +
+                  (mdl.article ? '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(mdl.article) + '</div>' : '') +
+                  '</div></div>';
+    });
+  }
+
+  if (!optsHtml) {
+    optsHtml = '<div style="padding:30px;text-align:center;color:var(--text-light);">Нет позиций для добавления. Используй «Вручную».</div>';
+  }
+
+  pick.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-list-search"></i> Выбор позиции</h3>' +
+      '<button class="modal-close" onclick="closeBoxItemPicker()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<style>.pick-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;}.pick-row:hover{background:var(--brand-bg);}</style>' +
+    '<div style="overflow-y:auto;flex:1;">' + optsHtml + '</div>' +
+  '</div>';
+  pick.classList.add('visible');
+}
+
+function closeBoxItemPicker() {
+  const pick = document.getElementById('box-item-picker');
+  if (pick) pick.classList.remove('visible');
+}
+
+function filterBoxItemPicker(q) {
+  const ql = (q || '').toLowerCase().trim();
+  document.querySelectorAll('#box-item-picker .pick-model').forEach(el => {
+    const s = el.getAttribute('data-search') || '';
+    el.style.display = (!ql || s.indexOf(ql) >= 0) ? '' : 'none';
+  });
+}
+
+async function _postBoxItem(boxId, payload) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/boxes/' + boxId + '/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось добавить', 'error');
+      return false;
+    }
+    showToast('Добавлено', 'success');
+    closeBoxItemPicker();
+    openBoxDetail(boxId);
+    return true;
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    return false;
+  }
+}
+
+async function addBoxItemFromAssembly(boxId, asmId, displayName, qty) {
+  await _postBoxItem(boxId, {
+    name: displayName, qty: qty, unit: 'шт.',
+    source_type: 'assembly', source_id: asmId,
+  });
+}
+
+async function addBoxItemFromSpec(boxId, specId, name, qty, unit) {
+  const customQty = prompt('Сколько кладём в коробку? (по спецификации: ' + qty + ' ' + unit + ')', qty);
+  if (customQty === null) return;
+  const n = parseFloat(customQty);
+  if (isNaN(n) || n <= 0) {
+    showToast('Некорректное количество', 'error');
+    return;
+  }
+  await _postBoxItem(boxId, {
+    name: name, qty: n, unit: unit,
+    source_type: 'contract_item', source_id: specId,
+  });
+}
+
+async function addBoxItemFromModel(boxId, name, article) {
+  const customQty = prompt('Сколько кладём в коробку?', '1');
+  if (customQty === null) return;
+  const n = parseFloat(customQty);
+  if (isNaN(n) || n <= 0) {
+    showToast('Некорректное количество', 'error');
+    return;
+  }
+  const fullName = name + (article ? ' · ' + article : '');
+  await _postBoxItem(boxId, {
+    name: fullName, qty: n, unit: 'шт.',
+    source_type: 'manual',
+  });
+}
+
+// Ввод вручную
+function openAddBoxItemManual(boxId) {
+  let pick = document.getElementById('box-item-picker');
+  if (!pick) {
+    pick = document.createElement('div');
+    pick.id = 'box-item-picker';
+    pick.className = 'modal-overlay';
+    pick.style.zIndex = 10500;
+    pick.onclick = (e) => { if (e.target === pick) closeBoxItemPicker(); };
+    document.body.appendChild(pick);
+  }
+  pick.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-edit"></i> Добавить позицию вручную</h3>' +
+      '<button class="modal-close" onclick="closeBoxItemPicker()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div style="padding:18px;">' +
+      '<label style="display:block;margin-bottom:10px;font-size:13px;color:var(--text-light);">Название</label>' +
+      '<input type="text" id="manual-item-name" placeholder="Например: Кабель ВВГнг 3х2.5" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;" />' +
+      '<div style="display:flex;gap:10px;margin-bottom:14px;">' +
+        '<div style="flex:1;">' +
+          '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);">Кол-во</label>' +
+          '<input type="number" id="manual-item-qty" value="1" min="0" step="0.01" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;" />' +
+        '</div>' +
+        '<div style="flex:1;">' +
+          '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);">Ед.</label>' +
+          '<select id="manual-item-unit" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;">' +
+            '<option value="шт.">шт.</option><option value="м">м</option><option value="кг">кг</option>' +
+            '<option value="л">л</option><option value="компл.">компл.</option><option value="уп.">уп.</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);">Комментарий (необязательно)</label>' +
+      '<input type="text" id="manual-item-comment" placeholder="" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:18px;" />' +
+      '<button class="btn btn-primary" onclick="submitManualBoxItem(' + boxId + ')" style="width:100%;"><i class="ti ti-check"></i> Добавить</button>' +
+    '</div>' +
+  '</div>';
+  pick.classList.add('visible');
+  setTimeout(() => { const i = document.getElementById('manual-item-name'); if (i) i.focus(); }, 100);
+}
+
+async function submitManualBoxItem(boxId) {
+  const name = (document.getElementById('manual-item-name').value || '').trim();
+  const qty = parseFloat(document.getElementById('manual-item-qty').value || '1');
+  const unit = document.getElementById('manual-item-unit').value || 'шт.';
+  const comment = (document.getElementById('manual-item-comment').value || '').trim();
+  if (!name) { showToast('Введите название', 'error'); return; }
+  if (isNaN(qty) || qty <= 0) { showToast('Некорректное количество', 'error'); return; }
+  await _postBoxItem(boxId, {
+    name: name, qty: qty, unit: unit, comment: comment, source_type: 'manual',
+  });
+}
+
+// ============ ПЕЧАТЬ УПАКОВОЧНОГО ЛИСТА (A4) ============
+
+async function printPackingList(boxId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/boxes/' + boxId + '/full', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось загрузить коробку', 'error'); return; }
+    const box = await r.json();
+    renderPackingListPrint(box);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+function renderPackingListPrint(box) {
+  const items = box.items || [];
+  const total = items.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, '0');
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const yyyy = today.getFullYear();
+  const todayStr = dd + '.' + mm + '.' + yyyy;
+
+  const qrUrl = box.qr_token ? (window.location.origin + '/b/' + box.qr_token) : '';
+  const userName = (state.user && (state.user.full_name || state.user.short_name)) || '';
+
+  const html =
+    '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">' +
+    '<title>Упаковочный лист — ' + escapeHtml(box.name || ('Коробка #' + box.id)) + '</title>' +
+    '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>' +
+    '<style>' +
+      '@page { size: A4 portrait; margin: 16mm 14mm; }' +
+      '* { box-sizing: border-box; }' +
+      'body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1B2030; margin: 0; padding: 20px; font-size: 12pt; line-height: 1.4; }' +
+      '.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2D5F8B; padding-bottom: 10px; margin-bottom: 16px; }' +
+      '.brand { font-size: 18pt; font-weight: 600; color: #2D5F8B; }' +
+      '.brand-sub { font-size: 9pt; color: #6E7689; margin-top: 2px; }' +
+      '.contacts { font-size: 9pt; color: #6E7689; text-align: right; }' +
+      'h1 { font-size: 16pt; font-weight: 700; margin: 12px 0 8px; text-align: center; letter-spacing: 0.5px; }' +
+      '.subtitle { text-align: center; color: #4A5061; font-size: 11pt; margin-bottom: 18px; }' +
+      '.meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 14px 0 18px; border: 1px solid #DCE3ED; border-radius: 6px; padding: 12px 14px; background: #F4F6FA; }' +
+      '.meta-row { font-size: 10.5pt; }' +
+      '.meta-row span { color: #6E7689; }' +
+      '.meta-row b { color: #1B2030; font-weight: 600; }' +
+      'table { width: 100%; border-collapse: collapse; margin: 6px 0 16px; }' +
+      'th, td { border: 1px solid #DCE3ED; padding: 8px 10px; font-size: 10.5pt; text-align: left; vertical-align: top; }' +
+      'th { background: #EAF2FA; color: #2D5F8B; font-weight: 600; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.3px; }' +
+      'td.num { text-align: center; width: 36px; }' +
+      'td.qty { text-align: right; white-space: nowrap; width: 90px; font-weight: 600; }' +
+      'td.unit { text-align: center; width: 60px; }' +
+      'tr.total td { font-weight: 700; background: #F4F6FA; }' +
+      '.footer-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 30px; align-items: flex-end; margin-top: 28px; }' +
+      '.sign { border-bottom: 1px solid #1B2030; min-height: 38px; padding: 6px 0; font-size: 9.5pt; color: #6E7689; }' +
+      '.sign-label { font-size: 9pt; color: #6E7689; margin-top: 4px; text-align: center; }' +
+      '.qr-block { text-align: center; }' +
+      '.qr-block img, .qr-block canvas { width: 90px; height: 90px; }' +
+      '.qr-url { font-size: 8pt; color: #6E7689; margin-top: 4px; word-break: break-all; max-width: 110px; }' +
+      '.print-btn { position: fixed; top: 14px; right: 14px; background: #2D5F8B; color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }' +
+      '.no-print { display: block; }' +
+      '@media print { .no-print { display: none; } body { padding: 0; } }' +
+    '</style></head><body>' +
+    '<button class="print-btn no-print" onclick="window.print()">🖨️ Печать</button>' +
+    '<div class="header">' +
+      '<div><div class="brand">Atom CRM</div><div class="brand-sub">ООО «Атомус Групп», Миасс</div></div>' +
+      '<div class="contacts">тел. +7 (912) 326-30-03<br>atomusgroup174@yandex.ru</div>' +
+    '</div>' +
+    '<h1>УПАКОВОЧНЫЙ ЛИСТ</h1>' +
+    '<div class="subtitle">' +
+      (box.contract_number ? 'к договору № ' + escapeHtml(box.contract_number) : 'без договора') +
+      (box.contract_sign_date ? ' от ' + escapeHtml(box.contract_sign_date) : '') +
+    '</div>' +
+    '<div class="meta">' +
+      '<div class="meta-row"><span>Контрагент:</span> <b>' + escapeHtml(box.contractor_name || '—') + '</b></div>' +
+      '<div class="meta-row"><span>ИНН:</span> <b>' + escapeHtml(box.contractor_inn || '—') + '</b></div>' +
+      '<div class="meta-row" style="grid-column:1/-1;"><span>Адрес доставки:</span> <b>' + escapeHtml(box.contract_delivery_address || '—') + '</b></div>' +
+      '<div class="meta-row"><span>Коробка:</span> <b>' + escapeHtml(box.name || ('Коробка #' + box.id)) + '</b></div>' +
+      '<div class="meta-row"><span>Дата упаковки:</span> <b>' + todayStr + '</b></div>' +
+    '</div>' +
+    (items.length ?
+      '<table><thead><tr>' +
+        '<th class="num">№</th><th>Наименование</th><th class="qty">Кол-во</th><th class="unit">Ед.</th>' +
+      '</tr></thead><tbody>' +
+      items.map((it, i) =>
+        '<tr><td class="num">' + (i + 1) + '</td>' +
+        '<td>' + escapeHtml(it.name || '—') +
+          (it.comment ? '<div style="color:#6E7689;font-size:9.5pt;margin-top:2px;">' + escapeHtml(it.comment) + '</div>' : '') +
+        '</td>' +
+        '<td class="qty">' + (Number(it.qty) % 1 === 0 ? Number(it.qty) : Number(it.qty).toFixed(2)) + '</td>' +
+        '<td class="unit">' + escapeHtml(it.unit || 'шт.') + '</td></tr>'
+      ).join('') +
+      '<tr class="total"><td colspan="2" style="text-align:right;">Всего позиций:</td><td class="qty">' + items.length + '</td><td class="unit">—</td></tr>' +
+      '</tbody></table>'
+      : '<p style="text-align:center;color:#6E7689;margin:30px 0;">Содержимое коробки не указано.</p>'
+    ) +
+    '<div class="footer-row">' +
+      '<div><div class="sign">' + escapeHtml(userName) + '</div><div class="sign-label">Упаковал (подпись)</div></div>' +
+      '<div><div class="sign">&nbsp;</div><div class="sign-label">Принял (подпись)</div></div>' +
+      '<div class="qr-block">' +
+        (qrUrl ? '<div id="qr-pl"></div><div class="qr-url">' + escapeHtml(qrUrl) + '</div>' : '') +
+      '</div>' +
+    '</div>' +
+    (qrUrl ?
+    '<script>window.addEventListener("DOMContentLoaded", function(){' +
+      'new QRCode(document.getElementById("qr-pl"), {' +
+        'text: ' + JSON.stringify(qrUrl) + ', width: 90, height: 90, correctLevel: QRCode.CorrectLevel.M' +
+      '});' +
+      'setTimeout(function(){window.print();}, 400);' +
+    '});<\/script>'
+    : '<script>window.addEventListener("DOMContentLoaded", function(){setTimeout(function(){window.print();}, 200);});<\/script>') +
+    '</body></html>';
+
+  const w = window.open('', '_blank');
+  if (!w) { showToast('Разрешите всплывающие окна', 'error'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 
 // ============ ЭТАП 16В-2: задачи по договору ============
@@ -24557,6 +25102,326 @@ function updateShipCounter(shipped, total, lastName) {
 }
 
 // ===== Открытие экрана отгрузки по договору =====
+
+// ============ ЭТАП 30.2: ЭКРАН ВЫБОРА СЦЕНАРИЯ ОТГРУЗКИ ============
+
+function openShipmentEntry() {
+  let m = document.getElementById('shipment-entry-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'shipment-entry-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeShipmentEntry(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-truck-delivery"></i> Произвести отгрузку</h3>' +
+      '<button class="modal-close" onclick="closeShipmentEntry()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div style="padding:18px;display:flex;flex-direction:column;gap:10px;">' +
+      '<button class="shipment-choice" onclick="shipmentEntryChoose(\'contract\')" style="display:flex;align-items:center;gap:14px;padding:16px;border:2px solid var(--border);border-radius:10px;background:white;cursor:pointer;text-align:left;transition:all .15s;">' +
+        '<div style="width:42px;height:42px;border-radius:10px;background:var(--brand-bg);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-file-text" style="font-size:22px;"></i></div>' +
+        '<div style="flex:1;"><div style="font-weight:600;font-size:15px;">По договору</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">Сборки или коробки, привязанные к договору</div></div>' +
+        '<i class="ti ti-chevron-right" style="color:var(--text-light);"></i>' +
+      '</button>' +
+      '<button class="shipment-choice" onclick="shipmentEntryChoose(\'external\')" style="display:flex;align-items:center;gap:14px;padding:16px;border:2px solid var(--border);border-radius:10px;background:white;cursor:pointer;text-align:left;transition:all .15s;">' +
+        '<div style="width:42px;height:42px;border-radius:10px;background:#FFF3E0;color:#F57C00;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-package-export" style="font-size:22px;"></i></div>' +
+        '<div style="flex:1;"><div style="font-weight:600;font-size:15px;">По номенклатуре (без договора)</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">Отгрузка юрлицу по ИНН или физлицу с комментарием</div></div>' +
+        '<i class="ti ti-chevron-right" style="color:var(--text-light);"></i>' +
+      '</button>' +
+    '</div>' +
+    '<style>.shipment-choice:hover{border-color:var(--brand)!important;background:var(--brand-bg)!important;}</style>' +
+  '</div>';
+  m.classList.add('visible');
+}
+
+function closeShipmentEntry() {
+  const m = document.getElementById('shipment-entry-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function shipmentEntryChoose(kind) {
+  closeShipmentEntry();
+  if (kind === 'contract') {
+    // Откроем список договоров → клик откроет режим отгрузки по договору
+    openContractPickerForShipment();
+  } else {
+    openExternalShipmentForm();
+  }
+}
+
+async function openContractPickerForShipment() {
+  let m = document.getElementById('ship-contract-picker');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ship-contract-picker';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-file-text"></i> Выбор договора</h3>' +
+    '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+    '<div id="ship-contract-list" style="overflow-y:auto;flex:1;"><div class="loading-block" style="padding:30px;text-align:center;">Загружаем договоры…</div></div>' +
+  '</div>';
+  m.classList.add('visible');
+  try {
+    const r = await apiGet('/api/contracts');
+    const list = (r.contracts || []).filter(c => c.is_active && c.status !== 'closed');
+    const listEl = document.getElementById('ship-contract-list');
+    if (!list.length) {
+      listEl.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-light);">Нет активных договоров</div>';
+      return;
+    }
+    let html = '';
+    list.forEach(c => {
+      html += '<div onclick="closeShipContractPicker();openShipmentMode(' + c.id + ')" ' +
+              'style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;" ' +
+              'onmouseover="this.style.background=\'var(--brand-bg)\'" onmouseout="this.style.background=\'\'">' +
+              '<div style="font-weight:600;">№ ' + escapeHtml(c.number || '') + '</div>' +
+              '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(c.contractor_name || '') + '</div>' +
+              '</div>';
+    });
+    listEl.innerHTML = html;
+  } catch (e) {
+    document.getElementById('ship-contract-list').innerHTML = '<div style="padding:30px;text-align:center;color:var(--danger);">Не удалось загрузить</div>';
+  }
+}
+
+function closeShipContractPicker() {
+  const m = document.getElementById('ship-contract-picker');
+  if (m) m.classList.remove('visible');
+}
+
+// ============ ВНЕШНЯЯ ОТГРУЗКА (без договора) ============
+
+function openExternalShipmentForm() {
+  state._externalShipItems = [];
+  let m = document.getElementById('external-ship-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'external-ship-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeExternalShipment(); };
+    document.body.appendChild(m);
+  }
+  m.classList.add('visible');
+  renderExternalShipmentForm();
+}
+
+function closeExternalShipment() {
+  const m = document.getElementById('external-ship-modal');
+  if (m) m.classList.remove('visible');
+  state._externalShipItems = [];
+}
+
+function renderExternalShipmentForm() {
+  const m = document.getElementById('external-ship-modal');
+  if (!m) return;
+  const items = state._externalShipItems || [];
+
+  // Сохраняем введённые значения формы, если перерендериваемся
+  const prev = {
+    type: (document.getElementById('ext-rec-type-inn') && document.getElementById('ext-rec-type-inn').checked) ? 'inn' :
+          (document.getElementById('ext-rec-type-ind') && document.getElementById('ext-rec-type-ind').checked) ? 'individual' : 'inn',
+    inn: (document.getElementById('ext-rec-inn') && document.getElementById('ext-rec-inn').value) || '',
+    name: (document.getElementById('ext-rec-name') && document.getElementById('ext-rec-name').value) || '',
+    comment: (document.getElementById('ext-rec-comment') && document.getElementById('ext-rec-comment').value) || '',
+  };
+
+  let itemsHtml = '';
+  if (!items.length) {
+    itemsHtml = '<div style="padding:18px;text-align:center;color:var(--text-light);font-size:13px;border:1px dashed var(--border);border-radius:8px;">Отсканируй QR или добавь позицию вручную</div>';
+  } else {
+    itemsHtml = '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">';
+    items.forEach((it, i) => {
+      itemsHtml += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;' +
+                   (i ? 'border-top:1px solid var(--border);' : '') + '">' +
+                   '<i class="ti ' + (it.type === 'box' ? 'ti-package' : 'ti-tool') +
+                   '" style="color:var(--brand);"></i>' +
+                   '<div style="flex:1;font-size:13px;">' + escapeHtml(it.label) + '</div>' +
+                   '<button class="btn btn-secondary btn-small" onclick="removeExternalShipItem(' + i +
+                   ')" style="color:var(--danger);" title="Убрать"><i class="ti ti-x"></i></button>' +
+                   '</div>';
+    });
+    itemsHtml += '</div>';
+  }
+
+  m.innerHTML = '<div class="modal modal-wide" onclick="event.stopPropagation()" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-package-export"></i> Отгрузка без договора</h3>' +
+      '<button class="modal-close" onclick="closeExternalShipment()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div style="padding:18px;overflow-y:auto;flex:1;">' +
+      // Получатель
+      '<div style="font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Получатель</div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:12px;">' +
+        '<label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid ' + (prev.type === 'inn' ? 'var(--brand)' : 'var(--border)') + ';border-radius:8px;cursor:pointer;">' +
+          '<input type="radio" name="rec-type" id="ext-rec-type-inn" value="inn" ' + (prev.type === 'inn' ? 'checked' : '') + ' onchange="renderExternalShipmentForm()" />' +
+          '<span style="font-size:14px;font-weight:600;">Юрлицо (ИНН)</span>' +
+        '</label>' +
+        '<label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid ' + (prev.type === 'individual' ? 'var(--brand)' : 'var(--border)') + ';border-radius:8px;cursor:pointer;">' +
+          '<input type="radio" name="rec-type" id="ext-rec-type-ind" value="individual" ' + (prev.type === 'individual' ? 'checked' : '') + ' onchange="renderExternalShipmentForm()" />' +
+          '<span style="font-size:14px;font-weight:600;">Физлицо</span>' +
+        '</label>' +
+      '</div>' +
+      (prev.type === 'inn' ?
+        '<input type="text" id="ext-rec-inn" placeholder="ИНН (10 или 12 цифр)" value="' + escapeHtml(prev.inn) +
+        '" inputmode="numeric" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:8px;" />'
+        : ''
+      ) +
+      '<input type="text" id="ext-rec-name" placeholder="' + (prev.type === 'inn' ? 'Название организации' : 'ФИО получателя') +
+      '" value="' + escapeHtml(prev.name) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:12px;" />' +
+      '<textarea id="ext-rec-comment" placeholder="Комментарий (куда и зачем, обязательно)" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:16px;">' + escapeHtml(prev.comment) + '</textarea>' +
+      // Позиции
+      '<div style="font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Позиции (' + items.length + ')</div>' +
+      itemsHtml +
+      '<div style="display:flex;gap:8px;margin-top:10px;">' +
+        '<button class="btn btn-secondary btn-small" onclick="addExternalShipItemByQr()" style="flex:1;">' +
+          '<i class="ti ti-scan"></i> Сканировать QR</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="addExternalShipItemByToken()" style="flex:1;">' +
+          '<i class="ti ti-keyboard"></i> Ввести токен</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);">' +
+      '<button class="btn btn-primary" onclick="submitExternalShipment()" style="width:100%;">' +
+        '<i class="ti ti-check"></i> Отгрузить (' + items.length + ' поз.)</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function removeExternalShipItem(idx) {
+  state._externalShipItems.splice(idx, 1);
+  renderExternalShipmentForm();
+}
+
+function addExternalShipItemByToken() {
+  const token = prompt('Введи QR-токен или полную ссылку:');
+  if (!token) return;
+  _addExternalShipItemFromToken(token.trim());
+}
+
+function addExternalShipItemByQr() {
+  // Сохраним состояние формы перед запуском сканера
+  state._externalShipFormData = {
+    type: document.getElementById('ext-rec-type-inn').checked ? 'inn' : 'individual',
+    inn: (document.getElementById('ext-rec-inn') || {}).value || '',
+    name: document.getElementById('ext-rec-name').value || '',
+    comment: document.getElementById('ext-rec-comment').value || '',
+  };
+  state._externalShipCallback = true;
+  closeExternalShipment();
+  openQrScanner();
+}
+
+async function _addExternalShipItemFromToken(rawText) {
+  // Парсим URL или принимаем токен как есть
+  let token = rawText;
+  try {
+    const u = new URL(rawText);
+    const mm = u.pathname.match(/\/[abc]\/([A-Za-z0-9_\-]+)/);
+    if (mm) token = mm[1];
+  } catch (e) { /* не URL */ }
+
+  try {
+    const r = await fetch(API_BASE + '/api/qr/lookup/' + encodeURIComponent(token), {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) { showToast('QR не распознан', 'error'); return; }
+    const info = await r.json();
+    if (info.type === 'contract') {
+      showToast('Это QR договора, выбери сборку или коробку', 'error');
+      return;
+    }
+    if (info.is_shipped) {
+      showToast('Эта позиция уже отгружена', 'error');
+      return;
+    }
+    if (!state._externalShipItems) state._externalShipItems = [];
+    // Не добавлять дубль
+    const dup = state._externalShipItems.find(x => x.type === info.type && x.id === info.id);
+    if (dup) { showToast('Уже добавлено', 'info'); return; }
+    state._externalShipItems.push({
+      type: info.type,
+      id: info.id,
+      label: (info.type === 'box' ? '📦 ' : '🔧 ') + (info.name || ('#' + info.id)) +
+             (info.contract_number ? ' · договор № ' + info.contract_number : ''),
+    });
+    showToast('Добавлено', 'success');
+    // Если форма закрыта (запускали сканер) — открыть снова
+    if (state._externalShipCallback) {
+      state._externalShipCallback = false;
+      openExternalShipmentForm();
+      // Восстановим введённые данные
+      setTimeout(() => {
+        const saved = state._externalShipFormData;
+        if (saved) {
+          if (saved.type === 'individual') {
+            const r = document.getElementById('ext-rec-type-ind');
+            if (r) { r.checked = true; renderExternalShipmentForm(); }
+          }
+          setTimeout(() => {
+            if (document.getElementById('ext-rec-inn')) document.getElementById('ext-rec-inn').value = saved.inn || '';
+            if (document.getElementById('ext-rec-name')) document.getElementById('ext-rec-name').value = saved.name || '';
+            if (document.getElementById('ext-rec-comment')) document.getElementById('ext-rec-comment').value = saved.comment || '';
+          }, 50);
+        }
+      }, 100);
+    } else {
+      renderExternalShipmentForm();
+    }
+  } catch (e) {
+    showToast('Ошибка связи', 'error');
+  }
+}
+
+async function submitExternalShipment() {
+  const isInn = document.getElementById('ext-rec-type-inn').checked;
+  const rec_type = isInn ? 'inn' : 'individual';
+  const rec_inn = isInn ? (document.getElementById('ext-rec-inn').value || '').trim() : '';
+  const rec_name = (document.getElementById('ext-rec-name').value || '').trim();
+  const rec_comment = (document.getElementById('ext-rec-comment').value || '').trim();
+  const items = state._externalShipItems || [];
+
+  if (!rec_name) { showToast('Укажи получателя', 'error'); return; }
+  if (isInn && (!/^\d{10}$|^\d{12}$/.test(rec_inn))) {
+    showToast('ИНН должен содержать 10 или 12 цифр', 'error'); return;
+  }
+  if (!rec_comment) { showToast('Комментарий обязателен', 'error'); return; }
+  if (!items.length) { showToast('Добавь хотя бы одну позицию', 'error'); return; }
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/shipments/external', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        recipient_type: rec_type,
+        recipient_name: rec_name,
+        recipient_inn: rec_inn,
+        recipient_comment: rec_comment,
+        items: items.map(x => ({ type: x.type, id: x.id })),
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && r.status !== 207) {
+      showToast(d.message || 'Не удалось отгрузить', 'error');
+      return;
+    }
+    if (d.errors && d.errors.length) {
+      alert('Отгружено ' + (d.created || 0) + ' из ' + items.length + '\n\nОшибки:\n' + d.errors.join('\n'));
+    } else {
+      showToast('Отгружено: ' + (d.created || 0) + ' поз.', 'success');
+    }
+    closeExternalShipment();
+    if (state.currentScreen === 'warehouse-stock') loadWarehouseStock();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
 
 async function openShipmentMode(contractId) {
   if (!contractId) return;
