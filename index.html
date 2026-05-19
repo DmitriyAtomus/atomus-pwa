@@ -6639,16 +6639,22 @@
     color: var(--text-light);
   }
 
-  /* Кнопка "обзор номенклатуры" — рядом с полем поиска */
-  /* Привязка к низу обёртки = центрирование в input (autocomplete-результаты
-     position:absolute и в layout не считаются). Зазор 3px ≈ (38-32)/2. */
+  /* Обёртка input + кнопка обзора — flex со stretch, чтобы кнопка
+     автоматически тянулась на высоту input (без магических пикселей) */
+  .spec-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .spec-search-wrap > input[type="text"] {
+    flex: 1;
+    min-width: 0;
+  }
   .spec-browse-btn {
-    position: absolute;
-    right: 8px;
-    bottom: 3px;
-    top: auto;
-    width: 32px;
-    height: 32px;
+    flex: 0 0 auto;
+    width: 40px;
+    padding: 0;
     border-radius: 8px;
     background: var(--brand);
     color: white;
@@ -6658,7 +6664,6 @@
     justify-content: center;
     cursor: pointer;
     transition: opacity 0.15s;
-    z-index: 2;
   }
   .spec-browse-btn:hover { opacity: 0.88; }
   .spec-browse-btn i { font-size: 16px; }
@@ -9003,7 +9008,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.7.3-spec-btn-fix";
+const APP_VERSION = "v2.7.4-spec-btn-flex";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -15493,16 +15498,17 @@ function renderSpecForm(contractId, existing) {
 
   let html = '<div class="spec-form" id="' + formId + '">';
   // Поле поиска модели
-  html += '<div class="spec-form-field" style="grid-column: 1 / -1; position: relative;">';
+  html += '<div class="spec-form-field" style="grid-column: 1 / -1;">';
   html += '<label>Позиция (поиск по номенклатуре) *</label>';
   html += '<input type="hidden" id="spec-form-model-id" value="' + (e.model_id || '') + '">';
   html += '<input type="hidden" id="spec-form-name" value="' + escapeHtml(e.name || '') + '">';
+  html += '<div class="spec-search-wrap">';
   html += '<input type="text" id="spec-form-search" value="' + escapeHtml(modelLabel) +
           '" placeholder="Начните вводить название или артикул…" autocomplete="off" ' +
-          'oninput="onSpecSearchInput(this.value)" onfocus="onSpecSearchInput(this.value)" ' +
-          'style="padding-right: 46px;">';
+          'oninput="onSpecSearchInput(this.value)" onfocus="onSpecSearchInput(this.value)">';
   html += '<button class="spec-browse-btn" onclick="openNomPicker(' + contractId + ',' + (isEdit ? existing.id : 'null') + ')" title="Обзор номенклатуры" type="button"><i class="ti ti-layout-grid"></i></button>';
   html += '<div id="spec-search-results" class="spec-search-results" style="display:none;"></div>';
+  html += '</div>';
   html += '</div>';
   // Кол-во + ед.изм.
   html += '<div class="spec-form-field"><label>Кол-во *</label>' +
