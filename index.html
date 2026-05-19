@@ -912,14 +912,42 @@
     row-gap: 10px;
     position: relative;
   }
-  /* Контекст "Продажная номенклатура" — там есть абсолютная кнопка "Категории" справа */
-  .desktop-layout #sp-categories-filters {
-    padding-right: 140px !important;
+
+  /* ============ ЭТАП 30.4: компактный toolbar для каталогов ============ */
+  /* Поиск + чипы товара/услуги в одной строке. */
+  .sp-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 18px 10px;
+    flex-wrap: wrap;
   }
-  .desktop-layout #sp-categories-filters .cat-edit-link {
-    position: absolute;
-    right: 0; top: 0;
-    margin-left: 0 !important;
+  .desktop-layout .sp-toolbar {
+    padding: 0 0 12px;
+    background: none;
+  }
+  .sp-toolbar-search {
+    flex: 1 1 280px;
+    min-width: 240px;
+    max-width: 480px;
+  }
+  .sp-toolbar-chips {
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+  .desktop-layout .sp-toolbar-chips {
+    padding: 0 !important;
+  }
+  /* Категории — отдельной строкой, без правого padding и кнопки в углу */
+  .sp-categories-row {
+    padding: 6px 18px 14px !important;
+    gap: 8px;
+  }
+  .desktop-layout .sp-categories-row {
+    padding: 0 0 18px !important;
   }
 
   /* Обёртка для группы фильтр-кнопок (используется на Складе, Снабжении). */
@@ -4125,13 +4153,14 @@
 
   /* Строка в таблице/списке продажных позиций */
   .sale-product-row {
-    padding: 14px 18px;
+    padding: 11px 18px;
     display: grid;
     grid-template-columns: 44px 1fr 130px 140px 100px 36px;
     gap: 12px;
     align-items: center;
     border-top: 1px solid var(--border);
     cursor: pointer;
+    transition: background 0.12s;
   }
   .sale-product-row:hover { background: var(--bg); }
   .sale-product-row.header {
@@ -8326,28 +8355,30 @@
           </div>
           <div class="page-actions">
             <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-secondary" onclick="selectSidebarItem('sale-categories')" title="Управление категориями">
+              <i class="ti ti-settings"></i> Категории
+            </button>
             <button class="btn btn-primary" id="sp-new-btn" onclick="openNewSaleProduct()">
               <i class="ti ti-plus"></i> Новая позиция
             </button>
           </div>
         </div>
         <div class="content-inner">
-          <div class="search-box" style="padding: 12px 18px 0;">
-            <i class="ti ti-search"></i>
-            <input type="text" id="sp-search-input" placeholder="Поиск по названию или описанию…">
+          <!-- ЭТАП 30.4: единая компактная панель фильтров -->
+          <div class="sp-toolbar">
+            <div class="search-box sp-toolbar-search">
+              <i class="ti ti-search"></i>
+              <input type="text" id="sp-search-input" placeholder="Поиск по названию или описанию…">
+            </div>
+            <div class="filter-row sp-toolbar-chips" id="sp-filters">
+              <button class="filter-chip active" data-spf="all">Все</button>
+              <button class="filter-chip" data-spf="goods">Товары</button>
+              <button class="filter-chip" data-spf="service">Услуги</button>
+            </div>
           </div>
-          <div class="filter-row" id="sp-filters">
-            <button class="filter-chip active" data-spf="all">Все</button>
-            <button class="filter-chip" data-spf="goods">Товары</button>
-            <button class="filter-chip" data-spf="service">Услуги</button>
-          </div>
-          <!-- ЭТАП 17: фильтр по категории + ссылка на справочник -->
-          <div class="filter-row" id="sp-categories-filters" style="padding: 0 18px 8px;">
+          <div class="filter-row sp-categories-row" id="sp-categories-filters">
             <button class="filter-chip active" data-spcat="">Все категории</button>
             <!-- остальные чипы добавятся динамически -->
-            <button class="filter-chip cat-edit-link" onclick="selectSidebarItem('sale-categories')" style="margin-left: auto;">
-              <i class="ti ti-settings"></i> Категории
-            </button>
           </div>
           <div id="sp-content"><div class="loading-block">Загружаем…</div></div>
         </div>
@@ -9391,7 +9422,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.11.3-zilon-catalog";
+const APP_VERSION = "v2.11.4-ui-polish";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -11682,8 +11713,6 @@ function renderSaleProductsList() {
 function renderSaleCategoryChips(activeKey) {
   const wrap = document.getElementById('sp-categories-filters');
   if (!wrap) return;
-  // Удаляем все .filter-chip кроме «Все категории» и кнопки настроек
-  const editLink = wrap.querySelector('.cat-edit-link');
   // Очищаем содержимое
   wrap.innerHTML = '';
   // Кнопка «Все категории»
@@ -11710,16 +11739,7 @@ function renderSaleCategoryChips(activeKey) {
   noCatBtn.textContent = 'Без категории';
   noCatBtn.onclick = () => setSaleCategoryFilter('0');
   wrap.appendChild(noCatBtn);
-  // Кнопка «Категории» (ссылка на справочник)
-  if (editLink) wrap.appendChild(editLink);
-  else {
-    const link = document.createElement('button');
-    link.className = 'filter-chip cat-edit-link';
-    link.style.marginLeft = 'auto';
-    link.innerHTML = '<i class="ti ti-settings"></i> Категории';
-    link.onclick = () => selectSidebarItem('sale-categories');
-    wrap.appendChild(link);
-  }
+  // ЭТАП 30.4: кнопка «Категории» перенесена в page-actions, тут больше не добавляется
 }
 
 function setSaleCategoryFilter(key) {
