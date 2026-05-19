@@ -112,6 +112,38 @@
   }
   .code-input:focus { border-color: var(--brand); }
   .code-input::placeholder { color: #C0C5D0; font-weight: 400; }
+
+  /* ЭТАП 28: вкладки выбора способа входа */
+  .login-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: #F1F4F8;
+    border-radius: 10px;
+  }
+  .login-tab {
+    flex: 1;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light, #6B7280);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .login-tab.active {
+    background: white;
+    color: var(--brand);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .login-tab i { font-size: 16px; }
   .btn {
     padding: 10px 16px; border-radius: 10px;
     font-size: 14px; font-weight: 500; cursor: pointer;
@@ -7004,16 +7036,43 @@
 
     <div class="login-card">
       <h2>Вход в кабинет</h2>
-      <p>Получите одноразовый код у Telegram-бота и введите его ниже.</p>
-      <div class="steps">
-        1. Откройте <a href="https://t.me/AtomusgroupBot" target="_blank" class="telegram-link">@AtomusgroupBot</a><br/>
-        2. Отправьте команду <code>/login</code><br/>
-        3. Бот пришлёт код — введите его ниже
+
+      <!-- ЭТАП 28: вкладки выбора способа входа -->
+      <div class="login-tabs">
+        <button class="login-tab active" data-login-tab="telegram" onclick="switchLoginTab('telegram')">
+          <i class="ti ti-brand-telegram"></i> Через Telegram
+        </button>
+        <button class="login-tab" data-login-tab="password" onclick="switchLoginTab('password')">
+          <i class="ti ti-key"></i> По паролю
+        </button>
       </div>
-      <input type="text" id="code-input" class="code-input"
-             placeholder="000000" maxlength="6"
-             inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*">
-      <button class="btn btn-primary btn-full" id="submit-btn" onclick="submitCode()">Войти</button>
+
+      <!-- Вкладка: Telegram -->
+      <div class="login-tab-body" id="login-body-telegram">
+        <p>Получите одноразовый код у Telegram-бота и введите его ниже.</p>
+        <div class="steps">
+          1. Откройте <a href="https://t.me/AtomusgroupBot" target="_blank" class="telegram-link">@AtomusgroupBot</a><br/>
+          2. Отправьте команду <code>/login</code><br/>
+          3. Бот пришлёт код — введите его ниже
+        </div>
+        <input type="text" id="code-input" class="code-input"
+               placeholder="000000" maxlength="6"
+               inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*">
+        <button class="btn btn-primary btn-full" id="submit-btn" onclick="submitCode()">Войти</button>
+      </div>
+
+      <!-- Вкладка: Пароль -->
+      <div class="login-tab-body" id="login-body-password" style="display:none;">
+        <p>Введите ваш пароль. Имя определится автоматически.</p>
+        <div class="steps" style="background:transparent; padding:0 0 12px;">
+          Пароль выдаёт директор. Если забыли — обратитесь к нему.
+        </div>
+        <input type="password" id="password-input" class="code-input"
+               placeholder="Ваш пароль" autocomplete="current-password"
+               style="letter-spacing:normal; font-size:18px; text-align:left; padding:14px 16px;">
+        <button class="btn btn-primary btn-full" id="password-submit-btn" onclick="submitPassword()">Войти</button>
+      </div>
+
       <div class="status" id="login-status"></div>
     </div>
   </div>
@@ -9093,7 +9152,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.7.7-help-update";
+const APP_VERSION = "v2.8.0-password-auth";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -9291,12 +9350,76 @@ async function submitCode() {
     localStorage.setItem(TOKEN_KEY, r.data.token);
     state.user = r.data.user;
     setStatus('Готово!', 'success');
+    // ЭТАП 28: приветствие после входа
+    state._loginWelcome = r.data.user;
     setTimeout(showApp, 300);
   } catch (e) {
     setStatus('Ошибка соединения: ' + String(e), 'error');
     btn.disabled = false;
   }
 }
+
+// ============ ЭТАП 28: ВХОД ПО ПАРОЛЮ ============
+
+function switchLoginTab(tabName) {
+  // Переключатель вкладок Telegram / Пароль
+  document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+  const btn = document.querySelector('.login-tab[data-login-tab="' + tabName + '"]');
+  if (btn) btn.classList.add('active');
+  const tg = document.getElementById('login-body-telegram');
+  const pw = document.getElementById('login-body-password');
+  if (tg) tg.style.display = (tabName === 'telegram') ? '' : 'none';
+  if (pw) pw.style.display = (tabName === 'password') ? '' : 'none';
+  setStatus('');
+  // Фокус
+  setTimeout(() => {
+    if (tabName === 'telegram') {
+      const c = document.getElementById('code-input'); if (c) c.focus();
+    } else {
+      const p = document.getElementById('password-input'); if (p) p.focus();
+    }
+  }, 50);
+}
+
+async function submitPassword() {
+  const input = document.getElementById('password-input');
+  const password = (input && input.value || '').trim();
+  const btn = document.getElementById('password-submit-btn');
+  if (!password) { setStatus('Введите пароль', 'error'); return; }
+  if (password.length < 6) { setStatus('Пароль должен быть не короче 6 символов', 'error'); return; }
+  btn.disabled = true;
+  setStatus('Проверяем пароль…');
+  try {
+    const r = await apiPost('/api/auth/password', { password });
+    if (!r.ok) {
+      setStatus(r.data.message || r.data.error || 'Неверный пароль', 'error');
+      btn.disabled = false;
+      // Стираем поле чтобы не дать перебирать вслепую
+      if (input) { input.value = ''; input.focus(); }
+      return;
+    }
+    localStorage.setItem(TOKEN_KEY, r.data.token);
+    state.user = r.data.user;
+    setStatus('Готово!', 'success');
+    state._loginWelcome = r.data.user;
+    setTimeout(showApp, 300);
+  } catch (e) {
+    setStatus('Ошибка соединения: ' + String(e), 'error');
+    btn.disabled = false;
+  }
+}
+
+// Enter в поле пароля = клик по кнопке
+document.addEventListener('DOMContentLoaded', () => {
+  const p = document.getElementById('password-input');
+  if (p) {
+    p.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); submitPassword(); }
+    });
+  }
+});
+
+// ============ КОНЕЦ ЭТАПА 28 ============
 
 function logout() {
   localStorage.removeItem(TOKEN_KEY);
@@ -9306,6 +9429,10 @@ function logout() {
   const input = document.getElementById('code-input');
   if (input) { input.value = ''; input.focus(); }
   document.getElementById('submit-btn').disabled = false;
+  const pInput = document.getElementById('password-input');
+  if (pInput) pInput.value = '';
+  const pBtn = document.getElementById('password-submit-btn');
+  if (pBtn) pBtn.disabled = false;
   setStatus('');
 }
 
@@ -9331,12 +9458,22 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   applyLayout();
   if (!state.user) {
-    apiGet('/api/me').then(me => { state.user = me; renderProfile(); selectSection('home'); })
+    apiGet('/api/me').then(me => { state.user = me; renderProfile(); selectSection('home'); _showWelcomeIfFresh(); })
       .catch(() => logout());
   } else {
     renderProfile();
     selectSection('home');
+    _showWelcomeIfFresh();
   }
+}
+
+// ЭТАП 28: приветственный тост при свежем входе (любым способом)
+function _showWelcomeIfFresh() {
+  if (!state._loginWelcome) return;
+  const u = state._loginWelcome;
+  state._loginWelcome = null;
+  const name = u.short_name || u.full_name || u.name || 'друг';
+  setTimeout(() => showToast('Добро пожаловать, ' + name + '!', 'success'), 400);
 }
 
 function renderProfile() {
@@ -10034,7 +10171,9 @@ function renderEmployeeRow(e, isDirector) {
   const clickAttr = isDirector ? ' onclick="openEditEmployee(' + e.id + ')"' : '';
   const arrow = isDirector ? '<div class="emp-arrow"><i class="ti ti-chevron-right"></i></div>' : '';
   return '<div class="employee-row' + inactiveClass + '"' + clickAttr + '>' +
-    '<div class="emp-info"><div class="emp-name">' + escapeHtml(e.full_name || e.short_name || '—') + '</div>' +
+    '<div class="emp-info"><div class="emp-name">' + escapeHtml(e.full_name || e.short_name || '—') +
+       (e.has_password ? ' <i class="ti ti-key" title="Установлен пароль для входа без Telegram" style="font-size:13px; color:var(--text-light); margin-left:4px; vertical-align:middle;"></i>' : '') +
+    '</div>' +
     '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + ' ' + badges + '</div></div>' +
     arrow + '</div>';
 }
@@ -10055,6 +10194,9 @@ state.employeeForm = {
   telegram_id: '',
   roles: [],            // массив строк, напр. ['director','master']
   _is_active: true,     // для режима редактирования: показывать ли кнопку «Деактивировать»
+  password: '',         // ЭТАП 28: пароль (только при создании / явной смене)
+  _has_password: false, // ЭТАП 28: текущий статус (для edit)
+  _password_action: 'keep', // ЭТАП 28 (edit): 'keep' | 'set' | 'clear'
 };
 
 // Список 6 ролей — теперь синхронизирован с бэком (фронт может рендерить независимо).
@@ -10077,6 +10219,7 @@ function openNewEmployee() {
   state.employeeForm = {
     full_name: '', position: '', phone: '', email: '', tab_number: '', telegram_id: '',
     roles: [], _is_active: true,
+    password: '', _has_password: false, _password_action: 'set',  // ЭТАП 28
   };
   selectSidebarItem('employee-form');
 }
@@ -10103,6 +10246,10 @@ function openEditEmployee(empId) {
     telegram_id: emp.telegram_id ? String(emp.telegram_id) : '',
     roles: [...(emp.roles || [])],
     _is_active: !!emp.is_active,
+    // ЭТАП 28
+    password: '',
+    _has_password: !!emp.has_password,
+    _password_action: 'keep',
   };
   selectSidebarItem('employee-form');
 }
@@ -10163,7 +10310,70 @@ function renderEmployeeForm() {
   });
   html += '</div>';
 
-  // Блок 3: Расширенные настройки (скрыто по умолчанию, разворачивается)
+  // Блок 3 (ЭТАП 28): пароль для входа без Telegram
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Пароль для входа <span style="font-weight:400; font-size:12px; color:var(--text-light); margin-left:4px;">' +
+          (isEdit ? '(оставьте «не менять», чтобы сохранить текущий)' : '(для тех, кто работает без Telegram)') +
+          '</span></div>';
+
+  if (isEdit) {
+    // В режиме edit показываем три радио-варианта
+    const act = f._password_action || 'keep';
+    html += '<div style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;">';
+
+    // 1. Не менять
+    html += '<label class="role-checkbox' + (act === 'keep' ? ' selected' : '') + '" style="cursor:pointer;">' +
+      '<input type="radio" name="empf-pw-action" value="keep" ' + (act === 'keep' ? 'checked' : '') + ' style="display:none;" onclick="setEmployeePwAction(\'keep\')">' +
+      '<div class="check">' + (act === 'keep' ? '<i class="ti ti-check"></i>' : '') + '</div>' +
+      '<div class="role-body">' +
+        '<div class="role-name">Не менять</div>' +
+        '<div class="role-desc">' + (f._has_password ? 'Пароль установлен — оставить как есть' : 'Пароль не установлен — оставить без пароля') + '</div>' +
+      '</div></label>';
+
+    // 2. Установить новый
+    html += '<label class="role-checkbox' + (act === 'set' ? ' selected' : '') + '" style="cursor:pointer;">' +
+      '<input type="radio" name="empf-pw-action" value="set" ' + (act === 'set' ? 'checked' : '') + ' style="display:none;" onclick="setEmployeePwAction(\'set\')">' +
+      '<div class="check">' + (act === 'set' ? '<i class="ti ti-check"></i>' : '') + '</div>' +
+      '<div class="role-body">' +
+        '<div class="role-name">' + (f._has_password ? 'Сменить пароль' : 'Установить пароль') + '</div>' +
+        '<div class="role-desc">Задать новый пароль для входа без Telegram</div>' +
+      '</div></label>';
+
+    // 3. Снять
+    if (f._has_password) {
+      html += '<label class="role-checkbox' + (act === 'clear' ? ' selected' : '') + '" style="cursor:pointer;">' +
+        '<input type="radio" name="empf-pw-action" value="clear" ' + (act === 'clear' ? 'checked' : '') + ' style="display:none;" onclick="setEmployeePwAction(\'clear\')">' +
+        '<div class="check">' + (act === 'clear' ? '<i class="ti ti-check"></i>' : '') + '</div>' +
+        '<div class="role-body">' +
+          '<div class="role-name">Снять пароль</div>' +
+          '<div class="role-desc">Сотрудник больше не сможет входить по паролю (Telegram-вход останется работать)</div>' +
+        '</div></label>';
+    }
+    html += '</div>';
+  }
+
+  // Поле ввода пароля (показываем когда: new ИЛИ edit+_password_action==='set')
+  const showPwInput = !isEdit || f._password_action === 'set';
+  if (showPwInput) {
+    html += '<div class="sales-form-row cols-1"><div>';
+    html += '<label>Пароль ' +
+            '<span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(минимум 6 символов, должен быть уникальным)</span>' +
+            '</label>';
+    html += '<div style="display:flex; gap:8px; align-items:stretch;">';
+    html += '<input type="text" id="empf-password" value="' + escapeHtml(f.password || '') + '" placeholder="напр. ' + (isEdit ? 'новый пароль' : 'k7m9x2p4') + '" style="flex:1; font-family: ui-monospace, monospace; letter-spacing:1px;" autocomplete="off">';
+    html += '<button class="btn btn-secondary" onclick="generateEmployeePassword()" type="button" title="Сгенерировать случайный пароль" style="white-space:nowrap;"><i class="ti ti-dice"></i> Сгенерировать</button>';
+    html += '</div>';
+    if (!isEdit) {
+      html += '<div style="font-size: 12px; color: var(--text-light); margin-top: 6px; line-height: 1.5;">Если оставить пустым — войти можно будет только через Telegram. Запишите пароль и передайте сотруднику.</div>';
+    }
+    html += '</div></div>';
+  } else if (isEdit && f._has_password) {
+    // Индикатор «пароль установлен»
+    html += '<div style="font-size: 12.5px; color: var(--success, #2D7D46); padding: 8px 12px; background: rgba(45,125,70,0.08); border-radius: 8px;"><i class="ti ti-check"></i> Пароль установлен</div>';
+  }
+  html += '</div>';
+
+  // Блок 4: Расширенные настройки (скрыто по умолчанию, разворачивается)
   html += '<div class="sales-form-section">';
   html += '<button class="advanced-toggle" onclick="toggleAdvancedSettings()">' +
           '<i class="ti ti-chevron-down" id="empf-adv-icon"></i> Расширенные настройки</button>';
@@ -10217,6 +10427,38 @@ function renderEmployeeForm() {
   document.getElementById('empf-tab-number').addEventListener('input', e => { state.employeeForm.tab_number = e.target.value; });
   const tgEl = document.getElementById('empf-telegram-id');
   if (tgEl) tgEl.addEventListener('input', e => { state.employeeForm.telegram_id = e.target.value.replace(/\D/g, ''); });
+  // ЭТАП 28: подвязка поля пароля
+  const pwEl = document.getElementById('empf-password');
+  if (pwEl) pwEl.addEventListener('input', e => { state.employeeForm.password = e.target.value; });
+}
+
+// ЭТАП 28: переключение режима работы с паролем при редактировании
+function setEmployeePwAction(action) {
+  state.employeeForm._password_action = action;
+  if (action !== 'set') state.employeeForm.password = '';
+  renderEmployeeForm();
+}
+
+// ЭТАП 28: генератор случайного пароля (8 символов, латиница + цифры, без неоднозначных)
+function generateEmployeePassword() {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789'; // без 0/o/O/1/l/i/I чтобы не путали
+  let pw = '';
+  const arr = new Uint8Array(8);
+  if (window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(arr);
+    for (let i = 0; i < 8; i++) pw += alphabet[arr[i] % alphabet.length];
+  } else {
+    // fallback
+    for (let i = 0; i < 8; i++) pw += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  state.employeeForm.password = pw;
+  renderEmployeeForm();
+  // Сразу выставляем курсор в поле и подсвечиваем — чтобы директор мог скопировать
+  setTimeout(() => {
+    const el = document.getElementById('empf-password');
+    if (el) { el.focus(); el.select(); }
+  }, 50);
+  showToast('Пароль сгенерирован — запишите его', 'info');
 }
 
 function toggleEmployeeRole(roleCode) {
@@ -10261,6 +10503,21 @@ async function submitEmployeeForm() {
     return;
   }
 
+  // ЭТАП 28: валидация пароля
+  const isEdit = state.employeeFormMode === 'edit';
+  const pwAction = isEdit ? (f._password_action || 'keep') : (f.password ? 'set' : 'keep');
+  const pwValue = (f.password || '').trim();
+  if (pwAction === 'set') {
+    if (pwValue.length < 6) {
+      errEl.innerHTML = '<div class="sales-error">Пароль должен быть не короче 6 символов</div>';
+      return;
+    }
+    if (pwValue.length > 100) {
+      errEl.innerHTML = '<div class="sales-error">Пароль слишком длинный (макс 100)</div>';
+      return;
+    }
+  }
+
   const payload = {
     full_name: f.full_name.trim(),
     position: f.position.trim(),
@@ -10278,7 +10535,11 @@ async function submitEmployeeForm() {
     payload.telegram_id = tg;
   }
 
-  const isEdit = state.employeeFormMode === 'edit';
+  // При СОЗДАНИИ — пароль шлём прямо в payload, бэк создаст одной транзакцией
+  if (!isEdit && pwAction === 'set' && pwValue) {
+    payload.password = pwValue;
+  }
+
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
 
@@ -10305,7 +10566,32 @@ async function submitEmployeeForm() {
       btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать сотрудника');
       return;
     }
-    showToast(isEdit ? 'Сотрудник обновлён' : 'Сотрудник создан', 'success');
+
+    // ЭТАП 28: для EDIT — отдельный запрос на смену/сброс пароля
+    const empId = isEdit ? state.currentEmployeeId : (data.id || data.employee_id);
+    if (isEdit && empId && (pwAction === 'set' || pwAction === 'clear')) {
+      const pwPayload = pwAction === 'clear' ? { password: null } : { password: pwValue };
+      const r2 = await fetch(API_BASE + '/api/employees/' + empId + '/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(pwPayload),
+      });
+      const data2 = await r2.json();
+      if (!r2.ok) {
+        // Не критично: сотрудник уже сохранён, но пароль не применился
+        errEl.innerHTML = '<div class="sales-error">Сотрудник сохранён, но пароль не применился: ' +
+                          escapeHtml(data2.message || data2.error || 'ошибка') + '</div>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ti ti-check"></i> Сохранить';
+        return;
+      }
+    }
+    // ЭТАП 28: для создания — проверим что пароль реально применился
+    if (!isEdit && pwAction === 'set' && data && data.has_password === false) {
+      showToast('Сотрудник создан, но такой пароль уже используется. Задайте другой через карточку.', 'error');
+    } else {
+      showToast(isEdit ? 'Сотрудник обновлён' : 'Сотрудник создан', 'success');
+    }
     cache.employees = null;
     cache.activeEmployees = null;
     cache.managersForPicker = null;
@@ -18820,10 +19106,69 @@ const HELP_FAQ = [
     q: 'Что делать если приложение не открывается / висит?',
     a: '1) Нажми <b>Ctrl+Shift+R</b> (десктоп) — полная перезагрузка с очисткой кэша. 2) Если не помогло — F12 → Application → Service Workers → Unregister. 3) На телефоне: настройки → очистить данные сайта <code>atomus-pwa.vercel.app</code>. 4) Если совсем плохо — напиши в Telegram-бот @AtomusgroupBot.',
   },
+  {
+    id: 'team-password-login',
+    cat: 'start', cat_label: 'Старт', icon: 'ti-key',
+    title: 'Вход по паролю (для тех, кто без Telegram)',
+    summary: 'Как зайти в Atomus без Telegram — по паролю. Как директор задаёт пароль сотруднику.',
+    body: [
+      { p: 'С версии 2.8 в систему можно зайти двумя способами: через Telegram-бот (как раньше) или по паролю. Пароль удобен для сотрудников, которые не пользуются Telegram, — например, для бухгалтера или мастера производства.' },
+      { h: 'Как зайти по паролю (сотрудник)' },
+      { ul: [
+        'Открой страницу входа: <code>atomus-pwa.vercel.app</code>',
+        'Переключись на вкладку <b>«По паролю»</b>',
+        'Введи пароль и жми <b>«Войти»</b> — больше ничего вводить не нужно',
+        'Система сама определит, кто ты, и поздоровается: «Добро пожаловать, Иванов И.И.!»',
+      ] },
+      { note: 'Пароль выдаёт директор. Если забыл — не пытайся подобрать (после 10 попыток с одного устройства вход блокируется на 10 минут), просто попроси директора задать новый.' },
+      { h: 'Как директор задаёт пароль' },
+      { p: 'Только директор может ставить и менять пароли сотрудников.' },
+      { ul: [
+        'Кадры → Сотрудники → выбери сотрудника (или создай нового)',
+        'В форме найди блок <b>«Пароль для входа»</b>',
+        'Жми <b>«Сгенерировать»</b> — система предложит случайный пароль из 8 символов (без неоднозначных букв вроде <code>O</code>/<code>0</code> или <code>l</code>/<code>1</code>)',
+        'Либо введи свой пароль (минимум 6 символов)',
+        'Сохрани сотрудника',
+        'Запиши пароль и передай сотруднику — на стороне системы пароль увидеть нельзя (хранится только хеш)',
+      ] },
+      { h: 'Как сменить или снять пароль' },
+      { p: 'При редактировании сотрудника в блоке «Пароль для входа» доступно три варианта:' },
+      { ul: [
+        '<b>Не менять</b> — оставить как есть (выбрано по умолчанию)',
+        '<b>Сменить пароль</b> — задать новый',
+        '<b>Снять пароль</b> — сотрудник больше не сможет входить по паролю (Telegram-вход, если был, продолжит работать)',
+      ] },
+      { h: 'Можно ли использовать оба способа одновременно?' },
+      { p: 'Да. Если у сотрудника есть и Telegram-привязка, и пароль — он выбирает на странице входа удобную вкладку. Telegram даёт ещё и уведомления от бота; пароль — это просто доступ к веб-кабинету.' },
+      { h: 'Безопасность' },
+      { ul: [
+        'Пароль хранится в виде хеша PBKDF2-SHA256 с уникальной солью на каждого сотрудника',
+        'Подбор тормозится: на одно неверное угадывание уходит ~50 мс серверного времени',
+        'Дополнительная защита: после 10 неверных попыток с одного IP вход блокируется на 10 минут',
+        'Пароль должен быть <b>уникальным в системе</b> — двух одинаковых не бывает (иначе вход стал бы недетерминированным)',
+      ] },
+      { note: 'В списке «Сотрудники» рядом с именем тех, у кого установлен пароль, показывается иконка <i class="ti ti-key"></i>.' },
+    ],
+  },
 ];
 
 // Changelog — что нового, от свежего к старому
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.8.0',
+    date: '19.05.2026',
+    title: 'Вход по паролю',
+    features: [
+      'Новый способ входа — <b>«По паролю»</b> на экране логина, для сотрудников, у которых нет Telegram',
+      'Директор задаёт пароль в карточке сотрудника при создании или потом через редактирование',
+      'Кнопка <b>«Сгенерировать»</b> создаёт случайный пароль из 8 символов (без неоднозначных букв и цифр)',
+      'Сотрудник вводит <b>только пароль</b>, без выбора имени и табельного — система определяет, кто это, и здоровается: «Добро пожаловать, Иванов И.И.!»',
+      'Пароль уникален в системе (защита от пересечений) и хранится в виде хеша PBKDF2',
+      'У сотрудников с паролем в списке «Сотрудники» появилась иконка <i class="ti ti-key"></i>',
+      'Кадровик и мастер по электрике теперь могут заходить без Telegram',
+      'Telegram-вход продолжает работать как раньше — сотрудник с обоими способами может выбирать любой',
+    ],
+  },
   {
     version: 'v2.7.2',
     date: '18.05.2026',
