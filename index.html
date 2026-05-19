@@ -7403,6 +7403,10 @@
         <button class="nav-item new-btn" id="nav-hr-new" onclick="openNewVacation()">
           <i class="ti ti-circle-plus"></i><span>Новый отпуск</span>
         </button>
+        <div class="nav-section-label">ЛЮДИ</div>
+        <button class="nav-item" data-nav="employees" onclick="selectSidebarItem('employees')">
+          <i class="ti ti-users"></i><span>Сотрудники</span>
+        </button>
         <div class="nav-section-label">ОТПУСКА</div>
         <button class="nav-item active" data-nav="hr-vacations-timeline" onclick="selectSidebarItem('hr-vacations-timeline')">
           <i class="ti ti-chart-bar"></i><span>Таймлайн</span>
@@ -9152,7 +9156,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.8.0-password-auth";
+const APP_VERSION = "v2.8.1-hr-people-nav";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
