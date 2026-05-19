@@ -4163,6 +4163,62 @@
     transition: background 0.12s;
   }
   .sale-product-row:hover { background: var(--bg); }
+
+  /* ============ ЭТАП 30.6: сворачиваемые группы моделей ============ */
+  .models-group {
+    margin-bottom: 10px;
+  }
+  .models-group-toggle {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .models-group-toggle:hover {
+    background: var(--bg);
+    border-color: var(--brand);
+  }
+  .models-group-chevron {
+    transition: transform 0.2s;
+    color: var(--text-light);
+    font-size: 16px;
+  }
+  .models-group-chevron.open {
+    transform: rotate(90deg);
+  }
+  .models-group-name {
+    flex: 1;
+    text-align: left;
+    color: var(--text);
+  }
+  .models-group-count {
+    background: var(--brand-bg);
+    color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .models-group-body {
+    padding-top: 8px;
+    animation: modelGroupExpand 0.2s ease-out;
+  }
+  @keyframes modelGroupExpand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
   .sale-product-row.header {
     background: #F8F9FB;
     cursor: default;
@@ -7971,11 +8027,17 @@
         <div class="screen-header">
           <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
           <h2>Номенклатура</h2>
+          <button class="icon-btn" id="models-mobile-new" onclick="openNewModelForm()" style="display:none;"><i class="ti ti-plus"></i></button>
           <button class="icon-btn" onclick="loadModels()"><i class="ti ti-refresh"></i></button>
         </div>
         <div class="page-header">
           <div><h1>Номенклатура</h1><div class="page-subtitle">Справочник моделей по направлениям</div></div>
-          <button class="icon-btn" onclick="loadModels()"><i class="ti ti-refresh"></i></button>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadModels()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="models-new-btn" onclick="openNewModelForm()" style="display:none;">
+              <i class="ti ti-plus"></i> Новая модель
+            </button>
+          </div>
         </div>
         <div class="content-inner">
           <div id="models-list" class="list-container"><div class="loading-block">Загружаем…</div></div>
@@ -9422,7 +9484,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.11.5-suppliers-seed";
+const APP_VERSION = "v2.11.6-models-groups";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15765,6 +15827,13 @@ function formatActivityTime(iso) {
 
 async function loadModels() {
   const container = document.getElementById('models-list');
+  // ЭТАП 30.6: показ кнопки «Новая модель» для директора/зама
+  const canEdit = (typeof canManageSales === 'function') ? canManageSales() : false;
+  const btnDesktop = document.getElementById('models-new-btn');
+  const btnMobile = document.getElementById('models-mobile-new');
+  if (btnDesktop) btnDesktop.style.display = canEdit ? '' : 'none';
+  if (btnMobile) btnMobile.style.display = canEdit ? '' : 'none';
+
   if (cache.models) { renderModels(cache.models); return; }
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try { const d = await apiGet('/api/models'); cache.models = d; renderModels(d); }
@@ -15784,12 +15853,26 @@ function renderModels(d) {
     if (!groups[dirId]) groups[dirId] = [];
     groups[dirId].push(m);
   });
+  // ЭТАП 30.6: сворачиваемые группы. Состояние раскрытости в localStorage.
+  const openMap = JSON.parse(localStorage.getItem('models_groups_open') || '{}');
   let html = '';
-  Object.keys(groups).sort().forEach(dirId => {
+  const dirIds = Object.keys(groups).sort((a, b) => Number(a) - Number(b));
+  dirIds.forEach(dirId => {
     const dir = dirMap[dirId];
     const dirName = dir ? dir.name : '—';
     const models = groups[dirId];
-    html += '<div class="section-label">' + escapeHtml(dirName) + ' · ' + models.length + '</div><div class="card">';
+    // По умолчанию: если групп >= 2 — все свёрнуты; если одна — раскрыта.
+    const defaultOpen = (dirIds.length === 1);
+    const isOpen = (dirId in openMap) ? !!openMap[dirId] : defaultOpen;
+    html +=
+      '<div class="models-group">' +
+        '<button class="models-group-toggle" onclick="toggleModelsGroup(\'' + dirId + '\')">' +
+          '<i class="ti ti-chevron-right models-group-chevron' + (isOpen ? ' open' : '') + '"></i>' +
+          '<span class="models-group-name">' + escapeHtml(dirName) + '</span>' +
+          '<span class="models-group-count">' + models.length + '</span>' +
+        '</button>' +
+        '<div class="models-group-body" data-dirid="' + dirId + '" style="' + (isOpen ? '' : 'display:none;') + '">' +
+          '<div class="card">';
     models.forEach(m => {
       const title = m.name + (m.extra ? ' · ' + m.extra : '');
       const meta = [];
@@ -15802,9 +15885,172 @@ function renderModels(d) {
         '<div class="emp-info"><div class="emp-name">' + escapeHtml(title) + '</div>' +
         '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div></div></div>';
     });
-    html += '</div>';
+    html +=
+          '</div>' +
+        '</div>' +
+      '</div>';
   });
   container.innerHTML = html;
+}
+
+function toggleModelsGroup(dirId) {
+  const body = document.querySelector('.models-group-body[data-dirid="' + dirId + '"]');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? '' : 'none';
+  // Поворот шеврона
+  const toggle = body.previousElementSibling;
+  if (toggle) {
+    const chevron = toggle.querySelector('.models-group-chevron');
+    if (chevron) chevron.classList.toggle('open', isHidden);
+  }
+  // Сохраняем состояние
+  const openMap = JSON.parse(localStorage.getItem('models_groups_open') || '{}');
+  openMap[dirId] = isHidden;
+  localStorage.setItem('models_groups_open', JSON.stringify(openMap));
+}
+
+// ============ ЭТАП 30.6: создание новой модели ============
+
+function openNewModelForm() {
+  if (!canManageSales()) {
+    showToast('Создавать модели может директор или зам', 'error');
+    return;
+  }
+  const directions = (cache.models && cache.models.directions) || [];
+  if (!directions.length) {
+    showToast('Сначала загрузите номенклатуру', 'error');
+    return;
+  }
+  let m = document.getElementById('new-model-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'new-model-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeNewModelForm(); };
+    document.body.appendChild(m);
+  }
+
+  // Подсчёт следующего номера для подсказки артикула на каждое направление
+  const articleHint = directions.length > 0 ? directions[0].code || '' : '';
+
+  let dirOptions = directions.map(d =>
+    '<option value="' + d.id + '">' + escapeHtml(d.name) + '</option>'
+  ).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package-plus"></i> Новая модель</h3>' +
+        '<button class="modal-close" onclick="closeNewModelForm()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;overflow-y:auto;flex:1;">' +
+        // Направление
+        '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Направление *</label>' +
+        '<select id="nm-direction" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;background:white;font-family:inherit;">' +
+          dirOptions +
+        '</select>' +
+        // Название
+        '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Название модели *</label>' +
+        '<input type="text" id="nm-name" placeholder="Например: Наружный блок №49" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;" />' +
+        // Артикул
+        '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Артикул * <span style="color:var(--text-light);font-weight:400;">(уникальный код)</span></label>' +
+        '<input type="text" id="nm-article" placeholder="Например: КЛМ-НБ-049" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;font-family:monospace;text-transform:uppercase;" />' +
+        // Доп. описание
+        '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Дополнительно <span style="color:var(--text-light);font-weight:400;">(необязательно — IP54, нерж, габариты, и т.д.)</span></label>' +
+        '<input type="text" id="nm-extra" placeholder="Например: 600×800×200, IP65" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;" />' +
+        // Опции
+        '<div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:14px;">' +
+          '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;margin-bottom:10px;">' +
+            '<input type="checkbox" id="nm-needs-ip" />' +
+            '<span>Требуется указать IP при сборке (IP54, IP65 и т.д.)</span>' +
+          '</label>' +
+          '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);">Исполнение</label>' +
+          '<select id="nm-exec-mode" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:white;font-family:inherit;">' +
+            '<option value="none">Без выбора</option>' +
+            '<option value="choice">Мастер выбирает: Стандарт / Нерж. AISI</option>' +
+            '<option value="fixed">Фиксированное</option>' +
+          '</select>' +
+          '<input type="text" id="nm-exec-fixed" placeholder="Какое исполнение? (например: Нерж. AISI 304)" style="display:none;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-top:8px;" />' +
+        '</div>' +
+        // Тип работы
+        '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Тип работы</label>' +
+        '<select id="nm-work-type" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;font-family:inherit;">' +
+          '<option value="full_build">Полная сборка из материалов</option>' +
+          '<option value="modify_purchased">Модификация покупного товара</option>' +
+        '</select>' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);">' +
+        '<button class="btn btn-primary" onclick="submitNewModel()" style="width:100%;">' +
+          '<i class="ti ti-check"></i> Создать модель</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+
+  // Реактивность поля exec_fixed
+  setTimeout(() => {
+    const sel = document.getElementById('nm-exec-mode');
+    const fix = document.getElementById('nm-exec-fixed');
+    if (sel && fix) {
+      sel.addEventListener('change', () => {
+        fix.style.display = (sel.value === 'fixed') ? '' : 'none';
+      });
+    }
+    // фокус на название
+    const nameInput = document.getElementById('nm-name');
+    if (nameInput) nameInput.focus();
+  }, 50);
+}
+
+function closeNewModelForm() {
+  const m = document.getElementById('new-model-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function submitNewModel() {
+  const direction_id = parseInt(document.getElementById('nm-direction').value);
+  const name = (document.getElementById('nm-name').value || '').trim();
+  const article = (document.getElementById('nm-article').value || '').trim().toUpperCase();
+  const extra = (document.getElementById('nm-extra').value || '').trim();
+  const needs_ip = document.getElementById('nm-needs-ip').checked;
+  const exec_mode = document.getElementById('nm-exec-mode').value;
+  const exec_fixed = (document.getElementById('nm-exec-fixed').value || '').trim();
+  const work_type = document.getElementById('nm-work-type').value;
+
+  if (!direction_id) { showToast('Выбери направление', 'error'); return; }
+  if (!name) { showToast('Введи название модели', 'error'); return; }
+  if (!article) { showToast('Введи артикул', 'error'); return; }
+  if (exec_mode === 'fixed' && !exec_fixed) {
+    showToast('Укажи какое именно исполнение', 'error'); return;
+  }
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        direction_id, name, article, extra,
+        needs_ip, exec_mode, exec_fixed, work_type,
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось создать модель', 'error');
+      return;
+    }
+    showToast('Модель создана', 'success');
+    closeNewModelForm();
+    cache.models = null;          // сброс кэша
+    await loadModels();
+    // Раскроем группу новой модели
+    const openMap = JSON.parse(localStorage.getItem('models_groups_open') || '{}');
+    openMap[direction_id] = true;
+    localStorage.setItem('models_groups_open', JSON.stringify(openMap));
+    renderModels(cache.models);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 // ============ НОВАЯ СБОРКА ============
