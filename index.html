@@ -2361,6 +2361,25 @@
     color: var(--text-light);
     font-size: 13px;
   }
+  /* v2.7.6: кнопка «Показать ещё» / «Свернуть» внутри ленты */
+  .activity-toggle {
+    width: 100%;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .activity-toggle:hover { background: var(--brand-bg); }
+  .activity-toggle i { font-size: 15px; }
 
   /* ============ ЭТАП 16В: ЗАДАЧИ ============ */
 
@@ -9074,7 +9093,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.7.5-workers-picker";
+const APP_VERSION = "v2.7.6-activity-collapse";
 const APP_VERSION_DATE = "18.05.2026";
 
 // ============ Архитектура «под расширения» ============
@@ -14441,6 +14460,10 @@ function renderShipmentRow(c) {
 
 // ---- Лента активностей ----
 
+// v2.7.6: коллапс ленты — показываем 4 свежих, остальное по клику
+const HOME_ACTIVITY_COLLAPSED = 4;
+state.homeActivityExpanded = false;
+
 async function loadHomeActivity() {
   try {
     const d = await apiGet('/api/home/recent-activity');
@@ -14465,8 +14488,13 @@ function renderHomeActivity() {
     return;
   }
 
+  const total = list.length;
+  const expanded = !!state.homeActivityExpanded;
+  const shown = expanded ? list : list.slice(0, HOME_ACTIVITY_COLLAPSED);
+  const hiddenCount = total - shown.length;
+
   let html = '<div class="activity-feed">';
-  list.forEach(a => {
+  shown.forEach(a => {
     html += '<div class="activity-row">' +
       '<div class="ar-icon"><i class="ti ' + escapeHtml(a.icon || 'ti-circle') + '"></i></div>' +
       '<div class="ar-body">' +
@@ -14474,8 +14502,26 @@ function renderHomeActivity() {
         '<div class="ar-time">' + escapeHtml(formatActivityTime(a.created_at)) + '</div>' +
       '</div></div>';
   });
+
+  // Кнопка «Показать ещё» / «Свернуть» — только если есть что разворачивать
+  if (total > HOME_ACTIVITY_COLLAPSED) {
+    if (!expanded) {
+      html += '<button type="button" class="activity-toggle" onclick="toggleHomeActivity()">' +
+                '<i class="ti ti-chevron-down"></i> Показать ещё (' + hiddenCount + ')' +
+              '</button>';
+    } else {
+      html += '<button type="button" class="activity-toggle" onclick="toggleHomeActivity()">' +
+                '<i class="ti ti-chevron-up"></i> Свернуть' +
+              '</button>';
+    }
+  }
   html += '</div>';
   el.innerHTML = html;
+}
+
+function toggleHomeActivity() {
+  state.homeActivityExpanded = !state.homeActivityExpanded;
+  renderHomeActivity();
 }
 
 function formatActivityTime(iso) {
