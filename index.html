@@ -4367,6 +4367,97 @@
     margin: 0;
   }
 
+  /* ============ ЭТАП 35: дерево групп прайс-листа ZILON ============ */
+  .sp-tree-group {
+    margin: 0 18px 10px;
+  }
+  .sp-tree-subgroup {
+    margin: 6px 0 8px 24px;
+  }
+  .sp-tree-toggle {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .sp-tree-toggle.group {
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .sp-tree-toggle.subgroup {
+    background: #f8f9fb;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .sp-tree-toggle:hover { border-color: var(--brand); }
+  .sp-tree-chev {
+    transition: transform 0.2s;
+    font-size: 16px;
+  }
+  .sp-tree-toggle.open .sp-tree-chev { transform: rotate(90deg); }
+  .sp-tree-toggle > span:first-of-type { flex: 1; }
+  .sp-tree-count {
+    background: white;
+    color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .sp-tree-count.subgroup {
+    background: white;
+    color: var(--text-light);
+  }
+  .sp-tree-body { padding: 4px 0 0; }
+  .sp-tree-items { padding: 4px 0 0 0; }
+  .sp-tree-item {
+    display: flex; align-items: center; gap: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .sp-tree-item:hover {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .sp-tree-item-main { flex: 1; min-width: 0; }
+  .sp-tree-item-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .sp-tree-item-meta {
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  .sp-tree-item-prices {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .sp-price-retail {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .sp-price-dealer {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+
   /* Предпросмотр автосписания в форме сборки */
   .bom-preview-block {
     background: var(--bg); border: 1px solid var(--border);
@@ -9903,7 +9994,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.14.2-atomus-catalog-import";
+const APP_VERSION = "v2.15.0-zilon-pricelist";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12610,6 +12701,14 @@ function renderSaleProductsList() {
     return;
   }
 
+  // ============ ЭТАП 35: иерархический режим group → subgroup → товары ============
+  // Если у любой позиции есть group_name — используем иерархию
+  const hasHierarchy = list.some(p => p.group_name);
+  if (hasHierarchy) {
+    container.innerHTML = _renderSaleProductsHierarchical(list, search);
+    return;
+  }
+
   // ЭТАП 17: группировка по категории если включен «Все категории»
   const showGroups = !catFilter;
 
@@ -12654,7 +12753,102 @@ function renderSaleProductsList() {
   }
 }
 
-// ЭТАП 17: чипсы категорий вверху
+// ============ ЭТАП 35: Иерархический рендер (group → subgroup → товары) ============
+
+function _renderSaleProductsHierarchical(list, search) {
+  // Группируем: group_name → subgroup_name → []
+  const tree = {};
+  list.forEach(p => {
+    const g = p.group_name || '(без группы)';
+    const sg = p.subgroup_name || '(без подгруппы)';
+    if (!tree[g]) tree[g] = {};
+    if (!tree[g][sg]) tree[g][sg] = [];
+    tree[g][sg].push(p);
+  });
+
+  if (!state.spOpenGroups) state.spOpenGroups = {};
+  if (!state.spOpenSubgroups) state.spOpenSubgroups = {};
+  const allOpen = !!search;
+
+  let html = '<div style="padding: 10px 0 20px;">';
+  const groupNames = Object.keys(tree).sort();
+  groupNames.forEach(gName => {
+    const subgroups = tree[gName];
+    const subNames = Object.keys(subgroups).sort();
+    const groupCount = subNames.reduce((acc, sg) => acc + subgroups[sg].length, 0);
+    const gOpen = allOpen || !!state.spOpenGroups[gName];
+    html += '<div class="sp-tree-group">' +
+      '<button type="button" class="sp-tree-toggle group' + (gOpen ? ' open' : '') + '" ' +
+        'onclick="toggleSpGroup(\'' + gName.replace(/'/g, "\\'") + '\')">' +
+        '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+        '<i class="ti ti-folder" style="font-size:16px;"></i>' +
+        '<span>' + escapeHtml(gName) + '</span>' +
+        '<span class="sp-tree-count">' + groupCount + '</span>' +
+      '</button>';
+    if (gOpen) {
+      html += '<div class="sp-tree-body">';
+      subNames.forEach(sgName => {
+        const items = subgroups[sgName];
+        const sgKey = gName + '||' + sgName;
+        const sgOpen = allOpen || !!state.spOpenSubgroups[sgKey];
+        html += '<div class="sp-tree-subgroup">' +
+          '<button type="button" class="sp-tree-toggle subgroup' + (sgOpen ? ' open' : '') + '" ' +
+            'onclick="toggleSpSubgroup(\'' + sgKey.replace(/'/g, "\\'") + '\')">' +
+            '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+            '<span>' + escapeHtml(sgName) + '</span>' +
+            '<span class="sp-tree-count subgroup">' + items.length + '</span>' +
+          '</button>';
+        if (sgOpen) {
+          html += '<div class="sp-tree-items">';
+          items.forEach(p => { html += _spTreeItemHtml(p); });
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function _spTreeItemHtml(p) {
+  const retail = p.base_price != null ? _fmtMoney(p.base_price) + ' ₽' : '<span style="color:var(--text-light);">—</span>';
+  const dealer = p.dealer_price != null ? _fmtMoney(p.dealer_price) + ' ₽' : '';
+  const nc = p.nc_code || '';
+  return '<div class="sp-tree-item" onclick="openEditSaleProduct(' + p.id + ')">' +
+    '<div class="sp-tree-item-main">' +
+      '<div class="sp-tree-item-name">' + escapeHtml(p.name || '—') + '</div>' +
+      '<div class="sp-tree-item-meta">' +
+        (nc ? '<span style="font-family:monospace;font-size:11px;">' + escapeHtml(nc) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="sp-tree-item-prices">' +
+      '<div class="sp-price-retail">' + retail + '</div>' +
+      (dealer ? '<div class="sp-price-dealer">дилер: ' + dealer + '</div>' : '') +
+    '</div>' +
+  '</div>';
+}
+
+function _fmtMoney(n) {
+  const v = Number(n) || 0;
+  return v.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function toggleSpGroup(gName) {
+  if (!state.spOpenGroups) state.spOpenGroups = {};
+  state.spOpenGroups[gName] = !state.spOpenGroups[gName];
+  renderSaleProductsList();
+}
+
+function toggleSpSubgroup(sgKey) {
+  if (!state.spOpenSubgroups) state.spOpenSubgroups = {};
+  state.spOpenSubgroups[sgKey] = !state.spOpenSubgroups[sgKey];
+  renderSaleProductsList();
+}
+
+
 function renderSaleCategoryChips(activeKey) {
   const wrap = document.getElementById('sp-categories-filters');
   if (!wrap) return;
