@@ -9744,7 +9744,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.12.0-components-bom";
+const APP_VERSION = "v2.12.1-bom-quick-create";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16654,10 +16654,7 @@ async function openBomAddItem(modelId) {
     try { const r = await apiGet('/api/components/categories'); cache.componentCategories = r.categories || []; }
     catch (e) { cache.componentCategories = []; }
   }
-  if (!cache.components.length) {
-    showToast('Сначала добавь комплектующие в Склад → Комплектующие', 'error');
-    return;
-  }
+  // ЭТАП 32.1: убрана блокировка — если каталог пуст, юзер создаст комплектующее прямо здесь
   let m = document.getElementById('bom-add-modal');
   if (!m) {
     m = document.createElement('div');
@@ -16681,13 +16678,21 @@ async function openBomAddItem(modelId) {
     });
     optgroups += '</optgroup>';
   });
+  const hasComponents = cache.components.length > 0;
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:500px;">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
       '<div class="modal-header"><h3><i class="ti ti-plus"></i> Позиция в тех. карту</h3>' +
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:18px;">' +
         '<label class="form-label">Комплектующее *</label>' +
-        '<select id="bom-component" class="form-input" style="margin-bottom:14px;">' + optgroups + '</select>' +
+        '<div style="display:flex;gap:8px;margin-bottom:14px;">' +
+          '<select id="bom-component" class="form-input" style="flex:1;margin:0;">' +
+            (hasComponents ? optgroups : '<option value="">— Каталог пуст, создай новое →</option>') +
+          '</select>' +
+          '<button type="button" class="btn btn-secondary" onclick="openQuickComponentForm(' + modelId + ')" title="Создать новое комплектующее">' +
+            '<i class="ti ti-plus"></i> Новое' +
+          '</button>' +
+        '</div>' +
         '<label class="form-label">Количество на 1 ед. изделия *</label>' +
         '<input type="number" id="bom-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
@@ -16698,9 +16703,101 @@ async function openBomAddItem(modelId) {
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitBomAddItem(' + modelId + ')"><i class="ti ti-check"></i> Добавить</button>' +
+        '<button class="btn btn-primary" onclick="submitBomAddItem(' + modelId + ')"' +
+          (hasComponents ? '' : ' disabled style="opacity:0.5;cursor:not-allowed;"') +
+          '><i class="ti ti-check"></i> Добавить</button>' +
       '</div></div>';
   m.classList.add('visible');
+}
+
+// ЭТАП 32.1: быстрое создание комплектующего из формы BOM
+function openQuickComponentForm(modelId) {
+  const cats = cache.componentCategories || [];
+  let m = document.getElementById('quick-comp-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'quick-comp-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const catOptions = cats.map(cat =>
+    '<option value="' + cat.id + '">' + escapeHtml(cat.name) + '</option>'
+  ).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-tool"></i> Быстро создать комплектующее</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;">' +
+        '<label class="form-label">Категория *</label>' +
+        '<select id="qc-category" class="form-input" style="margin-bottom:14px;">' + catOptions + '</select>' +
+        '<label class="form-label">Название *</label>' +
+        '<input type="text" id="qc-name" class="form-input" placeholder="Например: Реле РЭК-77/4" style="margin-bottom:14px;" />' +
+        '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
+          '<div style="flex:2;"><label class="form-label">Артикул</label>' +
+            '<input type="text" id="qc-sku" class="form-input" /></div>' +
+          '<div style="flex:1;"><label class="form-label">Ед.</label>' +
+            '<select id="qc-unit" class="form-input">' +
+              ['шт.','м','кг','л','компл.','уп.','м²'].map(u =>
+                '<option' + (u === 'шт.' ? ' selected' : '') + '>' + u + '</option>'
+              ).join('') +
+            '</select></div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);padding-top:6px;">' +
+          'Будет создано в каталоге Склад → Комплектующие. Остаток на складе = 0, оприходовать можно потом.' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitQuickComponent(' + modelId + ')"><i class="ti ti-check"></i> Создать и выбрать</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => { const n = document.getElementById('qc-name'); if (n) n.focus(); }, 50);
+}
+
+async function submitQuickComponent(modelId) {
+  const data = {
+    category_id: parseInt(document.getElementById('qc-category').value),
+    name: (document.getElementById('qc-name').value || '').trim(),
+    sku: (document.getElementById('qc-sku').value || '').trim(),
+    unit: document.getElementById('qc-unit').value,
+  };
+  if (!data.name) { showToast('Укажи название', 'error'); return; }
+  if (!data.category_id) { showToast('Выбери категорию', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось создать', 'error');
+      return;
+    }
+    const created = await r.json();
+    // Закрываем quick-форму
+    document.getElementById('quick-comp-modal').classList.remove('visible');
+    // Обновляем кеш и пере-открываем BOM-форму с уже выбранным новым компонентом
+    cache.components = null;
+    try {
+      const cr = await apiGet('/api/components');
+      cache.components = cr.components || [];
+    } catch (e) { /* ignore */ }
+    // Закрываем старую модалку и открываем заново — теперь с новым компонентом
+    document.getElementById('bom-add-modal').classList.remove('visible');
+    await openBomAddItem(modelId);
+    // Выбираем созданный
+    const sel = document.getElementById('bom-component');
+    if (sel && created.id) sel.value = String(created.id);
+    showToast('Создано: ' + created.name, 'success');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 async function submitBomAddItem(modelId) {
