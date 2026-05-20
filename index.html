@@ -4255,6 +4255,77 @@
   .bom-qty-lbl { font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; }
   .bom-actions { display: flex; gap: 4px; }
 
+  /* ============ ЭТАП 33.1: Picker комплектующих (поиск + сворачиваемые категории) ============ */
+  .bom-picker-group {
+    margin-bottom: 8px;
+  }
+  .bom-picker-toggle {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    background: var(--brand-bg);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--brand);
+    text-align: left;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .bom-picker-toggle:hover {
+    border-color: var(--brand);
+  }
+  .bom-picker-chev {
+    transition: transform 0.2s;
+    font-size: 16px;
+  }
+  .bom-picker-toggle.open .bom-picker-chev {
+    transform: rotate(90deg);
+  }
+  .bom-picker-toggle > span:first-of-type {
+    flex: 1;
+  }
+  .bom-picker-count {
+    background: white;
+    color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .bom-picker-body {
+    padding: 6px 4px 8px;
+  }
+  .bom-picker-item {
+    display: block;
+    width: 100%;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .bom-picker-item:hover {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .bom-picker-item-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .bom-picker-item-meta {
+    font-size: 12px;
+    color: var(--text-light);
+  }
+
   /* Предпросмотр автосписания в форме сборки */
   .bom-preview-block {
     background: var(--bg); border: 1px solid var(--border);
@@ -9788,7 +9859,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.13.0-suppliers-link";
+const APP_VERSION = "v2.13.1-bom-picker";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16700,6 +16771,7 @@ async function openBomAddItem(modelId) {
     catch (e) { cache.componentCategories = []; }
   }
   // ЭТАП 32.1: убрана блокировка — если каталог пуст, юзер создаст комплектующее прямо здесь
+  // ЭТАП 33.1: вместо <select> — кнопка-picker с поиском и сворачиваемыми категориями
   let m = document.getElementById('bom-add-modal');
   if (!m) {
     m = document.createElement('div');
@@ -16708,21 +16780,8 @@ async function openBomAddItem(modelId) {
     m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
     document.body.appendChild(m);
   }
-  const groups = {};
-  cache.components.forEach(c => {
-    const cat = c.category_name || '—';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(c);
-  });
-  let optgroups = '';
-  Object.keys(groups).forEach(cat => {
-    optgroups += '<optgroup label="' + escapeHtml(cat) + '">';
-    groups[cat].forEach(c => {
-      optgroups += '<option value="' + c.id + '">' + escapeHtml(c.name) +
-        (c.sku ? ' (' + escapeHtml(c.sku) + ')' : '') + '</option>';
-    });
-    optgroups += '</optgroup>';
-  });
+  // Сбрасываем выбранное комплектующее
+  state._bomSelectedComponentId = null;
   const hasComponents = cache.components.length > 0;
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
@@ -16731,9 +16790,14 @@ async function openBomAddItem(modelId) {
       '<div style="padding:18px;">' +
         '<label class="form-label">Комплектующее *</label>' +
         '<div style="display:flex;gap:8px;margin-bottom:14px;">' +
-          '<select id="bom-component" class="form-input" style="flex:1;margin:0;">' +
-            (hasComponents ? optgroups : '<option value="">— Каталог пуст, создай новое →</option>') +
-          '</select>' +
+          '<button type="button" id="bom-component-btn" class="form-input" ' +
+            'onclick="openBomComponentPicker(' + modelId + ')" ' +
+            'style="flex:1;margin:0;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:white;">' +
+            '<span style="color:var(--text-light);">' +
+              (hasComponents ? 'Выбрать из каталога…' : 'Каталог пуст, создай новое →') +
+            '</span>' +
+            '<i class="ti ti-chevron-down" style="color:var(--text-light);"></i>' +
+          '</button>' +
           '<button type="button" class="btn btn-secondary" onclick="openQuickComponentForm(' + modelId + ')" title="Создать новое комплектующее">' +
             '<i class="ti ti-plus"></i> Новое' +
           '</button>' +
@@ -16748,11 +16812,138 @@ async function openBomAddItem(modelId) {
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitBomAddItem(' + modelId + ')"' +
-          (hasComponents ? '' : ' disabled style="opacity:0.5;cursor:not-allowed;"') +
-          '><i class="ti ti-check"></i> Добавить</button>' +
+        '<button class="btn btn-primary" onclick="submitBomAddItem(' + modelId + ')"><i class="ti ti-check"></i> Добавить</button>' +
       '</div></div>';
   m.classList.add('visible');
+}
+
+// ============ ЭТАП 33.1: PICKER комплектующего с поиском и категориями ============
+
+function openBomComponentPicker(modelId) {
+  const comps = cache.components || [];
+  if (!comps.length) {
+    showToast('Каталог пуст. Жми «+ Новое» чтобы создать комплектующее', 'error');
+    return;
+  }
+  // Состояние раскрытости категорий и текущий поиск
+  if (!state._bomPickerOpenCats) {
+    // По умолчанию: первая категория раскрыта, остальные свёрнуты
+    state._bomPickerOpenCats = {};
+    const cats = Array.from(new Set(comps.map(c => c.category_name || '—')));
+    cats.forEach((cat, i) => { state._bomPickerOpenCats[cat] = (i === 0); });
+  }
+  state._bomPickerSearch = '';
+
+  let m = document.getElementById('bom-comp-picker-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bom-comp-picker-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '10001'; // поверх bom-add-modal
+    m.onclick = (e) => { if (e.target === m) closeBomComponentPicker(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-search"></i> Выбрать комплектующее</h3>' +
+        '<button class="modal-close" onclick="closeBomComponentPicker()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 18px 0;">' +
+        '<div class="search-box">' +
+          '<i class="ti ti-search"></i>' +
+          '<input type="text" id="bom-picker-search" placeholder="Поиск по названию или артикулу…" oninput="renderBomComponentPicker()" />' +
+        '</div>' +
+      '</div>' +
+      '<div id="bom-picker-list" style="overflow-y:auto;flex:1;padding:14px 18px;">' +
+        '<div class="loading-block">Загружаем…</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => {
+    const inp = document.getElementById('bom-picker-search');
+    if (inp) inp.focus();
+    renderBomComponentPicker();
+  }, 50);
+}
+
+function closeBomComponentPicker() {
+  const m = document.getElementById('bom-comp-picker-modal');
+  if (m) m.classList.remove('visible');
+}
+
+function renderBomComponentPicker() {
+  const container = document.getElementById('bom-picker-list');
+  if (!container) return;
+  const q = ((document.getElementById('bom-picker-search') || {}).value || '').toLowerCase().trim();
+  state._bomPickerSearch = q;
+  const comps = (cache.components || []).filter(c => {
+    if (!q) return true;
+    return (c.name || '').toLowerCase().includes(q) ||
+           (c.sku || '').toLowerCase().includes(q);
+  });
+  if (!comps.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-search-off"></i>Ничего не найдено</div>';
+    return;
+  }
+  // Группируем по категориям
+  const groups = {};
+  comps.forEach(c => {
+    const cat = c.category_name || '—';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(c);
+  });
+  const catNames = Object.keys(groups);
+  // При поиске — все группы раскрыты
+  const allOpen = !!q;
+  let html = '';
+  catNames.forEach(cat => {
+    const isOpen = allOpen || !!state._bomPickerOpenCats[cat];
+    const items = groups[cat];
+    html += '<div class="bom-picker-group">' +
+      '<button type="button" class="bom-picker-toggle' + (isOpen ? ' open' : '') + '" ' +
+        'onclick="toggleBomPickerGroup(\'' + cat.replace(/'/g, "\\'") + '\')">' +
+        '<i class="ti ti-chevron-right bom-picker-chev"></i>' +
+        '<span>' + escapeHtml(cat) + '</span>' +
+        '<span class="bom-picker-count">' + items.length + '</span>' +
+      '</button>' +
+      '<div class="bom-picker-body"' + (isOpen ? '' : ' style="display:none;"') + '>';
+    items.forEach(c => {
+      html += '<button type="button" class="bom-picker-item" onclick="selectBomComponent(' + c.id + ')">' +
+        '<div class="bom-picker-item-name">' + escapeHtml(c.name || '—') + '</div>' +
+        '<div class="bom-picker-item-meta">' +
+          (c.sku ? escapeHtml(c.sku) + ' · ' : '') +
+          'остаток: ' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.') +
+          (c.default_supplier_name ? ' · ' + escapeHtml(c.default_supplier_name) : '') +
+        '</div>' +
+      '</button>';
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function toggleBomPickerGroup(cat) {
+  // При поиске игнорируем (все открыты)
+  if (state._bomPickerSearch) return;
+  state._bomPickerOpenCats[cat] = !state._bomPickerOpenCats[cat];
+  renderBomComponentPicker();
+}
+
+function selectBomComponent(componentId) {
+  const c = (cache.components || []).find(x => x.id === componentId);
+  if (!c) return;
+  state._bomSelectedComponentId = componentId;
+  // Обновляем кнопку-picker в форме
+  const btn = document.getElementById('bom-component-btn');
+  if (btn) {
+    btn.innerHTML =
+      '<span style="color:var(--text);font-weight:500;">' + escapeHtml(c.name) +
+        (c.sku ? ' <span style="color:var(--text-light);font-weight:400;font-family:monospace;font-size:12px;">' + escapeHtml(c.sku) + '</span>' : '') +
+      '</span>' +
+      '<i class="ti ti-chevron-down" style="color:var(--text-light);"></i>';
+  }
+  closeBomComponentPicker();
 }
 
 // ЭТАП 32.1: быстрое создание комплектующего из формы BOM
@@ -16842,18 +17033,18 @@ async function submitQuickComponent(modelId) {
     const created = await r.json();
     // Закрываем quick-форму
     document.getElementById('quick-comp-modal').classList.remove('visible');
-    // Обновляем кеш и пере-открываем BOM-форму с уже выбранным новым компонентом
+    // Обновляем кеш
     cache.components = null;
     try {
       const cr = await apiGet('/api/components');
       cache.components = cr.components || [];
     } catch (e) { /* ignore */ }
-    // Закрываем старую модалку и открываем заново — теперь с новым компонентом
+    // Переоткрываем BOM-форму и выбираем созданное через picker-state
     document.getElementById('bom-add-modal').classList.remove('visible');
     await openBomAddItem(modelId);
-    // Выбираем созданный
-    const sel = document.getElementById('bom-component');
-    if (sel && created.id) sel.value = String(created.id);
+    if (created.id) {
+      selectBomComponent(created.id);
+    }
     showToast('Создано: ' + created.name, 'success');
   } catch (e) {
     showToast('Ошибка соединения', 'error');
@@ -16861,12 +17052,13 @@ async function submitQuickComponent(modelId) {
 }
 
 async function submitBomAddItem(modelId) {
-  const component_id = parseInt(document.getElementById('bom-component').value);
+  const component_id = state._bomSelectedComponentId;
   const qty_required = parseFloat(document.getElementById('bom-qty').value);
   const is_critical = document.getElementById('bom-critical').checked;
   const comment = (document.getElementById('bom-comment').value || '').trim();
-  if (!component_id || isNaN(qty_required) || qty_required <= 0) {
-    showToast('Заполни поля', 'error'); return;
+  if (!component_id) { showToast('Выбери комплектующее из каталога', 'error'); return; }
+  if (isNaN(qty_required) || qty_required <= 0) {
+    showToast('Укажи количество', 'error'); return;
   }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -16881,6 +17073,7 @@ async function submitBomAddItem(modelId) {
     }
     showToast('Добавлено в тех. карту', 'success');
     document.getElementById('bom-add-modal').classList.remove('visible');
+    state._bomSelectedComponentId = null;
     await loadModelBom(modelId);
   } catch (e) { showToast('Ошибка', 'error'); }
 }
