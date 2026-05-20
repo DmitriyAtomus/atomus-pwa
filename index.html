@@ -9788,7 +9788,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.12.4-tasks-layout-fix";
+const APP_VERSION = "v2.13.0-suppliers-link";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16756,8 +16756,17 @@ async function openBomAddItem(modelId) {
 }
 
 // ЭТАП 32.1: быстрое создание комплектующего из формы BOM
-function openQuickComponentForm(modelId) {
+async function openQuickComponentForm(modelId) {
   const cats = cache.componentCategories || [];
+  // Подгружаем поставщиков
+  if (!cache.suppliers) {
+    try {
+      const r = await apiGet('/api/suppliers');
+      cache.suppliers = r.suppliers || [];
+    } catch (e) { cache.suppliers = []; }
+  }
+  const suppliers = cache.suppliers || [];
+
   let m = document.getElementById('quick-comp-modal');
   if (!m) {
     m = document.createElement('div');
@@ -16769,6 +16778,8 @@ function openQuickComponentForm(modelId) {
   const catOptions = cats.map(cat =>
     '<option value="' + cat.id + '">' + escapeHtml(cat.name) + '</option>'
   ).join('');
+  const supOptions = '<option value="">— Не указан —</option>' +
+    suppliers.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('');
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
       '<div class="modal-header">' +
@@ -16780,7 +16791,7 @@ function openQuickComponentForm(modelId) {
         '<select id="qc-category" class="form-input" style="margin-bottom:14px;">' + catOptions + '</select>' +
         '<label class="form-label">Название *</label>' +
         '<input type="text" id="qc-name" class="form-input" placeholder="Например: Реле РЭК-77/4" style="margin-bottom:14px;" />' +
-        '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
+        '<div style="display:flex;gap:10px;margin-bottom:14px;">' +
           '<div style="flex:2;"><label class="form-label">Артикул</label>' +
             '<input type="text" id="qc-sku" class="form-input" /></div>' +
           '<div style="flex:1;"><label class="form-label">Ед.</label>' +
@@ -16790,7 +16801,9 @@ function openQuickComponentForm(modelId) {
               ).join('') +
             '</select></div>' +
         '</div>' +
-        '<div style="font-size:12px;color:var(--text-light);padding-top:6px;">' +
+        '<label class="form-label">Поставщик</label>' +
+        '<select id="qc-supplier" class="form-input">' + supOptions + '</select>' +
+        '<div style="font-size:12px;color:var(--text-light);padding-top:8px;">' +
           'Будет создано в каталоге Склад → Комплектующие. Остаток на складе = 0, оприходовать можно потом.' +
         '</div>' +
       '</div>' +
@@ -16804,11 +16817,13 @@ function openQuickComponentForm(modelId) {
 }
 
 async function submitQuickComponent(modelId) {
+  const supVal = (document.getElementById('qc-supplier') || {}).value || '';
   const data = {
     category_id: parseInt(document.getElementById('qc-category').value),
     name: (document.getElementById('qc-name').value || '').trim(),
     sku: (document.getElementById('qc-sku').value || '').trim(),
     unit: document.getElementById('qc-unit').value,
+    default_supplier_id: supVal ? parseInt(supVal) : null,
   };
   if (!data.name) { showToast('Укажи название', 'error'); return; }
   if (!data.category_id) { showToast('Выбери категорию', 'error'); return; }
@@ -19958,6 +19973,7 @@ function renderComponentsCatalogList() {
         '<div class="comp-meta">' +
           '<span class="comp-cat-badge">' + escapeHtml(c.category_name || '—') + '</span>' +
           ' · на складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
+          (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
         '</div>' +
       '</div>' +
       '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
@@ -20058,6 +20074,7 @@ function renderComponentsList() {
         '</div>' +
         '<div class="comp-meta">' +
           '<span class="comp-cat-badge">' + escapeHtml(c.category_name || '—') + '</span>' +
+          (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
         '</div>' +
       '</div>' +
       '<div class="comp-row-qty ' + (zeroStock ? 'zero' : (lowStock ? 'low' : '')) + '">' +
@@ -20083,7 +20100,7 @@ function _fmtQty(q) {
 
 // ============ Создание / редактирование комплектующего ============
 
-function openComponentForm(componentId) {
+async function openComponentForm(componentId) {
   if (!canManageSales()) {
     showToast('Доступ только директору и заму', 'error');
     return;
@@ -20091,6 +20108,15 @@ function openComponentForm(componentId) {
   const isEdit = !!componentId;
   const c = isEdit ? (cache.components || []).find(x => x.id === componentId) : null;
   const cats = cache.componentCategories || [];
+
+  // ЭТАП 33: подгружаем поставщиков если ещё нет
+  if (!cache.suppliers) {
+    try {
+      const r = await apiGet('/api/suppliers');
+      cache.suppliers = r.suppliers || [];
+    } catch (e) { cache.suppliers = []; }
+  }
+  const suppliers = cache.suppliers || [];
 
   let m = document.getElementById('comp-form-modal');
   if (!m) {
@@ -20104,6 +20130,12 @@ function openComponentForm(componentId) {
     '<option value="' + cat.id + '"' + (c && c.category_id === cat.id ? ' selected' : '') + '>' +
     escapeHtml(cat.name) + '</option>'
   ).join('');
+  const supOptions = '<option value="">— Не указан —</option>' +
+    suppliers.map(s =>
+      '<option value="' + s.id + '"' +
+      (c && c.default_supplier_id === s.id ? ' selected' : '') + '>' +
+      escapeHtml(s.name) + '</option>'
+    ).join('');
 
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
@@ -20128,6 +20160,8 @@ function openComponentForm(componentId) {
               ).join('') +
             '</select></div>' +
         '</div>' +
+        '<label class="form-label">Основной поставщик</label>' +
+        '<select id="cf-supplier" class="form-input" style="margin-bottom:14px;">' + supOptions + '</select>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
         '<label class="form-label">Комментарий</label>' +
@@ -20151,6 +20185,7 @@ function closeComponentForm() {
 }
 
 async function submitComponentForm(componentId) {
+  const supVal = (document.getElementById('cf-supplier') || {}).value || '';
   const data = {
     category_id: parseInt(document.getElementById('cf-category').value),
     name: (document.getElementById('cf-name').value || '').trim(),
@@ -20158,6 +20193,7 @@ async function submitComponentForm(componentId) {
     unit: document.getElementById('cf-unit').value,
     min_stock: parseFloat(document.getElementById('cf-min').value || 0),
     comment: (document.getElementById('cf-comment').value || '').trim(),
+    default_supplier_id: supVal ? parseInt(supVal) : null,
   };
   if (!data.name) { showToast('Укажи название', 'error'); return; }
   if (!data.category_id) { showToast('Выбери категорию', 'error'); return; }
