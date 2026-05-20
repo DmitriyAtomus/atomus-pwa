@@ -8107,6 +8107,27 @@
   .spec-item-reservation.r-none { background: #FEE2E2; color: #7F1D1D; }
   .spec-item-reservation .ti { font-size: 13px; }
 
+  /* v2.19.1: бейджи для покупных позиций (sale_product_id) — кликабельные */
+  .spec-item-purchase {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11.5px; padding: 2px 10px;
+    border-radius: 6px; margin-left: 6px;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    user-select: none;
+  }
+  .spec-item-purchase:hover { transform: translateY(-1px); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+  .spec-item-purchase .ti { font-size: 13px; }
+  .spec-item-purchase.b-pending  { background: #FEE2E2; color: #7F1D1D; border-color: #FECACA; }
+  .spec-item-purchase.b-ordered  { background: #FEF3C7; color: #78350F; border-color: #FDE68A; }
+  .spec-item-purchase.b-received { background: #E8F5E9; color: #14532D; border-color: #BBF7D0; }
+  .spec-item-purchase[disabled],
+  .spec-item-purchase.locked { cursor: default; opacity: 0.85; }
+  .spec-item-purchase.locked:hover { transform: none; box-shadow: none; }
+
   /* --- Бейдж количества в шапке (мобильный) --- */
   .notif25-badge { transition: transform 0.2s; }
   .notif25-badge.pulse { animation: urgPulse 1.2s ease-in-out 2; }
@@ -10430,7 +10451,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.19.0-publish-reserve-notif";
+const APP_VERSION = "v2.19.1-purchase-tracking";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10613,6 +10634,26 @@ async function apiPost(path, body) {
     method: 'POST', headers, body: JSON.stringify(body),
   });
   return { ok: response.ok, status: response.status, data: await response.json() };
+}
+
+// v2.19.1: PATCH-хелпер — возвращает чистый JSON-объект (как apiGet) для удобства
+async function apiPatch(path, body) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) throw new Error('Нет токена');
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+  const response = await fetch(API_BASE + path, {
+    method: 'PATCH', headers, body: JSON.stringify(body || {}),
+  });
+  if (response.status === 401 || response.status === 403) {
+    logout();
+    throw new Error('Сессия истекла');
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = (data && (data.message || data.error)) || ('HTTP ' + response.status);
+    throw new Error(msg);
+  }
+  return data;
 }
 
 async function apiGet(path) {
@@ -10961,7 +11002,8 @@ async function ackAllNotifications() {
     updateNotifBadge(0);
     renderNotifModal();
     setTimeout(closeNotifModalForced, 300);
-    if (r && r.count) showToast('Подтверждено: ' + r.count, 'success');
+    const cnt = (r && r.data && r.data.count) || 0;
+    if (cnt > 0) showToast('Подтверждено: ' + cnt, 'success');
   } catch (e) {
     showToast('Ошибка: ' + e.message, 'error');
   }
@@ -20016,12 +20058,16 @@ async function loadContractItemsBlock(contractId) {
   }
 }
 
-// v2.19.0: бейдж резерва для позиции спецификации
+// v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции)
 function _renderReservationBadge(item) {
   if (!item) return '';
-  // Только для model_id и component_id (sale_product_id не лежит на складе)
+  // v2.19.1: для sale_product_id — отдельный бейдж статуса закупки
+  if (item.sale_product_id) {
+    return _renderPurchaseBadge(item);
+  }
+  // model_id / component_id — резерв через сборки/комплектующие
   const hasReservable = item.model_id || item.component_id;
-  if (!hasReservable) return '';
+  if (!hasReservable) return '';  // свободный текст — без бейджа
   const qty = Number(item.qty) || 0;
   const reserved = Number(item.qty_reserved || 0);
   if (qty <= 0) return '';
@@ -20043,6 +20089,53 @@ function _renderReservationBadge(item) {
   }
   return ' <span class="spec-item-reservation ' + cls + '" title="' + escapeHtml(txt) + '">' +
     '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
+}
+
+// v2.19.1: бейдж статуса закупки для sale_product_id (кликабельный, циклически переключает состояние)
+function _renderPurchaseBadge(item) {
+  const status = (item.purchase_status || 'pending');
+  let cls = 'b-pending', icon = 'ti-shopping-cart', txt = 'К заказу', nextStatus = 'ordered', tip = 'Клик — переключить на «Заказано»';
+  if (status === 'ordered') {
+    cls = 'b-ordered'; icon = 'ti-truck'; txt = 'Заказано'; nextStatus = 'received';
+    tip = 'Клик — переключить на «Готово» (пришло)';
+  } else if (status === 'received') {
+    cls = 'b-received'; icon = 'ti-circle-check'; txt = 'Готово'; nextStatus = 'pending';
+    tip = 'Клик — вернуть в «К заказу»';
+  }
+  const canEdit = (typeof canManageSales === 'function') ? canManageSales() : true;
+  const click = canEdit
+    ? ' onclick="event.stopPropagation(); cyclePurchaseStatus(' + item.id + ', \'' + nextStatus + '\')"'
+    : '';
+  const lockCls = canEdit ? '' : ' locked';
+  const title = canEdit ? tip : ('Статус закупки: ' + txt);
+  return ' <span class="spec-item-purchase ' + cls + lockCls + '"' + click + ' title="' + escapeHtml(title) + '">' +
+    '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
+}
+
+// v2.19.1: переключение статуса закупки одной позиции
+async function cyclePurchaseStatus(itemId, newStatus) {
+  if (!itemId || !newStatus) return;
+  try {
+    const r = await apiPatch('/api/contracts/items/' + itemId + '/purchase-status', { status: newStatus });
+    if (r && r.ok && r.item) {
+      // Перерисуем блок спецификации
+      const contractId = state.currentContractId;
+      if (contractId && state._specByContract && state._specByContract[contractId]) {
+        const st = state._specByContract[contractId];
+        // Обновим item в кэше
+        const items = st.items || [];
+        const idx = items.findIndex(x => x.id === itemId);
+        if (idx >= 0) items[idx] = Object.assign({}, items[idx], r.item);
+        renderContractItemsBlock(contractId);
+      }
+      const lbl = ({pending:'К заказу', ordered:'Заказано', received:'Готово'})[newStatus] || newStatus;
+      showToast('Статус: ' + lbl, 'success');
+    } else {
+      showToast('Не удалось обновить статус', 'error');
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка обновления', 'error');
+  }
 }
 
 function renderContractItemsBlock(contractId) {
@@ -26285,9 +26378,10 @@ async function publishContract(contractId) {
 
   try {
     const r = await apiPost('/api/contracts/' + contractId + '/publish', {});
-    if (r && r.ok) {
+    const body = (r && r.data) || {};
+    if (r && r.ok && body.ok) {
       // Показываем итог авторезерва
-      const rep = r.reservation || {};
+      const rep = body.reservation || {};
       const reservedAsm = (rep.reserved_assemblies || []).length;
       const reservedComp = (rep.reserved_components || []).length;
       const needMake = (rep.need_to_make || []).reduce((a, x) => a + (x.qty_short || 0), 0);
@@ -26307,7 +26401,8 @@ async function publishContract(contractId) {
         refreshCurrentScreen();
       }
     } else {
-      showToast('Не удалось опубликовать', 'error');
+      const errMsg = body.message || 'Не удалось опубликовать';
+      showToast(errMsg, 'error');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-rocket"></i>Опубликовать договор'; }
     }
   } catch (e) {
