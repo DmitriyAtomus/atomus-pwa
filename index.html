@@ -1564,6 +1564,9 @@
   .status-shipped::before { background: #6A4B9C; }
   .status-closed { background: #F0F2F7; color: var(--text-light); }
   .status-closed::before { background: var(--text-faint); }
+  /* v2.19.0: статус черновик */
+  .status-draft { background: #FFF6E0; color: #8A5A00; }
+  .status-draft::before { background: #E0B341; }
 
   /* Таблица договоров (десктоп) */
   .contracts-table {
@@ -7892,6 +7895,223 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   }
   /* ============ КОНЕЦ ЭТАПА 25.0 ============ */
+
+  /* ============ ЭТАП 39 (v2.19.0): УВЕДОМЛЕНИЯ + ПУБЛИКАЦИЯ + ОЧЕРЕДЬ ============ */
+
+  /* --- Модалка уведомлений (одна на главной) --- */
+  .notif-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 5000;
+    display: none;
+    align-items: flex-start; justify-content: center;
+    padding: 24px 16px;
+    overflow-y: auto;
+    animation: fadeIn25 0.2s ease;
+  }
+  .notif-modal-overlay.visible { display: flex; }
+  .notif-modal {
+    background: white;
+    border-radius: 16px;
+    width: 100%; max-width: 560px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    margin: auto 0;
+  }
+  .notif-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #FAFBFC, #F4F6F9);
+  }
+  .notif-modal-title {
+    font-weight: 600; font-size: 16px; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .notif-modal-title .ti { font-size: 20px; color: var(--brand); }
+  .notif-modal-count {
+    background: var(--brand); color: white;
+    border-radius: 999px; padding: 2px 10px;
+    font-size: 12px; font-weight: 600;
+    min-width: 22px; text-align: center;
+  }
+  .notif-modal-body {
+    padding: 8px 0;
+    max-height: min(540px, 70vh);
+    overflow-y: auto;
+  }
+  .notif-modal-empty {
+    padding: 32px 20px; text-align: center;
+    color: var(--text-light); font-size: 14px;
+  }
+  .notif-card {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .notif-card:last-child { border-bottom: none; }
+  .notif-card-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 18px;
+  }
+  .notif-card-icon.t-contract { background: var(--c-sales-bg-25, #EAF3FA); color: var(--c-sales-25, #2D5F8B); }
+  .notif-card-icon.t-assembly { background: var(--c-prod-bg-25, #F0EAFA); color: var(--c-prod-25, #6A4B9C); }
+  .notif-card-body { flex: 1; min-width: 0; }
+  .notif-card-title { font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 2px; }
+  .notif-card-msg { font-size: 13px; color: var(--text-mid); line-height: 1.45; word-wrap: break-word; }
+  .notif-card-time { font-size: 11.5px; color: var(--text-light); margin-top: 6px; }
+  .notif-card-actions { display: flex; align-items: center; flex-shrink: 0; }
+  .notif-ack-btn {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text-mid); padding: 6px 14px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+    font-family: inherit;
+  }
+  .notif-ack-btn:hover { background: var(--brand-bg); border-color: var(--brand); color: var(--brand); }
+  .notif-modal-foot {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    background: #FAFBFC;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+  }
+  .notif-ack-all-btn {
+    background: var(--brand); color: white; border: none;
+    padding: 10px 20px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+    flex: 1;
+    transition: background 0.15s;
+  }
+  .notif-ack-all-btn:hover { background: #1f4970; }
+  .notif-ack-all-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* --- Бейдж "Черновик" --- */
+  .status-step.s-draft {
+    background: #FFF6E0;
+    border-color: #E0B341;
+    color: #8A5A00;
+  }
+  .status-step.current.s-draft {
+    background: #E0B341;
+    border-color: #E0B341;
+    color: white;
+    box-shadow: 0 2px 6px rgba(224, 179, 65, 0.35);
+  }
+  .contract-status-badge.bdg-draft,
+  .badge-draft {
+    background: #FFF6E0;
+    color: #8A5A00;
+    border: 1px solid #E8C76A;
+  }
+
+  /* --- Большая кнопка "Опубликовать договор" --- */
+  .publish-contract-block {
+    margin: 16px 0;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%);
+    border: 1.5px dashed #E0B341;
+    border-radius: 14px;
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .publish-contract-block .pcb-text {
+    flex: 1; min-width: 200px;
+  }
+  .publish-contract-block .pcb-title {
+    font-weight: 600; font-size: 14px; color: #6B4A00;
+    margin-bottom: 3px;
+  }
+  .publish-contract-block .pcb-desc {
+    font-size: 12.5px; color: #8A5A00; line-height: 1.4;
+  }
+  .publish-contract-btn {
+    background: var(--brand); color: white;
+    border: none; padding: 11px 22px;
+    border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.15s;
+    box-shadow: 0 2px 8px rgba(45, 95, 139, 0.25);
+  }
+  .publish-contract-btn:hover { background: #1f4970; transform: translateY(-1px); }
+  .publish-contract-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+  .publish-contract-btn .ti { font-size: 18px; }
+
+  /* --- Виджет "На сборку" на главной Производства --- */
+  .prod-queue-block { padding: 0 18px; }
+  .prod-queue-empty {
+    text-align: center; padding: 24px 18px;
+    color: var(--text-light); font-size: 13px;
+  }
+  .prod-queue-contract {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 10px;
+    border-left: 4px solid var(--text-faint);
+  }
+  .prod-queue-contract.urg-overdue { border-left-color: #DC2626; }
+  .prod-queue-contract.urg-urgent  { border-left-color: #EA580C; }
+  .prod-queue-contract.urg-soon    { border-left-color: #16A34A; }
+  .prod-queue-contract.urg-ok      { border-left-color: var(--text-faint); }
+  .prod-queue-contract.urg-nodate  { border-left-color: var(--text-faint); }
+  .pqc-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .pqc-title { font-weight: 600; font-size: 14px; color: var(--text); }
+  .pqc-title .pqc-link {
+    color: var(--brand); cursor: pointer; text-decoration: none;
+  }
+  .pqc-title .pqc-link:hover { text-decoration: underline; }
+  .pqc-meta { font-size: 12px; color: var(--text-light); }
+  .pqc-item {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; padding: 8px 0;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .pqc-item:first-of-type { border-top: none; }
+  .pqc-item-name { font-size: 13px; color: var(--text); flex: 1; min-width: 0; line-height: 1.4; word-wrap: break-word; }
+  .pqc-item-name small { color: var(--text-light); font-size: 11.5px; display: block; margin-top: 2px; }
+  .pqc-item-qty {
+    font-size: 12px; color: var(--text-mid);
+    background: var(--bg); padding: 4px 10px;
+    border-radius: 6px; font-weight: 500;
+    white-space: nowrap;
+  }
+  .pqc-item-qty .pqc-need { color: var(--brand); font-weight: 600; }
+  .pqc-take-btn {
+    background: white; border: 1px solid var(--brand);
+    color: var(--brand); padding: 6px 12px;
+    border-radius: 8px; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .pqc-take-btn:hover { background: var(--brand); color: white; }
+
+  /* --- Бейджи резерва в спецификации --- */
+  .spec-item-reservation {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11.5px; padding: 2px 8px;
+    border-radius: 6px; margin-left: 6px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .spec-item-reservation.r-full { background: #E8F5E9; color: #14532D; }
+  .spec-item-reservation.r-partial { background: #FEF3C7; color: #78350F; }
+  .spec-item-reservation.r-none { background: #FEE2E2; color: #7F1D1D; }
+  .spec-item-reservation .ti { font-size: 13px; }
+
+  /* --- Бейдж количества в шапке (мобильный) --- */
+  .notif25-badge { transition: transform 0.2s; }
+  .notif25-badge.pulse { animation: urgPulse 1.2s ease-in-out 2; }
+
+  /* ============ КОНЕЦ ЭТАПА 39 (v2.19.0) ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -10210,7 +10430,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.18.0-statuses-urgency-clickable-items";
+const APP_VERSION = "v2.19.0-publish-reserve-notif";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10520,6 +10740,8 @@ function logout() {
   const pBtn = document.getElementById('password-submit-btn');
   if (pBtn) pBtn.disabled = false;
   setStatus('');
+  // v2.19.0: останавливаем polling уведомлений
+  stopNotifPolling();
 }
 
 // ============ TOAST ============
@@ -10539,18 +10761,261 @@ function showToast(message, type) {
 
 // ============ ПОКАЗ ПРИЛОЖЕНИЯ ============
 
+// ============ ЭТАП 39 (v2.19.0): IN-APP УВЕДОМЛЕНИЯ ============
+//
+// Архитектура:
+//   - Polling /api/notifications/unread каждые NOTIF_POLL_INTERVAL мс
+//   - state.notif.unread — кэш текущих непрочитанных
+//   - state.notif.shownIds — какие id уже показывали в модалке (чтобы не дёргать модалку повторно)
+//   - Модалка #notif-modal появляется автоматически если есть непрочитанные
+//   - Бейдж #notif25-badge обновляется при каждом poll'е
+
+const NOTIF_POLL_INTERVAL = 30000;  // 30 сек
+state.notif = state.notif || {
+  unread: [],
+  shownIds: new Set(),
+  pollTimer: null,
+  isModalOpen: false,
+};
+
+async function loadUnreadNotifications(options) {
+  options = options || {};
+  const silent = !!options.silent;
+  try {
+    const r = await apiGet('/api/notifications/unread?limit=50');
+    const items = (r && r.items) || [];
+    state.notif.unread = items;
+    updateNotifBadge(items.length);
+    // Автопоказ модалки: если есть новые id (которых раньше не показывали) — показать
+    if (items.length > 0) {
+      const newOnes = items.filter(x => !state.notif.shownIds.has(x.id));
+      if (newOnes.length > 0 && !state.notif.isModalOpen && !silent) {
+        // Показывать только если юзер на главной (не отвлекать в форме создания)
+        const screen = state.currentScreen || '';
+        if (screen === 'home-dashboard' || screen === '') {
+          openNotifModal();
+        }
+      }
+      // Помечаем что эти id уже видели (даже если модалка не показалась, бейдж обновлён)
+      items.forEach(x => state.notif.shownIds.add(x.id));
+    }
+    // Если открыта модалка — обновляем содержимое
+    if (state.notif.isModalOpen) {
+      renderNotifModal();
+    }
+    return items;
+  } catch (e) {
+    // Игнорируем ошибки сети — следующий poll попробует ещё раз
+    return [];
+  }
+}
+
+function startNotifPolling() {
+  stopNotifPolling();
+  // Первый запрос — без silent, чтобы показать модалку если есть свежие
+  loadUnreadNotifications({ silent: false });
+  state.notif.pollTimer = setInterval(() => {
+    loadUnreadNotifications({ silent: false });
+  }, NOTIF_POLL_INTERVAL);
+}
+
+function stopNotifPolling() {
+  if (state.notif && state.notif.pollTimer) {
+    clearInterval(state.notif.pollTimer);
+    state.notif.pollTimer = null;
+  }
+  if (state.notif) {
+    state.notif.unread = [];
+    state.notif.shownIds = new Set();
+  }
+  updateNotifBadge(0);
+  closeNotifModal();
+}
+
+function updateNotifBadge(n) {
+  const badge = document.getElementById('notif25-badge');
+  if (!badge) return;
+  if (n > 0) {
+    badge.textContent = String(n);
+    badge.style.display = '';
+    badge.classList.add('pulse');
+    setTimeout(() => badge.classList.remove('pulse'), 2500);
+  } else {
+    badge.style.display = 'none';
+    badge.textContent = '0';
+  }
+}
+
+function openNotifModal() {
+  const m = document.getElementById('notif-modal');
+  if (!m) return;
+  state.notif.isModalOpen = true;
+  renderNotifModal();
+  m.classList.add('visible');
+}
+
+function closeNotifModal(ev) {
+  // Если event есть — это клик по оверлею. Закрываем ТОЛЬКО если все подтверждены.
+  // Иначе модалка остаётся (по требованию из RESUME — висит пока не подтверждено каждое).
+  if (ev && ev.target && ev.target.id !== 'notif-modal') return;
+  const items = (state.notif && state.notif.unread) || [];
+  if (ev && items.length > 0) {
+    // Висит — даём фидбек
+    showToast('Подтвердите уведомления чтобы закрыть', 'info');
+    return;
+  }
+  const m = document.getElementById('notif-modal');
+  if (!m) return;
+  m.classList.remove('visible');
+  if (state.notif) state.notif.isModalOpen = false;
+}
+
+function renderNotifModal() {
+  const body = document.getElementById('notif-modal-body');
+  const cnt = document.getElementById('notif-modal-count');
+  const ackAll = document.getElementById('notif-ack-all-btn');
+  if (!body) return;
+  const items = (state.notif && state.notif.unread) || [];
+  if (cnt) cnt.textContent = String(items.length);
+  if (ackAll) ackAll.disabled = (items.length === 0);
+
+  if (items.length === 0) {
+    body.innerHTML = '<div class="notif-modal-empty"><i class="ti ti-check" style="font-size:32px;color:var(--success);display:block;margin-bottom:8px;"></i>Все уведомления прочитаны</div>';
+    return;
+  }
+  let html = '';
+  items.forEach(n => {
+    const iconCls = n.type === 'contract_published' ? 't-contract' : (n.type === 'assembly_created' ? 't-assembly' : '');
+    const icon = n.type === 'contract_published' ? 'ti-file-text' : (n.type === 'assembly_created' ? 'ti-tool' : 'ti-bell');
+    const linkAttr = (n.entity_type && n.entity_id)
+      ? 'onclick="onNotifClick(' + n.id + ', \'' + escapeHtml(n.entity_type) + '\', ' + Number(n.entity_id) + ')" style="cursor:pointer;"'
+      : '';
+    html += '<div class="notif-card" ' + linkAttr + '>';
+    html += '<div class="notif-card-icon ' + iconCls + '"><i class="ti ' + icon + '"></i></div>';
+    html += '<div class="notif-card-body">';
+    html += '<div class="notif-card-title">' + escapeHtml(n.title || '') + '</div>';
+    html += '<div class="notif-card-msg">' + escapeHtml(n.message || '') + '</div>';
+    if (n.created_at) {
+      html += '<div class="notif-card-time">' + escapeHtml(formatNotifTime(n.created_at)) + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="notif-card-actions">';
+    html += '<button class="notif-ack-btn" onclick="event.stopPropagation(); ackNotification(' + n.id + ')">ОК</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  body.innerHTML = html;
+}
+
+function formatNotifTime(iso) {
+  if (!iso) return '';
+  try {
+    // SQLite даёт 'YYYY-MM-DD HH:MM:SS' (UTC)
+    let d;
+    if (iso.includes('T') || iso.endsWith('Z')) {
+      d = new Date(iso);
+    } else {
+      d = new Date(iso.replace(' ', 'T') + 'Z');
+    }
+    if (isNaN(d.getTime())) return iso;
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'только что';
+    if (diffMin < 60) return diffMin + ' мин назад';
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return diffH + ' ч назад';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return dd + '.' + mm + ' ' + hh + ':' + mi;
+  } catch (e) {
+    return iso;
+  }
+}
+
+async function ackNotification(notifId) {
+  try {
+    await apiPost('/api/notifications/' + notifId + '/ack', {});
+  } catch (e) {
+    showToast('Не удалось подтвердить уведомление', 'error');
+    return;
+  }
+  // Убираем из state
+  if (state.notif && state.notif.unread) {
+    state.notif.unread = state.notif.unread.filter(x => x.id !== notifId);
+  }
+  updateNotifBadge((state.notif.unread || []).length);
+  renderNotifModal();
+  // Если последнее — закрываем модалку
+  if ((state.notif.unread || []).length === 0) {
+    setTimeout(closeNotifModalForced, 400);
+  }
+}
+
+async function ackAllNotifications() {
+  try {
+    const r = await apiPost('/api/notifications/ack-all', {});
+    if (state.notif) state.notif.unread = [];
+    updateNotifBadge(0);
+    renderNotifModal();
+    setTimeout(closeNotifModalForced, 300);
+    if (r && r.count) showToast('Подтверждено: ' + r.count, 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + e.message, 'error');
+  }
+}
+
+function closeNotifModalForced() {
+  const m = document.getElementById('notif-modal');
+  if (!m) return;
+  m.classList.remove('visible');
+  if (state.notif) state.notif.isModalOpen = false;
+}
+
+function onNotifClick(notifId, entityType, entityId) {
+  // Сначала ackнем (мягко), потом перейдём на сущность
+  ackNotification(notifId);
+  if (entityType === 'contract' && entityId) {
+    closeNotifModalForced();
+    openContractDetail(entityId);
+  } else if (entityType === 'assembly' && entityId) {
+    closeNotifModalForced();
+    // Журнал сборок — просто открываем historic с фильтром (упрощ. вариант)
+    selectSidebarItem('history');
+  }
+}
+
+// Кнопка-колокольчик: ручное открытие
+function manuallyOpenNotifModal() {
+  // Если есть непрочитанные — открываем; иначе показываем «пусто»
+  openNotifModal();
+}
+
+// ============ КОНЕЦ ЭТАПА 39 (v2.19.0) — УВЕДОМЛЕНИЯ ============
+
+
 function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   applyLayout();
   if (!state.user) {
-    apiGet('/api/me').then(me => { state.user = me; renderProfile(); applyPermissionsToUI(); _restoreLastView(); _showWelcomeIfFresh(); })
+    apiGet('/api/me').then(me => {
+      state.user = me;
+      renderProfile();
+      applyPermissionsToUI();
+      _restoreLastView();
+      _showWelcomeIfFresh();
+      startNotifPolling();  // v2.19.0
+    })
       .catch(() => logout());
   } else {
     renderProfile();
     applyPermissionsToUI();
     _restoreLastView();
     _showWelcomeIfFresh();
+    startNotifPolling();  // v2.19.0
   }
 }
 
@@ -10924,12 +11389,14 @@ function refreshCurrentScreen() {
 
 async function loadDashboard() {
   const container = document.getElementById('dashboard-content');
-  if (cache.dashboard) { renderDashboard(cache.dashboard); return; }
+  if (cache.dashboard) { renderDashboard(cache.dashboard); loadProductionQueue(); return; }
   container.innerHTML = '<div class="loading-block">Загружаем данные…</div>';
   try {
     const d = await apiGet('/api/dashboard');
     cache.dashboard = d;
     renderDashboard(d);
+    // v2.19.0: подгружаем виджет «На сборку» параллельно
+    loadProductionQueue();
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить: ' + escapeHtml(String(e)) + '</div>';
   }
@@ -10951,6 +11418,10 @@ function renderDashboard(d) {
   html += '<div class="kpi-pill"><div class="kpi-value">' + (d.month.qty || 0) + '</div><div class="kpi-label">за месяц</div></div>';
   html += '<div class="kpi-pill"><div class="kpi-value">' + (d.month.employees || 0) + '</div><div class="kpi-label">сборщиков</div></div>';
   html += '</div>';
+
+  // v2.19.0: виджет «На сборку» (мобильный) — между KPI и Последними записями
+  html += '<div class="qa25-section-label" id="prod-queue-label-m" style="display:none;">На сборку</div>';
+  html += '<div class="prod-queue-block" id="production-queue-block-mobile"></div>';
 
   // 2. Журнал работ за сегодня (последние записи, до 6)
   if (d.recent && d.recent.length) {
@@ -11008,6 +11479,12 @@ function renderDashboard(d) {
   html += kpiCard('за неделю', d.week.qty, trendText(d.week.trend_pct), trendClass(d.week.trend_pct));
   html += kpiCard('за месяц', d.month.qty, trendText(d.month.trend_pct), trendClass(d.month.trend_pct));
   html += kpiCard('сборщиков', d.month.employees, 'за месяц');
+  html += '</div>';
+
+  // v2.19.0: виджет «На сборку» (десктоп) — между KPI grid и row-2
+  html += '<div class="section" id="prod-queue-section-d" style="display:none;">';
+  html += '<h3 class="section-title">На сборку <a id="prod-queue-link-d" style="display:none;cursor:pointer;color:var(--brand);" onclick="selectSidebarItem(\'sales-contracts\')">Все договоры</a></h3>';
+  html += '<div class="prod-queue-block" id="production-queue-block-desktop"></div>';
   html += '</div>';
 
   html += '<div class="row-2">';
@@ -11070,6 +11547,150 @@ function renderDashboard(d) {
 
   container.innerHTML = html;
 }
+
+
+// ============ ЭТАП 39 (v2.19.0): ВИДЖЕТ «НА СБОРКУ» ============
+
+async function loadProductionQueue() {
+  try {
+    const r = await apiGet('/api/production/queue');
+    const contracts = (r && r.contracts) || [];
+    renderProductionQueue(contracts);
+  } catch (e) {
+    // Тихо — виджет необязательный
+    renderProductionQueue([]);
+  }
+}
+
+function renderProductionQueue(contracts) {
+  const containers = [
+    document.getElementById('production-queue-block-mobile'),
+    document.getElementById('production-queue-block-desktop'),
+  ].filter(Boolean);
+  const labelM = document.getElementById('prod-queue-label-m');
+  const sectionD = document.getElementById('prod-queue-section-d');
+  const linkD = document.getElementById('prod-queue-link-d');
+
+  if (!contracts || contracts.length === 0) {
+    if (labelM) labelM.style.display = 'none';
+    if (sectionD) sectionD.style.display = 'none';
+    containers.forEach(c => c.innerHTML = '');
+    return;
+  }
+
+  // Показываем секцию (была скрыта если пусто)
+  if (labelM) labelM.style.display = '';
+  if (sectionD) sectionD.style.display = '';
+  if (linkD) linkD.style.display = contracts.length > 3 ? '' : 'none';
+
+  let html = '';
+  contracts.forEach(c => {
+    const urgCls = _prodQueueUrgencyClass(c.delivery_date);
+    html += '<div class="prod-queue-contract ' + urgCls + '">';
+    html += '<div class="pqc-head">';
+    html += '<div class="pqc-title">';
+    html += '<span class="pqc-link" onclick="openContractDetail(' + c.contract_id + ')">№' + escapeHtml(c.contract_number || '—') + '</span>';
+    if (c.contractor_name) html += ' · ' + escapeHtml(c.contractor_name);
+    html += '</div>';
+    let metaParts = [];
+    if (c.delivery_date) {
+      metaParts.push('срок ' + formatDateShort(c.delivery_date));
+      const daysLeft = _prodQueueDaysLeft(c.delivery_date);
+      if (daysLeft !== null) {
+        if (daysLeft < 0) metaParts.push('просрочен на ' + Math.abs(daysLeft) + ' дн');
+        else if (daysLeft === 0) metaParts.push('сегодня');
+        else if (daysLeft <= 7) metaParts.push('через ' + daysLeft + ' дн');
+      }
+    } else {
+      metaParts.push('без срока');
+    }
+    html += '<div class="pqc-meta">' + escapeHtml(metaParts.join(' · ')) + '</div>';
+    html += '</div>';
+
+    // Позиции
+    (c.items || []).forEach(item => {
+      const subParts = [];
+      if (item.execution_type) {
+        const lbl = item.execution_type === 'stainless' ? 'Нерж. AISI' : (item.execution_type === 'standard' ? 'Стандарт' : item.execution_type);
+        subParts.push(lbl);
+      }
+      if (item.ip_rating) subParts.push(item.ip_rating);
+      html += '<div class="pqc-item">';
+      html += '<div class="pqc-item-name">' + escapeHtml(item.item_name || '—');
+      if (subParts.length) html += '<small>' + escapeHtml(subParts.join(' · ')) + '</small>';
+      html += '</div>';
+      const need = Math.round((item.qty_need || 0) * 100) / 100;
+      const qtyText = (item.qty_reserved > 0)
+        ? ('Нужно <span class="pqc-need">' + _fmtQty(need) + '</span> из ' + _fmtQty(item.qty))
+        : ('Нужно <span class="pqc-need">' + _fmtQty(item.qty) + '</span>');
+      html += '<div class="pqc-item-qty">' + qtyText + '</div>';
+      if (canCreateAssembly()) {
+        html += '<button class="pqc-take-btn" onclick="takeForAssembly(' + c.contract_id + ', ' + (item.model_id || 'null') + ', \'' + escapeHtml(String(item.execution_type || '')) + '\', \'' + escapeHtml(String(item.ip_rating || '')) + '\')"><i class="ti ti-tool"></i> Взять в работу</button>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  containers.forEach(c => c.innerHTML = html);
+}
+
+function _fmtQty(v) {
+  const n = Number(v) || 0;
+  return (n % 1 === 0) ? String(n) : n.toFixed(1).replace(/\.0$/, '');
+}
+
+function _prodQueueDaysLeft(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    return Math.round((target - today) / (24 * 3600 * 1000));
+  } catch (e) { return null; }
+}
+
+function _prodQueueUrgencyClass(iso) {
+  const days = _prodQueueDaysLeft(iso);
+  if (days === null) return 'urg-nodate';
+  if (days < 0) return 'urg-overdue';
+  if (days <= 3) return 'urg-urgent';
+  if (days <= 14) return 'urg-soon';
+  return 'urg-ok';
+}
+
+function canCreateAssembly() {
+  const u = state.user || {};
+  const perms = u.permissions || {};
+  const roles = u.roles || [];
+  // Есть permissions с ключом производства — или legacy роли мастер/инженер/директор/зам
+  if (perms['production.assembly_create'] || perms['production.full']) return true;
+  if (roles.includes('director') || roles.includes('master') || roles.includes('engineer') || roles.includes('zam')) return true;
+  return false;
+}
+
+// «Взять в работу» — открывает форму создания сборки с предзаполненной моделью и contract_id
+function takeForAssembly(contractId, modelId, executionType, ipRating) {
+  // state._prefillAssembly будет прочитан при инициализации формы новой сборки
+  state._prefillAssembly = {
+    contract_id: contractId,
+    model_id: modelId || null,
+    execution: executionType || null,
+    ip_class: ipRating || null,
+  };
+  // Открываем форму
+  if (typeof openNewAssembly === 'function') {
+    openNewAssembly();
+  } else if (typeof openSidebarItem === 'function') {
+    selectSidebarItem('new-assembly');
+  } else {
+    selectSidebarItem('new-assembly');
+  }
+}
+
+// ============ КОНЕЦ ВИДЖЕТА «НА СБОРКУ» ============
+
 
 function kpiCard(label, value, trendStr, trendCls) {
   return '<div class="kpi-card">' +
@@ -18167,6 +18788,57 @@ function initNewAssemblyForm() {
 
   ensureModelsLoaded();
   loadActiveEmployees();
+
+  // v2.19.0: предзаполнение из виджета «На сборку» (takeForAssembly)
+  _applyAssemblyPrefillIfAny();
+}
+
+// v2.19.0: подхватываем prefill из state._prefillAssembly (если был takeForAssembly)
+async function _applyAssemblyPrefillIfAny() {
+  if (!state._prefillAssembly) return;
+  const pf = state._prefillAssembly;
+  state._prefillAssembly = null;  // одноразово
+  try {
+    // Подтягиваем модели если ещё не загружены
+    if (!cache.models) {
+      try { await ensureModelsLoaded(); } catch (e) {}
+    }
+    // 1. Модель — если есть в кэше
+    if (pf.model_id && cache.models && cache.models.models) {
+      const model = cache.models.models.find(m => m.id === pf.model_id);
+      if (model) {
+        selectModel(pf.model_id);
+        // 2. Исполнение
+        if (pf.execution) {
+          setTimeout(() => {
+            const chip = document.querySelector('#execution-chips .chip-option[data-exec="' + pf.execution + '"]');
+            if (chip) chip.click();
+          }, 50);
+        }
+        // 3. IP-класс
+        if (pf.ip_class) {
+          setTimeout(() => {
+            const chip = document.querySelector('#ip-section .chip-option[data-ip="' + pf.ip_class + '"]');
+            if (chip) chip.click();
+          }, 70);
+        }
+      }
+    }
+    // 4. Договор
+    if (pf.contract_id) {
+      try {
+        const c = await apiGet('/api/contracts/' + pf.contract_id);
+        state.newAssembly.contractId = c.id;
+        state.newAssembly.contractLabel = '№' + (c.number || '') + (c.contractor_name ? ' · ' + c.contractor_name : '');
+        if (typeof renderAssemblyDestination === 'function') renderAssemblyDestination();
+      } catch (e) {
+        // не критично
+      }
+    }
+    showToast('Форма предзаполнена. Укажите сборщиков и сохраните.', 'info');
+  } catch (e) {
+    // тихо
+  }
 }
 
 // ЭТАП 23: переключение типа работы
@@ -19234,8 +19906,20 @@ function renderContractDetail(c) {
   html += '<div>' + statusBadgeHtml(c.status, c.status_label) + '</div>';
   html += '</div>';
 
-  // Переключатель статуса (если есть права)
-  if (canEdit) {
+  // v2.19.0: блок «Опубликовать договор» для draft + скрываем status-changer пока draft
+  const isDraft = (c.status === 'draft');
+  if (isDraft && canEdit) {
+    html += '<div class="publish-contract-block">';
+    html += '<div class="pcb-text">';
+    html += '<div class="pcb-title"><i class="ti ti-file-alert"></i> Это черновик договора</div>';
+    html += '<div class="pcb-desc">Договор не виден другим сотрудникам как «в работе». Опубликуйте — система зарезервирует свободные сборки и комплектующие со склада, и все сотрудники увидят его в производстве.</div>';
+    html += '</div>';
+    html += '<button class="publish-contract-btn" onclick="publishContract(' + c.id + ')"><i class="ti ti-rocket"></i>Опубликовать договор</button>';
+    html += '</div>';
+  }
+
+  // Переключатель статуса (если есть права и НЕ draft)
+  if (canEdit && !isDraft) {
     html += '<div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 16px; margin-bottom: 4px;">ИЗМЕНИТЬ СТАТУС</div>';
     const steps = [
       { code: 'production', label: 'В производстве' },
@@ -19332,6 +20016,35 @@ async function loadContractItemsBlock(contractId) {
   }
 }
 
+// v2.19.0: бейдж резерва для позиции спецификации
+function _renderReservationBadge(item) {
+  if (!item) return '';
+  // Только для model_id и component_id (sale_product_id не лежит на складе)
+  const hasReservable = item.model_id || item.component_id;
+  if (!hasReservable) return '';
+  const qty = Number(item.qty) || 0;
+  const reserved = Number(item.qty_reserved || 0);
+  if (qty <= 0) return '';
+  let cls = 'r-none';
+  let icon = 'ti-circle';
+  let txt = '';
+  if (reserved >= qty) {
+    cls = 'r-full';
+    icon = 'ti-circle-check';
+    txt = 'В резерве';
+  } else if (reserved > 0) {
+    cls = 'r-partial';
+    icon = 'ti-progress';
+    txt = 'Резерв ' + _fmtQty(reserved) + ' из ' + _fmtQty(qty);
+  } else {
+    cls = 'r-none';
+    icon = 'ti-circle-dashed';
+    txt = (item.model_id ? 'К сборке' : 'К закупке');
+  }
+  return ' <span class="spec-item-reservation ' + cls + '" title="' + escapeHtml(txt) + '">' +
+    '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
+}
+
 function renderContractItemsBlock(contractId) {
   const container = document.getElementById('scd-items-block');
   if (!container) return;
@@ -19391,6 +20104,8 @@ function renderContractItemsBlock(contractId) {
         if (it.ip_rating) {
           metaParts.push('<span style="color: var(--c-prod-25); font-weight: 600;">' + escapeHtml(it.ip_rating) + '</span>');
         }
+        // v2.19.0: бейдж резерва (для model_id и component_id)
+        const _reservedBadge = _renderReservationBadge(it);
         const meta = metaParts.join(' · ');
         // ЭТАП 38 (v2.18.0): клик по названию → открыть карточку связанной сущности
         let nameClickHandler = '';
@@ -19408,7 +20123,7 @@ function renderContractItemsBlock(contractId) {
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + _reservedBadge + '</div>' +
             '<div class="spec-item-meta">' + meta + '</div>' +
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
@@ -25551,6 +26266,58 @@ function loadHelpChangelog() {
 }
 
 
+// ============ ЭТАП 39 (v2.19.0): ПУБЛИКАЦИЯ ДОГОВОРА ============
+
+async function publishContract(contractId) {
+  if (!contractId) return;
+  const contract = state.lastLoadedContract;
+  const num = contract ? contract.number : ('#' + contractId);
+  if (!confirm(
+    'Опубликовать договор ' + num + '?\n\n' +
+    'Все сотрудники увидят его в производстве. Свободные сборки и комплектующие ' +
+    'на складе будут автоматически зарезервированы под этот договор.'
+  )) {
+    return;
+  }
+
+  const btn = document.querySelector('.publish-contract-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i>Публикуем…'; }
+
+  try {
+    const r = await apiPost('/api/contracts/' + contractId + '/publish', {});
+    if (r && r.ok) {
+      // Показываем итог авторезерва
+      const rep = r.reservation || {};
+      const reservedAsm = (rep.reserved_assemblies || []).length;
+      const reservedComp = (rep.reserved_components || []).length;
+      const needMake = (rep.need_to_make || []).reduce((a, x) => a + (x.qty_short || 0), 0);
+      const needBuy = (rep.need_to_buy || []).reduce((a, x) => a + (x.qty_short || 0), 0);
+      const parts = [];
+      if (reservedAsm) parts.push('зарезервировано сборок: ' + reservedAsm);
+      if (reservedComp) parts.push('комплектующих: ' + reservedComp);
+      if (needMake > 0) parts.push('на сборку: ' + needMake);
+      if (needBuy > 0) parts.push('к закупке: ' + needBuy);
+      const msg = parts.length ? ('Опубликовано · ' + parts.join(' · ')) : 'Договор опубликован';
+      showToast(msg, 'success');
+      // Перезагружаем карточку
+      if (typeof loadContractDetail === 'function') {
+        loadContractDetail(contractId);
+      } else {
+        // fallback — общий рефреш
+        refreshCurrentScreen();
+      }
+    } else {
+      showToast('Не удалось опубликовать', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-rocket"></i>Опубликовать договор'; }
+    }
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : 'Ошибка публикации';
+    showToast(msg, 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-rocket"></i>Опубликовать договор'; }
+  }
+}
+
+
 async function changeContractStatus(contractId, newStatus) {
   // ЭТАП 38 (v2.18.0): проверяем что статус реально меняется (не клик по текущему)
   const currentContract = state.lastLoadedContract;
@@ -29651,6 +30418,27 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
+<!-- ============ ЭТАП 39 (v2.19.0): МОДАЛКА УВЕДОМЛЕНИЙ ============ -->
+<div class="notif-modal-overlay" id="notif-modal" onclick="closeNotifModal(event)">
+  <div class="notif-modal" onclick="event.stopPropagation()">
+    <div class="notif-modal-head">
+      <div class="notif-modal-title">
+        <i class="ti ti-bell-ringing"></i>
+        Уведомления
+        <span class="notif-modal-count" id="notif-modal-count">0</span>
+      </div>
+    </div>
+    <div class="notif-modal-body" id="notif-modal-body">
+      <div class="notif-modal-empty">Нет новых уведомлений</div>
+    </div>
+    <div class="notif-modal-foot">
+      <button class="notif-ack-all-btn" id="notif-ack-all-btn" onclick="ackAllNotifications()">
+        <i class="ti ti-checks"></i> Прочитал всё
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ============ ЭТАП 25.0: ACTION SHEET (для + кнопки) ============ -->
 <div class="sheet25-overlay" id="action-sheet-25" onclick="closeActionSheet25(event)">
