@@ -1607,6 +1607,23 @@
     background: white; border: 1px solid var(--border);
     border-radius: 12px; padding: 14px 16px;
     cursor: pointer;
+    border-left: 4px solid var(--border);  /* ЭТАП 38 (v2.18.0): акцент срочности */
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .contract-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  /* ЭТАП 38 (v2.18.0): подсветка по срочности (border-left 4px) */
+  .contract-card.urg-overdue { border-left-color: #DC2626; animation: urgPulse 2s ease-in-out infinite; }
+  .contract-card.urg-urgent  { border-left-color: #DC2626; }
+  .contract-card.urg-soon    { border-left-color: #F59E0B; }
+  .contract-card.urg-ok      { border-left-color: #10B981; }
+  .contract-card.urg-nodate  { border-left-color: #9CA3AF; }
+  .contract-card.urg-done    { border-left-color: #D1D5DB; opacity: 0.75; }
+  @keyframes urgPulse {
+    0%, 100% { border-left-color: #DC2626; }
+    50%      { border-left-color: #FCA5A5; }
   }
   .contract-card .cc-top {
     display: flex; justify-content: space-between; align-items: flex-start;
@@ -1679,20 +1696,46 @@
 
   /* Status changer (переключатель статуса в карточке) */
   .status-changer {
-    display: flex; gap: 4px; padding: 6px; margin: 12px 0;
+    display: flex; gap: 6px; padding: 6px; margin: 12px 0;
     background: var(--bg); border-radius: 12px;
     overflow-x: auto; scrollbar-width: none;
   }
   .status-changer::-webkit-scrollbar { display: none; }
+  /* ЭТАП 38 (v2.18.0): кнопки статуса — явно кликабельны, с hover-эффектом и границей */
   .status-step {
-    padding: 8px 14px; border-radius: 8px;
-    font-size: 12.5px; font-weight: 500;
-    color: var(--text-light); cursor: pointer;
-    white-space: nowrap; border: none; background: transparent;
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-mid); cursor: pointer;
+    white-space: nowrap;
+    background: white;
+    border: 1.5px solid var(--border);
+    transition: all 0.15s ease;
+    user-select: none;
   }
-  .status-step.passed { color: var(--success); }
+  .status-step:hover:not(.current):not(:disabled) {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+    color: var(--brand);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(45, 95, 139, 0.15);
+  }
+  .status-step:active:not(.current):not(:disabled) {
+    transform: translateY(0);
+  }
+  .status-step.passed {
+    color: var(--success);
+    border-color: var(--success);
+    background: #E8F5E9;
+  }
   .status-step.passed::before { content: "✓ "; }
-  .status-step.current { background: white; color: var(--brand); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .status-step.current {
+    background: var(--brand);
+    color: white;
+    font-weight: 600;
+    border-color: var(--brand);
+    box-shadow: 0 2px 6px rgba(45, 95, 139, 0.25);
+    cursor: default;
+  }
   .status-step:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Карточка договора — детали */
@@ -4060,8 +4103,21 @@
     margin-bottom: 8px;
     cursor: pointer;
     display: flex; gap: 14px; align-items: center;
+    border-left: 4px solid var(--border);  /* ЭТАП 38 (v2.18.0): акцент срочности */
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
-  .contract-progress-card:hover { background: var(--bg); }
+  .contract-progress-card:hover {
+    background: var(--bg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  /* ЭТАП 38 (v2.18.0): подсветка по срочности (border-left 4px) для progress-card */
+  .contract-progress-card.urg-overdue { border-left-color: #DC2626; animation: urgPulse 2s ease-in-out infinite; }
+  .contract-progress-card.urg-urgent  { border-left-color: #DC2626; }
+  .contract-progress-card.urg-soon    { border-left-color: #F59E0B; }
+  .contract-progress-card.urg-ok      { border-left-color: #10B981; }
+  .contract-progress-card.urg-nodate  { border-left-color: #9CA3AF; }
+  .contract-progress-card.urg-done    { border-left-color: #D1D5DB; opacity: 0.75; }
   .contract-progress-card .cpc-body { flex: 1; min-width: 0; }
   .contract-progress-card .cpc-head {
     display: flex; justify-content: space-between; align-items: baseline;
@@ -7386,6 +7442,16 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* ЭТАП 38 (v2.18.0): кликабельное название позиции в спецификации */
+  .spec-item-name--link {
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  .spec-item-name--link:hover {
+    color: var(--brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
   .spec-item-meta {
     font-size: 12px;
     color: var(--text-light);
@@ -10144,7 +10210,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.17.0-payment-date-execution-components";
+const APP_VERSION = "v2.18.0-statuses-urgency-clickable-items";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15129,7 +15195,10 @@ function renderContractProgressCard(c) {
     } catch (e) {}
   }
 
-  return '<div class="contract-progress-card" onclick="openContractDetail(' + c.id + ')">' +
+  // ЭТАП 38 (v2.18.0): класс срочности для подсветки border-left
+  const urgCls = getContractUrgencyClass(c);
+
+  return '<div class="contract-progress-card ' + urgCls + '" onclick="openContractDetail(' + c.id + ')">' +
     '<div class="cpc-body">' +
       '<div class="cpc-head">' +
         '<span class="cpc-num">' + escapeHtml(c.number) + '</span>' +
@@ -15141,6 +15210,28 @@ function renderContractProgressCard(c) {
         '<span class="cpc-count">' + (hasAssemblies ? '<b>' + qty + '</b> ' + pluralAssemblies(qty) : 'нет сборок') + '</span>' +
       '</div>' +
     '</div></div>';
+}
+
+// ЭТАП 38 (v2.18.0): класс срочности договора для CSS-подсветки
+// Возвращает один из: 'urg-overdue', 'urg-urgent', 'urg-soon', 'urg-ok', 'urg-nodate', 'urg-done'
+function getContractUrgencyClass(c) {
+  if (!c) return 'urg-nodate';
+  const status = c.status || '';
+  if (status === 'shipped' || status === 'closed') return 'urg-done';
+  if (!c.delivery_date) return 'urg-nodate';
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(c.delivery_date + 'T00:00:00');
+    if (isNaN(target.getTime())) return 'urg-nodate';
+    const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'urg-overdue';   // просрочен
+    if (diffDays <= 3) return 'urg-urgent';    // 0-3 дней — горит
+    if (diffDays <= 10) return 'urg-soon';     // 4-10 — внимание
+    return 'urg-ok';                            // >10 — спокойно
+  } catch (e) {
+    return 'urg-nodate';
+  }
 }
 
 function pluralAssemblies(n) {
@@ -18945,9 +19036,23 @@ function renderSalesDashboard() {
 }
 
 function renderContractRowInline(c) {
+  // ЭТАП 38 (v2.18.0): подсветка иконки по срочности
+  const urgCls = getContractUrgencyClass(c);
+  const urgColors = {
+    'urg-overdue': '#DC2626',
+    'urg-urgent':  '#DC2626',
+    'urg-soon':    '#F59E0B',
+    'urg-ok':      '#10B981',
+    'urg-nodate':  '',  // дефолтный
+    'urg-done':    '#9CA3AF',
+  };
+  const c1 = urgColors[urgCls] || '';
+  const iconStyle = c1
+    ? ' style="background:' + c1 + '22; color:' + c1 + ';"'  // 22 = ~13% opacity hex
+    : '';
   // Краткая строка договора (для дашборда и связанных списков)
   return '<div class="record" onclick="openContract(' + c.id + ')">' +
-    '<div class="record-icon"><i class="ti ti-file-text"></i></div>' +
+    '<div class="record-icon"' + iconStyle + '><i class="ti ti-file-text"></i></div>' +
     '<div class="record-body">' +
       '<div class="record-title">' + escapeHtml(c.number || '—') + ' · ' + escapeHtml(c.contractor_name || '—') + '</div>' +
       '<div class="record-meta">' +
@@ -19056,7 +19161,9 @@ function renderContractsList() {
   } else {
     let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
     list.forEach(c => {
-      html += '<div class="contract-card" onclick="openContract(' + c.id + ')">' +
+      // ЭТАП 38 (v2.18.0): класс срочности
+      const urgCls = getContractUrgencyClass(c);
+      html += '<div class="contract-card ' + urgCls + '" onclick="openContract(' + c.id + ')">' +
         '<div class="cc-top">' +
           '<span class="cc-num">' + escapeHtml(c.number || '—') + '</span>' +
           statusBadgeHtml(c.status, c.status_label) +
@@ -19285,10 +19392,23 @@ function renderContractItemsBlock(contractId) {
           metaParts.push('<span style="color: var(--c-prod-25); font-weight: 600;">' + escapeHtml(it.ip_rating) + '</span>');
         }
         const meta = metaParts.join(' · ');
+        // ЭТАП 38 (v2.18.0): клик по названию → открыть карточку связанной сущности
+        let nameClickHandler = '';
+        let nameLinkClass = '';
+        if (it.sale_product_id) {
+          nameClickHandler = ' onclick="openSaleProductDetail(' + it.sale_product_id + ')"';
+          nameLinkClass = ' spec-item-name--link';
+        } else if (it.model_id) {
+          nameClickHandler = ' onclick="openModelDetail(' + it.model_id + ')"';
+          nameLinkClass = ' spec-item-name--link';
+        } else if (it.component_id) {
+          nameClickHandler = ' onclick="openComponentDetail(' + it.component_id + ')"';
+          nameLinkClass = ' spec-item-name--link';
+        }
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name">' + escapeHtml(displayName) + sourceTag + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + '</div>' +
             '<div class="spec-item-meta">' + meta + '</div>' +
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
@@ -24513,6 +24633,29 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 const HELP_CHANGELOG = [
   {
+    version: 'v2.18.0',
+    date: '20.05.2026',
+    title: 'Подсветка договоров + улучшения UX',
+    features: [
+      '<b>Подсветка договоров по срочности</b> — цветная полоска слева у карточки договора: 🔴 красная (просрочен или 0–3 дня до отгрузки), 🟠 оранжевая (4–10 дней), 🟢 зелёная (более 10 дней), серая (нет даты), приглушённая (отгружен/закрыт)',
+      '<b>Кнопки статуса договора</b> переделаны: теперь явно выглядят как кнопки (с границей, hover-эффектом, контрастным активным состоянием). Перед сменой статуса спрашивается подтверждение',
+      '<b>Кликабельная номенклатура в спецификации:</b> клик по названию позиции открывает её карточку (фото, характеристики для продажных; модель — для производственных; комплектующее — для запчастей). Свободный ввод остаётся обычным текстом',
+      '<b>Новая категория «Чиллеры»</b> в продажной номенклатуре',
+      '<b>Фикс нумерации коробок:</b> после удаления всех коробок счётчик сбрасывается на #1. Раньше: удалил #1 и #2, создал новую → получала #3. Теперь — #1',
+    ],
+  },
+  {
+    version: 'v2.17.0',
+    date: '20.05.2026',
+    title: 'Дата оплаты + Исполнение/IP + Комплектующие в договоре',
+    features: [
+      '<b>Дата оплаты</b> в форме договора — срок отгрузки теперь считается от неё. Пока оплаты нет — показывается прогноз от даты подписания с пометкой «уточнится после оплаты»',
+      '<b>Поле «Исполнение»</b> (обычное / нержавейка) в строке спецификации для воздухоохладителей, увлажнения, щитов управления',
+      '<b>Поле «Влагозащита»</b> (IP44/IP54/IP65/IP66/IP67) в строке спецификации для щитов управления',
+      '<b>Вкладка «Комплектующие»</b> в picker позиций договора — теперь можно отправлять клиенту запчасти отдельно',
+    ],
+  },
+  {
     version: 'v2.9.0',
     date: '19.05.2026',
     title: 'Уровни доступа',
@@ -25409,6 +25552,23 @@ function loadHelpChangelog() {
 
 
 async function changeContractStatus(contractId, newStatus) {
+  // ЭТАП 38 (v2.18.0): проверяем что статус реально меняется (не клик по текущему)
+  const currentContract = state.lastLoadedContract;
+  if (currentContract && currentContract.id === contractId && currentContract.status === newStatus) {
+    return;  // клик по уже активному статусу — игнорируем
+  }
+  // ЭТАП 38 (v2.18.0): универсальное подтверждение перед сменой статуса
+  const labels = {
+    'production': 'В производстве',
+    'ready': 'Готов к отгрузке',
+    'shipped': 'Отгружен',
+    'closed': 'Закрыт',
+  };
+  const targetLabel = labels[newStatus] || newStatus;
+  const contractNumber = currentContract ? currentContract.number : ('#' + contractId);
+  if (!confirm('Сменить статус договора ' + contractNumber + ' на «' + targetLabel + '»?')) {
+    return;
+  }
   // ЭТАП 26.1: если закрываем — проверяем прогресс отгрузки, чтобы дать понятное предупреждение
   let forceClose = false;
   if (newStatus === 'closed') {
