@@ -7425,7 +7425,7 @@
   .nom-picker-tab:hover:not(.active) { background: rgba(45, 95, 139, 0.05); }
 
   .nom-picker-search {
-    padding: 12px 18px 0;
+    padding: 12px 18px 14px;
   }
   .nom-picker-search input {
     width: 100%;
@@ -8660,7 +8660,7 @@
           </div>
         </div>
         <div class="content-inner">
-          <div style="padding: 12px 18px 0;">
+          <div style="padding: 12px 18px 14px;">
             <div class="search-box">
               <i class="ti ti-search"></i>
               <input type="text" id="sc-search-input" placeholder="Поиск по номеру, контрагенту…">
@@ -8748,7 +8748,7 @@
           </div>
         </div>
         <div class="content-inner">
-          <div style="padding: 12px 18px 0;">
+          <div style="padding: 12px 18px 14px;">
             <div class="search-box">
               <i class="ti ti-search"></i>
               <input type="text" id="ctr-search-input" placeholder="Поиск по названию, ИНН, телефону…">
@@ -8881,7 +8881,7 @@
           </div>
         </div>
         <div class="content-inner">
-          <div style="padding: 12px 18px 0;">
+          <div style="padding: 12px 18px 14px;">
             <div class="search-box">
               <i class="ti ti-search"></i>
               <input type="text" id="so-search-input" placeholder="Поиск по номеру, контрагенту…">
@@ -9900,7 +9900,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.13.2-collapsible-groups";
+const APP_VERSION = "v2.14.0-contractors-supplier-link";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13427,7 +13427,7 @@ function renderOfferDetail(o) {
   html += '</div>';
 
   // Кнопка «Скачать PDF» + «Скачать Word» (для всех авторизованных) — ЭТАП 17
-  html += '<div style="padding: 12px 18px 0;">';
+  html += '<div style="padding: 12px 18px 14px;">';
   html += '<div style="display: flex; gap: 8px;">';
   html += '<button class="btn btn-primary" onclick="downloadOfferPdf()" style="flex: 1; justify-content: center;">' +
           '<i class="ti ti-file-download"></i> PDF</button>';
@@ -20476,7 +20476,21 @@ async function openComponentForm(componentId) {
             '</select></div>' +
         '</div>' +
         '<label class="form-label">Основной поставщик</label>' +
-        '<select id="cf-supplier" class="form-input" style="margin-bottom:14px;">' + supOptions + '</select>' +
+        '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:stretch;">' +
+          '<select id="cf-supplier" class="form-input" style="flex:1;margin:0;" onchange="onComponentSupplierChange()">' + supOptions + '</select>' +
+          '<button type="button" class="btn btn-secondary" id="cf-sup-open-btn" ' +
+            'onclick="openSupplierFromComponent()" ' +
+            'title="Открыть карточку поставщика"' +
+            ((c && c.default_supplier_id) ? '' : ' disabled style="opacity:0.5;cursor:not-allowed;"') +
+            '><i class="ti ti-external-link"></i></button>' +
+        '</div>' +
+        // ЭТАП 34.1: кнопка корзины закупки (заглушка — раздел Снабжение скоро)
+        '<div style="display:flex;gap:8px;margin-bottom:14px;">' +
+          '<button type="button" class="btn btn-secondary" style="flex:1;" ' +
+            'onclick="addComponentToPurchaseCart(' + (componentId || 'null') + ')">' +
+            '<i class="ti ti-shopping-cart-plus"></i> В корзину закупки' +
+          '</button>' +
+        '</div>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
         '<label class="form-label">Комментарий</label>' +
@@ -20498,6 +20512,73 @@ function closeComponentForm() {
   const m = document.getElementById('comp-form-modal');
   if (m) m.classList.remove('visible');
 }
+
+// ============ ЭТАП 34.1: кнопки «Карточка поставщика» и «Корзина закупки» ============
+
+function onComponentSupplierChange() {
+  const sel = document.getElementById('cf-supplier');
+  const btn = document.getElementById('cf-sup-open-btn');
+  if (!sel || !btn) return;
+  const hasValue = !!sel.value;
+  btn.disabled = !hasValue;
+  btn.style.opacity = hasValue ? '' : '0.5';
+  btn.style.cursor = hasValue ? '' : 'not-allowed';
+}
+
+async function openSupplierFromComponent() {
+  const sel = document.getElementById('cf-supplier');
+  if (!sel || !sel.value) {
+    showToast('Сначала выбери поставщика', 'error');
+    return;
+  }
+  const supplierId = parseInt(sel.value);
+  closeComponentForm();
+  try {
+    if (typeof openEditSupplier === 'function') {
+      await openEditSupplier(supplierId);
+    } else {
+      showToast('Раздел поставщиков недоступен', 'error');
+    }
+  } catch (e) {
+    showToast('Не удалось открыть поставщика', 'error');
+  }
+}
+
+function addComponentToPurchaseCart(componentId) {
+  if (!componentId) {
+    showToast('Сначала сохрани комплектующее', 'error');
+    return;
+  }
+  const c = (cache.components || []).find(x => x.id === componentId);
+  if (!c) {
+    showToast('Комплектующее не найдено', 'error');
+    return;
+  }
+  if (!state.purchaseCart) {
+    try {
+      state.purchaseCart = JSON.parse(localStorage.getItem('atomus_purchase_cart') || '[]');
+    } catch (e) { state.purchaseCart = []; }
+  }
+  const exist = state.purchaseCart.find(x => x.component_id === componentId);
+  if (exist) {
+    exist.qty = (exist.qty || 1) + 1;
+    showToast('Уже в корзине · теперь ' + exist.qty + ' шт.', 'success');
+  } else {
+    state.purchaseCart.push({
+      component_id: componentId,
+      name: c.name,
+      supplier_id: c.default_supplier_id || null,
+      supplier_name: c.default_supplier_name || '',
+      unit: c.unit || 'шт.',
+      qty: 1,
+    });
+    showToast('В корзину закупки (' + state.purchaseCart.length + ' поз.)', 'success');
+  }
+  try {
+    localStorage.setItem('atomus_purchase_cart', JSON.stringify(state.purchaseCart));
+  } catch (e) { /* ignore */ }
+}
+
 
 async function submitComponentForm(componentId) {
   const supVal = (document.getElementById('cf-supplier') || {}).value || '';
