@@ -9900,7 +9900,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.14.0-contractors-supplier-link";
+const APP_VERSION = "v2.14.1-supplier-from-contractors";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21386,7 +21386,14 @@ function showSupplierModal(s) {
       '</div>' +
       '<div class="modal-content">' +
         '<div class="form-group"><label>Название *</label><input type="text" id="sm-name" value="' + escapeHtml(isEdit ? s.name : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
-        '<div class="form-group"><label>ИНН</label><input type="text" id="sm-inn" value="' + escapeHtml(isEdit ? s.inn : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
+        // ЭТАП 34.2: ИНН + кнопка выбора из контрагентов (762 шт. из 1С)
+        '<div class="form-group">' +
+          '<label>ИНН</label>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<input type="text" id="sm-inn" value="' + escapeHtml(isEdit ? (s.inn || '') : '') + '" placeholder="Введи ИНН или выбери →" style="flex:1;" ' + (canManage ? '' : 'disabled') + '>' +
+            (canManage ? '<button type="button" class="btn btn-secondary" onclick="openSupplierContractorPicker()" title="Выбрать из контрагентов"><i class="ti ti-users"></i> Из контрагентов</button>' : '') +
+          '</div>' +
+        '</div>' +
         '<div class="form-group"><label>Контактное лицо</label><input type="text" id="sm-contact" value="' + escapeHtml(isEdit ? s.contact_person : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
         '<div class="form-group form-row-2">' +
           '<div><label>Телефон</label><input type="text" id="sm-phone" value="' + escapeHtml(isEdit ? s.phone : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
@@ -21401,6 +21408,125 @@ function showSupplierModal(s) {
 
 function closeSupplyModal() {
   document.getElementById('supply-modal').classList.remove('visible');
+}
+
+// ============ ЭТАП 34.2: Picker контрагентов в форме поставщика ============
+
+async function openSupplierContractorPicker() {
+  // Подгружаем контрагентов если ещё нет
+  if (!cache.contractors) {
+    try {
+      const r = await apiGet('/api/contractors?type=legal');
+      cache.contractors = r.contractors || [];
+    } catch (e) {
+      cache.contractors = [];
+    }
+  }
+  if (!cache.contractors.length) {
+    showToast('Контрагентов пока нет в базе', 'error');
+    return;
+  }
+  state._supContractorPickerSearch = '';
+
+  let m = document.getElementById('sup-contractor-picker-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sup-contractor-picker-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '10001';
+    m.onclick = (e) => { if (e.target === m) closeSupplierContractorPicker(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-users"></i> Выбрать из контрагентов</h3>' +
+        '<button class="modal-close" onclick="closeSupplierContractorPicker()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 18px 0;">' +
+        '<div class="search-box">' +
+          '<i class="ti ti-search"></i>' +
+          '<input type="text" id="sup-cp-search" placeholder="Поиск по названию или ИНН…" oninput="renderSupplierContractorPicker()" />' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);padding:8px 0 0;">' +
+          'Всего: <b>' + cache.contractors.length + '</b>. Введи 2+ символа чтобы найти.' +
+        '</div>' +
+      '</div>' +
+      '<div id="sup-cp-list" style="overflow-y:auto;flex:1;padding:10px 18px 18px;">' +
+        '<div class="empty-block" style="padding:30px 0;color:var(--text-light);">' +
+          '<i class="ti ti-search"></i>Начни вводить название или ИНН' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => {
+    const inp = document.getElementById('sup-cp-search');
+    if (inp) inp.focus();
+  }, 50);
+}
+
+function closeSupplierContractorPicker() {
+  const m = document.getElementById('sup-contractor-picker-modal');
+  if (m) m.classList.remove('visible');
+}
+
+function renderSupplierContractorPicker() {
+  const container = document.getElementById('sup-cp-list');
+  if (!container) return;
+  const q = ((document.getElementById('sup-cp-search') || {}).value || '').toLowerCase().trim();
+  if (q.length < 2) {
+    container.innerHTML = '<div class="empty-block" style="padding:30px 0;color:var(--text-light);">' +
+      '<i class="ti ti-search"></i>Начни вводить название или ИНН (минимум 2 символа)' +
+    '</div>';
+    return;
+  }
+  const list = (cache.contractors || []).filter(c =>
+    (c.name || '').toLowerCase().includes(q) ||
+    (c.inn || '').includes(q)
+  ).slice(0, 50); // Показываем максимум 50
+
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block" style="padding:30px 0;">' +
+      '<i class="ti ti-search-off"></i>Ничего не найдено' +
+    '</div>';
+    return;
+  }
+  let html = '';
+  list.forEach(c => {
+    const safeName = (c.name || '').replace(/'/g, "\\'");
+    const safeInn = (c.inn || '').replace(/'/g, "\\'");
+    html += '<button type="button" class="bom-picker-item" ' +
+      'onclick="selectSupplierContractor(\'' + safeName + '\', \'' + safeInn + '\')">' +
+      '<div class="bom-picker-item-name">' + escapeHtml(c.name || '—') + '</div>' +
+      '<div class="bom-picker-item-meta">' +
+        'ИНН: <b>' + escapeHtml(c.inn || '—') + '</b>' +
+      '</div>' +
+    '</button>';
+  });
+  if ((cache.contractors || []).filter(c =>
+    (c.name || '').toLowerCase().includes(q) || (c.inn || '').includes(q)
+  ).length > 50) {
+    html += '<div style="text-align:center;padding:10px;color:var(--text-light);font-size:12px;">' +
+      'Показано первые 50. Уточни запрос.' +
+    '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function selectSupplierContractor(name, inn) {
+  const nameInput = document.getElementById('sm-name');
+  const innInput = document.getElementById('sm-inn');
+  if (nameInput && !nameInput.value.trim()) {
+    nameInput.value = name;
+  } else if (nameInput) {
+    // Если уже есть имя — спросим что делать
+    if (confirm('Заменить название "' + nameInput.value + '" на "' + name + '"?')) {
+      nameInput.value = name;
+    }
+  }
+  if (innInput) innInput.value = inn;
+  closeSupplierContractorPicker();
+  showToast('Подставлены данные: ' + name, 'success');
 }
 
 async function saveSupplier(supplierId) {
