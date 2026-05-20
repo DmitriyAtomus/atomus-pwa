@@ -4164,6 +4164,125 @@
   }
   .sale-product-row:hover { background: var(--bg); }
 
+  /* ============ ЭТАП 32: Комплектующие ============ */
+  .comp-table {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 0 18px 20px;
+  }
+  .comp-row {
+    display: grid;
+    grid-template-columns: 1fr 100px auto;
+    gap: 14px;
+    padding: 12px 14px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .comp-row:last-child { border-bottom: none; }
+  .comp-row:hover { background: var(--bg); }
+  .comp-row-main { cursor: pointer; min-width: 0; }
+  .comp-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .comp-sku {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-left: 6px;
+  }
+  .comp-meta { font-size: 12px; }
+  .comp-cat-badge {
+    display: inline-block;
+    background: var(--brand-bg);
+    color: var(--brand);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .comp-row-qty { text-align: right; line-height: 1.2; }
+  .comp-qty-num { font-size: 18px; font-weight: 700; color: var(--text); }
+  .comp-qty-unit { font-size: 11px; color: var(--text-light); }
+  .comp-row-qty.low .comp-qty-num { color: #F57C00; }
+  .comp-row-qty.zero .comp-qty-num { color: var(--danger); }
+  .comp-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .form-label {
+    display: block; margin-bottom: 6px;
+    font-size: 13px; color: var(--text-light); font-weight: 500;
+  }
+  .form-input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: white;
+  }
+  .form-input:focus { outline: none; border-color: var(--brand); }
+
+  /* ============ ЭТАП 32: BOM-таблица в карточке модели ============ */
+  .bom-table {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .bom-row {
+    display: grid;
+    grid-template-columns: 1fr 90px 90px auto;
+    gap: 10px;
+    padding: 12px 14px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .bom-row:last-child { border-bottom: none; }
+  .bom-row-main { min-width: 0; }
+  .bom-name {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    margin-bottom: 4px;
+  }
+  .bom-critical { color: #F57C00; margin-left: 4px; font-size: 13px; }
+  .bom-meta { font-size: 12px; color: var(--text-light); }
+  .bom-qty, .bom-stock { text-align: center; line-height: 1.2; }
+  .bom-qty-num { font-size: 16px; font-weight: 700; color: var(--text); }
+  .bom-stock-num { font-size: 16px; font-weight: 700; color: var(--text); }
+  .bom-stock.low .bom-stock-num { color: var(--danger); }
+  .bom-qty-lbl { font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; }
+  .bom-actions { display: flex; gap: 4px; }
+
+  /* Предпросмотр автосписания в форме сборки */
+  .bom-preview-block {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px;
+  }
+  .bom-preview-alert {
+    background: #FFEDED; color: #C62828;
+    border-left: 3px solid #C62828;
+    padding: 10px 12px; border-radius: 6px;
+    margin-bottom: 10px; font-size: 13px; font-weight: 500;
+  }
+  .bom-preview-warn {
+    background: #FFF8E1; color: #B26A00;
+    border-left: 3px solid #F57C00;
+    padding: 10px 12px; border-radius: 6px;
+    margin-bottom: 10px; font-size: 13px;
+  }
+  .bom-preview-row {
+    display: flex; justify-content: space-between;
+    padding: 6px 8px; border-radius: 6px;
+    font-size: 13px;
+  }
+  .bom-preview-row.shortage-critical { background: #FFE5E5; color: #C62828; }
+  .bom-preview-row.shortage-warn { background: #FFF4E5; color: #B26A00; }
+  .bom-preview-name { flex: 1; }
+  .bom-preview-qty { font-variant-numeric: tabular-nums; }
+  .bom-preview-stock { color: var(--text-light); font-size: 11px; }
+
   /* ============ ЭТАП 30.6: сворачиваемые группы моделей ============ */
   .models-group {
     margin-bottom: 10px;
@@ -7650,7 +7769,10 @@
       </div>
       <div class="sidebar-nav">
         <button class="nav-item active" data-nav="warehouse-stock" onclick="selectSidebarItem('warehouse-stock')">
-          <i class="ti ti-stack-2"></i><span>Остатки</span>
+          <i class="ti ti-stack-2"></i><span>Готовая продукция</span>
+        </button>
+        <button class="nav-item" data-nav="warehouse-components" onclick="selectSidebarItem('warehouse-components')">
+          <i class="ti ti-tool"></i><span>Комплектующие</span>
         </button>
         <button class="nav-item" data-nav="warehouse-movements" onclick="selectSidebarItem('warehouse-movements')">
           <i class="ti ti-history"></i><span>Журнал движений</span>
@@ -8299,9 +8421,17 @@
               <label class="form-label">Количество <span class="required">*</span></label>
               <div class="qty-stepper">
                 <button class="qty-btn" onclick="changeQty(-1)" id="qty-minus">−</button>
-                <input type="number" class="qty-input" id="qty-input" value="1" min="1" max="1000">
+                <input type="number" class="qty-input" id="qty-input" value="1" min="1" max="1000" oninput="refreshBomPreview()">
                 <button class="qty-btn" onclick="changeQty(1)">+</button>
                 <span class="qty-suffix">шт.</span>
+              </div>
+            </div>
+
+            <!-- ЭТАП 32: Предпросмотр автосписания со склада -->
+            <div class="form-section" id="bom-preview-section" style="display:none;">
+              <label class="form-label"><i class="ti ti-package-export"></i> Будет списано со склада</label>
+              <div id="bom-preview-content" class="bom-preview-block">
+                <div class="loading-block" style="padding:14px;">Считаем…</div>
               </div>
             </div>
 
@@ -8684,7 +8814,7 @@
           <div class="page-header">
             <div class="page-header-title">
               <i class="ti ti-stack-2"></i>
-              <h1>Остатки на складе</h1>
+              <h1>Готовая продукция</h1>
               <span class="page-counter" id="wh-stock-counter">0</span>
             </div>
             <div class="page-header-actions">
@@ -8731,6 +8861,39 @@
             <button class="btn btn-primary btn-small" onclick="printSelectedLabels()">
               <i class="ti ti-printer"></i> Печать наклеек
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ЭТАП 32: Комплектующие -->
+      <div class="screen" data-screen="warehouse-components" data-section="warehouse">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-tool"></i>
+              <h1>Комплектующие</h1>
+              <span class="page-counter" id="comp-counter">0</span>
+            </div>
+            <div class="page-header-actions">
+              <button class="btn btn-secondary btn-small" onclick="openComponentReceiveModal()">
+                <i class="ti ti-package-import"></i> Приход
+              </button>
+              <button class="btn btn-primary btn-small" id="comp-new-btn" onclick="openComponentForm()">
+                <i class="ti ti-plus"></i> Комплектующее
+              </button>
+            </div>
+          </div>
+          <!-- Фильтр категорий -->
+          <div class="filter-row" id="comp-cat-filters" style="padding: 6px 18px 14px;">
+            <button class="filter-chip active" data-comp-cat="">Все</button>
+          </div>
+          <!-- Поиск -->
+          <div class="search-box" style="padding: 0 18px 14px;">
+            <i class="ti ti-search"></i>
+            <input type="text" id="comp-search" placeholder="Поиск по названию или артикулу…" oninput="filterComponentsList()">
+          </div>
+          <div id="comp-list-container">
+            <div class="loading-block">Загружаем…</div>
           </div>
         </div>
       </div>
@@ -9581,7 +9744,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.11.10-activity-author";
+const APP_VERSION = "v2.12.0-components-bom";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10233,6 +10396,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
   // ЭТАП 18: склад
   if (screenName === 'warehouse-stock')     loadWarehouseStock();
+  if (screenName === 'warehouse-components') loadWarehouseComponents();
   if (screenName === 'warehouse-movements') loadWarehouseMovements();
   // ЭТАП 19: снабжение
   if (screenName === 'supply-requests')     loadSupplyRequests();
@@ -16371,10 +16535,260 @@ function _renderModelRow(m) {
   else if (m.exec_mode === 'fixed' && m.exec_fixed) meta.push('испол.: ' + m.exec_fixed);
   if (m.needs_ip) meta.push('IP');
   const inactiveCls = m.is_active ? '' : ' emp-inactive';
-  return '<div class="employee-row' + inactiveCls + '">' +
+  return '<div class="employee-row' + inactiveCls + '" style="cursor:pointer;" onclick="openModelDetail(' + m.id + ')">' +
     '<div class="emp-info"><div class="emp-name">' + escapeHtml(title) + '</div>' +
-    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div></div></div>';
+    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div></div>' +
+    '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
+    '</div>';
 }
+
+// ============ ЭТАП 32: Карточка модели с тех. картой ============
+
+async function openModelDetail(modelId) {
+  const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+  if (!m) { showToast('Модель не найдена', 'error'); return; }
+  state._currentBomModelId = modelId;
+
+  let overlay = document.getElementById('model-detail-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'model-detail-modal';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) closeModelDetail(); };
+    document.body.appendChild(overlay);
+  }
+
+  const dir = ((cache.models && cache.models.directions) || []).find(d => d.id === m.direction_id);
+  const dirName = dir ? dir.name : '—';
+  const subParts = [m.article];
+  if (m.exec_mode === 'choice') subParts.push('испол.: ' + m.exec_label_st + ' / ' + m.exec_label_ne);
+  else if (m.exec_mode === 'fixed' && m.exec_fixed) subParts.push('испол.: ' + m.exec_fixed);
+  if (m.needs_ip) subParts.push('IP-класс');
+
+  overlay.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<div>' +
+          '<h3 style="margin:0;">' + escapeHtml(m.name + (m.extra ? ' · ' + m.extra : '')) + '</h3>' +
+          '<div style="font-size:12px;color:var(--text-light);margin-top:4px;">' +
+            escapeHtml(dirName) + ' · ' + escapeHtml(subParts.join(' · ')) +
+          '</div>' +
+        '</div>' +
+        '<button class="modal-close" onclick="closeModelDetail()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="overflow-y:auto;flex:1;padding:18px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+          '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
+          (canManageSales() ?
+            '<button class="btn btn-primary btn-small" onclick="openBomAddItem(' + modelId + ')">' +
+              '<i class="ti ti-plus"></i> Позиция' +
+            '</button>' : '') +
+        '</div>' +
+        '<div id="bom-list"><div class="loading-block">Загружаем…</div></div>' +
+      '</div>' +
+    '</div>';
+  overlay.classList.add('visible');
+  await loadModelBom(modelId);
+}
+
+function closeModelDetail() {
+  const o = document.getElementById('model-detail-modal');
+  if (o) o.classList.remove('visible');
+  state._currentBomModelId = null;
+}
+
+async function loadModelBom(modelId) {
+  const container = document.getElementById('bom-list');
+  if (!container) return;
+  try {
+    const r = await apiGet('/api/models/' + modelId + '/bom');
+    const items = r.items || [];
+    if (!items.length) {
+      container.innerHTML = '<div class="empty-block" style="padding:30px 0;">' +
+        '<i class="ti ti-list-search"></i>Тех. карта пуста. ' +
+        (canManageSales() ? 'Жми «+ Позиция» чтобы добавить комплектующее.' : '') +
+        '</div>';
+      return;
+    }
+    let html = '<div class="bom-table">';
+    items.forEach(it => {
+      const have = parseFloat(it.component_qty || 0);
+      const need = parseFloat(it.qty_required || 0);
+      const lowFlag = have < need;
+      const commentEsc = String(it.comment || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      html += '<div class="bom-row">' +
+        '<div class="bom-row-main">' +
+          '<div class="bom-name">' + escapeHtml(it.component_name || '—') +
+            (it.component_sku ? ' <span class="comp-sku">' + escapeHtml(it.component_sku) + '</span>' : '') +
+            (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
+          '</div>' +
+          '<div class="bom-meta">' +
+            (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '') +
+            (it.comment ? ' · ' + escapeHtml(it.comment) : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="bom-qty"><div class="bom-qty-num">' + _fmtQty(need) + '</div>' +
+          '<div class="bom-qty-lbl">' + escapeHtml(it.component_unit || 'шт.') + ' / ед.</div></div>' +
+        '<div class="bom-stock' + (lowFlag ? ' low' : '') + '"><div class="bom-stock-num">' + _fmtQty(have) + '</div>' +
+          '<div class="bom-qty-lbl">в наличии</div></div>' +
+        (canManageSales() ?
+          '<div class="bom-actions">' +
+            '<button class="btn btn-secondary btn-small" onclick="openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\')" title="Изменить"><i class="ti ti-edit"></i></button>' +
+            '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+          '</div>' : '<div></div>') +
+      '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block">Ошибка загрузки</div>';
+  }
+}
+
+async function openBomAddItem(modelId) {
+  if (!cache.components) {
+    try { const r = await apiGet('/api/components'); cache.components = r.components || []; }
+    catch (e) { cache.components = []; }
+  }
+  if (!cache.componentCategories) {
+    try { const r = await apiGet('/api/components/categories'); cache.componentCategories = r.categories || []; }
+    catch (e) { cache.componentCategories = []; }
+  }
+  if (!cache.components.length) {
+    showToast('Сначала добавь комплектующие в Склад → Комплектующие', 'error');
+    return;
+  }
+  let m = document.getElementById('bom-add-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bom-add-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const groups = {};
+  cache.components.forEach(c => {
+    const cat = c.category_name || '—';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(c);
+  });
+  let optgroups = '';
+  Object.keys(groups).forEach(cat => {
+    optgroups += '<optgroup label="' + escapeHtml(cat) + '">';
+    groups[cat].forEach(c => {
+      optgroups += '<option value="' + c.id + '">' + escapeHtml(c.name) +
+        (c.sku ? ' (' + escapeHtml(c.sku) + ')' : '') + '</option>';
+    });
+    optgroups += '</optgroup>';
+  });
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:500px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-plus"></i> Позиция в тех. карту</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:18px;">' +
+        '<label class="form-label">Комплектующее *</label>' +
+        '<select id="bom-component" class="form-input" style="margin-bottom:14px;">' + optgroups + '</select>' +
+        '<label class="form-label">Количество на 1 ед. изделия *</label>' +
+        '<input type="number" id="bom-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
+          '<input type="checkbox" id="bom-critical" checked />' +
+          '<span><b>Критичное</b> — без него сборка не создаётся</span></label>' +
+        '<label class="form-label">Комментарий</label>' +
+        '<input type="text" id="bom-comment" class="form-input" placeholder="" />' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitBomAddItem(' + modelId + ')"><i class="ti ti-check"></i> Добавить</button>' +
+      '</div></div>';
+  m.classList.add('visible');
+}
+
+async function submitBomAddItem(modelId) {
+  const component_id = parseInt(document.getElementById('bom-component').value);
+  const qty_required = parseFloat(document.getElementById('bom-qty').value);
+  const is_critical = document.getElementById('bom-critical').checked;
+  const comment = (document.getElementById('bom-comment').value || '').trim();
+  if (!component_id || isNaN(qty_required) || qty_required <= 0) {
+    showToast('Заполни поля', 'error'); return;
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/bom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ component_id, qty_required, is_critical, comment }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось добавить', 'error'); return;
+    }
+    showToast('Добавлено в тех. карту', 'success');
+    document.getElementById('bom-add-modal').classList.remove('visible');
+    await loadModelBom(modelId);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+function openBomEditItem(bomId, qty, isCritical, comment) {
+  let m = document.getElementById('bom-edit-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bom-edit-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-edit"></i> Изменить позицию</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:18px;">' +
+        '<label class="form-label">Количество на 1 ед. *</label>' +
+        '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
+          '<input type="checkbox" id="bome-critical"' + (isCritical ? ' checked' : '') + ' />' +
+          '<span><b>Критичное</b></span></label>' +
+        '<label class="form-label">Комментарий</label>' +
+        '<input type="text" id="bome-comment" class="form-input" value="' + escapeHtml(comment) + '" />' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitBomEditItem(' + bomId + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+      '</div></div>';
+  m.classList.add('visible');
+}
+
+async function submitBomEditItem(bomId) {
+  const qty_required = parseFloat(document.getElementById('bome-qty').value);
+  const is_critical = document.getElementById('bome-critical').checked;
+  const comment = (document.getElementById('bome-comment').value || '').trim();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/bom/' + bomId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ qty_required, is_critical, comment }),
+    });
+    if (!r.ok) { showToast('Не удалось сохранить', 'error'); return; }
+    showToast('Сохранено', 'success');
+    document.getElementById('bom-edit-modal').classList.remove('visible');
+    if (state._currentBomModelId) await loadModelBom(state._currentBomModelId);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+async function deleteBomItem(bomId, modelId) {
+  if (!confirm('Удалить позицию из тех. карты?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/bom/' + bomId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    showToast('Удалено', 'success');
+    await loadModelBom(modelId);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
 
 function toggleModelsSubgroup(subKey) {
   const body = document.querySelector('.models-subgroup-body[data-subkey="' + subKey + '"]');
@@ -17100,6 +17514,81 @@ function selectModel(modelId) {
   document.querySelectorAll('#ip-section .chip-option').forEach(c => c.classList.remove('selected'));
 
   closeModelModal();
+  refreshBomPreview();  // ЭТАП 32: предпросмотр списания
+}
+
+// ЭТАП 32: предпросмотр автосписания со склада
+let _bomPreviewDebounce = null;
+function refreshBomPreview() {
+  clearTimeout(_bomPreviewDebounce);
+  _bomPreviewDebounce = setTimeout(_doBomPreview, 250);
+}
+
+async function _doBomPreview() {
+  const section = document.getElementById('bom-preview-section');
+  const content = document.getElementById('bom-preview-content');
+  if (!section || !content) return;
+
+  const model = state.newAssembly && state.newAssembly.model;
+  if (!model) { section.style.display = 'none'; return; }
+  const qtyInput = document.getElementById('qty-input');
+  const quantity = parseInt((qtyInput && qtyInput.value) || 1);
+  if (!quantity || quantity < 1) { section.style.display = 'none'; return; }
+
+  try {
+    const data = await apiGet('/api/assemblies/preview-writeoff?model_id=' + model.id + '&quantity=' + quantity);
+    state._lastBomPreview = data;
+    if (!data.items || !data.items.length) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+    const ok = data.ok_critical;
+    let html = '';
+    if (!ok) {
+      const critMissing = (data.shortage || []).filter(s => s.is_critical);
+      html += '<div class="bom-preview-alert"><i class="ti ti-alert-triangle"></i> ' +
+        'Не хватает критичных позиций: ' +
+        critMissing.map(s => escapeHtml(s.component_name) + ' (' + _fmtQty(s.missing) + ')').join(', ') +
+        '. Сборка не будет создана.</div>';
+    } else if (data.shortage && data.shortage.length) {
+      html += '<div class="bom-preview-warn"><i class="ti ti-info-circle"></i> ' +
+        'Некритичных не хватает: ' +
+        data.shortage.map(s => escapeHtml(s.component_name)).join(', ') +
+        '. Они не будут списаны.</div>';
+    }
+    html += '<div class="bom-preview-list">';
+    data.items.forEach(it => {
+      const shortCls = !it.enough ? (it.is_critical ? ' shortage-critical' : ' shortage-warn') : '';
+      html += '<div class="bom-preview-row' + shortCls + '">' +
+        '<div class="bom-preview-name">' + escapeHtml(it.component_name) +
+          (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') + '</div>' +
+        '<div class="bom-preview-qty">' +
+          '<b>' + _fmtQty(it.qty_need_total) + '</b> ' + escapeHtml(it.component_unit) +
+          '<span class="bom-preview-stock"> (есть ' + _fmtQty(it.qty_have) + ')</span>' +
+        '</div></div>';
+    });
+    html += '</div>';
+    content.innerHTML = html;
+
+    // Блокируем кнопку «Сохранить» если не хватает критичных
+    const saveBtn = document.querySelector('button[onclick="submitAssembly()"], #submit-assembly-btn, .btn-save-assembly');
+    if (saveBtn) {
+      if (!ok) {
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.5';
+        saveBtn.style.cursor = 'not-allowed';
+        saveBtn.title = 'Не хватает критичных комплектующих';
+      } else {
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = '';
+        saveBtn.style.cursor = '';
+        saveBtn.title = '';
+      }
+    }
+  } catch (e) {
+    section.style.display = 'none';
+  }
 }
 
 document.querySelectorAll('#ip-section .chip-option').forEach(c => {
@@ -17119,6 +17608,7 @@ function changeQty(delta) {
   input.value = v;
   state.newAssembly.quantity = v;
   document.getElementById('qty-minus').disabled = v <= 1;
+  refreshBomPreview();
 }
 
 document.getElementById('qty-input').addEventListener('input', function() {
@@ -17215,10 +17705,18 @@ async function submitAssembly() {
       return;
     }
     showToast('Запись сохранена: ID ' + r.data.id, 'success');
+    // ЭТАП 32: уведомления о списании комплектующих
+    if (r.data.bom_writeoff && r.data.bom_writeoff.count) {
+      setTimeout(() => showToast('Списано со склада: ' + r.data.bom_writeoff.count + ' поз.', 'success'), 1200);
+    }
+    if (r.data.bom_warning) {
+      setTimeout(() => showToast('⚠ ' + r.data.bom_warning, 'error'), 2400);
+    }
     cache.dashboard = null;
     cache.history = {};
     cache.summary = {};
-    // ЭТАП 15: сбрасываем кэш договоров с прогрессом — кол-во могло измениться
+    // Сбрасываем кэш комплектующих — qty изменились
+    cache.components = null;
     cache.contractsWithProgress = null;
     cache.contracts = null;
     setTimeout(() => {
@@ -19235,6 +19733,470 @@ const ASSEMBLY_STATUS_LABELS = {
 const ASSEMBLY_STATUS_ORDER = ['in_progress', 'ready', 'shipped', 'written_off'];
 
 // --- Загрузка остатков ---
+
+// ============ ЭТАП 32: КОМПЛЕКТУЮЩИЕ ============
+
+async function loadWarehouseComponents() {
+  const newBtn = document.getElementById('comp-new-btn');
+  if (newBtn) newBtn.style.display = canManageSales() ? '' : 'none';
+
+  // Подгружаем категории если ещё не загружены
+  if (!cache.componentCategories) {
+    try {
+      const r = await apiGet('/api/components/categories');
+      cache.componentCategories = r.categories || [];
+    } catch (e) {
+      cache.componentCategories = [];
+    }
+    renderComponentCategoryChips();
+  }
+  // Подгружаем список комплектующих
+  const container = document.getElementById('comp-list-container');
+  if (container) container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const r = await apiGet('/api/components');
+    cache.components = r.components || [];
+    renderComponentsList();
+  } catch (e) {
+    if (container) container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderComponentCategoryChips() {
+  const wrap = document.getElementById('comp-cat-filters');
+  if (!wrap) return;
+  let html = '<button class="filter-chip active" data-comp-cat="" onclick="setComponentCategory(\'\')">Все</button>';
+  (cache.componentCategories || []).forEach(c => {
+    html += '<button class="filter-chip" data-comp-cat="' + c.id + '" onclick="setComponentCategory(\'' + c.id + '\')">' +
+            escapeHtml(c.name) + '</button>';
+  });
+  wrap.innerHTML = html;
+}
+
+function setComponentCategory(catId) {
+  state.componentCatFilter = String(catId || '');
+  document.querySelectorAll('#comp-cat-filters .filter-chip').forEach(chip => {
+    chip.classList.toggle('active', (chip.dataset.compCat || '') === state.componentCatFilter);
+  });
+  renderComponentsList();
+}
+
+function filterComponentsList() {
+  renderComponentsList();
+}
+
+function renderComponentsList() {
+  const container = document.getElementById('comp-list-container');
+  const counter = document.getElementById('comp-counter');
+  if (!container) return;
+  let list = cache.components || [];
+
+  // Фильтр по категории
+  const catFilter = state.componentCatFilter || '';
+  if (catFilter) {
+    list = list.filter(c => String(c.category_id) === catFilter);
+  }
+  // Поиск
+  const q = ((document.getElementById('comp-search') || {}).value || '').toLowerCase().trim();
+  if (q) {
+    list = list.filter(c =>
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.sku || '').toLowerCase().includes(q)
+    );
+  }
+  if (counter) counter.textContent = list.length;
+
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>' +
+      (cache.components && cache.components.length ? 'Ничего не найдено' :
+        'Пока нет комплектующих. Нажми «+ Комплектующее»') +
+      '</div>';
+    return;
+  }
+
+  let html = '<div class="comp-table">';
+  list.forEach(c => {
+    const lowStock = (c.min_stock > 0 && c.qty_on_stock < c.min_stock);
+    const zeroStock = (c.qty_on_stock <= 0);
+    html += '<div class="comp-row">' +
+      '<div class="comp-row-main" onclick="openComponentDetail(' + c.id + ')">' +
+        '<div class="comp-name">' + escapeHtml(c.name || '—') +
+          (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
+        '</div>' +
+        '<div class="comp-meta">' +
+          '<span class="comp-cat-badge">' + escapeHtml(c.category_name || '—') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="comp-row-qty ' + (zeroStock ? 'zero' : (lowStock ? 'low' : '')) + '">' +
+        '<div class="comp-qty-num">' + _fmtQty(c.qty_on_stock) + '</div>' +
+        '<div class="comp-qty-unit">' + escapeHtml(c.unit || 'шт.') + '</div>' +
+      '</div>' +
+      '<div class="comp-row-actions">' +
+        '<button class="btn btn-secondary btn-small" title="Приход" onclick="openComponentReceiveModal(' + c.id + ')"><i class="ti ti-package-import"></i></button>' +
+        '<button class="btn btn-secondary btn-small" title="Списать" onclick="openComponentWriteoffModal(' + c.id + ')"><i class="ti ti-package-export"></i></button>' +
+        '<button class="btn btn-secondary btn-small" title="История" onclick="openComponentMovements(' + c.id + ')"><i class="ti ti-history"></i></button>' +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function _fmtQty(q) {
+  const n = Number(q || 0);
+  if (n === Math.round(n)) return String(Math.round(n));
+  return n.toFixed(2);
+}
+
+// ============ Создание / редактирование комплектующего ============
+
+function openComponentForm(componentId) {
+  if (!canManageSales()) {
+    showToast('Доступ только директору и заму', 'error');
+    return;
+  }
+  const isEdit = !!componentId;
+  const c = isEdit ? (cache.components || []).find(x => x.id === componentId) : null;
+  const cats = cache.componentCategories || [];
+
+  let m = document.getElementById('comp-form-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'comp-form-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeComponentForm(); };
+    document.body.appendChild(m);
+  }
+  const catOptions = cats.map(cat =>
+    '<option value="' + cat.id + '"' + (c && c.category_id === cat.id ? ' selected' : '') + '>' +
+    escapeHtml(cat.name) + '</option>'
+  ).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-tool"></i> ' + (isEdit ? 'Редактировать' : 'Новое') + ' комплектующее</h3>' +
+        '<button class="modal-close" onclick="closeComponentForm()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;">' +
+        '<label class="form-label">Категория *</label>' +
+        '<select id="cf-category" class="form-input" style="margin-bottom:14px;">' +
+          (cats.length ? catOptions : '<option value="">— нет категорий —</option>') +
+        '</select>' +
+        '<label class="form-label">Название *</label>' +
+        '<input type="text" id="cf-name" class="form-input" placeholder="Например: Реле РЭК-77/4" value="' + escapeHtml((c && c.name) || '') + '" style="margin-bottom:14px;" />' +
+        '<div style="display:flex;gap:10px;margin-bottom:14px;">' +
+          '<div style="flex:2;"><label class="form-label">Артикул / SKU</label>' +
+            '<input type="text" id="cf-sku" class="form-input" value="' + escapeHtml((c && c.sku) || '') + '" /></div>' +
+          '<div style="flex:1;"><label class="form-label">Единица</label>' +
+            '<select id="cf-unit" class="form-input">' +
+              ['шт.','м','кг','л','компл.','уп.','м²'].map(u =>
+                '<option' + ((c && c.unit === u) || (!c && u === 'шт.') ? ' selected' : '') + '>' + u + '</option>'
+              ).join('') +
+            '</select></div>' +
+        '</div>' +
+        '<label class="form-label">Мин. остаток (для алертов)</label>' +
+        '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
+        '<label class="form-label">Комментарий</label>' +
+        '<textarea id="cf-comment" class="form-input" rows="2" style="resize:vertical;">' + escapeHtml((c && c.comment) || '') + '</textarea>' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        (isEdit ?
+          '<button class="btn btn-secondary" onclick="deleteComponent(' + componentId + ')" style="color:var(--danger);margin-right:auto;">' +
+            '<i class="ti ti-trash"></i> Удалить</button>' : '') +
+        '<button class="btn btn-secondary" onclick="closeComponentForm()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitComponentForm(' + (componentId || 'null') + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => { const n = document.getElementById('cf-name'); if (n) n.focus(); }, 50);
+}
+
+function closeComponentForm() {
+  const m = document.getElementById('comp-form-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function submitComponentForm(componentId) {
+  const data = {
+    category_id: parseInt(document.getElementById('cf-category').value),
+    name: (document.getElementById('cf-name').value || '').trim(),
+    sku: (document.getElementById('cf-sku').value || '').trim(),
+    unit: document.getElementById('cf-unit').value,
+    min_stock: parseFloat(document.getElementById('cf-min').value || 0),
+    comment: (document.getElementById('cf-comment').value || '').trim(),
+  };
+  if (!data.name) { showToast('Укажи название', 'error'); return; }
+  if (!data.category_id) { showToast('Выбери категорию', 'error'); return; }
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const method = componentId ? 'PATCH' : 'POST';
+    const url = componentId ? '/api/components/' + componentId : '/api/components';
+    const r = await fetch(API_BASE + url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось сохранить', 'error');
+      return;
+    }
+    showToast(componentId ? 'Сохранено' : 'Комплектующее добавлено', 'success');
+    closeComponentForm();
+    cache.components = null;
+    loadWarehouseComponents();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+async function deleteComponent(componentId) {
+  if (!confirm('Удалить комплектующее? Оно будет скрыто из списка (история движений сохранится).')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/' + componentId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    showToast('Удалено', 'success');
+    closeComponentForm();
+    cache.components = null;
+    loadWarehouseComponents();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+function openComponentDetail(componentId) {
+  // Открываем форму редактирования
+  openComponentForm(componentId);
+}
+
+// ============ Приход ============
+
+function openComponentReceiveModal(preselectedId) {
+  const components = cache.components || [];
+  if (!components.length) {
+    showToast('Сначала добавь хотя бы одно комплектующее', 'error');
+    return;
+  }
+  let m = document.getElementById('comp-receive-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'comp-receive-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeComponentReceiveModal(); };
+    document.body.appendChild(m);
+  }
+  const opts = components.map(c =>
+    '<option value="' + c.id + '"' + (preselectedId === c.id ? ' selected' : '') + '>' +
+    escapeHtml(c.name) + (c.sku ? ' (' + escapeHtml(c.sku) + ')' : '') +
+    ' — на складе: ' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.') +
+    '</option>'
+  ).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package-import"></i> Приход на склад</h3>' +
+        '<button class="modal-close" onclick="closeComponentReceiveModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;">' +
+        '<label class="form-label">Комплектующее *</label>' +
+        '<select id="recv-component" class="form-input" style="margin-bottom:14px;">' + opts + '</select>' +
+        '<label class="form-label">Количество *</label>' +
+        '<input type="number" id="recv-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
+        '<label class="form-label">Поставщик (опционально)</label>' +
+        '<select id="recv-supplier" class="form-input" style="margin-bottom:14px;">' +
+          '<option value="">— Не указан —</option>' +
+          (cache.suppliers || []).map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('') +
+        '</select>' +
+        '<label class="form-label">Комментарий</label>' +
+        '<input type="text" id="recv-reason" class="form-input" placeholder="Например: Накладная №12 от 20.05" />' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="closeComponentReceiveModal()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitComponentReceive()"><i class="ti ti-check"></i> Оприходовать</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+
+  // Подгружаем поставщиков если ещё нет
+  if (!cache.suppliers) {
+    apiGet('/api/suppliers').then(r => {
+      cache.suppliers = r.suppliers || [];
+      // Перерисовать select поставщиков
+      const sel = document.getElementById('recv-supplier');
+      if (sel) {
+        sel.innerHTML = '<option value="">— Не указан —</option>' +
+          cache.suppliers.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('');
+      }
+    }).catch(() => {});
+  }
+}
+
+function closeComponentReceiveModal() {
+  const m = document.getElementById('comp-receive-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function submitComponentReceive() {
+  const component_id = parseInt(document.getElementById('recv-component').value);
+  const qty = parseFloat(document.getElementById('recv-qty').value);
+  const supplier_id = document.getElementById('recv-supplier').value || null;
+  const reason = document.getElementById('recv-reason').value || '';
+  if (!component_id || isNaN(qty) || qty <= 0) {
+    showToast('Заполни поля корректно', 'error'); return;
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/receive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ component_id, qty, supplier_id, reason }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось оприходовать', 'error');
+      return;
+    }
+    showToast('Приход +' + _fmtQty(qty), 'success');
+    closeComponentReceiveModal();
+    cache.components = null;
+    loadWarehouseComponents();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// ============ Списание ============
+
+function openComponentWriteoffModal(componentId) {
+  const c = (cache.components || []).find(x => x.id === componentId);
+  if (!c) return;
+  let m = document.getElementById('comp-writeoff-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'comp-writeoff-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeComponentWriteoffModal(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package-export"></i> Списать со склада</h3>' +
+        '<button class="modal-close" onclick="closeComponentWriteoffModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;">' +
+        '<div style="font-size:14px;margin-bottom:14px;color:var(--text-light);">' +
+          '<b style="color:var(--text);">' + escapeHtml(c.name) + '</b>' +
+          (c.sku ? ' · ' + escapeHtml(c.sku) : '') +
+          '<br>На складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
+        '</div>' +
+        '<label class="form-label">Количество к списанию *</label>' +
+        '<input type="number" id="wo-qty" class="form-input" value="1" min="0.01" max="' + c.qty_on_stock + '" step="0.01" style="margin-bottom:14px;" />' +
+        '<label class="form-label">Причина *</label>' +
+        '<input type="text" id="wo-reason" class="form-input" placeholder="Например: Списано в брак / Использовано на сборку" />' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="closeComponentWriteoffModal()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitComponentWriteoff(' + componentId + ')" style="background:var(--danger);"><i class="ti ti-check"></i> Списать</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeComponentWriteoffModal() {
+  const m = document.getElementById('comp-writeoff-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function submitComponentWriteoff(componentId) {
+  const qty = parseFloat(document.getElementById('wo-qty').value);
+  const reason = (document.getElementById('wo-reason').value || '').trim();
+  if (isNaN(qty) || qty <= 0) { showToast('Кол-во некорректно', 'error'); return; }
+  if (!reason) { showToast('Укажи причину', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/writeoff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ component_id: componentId, qty, reason }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось списать', 'error');
+      return;
+    }
+    showToast('Списано −' + _fmtQty(qty), 'success');
+    closeComponentWriteoffModal();
+    cache.components = null;
+    loadWarehouseComponents();
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
+}
+
+// ============ История движений ============
+
+async function openComponentMovements(componentId) {
+  const c = (cache.components || []).find(x => x.id === componentId);
+  let m = document.getElementById('comp-movements-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'comp-movements-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal modal-wide" onclick="event.stopPropagation()" style="max-width:680px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-history"></i> История · ' + escapeHtml((c && c.name) || '') + '</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div id="cm-list" style="overflow-y:auto;flex:1;padding:8px 0;"><div class="loading-block">Загружаем…</div></div>' +
+    '</div>';
+  m.classList.add('visible');
+
+  try {
+    const r = await apiGet('/api/components/' + componentId + '/movements');
+    const movs = r.movements || [];
+    const el = document.getElementById('cm-list');
+    if (!movs.length) {
+      el.innerHTML = '<div class="empty-block"><i class="ti ti-inbox"></i>Движений пока нет</div>';
+      return;
+    }
+    let html = '';
+    movs.forEach(mv => {
+      const isReceive = mv.movement_type === 'receive';
+      const sign = isReceive ? '+' : (mv.movement_type === 'writeoff' ? '−' : '±');
+      const color = isReceive ? '#15803D' : (mv.movement_type === 'writeoff' ? 'var(--danger)' : 'var(--text-light)');
+      const icon = isReceive ? 'ti-package-import' : (mv.movement_type === 'writeoff' ? 'ti-package-export' : 'ti-arrow-bar-up');
+      html += '<div style="padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start;">' +
+        '<div style="color:' + color + ';font-size:18px;"><i class="ti ' + icon + '"></i></div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:600;color:' + color + ';">' + sign + _fmtQty(mv.qty) + ' (было ' + _fmtQty(mv.qty_before) + ' → стало ' + _fmtQty(mv.qty_after) + ')</div>' +
+          '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
+            (mv.reason ? escapeHtml(mv.reason) : '') +
+            (mv.supplier_name ? ' · ' + escapeHtml(mv.supplier_name) : '') +
+            (mv.source_kind === 'assembly' ? ' · сборка #' + mv.source_id : '') +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--text-light);margin-top:2px;">' +
+            (mv.created_at ? String(mv.created_at).slice(0, 16).replace('T', ' ') : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    });
+    el.innerHTML = html;
+  } catch (e) {
+    document.getElementById('cm-list').innerHTML = '<div class="empty-block">Ошибка загрузки</div>';
+  }
+}
+
 
 async function loadWarehouseStock() {
   const container = document.getElementById('wh-stock-list');
