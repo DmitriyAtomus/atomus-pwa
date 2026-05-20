@@ -4458,6 +4458,156 @@
     margin-top: 2px;
   }
 
+  /* ============ ЭТАП 36: картинки и характеристики ============ */
+  .sp-tree-image-wrap {
+    text-align: center;
+    padding: 8px 0 10px;
+    background: linear-gradient(to bottom, var(--brand-bg) 0%, transparent 100%);
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+  .sp-tree-image {
+    max-height: 140px;
+    max-width: 220px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: white;
+    padding: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .sp-tree-specs-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 10px;
+    vertical-align: middle;
+  }
+  .sp-tree-specs-badge i { font-size: 11px; margin: auto; }
+
+  /* Модалка деталей товара */
+  .sp-detail-path {
+    font-size: 12px;
+    color: var(--text-light);
+    padding: 0 0 8px;
+  }
+  .sp-detail-nc {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 12px;
+  }
+  .sp-detail-image {
+    text-align: center;
+    padding: 12px;
+    background: #fafbfc;
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+  .sp-detail-image img {
+    max-height: 240px;
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  .sp-detail-prices {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    background: var(--brand-bg);
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .sp-detail-price-item { flex: 1; }
+  .sp-detail-price-label {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .sp-detail-price-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .sp-detail-price-value.dealer {
+    font-size: 16px;
+    color: var(--text-light);
+  }
+  .sp-detail-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sp-detail-specs {
+    background: #fafbfc;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .sp-spec-row {
+    display: flex;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .sp-spec-row:last-child { border-bottom: none; }
+  .sp-spec-key {
+    flex: 1.3;
+    color: var(--text-light);
+    padding-right: 12px;
+  }
+  .sp-spec-val {
+    flex: 1;
+    color: var(--text);
+    font-weight: 500;
+    text-align: right;
+  }
+
+  /* ============ ЭТАП 36.3: Калькулятор срока отгрузки ============ */
+  .ship-calc-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .ship-calc-row input[type="date"] {
+    flex: 1;
+  }
+  .ship-calc-mini {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--brand-bg);
+    border-radius: 8px;
+    padding: 0 10px;
+    min-width: 100px;
+  }
+  .ship-calc-mini input {
+    width: 60px;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 14px;
+    text-align: right;
+  }
+  .ship-calc-mini input:focus { outline: none; }
+  .ship-calc-label {
+    font-size: 12px;
+    color: var(--brand);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .ship-calc-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
   /* Предпросмотр автосписания в форме сборки */
   .bom-preview-block {
     background: var(--bg); border: 1px solid var(--border);
@@ -9994,7 +10144,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.15.0-zilon-pricelist";
+const APP_VERSION = "v2.16.0-images-specs-ship-calc";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12799,6 +12949,15 @@ function _renderSaleProductsHierarchical(list, search) {
             '<span class="sp-tree-count subgroup">' + items.length + '</span>' +
           '</button>';
         if (sgOpen) {
+          // ЭТАП 36: картинка серии — берём из первой позиции с image_path
+          const firstWithImage = items.find(it => it.image_path);
+          if (firstWithImage) {
+            html += '<div class="sp-tree-image-wrap">' +
+              '<img src="' + API_BASE + '/static/images/' + escapeHtml(firstWithImage.image_path) + '" ' +
+                'alt="' + escapeHtml(sgName) + '" class="sp-tree-image" ' +
+                'onerror="this.parentNode.style.display=\'none\'" />' +
+            '</div>';
+          }
           html += '<div class="sp-tree-items">';
           items.forEach(p => { html += _spTreeItemHtml(p); });
           html += '</div>';
@@ -12817,9 +12976,13 @@ function _spTreeItemHtml(p) {
   const retail = p.base_price != null ? _fmtMoney(p.base_price) + ' ₽' : '<span style="color:var(--text-light);">—</span>';
   const dealer = p.dealer_price != null ? _fmtMoney(p.dealer_price) + ' ₽' : '';
   const nc = p.nc_code || '';
-  return '<div class="sp-tree-item" onclick="openEditSaleProduct(' + p.id + ')">' +
+  const hasSpecs = p.specs && Object.keys(p.specs).length > 0;
+  const specsBadge = hasSpecs
+    ? '<span class="sp-tree-specs-badge" title="Есть характеристики"><i class="ti ti-list-details"></i></span>'
+    : '';
+  return '<div class="sp-tree-item" onclick="openSaleProductDetail(' + p.id + ')">' +
     '<div class="sp-tree-item-main">' +
-      '<div class="sp-tree-item-name">' + escapeHtml(p.name || '—') + '</div>' +
+      '<div class="sp-tree-item-name">' + escapeHtml(p.name || '—') + specsBadge + '</div>' +
       '<div class="sp-tree-item-meta">' +
         (nc ? '<span style="font-family:monospace;font-size:11px;">' + escapeHtml(nc) + '</span>' : '') +
       '</div>' +
@@ -12829,6 +12992,92 @@ function _spTreeItemHtml(p) {
       (dealer ? '<div class="sp-price-dealer">дилер: ' + dealer + '</div>' : '') +
     '</div>' +
   '</div>';
+}
+
+// ============ ЭТАП 36: модалка с фото + характеристиками + действиями ============
+
+async function openSaleProductDetail(productId) {
+  // Грузим полную карточку с linked_models
+  let p;
+  try {
+    p = await apiGet('/api/sale-products/' + productId);
+  } catch (e) {
+    showToast('Не удалось загрузить позицию', 'error');
+    return;
+  }
+  if (!p) return;
+
+  // Если у позиции нет картинки/характеристик — открываем сразу старую форму
+  const hasMeta = !!(p.image_path || (p.specs && Object.keys(p.specs).length));
+  if (!hasMeta) {
+    openEditSaleProduct(productId);
+    return;
+  }
+
+  let m = document.getElementById('sp-detail-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sp-detail-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+
+  const retail = p.base_price != null ? _fmtMoney(p.base_price) + ' ₽' : '—';
+  const dealer = p.dealer_price != null ? _fmtMoney(p.dealer_price) + ' ₽' : '';
+  const nc = p.nc_code || '';
+  const groupPath = [p.group_name, p.subgroup_name].filter(Boolean).join(' → ');
+
+  let specsHtml = '';
+  if (p.specs && Object.keys(p.specs).length) {
+    specsHtml = '<div class="sp-detail-specs">' +
+      '<div class="sp-detail-section-title"><i class="ti ti-list-details"></i> Характеристики</div>';
+    Object.keys(p.specs).forEach(k => {
+      specsHtml += '<div class="sp-spec-row">' +
+        '<div class="sp-spec-key">' + escapeHtml(k) + '</div>' +
+        '<div class="sp-spec-val">' + escapeHtml(p.specs[k]) + '</div>' +
+      '</div>';
+    });
+    specsHtml += '</div>';
+  }
+
+  let imgHtml = '';
+  if (p.image_path) {
+    imgHtml = '<div class="sp-detail-image">' +
+      '<img src="' + API_BASE + '/static/images/' + escapeHtml(p.image_path) + '" ' +
+        'alt="' + escapeHtml(p.name) + '" ' +
+        'onerror="this.parentNode.style.display=\'none\'" />' +
+    '</div>';
+  }
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package"></i> ' + escapeHtml(p.name) + '</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        (groupPath ? '<div class="sp-detail-path"><i class="ti ti-folder"></i> ' + escapeHtml(groupPath) + '</div>' : '') +
+        (nc ? '<div class="sp-detail-nc">НС-код: <b>' + escapeHtml(nc) + '</b></div>' : '') +
+        imgHtml +
+        '<div class="sp-detail-prices">' +
+          '<div class="sp-detail-price-item">' +
+            '<div class="sp-detail-price-label">Розничная</div>' +
+            '<div class="sp-detail-price-value retail">' + retail + '</div>' +
+          '</div>' +
+          (dealer ? '<div class="sp-detail-price-item">' +
+            '<div class="sp-detail-price-label">Дилерская</div>' +
+            '<div class="sp-detail-price-value dealer">' + dealer + '</div>' +
+          '</div>' : '') +
+        '</div>' +
+        specsHtml +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Закрыть</button>' +
+        (canManageSales() ? '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\'); openEditSaleProduct(' + p.id + ')"><i class="ti ti-edit"></i> Редактировать</button>' : '') +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
 }
 
 function _fmtMoney(n) {
@@ -24932,6 +25181,7 @@ function openNewContract() {
     number: '', sign_date: todayIso(), contractor_id: null, contract_type: 'supply',
     legal_entity: 'ooo_atomus', sum_amount: '', delivery_date: '',
     delivery_address: '', manager_id: null, comment: '',
+    working_days: null, _delivery_manual: false,  // ЭТАП 36.3
   };
   selectSidebarItem('sales-contract-form');
 }
@@ -25052,8 +25302,18 @@ function renderContractForm() {
   html += '<div class="sales-form-row">';
   html += '<div><label>Сумма, ₽</label>' +
           '<input type="number" id="scf-sum" value="' + (f.sum_amount || '') + '" placeholder="напр. 485000" min="0" step="1000"></div>';
+  // ЭТАП 36.3: калькулятор срока отгрузки
   html += '<div><label>Срок отгрузки</label>' +
-          '<input type="date" id="scf-delivery-date" value="' + escapeHtml(f.delivery_date) + '"></div>';
+          '<div class="ship-calc-row">' +
+            '<input type="date" id="scf-delivery-date" value="' + escapeHtml(f.delivery_date) + '">' +
+            '<div class="ship-calc-mini">' +
+              '<input type="number" id="scf-working-days" placeholder="дни" min="1" max="365" value="' +
+                (f.working_days || '') + '" title="Рабочих дней изготовления">' +
+              '<span class="ship-calc-label">раб. дн.</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="ship-calc-hint" id="scf-ship-hint">Введи рабочих дней — дата отгрузки посчитается автоматически</div>' +
+        '</div>';
   html += '</div>';
 
   // Адрес
@@ -25088,11 +25348,75 @@ function renderContractForm() {
 
   // Подвязка input → state
   document.getElementById('scf-number').addEventListener('input', e => { state.contractForm.number = e.target.value; });
-  document.getElementById('scf-sign-date').addEventListener('change', e => { state.contractForm.sign_date = e.target.value; });
+  document.getElementById('scf-sign-date').addEventListener('change', e => {
+    state.contractForm.sign_date = e.target.value;
+    _recalcShipDate();  // ЭТАП 36.3
+  });
   document.getElementById('scf-sum').addEventListener('input', e => { state.contractForm.sum_amount = e.target.value; });
-  document.getElementById('scf-delivery-date').addEventListener('change', e => { state.contractForm.delivery_date = e.target.value; });
+  document.getElementById('scf-delivery-date').addEventListener('change', e => {
+    state.contractForm.delivery_date = e.target.value;
+    state.contractForm._delivery_manual = true;  // ручное изменение — больше не пересчитываем
+    const hint = document.getElementById('scf-ship-hint');
+    if (hint) hint.textContent = 'Дата отгрузки изменена вручную';
+  });
+  document.getElementById('scf-working-days').addEventListener('input', e => {
+    state.contractForm.working_days = parseInt(e.target.value) || null;
+    state.contractForm._delivery_manual = false;
+    _recalcShipDate();
+  });
   document.getElementById('scf-delivery-address').addEventListener('input', e => { state.contractForm.delivery_address = e.target.value; });
   document.getElementById('scf-comment').addEventListener('input', e => { state.contractForm.comment = e.target.value; });
+}
+
+// ============ ЭТАП 36.3: Календарь РФ и калькулятор срока отгрузки ============
+
+const _RU_FIXED_HOLIDAYS = [
+  '01-01','01-02','01-03','01-04','01-05','01-06','01-07','01-08',
+  '02-23','03-08','05-01','05-09','06-12','11-04',
+];
+function _isHolidayRu(d) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return _RU_FIXED_HOLIDAYS.includes(mm + '-' + dd);
+}
+function _isWorkingDayRu(d) {
+  const wd = d.getDay();
+  if (wd === 0 || wd === 6) return false;
+  if (_isHolidayRu(d)) return false;
+  return true;
+}
+function _addWorkingDaysRu(startDate, n) {
+  const d = new Date(startDate);
+  let added = 0;
+  while (added < n) {
+    d.setDate(d.getDate() + 1);
+    if (_isWorkingDayRu(d)) added++;
+  }
+  return d;
+}
+function _recalcShipDate() {
+  if (state.contractForm._delivery_manual) return;
+  const signStr = state.contractForm.sign_date;
+  const days = parseInt(state.contractForm.working_days) || 0;
+  const hint = document.getElementById('scf-ship-hint');
+  const input = document.getElementById('scf-delivery-date');
+  if (!signStr || !days) {
+    if (hint) hint.textContent = 'Введи рабочих дней — дата отгрузки посчитается автоматически';
+    return;
+  }
+  const signDate = new Date(signStr + 'T00:00:00');
+  if (isNaN(signDate)) return;
+  const shipDate = _addWorkingDaysRu(signDate, days);
+  const yyyy = shipDate.getFullYear();
+  const mm = String(shipDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(shipDate.getDate()).padStart(2, '0');
+  const iso = yyyy + '-' + mm + '-' + dd;
+  if (input) input.value = iso;
+  state.contractForm.delivery_date = iso;
+  if (hint) {
+    const dStr = dd + '.' + mm + '.' + yyyy;
+    hint.textContent = '+' + days + ' раб. дн. от подписания → ' + dStr;
+  }
 }
 
 function setContractType(t) {
