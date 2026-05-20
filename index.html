@@ -4326,6 +4326,47 @@
     color: var(--text-light);
   }
 
+  /* ============ ЭТАП 33.2: Сворачиваемые категории в списке комплектующих ============ */
+  .comp-group {
+    margin: 0 18px 8px;
+  }
+  .comp-group-toggle {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    background: var(--brand-bg);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--brand);
+    text-align: left;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .comp-group-toggle:hover { border-color: var(--brand); }
+  .comp-group-chev {
+    transition: transform 0.2s;
+    font-size: 16px;
+  }
+  .comp-group-toggle.open .comp-group-chev { transform: rotate(90deg); }
+  .comp-group-toggle > span:first-of-type { flex: 1; }
+  .comp-group-count {
+    background: white;
+    color: var(--brand);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .comp-group-body {
+    padding-top: 8px;
+  }
+  .comp-group-body .comp-table {
+    margin: 0;
+  }
+
   /* Предпросмотр автосписания в форме сборки */
   .bom-preview-block {
     background: var(--bg); border: 1px solid var(--border);
@@ -9859,7 +9900,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.13.1-bom-picker";
+const APP_VERSION = "v2.13.2-collapsible-groups";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20116,9 +20157,10 @@ async function loadComponentsCatalog() {
 function renderCcCategoryChips() {
   const wrap = document.getElementById('cc-cat-filters');
   if (!wrap) return;
-  let html = '<button class="filter-chip active" data-cc-cat="" onclick="setCcCategory(\'\')">Все</button>';
+  const active = state.ccCatFilter || '';
+  let html = '<button class="filter-chip' + (active === '' ? ' active' : '') + '" data-cc-cat="" onclick="setCcCategory(\'\')">Все</button>';
   (cache.componentCategories || []).forEach(c => {
-    html += '<button class="filter-chip" data-cc-cat="' + c.id + '" onclick="setCcCategory(\'' + c.id + '\')">' +
+    html += '<button class="filter-chip' + (active === String(c.id) ? ' active' : '') + '" data-cc-cat="' + c.id + '" onclick="setCcCategory(\'' + c.id + '\')">' +
             escapeHtml(c.name) + '</button>';
   });
   wrap.innerHTML = html;
@@ -20156,24 +20198,57 @@ function renderComponentsCatalogList() {
     return;
   }
 
-  let html = '<div class="comp-table">';
+  // ЭТАП 33.2: группировка по категориям со сворачиваемыми заголовками
+  const groups = {};
   list.forEach(c => {
-    html += '<div class="comp-row" style="grid-template-columns: 1fr auto;cursor:pointer;" onclick="openComponentForm(' + c.id + ')">' +
-      '<div class="comp-row-main">' +
-        '<div class="comp-name">' + escapeHtml(c.name || '—') +
-          (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
-        '</div>' +
-        '<div class="comp-meta">' +
-          '<span class="comp-cat-badge">' + escapeHtml(c.category_name || '—') + '</span>' +
-          ' · на складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
-          (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
-        '</div>' +
-      '</div>' +
-      '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
-    '</div>';
+    const cat = c.category_name || '—';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(c);
   });
-  html += '</div>';
+  const sortMap = {};
+  (cache.componentCategories || []).forEach(c => { sortMap[c.name] = c.sort_order || 0; });
+  const catNames = Object.keys(groups).sort((a, b) =>
+    (sortMap[a] || 999) - (sortMap[b] || 999) || a.localeCompare(b)
+  );
+  if (!state.ccListOpenCats) state.ccListOpenCats = {};
+  const allOpen = !!q || !!catFilter;
+
+  let html = '';
+  catNames.forEach(cat => {
+    const items = groups[cat];
+    const isOpen = allOpen ? true : !!state.ccListOpenCats[cat];
+    html += '<div class="comp-group">' +
+      '<button type="button" class="comp-group-toggle' + (isOpen ? ' open' : '') + '" ' +
+        'onclick="toggleCatalogGroup(\'' + cat.replace(/'/g, "\\'") + '\')">' +
+        '<i class="ti ti-chevron-right comp-group-chev"></i>' +
+        '<span>' + escapeHtml(cat) + '</span>' +
+        '<span class="comp-group-count">' + items.length + '</span>' +
+      '</button>' +
+      '<div class="comp-group-body"' + (isOpen ? '' : ' style="display:none;"') + '>' +
+        '<div class="comp-table">';
+    items.forEach(c => {
+      html += '<div class="comp-row" style="grid-template-columns: 1fr auto;cursor:pointer;" onclick="openComponentForm(' + c.id + ')">' +
+        '<div class="comp-row-main">' +
+          '<div class="comp-name">' + escapeHtml(c.name || '—') +
+            (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
+          '</div>' +
+          '<div class="comp-meta">' +
+            'на складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
+            (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
+      '</div>';
+    });
+    html += '</div></div></div>';
+  });
   container.innerHTML = html;
+}
+
+function toggleCatalogGroup(cat) {
+  if (!state.ccListOpenCats) state.ccListOpenCats = {};
+  state.ccListOpenCats[cat] = !state.ccListOpenCats[cat];
+  renderComponentsCatalogList();
 }
 
 
@@ -20182,7 +20257,7 @@ async function loadWarehouseComponents() {
   const newBtn = document.getElementById('comp-new-btn');
   if (newBtn) newBtn.style.display = canManageSales() ? '' : 'none';
 
-  // Подгружаем категории если ещё не загружены
+  // Подгружаем категории
   if (!cache.componentCategories) {
     try {
       const r = await apiGet('/api/components/categories');
@@ -20190,8 +20265,10 @@ async function loadWarehouseComponents() {
     } catch (e) {
       cache.componentCategories = [];
     }
-    renderComponentCategoryChips();
   }
+  // ЭТАП 33.2: всегда рендерим чипы (раньше пропускалось если кеш уже был)
+  renderComponentCategoryChips();
+
   // Подгружаем список комплектующих
   const container = document.getElementById('comp-list-container');
   if (container) container.innerHTML = '<div class="loading-block">Загружаем…</div>';
@@ -20207,9 +20284,10 @@ async function loadWarehouseComponents() {
 function renderComponentCategoryChips() {
   const wrap = document.getElementById('comp-cat-filters');
   if (!wrap) return;
-  let html = '<button class="filter-chip active" data-comp-cat="" onclick="setComponentCategory(\'\')">Все</button>';
+  const active = state.componentCatFilter || '';
+  let html = '<button class="filter-chip' + (active === '' ? ' active' : '') + '" data-comp-cat="" onclick="setComponentCategory(\'\')">Все</button>';
   (cache.componentCategories || []).forEach(c => {
-    html += '<button class="filter-chip" data-comp-cat="' + c.id + '" onclick="setComponentCategory(\'' + c.id + '\')">' +
+    html += '<button class="filter-chip' + (active === String(c.id) ? ' active' : '') + '" data-comp-cat="' + c.id + '" onclick="setComponentCategory(\'' + c.id + '\')">' +
             escapeHtml(c.name) + '</button>';
   });
   wrap.innerHTML = html;
@@ -20233,7 +20311,7 @@ function renderComponentsList() {
   if (!container) return;
   let list = cache.components || [];
 
-  // Фильтр по категории
+  // Фильтр по чип-категории
   const catFilter = state.componentCatFilter || '';
   if (catFilter) {
     list = list.filter(c => String(c.category_id) === catFilter);
@@ -20256,33 +20334,77 @@ function renderComponentsList() {
     return;
   }
 
-  let html = '<div class="comp-table">';
+  // ЭТАП 33.2: группировка по категориям со сворачиваемыми заголовками
+  // Группируем
+  const groups = {};
   list.forEach(c => {
-    const lowStock = (c.min_stock > 0 && c.qty_on_stock < c.min_stock);
-    const zeroStock = (c.qty_on_stock <= 0);
-    html += '<div class="comp-row">' +
-      '<div class="comp-row-main" onclick="openComponentDetail(' + c.id + ')">' +
-        '<div class="comp-name">' + escapeHtml(c.name || '—') +
-          (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
-        '</div>' +
-        '<div class="comp-meta">' +
-          '<span class="comp-cat-badge">' + escapeHtml(c.category_name || '—') + '</span>' +
-          (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
-        '</div>' +
-      '</div>' +
-      '<div class="comp-row-qty ' + (zeroStock ? 'zero' : (lowStock ? 'low' : '')) + '">' +
-        '<div class="comp-qty-num">' + _fmtQty(c.qty_on_stock) + '</div>' +
-        '<div class="comp-qty-unit">' + escapeHtml(c.unit || 'шт.') + '</div>' +
-      '</div>' +
-      '<div class="comp-row-actions">' +
-        '<button class="btn btn-secondary btn-small" title="Приход" onclick="openComponentReceiveModal(' + c.id + ')"><i class="ti ti-package-import"></i></button>' +
-        '<button class="btn btn-secondary btn-small" title="Списать" onclick="openComponentWriteoffModal(' + c.id + ')"><i class="ti ti-package-export"></i></button>' +
-        '<button class="btn btn-secondary btn-small" title="История" onclick="openComponentMovements(' + c.id + ')"><i class="ti ti-history"></i></button>' +
-      '</div>' +
-    '</div>';
+    const cat = c.category_name || '—';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(c);
   });
-  html += '</div>';
+  // Сортируем по sort_order из componentCategories
+  const sortMap = {};
+  (cache.componentCategories || []).forEach(c => { sortMap[c.name] = c.sort_order || 0; });
+  const catNames = Object.keys(groups).sort((a, b) =>
+    (sortMap[a] || 999) - (sortMap[b] || 999) || a.localeCompare(b)
+  );
+
+  // Состояние раскрытости (по умолчанию: все свёрнуты для уменьшения шума,
+  // кроме одного случая — когда категорий ≤ 2 или активный фильтр)
+  if (!state.compListOpenCats) state.compListOpenCats = {};
+  const isFiltered = !!catFilter;
+  const isSearching = !!q;
+  const allOpen = isSearching || isFiltered;
+
+  let html = '';
+  catNames.forEach(cat => {
+    const items = groups[cat];
+    let isOpen = allOpen;
+    if (!allOpen) {
+      // если состояние не задано — по умолчанию свёрнуто
+      isOpen = !!state.compListOpenCats[cat];
+    }
+    html += '<div class="comp-group">' +
+      '<button type="button" class="comp-group-toggle' + (isOpen ? ' open' : '') + '" ' +
+        'onclick="toggleComponentsGroup(\'' + cat.replace(/'/g, "\\'") + '\')">' +
+        '<i class="ti ti-chevron-right comp-group-chev"></i>' +
+        '<span>' + escapeHtml(cat) + '</span>' +
+        '<span class="comp-group-count">' + items.length + '</span>' +
+      '</button>' +
+      '<div class="comp-group-body"' + (isOpen ? '' : ' style="display:none;"') + '>' +
+        '<div class="comp-table">';
+    items.forEach(c => {
+      const lowStock = (c.min_stock > 0 && c.qty_on_stock < c.min_stock);
+      const zeroStock = (c.qty_on_stock <= 0);
+      html += '<div class="comp-row">' +
+        '<div class="comp-row-main" onclick="openComponentDetail(' + c.id + ')">' +
+          '<div class="comp-name">' + escapeHtml(c.name || '—') +
+            (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
+          '</div>' +
+          '<div class="comp-meta">' +
+            (c.default_supplier_name ? '<i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '<span style="color:var(--text-light);">без поставщика</span>') +
+          '</div>' +
+        '</div>' +
+        '<div class="comp-row-qty ' + (zeroStock ? 'zero' : (lowStock ? 'low' : '')) + '">' +
+          '<div class="comp-qty-num">' + _fmtQty(c.qty_on_stock) + '</div>' +
+          '<div class="comp-qty-unit">' + escapeHtml(c.unit || 'шт.') + '</div>' +
+        '</div>' +
+        '<div class="comp-row-actions">' +
+          '<button class="btn btn-secondary btn-small" title="Приход" onclick="openComponentReceiveModal(' + c.id + ')"><i class="ti ti-package-import"></i></button>' +
+          '<button class="btn btn-secondary btn-small" title="Списать" onclick="openComponentWriteoffModal(' + c.id + ')"><i class="ti ti-package-export"></i></button>' +
+          '<button class="btn btn-secondary btn-small" title="История" onclick="openComponentMovements(' + c.id + ')"><i class="ti ti-history"></i></button>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div></div></div>';
+  });
   container.innerHTML = html;
+}
+
+function toggleComponentsGroup(cat) {
+  if (!state.compListOpenCats) state.compListOpenCats = {};
+  state.compListOpenCats[cat] = !state.compListOpenCats[cat];
+  renderComponentsList();
 }
 
 function _fmtQty(q) {
