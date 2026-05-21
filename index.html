@@ -9333,6 +9333,163 @@
   .pkb-status-chip.s-cancel  { background: var(--bg); color: var(--text-light); }
 
   /* ============ КОНЕЦ ЭТАПА 29.2 (v2.22.0) ============ */
+
+  /* ============================================================
+     ЭТАП 29.3 + 29.4 + хотфикс шапки (v2.23.0)
+     ============================================================ */
+
+  /* --- Хотфикс: убираем дубль шапки над канбаном производства --- */
+  .screen[data-screen="dashboard"][data-section="production"] > .page-header,
+  .screen[data-screen="dashboard"][data-section="production"] > .greeting {
+    display: none;
+  }
+
+  /* --- DnD: визуальные состояния перетаскивания --- */
+  .pkb-wc[draggable="true"]         { cursor: grab; }
+  .pkb-wc[draggable="true"]:active  { cursor: grabbing; }
+  .pkb-wc-dragging {
+    opacity: 0.5;
+    transform: rotate(-1deg) scale(0.98);
+    transition: transform 0.1s;
+  }
+  .pkb-col.pkb-drop-target {
+    background: rgba(37, 99, 235, 0.06);
+    outline: 2px dashed #2563EB;
+    outline-offset: -2px;
+  }
+  .pkb-col.pkb-drop-target .pkb-col-body {
+    background: transparent;
+  }
+  /* На мобиле DnD не работает (касания), курсор оставляем как pointer */
+  @media (max-width: 980px) {
+    .pkb-wc[draggable="true"]        { cursor: pointer; }
+    .pkb-wc[draggable="true"]:active { cursor: pointer; }
+  }
+
+  /* --- Виджет загрузки сборщиков (Stage 29.4) --- */
+  .pkb-workload {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0 18px 14px;
+  }
+  .desktop-layout .pkb-workload { margin: 0 0 16px; }
+  @media (max-width: 720px) {
+    .pkb-workload { margin: 0 14px 12px; padding: 10px 12px; }
+  }
+
+  .pkb-workload-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .pkb-workload-title {
+    flex: 1;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    color: var(--text-mid);
+  }
+  .pkb-workload-norm {
+    font-size: 11px;
+    color: var(--text-light);
+  }
+
+  .pkb-wl-row {
+    display: grid;
+    grid-template-columns: 26px minmax(100px, 1.4fr) minmax(140px, 3fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 5px 0;
+  }
+  .pkb-wl-avatar {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--brand-bg);
+    color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .pkb-wl-name {
+    font-size: 12.5px;
+    color: var(--text-dark);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pkb-wl-bar {
+    position: relative;
+    height: 16px;
+    background: #F1F3F5;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .pkb-wl-bar-fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .pkb-wl-bar-fill.s-undersized { background: #BA7517; }
+  .pkb-wl-bar-fill.s-normal     { background: #1D9E75; }
+  .pkb-wl-bar-fill.s-overloaded { background: #E24B4A; }
+  .pkb-wl-bar-text {
+    position: relative;
+    z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    height: 100%;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+  .pkb-wl-bar.empty .pkb-wl-bar-text {
+    color: var(--text-faint);
+    text-shadow: none;
+  }
+  .pkb-wl-norm-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 80%;
+    width: 1px;
+    background: rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .pkb-wl-status {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .pkb-wl-status.s-undersized { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .pkb-wl-status.s-normal     { background: rgba(29,158,117,0.15);  color: #0A5B41; }
+  .pkb-wl-status.s-overloaded { background: rgba(226,75,74,0.15);  color: #8C2A2A; }
+
+  .pkb-workload-empty {
+    font-size: 12px;
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 6px 0;
+    text-align: center;
+  }
+
+  @media (max-width: 600px) {
+    .pkb-wl-row {
+      grid-template-columns: 22px minmax(80px, 1fr) minmax(80px, 2fr) auto;
+      gap: 6px;
+    }
+    .pkb-wl-name { font-size: 11.5px; }
+    .pkb-wl-status { font-size: 10px; padding: 1px 7px; }
+    .pkb-wl-bar-text { font-size: 9.5px; padding: 0 4px; }
+  }
+
+  /* ============ КОНЕЦ ЭТАПА 29.3 + 29.4 (v2.23.0) ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -11692,7 +11849,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.22.2-sync-from-contracts-ui";
+const APP_VERSION = "v2.23.0-dnd-workload";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12898,16 +13055,17 @@ async function loadProductionDashboard() {
 }
 
 async function fetchProductionKanban() {
-  // Грузим параллельно: KPI и список работ (без статус-фильтра — все активные за период)
-  // /api/production/works отдаёт is_active=1 по умолчанию.
-  // Для колонки done нужны завершённые за 7 дней — фильтруем на фронте по finished_at.
-  const [kpiRes, worksRes] = await Promise.all([
+  // Грузим параллельно: KPI, список работ, workload сборщиков.
+  // workload — необязательный (если упадёт, виджет просто скроется).
+  const [kpiRes, worksRes, workloadRes] = await Promise.all([
     apiGet('/api/production/kpi'),
     apiGet('/api/production/works'),
+    apiGet('/api/production/workload').catch(() => null),
   ]);
   return {
     kpi: kpiRes || {},
     works: (worksRes && worksRes.works) || [],
+    workload: workloadRes || { workers: [], norm_hours: 40 },
     fetchedAt: new Date(),
   };
 }
@@ -12973,6 +13131,9 @@ function renderProductionDashboard(d) {
   // --- KPI ряд ---
   html += renderPkbKpi(kpi);
 
+  // --- Виджет загрузки сборщиков (Stage 29.4) ---
+  html += renderPkbWorkload(d.workload || { workers: [], norm_hours: 40 });
+
   // --- Мобильные табы переключения колонок ---
   html += '<div class="pkb-col-tabs">';
   PKB_COL_DEFS.forEach(def => {
@@ -12986,11 +13147,18 @@ function renderProductionDashboard(d) {
   html += '</div>';
 
   // --- Канбан-доска ---
+  const canDrag = hasPermission('production.manage');
   html += '<div class="pkb-board">';
   PKB_COL_DEFS.forEach(def => {
     const items = byCol[def.key] || [];
     const activeCls = (pkbMobileCol === def.key) ? ' active' : '';
-    html += '<div class="pkb-col ' + def.cls + activeCls + '" data-pkb-col="' + def.key + '">';
+    // v2.23.0: drop-обработчики только если у пользователя есть права на смену статуса
+    const dropAttrs = canDrag
+      ? ' ondragover="pkbColDragOver(event)"' +
+        ' ondragleave="pkbColDragLeave(event)"' +
+        ' ondrop="pkbColDrop(event, \'' + def.key + '\')"'
+      : '';
+    html += '<div class="pkb-col ' + def.cls + activeCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
     html +=   '<div class="pkb-col-head">';
     html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
     html +=     '<div class="pkb-col-count">' + items.length + '</div>';
@@ -13095,6 +13263,140 @@ function pkbFilterOverdue() {
   showToast('Фильтр по просрочке — в следующем стейдже', 'info');
 }
 
+// ============ Stage 29.4: виджет загрузки сборщиков ============
+
+function renderPkbWorkload(workload) {
+  const workers = (workload && workload.workers) || [];
+  const norm    = (workload && workload.norm_hours) || 40;
+
+  // Скрываем виджет если нет сотрудников вовсе
+  if (!workers.length) return '';
+
+  // Сортировка: перегруженные первыми, потом норма, потом недогруз,
+  // внутри группы — по убыванию pct
+  const orderMap = { overloaded: 0, normal: 1, undersized: 2 };
+  const sorted = [...workers].sort((a, b) => {
+    const oa = orderMap[a.status] != null ? orderMap[a.status] : 9;
+    const ob = orderMap[b.status] != null ? orderMap[b.status] : 9;
+    if (oa !== ob) return oa - ob;
+    return (b.pct || 0) - (a.pct || 0);
+  });
+
+  let html = '<div class="pkb-workload">';
+  html +=   '<div class="pkb-workload-head">';
+  html +=     '<div class="pkb-workload-title">Загрузка сборщиков</div>';
+  html +=     '<div class="pkb-workload-norm">норма ' + norm + 'ч / неделю</div>';
+  html +=   '</div>';
+
+  sorted.forEach(w => {
+    const name     = w.short_name || w.full_name || ('Сотрудник #' + w.employee_id);
+    const initials = getInitials(name);
+    const pct      = Math.max(0, Math.min(200, w.pct || 0)); // обрезаем визуально 200%
+    const hours    = (w.total_hours != null) ? w.total_hours : 0;
+    const works    = w.works_count || 0;
+    const status   = w.status || 'undersized';
+    const statusLabel =
+      (status === 'overloaded') ? 'перегруз' :
+      (status === 'normal')     ? 'норма'    :
+      (works === 0)             ? 'свободен' : 'недогруз';
+
+    // Внутри полосы текст: "N работ · Mч"
+    const barText = works > 0
+      ? (works + ' ' + plural(works, 'работа', 'работы', 'работ') + ' · ' + formatHours(hours) + 'ч')
+      : 'нет работ';
+
+    const fillWidth = Math.min(100, pct); // фактическая ширина заливки 0..100%
+    const barEmptyCls = (works === 0) ? ' empty' : '';
+
+    html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
+    html +=   '<div class="pkb-wl-avatar">' + escapeHtml(initials) + '</div>';
+    html +=   '<div class="pkb-wl-name">' + escapeHtml(name) + '</div>';
+    html +=   '<div class="pkb-wl-bar' + barEmptyCls + '">';
+    if (works > 0) {
+      html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
+    }
+    html +=   '<div class="pkb-wl-norm-line" title="80% — норма"></div>';
+    html +=   '<div class="pkb-wl-bar-text">' + escapeHtml(barText) + '</div>';
+    html +=   '</div>';
+    html +=   '<div class="pkb-wl-status s-' + status + '">' + escapeHtml(statusLabel) + '</div>';
+    html += '</div>';
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function formatHours(h) {
+  if (h == null) return '0';
+  const n = parseFloat(h);
+  if (isNaN(n)) return '0';
+  return (n % 1 === 0) ? String(Math.round(n)) : n.toFixed(1);
+}
+
+// ============ Stage 29.3: Drag-and-drop между колонками ============
+
+// Активный draggable работ: { workId, fromStatus }
+let pkbDrag = null;
+
+function pkbCardDragStart(ev, workId, fromStatus) {
+  pkbDrag = { workId: workId, fromStatus: fromStatus };
+  try {
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', String(workId));
+  } catch (e) {}
+  const card = ev.currentTarget;
+  if (card && card.classList) card.classList.add('pkb-wc-dragging');
+}
+
+function pkbCardDragEnd(ev) {
+  const card = ev.currentTarget;
+  if (card && card.classList) card.classList.remove('pkb-wc-dragging');
+  // На всякий случай — снимаем drop-подсветку со всех колонок
+  document.querySelectorAll('.pkb-col.pkb-drop-target').forEach(c =>
+    c.classList.remove('pkb-drop-target'));
+  pkbDrag = null;
+}
+
+function pkbColDragOver(ev) {
+  if (!pkbDrag) return; // не наша карточка → пропускаем
+  ev.preventDefault();
+  try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {}
+  const col = ev.currentTarget;
+  if (col && col.classList) col.classList.add('pkb-drop-target');
+}
+
+function pkbColDragLeave(ev) {
+  const col = ev.currentTarget;
+  // dragleave срабатывает при переходе на дочерний элемент — фильтруем
+  if (col && ev.relatedTarget && col.contains(ev.relatedTarget)) return;
+  if (col && col.classList) col.classList.remove('pkb-drop-target');
+}
+
+async function pkbColDrop(ev, newStatus) {
+  ev.preventDefault();
+  const col = ev.currentTarget;
+  if (col && col.classList) col.classList.remove('pkb-drop-target');
+
+  if (!pkbDrag) return;
+  const workId = pkbDrag.workId;
+  const fromStatus = pkbDrag.fromStatus;
+  pkbDrag = null;
+
+  if (!workId || newStatus === fromStatus) return;
+
+  // Делаем оптимистичное PATCH, ошибка → откатываем (перерисуем при reload)
+  try {
+    await apiPatch('/api/production/works/' + workId + '/status', { status: newStatus });
+    showToast('Статус обновлён', 'success');
+    cache.productionKanban = null;
+    loadProductionDashboard();
+  } catch (e) {
+    // Скорее всего 409 FSM-нарушение или 403 — показываем сообщение и перезагружаем чтобы вернуть карту
+    showToast('Ошибка: ' + (e.message || e), 'error');
+    loadProductionDashboard();
+  }
+}
+
 function renderPkbWorkCard(w, colKey) {
   const overdueClass = w.is_overdue ? ' b-overdue' : '';
   const isDone = (colKey === 'done');
@@ -13112,7 +13414,19 @@ function renderPkbWorkCard(w, colKey) {
   }
   const borderCls = overdueClass || urgencyClass;
 
-  let html = '<div class="pkb-wc' + borderCls + dimCls + '" onclick="openProductionWorkDetail(' + w.id + ')">';
+  // v2.23.0: DnD — только если есть права на управление и не done с привязанной сборкой
+  const canDrag = hasPermission('production.manage');
+  const dragAttrs = canDrag
+    ? ' draggable="true"' +
+      ' ondragstart="pkbCardDragStart(event, ' + w.id + ', \'' + w.status + '\')"' +
+      ' ondragend="pkbCardDragEnd(event)"'
+    : '';
+
+  let html = '<div class="pkb-wc' + borderCls + dimCls + '"' +
+             ' data-work-id="' + w.id + '"' +
+             ' data-work-status="' + escapeHtml(w.status || '') + '"' +
+             dragAttrs +
+             ' onclick="openProductionWorkDetail(' + w.id + ')">';
 
   // Бар срочности или статус-инфо
   if (w.is_overdue) {
