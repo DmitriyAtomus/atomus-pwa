@@ -8896,6 +8896,443 @@
   .ss-source.ss-model     { background: #FEF9C3; color: #713F12; }
   .ss-source.ss-component { background: #F0EAFA; color: #6A4B9C; }
   .ss-source.ss-sale      { background: #EAF3FA; color: #2D5F8B; }
+
+  /* ============================================================
+     ЭТАП 29.2 (v2.22.0): КАНБАН ПРОИЗВОДСТВА
+     Главная Производства = шапка + KPI + 4-колонная доска
+     ============================================================ */
+
+  /* --- Шапка раздела --- */
+  .pkb-section-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px;
+    padding: 18px 18px 12px;
+  }
+  .desktop-layout .pkb-section-header { padding: 6px 0 14px; }
+  .pkb-section-header .pkb-title h1 {
+    font-size: 20px; font-weight: 600; color: var(--text-dark);
+    line-height: 1.2;
+  }
+  .pkb-section-header .pkb-title .pkb-subtitle {
+    font-size: 12px; color: var(--text-light);
+    margin-top: 4px;
+  }
+  .pkb-section-actions {
+    display: flex; gap: 8px; flex-shrink: 0;
+  }
+  .pkb-btn {
+    height: 36px; padding: 0 14px;
+    border-radius: 8px;
+    background: white; color: var(--text-dark);
+    border: 1px solid var(--border-strong);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .pkb-btn:hover { background: var(--bg); border-color: var(--text-light); }
+  .pkb-btn .ti { font-size: 16px; }
+  .pkb-btn.primary {
+    background: var(--brand); color: white; border-color: var(--brand);
+  }
+  .pkb-btn.primary:hover { background: var(--brand-light); border-color: var(--brand-light); }
+  .pkb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* --- KPI ряд (5 карточек) --- */
+  .pkb-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    padding: 0 18px 14px;
+  }
+  .desktop-layout .pkb-kpi-grid { padding: 0 0 16px; }
+  @media (max-width: 1100px) {
+    .pkb-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 720px) {
+    .pkb-kpi-grid {
+      grid-template-columns: repeat(2, 1fr);
+      padding: 0 14px 12px;
+      gap: 8px;
+    }
+  }
+
+  .pkb-kpi {
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 11px 12px;
+    cursor: default;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: box-shadow 0.12s, transform 0.12s;
+  }
+  .pkb-kpi.clickable { cursor: pointer; }
+  .pkb-kpi.clickable:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  .pkb-kpi-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    font-weight: 600;
+  }
+  .pkb-kpi-value {
+    font-size: 23px; font-weight: 600;
+    color: var(--text-dark);
+    line-height: 1;
+  }
+  .pkb-kpi-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .pkb-kpi.k-neutral { border-left-color: #9AA1B0; }
+  .pkb-kpi.k-info    { border-left-color: #2563EB; }
+  .pkb-kpi.k-info    .pkb-kpi-value { color: #1E40AF; }
+  .pkb-kpi.k-danger  { border-left-color: #E24B4A; }
+  .pkb-kpi.k-danger  .pkb-kpi-value { color: #8C2A2A; }
+  .pkb-kpi.k-warning { border-left-color: #BA7517; }
+  .pkb-kpi.k-warning .pkb-kpi-value { color: #854F0B; }
+  .pkb-kpi.k-success { border-left-color: #1D9E75; }
+  .pkb-kpi.k-success .pkb-kpi-value { color: #0A5B41; }
+
+  /* --- Канбан-доска --- */
+  .pkb-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 18px 24px;
+  }
+  .desktop-layout .pkb-board { padding: 0 0 24px; }
+  @media (max-width: 980px) {
+    /* На мобиле — переключатель колонок (вкладки) + одна видимая колонка */
+    .pkb-board {
+      grid-template-columns: 1fr;
+      padding: 0 14px 24px;
+    }
+    .pkb-col { display: none; }
+    .pkb-col.active { display: flex; }
+  }
+
+  .pkb-col-tabs {
+    display: none;
+    gap: 6px;
+    padding: 0 14px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pkb-col-tabs::-webkit-scrollbar { display: none; }
+  @media (max-width: 980px) {
+    .pkb-col-tabs { display: flex; }
+  }
+  .pkb-col-tab {
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: white;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-mid);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .pkb-col-tab .pkb-col-tab-count {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text-light);
+  }
+  .pkb-col-tab.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .pkb-col-tab.active .pkb-col-tab-count {
+    background: rgba(255,255,255,0.25);
+    color: white;
+  }
+
+  .pkb-col {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    min-height: 200px;
+    max-height: calc(100vh - 280px);
+  }
+  .pkb-col-head {
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    background: white;
+    border-radius: 10px 10px 0 0;
+  }
+  .pkb-col-head .pkb-col-name {
+    flex: 1; min-width: 0;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .pkb-col-head .pkb-col-count {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text-light);
+  }
+  .pkb-col.c-queue   .pkb-col-name  { color: #4B5563; }
+  .pkb-col.c-queue   .pkb-col-count { background: #E5E7EB; color: #4B5563; }
+  .pkb-col.c-active  .pkb-col-name  { color: #1E40AF; }
+  .pkb-col.c-active  .pkb-col-count { background: rgba(37,99,235,0.15); color: #1E40AF; }
+  .pkb-col.c-review  .pkb-col-name  { color: #854F0B; }
+  .pkb-col.c-review  .pkb-col-count { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .pkb-col.c-done    .pkb-col-name  { color: #0A5B41; }
+  .pkb-col.c-done    .pkb-col-count { background: rgba(29,158,117,0.15); color: #0A5B41; }
+
+  .pkb-col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex; flex-direction: column;
+    gap: 8px;
+  }
+  .pkb-col-body::-webkit-scrollbar { width: 6px; }
+  .pkb-col-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  .pkb-col-empty {
+    padding: 24px 8px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  /* --- Карточка работы --- */
+  .pkb-wc {
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 5px;
+    transition: box-shadow 0.12s, transform 0.12s;
+  }
+  .pkb-wc:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+  }
+  .pkb-wc.b-overdue  { border-left-color: #E24B4A; }
+  .pkb-wc.b-today    { border-left-color: #BA7517; }
+  .pkb-wc.b-tomorrow { border-left-color: #BA7517; }
+  .pkb-wc.dim        { opacity: 0.85; }
+
+  .pkb-wc-bar {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    align-self: flex-start;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .pkb-wc-bar .ti { font-size: 11px; }
+  .pkb-wc-bar.b-overdue {
+    background: rgba(226,75,74,0.15);
+    color: #8C2A2A;
+  }
+  .pkb-wc-bar.b-today {
+    background: rgba(186,117,23,0.15);
+    color: #854F0B;
+  }
+  .pkb-wc-bar.b-tomorrow {
+    background: rgba(186,117,23,0.10);
+    color: #854F0B;
+  }
+  .pkb-wc-bar.b-deadline {
+    background: var(--bg);
+    color: var(--text-light);
+  }
+  .pkb-wc-bar.b-success {
+    background: rgba(29,158,117,0.15);
+    color: #0A5B41;
+  }
+
+  .pkb-wc-title {
+    font-size: 12px; font-weight: 500;
+    color: var(--text-dark);
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .pkb-wc-sub {
+    font-size: 10.5px;
+    color: var(--text-light);
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .pkb-wc-meta {
+    font-size: 10.5px;
+    color: var(--text-light);
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pkb-wc-meta .ti { font-size: 12px; }
+
+  .pkb-wc-progress {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pkb-wc-progress .pkb-wc-av {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 9px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pkb-wc-progress .pkb-wc-bar-track {
+    flex: 1; height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .pkb-wc-progress .pkb-wc-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2563EB 0%, #4A7FB5 100%);
+    border-radius: 3px;
+    transition: width 0.25s;
+  }
+  .pkb-wc-progress .pkb-wc-pct {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-mid);
+    flex-shrink: 0;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* --- Модалка детали работы --- */
+  .pkb-detail-modal .modal {
+    max-width: 560px;
+  }
+  .pkb-detail-modal .modal-body {
+    padding: 16px 18px;
+  }
+  .pkb-detail-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 10px 14px;
+    align-items: baseline;
+  }
+  .pkb-detail-grid dt {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+    font-weight: 600;
+  }
+  .pkb-detail-grid dd {
+    font-size: 13px;
+    color: var(--text-dark);
+    word-break: break-word;
+  }
+  .pkb-detail-actions {
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+    flex-wrap: wrap;
+    background: var(--bg);
+  }
+  .pkb-detail-actions .pkb-btn { font-size: 12px; height: 34px; padding: 0 12px; }
+
+  /* --- Формa создания работы --- */
+  .pkb-form-modal .modal {
+    max-width: 520px;
+  }
+  .pkb-form-modal .modal-body {
+    padding: 16px 18px 20px;
+  }
+  .pkb-form-modal .pkb-field {
+    margin-bottom: 14px;
+  }
+  .pkb-form-modal .pkb-field label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .pkb-form-modal .pkb-field input,
+  .pkb-form-modal .pkb-field select,
+  .pkb-form-modal .pkb-field textarea {
+    width: 100%;
+    padding: 9px 12px;
+    background: white;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    color: var(--text-dark);
+    transition: border-color 0.12s;
+  }
+  .pkb-form-modal .pkb-field input:focus,
+  .pkb-form-modal .pkb-field select:focus,
+  .pkb-form-modal .pkb-field textarea:focus {
+    border-color: var(--brand);
+  }
+  .pkb-form-modal .pkb-field textarea {
+    min-height: 70px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .pkb-form-modal .pkb-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .pkb-form-modal .pkb-form-actions {
+    margin-top: 4px;
+    display: flex; gap: 8px;
+    justify-content: flex-end;
+  }
+  .pkb-form-error {
+    background: rgba(226,75,74,0.10);
+    color: #8C2A2A;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* --- Статус-чип в модалке --- */
+  .pkb-status-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .pkb-status-chip.s-queue   { background: #E5E7EB; color: #4B5563; }
+  .pkb-status-chip.s-active  { background: rgba(37,99,235,0.15); color: #1E40AF; }
+  .pkb-status-chip.s-review  { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .pkb-status-chip.s-done    { background: rgba(29,158,117,0.15); color: #0A5B41; }
+  .pkb-status-chip.s-cancel  { background: var(--bg); color: var(--text-light); }
+
+  /* ============ КОНЕЦ ЭТАПА 29.2 (v2.22.0) ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -11255,7 +11692,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.21.6-empty-direction-fix";
+const APP_VERSION = "v2.22.0-kanban-base";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12249,7 +12686,10 @@ function refreshCurrentScreen() {
 
 // ============ ДАШБОРД ============
 
-async function loadDashboard() {
+// ЭТАП 29.2 (v2.22.0): главная Производства переехала на канбан.
+// Старая реализация сохранена под именем loadLegacyProductionDashboard
+// на случай быстрого отката.
+async function loadLegacyProductionDashboard() {
   const container = document.getElementById('dashboard-content');
   if (cache.dashboard) { renderDashboard(cache.dashboard); loadProductionQueue(); return; }
   container.innerHTML = '<div class="loading-block">Загружаем данные…</div>';
@@ -12262,6 +12702,11 @@ async function loadDashboard() {
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить: ' + escapeHtml(String(e)) + '</div>';
   }
+}
+
+// Новая точка входа — канбан производства
+async function loadDashboard() {
+  return loadProductionDashboard();
 }
 
 function renderDashboard(d) {
@@ -12409,6 +12854,670 @@ function renderDashboard(d) {
 
   container.innerHTML = html;
 }
+
+
+// ============================================================
+// ЭТАП 29.2 (v2.22.0): КАНБАН ПРОИЗВОДСТВА
+// ============================================================
+
+// Кеш данных канбана (KPI + works)
+cache.productionKanban = null;
+// Активная мобильная колонка
+let pkbMobileCol = 'queue';
+
+const PKB_COL_DEFS = [
+  { key: 'queue',       title: 'В очереди',       cls: 'c-queue'  },
+  { key: 'in_progress', title: 'В работе',        cls: 'c-active' },
+  { key: 'review',      title: 'На проверке',     cls: 'c-review' },
+  { key: 'done',        title: 'Готово · 7 дней', cls: 'c-done'   },
+];
+
+async function loadProductionDashboard() {
+  const container = document.getElementById('dashboard-content');
+  if (!container) return;
+
+  // Если есть кеш — рендерим сразу, фоновый refresh
+  if (cache.productionKanban) {
+    renderProductionDashboard(cache.productionKanban);
+    // Освежаем в фоне
+    fetchProductionKanban().then(d => {
+      cache.productionKanban = d;
+      renderProductionDashboard(d);
+    }).catch(() => {});
+    return;
+  }
+
+  container.innerHTML = '<div class="loading-block">Загружаем производство…</div>';
+  try {
+    const d = await fetchProductionKanban();
+    cache.productionKanban = d;
+    renderProductionDashboard(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить канбан: ' + escapeHtml(String(e && e.message || e)) + '</div>';
+  }
+}
+
+async function fetchProductionKanban() {
+  // Грузим параллельно: KPI и список работ (без статус-фильтра — все активные за период)
+  // /api/production/works отдаёт is_active=1 по умолчанию.
+  // Для колонки done нужны завершённые за 7 дней — фильтруем на фронте по finished_at.
+  const [kpiRes, worksRes] = await Promise.all([
+    apiGet('/api/production/kpi'),
+    apiGet('/api/production/works'),
+  ]);
+  return {
+    kpi: kpiRes || {},
+    works: (worksRes && worksRes.works) || [],
+    fetchedAt: new Date(),
+  };
+}
+
+function renderProductionDashboard(d) {
+  const container = document.getElementById('dashboard-content');
+  if (!container) return;
+
+  const kpi = d.kpi || {};
+  const works = d.works || [];
+  const fetchedAt = d.fetchedAt || new Date();
+
+  // Распределяем работы по колонкам
+  const byCol = { queue: [], in_progress: [], review: [], done: [] };
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  works.forEach(w => {
+    const st = w.status;
+    if (st === 'queue' || st === 'in_progress' || st === 'review') {
+      byCol[st].push(w);
+    } else if (st === 'done') {
+      // в колонку «Готово» — только за последние 7 дней
+      const fin = w.finished_at ? new Date(w.finished_at) : null;
+      if (!fin || fin >= weekAgo) byCol.done.push(w);
+    }
+  });
+  // Сортировка: просроченные сначала, потом по deadline, потом по id
+  Object.keys(byCol).forEach(k => {
+    byCol[k].sort((a, b) => {
+      const ao = a.is_overdue ? 1 : 0;
+      const bo = b.is_overdue ? 1 : 0;
+      if (ao !== bo) return bo - ao;
+      const ad = a.deadline_at ? new Date(a.deadline_at).getTime() : 99999999999;
+      const bd = b.deadline_at ? new Date(b.deadline_at).getTime() : 99999999999;
+      if (ad !== bd) return ad - bd;
+      return (a.id || 0) - (b.id || 0);
+    });
+  });
+
+  let html = '';
+
+  // --- Шапка ---
+  const updatedStr = formatPkbDateTime(fetchedAt);
+  html += '<div class="pkb-section-header">';
+  html +=   '<div class="pkb-title">';
+  html +=     '<h1>Производство</h1>';
+  html +=     '<div class="pkb-subtitle">обновлено ' + escapeHtml(updatedStr) + '</div>';
+  html +=   '</div>';
+  html +=   '<div class="pkb-section-actions">';
+  html +=     '<button class="pkb-btn" disabled title="Скоро"><i class="ti ti-calendar-week"></i>План недели</button>';
+  html +=     '<button class="pkb-btn" onclick="selectSidebarItem(\'summary\')"><i class="ti ti-chart-bar"></i>Аналитика</button>';
+  if (hasPermission('production.create')) {
+    html +=   '<button class="pkb-btn primary" onclick="openNewProductionWork()"><i class="ti ti-plus"></i>Новая работа</button>';
+  }
+  html +=   '</div>';
+  html += '</div>';
+
+  // --- KPI ряд ---
+  html += renderPkbKpi(kpi);
+
+  // --- Мобильные табы переключения колонок ---
+  html += '<div class="pkb-col-tabs">';
+  PKB_COL_DEFS.forEach(def => {
+    const cnt = (byCol[def.key] || []).length;
+    const active = (pkbMobileCol === def.key) ? ' active' : '';
+    html += '<button class="pkb-col-tab' + active + '" onclick="pkbSwitchMobileColumn(\'' + def.key + '\')">' +
+              escapeHtml(def.title) +
+              '<span class="pkb-col-tab-count">' + cnt + '</span>' +
+            '</button>';
+  });
+  html += '</div>';
+
+  // --- Канбан-доска ---
+  html += '<div class="pkb-board">';
+  PKB_COL_DEFS.forEach(def => {
+    const items = byCol[def.key] || [];
+    const activeCls = (pkbMobileCol === def.key) ? ' active' : '';
+    html += '<div class="pkb-col ' + def.cls + activeCls + '" data-pkb-col="' + def.key + '">';
+    html +=   '<div class="pkb-col-head">';
+    html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
+    html +=     '<div class="pkb-col-count">' + items.length + '</div>';
+    html +=   '</div>';
+    html +=   '<div class="pkb-col-body">';
+    if (items.length === 0) {
+      html += '<div class="pkb-col-empty">' + escapeHtml(pkbEmptyText(def.key)) + '</div>';
+    } else {
+      items.forEach(w => html += renderPkbWorkCard(w, def.key));
+    }
+    html +=   '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function pkbEmptyText(colKey) {
+  switch (colKey) {
+    case 'queue':       return 'Очередь пуста';
+    case 'in_progress': return 'Ничего в работе';
+    case 'review':      return 'Нет работ на проверке';
+    case 'done':        return 'За неделю пока пусто';
+    default:            return '—';
+  }
+}
+
+function pkbSwitchMobileColumn(colKey) {
+  pkbMobileCol = colKey;
+  // Локально переключаем (без полной перерисовки)
+  document.querySelectorAll('.pkb-col-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.pkb-col').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.pkb-col-tab').forEach(t => {
+    if (t.getAttribute('onclick') && t.getAttribute('onclick').indexOf("'" + colKey + "'") !== -1) {
+      t.classList.add('active');
+    }
+  });
+  const col = document.querySelector('.pkb-col[data-pkb-col="' + colKey + '"]');
+  if (col) col.classList.add('active');
+}
+
+function renderPkbKpi(kpi) {
+  // kpi: { queue, in_progress: {count, assignees}, review, overdue, blocked, week_done, week_plan }
+  const queueCnt    = (kpi.queue != null) ? kpi.queue : 0;
+  const inProgObj   = kpi.in_progress || {};
+  const inProgCnt   = (typeof inProgObj === 'object') ? (inProgObj.count || 0) : inProgObj;
+  const inProgAss   = (typeof inProgObj === 'object') ? (inProgObj.assignees || 0) : 0;
+  const reviewCnt   = (kpi.review != null) ? kpi.review : 0;
+  const overdueCnt  = (kpi.overdue != null) ? kpi.overdue : 0;
+  const blockedCnt  = (kpi.blocked != null) ? kpi.blocked : 0;
+  const weekDone    = (kpi.week_done != null) ? kpi.week_done : 0;
+  const weekPlan    = (kpi.week_plan != null) ? kpi.week_plan : null;
+
+  let html = '<div class="pkb-kpi-grid">';
+
+  // 1. В очереди
+  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false);
+
+  // 2. В работе
+  const inProgHint = inProgAss ? (inProgAss + ' ' + plural(inProgAss, 'сборщик', 'сборщика', 'сборщиков')) : '—';
+  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false);
+
+  // 3. Просрочка
+  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0);
+
+  // 4. На проверке (по брифу здесь «Заблокированы», но это Stage 30 — пока показываем «На проверке»)
+  // Чтобы не было пустого слота — показываем review (или blocked если есть)
+  if (blockedCnt > 0) {
+    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false);
+  } else {
+    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false);
+  }
+
+  // 5. За неделю
+  let weekVal, weekHint;
+  if (weekPlan != null && weekPlan > 0) {
+    weekVal = weekDone + ' / ' + weekPlan;
+    const pct = Math.round(weekDone / weekPlan * 100);
+    weekHint = 'факт / план · ' + pct + '%';
+  } else {
+    weekVal = String(weekDone);
+    weekHint = 'завершено';
+  }
+  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false);
+
+  html += '</div>';
+  return html;
+}
+
+function pkbKpiCard(label, value, hint, cls, clickable) {
+  const clickAttr = clickable ? ' onclick="pkbFilterOverdue()"' : '';
+  return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + '"' + clickAttr + '>' +
+           '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
+           '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
+           '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
+         '</div>';
+}
+
+function pkbFilterOverdue() {
+  // Заглушка под фильтр просрочки. В следующем стейдже.
+  showToast('Фильтр по просрочке — в следующем стейдже', 'info');
+}
+
+function renderPkbWorkCard(w, colKey) {
+  const overdueClass = w.is_overdue ? ' b-overdue' : '';
+  const isDone = (colKey === 'done');
+  const dimCls = isDone ? ' dim' : '';
+
+  // Определение «срочности» дедлайна (для border-left у незавершённых)
+  let urgencyClass = '';
+  if (!isDone && w.deadline_at && !w.is_overdue) {
+    const d = new Date(w.deadline_at);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const dl = new Date(d); dl.setHours(0,0,0,0);
+    if (dl.getTime() === today.getTime()) urgencyClass = ' b-today';
+    else if (dl.getTime() === tomorrow.getTime()) urgencyClass = ' b-tomorrow';
+  }
+  const borderCls = overdueClass || urgencyClass;
+
+  let html = '<div class="pkb-wc' + borderCls + dimCls + '" onclick="openProductionWorkDetail(' + w.id + ')">';
+
+  // Бар срочности или статус-инфо
+  if (w.is_overdue) {
+    const days = pkbOverdueDays(w.deadline_at);
+    html += '<div class="pkb-wc-bar b-overdue"><i class="ti ti-alert-triangle"></i>Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
+  } else if (colKey === 'queue' && w.deadline_at) {
+    const labelDate = formatPkbDate(w.deadline_at);
+    if (urgencyClass === ' b-today') {
+      html += '<div class="pkb-wc-bar b-today"><i class="ti ti-clock"></i>Срок сегодня</div>';
+    } else if (urgencyClass === ' b-tomorrow') {
+      html += '<div class="pkb-wc-bar b-tomorrow"><i class="ti ti-clock"></i>Срок завтра</div>';
+    } else {
+      html += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + '</div>';
+    }
+  } else if (colKey === 'in_progress') {
+    const startedDays = w.started_at ? pkbDaysSince(w.started_at) : 0;
+    const dlStr = w.deadline_at ? (' · до ' + formatPkbDate(w.deadline_at)) : '';
+    html += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-player-play"></i>' + startedDays + ' ' + plural(startedDays, 'день', 'дня', 'дней') + escapeHtml(dlStr) + '</div>';
+  } else if (colKey === 'review') {
+    const finStr = w.finished_at ? (' · ' + formatPkbDateTime(w.finished_at)) : '';
+    html += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-checks"></i>Ждёт ОТК' + escapeHtml(finStr) + '</div>';
+  } else if (colKey === 'done') {
+    const finStr = w.finished_at ? formatPkbDate(w.finished_at) : '—';
+    const hrs = (w.actual_hours != null) ? (' · ' + w.actual_hours + 'ч') : '';
+    html += '<div class="pkb-wc-bar b-success"><i class="ti ti-circle-check"></i>' + escapeHtml(finStr + hrs) + '</div>';
+  }
+
+  // Title — название модели
+  const modelTitle = w.model_name || ('Модель #' + (w.model_id || '?'));
+  const modelExtra = w.model_extra ? (' ' + w.model_extra) : '';
+  const qtyStr = (w.qty && w.qty > 1) ? (' × ' + w.qty) : '';
+  html += '<div class="pkb-wc-title">' + escapeHtml(modelTitle + modelExtra) + escapeHtml(qtyStr) + '</div>';
+
+  // Sub — договор + клиент
+  const subParts = [];
+  if (w.contract_number) subParts.push('№' + w.contract_number);
+  if (w.contractor_name) subParts.push(w.contractor_name);
+  if (subParts.length) {
+    html += '<div class="pkb-wc-sub">' + escapeHtml(subParts.join(' · ')) + '</div>';
+  }
+
+  // Прогресс/исполнитель для in_progress
+  if (colKey === 'in_progress') {
+    const initials = w.assignee_short_name ? getInitials(w.assignee_short_name) : '?';
+    const pct = (w.progress != null) ? w.progress : 0;
+    html += '<div class="pkb-wc-progress">' +
+              '<div class="pkb-wc-av" title="' + escapeHtml(w.assignee_short_name || '—') + '">' + escapeHtml(initials) + '</div>' +
+              '<div class="pkb-wc-bar-track"><div class="pkb-wc-bar-fill" style="width: ' + pct + '%"></div></div>' +
+              '<div class="pkb-wc-pct">' + pct + '%</div>' +
+            '</div>';
+  } else if (colKey === 'review' || colKey === 'done') {
+    if (w.assignee_short_name) {
+      const initials = getInitials(w.assignee_short_name);
+      html += '<div class="pkb-wc-meta">' +
+                '<div class="pkb-wc-av" style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--brand-bg);color:var(--brand);font-size:9px;font-weight:600;align-items:center;justify-content:center;">' + escapeHtml(initials) + '</div>' +
+                escapeHtml(w.assignee_short_name) +
+              '</div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function pkbOverdueDays(deadlineStr) {
+  if (!deadlineStr) return 0;
+  const dl = new Date(deadlineStr); dl.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.max(0, Math.round((today - dl) / (1000 * 60 * 60 * 24)));
+}
+
+function pkbDaysSince(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.max(0, Math.round((today - d) / (1000 * 60 * 60 * 24)));
+}
+
+function formatPkbDate(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return dd + '.' + mm;
+}
+
+function formatPkbDateTime(s) {
+  const d = (s instanceof Date) ? s : new Date(s);
+  if (isNaN(d.getTime())) return String(s || '');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return dd + '.' + mm + ' ' + hh + ':' + mi;
+}
+
+// ============ МОДАЛКА ДЕТАЛИ РАБОТЫ ============
+
+async function openProductionWorkDetail(workId) {
+  // Удаляем предыдущую модалку, если осталась
+  const existing = document.getElementById('pkb-detail-modal');
+  if (existing) existing.remove();
+
+  // Каркас сразу с loading
+  const overlay = document.createElement('div');
+  overlay.id = 'pkb-detail-modal';
+  overlay.className = 'modal-overlay visible pkb-detail-modal';
+  overlay.onclick = function(e) { if (e.target === overlay) closeProductionWorkDetail(); };
+  overlay.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header">' +
+        '<h3>Работа</h3>' +
+        '<button class="icon-btn" onclick="closeProductionWorkDetail()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body"><div class="loading-block">Загружаем…</div></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  try {
+    const w = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(w);
+  } catch (e) {
+    overlay.querySelector('.modal-body').innerHTML =
+      '<div class="empty-block" style="padding:20px;"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e.message || e)) + '</div>';
+  }
+}
+
+function closeProductionWorkDetail() {
+  const m = document.getElementById('pkb-detail-modal');
+  if (m) m.remove();
+}
+
+function renderProductionWorkDetail(w) {
+  const overlay = document.getElementById('pkb-detail-modal');
+  if (!overlay) return;
+  const modal = overlay.querySelector('.modal');
+
+  const modelTitle = (w.model_name || ('Модель #' + (w.model_id || '?'))) + (w.model_extra ? (' ' + w.model_extra) : '');
+  const statusLabel = w.status_label || w.status || '—';
+  const statusCls = pkbStatusToCss(w.status);
+
+  let html = '';
+  html += '<div class="modal-header">';
+  html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + '</h3>';
+  html +=   '<span class="pkb-status-chip ' + statusCls + '">' + escapeHtml(statusLabel) + '</span>';
+  html +=   '<button class="icon-btn" onclick="closeProductionWorkDetail()"><i class="ti ti-x"></i></button>';
+  html += '</div>';
+  html += '<div class="modal-body">';
+
+  if (w.is_overdue) {
+    const days = pkbOverdueDays(w.deadline_at);
+    html += '<div class="pkb-form-error" style="margin-bottom:14px;"><i class="ti ti-alert-triangle"></i> Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
+  }
+
+  html += '<dl class="pkb-detail-grid">';
+  if (w.contract_number) {
+    html += '<dt>Договор</dt><dd>№' + escapeHtml(w.contract_number) + (w.contractor_name ? (' · ' + escapeHtml(w.contractor_name)) : '') + '</dd>';
+  }
+  html += '<dt>Кол-во</dt><dd>' + (w.qty || 1) + ' шт.</dd>';
+  if (w.deadline_at) html += '<dt>Срок</dt><dd>' + escapeHtml(formatPkbDate(w.deadline_at)) + '</dd>';
+  if (w.assignee_short_name) html += '<dt>Исполнитель</dt><dd>' + escapeHtml(w.assignee_short_name) + '</dd>';
+  if (w.estimated_hours != null) html += '<dt>План часов</dt><dd>' + w.estimated_hours + 'ч</dd>';
+  if (w.actual_hours != null) html += '<dt>Факт часов</dt><dd>' + w.actual_hours + 'ч</dd>';
+  if (w.progress != null && w.status === 'in_progress') html += '<dt>Прогресс</dt><dd>' + w.progress + '%</dd>';
+  if (w.execution_type && w.execution_type !== 'standard') html += '<dt>Исполнение</dt><dd>' + escapeHtml(w.execution_type) + '</dd>';
+  if (w.ip_rating) html += '<dt>IP</dt><dd>' + escapeHtml(w.ip_rating) + '</dd>';
+  if (w.started_at)  html += '<dt>Начато</dt><dd>'    + escapeHtml(formatPkbDateTime(w.started_at)) + '</dd>';
+  if (w.finished_at) html += '<dt>Завершено</dt><dd>' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</dd>';
+  if (w.description) html += '<dt>Описание</dt><dd style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</dd>';
+  html += '</dl>';
+
+  html += '</div>';
+
+  // Кнопки смены статуса (заменяют DnD до Stage 29.3)
+  html += renderPkbDetailActions(w);
+
+  modal.innerHTML = html;
+}
+
+function pkbStatusToCss(status) {
+  switch (status) {
+    case 'queue':       return 's-queue';
+    case 'in_progress': return 's-active';
+    case 'review':      return 's-review';
+    case 'done':        return 's-done';
+    case 'cancelled':   return 's-cancel';
+    default:            return 's-queue';
+  }
+}
+
+function renderPkbDetailActions(w) {
+  // Подсчёт допустимых переходов из FSM:
+  //   queue       → in_progress, cancelled
+  //   in_progress → queue, review, done, cancelled
+  //   review      → in_progress, done, cancelled
+  //   done        → review
+  //   cancelled   → queue
+  const transitions = {
+    queue:       [{ to: 'in_progress', label: 'Взять в работу', icon: 'ti-player-play', cls: 'primary' },
+                  { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
+    in_progress: [{ to: 'review',      label: 'На проверку',    icon: 'ti-checks', cls: 'primary' },
+                  { to: 'queue',       label: 'Вернуть в очередь', icon: 'ti-arrow-back-up' },
+                  { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
+    review:      [{ to: 'done',        label: 'Принять (Готово)', icon: 'ti-circle-check', cls: 'primary' },
+                  { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
+    done:        [{ to: 'review',      label: 'Откатить (ОТК)', icon: 'ti-arrow-back-up' }],
+    cancelled:   [{ to: 'queue',       label: 'Реактивировать', icon: 'ti-refresh' }],
+  };
+  const allowed = transitions[w.status] || [];
+  if (allowed.length === 0) return '';
+  // Без прав на управление — только показ, никаких кнопок
+  if (!hasPermission('production.manage')) return '';
+
+  let html = '<div class="pkb-detail-actions">';
+  allowed.forEach(t => {
+    const cls = (t.cls === 'primary') ? 'pkb-btn primary' : 'pkb-btn';
+    html += '<button class="' + cls + '" onclick="changeProductionWorkStatus(' + w.id + ', \'' + t.to + '\')">' +
+              '<i class="ti ' + t.icon + '"></i>' + escapeHtml(t.label) +
+            '</button>';
+  });
+  // Кнопка удалить — только для не-done или done без assembly_id
+  if (w.status !== 'done' || !w.assembly_id) {
+    html += '<button class="pkb-btn" style="margin-left:auto;color:#8C2A2A;" onclick="deleteProductionWork(' + w.id + ')">' +
+              '<i class="ti ti-trash"></i>Удалить' +
+            '</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+async function changeProductionWorkStatus(workId, newStatus) {
+  try {
+    await apiPatch('/api/production/works/' + workId + '/status', { status: newStatus });
+    showToast('Статус обновлён', 'success');
+    closeProductionWorkDetail();
+    cache.productionKanban = null;
+    loadProductionDashboard();
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+async function deleteProductionWork(workId) {
+  if (!confirm('Удалить работу? Действие необратимо.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/production/works/' + workId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.message || data.error || 'Ошибка', 'error');
+      return;
+    }
+    showToast('Работа удалена', 'success');
+    closeProductionWorkDetail();
+    cache.productionKanban = null;
+    loadProductionDashboard();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// ============ ФОРМА СОЗДАНИЯ РАБОТЫ ============
+
+async function openNewProductionWork() {
+  // Удаляем старую
+  const existing = document.getElementById('pkb-new-modal');
+  if (existing) existing.remove();
+
+  // Параллельно подгружаем модели и сотрудников (если ещё нет в кеше)
+  if (!cache.models) {
+    try { cache.models = await apiGet('/api/models'); } catch (e) {}
+  }
+  let employees = [];
+  try {
+    const d = await apiGet('/api/employees/active');
+    employees = Array.isArray(d) ? d : (d.items || []);
+  } catch (e) {}
+
+  const models = (cache.models && cache.models.models) ? cache.models.models : [];
+
+  // Сортируем модели по имени
+  const modelsSorted = [...models].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'ru'));
+  const employeesSorted = [...employees].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'ru'));
+
+  // Дефолтный дедлайн — через 7 дней
+  const defaultDeadline = new Date();
+  defaultDeadline.setDate(defaultDeadline.getDate() + 7);
+  const ddStr = defaultDeadline.toISOString().slice(0, 10);
+
+  let modelOpts = '<option value="">— выберите модель —</option>';
+  modelsSorted.forEach(m => {
+    const labelExtra = m.extra ? (' ' + m.extra) : '';
+    modelOpts += '<option value="' + m.id + '">' + escapeHtml((m.name || '?') + labelExtra) + '</option>';
+  });
+  let empOpts = '<option value="">— не назначен —</option>';
+  employeesSorted.forEach(e => {
+    empOpts += '<option value="' + e.id + '">' + escapeHtml(e.name || '?') + '</option>';
+  });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pkb-new-modal';
+  overlay.className = 'modal-overlay visible pkb-form-modal';
+  overlay.onclick = function(e) { if (e.target === overlay) closeNewProductionWork(); };
+  overlay.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header">' +
+        '<h3>Новая работа</h3>' +
+        '<button class="icon-btn" onclick="closeNewProductionWork()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div id="pkb-form-error" class="pkb-form-error" style="display:none;"></div>' +
+        '<div class="pkb-field">' +
+          '<label>Модель *</label>' +
+          '<select id="pkb-f-model">' + modelOpts + '</select>' +
+        '</div>' +
+        '<div class="pkb-field-row">' +
+          '<div class="pkb-field">' +
+            '<label>Кол-во *</label>' +
+            '<input type="number" id="pkb-f-qty" min="1" value="1" />' +
+          '</div>' +
+          '<div class="pkb-field">' +
+            '<label>Срок</label>' +
+            '<input type="date" id="pkb-f-deadline" value="' + ddStr + '" />' +
+          '</div>' +
+        '</div>' +
+        '<div class="pkb-field-row">' +
+          '<div class="pkb-field">' +
+            '<label>Исполнитель</label>' +
+            '<select id="pkb-f-assignee">' + empOpts + '</select>' +
+          '</div>' +
+          '<div class="pkb-field">' +
+            '<label>План часов</label>' +
+            '<input type="number" id="pkb-f-hours" min="0" step="0.5" placeholder="—" />' +
+          '</div>' +
+        '</div>' +
+        '<div class="pkb-field">' +
+          '<label>Описание / заметка</label>' +
+          '<textarea id="pkb-f-desc" placeholder="Особенности, IP, нюансы…"></textarea>' +
+        '</div>' +
+        '<div class="pkb-form-actions">' +
+          '<button class="pkb-btn" onclick="closeNewProductionWork()">Отмена</button>' +
+          '<button class="pkb-btn primary" onclick="submitNewProductionWork()"><i class="ti ti-check"></i>Создать</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  // Фокус на модель
+  setTimeout(() => { const el = document.getElementById('pkb-f-model'); if (el) el.focus(); }, 60);
+}
+
+function closeNewProductionWork() {
+  const m = document.getElementById('pkb-new-modal');
+  if (m) m.remove();
+}
+
+async function submitNewProductionWork() {
+  const errEl = document.getElementById('pkb-form-error');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+
+  const modelId = parseInt(document.getElementById('pkb-f-model').value, 10);
+  const qty     = parseInt(document.getElementById('pkb-f-qty').value, 10);
+  const deadline = document.getElementById('pkb-f-deadline').value;
+  const assigneeRaw = document.getElementById('pkb-f-assignee').value;
+  const assigneeId  = assigneeRaw ? parseInt(assigneeRaw, 10) : null;
+  const hoursRaw    = document.getElementById('pkb-f-hours').value;
+  const hours       = hoursRaw ? parseFloat(hoursRaw) : null;
+  const desc        = document.getElementById('pkb-f-desc').value.trim();
+
+  if (!modelId) {
+    errEl.textContent = 'Выберите модель';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!qty || qty < 1) {
+    errEl.textContent = 'Кол-во должно быть ≥ 1';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const body = { model_id: modelId, qty: qty };
+  if (deadline) body.deadline_at = deadline;
+  if (assigneeId) body.assignee_id = assigneeId;
+  if (hours != null && !isNaN(hours)) body.estimated_hours = hours;
+  if (desc) body.description = desc;
+
+  try {
+    const r = await apiPost('/api/production/works', body);
+    if (!r.ok) {
+      errEl.textContent = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+      errEl.style.display = 'block';
+      return;
+    }
+    showToast('Работа создана', 'success');
+    closeNewProductionWork();
+    cache.productionKanban = null;
+    loadProductionDashboard();
+  } catch (e) {
+    errEl.textContent = 'Ошибка: ' + (e.message || e);
+    errEl.style.display = 'block';
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 29.2 (v2.22.0) ============
 
 
 // ============ ЭТАП 39 (v2.19.0): ВИДЖЕТ «НА СБОРКУ» ============
