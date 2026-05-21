@@ -11167,7 +11167,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.21.2-parts-dashboard";
+const APP_VERSION = "v2.21.3-bom-shortage";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23405,6 +23405,21 @@ async function openComponentForm(componentId) {
       escapeHtml(s.name) + '</option>'
     ).join('');
 
+  // ЭТАП 28.3.1: подгружаем supply_items для выпадашки связи
+  if (!cache.supplyCatalog) {
+    try {
+      const dCat = await apiGet('/api/supply-items');
+      cache.supplyCatalog = dCat.items || dCat.supply_items || [];
+    } catch (e) { cache.supplyCatalog = []; }
+  }
+  const supplyItems = (cache.supplyCatalog || []).filter(si => si.is_active !== 0);
+  const siOptions = '<option value="">— Не связано —</option>' +
+    supplyItems.map(si =>
+      '<option value="' + si.id + '"' +
+      (c && c.supply_item_id === si.id ? ' selected' : '') + '>' +
+      escapeHtml(si.name) + ' (' + escapeHtml(si.unit || 'шт.') + ')</option>'
+    ).join('');
+
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
       '<div class="modal-header">' +
@@ -23446,6 +23461,9 @@ async function openComponentForm(componentId) {
         '</div>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
+        // ЭТАП 28.3.1: связь с позицией Снабжения (для прозрачной кнопки «Заказать»)
+        '<label class="form-label">Связь со снабжением <span style="color:var(--text-light);font-weight:400;font-size:11px;">(необязательно — для авто-создания заявок)</span></label>' +
+        '<select id="cf-supply-item" class="form-input" style="margin-bottom:14px;">' + siOptions + '</select>' +
         '<label class="form-label">Комментарий</label>' +
         '<textarea id="cf-comment" class="form-input" rows="2" style="resize:vertical;">' + escapeHtml((c && c.comment) || '') + '</textarea>' +
       '</div>' +
@@ -23535,6 +23553,7 @@ function addComponentToPurchaseCart(componentId) {
 
 async function submitComponentForm(componentId) {
   const supVal = (document.getElementById('cf-supplier') || {}).value || '';
+  const siVal = (document.getElementById('cf-supply-item') || {}).value || '';
   const data = {
     category_id: parseInt(document.getElementById('cf-category').value),
     name: (document.getElementById('cf-name').value || '').trim(),
@@ -23543,6 +23562,7 @@ async function submitComponentForm(componentId) {
     min_stock: parseFloat(document.getElementById('cf-min').value || 0),
     comment: (document.getElementById('cf-comment').value || '').trim(),
     default_supplier_id: supVal ? parseInt(supVal) : null,
+    supply_item_id: siVal ? parseInt(siVal) : null,
   };
   if (!data.name) { showToast('Укажи название', 'error'); return; }
   if (!data.category_id) { showToast('Выбери категорию', 'error'); return; }
@@ -23564,7 +23584,12 @@ async function submitComponentForm(componentId) {
     showToast(componentId ? 'Сохранено' : 'Комплектующее добавлено', 'success');
     closeComponentForm();
     cache.components = null;
-    loadWarehouseComponents();
+    // Перезагрузим текущий активный таб (новый или старый рендер)
+    if (state.activeWarehouseTab === 'components' && typeof loadPartsDashboard === 'function') {
+      loadPartsDashboard();
+    } else if (typeof loadWarehouseComponents === 'function') {
+      loadWarehouseComponents();
+    }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
@@ -24259,32 +24284,112 @@ function _renderPtKpis(k) {
 }
 
 function _renderPtAiHint(d) {
-  // ЭТАП 28.3 — placeholder. Реальная BOM-аналитика будет в 28.4.
-  // Сейчас показываем «спокойную» подсказку только если есть проблемные позиции.
+  // ЭТАП 28.4: реальный BOM-анализ нехватки под план производства
   const host = document.getElementById('pt-ai');
   const body = document.getElementById('pt-ai-body');
   if (!host || !body) return;
-  const k = d.kpis || {};
-  if ((k.attention_count || 0) === 0) {
+
+  const shortage = (d && d.production_shortage) || [];
+  if (shortage.length === 0) {
+    // Нет дефицита — показываем зелёное «всё ок» только если есть активный план
+    // Иначе скрываем полосу
     host.style.display = 'none';
     return;
   }
-  // Топ-3 проблемных по nехватке (min - qty)
-  const items = (d.items || [])
-    .filter(it => it.status === 'critical' || it.status === 'zero')
-    .map(it => ({
-      name: it.name,
-      lack: Math.max(0, (it.min_stock || 0) - (it.qty_on_stock || 0)),
-      have: it.qty_on_stock || 0,
-    }))
-    .sort((a, b) => b.lack - a.lack)
-    .slice(0, 3);
-  if (!items.length) { host.style.display = 'none'; return; }
-  const parts = items.map(it => '<b>' + escapeHtml(it.name) + '</b> (есть ' + it.have +
-                                (it.lack > 0 ? ', не хватает ' + it.lack : '') + ')');
-  body.innerHTML = 'Обратите внимание на низкие остатки: ' + parts.join(', ') + '.';
+
+  // Топ-3 по нехватке для текста (остальные — общим счётом)
+  const top = shortage.slice(0, 3);
+  const rest = shortage.length - top.length;
+
+  const parts = top.map(s =>
+    '<b>' + escapeHtml(s.component_name) + '</b> ' +
+    '(нужно ' + _fmtNum(s.need) + ', есть ' + _fmtNum(s.have) +
+    (s.unit && s.unit !== 'шт.' ? ' ' + escapeHtml(s.unit) : '') + ')'
+  );
+
+  // Сериализуем shortage в data-атрибут, чтобы кнопка могла создать заявки разом
+  const shortagePayload = JSON.stringify(shortage).replace(/"/g, '&quot;');
+
+  body.innerHTML =
+    '<div style="margin-bottom:8px;">Под текущий план производства не хватит: ' +
+      parts.join(', ') +
+      (rest > 0 ? ', и ещё <b>' + rest + '</b> ' + _plural(rest, ['позиция', 'позиции', 'позиций']) : '') +
+      '.' +
+    '</div>' +
+    '<button class="btn btn-secondary btn-small" ' +
+            'onclick="openPtShortageBatchOrder(this)" ' +
+            'data-shortage="' + shortagePayload + '">' +
+      '<i class="ti ti-shopping-cart-plus"></i> Создать заявки на ' + shortage.length + ' ' +
+      _plural(shortage.length, ['позицию', 'позиции', 'позиций']) +
+    '</button>';
   host.style.display = '';
   host.classList.remove('empty');
+}
+
+// Открывает batch-просмотр дефицитов с возможностью создания заявок
+function openPtShortageBatchOrder(btn) {
+  let shortage;
+  try {
+    shortage = JSON.parse((btn.dataset.shortage || '').replace(/&quot;/g, '"'));
+  } catch (e) { shortage = []; }
+  if (!shortage.length) return;
+  _showPtShortageModal(shortage);
+}
+
+function _showPtShortageModal(shortage) {
+  let m = document.getElementById('pt-shortage-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'pt-shortage-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+
+  const rowsHtml = shortage.map(s => {
+    const linked = s.supply_item_id != null;
+    const recommend = Math.max(1, Math.round(s.shortage * 1.2));  // запас 20%
+    return '<div style="display:grid;grid-template-columns:1fr 90px 110px;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);">' +
+      '<div>' +
+        '<div style="font-weight:500;font-size:13px;">' + escapeHtml(s.component_name) +
+          (s.sku ? '<span style="color:#9CA3AF;margin-left:6px;font-size:12px;">' + escapeHtml(s.sku) + '</span>' : '') +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text-light);margin-top:2px;">' +
+          'нужно ' + _fmtNum(s.need) + ' ' + escapeHtml(s.unit || 'шт.') +
+          ' · есть ' + _fmtNum(s.have) +
+          ' · модели: ' + (s.models || []).map(escapeHtml).join(', ') +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:13px;color:#8C2A2A;font-weight:600;text-align:right;">−' + _fmtNum(s.shortage) + ' ' + escapeHtml(s.unit || 'шт.') + '</div>' +
+      '<button class="btn btn-primary btn-small" onclick="openPtOrderFromShortage(' + s.component_id + ',' + recommend + ',' + (linked ? s.supply_item_id : 'null') + ')" style="font-size:12px;">' +
+        '<i class="ti ti-shopping-cart-plus"></i> ' + (linked ? 'Заказать' : 'Связать и заказать') +
+      '</button>' +
+    '</div>';
+  }).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-sparkles" style="color:#534AB7;"></i> Нехватка под план производства</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'pt-shortage-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:10px 14px;background:#EEEDFE;color:#3C3489;font-size:12px;border-bottom:1px solid #CECBF6;">' +
+        '<i class="ti ti-info-circle"></i> Расчёт по активным договорам в производстве и готовности. По каждой позиции можно создать отдельную заявку в Снабжение.' +
+      '</div>' +
+      '<div style="overflow-y:auto;flex:1;">' + rowsHtml + '</div>' +
+      '<div style="padding:12px 14px;border-top:1px solid var(--border);background:var(--bg);display:flex;justify-content:flex-end;gap:8px;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'pt-shortage-modal\').classList.remove(\'visible\')">Закрыть</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function openPtOrderFromShortage(componentId, recommendedQty, supplyItemId) {
+  // Закрываем модалку дефицитов
+  const m = document.getElementById('pt-shortage-modal');
+  if (m) m.classList.remove('visible');
+  // Делегируем общей функции заказа
+  _doPtOrder(componentId, recommendedQty, supplyItemId);
 }
 
 function _renderPtChips(categories, total) {
@@ -24449,18 +24554,93 @@ function openPtItemDetail(id) {
 }
 
 function openPtOrder(componentId, recommendedQty) {
-  // TODO (28.3.1): прямая связь supply_items ↔ components.
-  // Сейчас открываем общий мастер заявки на закупку, пользователь выбирает позицию вручную.
+  // ЭТАП 28.3.1: если у компонента есть связь — заказываем прозрачно
   const item = (state.ptData && state.ptData.items || []).find(i => i.id === componentId);
   if (!item) { showToast('Позиция не найдена', 'error'); return; }
-  showToast('Создаём заявку на «' + item.name + '» (рекоменд. ' + recommendedQty + ' ' + (item.unit || 'шт.') + ')', 'success');
-  setTimeout(() => {
-    if (typeof openNewSupplyRequest === 'function') {
-      openNewSupplyRequest();
-    } else {
-      selectSidebarItem('supply-requests');
+  _doPtOrder(componentId, recommendedQty, item.supply_item_id);
+}
+
+function _doPtOrder(componentId, recommendedQty, supplyItemId) {
+  const item = (state.ptData && state.ptData.items || []).find(i => i.id === componentId);
+  const compName = item ? item.name : ('#' + componentId);
+  const unit = item ? (item.unit || 'шт.') : 'шт.';
+
+  if (supplyItemId) {
+    // Связь есть — открываем форму заявки с предзаполнением
+    if (typeof showSupplyRequestModal === 'function') {
+      Promise.resolve(showSupplyRequestModal(null)).then(() => {
+        // После рендера модалки выставим предзаполненные поля
+        setTimeout(() => {
+          const sel = document.getElementById('sr-item');
+          const qty = document.getElementById('sr-qty');
+          const cmt = document.getElementById('sr-comment');
+          if (sel) sel.value = String(supplyItemId);
+          if (qty) qty.value = String(recommendedQty);
+          if (cmt) cmt.value = 'Автозаявка по дефициту: ' + compName;
+        }, 80);
+      });
+      showToast('Заявка предзаполнена: ' + compName + ' × ' + recommendedQty + ' ' + unit, 'success');
+      return;
     }
-  }, 600);
+    // Fallback — обычный мастер
+    if (typeof openNewSupplyRequest === 'function') openNewSupplyRequest();
+    else selectSidebarItem('supply-requests');
+    return;
+  }
+
+  // Связи нет — предлагаем создать
+  if (!confirm(
+    'У компонента «' + compName + '» нет связанной позиции в каталоге Снабжения.\n\n' +
+    'Создать позицию автоматически и оформить заявку?\n\n' +
+    '(Нажми OK для авто-создания, Отмена — чтобы привязать вручную в карточке комплектующего)'
+  )) {
+    if (typeof openComponentForm === 'function') openComponentForm(componentId);
+    return;
+  }
+
+  // Авто-создание supply_item + привязка
+  _autoLinkAndOrder(componentId, compName, unit, recommendedQty);
+}
+
+async function _autoLinkAndOrder(componentId, compName, unit, recommendedQty) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    // 1. Создаём supply_item
+    const r1 = await fetch(API_BASE + '/api/supply-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name: compName, kind: 'material', unit: unit }),
+    });
+    if (!r1.ok) {
+      const e = await r1.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось создать позицию снабжения', 'error');
+      return;
+    }
+    const supplyItem = await r1.json();
+    const supplyItemId = supplyItem.id || (supplyItem.item && supplyItem.item.id);
+    if (!supplyItemId) {
+      showToast('Не удалось получить id новой позиции', 'error');
+      return;
+    }
+    // 2. Привязываем к компоненту
+    await fetch(API_BASE + '/api/components/' + componentId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ supply_item_id: supplyItemId }),
+    });
+    showToast('Создана связанная позиция «' + compName + '»', 'success');
+    // 3. Обновляем кэш и открываем мастер заявки
+    if (state.ptData && state.ptData.items) {
+      const it = state.ptData.items.find(i => i.id === componentId);
+      if (it) it.supply_item_id = supplyItemId;
+    }
+    if (cache.supplyCatalog) {
+      cache.supplyCatalog.push({ id: supplyItemId, name: compName, unit: unit, kind: 'material', is_active: 1 });
+    }
+    _doPtOrder(componentId, recommendedQty, supplyItemId);
+  } catch (e) {
+    showToast('Ошибка при автосвязывании: ' + String(e), 'error');
+  }
 }
 
 function openPtWriteoff(componentId) {
