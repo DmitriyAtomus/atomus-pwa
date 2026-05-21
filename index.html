@@ -1259,6 +1259,189 @@
     .fp-row-age, .fp-row-badge { display: none; }
   }
 
+  /* ============ ЭТАП 28.3: ДАШБОРД КОМПЛЕКТУЮЩИХ ============ */
+  /* KPI используют те же стили .fp-kpi-row / .fp-kpi и тоны */
+  .pt-ai {
+    margin: 4px 18px 14px;
+    padding: 12px 14px;
+    background: #EEEDFE;
+    border: 1px solid #CECBF6;
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    color: #3C3489;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .pt-ai .ti-sparkles { color: #534AB7; font-size: 18px; flex-shrink: 0; }
+  .pt-ai-body { flex: 1; }
+  .pt-ai-body b { color: #1F1A6B; }
+  .pt-ai .btn { white-space: nowrap; flex-shrink: 0; }
+  .pt-ai.empty { background: var(--bg); border-color: var(--border); color: var(--text-light); }
+  .pt-ai.empty .ti-sparkles { color: var(--text-light); }
+
+  .pt-chips {
+    display: flex;
+    gap: 6px;
+    padding: 4px 18px 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pt-chips::-webkit-scrollbar { display: none; }
+  .pt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-mid);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .12s, color .12s, background .12s;
+    font-family: inherit;
+  }
+  .pt-chip:hover { border-color: var(--brand); color: var(--brand); }
+  .pt-chip.active { background: var(--brand); color: white; border-color: var(--brand); }
+  .pt-chip-qty { font-weight: 600; }
+
+  .pt-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 0 18px 12px;
+    flex-wrap: wrap;
+  }
+  .pt-toolbar .search-box { flex: 1; min-width: 220px; }
+  .pt-attn-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(226,75,74,0.10);
+    border: 1px solid rgba(226,75,74,0.25);
+    color: #8C2A2A;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s, border-color .12s;
+    font-family: inherit;
+  }
+  .pt-attn-btn:hover { background: rgba(226,75,74,0.18); }
+  .pt-attn-btn.active { background: #E24B4A; color: white; border-color: #E24B4A; }
+  .pt-attn-btn.active .ti { color: white; }
+  .pt-attn-btn .ti { color: #8C2A2A; font-size: 14px; }
+  .pt-attn-btn.zero { display: none; }
+
+  .pt-list {
+    padding: 0 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pt-row {
+    display: grid;
+    grid-template-columns: 12px 1fr 110px 100px 100px 90px;
+    gap: 12px;
+    align-items: center;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    transition: border-color .12s;
+  }
+  .pt-row:hover { border-color: var(--brand); }
+  .pt-row.s-critical { background: rgba(226,75,74,0.04); }
+  .pt-row.s-zero     { background: rgba(226,75,74,0.08); }
+  .pt-row.s-excess   { background: rgba(83,74,183,0.04); }
+  .pt-row-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    align-self: center;
+    justify-self: center;
+  }
+  .pt-row-dot.normal   { background: #1D9E75; }
+  .pt-row-dot.critical { background: #E24B4A; }
+  .pt-row-dot.zero     { background: #E24B4A; box-shadow: 0 0 0 3px rgba(226,75,74,0.18); }
+  .pt-row-dot.excess   { background: #534AB7; }
+  .pt-row-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .pt-row-sku {
+    font-size: 12px;
+    color: #9CA3AF;
+    margin-left: 6px;
+    font-weight: 400;
+  }
+  .pt-row-sub {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 3px;
+  }
+  .pt-row-stock {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .pt-row-stock-sub {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-light);
+  }
+  .pt-row-stock.critical, .pt-row-stock.zero { color: #8C2A2A; }
+  .pt-row-stock.excess { color: #3C3489; }
+  .pt-row-consume {
+    font-size: 12px;
+    text-align: right;
+    color: var(--text-mid);
+    white-space: nowrap;
+  }
+  .pt-row-badge {
+    display: inline-flex;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    justify-self: end;
+    white-space: nowrap;
+  }
+  .pt-row-badge.normal   { background: rgba(29,158,117,0.15);  color: #0A5B41; }
+  .pt-row-badge.critical { background: rgba(226,75,74,0.15);   color: #8C2A2A; }
+  .pt-row-badge.zero     { background: rgba(226,75,74,0.20);   color: #8C2A2A; }
+  .pt-row-badge.excess   { background: rgba(83,74,183,0.15);   color: #3C3489; }
+  .pt-row-action button {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: opacity .12s;
+  }
+  .pt-row-action button:hover { opacity: 0.85; }
+  .pt-row-action .btn-order  { background: #2563EB; color: white; }
+  .pt-row-action .btn-open   { background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); }
+  .pt-row-action .btn-writeoff { background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); }
+  @media (max-width: 900px) {
+    .pt-row { grid-template-columns: 12px 1fr auto auto; }
+    .pt-row-consume, .pt-row-badge { display: none; }
+  }
+
   /* FIX v1.8.1-fix2: общий стиль для поиска в списках (Договоры, Контрагенты,
      Продажная номенклатура, КП и т.д.). До этого CSS отсутствовал → инпут
      не имел ширины 100% и текст placeholder обрезался. */
@@ -10093,27 +10276,50 @@
             </div>
           </div>
 
-          <!-- ТАБ: Комплектующие -->
+          <!-- ТАБ: Комплектующие (Этап 28.3 — новый дашборд) -->
           <div class="wh-tab-pane" data-wh-pane="components">
             <div class="content-inner" style="max-width: 100%;">
-              <!-- Фильтр категорий -->
-              <div class="filter-row" id="comp-cat-filters" style="padding: 6px 18px 14px;">
-                <button class="filter-chip active" data-comp-cat="">Все</button>
+              <!-- KPI ряд (используются те же стили fp-kpi-*) -->
+              <div class="fp-kpi-row" id="pt-kpis">
+                <!-- генерируется в renderPartsDashboard -->
               </div>
-              <!-- Поиск -->
-              <div style="padding: 0 18px 14px;">
-                <div class="search-box">
+
+              <!-- AI-подсказка (на 28.3 — заглушка-приглашение, реальный расчёт в 28.4) -->
+              <div class="pt-ai empty" id="pt-ai" style="display:none;">
+                <i class="ti ti-sparkles"></i>
+                <div class="pt-ai-body" id="pt-ai-body">—</div>
+              </div>
+
+              <!-- Чипы категорий -->
+              <div class="pt-chips" id="pt-chips">
+                <!-- генерируется -->
+              </div>
+
+              <!-- Тулбар -->
+              <div class="pt-toolbar">
+                <div class="search-box" style="flex:1;">
                   <i class="ti ti-search"></i>
-                  <input type="text" id="comp-search" placeholder="Поиск по названию или артикулу…" oninput="filterComponentsList()">
+                  <input type="text" id="pt-search"
+                         placeholder="Название, артикул или производитель…"
+                         oninput="onPtSearchInput()">
                 </div>
+                <button class="pt-attn-btn" id="pt-attn-btn" onclick="togglePtAttention()">
+                  <i class="ti ti-alert-triangle"></i>
+                  <span>Требуют внимания</span>
+                  <span class="pt-chip-qty" id="pt-attn-count">0</span>
+                </button>
               </div>
-              <div id="comp-list-container">
+
+              <!-- Список позиций -->
+              <div class="pt-list" id="pt-list">
                 <div class="loading-block">Загружаем…</div>
               </div>
-              <!-- Скрытый счётчик: для совместимости со старым кодом, который пишет в #comp-counter -->
+
+              <!-- Скрытые элементы для совместимости со старым кодом (loadWarehouseComponents) -->
+              <div id="comp-cat-filters" style="display:none;"></div>
+              <input type="hidden" id="comp-search" />
+              <div id="comp-list-container" style="display:none;"></div>
               <span id="comp-counter" style="display:none;">0</span>
-              <!-- Скрытая кнопка: используется в openComponentForm для проверки прав. Дублируется
-                   в шапке через wh-dash-actions, но id зашит в существующем коде. -->
               <button id="comp-new-btn" style="display:none;" onclick="openComponentForm()"></button>
             </div>
           </div>
@@ -10961,7 +11167,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.21.1-fp-dashboard";
+const APP_VERSION = "v2.21.2-parts-dashboard";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23675,7 +23881,7 @@ function switchWarehouseTab(tab) {
 
   // Лениво грузим контент таба
   if (tab === 'stock')       loadFinishedProductsDashboard();
-  if (tab === 'components')  loadWarehouseComponents();
+  if (tab === 'components')  loadPartsDashboard();
   if (tab === 'movements')   loadWarehouseMovements();
 }
 
@@ -23974,6 +24180,299 @@ function _plural(n, forms) {
   if (n10 > 1 && n10 < 5) return forms[1];
   if (n10 === 1)         return forms[0];
   return forms[2];
+}
+
+
+// ============ ЭТАП 28.3: ДАШБОРД КОМПЛЕКТУЮЩИХ ============
+
+state.ptData = null;
+state.ptCategoryFilter = null;   // category_id или null
+state.ptAttentionOnly = false;
+state.ptSearch = '';
+
+async function loadPartsDashboard() {
+  const container = document.getElementById('pt-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/warehouse/dashboard/parts');
+    state.ptData = d;
+    renderPartsDashboard();
+    if (typeof _updateWarehouseTabBadges === 'function') {
+      _updateWarehouseTabBadges({ components: (d.kpis && d.kpis.total) || 0 });
+    }
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderPartsDashboard() {
+  const d = state.ptData || { kpis: {}, categories: [], items: [] };
+  _renderPtKpis(d.kpis);
+  _renderPtAiHint(d);
+  _renderPtChips(d.categories, d.kpis.total || 0);
+  _renderPtAttentionBtn(d.kpis.attention_count || 0);
+  _renderPtList();
+}
+
+function _renderPtKpis(k) {
+  const host = document.getElementById('pt-kpis');
+  if (!host) return;
+  const kpis = [
+    {
+      label: 'Всего позиций',
+      value: k.total || 0,
+      hint: (k.categories_count || 0) + ' ' + _plural(k.categories_count || 0, ['категория', 'категории', 'категорий']),
+      tone: '',
+    },
+    {
+      label: 'Ниже минимума',
+      value: k.below_min || 0,
+      hint: (k.below_min || 0) > 0 ? 'требуется закупка' : 'всё в норме',
+      tone: 'tone-red',
+      clickable: (k.below_min || 0) > 0,
+      onclick: 'setPtCategoryFilter(null); togglePtAttention(true)',
+    },
+    {
+      label: 'Нет в наличии',
+      value: k.zero || 0,
+      hint: (k.zero || 0) > 0 ? 'остаток 0' : 'не пусто нигде',
+      tone: 'tone-yellow',
+    },
+    {
+      label: 'Ожидается приход',
+      value: Math.round(k.incoming || 0),
+      hint: (k.incoming_orders || 0) + ' ' + _plural(k.incoming_orders || 0, ['заказ', 'заказа', 'заказов']) + ' поставщикам',
+      tone: 'tone-blue',
+      clickable: (k.incoming_orders || 0) > 0,
+      onclick: "selectSidebarItem('supply-orders')",
+    },
+  ];
+  host.innerHTML = kpis.map(x =>
+    '<div class="fp-kpi ' + x.tone + (x.clickable ? ' clickable' : '') + '"' +
+      (x.onclick ? ' onclick="' + x.onclick + '"' : '') + '>' +
+      '<div class="fp-kpi-label">' + escapeHtml(x.label) + '</div>' +
+      '<div class="fp-kpi-value">' + x.value + '</div>' +
+      '<div class="fp-kpi-hint">' + escapeHtml(x.hint) + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function _renderPtAiHint(d) {
+  // ЭТАП 28.3 — placeholder. Реальная BOM-аналитика будет в 28.4.
+  // Сейчас показываем «спокойную» подсказку только если есть проблемные позиции.
+  const host = document.getElementById('pt-ai');
+  const body = document.getElementById('pt-ai-body');
+  if (!host || !body) return;
+  const k = d.kpis || {};
+  if ((k.attention_count || 0) === 0) {
+    host.style.display = 'none';
+    return;
+  }
+  // Топ-3 проблемных по nехватке (min - qty)
+  const items = (d.items || [])
+    .filter(it => it.status === 'critical' || it.status === 'zero')
+    .map(it => ({
+      name: it.name,
+      lack: Math.max(0, (it.min_stock || 0) - (it.qty_on_stock || 0)),
+      have: it.qty_on_stock || 0,
+    }))
+    .sort((a, b) => b.lack - a.lack)
+    .slice(0, 3);
+  if (!items.length) { host.style.display = 'none'; return; }
+  const parts = items.map(it => '<b>' + escapeHtml(it.name) + '</b> (есть ' + it.have +
+                                (it.lack > 0 ? ', не хватает ' + it.lack : '') + ')');
+  body.innerHTML = 'Обратите внимание на низкие остатки: ' + parts.join(', ') + '.';
+  host.style.display = '';
+  host.classList.remove('empty');
+}
+
+function _renderPtChips(categories, total) {
+  const host = document.getElementById('pt-chips');
+  if (!host) return;
+  let html = '<button class="pt-chip ' + (state.ptCategoryFilter == null ? 'active' : '') +
+    '" onclick="setPtCategoryFilter(null)">' +
+    'Все <span class="pt-chip-qty">' + total + '</span></button>';
+  (categories || []).forEach(c => {
+    const active = state.ptCategoryFilter === c.id;
+    html += '<button class="pt-chip ' + (active ? 'active' : '') +
+      '" onclick="setPtCategoryFilter(' + c.id + ')">' +
+      escapeHtml(c.name) + ' <span class="pt-chip-qty">' + c.count + '</span>' +
+      '</button>';
+  });
+  host.innerHTML = html;
+}
+
+function _renderPtAttentionBtn(n) {
+  const btn = document.getElementById('pt-attn-btn');
+  const cnt = document.getElementById('pt-attn-count');
+  if (!btn || !cnt) return;
+  cnt.textContent = n;
+  btn.classList.toggle('zero', n === 0);  // спрятать если 0
+  btn.classList.toggle('active', state.ptAttentionOnly && n > 0);
+}
+
+function _renderPtList() {
+  const host = document.getElementById('pt-list');
+  if (!host || !state.ptData) return;
+  let items = (state.ptData.items || []).slice();
+
+  if (state.ptAttentionOnly) {
+    items = items.filter(it => it.status === 'critical' || it.status === 'zero');
+  }
+  if (state.ptCategoryFilter != null) {
+    items = items.filter(it => it.category_id === state.ptCategoryFilter);
+  }
+  const q = (state.ptSearch || '').toLowerCase().trim();
+  if (q) {
+    items = items.filter(it =>
+      (it.name || '').toLowerCase().includes(q) ||
+      (it.sku || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (items.length === 0) {
+    host.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>' +
+      (state.ptCategoryFilter != null || q || state.ptAttentionOnly
+        ? 'По заданным фильтрам ничего не найдено'
+        : 'Каталог комплектующих пуст') +
+      '</div>';
+    return;
+  }
+
+  host.innerHTML = items.map(it => _renderPtRow(it)).join('');
+}
+
+function _renderPtRow(it) {
+  const st = it.status;  // zero | critical | excess | normal
+  const unit = it.unit || 'шт.';
+
+  // Stock колонка
+  let stockHtml;
+  if (it.min_stock > 0) {
+    stockHtml = '<div class="pt-row-stock ' + st + '">' +
+      _fmtNum(it.qty_on_stock) +
+      ' <span class="pt-row-stock-sub">/ ' + _fmtNum(it.min_stock) + ' ' + escapeHtml(unit) + '</span>' +
+      '</div>';
+  } else {
+    stockHtml = '<div class="pt-row-stock ' + st + '">' +
+      _fmtNum(it.qty_on_stock) + ' <span class="pt-row-stock-sub">' + escapeHtml(unit) + '</span>' +
+      '</div>';
+  }
+
+  // Consumption
+  const consumeHtml = '<div class="pt-row-consume">' +
+    (it.consumption_30d > 0 ? '~' + _fmtNum(it.consumption_30d) + ' / мес' : '—') +
+    '</div>';
+
+  // Badge
+  const labels = { zero: 'нет в наличии', critical: 'критично', excess: 'избыток', normal: 'в норме' };
+  const badgeHtml = '<span class="pt-row-badge ' + st + '">' + labels[st] + '</span>';
+
+  // Action
+  let actionHtml;
+  if (st === 'zero' || st === 'critical') {
+    // Рекомендованное к заказу: до min*2 - текущий
+    const recommend = Math.max(1, Math.round((it.min_stock || 1) * 2 - (it.qty_on_stock || 0)));
+    actionHtml = '<div class="pt-row-action">' +
+      '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
+      '<i class="ti ti-shopping-cart-plus"></i> Заказать' +
+      '</button></div>';
+  } else if (st === 'excess') {
+    actionHtml = '<div class="pt-row-action">' +
+      '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
+      '<i class="ti ti-minus"></i> Расход' +
+      '</button></div>';
+  } else {
+    actionHtml = '<div class="pt-row-action">' +
+      '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
+      '<i class="ti ti-minus"></i> Расход' +
+      '</button></div>';
+  }
+
+  return '<div class="pt-row s-' + st + '" onclick="openPtItemDetail(' + it.id + ')">' +
+    '<span class="pt-row-dot ' + st + '"></span>' +
+    '<div>' +
+      '<div class="pt-row-name">' + escapeHtml(it.name) +
+        (it.sku ? '<span class="pt-row-sku">' + escapeHtml(it.sku) + '</span>' : '') +
+      '</div>' +
+      '<div class="pt-row-sub">' + escapeHtml(it.category_name || '—') + '</div>' +
+    '</div>' +
+    stockHtml +
+    consumeHtml +
+    badgeHtml +
+    actionHtml +
+    '</div>';
+}
+
+function _fmtNum(n) {
+  // Целое — без дробной, иначе одна цифра после точки
+  if (Math.abs(n - Math.round(n)) < 0.001) return String(Math.round(n));
+  return n.toFixed(1).replace(/\.0$/, '');
+}
+
+// ---- Обработчики ----
+
+function setPtCategoryFilter(catId) {
+  state.ptCategoryFilter = catId;
+  if (state.ptData) {
+    _renderPtChips(state.ptData.categories, state.ptData.kpis.total || 0);
+  }
+  _renderPtList();
+}
+
+function togglePtAttention(forceOn) {
+  if (forceOn === true) {
+    state.ptAttentionOnly = true;
+  } else {
+    state.ptAttentionOnly = !state.ptAttentionOnly;
+  }
+  if (state.ptData) {
+    _renderPtAttentionBtn(state.ptData.kpis.attention_count || 0);
+  }
+  _renderPtList();
+}
+
+let _ptSearchTimer = null;
+function onPtSearchInput() {
+  const v = (document.getElementById('pt-search') || {}).value || '';
+  state.ptSearch = v;
+  clearTimeout(_ptSearchTimer);
+  _ptSearchTimer = setTimeout(_renderPtList, 120);
+}
+
+function openPtItemDetail(id) {
+  // Открыть существующую модалку редактирования компонента, если есть
+  if (typeof openComponentForm === 'function') {
+    openComponentForm(id);
+  }
+}
+
+function openPtOrder(componentId, recommendedQty) {
+  // TODO (28.3.1): прямая связь supply_items ↔ components.
+  // Сейчас открываем общий мастер заявки на закупку, пользователь выбирает позицию вручную.
+  const item = (state.ptData && state.ptData.items || []).find(i => i.id === componentId);
+  if (!item) { showToast('Позиция не найдена', 'error'); return; }
+  showToast('Создаём заявку на «' + item.name + '» (рекоменд. ' + recommendedQty + ' ' + (item.unit || 'шт.') + ')', 'success');
+  setTimeout(() => {
+    if (typeof openNewSupplyRequest === 'function') {
+      openNewSupplyRequest();
+    } else {
+      selectSidebarItem('supply-requests');
+    }
+  }, 600);
+}
+
+function openPtWriteoff(componentId) {
+  // Используем существующую модалку списания, если есть
+  if (typeof openComponentWriteoffModal === 'function') {
+    openComponentWriteoffModal(componentId);
+    return;
+  }
+  // Fallback: открыть карточку компонента
+  if (typeof openComponentForm === 'function') {
+    openComponentForm(componentId);
+  }
 }
 
 
