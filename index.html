@@ -8133,6 +8133,57 @@
   .notif25-badge.pulse { animation: urgPulse 1.2s ease-in-out 2; }
 
   /* ============ КОНЕЦ ЭТАПА 39 (v2.19.0) ============ */
+
+  /* ============ ЭТАП 40 (v2.20.0): БЕЙДЖИ НАЛИЧИЯ В НОМЕНКЛАТУРЕ + BOM ============ */
+  .model-badges-row {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    margin-top: 5px;
+  }
+  .model-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .model-badge .ti { font-size: 12px; }
+  .model-badge.mb-stock    { background: #E8F5E9; color: #14532D; border-color: #BBF7D0; }
+  .model-badge.mb-reserved { background: #EFF6FF; color: #1E3A8A; border-color: #BFDBFE; }
+  .model-badge.mb-shortage { background: #FEE2E2; color: #7F1D1D; border-color: #FECACA; }
+  .model-badge.mb-ready    { background: #FEF9C3; color: #713F12; border-color: #FDE68A; }
+
+  /* Бейдж в BOM-строке (показывает qty_on_stock + дефицит) */
+  .bom-stock-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 6px;
+    margin-left: 8px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .bom-stock-badge.bsb-ok       { background: #E8F5E9; color: #14532D; }
+  .bom-stock-badge.bsb-shortage { background: #FEE2E2; color: #7F1D1D; }
+  .bom-stock-badge.bsb-empty    { background: #FEF3C7; color: #78350F; }
+
+  /* ============ КОНЕЦ ЭТАПА 40 (v2.20.0) ============ */
+
+  /* v2.20.0: бейджи источника в выпадающем поиске спецификации */
+  .ss-source {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 10px; padding: 1px 7px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+  }
+  .ss-source .ti { font-size: 11px; }
+  .ss-source.ss-model     { background: #FEF9C3; color: #713F12; }
+  .ss-source.ss-component { background: #F0EAFA; color: #6A4B9C; }
+  .ss-source.ss-sale      { background: #EAF3FA; color: #2D5F8B; }
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -10451,7 +10502,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.19.1-purchase-tracking";
+const APP_VERSION = "v2.20.0-stock-search-shipping";
 const APP_VERSION_DATE = "20.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17967,7 +18018,7 @@ async function loadModels() {
 
   if (cache.models) { renderModels(cache.models); return; }
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
-  try { const d = await apiGet('/api/models'); cache.models = d; renderModels(d); }
+  try { const d = await apiGet('/api/models?with_stock=true'); cache.models = d; renderModels(d); }
   catch (e) { container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>'; }
 }
 
@@ -18078,9 +18129,26 @@ function _renderModelRow(m) {
   else if (m.exec_mode === 'fixed' && m.exec_fixed) meta.push('испол.: ' + m.exec_fixed);
   if (m.needs_ip) meta.push('IP');
   const inactiveCls = m.is_active ? '' : ' emp-inactive';
+  // v2.20.0: бейджи наличия и BOM-дефицита (когда with_stock=true)
+  let stockBadges = '';
+  if (typeof m.assemblies_ready === 'number') {
+    if (m.assemblies_ready > 0) {
+      stockBadges += '<span class="model-badge mb-stock" title="Готовых сборок на складе"><i class="ti ti-package"></i>В наличии: ' + m.assemblies_ready + '</span>';
+    }
+    if (m.assemblies_reserved > 0) {
+      stockBadges += '<span class="model-badge mb-reserved" title="Зарезервировано под договоры"><i class="ti ti-lock"></i>Резерв: ' + m.assemblies_reserved + '</span>';
+    }
+    if (m.bom_shortage > 0) {
+      stockBadges += '<span class="model-badge mb-shortage" title="Комплектующих в дефиците для сборки"><i class="ti ti-shopping-cart"></i>К закупке: ' + m.bom_shortage + '</span>';
+    } else if (m.bom_total > 0 && m.assemblies_ready === 0) {
+      stockBadges += '<span class="model-badge mb-ready" title="Все комплектующие в наличии — можно собирать"><i class="ti ti-tool"></i>К сборке</span>';
+    }
+  }
   return '<div class="employee-row' + inactiveCls + '" style="cursor:pointer;" onclick="openModelDetail(' + m.id + ')">' +
     '<div class="emp-info"><div class="emp-name">' + escapeHtml(title) + '</div>' +
-    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div></div>' +
+    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') +
+      (stockBadges ? '<div class="model-badges-row">' + stockBadges + '</div>' : '') +
+    '</div></div>' +
     '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
     '</div>';
 }
@@ -18159,11 +18227,24 @@ async function loadModelBom(modelId) {
       const need = parseFloat(it.qty_required || 0);
       const lowFlag = have < need;
       const commentEsc = String(it.comment || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      // v2.20.0: явный бейдж дефицита
+      let stockBadge = '';
+      if (need > 0) {
+        if (have >= need) {
+          stockBadge = ' <span class="bom-stock-badge bsb-ok" title="Достаточно для сборки"><i class="ti ti-circle-check"></i>В наличии</span>';
+        } else if (have > 0) {
+          const shortBy = _fmtQty(need - have);
+          stockBadge = ' <span class="bom-stock-badge bsb-empty" title="Хватит только на часть"><i class="ti ti-alert-triangle"></i>Не хватает: ' + shortBy + '</span>';
+        } else {
+          stockBadge = ' <span class="bom-stock-badge bsb-shortage" title="На складе нет"><i class="ti ti-shopping-cart"></i>К закупке</span>';
+        }
+      }
       html += '<div class="bom-row">' +
         '<div class="bom-row-main">' +
           '<div class="bom-name">' + escapeHtml(it.component_name || '—') +
             (it.component_sku ? ' <span class="comp-sku">' + escapeHtml(it.component_sku) + '</span>' : '') +
             (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
+            stockBadge +
           '</div>' +
           '<div class="bom-meta">' +
             (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '') +
@@ -20305,14 +20386,14 @@ function renderSpecForm(contractId, existing) {
   let html = '<div class="spec-form" id="' + formId + '">';
   // Поле поиска модели
   html += '<div class="spec-form-field" style="grid-column: 1 / -1;">';
-  html += '<label>Позиция (поиск по номенклатуре) *</label>';
+  html += '<label>Позиция (поиск по всей номенклатуре)<span style="color:var(--text-light); font-size:11px; font-weight:400; margin-left:6px;">модели · комплектующие · продажа</span> *</label>';
   html += '<input type="hidden" id="spec-form-model-id" value="' + (e.model_id || '') + '">';
   html += '<input type="hidden" id="spec-form-component-id" value="' + (e.component_id || '') + '">';
   html += '<input type="hidden" id="spec-form-sale-product-id" value="' + (e.sale_product_id || '') + '">';
   html += '<input type="hidden" id="spec-form-name" value="' + escapeHtml(e.name || '') + '">';
   html += '<div class="spec-search-wrap">';
   html += '<input type="text" id="spec-form-search" value="' + escapeHtml(modelLabel) +
-          '" placeholder="Начните вводить название или артикул…" autocomplete="off" ' +
+          '" placeholder="Артикул, название или НС-код…" autocomplete="off" ' +
           'oninput="onSpecSearchInput(this.value)" onfocus="onSpecSearchInput(this.value)">';
   html += '<button class="spec-browse-btn" onclick="openNomPicker(' + contractId + ',' + (isEdit ? existing.id : 'null') + ')" title="Обзор номенклатуры" type="button"><i class="ti ti-layout-grid"></i></button>';
   html += '<div id="spec-search-results" class="spec-search-results" style="display:none;"></div>';
@@ -20443,8 +20524,12 @@ async function onSpecSearchInput(query) {
   // Если очистили поле — сбрасываем выбор
   if (!q) {
     const mid = document.getElementById('spec-form-model-id');
+    const cid = document.getElementById('spec-form-component-id');
+    const sid = document.getElementById('spec-form-sale-product-id');
     const nm = document.getElementById('spec-form-name');
     if (mid) mid.value = '';
+    if (cid) cid.value = '';
+    if (sid) sid.value = '';
     if (nm) nm.value = '';
     results.style.display = 'none';
     return;
@@ -20453,14 +20538,15 @@ async function onSpecSearchInput(query) {
   // Дебаунс 250мс
   clearTimeout(state._specSearchTimer);
   state._specSearchTimer = setTimeout(async () => {
-    let models;
+    let items;
     if (state._specSearchCache[q]) {
-      models = state._specSearchCache[q];
+      items = state._specSearchCache[q];
     } else {
       try {
-        const d = await apiGet('/api/models?search=' + encodeURIComponent(q));
-        models = (d && d.models) || [];
-        state._specSearchCache[q] = models;
+        // v2.20.0: унифицированный поиск (модели + комплектующие + продажная)
+        const d = await apiGet('/api/nomenclature/search?q=' + encodeURIComponent(q) + '&limit=20');
+        items = (d && d.items) || [];
+        state._specSearchCache[q] = items;
       } catch (e) {
         results.innerHTML = '<div class="spec-search-empty">Ошибка загрузки</div>';
         results.style.display = 'block';
@@ -20468,31 +20554,106 @@ async function onSpecSearchInput(query) {
       }
     }
 
-    if (!models.length) {
-      results.innerHTML = '<div class="spec-search-empty">Ничего не найдено. Добавьте модель в Производство → Номенклатура.</div>';
+    if (!items.length) {
+      results.innerHTML = '<div class="spec-search-empty">Ничего не найдено. Можно ввести название вручную и нажать «Добавить» — сохранится как свободный ввод.</div>';
       results.style.display = 'block';
       return;
     }
 
+    // v2.20.0: рендерим с бейджем источника (модель / компл. / продажа)
     let html = '';
-    models.slice(0, 12).forEach(m => {
-      const parts = [];
-      if (m.article) parts.push('<b>' + escapeHtml(m.article) + '</b>');
-      if (m.name) parts.push(escapeHtml(m.name));
-      const title = parts.join(' · ');
-      const meta = [];
-      if (m.direction_name) meta.push(escapeHtml(m.direction_name));
-      if (m.category_name) meta.push(escapeHtml(m.category_name));
-      const label = (m.article ? m.article + ' · ' : '') + (m.name || '');
-      html += '<div class="spec-search-item" onclick="selectSpecModel(' + m.id + ',' +
-              JSON.stringify(label).replace(/"/g, '&quot;') + ')">' +
-        '<div class="spec-search-item-title">' + title + '</div>' +
-        (meta.length ? '<div class="spec-search-item-meta">' + meta.join(' · ') + '</div>' : '') +
+    items.slice(0, 24).forEach(it => {
+      const sourceBadge = _specSearchSourceBadge(it.source);
+      const labelHtml = '<b>' + escapeHtml(it.label || '—') + '</b>';
+      const sublabel = it.sublabel ? '<div class="spec-search-item-meta">' + escapeHtml(it.sublabel) + '</div>' : '';
+      const itemPayload = JSON.stringify({
+        source: it.source,
+        model_id: it.model_id || null,
+        component_id: it.component_id || null,
+        sale_product_id: it.sale_product_id || null,
+        label: it.label || '',
+        exec_mode: it.exec_mode || null,
+        exec_fixed: it.exec_fixed || null,
+        exec_label_st: it.exec_label_st || null,
+        exec_label_ne: it.exec_label_ne || null,
+        needs_ip: !!it.needs_ip,
+        direction_name: it.direction_name || '',
+        category_name: it.category_name || '',
+        unit: it.unit || 'шт.',
+      }).replace(/"/g, '&quot;');
+      html += '<div class="spec-search-item" onclick="selectUnifiedSpec(&quot;' + itemPayload.replace(/&quot;/g, '\\&quot;') + '&quot;)">' +
+        '<div class="spec-search-item-title">' + labelHtml + sourceBadge + '</div>' +
+        sublabel +
       '</div>';
     });
     results.innerHTML = html;
     results.style.display = 'block';
   }, 250);
+}
+
+// v2.20.0: бейдж источника в выпадающем списке поиска
+function _specSearchSourceBadge(source) {
+  if (source === 'model')        return ' <span class="ss-source ss-model"><i class="ti ti-tool"></i>модель</span>';
+  if (source === 'component')    return ' <span class="ss-source ss-component"><i class="ti ti-package"></i>компл.</span>';
+  if (source === 'sale_product') return ' <span class="ss-source ss-sale"><i class="ti ti-shopping-cart"></i>продажа</span>';
+  return '';
+}
+
+// v2.20.0: универсальный обработчик выбора из унифицированного поиска
+function selectUnifiedSpec(payloadStr) {
+  let p;
+  try {
+    // Декодируем дважды экранированный JSON
+    const json = String(payloadStr).replace(/\\&quot;/g, '"').replace(/&quot;/g, '"');
+    p = JSON.parse(json);
+  } catch (e) {
+    showToast('Ошибка выбора позиции', 'error');
+    return;
+  }
+  const mid = document.getElementById('spec-form-model-id');
+  const cid = document.getElementById('spec-form-component-id');
+  const sid = document.getElementById('spec-form-sale-product-id');
+  const nm = document.getElementById('spec-form-name');
+  const input = document.getElementById('spec-form-search');
+  const unitInput = document.getElementById('spec-form-unit');
+  const results = document.getElementById('spec-search-results');
+
+  // Сбрасываем все три id
+  if (mid) mid.value = '';
+  if (cid) cid.value = '';
+  if (sid) sid.value = '';
+
+  // Устанавливаем нужный id и контекст
+  if (p.source === 'model' && p.model_id) {
+    if (mid) mid.value = String(p.model_id);
+    state._specFormCtx = {
+      kind: 'model',
+      directionName: p.direction_name || '',
+      categoryName: p.category_name || '',
+    };
+  } else if (p.source === 'component' && p.component_id) {
+    if (cid) cid.value = String(p.component_id);
+    state._specFormCtx = { kind: 'component', directionName: '', categoryName: p.category_name || '' };
+  } else if (p.source === 'sale_product' && p.sale_product_id) {
+    if (sid) sid.value = String(p.sale_product_id);
+    state._specFormCtx = { kind: 'sale', directionName: '', categoryName: p.category_name || '' };
+  }
+  if (nm) nm.value = p.label || '';
+  if (input) input.value = p.label || '';
+  if (unitInput && p.unit && !unitInput.value) unitInput.value = p.unit;
+
+  if (results) results.style.display = 'none';
+
+  // Перерисуем условные поля (Исполнение/IP) под новый контекст
+  const cond = document.getElementById('spec-form-conditional');
+  if (cond && typeof _renderSpecConditionalFieldsHTML === 'function') {
+    cond.innerHTML = _renderSpecConditionalFieldsHTML({
+      execution_type: null, ip_rating: null,
+      exec_mode: p.exec_mode, exec_fixed: p.exec_fixed,
+      exec_label_st: p.exec_label_st, exec_label_ne: p.exec_label_ne,
+      needs_ip: p.needs_ip,
+    });
+  }
 }
 
 function selectSpecModel(modelId, label) {
