@@ -11692,7 +11692,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.22.1-restore-new-assembly";
+const APP_VERSION = "v2.22.2-sync-from-contracts-ui";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12959,6 +12959,11 @@ function renderProductionDashboard(d) {
   html +=   '<div class="pkb-section-actions">';
   html +=     '<button class="pkb-btn" disabled title="Скоро"><i class="ti ti-calendar-week"></i>План недели</button>';
   html +=     '<button class="pkb-btn" onclick="selectSidebarItem(\'summary\')"><i class="ti ti-chart-bar"></i>Аналитика</button>';
+  // v2.22.2: кнопка синхронизации production_works из договоров — только для директора
+  const isDirector = state.user && (state.user.roles || []).indexOf('director') >= 0;
+  if (isDirector) {
+    html += '<button class="pkb-btn" onclick="syncProductionWorksFromContracts()" title="Создать работы для непокрытых позиций опубликованных договоров (безопасно — дубли не плодит)"><i class="ti ti-cloud-download"></i>Синхронизировать</button>';
+  }
   if (hasPermission('production.create')) {
     html +=   '<button class="pkb-btn primary" onclick="openNewAssembly()"><i class="ti ti-plus"></i>Новая работа</button>';
   }
@@ -13520,6 +13525,44 @@ async function submitNewProductionWork() {
   } catch (e) {
     errEl.textContent = 'Ошибка: ' + (e.message || e);
     errEl.style.display = 'block';
+  }
+}
+
+// ============ v2.22.2: СИНХРОНИЗАЦИЯ ИЗ ДОГОВОРОВ ============
+
+async function syncProductionWorksFromContracts() {
+  const ok = confirm(
+    'Создать работы в очереди для непокрытых позиций ВСЕХ опубликованных договоров?\n\n' +
+    'Это безопасно: уже существующие работы не дублируются. ' +
+    'Можно повторно нажимать после добавления новых позиций в договоры.'
+  );
+  if (!ok) return;
+
+  showToast('Синхронизирую с договорами…', 'info');
+  try {
+    const r = await apiPost('/api/admin/sync-production-works', {});
+    if (!r.ok) {
+      const msg = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+      showToast('Ошибка: ' + msg, 'error');
+      return;
+    }
+    const d = r.data || {};
+    const created   = d.total_created || 0;
+    const totalQty  = d.total_qty_created || 0;
+    const procd     = d.contracts_processed || 0;
+    const skipNoMdl = d.total_skipped_no_model || 0;
+
+    if (created === 0) {
+      let msg = 'Договоров обработано: ' + procd + '. Новых работ нет — всё уже синхронизировано';
+      if (skipNoMdl > 0) msg += '. Позиций без модели: ' + skipNoMdl;
+      showToast(msg, 'info');
+    } else {
+      showToast('Создано работ: ' + created + ' (шт. суммарно: ' + totalQty + ') из ' + procd + ' договоров', 'success');
+    }
+    cache.productionKanban = null;
+    loadProductionDashboard();
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
   }
 }
 
