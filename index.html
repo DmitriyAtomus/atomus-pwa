@@ -10609,7 +10609,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.0-shipping-readiness";
+const APP_VERSION = "v2.20.0-auto-reserve";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19727,6 +19727,12 @@ async function submitAssembly() {
     }
     if (r.data.bom_warning) {
       setTimeout(() => showToast('⚠ ' + r.data.bom_warning, 'error'), 2400);
+    }
+    // ЭТАП 42 (v2.20.0): если сборка автоматически прирезервирована под открытый договор
+    if (r.data.auto_reserved_to) {
+      const ar = r.data.auto_reserved_to;
+      const cn = ar.contract_number || ('#' + ar.contract_id);
+      setTimeout(() => showToast('🔗 Зарезервирована под договор ' + cn, 'success'), 1800);
     }
     cache.dashboard = null;
     cache.history = {};
