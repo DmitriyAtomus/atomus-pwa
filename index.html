@@ -992,6 +992,74 @@
     color: white;
   }
 
+  /* ============ ЭТАП 28.1: ТАБЫ СКЛАДА ============ */
+  .wh-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .wh-tabs::-webkit-scrollbar { display: none; }
+  .wh-tab {
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 12px 18px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-mid);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+  }
+  .wh-tab .ti { font-size: 16px; }
+  .wh-tab:hover { color: var(--brand); }
+  .wh-tab.active { color: var(--brand); }
+  .wh-tab.active::after {
+    content: '';
+    position: absolute;
+    left: 12px; right: 12px; bottom: -1px;
+    height: 2px;
+    background: var(--brand);
+    border-radius: 2px 2px 0 0;
+  }
+  .wh-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    margin-left: 4px;
+    background: var(--bg);
+    color: var(--text-mid);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .wh-tab.active .wh-tab-badge {
+    background: var(--brand);
+    color: white;
+  }
+  .wh-tab-badge.warn {
+    background: rgba(226,75,74,0.12);
+    color: #8C2A2A;
+  }
+  .wh-tab-pane { display: none; }
+  .wh-tab-pane.active { display: block; }
+  /* Прячем дублирующиеся .page-header внутри табов — общая шапка остаётся одна. */
+  .wh-tab-pane > .content-inner > .page-header { display: none; }
+  .wh-tab-pane > .content-inner { padding: 0; }
+
   /* FIX v1.8.1-fix2: общий стиль для поиска в списках (Договоры, Контрагенты,
      Продажная номенклатура, КП и т.д.). До этого CSS отсутствовал → инпут
      не имел ширины 100% и текст placeholder обрезался. */
@@ -9743,123 +9811,129 @@
       <!-- ============ РАЗДЕЛ СКЛАД (Этап 18) ============ -->
 
       <!-- Остатки -->
-      <div class="screen" data-screen="warehouse-stock" data-section="warehouse">
+      <!-- ЭТАП 28.1: Единый экран Склад с табами над тремя контентами -->
+      <div class="screen" data-screen="warehouse-dashboard" data-section="warehouse">
         <div class="content-inner" style="max-width: 100%;">
+          <!-- Общая шапка -->
           <div class="page-header">
             <div class="page-header-title">
-              <i class="ti ti-stack-2"></i>
-              <h1>Готовая продукция</h1>
-              <span class="page-counter" id="wh-stock-counter">0</span>
+              <i class="ti ti-building-warehouse"></i>
+              <h1>Склад</h1>
+              <span class="page-subtitle" id="wh-dash-subtitle" style="margin-left:12px; font-size:13px; color:var(--text-light); font-weight:400;"></span>
             </div>
-            <div class="page-header-actions">
-              <button class="btn btn-primary btn-small" onclick="openShipmentEntry()">
-                <i class="ti ti-truck-delivery"></i> Произвести отгрузку
-              </button>
+            <div class="page-header-actions" id="wh-dash-actions">
+              <!-- Кнопки рендерятся динамически в зависимости от активного таба (см. switchWarehouseTab) -->
             </div>
           </div>
 
-          <!-- Сводка -->
-          <div class="wh-summary" id="wh-summary">
-            <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-total">—</div><div class="wh-sum-lbl">всего на складе</div></div>
-            <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-free">—</div><div class="wh-sum-lbl">свободных</div></div>
-            <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-reserved">—</div><div class="wh-sum-lbl">зарезервировано</div></div>
-          </div>
-
-          <!-- Фильтры -->
-          <div class="desktop-layout">
-            <div class="filter-row" style="position: relative;">
-              <div class="filter-tabs">
-                <button class="filter-tab active" data-wh-filter="all" onclick="setWarehouseFilter('all')">Все</button>
-                <button class="filter-tab" data-wh-filter="free" onclick="setWarehouseFilter('free')">Свободные</button>
-                <button class="filter-tab" data-wh-filter="reserved" onclick="setWarehouseFilter('reserved')">Зарезервированные</button>
-              </div>
-              <div class="search-box" style="margin-left: 12px; flex: 1; max-width: 340px;">
-                <i class="ti ti-search"></i>
-                <input type="text" id="wh-search" placeholder="Поиск по модели или исполнению…" oninput="onWarehouseSearchInput()">
-              </div>
-            </div>
-          </div>
-
-          <!-- Контейнер списка -->
-          <div id="wh-stock-list" class="wh-stock-list">
-            <div class="loading-block">Загружаем остатки…</div>
-          </div>
-
-          <!-- ЭТАП 21: Панель массовой печати наклеек -->
-          <div class="bulk-action-bar hidden" id="wh-bulk-bar">
-            <div>Выбрано: <span class="bulk-action-count" id="wh-bulk-count">0</span></div>
-            <div class="bulk-action-spacer"></div>
-            <button class="btn btn-secondary btn-small" onclick="clearWarehouseSelection()">
-              <i class="ti ti-x"></i> Снять выделение
+          <!-- Табы -->
+          <div class="wh-tabs" role="tablist">
+            <button class="wh-tab active" data-wh-tab="stock" onclick="switchWarehouseTab('stock')" role="tab">
+              <i class="ti ti-stack-2"></i> Готовая продукция
+              <span class="wh-tab-badge" id="wh-tab-badge-stock">—</span>
             </button>
-            <button class="btn btn-primary btn-small" onclick="printSelectedLabels()">
-              <i class="ti ti-printer"></i> Печать наклеек
+            <button class="wh-tab" data-wh-tab="components" onclick="switchWarehouseTab('components')" role="tab">
+              <i class="ti ti-tool"></i> Комплектующие
+              <span class="wh-tab-badge" id="wh-tab-badge-components">—</span>
+            </button>
+            <button class="wh-tab" data-wh-tab="movements" onclick="switchWarehouseTab('movements')" role="tab">
+              <i class="ti ti-history"></i> Журнал движений
             </button>
           </div>
-        </div>
-      </div>
 
-      <!-- ЭТАП 32: Комплектующие -->
-      <div class="screen" data-screen="warehouse-components" data-section="warehouse">
-        <div class="content-inner" style="max-width: 100%;">
-          <div class="page-header">
-            <div class="page-header-title">
-              <i class="ti ti-tool"></i>
-              <h1>Комплектующие</h1>
-              <span class="page-counter" id="comp-counter">0</span>
-            </div>
-            <div class="page-header-actions">
-              <button class="btn btn-secondary btn-small" onclick="openComponentReceiveModal()">
-                <i class="ti ti-package-import"></i> Приход
-              </button>
-              <button class="btn btn-primary btn-small" id="comp-new-btn" onclick="openComponentForm()">
-                <i class="ti ti-plus"></i> Комплектующее
-              </button>
-            </div>
-          </div>
-          <!-- Фильтр категорий -->
-          <div class="filter-row" id="comp-cat-filters" style="padding: 6px 18px 14px;">
-            <button class="filter-chip active" data-comp-cat="">Все</button>
-          </div>
-          <!-- Поиск -->
-          <div style="padding: 0 18px 14px;">
-            <div class="search-box">
-              <i class="ti ti-search"></i>
-              <input type="text" id="comp-search" placeholder="Поиск по названию или артикулу…" oninput="filterComponentsList()">
-            </div>
-          </div>
-          <div id="comp-list-container">
-            <div class="loading-block">Загружаем…</div>
-          </div>
-        </div>
-      </div>
+          <!-- ТАБ: Готовая продукция -->
+          <div class="wh-tab-pane active" data-wh-pane="stock">
+            <div class="content-inner" style="max-width: 100%;">
+              <!-- Сводка -->
+              <div class="wh-summary" id="wh-summary">
+                <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-total">—</div><div class="wh-sum-lbl">всего на складе</div></div>
+                <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-free">—</div><div class="wh-sum-lbl">свободных</div></div>
+                <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-reserved">—</div><div class="wh-sum-lbl">зарезервировано</div></div>
+              </div>
 
-      <!-- Журнал движений -->
-      <div class="screen" data-screen="warehouse-movements" data-section="warehouse">
-        <div class="content-inner" style="max-width: 100%;">
-          <div class="page-header">
-            <div class="page-header-title">
-              <i class="ti ti-history"></i>
-              <h1>Журнал движений</h1>
-            </div>
-          </div>
+              <!-- Фильтры -->
+              <div class="desktop-layout">
+                <div class="filter-row" style="position: relative;">
+                  <div class="filter-tabs">
+                    <button class="filter-tab active" data-wh-filter="all" onclick="setWarehouseFilter('all')">Все</button>
+                    <button class="filter-tab" data-wh-filter="free" onclick="setWarehouseFilter('free')">Свободные</button>
+                    <button class="filter-tab" data-wh-filter="reserved" onclick="setWarehouseFilter('reserved')">Зарезервированные</button>
+                  </div>
+                  <div class="search-box" style="margin-left: 12px; flex: 1; max-width: 340px;">
+                    <i class="ti ti-search"></i>
+                    <input type="text" id="wh-search" placeholder="Поиск по модели или исполнению…" oninput="onWarehouseSearchInput()">
+                  </div>
+                </div>
+              </div>
 
-          <!-- Фильтры по направлению -->
-          <div class="desktop-layout">
-            <div class="filter-row">
-              <div class="filter-tabs">
-                <button class="filter-tab active" data-wh-mov="all" onclick="setMovementsFilter('all')">Все</button>
-                <button class="filter-tab" data-wh-mov="in" onclick="setMovementsFilter('in')">Приходы</button>
-                <button class="filter-tab" data-wh-mov="out" onclick="setMovementsFilter('out')">Расходы</button>
-                <button class="filter-tab" data-wh-mov="write_off" onclick="setMovementsFilter('write_off')">Списания</button>
+              <!-- Контейнер списка -->
+              <div id="wh-stock-list" class="wh-stock-list">
+                <div class="loading-block">Загружаем остатки…</div>
+              </div>
+
+              <!-- ЭТАП 21: Панель массовой печати наклеек -->
+              <div class="bulk-action-bar hidden" id="wh-bulk-bar">
+                <div>Выбрано: <span class="bulk-action-count" id="wh-bulk-count">0</span></div>
+                <div class="bulk-action-spacer"></div>
+                <button class="btn btn-secondary btn-small" onclick="clearWarehouseSelection()">
+                  <i class="ti ti-x"></i> Снять выделение
+                </button>
+                <button class="btn btn-primary btn-small" onclick="printSelectedLabels()">
+                  <i class="ti ti-printer"></i> Печать наклеек
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Контейнер журнала -->
-          <div id="wh-movements-list" class="wh-mov-list">
-            <div class="loading-block">Загружаем журнал…</div>
+          <!-- ТАБ: Комплектующие -->
+          <div class="wh-tab-pane" data-wh-pane="components">
+            <div class="content-inner" style="max-width: 100%;">
+              <!-- Фильтр категорий -->
+              <div class="filter-row" id="comp-cat-filters" style="padding: 6px 18px 14px;">
+                <button class="filter-chip active" data-comp-cat="">Все</button>
+              </div>
+              <!-- Поиск -->
+              <div style="padding: 0 18px 14px;">
+                <div class="search-box">
+                  <i class="ti ti-search"></i>
+                  <input type="text" id="comp-search" placeholder="Поиск по названию или артикулу…" oninput="filterComponentsList()">
+                </div>
+              </div>
+              <div id="comp-list-container">
+                <div class="loading-block">Загружаем…</div>
+              </div>
+              <!-- Скрытый счётчик: для совместимости со старым кодом, который пишет в #comp-counter -->
+              <span id="comp-counter" style="display:none;">0</span>
+              <!-- Скрытая кнопка: используется в openComponentForm для проверки прав. Дублируется
+                   в шапке через wh-dash-actions, но id зашит в существующем коде. -->
+              <button id="comp-new-btn" style="display:none;" onclick="openComponentForm()"></button>
+            </div>
           </div>
+
+          <!-- ТАБ: Журнал движений -->
+          <div class="wh-tab-pane" data-wh-pane="movements">
+            <div class="content-inner" style="max-width: 100%;">
+              <!-- Фильтры по направлению -->
+              <div class="desktop-layout">
+                <div class="filter-row">
+                  <div class="filter-tabs">
+                    <button class="filter-tab active" data-wh-mov="all" onclick="setMovementsFilter('all')">Все</button>
+                    <button class="filter-tab" data-wh-mov="in" onclick="setMovementsFilter('in')">Приходы</button>
+                    <button class="filter-tab" data-wh-mov="out" onclick="setMovementsFilter('out')">Расходы</button>
+                    <button class="filter-tab" data-wh-mov="write_off" onclick="setMovementsFilter('write_off')">Списания</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Контейнер журнала -->
+              <div id="wh-movements-list" class="wh-mov-list">
+                <div class="loading-block">Загружаем журнал…</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Скрытый счётчик для совместимости со старым кодом (loadWarehouseStock пишет в #wh-stock-counter) -->
+          <span id="wh-stock-counter" style="display:none;">0</span>
         </div>
       </div>
       <!-- ============ КОНЕЦ РАЗДЕЛА СКЛАД ============ -->
@@ -10680,7 +10754,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.1-new-direction";
+const APP_VERSION = "v2.21.0-warehouse-tabs";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10721,7 +10795,7 @@ const SECTION_CONFIG = {
   production: { sidebar: 'sidebar-production', defaultScreen: 'dashboard' },
   sales:      { sidebar: 'sidebar-sales',      defaultScreen: 'sales-dashboard' },
   tasks:      { sidebar: 'sidebar-tasks',      defaultScreen: 'tasks-list' },       // ЭТАП 16В
-  warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-stock' },     // ЭТАП 18
+  warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-dashboard' },     // ЭТАП 18 → 28.1
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
   supply:     { sidebar: 'sidebar-supply',     defaultScreen: 'supply-requests' },    // ЭТАП 19
   defects:    { sidebar: 'sidebar-defects',    defaultScreen: 'defects-list' },       // ЭТАП 22
@@ -11549,8 +11623,17 @@ function selectSidebarItem(screenName) {
     'defects-list-progress': 'defects-list',
     'defects-list-resolved': 'defects-list',
     'defects-list-rejected': 'defects-list',
+    // ЭТАП 28.1: старые экраны склада → новый единый дашборд с табами
+    'warehouse-stock':       'warehouse-dashboard',
+    'warehouse-components':  'warehouse-dashboard',
+    'warehouse-movements':   'warehouse-dashboard',
   };
   const targetScreen = SCREEN_ALIASES[screenName] || screenName;
+
+  // ЭТАП 28.1: если запросили склад с конкретным табом — запомним
+  if (screenName === 'warehouse-stock')      state._requestedWarehouseTab = 'stock';
+  if (screenName === 'warehouse-components') state._requestedWarehouseTab = 'components';
+  if (screenName === 'warehouse-movements')  state._requestedWarehouseTab = 'movements';
 
   // Скрываем все экраны
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -11597,11 +11680,18 @@ function selectSidebarItem(screenName) {
   // КП (14Б)
   if (screenName === 'sales-offers') loadOffers();
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
-  // ЭТАП 18: склад
-  if (screenName === 'warehouse-stock')     loadWarehouseStock();
-  if (screenName === 'warehouse-components') loadWarehouseComponents();
+  // ЭТАП 18 → 28.1: склад — единый дашборд с табами
+  if (screenName === 'warehouse-stock')      switchWarehouseTab('stock');
+  if (screenName === 'warehouse-components') switchWarehouseTab('components');
+  if (screenName === 'warehouse-movements')  switchWarehouseTab('movements');
+  if (screenName === 'warehouse-dashboard') {
+    const tab = state._requestedWarehouseTab
+             || localStorage.getItem('wh_active_tab')
+             || 'stock';
+    state._requestedWarehouseTab = null;
+    switchWarehouseTab(tab);
+  }
   if (screenName === 'components-catalog')   loadComponentsCatalog();
-  if (screenName === 'warehouse-movements') loadWarehouseMovements();
   // ЭТАП 19: снабжение
   if (screenName === 'supply-requests')     loadSupplyRequests();
   if (screenName === 'supply-orders')       loadSupplyOrders();
@@ -22771,6 +22861,10 @@ function renderComponentsList() {
     );
   }
   if (counter) counter.textContent = list.length;
+  // ЭТАП 28.1: обновим бейдж таба
+  if (typeof _updateWarehouseTabBadges === 'function') {
+    _updateWarehouseTabBadges({ components: list.length });
+  }
 
   if (!list.length) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>' +
@@ -23309,6 +23403,76 @@ async function openComponentMovements(componentId) {
 }
 
 
+// ============ ЭТАП 28.1: переключатель табов склада ============
+
+const WH_TAB_ACTIONS = {
+  // Кнопки в общей шапке, специфичные для каждого таба
+  stock: [
+    { label: 'Произвести отгрузку', icon: 'ti-truck-delivery', cls: 'btn btn-primary btn-small',
+      onclick: 'openShipmentEntry()' },
+  ],
+  components: [
+    { label: 'Приход', icon: 'ti-package-import', cls: 'btn btn-secondary btn-small',
+      onclick: 'openComponentReceiveModal()' },
+    { label: 'Комплектующее', icon: 'ti-plus', cls: 'btn btn-primary btn-small',
+      onclick: 'openComponentForm()' },
+  ],
+  movements: [],  // у журнала своих действий нет
+};
+
+function _renderWarehouseDashActions(tab) {
+  const host = document.getElementById('wh-dash-actions');
+  if (!host) return;
+  const actions = WH_TAB_ACTIONS[tab] || [];
+  host.innerHTML = actions.map(a =>
+    '<button class="' + a.cls + '" onclick="' + a.onclick + '">' +
+    '<i class="ti ' + a.icon + '"></i> ' + a.label +
+    '</button>'
+  ).join('');
+}
+
+function _updateWarehouseTabBadges(counts) {
+  // counts = { stock, components, attention } — все опциональные
+  const set = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (val == null) { el.textContent = '—'; el.classList.remove('warn'); return; }
+    el.textContent = String(val);
+  };
+  if (counts && 'stock' in counts) set('wh-tab-badge-stock', counts.stock);
+  if (counts && 'components' in counts) set('wh-tab-badge-components', counts.components);
+}
+
+function switchWarehouseTab(tab) {
+  if (!['stock', 'components', 'movements'].includes(tab)) tab = 'stock';
+
+  // Подсветка таба
+  document.querySelectorAll('.wh-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.whTab === tab);
+  });
+  // Показ нужной панели
+  document.querySelectorAll('.wh-tab-pane').forEach(p => {
+    p.classList.toggle('active', p.dataset.whPane === tab);
+  });
+  // Кнопки в шапке под таб
+  _renderWarehouseDashActions(tab);
+  // Подсветка sidebar — соответствующий пункт активен
+  document.querySelectorAll('.sidebar .nav-item[data-nav]').forEach(t => t.classList.remove('active'));
+  const navName = 'warehouse-' + tab;
+  document.querySelectorAll('.sidebar .nav-item[data-nav="' + navName + '"]')
+    .forEach(t => t.classList.add('active'));
+
+  // Сохраним последнюю вкладку
+  state.activeWarehouseTab = tab;
+  try { localStorage.setItem('wh_active_tab', tab); } catch (e) {}
+
+  // Лениво грузим контент таба
+  if (tab === 'stock')       loadWarehouseStock();
+  if (tab === 'components')  loadWarehouseComponents();
+  if (tab === 'movements')   loadWarehouseMovements();
+}
+
+
 async function loadWarehouseStock() {
   const container = document.getElementById('wh-stock-list');
   if (!container) return;
@@ -23333,6 +23497,10 @@ function renderWarehouseStock(d) {
 
   const list = d.stock || [];
   document.getElementById('wh-stock-counter').textContent = list.length;
+  // ЭТАП 28.1: обновим бейдж таба
+  if (typeof _updateWarehouseTabBadges === 'function') {
+    _updateWarehouseTabBadges({ stock: list.length });
+  }
 
   // ЭТАП 42.5 (v2.20.0): KPI считаем по реальным штукам, а не по числу записей.
   // Бэкенд возвращает summary.total/free/reserved как количество записей assemblies,
