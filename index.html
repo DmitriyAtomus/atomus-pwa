@@ -1567,6 +1567,9 @@
   /* v2.19.0: статус черновик */
   .status-draft { background: #FFF6E0; color: #8A5A00; }
   .status-draft::before { background: #E0B341; }
+  /* ЭТАП 40 (v2.20.0): статус «Отгружен частично» — тёплый оранжевый */
+  .status-partially_shipped { background: #FEF3C7; color: #B45309; }
+  .status-partially_shipped::before { background: #F59E0B; }
 
   /* Таблица договоров (десктоп) */
   .contracts-table {
@@ -1740,6 +1743,43 @@
     cursor: default;
   }
   .status-step:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ЭТАП 40 (v2.20.0): шаг "Отгружен частично" — тёплый оранжевый */
+  .status-step.s-partial.current {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+  }
+  .status-step.s-partial.passed {
+    color: #b45309;
+    border-color: #f59e0b;
+    background: #fef3c7;
+  }
+  .status-step.s-partial.passed::before { content: "✓ "; }
+  .status-step.s-partial:hover:not(.current):not(:disabled) {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    color: #b45309;
+  }
+  /* Замок 🔒 на «Отгружен» когда не все позиции готовы — кликабельна, но визуально маркируется */
+  .status-step.locked {
+    position: relative;
+    color: var(--text-light);
+    background: #f9fafb;
+    border-style: dashed;
+  }
+  .status-step.locked::after {
+    content: " 🔒";
+    font-size: 11px;
+    opacity: 0.8;
+    margin-left: 2px;
+  }
+  .status-step.locked:hover:not(.current):not(:disabled) {
+    background: #fff7ed;
+    border-color: #f59e0b;
+    color: #b45309;
+  }
 
   /* Карточка договора — детали */
   .contract-header-card {
@@ -10502,7 +10542,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.0-chiller-migration";
+const APP_VERSION = "v2.20.0-shipping-readiness";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19993,6 +20033,15 @@ async function loadCurrentContract() {
   container.innerHTML = '<div class="loading-block">Загружаем договор…</div>';
   try {
     const c = await apiGet('/api/contracts/' + cid);
+    // ЭТАП 40 (v2.20.0): подгружаем готовность к отгрузке для замка 🔒 на кнопке «Отгружен».
+    // Не блокируем рендер — если запрос упал, просто без замка.
+    const showLock = c.status && !['draft', 'closed', 'shipped'].includes(c.status);
+    if (showLock) {
+      try {
+        const r = await apiGet('/api/contracts/' + cid + '/shipping-readiness');
+        c.shipping_readiness = r;
+      } catch (e) { /* без замка тоже норм */ }
+    }
     renderContractDetail(c);
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
@@ -20044,22 +20093,40 @@ function renderContractDetail(c) {
   // Переключатель статуса (если есть права и НЕ draft)
   if (canEdit && !isDraft) {
     html += '<div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 16px; margin-bottom: 4px;">ИЗМЕНИТЬ СТАТУС</div>';
+    // ЭТАП 40 (v2.20.0): добавлен шаг partially_shipped между ready и shipped
     const steps = [
-      { code: 'production', label: 'В производстве' },
-      { code: 'ready', label: 'Готов к отгрузке' },
-      { code: 'shipped', label: 'Отгружен' },
-      { code: 'closed', label: 'Закрыт' },
+      { code: 'production',        label: 'В производстве' },
+      { code: 'ready',             label: 'Готов к отгрузке' },
+      { code: 'partially_shipped', label: 'Отгружен частично', extraCls: 's-partial' },
+      { code: 'shipped',           label: 'Отгружен' },
+      { code: 'closed',            label: 'Закрыт' },
     ];
     const currentIdx = steps.findIndex(s => s.code === c.status);
+    // Замок на «Отгружен», если бэк сказал что не все позиции готовы
+    const readiness = c.shipping_readiness;
+    const showLock = readiness && readiness.ready === false;
     html += '<div class="status-changer">';
     steps.forEach((s, i) => {
       let cls = 'status-step';
+      if (s.extraCls) cls += ' ' + s.extraCls;
       if (i < currentIdx) cls += ' passed';
       else if (i === currentIdx) cls += ' current';
-      html += '<button class="' + cls + '" onclick="changeContractStatus(' + c.id + ', \'' + s.code + '\')">' +
+      if (s.code === 'shipped' && showLock && i !== currentIdx) cls += ' locked';
+      const titleAttr = (s.code === 'shipped' && showLock)
+        ? ' title="Не все позиции готовы — клик откроет список"'
+        : '';
+      html += '<button class="' + cls + '" onclick="changeContractStatus(' + c.id + ', \'' + s.code + '\')"' + titleAttr + '>' +
         escapeHtml(s.label) + '</button>';
     });
     html += '</div>';
+    // Подсказка про блокеры (краткая)
+    if (showLock && readiness.blockers && readiness.blockers.length) {
+      const ready = readiness.items_ready || 0;
+      const total = readiness.items_total || 0;
+      html += '<div style="font-size:12px;color:#b45309;margin:-4px 0 8px 4px;">' +
+        '<i class="ti ti-info-circle"></i> Готово ' + ready + ' из ' + total +
+        ' позиций. Нажмите «Отгружен», чтобы увидеть что не готово.</div>';
+    }
   }
 
   // Детали
@@ -25606,14 +25673,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 const HELP_CHANGELOG = [
   {
-    version: 'v2.20.0-chiller-migration',
+    version: 'v2.20.0',
     date: '21.05.2026',
-    title: 'Чиллеры → в производственную номенклатуру',
+    title: 'Готовность к отгрузке + Чиллеры + Унифицированный поиск + Бейджи',
     features: [
-      '<b>Чиллеры перенесены</b> из продажной номенклатуры в производственную, под направление «Чиллера». Теперь по ним можно вести спецификации (BOM), резервировать сборки на складе и считать готовность к отгрузке',
-      'Артикулы новых моделей чиллеров: <code>ЧИЛ-NNN</code>',
-      'Старые позиции из продажной категории «Чиллеры» помечены как неактивные (но сохранены для аудита и старых договоров)',
-      'Категория «Чиллеры» в продажной номенклатуре скрыта — больше не выбирается при создании новой позиции',
+      '<b>Проверка готовности к отгрузке:</b> при попытке поставить договор в «Отгружен» система проверяет, что все позиции готовы (сборки на складе, комплектующие в резерве, закупки получены). Если что-то не готово — открывается модалка со списком блокеров и предлагает два пути: «Отгрузить частично» (мягкий шаг) или «Всё равно отгрузить (force)»',
+      '<b>Новый статус «Отгружен частично»</b> в переключателе статуса — между «Готов к отгрузке» и «Отгружен». Полезно когда часть позиций уехала, а часть ещё в производстве. Тёплый оранжевый цвет',
+      '<b>Замок 🔒 на кнопке «Отгружен»</b> — если бэкенд проактивно сообщил что не все позиции готовы. Подсказка «Готово X из Y позиций» прямо под кнопками',
+      '<b>Чиллеры перенесены</b> из продажной номенклатуры в производственную, под направление «Чиллера». Артикулы новых моделей: <code>ЧИЛ-NNN</code>. По чиллерам теперь можно вести спецификации (BOM), резервировать сборки и считать готовность к отгрузке',
+      '<b>Унифицированный поиск</b> в спецификации договора — одно поле ищет одновременно по моделям, комплектующим и продажной номенклатуре. Бейджи: 🛠 модель / 📦 компл. / 🛒 продажа',
+      '<b>Бейджи наличия в Номенклатуре:</b> 🟢 «В наличии: N» / 🔵 «Резерв: N» / 🔴 «К закупке: N компл.» / 🟡 «К сборке». Понятно с одного взгляда что есть на складе, что в резерве и что нужно докупить',
+      '<b>Бейджи наличия в BOM</b> карточки модели — для каждой комплектующей сразу видно, хватает ли её, не хватает или нужно закупать',
     ],
   },
   {
@@ -26599,6 +26669,7 @@ async function changeContractStatus(contractId, newStatus) {
   const labels = {
     'production': 'В производстве',
     'ready': 'Готов к отгрузке',
+    'partially_shipped': 'Отгружен частично',
     'shipped': 'Отгружен',
     'closed': 'Закрыт',
   };
@@ -26655,10 +26726,122 @@ async function changeContractStatus(contractId, newStatus) {
         showToast(d.message || 'Сначала отгрузите остаток', 'error');
         return;
       }
+      // ЭТАП 40 (v2.20.0): 409 с error=items_not_ready — открываем модалку blockers
+      if (r.status === 409 && d.error === 'items_not_ready') {
+        openShippingBlockersModal(contractId, d.readiness || {}, d.message || '');
+        return;
+      }
       showToast(d.message || 'Не удалось изменить статус', 'error');
       return;
     }
     showToast('Статус изменён', 'success');
+    cache.contracts = null;
+    cache.contractsCounts = null;
+    loadCurrentContract();
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
+// ============ ЭТАП 40 (v2.20.0): МОДАЛКА БЛОКЕРОВ ОТГРУЗКИ ============
+// Открывается когда бэк возвращает 409 items_not_ready при попытке поставить shipped.
+// Показывает список незавершённых позиций и предлагает два пути:
+//   1) Всё равно отгрузить (force_ship=true) — обходит блокировку
+//   2) Отгрузить частично (status=partially_shipped) — мягкий шаг
+function openShippingBlockersModal(contractId, readiness, message) {
+  const blockers = (readiness && readiness.blockers) || [];
+  const total = (readiness && readiness.items_total) || 0;
+  const ready = (readiness && readiness.items_ready) || 0;
+
+  let m = document.getElementById('shipping-blockers-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'shipping-blockers-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeShippingBlockersModal(); };
+    document.body.appendChild(m);
+  }
+
+  let blockerRowsHtml = '';
+  if (blockers.length) {
+    blockers.forEach(b => {
+      const need = (b.qty_need !== undefined && b.qty_need !== null) ? b.qty_need : '?';
+      const have = (b.qty_have !== undefined && b.qty_have !== null) ? b.qty_have : 0;
+      blockerRowsHtml +=
+        '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:500;color:var(--text);">' + escapeHtml(b.item_name || 'Позиция #' + b.item_id) + '</div>' +
+            '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' + escapeHtml(b.reason || '') + '</div>' +
+          '</div>' +
+          '<div style="font-size:13px;font-weight:600;color:#b45309;white-space:nowrap;">' +
+            escapeHtml(String(have)) + ' / ' + escapeHtml(String(need)) +
+          '</div>' +
+        '</div>';
+    });
+  } else {
+    blockerRowsHtml = '<div style="padding:14px;color:var(--text-light);text-align:center;">Бэкенд не вернул детали блокеров.</div>';
+  }
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-alert-triangle" style="color:#f59e0b;"></i> Не все позиции готовы</h3>' +
+        '<button class="modal-close" onclick="closeShippingBlockersModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 18px 8px 18px;">' +
+        '<div style="background:#fef3c7;color:#92400e;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.4;">' +
+          '<b>Готово ' + ready + ' из ' + total + ' позиций.</b><br>' +
+          escapeHtml(message || 'Используйте «Отгрузить частично», если нужно отгрузить только готовые.') +
+        '</div>' +
+      '</div>' +
+      '<div style="overflow-y:auto;flex:1;border-top:1px solid var(--border);">' +
+        blockerRowsHtml +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">' +
+        '<button class="primary-btn" style="background:#f59e0b;" onclick="doShippingAction(' + contractId + ', \'partial\')">' +
+          '<i class="ti ti-package-export"></i> Отгрузить частично' +
+        '</button>' +
+        '<button class="primary-btn" style="background:#dc2626;" onclick="doShippingAction(' + contractId + ', \'force\')">' +
+          '<i class="ti ti-alert-octagon"></i> Всё равно отгрузить (force)' +
+        '</button>' +
+        '<button class="secondary-btn" onclick="closeShippingBlockersModal()">Отмена</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeShippingBlockersModal() {
+  const m = document.getElementById('shipping-blockers-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function doShippingAction(contractId, mode) {
+  // mode === 'partial' → ставим status=partially_shipped
+  // mode === 'force'   → ставим status=shipped с force_ship=true
+  const body = (mode === 'partial')
+    ? { status: 'partially_shipped' }
+    : { status: 'shipped', force_ship: true };
+  const confirmMsg = (mode === 'partial')
+    ? 'Перевести договор в «Отгружен частично»?'
+    : 'Отгрузить договор несмотря на блокеры?';
+  if (!confirm(confirmMsg)) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось изменить статус', 'error');
+      return;
+    }
+    closeShippingBlockersModal();
+    showToast(mode === 'partial' ? 'Договор переведён в «Отгружен частично»' : 'Договор отгружен (force)', 'success');
     cache.contracts = null;
     cache.contractsCounts = null;
     loadCurrentContract();
