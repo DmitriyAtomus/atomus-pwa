@@ -2808,6 +2808,30 @@
   .wh-stock-group-details .wh-stock-row.compact .wh-stock-icon {
     width: 28px; height: 28px; font-size: 14px; flex: 0 0 28px;
   }
+
+  /* ЭТАП 42.4 (v2.20.0): сводка по модели — заголовок над группами одной модели */
+  .wh-model-summary {
+    padding: 8px 14px;
+    margin: 12px 0 4px 0;
+    font-size: 12px;
+    color: var(--text-mid);
+    background: linear-gradient(to right, #f8fafc, transparent);
+    border-left: 3px solid var(--brand);
+    border-radius: 0 8px 8px 0;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .wh-model-summary .wh-code {
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-light);
+  }
+  .wh-model-summary b {
+    color: var(--text);
+    font-weight: 600;
+  }
   .wh-stock-icon, .wh-mov-icon {
     width: 36px; height: 36px;
     background: var(--brand-bg);
@@ -10652,7 +10676,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.0-rebuild-button";
+const APP_VERSION = "v2.20.0-stock-summary";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23135,10 +23159,58 @@ function renderWarehouseStock(d) {
     g.total_qty += Number(s.stock_qty) || 0;
   });
 
-  let html = '';
+  // ЭТАП 42.4 (v2.20.0): сводка по модели — если у одной модели есть несколько групп
+  // (свободные + под разные договоры), показываем заголовок-разделитель.
+  const modelStats = new Map(); // model_id → { name, article, total, free, reserved, byContract: Map }
   for (const g of groups.values()) {
+    const s = g.first;
+    const mid = s.model_id || 0;
+    if (!modelStats.has(mid)) {
+      modelStats.set(mid, {
+        name: s.model_name || '',
+        article: s.model_article || '',
+        total: 0, free: 0, reserved: 0,
+        byContract: new Map(),
+        groupCount: 0,
+      });
+    }
+    const m = modelStats.get(mid);
+    m.total += g.total_qty;
+    m.groupCount += 1;
+    if (s.contract_id) {
+      m.reserved += g.total_qty;
+      const cn = s.contract_number || '#' + s.contract_id;
+      m.byContract.set(cn, (m.byContract.get(cn) || 0) + g.total_qty);
+    } else {
+      m.free += g.total_qty;
+    }
+  }
+
+  let html = '';
+  let prevModelId = null;
+  for (const g of groups.values()) {
+    const curModelId = g.first.model_id || 0;
+    // Заголовок-сводка по модели, если у неё >1 группы (т.е. есть смешанные состояния)
+    if (curModelId !== prevModelId) {
+      const m = modelStats.get(curModelId);
+      if (m && m.groupCount > 1) {
+        let breakdown = '';
+        if (m.free > 0) breakdown += '<span style="color:var(--success);">свободно: ' + m.free + '</span>';
+        for (const [cn, qty] of m.byContract.entries()) {
+          if (breakdown) breakdown += ' · ';
+          breakdown += '<span style="color:var(--brand);">' + escapeHtml(cn) + ': ' + qty + '</span>';
+        }
+        html += '<div class="wh-model-summary">' +
+          '<i class="ti ti-package"></i> ' +
+          '<b>' + escapeHtml(m.name) + '</b> ' +
+          (m.article ? '<span class="wh-code">' + escapeHtml(m.article) + '</span>' : '') +
+          ' · всего ' + m.total + ' шт. · ' + breakdown +
+          '</div>';
+      }
+      prevModelId = curModelId;
+    }
+
     if (g.items.length === 1) {
-      // Одиночка — рендерим как обычную строку, без группы
       html += renderStockRow(g.items[0]);
     } else {
       html += renderStockGroup(g);
