@@ -11692,7 +11692,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.22.0-kanban-base";
+const APP_VERSION = "v2.22.1-restore-new-assembly";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12960,7 +12960,7 @@ function renderProductionDashboard(d) {
   html +=     '<button class="pkb-btn" disabled title="Скоро"><i class="ti ti-calendar-week"></i>План недели</button>';
   html +=     '<button class="pkb-btn" onclick="selectSidebarItem(\'summary\')"><i class="ti ti-chart-bar"></i>Аналитика</button>';
   if (hasPermission('production.create')) {
-    html +=   '<button class="pkb-btn primary" onclick="openNewProductionWork()"><i class="ti ti-plus"></i>Новая работа</button>';
+    html +=   '<button class="pkb-btn primary" onclick="openNewAssembly()"><i class="ti ti-plus"></i>Новая работа</button>';
   }
   html +=   '</div>';
   html += '</div>';
@@ -13374,6 +13374,12 @@ async function deleteProductionWork(workId) {
 }
 
 // ============ ФОРМА СОЗДАНИЯ РАБОТЫ ============
+// ВАЖНО (v2.22.1): функции openNewProductionWork / closeNewProductionWork /
+// submitNewProductionWork отвязаны от UI — кнопка «+ Новая работа» в канбане
+// теперь вызывает openNewAssembly() (старый полнофункциональный экран сборки).
+// Production_works создаются автоматически при публикации договора
+// (см. Stage 29.2.1 / sync_production_works_for_contract в бэке).
+// Функции оставлены как fallback на случай возврата к быстрой модалке.
 
 async function openNewProductionWork() {
   // Удаляем старую
