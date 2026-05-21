@@ -1135,6 +1135,16 @@
     flex-wrap: wrap;
     gap: 6px;
   }
+  @media (max-width: 760px) {
+    .fp-catlegend {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .fp-catlegend::-webkit-scrollbar { display: none; }
+    .fp-catchip { flex-shrink: 0; font-size: 11px; padding: 3px 8px; }
+  }
   .fp-catchip {
     display: inline-flex;
     align-items: center;
@@ -1169,6 +1179,13 @@
     flex-wrap: wrap;
   }
   .fp-toolbar .search-box { flex: 1; min-width: 220px; }
+  @media (max-width: 760px) {
+    .fp-toolbar {
+      padding: 0 14px 10px;
+      gap: 8px;
+    }
+    .fp-toolbar .search-box { flex: 0 0 100%; min-width: 0; }
+  }
 
   .fp-list {
     padding: 0 18px 18px;
@@ -1255,8 +1272,15 @@
   .fp-row-badge.reserved { background: rgba(186,117,23,0.15); color: #854F0B; }
   .fp-row-badge.mixed    { background: rgba(37,99,235,0.15); color: #1E40AF; }
   @media (max-width: 760px) {
-    .fp-row { grid-template-columns: 12px 1fr auto; }
-    .fp-row-age, .fp-row-badge { display: none; }
+    .fp-row {
+      grid-template-columns: 10px 1fr auto auto;
+      gap: 8px;
+      padding: 10px;
+    }
+    .fp-row-age { display: none; }
+    .fp-row-qty { font-size: 13px; }
+    .fp-row-qty-sub { font-size: 10px; }
+    .fp-row-badge { font-size: 10px; padding: 2px 6px; }
   }
 
   /* ============ ЭТАП 28.3: ДАШБОРД КОМПЛЕКТУЮЩИХ ============ */
@@ -1280,6 +1304,21 @@
   .pt-ai .btn { white-space: nowrap; flex-shrink: 0; }
   .pt-ai.empty { background: var(--bg); border-color: var(--border); color: var(--text-light); }
   .pt-ai.empty .ti-sparkles { color: var(--text-light); }
+  @media (max-width: 760px) {
+    .pt-ai {
+      align-items: flex-start;
+      gap: 8px;
+      padding: 12px;
+      font-size: 12px;
+    }
+    .pt-ai-body { min-width: 0; }
+    .pt-ai .btn {
+      width: 100%;
+      justify-content: center;
+      white-space: normal;
+      margin-top: 8px;
+    }
+  }
 
   .pt-chips {
     display: flex;
@@ -1316,6 +1355,14 @@
     flex-wrap: wrap;
   }
   .pt-toolbar .search-box { flex: 1; min-width: 220px; }
+  @media (max-width: 760px) {
+    .pt-toolbar {
+      padding: 0 14px 10px;
+      gap: 8px;
+    }
+    .pt-toolbar .search-box { flex: 0 0 100%; min-width: 0; }
+    .pt-attn-btn { font-size: 12px; padding: 6px 12px; }
+  }
   .pt-attn-btn {
     display: inline-flex;
     align-items: center;
@@ -1438,8 +1485,23 @@
   .pt-row-action .btn-open   { background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); }
   .pt-row-action .btn-writeoff { background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); }
   @media (max-width: 900px) {
-    .pt-row { grid-template-columns: 12px 1fr auto auto; }
+    .pt-row { grid-template-columns: 12px 1fr auto auto; gap: 8px; }
     .pt-row-consume, .pt-row-badge { display: none; }
+  }
+  @media (max-width: 480px) {
+    .pt-row {
+      grid-template-columns: 10px 1fr auto auto;
+      padding: 10px;
+    }
+    .pt-row-stock { font-size: 13px; }
+    .pt-row-stock-sub { font-size: 10px; }
+    .pt-row-name { font-size: 12px; }
+    .pt-row-sku { font-size: 11px; }
+    .pt-row-sub { font-size: 10px; }
+    .pt-row-action button { font-size: 11px; padding: 6px 8px; gap: 2px; }
+    .pt-row-action button .ti { font-size: 14px; }
+    /* На ультра-узких — спрячем текст кнопки, оставим иконку */
+    .pt-row-action button span { display: none; }
   }
 
   /* FIX v1.8.1-fix2: общий стиль для поиска в списках (Договоры, Контрагенты,
@@ -8012,6 +8074,32 @@
     gap: 12px;
     flex-wrap: wrap;
   }
+  /* ЭТАП 27.4 (v2.21.4): кнопки экспорта спецификации */
+  .spec-export-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .spec-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: white;
+    color: var(--brand);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .spec-export-btn:hover {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .spec-export-btn i { font-size: 16px; }
+  .spec-export-btn span { letter-spacing: 0.2px; }
   .spec-title {
     font-size: 14px;
     color: var(--text-light);
@@ -11167,7 +11255,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.21.3-bom-shortage";
+const APP_VERSION = "v2.21.5-mobile-warehouse";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21154,6 +21242,17 @@ function renderContractItemsBlock(contractId) {
   html += '<div class="spec-head">';
   html += '<div class="spec-title"><i class="ti ti-list-details" style="color: var(--brand);"></i> Спецификация ' +
           (items.length ? '(' + items.length + ')' : '') + '</div>';
+  // ЭТАП 27.4 (v2.21.4): кнопки скачивания спецификации в Word/PDF
+  if (items.length) {
+    html += '<div class="spec-export-buttons">' +
+      '<button class="spec-export-btn" onclick="downloadContractSpecDocx(' + contractId + ')" title="Скачать Word">' +
+        '<i class="ti ti-file-type-docx"></i><span>Word</span>' +
+      '</button>' +
+      '<button class="spec-export-btn" onclick="downloadContractSpecPdf(' + contractId + ')" title="Открыть PDF">' +
+        '<i class="ti ti-file-type-pdf"></i><span>PDF</span>' +
+      '</button>' +
+    '</div>';
+  }
   html += '</div>';
 
   // Список позиций
@@ -21690,6 +21789,68 @@ async function deleteSpecItem(contractId, itemId) {
     loadContractItemsBlock(contractId);
   } catch (e) {
     showToast('Ошибка', 'error');
+  }
+}
+
+// ============ ЭТАП 27.4 (v2.21.4): СКАЧИВАНИЕ СПЕЦИФИКАЦИИ ============
+
+async function downloadContractSpecDocx(contractId) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  showToast('Готовим Word…', 'success');
+  try {
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/spec/docx', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось получить Word';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cd = r.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="([^"]+)"/);
+    a.download = match ? match[1] : 'Спецификация.docx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
+async function downloadContractSpecPdf(contractId) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  showToast('Готовим PDF…', 'success');
+  try {
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/spec/pdf', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось получить PDF';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    // Открываем PDF в новой вкладке (мобильный браузер сам предложит скачать)
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
   }
 }
 
@@ -24481,17 +24642,17 @@ function _renderPtRow(it) {
     const recommend = Math.max(1, Math.round((it.min_stock || 1) * 2 - (it.qty_on_stock || 0)));
     actionHtml = '<div class="pt-row-action">' +
       '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
-      '<i class="ti ti-shopping-cart-plus"></i> Заказать' +
+      '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span>' +
       '</button></div>';
   } else if (st === 'excess') {
     actionHtml = '<div class="pt-row-action">' +
       '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
-      '<i class="ti ti-minus"></i> Расход' +
+      '<i class="ti ti-minus"></i><span>Расход</span>' +
       '</button></div>';
   } else {
     actionHtml = '<div class="pt-row-action">' +
       '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
-      '<i class="ti ti-minus"></i> Расход' +
+      '<i class="ti ti-minus"></i><span>Расход</span>' +
       '</button></div>';
   }
 
