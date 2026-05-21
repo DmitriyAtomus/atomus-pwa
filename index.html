@@ -1060,6 +1060,205 @@
   .wh-tab-pane > .content-inner > .page-header { display: none; }
   .wh-tab-pane > .content-inner { padding: 0; }
 
+  /* ============ ЭТАП 28.2: ДАШБОРД ГОТОВОЙ ПРОДУКЦИИ ============ */
+  .fp-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 6px 18px 14px;
+  }
+  @media (max-width: 900px) {
+    .fp-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  }
+  .fp-kpi {
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .fp-kpi.clickable { cursor: pointer; }
+  .fp-kpi.clickable:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  }
+  .fp-kpi-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    font-weight: 600;
+  }
+  .fp-kpi-value {
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--text);
+  }
+  .fp-kpi-hint {
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  .fp-kpi.tone-green  { border-left-color: #1D9E75; }
+  .fp-kpi.tone-yellow { border-left-color: #BA7517; }
+  .fp-kpi.tone-red    { border-left-color: #E24B4A; }
+  .fp-kpi.tone-blue   { border-left-color: #2563EB; }
+  .fp-kpi.tone-red.clickable .fp-kpi-value { color: #8C2A2A; }
+  .fp-kpi.tone-yellow .fp-kpi-value { color: #854F0B; }
+  .fp-kpi.tone-green .fp-kpi-value  { color: #0A5B41; }
+
+  .fp-catbar-wrap {
+    padding: 4px 18px 14px;
+  }
+  .fp-catbar-title {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .fp-catbar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--bg);
+    margin-bottom: 8px;
+  }
+  .fp-catbar-seg { transition: opacity .15s; }
+  .fp-catbar-seg:hover { opacity: 0.8; }
+  .fp-catlegend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .fp-catchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: border-color .12s, color .12s;
+  }
+  .fp-catchip:hover { border-color: var(--brand); color: var(--brand); }
+  .fp-catchip.active { background: var(--brand); border-color: var(--brand); color: white; }
+  .fp-catchip-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .fp-catchip-qty {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .fp-catchip.active .fp-catchip-qty { color: white; }
+
+  .fp-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 0 18px 12px;
+    flex-wrap: wrap;
+  }
+  .fp-toolbar .search-box { flex: 1; min-width: 220px; }
+
+  .fp-list {
+    padding: 0 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .fp-row {
+    display: grid;
+    grid-template-columns: 12px 1fr 110px 90px 110px;
+    gap: 12px;
+    align-items: center;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    transition: border-color .12s, background .12s;
+  }
+  .fp-row:hover { border-color: var(--brand); }
+  .fp-row.tone-yellow { background: rgba(186,117,23,0.04); }
+  .fp-row.tone-red    { background: rgba(226,75,74,0.04); }
+  .fp-row-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    align-self: center;
+    justify-self: center;
+  }
+  .fp-row-dot.fresh { background: #1D9E75; }
+  .fp-row-dot.warm  { background: #BA7517; }
+  .fp-row-dot.dead  { background: #E24B4A; }
+  .fp-row-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .fp-row-article {
+    font-size: 12px;
+    color: #9CA3AF;
+    margin-left: 6px;
+    font-weight: 400;
+  }
+  .fp-row-sub {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 3px;
+    line-height: 1.3;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .fp-row-sub.reserved { color: #854F0B; }
+  .fp-row-sub.dead     { color: #8C2A2A; }
+  .fp-row-qty {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .fp-row-qty-sub {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-light);
+  }
+  .fp-row-age {
+    font-size: 12px;
+    text-align: right;
+    color: var(--text-mid);
+    white-space: nowrap;
+  }
+  .fp-row-age.warm { color: #BA7517; }
+  .fp-row-age.dead { color: #E24B4A; font-weight: 500; }
+  .fp-row-badge {
+    display: inline-flex;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    justify-self: end;
+    white-space: nowrap;
+  }
+  .fp-row-badge.free     { background: rgba(29,158,117,0.15); color: #0A5B41; }
+  .fp-row-badge.reserved { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .fp-row-badge.mixed    { background: rgba(37,99,235,0.15); color: #1E40AF; }
+  @media (max-width: 760px) {
+    .fp-row { grid-template-columns: 12px 1fr auto; }
+    .fp-row-age, .fp-row-badge { display: none; }
+  }
+
   /* FIX v1.8.1-fix2: общий стиль для поиска в списках (Договоры, Контрагенты,
      Продажная номенклатура, КП и т.д.). До этого CSS отсутствовал → инпут
      не имел ширины 100% и текст placeholder обрезался. */
@@ -9841,46 +10040,55 @@
             </button>
           </div>
 
-          <!-- ТАБ: Готовая продукция -->
+          <!-- ТАБ: Готовая продукция (Этап 28.2 — новый дашборд) -->
           <div class="wh-tab-pane active" data-wh-pane="stock">
             <div class="content-inner" style="max-width: 100%;">
-              <!-- Сводка -->
-              <div class="wh-summary" id="wh-summary">
-                <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-total">—</div><div class="wh-sum-lbl">всего на складе</div></div>
-                <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-free">—</div><div class="wh-sum-lbl">свободных</div></div>
-                <div class="wh-sum-card"><div class="wh-sum-num" id="wh-sum-reserved">—</div><div class="wh-sum-lbl">зарезервировано</div></div>
+              <!-- KPI ряд -->
+              <div class="fp-kpi-row" id="fp-kpis">
+                <!-- генерируется в renderFinishedProductsDashboard -->
               </div>
 
-              <!-- Фильтры -->
-              <div class="desktop-layout">
-                <div class="filter-row" style="position: relative;">
-                  <div class="filter-tabs">
-                    <button class="filter-tab active" data-wh-filter="all" onclick="setWarehouseFilter('all')">Все</button>
-                    <button class="filter-tab" data-wh-filter="free" onclick="setWarehouseFilter('free')">Свободные</button>
-                    <button class="filter-tab" data-wh-filter="reserved" onclick="setWarehouseFilter('reserved')">Зарезервированные</button>
-                  </div>
-                  <div class="search-box" style="margin-left: 12px; flex: 1; max-width: 340px;">
-                    <i class="ti ti-search"></i>
-                    <input type="text" id="wh-search" placeholder="Поиск по модели или исполнению…" oninput="onWarehouseSearchInput()">
-                  </div>
+              <!-- Стек-бар категорий -->
+              <div class="fp-catbar-wrap" id="fp-catbar-wrap" style="display:none;">
+                <div class="fp-catbar-title">Распределение по категориям</div>
+                <div class="fp-catbar" id="fp-catbar"></div>
+                <div class="fp-catlegend" id="fp-catlegend"></div>
+              </div>
+
+              <!-- Тулбар: поиск + фильтры -->
+              <div class="fp-toolbar">
+                <div class="search-box" style="flex:1;">
+                  <i class="ti ti-search"></i>
+                  <input type="text" id="fp-search"
+                         placeholder="Модель, артикул, серийник или № договора…"
+                         oninput="onFpSearchInput()">
                 </div>
+                <div class="filter-tabs">
+                  <button class="filter-tab active" data-fp-status="all"   onclick="setFpStatusFilter('all')">Все</button>
+                  <button class="filter-tab"        data-fp-status="free"  onclick="setFpStatusFilter('free')">Свободные</button>
+                  <button class="filter-tab"        data-fp-status="reserved" onclick="setFpStatusFilter('reserved')">Резерв</button>
+                </div>
+                <button class="filter-tab" id="fp-sort-btn" onclick="toggleFpSort()" title="Сортировать">
+                  <i class="ti ti-arrows-sort"></i> <span id="fp-sort-label">По возрасту</span>
+                </button>
               </div>
 
-              <!-- Контейнер списка -->
-              <div id="wh-stock-list" class="wh-stock-list">
-                <div class="loading-block">Загружаем остатки…</div>
+              <!-- Список позиций -->
+              <div class="fp-list" id="fp-list">
+                <div class="loading-block">Загружаем…</div>
               </div>
 
-              <!-- ЭТАП 21: Панель массовой печати наклеек -->
-              <div class="bulk-action-bar hidden" id="wh-bulk-bar">
-                <div>Выбрано: <span class="bulk-action-count" id="wh-bulk-count">0</span></div>
-                <div class="bulk-action-spacer"></div>
-                <button class="btn btn-secondary btn-small" onclick="clearWarehouseSelection()">
-                  <i class="ti ti-x"></i> Снять выделение
-                </button>
-                <button class="btn btn-primary btn-small" onclick="printSelectedLabels()">
-                  <i class="ti ti-printer"></i> Печать наклеек
-                </button>
+              <!-- Скрытый счётчик: совместимость со старыми вызовами (loadWarehouseStock использует #wh-stock-counter) -->
+              <span id="wh-stock-counter" style="display:none;">0</span>
+              <!-- Скрытые элементы старого дашборда — оставляем чтобы не сломать существующий код,
+                   который ищет их по id. Если вернёмся на старый рендер — раскомментировать. -->
+              <div id="wh-stock-list" style="display:none;"></div>
+              <div id="wh-summary" style="display:none;">
+                <div id="wh-sum-total"></div><div id="wh-sum-free"></div><div id="wh-sum-reserved"></div>
+              </div>
+              <input type="hidden" id="wh-search" />
+              <div id="wh-bulk-bar" class="hidden">
+                <span id="wh-bulk-count">0</span>
               </div>
             </div>
           </div>
@@ -9932,8 +10140,7 @@
             </div>
           </div>
 
-          <!-- Скрытый счётчик для совместимости со старым кодом (loadWarehouseStock пишет в #wh-stock-counter) -->
-          <span id="wh-stock-counter" style="display:none;">0</span>
+          <!-- Скрытый счётчик уже есть внутри stock-pane -->
         </div>
       </div>
       <!-- ============ КОНЕЦ РАЗДЕЛА СКЛАД ============ -->
@@ -10754,7 +10961,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.21.0-warehouse-tabs";
+const APP_VERSION = "v2.21.1-fp-dashboard";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23467,9 +23674,306 @@ function switchWarehouseTab(tab) {
   try { localStorage.setItem('wh_active_tab', tab); } catch (e) {}
 
   // Лениво грузим контент таба
-  if (tab === 'stock')       loadWarehouseStock();
+  if (tab === 'stock')       loadFinishedProductsDashboard();
   if (tab === 'components')  loadWarehouseComponents();
   if (tab === 'movements')   loadWarehouseMovements();
+}
+
+
+// ============ ЭТАП 28.2: ДАШБОРД ГОТОВОЙ ПРОДУКЦИИ ============
+
+// Палитра сегментов для категорий (стек-бар + точки на чипах)
+const FP_CATEGORY_COLORS = ['#2563EB', '#534AB7', '#1D9E75', '#BA7517', '#C44A91', '#0EA5E9', '#DC2626', '#16A34A'];
+
+// state для фильтров/поиска/сортировки
+state.fpData = null;
+state.fpStatusFilter = 'all';     // all | free | reserved | dead90
+state.fpCategoryFilter = null;    // direction_id или null
+state.fpSearch = '';
+state.fpSort = 'age';             // age | name | qty
+
+async function loadFinishedProductsDashboard() {
+  const container = document.getElementById('fp-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/warehouse/dashboard/finished-products');
+    state.fpData = d;
+    renderFinishedProductsDashboard();
+    // Бейдж в табе — реальные штуки, не моделей
+    if (typeof _updateWarehouseTabBadges === 'function') {
+      _updateWarehouseTabBadges({ stock: (d.kpis && d.kpis.total) || 0 });
+    }
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function renderFinishedProductsDashboard() {
+  const d = state.fpData || { kpis: {}, by_category: [], items: [] };
+  _renderFpKpis(d.kpis);
+  _renderFpCatbar(d.by_category, d.kpis.total || 0);
+  _renderFpList();
+}
+
+function _renderFpKpis(k) {
+  const host = document.getElementById('fp-kpis');
+  if (!host) return;
+  const kpis = [
+    {
+      label: 'Всего на складе',
+      value: k.total || 0,
+      hint: (k.models_total || 0) + ' ' + _plural(k.models_total || 0, ['модель', 'модели', 'моделей']),
+      tone: '',
+    },
+    {
+      label: 'Свободно',
+      value: k.free || 0,
+      hint: (k.free_models || 0) + ' ' + _plural(k.free_models || 0, ['модель', 'модели', 'моделей']),
+      tone: 'tone-green',
+    },
+    {
+      label: 'Зарезервировано',
+      value: k.reserved || 0,
+      hint: (k.reserved_contracts || 0) + ' ' + _plural(k.reserved_contracts || 0, ['договор', 'договора', 'договоров']),
+      tone: 'tone-yellow',
+    },
+    {
+      label: 'Лежит > 90 дней',
+      value: k.dead90 || 0,
+      hint: (k.dead90_models || 0) + ' ' + _plural(k.dead90_models || 0, ['модель', 'модели', 'моделей']),
+      tone: 'tone-red',
+      clickable: true,
+      onclick: 'toggleFpDeadFilter()',
+    },
+  ];
+  host.innerHTML = kpis.map(k =>
+    '<div class="fp-kpi ' + k.tone + (k.clickable ? ' clickable' : '') + '"' +
+      (k.onclick ? ' onclick="' + k.onclick + '"' : '') + '>' +
+      '<div class="fp-kpi-label">' + escapeHtml(k.label) + '</div>' +
+      '<div class="fp-kpi-value">' + k.value + '</div>' +
+      '<div class="fp-kpi-hint">' + escapeHtml(k.hint) + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function _renderFpCatbar(categories, totalQty) {
+  const wrap = document.getElementById('fp-catbar-wrap');
+  const bar = document.getElementById('fp-catbar');
+  const legend = document.getElementById('fp-catlegend');
+  if (!wrap || !bar || !legend) return;
+  if (!categories || categories.length === 0 || totalQty === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  // Сегменты бара (пропорционально qty)
+  let segs = '';
+  let chips = '';
+  // «Все» — сбросить фильтр
+  chips += '<div class="fp-catchip ' + (state.fpCategoryFilter == null ? 'active' : '') + '" onclick="setFpCategoryFilter(null)">' +
+    '<span class="fp-catchip-qty">Все</span></div>';
+  categories.forEach((c, idx) => {
+    const color = FP_CATEGORY_COLORS[idx % FP_CATEGORY_COLORS.length];
+    const pct = totalQty > 0 ? (c.qty / totalQty * 100) : 0;
+    segs += '<div class="fp-catbar-seg" style="width:' + pct.toFixed(2) + '%;background:' + color + ';" title="' +
+      escapeHtml(c.direction_name) + ': ' + c.qty + '"></div>';
+    const active = state.fpCategoryFilter === c.direction_id;
+    chips += '<div class="fp-catchip ' + (active ? 'active' : '') + '" onclick="setFpCategoryFilter(' + c.direction_id + ')">' +
+      (active ? '' : '<span class="fp-catchip-dot" style="background:' + color + ';"></span>') +
+      '<span>' + escapeHtml(c.direction_name) + '</span>' +
+      '<span class="fp-catchip-qty">' + c.qty + '</span>' +
+      '</div>';
+  });
+  bar.innerHTML = segs;
+  legend.innerHTML = chips;
+}
+
+function _renderFpList() {
+  const host = document.getElementById('fp-list');
+  if (!host || !state.fpData) return;
+  let items = (state.fpData.items || []).slice();
+
+  // Фильтр по статусу
+  if (state.fpStatusFilter === 'free')     items = items.filter(it => it.free_qty > 0 && it.reserved_qty === 0);
+  if (state.fpStatusFilter === 'reserved') items = items.filter(it => it.reserved_qty > 0);
+  if (state.fpStatusFilter === 'dead90')   items = items.filter(it => it.age_category === 'dead');
+
+  // Фильтр по категории
+  if (state.fpCategoryFilter != null) {
+    items = items.filter(it => it.direction_id === state.fpCategoryFilter);
+  }
+
+  // Поиск
+  const q = (state.fpSearch || '').toLowerCase().trim();
+  if (q) {
+    items = items.filter(it => {
+      if ((it.model_name || '').toLowerCase().includes(q)) return true;
+      if ((it.model_article || '').toLowerCase().includes(q)) return true;
+      // поиск по № договора в резервах
+      return (it.reservations || []).some(r =>
+        (r.contract_number || '').toLowerCase().includes(q) ||
+        (r.contractor_name || '').toLowerCase().includes(q)
+      );
+    });
+  }
+
+  // Сортировка
+  if (state.fpSort === 'age') {
+    // Уже отсортировано на бэке (dead → warm → fresh), но при фильтрах нужно повторить
+    const ageRank = { dead: 0, warm: 1, fresh: 2 };
+    items.sort((a, b) => (ageRank[a.age_category] - ageRank[b.age_category])
+                       || (b.oldest_age_days - a.oldest_age_days)
+                       || (b.total_qty - a.total_qty));
+  } else if (state.fpSort === 'name') {
+    items.sort((a, b) => (a.model_name || '').localeCompare(b.model_name || ''));
+  } else if (state.fpSort === 'qty') {
+    items.sort((a, b) => b.total_qty - a.total_qty);
+  }
+
+  if (items.length === 0) {
+    host.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>' +
+      (state.fpStatusFilter !== 'all' || q || state.fpCategoryFilter != null
+        ? 'По заданным фильтрам ничего не найдено'
+        : 'На складе пока нет готовой продукции') +
+      '</div>';
+    return;
+  }
+
+  host.innerHTML = items.map(it => _renderFpRow(it)).join('');
+}
+
+function _renderFpRow(it) {
+  const isReserved = it.reserved_qty > 0;
+  const isFullyReserved = it.free_qty === 0 && it.reserved_qty > 0;
+  const isMixed = it.free_qty > 0 && it.reserved_qty > 0;
+  const isDead = it.age_category === 'dead';
+
+  const rowTone = isDead ? 'tone-red' : (isReserved ? 'tone-yellow' : '');
+
+  // Подстрока
+  let subText = '';
+  let subClass = '';
+  if (isDead) {
+    subClass = 'dead';
+    subText = '<i class="ti ti-alert-triangle" style="font-size:12px;"></i>Лежит больше 90 дней — проверить актуальность';
+  } else if (isReserved) {
+    subClass = 'reserved';
+    const r = (it.reservations || [])[0];
+    if (r) {
+      let resTxt = '<i class="ti ti-lock" style="font-size:12px;"></i>Резерв: №' + escapeHtml(r.contract_number || '—');
+      if (r.contractor_name) resTxt += ' · ' + escapeHtml(r.contractor_name);
+      if ((it.reservations || []).length > 1) {
+        resTxt += ' <span style="color:var(--text-light);">+' + ((it.reservations.length - 1)) + ' договор.</span>';
+      }
+      subText = resTxt;
+    }
+  } else {
+    // обычная — категория + кол-во сборок
+    const parts = [];
+    if (it.direction_name) parts.push(escapeHtml(it.direction_name));
+    parts.push(it.assemblies_count + ' ' + _plural(it.assemblies_count, ['сборка', 'сборки', 'сборок']));
+    subText = parts.join(' · ');
+  }
+
+  // Количество: показываем X / Y если есть и резерв и свободно
+  let qtyHtml;
+  if (isMixed) {
+    qtyHtml = '<div class="fp-row-qty">' + it.free_qty + ' <span class="fp-row-qty-sub">/ ' + it.total_qty + ' шт</span></div>';
+  } else {
+    qtyHtml = '<div class="fp-row-qty">' + it.total_qty + ' <span class="fp-row-qty-sub">шт</span></div>';
+  }
+
+  // Возраст
+  const ageCls = it.age_category;
+  const ageText = it.oldest_age_days + ' дн';
+
+  // Бейдж
+  let badgeHtml;
+  if (isMixed)            badgeHtml = '<span class="fp-row-badge mixed">смешан</span>';
+  else if (isFullyReserved) badgeHtml = '<span class="fp-row-badge reserved">резерв</span>';
+  else                    badgeHtml = '<span class="fp-row-badge free">свободна</span>';
+
+  return '<div class="fp-row ' + rowTone + '" onclick="openFpModelDetail(' + it.model_id + ')">' +
+    '<span class="fp-row-dot ' + it.age_category + '"></span>' +
+    '<div>' +
+      '<div class="fp-row-name">' + escapeHtml(it.model_name) +
+        (it.model_article ? '<span class="fp-row-article">' + escapeHtml(it.model_article) + '</span>' : '') +
+      '</div>' +
+      '<div class="fp-row-sub ' + subClass + '">' + subText + '</div>' +
+    '</div>' +
+    qtyHtml +
+    '<div class="fp-row-age ' + ageCls + '">' + ageText + '</div>' +
+    badgeHtml +
+    '</div>';
+}
+
+// ---- Обработчики тулбара ----
+
+function setFpStatusFilter(filter) {
+  state.fpStatusFilter = filter;
+  document.querySelectorAll('.filter-tab[data-fp-status]').forEach(b => {
+    b.classList.toggle('active', b.dataset.fpStatus === filter);
+  });
+  _renderFpList();
+}
+
+function toggleFpDeadFilter() {
+  // Клик на красный KPI «Лежит > 90 дней» — переключает фильтр
+  if (state.fpStatusFilter === 'dead90') {
+    setFpStatusFilter('all');
+  } else {
+    state.fpStatusFilter = 'dead90';
+    document.querySelectorAll('.filter-tab[data-fp-status]').forEach(b => {
+      b.classList.toggle('active', b.dataset.fpStatus === 'all');  // визуально выделяется красным kpi
+    });
+    _renderFpList();
+  }
+}
+
+function setFpCategoryFilter(directionId) {
+  state.fpCategoryFilter = directionId;
+  // Перерисовать только список и легенду (KPIs не меняются)
+  _renderFpCatbar((state.fpData && state.fpData.by_category) || [],
+                  (state.fpData && state.fpData.kpis && state.fpData.kpis.total) || 0);
+  _renderFpList();
+}
+
+let _fpSearchTimer = null;
+function onFpSearchInput() {
+  const v = (document.getElementById('fp-search') || {}).value || '';
+  state.fpSearch = v;
+  clearTimeout(_fpSearchTimer);
+  _fpSearchTimer = setTimeout(_renderFpList, 120);
+}
+
+function toggleFpSort() {
+  const order = ['age', 'qty', 'name'];
+  const labels = { age: 'По возрасту', qty: 'По количеству', name: 'По названию' };
+  const idx = order.indexOf(state.fpSort);
+  state.fpSort = order[(idx + 1) % order.length];
+  const lbl = document.getElementById('fp-sort-label');
+  if (lbl) lbl.textContent = labels[state.fpSort];
+  _renderFpList();
+}
+
+function openFpModelDetail(modelId) {
+  // Клик по строке — пока просто открываем модель в производстве
+  // (детальная карточка склада по модели — задел на будущее)
+  if (typeof selectSidebarItem === 'function') {
+    selectSidebarItem('models');
+    // дополнительно можно подсветить нужную модель — пока без этого
+  }
+}
+
+// Plural helper: ((1, ['модель','модели','моделей']) → 'модель')
+function _plural(n, forms) {
+  n = Math.abs(parseInt(n, 10)) % 100;
+  const n10 = n % 10;
+  if (n > 10 && n < 20) return forms[2];
+  if (n10 > 1 && n10 < 5) return forms[1];
+  if (n10 === 1)         return forms[0];
+  return forms[2];
 }
 
 
@@ -23950,8 +24454,11 @@ async function changeAssemblyStatus(assemblyId, newStatus) {
     closeAssemblyStockModal();
     cache.warehouseStock = null;
     cache.warehouseMovements = null;
-    if (state.currentScreen === 'warehouse-stock')     loadWarehouseStock();
-    if (state.currentScreen === 'warehouse-movements') loadWarehouseMovements();
+    // ЭТАП 28.1: экран теперь warehouse-dashboard, активный таб — в state.activeWarehouseTab
+    if (state.currentScreen === 'warehouse-dashboard') {
+      if (state.activeWarehouseTab === 'stock')     loadFinishedProductsDashboard();
+      if (state.activeWarehouseTab === 'movements') loadWarehouseMovements();
+    }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
@@ -23988,8 +24495,11 @@ async function promptWriteOff(assemblyId, currentStock) {
     closeAssemblyStockModal();
     cache.warehouseStock = null;
     cache.warehouseMovements = null;
-    if (state.currentScreen === 'warehouse-stock')     loadWarehouseStock();
-    if (state.currentScreen === 'warehouse-movements') loadWarehouseMovements();
+    // ЭТАП 28.1: экран теперь warehouse-dashboard, активный таб — в state.activeWarehouseTab
+    if (state.currentScreen === 'warehouse-dashboard') {
+      if (state.activeWarehouseTab === 'stock')     loadFinishedProductsDashboard();
+      if (state.activeWarehouseTab === 'movements') loadWarehouseMovements();
+    }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
@@ -31364,7 +31874,7 @@ async function submitExternalShipment() {
       showToast('Отгружено: ' + (d.created || 0) + ' поз.', 'success');
     }
     closeExternalShipment();
-    if (state.currentScreen === 'warehouse-stock') loadWarehouseStock();
+    if (state.currentScreen === 'warehouse-dashboard' && state.activeWarehouseTab === 'stock') loadFinishedProductsDashboard();
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
