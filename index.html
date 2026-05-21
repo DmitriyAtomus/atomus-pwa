@@ -20058,37 +20058,36 @@ async function loadContractItemsBlock(contractId) {
   }
 }
 
-// v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции)
+// v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции + свободный ввод)
 function _renderReservationBadge(item) {
   if (!item) return '';
-  // v2.19.1: для sale_product_id — отдельный бейдж статуса закупки
-  if (item.sale_product_id) {
-    return _renderPurchaseBadge(item);
-  }
   // model_id / component_id — резерв через сборки/комплектующие
-  const hasReservable = item.model_id || item.component_id;
-  if (!hasReservable) return '';  // свободный текст — без бейджа
-  const qty = Number(item.qty) || 0;
-  const reserved = Number(item.qty_reserved || 0);
-  if (qty <= 0) return '';
-  let cls = 'r-none';
-  let icon = 'ti-circle';
-  let txt = '';
-  if (reserved >= qty) {
-    cls = 'r-full';
-    icon = 'ti-circle-check';
-    txt = 'В резерве';
-  } else if (reserved > 0) {
-    cls = 'r-partial';
-    icon = 'ti-progress';
-    txt = 'Резерв ' + _fmtQty(reserved) + ' из ' + _fmtQty(qty);
-  } else {
-    cls = 'r-none';
-    icon = 'ti-circle-dashed';
-    txt = (item.model_id ? 'К сборке' : 'К закупке');
+  if (item.model_id || item.component_id) {
+    const qty = Number(item.qty) || 0;
+    const reserved = Number(item.qty_reserved || 0);
+    if (qty <= 0) return '';
+    let cls = 'r-none';
+    let icon = 'ti-circle';
+    let txt = '';
+    if (reserved >= qty) {
+      cls = 'r-full';
+      icon = 'ti-circle-check';
+      txt = 'В резерве';
+    } else if (reserved > 0) {
+      cls = 'r-partial';
+      icon = 'ti-progress';
+      txt = 'Резерв ' + _fmtQty(reserved) + ' из ' + _fmtQty(qty);
+    } else {
+      cls = 'r-none';
+      icon = 'ti-circle-dashed';
+      txt = (item.model_id ? 'К сборке' : 'К закупке');
+    }
+    return ' <span class="spec-item-reservation ' + cls + '" title="' + escapeHtml(txt) + '">' +
+      '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
   }
-  return ' <span class="spec-item-reservation ' + cls + '" title="' + escapeHtml(txt) + '">' +
-    '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
+  // v2.19.1: для sale_product_id И для свободного ввода — бейдж статуса закупки
+  // (по решению от 21.05.2026: свободный ввод тоже трекаем как покупное)
+  return _renderPurchaseBadge(item);
 }
 
 // v2.19.1: бейдж статуса закупки для sale_product_id (кликабельный, циклически переключает состояние)
@@ -20201,6 +20200,7 @@ function renderContractItemsBlock(contractId) {
         const _reservedBadge = _renderReservationBadge(it);
         const meta = metaParts.join(' · ');
         // ЭТАП 38 (v2.18.0): клик по названию → открыть карточку связанной сущности
+        // v2.19.1: для свободного ввода — открыть форму редактирования позиции
         let nameClickHandler = '';
         let nameLinkClass = '';
         if (it.sale_product_id) {
@@ -20211,6 +20211,10 @@ function renderContractItemsBlock(contractId) {
           nameLinkClass = ' spec-item-name--link';
         } else if (it.component_id) {
           nameClickHandler = ' onclick="openComponentDetail(' + it.component_id + ')"';
+          nameLinkClass = ' spec-item-name--link';
+        } else if (canEdit) {
+          // v2.19.1: свободный ввод — клик открывает форму редактирования (если есть права)
+          nameClickHandler = ' onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"';
           nameLinkClass = ' spec-item-name--link';
         }
         html += '<div class="spec-item">' +
