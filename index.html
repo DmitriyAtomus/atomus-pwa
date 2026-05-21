@@ -1781,6 +1781,73 @@
     color: #b45309;
   }
 
+  /* ЭТАП 40 (v2.20.0): action-кнопки в модалке blockers отгрузки */
+  .ship-action-btn {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 14px 16px;
+    border: none; border-radius: 12px;
+    cursor: pointer; user-select: none;
+    text-align: left; font-family: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    position: relative; overflow: hidden;
+  }
+  .ship-action-btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
+  .ship-action-btn:active { transform: translateY(0); filter: brightness(0.97); }
+  .ship-action-btn .sa-icon {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.22);
+    font-size: 20px;
+  }
+  .ship-action-btn .sa-body { flex: 1; min-width: 0; }
+  .ship-action-btn .sa-title {
+    font-size: 15px; font-weight: 600; color: white;
+    line-height: 1.2; margin-bottom: 2px;
+  }
+  .ship-action-btn .sa-sub {
+    font-size: 12px; color: rgba(255,255,255,0.85);
+    line-height: 1.3;
+  }
+  .ship-action-btn .sa-arrow {
+    flex-shrink: 0; color: rgba(255,255,255,0.6);
+    font-size: 18px; transition: transform 0.15s ease, color 0.15s ease;
+  }
+  .ship-action-btn:hover .sa-arrow { transform: translateX(3px); color: white; }
+  /* Партиальная — мёд */
+  .ship-action-btn.ship-partial {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 60%, #d97706 100%);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+  }
+  .ship-action-btn.ship-partial:hover {
+    box-shadow: 0 8px 20px rgba(245, 158, 11, 0.45);
+  }
+  /* Force — критичная, с красно-розовым переходом */
+  .ship-action-btn.ship-force {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 60%, #b91c1c 100%);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+  }
+  .ship-action-btn.ship-force:hover {
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.5);
+  }
+  /* Отмена — тонкая, минималистичная */
+  .ship-action-btn.ship-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    justify-content: center;
+  }
+  .ship-action-btn.ship-cancel:hover {
+    background: var(--bg);
+    transform: none; filter: none;
+    border-color: var(--text-light);
+  }
+  .ship-action-btn.ship-cancel .sa-title {
+    color: var(--text-mid); font-weight: 500; font-size: 14px;
+    margin: 0;
+  }
+
   /* Карточка договора — детали */
   .contract-header-card {
     background: white; border: 1px solid var(--border);
@@ -26797,14 +26864,26 @@ function openShippingBlockersModal(contractId, readiness, message) {
       '<div style="overflow-y:auto;flex:1;border-top:1px solid var(--border);">' +
         blockerRowsHtml +
       '</div>' +
-      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">' +
-        '<button class="primary-btn" style="background:#f59e0b;" onclick="doShippingAction(' + contractId + ', \'partial\')">' +
-          '<i class="ti ti-package-export"></i> Отгрузить частично' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;background:#fafbfc;">' +
+        '<button class="ship-action-btn ship-partial" onclick="doShippingAction(' + contractId + ', \'partial\')">' +
+          '<div class="sa-icon"><i class="ti ti-package-export"></i></div>' +
+          '<div class="sa-body">' +
+            '<div class="sa-title">Отгрузить частично</div>' +
+            '<div class="sa-sub">Отгрузим только готовые позиции, остаток — позже</div>' +
+          '</div>' +
+          '<i class="ti ti-chevron-right sa-arrow"></i>' +
         '</button>' +
-        '<button class="primary-btn" style="background:#dc2626;" onclick="doShippingAction(' + contractId + ', \'force\')">' +
-          '<i class="ti ti-alert-octagon"></i> Всё равно отгрузить (force)' +
+        '<button class="ship-action-btn ship-force" onclick="doShippingAction(' + contractId + ', \'force\')">' +
+          '<div class="sa-icon"><i class="ti ti-alert-octagon"></i></div>' +
+          '<div class="sa-body">' +
+            '<div class="sa-title">Всё равно отгрузить</div>' +
+            '<div class="sa-sub">Игнорировать блокировку и закрыть отгрузку</div>' +
+          '</div>' +
+          '<i class="ti ti-chevron-right sa-arrow"></i>' +
         '</button>' +
-        '<button class="secondary-btn" onclick="closeShippingBlockersModal()">Отмена</button>' +
+        '<button class="ship-action-btn ship-cancel" onclick="closeShippingBlockersModal()">' +
+          '<div class="sa-title">Отмена</div>' +
+        '</button>' +
       '</div>' +
     '</div>';
   m.classList.add('visible');
