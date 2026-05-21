@@ -9134,6 +9134,7 @@
         <div class="screen-header">
           <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
           <h2>Номенклатура оборудования</h2>
+          <button class="icon-btn" id="models-mobile-new-dir" onclick="openNewDirectionForm()" style="display:none;" title="Новый раздел"><i class="ti ti-folder-plus"></i></button>
           <button class="icon-btn" id="models-mobile-new" onclick="openNewModelForm()" style="display:none;"><i class="ti ti-plus"></i></button>
           <button class="icon-btn" onclick="loadModels()"><i class="ti ti-refresh"></i></button>
         </div>
@@ -9141,6 +9142,9 @@
           <div><h1>Номенклатура оборудования</h1><div class="page-subtitle">Справочник моделей по направлениям</div></div>
           <div class="page-actions">
             <button class="icon-btn" onclick="loadModels()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-secondary" id="models-new-dir-btn" onclick="openNewDirectionForm()" style="display:none;">
+              <i class="ti ti-folder-plus"></i> Новый раздел
+            </button>
             <button class="btn btn-primary" id="models-new-btn" onclick="openNewModelForm()" style="display:none;">
               <i class="ti ti-plus"></i> Новая модель
             </button>
@@ -10676,7 +10680,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.0-air-coolers";
+const APP_VERSION = "v2.20.1-new-direction";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -18184,11 +18188,16 @@ function formatActivityTime(iso) {
 async function loadModels() {
   const container = document.getElementById('models-list');
   // ЭТАП 30.6: показ кнопки «Новая модель» для директора/зама
+  // ЭТАП 44: + кнопка «Новый раздел» (те же права)
   const canEdit = (typeof canManageSales === 'function') ? canManageSales() : false;
   const btnDesktop = document.getElementById('models-new-btn');
   const btnMobile = document.getElementById('models-mobile-new');
+  const btnDirDesktop = document.getElementById('models-new-dir-btn');
+  const btnDirMobile = document.getElementById('models-mobile-new-dir');
   if (btnDesktop) btnDesktop.style.display = canEdit ? '' : 'none';
   if (btnMobile) btnMobile.style.display = canEdit ? '' : 'none';
+  if (btnDirDesktop) btnDirDesktop.style.display = canEdit ? '' : 'none';
+  if (btnDirMobile) btnDirMobile.style.display = canEdit ? '' : 'none';
 
   if (cache.models) { renderModels(cache.models); return; }
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
@@ -19026,6 +19035,202 @@ async function submitNewModel() {
     openMap[direction_id] = true;
     localStorage.setItem('models_groups_open', JSON.stringify(openMap));
     renderModels(cache.models);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// ============ ЭТАП 44: НОВЫЙ РАЗДЕЛ НОМЕНКЛАТУРЫ ============
+
+// Набор иконок для выбора (tabler) — покрывает типичные категории оборудования
+const DIR_ICON_PRESETS = [
+  'ti-box',
+  'ti-adjustments-horizontal',
+  'ti-temperature',
+  'ti-temperature-snow',
+  'ti-snowflake',
+  'ti-flame',
+  'ti-droplet',
+  'ti-air-conditioning',
+  'ti-wind',
+  'ti-bolt',
+  'ti-layout-grid',
+  'ti-tool',
+];
+
+// Транслитерация для автогенерации кода: первая буква каждого слова
+const DIR_CYR2LAT = {
+  'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e',
+  'ж':'zh','з':'z','и':'i','й':'i','к':'k','л':'l','м':'m',
+  'н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u',
+  'ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sh',
+  'ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya',
+};
+
+function _autoGenDirectionCode(name) {
+  const s = (name || '').trim().toLowerCase();
+  if (!s) return '';
+  const words = s.split(/\s+/).filter(Boolean);
+  let code = '';
+  for (const w of words) {
+    const first = w[0] || '';
+    code += (DIR_CYR2LAT[first] !== undefined ? DIR_CYR2LAT[first] : (/[a-z0-9]/.test(first) ? first : ''));
+    if (code.length >= 4) break;
+  }
+  code = code.replace(/[^a-z0-9]/g, '');
+  if (code.length < 2 && words.length === 1) {
+    // Один короткий слов — добавим больше букв
+    const w = words[0];
+    code = '';
+    for (const ch of w) {
+      code += (DIR_CYR2LAT[ch] !== undefined ? DIR_CYR2LAT[ch] : (/[a-z0-9]/.test(ch) ? ch : ''));
+      if (code.length >= 3) break;
+    }
+  }
+  return code.slice(0, 4);
+}
+
+function openNewDirectionForm() {
+  if (!canManageSales()) {
+    showToast('Создавать разделы может директор или зам', 'error');
+    return;
+  }
+  let m = document.getElementById('new-direction-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'new-direction-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeNewDirectionForm(); };
+    document.body.appendChild(m);
+  }
+
+  const iconsHtml = DIR_ICON_PRESETS.map((ic, idx) =>
+    '<button type="button" class="nd-icon-btn' + (idx === 0 ? ' selected' : '') +
+    '" data-icon="' + ic + '" onclick="selectDirectionIcon(\'' + ic + '\')" ' +
+    'style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;transition:all .15s;">' +
+    '<i class="ti ' + ic + '" style="font-size:20px;color:var(--text-mid);"></i>' +
+    '</button>'
+  ).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-folder-plus"></i> Новый раздел номенклатуры</h3>' +
+        '<button class="modal-close" onclick="closeNewDirectionForm()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;overflow-y:auto;flex:1;">' +
+        // Название
+        '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Название раздела *</label>' +
+        '<input type="text" id="nd-name" oninput="_onNdNameInput()" placeholder="Например: Смесительные узлы" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;" autocomplete="off" />' +
+        // Иконка
+        '<label style="display:block;margin-bottom:8px;font-size:13px;color:var(--text-light);font-weight:500;">Иконка</label>' +
+        '<div id="nd-icons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">' +
+          iconsHtml +
+        '</div>' +
+        '<input type="hidden" id="nd-icon" value="' + DIR_ICON_PRESETS[0] + '" />' +
+        // Доп. блок
+        '<details style="margin-bottom:4px;">' +
+          '<summary style="cursor:pointer;font-size:13px;color:var(--text-mid);font-weight:500;margin-bottom:10px;user-select:none;"><i class="ti ti-chevron-down" style="font-size:14px;vertical-align:middle;"></i> Дополнительно</summary>' +
+          '<div style="padding-top:6px;">' +
+            '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Описание <span style="color:var(--text-light);font-weight:400;">(необязательно)</span></label>' +
+            '<input type="text" id="nd-subtitle" placeholder="Например: узлы регулирования температуры" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;" autocomplete="off" />' +
+            '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Короткий код <span style="color:var(--text-light);font-weight:400;">(автоматически из названия)</span></label>' +
+            '<input type="text" id="nd-code" placeholder="Например: smu" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:6px;font-family:monospace;" autocomplete="off" maxlength="12" />' +
+            '<div style="font-size:11px;color:var(--text-light);">latin/цифры/дефис, 2–12 символов</div>' +
+          '</div>' +
+        '</details>' +
+        '<div style="margin-top:14px;padding:10px 12px;background:#eef2ff;border-radius:8px;color:#3730a3;font-size:12px;display:flex;align-items:center;gap:8px;">' +
+          '<i class="ti ti-info-circle" style="font-size:16px;"></i>' +
+          '<span>Раздел появится в выпадашках Производства и в боте после создания модели.</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);display:flex;gap:10px;">' +
+        '<button class="btn btn-secondary" onclick="closeNewDirectionForm()" style="flex:1;">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitNewDirection()" style="flex:2;">' +
+          '<i class="ti ti-check"></i> Создать раздел</button>' +
+      '</div>' +
+    '</div>';
+
+  // CSS для выбора иконки (один раз)
+  if (!document.getElementById('nd-icon-style')) {
+    const s = document.createElement('style');
+    s.id = 'nd-icon-style';
+    s.textContent =
+      '.nd-icon-btn:hover { background:var(--bg) !important; border-color:var(--brand) !important; }' +
+      '.nd-icon-btn.selected { background:var(--brand) !important; border-color:var(--brand) !important; }' +
+      '.nd-icon-btn.selected i { color:white !important; }';
+    document.head.appendChild(s);
+  }
+
+  m.classList.add('visible');
+  setTimeout(() => {
+    const nameInput = document.getElementById('nd-name');
+    if (nameInput) nameInput.focus();
+  }, 50);
+}
+
+function _onNdNameInput() {
+  const nameEl = document.getElementById('nd-name');
+  const codeEl = document.getElementById('nd-code');
+  if (!nameEl || !codeEl) return;
+  // Если код пустой или авто-сгенерирован — обновляем
+  if (!codeEl.dataset.manual) {
+    codeEl.value = _autoGenDirectionCode(nameEl.value);
+  }
+  // Помечаем код как ручной если пользователь сам его правил
+  codeEl.oninput = () => { codeEl.dataset.manual = '1'; };
+}
+
+function selectDirectionIcon(icon) {
+  const hidden = document.getElementById('nd-icon');
+  if (hidden) hidden.value = icon;
+  document.querySelectorAll('.nd-icon-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.icon === icon);
+  });
+}
+
+function closeNewDirectionForm() {
+  const m = document.getElementById('new-direction-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function submitNewDirection() {
+  const name = (document.getElementById('nd-name').value || '').trim();
+  const code = (document.getElementById('nd-code').value || '').trim().toLowerCase();
+  const subtitle = (document.getElementById('nd-subtitle').value || '').trim();
+  const icon = (document.getElementById('nd-icon').value || '').trim();
+
+  if (!name) { showToast('Введи название раздела', 'error'); return; }
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/directions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        name: name,
+        code: code || undefined,   // бэк сгенерит сам если пусто
+        subtitle: subtitle || undefined,
+        icon: icon || undefined,
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось создать раздел', 'error');
+      return;
+    }
+    const created = await r.json();
+    showToast('Раздел «' + (created.name || name) + '» создан', 'success');
+    closeNewDirectionForm();
+    cache.models = null;          // сброс кэша
+    await loadModels();
+    // Раскроем новый раздел сразу (он пустой)
+    if (created.id) {
+      const openMap = JSON.parse(localStorage.getItem('models_groups_open') || '{}');
+      openMap[created.id] = true;
+      localStorage.setItem('models_groups_open', JSON.stringify(openMap));
+      renderModels(cache.models);
+    }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
