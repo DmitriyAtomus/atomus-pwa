@@ -10652,7 +10652,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.0-reserve-hooks";
+const APP_VERSION = "v2.20.0-rebuild-button";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20243,6 +20243,15 @@ function renderContractDetail(c) {
         '<i class="ti ti-info-circle"></i> Готово ' + ready + ' из ' + total +
         ' позиций. Нажмите «Отгружен», чтобы увидеть что не готово.</div>';
     }
+    // ЭТАП 42.2 (v2.20.0): ручная кнопка пересборки резервов
+    html += '<button onclick="rebuildReservations()" ' +
+      'style="margin-top:6px;padding:6px 12px;font-size:12px;background:transparent;' +
+      'color:var(--text-light);border:1px dashed var(--border);border-radius:6px;cursor:pointer;' +
+      'transition:all 0.15s;" ' +
+      'onmouseover="this.style.color=\'var(--brand)\';this.style.borderColor=\'var(--brand)\';" ' +
+      'onmouseout="this.style.color=\'var(--text-light)\';this.style.borderColor=\'var(--border)\';" ' +
+      'title="Пересчитать привязки сборок к договорам (cleanup + backfill)">' +
+      '<i class="ti ti-refresh"></i> Пересобрать резервы</button>';
   }
 
   // Детали
@@ -26869,6 +26878,40 @@ async function publishContract(contractId) {
     const msg = (e && e.message) ? e.message : 'Ошибка публикации';
     showToast(msg, 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-rocket"></i>Опубликовать договор'; }
+  }
+}
+
+// ============ ЭТАП 42.2 (v2.20.0): РУЧНАЯ ПЕРЕСБОРКА РЕЗЕРВОВ ============
+async function rebuildReservations() {
+  if (!confirm('Пересобрать резервы по всем активным договорам?\n\nЭто откатит лишние резервы и попробует привязать свободные сборки к открытым договорам.')) {
+    return;
+  }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/rebuild-reservations', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      // Если endpoint 404 — бэк ещё не задеплоен
+      if (r.status === 404) {
+        showToast('Endpoint не найден. Бэкенд ещё не задеплоен с новой версией.', 'error');
+        return;
+      }
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось пересобрать резервы', 'error');
+      return;
+    }
+    const d = await r.json();
+    const msg = 'Пересобрано: откачено ' + (d.cleaned_pairs || 0) +
+      ' лишних, зарезервировано ' + (d.reserved_assemblies || 0) + ' свободных';
+    showToast(msg, 'success');
+    cache.contracts = null;
+    cache.contractsWithProgress = null;
+    cache.warehouseStock = null;
+    loadCurrentContract();
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
   }
 }
 
