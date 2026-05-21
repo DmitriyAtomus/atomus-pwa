@@ -10676,7 +10676,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.20.0-reserve-diag";
+const APP_VERSION = "v2.20.0-warehouse-fix";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23126,14 +23126,22 @@ function renderWarehouseStock(d) {
   const container = document.getElementById('wh-stock-list');
   if (!container) return;
 
-  // Сводка
-  const sum = d.summary || {};
-  document.getElementById('wh-sum-total').textContent    = sum.total ?? 0;
-  document.getElementById('wh-sum-free').textContent     = sum.free ?? 0;
-  document.getElementById('wh-sum-reserved').textContent = sum.reserved ?? 0;
-
   const list = d.stock || [];
   document.getElementById('wh-stock-counter').textContent = list.length;
+
+  // ЭТАП 42.5 (v2.20.0): KPI считаем по реальным штукам, а не по числу записей.
+  // Бэкенд возвращает summary.total/free/reserved как количество записей assemblies,
+  // но визуально нужно показывать штуки — сумма stock_qty по статусу резерва.
+  let totalQty = 0, freeQty = 0, reservedQty = 0;
+  list.forEach(s => {
+    const q = Number(s.stock_qty) || 0;
+    totalQty += q;
+    if (s.contract_id) reservedQty += q;
+    else freeQty += q;
+  });
+  document.getElementById('wh-sum-total').textContent    = totalQty;
+  document.getElementById('wh-sum-free').textContent     = freeQty;
+  document.getElementById('wh-sum-reserved').textContent = reservedQty;
 
   if (!list.length) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>Под выбранный фильтр сборок нет</div>';
