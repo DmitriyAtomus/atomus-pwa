@@ -12566,7 +12566,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.26.4-confirmed-title";
+const APP_VERSION = "v2.26.5-rollback-delete";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35504,11 +35504,18 @@ function renderSupplyInvoicesList(items) {
     const supplier = inv.supplier_name_raw || '—';
     const itemsLine = inv.items_count != null ? (inv.items_count + ' поз.') : '';
     const createdLine = inv.created_at ? ('создано ' + siFmtDateTime(inv.created_at)) : '';
-    // Иконка удаления — только для черновиков и отменённых
-    const canDelete = (status === 'draft' || status === 'cancelled');
+    // Иконка удаления: для черновиков и отменённых — простой soft-delete,
+    // для оприходованных — с откатом со склада
+    const canDelete = (status !== 'cancelled');
+    const handler = (status === 'confirmed' || status === 'partially_refused')
+      ? 'deleteConfirmedSupplyInvoice'
+      : 'deleteSupplyInvoiceFromList';
+    const delTitle = (status === 'confirmed' || status === 'partially_refused')
+      ? 'Отменить оприходование'
+      : 'Удалить черновик';
     const delBtn = canDelete
-      ? '<button class="icon-btn si-row-del" title="Удалить черновик" ' +
-          'onclick="event.stopPropagation();deleteSupplyInvoiceFromList(' + inv.id + ')">' +
+      ? '<button class="icon-btn si-row-del" title="' + delTitle + '" ' +
+          'onclick="event.stopPropagation();' + handler + '(' + inv.id + ')">' +
           '<i class="ti ti-trash"></i></button>'
       : '';
     html +=
@@ -35732,6 +35739,8 @@ function renderSupplyInvoiceDetail(data) {
   html +=   '<div style="flex:1;"></div>';
   if (inv.status === 'draft') {
     html += '<button class="pkb-btn" onclick="deleteSupplyInvoice(' + inv.id + ')"><i class="ti ti-trash"></i>Удалить</button>';
+  } else if (inv.status === 'confirmed' || inv.status === 'partially_refused') {
+    html += '<button class="pkb-btn" style="color:#8C2A2A;" onclick="deleteConfirmedSupplyInvoice(' + inv.id + ')"><i class="ti ti-arrow-back-up"></i>Отменить оприходование</button>';
   }
   html += '</div>';
 
@@ -36318,6 +36327,32 @@ async function deleteSupplyInvoice(invoiceId) {
   try {
     await apiDelete('/api/supply/invoices/' + invoiceId);
     showToast('Черновик удалён', 'success');
+    loadSupplyInvoicesList();
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+async function deleteConfirmedSupplyInvoice(invoiceId) {
+  const msg = 'Отменить оприходование?\n\n' +
+              '• Со склада будет вычтено всё, что эта УПД приходовала\n' +
+              '• Движения по этой приёмке будут удалены\n' +
+              '• Авто-созданные карточки в «Разное» будут деактивированы (если не использовались больше нигде)\n' +
+              '• УПД будет помечена как отменённая';
+  if (!confirm(msg)) return;
+  try {
+    const r = await apiDelete('/api/supply/invoices/' + invoiceId);
+    if (r && r.ok === false) {
+      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
+      return;
+    }
+    const rb = (r && r.data && r.data.rollback) || {};
+    const parts = [];
+    if (rb.qty_reverted)           parts.push('вычтено: ' + rb.qty_reverted);
+    if (rb.movements_deleted)      parts.push('движений удалено: ' + rb.movements_deleted);
+    if (rb.components_deactivated) parts.push('карточек деактивировано: ' + rb.components_deactivated);
+    if (rb.aliases_removed)        parts.push('алиасов снято: ' + rb.aliases_removed);
+    showToast('Оприходование отменено' + (parts.length ? ' · ' + parts.join(', ') : ''), 'success');
     loadSupplyInvoicesList();
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
