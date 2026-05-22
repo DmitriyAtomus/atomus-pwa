@@ -12734,7 +12734,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.29.0-smart-category";
+const APP_VERSION = "v2.29.1-qty-edit";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36301,6 +36301,30 @@ function renderSiDestTiles(items) {
   return html;
 }
 
+// Быстрое редактирование qty прямо в строке через prompt
+async function openSiQtyEditPrompt(itemId, currentQty) {
+  const newQtyStr = prompt('Новое количество (через точку, например 12 или 3.5):', String(currentQty || '').replace(/\s/g, ''));
+  if (newQtyStr === null) return;  // отмена
+  const newQty = parseFloat(newQtyStr.replace(',', '.').replace(/\s/g, ''));
+  if (isNaN(newQty) || newQty < 0) {
+    showToast('Некорректное число', 'error');
+    return;
+  }
+  try {
+    const invId = siState.currentInvoiceId || 0;
+    const r = await apiPatch('/api/supply/invoices/' + invId + '/items/' + itemId, { qty: newQty });
+    if (r && r.ok === false) {
+      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
+      return;
+    }
+    showToast('Кол-во обновлено', 'success');
+    // Перерисуем карточку — самый простой способ
+    if (siState.currentInvoiceId) loadSupplyInvoiceDetail(siState.currentInvoiceId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 function renderSiItemsTable(items) {
   // Скрываем split-parent (qty=0) когда есть дети
   const visible = items.filter(it => !(parseFloat(it.qty) === 0 && !it.is_refused));
@@ -36334,10 +36358,14 @@ function renderSiItemRow(it) {
   const hint = renderSiMatchHint(it);
   if (hint) html += '<div class="si-item-hint">' + hint + '</div>';
   html += '</div>';
-  // qty
+  // qty — кликабельный для редактирования
   const qty = pkbFmtQty(it.qty);
   const unit = it.unit || '';
-  html += '<div style="text-align:right;font-variant-numeric:tabular-nums;' + (it.is_refused ? 'text-decoration:line-through;' : '') + '">' +
+  const qtyTitle = it.is_refused ? '' : ' title="Нажмите чтобы изменить количество"';
+  const qtyStyle = 'text-align:right;font-variant-numeric:tabular-nums;' +
+                   (it.is_refused ? 'text-decoration:line-through;' : 'cursor:pointer;border-bottom:1px dashed transparent;') ;
+  const qtyAttr = it.is_refused ? '' : ' onclick="openSiQtyEditPrompt(' + it.id + ',\'' + qty + '\')"';
+  html += '<div style="' + qtyStyle + '"' + qtyTitle + qtyAttr + '>' +
             qty + ' ' + escapeHtml(unit) +
           '</div>';
   // destination select
