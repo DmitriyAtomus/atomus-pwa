@@ -7635,7 +7635,7 @@
   .drawer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.55);
     z-index: 240;
     display: none;
     animation: fadeIn25 0.2s ease;
@@ -7645,20 +7645,34 @@
   /* Sidebar в режиме drawer (только на мобиле) */
   .app.mobile-layout .sidebar.drawer-mode {
     display: flex !important;
+    flex-direction: column;
     position: fixed !important;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
-    max-width: 85vw;
+    width: 300px;
+    max-width: 88vw;
     z-index: 250;
     height: 100vh;
     overflow-y: auto;
     transform: translateX(-100%);
     transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-    padding-top: max(16px, env(safe-area-inset-top));
+    /* Большой отступ сверху чтобы пункты меню начинались НИЖЕ кнопки X */
+    padding-top: calc(56px + max(8px, env(safe-area-inset-top)));
     padding-bottom: max(16px, env(safe-area-inset-bottom));
     box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+  }
+  /* Футер sidebar (версия) в режиме drawer — нормальная ширина */
+  .app.mobile-layout .sidebar.drawer-mode .sidebar-footer,
+  .app.mobile-layout .sidebar.drawer-mode .sidebar-version,
+  .app.mobile-layout .sidebar.drawer-mode .version-block {
+    width: 100%;
+    padding-left: 18px;
+    padding-right: 18px;
+    box-sizing: border-box;
+    text-align: left;
+    word-break: normal;
+    white-space: normal;
   }
   .app.mobile-layout .sidebar.drawer-mode.open {
     transform: translateX(0);
@@ -7668,10 +7682,10 @@
     position: absolute;
     top: max(14px, env(safe-area-inset-top));
     right: 14px;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.18);
     border: none;
     color: white;
     display: flex;
@@ -7679,8 +7693,9 @@
     justify-content: center;
     cursor: pointer;
     z-index: 5;
+    font-size: 18px;
   }
-  .drawer-close-btn:active { background: rgba(255, 255, 255, 0.28); }
+  .drawer-close-btn:active { background: rgba(255, 255, 255, 0.30); }
 
   /* ===== ЭТАП 25.1: ПРОИЗВОДСТВО (мобильный dashboard) ===== */
   .prod25-active-row {
@@ -12657,7 +12672,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.27.1-mobile-fix";
+const APP_VERSION = "v2.27.2-drawer-polish";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
