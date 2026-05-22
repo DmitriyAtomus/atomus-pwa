@@ -9827,6 +9827,68 @@
   }
   .si-upload-input { display: none; }
 
+  /* --- Большие кнопки выбора способа загрузки (мобильная и десктоп) --- */
+  .si-upload-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .si-upload-action-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+    min-height: 92px;
+  }
+  .si-upload-action-btn:hover, .si-upload-action-btn:active {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+    transform: translateY(-1px);
+  }
+  .si-upload-action-btn i { font-size: 28px; color: #7C3AED; }
+  .si-upload-action-btn .si-upload-action-title {
+    font-size: 13.5px; font-weight: 600; color: var(--text-dark);
+  }
+  .si-upload-action-btn .si-upload-action-hint {
+    font-size: 11px; color: var(--text-light); line-height: 1.3;
+  }
+  .si-upload-action-btn.primary {
+    background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%);
+    border-color: #6D28D9;
+    color: #fff;
+  }
+  .si-upload-action-btn.primary i { color: #fff; }
+  .si-upload-action-btn.primary .si-upload-action-title { color: #fff; }
+  .si-upload-action-btn.primary .si-upload-action-hint { color: rgba(255,255,255,0.85); }
+
+  /* На мобильной: drop-zone не нужен (drag&drop не работает на тач), кнопки в столбик */
+  .app.mobile-layout .si-upload-zone { display: none; }
+  .app.mobile-layout .si-upload-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .app.mobile-layout .si-upload-action-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 18px 16px;
+    min-height: 72px;
+    text-align: left;
+  }
+  .app.mobile-layout .si-upload-action-btn i { font-size: 32px; }
+  .app.mobile-layout .si-upload-action-btn > div { flex: 1; }
+  /* На мобильной шапки уменьшаем кнопки до иконок */
+  .app.mobile-layout .si-btn-label { display: none; }
+
   /* --- Шапка приёмки --- */
   .si-detail-header {
     display: flex; align-items: flex-start; justify-content: space-between;
@@ -11857,7 +11919,11 @@
               <h1>Приёмка УПД</h1>
               <span class="page-counter" id="si-counter">0</span>
             </div>
-            <button class="pkb-btn primary" onclick="openSupplyInvoiceUpload()"><i class="ti ti-cloud-upload"></i>Загрузить</button>
+            <div style="display:flex;gap:8px;">
+              <button class="pkb-btn primary" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную"><i class="ti ti-camera"></i><span class="si-btn-label">Камера</span></button>
+              <button class="pkb-btn primary" onclick="openSupplyInvoiceUpload()"><i class="ti ti-cloud-upload"></i><span class="si-btn-label">Загрузить</span></button>
+              <input type="file" id="si-camera-direct-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleCameraDirect(event)">
+            </div>
           </div>
           <div id="si-screen-body">
             <div class="loading-block">Загружаем приёмки…</div>
@@ -12566,7 +12632,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.26.6-restore-apply-fn";
+const APP_VERSION = "v2.27.0-mobile-camera";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35584,6 +35650,46 @@ function siFmtDocType(t) {
 
 // ---------- Модалка загрузки ----------
 
+// Прямое открытие камеры — без модалки, без выбора defer
+// При выборе фото — сразу же загружаем и идём в распознавание
+function openSupplyInvoiceCameraDirect() {
+  const input = document.getElementById('si-camera-direct-input');
+  if (input) {
+    input.value = '';  // сбросить, чтобы onchange сработал повторно для того же файла
+    input.click();
+  }
+}
+
+async function siHandleCameraDirect(event) {
+  const files = event.target.files;
+  if (!files || !files.length) return;
+  // Загружаем без модалки — сразу с тостом
+  showToast('Загружаем фото · распознаём…', 'success');
+  const fd = new FormData();
+  Array.from(files).forEach(f => fd.append('file', f, f.name));
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      showToast('Сессия истекла, войдите заново', 'error');
+      return;
+    }
+    const res = await fetch(API_BASE + '/api/supply/invoices/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast('Ошибка: ' + (data.message || data.error || ('HTTP ' + res.status)), 'error');
+      return;
+    }
+    const data = await res.json();
+    loadSupplyInvoiceDetail(data.id);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + (e.message || e), 'error');
+  }
+}
+
 function openSupplyInvoiceUpload() {
   const existing = document.getElementById('si-upload-modal');
   if (existing) existing.remove();
@@ -35602,9 +35708,26 @@ function openSupplyInvoiceUpload() {
         '<div class="si-upload-zone" id="si-drop-zone" ondrop="siHandleDrop(event)" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" onclick="document.getElementById(\'si-file-input\').click()">' +
           '<i class="ti ti-cloud-upload"></i>' +
           '<div class="si-upload-zone-title">Перетащите PDF/фото сюда</div>' +
-          '<div class="si-upload-zone-hint">PDF, JPEG или PNG до 25 МБ суммарно. Можно сразу несколько листов одной накладной (Ctrl+клик).</div>' +
+          '<div class="si-upload-zone-hint">или используйте кнопки ниже. До 25 МБ суммарно.</div>' +
         '</div>' +
-        '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<div class="si-upload-actions">' +
+          '<button class="si-upload-action-btn primary" onclick="document.getElementById(\'si-camera-input\').click()">' +
+            '<i class="ti ti-camera"></i>' +
+            '<div>' +
+              '<div class="si-upload-action-title">Сфотографировать</div>' +
+              '<div class="si-upload-action-hint">прямо с камеры</div>' +
+            '</div>' +
+          '</button>' +
+          '<button class="si-upload-action-btn" onclick="document.getElementById(\'si-file-input\').click()">' +
+            '<i class="ti ti-file-upload"></i>' +
+            '<div>' +
+              '<div class="si-upload-action-title">Выбрать файл</div>' +
+              '<div class="si-upload-action-hint">PDF, фото из галереи</div>' +
+            '</div>' +
+          '</button>' +
+        '</div>' +
+        '<input type="file" id="si-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf" style="display:none;" onchange="siHandleFileSelect(event)">' +
         '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:12.5px;line-height:1.4;color:var(--text-mid);">' +
           '<input type="checkbox" id="si-defer-recognize" style="margin-top:2px;flex-shrink:0;">' +
           '<span>' +
