@@ -9838,6 +9838,19 @@
     text-transform: uppercase; letter-spacing: 0.4px;
   }
   .si-status-chip.s-draft     { background: #FAEEDA; color: #854F0B; }
+  /* Inline-select раздела каталога для unmatched позиций */
+  .si-cat-select {
+    font-size: 11px;
+    padding: 2px 22px 2px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: white;
+    color: var(--text-dark);
+    cursor: pointer;
+    max-width: 200px;
+    appearance: menulist;
+  }
+  .si-cat-select:hover { border-color: var(--brand); }
   .si-status-chip.sc-pending  { background: rgba(124,58,237,0.12); color: #5B21B6; border: 1px dashed rgba(124,58,237,0.35); padding-left: 7px; padding-right: 7px; }
   .si-status-chip.s-confirmed { background: rgba(29,158,117,0.15); color: #0A5B41; }
   .si-status-chip.s-partial   { background: rgba(186,117,23,0.15); color: #854F0B; }
@@ -12734,7 +12747,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.29.2-prompt-revert";
+const APP_VERSION = "v2.30.0-inline-category";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35606,7 +35619,36 @@ const siState = {
   pollingTimer: null,
   pollingActive: false,
   itemsCache: [],
+  categories: null,  // [{id, name, code, ...}] — кешируем для inline-select раздела
 };
+
+// Загружаем категории компонентов один раз для всех селектов в карточке УПД
+async function siEnsureCategoriesLoaded() {
+  if (siState.categories) return siState.categories;
+  try {
+    const r = await apiGet('/api/components/categories');
+    siState.categories = (r && r.items) || [];
+  } catch (e) {
+    siState.categories = [];
+  }
+  return siState.categories;
+}
+
+// Меняем suggested_category_id у позиции
+async function siChangeItemCategory(itemId, newCatId) {
+  const invId = siState.currentInvoiceId || 0;
+  try {
+    const r = await apiPatch('/api/supply/invoices/' + invId + '/items/' + itemId,
+                              { suggested_category_id: newCatId ? parseInt(newCatId, 10) : null });
+    if (r && r.ok === false) {
+      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
+      return;
+    }
+    if (siState.currentInvoiceId) loadSupplyInvoiceDetail(siState.currentInvoiceId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
 
 const SI_DEST_DEF = {
   production:         { label: 'Производство',     icon: 'ti-building-factory-2', cls: 'd-production' },
@@ -36016,6 +36058,8 @@ async function loadSupplyInvoiceDetail(invoiceId) {
 
   try {
     const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    // Параллельно подгружаем категории если ещё не закешированы (для inline-select раздела)
+    await siEnsureCategoriesLoaded();
     renderSupplyInvoiceDetail(data);
     // Polling только если идёт распознавание (in_progress). Pending/done/error — не поллим.
     if (data.invoice && data.invoice.recognition_state === 'in_progress') {
@@ -36401,12 +36445,27 @@ function renderSiMatchHint(it) {
   }
   // Нет сопоставления
   if (!it.matched_component_id) {
-    // Для destination='production' (по умолчанию) при подтверждении создастся карточка
+    // Для destination='production' (по умолчанию) — даём Дмитрию dropdown категорий
     const dest = it.destination || 'production';
     if (dest === 'production') {
-      // Если Claude предложил категорию — показываем её, иначе "Разное"
-      const targetCat = it.suggested_category_name || 'Разное';
-      return '<span style="color:var(--text-faint);">→ при оприходовании создастся в разделе: ' + escapeHtml(targetCat) + '</span>';
+      const cats = (siState && siState.categories) || [];
+      // suggested_category_id может быть null — это означает "Разное" (default)
+      const currentId = it.suggested_category_id || '';
+      let opts = '<option value="">— Разное (по умолчанию)</option>';
+      cats.forEach(c => {
+        const sel = (String(c.id) === String(currentId)) ? ' selected' : '';
+        // "Разное" уже отдельной опцией наверху — не дублируем
+        if ((c.code || '').toLowerCase() === 'misc' || (c.name || '').toLowerCase() === 'разное') return;
+        opts += '<option value="' + c.id + '"' + sel + '>' + escapeHtml(c.name) + '</option>';
+      });
+      return (
+        '<span style="color:var(--text-faint);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+          '<span>→ создастся в разделе:</span>' +
+          '<select class="si-cat-select" onchange="siChangeItemCategory(' + it.id + ', this.value)" onclick="event.stopPropagation();">' +
+            opts +
+          '</select>' +
+        '</span>'
+      );
     }
     // Для других destination (tools/order/...) — пока не создаём авто
     return '<span style="color:#A32D2D;">+ нет в базе — оприходовать в этот раздел пока нельзя</span>';
