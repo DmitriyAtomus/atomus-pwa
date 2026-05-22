@@ -11895,6 +11895,11 @@
                          placeholder="Название, артикул или производитель…"
                          oninput="onPtSearchInput()">
                 </div>
+                <button class="pt-attn-btn" id="pt-instock-btn" onclick="togglePtInStock()" style="background:rgba(29,158,117,0.10);color:#0A5B41;border-color:rgba(29,158,117,0.30);">
+                  <i class="ti ti-package"></i>
+                  <span>В наличии</span>
+                  <span class="pt-chip-qty" id="pt-instock-count">0</span>
+                </button>
                 <button class="pt-attn-btn" id="pt-attn-btn" onclick="togglePtAttention()">
                   <i class="ti ti-alert-triangle"></i>
                   <span>Требуют внимания</span>
@@ -12779,7 +12784,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.30.6-create-cat-pt";
+const APP_VERSION = "v2.30.7-instock-filter";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -27095,6 +27100,7 @@ function _plural(n, forms) {
 state.ptData = null;
 state.ptCategoryFilter = null;   // category_id или null
 state.ptAttentionOnly = false;
+state.ptInStockOnly = false;     // фильтр "только то что есть на складе"
 state.ptSearch = '';
 
 async function loadPartsDashboard() {
@@ -27119,6 +27125,7 @@ function renderPartsDashboard() {
   _renderPtAiHint(d);
   _renderPtChips(d.categories, d.kpis.total || 0);
   _renderPtAttentionBtn(d.kpis.attention_count || 0);
+  _renderPtInStockBtn();
   _renderPtList();
 }
 
@@ -27302,6 +27309,18 @@ function _renderPtAttentionBtn(n) {
   btn.classList.toggle('active', state.ptAttentionOnly && n > 0);
 }
 
+function _renderPtInStockBtn() {
+  const btn = document.getElementById('pt-instock-btn');
+  const cnt = document.getElementById('pt-instock-count');
+  if (!btn || !cnt) return;
+  // Сколько позиций имеет qty_on_stock > 0
+  const items = (state.ptData && state.ptData.items) || [];
+  const inStock = items.filter(it => (parseFloat(it.qty_on_stock) || 0) > 0).length;
+  cnt.textContent = inStock;
+  btn.classList.toggle('zero', inStock === 0);
+  btn.classList.toggle('active', !!state.ptInStockOnly);
+}
+
 function _renderPtList() {
   const host = document.getElementById('pt-list');
   if (!host || !state.ptData) return;
@@ -27309,6 +27328,9 @@ function _renderPtList() {
 
   if (state.ptAttentionOnly) {
     items = items.filter(it => it.status === 'critical' || it.status === 'zero');
+  }
+  if (state.ptInStockOnly) {
+    items = items.filter(it => (parseFloat(it.qty_on_stock) || 0) > 0);
   }
   if (state.ptCategoryFilter != null) {
     items = items.filter(it => it.category_id === state.ptCategoryFilter);
@@ -27323,7 +27345,7 @@ function _renderPtList() {
 
   if (items.length === 0) {
     host.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>' +
-      (state.ptCategoryFilter != null || q || state.ptAttentionOnly
+      (state.ptCategoryFilter != null || q || state.ptAttentionOnly || state.ptInStockOnly
         ? 'По заданным фильтрам ничего не найдено'
         : 'Каталог комплектующих пуст') +
       '</div>';
@@ -27420,6 +27442,12 @@ function togglePtAttention(forceOn) {
   if (state.ptData) {
     _renderPtAttentionBtn(state.ptData.kpis.attention_count || 0);
   }
+  _renderPtList();
+}
+
+function togglePtInStock() {
+  state.ptInStockOnly = !state.ptInStockOnly;
+  _renderPtInStockBtn();
   _renderPtList();
 }
 
