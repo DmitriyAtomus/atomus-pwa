@@ -12707,7 +12707,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.27.3-defer-and-badge";
+const APP_VERSION = "v2.28.0-multipage";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35685,6 +35685,7 @@ function renderSupplyInvoicesList(items) {
       : (inv.source_file_name || 'Новый черновик');
     const supplier = inv.supplier_name_raw || '—';
     const itemsLine = inv.items_count != null ? (inv.items_count + ' поз.') : '';
+    const pagesLine = (inv.pages_count && inv.pages_count > 1) ? (inv.pages_count + ' стр.') : '';
     const createdLine = inv.created_at ? ('создано ' + siFmtDateTime(inv.created_at)) : '';
     // Иконка удаления: для черновиков и отменённых — простой soft-delete,
     // для оприходованных — с откатом со склада
@@ -35708,7 +35709,7 @@ function renderSupplyInvoicesList(items) {
           delBtn +
         '</div>' +
         '<div class="si-list-card-meta">' +
-          escapeHtml(supplier) + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
+          escapeHtml(supplier) + (pagesLine ? (' · ' + pagesLine) : '') + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
         '</div>' +
       '</div>';
   });
@@ -35806,12 +35807,53 @@ async function siHandleCameraDirect(event) {
       return;
     }
     const data = await res.json();
-    // Возвращаемся в список (не открываем detail), чтобы Дмитрий увидел плитку
-    // и спокойно с компа распознал. Список покажет статус "Ждёт распознавания".
-    loadSupplyInvoicesList();
+    // Открываем карточку УПД — там pending-блок с кнопкой «Добавить страницу»
+    // Это удобно для multi-page УПД: снял первый лист → сразу можешь снять второй
+    loadSupplyInvoiceDetail(data.id);
   } catch (e) {
     showToast('Ошибка соединения: ' + (e.message || e), 'error');
   }
+}
+
+// Добавление страницы к существующей УПД (для multi-page)
+function openSiAddPageDialog(invoiceId) {
+  // Создаём временный invisible input — capture камера; после фото шлём в add-files
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,application/pdf';
+  input.multiple = true;
+  // Capture только если есть смысл (на мобильной)
+  if (state && !state.isDesktop) input.setAttribute('capture', 'environment');
+  input.style.display = 'none';
+  input.onchange = async (ev) => {
+    const files = ev.target.files;
+    if (!files || !files.length) { input.remove(); return; }
+    showToast('Добавляем ' + files.length + ' стр…', 'success');
+    const fd = new FormData();
+    Array.from(files).forEach(f => fd.append('file', f, f.name));
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const res = await fetch(API_BASE + '/api/supply/invoices/' + invoiceId + '/add-files', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast('Ошибка: ' + (data.message || data.error || ('HTTP ' + res.status)), 'error');
+        return;
+      }
+      const data = await res.json();
+      showToast('Добавлено ' + (data.added || 0) + ' стр · всего ' + (data.total_pages || '?') + ' стр', 'success');
+      loadSupplyInvoiceDetail(invoiceId);
+    } catch (e) {
+      showToast('Ошибка соединения: ' + (e.message || e), 'error');
+    } finally {
+      input.remove();
+    }
+  };
+  document.body.appendChild(input);
+  input.click();
 }
 
 function openSupplyInvoiceUpload() {
@@ -36024,13 +36066,18 @@ function renderSupplyInvoiceDetail(data) {
 
   // Состояние "ожидает распознавания" (загружено с галкой «Распознать позже»)
   if (isPending) {
+    const pages = inv.pages_count || 1;
+    const pagesLabel = pages === 1 ? '1 страница' : (pages + ' страниц');
     html += '<div style="background:rgba(124,58,237,0.06);border:1px dashed rgba(124,58,237,0.35);border-radius:10px;padding:24px 20px;text-align:center;margin:8px 0 14px;">';
     html +=   '<i class="ti ti-photo-scan" style="font-size:36px;color:#7C3AED;display:block;margin-bottom:10px;"></i>';
-    html +=   '<div style="font-size:14px;font-weight:500;color:var(--text-dark);margin-bottom:4px;">Файл загружен и ждёт распознавания</div>';
+    html +=   '<div style="font-size:14px;font-weight:500;color:var(--text-dark);margin-bottom:4px;">Файл загружен и ждёт распознавания · ' + pagesLabel + '</div>';
     html +=   '<div style="font-size:12px;color:var(--text-light);margin-bottom:14px;">' +
                  (inv.source_file_name ? escapeHtml(inv.source_file_name) : 'без имени') +
               '</div>';
-    html +=   '<button class="pkb-btn ai-action" onclick="rerecognizeSupplyInvoice(' + inv.id + ')"><i class="ti ti-sparkles"></i>Распознать сейчас</button>';
+    html +=   '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">';
+    html +=     '<button class="pkb-btn" onclick="openSiAddPageDialog(' + inv.id + ')"><i class="ti ti-plus"></i>Добавить страницу</button>';
+    html +=     '<button class="pkb-btn ai-action" onclick="rerecognizeSupplyInvoice(' + inv.id + ')"><i class="ti ti-sparkles"></i>Распознать сейчас</button>';
+    html +=   '</div>';
     html += '</div>';
     body.innerHTML = html;
     return;
