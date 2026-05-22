@@ -12143,9 +12143,10 @@
               <h1>Приёмка УПД</h1>
               <span class="page-counter" id="si-counter">0</span>
             </div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="pkb-btn primary" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную"><i class="ti ti-camera"></i><span class="si-btn-label">Камера</span></button>
               <button class="pkb-btn primary" onclick="openSupplyInvoiceUpload()"><i class="ti ti-cloud-upload"></i><span class="si-btn-label">Загрузить</span></button>
+              <button class="pkb-btn" onclick="openManualSupplyInvoice()" title="Заполнить накладную вручную без фото/файла" style="background:white;color:var(--brand);border:1.5px solid var(--brand);"><i class="ti ti-edit"></i><span class="si-btn-label">Вручную</span></button>
             </div>
           </div>
           <div id="si-screen-body">
@@ -12855,7 +12856,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.31.8-exif-rotate";
+const APP_VERSION = "v2.32.0-manual-intake";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36097,6 +36098,216 @@ function openSiAddPageDialog(invoiceId) {
   input.click();
 }
 
+// === Ручная приёмка УПД (без AI) ===
+// Открывает модалку с шапкой документа. После создания пользователь
+// переходит на детальную страницу УПД и добавляет позиции через addManualSiItem.
+// === Добавление позиции вручную с автокомплитом по каталогу ===
+function openAddManualItemForm() {
+  const existing = document.getElementById('si-add-item-modal');
+  if (existing) existing.remove();
+  const cats = (siState && siState.categories) || [];
+  let catOpts = '<option value="">— Разное</option>';
+  cats.forEach(c => {
+    if ((c.code || '').toLowerCase() === 'misc' || (c.name || '').toLowerCase() === 'разное') return;
+    catOpts += '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
+  });
+  const overlay = document.createElement('div');
+  overlay.id = 'si-add-item-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-plus"></i>Добавить позицию</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'si-add-item-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group" style="position:relative;"><label>Название</label>' +
+          '<input type="text" id="si-add-item-name" placeholder="Например: Наконечник НШВИ 0.75-8 синий" autocomplete="off" autofocus oninput="onAddItemNameInput()">' +
+          '<div id="si-add-item-suggest" style="position:absolute;left:0;right:0;top:100%;background:white;border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:260px;overflow:auto;display:none;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>' +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;" id="si-add-item-match-status">Начните вводить — подскажу совпадения из каталога</div>' +
+        '</div>' +
+        '<div class="form-row" style="display:flex;gap:10px;">' +
+          '<div class="form-group" style="flex:1;"><label>Кол-во</label>' +
+            '<input type="number" id="si-add-item-qty" step="0.01" min="0" value="1">' +
+          '</div>' +
+          '<div class="form-group" style="flex:1;"><label>Ед.</label>' +
+            '<input type="text" id="si-add-item-unit" value="шт">' +
+          '</div>' +
+          '<div class="form-group" style="flex:1;"><label>Цена (опц.)</label>' +
+            '<input type="number" id="si-add-item-price" step="0.01" min="0" placeholder="0">' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group" id="si-add-item-cat-row"><label>Раздел (если новая карточка)</label>' +
+          '<select id="si-add-item-cat">' + catOpts + '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'si-add-item-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitAddManualItem()">Добавить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  // Сбрасываем выбор существующего компонента
+  siAddItemState = { matchedId: null, matchedName: '', matchedCategory: '' };
+}
+
+let siAddItemState = { matchedId: null, matchedName: '', matchedCategory: '' };
+let _siAddItemTimer = null;
+
+function onAddItemNameInput() {
+  clearTimeout(_siAddItemTimer);
+  _siAddItemTimer = setTimeout(siAutocompleteComponent, 200);
+}
+
+async function siAutocompleteComponent() {
+  const q = ((document.getElementById('si-add-item-name') || {}).value || '').trim();
+  const box = document.getElementById('si-add-item-suggest');
+  const status = document.getElementById('si-add-item-match-status');
+  if (!box) return;
+  if (q.length < 2) {
+    box.style.display = 'none';
+    siAddItemState.matchedId = null;
+    if (status) status.innerHTML = 'Начните вводить — подскажу совпадения из каталога';
+    return;
+  }
+  try {
+    const r = await apiGet('/api/components?search=' + encodeURIComponent(q));
+    const items = (r && (r.items || r.components)) || [];
+    const top = items.slice(0, 8);
+    if (top.length === 0) {
+      box.style.display = 'none';
+      if (status) status.innerHTML = '<span style="color:#854F0B;">⊕ В каталоге не найдено — будет создана новая карточка</span>';
+      siAddItemState.matchedId = null;
+      return;
+    }
+    let html = '';
+    top.forEach(c => {
+      const cat = c.category_name || '—';
+      const qty = c.qty_on_stock != null ? (' · в наличии: ' + c.qty_on_stock + ' ' + (c.unit || 'шт')) : '';
+      html += '<div class="si-suggest-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" ' +
+              'onclick="pickAutocompleteSuggestion(' + c.id + ', \'' + escapeJs(c.name) + '\', \'' + escapeJs(cat) + '\', \'' + (c.unit || 'шт') + '\')">' +
+              '<div style="font-weight:500;color:var(--text-dark);">' + escapeHtml(c.name) + '</div>' +
+              '<div style="font-size:11.5px;color:var(--text-light);">раздел: ' + escapeHtml(cat) + qty + '</div>' +
+              '</div>';
+    });
+    box.innerHTML = html;
+    box.style.display = 'block';
+    if (status) status.innerHTML = '<span style="color:#0A5B41;">✓ Найдено ' + top.length + ' совпадений — выберите из списка или продолжайте ввод</span>';
+  } catch (e) {
+    box.style.display = 'none';
+  }
+}
+
+function escapeJs(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+}
+
+function pickAutocompleteSuggestion(id, name, category, unit) {
+  document.getElementById('si-add-item-name').value = name;
+  const unitInput = document.getElementById('si-add-item-unit');
+  if (unitInput && !unitInput.value.trim()) unitInput.value = unit || 'шт';
+  document.getElementById('si-add-item-suggest').style.display = 'none';
+  document.getElementById('si-add-item-cat-row').style.display = 'none';  // раздел не нужен — позиция привяжется к существующей карточке
+  siAddItemState = { matchedId: id, matchedName: name, matchedCategory: category };
+  const status = document.getElementById('si-add-item-match-status');
+  if (status) status.innerHTML = '<span style="color:#0A5B41;">✓ Привязано к карточке: <b>' + escapeHtml(name) + '</b> (раздел: ' + escapeHtml(category) + ')</span>';
+}
+
+async function submitAddManualItem() {
+  const name  = ((document.getElementById('si-add-item-name')  || {}).value || '').trim();
+  const qty   = parseFloat(((document.getElementById('si-add-item-qty')   || {}).value || '').replace(',', '.'));
+  const unit  = ((document.getElementById('si-add-item-unit')  || {}).value || 'шт').trim();
+  const price = parseFloat(((document.getElementById('si-add-item-price') || {}).value || '').replace(',', '.'));
+  const catSel = document.getElementById('si-add-item-cat');
+  const catId = catSel && catSel.value ? parseInt(catSel.value, 10) : null;
+  if (!name) { showToast('Укажите название', 'error'); return; }
+  if (!qty || qty <= 0) { showToast('Кол-во должно быть > 0', 'error'); return; }
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) { showToast('Нет открытой УПД', 'error'); return; }
+  const body = {
+    name: name,
+    qty: qty,
+    unit: unit,
+    price: isNaN(price) ? null : price,
+  };
+  if (siAddItemState.matchedId) body.matched_component_id = siAddItemState.matchedId;
+  else if (catId) body.suggested_category_id = catId;
+  try {
+    const r = await apiPost('/api/supply/invoices/' + invoiceId + '/items', body);
+    if (!r.ok) { showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + r.status)), 'error'); return; }
+    document.getElementById('si-add-item-modal').remove();
+    showToast('Позиция добавлена', 'success');
+    loadSupplyInvoiceDetail(invoiceId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+function openManualSupplyInvoice() {
+  const existing = document.getElementById('si-manual-modal');
+  if (existing) existing.remove();
+  const today = new Date().toISOString().slice(0, 10);
+  const overlay = document.createElement('div');
+  overlay.id = 'si-manual-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:480px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-edit"></i>Принять накладную вручную</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'si-manual-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Поставщик (название)</label>' +
+          '<input type="text" id="si-manual-supplier-name" placeholder="ООО «ТД Электрика»" autofocus>' +
+        '</div>' +
+        '<div class="form-group"><label>ИНН поставщика (опционально)</label>' +
+          '<input type="text" id="si-manual-supplier-inn" placeholder="7415091417" maxlength="12">' +
+        '</div>' +
+        '<div class="form-row" style="display:flex;gap:10px;">' +
+          '<div class="form-group" style="flex:1;"><label>№ УПД</label>' +
+            '<input type="text" id="si-manual-doc-num" placeholder="140">' +
+          '</div>' +
+          '<div class="form-group" style="flex:1;"><label>Дата</label>' +
+            '<input type="date" id="si-manual-doc-date" value="' + today + '">' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:6px;">' +
+          'После создания черновика вы сможете добавить позиции.' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'si-manual-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitManualSupplyInvoice()">Создать</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+async function submitManualSupplyInvoice() {
+  const name = (document.getElementById('si-manual-supplier-name') || {}).value || '';
+  const inn  = (document.getElementById('si-manual-supplier-inn')  || {}).value || '';
+  const num  = (document.getElementById('si-manual-doc-num')       || {}).value || '';
+  const dt   = (document.getElementById('si-manual-doc-date')      || {}).value || '';
+  if (!name.trim()) { showToast('Укажите название поставщика', 'error'); return; }
+  try {
+    const r = await apiPost('/api/supply/invoices/manual', {
+      supplier_name: name.trim(),
+      supplier_inn:  inn.trim(),
+      document_number: num.trim(),
+      document_date: dt,
+    });
+    if (!r.ok) { showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + r.status)), 'error'); return; }
+    const newId = (r.data && r.data.id);
+    document.getElementById('si-manual-modal').remove();
+    showToast('Черновик создан, добавьте позиции', 'success');
+    if (newId) loadSupplyInvoiceDetail(newId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 function openSupplyInvoiceUpload() {
   const existing = document.getElementById('si-upload-modal');
   if (existing) existing.remove();
@@ -36264,6 +36475,7 @@ function renderSupplyInvoiceDetail(data) {
   const items = data.items || [];
   const duplicate = data.duplicate_warning;
   siState.itemsCache = items;
+  siState.currentInvoice = inv;  // нужно для renderSiItemsTable: показывать кнопку "+ позиция" только для draft
 
   const recoState = inv.recognition_state || (inv.ai_recognized_at ? 'done' : (inv.ai_error ? 'error' : 'in_progress'));
   const isLoading = recoState === 'in_progress';
@@ -36572,6 +36784,18 @@ function renderSiItemsTable(items) {
 
   visible.forEach(it => html += renderSiItemRow(it));
   html += '</div>';
+
+  // Кнопка "+ Добавить позицию" — только для draft
+  // (для confirmed позиции уже зафиксированы, для cancelled тоже нельзя)
+  const inv = siState.currentInvoice;
+  const canAdd = !inv || inv.status === 'draft';
+  if (canAdd) {
+    html += '<div style="margin-top:10px;text-align:center;">' +
+              '<button class="btn btn-secondary" onclick="openAddManualItemForm()" style="border-style:dashed;">' +
+                '<i class="ti ti-plus"></i> Добавить позицию вручную' +
+              '</button>' +
+            '</div>';
+  }
   return html;
 }
 
