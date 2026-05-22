@@ -4583,6 +4583,58 @@
     border-color: var(--brand);
   }
   .modal-content .form-group textarea { resize: vertical; min-height: 60px; }
+
+  /* Те же стили формы применяем и к .modal-body (новые модалки) */
+  .modal-body .form-group { margin-bottom: 14px; }
+  .modal-body .form-group label {
+    display: block;
+    font-size: 11.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    color: var(--text-light);
+    margin-bottom: 5px;
+  }
+  .modal-body .form-group input,
+  .modal-body .form-group select,
+  .modal-body .form-group textarea {
+    width: 100%;
+    padding: 9px 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    color: var(--text);
+    font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .modal-body .form-group input:focus,
+  .modal-body .form-group select:focus,
+  .modal-body .form-group textarea:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
+  }
+  .modal-body .form-group input::placeholder { color: var(--text-faint); }
+  .modal-body .form-row { display: flex; gap: 10px; }
+  .modal-body .form-row > .form-group { flex: 1; }
+  .modal-body .form-hint {
+    font-size: 12px; color: var(--text-light);
+    margin-top: 10px; padding: 8px 12px;
+    background: var(--bg); border-radius: 6px;
+  }
+  /* Кнопки футера модалки */
+  .modal-footer {
+    display: flex; gap: 8px; justify-content: flex-end;
+    padding: 12px 20px 16px; border-top: 1px solid var(--border);
+    background: white; border-radius: 0 0 16px 16px;
+  }
+  /* Modal-body нормальный padding */
+  .modal-body { padding: 18px 20px; }
+  .modal-body .modal-section-title {
+    font-size: 11.5px; font-weight: 600; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin: 4px 0 10px 0;
+  }
   /* ============ КОНЕЦ ОБЩИЕ СТИЛИ МОДАЛОК ============ */
 
   .task-status-pill {
@@ -10805,9 +10857,6 @@
         <button class="nav-item" data-nav="supply-invoice-intake" onclick="selectSidebarItem('supply-invoice-intake')">
           <i class="ti ti-sparkles"></i><span>Приёмка УПД</span>
         </button>
-        <button class="nav-item" data-nav="supply-receipts" onclick="selectSidebarItem('supply-receipts')">
-          <i class="ti ti-package-import"></i><span>Приёмки</span>
-        </button>
         <div class="nav-section-label">СПРАВОЧНИКИ</div>
         <button class="nav-item" data-nav="supply-suppliers" onclick="selectSidebarItem('supply-suppliers')">
           <i class="ti ti-truck-loading"></i><span>Поставщики</span>
@@ -12856,7 +12905,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.32.0-manual-intake";
+const APP_VERSION = "v2.32.2-hide-receipts";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36122,29 +36171,33 @@ function openAddManualItemForm() {
         '<button class="icon-btn" onclick="document.getElementById(\'si-add-item-modal\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-body">' +
-        '<div class="form-group" style="position:relative;"><label>Название</label>' +
+        '<div class="form-group" style="position:relative;"><label>Название позиции</label>' +
           '<input type="text" id="si-add-item-name" placeholder="Например: Наконечник НШВИ 0.75-8 синий" autocomplete="off" autofocus oninput="onAddItemNameInput()">' +
           '<div id="si-add-item-suggest" style="position:absolute;left:0;right:0;top:100%;background:white;border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:260px;overflow:auto;display:none;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>' +
-          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;" id="si-add-item-match-status">Начните вводить — подскажу совпадения из каталога</div>' +
+          '<div id="si-add-item-match-status" class="form-hint" style="margin-top:6px;">' +
+            '<i class="ti ti-search" style="vertical-align:-2px;margin-right:4px;color:var(--text-faint);"></i>' +
+            'Начните вводить — подскажу совпадения из каталога' +
+          '</div>' +
         '</div>' +
-        '<div class="form-row" style="display:flex;gap:10px;">' +
-          '<div class="form-group" style="flex:1;"><label>Кол-во</label>' +
+        '<div class="form-row" style="margin-top:14px;">' +
+          '<div class="form-group"><label>Кол-во</label>' +
             '<input type="number" id="si-add-item-qty" step="0.01" min="0" value="1">' +
           '</div>' +
-          '<div class="form-group" style="flex:1;"><label>Ед.</label>' +
+          '<div class="form-group"><label>Ед.</label>' +
             '<input type="text" id="si-add-item-unit" value="шт">' +
           '</div>' +
-          '<div class="form-group" style="flex:1;"><label>Цена (опц.)</label>' +
+          '<div class="form-group"><label>Цена <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опц.)</span></label>' +
             '<input type="number" id="si-add-item-price" step="0.01" min="0" placeholder="0">' +
           '</div>' +
         '</div>' +
-        '<div class="form-group" id="si-add-item-cat-row"><label>Раздел (если новая карточка)</label>' +
+        '<div class="form-group" id="si-add-item-cat-row" style="margin-top:14px;">' +
+          '<label>Раздел склада <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(если создаётся новая карточка)</span></label>' +
           '<select id="si-add-item-cat">' + catOpts + '</select>' +
         '</div>' +
       '</div>' +
-      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);">' +
+      '<div class="modal-footer">' +
         '<button class="btn btn-secondary" onclick="document.getElementById(\'si-add-item-modal\').remove()">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitAddManualItem()">Добавить</button>' +
+        '<button class="btn btn-primary" onclick="submitAddManualItem()"><i class="ti ti-plus"></i>Добавить</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
@@ -36259,27 +36312,30 @@ function openManualSupplyInvoice() {
         '<button class="icon-btn" onclick="document.getElementById(\'si-manual-modal\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label>Поставщик (название)</label>' +
+        '<div class="modal-section-title">Поставщик</div>' +
+        '<div class="form-group"><label>Название организации</label>' +
           '<input type="text" id="si-manual-supplier-name" placeholder="ООО «ТД Электрика»" autofocus>' +
         '</div>' +
-        '<div class="form-group"><label>ИНН поставщика (опционально)</label>' +
-          '<input type="text" id="si-manual-supplier-inn" placeholder="7415091417" maxlength="12">' +
+        '<div class="form-group"><label>ИНН <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально)</span></label>' +
+          '<input type="text" id="si-manual-supplier-inn" placeholder="7415091417" maxlength="12" inputmode="numeric">' +
         '</div>' +
-        '<div class="form-row" style="display:flex;gap:10px;">' +
-          '<div class="form-group" style="flex:1;"><label>№ УПД</label>' +
+        '<div class="modal-section-title" style="margin-top:18px;">Документ</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>№ УПД</label>' +
             '<input type="text" id="si-manual-doc-num" placeholder="140">' +
           '</div>' +
-          '<div class="form-group" style="flex:1;"><label>Дата</label>' +
+          '<div class="form-group"><label>Дата</label>' +
             '<input type="date" id="si-manual-doc-date" value="' + today + '">' +
           '</div>' +
         '</div>' +
-        '<div style="font-size:12px;color:var(--text-light);margin-top:6px;">' +
-          'После создания черновика вы сможете добавить позиции.' +
+        '<div class="form-hint">' +
+          '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
+          'После создания черновика откроется страница, на которой вы добавите позиции по одной — с подсказками из каталога.' +
         '</div>' +
       '</div>' +
-      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);">' +
+      '<div class="modal-footer">' +
         '<button class="btn btn-secondary" onclick="document.getElementById(\'si-manual-modal\').remove()">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitManualSupplyInvoice()">Создать</button>' +
+        '<button class="btn btn-primary" onclick="submitManualSupplyInvoice()"><i class="ti ti-check"></i>Создать черновик</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
