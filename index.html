@@ -10033,6 +10033,51 @@
     font-size: 11.5px; color: var(--text-light);
   }
 
+  /* --- Skeleton-блок для приёмки во время распознавания --- */
+  .si-skeleton-wrap {
+    margin: 4px 0 14px;
+  }
+  .si-skel {
+    background: linear-gradient(90deg,
+      rgba(0,0,0,0.04) 0%,
+      rgba(0,0,0,0.08) 50%,
+      rgba(0,0,0,0.04) 100%);
+    background-size: 200% 100%;
+    animation: si-shimmer 1.6s linear infinite;
+    border-radius: 6px;
+  }
+  @keyframes si-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .si-skel-row {
+    display: grid;
+    grid-template-columns: 16px 1fr 70px 130px 32px;
+    gap: 10px;
+    align-items: center;
+    padding: 11px 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .si-skel-row:last-child { border-bottom: 0; }
+  .si-skel-banner {
+    background: linear-gradient(120deg,
+      rgba(124,58,237,0.06) 0%,
+      rgba(124,58,237,0.13) 50%,
+      rgba(124,58,237,0.06) 100%);
+    background-size: 200% 100%;
+    animation: si-shimmer 2.4s linear infinite;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+    color: #5B21B6;
+    font-size: 13px;
+  }
+  .si-skel-banner .ti-sparkles {
+    font-size: 18px;
+    animation: si-pulse 1.5s ease-in-out infinite;
+  }
+
   /* --- Модалка split и refuse --- */
   .si-modal-block {
     margin-bottom: 14px;
@@ -12453,8 +12498,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.25.1-supply-upload-fix";
-const APP_VERSION_DATE = "21.05.2026";
+const APP_VERSION = "v2.26.0-deferred-recognition";
+const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -35432,6 +35477,11 @@ function siFmtDateTime(s) {
   if (isNaN(d.getTime())) return String(s);
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+// Маппинг типа документа из Vision (UPD/TORG12/INVOICE) → русское обозначение
+function siFmtDocType(t) {
+  const m = { 'UPD': 'УПД', 'TORG12': 'ТОРГ-12', 'INVOICE': 'Счёт-фактура' };
+  return m[String(t || '').toUpperCase()] || (t || 'УПД');
+}
 
 // ---------- Модалка загрузки ----------
 
@@ -35456,6 +35506,13 @@ function openSupplyInvoiceUpload() {
           '<div class="si-upload-zone-hint">PDF, JPEG или PNG до 25 МБ суммарно. Можно сразу несколько листов одной накладной (Ctrl+клик).</div>' +
         '</div>' +
         '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:12.5px;line-height:1.4;color:var(--text-mid);">' +
+          '<input type="checkbox" id="si-defer-recognize" style="margin-top:2px;flex-shrink:0;">' +
+          '<span>' +
+            '<b style="color:var(--text-dark);">Распознать позже</b><br>' +
+            '<span style="color:var(--text-light);font-size:11.5px;">Удобно если фотографируете с телефона. Файл загрузится, а распознавание ИИ запустите вручную с компьютера.</span>' +
+          '</span>' +
+        '</label>' +
         '<div id="si-upload-status" style="margin-top:12px;font-size:12.5px;color:var(--text-light);text-align:center;"></div>' +
       '</div>' +
     '</div>';
@@ -35477,14 +35534,17 @@ async function uploadSupplyInvoiceFiles(files) {
   const statusEl = document.getElementById('si-upload-status');
   const zone = document.getElementById('si-drop-zone');
   if (!files || !files.length) return;
+  const deferEl = document.getElementById('si-defer-recognize');
+  const defer = !!(deferEl && deferEl.checked);
   const label = files.length === 1
-    ? 'Загружаем файл...'
+    ? (defer ? 'Загружаем файл (без распознавания)...' : 'Загружаем файл...')
     : ('Загружаем ' + files.length + ' файла(ов)...');
   if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> ' + label;
   if (zone) zone.style.pointerEvents = 'none';
 
   const fd = new FormData();
   files.forEach(f => fd.append('file', f, f.name));
+  if (defer) fd.append('defer_recognition', '1');
 
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -35507,7 +35567,7 @@ async function uploadSupplyInvoiceFiles(files) {
     }
     const data = await res.json();
     const invId = data.id;
-    showToast('Файл загружен · распознаём', 'success');
+    showToast(defer ? 'Файл загружен · ожидает распознавания' : 'Файл загружен · распознаём', 'success');
     document.getElementById('si-upload-modal').remove();
     loadSupplyInvoiceDetail(invId);
   } catch (e) {
@@ -35528,8 +35588,8 @@ async function loadSupplyInvoiceDetail(invoiceId) {
   try {
     const data = await apiGet('/api/supply/invoices/' + invoiceId);
     renderSupplyInvoiceDetail(data);
-    // Если ИИ ещё не отработал — стартуем polling
-    if (data.invoice && !data.invoice.ai_recognized_at && !data.invoice.ai_error) {
+    // Polling только если идёт распознавание (in_progress). Pending/done/error — не поллим.
+    if (data.invoice && data.invoice.recognition_state === 'in_progress') {
       siStartPolling(invoiceId);
     }
   } catch (e) {
@@ -35546,7 +35606,7 @@ function siStartPolling(invoiceId) {
       const data = await apiGet('/api/supply/invoices/' + invoiceId);
       // Re-render если что-то изменилось
       renderSupplyInvoiceDetail(data);
-      if (data.invoice && (data.invoice.ai_recognized_at || data.invoice.ai_error)) {
+      if (data.invoice && data.invoice.recognition_state !== 'in_progress') {
         siStopPolling();
         return;
       }
@@ -35568,7 +35628,9 @@ function renderSupplyInvoiceDetail(data) {
   const duplicate = data.duplicate_warning;
   siState.itemsCache = items;
 
-  const isLoading = !inv.ai_recognized_at && !inv.ai_error;
+  const recoState = inv.recognition_state || (inv.ai_recognized_at ? 'done' : (inv.ai_error ? 'error' : 'in_progress'));
+  const isLoading = recoState === 'in_progress';
+  const isPending = recoState === 'pending';
   const recoTime = inv.ai_recognized_at ? siRecoSeconds(inv) : null;
 
   let html = '';
@@ -35592,6 +35654,8 @@ function renderSupplyInvoiceDetail(data) {
   html +=   '</div>';
   if (isLoading) {
     html += '<div class="si-ai-badge" style="background:#FAEEDA;color:#854F0B;"><i class="ti ti-sparkles si-recognize-loading"></i>Распознаём…</div>';
+  } else if (isPending) {
+    html += '<div class="si-ai-badge" style="background:rgba(124,58,237,0.10);color:#5B21B6;"><i class="ti ti-hourglass"></i>Ждёт распознавания</div>';
   } else if (inv.ai_error) {
     html += '<div class="si-ai-badge" style="background:rgba(226,75,74,0.15);color:#8C2A2A;"><i class="ti ti-alert-triangle"></i>Ошибка ИИ</div>';
   } else if (recoTime) {
@@ -35599,12 +35663,56 @@ function renderSupplyInvoiceDetail(data) {
   }
   html += '</div>';
 
-  // Состояние "распознаём"
+  // Состояние "ожидает распознавания" (загружено с галкой «Распознать позже»)
+  if (isPending) {
+    html += '<div style="background:rgba(124,58,237,0.06);border:1px dashed rgba(124,58,237,0.35);border-radius:10px;padding:24px 20px;text-align:center;margin:8px 0 14px;">';
+    html +=   '<i class="ti ti-photo-scan" style="font-size:36px;color:#7C3AED;display:block;margin-bottom:10px;"></i>';
+    html +=   '<div style="font-size:14px;font-weight:500;color:var(--text-dark);margin-bottom:4px;">Файл загружен и ждёт распознавания</div>';
+    html +=   '<div style="font-size:12px;color:var(--text-light);margin-bottom:14px;">' +
+                 (inv.source_file_name ? escapeHtml(inv.source_file_name) : 'без имени') +
+              '</div>';
+    html +=   '<button class="pkb-btn ai-action" onclick="rerecognizeSupplyInvoice(' + inv.id + ')"><i class="ti ti-sparkles"></i>Распознать сейчас</button>';
+    html += '</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  // Состояние "распознаём" — скелетон будущей карточки приёмки с shimmer-эффектом
   if (isLoading) {
-    html += '<div class="loading-block" style="padding:30px;text-align:center;color:var(--text-light);">';
-    html +=   '<i class="ti ti-sparkles" style="font-size:32px;color:#7C3AED;animation:spin 1.5s linear infinite;display:block;margin:0 auto 12px;"></i>';
-    html +=   'Claude анализирует накладную...<br>';
-    html +=   '<span style="font-size:11px;color:var(--text-faint);">обычно 15-30 секунд · экран обновляется автоматически</span>';
+    html += '<div class="si-skeleton-wrap">';
+    html +=   '<div class="si-skel-banner">';
+    html +=     '<i class="ti ti-sparkles"></i>';
+    html +=     '<div>';
+    html +=       '<div style="font-weight:500;">Claude анализирует накладную…</div>';
+    html +=       '<div style="font-size:11px;color:#7C3AED;opacity:0.75;margin-top:2px;">обычно 15–30 секунд · экран обновится сам</div>';
+    html +=     '</div>';
+    html +=   '</div>';
+    // 3 карточки реквизитов — заглушки
+    html +=   '<div class="si-req-grid" style="margin-bottom:14px;">';
+    for (let i = 0; i < 3; i++) {
+      html += '<div class="si-req-card">';
+      html +=   '<div class="si-skel" style="height:11px;width:50%;margin-bottom:8px;"></div>';
+      html +=   '<div class="si-skel" style="height:16px;width:80%;margin-bottom:6px;"></div>';
+      html +=   '<div class="si-skel" style="height:11px;width:40%;"></div>';
+      html += '</div>';
+    }
+    html +=   '</div>';
+    // Заглушки строк таблицы позиций
+    html +=   '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-card);">';
+    const widths = ['78%', '55%', '68%', '42%', '60%'];
+    for (let i = 0; i < widths.length; i++) {
+      html += '<div class="si-skel-row">';
+      html +=   '<div class="si-skel" style="height:10px;width:10px;border-radius:50%;"></div>';
+      html +=   '<div>';
+      html +=     '<div class="si-skel" style="height:13px;width:' + widths[i] + ';margin-bottom:5px;"></div>';
+      html +=     '<div class="si-skel" style="height:10px;width:35%;"></div>';
+      html +=   '</div>';
+      html +=   '<div class="si-skel" style="height:13px;width:50px;justify-self:end;"></div>';
+      html +=   '<div class="si-skel" style="height:30px;"></div>';
+      html +=   '<div class="si-skel" style="height:24px;width:24px;border-radius:6px;"></div>';
+      html += '</div>';
+    }
+    html +=   '</div>';
     html += '</div>';
     body.innerHTML = html;
     return;
@@ -35690,7 +35798,7 @@ function renderSiRequisites(inv) {
   html +=   '</div>';
   html +=   '<div class="si-req-card">';
   html +=     '<div class="si-req-label">Документ</div>';
-  html +=     '<div class="si-req-value">' + escapeHtml(inv.document_type || 'УПД') + ' №' + escapeHtml(inv.document_number || '—') + '</div>';
+  html +=     '<div class="si-req-value">' + escapeHtml(siFmtDocType(inv.document_type)) + ' №' + escapeHtml(inv.document_number || '—') + '</div>';
   html +=     '<div class="si-req-meta">' + (inv.document_date ? ('от ' + siFmtDate(inv.document_date)) : '') + '</div>';
   html +=   '</div>';
   html +=   '<div class="si-req-card">';
@@ -35811,9 +35919,13 @@ function renderSiMatchHint(it) {
     const r = SI_REFUSE_REASONS.find(x => x.key === it.refuse_reason);
     return '<span style="color:#8C2A2A;">✕ Отказ: ' + escapeHtml(r ? r.label : (it.refuse_reason || 'причина не указана')) + '</span>';
   }
-  if (it.match_confidence === 'high' && it.matched_component_name) {
+  // Подсказка с категорией: показываем, в какой раздел склада попадёт компонент
+  const catSuffix = it.matched_category_name
+    ? ' <span style="color:var(--text-faint);">· раздел: ' + escapeHtml(it.matched_category_name) + '</span>'
+    : '';
+  if (it.match_confidence === 'high' && it.matched_name) {
     const viaAlias = it.via_alias ? ' · из истории' : '';
-    return '<span style="color:var(--text-faint);">✓ ' + escapeHtml(it.matched_component_name) + viaAlias + '</span>';
+    return '<span style="color:var(--text-faint);">✓ ' + escapeHtml(it.matched_name) + viaAlias + catSuffix + '</span>';
   }
   if (it.match_confidence === 'medium') {
     const alt = siParseAlternatives(it.match_alternatives);
@@ -35824,7 +35936,7 @@ function renderSiMatchHint(it) {
   if (!it.matched_component_id) {
     return '<span style="color:#A32D2D;">+ нет в базе · создать карточку?</span>';
   }
-  return '<span style="color:var(--text-faint);">' + escapeHtml(it.matched_component_name || '—') + '</span>';
+  return '<span style="color:var(--text-faint);">' + escapeHtml(it.matched_name || '—') + catSuffix + '</span>';
 }
 
 function siParseAlternatives(raw) {
