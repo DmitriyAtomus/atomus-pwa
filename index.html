@@ -9499,6 +9499,89 @@
   }
 
   /* ============ КОНЕЦ ЭТАПА 29.3 + 29.4 (v2.23.0) ============ */
+
+  /* ============================================================
+     ЭТАП 29.5 (v2.23.2): БЕЙДЖИ КОМПЛЕКТНОСТИ
+     ============================================================ */
+
+  /* Контейнер для нескольких бейджей в карточке (срочность + комплектность) */
+  .pkb-wc-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* Бейдж комплектности на карточке — стиль как у pkb-wc-bar но компактнее */
+  .pkb-wc-kit {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .pkb-wc-kit .ti      { font-size: 11px; }
+  .pkb-wc-kit.k-ready  { background: rgba(29,158,117,0.18); color: #0A5B41; }
+  .pkb-wc-kit.k-partial{ background: rgba(186,117,23,0.18); color: #854F0B; }
+  .pkb-wc-kit.k-missing{ background: rgba(226,75,74,0.18);  color: #8C2A2A; }
+
+  /* Блок выбора комплектности в модалке деталей */
+  .pkb-kit-block {
+    margin: 14px 0 4px;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+  .pkb-kit-block-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .pkb-kit-options {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pkb-kit-opt {
+    flex: 1; min-width: 110px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    color: var(--text-mid);
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .pkb-kit-opt .ti { font-size: 14px; }
+  .pkb-kit-opt:hover { background: white; border-color: var(--text-mid); }
+  .pkb-kit-opt.active.k-ready {
+    background: rgba(29,158,117,0.15); border-color: #1D9E75; color: #0A5B41;
+  }
+  .pkb-kit-opt.active.k-partial {
+    background: rgba(186,117,23,0.15); border-color: #BA7517; color: #854F0B;
+  }
+  .pkb-kit-opt.active.k-missing {
+    background: rgba(226,75,74,0.15); border-color: #E24B4A; color: #8C2A2A;
+  }
+  .pkb-kit-opt.active.k-none {
+    background: var(--bg); border-color: var(--text-light); color: var(--text-mid);
+  }
+  .pkb-kit-meta {
+    font-size: 10.5px;
+    color: var(--text-faint);
+    margin-top: 8px;
+  }
+
+  /* ============ КОНЕЦ ЭТАПА 29.5 (v2.23.2) ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -11858,7 +11941,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.23.1-prod-filter-colors";
+const APP_VERSION = "v2.23.2-kit-status-badges";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13196,6 +13279,24 @@ function pkbEmptyText(colKey) {
   }
 }
 
+// v2.23.2 (Stage 29.5): рендер бейджа комплектности на карточке
+function renderPkbKitBadge(kitStatus) {
+  const def = pkbKitDef(kitStatus);
+  if (!def) return '';
+  return '<div class="pkb-wc-kit k-' + kitStatus + '" title="' + escapeHtml(def.tooltip) + '">' +
+           '<i class="ti ' + def.icon + '"></i>' + escapeHtml(def.short) +
+         '</div>';
+}
+
+function pkbKitDef(kitStatus) {
+  switch (kitStatus) {
+    case 'ready':   return { short: 'комплект', label: 'Комплект собран', tooltip: 'Все детали в наличии', icon: 'ti-package-check' };
+    case 'partial': return { short: 'частично', label: 'Частично',         tooltip: 'Часть деталей в наличии', icon: 'ti-package' };
+    case 'missing': return { short: 'нет деталей', label: 'Нет деталей',   tooltip: 'Не хватает комплектующих', icon: 'ti-package-off' };
+    default:        return null;
+  }
+}
+
 function pkbSwitchMobileColumn(colKey) {
   pkbMobileCol = colKey;
   // Локально переключаем (без полной перерисовки)
@@ -13437,30 +13538,40 @@ function renderPkbWorkCard(w, colKey) {
              dragAttrs +
              ' onclick="openProductionWorkDetail(' + w.id + ')">';
 
-  // Бар срочности или статус-инфо
+  // Бар срочности или статус-инфо (v2.23.2: оборачиваем в pkb-wc-badges, рядом — бейдж кита)
+  let badgesHtml = '';
   if (w.is_overdue) {
     const days = pkbOverdueDays(w.deadline_at);
-    html += '<div class="pkb-wc-bar b-overdue"><i class="ti ti-alert-triangle"></i>Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
+    badgesHtml += '<div class="pkb-wc-bar b-overdue"><i class="ti ti-alert-triangle"></i>Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
   } else if (colKey === 'queue' && w.deadline_at) {
     const labelDate = formatPkbDate(w.deadline_at);
     if (urgencyClass === ' b-today') {
-      html += '<div class="pkb-wc-bar b-today"><i class="ti ti-clock"></i>Срок сегодня</div>';
+      badgesHtml += '<div class="pkb-wc-bar b-today"><i class="ti ti-clock"></i>Срок сегодня</div>';
     } else if (urgencyClass === ' b-tomorrow') {
-      html += '<div class="pkb-wc-bar b-tomorrow"><i class="ti ti-clock"></i>Срок завтра</div>';
+      badgesHtml += '<div class="pkb-wc-bar b-tomorrow"><i class="ti ti-clock"></i>Срок завтра</div>';
     } else {
-      html += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + '</div>';
+      badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + '</div>';
     }
   } else if (colKey === 'in_progress') {
     const startedDays = w.started_at ? pkbDaysSince(w.started_at) : 0;
     const dlStr = w.deadline_at ? (' · до ' + formatPkbDate(w.deadline_at)) : '';
-    html += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-player-play"></i>' + startedDays + ' ' + plural(startedDays, 'день', 'дня', 'дней') + escapeHtml(dlStr) + '</div>';
+    badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-player-play"></i>' + startedDays + ' ' + plural(startedDays, 'день', 'дня', 'дней') + escapeHtml(dlStr) + '</div>';
   } else if (colKey === 'review') {
     const finStr = w.finished_at ? (' · ' + formatPkbDateTime(w.finished_at)) : '';
-    html += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-checks"></i>Ждёт ОТК' + escapeHtml(finStr) + '</div>';
+    badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-checks"></i>Ждёт ОТК' + escapeHtml(finStr) + '</div>';
   } else if (colKey === 'done') {
     const finStr = w.finished_at ? formatPkbDate(w.finished_at) : '—';
     const hrs = (w.actual_hours != null) ? (' · ' + w.actual_hours + 'ч') : '';
-    html += '<div class="pkb-wc-bar b-success"><i class="ti ti-circle-check"></i>' + escapeHtml(finStr + hrs) + '</div>';
+    badgesHtml += '<div class="pkb-wc-bar b-success"><i class="ti ti-circle-check"></i>' + escapeHtml(finStr + hrs) + '</div>';
+  }
+
+  // v2.23.2: бейдж комплектности — показывается только когда задан и для не-done колонок
+  if (w.kit_status && colKey !== 'done') {
+    badgesHtml += renderPkbKitBadge(w.kit_status);
+  }
+
+  if (badgesHtml) {
+    html += '<div class="pkb-wc-badges">' + badgesHtml + '</div>';
   }
 
   // Title — название модели
@@ -13608,6 +13719,11 @@ function renderProductionWorkDetail(w) {
   if (w.description) html += '<dt>Описание</dt><dd style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</dd>';
   html += '</dl>';
 
+  // v2.23.2 (Stage 29.5): блок выбора комплектности — только для не-done и при наличии прав
+  if (w.status !== 'done' && w.status !== 'cancelled' && hasPermission('production.manage')) {
+    html += renderPkbKitBlock(w);
+  }
+
   html += '</div>';
 
   // Кнопки смены статуса (заменяют DnD до Stage 29.3)
@@ -13672,6 +13788,54 @@ async function changeProductionWorkStatus(workId, newStatus) {
     await apiPatch('/api/production/works/' + workId + '/status', { status: newStatus });
     showToast('Статус обновлён', 'success');
     closeProductionWorkDetail();
+    cache.productionKanban = null;
+    loadProductionDashboard();
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.23.2 (Stage 29.5): блок выбора комплектности в модалке детали
+function renderPkbKitBlock(w) {
+  const current = w.kit_status || null;
+  const options = [
+    { key: 'ready',   icon: 'ti-package-check', label: 'Комплект' },
+    { key: 'partial', icon: 'ti-package',       label: 'Частично' },
+    { key: 'missing', icon: 'ti-package-off',   label: 'Нет деталей' },
+    { key: null,      icon: 'ti-eraser',        label: 'Снять отметку', noneClass: 'k-none' },
+  ];
+  let html = '<div class="pkb-kit-block">';
+  html +=   '<div class="pkb-kit-block-title">Комплектность</div>';
+  html +=   '<div class="pkb-kit-options">';
+  options.forEach(o => {
+    const isActive = (o.key === current) || (o.key === null && !current);
+    const cls = 'pkb-kit-opt ' +
+                (o.key ? ('k-' + o.key) : (o.noneClass || 'k-none')) +
+                (isActive ? ' active' : '');
+    const arg = o.key ? ("'" + o.key + "'") : 'null';
+    html += '<button class="' + cls + '" onclick="setProductionWorkKitStatus(' + w.id + ', ' + arg + ')">' +
+              '<i class="ti ' + o.icon + '"></i>' + escapeHtml(o.label) +
+            '</button>';
+  });
+  html +=   '</div>';
+  if (w.kit_set_at) {
+    html += '<div class="pkb-kit-meta">отмечено ' + escapeHtml(formatPkbDateTime(w.kit_set_at)) + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+async function setProductionWorkKitStatus(workId, kitStatus) {
+  try {
+    await apiPatch('/api/production/works/' + workId + '/kit-status', { kit_status: kitStatus });
+    showToast(kitStatus
+      ? ('Комплектность: ' + (pkbKitDef(kitStatus) || {}).label)
+      : 'Отметка снята', 'success');
+    // Не закрываем модалку — обновляем её содержимое + перечитываем канбан в фоне
+    try {
+      const fresh = await apiGet('/api/production/works/' + workId);
+      renderProductionWorkDetail(fresh);
+    } catch (e) {}
     cache.productionKanban = null;
     loadProductionDashboard();
   } catch (e) {
