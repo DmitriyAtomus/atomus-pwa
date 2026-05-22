@@ -12747,7 +12747,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.30.0-inline-category";
+const APP_VERSION = "v2.30.1-learn-by-inn";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35627,7 +35627,8 @@ async function siEnsureCategoriesLoaded() {
   if (siState.categories) return siState.categories;
   try {
     const r = await apiGet('/api/components/categories');
-    siState.categories = (r && r.items) || [];
+    // Эндпоинт отдаёт {categories: [...]} — но на всякий случай поддерживаем и items
+    siState.categories = (r && (r.categories || r.items)) || [];
   } catch (e) {
     siState.categories = [];
   }
