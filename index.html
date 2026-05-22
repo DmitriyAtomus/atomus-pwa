@@ -12453,7 +12453,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.25.0-supply-invoice-intake";
+const APP_VERSION = "v2.25.1-supply-upload-fix";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35453,9 +35453,9 @@ function openSupplyInvoiceUpload() {
         '<div class="si-upload-zone" id="si-drop-zone" ondrop="siHandleDrop(event)" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" onclick="document.getElementById(\'si-file-input\').click()">' +
           '<i class="ti ti-cloud-upload"></i>' +
           '<div class="si-upload-zone-title">Перетащите PDF/фото сюда</div>' +
-          '<div class="si-upload-zone-hint">PDF, JPEG или PNG до 25 МБ. Сделайте фото или выберите файл.</div>' +
+          '<div class="si-upload-zone-hint">PDF, JPEG или PNG до 25 МБ суммарно. Можно сразу несколько листов одной накладной (Ctrl+клик).</div>' +
         '</div>' +
-        '<input type="file" id="si-file-input" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
         '<div id="si-upload-status" style="margin-top:12px;font-size:12.5px;color:var(--text-light);text-align:center;"></div>' +
       '</div>' +
     '</div>';
@@ -35466,26 +35466,36 @@ function siHandleDrop(e) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
   const files = e.dataTransfer && e.dataTransfer.files;
-  if (files && files.length > 0) uploadSupplyInvoiceFile(files[0]);
+  if (files && files.length > 0) uploadSupplyInvoiceFiles(Array.from(files));
 }
 function siHandleFileSelect(e) {
-  const f = e.target.files && e.target.files[0];
-  if (f) uploadSupplyInvoiceFile(f);
+  const files = e.target.files;
+  if (files && files.length > 0) uploadSupplyInvoiceFiles(Array.from(files));
 }
 
-async function uploadSupplyInvoiceFile(file) {
+async function uploadSupplyInvoiceFiles(files) {
   const statusEl = document.getElementById('si-upload-status');
   const zone = document.getElementById('si-drop-zone');
-  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Загружаем файл...';
+  if (!files || !files.length) return;
+  const label = files.length === 1
+    ? 'Загружаем файл...'
+    : ('Загружаем ' + files.length + ' файла(ов)...');
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> ' + label;
   if (zone) zone.style.pointerEvents = 'none';
 
   const fd = new FormData();
-  fd.append('file', file, file.name);
+  files.forEach(f => fd.append('file', f, f.name));
 
   try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:#8C2A2A;">Сессия истекла, войдите заново</span>';
+      if (zone) zone.style.pointerEvents = '';
+      return;
+    }
     const res = await fetch(API_BASE + '/api/supply/invoices/upload', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + state.token },
+      headers: { 'Authorization': 'Bearer ' + token },
       body: fd,
     });
     if (!res.ok) {
