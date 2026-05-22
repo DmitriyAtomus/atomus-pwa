@@ -12779,7 +12779,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.30.5-keep-brackets";
+const APP_VERSION = "v2.30.6-create-cat-pt";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26116,7 +26116,9 @@ async function createComponentCategoryPrompt() {
       cache.componentCategories = (cats && (cats.categories || cats.items)) || [];
     } catch (e) { /* игнор */ }
     if (typeof siState !== 'undefined') siState.categories = null;
-    renderComponentCategoryChips();
+    // Перерисуем чипы — для обоих UI (старый Components list + новый PtDashboard)
+    if (typeof renderComponentCategoryChips === 'function') renderComponentCategoryChips();
+    if (typeof loadPartsDashboard === 'function') loadPartsDashboard();
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
   }
@@ -27285,6 +27287,9 @@ function _renderPtChips(categories, total) {
       escapeHtml(c.name) + ' <span class="pt-chip-qty">' + c.count + '</span>' +
       '</button>';
   });
+  // Кнопка создания нового раздела (после всех категорий, пунктирная)
+  html += '<button class="pt-chip" style="border-style:dashed;color:var(--brand);" onclick="createComponentCategoryPrompt()">' +
+    '<i class="ti ti-plus" style="font-size:12px;"></i> Раздел</button>';
   host.innerHTML = html;
 }
 
