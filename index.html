@@ -9582,6 +9582,167 @@
   }
 
   /* ============ КОНЕЦ ЭТАПА 29.5 (v2.23.2) ============ */
+
+  /* ============================================================
+     ЭТАП 30.0 (v2.24.0): AI-ИНСАЙТЫ + BOM-БЛОКИРОВКИ
+     ============================================================ */
+
+  /* Бейдж «Заблокирована» (BOM) на карточке */
+  .pkb-wc-blocked {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    background: #B5260C;
+    color: white;
+    white-space: nowrap;
+  }
+  .pkb-wc-blocked .ti { font-size: 11px; }
+  /* Карточка с блокировкой — красный border-left с приоритетом над overdue */
+  .pkb-col .pkb-wc.is-blocked { border-left-color: #B5260C; }
+  .pkb-col .pkb-wc.is-blocked.b-overdue {
+    border-left: 3px solid #B5260C;
+    box-shadow: inset 2px 0 0 #E24B4A;
+  }
+
+  /* Блок «Дефицит на складе» в модалке детали */
+  .pkb-bom-block {
+    margin: 14px 0 4px;
+    padding: 12px;
+    background: rgba(226,75,74,0.06);
+    border: 1px solid rgba(226,75,74,0.2);
+    border-radius: 8px;
+  }
+  .pkb-bom-block.no-deficit {
+    background: rgba(29,158,117,0.06);
+    border-color: rgba(29,158,117,0.2);
+  }
+  .pkb-bom-block.no-bom {
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  .pkb-bom-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pkb-bom-title .ti { font-size: 14px; }
+  .pkb-bom-list {
+    display: flex; flex-direction: column; gap: 4px;
+    margin: 0; padding: 0; list-style: none;
+  }
+  .pkb-bom-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px dashed rgba(0,0,0,0.06);
+  }
+  .pkb-bom-item:last-child { border-bottom: none; }
+  .pkb-bom-item-name { color: var(--text-dark); }
+  .pkb-bom-item-name.crit::after {
+    content: '!';
+    margin-left: 5px;
+    color: #B5260C;
+    font-weight: 700;
+  }
+  .pkb-bom-item-qty {
+    font-size: 11px;
+    color: var(--text-mid);
+    font-variant-numeric: tabular-nums;
+  }
+  .pkb-bom-item-deficit {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8C2A2A;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Модалка AI-помощника --- */
+  .pkb-ai-modal .modal { max-width: 640px; }
+  .pkb-ai-modal .modal-header {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pkb-ai-modal .modal-header h3 {
+    flex: 1;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pkb-ai-modal .modal-header h3 .ti {
+    color: #7C3AED;
+  }
+  .pkb-ai-body {
+    padding: 16px 18px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .pkb-ai-loading {
+    padding: 30px 12px;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+  .pkb-ai-loading .pkb-ai-spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--bg);
+    border-top-color: #7C3AED;
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    animation: pkb-ai-spin 0.9s linear infinite;
+  }
+  @keyframes pkb-ai-spin {
+    to { transform: rotate(360deg); }
+  }
+  .pkb-ai-text {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-dark);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .pkb-ai-meta {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 11px;
+    color: var(--text-light);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pkb-ai-actions {
+    padding: 12px 18px 16px;
+    display: flex; gap: 8px; justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .pkb-ai-error {
+    background: rgba(226,75,74,0.10);
+    border: 1px solid rgba(226,75,74,0.25);
+    color: #8C2A2A;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  /* AI-кнопка с фиолетовым акцентом */
+  .pkb-btn.ai-action {
+    background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
+    color: white;
+    border-color: transparent;
+  }
+  .pkb-btn.ai-action:hover {
+    background: linear-gradient(135deg, #6D28D9 0%, #4C1D95 100%);
+  }
+
+  /* ============ КОНЕЦ ЭТАПА 30.0 (v2.24.0) ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -11941,7 +12102,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.23.2-kit-status-badges";
+const APP_VERSION = "v2.24.0-ai-bom";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13209,6 +13370,10 @@ function renderProductionDashboard(d) {
   html +=   '<div class="pkb-section-actions">';
   html +=     '<button class="pkb-btn" disabled title="Скоро"><i class="ti ti-calendar-week"></i>План недели</button>';
   html +=     '<button class="pkb-btn" onclick="selectSidebarItem(\'summary\')"><i class="ti ti-chart-bar"></i>Аналитика</button>';
+  // v2.24.0 (Stage 30.0): AI-анализ канбана — для мастера и директора
+  if (hasPermission('production.manage')) {
+    html += '<button class="pkb-btn ai-action" onclick="openAiInsightModal()" title="Запросить анализ канбана у Claude AI"><i class="ti ti-sparkles"></i>AI-анализ</button>';
+  }
   // v2.22.2: кнопка синхронизации production_works из договоров — только для директора
   const isDirector = state.user && (state.user.roles || []).indexOf('director') >= 0;
   if (isDirector) {
@@ -13532,7 +13697,10 @@ function renderPkbWorkCard(w, colKey) {
       ' ondragend="pkbCardDragEnd(event)"'
     : '';
 
-  let html = '<div class="pkb-wc' + borderCls + dimCls + '"' +
+  // v2.24.0: класс is-blocked для красного border-left если BOM-дефицит
+  const blockedCls = (w.is_blocked && colKey !== 'done') ? ' is-blocked' : '';
+
+  let html = '<div class="pkb-wc' + borderCls + dimCls + blockedCls + '"' +
              ' data-work-id="' + w.id + '"' +
              ' data-work-status="' + escapeHtml(w.status || '') + '"' +
              dragAttrs +
@@ -13568,6 +13736,13 @@ function renderPkbWorkCard(w, colKey) {
   // v2.23.2: бейдж комплектности — показывается только когда задан и для не-done колонок
   if (w.kit_status && colKey !== 'done') {
     badgesHtml += renderPkbKitBadge(w.kit_status);
+  }
+
+  // v2.24.0 (Stage 30.0): бейдж блокировки по BOM — только для активных колонок
+  if (w.is_blocked && colKey !== 'done') {
+    badgesHtml += '<div class="pkb-wc-blocked" title="Не хватает критичных компонентов">' +
+                    '<i class="ti ti-lock"></i>Нет деталей' +
+                  '</div>';
   }
 
   if (badgesHtml) {
@@ -13724,6 +13899,11 @@ function renderProductionWorkDetail(w) {
     html += renderPkbKitBlock(w);
   }
 
+  // v2.24.0 (Stage 30.0): блок BOM-дефицита (всегда показывается если has_bom)
+  if (w.status !== 'cancelled' && (w.has_bom || (w.missing_components && w.missing_components.length))) {
+    html += renderPkbBomBlock(w);
+  }
+
   html += '</div>';
 
   // Кнопки смены статуса (заменяют DnD до Stage 29.3)
@@ -13841,6 +14021,168 @@ async function setProductionWorkKitStatus(workId, kitStatus) {
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
   }
+}
+
+// ============ v2.24.0 (Stage 30.0): BOM-блок в модалке деталей ============
+
+function renderPkbBomBlock(w) {
+  const missing = w.missing_components || [];
+  const hasBom = w.has_bom;
+
+  // Нет BOM у модели — выводим информационное сообщение
+  if (!hasBom && missing.length === 0) {
+    return '<div class="pkb-bom-block no-bom">' +
+             '<div class="pkb-bom-title"><i class="ti ti-info-circle"></i>Спецификация модели не задана</div>' +
+             '<div style="font-size:11.5px;color:var(--text-light);">Чтобы автоматически отслеживать дефицит компонентов, заполните BOM модели в справочнике.</div>' +
+           '</div>';
+  }
+
+  // BOM есть и нет дефицита — всё хорошо
+  if (missing.length === 0) {
+    return '<div class="pkb-bom-block no-deficit">' +
+             '<div class="pkb-bom-title" style="color:#0A5B41;"><i class="ti ti-circle-check"></i>Все компоненты на складе</div>' +
+           '</div>';
+  }
+
+  // Есть дефицит — выводим список
+  const hasCritical = missing.some(m => m.is_critical);
+  const titleIcon = hasCritical ? 'ti-alert-triangle' : 'ti-info-circle';
+  const titleColor = hasCritical ? '#8C2A2A' : '#854F0B';
+  const titleText = hasCritical
+    ? 'Дефицит — работа заблокирована'
+    : 'Дефицит некритичных компонентов';
+
+  let html = '<div class="pkb-bom-block">';
+  html +=   '<div class="pkb-bom-title" style="color:' + titleColor + ';">';
+  html +=     '<i class="ti ' + titleIcon + '"></i>' + escapeHtml(titleText);
+  html +=   '</div>';
+  html +=   '<div class="pkb-bom-list">';
+  missing.forEach(m => {
+    const need = pkbFmtQty(m.need);
+    const have = pkbFmtQty(m.available);
+    const def  = pkbFmtQty(m.deficit);
+    const unit = m.unit || 'шт.';
+    const critCls = m.is_critical ? ' crit' : '';
+    html += '<div class="pkb-bom-item">';
+    html +=   '<span class="pkb-bom-item-name' + critCls + '">' + escapeHtml(m.component_name || '?') + '</span>';
+    html +=   '<span class="pkb-bom-item-qty">нужно ' + need + ' / есть ' + have + ' ' + escapeHtml(unit) + '</span>';
+    html +=   '<span class="pkb-bom-item-deficit">−' + def + '</span>';
+    html += '</div>';
+  });
+  html +=   '</div>';
+  if (hasCritical) {
+    html += '<div style="font-size:11px;color:var(--text-light);margin-top:8px;">! — критичный компонент. Работа считается заблокированной пока их нет на складе.</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function pkbFmtQty(n) {
+  if (n == null) return '0';
+  const v = parseFloat(n);
+  if (isNaN(v)) return '0';
+  return (v % 1 === 0) ? String(Math.round(v)) : v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+
+// ============ v2.24.0 (Stage 30.0): AI-ИНСАЙТ КАНБАНА ============
+
+async function openAiInsightModal() {
+  // Удаляем предыдущую
+  const existing = document.getElementById('pkb-ai-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pkb-ai-modal';
+  overlay.className = 'modal-overlay visible pkb-ai-modal';
+  overlay.onclick = function(e) { if (e.target === overlay) closeAiInsightModal(); };
+  overlay.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-sparkles"></i>AI-анализ канбана</h3>' +
+        '<button class="icon-btn" onclick="closeAiInsightModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="pkb-ai-body" id="pkb-ai-body">' +
+        '<div class="pkb-ai-loading">' +
+          '<div class="pkb-ai-spinner"></div>' +
+          'Claude анализирует канбан...<br>' +
+          '<span style="font-size:11px;color:var(--text-faint);">Обычно 5-15 секунд</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="pkb-ai-actions" id="pkb-ai-actions" style="display:none;">' +
+        '<button class="pkb-btn" onclick="closeAiInsightModal()">Закрыть</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  // Запускаем запрос
+  requestAiInsight();
+}
+
+function closeAiInsightModal() {
+  const m = document.getElementById('pkb-ai-modal');
+  if (m) m.remove();
+}
+
+async function requestAiInsight() {
+  const body = document.getElementById('pkb-ai-body');
+  const actions = document.getElementById('pkb-ai-actions');
+  if (!body) return;
+
+  // Показываем loading
+  body.innerHTML =
+    '<div class="pkb-ai-loading">' +
+      '<div class="pkb-ai-spinner"></div>' +
+      'Claude анализирует канбан...<br>' +
+      '<span style="font-size:11px;color:var(--text-faint);">Обычно 5-15 секунд</span>' +
+    '</div>';
+  if (actions) actions.style.display = 'none';
+
+  try {
+    const r = await apiPost('/api/production/ai-insights', {});
+    if (!r.ok) {
+      const msg = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+      body.innerHTML = '<div class="pkb-ai-error"><b>Не удалось получить анализ</b><br>' + escapeHtml(msg) + '</div>';
+      renderAiActions(false);
+      return;
+    }
+    const d = r.data || {};
+    let html = '<div class="pkb-ai-text">' + escapeHtml(d.response_text || '(пустой ответ)') + '</div>';
+    body.innerHTML = html;
+
+    // Метаданные внизу модалки
+    const cost = (d.cost_usd != null) ? d.cost_usd.toFixed(4) : '0';
+    const created = d.created_at ? new Date(d.created_at).toLocaleString('ru-RU') : '';
+    const metaHtml = '<div class="pkb-ai-meta">' +
+                       '<span>модель: ' + escapeHtml(d.model || '—') + '</span>' +
+                       '<span>токены: ' + (d.tokens_in || 0) + '→' + (d.tokens_out || 0) + '</span>' +
+                       '<span>стоимость: $' + cost + '</span>' +
+                       '<span>' + escapeHtml(created) + '</span>' +
+                     '</div>';
+    body.insertAdjacentHTML('afterend', metaHtml);
+    // Удалим следующий мета-блок при следующем requestAiInsight (см. ниже)
+
+    renderAiActions(true);
+  } catch (e) {
+    body.innerHTML = '<div class="pkb-ai-error"><b>Ошибка соединения</b><br>' + escapeHtml(String(e.message || e)) + '</div>';
+    renderAiActions(false);
+  }
+}
+
+function renderAiActions(success) {
+  const actions = document.getElementById('pkb-ai-actions');
+  if (!actions) return;
+  let html = '<button class="pkb-btn" onclick="closeAiInsightModal()">Закрыть</button>';
+  html += '<button class="pkb-btn ai-action" onclick="resetAiAndRequest()"><i class="ti ti-refresh"></i>Запросить новый</button>';
+  actions.innerHTML = html;
+  actions.style.display = 'flex';
+}
+
+function resetAiAndRequest() {
+  // Удаляем мета-блок если он был добавлен через insertAdjacentHTML
+  const meta = document.querySelector('#pkb-ai-modal .pkb-ai-meta');
+  if (meta) meta.remove();
+  requestAiInsight();
 }
 
 async function deleteProductionWork(workId) {
