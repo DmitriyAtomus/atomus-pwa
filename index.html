@@ -12734,7 +12734,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.28.1-list-card-layout";
+const APP_VERSION = "v2.29.0-smart-category";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36373,10 +36373,12 @@ function renderSiMatchHint(it) {
   }
   // Нет сопоставления
   if (!it.matched_component_id) {
-    // Для destination='production' (по умолчанию) при подтверждении создастся карточка в «Разное».
+    // Для destination='production' (по умолчанию) при подтверждении создастся карточка
     const dest = it.destination || 'production';
     if (dest === 'production') {
-      return '<span style="color:var(--text-faint);">→ при оприходовании создастся в разделе: Разное</span>';
+      // Если Claude предложил категорию — показываем её, иначе "Разное"
+      const targetCat = it.suggested_category_name || 'Разное';
+      return '<span style="color:var(--text-faint);">→ при оприходовании создастся в разделе: ' + escapeHtml(targetCat) + '</span>';
     }
     // Для других destination (tools/order/...) — пока не создаём авто
     return '<span style="color:#A32D2D;">+ нет в базе — оприходовать в этот раздел пока нельзя</span>';
