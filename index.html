@@ -9795,14 +9795,41 @@
   .si-list-card .si-row-del i { font-size: 15px; }
   .si-list-card-row {
     display: flex; align-items: center; gap: 10px;
-    flex-wrap: wrap;
+    min-width: 0;
   }
   .si-list-card-title {
     font-size: 13.5px; font-weight: 500; color: var(--text-dark);
     flex: 1; min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Вторая строка: статус-чип + supplier · pages · date */
+  .si-list-card-bottom {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 6px;
+    min-width: 0;
   }
   .si-list-card-meta {
     font-size: 11.5px; color: var(--text-light);
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* На мобильной title может уезжать в 2 строки */
+  .app.mobile-layout .si-list-card { padding: 10px 12px; }
+  .app.mobile-layout .si-list-card-title {
+    font-size: 13px;
+    white-space: normal;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-all;
+  }
+  .app.mobile-layout .si-list-card-bottom { flex-wrap: wrap; gap: 6px; }
+  .app.mobile-layout .si-list-card .si-status-chip {
+    flex-shrink: 0; font-size: 9.5px; padding: 2px 7px;
   }
   .si-status-chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -12707,7 +12734,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.28.0-multipage";
+const APP_VERSION = "v2.28.1-list-card-layout";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35680,9 +35707,15 @@ function renderSupplyInvoicesList(items) {
     const isPending = (inv.recognition_state === 'pending');
     const chipCls = isPending ? 'sc-pending' : siStatusChipClass(status);
     const chipTxt = isPending ? 'Ждёт распознавания' : siStatusLabel(status);
+    // Заголовок: предпочтительно УПД №… от …; иначе осмысленное имя файла (без timestamp-мусора);
+    // иначе просто "Черновик · {дата создания}"
+    const rawName = inv.source_file_name || '';
+    const looksLikeTimestamp = /^\d{10,}\.[a-z]+$/i.test(rawName) || /^IMG_\d+/i.test(rawName);
     const docTitle = inv.document_number
       ? ('УПД №' + escapeHtml(inv.document_number) + (inv.document_date ? (' от ' + siFmtDate(inv.document_date)) : ''))
-      : (inv.source_file_name || 'Новый черновик');
+      : (rawName && !looksLikeTimestamp
+          ? rawName
+          : ('Черновик · ' + (inv.created_at ? siFmtDateTime(inv.created_at) : '')));
     const supplier = inv.supplier_name_raw || '—';
     const itemsLine = inv.items_count != null ? (inv.items_count + ' поз.') : '';
     const pagesLine = (inv.pages_count && inv.pages_count > 1) ? (inv.pages_count + ' стр.') : '';
@@ -35705,11 +35738,13 @@ function renderSupplyInvoicesList(items) {
       '<div class="si-list-card" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
         '<div class="si-list-card-row">' +
           '<div class="si-list-card-title">' + escapeHtml(docTitle) + '</div>' +
-          '<span class="si-status-chip ' + chipCls + '">' + escapeHtml(chipTxt) + '</span>' +
           delBtn +
         '</div>' +
-        '<div class="si-list-card-meta">' +
-          escapeHtml(supplier) + (pagesLine ? (' · ' + pagesLine) : '') + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
+        '<div class="si-list-card-bottom">' +
+          '<span class="si-status-chip ' + chipCls + '">' + escapeHtml(chipTxt) + '</span>' +
+          '<span class="si-list-card-meta">' +
+            escapeHtml(supplier) + (pagesLine ? (' · ' + pagesLine) : '') + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
+          '</span>' +
         '</div>' +
       '</div>';
   });
