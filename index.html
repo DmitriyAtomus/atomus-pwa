@@ -9811,6 +9811,7 @@
     text-transform: uppercase; letter-spacing: 0.4px;
   }
   .si-status-chip.s-draft     { background: #FAEEDA; color: #854F0B; }
+  .si-status-chip.sc-pending  { background: rgba(124,58,237,0.12); color: #5B21B6; border: 1px dashed rgba(124,58,237,0.35); padding-left: 7px; padding-right: 7px; }
   .si-status-chip.s-confirmed { background: rgba(29,158,117,0.15); color: #0A5B41; }
   .si-status-chip.s-partial   { background: rgba(186,117,23,0.15); color: #854F0B; }
   .si-status-chip.s-cancel    { background: var(--bg); color: var(--text-light); }
@@ -9946,6 +9947,40 @@
   .si-ai-badge .ti { font-size: 13px; }
   .si-ai-badge.loading {
     background: var(--bg); color: var(--text-light);
+  }
+
+  /* Бейдж активного распознавания — фиолетовый с пульсацией */
+  .si-ai-badge.recognizing {
+    background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%);
+    color: #fff;
+    padding: 5px 12px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(124,58,237,0.30);
+    position: relative;
+    overflow: hidden;
+  }
+  .si-ai-badge.recognizing::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: -40%;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+    animation: si-badge-scan 2.2s ease-in-out infinite;
+  }
+  @keyframes si-badge-scan {
+    0%   { left: -40%; }
+    100% { left: 100%; }
+  }
+  .si-ai-badge.recognizing i {
+    animation: si-pulse 1.4s ease-in-out infinite;
+  }
+  /* Бейдж "Ждёт распознавания" — нейтральный с лёгкой "приглашающей" анимацией */
+  .si-ai-badge.pending {
+    background: rgba(124,58,237,0.10);
+    color: #5B21B6;
+    padding: 5px 12px;
+    border: 1px dashed rgba(124,58,237,0.40);
+    font-weight: 600;
   }
 
   /* --- Карточки реквизитов (3 шт) --- */
@@ -12672,7 +12707,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.27.2-drawer-polish";
+const APP_VERSION = "v2.27.3-defer-and-badge";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35641,8 +35676,10 @@ function renderSupplyInvoicesList(items) {
   let html = isMobile ? renderSiMobileHeader() : '';
   items.forEach(inv => {
     const status = inv.status || 'draft';
-    const chipCls = siStatusChipClass(status);
-    const chipTxt = siStatusLabel(status);
+    // Pending-распознавание показываем особым чипом — Дмитрий с компа должен видеть, какие УПД ждут запуска
+    const isPending = (inv.recognition_state === 'pending');
+    const chipCls = isPending ? 'sc-pending' : siStatusChipClass(status);
+    const chipTxt = isPending ? 'Ждёт распознавания' : siStatusLabel(status);
     const docTitle = inv.document_number
       ? ('УПД №' + escapeHtml(inv.document_number) + (inv.document_date ? (' от ' + siFmtDate(inv.document_date)) : ''))
       : (inv.source_file_name || 'Новый черновик');
@@ -35743,13 +35780,15 @@ async function siHandleCameraDirect(event) {
   const files = event.target.files;
   if (!files || !files.length) return;
   // Загружаем без модалки — сразу с тостом
-  showToast('Загружаем фото · распознаём…', 'success');
+  showToast('Загружаем фото · распознавание запустишь вручную', 'success');
   // Переключаемся на экран Приёмки УПД, чтобы было куда показать detail
   if (typeof selectSidebarItem === 'function' && state.currentScreen !== 'supply-invoice-intake') {
     selectSidebarItem('supply-invoice-intake');
   }
   const fd = new FormData();
   Array.from(files).forEach(f => fd.append('file', f, f.name));
+  // Камера всегда откладывает распознавание — токены экономим, запускаем с компа
+  fd.append('defer_recognition', '1');
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
@@ -35767,7 +35806,9 @@ async function siHandleCameraDirect(event) {
       return;
     }
     const data = await res.json();
-    loadSupplyInvoiceDetail(data.id);
+    // Возвращаемся в список (не открываем detail), чтобы Дмитрий увидел плитку
+    // и спокойно с компа распознал. Список покажет статус "Ждёт распознавания".
+    loadSupplyInvoicesList();
   } catch (e) {
     showToast('Ошибка соединения: ' + (e.message || e), 'error');
   }
@@ -35822,6 +35863,12 @@ function openSupplyInvoiceUpload() {
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
+  // На мобильной по умолчанию отмечаем "Распознать позже" — экономим токены и батарею телефона
+  const isMobile = !!(state && !state.isDesktop);
+  if (isMobile) {
+    const cb = document.getElementById('si-defer-recognize');
+    if (cb) cb.checked = true;
+  }
 }
 
 function siHandleDrop(e) {
@@ -35965,9 +36012,9 @@ function renderSupplyInvoiceDetail(data) {
               '</div>';
   html +=   '</div>';
   if (isLoading) {
-    html += '<div class="si-ai-badge" style="background:#FAEEDA;color:#854F0B;"><i class="ti ti-sparkles si-recognize-loading"></i>Распознаём…</div>';
+    html += '<div class="si-ai-badge recognizing"><i class="ti ti-sparkles"></i>Распознаём…</div>';
   } else if (isPending) {
-    html += '<div class="si-ai-badge" style="background:rgba(124,58,237,0.10);color:#5B21B6;"><i class="ti ti-hourglass"></i>Ждёт распознавания</div>';
+    html += '<div class="si-ai-badge pending"><i class="ti ti-hourglass"></i>Ждёт распознавания</div>';
   } else if (inv.ai_error) {
     html += '<div class="si-ai-badge" style="background:rgba(226,75,74,0.15);color:#8C2A2A;"><i class="ti ti-alert-triangle"></i>Ошибка ИИ</div>';
   } else if (recoTime) {
