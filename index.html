@@ -9090,12 +9090,16 @@
   }
   .pkb-col.c-queue   .pkb-col-name  { color: #4B5563; }
   .pkb-col.c-queue   .pkb-col-count { background: #E5E7EB; color: #4B5563; }
+  .pkb-col.c-queue   .pkb-col-head  { background: linear-gradient(180deg, rgba(75,85,99,0.05) 0%, white 100%); }
   .pkb-col.c-active  .pkb-col-name  { color: #1E40AF; }
   .pkb-col.c-active  .pkb-col-count { background: rgba(37,99,235,0.15); color: #1E40AF; }
+  .pkb-col.c-active  .pkb-col-head  { background: linear-gradient(180deg, rgba(37,99,235,0.07) 0%, white 100%); }
   .pkb-col.c-review  .pkb-col-name  { color: #854F0B; }
   .pkb-col.c-review  .pkb-col-count { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .pkb-col.c-review  .pkb-col-head  { background: linear-gradient(180deg, rgba(186,117,23,0.07) 0%, white 100%); }
   .pkb-col.c-done    .pkb-col-name  { color: #0A5B41; }
   .pkb-col.c-done    .pkb-col-count { background: rgba(29,158,117,0.15); color: #0A5B41; }
+  .pkb-col.c-done    .pkb-col-head  { background: linear-gradient(180deg, rgba(29,158,117,0.07) 0%, white 100%); }
 
   .pkb-col-body {
     flex: 1;
@@ -9133,6 +9137,11 @@
   .pkb-wc.b-today    { border-left-color: #BA7517; }
   .pkb-wc.b-tomorrow { border-left-color: #BA7517; }
   .pkb-wc.dim        { opacity: 0.85; }
+  /* v2.23.1: лёгкая цветовая полоска для карточек без срочности — по цвету колонки */
+  .pkb-col.c-queue   .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(75,85,99,0.35); }
+  .pkb-col.c-active  .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(37,99,235,0.45); }
+  .pkb-col.c-review  .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(186,117,23,0.45); }
+  .pkb-col.c-done    .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(29,158,117,0.45); }
 
   .pkb-wc-bar {
     display: inline-flex; align-items: center; gap: 3px;
@@ -9158,8 +9167,8 @@
     color: #854F0B;
   }
   .pkb-wc-bar.b-deadline {
-    background: var(--bg);
-    color: var(--text-light);
+    background: rgba(37,99,235,0.10);
+    color: #1E40AF;
   }
   .pkb-wc-bar.b-success {
     background: rgba(29,158,117,0.15);
@@ -11849,7 +11858,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.23.0-dnd-workload";
+const APP_VERSION = "v2.23.1-prod-filter-colors";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
