@@ -12855,7 +12855,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.31.2-instock-visible";
+const APP_VERSION = "v2.31.3-edit-feedback";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35802,15 +35802,13 @@ async function siEnsureCategoriesLoaded() {
 
 // Меняем suggested_category_id у позиции
 async function siChangeItemCategory(itemId, newCatId) {
-  const invId = siState.currentInvoiceId || 0;
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) { showToast('Нет открытой УПД', 'error'); return; }
   try {
-    const r = await apiPatch('/api/supply/invoices/' + invId + '/items/' + itemId,
-                              { suggested_category_id: newCatId ? parseInt(newCatId, 10) : null });
-    if (r && r.ok === false) {
-      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
-      return;
-    }
-    if (siState.currentInvoiceId) loadSupplyInvoiceDetail(siState.currentInvoiceId);
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId,
+                    { suggested_category_id: newCatId ? parseInt(newCatId, 10) : null });
+    showToast('Раздел обновлён', 'success');
+    loadSupplyInvoiceDetail(invoiceId);
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
   }
@@ -36520,16 +36518,16 @@ async function openSiQtyEditPrompt(itemId, currentQty) {
     showToast('Некорректное число', 'error');
     return;
   }
+  // No-op защита: если не изменилось — просто закрываем без запроса
+  if (parseFloat(currentQty) === newQty) {
+    return;
+  }
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) { showToast('Нет открытой УПД', 'error'); return; }
   try {
-    const invId = siState.currentInvoiceId || 0;
-    const r = await apiPatch('/api/supply/invoices/' + invId + '/items/' + itemId, { qty: newQty });
-    if (r && r.ok === false) {
-      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
-      return;
-    }
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, { qty: newQty });
     showToast('Кол-во обновлено', 'success');
-    // Перерисуем карточку — самый простой способ
-    if (siState.currentInvoiceId) loadSupplyInvoiceDetail(siState.currentInvoiceId);
+    loadSupplyInvoiceDetail(invoiceId);
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
   }
@@ -36544,14 +36542,16 @@ async function openSiNameEditPrompt(itemId, currentName) {
     showToast('Название не может быть пустым', 'error');
     return;
   }
+  // No-op защита: если не изменилось — закрываем
+  if (trimmed === (currentName || '').trim()) {
+    return;
+  }
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) { showToast('Нет открытой УПД', 'error'); return; }
   try {
-    const invId = siState.currentInvoiceId || 0;
-    const r = await apiPatch('/api/supply/invoices/' + invId + '/items/' + itemId, { name_raw: trimmed });
-    if (r && r.ok === false) {
-      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
-      return;
-    }
-    if (siState.currentInvoiceId) loadSupplyInvoiceDetail(siState.currentInvoiceId);
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, { name_raw: trimmed });
+    showToast('Название обновлено', 'success');
+    loadSupplyInvoiceDetail(invoiceId);
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
   }
@@ -36964,11 +36964,7 @@ async function applyMatchModal(itemId) {
     };
   }
   try {
-    const r = await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, body);
-    if (r && r.ok === false) {
-      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
-      return;
-    }
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, body);
     overlay.remove();
     showToast('Сопоставление обновлено', 'success');
     loadSupplyInvoiceDetail(invoiceId);
