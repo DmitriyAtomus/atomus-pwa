@@ -9763,6 +9763,21 @@
     transition: box-shadow 0.12s;
   }
   .si-list-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .si-list-card .si-row-del {
+    width: 28px; height: 28px; padding: 0;
+    border-radius: 6px; border: 1px solid transparent;
+    background: transparent; color: var(--text-faint);
+    cursor: pointer;
+    transition: all 0.12s;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .si-list-card .si-row-del:hover {
+    background: rgba(226,75,74,0.10);
+    color: #8C2A2A;
+    border-color: rgba(226,75,74,0.20);
+  }
+  .si-list-card .si-row-del i { font-size: 15px; }
   .si-list-card-row {
     display: flex; align-items: center; gap: 10px;
     flex-wrap: wrap;
@@ -10033,17 +10048,88 @@
     font-size: 11.5px; color: var(--text-light);
   }
 
-  /* --- Skeleton-блок для приёмки во время распознавания --- */
-  .si-skeleton-wrap {
-    margin: 4px 0 14px;
+  /* --- Большой "процесс распознавания" блок с этапами --- */
+  .si-reco-stage-block {
+    position: relative;
+    background: linear-gradient(135deg, #F5F0FF 0%, #EEE7FB 100%);
+    border: 1px solid rgba(124,58,237,0.18);
+    border-radius: 14px;
+    padding: 22px 22px 18px;
+    margin: 6px 0 14px;
+    overflow: hidden;
   }
+  /* Сканирующая полоса слева направо */
+  .si-reco-stage-block::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: -30%;
+    width: 30%;
+    background: linear-gradient(90deg,
+      rgba(124,58,237,0) 0%,
+      rgba(124,58,237,0.18) 50%,
+      rgba(124,58,237,0) 100%);
+    animation: si-reco-scan 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes si-reco-scan {
+    0%   { left: -30%; }
+    100% { left: 100%; }
+  }
+  .si-reco-header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+  }
+  .si-reco-icon-big {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(124,58,237,0.22);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    animation: si-pulse 1.6s ease-in-out infinite;
+  }
+  .si-reco-icon-big i { font-size: 28px; color: #7C3AED; }
+  .si-reco-title { font-size: 16px; font-weight: 600; color: #4C1D95; line-height: 1.2; }
+  .si-reco-sub { font-size: 12px; color: #6D52B5; margin-top: 3px; }
+  .si-reco-stages { position: relative; z-index: 1; }
+  .si-reco-stage {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0;
+    color: #4C1D95;
+    font-size: 13px;
+    opacity: 0.35;
+    animation: si-stage-show 30s linear forwards;
+  }
+  .si-reco-stage:nth-child(1) { animation-delay: 0s; }
+  .si-reco-stage:nth-child(2) { animation-delay: 7s; }
+  .si-reco-stage:nth-child(3) { animation-delay: 16s; }
+  @keyframes si-stage-show {
+    0%   { opacity: 0.35; }
+    8%   { opacity: 1; }
+    100% { opacity: 1; }
+  }
+  .si-reco-stage .si-stage-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #7C3AED;
+    flex-shrink: 0;
+    animation: si-stage-dot 1.2s ease-in-out infinite;
+  }
+  @keyframes si-stage-dot {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50%      { opacity: 1; transform: scale(1.2); }
+  }
+
+  /* --- Skeleton-строки таблицы во время распознавания --- */
+  .si-skeleton-wrap { margin: 4px 0 14px; }
   .si-skel {
     background: linear-gradient(90deg,
-      rgba(0,0,0,0.04) 0%,
-      rgba(0,0,0,0.08) 50%,
-      rgba(0,0,0,0.04) 100%);
+      rgba(124,58,237,0.05) 0%,
+      rgba(124,58,237,0.13) 50%,
+      rgba(124,58,237,0.05) 100%);
     background-size: 200% 100%;
-    animation: si-shimmer 1.6s linear infinite;
+    animation: si-shimmer 1.4s linear infinite;
     border-radius: 6px;
   }
   @keyframes si-shimmer {
@@ -10055,28 +10141,10 @@
     grid-template-columns: 16px 1fr 70px 130px 32px;
     gap: 10px;
     align-items: center;
-    padding: 11px 6px;
+    padding: 11px 8px;
     border-bottom: 1px solid var(--border);
   }
   .si-skel-row:last-child { border-bottom: 0; }
-  .si-skel-banner {
-    background: linear-gradient(120deg,
-      rgba(124,58,237,0.06) 0%,
-      rgba(124,58,237,0.13) 50%,
-      rgba(124,58,237,0.06) 100%);
-    background-size: 200% 100%;
-    animation: si-shimmer 2.4s linear infinite;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 12px;
-    display: flex; align-items: center; gap: 10px;
-    color: #5B21B6;
-    font-size: 13px;
-  }
-  .si-skel-banner .ti-sparkles {
-    font-size: 18px;
-    animation: si-pulse 1.5s ease-in-out infinite;
-  }
 
   /* --- Модалка split и refuse --- */
   .si-modal-block {
@@ -12498,7 +12566,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.26.1-auto-misc-category";
+const APP_VERSION = "v2.26.3-delete-from-list";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35436,11 +35504,19 @@ function renderSupplyInvoicesList(items) {
     const supplier = inv.supplier_name_raw || '—';
     const itemsLine = inv.items_count != null ? (inv.items_count + ' поз.') : '';
     const createdLine = inv.created_at ? ('создано ' + siFmtDateTime(inv.created_at)) : '';
+    // Иконка удаления — только для черновиков и отменённых
+    const canDelete = (status === 'draft' || status === 'cancelled');
+    const delBtn = canDelete
+      ? '<button class="icon-btn si-row-del" title="Удалить черновик" ' +
+          'onclick="event.stopPropagation();deleteSupplyInvoiceFromList(' + inv.id + ')">' +
+          '<i class="ti ti-trash"></i></button>'
+      : '';
     html +=
       '<div class="si-list-card" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
         '<div class="si-list-card-row">' +
           '<div class="si-list-card-title">' + escapeHtml(docTitle) + '</div>' +
           '<span class="si-status-chip ' + chipCls + '">' + escapeHtml(chipTxt) + '</span>' +
+          delBtn +
         '</div>' +
         '<div class="si-list-card-meta">' +
           escapeHtml(supplier) + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
@@ -35448,6 +35524,22 @@ function renderSupplyInvoicesList(items) {
       '</div>';
   });
   body.innerHTML = html;
+}
+
+// Удаление из списка с подтверждением
+async function deleteSupplyInvoiceFromList(invoiceId) {
+  if (!confirm('Удалить эту приёмку?\n\nЧерновик будет помечен как отменённый и скрыт из списка.')) return;
+  try {
+    const r = await apiDelete('/api/supply/invoices/' + invoiceId);
+    if (r && r.ok === false) {
+      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
+      return;
+    }
+    showToast('Удалено', 'success');
+    loadSupplyInvoicesList();
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
 }
 
 function siStatusChipClass(s) {
@@ -35677,29 +35769,27 @@ function renderSupplyInvoiceDetail(data) {
     return;
   }
 
-  // Состояние "распознаём" — скелетон будущей карточки приёмки с shimmer-эффектом
+  // Состояние "распознаём" — большой блок с анимированными этапами + скелетон-строки таблицы
   if (isLoading) {
-    html += '<div class="si-skeleton-wrap">';
-    html +=   '<div class="si-skel-banner">';
-    html +=     '<i class="ti ti-sparkles"></i>';
+    html += '<div class="si-reco-stage-block">';
+    html +=   '<div class="si-reco-header">';
+    html +=     '<div class="si-reco-icon-big"><i class="ti ti-sparkles"></i></div>';
     html +=     '<div>';
-    html +=       '<div style="font-weight:500;">Claude анализирует накладную…</div>';
-    html +=       '<div style="font-size:11px;color:#7C3AED;opacity:0.75;margin-top:2px;">обычно 15–30 секунд · экран обновится сам</div>';
+    html +=       '<div class="si-reco-title">Claude анализирует накладную</div>';
+    html +=       '<div class="si-reco-sub">обычно 15–30 секунд · экран обновится автоматически</div>';
     html +=     '</div>';
     html +=   '</div>';
-    // 3 карточки реквизитов — заглушки
-    html +=   '<div class="si-req-grid" style="margin-bottom:14px;">';
-    for (let i = 0; i < 3; i++) {
-      html += '<div class="si-req-card">';
-      html +=   '<div class="si-skel" style="height:11px;width:50%;margin-bottom:8px;"></div>';
-      html +=   '<div class="si-skel" style="height:16px;width:80%;margin-bottom:6px;"></div>';
-      html +=   '<div class="si-skel" style="height:11px;width:40%;"></div>';
-      html += '</div>';
-    }
+    html +=   '<div class="si-reco-stages">';
+    html +=     '<div class="si-reco-stage"><span class="si-stage-dot"></span>Извлечение реквизитов поставщика и документа</div>';
+    html +=     '<div class="si-reco-stage"><span class="si-stage-dot"></span>Распознавание позиций накладной</div>';
+    html +=     '<div class="si-reco-stage"><span class="si-stage-dot"></span>Сопоставление с каталогом комплектующих</div>';
     html +=   '</div>';
-    // Заглушки строк таблицы позиций
+    html += '</div>';
+
+    // Скелетон таблицы позиций (фиолетовый, в тон блока) — добавляет ритм
+    html += '<div class="si-skeleton-wrap">';
     html +=   '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-card);">';
-    const widths = ['78%', '55%', '68%', '42%', '60%'];
+    const widths = ['80%', '58%', '70%', '46%', '63%'];
     for (let i = 0; i < widths.length; i++) {
       html += '<div class="si-skel-row">';
       html +=   '<div class="si-skel" style="height:10px;width:10px;border-radius:50%;"></div>';
