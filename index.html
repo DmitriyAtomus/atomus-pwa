@@ -12855,7 +12855,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.31.4-confidence-patch";
+const APP_VERSION = "v2.31.5-xlsx-support";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35873,7 +35873,7 @@ function renderSiMobileHeader() {
           '<i class="ti ti-file-upload"></i>' +
           '<div>' +
             '<div class="si-upload-action-title">Загрузить</div>' +
-            '<div class="si-upload-action-hint">PDF, фото из галереи</div>' +
+            '<div class="si-upload-action-hint">PDF, фото или Excel</div>' +
           '</div>' +
         '</button>' +
       '</div>' +
@@ -36129,12 +36129,12 @@ function openSupplyInvoiceUpload() {
             '<i class="ti ti-file-upload"></i>' +
             '<div>' +
               '<div class="si-upload-action-title">Выбрать файл</div>' +
-              '<div class="si-upload-action-hint">PDF, фото из галереи</div>' +
+              '<div class="si-upload-action-hint">PDF, фото или Excel</div>' +
             '</div>' +
           '</button>' +
         '</div>' +
         '<input type="file" id="si-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
-        '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.xlsx,.xls" style="display:none;" onchange="siHandleFileSelect(event)">' +
         '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:12.5px;line-height:1.4;color:var(--text-mid);">' +
           '<input type="checkbox" id="si-defer-recognize" style="margin-top:2px;flex-shrink:0;">' +
           '<span>' +
