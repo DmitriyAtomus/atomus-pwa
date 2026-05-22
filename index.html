@@ -12566,7 +12566,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.26.3-delete-from-list";
+const APP_VERSION = "v2.26.4-confirmed-title";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35735,13 +35735,18 @@ function renderSupplyInvoiceDetail(data) {
   }
   html += '</div>';
 
-  // Шапка приёмки
+  // Шапка приёмки — заголовок зависит от статуса
+  const titlePrefix = (inv.status === 'confirmed') ? 'Приёмка'
+                    : (inv.status === 'partially_refused') ? 'Приёмка (с отказами)'
+                    : (inv.status === 'cancelled') ? 'Отменённая приёмка'
+                    : 'Черновик приёмки';
   html += '<div class="si-detail-header">';
   html +=   '<div>';
   html +=     '<div style="font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Снабжение / приёмка</div>';
-  html +=     '<h2 style="margin:4px 0 2px;">' + (inv.document_number ? ('Черновик приёмки · УПД №' + escapeHtml(inv.document_number)) : 'Черновик приёмки') + '</h2>';
+  html +=     '<h2 style="margin:4px 0 2px;">' + titlePrefix + (inv.document_number ? (' · УПД №' + escapeHtml(inv.document_number)) : '') + '</h2>';
   html +=     '<div style="font-size:12px;color:var(--text-faint);">' +
                 (inv.source_file_name ? ('файл: ' + escapeHtml(inv.source_file_name)) : '') +
+                (inv.confirmed_at ? (' · оприходовано ' + siFmtDateTime(inv.confirmed_at)) : '') +
               '</div>';
   html +=   '</div>';
   if (isLoading) {
