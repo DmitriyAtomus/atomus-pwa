@@ -9743,6 +9743,337 @@
   }
 
   /* ============ КОНЕЦ ЭТАПА 30.0 (v2.24.0) ============ */
+
+  /* ============================================================
+     ЭТАП 26 (v2.25.0): АВТО-ПРИЁМКА УПД
+     ============================================================ */
+
+  /* --- Список приёмок --- */
+  .si-list-empty {
+    padding: 40px 16px; text-align: center;
+    color: var(--text-light); font-size: 13px;
+  }
+  .si-list-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: box-shadow 0.12s;
+  }
+  .si-list-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .si-list-card-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .si-list-card-title {
+    font-size: 13.5px; font-weight: 500; color: var(--text-dark);
+    flex: 1; min-width: 0;
+  }
+  .si-list-card-meta {
+    font-size: 11.5px; color: var(--text-light);
+  }
+  .si-status-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 600;
+    padding: 2px 9px; border-radius: 12px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .si-status-chip.s-draft     { background: #FAEEDA; color: #854F0B; }
+  .si-status-chip.s-confirmed { background: rgba(29,158,117,0.15); color: #0A5B41; }
+  .si-status-chip.s-partial   { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .si-status-chip.s-cancel    { background: var(--bg); color: var(--text-light); }
+
+  /* --- Зона загрузки --- */
+  .si-upload-zone {
+    background: white;
+    border: 2px dashed var(--border-strong);
+    border-radius: 12px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .si-upload-zone:hover, .si-upload-zone.drag-over {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .si-upload-zone .ti-cloud-upload {
+    font-size: 36px; color: var(--text-light);
+    display: block; margin: 0 auto 8px;
+  }
+  .si-upload-zone-title {
+    font-size: 14px; font-weight: 500; color: var(--text-dark);
+    margin-bottom: 4px;
+  }
+  .si-upload-zone-hint {
+    font-size: 11.5px; color: var(--text-light);
+  }
+  .si-upload-input { display: none; }
+
+  /* --- Шапка приёмки --- */
+  .si-detail-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .si-detail-header h2 {
+    font-size: 20px; font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .si-ai-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    background: #EEEDFE; color: #3C3489;
+    border-radius: 999px;
+    font-size: 11.5px; font-weight: 500;
+    white-space: nowrap;
+  }
+  .si-ai-badge .ti { font-size: 13px; }
+  .si-ai-badge.loading {
+    background: var(--bg); color: var(--text-light);
+  }
+
+  /* --- Карточки реквизитов (3 шт) --- */
+  .si-req-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 720px) {
+    .si-req-grid { grid-template-columns: 1fr; }
+  }
+  .si-req-card {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--border-strong);
+  }
+  .si-req-card.ok { border-left-color: #1D9E75; }
+  .si-req-card.warn { border-left-color: #BA7517; }
+  .si-req-label {
+    font-size: 10px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600; margin-bottom: 3px;
+  }
+  .si-req-value {
+    font-size: 13px; font-weight: 500; color: var(--text-dark);
+    line-height: 1.25;
+  }
+  .si-req-hint {
+    font-size: 11px; color: var(--text-light);
+    margin-top: 2px;
+  }
+
+  /* --- Блок предупреждений --- */
+  .si-warnings {
+    background: rgba(186,117,23,0.08);
+    border: 1px solid rgba(186,117,23,0.25);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+  .si-warnings-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #854F0B;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600; margin-bottom: 6px;
+  }
+  .si-warnings-item {
+    font-size: 12.5px; color: var(--text-dark);
+    line-height: 1.5;
+  }
+
+  /* --- Плитки сводки по местам --- */
+  .si-dest-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 720px) {
+    .si-dest-tiles { grid-template-columns: repeat(2, 1fr); }
+  }
+  .si-dest-tile {
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .si-dest-tile.d-production { background: #E6F1FB; }
+  .si-dest-tile.d-tools      { background: #FAEEDA; }
+  .si-dest-tile.d-order      { background: #E1F5EE; }
+  .si-dest-tile.d-refused    { background: #F1EFE8; }
+  .si-dest-tile-title {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 500;
+  }
+  .si-dest-tile.d-production .si-dest-tile-title { color: #185FA5; }
+  .si-dest-tile.d-tools      .si-dest-tile-title { color: #854F0B; }
+  .si-dest-tile.d-order      .si-dest-tile-title { color: #0F6E56; }
+  .si-dest-tile.d-refused    .si-dest-tile-title { color: #5F5E5A; }
+  .si-dest-tile-count {
+    font-size: 18px; font-weight: 600;
+    margin-top: 4px; line-height: 1;
+  }
+  .si-dest-tile.d-production .si-dest-tile-count { color: #0C447C; }
+  .si-dest-tile.d-tools      .si-dest-tile-count { color: #633806; }
+  .si-dest-tile.d-order      .si-dest-tile-count { color: #04342C; }
+  .si-dest-tile.d-refused    .si-dest-tile-count { color: #2C2C2A; }
+
+  /* --- Таблица позиций --- */
+  .si-items-table {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .si-items-row {
+    display: grid;
+    grid-template-columns: 14px 1fr 90px 165px 26px 26px;
+    gap: 10px;
+    padding: 10px 12px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .si-items-row.head {
+    background: var(--bg);
+    border-top: none;
+    padding: 8px 12px;
+    font-size: 10px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .si-items-row.is-refused { opacity: 0.6; }
+  .si-items-row.is-refused .si-item-name { text-decoration: line-through; }
+  .si-items-row.is-warn { background: rgba(186,117,23,0.04); }
+
+  .si-conf-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+  }
+  .si-conf-dot.high   { background: #1D9E75; }
+  .si-conf-dot.medium { background: #BA7517; }
+  .si-conf-dot.low    { background: #E24B4A; }
+  .si-conf-dot.refused{ background: #6B7280; }
+
+  .si-item-name { font-weight: 500; color: var(--text-dark); }
+  .si-item-name-sub {
+    font-size: 10.5px; color: var(--text-light);
+    font-style: italic; margin-top: 2px;
+  }
+  .si-item-qty {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Выпадайка «Куда» --- */
+  .si-dest-select {
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 11px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: white;
+    cursor: pointer;
+  }
+  .si-dest-select.d-production { background: #E6F1FB; color: #185FA5; border-color: rgba(37,99,235,0.3); }
+  .si-dest-select.d-tools      { background: #FAEEDA; color: #854F0B; border-color: rgba(186,117,23,0.3); }
+  .si-dest-select.d-order      { background: #E1F5EE; color: #0F6E56; border-color: rgba(29,158,117,0.3); }
+  .si-dest-select.d-expense    { background: #EEEDFE; color: #3C3489; border-color: rgba(83,74,183,0.3); }
+  .si-dest-select.d-refused    { background: #F1EFE8; color: #5F5E5A; border-color: rgba(0,0,0,0.15); }
+  .si-dest-select.d-finished   { background: #E6F1FB; color: #185FA5; }
+
+  .si-row-action {
+    text-align: center;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .si-row-action:hover { color: var(--brand); }
+
+  /* --- Нижняя панель --- */
+  .si-bottom-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    flex-wrap: wrap;
+  }
+  .si-bottom-summary {
+    font-size: 12.5px; color: var(--text-light);
+  }
+  .si-bottom-summary b { color: var(--text-dark); font-weight: 500; }
+
+  /* --- Loading с прогрессом ИИ --- */
+  .si-recognize-loading {
+    text-align: center; padding: 40px 20px;
+    background: var(--bg); border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .si-recognize-loading .ti-sparkles {
+    font-size: 36px; color: #7C3AED;
+    animation: si-pulse 1.5s ease-in-out infinite;
+    display: block; margin: 0 auto 10px;
+  }
+  @keyframes si-pulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+  .si-recognize-title {
+    font-size: 14px; font-weight: 500; color: var(--text-dark);
+    margin-bottom: 4px;
+  }
+  .si-recognize-hint {
+    font-size: 11.5px; color: var(--text-light);
+  }
+
+  /* --- Модалка split и refuse --- */
+  .si-modal-block {
+    margin-bottom: 14px;
+  }
+  .si-modal-block label {
+    display: block; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); font-weight: 600;
+    margin-bottom: 5px;
+  }
+  .si-qty-pair {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .si-qty-input {
+    width: 100%; padding: 9px 12px;
+    background: white; border: 1px solid var(--border-strong);
+    border-radius: 8px; font-size: 14px;
+    box-sizing: border-box;
+  }
+  .si-qty-input:focus { outline: none; border-color: var(--brand); }
+  .si-reason-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  }
+  .si-reason-opt {
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-mid);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .si-reason-opt:hover { border-color: var(--text-mid); }
+  .si-reason-opt.active {
+    background: rgba(226,75,74,0.10); color: #8C2A2A;
+    border-color: #E24B4A;
+  }
+  .si-reason-opt .ti { font-size: 13px; }
+
+  /* ============ КОНЕЦ ЭТАПА 26 (v2.25.0) ============ */
 </style>
 
 <!-- QRCode generation library (small, ~9KB) -->
@@ -10076,6 +10407,9 @@
         </button>
         <button class="nav-item" data-nav="supply-orders" onclick="selectSidebarItem('supply-orders')">
           <i class="ti ti-file-invoice"></i><span>Заказы</span>
+        </button>
+        <button class="nav-item" data-nav="supply-invoice-intake" onclick="selectSidebarItem('supply-invoice-intake')">
+          <i class="ti ti-sparkles"></i><span>Приёмка УПД</span>
         </button>
         <button class="nav-item" data-nav="supply-receipts" onclick="selectSidebarItem('supply-receipts')">
           <i class="ti ti-package-import"></i><span>Приёмки</span>
@@ -11401,6 +11735,23 @@
       </div>
 
       <!-- ПРИЁМКИ -->
+      <!-- v2.25.0: ПРИЁМКА УПД (ЭТАП 26) -->
+      <div class="screen" data-screen="supply-invoice-intake" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-sparkles"></i>
+              <h1>Приёмка УПД</h1>
+              <span class="page-counter" id="si-counter">0</span>
+            </div>
+            <button class="pkb-btn primary" onclick="openSupplyInvoiceUpload()"><i class="ti ti-cloud-upload"></i>Загрузить</button>
+          </div>
+          <div id="si-screen-body">
+            <div class="loading-block">Загружаем приёмки…</div>
+          </div>
+        </div>
+      </div>
+
       <div class="screen" data-screen="supply-receipts" data-section="supply">
         <div class="content-inner" style="max-width: 100%;">
           <div class="page-header">
@@ -12102,7 +12453,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.24.0-ai-bom";
+const APP_VERSION = "v2.25.0-supply-invoice-intake";
 const APP_VERSION_DATE = "21.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12319,6 +12670,25 @@ async function apiGet(path) {
   }
   if (!response.ok) throw new Error('HTTP ' + response.status);
   return response.json();
+}
+
+async function apiDelete(path) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) throw new Error('Нет токена');
+  const response = await fetch(API_BASE + path, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  if (response.status === 401 || response.status === 403) {
+    logout();
+    throw new Error('Сессия истекла');
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = (data && (data.message || data.error)) || ('HTTP ' + response.status);
+    throw new Error(msg);
+  }
+  return data;
 }
 
 // ============ ЛОГИН ============
@@ -13045,6 +13415,8 @@ function selectSidebarItem(screenName) {
   if (screenName === 'supply-orders')       loadSupplyOrders();
   if (screenName === 'supply-order-detail') loadSupplyOrderDetail();
   if (screenName === 'supply-receipts')     loadSupplyReceipts();
+  // v2.25.0 (Этап 26): авто-приёмка УПД через ИИ
+  if (screenName === 'supply-invoice-intake') loadSupplyInvoicesList();
   if (screenName === 'supply-suppliers')    loadSuppliers();
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
   // Помощь
@@ -34941,6 +35313,788 @@ function finishShipmentScan() {
 }
 
 // ============ КОНЕЦ ЭТАПА 26.2 ============
+
+
+// ============================================================
+// ЭТАП 26 (v2.25.0): АВТО-ПРИЁМКА УПД через ИИ
+// ============================================================
+
+// Состояние модуля
+const siState = {
+  currentInvoiceId: null,
+  pollingTimer: null,
+  pollingActive: false,
+  itemsCache: [],
+};
+
+const SI_DEST_DEF = {
+  production:         { label: 'Производство',     icon: 'ti-building-factory-2', cls: 'd-production' },
+  finished_warehouse: { label: 'Готовый склад',    icon: 'ti-package',            cls: 'd-production' },
+  tools:              { label: 'Инструмент',       icon: 'ti-tool',               cls: 'd-tools' },
+  order:              { label: 'На заказ',         icon: 'ti-target',             cls: 'd-order' },
+  expense:            { label: 'Списать сразу',    icon: 'ti-bolt',               cls: 'd-tools' },
+  refused:            { label: 'Не принять',       icon: 'ti-circle-x',           cls: 'd-refused' },
+};
+
+const SI_REFUSE_REASONS = [
+  { key: 'defect',       label: 'Брак',                  icon: 'ti-alert-octagon' },
+  { key: 'not_ordered',  label: 'Не заказывали',         icon: 'ti-x' },
+  { key: 'wrong_item',   label: 'Пересортица',           icon: 'ti-replace' },
+  { key: 'excess_qty',   label: 'Перебор по количеству', icon: 'ti-arrow-up' },
+  { key: 'other',        label: 'Другое',                icon: 'ti-dots' },
+];
+
+// ---------- Главный вход: список черновиков ----------
+
+async function loadSupplyInvoicesList() {
+  // Сбрасываем detail-режим при возврате
+  siState.currentInvoiceId = null;
+  siStopPolling();
+
+  const body = document.getElementById('si-screen-body');
+  const counter = document.getElementById('si-counter');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем приёмки…</div>';
+
+  try {
+    const r = await apiGet('/api/supply/invoices?limit=100');
+    const items = (r && r.items) || [];
+    if (counter) counter.textContent = items.length;
+    renderSupplyInvoicesList(items);
+  } catch (e) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i><h3>Ошибка</h3><p>' + escapeHtml(String(e.message || e)) + '</p></div>';
+  }
+}
+
+function renderSupplyInvoicesList(items) {
+  const body = document.getElementById('si-screen-body');
+  if (!body) return;
+
+  if (!items.length) {
+    body.innerHTML =
+      '<div class="si-upload-zone" onclick="openSupplyInvoiceUpload()">' +
+        '<i class="ti ti-cloud-upload"></i>' +
+        '<div class="si-upload-zone-title">Перетащите PDF/фото накладной сюда</div>' +
+        '<div class="si-upload-zone-hint">или нажмите чтобы выбрать файл. ИИ распознает реквизиты и позиции за 15-30 секунд.</div>' +
+      '</div>';
+    return;
+  }
+
+  let html = '';
+  items.forEach(inv => {
+    const status = inv.status || 'draft';
+    const chipCls = siStatusChipClass(status);
+    const chipTxt = siStatusLabel(status);
+    const docTitle = inv.document_number
+      ? ('УПД №' + escapeHtml(inv.document_number) + (inv.document_date ? (' от ' + siFmtDate(inv.document_date)) : ''))
+      : (inv.source_file_name || 'Новый черновик');
+    const supplier = inv.supplier_name_raw || '—';
+    const itemsLine = inv.items_count != null ? (inv.items_count + ' поз.') : '';
+    const createdLine = inv.created_at ? ('создано ' + siFmtDateTime(inv.created_at)) : '';
+    html +=
+      '<div class="si-list-card" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
+        '<div class="si-list-card-row">' +
+          '<div class="si-list-card-title">' + escapeHtml(docTitle) + '</div>' +
+          '<span class="si-status-chip ' + chipCls + '">' + escapeHtml(chipTxt) + '</span>' +
+        '</div>' +
+        '<div class="si-list-card-meta">' +
+          escapeHtml(supplier) + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
+        '</div>' +
+      '</div>';
+  });
+  body.innerHTML = html;
+}
+
+function siStatusChipClass(s) {
+  if (s === 'confirmed') return 'sc-success';
+  if (s === 'partially_refused') return 'sc-warn';
+  if (s === 'cancelled') return 'sc-muted';
+  return 'sc-info';
+}
+function siStatusLabel(s) {
+  switch (s) {
+    case 'draft':              return 'Черновик';
+    case 'confirmed':          return 'Оприходовано';
+    case 'partially_refused':  return 'С отказами';
+    case 'cancelled':          return 'Отменено';
+    default:                   return s;
+  }
+}
+function siFmtDate(s) {
+  if (!s) return '';
+  const d = String(s).substring(0, 10);
+  const [y, m, dd] = d.split('-');
+  return (dd && m && y) ? (dd + '.' + m + '.' + y) : d;
+}
+function siFmtDateTime(s) {
+  if (!s) return '';
+  const d = new Date(String(s).replace(' ', 'T') + (String(s).includes('Z') ? '' : 'Z'));
+  if (isNaN(d.getTime())) return String(s);
+  return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// ---------- Модалка загрузки ----------
+
+function openSupplyInvoiceUpload() {
+  const existing = document.getElementById('si-upload-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'si-upload-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:480px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-cloud-upload"></i>Загрузить накладную</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'si-upload-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="si-upload-zone" id="si-drop-zone" ondrop="siHandleDrop(event)" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" onclick="document.getElementById(\'si-file-input\').click()">' +
+          '<i class="ti ti-cloud-upload"></i>' +
+          '<div class="si-upload-zone-title">Перетащите PDF/фото сюда</div>' +
+          '<div class="si-upload-zone-hint">PDF, JPEG или PNG до 25 МБ. Сделайте фото или выберите файл.</div>' +
+        '</div>' +
+        '<input type="file" id="si-file-input" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<div id="si-upload-status" style="margin-top:12px;font-size:12.5px;color:var(--text-light);text-align:center;"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function siHandleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (files && files.length > 0) uploadSupplyInvoiceFile(files[0]);
+}
+function siHandleFileSelect(e) {
+  const f = e.target.files && e.target.files[0];
+  if (f) uploadSupplyInvoiceFile(f);
+}
+
+async function uploadSupplyInvoiceFile(file) {
+  const statusEl = document.getElementById('si-upload-status');
+  const zone = document.getElementById('si-drop-zone');
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Загружаем файл...';
+  if (zone) zone.style.pointerEvents = 'none';
+
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+
+  try {
+    const res = await fetch(API_BASE + '/api/supply/invoices/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + state.token },
+      body: fd,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const msg = data.message || data.error || ('HTTP ' + res.status);
+      if (statusEl) statusEl.innerHTML = '<span style="color:#8C2A2A;">Ошибка: ' + escapeHtml(msg) + '</span>';
+      if (zone) zone.style.pointerEvents = '';
+      return;
+    }
+    const data = await res.json();
+    const invId = data.id;
+    showToast('Файл загружен · распознаём', 'success');
+    document.getElementById('si-upload-modal').remove();
+    loadSupplyInvoiceDetail(invId);
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:#8C2A2A;">Ошибка соединения: ' + escapeHtml(String(e.message || e)) + '</span>';
+    if (zone) zone.style.pointerEvents = '';
+  }
+}
+
+// ---------- Detail-экран приёмки ----------
+
+async function loadSupplyInvoiceDetail(invoiceId) {
+  siState.currentInvoiceId = invoiceId;
+  siStopPolling();
+  const body = document.getElementById('si-screen-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем приёмку…</div>';
+
+  try {
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+    // Если ИИ ещё не отработал — стартуем polling
+    if (data.invoice && !data.invoice.ai_recognized_at && !data.invoice.ai_error) {
+      siStartPolling(invoiceId);
+    }
+  } catch (e) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i><h3>Ошибка</h3><p>' + escapeHtml(String(e.message || e)) + '</p></div>';
+  }
+}
+
+function siStartPolling(invoiceId) {
+  if (siState.pollingActive) return;
+  siState.pollingActive = true;
+  const tick = async () => {
+    if (siState.currentInvoiceId !== invoiceId || !siState.pollingActive) return;
+    try {
+      const data = await apiGet('/api/supply/invoices/' + invoiceId);
+      // Re-render если что-то изменилось
+      renderSupplyInvoiceDetail(data);
+      if (data.invoice && (data.invoice.ai_recognized_at || data.invoice.ai_error)) {
+        siStopPolling();
+        return;
+      }
+    } catch (e) { /* пропускаем */ }
+    if (siState.pollingActive) siState.pollingTimer = setTimeout(tick, 3000);
+  };
+  siState.pollingTimer = setTimeout(tick, 3000);
+}
+function siStopPolling() {
+  siState.pollingActive = false;
+  if (siState.pollingTimer) { clearTimeout(siState.pollingTimer); siState.pollingTimer = null; }
+}
+
+function renderSupplyInvoiceDetail(data) {
+  const body = document.getElementById('si-screen-body');
+  if (!body) return;
+  const inv = data.invoice || {};
+  const items = data.items || [];
+  const duplicate = data.duplicate_warning;
+  siState.itemsCache = items;
+
+  const isLoading = !inv.ai_recognized_at && !inv.ai_error;
+  const recoTime = inv.ai_recognized_at ? siRecoSeconds(inv) : null;
+
+  let html = '';
+  // Шапка с кнопкой Назад
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
+  html +=   '<button class="pkb-btn" onclick="loadSupplyInvoicesList()"><i class="ti ti-arrow-left"></i>К списку</button>';
+  html +=   '<div style="flex:1;"></div>';
+  if (inv.status === 'draft') {
+    html += '<button class="pkb-btn" onclick="deleteSupplyInvoice(' + inv.id + ')"><i class="ti ti-trash"></i>Удалить</button>';
+  }
+  html += '</div>';
+
+  // Шапка приёмки
+  html += '<div class="si-detail-header">';
+  html +=   '<div>';
+  html +=     '<div style="font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Снабжение / приёмка</div>';
+  html +=     '<h2 style="margin:4px 0 2px;">' + (inv.document_number ? ('Черновик приёмки · УПД №' + escapeHtml(inv.document_number)) : 'Черновик приёмки') + '</h2>';
+  html +=     '<div style="font-size:12px;color:var(--text-faint);">' +
+                (inv.source_file_name ? ('файл: ' + escapeHtml(inv.source_file_name)) : '') +
+              '</div>';
+  html +=   '</div>';
+  if (isLoading) {
+    html += '<div class="si-ai-badge" style="background:#FAEEDA;color:#854F0B;"><i class="ti ti-sparkles si-recognize-loading"></i>Распознаём…</div>';
+  } else if (inv.ai_error) {
+    html += '<div class="si-ai-badge" style="background:rgba(226,75,74,0.15);color:#8C2A2A;"><i class="ti ti-alert-triangle"></i>Ошибка ИИ</div>';
+  } else if (recoTime) {
+    html += '<div class="si-ai-badge"><i class="ti ti-sparkles"></i>распознано за ' + recoTime + ' сек</div>';
+  }
+  html += '</div>';
+
+  // Состояние "распознаём"
+  if (isLoading) {
+    html += '<div class="loading-block" style="padding:30px;text-align:center;color:var(--text-light);">';
+    html +=   '<i class="ti ti-sparkles" style="font-size:32px;color:#7C3AED;animation:spin 1.5s linear infinite;display:block;margin:0 auto 12px;"></i>';
+    html +=   'Claude анализирует накладную...<br>';
+    html +=   '<span style="font-size:11px;color:var(--text-faint);">обычно 15-30 секунд · экран обновляется автоматически</span>';
+    html += '</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  // Ошибка ИИ
+  if (inv.ai_error) {
+    html += '<div class="pkb-form-error" style="margin:12px 0;"><i class="ti ti-alert-triangle"></i>' + escapeHtml(inv.ai_error) + '</div>';
+    html += '<button class="pkb-btn ai-action" onclick="rerecognizeSupplyInvoice(' + inv.id + ')"><i class="ti ti-refresh"></i>Попробовать ещё раз</button>';
+    body.innerHTML = html;
+    return;
+  }
+
+  // Предупреждение о дубликате
+  if (duplicate) {
+    html += '<div style="background:rgba(226,75,74,0.10);border:1px solid rgba(226,75,74,0.3);border-radius:8px;padding:12px;margin-bottom:14px;color:#8C2A2A;">';
+    html +=   '<b><i class="ti ti-alert-triangle"></i> Похоже на дубликат</b><br>';
+    html +=   'УПД №' + escapeHtml(inv.document_number || '?') + ' от ' + escapeHtml(siFmtDate(inv.document_date)) +
+              ' уже оприходована (приёмка #' + duplicate.id + ', ' + escapeHtml(siFmtDateTime(duplicate.confirmed_at)) + ').';
+    html += '</div>';
+  }
+
+  // 3 карточки реквизитов
+  html += renderSiRequisites(inv);
+
+  // Предупреждения ИИ (без цен/НДС)
+  const warnings = siParseWarnings(inv.ai_warnings);
+  if (warnings.length) html += renderSiWarnings(warnings);
+
+  // Сводка по местам назначения
+  html += renderSiDestTiles(items);
+
+  // Таблица позиций
+  html += renderSiItemsTable(items);
+
+  // Нижняя панель
+  const acceptedCount = items.filter(it => !it.is_refused && (parseFloat(it.qty) || 0) > 0).length;
+  const totalCount = items.filter(it => parseFloat(it.qty) > 0 || (parseFloat(it.qty) === 0 && it.is_refused)).length;
+  html += '<div class="si-bottom-bar">';
+  html +=   '<div class="si-bottom-stat"><span style="color:var(--text-dark);font-weight:600;">' + acceptedCount + '</span> из ' + items.length + ' позиций к оприходованию</div>';
+  html +=   '<div style="display:flex;gap:8px;">';
+  if (inv.status === 'draft') {
+    html += '<button class="pkb-btn" onclick="loadSupplyInvoicesList()">Сохранить черновик</button>';
+    html += '<button class="pkb-btn primary" style="background:#1D9E75;" onclick="confirmSupplyInvoice(' + inv.id + ')"><i class="ti ti-check"></i>Оприходовать и закрыть УПД</button>';
+  } else {
+    html += '<span class="si-status-chip ' + siStatusChipClass(inv.status) + '">' + escapeHtml(siStatusLabel(inv.status)) + '</span>';
+  }
+  html +=   '</div>';
+  html += '</div>';
+
+  // Легенда
+  html += '<div style="display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--text-faint);margin-top:10px;flex-wrap:wrap;">';
+  html +=   '<span style="display:inline-flex;align-items:center;gap:5px;"><span class="si-conf-dot high"></span>высокая уверенность</span>';
+  html +=   '<span style="display:inline-flex;align-items:center;gap:5px;"><span class="si-conf-dot medium"></span>средняя — уточните</span>';
+  html +=   '<span style="display:inline-flex;align-items:center;gap:5px;"><span class="si-conf-dot low"></span>низкая — нет в базе</span>';
+  html += '</div>';
+
+  body.innerHTML = html;
+}
+
+function siRecoSeconds(inv) {
+  if (!inv.created_at || !inv.ai_recognized_at) return null;
+  try {
+    const a = new Date(inv.created_at.replace(' ', 'T') + 'Z').getTime();
+    const b = new Date(inv.ai_recognized_at.replace(' ', 'T') + 'Z').getTime();
+    return Math.max(1, Math.round((b - a) / 1000));
+  } catch (e) { return null; }
+}
+function siParseWarnings(raw) {
+  if (!raw) return [];
+  try {
+    const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(a) ? a : [];
+  } catch (e) { return []; }
+}
+
+function renderSiRequisites(inv) {
+  let html = '<div class="si-req-grid">';
+  html +=   '<div class="si-req-card">';
+  html +=     '<div class="si-req-label">Поставщик</div>';
+  html +=     '<div class="si-req-value">' + escapeHtml(inv.supplier_name_raw || '—') + '</div>';
+  html +=     '<div class="si-req-meta">' + (inv.supplier_inn ? ('ИНН ' + escapeHtml(inv.supplier_inn)) : '') + '</div>';
+  html +=   '</div>';
+  html +=   '<div class="si-req-card">';
+  html +=     '<div class="si-req-label">Документ</div>';
+  html +=     '<div class="si-req-value">' + escapeHtml(inv.document_type || 'УПД') + ' №' + escapeHtml(inv.document_number || '—') + '</div>';
+  html +=     '<div class="si-req-meta">' + (inv.document_date ? ('от ' + siFmtDate(inv.document_date)) : '') + '</div>';
+  html +=   '</div>';
+  html +=   '<div class="si-req-card">';
+  html +=     '<div class="si-req-label">Основание</div>';
+  if (inv.contract_id && inv.contract_number) {
+    html += '<div class="si-req-value">Договор №' + escapeHtml(inv.contract_number) + '</div>';
+    html += '<div class="si-req-meta">найден ✓ ' + (inv.contract_contractor_name ? escapeHtml(inv.contract_contractor_name) : '') + '</div>';
+  } else if (inv.contract_number_raw) {
+    html += '<div class="si-req-value">№' + escapeHtml(inv.contract_number_raw) + (inv.contract_date_raw ? (' от ' + siFmtDate(inv.contract_date_raw)) : '') + '</div>';
+    html += '<div class="si-req-meta" style="color:#854F0B;">не найден в базе</div>';
+  } else {
+    html += '<div class="si-req-value">—</div>';
+    html += '<div class="si-req-meta">не указано</div>';
+  }
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderSiWarnings(warnings) {
+  let html = '<div class="si-warnings">';
+  html +=   '<div class="si-warnings-title"><i class="ti ti-alert-triangle"></i>Предупреждения ИИ (' + warnings.length + ')</div>';
+  warnings.forEach(w => {
+    html += '<div class="si-warning-row">⚠ ' + escapeHtml(w) + '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderSiDestTiles(items) {
+  const buckets = { production: 0, tools: 0, order: 0, refused: 0, other: 0 };
+  items.forEach(it => {
+    if (parseFloat(it.qty) === 0 && it.split_parent_id) return;
+    if (it.is_refused) { buckets.refused++; return; }
+    const d = it.destination;
+    if (d === 'production' || d === 'finished_warehouse') buckets.production++;
+    else if (d === 'tools') buckets.tools++;
+    else if (d === 'order') buckets.order++;
+    else if (d === 'refused') buckets.refused++;
+    else buckets.other++;
+  });
+
+  let html = '<div class="si-dest-tiles">';
+  html +=   '<div class="si-dest-tile d-production">';
+  html +=     '<div class="si-dest-tile-head"><i class="ti ti-building-factory-2"></i>Производство</div>';
+  html +=     '<div class="si-dest-tile-count">' + buckets.production + (buckets.production === 1 ? ' позиция' : ' позиций') + '</div>';
+  html +=   '</div>';
+  html +=   '<div class="si-dest-tile d-tools">';
+  html +=     '<div class="si-dest-tile-head"><i class="ti ti-tool"></i>Инструмент</div>';
+  html +=     '<div class="si-dest-tile-count">' + buckets.tools + (buckets.tools === 1 ? ' позиция' : ' позиций') + '</div>';
+  html +=   '</div>';
+  html +=   '<div class="si-dest-tile d-order">';
+  html +=     '<div class="si-dest-tile-head"><i class="ti ti-target"></i>На заказ</div>';
+  html +=     '<div class="si-dest-tile-count">' + buckets.order + (buckets.order === 1 ? ' позиция' : ' позиций') + '</div>';
+  html +=   '</div>';
+  html +=   '<div class="si-dest-tile d-refused">';
+  html +=     '<div class="si-dest-tile-head"><i class="ti ti-circle-x"></i>Не принять</div>';
+  html +=     '<div class="si-dest-tile-count">' + (buckets.refused ? buckets.refused + (buckets.refused === 1 ? ' позиция' : ' позиций') : '—') + '</div>';
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderSiItemsTable(items) {
+  // Скрываем split-parent (qty=0) когда есть дети
+  const visible = items.filter(it => !(parseFloat(it.qty) === 0 && !it.is_refused));
+
+  let html = '<div class="si-items-table">';
+  html += '<div class="si-items-row si-items-row-head">';
+  html +=   '<div></div>';
+  html +=   '<div>Позиция</div>';
+  html +=   '<div style="text-align:right;">Кол-во</div>';
+  html +=   '<div>Куда</div>';
+  html +=   '<div></div>';
+  html += '</div>';
+
+  visible.forEach(it => html += renderSiItemRow(it));
+  html += '</div>';
+  return html;
+}
+
+function renderSiItemRow(it) {
+  const confKey = it.is_refused ? 'refused' : (it.match_confidence || 'low');
+  const dotCls = it.is_refused ? 'refused' : confKey;
+  const isWarn = it.match_confidence === 'medium' || it.match_confidence === 'low';
+  const rowCls = 'si-items-row' + (it.is_refused ? ' is-refused' : '') + (isWarn && !it.is_refused ? ' is-warn' : '');
+
+  let html = '<div class="' + rowCls + '">';
+  // confidence dot
+  html += '<div><span class="si-conf-dot ' + dotCls + '"></span></div>';
+  // name + hint
+  html += '<div>';
+  html +=   '<div style="font-size:13px;">' + escapeHtml(it.name_raw || '—') + '</div>';
+  const hint = renderSiMatchHint(it);
+  if (hint) html += '<div class="si-item-hint">' + hint + '</div>';
+  html += '</div>';
+  // qty
+  const qty = pkbFmtQty(it.qty);
+  const unit = it.unit || '';
+  html += '<div style="text-align:right;font-variant-numeric:tabular-nums;' + (it.is_refused ? 'text-decoration:line-through;' : '') + '">' +
+            qty + ' ' + escapeHtml(unit) +
+          '</div>';
+  // destination select
+  html += '<div>' + renderSiDestSelect(it) + '</div>';
+  // actions: split
+  html += '<div>';
+  if (!it.is_refused) {
+    html += '<button class="icon-btn" onclick="openSupplyItemSplitModal(' + it.id + ')" title="Разделить позицию"><i class="ti ti-arrows-split"></i></button>';
+  }
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+function renderSiMatchHint(it) {
+  if (it.is_refused) {
+    const r = SI_REFUSE_REASONS.find(x => x.key === it.refuse_reason);
+    return '<span style="color:#8C2A2A;">✕ Отказ: ' + escapeHtml(r ? r.label : (it.refuse_reason || 'причина не указана')) + '</span>';
+  }
+  if (it.match_confidence === 'high' && it.matched_component_name) {
+    const viaAlias = it.via_alias ? ' · из истории' : '';
+    return '<span style="color:var(--text-faint);">✓ ' + escapeHtml(it.matched_component_name) + viaAlias + '</span>';
+  }
+  if (it.match_confidence === 'medium') {
+    const alt = siParseAlternatives(it.match_alternatives);
+    const cnt = alt.length || 2;
+    return '<span style="color:#854F0B;cursor:pointer;" onclick="openMatchAlternativesModal(' + it.id + ')">? ' + cnt + ' варианта · нажмите чтобы выбрать</span>';
+  }
+  // low / null
+  if (!it.matched_component_id) {
+    return '<span style="color:#A32D2D;">+ нет в базе · создать карточку?</span>';
+  }
+  return '<span style="color:var(--text-faint);">' + escapeHtml(it.matched_component_name || '—') + '</span>';
+}
+
+function siParseAlternatives(raw) {
+  if (!raw) return [];
+  try {
+    const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(a) ? a : [];
+  } catch (e) { return []; }
+}
+
+function renderSiDestSelect(it) {
+  const current = it.is_refused ? 'refused' : (it.destination || 'production');
+  const def = SI_DEST_DEF[current] || SI_DEST_DEF.production;
+  let html = '<select class="si-dest-select ' + def.cls + '" onchange="changeSupplyItemDestination(' + it.id + ', this.value)">';
+  Object.keys(SI_DEST_DEF).forEach(k => {
+    const d = SI_DEST_DEF[k];
+    const sel = k === current ? ' selected' : '';
+    html += '<option value="' + k + '"' + sel + '>' + d.label + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+// ---------- Действия с позициями ----------
+
+async function changeSupplyItemDestination(itemId, newDest) {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+
+  // Особый случай: refused → открыть модалку причины
+  if (newDest === 'refused') {
+    openSupplyItemRefuseModal(itemId);
+    return;
+  }
+
+  try {
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, {
+      destination: newDest,
+      is_refused: false,
+      refuse_reason: null,
+    });
+    // Обновляем detail без полного reload — экран обновится сам через render
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+function openSupplyItemRefuseModal(itemId) {
+  const existing = document.getElementById('si-refuse-modal');
+  if (existing) existing.remove();
+
+  let optsHtml = '';
+  SI_REFUSE_REASONS.forEach(r => {
+    optsHtml += '<div class="si-reason-opt" onclick="submitSupplyItemRefuse(' + itemId + ', \'' + r.key + '\')">' +
+                  '<i class="ti ' + r.icon + '"></i>' + escapeHtml(r.label) +
+                '</div>';
+  });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'si-refuse-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:440px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-circle-x"></i>Причина отказа</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'si-refuse-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body">' +
+        '<div class="si-reason-grid">' + optsHtml + '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+async function submitSupplyItemRefuse(itemId, reason) {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+  document.getElementById('si-refuse-modal').remove();
+  try {
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, {
+      is_refused: true,
+      destination: 'refused',
+      refuse_reason: reason,
+    });
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+    showToast('Позиция отмечена как отказ', 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+function openSupplyItemSplitModal(itemId) {
+  const it = siState.itemsCache.find(x => x.id === itemId);
+  if (!it) return;
+  const existing = document.getElementById('si-split-modal');
+  if (existing) existing.remove();
+
+  const maxQty = parseFloat(it.qty) || 0;
+
+  let reasonsHtml = '';
+  SI_REFUSE_REASONS.forEach((r, i) => {
+    reasonsHtml += '<label class="si-reason-opt" style="cursor:pointer;">' +
+                     '<input type="radio" name="si-split-reason" value="' + r.key + '"' + (i === 0 ? ' checked' : '') + ' style="margin-right:6px;">' +
+                     '<i class="ti ' + r.icon + '"></i>' + escapeHtml(r.label) +
+                   '</label>';
+  });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'si-split-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:480px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-arrows-split"></i>Разделить позицию</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'si-split-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body">' +
+        '<div style="font-size:13px;margin-bottom:12px;color:var(--text-mid);">' + escapeHtml(it.name_raw) + ' · всего ' + maxQty + ' ' + (it.unit || '') + '</div>' +
+        '<div class="si-qty-pair">' +
+          '<div>' +
+            '<label style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Принять</label>' +
+            '<input type="number" id="si-split-accept" min="0" max="' + maxQty + '" step="0.01" value="' + (maxQty - 1) + '" oninput="siSplitRecalc(' + maxQty + ')" style="width:100%;padding:8px;font-size:14px;">' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Отказать</label>' +
+            '<input type="number" id="si-split-refuse" readonly value="1" style="width:100%;padding:8px;font-size:14px;background:var(--bg);">' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-top:14px;font-size:11px;color:var(--text-light);text-transform:uppercase;font-weight:600;">Причина отказа</div>' +
+        '<div class="si-reason-grid" style="margin-top:6px;">' + reasonsHtml + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;padding:14px 18px;">' +
+        '<button class="pkb-btn" onclick="document.getElementById(\'si-split-modal\').remove()">Отмена</button>' +
+        '<button class="pkb-btn primary" onclick="submitSupplyItemSplit(' + itemId + ')">Разделить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function siSplitRecalc(maxQty) {
+  const accept = parseFloat(document.getElementById('si-split-accept').value) || 0;
+  const refuse = Math.max(0, maxQty - accept);
+  document.getElementById('si-split-refuse').value = refuse;
+}
+
+async function submitSupplyItemSplit(itemId) {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+  const acceptQty = parseFloat(document.getElementById('si-split-accept').value) || 0;
+  const refuseQty = parseFloat(document.getElementById('si-split-refuse').value) || 0;
+  const reasonEl = document.querySelector('input[name="si-split-reason"]:checked');
+  const reason = reasonEl ? reasonEl.value : 'other';
+
+  if (acceptQty <= 0 && refuseQty <= 0) {
+    showToast('Укажите количество', 'error');
+    return;
+  }
+
+  try {
+    await apiPost('/api/supply/invoices/' + invoiceId + '/items/' + itemId + '/split', {
+      accept_qty: acceptQty,
+      refuse_qty: refuseQty,
+      refuse_reason: reason,
+    });
+    document.getElementById('si-split-modal').remove();
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+    showToast('Позиция разделена', 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+function openMatchAlternativesModal(itemId) {
+  const it = siState.itemsCache.find(x => x.id === itemId);
+  if (!it) return;
+  const alt = siParseAlternatives(it.match_alternatives);
+  const existing = document.getElementById('si-alt-modal');
+  if (existing) existing.remove();
+
+  // Текущий выбор тоже в список
+  const candidates = [];
+  if (it.matched_component_id) {
+    candidates.push({
+      id: it.matched_component_id, name: it.matched_component_name,
+      confidence: it.match_confidence || 'medium', current: true,
+    });
+  }
+  alt.forEach(a => candidates.push(a));
+
+  let optsHtml = '';
+  candidates.forEach(c => {
+    optsHtml +=
+      '<div class="si-reason-opt" style="display:flex;align-items:center;justify-content:space-between;" onclick="pickMatchAlternative(' + itemId + ', ' + c.id + ')">' +
+        '<div>' +
+          '<div>' + escapeHtml(c.name || '—') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-faint);">' + (c.current ? 'текущий выбор · ' : '') + 'уверенность: ' + escapeHtml(c.confidence || '?') + '</div>' +
+        '</div>' +
+        '<i class="ti ti-chevron-right"></i>' +
+      '</div>';
+  });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'si-alt-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:480px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-list-search"></i>Выбрать сопоставление</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'si-alt-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body">' +
+        '<div style="font-size:13px;margin-bottom:10px;color:var(--text-mid);">' + escapeHtml(it.name_raw) + '</div>' +
+        '<div class="si-reason-grid" style="grid-template-columns:1fr;">' + (optsHtml || '<div style="color:var(--text-faint);">Альтернатив нет</div>') + '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+async function pickMatchAlternative(itemId, componentId) {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+  document.getElementById('si-alt-modal').remove();
+  try {
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, {
+      matched_component_id: componentId,
+      match_confidence: 'high',  // ручное подтверждение = high
+    });
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+    showToast('Сопоставление обновлено', 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// ---------- Подтверждение и прочее ----------
+
+async function confirmSupplyInvoice(invoiceId) {
+  if (!confirm('Оприходовать накладную? После этого изменить будет нельзя.')) return;
+  try {
+    const r = await apiPost('/api/supply/invoices/' + invoiceId + '/confirm', {});
+    if (r.status === 409) {
+      const msg = (r.data && r.data.message) || 'Дубликат: эта УПД уже была оприходована ранее.';
+      alert(msg);
+      return;
+    }
+    if (!r.ok) {
+      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + r.status)), 'error');
+      return;
+    }
+    showToast('Накладная оприходована', 'success');
+    loadSupplyInvoiceDetail(invoiceId);  // покажет финальный статус
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+async function rerecognizeSupplyInvoice(invoiceId) {
+  try {
+    await apiPost('/api/supply/invoices/' + invoiceId + '/recognize', {});
+    showToast('Запущено повторное распознавание', 'success');
+    loadSupplyInvoiceDetail(invoiceId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+async function deleteSupplyInvoice(invoiceId) {
+  if (!confirm('Удалить черновик приёмки?')) return;
+  try {
+    await apiDelete('/api/supply/invoices/' + invoiceId);
+    showToast('Черновик удалён', 'success');
+    loadSupplyInvoicesList();
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 26 (v2.25.0) ============
 
 
 // ============ INIT ============
