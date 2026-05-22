@@ -1322,12 +1322,10 @@
 
   .pt-chips {
     display: flex;
+    flex-wrap: wrap;      /* переносим на новую строку вместо горизонтального ухода за экран */
     gap: 6px;
     padding: 4px 18px 12px;
-    overflow-x: auto;
-    scrollbar-width: none;
   }
-  .pt-chips::-webkit-scrollbar { display: none; }
   .pt-chip {
     display: inline-flex;
     align-items: center;
@@ -9838,6 +9836,60 @@
     text-transform: uppercase; letter-spacing: 0.4px;
   }
   .si-status-chip.s-draft     { background: #FAEEDA; color: #854F0B; }
+
+  /* Модалка сопоставления позиции УПД с каталогом */
+  .si-mm-modal { max-width: 540px; }
+  .si-mm-subj {
+    font-size: 14px; font-weight: 600; color: var(--text-dark);
+    background: var(--bg); border-radius: 8px; padding: 10px 12px;
+    margin-bottom: 12px; word-break: break-word; line-height: 1.4;
+  }
+  .si-mm-section-title {
+    font-size: 11px; font-weight: 600; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin: 6px 0 8px 0;
+  }
+  .si-mm-card {
+    display: flex; align-items: flex-start; gap: 10px;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 12px; margin-bottom: 8px;
+    cursor: pointer; background: white;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .si-mm-card:hover { border-color: var(--brand); background: rgba(124,58,237,0.03); }
+  .si-mm-card input[type="radio"] {
+    margin-top: 3px; cursor: pointer; flex-shrink: 0;
+    accent-color: var(--brand);
+  }
+  .si-mm-card:has(input:checked) {
+    border-color: var(--brand); background: rgba(124,58,237,0.06);
+    box-shadow: 0 0 0 1px var(--brand) inset;
+  }
+  .si-mm-card-body { flex: 1; min-width: 0; }
+  .si-mm-card-title {
+    font-size: 14px; font-weight: 500; color: var(--text-dark);
+    margin-bottom: 4px; word-break: break-word; line-height: 1.3;
+  }
+  .si-mm-card-title i { color: var(--brand); margin-right: 4px; }
+  .si-mm-card-meta {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 11.5px; color: var(--text-light);
+  }
+  .si-mm-card-meta b { color: var(--text-mid); font-weight: 600; }
+  .si-mm-current {
+    background: rgba(29,158,117,0.12); color: #0A5B41;
+    padding: 1px 6px; border-radius: 4px; font-weight: 600;
+  }
+  .si-mm-conf { padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+  .si-mm-conf-high   { background: rgba(29,158,117,0.12); color: #0A5B41; }
+  .si-mm-conf-medium { background: rgba(186,117,23,0.12); color: #854F0B; }
+  .si-mm-conf-low    { background: rgba(226,75,74,0.12); color: #A32D2D; }
+  .si-mm-card-new { border-style: dashed; }
+  .si-mm-card-new select {
+    padding: 4px 22px 4px 8px; font-size: 12px;
+    border: 1px solid var(--border-strong); border-radius: 6px;
+    background: white; cursor: pointer;
+  }
   /* Inline-select раздела каталога для unmatched позиций */
   .si-cat-select {
     font-size: 11px;
@@ -12784,7 +12836,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.30.8-empty-cats";
+const APP_VERSION = "v2.31.1-chips-wrap";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36778,52 +36830,143 @@ function openMatchAlternativesModal(itemId) {
   const existing = document.getElementById('si-alt-modal');
   if (existing) existing.remove();
 
-  // Текущий выбор тоже в список
+  // Текущий выбор + альтернативы в единый список кандидатов
   const candidates = [];
   if (it.matched_component_id) {
     candidates.push({
-      id: it.matched_component_id, name: it.matched_component_name,
-      confidence: it.match_confidence || 'medium', current: true,
+      id: it.matched_component_id,
+      name: it.matched_name || '(без названия)',  // поле из сериализатора — matched_name
+      category: it.matched_category_name || '',
+      confidence: it.match_confidence || 'medium',
+      current: true,
     });
   }
-  alt.forEach(a => candidates.push(a));
-
-  let optsHtml = '';
-  candidates.forEach(c => {
-    optsHtml +=
-      '<div class="si-reason-opt" style="display:flex;align-items:center;justify-content:space-between;" onclick="pickMatchAlternative(' + itemId + ', ' + c.id + ')">' +
-        '<div>' +
-          '<div>' + escapeHtml(c.name || '—') + '</div>' +
-          '<div style="font-size:11px;color:var(--text-faint);">' + (c.current ? 'текущий выбор · ' : '') + 'уверенность: ' + escapeHtml(c.confidence || '?') + '</div>' +
-        '</div>' +
-        '<i class="ti ti-chevron-right"></i>' +
-      '</div>';
+  alt.forEach(a => {
+    // не дублируем текущий выбор
+    if (it.matched_component_id && a.id === it.matched_component_id) return;
+    candidates.push(a);
   });
+
+  // HTML кандидатов — большими карточками с радио-инпутами
+  let optsHtml = '';
+  if (candidates.length) {
+    optsHtml = '<div class="si-mm-section-title">Кандидаты из каталога</div>';
+    candidates.forEach((c, idx) => {
+      const checked = c.current ? ' checked' : '';
+      const confChip = c.confidence
+        ? '<span class="si-mm-conf si-mm-conf-' + escapeHtml(c.confidence) + '">' + escapeHtml(c.confidence) + '</span>'
+        : '';
+      optsHtml +=
+        '<label class="si-mm-card">' +
+          '<input type="radio" name="si-mm-pick" value="match:' + c.id + '"' + checked + '>' +
+          '<div class="si-mm-card-body">' +
+            '<div class="si-mm-card-title">' + escapeHtml(c.name || '—') + '</div>' +
+            '<div class="si-mm-card-meta">' +
+              (c.category ? '<span>раздел: <b>' + escapeHtml(c.category) + '</b></span>' : '') +
+              (c.current ? '<span class="si-mm-current">текущий выбор</span>' : '') +
+              confChip +
+            '</div>' +
+          '</div>' +
+        '</label>';
+    });
+  }
+
+  // Блок "Создать новую карточку в разделе X"
+  const cats = (siState && siState.categories) || [];
+  const curCatId = it.suggested_category_id || '';
+  let catOpts = '<option value="">— Разное (по умолчанию)</option>';
+  cats.forEach(c => {
+    if ((c.code || '').toLowerCase() === 'misc' || (c.name || '').toLowerCase() === 'разное') return;
+    const sel = (String(c.id) === String(curCatId)) ? ' selected' : '';
+    catOpts += '<option value="' + c.id + '"' + sel + '>' + escapeHtml(c.name) + '</option>';
+  });
+  // "Создать новую" опция: радио без matched_id — оприходовать как новую карточку в выбранной категории
+  const newChecked = !it.matched_component_id ? ' checked' : '';
+  const newOption =
+    '<label class="si-mm-card si-mm-card-new">' +
+      '<input type="radio" name="si-mm-pick" value="new"' + newChecked + '>' +
+      '<div class="si-mm-card-body">' +
+        '<div class="si-mm-card-title"><i class="ti ti-plus"></i> Создать новую карточку</div>' +
+        '<div class="si-mm-card-meta">' +
+          '<span>раздел:</span>' +
+          '<select id="si-mm-new-cat" onclick="event.stopPropagation();" onchange="event.stopPropagation();">' + catOpts + '</select>' +
+        '</div>' +
+      '</div>' +
+    '</label>';
 
   const overlay = document.createElement('div');
   overlay.id = 'si-alt-modal';
   overlay.className = 'modal-overlay visible';
   overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
   overlay.innerHTML =
-    '<div class="modal" style="max-width:480px;">' +
-      '<div class="modal-header"><h3><i class="ti ti-list-search"></i>Выбрать сопоставление</h3>' +
-      '<button class="icon-btn" onclick="document.getElementById(\'si-alt-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
-      '<div class="modal-body">' +
-        '<div style="font-size:13px;margin-bottom:10px;color:var(--text-mid);">' + escapeHtml(it.name_raw) + '</div>' +
-        '<div class="si-reason-grid" style="grid-template-columns:1fr;">' + (optsHtml || '<div style="color:var(--text-faint);">Альтернатив нет</div>') + '</div>' +
+    '<div class="modal si-mm-modal">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-search"></i>Сопоставить позицию</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'si-alt-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="padding-top:6px;">' +
+        '<div class="si-mm-subj">' + escapeHtml(it.name_raw || '—') + '</div>' +
+        optsHtml +
+        '<div class="si-mm-section-title" style="margin-top:14px;">Или новой карточкой</div>' +
+        newOption +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'si-alt-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="applyMatchModal(' + itemId + ')">Применить</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
 }
 
+async function applyMatchModal(itemId) {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+  const overlay = document.getElementById('si-alt-modal');
+  const picked = overlay && overlay.querySelector('input[name="si-mm-pick"]:checked');
+  if (!picked) {
+    showToast('Выберите вариант', 'error');
+    return;
+  }
+  const value = picked.value;  // "match:42" или "new"
+  let body = {};
+  if (value.startsWith('match:')) {
+    body = {
+      matched_component_id: parseInt(value.split(':')[1], 10),
+      match_confidence: 'high',  // ручное подтверждение
+    };
+  } else {
+    // "new" — снимаем матч и сохраняем выбранную категорию
+    const catSel = document.getElementById('si-mm-new-cat');
+    const catId = catSel && catSel.value ? parseInt(catSel.value, 10) : null;
+    body = {
+      matched_component_id: null,
+      match_confidence: 'low',
+      suggested_category_id: catId,
+    };
+  }
+  try {
+    const r = await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, body);
+    if (r && r.ok === false) {
+      showToast('Ошибка: ' + ((r.data && r.data.message) || ('HTTP ' + (r.status || '?'))), 'error');
+      return;
+    }
+    overlay.remove();
+    showToast('Сопоставление обновлено', 'success');
+    loadSupplyInvoiceDetail(invoiceId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 async function pickMatchAlternative(itemId, componentId) {
+  // Legacy-вызов для обратной совместимости — теперь логика в applyMatchModal
   const invoiceId = siState.currentInvoiceId;
   if (!invoiceId) return;
   document.getElementById('si-alt-modal').remove();
   try {
     await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, {
       matched_component_id: componentId,
-      match_confidence: 'high',  // ручное подтверждение = high
+      match_confidence: 'high',
     });
     const data = await apiGet('/api/supply/invoices/' + invoiceId);
     renderSupplyInvoiceDetail(data);
