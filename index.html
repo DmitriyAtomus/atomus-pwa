@@ -12905,7 +12905,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.32.2-hide-receipts";
+const APP_VERSION = "v2.32.3-assign-worker";
 const APP_VERSION_DATE = "22.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -14645,6 +14645,87 @@ function formatPkbDateTime(s) {
 
 // ============ МОДАЛКА ДЕТАЛИ РАБОТЫ ============
 
+// Модалка назначения/смены исполнителя на производственную работу
+async function openAssignProductionWorkerModal(workId) {
+  const existing = document.getElementById('assign-worker-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'assign-worker-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:440px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-user-plus"></i>Назначить исполнителя</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'assign-worker-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" id="assign-worker-body">' +
+        '<div class="loading-block">Загружаем сотрудников…</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'assign-worker-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitAssignProductionWorker(' + workId + ')"><i class="ti ti-check"></i>Применить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  try {
+    const w = await apiGet('/api/production/works/' + workId);
+    const r = await apiGet('/api/employees/active');
+    const employees = (r && r.employees) || [];
+    const currentId = w.assignee_id || w.assignee_employee_id || null;
+    const body = document.getElementById('assign-worker-body');
+    if (!employees.length) {
+      body.innerHTML = '<div class="empty-block"><i class="ti ti-user-off"></i>Нет активных сотрудников</div>';
+      return;
+    }
+    let html = '';
+    // Опция "Снять назначение"
+    html += '<label class="si-mm-card" style="margin-bottom:6px;">' +
+              '<input type="radio" name="assign-emp" value=""' + (!currentId ? ' checked' : '') + '>' +
+              '<div class="si-mm-card-body">' +
+                '<div class="si-mm-card-title" style="color:var(--text-light);"><i class="ti ti-user-off"></i> Не назначен</div>' +
+                '<div class="si-mm-card-meta">убрать исполнителя с задачи</div>' +
+              '</div>' +
+            '</label>';
+    employees.forEach(e => {
+      const isMaster = e.is_master || (e.roles || []).indexOf('master') !== -1;
+      const checked = (String(e.id) === String(currentId)) ? ' checked' : '';
+      const fullName = e.full_name || e.short_name || ('#' + e.id);
+      const pos = e.position || '';
+      html += '<label class="si-mm-card">' +
+                '<input type="radio" name="assign-emp" value="' + e.id + '"' + checked + '>' +
+                '<div class="si-mm-card-body">' +
+                  '<div class="si-mm-card-title">' + escapeHtml(fullName) + (isMaster ? ' <span style="color:var(--brand);font-size:11px;font-weight:600;">★ мастер</span>' : '') + '</div>' +
+                  (pos ? '<div class="si-mm-card-meta">' + escapeHtml(pos) + '</div>' : '') +
+                '</div>' +
+              '</label>';
+    });
+    body.innerHTML = html;
+  } catch (e) {
+    document.getElementById('assign-worker-body').innerHTML =
+      '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e.message || e)) + '</div>';
+  }
+}
+
+async function submitAssignProductionWorker(workId) {
+  const overlay = document.getElementById('assign-worker-modal');
+  const picked = overlay && overlay.querySelector('input[name="assign-emp"]:checked');
+  if (!picked) { showToast('Выберите сотрудника или «Не назначен»', 'error'); return; }
+  const val = picked.value;
+  const body = { assignee_id: val ? parseInt(val, 10) : null };
+  try {
+    await apiPatch('/api/production/works/' + workId + '/assign', body);
+    overlay.remove();
+    showToast(val ? 'Исполнитель назначен' : 'Назначение снято', 'success');
+    // Перерисуем карточку работы — она открыта поверх
+    openProductionWorkDetail(workId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 async function openProductionWorkDetail(workId) {
   // Удаляем предыдущую модалку, если осталась
   const existing = document.getElementById('pkb-detail-modal');
@@ -14707,7 +14788,19 @@ function renderProductionWorkDetail(w) {
   }
   html += '<dt>Кол-во</dt><dd>' + (w.qty || 1) + ' шт.</dd>';
   if (w.deadline_at) html += '<dt>Срок</dt><dd>' + escapeHtml(formatPkbDate(w.deadline_at)) + '</dd>';
-  if (w.assignee_short_name) html += '<dt>Исполнитель</dt><dd>' + escapeHtml(w.assignee_short_name) + '</dd>';
+  // Исполнитель — ВСЕГДА показываем строку (даже если не назначен) + кнопка назначить/сменить
+  {
+    const canAssign = hasPermission('production.manage') && w.status !== 'done' && w.status !== 'cancelled';
+    const btnLabel = w.assignee_short_name ? 'Сменить' : 'Назначить';
+    const btnIcon  = w.assignee_short_name ? 'ti-user-edit' : 'ti-user-plus';
+    const valueText = w.assignee_short_name
+      ? escapeHtml(w.assignee_short_name)
+      : '<span style="color:var(--text-faint);font-style:italic;">не назначен</span>';
+    const btn = canAssign
+      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:8px;vertical-align:middle;" onclick="openAssignProductionWorkerModal(' + w.id + ')"><i class="ti ' + btnIcon + '" style="font-size:12px;"></i>' + btnLabel + '</button>'
+      : '';
+    html += '<dt>Исполнитель</dt><dd>' + valueText + btn + '</dd>';
+  }
   if (w.estimated_hours != null) html += '<dt>План часов</dt><dd>' + w.estimated_hours + 'ч</dd>';
   if (w.actual_hours != null) html += '<dt>Факт часов</dt><dd>' + w.actual_hours + 'ч</dd>';
   if (w.progress != null && w.status === 'in_progress') html += '<dt>Прогресс</dt><dd>' + w.progress + '%</dd>';
