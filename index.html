@@ -1003,6 +1003,89 @@
     scrollbar-width: none;
   }
   .wh-tabs::-webkit-scrollbar { display: none; }
+
+  /* ============ v2.35.0: ФИЛЬТР СВОДКИ ПО СБОРЩИКУ ============ */
+  .summary-worker-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    margin: 6px 0 12px;
+    flex-wrap: wrap;
+  }
+  .desktop-layout .summary-worker-row {
+    padding: 0 0 0 4px;
+  }
+  .summary-worker-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-light);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .summary-worker-label i { font-size: 16px; }
+  .summary-worker-select {
+    flex: 1;
+    min-width: 180px;
+    max-width: 340px;
+    padding: 8px 28px 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A8294' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .summary-worker-select:hover { border-color: var(--brand); }
+  .summary-worker-select:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-bg);
+  }
+  .summary-worker-select.has-filter {
+    border-color: var(--brand);
+    background-color: var(--brand-bg);
+    font-weight: 600;
+    color: var(--brand);
+  }
+  .summary-worker-reset {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-light);
+    flex-shrink: 0;
+  }
+  .summary-worker-reset:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+  .summary-worker-reset i { font-size: 16px; }
+  .summary-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 500;
+  }
   .wh-tab {
     position: relative;
     background: transparent;
@@ -11286,6 +11369,19 @@
             <button class="filter-chip active" data-sf="month">Месяц</button>
             <button class="filter-chip" data-sf="prev_month">Прошлый</button>
           </div>
+          <!-- v2.35.0: фильтр по сборщику -->
+          <div class="summary-worker-row" id="summary-worker-row">
+            <label for="summary-worker-select" class="summary-worker-label">
+              <i class="ti ti-user"></i> Сборщик:
+            </label>
+            <select id="summary-worker-select" class="summary-worker-select" onchange="onSummaryWorkerChange(this.value)">
+              <option value="">Все сборщики</option>
+            </select>
+            <button class="summary-worker-reset" id="summary-worker-reset"
+                    onclick="onSummaryWorkerChange('')" title="Сбросить фильтр" style="display:none;">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
           <div id="summary-content"><div class="loading-block">Считаем сводки…</div></div>
         </div>
       </div>
@@ -13031,7 +13127,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.34.2-packing-stage";
+const APP_VERSION = "v2.35.0-summary-by-worker";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13086,6 +13182,7 @@ const state = {
   currentScreen: 'home-dashboard',
   historyFilter: 'month',
   summaryFilter: 'month',
+  summaryEmployeeFilter: null,     // v2.35.0: id сборщика или null = все
   isDesktop: false,
   newAssembly: {
     model: null, execution: null, ipClass: null,
@@ -15753,10 +15850,14 @@ async function quickExportSummary(fmt) {
     const token = localStorage.getItem(TOKEN_KEY);
     // Все 8 типов работ
     const allTypes = 'assembly,repair,installation,commissioning,diagnostics,design,maintenance,other';
-    const url = API_BASE + '/api/assemblies/export?from=' + encodeURIComponent(fromStr) +
+    let url = API_BASE + '/api/assemblies/export?from=' + encodeURIComponent(fromStr) +
       '&to=' + encodeURIComponent(toStr) +
       '&format=' + fmt +
       '&types=' + encodeURIComponent(allTypes);
+    // v2.35.0: прокидываем фильтр по сборщику
+    if (state.summaryEmployeeFilter) {
+      url += '&employee_id=' + encodeURIComponent(state.summaryEmployeeFilter);
+    }
     const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -15839,6 +15940,11 @@ function openExportAssembliesModal() {
           '<span style="color:var(--text-light);">·</span>' +
           '<a onclick="toggleAllExportTypes(false)" style="color:var(--brand);cursor:pointer;">Снять все</a>' +
         '</div>' +
+        // v2.35.0: Сотрудник
+        '<div style="font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Сборщик</div>' +
+        '<select id="export-worker-select" class="summary-worker-select" style="width:100%;max-width:none;margin-bottom:18px;">' +
+          '<option value="">Все сборщики</option>' +
+        '</select>' +
         // Формат
         '<div style="font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Формат файла</div>' +
         '<div style="display:flex;gap:10px;">' +
@@ -15878,6 +15984,46 @@ function openExportAssembliesModal() {
       });
     });
   }, 50);
+
+  // v2.35.0: Подгружаем сборщиков и предвыбираем фильтр из Сводок
+  _loadExportWorkersDropdown();
+}
+
+async function _loadExportWorkersDropdown() {
+  const sel = document.getElementById('export-worker-select');
+  if (!sel) return;
+  try {
+    const d = await apiGet('/api/employees/active');
+    const employees = (d && d.employees) || [];
+    // Сначала те, у кого роль assembler/master, остальные ниже
+    const isAssembler = (e) => (e.roles || []).some(r => r === 'assembler' || r === 'master');
+    const top = employees.filter(isAssembler);
+    const rest = employees.filter(e => !isAssembler(e));
+    let html = '<option value="">Все сборщики</option>';
+    if (top.length) {
+      html += '<optgroup label="Сборщики">';
+      top.forEach(e => {
+        const name = e.short_name || e.full_name || '—';
+        html += '<option value="' + e.id + '">' + escapeHtml(name) + '</option>';
+      });
+      html += '</optgroup>';
+    }
+    if (rest.length) {
+      html += '<optgroup label="Остальные">';
+      rest.forEach(e => {
+        const name = e.short_name || e.full_name || '—';
+        html += '<option value="' + e.id + '">' + escapeHtml(name) + '</option>';
+      });
+      html += '</optgroup>';
+    }
+    sel.innerHTML = html;
+    // Предвыбираем фильтр из Сводок, если он активен
+    if (state.summaryEmployeeFilter) {
+      sel.value = String(state.summaryEmployeeFilter);
+    }
+  } catch (e) {
+    // Тихо — выпадайка останется с одной опцией «Все сборщики»
+  }
 }
 
 function _exportTypeCheckbox(value, label, checked) {
@@ -15932,12 +16078,20 @@ async function doExportAssemblies() {
   const btn = document.getElementById('export-do-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Готовим файл…'; }
 
+  // v2.35.0: фильтр по сборщику из модалки
+  const workerSel = document.getElementById('export-worker-select');
+  const workerId = workerSel ? (workerSel.value || '').trim() : '';
+  const workerName = workerId && workerSel
+    ? (workerSel.options[workerSel.selectedIndex].textContent || '').trim()
+    : '';
+
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const url = API_BASE + '/api/assemblies/export?from=' + encodeURIComponent(from) +
+    let url = API_BASE + '/api/assemblies/export?from=' + encodeURIComponent(from) +
       '&to=' + encodeURIComponent(to) +
       '&format=' + fmt +
       '&types=' + encodeURIComponent(types.join(','));
+    if (workerId) url += '&employee_id=' + encodeURIComponent(workerId);
     const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -15945,8 +16099,11 @@ async function doExportAssemblies() {
       return;
     }
     const blob = await r.blob();
-    // Имя файла
-    const filename = 'atomus-rabota-' + from + '_' + to + '.' + fmt;
+    // Имя файла: добавляем суффикс с именем сборщика, если выбран
+    const safeWorker = workerName
+      ? '-' + workerName.replace(/[^\wА-Яа-яЁё.-]+/g, '_').slice(0, 30)
+      : '';
+    const filename = 'atomus-rabota' + safeWorker + '-' + from + '_' + to + '.' + fmt;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -15968,12 +16125,16 @@ async function doExportAssemblies() {
 
 async function loadSummary() {
   const period = state.summaryFilter;
+  const empId = state.summaryEmployeeFilter;
+  const cacheKey = period + '|' + (empId || 'all');
   const container = document.getElementById('summary-content');
-  if (cache.summary[period]) { renderSummary(cache.summary[period]); return; }
+  if (cache.summary[cacheKey]) { renderSummary(cache.summary[cacheKey]); return; }
   container.innerHTML = '<div class="loading-block">Считаем сводки…</div>';
   try {
-    const d = await apiGet('/api/summary?period=' + period);
-    cache.summary[period] = d;
+    let url = '/api/summary?period=' + period;
+    if (empId) url += '&employee_id=' + encodeURIComponent(empId);
+    const d = await apiGet(url);
+    cache.summary[cacheKey] = d;
     renderSummary(d);
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
@@ -15983,27 +16144,60 @@ async function loadSummary() {
 function renderSummary(d) {
   const container = document.getElementById('summary-content');
   const t = d.total;
+  const empId = state.summaryEmployeeFilter;
+  // Имя выбранного сборщика (для заголовков карточек)
+  const selectedWorker = empId
+    ? ((d.available_workers || []).find(w => String(w.id) === String(empId)) ||
+       (d.by_employee && d.by_employee[0]) || null)
+    : null;
+  const selectedName = selectedWorker
+    ? (selectedWorker.short_name || selectedWorker.full_name || '—')
+    : null;
+
+  // Всегда обновляем выпадайку — даже когда данных нет, чтобы можно было сбросить фильтр.
+  _updateSummaryWorkerSelect(d.available_workers || []);
+
   if (!t || t.total_records === 0) {
-    container.innerHTML = '<div class="empty-block"><i class="ti ti-chart-bar"></i>За этот период нет данных</div>';
+    let empty = '<div class="empty-block"><i class="ti ti-chart-bar"></i>';
+    empty += selectedName
+      ? 'У сотрудника <b>' + escapeHtml(selectedName) + '</b> нет работ за этот период'
+      : 'За этот период нет данных';
+    empty += '</div>';
+    container.innerHTML = empty;
     return;
   }
   let html = '';
+
+  // Бейдж активного фильтра — над KPI
+  if (selectedName) {
+    html += '<div style="padding:0 18px 8px;">' +
+      '<span class="summary-filter-badge"><i class="ti ti-filter"></i>Сводка по: ' +
+      escapeHtml(selectedName) + '</span></div>';
+  }
+
   html += '<div class="kpi-grid">';
   html += kpiCard('записей', t.total_records, '—');
   html += kpiCard('штук', t.total_qty, '—');
   html += kpiCard('моделей', t.unique_models, '—');
-  html += kpiCard('сборщиков', t.unique_employees, '—');
+  // При фильтре по одному сборщику карточка «сборщиков» бессмысленна — скрываем.
+  if (!empId) {
+    html += kpiCard('сборщиков', t.unique_employees, '—');
+  }
   html += '</div>';
 
   html += '<div class="row-2">';
   if (d.by_direction && d.by_direction.length > 1) {
-    html += '<div class="section"><h3 class="section-title">По направлениям</h3>';
+    html += '<div class="section"><h3 class="section-title">По направлениям' +
+      (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
+      '</h3>';
     html += '<div class="card">' + renderPieChart(d.by_direction, t.total_qty) + '</div></div>';
   }
   if (d.by_model && d.by_model.length) {
     const top = d.by_model.slice(0, 8);
     const maxQty = top[0].qty;
-    html += '<div class="section"><h3 class="section-title">Топ моделей</h3>';
+    html += '<div class="section"><h3 class="section-title">Топ моделей' +
+      (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
+      '</h3>';
     html += '<div class="card"><div class="hbar-list">';
     top.forEach(m => {
       const title = m.model_name + (m.model_extra ? ' · ' + m.model_extra : '');
@@ -16017,12 +16211,16 @@ function renderSummary(d) {
   }
   html += '</div>';
 
-  if (d.by_employee && d.by_employee.length) {
+  // Топ сборщиков — только когда фильтра нет. При фильтре по одному сотруднику теряет смысл.
+  if (!empId && d.by_employee && d.by_employee.length) {
     html += '<div class="section"><h3 class="section-title">Топ сборщиков</h3>';
     html += '<div class="card"><div class="top-list">';
     d.by_employee.slice(0, 10).forEach((e, i) => {
       const name = e.short_name || e.full_name || '—';
-      html += '<div class="row">';
+      const clickable = e.id
+        ? ' onclick="onSummaryWorkerChange(\'' + e.id + '\')" style="cursor:pointer;" title="Фильтр по сборщику"'
+        : '';
+      html += '<div class="row"' + clickable + '>';
       html += '<div class="rank">' + (i + 1) + '.</div>';
       html += '<div class="avatar">' + getInitials(name) + '</div>';
       html += '<div class="name">' + escapeHtml(name) + '</div>';
@@ -16032,7 +16230,9 @@ function renderSummary(d) {
   }
 
   // ЭТАП 31.9: кнопки быстрого скачивания за активный период
-  html += '<div class="section"><h3 class="section-title">Скачать отчёт за выбранный период</h3></div>';
+  html += '<div class="section"><h3 class="section-title">Скачать отчёт за выбранный период' +
+    (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
+    '</h3></div>';
   html += '<div class="report-buttons">';
   html += '<button onclick="quickExportSummary(\'xlsx\')"><i class="ti ti-file-spreadsheet"></i>Excel</button>';
   html += '<button onclick="quickExportSummary(\'pdf\')"><i class="ti ti-file-text"></i>PDF</button>';
@@ -16041,6 +16241,49 @@ function renderSummary(d) {
     'Нужны другие параметры? Жми <a onclick="openExportAssembliesModal()" style="color:var(--brand);cursor:pointer;font-weight:500;">«Экспорт»</a> сверху' +
     '</div>';
   container.innerHTML = html;
+}
+
+// v2.35.0: перезаполнение выпадайки сборщиков (вызывается из renderSummary)
+function _updateSummaryWorkerSelect(workers) {
+  const sel = document.getElementById('summary-worker-select');
+  const resetBtn = document.getElementById('summary-worker-reset');
+  if (!sel) return;
+  const currentVal = state.summaryEmployeeFilter ? String(state.summaryEmployeeFilter) : '';
+  // Если выбранного нет в списке за период — добавляем его как disabled, чтобы UI не сбросился
+  let html = '<option value="">Все сборщики</option>';
+  let foundCurrent = false;
+  workers.forEach(w => {
+    if (String(w.id) === currentVal) foundCurrent = true;
+    const name = w.short_name || w.full_name || '—';
+    html += '<option value="' + w.id + '">' + escapeHtml(name) + ' · ' + w.qty + ' шт.</option>';
+  });
+  if (currentVal && !foundCurrent) {
+    // Сборщик отфильтрован, у него нет работ за период — даём остаться выбранным
+    const fromState = state._summaryWorkerName || ('ID ' + currentVal);
+    html += '<option value="' + currentVal + '">' + escapeHtml(fromState) + ' · 0 шт.</option>';
+  }
+  sel.innerHTML = html;
+  sel.value = currentVal;
+  sel.classList.toggle('has-filter', !!currentVal);
+  if (resetBtn) resetBtn.style.display = currentVal ? 'inline-flex' : 'none';
+}
+
+// v2.35.0: смена фильтра по сборщику
+function onSummaryWorkerChange(val) {
+  const newVal = val ? parseInt(val, 10) : null;
+  if (state.summaryEmployeeFilter === newVal) return;
+  state.summaryEmployeeFilter = newVal;
+  // Запомним имя на случай нулевых результатов (см. _updateSummaryWorkerSelect)
+  if (newVal) {
+    const sel = document.getElementById('summary-worker-select');
+    if (sel) {
+      const opt = sel.querySelector('option[value="' + newVal + '"]');
+      if (opt) state._summaryWorkerName = opt.textContent.split(' · ')[0];
+    }
+  } else {
+    state._summaryWorkerName = null;
+  }
+  loadSummary();
 }
 
 function renderPieChart(byDir, totalQty) {
