@@ -12908,7 +12908,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.33.2-canedit-fix";
+const APP_VERSION = "v2.33.4-delete-with-password";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -22077,6 +22077,7 @@ function renderModels(d) {
             '<span style="margin-left:auto;display:inline-flex;gap:4px;" onclick="event.stopPropagation()">' +
               '<span role="button" tabindex="0" class="icon-btn" title="Переименовать раздел" onclick="event.stopPropagation();openEditDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-edit" style="font-size:14px;"></i></span>' +
               '<span role="button" tabindex="0" class="icon-btn" title="Дублировать раздел" onclick="event.stopPropagation();openDuplicateDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-copy" style="font-size:14px;"></i></span>' +
+              '<span role="button" tabindex="0" class="icon-btn" title="Удалить раздел" onclick="event.stopPropagation();openDeleteDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;color:var(--danger);"><i class="ti ti-trash" style="font-size:14px;"></i></span>' +
             '</span>' : '') +
         '</button>' +
         '<div class="models-group-body" data-dirid="' + dirId + '" style="' + (isOpen ? '' : 'display:none;') + '">';
@@ -22420,7 +22421,7 @@ async function openEditModelModal(modelId) {
         '<div class="modal-section-title" style="margin-top:18px;">Сборка</div>' +
         '<div class="form-group">' +
           '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text-dark);">' +
-            '<input type="checkbox" id="em-needs-ip"' + (m.needs_ip ? ' checked' : '') + ' />' +
+            '<input type="checkbox" id="em-needs-ip"' + (m.needs_ip ? ' checked' : '') + ' style="width:auto;flex-shrink:0;" />' +
             '<span>Требуется указать IP при сборке</span>' +
           '</label>' +
         '</div>' +
@@ -22693,11 +22694,11 @@ async function openDuplicateDirectionModal(directionId) {
         '</div>' +
         '<div class="form-group" style="background:var(--bg);border-radius:8px;padding:12px 14px;">' +
           '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text-dark);margin-bottom:8px;">' +
-            '<input type="checkbox" id="dup-dir-subgroups" checked />' +
+            '<input type="checkbox" id="dup-dir-subgroups" checked style="width:auto;flex-shrink:0;" />' +
             '<span>Скопировать подгруппы (' + subgroupsCount + ')</span>' +
           '</label>' +
           '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text-dark);">' +
-            '<input type="checkbox" id="dup-dir-models" checked />' +
+            '<input type="checkbox" id="dup-dir-models" checked style="width:auto;flex-shrink:0;" />' +
             '<span>Скопировать модели (' + models.length + ')</span>' +
           '</label>' +
         '</div>' +
@@ -22735,6 +22736,99 @@ async function submitDuplicateDirection(directionId) {
 }
 
 // ============ КОНЕЦ ЭТАПА 45.1 (UI блок 3) ============
+
+
+// ============ ЭТАП 45.2 (v2.33.4): УДАЛЕНИЕ РАЗДЕЛА С ПОДТВЕРЖДЕНИЕМ ПАРОЛЯ ============
+
+async function openDeleteDirectionModal(directionId) {
+  if (!canManageSales()) {
+    showToast('Удаление разделов доступно директору и заму', 'error');
+    return;
+  }
+  const dir = ((cache.models && cache.models.directions) || []).find(d => d.id === directionId);
+  if (!dir) { showToast('Раздел не найден', 'error'); return; }
+  const models = ((cache.models && cache.models.models) || []).filter(m => m.direction_id === directionId && m.is_active !== false);
+
+  let overlay = document.getElementById('delete-direction-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'delete-direction-modal';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('visible'); };
+    document.body.appendChild(overlay);
+  }
+
+  // Если есть модели — показываем предупреждение и блокируем кнопку
+  const hasModels = models.length > 0;
+  const warningBlock = hasModels
+    ? '<div style="background:#FEE;border:1px solid var(--danger);border-radius:8px;padding:12px 14px;margin-bottom:14px;color:#A32D2D;font-size:13px;">' +
+        '<i class="ti ti-alert-triangle" style="vertical-align:-2px;margin-right:6px;"></i>' +
+        '<b>В разделе ' + models.length + ' активных моделей.</b> Сначала перенесите их в другой раздел (через «Редактировать» в карточке модели) или деактивируйте.' +
+      '</div>'
+    : '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 14px;margin-bottom:14px;color:#854F0B;font-size:13px;">' +
+        '<i class="ti ti-alert-triangle" style="vertical-align:-2px;margin-right:6px;"></i>' +
+        'Раздел будет деактивирован. Это действие нельзя отменить через UI.' +
+      '</div>';
+
+  overlay.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+      '<div class="modal-header">' +
+        '<h3 style="color:var(--danger);"><i class="ti ti-trash"></i> Удалить раздел</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'delete-direction-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        warningBlock +
+        '<div class="form-group">' +
+          '<label style="text-transform:none;font-size:14px;font-weight:500;color:var(--text-dark);">' +
+            'Удаляется раздел: <b>' + escapeHtml(dir.name) + '</b>' +
+          '</label>' +
+        '</div>' +
+        (hasModels ? '' :
+          '<div class="form-group">' +
+            '<label>Подтвердите паролем *</label>' +
+            '<input type="password" id="del-dir-password" placeholder="Ваш пароль для входа" autocomplete="current-password" />' +
+          '</div>'
+        ) +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'delete-direction-modal\').classList.remove(\'visible\')">Отмена</button>' +
+        (hasModels
+          ? '<button class="btn btn-secondary" disabled style="background:var(--bg);color:var(--text-faint);cursor:not-allowed;"><i class="ti ti-trash"></i> Удалить</button>'
+          : '<button class="btn" onclick="submitDeleteDirection(' + directionId + ')" style="background:var(--danger);color:white;"><i class="ti ti-trash"></i> Удалить</button>'
+        ) +
+      '</div>' +
+    '</div>';
+  overlay.classList.add('visible');
+  setTimeout(() => {
+    const p = document.getElementById('del-dir-password');
+    if (p) p.focus();
+  }, 50);
+}
+
+async function submitDeleteDirection(directionId) {
+  const passInput = document.getElementById('del-dir-password');
+  const password = passInput ? (passInput.value || '') : '';
+  if (!password) { showToast('Введите пароль', 'error'); return; }
+  try {
+    await apiPost('/api/directions/' + directionId + '/delete-with-password', { password });
+    showToast('Раздел удалён', 'success');
+    document.getElementById('delete-direction-modal').classList.remove('visible');
+    cache.models = null;
+    if (typeof loadModels === 'function') {
+      try { await loadModels(); } catch (e) {}
+    }
+  } catch (e) {
+    const msg = e.message || String(e);
+    if (msg.includes('пароль') || msg.toLowerCase().includes('password')) {
+      showToast('Неверный пароль', 'error');
+      if (passInput) { passInput.value = ''; passInput.focus(); }
+    } else {
+      showToast('Ошибка: ' + msg, 'error');
+    }
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 45.2 ============
 
 async function loadModelBom(modelId) {
   const container = document.getElementById('bom-list');
