@@ -7333,6 +7333,59 @@
   .defect-chat-send i { font-size: 18px; }
   .defect-chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* v2.40.0: кнопка-колокольчик */
+  .defect-chat-sound {
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-left: 4px;
+  }
+  .defect-chat-sound:hover { background: var(--bg); color: var(--brand); }
+  .defect-chat-sound i { font-size: 16px; }
+
+  /* v2.40.0: разделитель дней */
+  .defect-chat-day-sep {
+    display: flex; align-items: center; justify-content: center;
+    margin: 14px 0 6px;
+    color: var(--text-light);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .defect-chat-day-sep span {
+    background: var(--card);
+    padding: 4px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  /* v2.40.0: крестик удаления участника */
+  .defect-participant-chip { position: relative; }
+  .defect-participant-chip .dp-ban {
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 0 4px 0 2px;
+    margin-left: 2px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .defect-participant-chip:hover .dp-ban { opacity: 0.7; }
+  .defect-participant-chip .dp-ban:hover {
+    opacity: 1;
+    color: var(--danger);
+    background: var(--danger-bg, #FEE2E2);
+  }
+
   /* v2.39.0: адаптив под мобильные */
   @media (max-width: 768px) {
     .defect-msg { max-width: 92%; }
@@ -13491,7 +13544,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.39.1-owner-display-name";
+const APP_VERSION = "v2.40.0-chat-moderation";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35064,6 +35117,9 @@ function renderPublicDefectCard(d, token) {
       '<div class="defect-chat-title">' +
         '<i class="ti ti-messages"></i> Обсуждение' +
         '<span class="defect-chat-count" id="public-defect-chat-count">' + (d.messages_count || 0) + '</span>' +
+        '<button class="defect-chat-sound" id="defect-chat-sound-btn" onclick="toggleDefectChatSound()" title="Звук уведомлений">' +
+          '<i class="ti ' + (_getDefectSoundEnabled() ? 'ti-bell' : 'ti-bell-off') + '"></i>' +
+        '</button>' +
       '</div>' +
       '<div class="defect-participants" id="defect-participants"></div>' +
       '<div class="defect-chat-feed" id="public-defect-chat-feed">' +
@@ -35214,6 +35270,17 @@ async function _refreshPublicDefectMessagesSilently(token) {
     const prevSig = feed.dataset.sig || '';
     const newSig = messages.length + ':' + (messages.length ? messages[messages.length - 1].id : '0');
     if (prevSig === newSig) return;
+    // v2.40.0: ping звуком на новое сообщение (для гостя свои не пингуют — гостевые имя сравним по name+phone из guest)
+    if (prevSig && messages.length) {
+      const prevLastId = parseInt(prevSig.split(':')[1] || '0', 10);
+      const last = messages[messages.length - 1];
+      const guest = _getPublicDefectGuest();
+      const myDisplay = guest ? (guest.name + ' · ' + guest.phone) : null;
+      const isMine = myDisplay && last.author_name === myDisplay;
+      if (last.id > prevLastId && !last.is_system && !isMine) {
+        _playDefectChatPing();
+      }
+    }
     const wasNearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 80;
     _renderMessagesInto(feed, messages, document.getElementById('public-defect-chat-count'), true);
     feed.dataset.sig = newSig;
@@ -36675,6 +36742,10 @@ function renderDefectDetail(d) {
         '<div class="defect-chat-title">' +
           '<i class="ti ti-messages"></i> Обсуждение' +
           '<span class="defect-chat-count" id="defect-chat-count">' + (d.messages_count || 0) + '</span>' +
+          // v2.40.0: тоггл звука
+          '<button class="defect-chat-sound" id="defect-chat-sound-btn" onclick="toggleDefectChatSound()" title="Звук уведомлений">' +
+            '<i class="ti ' + (_getDefectSoundEnabled() ? 'ti-bell' : 'ti-bell-off') + '"></i>' +
+          '</button>' +
         '</div>' +
         // v2.39.0: участники чата
         '<div class="defect-participants" id="defect-participants"></div>' +
@@ -36771,6 +36842,11 @@ function renderDefectParticipants(box, participants) {
     box.innerHTML = '';
     return;
   }
+  // v2.40.0: банить может только сотрудник с manage. Не во вьюхе.
+  const canBan = state.user && (
+    state.user.is_director ||
+    (state.user.roles && (state.user.roles.includes('director') || state.user.roles.includes('zam')))
+  );
   const onlineCount = participants.filter(p => p.is_online).length;
   let html = '<div class="defect-participants-row">' +
     '<span class="defect-participants-label">' +
@@ -36778,20 +36854,51 @@ function renderDefectParticipants(box, participants) {
       (onlineCount ? ' · <span style="color:#15803D;">●</span> ' + onlineCount + ' онлайн' : '') +
     '</span>' +
     '<div class="defect-participants-chips">';
-  participants.slice(0, 10).forEach(p => {
+  participants.slice(0, 15).forEach(p => {
     const cls = (p.is_online ? 'online' : '') + (p.is_guest ? ' guest' : ' employee');
     const initials = getInitials(p.name || '—');
     const title = (p.name || '') + (p.phone ? ' · ' + p.phone : '') + (p.is_online ? ' · онлайн' : '');
+    // Банить можем только гостей (сотрудников нет смысла — они авторизованы через бот)
+    const banBtn = (canBan && p.is_guest && p.key) ?
+      '<button class="dp-ban" title="Удалить из обсуждения" onclick="banDefectParticipant(\'' +
+      String(p.key).replace(/'/g, "\\'") + '\', \'' +
+      String(p.name || '').replace(/'/g, "\\'") + '\')">×</button>' : '';
     html += '<span class="defect-participant-chip ' + cls + '" title="' + escapeHtml(title) + '">' +
       '<span class="dp-avatar">' + initials + '</span>' +
       '<span class="dp-name">' + escapeHtml(p.name || '—') + '</span>' +
+      banBtn +
     '</span>';
   });
-  if (participants.length > 10) {
-    html += '<span class="defect-participants-more">+' + (participants.length - 10) + '</span>';
+  if (participants.length > 15) {
+    html += '<span class="defect-participants-more">+' + (participants.length - 15) + '</span>';
   }
   html += '</div></div>';
   box.innerHTML = html;
+}
+
+// v2.40.0: удалить участника из обсуждения
+async function banDefectParticipant(key, name) {
+  if (!state.currentDefectId) return;
+  if (!confirm('Удалить «' + name + '» из обсуждения?\n\nЧеловек больше не сможет писать сообщения по этой ссылке.')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  try {
+    const r = await fetch(API_BASE + '/api/defects/' + state.currentDefectId + '/participants/block', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ key: key, name: name }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    showToast('Участник удалён', 'success');
+    // Перезагрузим участников и ленту (там появится системка)
+    loadDefectParticipants(state.currentDefectId);
+    loadDefectMessages(state.currentDefectId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 // v2.39.0: polling + heartbeat для realtime обновления чата
@@ -36856,6 +36963,16 @@ async function _refreshDefectMessagesSilently(defectId) {
     const prevSig = feed.dataset.sig || '';
     const newSig = messages.length + ':' + (messages.length ? messages[messages.length - 1].id : '0');
     if (prevSig === newSig) return;
+    // v2.40.0: пинг звуком если появилось НОВОЕ сообщение от ДРУГОГО автора
+    if (prevSig && messages.length) {
+      const prevLastId = parseInt(prevSig.split(':')[1] || '0', 10);
+      const last = messages[messages.length - 1];
+      const myEmpId = state.user && state.user.employee_id;
+      const isMine = myEmpId && last.author_employee_id === myEmpId;
+      if (last.id > prevLastId && !last.is_system && !isMine) {
+        _playDefectChatPing();
+      }
+    }
     const wasNearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 80;
     renderDefectMessages(messages);
     feed.dataset.sig = newSig;
@@ -36886,8 +37003,16 @@ function _renderMessagesInto(feed, messages, countEl, publicView) {
     state.user.is_director ||
     (state.user.roles && (state.user.roles.includes('director') || state.user.roles.includes('zam')))
   );
+
+  // v2.40.0: группировка по дням
   let html = '';
+  let prevDay = '';
   messages.forEach(m => {
+    const day = (m.created_at || '').slice(0, 10);
+    if (day && day !== prevDay) {
+      html += '<div class="defect-chat-day-sep"><span>' + _formatDaySeparator(day) + '</span></div>';
+      prevDay = day;
+    }
     const isMine = !publicView && myEmpId && m.author_employee_id === myEmpId;
     if (m.is_system) {
       const delBtn = canDelete
@@ -36934,6 +37059,78 @@ function _renderMessagesInto(feed, messages, countEl, publicView) {
   });
   feed.innerHTML = html;
   feed.scrollTop = feed.scrollHeight;
+}
+
+// v2.40.0: тоггл звука уведомлений
+const DEFECT_SOUND_KEY = 'atomus_defect_chat_sound';
+
+function _getDefectSoundEnabled() {
+  try { return localStorage.getItem(DEFECT_SOUND_KEY) === '1'; } catch (_) { return false; }
+}
+
+function toggleDefectChatSound() {
+  const cur = _getDefectSoundEnabled();
+  try { localStorage.setItem(DEFECT_SOUND_KEY, cur ? '0' : '1'); } catch (_) {}
+  const btn = document.getElementById('defect-chat-sound-btn');
+  if (btn) {
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = 'ti ' + (cur ? 'ti-bell-off' : 'ti-bell');
+  }
+  if (!cur) {
+    // включили — проиграем короткий ping чтобы пользователь услышал и одобрил autoplay
+    _playDefectChatPing();
+    showToast('Звук включён', 'success');
+  } else {
+    showToast('Звук выключен', 'info');
+  }
+}
+
+function _playDefectChatPing() {
+  if (!_getDefectSoundEnabled()) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = state._audioCtx || (state._audioCtx = new AudioCtx());
+    if (ctx.state === 'suspended') ctx.resume();
+    const t0 = ctx.currentTime;
+    // Двойной ping (две короткие ноты)
+    [880, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = t0 + i * 0.12;
+      gain.gain.setValueAtTime(0.0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.10);
+      osc.start(start);
+      osc.stop(start + 0.12);
+    });
+  } catch (_) {}
+}
+
+// v2.40.0: форматирование разделителя дня
+function _formatDaySeparator(iso) {
+  // iso = "2026-05-25"
+  const today = new Date();
+  const todayISO = today.toISOString().slice(0, 10);
+  if (iso === todayISO) return 'Сегодня';
+  const yest = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  if (iso === yest.toISOString().slice(0, 10)) return 'Вчера';
+  // 25 мая 2026 (или без года если этот год)
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  try {
+    const parts = iso.split('-');
+    const y = parseInt(parts[0], 10);
+    const mo = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const sameYear = y === today.getFullYear();
+    return d + ' ' + months[mo] + (sameYear ? '' : ' ' + y);
+  } catch (e) {
+    return iso;
+  }
 }
 
 // v2.37.0: удаление сообщения чата (только сотрудник с defects.resolve)
