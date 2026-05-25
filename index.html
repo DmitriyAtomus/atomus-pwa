@@ -4615,6 +4615,26 @@
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
   }
   .modal-body .form-group input::placeholder { color: var(--text-faint); }
+  /* ЭТАП 45.3 (v2.33.5): чекбоксы и радио — не текстовые, не должны иметь padding/border/bg */
+  .modal-body .form-group input[type="checkbox"],
+  .modal-body .form-group input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    accent-color: var(--brand);
+    flex-shrink: 0;
+    cursor: pointer;
+    appearance: auto;
+    -webkit-appearance: auto;
+    box-shadow: none;
+  }
+  .modal-body .form-group input[type="checkbox"]:focus,
+  .modal-body .form-group input[type="radio"]:focus {
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+  }
   .modal-body .form-row { display: flex; gap: 10px; }
   .modal-body .form-row > .form-group { flex: 1; }
   .modal-body .form-hint {
@@ -12908,7 +12928,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.33.4-delete-with-password";
+const APP_VERSION = "v2.33.5-checkbox-css-fix";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -22724,7 +22744,9 @@ async function submitDuplicateDirection(directionId) {
     const r = await apiPost('/api/directions/' + directionId + '/duplicate', {
       new_name, copy_subgroups, copy_models,
     });
-    showToast('Раздел создан · подгрупп: ' + r.subgroups_copied + ', моделей: ' + r.models_copied, 'success');
+    const sgCnt = (r.subgroups_copied != null) ? r.subgroups_copied : 0;
+    const mCnt  = (r.models_copied != null) ? r.models_copied : 0;
+    showToast('Раздел создан · подгрупп: ' + sgCnt + ', моделей: ' + mCnt, 'success');
     document.getElementById('duplicate-direction-modal').classList.remove('visible');
     cache.models = null;
     if (typeof loadModels === 'function') {
