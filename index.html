@@ -13015,7 +13015,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.33.9-feed-workers-fp-modal";
+const APP_VERSION = "v2.33.10-execution-label";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -28441,7 +28441,7 @@ async function openFpModelDetail(modelId) {
       const reservedBadge = s.contract_id
         ? '<span style="background:#FEF3C7;color:#854F0B;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">резерв · ' + escapeHtml(s.contract_number || '') + '</span>'
         : '<span style="background:rgba(29,158,117,0.15);color:#0A5B41;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">свободна</span>';
-      const exec = [s.execution, s.ip_class].filter(Boolean).join(' · ');
+      const exec = [s.execution_label || s.execution, s.ip_class].filter(Boolean).join(' · ');
       html +=
         '<div class="modal-item" style="border:1px solid var(--border);border-radius:10px;border-bottom:1px solid var(--border);margin-bottom:0;" onclick="document.getElementById(\'fp-model-assemblies-modal\').classList.remove(\'visible\'); openAssemblyStock(' + s.id + ')">' +
           '<div class="mi-icon"><i class="ti ti-package"></i></div>' +
@@ -29386,7 +29386,7 @@ function showAssemblyStockModal(d) {
           (a.work_type === 'assembly' || !a.work_type
             ? '<div><span class="as-lbl">Остаток:</span> <strong>' + (a.stock_qty || 0) + ' шт.</strong></div>'
             : '') +
-          (a.execution ? '<div><span class="as-lbl">Исполнение:</span> ' + escapeHtml(a.execution) + '</div>' : '') +
+          (a.execution ? '<div><span class="as-lbl">Исполнение:</span> ' + escapeHtml(a.execution_label || a.execution) + '</div>' : '') +
           (a.ip_class ? '<div><span class="as-lbl">IP-класс:</span> ' + escapeHtml(a.ip_class) + '</div>' : '') +
           '<div><span class="as-lbl">Дата сборки:</span> ' + escapeHtml(a.assembly_date || '—') + '</div>' +
           (a.created_at ? '<div><span class="as-lbl">Внесена:</span> ' + escapeHtml((a.created_at || '').replace('T', ' ').substring(0, 16)) + '</div>' : '') +
