@@ -12908,7 +12908,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.33.1-move-rename-duplicate";
+const APP_VERSION = "v2.33.2-canedit-fix";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -22021,6 +22021,8 @@ function renderModels(d) {
   if (!d.models || d.models.length === 0) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-package"></i>Моделей нет</div>'; return;
   }
+  // ЭТАП 45.1: возможность редактировать/дублировать разделы
+  const canEdit = (typeof canManageSales === 'function') ? canManageSales() : false;
   const dirMap = {};
   d.directions.forEach(dir => { dirMap[dir.id] = dir; });
   const groups = {};
