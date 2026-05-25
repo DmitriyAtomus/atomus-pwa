@@ -7034,6 +7034,216 @@
     border-top: 1px solid var(--border);
   }
 
+  /* ============ v2.36.0: КАТЕГОРИЯ, ВИДЕО/ДОКУМЕНТ В ГАЛЕРЕЕ, ЧАТ ============ */
+  .defect-category-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .defect-category-badge i { font-size: 14px; }
+
+  /* Превью видео/документа в форме создания */
+  .file-preview-icon {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 6px;
+    background: var(--bg);
+    color: var(--text-mid);
+    text-align: center;
+  }
+  .file-preview-icon i { font-size: 28px; color: var(--brand); margin-bottom: 4px; }
+  .file-preview-icon .fpn {
+    font-size: 11px; line-height: 1.2; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+
+  /* Видео/документ в галерее заявки */
+  .defect-file-thumb {
+    aspect-ratio: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-decoration: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 8px;
+    text-align: center;
+  }
+  .defect-file-thumb:hover { border-color: var(--brand); }
+  .defect-file-thumb i { font-size: 32px; color: var(--brand); margin-bottom: 4px; }
+  .defect-file-thumb.video-thumb { background: #1B2030; color: #fff; }
+  .defect-file-thumb.video-thumb i { color: #fff; }
+  .defect-file-thumb .ftn {
+    font-size: 11px; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+
+  /* ============ ЧАТ ============ */
+  .defect-chat {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 2px solid var(--border);
+  }
+  .defect-chat-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+  .defect-chat-title i { color: var(--brand); }
+  .defect-chat-count {
+    margin-left: auto;
+    background: var(--bg);
+    color: var(--text-light);
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .defect-chat-feed {
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: 460px;
+    overflow-y: auto;
+    padding: 4px;
+    margin-bottom: 12px;
+  }
+  .defect-chat-empty {
+    text-align: center; padding: 20px;
+    color: var(--text-light); font-size: 13px;
+  }
+  .defect-msg {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    max-width: 85%;
+    align-self: flex-start;
+  }
+  .defect-msg.mine {
+    align-self: flex-end;
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .defect-msg.system {
+    align-self: center;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-light);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    max-width: 95%;
+  }
+  .defect-msg.system i { color: var(--text-light); }
+  .defect-msg.system time { color: var(--text-light); margin-left: 6px; opacity: .8; }
+  .defect-msg-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .defect-msg-author { font-size: 12px; font-weight: 600; color: var(--brand); }
+  .defect-msg.mine .defect-msg-author { color: var(--brand); }
+  .defect-msg-head time { font-size: 11px; color: var(--text-light); }
+  .defect-msg-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .defect-msg-files {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 6px;
+  }
+  .defect-msg-file {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text);
+    text-decoration: none;
+    max-width: 100%;
+  }
+  .defect-msg-file:hover { border-color: var(--brand); }
+  .defect-msg-file span {
+    max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .defect-msg-file.photo {
+    padding: 0; border-radius: 6px; overflow: hidden;
+    width: 80px; height: 80px;
+  }
+  .defect-msg-file.photo img { width: 100%; height: 100%; object-fit: cover; }
+  .defect-msg-file.video i,
+  .defect-msg-file.doc i { color: var(--brand); }
+
+  .defect-chat-compose {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+    background: var(--card);
+  }
+  .defect-chat-attachments {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 6px;
+  }
+  .defect-chat-attachments:empty { display: none; }
+  .defect-chat-att {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 4px 4px 8px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 6px;
+    font-size: 12px;
+    max-width: 220px;
+  }
+  .defect-chat-att i { font-size: 14px; }
+  .defect-chat-att span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .defect-chat-att button {
+    background: transparent; border: none; color: var(--brand);
+    cursor: pointer; font-size: 16px;
+    padding: 0 4px; line-height: 1;
+  }
+  .defect-chat-input-row {
+    display: flex; align-items: flex-end; gap: 6px;
+  }
+  .defect-chat-attach {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .defect-chat-attach:hover { background: var(--bg); color: var(--brand); }
+  .defect-chat-attach i { font-size: 20px; }
+  .defect-chat-input-row textarea {
+    flex: 1; min-height: 36px; max-height: 160px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit; font-size: 14px;
+    resize: none;
+    background: var(--card); color: var(--text);
+  }
+  .defect-chat-input-row textarea:focus {
+    outline: none;
+    border-color: var(--brand);
+  }
+  .defect-chat-send {
+    flex-shrink: 0; width: 40px; height: 40px;
+    padding: 0; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .defect-chat-send i { font-size: 18px; }
+  .defect-chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* Лайтбокс для фото */
   .photo-lightbox {
     position: fixed;
@@ -10831,7 +11041,7 @@
           <i class="ti ti-shopping-cart"></i>Снабжение
         </button>
         <button class="section-tab" data-section="defects">
-          <i class="ti ti-alert-circle"></i>Доработки
+          <i class="ti ti-alert-circle"></i>Сервис
         </button>
         <button class="section-tab" data-section="hr">
           <i class="ti ti-id-badge"></i>Кадры
@@ -10878,7 +11088,7 @@
       <button data-section="warehouse"><i class="ti ti-building-warehouse"></i>Склад</button>
       <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
       <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
-      <button data-section="defects"><i class="ti ti-alert-circle"></i>Доработки</button>
+      <button data-section="defects"><i class="ti ti-alert-circle"></i>Сервис</button>
       <button data-section="hr"><i class="ti ti-id-badge"></i>Кадры</button>
       <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
     </nav>
@@ -11079,7 +11289,7 @@
     <!-- SIDEBAR ДОРАБОТКИ (Этап 22) -->
     <aside class="sidebar" id="sidebar-defects" data-section="defects" data-visible="0">
       <div class="sidebar-title">
-        <i class="ti ti-alert-circle"></i> Доработки
+        <i class="ti ti-alert-circle"></i> Сервис
       </div>
       <div class="sidebar-nav">
         <button class="nav-item new-btn" id="nav-defects-new" onclick="openNewDefectFromCRM()">
@@ -12601,7 +12811,7 @@
       <div class="screen" data-screen="defects-list" data-section="defects">
         <!-- Мобильный header (только на мобильной) -->
         <div class="screen-header">
-          <h2 id="defects-list-mobile-title">Доработки</h2>
+          <h2 id="defects-list-mobile-title">Сервис</h2>
           <div style="display: flex; gap: 6px;">
             <button class="icon-btn" onclick="openShareForInstallerFromCRM()" title="Отправить монтажнику" style="color: #15803D;">
               <i class="ti ti-send"></i>
@@ -12646,13 +12856,13 @@
       <div class="screen" data-screen="defects-detail" data-section="defects">
         <div class="screen-header">
           <button class="back-btn" onclick="selectSidebarItem('defects-list')"><i class="ti ti-arrow-left"></i></button>
-          <h2 id="dd-mobile-title">Замечание</h2>
+          <h2 id="dd-mobile-title">Заявка</h2>
         </div>
         <div class="page-header">
           <div style="display: flex; align-items: center; gap: 12px;">
             <button class="icon-btn" onclick="selectSidebarItem('defects-list')"><i class="ti ti-arrow-left"></i></button>
             <div>
-              <h1 id="dd-title">Замечание</h1>
+              <h1 id="dd-title">Заявка</h1>
               <div class="page-subtitle" id="dd-subtitle">—</div>
             </div>
           </div>
@@ -13127,7 +13337,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.35.0-summary-by-worker";
+const APP_VERSION = "v2.36.0-service";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -34726,6 +34936,7 @@ function openGeneralDefectForm() {
     author_phone: '',
     location: '',
     photos: [],
+    category: '',
   };
   const m = document.getElementById('defect-form-modal');
   if (!m) return;
@@ -35575,7 +35786,8 @@ function openDefectForm(targetType, token) {
     author_name: '',
     author_phone: '',
     location: '',
-    photos: [],   // [{file, dataUrl}]
+    photos: [],   // [{file, dataUrl, kind}] v2.36.0
+    category: '',
   };
   const m = document.getElementById('defect-form-modal');
   if (!m) return;
@@ -35598,33 +35810,41 @@ function renderDefectFormHtml() {
     typeTabs += '<button class="defect-type-pill' + active + '" onclick="setDefectType(\'' + k + '\')"><i class="ti ' + v.icon + '"></i>' + v.label + '</button>';
   });
 
-  let photoPreviews = '';
-  s.photos.forEach((p, i) => {
-    photoPreviews += '<div class="photo-preview">' +
-      '<img src="' + p.dataUrl + '" alt="">' +
-      '<button class="photo-preview-remove" onclick="removeDefectPhoto(' + i + ')" type="button">×</button>' +
-    '</div>';
+  // v2.36.0: dropdown категории
+  let catOptions = '<option value="">— Не указана —</option>';
+  Object.entries(DEFECT_CATEGORY_LABELS).forEach(([k, v]) => {
+    const sel = s.category === k ? ' selected' : '';
+    catOptions += '<option value="' + k + '"' + sel + '>' + escapeHtml(v) + '</option>';
+  });
+
+  // v2.36.0: превью файлов — фото/видео/документ
+  let filePreviews = '';
+  (s.photos || []).forEach((p, i) => {
+    filePreviews += _renderDefectFilePreview(p, i);
   });
 
   return '<div class="modal" onclick="event.stopPropagation()" style="max-width: 520px;">' +
     '<div class="modal-header">' +
-      '<h3><i class="ti ti-alert-circle"></i> Новое замечание</h3>' +
+      '<h3><i class="ti ti-alert-circle"></i> Новая заявка</h3>' +
       '<button class="modal-close" onclick="closeDefectForm()"><i class="ti ti-x"></i></button>' +
     '</div>' +
     '<div class="modal-content">' +
       '<div class="defect-form">' +
         '<div class="form-group"><label>Тип</label><div class="defect-type-tabs">' + typeTabs + '</div></div>' +
-        '<div class="form-group"><label>Описание *</label>' +
-          '<textarea id="def-description" rows="4" placeholder="Что не так? Например: «Не хватает заземляющего болта»" oninput="state._defectFormState.description = this.value">' + escapeHtml(s.description) + '</textarea>' +
+        '<div class="form-group"><label>Категория проблемы</label>' +
+          '<select id="def-category" onchange="state._defectFormState.category = this.value">' + catOptions + '</select>' +
         '</div>' +
-        '<div class="form-group"><label>Фото (до 5)</label>' +
+        '<div class="form-group"><label>Описание *</label>' +
+          '<textarea id="def-description" rows="4" placeholder="Что случилось? Например: «Течёт вода в камере созревания, конденсат на нижнем коллекторе»" oninput="state._defectFormState.description = this.value">' + escapeHtml(s.description) + '</textarea>' +
+        '</div>' +
+        '<div class="form-group"><label>Файлы — фото, видео, документы (до 5)</label>' +
           '<label class="photo-upload-area">' +
-            '<input type="file" accept="image/*" multiple style="display:none;" onchange="addDefectPhotos(this)">' +
-            '<i class="ti ti-camera-plus"></i>' +
-            '<div>Добавить фото</div>' +
-            '<div class="upload-hint">JPG/PNG/HEIC, до 8 МБ</div>' +
+            '<input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" multiple style="display:none;" onchange="addDefectFiles(this)">' +
+            '<i class="ti ti-paperclip"></i>' +
+            '<div>Добавить файлы</div>' +
+            '<div class="upload-hint">JPG/PNG/HEIC до 8 МБ · видео до 50 МБ · PDF/DOC/XLS до 20 МБ</div>' +
           '</label>' +
-          (photoPreviews ? '<div class="photo-previews">' + photoPreviews + '</div>' : '') +
+          (filePreviews ? '<div class="photo-previews">' + filePreviews + '</div>' : '') +
         '</div>' +
         '<div class="form-group"><label>Где найдено (опционально)</label>' +
           '<input type="text" placeholder="например: ТП-3 на объекте Невский" value="' + escapeHtml(s.location) + '" oninput="state._defectFormState.location = this.value">' +
@@ -35644,6 +35864,58 @@ function renderDefectFormHtml() {
   '</div>';
 }
 
+// v2.36.0: справочник категорий — должен совпадать с DEFECT_CATEGORY_LABELS на бэке
+const DEFECT_CATEGORY_LABELS = {
+  electric:   'Электрика',
+  plumbing:   'Сантехника',
+  climate:    'Климатика',
+  leak:       'Протечка',
+  condensate: 'Конденсат',
+  noise:      'Шум',
+  mechanics:  'Механика',
+  software:   'Автоматика/ПО',
+  other:      'Прочее',
+};
+
+// v2.36.0: иконки категорий (для бейджей в списке/карточке)
+const DEFECT_CATEGORY_ICONS = {
+  electric:   'ti-plug',
+  plumbing:   'ti-droplet',
+  climate:    'ti-temperature',
+  leak:       'ti-droplet-filled',
+  condensate: 'ti-droplets',
+  noise:      'ti-volume',
+  mechanics:  'ti-settings',
+  software:   'ti-cpu',
+  other:      'ti-dots',
+};
+
+// v2.36.0: ярлык kind по content-type (для FormData превью)
+function _kindForContentType(ct) {
+  if (!ct) return 'document';
+  if (ct.startsWith('image/')) return 'photo';
+  if (ct.startsWith('video/')) return 'video';
+  return 'document';
+}
+
+// v2.36.0: превью одного файла (фото — миниатюра; видео — иконка плеера; документ — иконка типа)
+function _renderDefectFilePreview(p, i) {
+  const k = p.kind || _kindForContentType(p.file && p.file.type);
+  let body;
+  if (k === 'photo' && p.dataUrl) {
+    body = '<img src="' + p.dataUrl + '" alt="">';
+  } else if (k === 'video') {
+    body = '<div class="file-preview-icon"><i class="ti ti-movie"></i><div class="fpn">' +
+      escapeHtml((p.file && p.file.name) || 'видео') + '</div></div>';
+  } else {
+    body = '<div class="file-preview-icon"><i class="ti ti-file-text"></i><div class="fpn">' +
+      escapeHtml((p.file && p.file.name) || 'документ') + '</div></div>';
+  }
+  return '<div class="photo-preview">' + body +
+    '<button class="photo-preview-remove" onclick="removeDefectPhoto(' + i + ')" type="button">×</button>' +
+  '</div>';
+}
+
 function setDefectType(t) {
   if (!state._defectFormState) return;
   state._defectFormState.type = t;
@@ -35660,32 +35932,47 @@ function setDefectType(t) {
   tabs.innerHTML = html;
 }
 
-function addDefectPhotos(input) {
+function addDefectFiles(input) {
   if (!input.files || !input.files.length) return;
   if (!state._defectFormState) return;
   const remaining = 5 - state._defectFormState.photos.length;
   const files = Array.from(input.files).slice(0, remaining);
   let processed = 0;
+  const done = () => {
+    processed++;
+    if (processed === files.length) {
+      input.value = '';
+      rerenderDefectPhotoPreviews();
+    }
+  };
   files.forEach(file => {
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Фото "' + file.name + '" слишком большое (макс 8 МБ)');
-      processed++;
-      if (processed === files.length) input.value = '';
+    // v2.36.0: лимиты по виду
+    const ct = file.type || '';
+    let limit, kind;
+    if (ct.startsWith('image/')) { limit = 8 * 1024 * 1024;  kind = 'photo'; }
+    else if (ct.startsWith('video/')) { limit = 50 * 1024 * 1024; kind = 'video'; }
+    else { limit = 20 * 1024 * 1024; kind = 'document'; }
+    if (file.size > limit) {
+      alert('Файл "' + file.name + '" слишком большой (макс ' + Math.round(limit/1024/1024) + ' МБ для ' + kind + ')');
+      done();
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      state._defectFormState.photos.push({ file, dataUrl: e.target.result });
-      processed++;
-      if (processed === files.length) {
-        input.value = '';
-        // Перерисуем превью
-        rerenderDefectPhotoPreviews();
-      }
-    };
-    reader.readAsDataURL(file);
+    if (kind === 'photo') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state._defectFormState.photos.push({ file, dataUrl: e.target.result, kind });
+        done();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      state._defectFormState.photos.push({ file, dataUrl: null, kind });
+      done();
+    }
   });
 }
+
+// Бэкомпат — старое имя функции
+function addDefectPhotos(input) { return addDefectFiles(input); }
 
 function removeDefectPhoto(idx) {
   if (!state._defectFormState) return;
@@ -35698,7 +35985,6 @@ function rerenderDefectPhotoPreviews() {
   if (!m) return;
   const area = m.querySelector('.photo-upload-area');
   if (!area || !area.parentNode) return;
-  // Удалим существующее .photo-previews если есть
   const existing = area.parentNode.querySelector('.photo-previews');
   if (existing) existing.remove();
   const s = state._defectFormState;
@@ -35707,10 +35993,8 @@ function rerenderDefectPhotoPreviews() {
   wrap.className = 'photo-previews';
   s.photos.forEach((p, i) => {
     const cell = document.createElement('div');
-    cell.className = 'photo-preview';
-    cell.innerHTML = '<img src="' + p.dataUrl + '" alt="">' +
-      '<button class="photo-preview-remove" onclick="removeDefectPhoto(' + i + ')" type="button">×</button>';
-    wrap.appendChild(cell);
+    cell.innerHTML = _renderDefectFilePreview(p, i);
+    wrap.appendChild(cell.firstElementChild);
   });
   area.parentNode.appendChild(wrap);
 }
@@ -35719,18 +36003,20 @@ async function submitDefectReport() {
   const s = state._defectFormState;
   if (!s) return;
   const desc = (s.description || '').trim();
-  if (!desc) { showToast('Опишите замечание', 'error'); return; }
+  if (!desc) { showToast('Опишите проблему', 'error'); return; }
 
   const fd = new FormData();
   fd.append('description', desc);
   fd.append('type', s.type);
+  if (s.category) fd.append('category', s.category);    // v2.36.0
   if (s.targetType === 'assembly') fd.append('assembly_token', s.token);
   else if (s.targetType === 'contract') fd.append('contract_token', s.token);
   else if (s.targetType === 'general') fd.append('general', '1');     // ЭТАП 23+: общая публичная форма
   if (s.author_name) fd.append('author_name', s.author_name);
   if (s.author_phone) fd.append('author_phone', s.author_phone);
   if (s.location) fd.append('location', s.location);
-  s.photos.forEach((p, i) => fd.append('photo_' + (i + 1), p.file, p.file.name));
+  // v2.36.0: file_* (бэк принимает и legacy photo_*)
+  s.photos.forEach((p, i) => fd.append('file_' + (i + 1), p.file, p.file.name));
 
   // Маршрутизация:
   // - 'general' (публичная общая форма) → /api/public/defects с general=1
@@ -35755,8 +36041,8 @@ async function submitDefectReport() {
       '<div class="modal-content">' +
         '<div class="defect-form-success">' +
           '<i class="ti ti-circle-check-filled"></i>' +
-          '<h3>Замечание отправлено</h3>' +
-          '<p>Спасибо! Мы рассмотрим замечание и при необходимости свяжемся с вами.</p>' +
+          '<h3>Заявка отправлена</h3>' +
+          '<p>Спасибо! Мы рассмотрим обращение и при необходимости свяжемся с вами.</p>' +
         '</div>' +
       '</div>' +
       '<div class="modal-footer">' +
@@ -35870,8 +36156,8 @@ function renderDefectDetail(d) {
   const titleEl = document.getElementById('dd-title');
   const subEl = document.getElementById('dd-subtitle');
   const mobileTitle = document.getElementById('dd-mobile-title');
-  if (titleEl) titleEl.textContent = (DEFECT_TYPE_LABELS[d.type] || {label: 'Замечание'}).label + ' #' + d.id;
-  if (mobileTitle) mobileTitle.textContent = (DEFECT_TYPE_LABELS[d.type] || {label: 'Замечание'}).label;
+  if (titleEl) titleEl.textContent = (DEFECT_TYPE_LABELS[d.type] || {label: 'Заявка'}).label + ' #' + d.id;
+  if (mobileTitle) mobileTitle.textContent = (DEFECT_TYPE_LABELS[d.type] || {label: 'Заявка'}).label;
   if (subEl) subEl.textContent = (d.created_at || '').replace('T', ' ').slice(0, 16);
 
   const typeInfo = DEFECT_TYPE_LABELS[d.type] || DEFECT_TYPE_LABELS.defect;
@@ -35894,10 +36180,11 @@ function renderDefectDetail(d) {
   if (d.author_phone) addInfo('Телефон', escapeHtml(d.author_phone));
   if (d.assignee_name) addInfo('Ответственный', escapeHtml(d.assignee_name));
 
-  let photos = '';
+  // v2.36.0: галерея файлов — фото / видео / документы
+  let filesBlock = '';
   if (d.photos && d.photos.length) {
-    photos = '<div class="defect-photos-grid">' +
-      d.photos.map(p => '<div class="defect-photo-thumb" onclick="openPhotoLightbox(\'' + (API_BASE + p.url) + '\')"><img src="' + API_BASE + p.url + '" loading="lazy" alt=""></div>').join('') +
+    filesBlock = '<div class="defect-photos-grid">' +
+      d.photos.map(p => _renderDefectGalleryItem(p)).join('') +
     '</div>';
   }
 
@@ -35914,18 +36201,247 @@ function renderDefectDetail(d) {
     actions = '<div class="defect-status-actions">' + buttons.join('') + '</div>';
   }
 
+  // v2.36.0: бейдж категории рядом с типом и статусом
+  let catBadge = '';
+  if (d.category && d.category_label) {
+    const icon = DEFECT_CATEGORY_ICONS[d.category] || 'ti-tag';
+    catBadge = '<span class="defect-category-badge"><i class="ti ' + icon + '"></i>' + escapeHtml(d.category_label) + '</span>';
+  }
+
   content.innerHTML =
     '<div class="defect-detail">' +
       '<div class="defect-detail-head">' +
         '<span class="defect-type-badge ' + typeInfo.cls + '">' + typeInfo.label + '</span>' +
         '<span class="defect-status-badge s-' + d.status + '">' + escapeHtml(d.status_label) + '</span>' +
+        catBadge +
       '</div>' +
       '<div class="defect-detail-desc">' + escapeHtml(d.description) + '</div>' +
       (info ? '<div class="defect-detail-info">' + info + '</div>' : '') +
-      (photos ? '<div class="defect-detail-info-label" style="margin-top: 16px; margin-bottom: 10px;">ФОТО</div>' + photos : '') +
-      (d.resolution_note ? '<div class="defect-detail-info-label" style="margin-top: 16px; margin-bottom: 6px;">КОММЕНТАРИЙ</div><div class="defect-detail-desc" style="background: #FFF4E6;">' + escapeHtml(d.resolution_note) + '</div>' : '') +
+      (filesBlock ? '<div class="defect-detail-info-label" style="margin-top: 16px; margin-bottom: 10px;">ФАЙЛЫ</div>' + filesBlock : '') +
+      (d.resolution_note ? '<div class="defect-detail-info-label" style="margin-top: 16px; margin-bottom: 6px;">КОММЕНТАРИЙ К РЕШЕНИЮ</div><div class="defect-detail-desc" style="background: #FFF4E6;">' + escapeHtml(d.resolution_note) + '</div>' : '') +
       actions +
+      // v2.36.0: чат
+      '<div class="defect-chat" id="defect-chat-block">' +
+        '<div class="defect-chat-title">' +
+          '<i class="ti ti-messages"></i> Обсуждение' +
+          '<span class="defect-chat-count" id="defect-chat-count">' + (d.messages_count || 0) + '</span>' +
+        '</div>' +
+        '<div class="defect-chat-feed" id="defect-chat-feed">' +
+          '<div class="loading-block">Загружаем сообщения…</div>' +
+        '</div>' +
+        '<div class="defect-chat-compose" id="defect-chat-compose">' +
+          '<div class="defect-chat-attachments" id="defect-chat-attachments"></div>' +
+          '<div class="defect-chat-input-row">' +
+            '<button class="defect-chat-attach" onclick="document.getElementById(\'defect-chat-file-input\').click()" title="Прикрепить">' +
+              '<i class="ti ti-paperclip"></i>' +
+            '</button>' +
+            '<input type="file" id="defect-chat-file-input" multiple style="display:none;" ' +
+              'accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" ' +
+              'onchange="addDefectChatAttachments(this)">' +
+            '<textarea id="defect-chat-text" rows="1" placeholder="Написать сообщение…" ' +
+              'oninput="autosizeDefectChatInput(this)"></textarea>' +
+            '<button class="defect-chat-send btn btn-primary" onclick="sendDefectChatMessage()">' +
+              '<i class="ti ti-send"></i>' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
     '</div>';
+
+  // Подгружаем сообщения
+  state._defectChatAttachments = [];
+  loadDefectMessages(d.id);
+}
+
+// v2.36.0: рендер одного элемента галереи (фото / видео / документ)
+function _renderDefectGalleryItem(p) {
+  const url = API_BASE + p.url;
+  const kind = p.kind || 'photo';
+  if (kind === 'photo') {
+    return '<div class="defect-photo-thumb" onclick="openPhotoLightbox(\'' + url + '\')"><img src="' + url + '" loading="lazy" alt=""></div>';
+  }
+  if (kind === 'video') {
+    return '<div class="defect-file-thumb video-thumb" onclick="openDefectVideoLightbox(\'' + url + '\')">' +
+      '<i class="ti ti-player-play-filled"></i>' +
+      '<div class="ftn">Видео</div>' +
+    '</div>';
+  }
+  // document
+  const name = p.original_name || 'Документ';
+  return '<a class="defect-file-thumb doc-thumb" href="' + url + '" target="_blank" rel="noopener" title="' + escapeHtml(name) + '">' +
+    '<i class="ti ti-file-text"></i>' +
+    '<div class="ftn">' + escapeHtml(name) + '</div>' +
+  '</a>';
+}
+
+// v2.36.0: простой лайтбокс для видео — используем <video> в overlay
+function openDefectVideoLightbox(url) {
+  let m = document.getElementById('defect-video-lb');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'defect-video-lb';
+    m.className = 'photo-lightbox';
+    m.onclick = () => { m.classList.remove('visible'); m.innerHTML = ''; };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = '<video src="' + url + '" controls autoplay playsinline style="max-width:95vw;max-height:90vh;"></video>';
+  m.classList.add('visible');
+}
+
+// v2.36.0: подгружаем сообщения чата
+async function loadDefectMessages(defectId) {
+  const feed = document.getElementById('defect-chat-feed');
+  if (!feed) return;
+  try {
+    const d = await apiGet('/api/defects/' + defectId + '/messages');
+    renderDefectMessages(d.messages || []);
+  } catch (e) {
+    feed.innerHTML = '<div class="empty-block">Не удалось загрузить сообщения</div>';
+  }
+}
+
+function renderDefectMessages(messages) {
+  const feed = document.getElementById('defect-chat-feed');
+  if (!feed) return;
+  const countEl = document.getElementById('defect-chat-count');
+  if (countEl) countEl.textContent = messages.filter(m => !m.is_system).length;
+  if (!messages.length) {
+    feed.innerHTML = '<div class="defect-chat-empty">Пока никто не подключился к обсуждению — будьте первым.</div>';
+    return;
+  }
+  const myEmpId = state.user && state.user.employee_id;
+  let html = '';
+  messages.forEach(m => {
+    const isMine = myEmpId && m.author_employee_id === myEmpId;
+    if (m.is_system) {
+      html += '<div class="defect-msg system">' +
+        '<i class="ti ti-info-circle"></i>' +
+        '<span>' + escapeHtml(m.text || '').replace(/\n/g, '<br>') + '</span>' +
+        '<time>' + _formatChatTime(m.created_at) + '</time>' +
+      '</div>';
+      return;
+    }
+    let files = '';
+    if (m.files && m.files.length) {
+      files = '<div class="defect-msg-files">' + m.files.map(f => {
+        const url = API_BASE + f.url;
+        if (f.kind === 'photo') {
+          return '<a class="defect-msg-file photo" href="' + url + '" target="_blank" rel="noopener">' +
+            '<img src="' + url + '" loading="lazy" alt=""></a>';
+        }
+        if (f.kind === 'video') {
+          return '<a class="defect-msg-file video" onclick="openDefectVideoLightbox(\'' + url + '\'); return false;" href="#">' +
+            '<i class="ti ti-player-play-filled"></i><span>Видео</span></a>';
+        }
+        return '<a class="defect-msg-file doc" href="' + url + '" target="_blank" rel="noopener">' +
+          '<i class="ti ti-file-text"></i><span>' + escapeHtml(f.original_name || 'Документ') + '</span></a>';
+      }).join('') + '</div>';
+    }
+    html += '<div class="defect-msg' + (isMine ? ' mine' : '') + '">' +
+      '<div class="defect-msg-head">' +
+        '<span class="defect-msg-author">' + escapeHtml(m.author_name || '—') + '</span>' +
+        '<time>' + _formatChatTime(m.created_at) + '</time>' +
+      '</div>' +
+      (m.text ? '<div class="defect-msg-text">' + escapeHtml(m.text).replace(/\n/g, '<br>') + '</div>' : '') +
+      files +
+    '</div>';
+  });
+  feed.innerHTML = html;
+  // Прокрутим вниз
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function _formatChatTime(iso) {
+  if (!iso) return '';
+  // 2026-05-25 14:32:11 → 14:32 / 25.05 14:32 / 25.05.2026 14:32
+  const s = String(iso).replace('T', ' ');
+  const today = new Date().toISOString().slice(0, 10);
+  if (s.startsWith(today)) return s.slice(11, 16);
+  // другой день этого года
+  const year = String(new Date().getFullYear());
+  if (s.startsWith(year)) return s.slice(8, 10) + '.' + s.slice(5, 7) + ' ' + s.slice(11, 16);
+  return s.slice(8, 10) + '.' + s.slice(5, 7) + '.' + s.slice(0, 4) + ' ' + s.slice(11, 16);
+}
+
+function autosizeDefectChatInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+function addDefectChatAttachments(input) {
+  if (!input.files || !input.files.length) return;
+  state._defectChatAttachments = state._defectChatAttachments || [];
+  const remaining = 5 - state._defectChatAttachments.length;
+  const files = Array.from(input.files).slice(0, remaining);
+  files.forEach(file => {
+    const ct = file.type || '';
+    let limit, kind;
+    if (ct.startsWith('image/')) { limit = 8 * 1024 * 1024;  kind = 'photo'; }
+    else if (ct.startsWith('video/')) { limit = 50 * 1024 * 1024; kind = 'video'; }
+    else { limit = 20 * 1024 * 1024; kind = 'document'; }
+    if (file.size > limit) {
+      showToast('"' + file.name + '" — больше ' + Math.round(limit/1024/1024) + ' МБ', 'error');
+      return;
+    }
+    state._defectChatAttachments.push({ file, kind });
+  });
+  input.value = '';
+  renderDefectChatAttachments();
+}
+
+function removeDefectChatAttachment(idx) {
+  if (!state._defectChatAttachments) return;
+  state._defectChatAttachments.splice(idx, 1);
+  renderDefectChatAttachments();
+}
+
+function renderDefectChatAttachments() {
+  const wrap = document.getElementById('defect-chat-attachments');
+  if (!wrap) return;
+  const arr = state._defectChatAttachments || [];
+  if (!arr.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = arr.map((a, i) => {
+    const icon = a.kind === 'photo' ? 'ti-photo' :
+                 a.kind === 'video' ? 'ti-movie' : 'ti-file-text';
+    return '<div class="defect-chat-att"><i class="ti ' + icon + '"></i>' +
+      '<span>' + escapeHtml(a.file.name) + '</span>' +
+      '<button onclick="removeDefectChatAttachment(' + i + ')" type="button">×</button></div>';
+  }).join('');
+}
+
+async function sendDefectChatMessage() {
+  const ta = document.getElementById('defect-chat-text');
+  const text = (ta && ta.value || '').trim();
+  const atts = state._defectChatAttachments || [];
+  if (!text && !atts.length) { showToast('Напишите сообщение или прикрепите файл', 'error'); return; }
+  if (!state.currentDefectId) return;
+  const fd = new FormData();
+  if (text) fd.append('text', text);
+  atts.forEach((a, i) => fd.append('file_' + (i + 1), a.file, a.file.name));
+  const token = localStorage.getItem(TOKEN_KEY);
+  const sendBtn = document.querySelector('.defect-chat-send');
+  if (sendBtn) sendBtn.disabled = true;
+  try {
+    const r = await fetch(API_BASE + '/api/defects/' + state.currentDefectId + '/messages', {
+      method: 'POST', body: fd,
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось отправить', 'error');
+      return;
+    }
+    // Очистим input и вложения
+    if (ta) { ta.value = ''; autosizeDefectChatInput(ta); }
+    state._defectChatAttachments = [];
+    renderDefectChatAttachments();
+    // Перезагрузим ленту
+    loadDefectMessages(state.currentDefectId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 async function changeDefectStatus(newStatus) {
@@ -36007,6 +36523,7 @@ async function openDefectFormForAssembly(assemblyId) {
       author_phone: (state.user && state.user.phone) || '',
       location: '',
       photos: [],
+    category: '',
     };
     const m = document.getElementById('defect-form-modal');
     if (!m) return;
@@ -36031,6 +36548,7 @@ async function openDefectFormForContract() {
       author_phone: (state.user && state.user.phone) || '',
       location: '',
       photos: [],
+    category: '',
     };
     const m = document.getElementById('defect-form-modal');
     if (!m) return;
@@ -36210,6 +36728,7 @@ function openInternalDefectForm() {
     author_phone: (state.user && state.user.phone) || '',
     location: '',
     photos: [],
+    category: '',
   };
   const m = document.getElementById('defect-form-modal');
   if (!m) return;
@@ -36304,6 +36823,7 @@ async function chooseAssemblyForDefect(assemblyId) {
       author_phone: (state.user && state.user.phone) || '',
       location: '',
       photos: [],
+    category: '',
     };
     const m = document.getElementById('defect-form-modal');
     if (!m) return;
@@ -36390,6 +36910,7 @@ async function chooseContractForDefect(contractId) {
       author_phone: (state.user && state.user.phone) || '',
       location: '',
       photos: [],
+    category: '',
     };
     const m = document.getElementById('defect-form-modal');
     if (!m) return;
