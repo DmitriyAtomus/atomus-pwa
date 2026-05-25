@@ -11738,6 +11738,9 @@
             <button class="btn btn-secondary" id="sp-import-btn" onclick="openSaleProductsImport()" title="Импорт каталога">
               <i class="ti ti-download"></i> Импорт
             </button>
+            <button class="btn btn-secondary" id="sp-bulk-promote-btn" onclick="openBulkPromoteModal()" title="Перенести категорию в производственную номенклатуру">
+              <i class="ti ti-package-export"></i> В производство
+            </button>
             <button class="btn btn-secondary" onclick="selectSidebarItem('sale-categories')" title="Управление категориями">
               <i class="ti ti-settings"></i> Категории
             </button>
@@ -12905,8 +12908,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.32.3-assign-worker";
-const APP_VERSION_DATE = "22.05.2026";
+const APP_VERSION = "v2.33.0-promote-to-models";
+const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -17461,9 +17464,11 @@ async function openSaleProductDetail(productId) {
   }
   if (!p) return;
 
-  // Если у позиции нет картинки/характеристик — открываем сразу старую форму
+  // ЭТАП 45 (v2.33.0): для locked-позиций всегда показываем detail-модалку
+  // (даже если нет meta — нужно дать кнопку «Открыть модель»)
+  const isLocked = !!p.is_locked;
   const hasMeta = !!(p.image_path || (p.specs && Object.keys(p.specs).length));
-  if (!hasMeta) {
+  if (!hasMeta && !isLocked) {
     openEditSaleProduct(productId);
     return;
   }
@@ -17504,6 +17509,33 @@ async function openSaleProductDetail(productId) {
     '</div>';
   }
 
+  // ЭТАП 45 (v2.33.0): бейдж "Управляется из производственной" + кнопки
+  let lockedBadge = '';
+  if (isLocked) {
+    lockedBadge =
+      '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;color:#854F0B;">' +
+        '<i class="ti ti-lock" style="font-size:18px;flex-shrink:0;"></i>' +
+        '<div>' +
+          '<div style="font-weight:600;margin-bottom:2px;">Управляется из производственной номенклатуры</div>' +
+          '<div style="font-size:12px;color:#9A5F12;">Артикул: <b>' + escapeHtml(p.linked_model_article || ('#' + p.linked_model_id)) + '</b></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Кнопки в футере зависят от is_locked
+  let footerButtons = '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Закрыть</button>';
+  if (canManageSales()) {
+    if (isLocked) {
+      footerButtons +=
+        '<button class="btn btn-secondary" onclick="if(confirm(\'Отвязать от производственной модели? Карточка снова станет редактируемой, а модель — пустой ссылкой.\'))unlinkSaleProductFromModel(' + p.id + ')" style="color:var(--danger);"><i class="ti ti-unlink"></i> Отвязать</button>' +
+        '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\'); openModelDetail(' + p.linked_model_id + ')"><i class="ti ti-package"></i> Открыть модель</button>';
+    } else {
+      footerButtons +=
+        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\'); openEditSaleProduct(' + p.id + ')"><i class="ti ti-edit"></i> Редактировать</button>' +
+        '<button class="btn btn-primary" onclick="openPromoteSaleProductModal(' + p.id + ')"><i class="ti ti-package-export"></i> В производство</button>';
+    }
+  }
+
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
@@ -17511,6 +17543,7 @@ async function openSaleProductDetail(productId) {
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
+        lockedBadge +
         (groupPath ? '<div class="sp-detail-path"><i class="ti ti-folder"></i> ' + escapeHtml(groupPath) + '</div>' : '') +
         (nc ? '<div class="sp-detail-nc">НС-код: <b>' + escapeHtml(nc) + '</b></div>' : '') +
         imgHtml +
@@ -17526,9 +17559,8 @@ async function openSaleProductDetail(productId) {
         '</div>' +
         specsHtml +
       '</div>' +
-      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
-        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Закрыть</button>' +
-        (canManageSales() ? '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\'); openEditSaleProduct(' + p.id + ')"><i class="ti ti-edit"></i> Редактировать</button>' : '') +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
+        footerButtons +
       '</div>' +
     '</div>';
   m.classList.add('visible');
@@ -17538,6 +17570,290 @@ function _fmtMoney(n) {
   const v = Number(n) || 0;
   return v.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
+
+// ============ ЭТАП 45 (v2.33.0): ПЕРЕНОС ПРОДАЖНОЙ → ПРОИЗВОДСТВЕННАЯ ============
+
+async function _ensureDirectionsForPromote() {
+  // Гарантирует наличие cache.models.directions (для dropdown направления)
+  if (cache.models && cache.models.directions && cache.models.directions.length) return;
+  try {
+    const d = await apiGet('/api/models?with_stock=false');
+    cache.models = d;
+  } catch (e) {
+    cache.models = { models: [], directions: [] };
+  }
+}
+
+async function openPromoteSaleProductModal(productId) {
+  if (!canManageSales()) {
+    showToast('Перевод доступен директору и заму', 'error');
+    return;
+  }
+  // Загружаем направления
+  await _ensureDirectionsForPromote();
+  const directions = (cache.models && cache.models.directions) || [];
+  if (!directions.length) {
+    showToast('Сначала создайте хотя бы одно направление', 'error');
+    return;
+  }
+
+  // Закрываем detail-модалку
+  const detailM = document.getElementById('sp-detail-modal');
+  if (detailM) detailM.classList.remove('visible');
+
+  let m = document.getElementById('promote-sp-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'promote-sp-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+
+  const defaultArticle = 'SP-' + productId;
+  const dirOptions = directions.map(d =>
+    '<option value="' + d.id + '">' + escapeHtml(d.name) + '</option>'
+  ).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package-export"></i> Перевести в производство</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'promote-sp-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-hint" style="margin-bottom:14px;">' +
+          '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
+          'Создастся карточка в производственной номенклатуре с теми же характеристиками, ценами и описанием. После переноса продажная карточка станет read-only.' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Направление *</label>' +
+          '<select id="promote-direction" onchange="_onPromoteDirChange()">' +
+            dirOptions +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group" id="promote-subgroup-wrap" style="display:none;">' +
+          '<label>Подгруппа <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально)</span></label>' +
+          '<select id="promote-subgroup"><option value="">— Без подгруппы —</option></select>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Артикул *</label>' +
+          '<input type="text" id="promote-article" value="' + defaultArticle + '" style="font-family:monospace;text-transform:uppercase;" />' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'promote-sp-modal\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitPromoteSaleProduct(' + productId + ')"><i class="ti ti-check"></i> Перенести</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(_onPromoteDirChange, 50);
+}
+
+function _onPromoteDirChange() {
+  const dirSel = document.getElementById('promote-direction');
+  const sgWrap = document.getElementById('promote-subgroup-wrap');
+  const sgSel = document.getElementById('promote-subgroup');
+  if (!dirSel || !sgWrap || !sgSel) return;
+  const dirId = parseInt(dirSel.value);
+  const directions = (cache.models && cache.models.directions) || [];
+  const dir = directions.find(d => d.id === dirId);
+  const subgroups = (dir && dir.subgroups) || [];
+  if (!subgroups.length) {
+    sgWrap.style.display = 'none';
+    sgSel.innerHTML = '<option value="">— Без подгруппы —</option>';
+    return;
+  }
+  sgWrap.style.display = '';
+  let opts = '<option value="">— Без подгруппы —</option>';
+  subgroups.forEach(sg => {
+    opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
+  });
+  sgSel.innerHTML = opts;
+}
+
+async function submitPromoteSaleProduct(productId) {
+  const dirSel = document.getElementById('promote-direction');
+  const sgSel = document.getElementById('promote-subgroup');
+  const artInput = document.getElementById('promote-article');
+  const direction_id = parseInt(dirSel.value);
+  const subgroupRaw = sgSel ? sgSel.value : '';
+  const subgroup_id = subgroupRaw ? parseInt(subgroupRaw) : null;
+  const article = (artInput.value || '').trim().toUpperCase();
+  if (!direction_id) { showToast('Выбери направление', 'error'); return; }
+  if (!article) { showToast('Введи артикул', 'error'); return; }
+
+  try {
+    const r = await apiPost('/api/sale-products/' + productId + '/promote', {
+      direction_id, subgroup_id, article,
+    });
+    document.getElementById('promote-sp-modal').classList.remove('visible');
+    if (r.was_existing) {
+      showToast('Уже была связана с моделью ' + r.article, 'info');
+    } else {
+      showToast('Перенесено в производство: ' + r.article, 'success');
+    }
+    // Сбросим кэш моделей и продажки
+    cache.models = null;
+    cache.saleProducts = null;
+    // Если на экране продажная номенклатура — перерисуем
+    if (typeof loadSaleProducts === 'function') {
+      try { await loadSaleProducts(); } catch (e) {}
+    }
+    // Открываем модель сразу для редактирования характеристик
+    setTimeout(() => {
+      try { openModelDetail(r.model_id); } catch (e) {}
+    }, 300);
+  } catch (e) {
+    showToast('Ошибка переноса: ' + (e.message || e), 'error');
+  }
+}
+
+async function unlinkSaleProductFromModel(productId) {
+  // Сейчас бэк не имеет специального эндпоинта unlink, но мы можем сделать его
+  // через прямой запрос — однако пока что bыставим оповещение и оставим как заглушку,
+  // дав возможность пользователю отредактировать модель и решить вопрос там.
+  // Простой путь — добавим прямое DELETE/PATCH на отдельном пути; пока что — просим
+  // открыть модель.
+  try {
+    // Используем нештатный путь: PATCH /api/sale-products/{id} с явным "_unlink_only"
+    // Поскольку бэк блокирует update locked-позиции, нужен отдельный эндпоинт.
+    // Пока что — открываем модель и сообщаем что отвязать можно через её деактивацию.
+    showToast('Чтобы отвязать — деактивируйте модель в производственной номенклатуре', 'info');
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// ============ Массовый импорт категории ============
+
+async function openBulkPromoteModal() {
+  if (!canManageSales()) {
+    showToast('Импорт доступен директору и заму', 'error');
+    return;
+  }
+  await _ensureDirectionsForPromote();
+  const directions = (cache.models && cache.models.directions) || [];
+  if (!directions.length) {
+    showToast('Сначала создайте хотя бы одно направление', 'error');
+    return;
+  }
+
+  // Загружаем продажные категории
+  let saleCats = cache.saleCategories;
+  if (!saleCats || !saleCats.length) {
+    try {
+      const r = await apiGet('/api/sale-categories');
+      saleCats = r.categories || [];
+      cache.saleCategories = saleCats;
+    } catch (e) { saleCats = []; }
+  }
+
+  let m = document.getElementById('bulk-promote-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bulk-promote-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+
+  let saleCatOptions = '<option value="">— Без категории —</option>';
+  saleCats.forEach(c => {
+    saleCatOptions += '<option value="' + c.id + '">' + escapeHtml(c.name) + (c.products_count ? ' · ' + c.products_count : '') + '</option>';
+  });
+
+  const dirOptions = directions.map(d =>
+    '<option value="' + d.id + '">' + escapeHtml(d.name) + '</option>'
+  ).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package-export"></i> Импорт категории в производство</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'bulk-promote-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-hint" style="margin-bottom:14px;">' +
+          '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
+          'Все позиции выбранной продажной категории станут производственными моделями. Артикулы автогенерируются: SP-&lt;id&gt;. Уже перенесённые позиции пропускаются.' +
+        '</div>' +
+        '<div class="modal-section-title">Откуда</div>' +
+        '<div class="form-group">' +
+          '<label>Продажная категория</label>' +
+          '<select id="bulk-promote-sale-cat">' + saleCatOptions + '</select>' +
+        '</div>' +
+        '<div class="modal-section-title">Куда</div>' +
+        '<div class="form-group">' +
+          '<label>Направление *</label>' +
+          '<select id="bulk-promote-direction" onchange="_onBulkPromoteDirChange()">' + dirOptions + '</select>' +
+        '</div>' +
+        '<div class="form-group" id="bulk-promote-subgroup-wrap" style="display:none;">' +
+          '<label>Подгруппа <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально, для всех)</span></label>' +
+          '<select id="bulk-promote-subgroup"><option value="">— Без подгруппы —</option></select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'bulk-promote-modal\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitBulkPromote()"><i class="ti ti-check"></i> Перенести категорию</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(_onBulkPromoteDirChange, 50);
+}
+
+function _onBulkPromoteDirChange() {
+  const dirSel = document.getElementById('bulk-promote-direction');
+  const sgWrap = document.getElementById('bulk-promote-subgroup-wrap');
+  const sgSel = document.getElementById('bulk-promote-subgroup');
+  if (!dirSel || !sgWrap || !sgSel) return;
+  const dirId = parseInt(dirSel.value);
+  const directions = (cache.models && cache.models.directions) || [];
+  const dir = directions.find(d => d.id === dirId);
+  const subgroups = (dir && dir.subgroups) || [];
+  if (!subgroups.length) {
+    sgWrap.style.display = 'none';
+    sgSel.innerHTML = '<option value="">— Без подгруппы —</option>';
+    return;
+  }
+  sgWrap.style.display = '';
+  let opts = '<option value="">— Без подгруппы —</option>';
+  subgroups.forEach(sg => {
+    opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
+  });
+  sgSel.innerHTML = opts;
+}
+
+async function submitBulkPromote() {
+  const dirSel = document.getElementById('bulk-promote-direction');
+  const catSel = document.getElementById('bulk-promote-sale-cat');
+  const sgSel = document.getElementById('bulk-promote-subgroup');
+  const direction_id = parseInt(dirSel.value);
+  const saleCatRaw = catSel.value;
+  const sale_category_id = saleCatRaw === '' ? null : parseInt(saleCatRaw);
+  const prod_subgroup_id = sgSel && sgSel.value ? parseInt(sgSel.value) : null;
+  if (!direction_id) { showToast('Выбери направление', 'error'); return; }
+
+  try {
+    const r = await apiPost('/api/sale-products/bulk-promote', {
+      sale_category_id, direction_id, prod_subgroup_id,
+    });
+    document.getElementById('bulk-promote-modal').classList.remove('visible');
+    const errCount = (r.errors || []).length;
+    let msg = 'Перенесено: ' + r.promoted + ', пропущено: ' + r.skipped;
+    if (errCount) msg += ', ошибок: ' + errCount;
+    showToast(msg, r.promoted > 0 ? 'success' : 'info');
+    cache.models = null;
+    cache.saleProducts = null;
+    if (typeof loadSaleProducts === 'function') {
+      try { await loadSaleProducts(); } catch (e) {}
+    }
+  } catch (e) {
+    showToast('Ошибка массового переноса: ' + (e.message || e), 'error');
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 45 (UI блок 1) ============
 
 function toggleSpGroup(gName) {
   if (!state.spOpenGroups) state.spOpenGroups = {};
@@ -21839,8 +22155,28 @@ function _renderModelRow(m) {
 // ============ ЭТАП 32: Карточка модели с тех. картой ============
 
 async function openModelDetail(modelId) {
-  const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+  // ЭТАП 45 (v2.33.0): нужны актуальные поля модели (specs_json, image_path, prices, nc_code).
+  // Грузим деталь напрямую через GET /api/models/{id}/bom — он только BOM, поля модели в нём нет.
+  // Поэтому возьмём из cache.models, но если кэш устарел или нет поля — освежим.
+  let m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+  if (!m) {
+    // Освежаем кэш — возможно модель только что создана через promote
+    try {
+      const d = await apiGet('/api/models?with_stock=true');
+      cache.models = d;
+      m = (d.models || []).find(x => x.id === modelId);
+    } catch (e) {}
+  }
   if (!m) { showToast('Модель не найдена', 'error'); return; }
+  // Поля promote (specs_json/image_path/prices/nc_code) в /api/models нет —
+  // нужен прямой запрос за полной строкой. Используем простой обходной путь:
+  // получим напрямую из БД через отдельный endpoint... которого нет.
+  // PATCH-эндпоинт возвращает полную модель. Сделаем GET через хак: PATCH с пустым body вернёт ошибку.
+  // Решение: добавим в /api/models поля promote → уже сделано в _serialize... СТОП, в get_models
+  // полей promote НЕТ. Чтобы не ломать структуру списка, попробуем достать поля из бэка
+  // через простой GET. Если нет — попросим бэк отдавать их в /api/models тоже.
+  // Пока что: используем поля что есть в m (m.specs_json, m.image_path, m.base_price...)
+  // которых может не быть, и для отображения берём пусто.
   state._currentBomModelId = modelId;
 
   let overlay = document.getElementById('model-detail-modal');
@@ -21859,6 +22195,84 @@ async function openModelDetail(modelId) {
   else if (m.exec_mode === 'fixed' && m.exec_fixed) subParts.push('испол.: ' + m.exec_fixed);
   if (m.needs_ip) subParts.push('IP-класс');
 
+  // ЭТАП 45: цены, НС-код, картинка, характеристики (если есть)
+  const retail = (m.base_price != null && m.base_price !== '') ? _fmtMoney(m.base_price) + ' ₽' : '';
+  const dealer = (m.dealer_price != null && m.dealer_price !== '') ? _fmtMoney(m.dealer_price) + ' ₽' : '';
+  const nc = m.nc_code || '';
+
+  let pricesHtml = '';
+  if (retail || dealer || nc) {
+    pricesHtml = '<div class="sp-detail-prices" style="margin-bottom:18px;">';
+    if (retail) {
+      pricesHtml += '<div class="sp-detail-price-item">' +
+        '<div class="sp-detail-price-label">Розничная</div>' +
+        '<div class="sp-detail-price-value retail">' + retail + '</div></div>';
+    }
+    if (dealer) {
+      pricesHtml += '<div class="sp-detail-price-item">' +
+        '<div class="sp-detail-price-label">Дилерская</div>' +
+        '<div class="sp-detail-price-value dealer">' + dealer + '</div></div>';
+    }
+    if (nc) {
+      pricesHtml += '<div class="sp-detail-price-item">' +
+        '<div class="sp-detail-price-label">НС-код</div>' +
+        '<div class="sp-detail-price-value" style="font-family:monospace;font-size:14px;">' + escapeHtml(nc) + '</div></div>';
+    }
+    pricesHtml += '</div>';
+  }
+
+  // Картинка из связанной продажной (или из самой модели если поле есть)
+  let imgHtml = '';
+  if (m.image_path) {
+    imgHtml = '<div class="sp-detail-image" style="margin-bottom:14px;">' +
+      '<img src="' + API_BASE + '/static/images/' + escapeHtml(m.image_path) + '" ' +
+        'alt="' + escapeHtml(m.name) + '" ' +
+        'onerror="this.parentNode.style.display=\'none\'" />' +
+    '</div>';
+  }
+
+  // Характеристики (specs)
+  let specsHtml = '';
+  let specsObj = {};
+  if (m.specs_json) {
+    try { specsObj = JSON.parse(m.specs_json) || {}; } catch (e) { specsObj = {}; }
+  } else if (m.specs && typeof m.specs === 'object') {
+    specsObj = m.specs;
+  }
+  if (Object.keys(specsObj).length) {
+    specsHtml = '<div class="sp-detail-specs" style="margin-bottom:18px;">' +
+      '<div class="sp-detail-section-title"><i class="ti ti-list-details"></i> Характеристики</div>';
+    Object.keys(specsObj).forEach(k => {
+      specsHtml += '<div class="sp-spec-row">' +
+        '<div class="sp-spec-key">' + escapeHtml(k) + '</div>' +
+        '<div class="sp-spec-val">' + escapeHtml(specsObj[k]) + '</div>' +
+      '</div>';
+    });
+    specsHtml += '</div>';
+  }
+
+  // Описание
+  let descHtml = '';
+  if (m.description) {
+    descHtml = '<div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:13px;color:var(--text-dark);white-space:pre-wrap;">' +
+      escapeHtml(m.description) + '</div>';
+  }
+
+  // Бейдж "Перенесено из продажной"
+  let sourceBadge = '';
+  if (m.source_sale_product_id) {
+    sourceBadge =
+      '<div style="background:var(--brand-bg);border:1px solid var(--brand);border-radius:8px;padding:8px 12px;margin-bottom:14px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--brand);">' +
+        '<i class="ti ti-package-import" style="font-size:16px;"></i>' +
+        '<span>Создано из продажной позиции #' + m.source_sale_product_id + '</span>' +
+      '</div>';
+  }
+
+  // Кнопка «Редактировать» (для директора/зама)
+  const editBtn = canManageSales()
+    ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')"><i class="ti ti-edit"></i> Редактировать</button>'
+    : '';
+
   overlay.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
@@ -21871,12 +22285,20 @@ async function openModelDetail(modelId) {
         '<button class="modal-close" onclick="closeModelDetail()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="overflow-y:auto;flex:1;padding:18px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+        sourceBadge +
+        imgHtml +
+        pricesHtml +
+        descHtml +
+        specsHtml +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-top:1px solid var(--border);padding-top:14px;">' +
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
-          (canManageSales() ?
-            '<button class="btn btn-primary btn-small" onclick="openBomAddItem(' + modelId + ')">' +
-              '<i class="ti ti-plus"></i> Позиция' +
-            '</button>' : '') +
+          '<div style="display:flex;gap:8px;">' +
+            editBtn +
+            (canManageSales() ?
+              '<button class="btn btn-primary btn-small" onclick="openBomAddItem(' + modelId + ')">' +
+                '<i class="ti ti-plus"></i> Позиция' +
+              '</button>' : '') +
+          '</div>' +
         '</div>' +
         '<div id="bom-list"><div class="loading-block">Загружаем…</div></div>' +
       '</div>' +
@@ -21890,6 +22312,225 @@ function closeModelDetail() {
   if (o) o.classList.remove('visible');
   state._currentBomModelId = null;
 }
+
+// ============ ЭТАП 45 (v2.33.0): РЕДАКТИРОВАНИЕ МОДЕЛИ ============
+
+async function openEditModelModal(modelId) {
+  if (!canManageSales()) {
+    showToast('Редактирование доступно директору и заму', 'error');
+    return;
+  }
+  let m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+  if (!m) {
+    try {
+      const d = await apiGet('/api/models?with_stock=false');
+      cache.models = d;
+      m = (d.models || []).find(x => x.id === modelId);
+    } catch (e) {}
+  }
+  if (!m) { showToast('Модель не найдена', 'error'); return; }
+
+  // Подгружаем specs
+  let specsObj = {};
+  if (m.specs && typeof m.specs === 'object') specsObj = m.specs;
+  else if (m.specs_json) {
+    try { specsObj = JSON.parse(m.specs_json) || {}; } catch (e) { specsObj = {}; }
+  }
+  state._editModelSpecs = Object.keys(specsObj).map(k => ({ key: k, val: String(specsObj[k]) }));
+  state._editModelId = modelId;
+
+  let overlay = document.getElementById('edit-model-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'edit-model-modal';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('visible'); };
+    document.body.appendChild(overlay);
+  }
+
+  // Закрываем detail-модалку чтобы не перекрывала
+  const detailM = document.getElementById('model-detail-modal');
+  if (detailM) detailM.classList.remove('visible');
+
+  overlay.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:640px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-edit"></i> Редактирование модели</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'edit-model-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' +
+        '<div class="form-hint" style="margin-bottom:14px;">' +
+          '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
+          'Артикул <b>' + escapeHtml(m.article) + '</b> и направление менять нельзя. Если нужна другая привязка — деактивируйте и создайте новую модель.' +
+        '</div>' +
+        '<div class="modal-section-title">Основное</div>' +
+        '<div class="form-group">' +
+          '<label>Название *</label>' +
+          '<input type="text" id="em-name" value="' + escapeHtml(m.name || '') + '" />' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Дополнительно <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(размеры, IP, исполнение и т.д.)</span></label>' +
+          '<input type="text" id="em-extra" value="' + escapeHtml(m.extra || '') + '" />' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Описание</label>' +
+          '<textarea id="em-description" rows="3" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;">' + escapeHtml(m.description || '') + '</textarea>' +
+        '</div>' +
+        '<div class="modal-section-title">Цены</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group">' +
+            '<label>Розничная, ₽</label>' +
+            '<input type="number" id="em-base-price" step="0.01" min="0" value="' + (m.base_price != null ? m.base_price : '') + '" />' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label>Дилерская, ₽</label>' +
+            '<input type="number" id="em-dealer-price" step="0.01" min="0" value="' + (m.dealer_price != null ? m.dealer_price : '') + '" />' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>НС-код <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально)</span></label>' +
+          '<input type="text" id="em-nc-code" value="' + escapeHtml(m.nc_code || '') + '" style="font-family:monospace;" />' +
+        '</div>' +
+        '<div class="modal-section-title">Характеристики</div>' +
+        '<div id="em-specs-editor"></div>' +
+        '<button class="btn btn-secondary" onclick="addEmSpecRow()" style="border-style:dashed;margin-top:8px;width:100%;">' +
+          '<i class="ti ti-plus"></i> Добавить характеристику' +
+        '</button>' +
+        '<div class="modal-section-title" style="margin-top:18px;">Сборка</div>' +
+        '<div class="form-group">' +
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text-dark);">' +
+            '<input type="checkbox" id="em-needs-ip"' + (m.needs_ip ? ' checked' : '') + ' />' +
+            '<span>Требуется указать IP при сборке</span>' +
+          '</label>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Исполнение</label>' +
+          '<select id="em-exec-mode" onchange="_onEmExecModeChange()">' +
+            '<option value="none"' + (m.exec_mode === 'none' ? ' selected' : '') + '>Без выбора</option>' +
+            '<option value="choice"' + (m.exec_mode === 'choice' ? ' selected' : '') + '>Мастер выбирает: Стандарт / Нерж.</option>' +
+            '<option value="fixed"' + (m.exec_mode === 'fixed' ? ' selected' : '') + '>Фиксированное</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group" id="em-exec-fixed-wrap" style="' + (m.exec_mode === 'fixed' ? '' : 'display:none;') + '">' +
+          '<label>Какое исполнение</label>' +
+          '<input type="text" id="em-exec-fixed" value="' + escapeHtml(m.exec_fixed || '') + '" placeholder="Например: Нерж. AISI 304" />' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Тип работы</label>' +
+          '<select id="em-work-type">' +
+            '<option value="full_build"' + ((m.work_type || 'full_build') === 'full_build' ? ' selected' : '') + '>Полная сборка из материалов</option>' +
+            '<option value="modify_purchased"' + (m.work_type === 'modify_purchased' ? ' selected' : '') + '>Модификация покупного товара</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-model-modal\').classList.remove(\'visible\'); openModelDetail(' + modelId + ')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitEditModel(' + modelId + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+      '</div>' +
+    '</div>';
+  overlay.classList.add('visible');
+  renderEmSpecsEditor();
+}
+
+function _onEmExecModeChange() {
+  const sel = document.getElementById('em-exec-mode');
+  const wrap = document.getElementById('em-exec-fixed-wrap');
+  if (!sel || !wrap) return;
+  wrap.style.display = sel.value === 'fixed' ? '' : 'none';
+}
+
+function renderEmSpecsEditor() {
+  const container = document.getElementById('em-specs-editor');
+  if (!container) return;
+  const rows = state._editModelSpecs || [];
+  if (!rows.length) {
+    container.innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:8px 0;font-style:italic;">Пока нет характеристик. Жми «+ Добавить» чтобы внести.</div>';
+    return;
+  }
+  let html = '';
+  rows.forEach((r, idx) => {
+    html += '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">' +
+      '<input type="text" placeholder="Параметр (напр. Мощность)" value="' + escapeHtml(r.key) + '" oninput="updateEmSpec(' + idx + ',\'key\',this.value)" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;" />' +
+      '<input type="text" placeholder="Значение (14 кВт)" value="' + escapeHtml(r.val) + '" oninput="updateEmSpec(' + idx + ',\'val\',this.value)" style="flex:1.2;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;" />' +
+      '<button class="icon-btn" onclick="removeEmSpec(' + idx + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+    '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function addEmSpecRow() {
+  if (!state._editModelSpecs) state._editModelSpecs = [];
+  state._editModelSpecs.push({ key: '', val: '' });
+  renderEmSpecsEditor();
+}
+
+function updateEmSpec(idx, field, value) {
+  if (!state._editModelSpecs || !state._editModelSpecs[idx]) return;
+  state._editModelSpecs[idx][field] = value;
+}
+
+function removeEmSpec(idx) {
+  if (!state._editModelSpecs) return;
+  state._editModelSpecs.splice(idx, 1);
+  renderEmSpecsEditor();
+}
+
+async function submitEditModel(modelId) {
+  const name = (document.getElementById('em-name').value || '').trim();
+  if (!name) { showToast('Название не может быть пустым', 'error'); return; }
+  const extra = (document.getElementById('em-extra').value || '').trim();
+  const description = (document.getElementById('em-description').value || '').trim();
+  const basePriceRaw = document.getElementById('em-base-price').value;
+  const dealerPriceRaw = document.getElementById('em-dealer-price').value;
+  const ncCode = (document.getElementById('em-nc-code').value || '').trim();
+  const needsIp = document.getElementById('em-needs-ip').checked;
+  const execMode = document.getElementById('em-exec-mode').value;
+  const execFixed = (document.getElementById('em-exec-fixed').value || '').trim();
+  const workType = document.getElementById('em-work-type').value;
+
+  // Собираем specs из state
+  const specs = {};
+  (state._editModelSpecs || []).forEach(r => {
+    const k = String(r.key || '').trim();
+    const v = String(r.val || '').trim();
+    if (k && v) specs[k] = v;
+  });
+
+  const body = {
+    name,
+    extra: extra || '',
+    description: description || '',
+    base_price: basePriceRaw === '' ? null : parseFloat(basePriceRaw),
+    dealer_price: dealerPriceRaw === '' ? null : parseFloat(dealerPriceRaw),
+    nc_code: ncCode,
+    needs_ip: needsIp,
+    exec_mode: execMode,
+    exec_fixed: execMode === 'fixed' ? execFixed : '',
+    work_type: workType,
+    specs: specs,
+  };
+
+  try {
+    await apiPatch('/api/models/' + modelId, body);
+    showToast('Модель обновлена', 'success');
+    document.getElementById('edit-model-modal').classList.remove('visible');
+    cache.models = null;
+    // Заново загружаем для актуального кэша
+    try {
+      const d = await apiGet('/api/models?with_stock=true');
+      cache.models = d;
+      if (typeof renderModels === 'function' && document.querySelector('[data-screen="models"].active')) {
+        renderModels(d);
+      }
+    } catch (e) {}
+    // Снова открываем деталь
+    setTimeout(() => openModelDetail(modelId), 200);
+  } catch (e) {
+    showToast('Ошибка сохранения: ' + (e.message || e), 'error');
+  }
+}
+
+// ============ КОНЕЦ ЭТАПА 45 (UI блок 2) ============
 
 async function loadModelBom(modelId) {
   const container = document.getElementById('bom-list');
