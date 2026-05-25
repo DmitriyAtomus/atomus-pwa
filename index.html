@@ -7244,6 +7244,52 @@
   .defect-chat-send i { font-size: 18px; }
   .defect-chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* v2.37.0: кнопка удаления сообщения */
+  .defect-msg-del {
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 2px;
+    margin-left: 4px;
+    opacity: 0.4;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .defect-msg-del:hover {
+    opacity: 1;
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
+  .defect-msg-del i { font-size: 14px; }
+  .defect-msg-del.sys i { font-size: 12px; }
+
+  /* v2.37.0: блок «представьтесь» на публичной странице */
+  .public-defect-introduce {
+    background: var(--brand-bg);
+    border: 1px solid var(--brand);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 6px;
+  }
+  .public-defect-introduce .form-group { margin-bottom: 10px; }
+  .public-defect-introduce input {
+    width: 100%; box-sizing: border-box;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px; font-family: inherit;
+    background: var(--card);
+  }
+  .public-defect-guest-tag {
+    font-size: 12px;
+    color: var(--text-light);
+    padding: 6px 0;
+    margin-bottom: 4px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .public-defect-guest-tag b { color: var(--text); }
+
   /* Лайтбокс для фото */
   .photo-lightbox {
     position: fixed;
@@ -12867,6 +12913,12 @@
             </div>
           </div>
           <div class="page-actions">
+            <button class="btn btn-secondary" id="dd-edit-btn" onclick="openEditDefectModal()" style="display:none;">
+              <i class="ti ti-edit"></i> Редактировать
+            </button>
+            <button class="btn btn-secondary" id="dd-share-btn" onclick="openShareDefectLink()" style="display:none;">
+              <i class="ti ti-share"></i> Поделиться
+            </button>
             <button class="btn btn-secondary" id="dd-delete-btn" onclick="deleteCurrentDefect()" style="color: var(--danger);">
               <i class="ti ti-trash"></i> Удалить
             </button>
@@ -13337,7 +13389,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.36.0-service";
+const APP_VERSION = "v2.37.0-service-share-edit";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -34829,6 +34881,225 @@ function renderPublicContractCard(c, token) {
   '</div>';
 }
 
+// ============ v2.37.0: ПУБЛИЧНАЯ СТРАНИЦА ЗАЯВКИ ============
+
+const PUBLIC_DEFECT_GUEST_KEY = 'atomus_public_defect_guest';
+
+async function showPublicDefect(token) {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  const page = document.getElementById('public-page');
+  page.style.display = 'flex';
+  const body = document.getElementById('public-card-body');
+  body.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-light);">Загружаем…</div>';
+  state._publicDefectToken = token;
+  try {
+    const r = await fetch(API_BASE + '/api/public/defect/' + encodeURIComponent(token));
+    if (!r.ok) {
+      body.innerHTML = renderPublicError(r.status);
+      return;
+    }
+    const d = await r.json();
+    state._publicDefect = d;
+    body.innerHTML = renderPublicDefectCard(d, token);
+    // Загружаем чат
+    loadPublicDefectMessages(token);
+  } catch (e) {
+    body.innerHTML = renderPublicError('network');
+  }
+}
+
+function renderPublicDefectCard(d, token) {
+  const typeInfo = (typeof DEFECT_TYPE_LABELS !== 'undefined' && DEFECT_TYPE_LABELS[d.type]) || { label: d.type_label || 'Заявка', cls: 't-defect' };
+
+  let catBadge = '';
+  if (d.category && d.category_label) {
+    const icon = (typeof DEFECT_CATEGORY_ICONS !== 'undefined' && DEFECT_CATEGORY_ICONS[d.category]) || 'ti-tag';
+    catBadge = '<span class="defect-category-badge"><i class="ti ' + icon + '"></i>' + escapeHtml(d.category_label) + '</span>';
+  }
+
+  let files = '';
+  if (d.photos && d.photos.length) {
+    files = '<div class="public-section-title">Файлы</div>' +
+      '<div class="defect-photos-grid">' +
+      d.photos.map(p => _renderDefectGalleryItem(p)).join('') +
+    '</div>';
+  }
+
+  let rows = '';
+  if (d.location) {
+    rows += '<div class="public-row"><span class="public-row-label">Где найдено</span><span class="public-row-value">' + escapeHtml(d.location) + '</span></div>';
+  }
+  if (d.model_name) {
+    rows += '<div class="public-row"><span class="public-row-label">Сборка</span><span class="public-row-value">' + escapeHtml(d.model_name) + '</span></div>';
+  }
+  if (d.contract_number) {
+    rows += '<div class="public-row"><span class="public-row-label">Договор</span><span class="public-row-value">' + escapeHtml(d.contract_number) + '</span></div>';
+  }
+
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">Заявка #' + d.id + '</h1>' +
+    '<div class="public-header-sub"><i class="ti ti-calendar"></i> ' + escapeHtml((d.created_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
+  '</div>' +
+  '<div class="public-body">' +
+    '<div class="defect-detail-head">' +
+      '<span class="defect-type-badge ' + typeInfo.cls + '">' + escapeHtml(typeInfo.label) + '</span>' +
+      '<span class="defect-status-badge s-' + d.status + '">' + escapeHtml(d.status_label) + '</span>' +
+      catBadge +
+    '</div>' +
+    '<div class="defect-detail-desc">' + escapeHtml(d.description) + '</div>' +
+    rows +
+    files +
+    // Чат
+    '<div class="defect-chat" id="defect-chat-block">' +
+      '<div class="defect-chat-title">' +
+        '<i class="ti ti-messages"></i> Обсуждение' +
+        '<span class="defect-chat-count" id="public-defect-chat-count">' + (d.messages_count || 0) + '</span>' +
+      '</div>' +
+      '<div class="defect-chat-feed" id="public-defect-chat-feed">' +
+        '<div class="loading-block">Загружаем…</div>' +
+      '</div>' +
+      _renderPublicDefectComposer() +
+    '</div>' +
+  '</div>' +
+  '<div class="public-footer">Внутренняя CRM-система ООО «Атомус Групп»</div>';
+}
+
+function _renderPublicDefectComposer() {
+  // Проверим, что гость уже представился (имя+телефон сохранены в localStorage)
+  const guest = _getPublicDefectGuest();
+  if (!guest) {
+    return '<div class="public-defect-introduce">' +
+      '<div class="public-section-title" style="margin-top:0;">Представьтесь, чтобы писать в обсуждение</div>' +
+      '<div class="form-group"><label>Ваше имя *</label>' +
+        '<input type="text" id="pub-def-name" placeholder="Иванов И.И.">' +
+      '</div>' +
+      '<div class="form-group"><label>Телефон *</label>' +
+        '<input type="tel" id="pub-def-phone" placeholder="+7...">' +
+      '</div>' +
+      '<button class="btn btn-primary" style="width:100%;" onclick="savePublicDefectGuest()">' +
+        '<i class="ti ti-arrow-right"></i> Продолжить' +
+      '</button>' +
+    '</div>';
+  }
+  return '<div class="defect-chat-compose" id="defect-chat-compose">' +
+    '<div class="public-defect-guest-tag">' +
+      '<i class="ti ti-user"></i> Вы пишете как: <b>' + escapeHtml(guest.name) + '</b> · ' + escapeHtml(guest.phone) +
+      ' <a onclick="changePublicDefectGuest()" style="margin-left:8px; color:var(--brand); cursor:pointer;">сменить</a>' +
+    '</div>' +
+    '<div class="defect-chat-attachments" id="defect-chat-attachments"></div>' +
+    '<div class="defect-chat-input-row">' +
+      '<button class="defect-chat-attach" onclick="document.getElementById(\'public-defect-chat-file-input\').click()" title="Прикрепить">' +
+        '<i class="ti ti-paperclip"></i>' +
+      '</button>' +
+      '<input type="file" id="public-defect-chat-file-input" multiple style="display:none;" ' +
+        'accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" ' +
+        'onchange="addDefectChatAttachments(this)">' +
+      '<textarea id="defect-chat-text" rows="1" placeholder="Написать сообщение…" oninput="autosizeDefectChatInput(this)"></textarea>' +
+      '<button class="defect-chat-send btn btn-primary" onclick="sendPublicDefectMessage()">' +
+        '<i class="ti ti-send"></i>' +
+      '</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function _getPublicDefectGuest() {
+  try {
+    const raw = localStorage.getItem(PUBLIC_DEFECT_GUEST_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (obj && obj.name && obj.phone) return obj;
+    return null;
+  } catch (_) { return null; }
+}
+
+function savePublicDefectGuest() {
+  const name = (document.getElementById('pub-def-name') || {}).value || '';
+  const phone = (document.getElementById('pub-def-phone') || {}).value || '';
+  if (!name.trim()) { showToast('Укажите имя', 'error'); return; }
+  if (!phone.trim()) { showToast('Укажите телефон', 'error'); return; }
+  localStorage.setItem(PUBLIC_DEFECT_GUEST_KEY, JSON.stringify({
+    name: name.trim(), phone: phone.trim(),
+  }));
+  // Перерисуем композер
+  const block = document.getElementById('defect-chat-block');
+  if (block) {
+    const composeOld = block.querySelector('.public-defect-introduce, .defect-chat-compose');
+    if (composeOld) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = _renderPublicDefectComposer();
+      composeOld.replaceWith(wrapper.firstElementChild);
+    }
+  }
+  state._defectChatAttachments = [];
+}
+
+function changePublicDefectGuest() {
+  localStorage.removeItem(PUBLIC_DEFECT_GUEST_KEY);
+  const block = document.getElementById('defect-chat-block');
+  if (block) {
+    const composeOld = block.querySelector('.defect-chat-compose');
+    if (composeOld) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = _renderPublicDefectComposer();
+      composeOld.replaceWith(wrapper.firstElementChild);
+    }
+  }
+}
+
+async function loadPublicDefectMessages(token) {
+  const feed = document.getElementById('public-defect-chat-feed');
+  if (!feed) return;
+  try {
+    const r = await fetch(API_BASE + '/api/public/defect/' + encodeURIComponent(token) + '/messages');
+    if (!r.ok) {
+      feed.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
+      return;
+    }
+    const d = await r.json();
+    _renderMessagesInto(feed, d.messages || [], document.getElementById('public-defect-chat-count'), /* publicView */ true);
+  } catch (e) {
+    feed.innerHTML = '<div class="empty-block">Ошибка сети</div>';
+  }
+}
+
+async function sendPublicDefectMessage() {
+  const token = state._publicDefectToken;
+  if (!token) return;
+  const guest = _getPublicDefectGuest();
+  if (!guest) { showToast('Сначала представьтесь', 'error'); return; }
+  const ta = document.getElementById('defect-chat-text');
+  const text = (ta && ta.value || '').trim();
+  const atts = state._defectChatAttachments || [];
+  if (!text && !atts.length) { showToast('Напишите сообщение или прикрепите файл', 'error'); return; }
+  const fd = new FormData();
+  fd.append('author_name', guest.name);
+  fd.append('author_phone', guest.phone);
+  if (text) fd.append('text', text);
+  atts.forEach((a, i) => fd.append('file_' + (i + 1), a.file, a.file.name));
+  const sendBtn = document.querySelector('.defect-chat-send');
+  if (sendBtn) sendBtn.disabled = true;
+  try {
+    const r = await fetch(API_BASE + '/api/public/defect/' + encodeURIComponent(token) + '/messages', {
+      method: 'POST', body: fd,
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось отправить', 'error');
+      return;
+    }
+    if (ta) { ta.value = ''; autosizeDefectChatInput(ta); }
+    state._defectChatAttachments = [];
+    renderDefectChatAttachments();
+    loadPublicDefectMessages(token);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
 // ============ ЭТАП 26: ПУБЛИЧНАЯ СТРАНИЦА КОРОБКИ ============
 
 async function showPublicBox(token) {
@@ -36191,6 +36462,13 @@ function renderDefectDetail(d) {
   // Кнопки смены статуса
   const canManage = state.user && (state.user.is_director || state.user.role === 'director' || state.user.role === 'zam' ||
     (state.user.roles && (state.user.roles.includes('director') || state.user.roles.includes('zam'))));
+  // v2.37.0: показываем «Редактировать» и «Поделиться» только тем кто может управлять
+  const editBtn = document.getElementById('dd-edit-btn');
+  const shareBtn = document.getElementById('dd-share-btn');
+  if (editBtn) editBtn.style.display = canManage ? '' : 'none';
+  if (shareBtn) shareBtn.style.display = canManage ? '' : 'none';
+  // Сохраним текущую заявку в state — для модалки редактирования
+  state._currentDefect = d;
   let actions = '';
   if (canManage) {
     const buttons = [];
@@ -36304,20 +36582,34 @@ function renderDefectMessages(messages) {
   const feed = document.getElementById('defect-chat-feed');
   if (!feed) return;
   const countEl = document.getElementById('defect-chat-count');
+  _renderMessagesInto(feed, messages, countEl, /* publicView */ false);
+}
+
+// v2.37.0: переиспользуемая функция рендера ленты (внутренний и публичный режим)
+function _renderMessagesInto(feed, messages, countEl, publicView) {
   if (countEl) countEl.textContent = messages.filter(m => !m.is_system).length;
   if (!messages.length) {
     feed.innerHTML = '<div class="defect-chat-empty">Пока никто не подключился к обсуждению — будьте первым.</div>';
     return;
   }
   const myEmpId = state.user && state.user.employee_id;
+  // Удалять может только сотрудник с правом defects.resolve (которое у редактирующих — director/zam)
+  const canDelete = !publicView && state.user && (
+    state.user.is_director ||
+    (state.user.roles && (state.user.roles.includes('director') || state.user.roles.includes('zam')))
+  );
   let html = '';
   messages.forEach(m => {
-    const isMine = myEmpId && m.author_employee_id === myEmpId;
+    const isMine = !publicView && myEmpId && m.author_employee_id === myEmpId;
     if (m.is_system) {
+      const delBtn = canDelete
+        ? '<button class="defect-msg-del sys" title="Удалить" onclick="deleteDefectMessage(' + m.id + ')"><i class="ti ti-x"></i></button>'
+        : '';
       html += '<div class="defect-msg system">' +
         '<i class="ti ti-info-circle"></i>' +
         '<span>' + escapeHtml(m.text || '').replace(/\n/g, '<br>') + '</span>' +
         '<time>' + _formatChatTime(m.created_at) + '</time>' +
+        delBtn +
       '</div>';
       return;
     }
@@ -36337,18 +36629,42 @@ function renderDefectMessages(messages) {
           '<i class="ti ti-file-text"></i><span>' + escapeHtml(f.original_name || 'Документ') + '</span></a>';
       }).join('') + '</div>';
     }
+    const delBtn = canDelete
+      ? '<button class="defect-msg-del" title="Удалить" onclick="deleteDefectMessage(' + m.id + ')"><i class="ti ti-trash"></i></button>'
+      : '';
     html += '<div class="defect-msg' + (isMine ? ' mine' : '') + '">' +
       '<div class="defect-msg-head">' +
         '<span class="defect-msg-author">' + escapeHtml(m.author_name || '—') + '</span>' +
         '<time>' + _formatChatTime(m.created_at) + '</time>' +
+        delBtn +
       '</div>' +
       (m.text ? '<div class="defect-msg-text">' + escapeHtml(m.text).replace(/\n/g, '<br>') + '</div>' : '') +
       files +
     '</div>';
   });
   feed.innerHTML = html;
-  // Прокрутим вниз
   feed.scrollTop = feed.scrollHeight;
+}
+
+// v2.37.0: удаление сообщения чата (только сотрудник с defects.resolve)
+async function deleteDefectMessage(msgId) {
+  if (!state.currentDefectId) return;
+  if (!confirm('Удалить это сообщение?')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  try {
+    const r = await fetch(
+      API_BASE + '/api/defects/' + state.currentDefectId + '/messages/' + msgId,
+      { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }
+    );
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    loadDefectMessages(state.currentDefectId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 function _formatChatTime(iso) {
@@ -36441,6 +36757,172 @@ async function sendDefectChatMessage() {
     showToast('Ошибка соединения', 'error');
   } finally {
     if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// v2.37.0: модалка редактирования заявки
+function openEditDefectModal() {
+  const d = state._currentDefect;
+  if (!d) { showToast('Сначала загрузите карточку', 'error'); return; }
+  let m = document.getElementById('defect-edit-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'defect-edit-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeEditDefectModal(); };
+    document.body.appendChild(m);
+  }
+
+  let typeOptions = '';
+  Object.entries(DEFECT_TYPE_LABELS).forEach(([k, v]) => {
+    typeOptions += '<option value="' + k + '"' + (d.type === k ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
+  });
+
+  let catOptions = '<option value="">— Не указана —</option>';
+  Object.entries(DEFECT_CATEGORY_LABELS).forEach(([k, v]) => {
+    catOptions += '<option value="' + k + '"' + (d.category === k ? ' selected' : '') + '>' + escapeHtml(v) + '</option>';
+  });
+
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width: 520px;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-edit"></i> Редактировать заявку #' + d.id + '</h3>' +
+      '<button class="modal-close" onclick="closeEditDefectModal()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div class="modal-content">' +
+      '<div class="defect-form">' +
+        '<div class="form-group"><label>Тип</label>' +
+          '<select id="def-edit-type">' + typeOptions + '</select>' +
+        '</div>' +
+        '<div class="form-group"><label>Категория проблемы</label>' +
+          '<select id="def-edit-category">' + catOptions + '</select>' +
+        '</div>' +
+        '<div class="form-group"><label>Описание *</label>' +
+          '<textarea id="def-edit-description" rows="5">' + escapeHtml(d.description || '') + '</textarea>' +
+        '</div>' +
+        '<div class="form-group"><label>Где найдено</label>' +
+          '<input type="text" id="def-edit-location" value="' + escapeHtml(d.location || '') + '" placeholder="например: ТП-3 на объекте Невский">' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="closeEditDefectModal()">Отмена</button>' +
+      '<button class="btn btn-primary" id="def-edit-save-btn" onclick="saveDefectEdits()">' +
+        '<i class="ti ti-check"></i> Сохранить' +
+      '</button>' +
+    '</div>' +
+  '</div>';
+  m.classList.add('visible');
+}
+
+function closeEditDefectModal() {
+  const m = document.getElementById('defect-edit-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function saveDefectEdits() {
+  const id = state.currentDefectId;
+  if (!id) return;
+  const type_  = (document.getElementById('def-edit-type') || {}).value;
+  const cat    = (document.getElementById('def-edit-category') || {}).value;
+  const desc   = ((document.getElementById('def-edit-description') || {}).value || '').trim();
+  const loc    = ((document.getElementById('def-edit-location') || {}).value || '').trim();
+  if (!desc) { showToast('Описание не может быть пустым', 'error'); return; }
+  const btn = document.getElementById('def-edit-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/defects/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        type: type_,
+        category: cat,
+        description: desc,
+        location: loc,
+      }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось сохранить', 'error');
+      return;
+    }
+    showToast('Сохранено', 'success');
+    closeEditDefectModal();
+    openDefectDetail(id);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Сохранить'; }
+  }
+}
+
+// v2.37.0: модалка «Поделиться ссылкой»
+async function openShareDefectLink() {
+  const id = state.currentDefectId;
+  if (!id) return;
+  let m = document.getElementById('defect-share-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'defect-share-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width: 520px;">' +
+    '<div class="modal-header">' +
+      '<h3><i class="ti ti-share"></i> Ссылка на заявку</h3>' +
+      '<button class="modal-close" onclick="document.getElementById(\'defect-share-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div class="modal-content"><div class="loading-block">Получаем ссылку…</div></div>' +
+  '</div>';
+  m.classList.add('visible');
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/defects/' + id + '/public-token', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      m.querySelector('.modal-content').innerHTML =
+        '<div class="empty-block"><i class="ti ti-alert-triangle"></i>' +
+        escapeHtml(e.message || 'Не удалось получить ссылку') + '</div>';
+      return;
+    }
+    const d = await r.json();
+    const url = window.location.origin + '/d/' + d.public_token;
+    m.querySelector('.modal-content').innerHTML =
+      '<p style="margin-top:0; color: var(--text-mid);">Скиньте эту ссылку — получатель сможет посмотреть карточку и написать в обсуждение. Регистрация не нужна, попросим только имя и телефон.</p>' +
+      '<div style="display:flex; gap:8px; align-items:center; margin-top:14px;">' +
+        '<input type="text" id="defect-share-url" value="' + escapeHtml(url) + '" readonly style="flex:1;" onclick="this.select()">' +
+        '<button class="btn btn-primary" onclick="copyDefectShareLink()"><i class="ti ti-copy"></i> Копировать</button>' +
+      '</div>' +
+      '<div style="margin-top: 12px; font-size: 12px; color: var(--text-light);">' +
+        '<i class="ti ti-info-circle"></i> Ссылка остаётся рабочей пока заявка существует.' +
+      '</div>';
+  } catch (e) {
+    m.querySelector('.modal-content').innerHTML =
+      '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка сети</div>';
+  }
+}
+
+function copyDefectShareLink() {
+  const inp = document.getElementById('defect-share-url');
+  if (!inp) return;
+  inp.select();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(inp.value).then(
+        () => showToast('Ссылка скопирована', 'success'),
+        () => { document.execCommand('copy'); showToast('Ссылка скопирована', 'success'); }
+      );
+    } else {
+      document.execCommand('copy');
+      showToast('Ссылка скопирована', 'success');
+    }
+  } catch (e) {
+    showToast('Не удалось скопировать — выделите вручную', 'error');
   }
 }
 
@@ -39607,6 +40089,8 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
   const publicContractMatch = path.match(/^\/c\/([A-Za-z0-9_\-]+)$/);
   // ЭТАП 26: публичная страница коробки /b/{token}
   const publicBoxMatch = path.match(/^\/b\/([A-Za-z0-9_\-]+)$/);
+  // v2.37.0: публичная страница заявки /d/{token}
+  const publicDefectMatch = path.match(/^\/d\/([A-Za-z0-9_\-]+)$/);
   if (publicAsmMatch) {
     showPublicAssembly(publicAsmMatch[1]);
     return;
@@ -39617,6 +40101,10 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
   }
   if (publicBoxMatch) {
     showPublicBox(publicBoxMatch[1]);
+    return;
+  }
+  if (publicDefectMatch) {
+    showPublicDefect(publicDefectMatch[1]);
     return;
   }
   // ЭТАП 23+: общая публичная форма замечаний /feedback
