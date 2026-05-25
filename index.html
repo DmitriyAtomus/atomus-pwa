@@ -9188,6 +9188,8 @@
   .pkb-kpi.k-warning .pkb-kpi-value { color: #854F0B; }
   .pkb-kpi.k-success { border-left-color: #1D9E75; }
   .pkb-kpi.k-success .pkb-kpi-value { color: #0A5B41; }
+  .pkb-kpi.k-violet  { border-left-color: #7E22CE; }
+  .pkb-kpi.k-violet  .pkb-kpi-value { color: #6B21A8; }
 
   /* --- Канбан-доска --- */
   .pkb-board {
@@ -9287,6 +9289,9 @@
   .pkb-col.c-review  .pkb-col-name  { color: #854F0B; }
   .pkb-col.c-review  .pkb-col-count { background: rgba(186,117,23,0.15); color: #854F0B; }
   .pkb-col.c-review  .pkb-col-head  { background: linear-gradient(180deg, rgba(186,117,23,0.07) 0%, white 100%); }
+  .pkb-col.c-packing .pkb-col-name  { color: #6B21A8; }
+  .pkb-col.c-packing .pkb-col-count { background: rgba(126,34,206,0.15); color: #6B21A8; }
+  .pkb-col.c-packing .pkb-col-head  { background: linear-gradient(180deg, rgba(126,34,206,0.07) 0%, white 100%); }
   .pkb-col.c-done    .pkb-col-name  { color: #0A5B41; }
   .pkb-col.c-done    .pkb-col-count { background: rgba(29,158,117,0.15); color: #0A5B41; }
   .pkb-col.c-done    .pkb-col-head  { background: linear-gradient(180deg, rgba(29,158,117,0.07) 0%, white 100%); }
@@ -9331,6 +9336,7 @@
   .pkb-col.c-queue   .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(75,85,99,0.35); }
   .pkb-col.c-active  .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(37,99,235,0.45); }
   .pkb-col.c-review  .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(186,117,23,0.45); }
+  .pkb-col.c-packing .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(126,34,206,0.45); }
   .pkb-col.c-done    .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(29,158,117,0.45); }
 
   .pkb-wc-bar {
@@ -9528,6 +9534,7 @@
   .pkb-status-chip.s-queue   { background: #E5E7EB; color: #4B5563; }
   .pkb-status-chip.s-active  { background: rgba(37,99,235,0.15); color: #1E40AF; }
   .pkb-status-chip.s-review  { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .pkb-status-chip.s-packing { background: rgba(126,34,206,0.15); color: #6B21A8; }
   .pkb-status-chip.s-done    { background: rgba(29,158,117,0.15); color: #0A5B41; }
   .pkb-status-chip.s-cancel  { background: var(--bg); color: var(--text-light); }
 
@@ -13024,7 +13031,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.34.1-bom-import-fix";
+const APP_VERSION = "v2.34.2-packing-stage";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -14219,10 +14226,11 @@ cache.productionKanban = null;
 let pkbMobileCol = 'queue';
 
 const PKB_COL_DEFS = [
-  { key: 'queue',       title: 'В очереди',       cls: 'c-queue'  },
-  { key: 'in_progress', title: 'В работе',        cls: 'c-active' },
-  { key: 'review',      title: 'На проверке',     cls: 'c-review' },
-  { key: 'done',        title: 'Готово · 7 дней', cls: 'c-done'   },
+  { key: 'queue',       title: 'В очереди',       cls: 'c-queue'   },
+  { key: 'in_progress', title: 'В работе',        cls: 'c-active'  },
+  { key: 'review',      title: 'На проверке',     cls: 'c-review'  },
+  { key: 'packing',     title: 'Упаковка',        cls: 'c-packing' },
+  { key: 'done',        title: 'Готово · 7 дней', cls: 'c-done'    },
 ];
 
 async function loadProductionDashboard() {
@@ -14275,12 +14283,12 @@ function renderProductionDashboard(d) {
   const fetchedAt = d.fetchedAt || new Date();
 
   // Распределяем работы по колонкам
-  const byCol = { queue: [], in_progress: [], review: [], done: [] };
+  const byCol = { queue: [], in_progress: [], review: [], packing: [], done: [] };
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   works.forEach(w => {
     const st = w.status;
-    if (st === 'queue' || st === 'in_progress' || st === 'review') {
+    if (st === 'queue' || st === 'in_progress' || st === 'review' || st === 'packing') {
       byCol[st].push(w);
     } else if (st === 'done') {
       // в колонку «Готово» — только за последние 7 дней
@@ -14382,6 +14390,7 @@ function pkbEmptyText(colKey) {
     case 'queue':       return 'Очередь пуста';
     case 'in_progress': return 'Ничего в работе';
     case 'review':      return 'Нет работ на проверке';
+    case 'packing':     return 'Нет работ на упаковке';
     case 'done':        return 'За неделю пока пусто';
     default:            return '—';
   }
@@ -14420,12 +14429,13 @@ function pkbSwitchMobileColumn(colKey) {
 }
 
 function renderPkbKpi(kpi) {
-  // kpi: { queue, in_progress: {count, assignees}, review, overdue, blocked, week_done, week_plan }
+  // kpi: { queue, in_progress: {count, assignees}, review, packing, overdue, blocked, week_done, week_plan }
   const queueCnt    = (kpi.queue != null) ? kpi.queue : 0;
   const inProgObj   = kpi.in_progress || {};
   const inProgCnt   = (typeof inProgObj === 'object') ? (inProgObj.count || 0) : inProgObj;
   const inProgAss   = (typeof inProgObj === 'object') ? (inProgObj.assignees || 0) : 0;
   const reviewCnt   = (kpi.review != null) ? kpi.review : 0;
+  const packingCnt  = (kpi.packing != null) ? kpi.packing : 0;
   const overdueCnt  = (kpi.overdue != null) ? kpi.overdue : 0;
   const blockedCnt  = (kpi.blocked != null) ? kpi.blocked : 0;
   const weekDone    = (kpi.week_done != null) ? kpi.week_done : 0;
@@ -14443,15 +14453,17 @@ function renderPkbKpi(kpi) {
   // 3. Просрочка
   html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0);
 
-  // 4. На проверке (по брифу здесь «Заблокированы», но это Stage 30 — пока показываем «На проверке»)
-  // Чтобы не было пустого слота — показываем review (или blocked если есть)
+  // 4. На проверке (или Заблокированы, если есть)
   if (blockedCnt > 0) {
     html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false);
   } else {
     html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false);
   }
 
-  // 5. За неделю
+  // 5. v2.34.2: Упаковка
+  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false);
+
+  // 6. За неделю
   let weekVal, weekHint;
   if (weekPlan != null && weekPlan > 0) {
     weekVal = weekDone + ' / ' + weekPlan;
@@ -14953,6 +14965,7 @@ function pkbStatusToCss(status) {
     case 'queue':       return 's-queue';
     case 'in_progress': return 's-active';
     case 'review':      return 's-review';
+    case 'packing':     return 's-packing';
     case 'done':        return 's-done';
     case 'cancelled':   return 's-cancel';
     default:            return 's-queue';
@@ -14966,15 +14979,27 @@ function renderPkbDetailActions(w) {
   //   review      → in_progress, done, cancelled
   //   done        → review
   //   cancelled   → queue
+  // v2.34.2: добавлен этап «упаковка»
+  //   queue       → in_progress, cancelled
+  //   in_progress → queue, review, packing, done, cancelled
+  //   review      → in_progress, packing, done, cancelled
+  //   packing     → review, done, cancelled
+  //   done        → review, packing
+  //   cancelled   → queue
   const transitions = {
     queue:       [{ to: 'in_progress', label: 'Взять в работу', icon: 'ti-player-play', cls: 'primary' },
                   { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
     in_progress: [{ to: 'review',      label: 'На проверку',    icon: 'ti-checks', cls: 'primary' },
+                  { to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
                   { to: 'queue',       label: 'Вернуть в очередь', icon: 'ti-arrow-back-up' },
                   { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
-    review:      [{ to: 'done',        label: 'Принять (Готово)', icon: 'ti-circle-check', cls: 'primary' },
+    review:      [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package', cls: 'primary' },
+                  { to: 'done',        label: 'Принять (Готово)', icon: 'ti-circle-check' },
                   { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
-    done:        [{ to: 'review',      label: 'Откатить (ОТК)', icon: 'ti-arrow-back-up' }],
+    packing:     [{ to: 'done',        label: 'Упаковано (Готово)', icon: 'ti-circle-check', cls: 'primary' },
+                  { to: 'review',      label: 'Вернуть на проверку', icon: 'ti-arrow-back-up' }],
+    done:        [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
+                  { to: 'review',      label: 'Откатить (ОТК)', icon: 'ti-arrow-back-up' }],
     cancelled:   [{ to: 'queue',       label: 'Реактивировать', icon: 'ti-refresh' }],
   };
   const allowed = transitions[w.status] || [];
