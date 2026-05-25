@@ -7108,29 +7108,112 @@
     padding: 2px 8px;
     border-radius: 10px;
   }
+
+  /* v2.39.0: участники чата (полоска под заголовком) */
+  .defect-participants:empty { display: none; }
+  .defect-participants-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: var(--bg);
+    border-radius: 10px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .defect-participants-label {
+    color: var(--text-light);
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .defect-participants-label i { color: var(--brand); font-size: 16px; }
+  .defect-participants-label b { color: var(--text); }
+  .defect-participants-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    flex: 1;
+  }
+  .defect-participant-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px 3px 3px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+  .defect-participant-chip .dp-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-size: 10px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .defect-participant-chip.guest .dp-avatar { background: #B25E00; }
+  .defect-participant-chip.online {
+    border-color: #15803D;
+    box-shadow: 0 0 0 2px rgba(21,128,61,0.12);
+  }
+  .defect-participant-chip.online .dp-avatar {
+    position: relative;
+  }
+  .defect-participant-chip.online .dp-avatar::after {
+    content: '';
+    position: absolute; right: -2px; bottom: -2px;
+    width: 8px; height: 8px;
+    background: #15803D;
+    border: 2px solid var(--card);
+    border-radius: 50%;
+  }
+  .defect-participants-more {
+    font-size: 12px; color: var(--text-light); padding: 4px 8px;
+  }
+
+  /* Лента */
   .defect-chat-feed {
     display: flex; flex-direction: column; gap: 10px;
     max-height: 460px;
     overflow-y: auto;
-    padding: 4px;
+    padding: 8px 4px;
     margin-bottom: 12px;
+    background: linear-gradient(180deg, var(--bg) 0%, transparent 100%);
+    border-radius: 10px;
   }
   .defect-chat-empty {
-    text-align: center; padding: 20px;
+    text-align: center; padding: 28px 16px;
     color: var(--text-light); font-size: 13px;
   }
+
+  /* Сообщения */
   .defect-msg {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 10px 12px;
     max-width: 85%;
     align-self: flex-start;
+    box-shadow: 0 1px 2px rgba(27,32,48,0.04);
+    word-wrap: break-word;
   }
   .defect-msg.mine {
     align-self: flex-end;
-    background: var(--brand-bg);
+    background: var(--brand);
+    color: #fff;
     border-color: var(--brand);
+  }
+  .defect-msg.mine .defect-msg-author { color: rgba(255,255,255,0.95); }
+  .defect-msg.mine .defect-msg-head time { color: rgba(255,255,255,0.7); }
+  .defect-msg.mine .defect-msg-del { color: rgba(255,255,255,0.7); }
+  .defect-msg.mine .defect-msg-del:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .defect-msg.mine .defect-msg-file {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+  }
+  .defect-msg.mine .defect-msg-file i { color: #fff; }
+  /* Гостевое сообщение — отдельный цвет (внешний клиент) */
+  .defect-msg.guest {
+    background: #FFF4E6;
+    border-color: #FFD8A8;
   }
   .defect-msg.system {
     align-self: center;
@@ -7138,22 +7221,24 @@
     border: 1px dashed var(--border);
     color: var(--text-light);
     font-size: 12px;
-    padding: 6px 12px;
-    border-radius: 12px;
+    padding: 6px 14px;
+    border-radius: 14px;
     display: inline-flex; align-items: center; gap: 6px;
     max-width: 95%;
+    box-shadow: none;
   }
   .defect-msg.system i { color: var(--text-light); }
   .defect-msg.system time { color: var(--text-light); margin-left: 6px; opacity: .8; }
+
   .defect-msg-head {
     display: flex; justify-content: space-between; align-items: baseline;
     gap: 8px;
     margin-bottom: 4px;
   }
   .defect-msg-author { font-size: 12px; font-weight: 600; color: var(--brand); }
-  .defect-msg.mine .defect-msg-author { color: var(--brand); }
   .defect-msg-head time { font-size: 11px; color: var(--text-light); }
   .defect-msg-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+
   .defect-msg-files {
     display: flex; flex-wrap: wrap; gap: 6px;
     margin-top: 6px;
@@ -7186,6 +7271,10 @@
     border-radius: 12px;
     padding: 8px;
     background: var(--card);
+  }
+  .defect-chat-compose:focus-within {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-bg);
   }
   .defect-chat-attachments {
     display: flex; flex-wrap: wrap; gap: 6px;
@@ -7226,15 +7315,15 @@
   .defect-chat-input-row textarea {
     flex: 1; min-height: 36px; max-height: 160px;
     padding: 8px 12px;
-    border: 1px solid var(--border);
+    border: 1px solid transparent;
     border-radius: 8px;
     font-family: inherit; font-size: 14px;
     resize: none;
-    background: var(--card); color: var(--text);
+    background: transparent; color: var(--text);
+    width: 100%;
   }
   .defect-chat-input-row textarea:focus {
     outline: none;
-    border-color: var(--brand);
   }
   .defect-chat-send {
     flex-shrink: 0; width: 40px; height: 40px;
@@ -7243,6 +7332,19 @@
   }
   .defect-chat-send i { font-size: 18px; }
   .defect-chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* v2.39.0: адаптив под мобильные */
+  @media (max-width: 768px) {
+    .defect-msg { max-width: 92%; }
+    .defect-chat-feed { max-height: 60vh; }
+    .defect-participants-row { gap: 6px; padding: 6px 10px; }
+    .defect-participant-chip .dp-name { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+  /* На широких экранах разворачиваем карточку шире */
+  @media (min-width: 1200px) {
+    .content-inner #dd-content { max-width: 1100px !important; }
+    .defect-chat-feed { max-height: 560px; }
+  }
 
   /* v2.37.0: кнопка удаления сообщения */
   .defect-msg-del {
@@ -13389,7 +13491,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.38.1-share-query-fallback";
+const APP_VERSION = "v2.39.0-chat-realtime";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -14249,6 +14351,10 @@ function selectSection(sectionName) {
 
 function selectSidebarItem(screenName) {
   state.currentScreen = screenName;
+  // v2.39.0: если уходим с карточки заявки — глушим polling чата
+  if (screenName !== 'defects-detail') {
+    try { _stopDefectChatPolling && _stopDefectChatPolling(); } catch (_) {}
+  }
 
   // v2.8.2: сохраняем текущий раздел+экран чтобы при F5 вернуться сюда
   try {
@@ -34904,6 +35010,8 @@ async function showPublicDefect(token) {
     body.innerHTML = renderPublicDefectCard(d, token);
     // Загружаем чат
     loadPublicDefectMessages(token);
+    loadPublicDefectParticipants(token);
+    _startPublicDefectPolling(token);
   } catch (e) {
     body.innerHTML = renderPublicError('network');
   }
@@ -34957,6 +35065,7 @@ function renderPublicDefectCard(d, token) {
         '<i class="ti ti-messages"></i> Обсуждение' +
         '<span class="defect-chat-count" id="public-defect-chat-count">' + (d.messages_count || 0) + '</span>' +
       '</div>' +
+      '<div class="defect-participants" id="defect-participants"></div>' +
       '<div class="defect-chat-feed" id="public-defect-chat-feed">' +
         '<div class="loading-block">Загружаем…</div>' +
       '</div>' +
@@ -35033,6 +35142,11 @@ function savePublicDefectGuest() {
     }
   }
   state._defectChatAttachments = [];
+  // v2.39.0: сразу пинганём — сервер занесёт гостя в участники
+  if (state._publicDefectToken) {
+    _sendDefectHeartbeat(null, true);
+    loadPublicDefectParticipants(state._publicDefectToken);
+  }
 }
 
 function changePublicDefectGuest() {
@@ -35059,9 +35173,63 @@ async function loadPublicDefectMessages(token) {
     }
     const d = await r.json();
     _renderMessagesInto(feed, d.messages || [], document.getElementById('public-defect-chat-count'), /* publicView */ true);
+    feed.dataset.sig = (d.messages || []).length + ':' + ((d.messages || []).length ? d.messages[d.messages.length - 1].id : '0');
   } catch (e) {
     feed.innerHTML = '<div class="empty-block">Ошибка сети</div>';
   }
+}
+
+// v2.39.0: polling для публичной страницы заявки
+function _startPublicDefectPolling(token) {
+  _stopPublicDefectPolling();
+  // heartbeat сразу
+  _sendDefectHeartbeat(null, true);
+  state._publicPollTimer = setInterval(() => {
+    if (state._publicDefectToken !== token) {
+      _stopPublicDefectPolling();
+      return;
+    }
+    _refreshPublicDefectMessagesSilently(token);
+    loadPublicDefectParticipants(token);
+  }, DEFECT_POLL_INTERVAL_MS);
+  state._publicHbTimer = setInterval(() => {
+    if (state._publicDefectToken !== token) { _stopPublicDefectPolling(); return; }
+    _sendDefectHeartbeat(null, true);
+  }, DEFECT_HEARTBEAT_INTERVAL_MS);
+}
+
+function _stopPublicDefectPolling() {
+  if (state._publicPollTimer) { clearInterval(state._publicPollTimer); state._publicPollTimer = null; }
+  if (state._publicHbTimer)   { clearInterval(state._publicHbTimer);   state._publicHbTimer = null; }
+}
+
+async function _refreshPublicDefectMessagesSilently(token) {
+  const feed = document.getElementById('public-defect-chat-feed');
+  if (!feed) return;
+  try {
+    const r = await fetch(API_BASE + '/api/public/defect/' + encodeURIComponent(token) + '/messages');
+    if (!r.ok) return;
+    const d = await r.json();
+    const messages = d.messages || [];
+    const prevSig = feed.dataset.sig || '';
+    const newSig = messages.length + ':' + (messages.length ? messages[messages.length - 1].id : '0');
+    if (prevSig === newSig) return;
+    const wasNearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 80;
+    _renderMessagesInto(feed, messages, document.getElementById('public-defect-chat-count'), true);
+    feed.dataset.sig = newSig;
+    if (!wasNearBottom) feed.scrollTop = feed.scrollHeight - feed.clientHeight - 80;
+  } catch (_) {}
+}
+
+async function loadPublicDefectParticipants(token) {
+  const box = document.getElementById('defect-participants');
+  if (!box) return;
+  try {
+    const r = await fetch(API_BASE + '/api/public/defect/' + encodeURIComponent(token) + '/participants');
+    if (!r.ok) return;
+    const d = await r.json();
+    renderDefectParticipants(box, d.participants || []);
+  } catch (_) {}
 }
 
 async function sendPublicDefectMessage() {
@@ -36508,6 +36676,8 @@ function renderDefectDetail(d) {
           '<i class="ti ti-messages"></i> Обсуждение' +
           '<span class="defect-chat-count" id="defect-chat-count">' + (d.messages_count || 0) + '</span>' +
         '</div>' +
+        // v2.39.0: участники чата
+        '<div class="defect-participants" id="defect-participants"></div>' +
         '<div class="defect-chat-feed" id="defect-chat-feed">' +
           '<div class="loading-block">Загружаем сообщения…</div>' +
         '</div>' +
@@ -36530,9 +36700,11 @@ function renderDefectDetail(d) {
       '</div>' +
     '</div>';
 
-  // Подгружаем сообщения
+  // Подгружаем сообщения и стартуем real-time опрос
   state._defectChatAttachments = [];
   loadDefectMessages(d.id);
+  loadDefectParticipants(d.id);
+  _startDefectChatPolling(d.id);
 }
 
 // v2.36.0: рендер одного элемента галереи (фото / видео / документ)
@@ -36580,6 +36752,118 @@ async function loadDefectMessages(defectId) {
   } catch (e) {
     feed.innerHTML = '<div class="empty-block">Не удалось загрузить сообщения</div>';
   }
+}
+
+// v2.39.0: загрузка списка участников чата
+async function loadDefectParticipants(defectId) {
+  const box = document.getElementById('defect-participants');
+  if (!box) return;
+  try {
+    const d = await apiGet('/api/defects/' + defectId + '/participants');
+    renderDefectParticipants(box, d.participants || []);
+  } catch (e) {
+    // тихо
+  }
+}
+
+function renderDefectParticipants(box, participants) {
+  if (!participants.length) {
+    box.innerHTML = '';
+    return;
+  }
+  const onlineCount = participants.filter(p => p.is_online).length;
+  let html = '<div class="defect-participants-row">' +
+    '<span class="defect-participants-label">' +
+      '<i class="ti ti-users"></i> Участники <b>' + participants.length + '</b>' +
+      (onlineCount ? ' · <span style="color:#15803D;">●</span> ' + onlineCount + ' онлайн' : '') +
+    '</span>' +
+    '<div class="defect-participants-chips">';
+  participants.slice(0, 10).forEach(p => {
+    const cls = (p.is_online ? 'online' : '') + (p.is_guest ? ' guest' : ' employee');
+    const initials = getInitials(p.name || '—');
+    const title = (p.name || '') + (p.phone ? ' · ' + p.phone : '') + (p.is_online ? ' · онлайн' : '');
+    html += '<span class="defect-participant-chip ' + cls + '" title="' + escapeHtml(title) + '">' +
+      '<span class="dp-avatar">' + initials + '</span>' +
+      '<span class="dp-name">' + escapeHtml(p.name || '—') + '</span>' +
+    '</span>';
+  });
+  if (participants.length > 10) {
+    html += '<span class="defect-participants-more">+' + (participants.length - 10) + '</span>';
+  }
+  html += '</div></div>';
+  box.innerHTML = html;
+}
+
+// v2.39.0: polling + heartbeat для realtime обновления чата
+const DEFECT_POLL_INTERVAL_MS = 5000;
+const DEFECT_HEARTBEAT_INTERVAL_MS = 25000;
+
+function _startDefectChatPolling(defectId) {
+  _stopDefectChatPolling();
+  // Сразу пингуем
+  _sendDefectHeartbeat(defectId, false);
+  state._defectPollTimer = setInterval(() => {
+    // Если карточка ещё открыта
+    if (state.currentDefectId !== defectId || state.currentScreen !== 'defects-detail') {
+      _stopDefectChatPolling();
+      return;
+    }
+    // Не перетираем ленту если пользователь печатает / прокрутил вверх
+    _refreshDefectMessagesSilently(defectId);
+    loadDefectParticipants(defectId);
+  }, DEFECT_POLL_INTERVAL_MS);
+  state._defectHbTimer = setInterval(() => {
+    if (state.currentDefectId !== defectId) { _stopDefectChatPolling(); return; }
+    _sendDefectHeartbeat(defectId, false);
+  }, DEFECT_HEARTBEAT_INTERVAL_MS);
+}
+
+function _stopDefectChatPolling() {
+  if (state._defectPollTimer) { clearInterval(state._defectPollTimer); state._defectPollTimer = null; }
+  if (state._defectHbTimer)   { clearInterval(state._defectHbTimer);   state._defectHbTimer = null; }
+}
+
+async function _sendDefectHeartbeat(defectId, isPublic) {
+  try {
+    if (isPublic) {
+      const token = state._publicDefectToken;
+      const guest = _getPublicDefectGuest();
+      if (!token || !guest) return;
+      await fetch(API_BASE + '/api/public/defect/' + encodeURIComponent(token) + '/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: guest.name, phone: guest.phone }),
+      });
+    } else {
+      const tok = localStorage.getItem(TOKEN_KEY);
+      if (!tok) return;
+      await fetch(API_BASE + '/api/defects/' + defectId + '/heartbeat', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + tok },
+      });
+    }
+  } catch (_) { /* тихо */ }
+}
+
+// Загружаем сообщения, не теряя позицию прокрутки и не дёргая UI если ничего не изменилось
+async function _refreshDefectMessagesSilently(defectId) {
+  const feed = document.getElementById('defect-chat-feed');
+  if (!feed) return;
+  try {
+    const d = await apiGet('/api/defects/' + defectId + '/messages');
+    const messages = d.messages || [];
+    // Сравним по id последнего и по количеству
+    const prevSig = feed.dataset.sig || '';
+    const newSig = messages.length + ':' + (messages.length ? messages[messages.length - 1].id : '0');
+    if (prevSig === newSig) return;
+    const wasNearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 80;
+    renderDefectMessages(messages);
+    feed.dataset.sig = newSig;
+    if (!wasNearBottom) {
+      // оставим прокрутку как была
+      feed.scrollTop = feed.scrollHeight - feed.clientHeight - 80;
+    }
+  } catch (_) { /* тихо */ }
 }
 
 function renderDefectMessages(messages) {
@@ -36636,7 +36920,9 @@ function _renderMessagesInto(feed, messages, countEl, publicView) {
     const delBtn = canDelete
       ? '<button class="defect-msg-del" title="Удалить" onclick="deleteDefectMessage(' + m.id + ')"><i class="ti ti-trash"></i></button>'
       : '';
-    html += '<div class="defect-msg' + (isMine ? ' mine' : '') + '">' +
+    // v2.39.0: внешний гость (без employee_id) — отдельный визуал
+    const isGuest = !m.author_employee_id && !isMine;
+    html += '<div class="defect-msg' + (isMine ? ' mine' : (isGuest ? ' guest' : '')) + '">' +
       '<div class="defect-msg-head">' +
         '<span class="defect-msg-author">' + escapeHtml(m.author_name || '—') + '</span>' +
         '<time>' + _formatChatTime(m.created_at) + '</time>' +
