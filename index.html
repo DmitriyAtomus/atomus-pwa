@@ -3491,6 +3491,43 @@
     color: var(--text-light);
     margin-bottom: 8px;
   }
+  /* v2.33.8: блок «Кто собирал» */
+  .as-workers-block {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--brand-bg);
+    border-radius: 10px;
+  }
+  .as-workers-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--brand);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .as-workers-list {
+    display: flex; flex-wrap: wrap; gap: 10px;
+  }
+  .as-worker-chip {
+    display: flex; align-items: center; gap: 10px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px 8px 8px;
+    min-width: 180px;
+  }
+  .as-worker-avatar {
+    width: 32px; height: 32px;
+    background: var(--brand);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .as-worker-body { min-width: 0; }
+  .as-worker-name { font-size: 13.5px; font-weight: 600; color: var(--text-dark); }
+  .as-worker-pos { font-size: 11.5px; color: var(--text-light); margin-top: 1px; }
   .as-history-list {
     display: flex; flex-direction: column; gap: 6px;
     max-height: 340px; overflow-y: auto;
@@ -12978,7 +13015,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.33.7-ui-polish";
+const APP_VERSION = "v2.33.8-assembly-card-workers";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29288,19 +29325,45 @@ function showAssemblyStockModal(d) {
             '</div>'
           : '') +
         '<div class="as-info-grid">' +
+          '<div><span class="as-lbl">№ сборки:</span> <strong>#' + a.id + '</strong></div>' +
           '<div><span class="as-lbl">Статус:</span> <span class="status-pill st-' + a.status + '">' + escapeHtml(a.status_label) + '</span></div>' +
           (a.work_type === 'assembly' || !a.work_type
             ? '<div><span class="as-lbl">Остаток:</span> <strong>' + (a.stock_qty || 0) + ' шт.</strong></div>'
             : '') +
           (a.execution ? '<div><span class="as-lbl">Исполнение:</span> ' + escapeHtml(a.execution) + '</div>' : '') +
           (a.ip_class ? '<div><span class="as-lbl">IP-класс:</span> ' + escapeHtml(a.ip_class) + '</div>' : '') +
-          '<div><span class="as-lbl">Дата:</span> ' + escapeHtml(a.assembly_date || '—') + '</div>' +
+          '<div><span class="as-lbl">Дата сборки:</span> ' + escapeHtml(a.assembly_date || '—') + '</div>' +
+          (a.created_at ? '<div><span class="as-lbl">Внесена:</span> ' + escapeHtml((a.created_at || '').replace('T', ' ').substring(0, 16)) + '</div>' : '') +
           (a.location ? '<div><span class="as-lbl">Где:</span> ' + escapeHtml(a.location) + '</div>' : '') +
           (a.hours_spent ? '<div><span class="as-lbl">Часов:</span> <strong>' + a.hours_spent + ' ч</strong></div>' : '') +
           (a.contract_id
             ? '<div><span class="as-lbl">Договор:</span> <a href="#" onclick="event.preventDefault(); closeAssemblyStockModal(); openContractFromWarehouse(' + a.contract_id + ')" class="contract-link">' + escapeHtml(a.contract_number) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : '') + '</a></div>'
             : (a.work_type === 'assembly' || !a.work_type ? '<div><span class="as-lbl">Договор:</span> <em>не привязан</em></div>' : '')) +
         '</div>' +
+        // v2.33.8: блок «Кто собирал»
+        (a.workers && a.workers.length
+          ? '<div class="as-workers-block">' +
+              '<div class="as-workers-title"><i class="ti ti-users"></i> Кто собирал</div>' +
+              '<div class="as-workers-list">' +
+                a.workers.map(w =>
+                  '<div class="as-worker-chip">' +
+                    '<div class="as-worker-avatar">' + escapeHtml(getInitials(w.short_name || w.full_name)) + '</div>' +
+                    '<div class="as-worker-body">' +
+                      '<div class="as-worker-name">' + escapeHtml(w.short_name || w.full_name) + '</div>' +
+                      (w.position ? '<div class="as-worker-pos">' + escapeHtml(w.position) + '</div>' : '') +
+                    '</div>' +
+                  '</div>'
+                ).join('') +
+              '</div>' +
+            '</div>'
+          : '') +
+        // Комментарий к сборке
+        (a.comment
+          ? '<div style="background: var(--bg); border-radius: 8px; padding: 10px 12px; margin-top: 14px; font-size: 13px; color: var(--text-dark); white-space: pre-wrap;">' +
+              '<div style="font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:4px;">Комментарий</div>' +
+              escapeHtml(a.comment) +
+            '</div>'
+          : '') +
         (actionsHtml ? '<div class="as-actions">' + actionsHtml + '</div>' : '') +
         '<div class="as-history-title">История движений</div>' +
         '<div class="as-history-list">' + movsHtml + '</div>' +
