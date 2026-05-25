@@ -13389,7 +13389,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.37.0-service-share-edit";
+const APP_VERSION = "v2.38.1-share-query-fallback";
 const APP_VERSION_DATE = "25.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36446,6 +36446,10 @@ function renderDefectDetail(d) {
   };
   if (d.assembly_id) addInfo('Сборка', '<a href="#" onclick="event.preventDefault(); openAssemblyStock(' + d.assembly_id + ')" style="color: var(--brand); font-weight: 600;">' + escapeHtml(d.model_name || ('#' + d.assembly_id)) + (d.model_article ? ' · ' + escapeHtml(d.model_article) : '') + '</a>');
   if (d.contract_id) addInfo('Договор', '<a href="#" onclick="event.preventDefault(); state.currentContractId=' + d.contract_id + '; selectSection(\'sales\'); selectSidebarItem(\'sales-contract-detail\');" style="color: var(--brand); font-weight: 600;">' + escapeHtml(d.contract_number || '#' + d.contract_id) + (d.contractor_name ? ' · ' + escapeHtml(d.contractor_name) : '') + '</a>');
+  // v2.38.0: показываем контрагента отдельно, если он есть но БЕЗ договора (прямая привязка)
+  if (!d.contract_id && d.contractor_id && d.contractor_name) {
+    addInfo('Контрагент', '<a href="#" onclick="event.preventDefault(); state.currentContractorId=' + d.contractor_id + '; selectSection(\'sales\'); selectSidebarItem(\'sales-contractor-detail\');" style="color: var(--brand); font-weight: 600;">' + escapeHtml(d.contractor_name) + '</a>');
+  }
   if (d.location) addInfo('Где найдено', escapeHtml(d.location));
   if (d.author_name) addInfo('Имя', escapeHtml(d.author_name));
   if (d.author_phone) addInfo('Телефон', escapeHtml(d.author_phone));
@@ -36761,7 +36765,7 @@ async function sendDefectChatMessage() {
 }
 
 // v2.37.0: модалка редактирования заявки
-function openEditDefectModal() {
+async function openEditDefectModal() {
   const d = state._currentDefect;
   if (!d) { showToast('Сначала загрузите карточку', 'error'); return; }
   let m = document.getElementById('defect-edit-modal');
@@ -36783,6 +36787,13 @@ function openEditDefectModal() {
     catOptions += '<option value="' + k + '"' + (d.category === k ? ' selected' : '') + '>' + escapeHtml(v) + '</option>';
   });
 
+  // v2.38.0: контрагенты — заполняем после загрузки. Пока показываем текущего (если есть) с пометкой.
+  let contractorOptions = '<option value="">— Не указан —</option>';
+  if (d.contractor_id) {
+    contractorOptions += '<option value="' + d.contractor_id + '" selected>' +
+      escapeHtml(d.contractor_name || ('#' + d.contractor_id)) + ' (текущий)</option>';
+  }
+
   m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width: 520px;">' +
     '<div class="modal-header">' +
       '<h3><i class="ti ti-edit"></i> Редактировать заявку #' + d.id + '</h3>' +
@@ -36795,6 +36806,10 @@ function openEditDefectModal() {
         '</div>' +
         '<div class="form-group"><label>Категория проблемы</label>' +
           '<select id="def-edit-category">' + catOptions + '</select>' +
+        '</div>' +
+        '<div class="form-group"><label>Контрагент</label>' +
+          '<select id="def-edit-contractor">' + contractorOptions + '</select>' +
+          '<div class="upload-hint" id="def-edit-contractor-hint">Загружаем список…</div>' +
         '</div>' +
         '<div class="form-group"><label>Описание *</label>' +
           '<textarea id="def-edit-description" rows="5">' + escapeHtml(d.description || '') + '</textarea>' +
@@ -36812,6 +36827,33 @@ function openEditDefectModal() {
     '</div>' +
   '</div>';
   m.classList.add('visible');
+
+  // Подгружаем список контрагентов
+  _loadContractorsForDefectEdit(d.contractor_id);
+}
+
+async function _loadContractorsForDefectEdit(currentId) {
+  const sel = document.getElementById('def-edit-contractor');
+  const hint = document.getElementById('def-edit-contractor-hint');
+  if (!sel) return;
+  try {
+    const r = await apiGet('/api/contractors');
+    const list = (r && r.contractors) || [];
+    let html = '<option value="">— Не указан —</option>';
+    list.forEach(c => {
+      const selAttr = String(c.id) === String(currentId || '') ? ' selected' : '';
+      const typeLbl = c.type_label ? ' · ' + c.type_label : '';
+      html += '<option value="' + c.id + '"' + selAttr + '>' +
+        escapeHtml(c.name || ('#' + c.id)) + escapeHtml(typeLbl) + '</option>';
+    });
+    sel.innerHTML = html;
+    if (hint) hint.style.display = 'none';
+  } catch (e) {
+    if (hint) {
+      hint.textContent = 'Не удалось загрузить список контрагентов';
+      hint.style.color = 'var(--danger)';
+    }
+  }
 }
 
 function closeEditDefectModal() {
@@ -36826,20 +36868,23 @@ async function saveDefectEdits() {
   const cat    = (document.getElementById('def-edit-category') || {}).value;
   const desc   = ((document.getElementById('def-edit-description') || {}).value || '').trim();
   const loc    = ((document.getElementById('def-edit-location') || {}).value || '').trim();
+  const contractorRaw = ((document.getElementById('def-edit-contractor') || {}).value || '').trim();
   if (!desc) { showToast('Описание не может быть пустым', 'error'); return; }
   const btn = document.getElementById('def-edit-save-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
+    const body = {
+      type: type_,
+      category: cat,
+      description: desc,
+      location: loc,
+      contractor_id: contractorRaw ? parseInt(contractorRaw, 10) : null,
+    };
     const r = await fetch(API_BASE + '/api/defects/' + id, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({
-        type: type_,
-        category: cat,
-        description: desc,
-        location: loc,
-      }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
@@ -36891,7 +36936,10 @@ async function openShareDefectLink() {
       return;
     }
     const d = await r.json();
-    const url = window.location.origin + '/d/' + d.public_token;
+    // v2.38.1: query-формат — работает без правок vercel.json.
+    // Если хочешь красивый URL /d/<token> — добавь rewrite в vercel.json и поменяй на:
+    //   const url = window.location.origin + '/d/' + d.public_token;
+    const url = window.location.origin + '/?d=' + encodeURIComponent(d.public_token);
     m.querySelector('.modal-content').innerHTML =
       '<p style="margin-top:0; color: var(--text-mid);">Скиньте эту ссылку — получатель сможет посмотреть карточку и написать в обсуждение. Регистрация не нужна, попросим только имя и телефон.</p>' +
       '<div style="display:flex; gap:8px; align-items:center; margin-top:14px;">' +
@@ -40107,6 +40155,15 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
     showPublicDefect(publicDefectMatch[1]);
     return;
   }
+  // v2.38.1: fallback на query ?d=<token> (если на Vercel нет rewrite для /d/)
+  try {
+    const usp = new URLSearchParams(window.location.search);
+    const qDefect = usp.get('d');
+    if (qDefect && /^[A-Za-z0-9_\-]+$/.test(qDefect)) {
+      showPublicDefect(qDefect);
+      return;
+    }
+  } catch (_) {}
   // ЭТАП 23+: общая публичная форма замечаний /feedback
   if (path === '/feedback' || path === '/feedback/') {
     showPublicFeedbackPage();
