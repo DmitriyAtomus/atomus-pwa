@@ -13761,7 +13761,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.4-autofix-bom";
+const APP_VERSION = "v2.41.5-warehouse-tools";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29709,6 +29709,11 @@ const WH_TAB_ACTIONS = {
       onclick: 'openShipmentEntry()' },
   ],
   components: [
+    // v2.41.x: инструменты для разруливания дублей и битых связей
+    { label: 'Диагностика', icon: 'ti-stethoscope', cls: 'btn btn-secondary btn-small',
+      onclick: 'openBomDiagnose()' },
+    { label: 'Дубли', icon: 'ti-copy-x', cls: 'btn btn-secondary btn-small',
+      onclick: 'openComponentDuplicates()' },
     { label: 'Приход', icon: 'ti-package-import', cls: 'btn btn-secondary btn-small',
       onclick: 'openComponentReceiveModal()' },
     { label: 'Комплектующее', icon: 'ti-plus', cls: 'btn btn-primary btn-small',
