@@ -2120,6 +2120,14 @@
   .modal-item .mi-text { flex: 1; min-width: 0; }
   .modal-item .mi-title { font-size: 14px; font-weight: 500; }
   .modal-item .mi-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  /* v2.42.0: AISI-модели в пикере — голубая полоска слева */
+  .modal-item.mi-aisi {
+    border-left: 3px solid #0891B2;
+    background: linear-gradient(90deg, #ECFEFF 0%, transparent 30%);
+  }
+  .modal-item.mi-aisi .mi-icon {
+    background: #CFFAFE; color: #0891B2;
+  }
 
   /* Toast */
   .toast {
@@ -13941,7 +13949,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.42.0-summary-colors-defect-wide";
+const APP_VERSION = "v2.42.1-modelpicker-subgroups";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25600,53 +25608,125 @@ function renderModelModalList(query) {
     return;
   }
 
+  // Группируем по направлениям, затем внутри — по подгруппам
   const groups = {};
   filtered.forEach(m => {
     const dirId = m.direction_id || 0;
-    if (!groups[dirId]) groups[dirId] = [];
-    groups[dirId].push(m);
+    if (!groups[dirId]) groups[dirId] = { withoutSub: [], bySub: {} };
+    if (m.subgroup_id) {
+      const sid = String(m.subgroup_id);
+      if (!groups[dirId].bySub[sid]) {
+        groups[dirId].bySub[sid] = { name: m.subgroup_name || ('Подгруппа #' + sid), items: [] };
+      }
+      groups[dirId].bySub[sid].items.push(m);
+    } else {
+      groups[dirId].withoutSub.push(m);
+    }
   });
 
-  let html = '';
-  // ЭТАП 31.6: сворачиваемые группы в выборе модели
+  // v2.42.0: при поиске — автоматически раскрываем всё. Без поиска — используем сохранённое состояние.
   const openMap = JSON.parse(localStorage.getItem('modelpicker_groups_open') || '{}');
+  const openSubMap = JSON.parse(localStorage.getItem('modelpicker_subgroups_open') || '{}');
   const dirIds = Object.keys(groups).sort((a, b) => Number(a) - Number(b));
-  const defaultOpen = (dirIds.length === 1);
+  const hasQuery = !!query;
+  const defaultOpen = hasQuery || (dirIds.length === 1);
 
+  let html = '';
   dirIds.forEach(dirId => {
     const dir = dirMap[dirId];
     const dirName = dir ? dir.name : '—';
-    const dirCode = dir ? dir.code : '';
-    const iconCls = getDirectionIcon(dirCode);
-    const count = groups[dirId].length;
-    const isOpen = (dirId in openMap) ? !!openMap[dirId] : defaultOpen;
+    const dirNamePretty = (typeof _nvCapitalize === 'function') ? _nvCapitalize(dirName) : dirName;
+    const palCls = (typeof _nvPaletteClass === 'function') ? _nvPaletteClass(dir ? (dir.code || dir.name) : dirId) : '';
+    const iconCls = (typeof _nvIconFor === 'function') ? _nvIconFor(dirName) : (typeof getDirectionIcon === 'function' ? getDirectionIcon(dir ? dir.code : '') : 'ti-folder');
+    const g = groups[dirId];
+    const totalCount = g.withoutSub.length + Object.values(g.bySub).reduce((s, x) => s + x.items.length, 0);
+    const isOpen = hasQuery ? true : ((dirId in openMap) ? !!openMap[dirId] : defaultOpen);
+    const subKeys = Object.keys(g.bySub).sort((a, b) => (g.bySub[a].name || '').localeCompare(g.bySub[b].name || ''));
 
-    html += '<button class="modelpicker-group-toggle" data-dirid="' + dirId + '" onclick="toggleModelPickerGroup(\'' + dirId + '\')">' +
+    html += '<button class="modelpicker-group-toggle ' + palCls + '" data-dirid="' + dirId + '" onclick="toggleModelPickerGroup(\'' + dirId + '\')">' +
       '<i class="ti ti-chevron-right mp-chevron' + (isOpen ? ' open' : '') + '"></i>' +
-      '<i class="ti ' + iconCls + '" style="color:var(--brand);"></i>' +
-      '<span class="mp-name">' + escapeHtml(dirName) + '</span>' +
-      '<span class="mp-count">' + count + '</span>' +
+      '<span class="nv-group-icon"><i class="ti ' + iconCls + '"></i></span>' +
+      '<span class="mp-name">' + escapeHtml(dirNamePretty) + '</span>' +
+      '<span class="mp-count">' + totalCount + '</span>' +
     '</button>';
     html += '<div class="modelpicker-group-body" data-dirid="' + dirId + '" style="' + (isOpen ? '' : 'display:none;') + '">';
-    groups[dirId].forEach(m => {
-      const title = m.name + (m.extra ? ' · ' + m.extra : '');
-      const meta = [];
-      if (m.article) meta.push(m.article);
-      if (m.exec_mode === 'choice') meta.push('исполнение');
-      if (m.needs_ip) meta.push('IP-класс');
-      html += '<div class="modal-item" data-mid="' + m.id + '">' +
-        '<div class="mi-icon"><i class="ti ' + iconCls + '"></i></div>' +
-        '<div class="mi-text">' +
-          '<div class="mi-title">' + escapeHtml(title) + '</div>' +
-          '<div class="mi-meta">' + escapeHtml(meta.join(' · ') || '&nbsp;') + '</div>' +
-        '</div></div>';
+
+    // Модели без подгруппы (только если нет подгрупп — иначе будут торчать)
+    if (g.withoutSub.length && !subKeys.length) {
+      g.withoutSub.forEach(m => { html += _mpRenderItem(m, iconCls); });
+    } else if (g.withoutSub.length) {
+      const subKey = dirId + ':none';
+      const subOpen = hasQuery || (subKey in openSubMap ? !!openSubMap[subKey] : true);
+      html += '<div class="models-subgroup" style="margin-left:8px;">' +
+        '<button class="models-subgroup-toggle" data-subkey="' + subKey + '" onclick="toggleModelPickerSubgroup(\'' + subKey + '\')">' +
+          '<i class="ti ti-chevron-right models-subgroup-chevron' + (subOpen ? ' open' : '') + '"></i>' +
+          '<i class="ti ti-folder sg-icon"></i>' +
+          '<span class="sg-name">Без подгруппы</span>' +
+          '<span class="models-subgroup-count">' + g.withoutSub.length + '</span>' +
+        '</button>' +
+        '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
+      g.withoutSub.forEach(m => { html += _mpRenderItem(m, iconCls); });
+      html += '</div></div>';
+    }
+
+    // Подгруппы с темами
+    subKeys.forEach(sid => {
+      const sg = g.bySub[sid];
+      const subKey = dirId + ':' + sid;
+      const subOpen = hasQuery || (subKey in openSubMap ? !!openSubMap[subKey] : false);
+      const theme = (typeof _subgroupTheme === 'function') ? _subgroupTheme(sg.name) : { icon: 'ti-folder', cls: 'sg-default' };
+      html += '<div class="models-subgroup ' + theme.cls + '" style="margin-left:8px;">' +
+        '<button class="models-subgroup-toggle" data-subkey="' + subKey + '" onclick="toggleModelPickerSubgroup(\'' + subKey + '\')">' +
+          '<i class="ti ti-chevron-right models-subgroup-chevron' + (subOpen ? ' open' : '') + '"></i>' +
+          '<i class="ti ' + theme.icon + ' sg-icon"></i>' +
+          '<span class="sg-name">' + escapeHtml(sg.name) + '</span>' +
+          '<span class="models-subgroup-count">' + sg.items.length + '</span>' +
+        '</button>' +
+        '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
+      sg.items.forEach(m => { html += _mpRenderItem(m, theme.icon); });
+      html += '</div></div>';
     });
+
     html += '</div>';
   });
   container.innerHTML = html;
   container.querySelectorAll('.modal-item').forEach(item => {
     item.addEventListener('click', () => selectModel(parseInt(item.dataset.mid)));
   });
+}
+
+// v2.42.0: рендер одной строки модели в пикере с подсветкой AISI
+function _mpRenderItem(m, iconCls) {
+  const title = m.name + (m.extra ? ' · ' + m.extra : '');
+  const meta = [];
+  if (m.article) meta.push(m.article);
+  if (m.exec_mode === 'choice') meta.push('исполнение: ' + (m.exec_label_st || 'Стандарт') + ' / ' + (m.exec_label_ne || 'Нерж. AISI'));
+  else if (m.exec_mode === 'fixed' && m.exec_fixed) meta.push('испол.: ' + m.exec_fixed);
+  if (m.needs_ip) meta.push('IP');
+  const isAisi = ((m.name || '').toUpperCase().includes('AISI')) || ((m.exec_fixed || '').toLowerCase().startsWith('нерж'));
+  const aisiCls = isAisi ? ' mi-aisi' : '';
+  const hl = (typeof _highlightAisi === 'function') ? _highlightAisi : escapeHtml;
+  return '<div class="modal-item' + aisiCls + '" data-mid="' + m.id + '">' +
+    '<div class="mi-icon"><i class="ti ' + iconCls + '"></i></div>' +
+    '<div class="mi-text">' +
+      '<div class="mi-title">' + hl(title) + '</div>' +
+      '<div class="mi-meta">' + hl(meta.join(' · ') || '\u00a0') + '</div>' +
+    '</div></div>';
+}
+
+function toggleModelPickerSubgroup(subKey) {
+  const body = document.querySelector('.models-subgroup-body[data-subkey="' + subKey + '"]');
+  const toggle = document.querySelector('.models-subgroup-toggle[data-subkey="' + subKey + '"]');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? '' : 'none';
+  if (toggle) {
+    const chev = toggle.querySelector('.models-subgroup-chevron');
+    if (chev) chev.classList.toggle('open', isHidden);
+  }
+  const openMap = JSON.parse(localStorage.getItem('modelpicker_subgroups_open') || '{}');
+  openMap[subKey] = isHidden;
+  localStorage.setItem('modelpicker_subgroups_open', JSON.stringify(openMap));
 }
 
 function toggleModelPickerGroup(dirId) {
