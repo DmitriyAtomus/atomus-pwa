@@ -5807,6 +5807,34 @@
   }
   .models-subgroup.sg-default .sg-icon { color: #6B7280; }
 
+  /* v2.41.15: темы подгрупп Щитов */
+  .models-subgroup.sg-aisi .models-subgroup-toggle {
+    background: linear-gradient(135deg, #FBEAF0 0%, #FEF0F5 100%);
+    border-color: #F4C0D1;
+    border-left-color: #D4537E;
+    color: #4B1528;
+  }
+  .models-subgroup.sg-aisi .sg-icon { color: #D4537E; }
+  .models-subgroup.sg-aisi .models-subgroup-count { color: #993556; border-color: #F4C0D1; background: #fff; }
+
+  .models-subgroup.sg-ip .models-subgroup-toggle {
+    background: linear-gradient(135deg, #E1F5EE 0%, #ECFDF4 100%);
+    border-color: #9FE1CB;
+    border-left-color: #1D9E75;
+    color: #04342C;
+  }
+  .models-subgroup.sg-ip .sg-icon { color: #1D9E75; }
+  .models-subgroup.sg-ip .models-subgroup-count { color: #0F6E56; border-color: #9FE1CB; background: #fff; }
+
+  .models-subgroup.sg-standard .models-subgroup-toggle {
+    background: linear-gradient(135deg, #FAEEDA 0%, #FEF6E6 100%);
+    border-color: #FAC775;
+    border-left-color: #BA7517;
+    color: #412402;
+  }
+  .models-subgroup.sg-standard .sg-icon { color: #BA7517; }
+  .models-subgroup.sg-standard .models-subgroup-count { color: #854F0B; border-color: #FAC775; background: #fff; }
+
   /* v2.41.10: подсветка слов AISI/Нерж */
   .lbl-aisi {
     color: #0891B2;
@@ -12288,6 +12316,9 @@
             <button class="btn btn-secondary" id="models-climate-setup-btn" onclick="openClimateSetup()" title="Создать подгруппы в Климатическом разделе и раздвоить модели на Стандарт/AISI" style="display:none;">
               <i class="ti ti-snowflake"></i> Структура Климатики
             </button>
+            <button class="btn btn-secondary" id="models-panels-setup-btn" onclick="openPanelsSetup()" title="Раздвоить Щиты управления на Стандарт/AISI/Влагозащ. с копированием BOM" style="display:none;">
+              <i class="ti ti-bolt"></i> Структура Щитов
+            </button>
             <button class="btn btn-secondary" id="models-import-bom-btn" onclick="openBomImportModal()" title="Импортировать BOM" style="display:none;">
               <i class="ti ti-upload"></i> Импорт BOM
             </button>
@@ -13910,7 +13941,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.14-bom-no-lock";
+const APP_VERSION = "v2.41.15-panels-triple-split";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23219,12 +23250,14 @@ async function loadModels() {
   const btnDirMobile = document.getElementById('models-mobile-new-dir');
   const btnImportBom = document.getElementById('models-import-bom-btn');
   const btnClimate = document.getElementById('models-climate-setup-btn');
+  const btnPanels = document.getElementById('models-panels-setup-btn');
   if (btnDesktop) btnDesktop.style.display = canEdit ? '' : 'none';
   if (btnMobile) btnMobile.style.display = canEdit ? '' : 'none';
   if (btnDirDesktop) btnDirDesktop.style.display = canEdit ? '' : 'none';
   if (btnDirMobile) btnDirMobile.style.display = canEdit ? '' : 'none';
   if (btnImportBom) btnImportBom.style.display = canEdit ? '' : 'none';
   if (btnClimate) btnClimate.style.display = canEdit ? '' : 'none';
+  if (btnPanels) btnPanels.style.display = canEdit ? '' : 'none';
 
   if (cache.models) { renderModels(cache.models); return; }
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
@@ -23241,6 +23274,9 @@ function _subgroupTheme(name) {
   if (n.includes('увлаж'))    return { icon: 'ti-droplet',                cls: 'sg-humid' };
   if (n.includes('дефрост'))  return { icon: 'ti-temperature-snow',       cls: 'sg-defrost' };
   if (n.includes('чиллер'))   return { icon: 'ti-thermometer',            cls: 'sg-chiller' };
+  if (n.includes('нерж') || n.includes('aisi'))      return { icon: 'ti-shield-check',     cls: 'sg-aisi' };
+  if (n.includes('влагозащ') || n.includes(' ip'))   return { icon: 'ti-droplet-half-2',   cls: 'sg-ip' };
+  if (n === 'стандарт' || n.startsWith('стандарт'))  return { icon: 'ti-package',          cls: 'sg-standard' };
   return { icon: 'ti-folder', cls: 'sg-default' };
 }
 
@@ -29904,6 +29940,190 @@ function _renderClimateSetupPreview(p) {
     '</button>' +
   '</div>';
   document.getElementById('climate-setup-body').innerHTML = html;
+}
+
+// v2.41.15: помощник «Структура Щитов»
+async function openPanelsSetup() {
+  let m = document.getElementById('panels-setup-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'panels-setup-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:900px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-bolt"></i> Структура Щитов управления</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'panels-setup-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;max-height:75vh;overflow:auto;" id="panels-setup-body">' +
+        '<div class="loading-block">Проверяем что есть сейчас…</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/panels/structure-preview', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      document.getElementById('panels-setup-body').innerHTML =
+        '<div class="empty-block"><i class="ti ti-alert-triangle"></i> ' +
+        escapeHtml(e.message || e.error || 'Ошибка') + '</div>';
+      return;
+    }
+    const d = await r.json();
+    _renderPanelsSetupPreview(d);
+  } catch (e) {
+    document.getElementById('panels-setup-body').innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+  }
+}
+
+function _renderPanelsSetupPreview(p) {
+  const wc = p.will_create_subgroups || [];
+  const ex = p.existing_subgroups || [];
+  const tr = p.will_triple || [];
+  const as = p.already_split || [];
+  const nc = p.not_choice || [];
+  let html =
+    '<div class="autofix-banner">' +
+      '<div class="autofix-banner-text">' +
+        '<i class="ti ti-bolt"></i>' +
+        '<div>' +
+          '<div class="autofix-banner-title">Раздвоить Щиты на 3 исполнения</div>' +
+          '<div class="autofix-banner-sub">' +
+            'Каждая choice-модель станет ' + _highlightAisi('Стандарт + Нерж. AISI + IP') +
+            '. <b>BOM копируется</b> во все три. Оригинал не удаляется — он становится «Стандарт».' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  // Подгруппы
+  html += '<h4 style="margin:14px 0 6px;font-size:14px;">Подгруппы</h4>';
+  if (wc.length) {
+    html += '<div style="margin-bottom:8px;color:var(--text-mid);font-size:13px;">Будут созданы:</div>';
+    html += '<ul style="margin:0 0 10px 20px;">';
+    wc.forEach(s => { html += '<li>' + escapeHtml(s.name) + '</li>'; });
+    html += '</ul>';
+  } else if (ex.length) {
+    html += '<div style="color:var(--text-mid);font-size:13px;margin-bottom:6px;">Уже существуют:</div>';
+    html += '<ul style="margin:0 0 10px 20px;">';
+    ex.forEach(s => { html += '<li>' + escapeHtml(s.name) + '</li>'; });
+    html += '</ul>';
+  }
+  // Раздвоение
+  html += '<h4 style="margin:14px 0 6px;font-size:14px;">Что произойдёт с моделями</h4>';
+  html += '<div class="bom-preview-summary">' +
+    '<span class="bom-pill ok"><i class="ti ti-arrows-split-2"></i> Раздвоятся: <b>' + tr.length + '</b></span>' +
+    (as.length ? '<span class="bom-pill warn">Уже раздвоены: <b>' + as.length + '</b></span>' : '') +
+    (nc.length ? '<span class="bom-pill">fixed (не трогаем): <b>' + nc.length + '</b></span>' : '') +
+    '<span class="bom-pill">всего моделей: <b>' + (p.total_models || 0) + '</b></span>' +
+  '</div>';
+  if (tr.length) {
+    html += '<p style="color:var(--text-mid);font-size:13px;margin:10px 0 6px;">' +
+      'Будут раздвоены (создастся ' + (tr.length * 2) + ' новых моделей):</p>';
+    html += '<div class="dup-group"><div class="dup-group-items" style="padding:6px 0;max-height:280px;overflow:auto;">';
+    tr.forEach(m => {
+      html += '<div style="padding:4px 14px;font-size:13px;color:var(--text);display:flex;justify-content:space-between;gap:8px;">' +
+        '<span><b>' + escapeHtml(m.name) + '</b> ' +
+          (m.article ? '<span style="color:var(--text-light);font-size:11px;">' + escapeHtml(m.article) + '</span>' : '') +
+        '</span>' +
+        '<span style="color:var(--text-light);font-size:11px;">→ Стандарт + AISI + IP</span>' +
+      '</div>';
+    });
+    html += '</div></div>';
+  }
+  if (as.length) {
+    html += '<details style="margin-top:10px;"><summary style="cursor:pointer;color:var(--text-mid);font-size:13px;">Уже AISI/IP — пропустим (' + as.length + ')</summary>' +
+      '<ul style="margin:8px 0 0 20px;color:var(--text-light);font-size:12px;">';
+    as.forEach(m => { html += '<li>' + escapeHtml(m.name) + '</li>'; });
+    html += '</ul></details>';
+  }
+  if (!tr.length) {
+    html += '<div style="margin-top:14px;text-align:center;padding:20px;color:var(--text-light);">' +
+      '<i class="ti ti-circle-check" style="font-size:32px;color:#15803D;"></i><br>' +
+      'Нечего раздваивать — все choice-модели уже разбиты на 3.</div>';
+  }
+  html += '<p style="color:var(--text-mid);font-size:12px;margin:14px 0 0;font-style:italic;">' +
+    'BOM каждой модели копируется в две новые. После применения у тебя будут три полные копии BOM — поправь руками если для разных исполнений нужны разные комплектующие.' +
+  '</p>';
+  html += '<div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
+    (tr.length ?
+      '<button class="btn btn-primary" onclick="runPanelsSetup()">' +
+        '<i class="ti ti-check"></i> Применить' +
+      '</button>' : '') +
+    '<button class="btn btn-secondary" onclick="document.getElementById(\'panels-setup-modal\').classList.remove(\'visible\')">Закрыть</button>' +
+  '</div>';
+  document.getElementById('panels-setup-body').innerHTML = html;
+}
+
+async function runPanelsSetup() {
+  if (!confirm(
+    'Раздвоить выбранные Щиты на 3 исполнения?\n\n' +
+    '• Создадутся подгруппы Стандарт / Нерж AISI / Влагозащищ. (если их нет)\n' +
+    '• Каждая choice-модель → 3 модели (Стандарт остаётся под старым id)\n' +
+    '• BOM копируется во все три\n\n' +
+    'Это безопасно: ничего не удаляется.'
+  )) return;
+  const body = document.getElementById('panels-setup-body');
+  if (body) body.innerHTML = '<div class="loading-block">Раздваиваем модели и копируем BOM… Может занять минуту.</div>';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/panels/structure-setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      if (body) body.innerHTML = '<div class="empty-block">' + escapeHtml(e.message || e.detail || 'Ошибка') + '</div>';
+      return;
+    }
+    const d = await r.json();
+    _renderPanelsSetupResult(d);
+    cache.models = null;
+    if (typeof loadModels === 'function') {
+      try { loadModels(); } catch (_) {}
+    }
+  } catch (e) {
+    if (body) body.innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+  }
+}
+
+function _renderPanelsSetupResult(d) {
+  const newModels = d.new_models || [];
+  let html =
+    '<div class="autofix-result">' +
+      '<div class="autofix-result-title"><i class="ti ti-circle-check" style="color:#15803D;"></i> Щиты раздвоены</div>' +
+      '<div class="autofix-result-grid">' +
+        '<div><div class="afr-num">' + (d.converted_originals || 0) + '</div><div class="afr-lab">оригиналов → Стандарт</div></div>' +
+        '<div><div class="afr-num">' + (d.created_aisi || 0) + '</div><div class="afr-lab">AISI создано</div></div>' +
+        '<div><div class="afr-num">' + (d.created_ip || 0) + '</div><div class="afr-lab">IP создано</div></div>' +
+        '<div><div class="afr-num">' + newModels.length + '</div><div class="afr-lab">новых всего</div></div>' +
+      '</div>' +
+    '</div>';
+  if (newModels.length) {
+    html += '<h4 style="margin:14px 0 6px;font-size:14px;">Созданы модели:</h4>' +
+      '<ul style="margin:0 0 0 20px;color:var(--text);max-height:300px;overflow:auto;">';
+    newModels.forEach(m => {
+      html += '<li>' + _highlightAisi(m.new_name) + '</li>';
+    });
+    html += '</ul>';
+  }
+  if (d.failures && d.failures.length) {
+    html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--danger);">Ошибки:</h4>' +
+      '<ul style="margin:0 0 0 20px;color:var(--text);">';
+    d.failures.forEach(f => {
+      html += '<li>' + escapeHtml(f.name || '') + ' — ' + escapeHtml(f.error || '') + ' (на этапе ' + escapeHtml(f.stage || '') + ')</li>';
+    });
+    html += '</ul>';
+  }
+  html += '<div style="margin-top:18px;text-align:center;">' +
+    '<button class="btn btn-secondary" onclick="document.getElementById(\'panels-setup-modal\').classList.remove(\'visible\')">Закрыть</button>' +
+  '</div>';
+  document.getElementById('panels-setup-body').innerHTML = html;
 }
 
 // v2.41.13: раздвоение одной модели через кнопку в карточке
