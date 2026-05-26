@@ -7461,7 +7461,50 @@
     background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD;
   }
 
-  /* v2.41.2: модалка дублей */
+  /* v2.41.6: модалка мастер-BOM */
+  .master-bom-table {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--card);
+  }
+  .mb-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 1.2fr;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .mb-row:last-child { border-bottom: none; }
+  .mb-row.has-suggestion { background: #F0FDF4; }
+  .mb-check { display: flex; justify-content: center; }
+  .mb-check input { width: 18px; height: 18px; cursor: pointer; }
+  .mb-node-name { font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 4px; }
+  .mb-node-stats { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mb-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    background: var(--bg);
+    color: var(--text-mid);
+    border: 1px solid var(--border);
+  }
+  .mb-pill.ok   { background: #DCFCE7; color: #166534; border-color: #86EFAC; }
+  .mb-pill.warn { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+  .mb-pill.bad  { background: #FEE2E2; color: #991B1B; border-color: #FECACA; }
+  .mb-model select { width: 100%; }
+  .mb-suggested {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+
   .autofix-banner {
     display: flex; align-items: center; gap: 14px;
     padding: 14px 16px;
@@ -13761,7 +13804,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.5-warehouse-tools";
+const APP_VERSION = "v2.41.6-master-bom-import";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29266,6 +29309,252 @@ async function runAutoFixBom() {
   }
 }
 
+// v2.41.6: импорт мастер-BOM из xlsx-файла
+function openMasterBomImport() {
+  let m = document.getElementById('master-bom-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'master-bom-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:1000px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-upload"></i> Загрузка мастер-BOM из Excel</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'master-bom-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;max-height:75vh;overflow:auto;" id="master-bom-body">' +
+        '<p style="margin:0 0 14px;color:var(--text-mid);">' +
+          'Загрузи xlsx-файл с эталонными BOMами. Программа разберёт все узлы, найдёт компоненты по артикулам, ' +
+          'предложит сопоставление с моделями в CRM и покажет превью перед применением.' +
+        '</p>' +
+        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">' +
+          '<input type="file" id="master-bom-file" accept=".xlsx" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;">' +
+          '<button class="btn btn-primary" onclick="uploadMasterBom()">' +
+            '<i class="ti ti-upload"></i> Загрузить и разобрать' +
+          '</button>' +
+        '</div>' +
+        '<div id="master-bom-preview"></div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function uploadMasterBom() {
+  const fileInput = document.getElementById('master-bom-file');
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    showToast('Выбери файл', 'error');
+    return;
+  }
+  const file = fileInput.files[0];
+  const preview = document.getElementById('master-bom-preview');
+  preview.innerHTML = '<div class="loading-block">Загружаем и разбираем файл…</div>';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(API_BASE + '/api/bom/master/parse', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      preview.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i> ' +
+        escapeHtml(e.message || e.detail || 'Ошибка разбора') +
+        (e.missing ? '<br>Отсутствуют колонки: ' + escapeHtml(e.missing.join(', ')) : '') +
+      '</div>';
+      return;
+    }
+    const d = await r.json();
+    state._masterBomSuggestions = d.suggestions || [];
+    // Подгружаем список моделей CRM для дропдаунов
+    if (!cache.models) {
+      try {
+        const m = await apiGet('/api/models?with_stock=false');
+        cache.models = m;
+      } catch (e) { cache.models = { models: [] }; }
+    }
+    _renderMasterBomPreview(d);
+  } catch (e) {
+    preview.innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+  }
+}
+
+function _renderMasterBomPreview(data) {
+  const sugs = data.suggestions || [];
+  const models = (cache.models && cache.models.models) || [];
+  let html =
+    '<div class="bom-preview-summary">' +
+      '<span class="bom-pill ok"><i class="ti ti-check"></i> Узлов в файле: <b>' + (data.node_count || 0) + '</b></span>' +
+    '</div>' +
+    '<p style="margin:14px 0 8px;color:var(--text-mid);font-size:13px;">' +
+      'Для каждого узла выбери модель в CRM, в которую нужно загрузить его BOM. <b>Существующий BOM модели будет полностью заменён.</b>' +
+    '</p>' +
+    '<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">' +
+      '<button class="btn btn-secondary btn-small" onclick="masterBomToggleAll(true)">' +
+        '<i class="ti ti-checks"></i> Включить все с предложением</button>' +
+      '<button class="btn btn-secondary btn-small" onclick="masterBomToggleAll(false)">' +
+        '<i class="ti ti-square"></i> Выключить все</button>' +
+      '<label style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);">' +
+        '<input type="checkbox" id="master-bom-create-missing" checked> Создавать недостающие компоненты автоматом</label>' +
+    '</div>' +
+    '<div class="master-bom-table">';
+  // Опции дропдауна моделей
+  const modelOptionsHtml = (selectedId) => {
+    let opts = '<option value="">— выбери модель —</option>';
+    models.forEach(m => {
+      opts += '<option value="' + m.id + '"' + (m.id === selectedId ? ' selected' : '') + '>' +
+        escapeHtml(m.name || '') + (m.article ? ' (' + escapeHtml(m.article) + ')' : '') +
+      '</option>';
+    });
+    return opts;
+  };
+  sugs.forEach((s, i) => {
+    const ok = s.suggested_model_id && s.matched_components > 0;
+    html += '<div class="mb-row' + (ok ? ' has-suggestion' : '') + '">' +
+      '<label class="mb-check"><input type="checkbox" id="mb-check-' + i + '"' +
+        (ok ? ' checked' : '') + '></label>' +
+      '<div class="mb-node">' +
+        '<div class="mb-node-name">' + escapeHtml(s.node_name || '') + '</div>' +
+        '<div class="mb-node-stats">' +
+          '<span class="mb-pill ok">✓ ' + (s.matched_components || 0) + '</span>' +
+          (s.will_create ? '<span class="mb-pill warn">+ ' + s.will_create + ' создать</span>' : '') +
+          (s.no_match ? '<span class="mb-pill bad">? ' + s.no_match + '</span>' : '') +
+          '<span class="mb-pill">всего ' + (s.row_count || 0) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="mb-model">' +
+        '<select id="mb-model-' + i + '" class="form-input" style="margin:0;">' +
+          modelOptionsHtml(s.suggested_model_id) +
+        '</select>' +
+        (s.suggested_model_id ?
+          '<div class="mb-suggested">→ ' + escapeHtml(s.suggested_model_name || '') +
+          ' <span style="color:var(--text-light);">(score ' + s.score + ')</span></div>' :
+          '<div class="mb-suggested" style="color:var(--danger);">⚠ Не найдено предложение — выбери вручную или пропусти</div>') +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>' +
+    '<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button class="btn btn-primary" onclick="applyMasterBom()">' +
+        '<i class="ti ti-check"></i> Применить ко всем включённым' +
+      '</button>' +
+    '</div>';
+  document.getElementById('master-bom-preview').innerHTML = html;
+}
+
+function masterBomToggleAll(value) {
+  const sugs = state._masterBomSuggestions || [];
+  sugs.forEach((s, i) => {
+    const chk = document.getElementById('mb-check-' + i);
+    if (!chk) return;
+    if (value) {
+      // Включаем только те у кого есть предложение и хотя бы одно совпадение
+      chk.checked = !!(s.suggested_model_id && s.matched_components > 0);
+    } else {
+      chk.checked = false;
+    }
+  });
+}
+
+async function applyMasterBom() {
+  const sugs = state._masterBomSuggestions || [];
+  const createMissing = !!(document.getElementById('master-bom-create-missing') || {}).checked;
+  const assignments = [];
+  sugs.forEach((s, i) => {
+    const chk = document.getElementById('mb-check-' + i);
+    if (!chk || !chk.checked) return;
+    const sel = document.getElementById('mb-model-' + i);
+    const model_id = sel && sel.value ? parseInt(sel.value, 10) : null;
+    if (!model_id) return;
+    assignments.push({ node_name: s.node_name, model_id: model_id });
+  });
+  if (!assignments.length) {
+    showToast('Не выбрано ни одного узла для применения', 'error');
+    return;
+  }
+  if (!confirm(
+    'Будет применено BOMов: ' + assignments.length + '.\n\n' +
+    'Существующие BOM выбранных моделей будут полностью заменены эталоном из файла.\n\n' +
+    (createMissing ? '✓ Недостающие компоненты будут созданы автоматически.\n' : '') +
+    '\nПродолжить?'
+  )) return;
+  const preview = document.getElementById('master-bom-preview');
+  if (preview) preview.innerHTML = '<div class="loading-block">Применяем… Это может занять до минуты.</div>';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/bom/master/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        assignments: assignments,
+        create_missing_components: createMissing,
+      }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      if (preview) preview.innerHTML = '<div class="empty-block">' + escapeHtml(e.message || e.detail || 'Ошибка') + '</div>';
+      return;
+    }
+    const d = await r.json();
+    _renderMasterBomResult(d);
+    cache.components = null;
+    cache.models = null;
+  } catch (e) {
+    if (preview) preview.innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+  }
+}
+
+function _renderMasterBomResult(data) {
+  const results = data.results || [];
+  let html =
+    '<div class="autofix-result">' +
+      '<div class="autofix-result-title"><i class="ti ti-circle-check" style="color:#15803D;"></i> BOMы применены</div>' +
+      '<div class="autofix-result-grid">' +
+        '<div><div class="afr-num">' + (data.total_applied || 0) + '</div><div class="afr-lab">строк применено</div></div>' +
+        '<div><div class="afr-num">' + (data.total_skipped || 0) + '</div><div class="afr-lab">строк пропущено</div></div>' +
+        '<div><div class="afr-num">' + (data.components_created || 0) + '</div><div class="afr-lab">компонентов создано</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="bom-preview-list">';
+  results.forEach(r => {
+    if (r.error) {
+      html += '<div class="bom-preview-row bad">' +
+        '<i class="ti ti-x"></i>' +
+        '<div class="bom-preview-main">' +
+          '<div class="bom-preview-raw"><b>' + escapeHtml(r.node_name || '') + '</b></div>' +
+          '<div class="bom-preview-parsed" style="color:var(--danger);">Ошибка: ' + escapeHtml(r.error) +
+            (r.detail ? ' · ' + escapeHtml(r.detail) : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    } else {
+      html += '<div class="bom-preview-row ok">' +
+        '<i class="ti ti-check"></i>' +
+        '<div class="bom-preview-main">' +
+          '<div class="bom-preview-raw"><b>' + escapeHtml(r.node_name || '') + '</b> → ' +
+            escapeHtml(r.model_name || ('#' + r.model_id)) + '</div>' +
+          '<div class="bom-preview-parsed">' +
+            'применено: <b>' + (r.applied || 0) + '</b> из ' + (r.total || 0) +
+            (r.created_components ? ' · создано компонентов: <b>' + r.created_components + '</b>' : '') +
+            (r.skipped ? ' · пропущено: ' + r.skipped : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+  });
+  html += '</div>' +
+    '<div style="margin-top:14px;text-align:center;">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'master-bom-modal\').classList.remove(\'visible\')">' +
+        'Закрыть' +
+      '</button>' +
+    '</div>';
+  document.getElementById('master-bom-preview').innerHTML = html;
+}
+
 // v2.41.3: backfill артикулов в номенклатуре
 async function runBackfillSku() {
   if (!confirm('Программа пройдёт по всем активным комплектующим с пустым артикулом и попытается извлечь артикул из их названий. Это не изменит названия — только заполнит поле «Артикул / SKU». Продолжить?')) return;
@@ -29710,6 +29999,8 @@ const WH_TAB_ACTIONS = {
   ],
   components: [
     // v2.41.x: инструменты для разруливания дублей и битых связей
+    { label: 'Загрузить мастер-BOM', icon: 'ti-file-upload', cls: 'btn btn-secondary btn-small',
+      onclick: 'openMasterBomImport()' },
     { label: 'Диагностика', icon: 'ti-stethoscope', cls: 'btn btn-secondary btn-small',
       onclick: 'openBomDiagnose()' },
     { label: 'Дубли', icon: 'ti-copy-x', cls: 'btn btn-secondary btn-small',
