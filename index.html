@@ -7462,6 +7462,60 @@
   }
 
   /* v2.41.2: модалка дублей */
+  .autofix-banner {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--brand) 0%, #4F46E5 100%);
+    border-radius: 12px;
+    color: #fff;
+  }
+  .autofix-banner-text {
+    flex: 1;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .autofix-banner-text > i {
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .autofix-banner-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .autofix-banner-sub { font-size: 13px; opacity: 0.9; line-height: 1.4; }
+  .autofix-banner .btn-primary {
+    background: #fff;
+    color: var(--brand);
+    border: none;
+    flex-shrink: 0;
+  }
+  .autofix-banner .btn-primary:hover { background: #f3f4f6; }
+
+  .autofix-result {
+    padding: 18px;
+    background: #DCFCE7;
+    border: 1px solid #86EFAC;
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+  .autofix-result-title {
+    font-size: 16px; font-weight: 600;
+    color: #166534;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .autofix-result-title i { font-size: 22px; }
+  .autofix-result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .autofix-result-grid > div {
+    background: #fff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .afr-num { font-size: 22px; font-weight: 700; color: var(--brand); }
+  .afr-lab { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+
   .dup-group {
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -13707,7 +13761,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.3-backfill-sku";
+const APP_VERSION = "v2.41.4-autofix-bom";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29086,17 +29140,31 @@ function _renderBomDiagnose(report) {
   const ci = report.contract_items || {};
   const bom = report.model_bom || {};
   let html =
-    '<p style="margin:0 0 14px;color:var(--text-mid);">' +
-      '<b>Шаг 1.</b> Заполнить пустые артикулы в номенклатуре — программа извлечёт их из названий.' +
-    '</p>' +
-    '<div style="margin-bottom:14px;">' +
-      '<button class="btn btn-secondary" onclick="runBackfillSku()">' +
-        '<i class="ti ti-wand"></i> Заполнить артикулы в номенклатуре' +
-      '</button>' +
+    // v2.41.4: большая кнопка «Починить всё»
+    '<div class="autofix-banner">' +
+      '<div class="autofix-banner-text">' +
+        '<i class="ti ti-wand"></i>' +
+        '<div>' +
+          '<div class="autofix-banner-title">Починить всё одним кликом</div>' +
+          '<div class="autofix-banner-sub">Программа сама заполнит артикулы, склеит дубли и привяжет спецификации к номенклатуре. Безопасно: можно прерывать, ничего не удаляется.</div>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="runAutoFixBom()"><i class="ti ti-wand"></i> Запустить</button>' +
     '</div>' +
-    '<p style="margin:0 0 14px;color:var(--text-mid);">' +
-      '<b>Шаг 2.</b> Программа пройдёт по спецификациям и привяжет их к номенклатуре по артикулу.' +
-    '</p>';
+    '<details style="margin-bottom:14px;"><summary style="cursor:pointer;color:var(--text-mid);font-size:13px;">Хочу сделать вручную пошагово</summary>' +
+    '<p style="margin:10px 0 8px;color:var(--text-mid);">' +
+      '<b>Шаг 1.</b> Заполнить пустые артикулы в номенклатуре.' +
+    '</p>' +
+    '<button class="btn btn-secondary" onclick="runBackfillSku()">' +
+      '<i class="ti ti-wand"></i> Заполнить артикулы' +
+    '</button>' +
+    '<p style="margin:10px 0 0;color:var(--text-mid);">' +
+      '<b>Шаг 2.</b> Склеить дубли в номенклатуре (кнопка «Дубли» в шапке Склада).' +
+    '</p>' +
+    '<p style="margin:10px 0 0;color:var(--text-mid);">' +
+      '<b>Шаг 3.</b> Привязать осиротевшие спецификации — кнопка «Привязать всё что нашлось» внизу.' +
+    '</p>' +
+    '</details>';
   // Сводка
   const totalProblems = (ci.total_unbound || 0) + (bom.total_unbound || 0);
   const totalCanFix = (ci.matched_exact || 0) + (bom.matched_exact || 0);
@@ -29149,6 +29217,53 @@ function _renderBomDiagnose(report) {
       'Все позиции уже корректно привязаны</div>';
   }
   document.getElementById('bom-diagnose-body').innerHTML = html;
+}
+
+// v2.41.4: «Починить всё одним кликом»
+async function runAutoFixBom() {
+  if (!confirm(
+    'Программа выполнит подряд:\n\n' +
+    '1) Заполнит пустые артикулы в номенклатуре\n' +
+    '2) Склеит дубли (победитель = с большим остатком)\n' +
+    '3) Привяжет осиротевшие спецификации по артикулу\n\n' +
+    'Это безопасно: остатки складываются, ничего не удаляется (дубли деактивируются). Продолжить?'
+  )) return;
+  const body = document.getElementById('bom-diagnose-body');
+  if (body) body.innerHTML = '<div class="loading-block">Работаем… Это может занять до минуты.</div>';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/bom/auto-fix', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      if (body) body.innerHTML = '<div class="empty-block">' + escapeHtml(e.detail || e.message || 'Не удалось') + '</div>';
+      return;
+    }
+    const d = await r.json();
+    const bf = d.backfill || {};
+    const am = d.auto_merge || {};
+    let summary =
+      '<div class="autofix-result">' +
+        '<div class="autofix-result-title"><i class="ti ti-circle-check" style="color:#15803D;"></i> Готово!</div>' +
+        '<div class="autofix-result-grid">' +
+          '<div><div class="afr-num">' + (bf.updated || 0) + '</div><div class="afr-lab">артикулов заполнено</div></div>' +
+          '<div><div class="afr-num">' + (am.groups_processed || 0) + '</div><div class="afr-lab">групп дублей склеено</div></div>' +
+          '<div><div class="afr-num">' + (am.components_merged || 0) + '</div><div class="afr-lab">записей слито</div></div>' +
+          '<div><div class="afr-num">' + (am.model_bom_moved || 0) + '</div><div class="afr-lab">связей BOM перенесено</div></div>' +
+          '<div><div class="afr-num">' + (am.contract_items || 0) + '</div><div class="afr-lab">строк договоров</div></div>' +
+          '<div><div class="afr-num">' + (d.fixed_model_bom || 0) + '</div><div class="afr-lab">BOM перепривязано</div></div>' +
+        '</div>' +
+      '</div>';
+    if (body) body.innerHTML = summary;
+    cache.components = null;
+    showToast('Готово — открой любой НПВ и проверь', 'success');
+    // Через 1.5 сек перезагрузим диагностику чтобы увидеть остаточные проблемы
+    setTimeout(_reloadBomDiagnose, 1500);
+  } catch (e) {
+    if (body) body.innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+  }
 }
 
 // v2.41.3: backfill артикулов в номенклатуре
