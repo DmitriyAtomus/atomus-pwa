@@ -13910,7 +13910,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.12-aisi-only-mode";
+const APP_VERSION = "v2.41.13-split-single-model";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23525,6 +23525,12 @@ async function openModelDetail(modelId) {
   const editBtn = canManageSales()
     ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')"><i class="ti ti-edit"></i> Редактировать</button>'
     : '';
+  // v2.41.13: кнопка «Раздвоить» для choice-моделей (только директор/зам)
+  const splitBtn = (canManageSales() && m.exec_mode === 'choice')
+    ? '<button class="btn btn-secondary btn-small" onclick="splitModelExecution(' + modelId + ')" title="Создать вторую модель — копию с пометкой AISI">' +
+        '<i class="ti ti-arrows-split-2"></i> Раздвоить' +
+      '</button>'
+    : '';
 
   overlay.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
@@ -23547,6 +23553,7 @@ async function openModelDetail(modelId) {
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
             editBtn +
+            splitBtn +
             (canManageSales() ?
               '<button class="btn btn-secondary btn-small" onclick="openBomImportFromText(' + modelId + ', ' + JSON.stringify(m.name || '') + ')" title="Вставить BOM из Excel/текста">' +
                 '<i class="ti ti-clipboard-data"></i> Импорт BOM' +
@@ -29897,6 +29904,54 @@ function _renderClimateSetupPreview(p) {
     '</button>' +
   '</div>';
   document.getElementById('climate-setup-body').innerHTML = html;
+}
+
+// v2.41.13: раздвоение одной модели через кнопку в карточке
+async function splitModelExecution(modelId) {
+  // m из cache
+  const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+  if (!m) {
+    showToast('Модель не найдена в кэше — обнови страницу', 'error');
+    return;
+  }
+  const labelSt = m.exec_label_st || 'Стандарт';
+  const labelNe = m.exec_label_ne || 'Нерж. AISI';
+  const newName = (m.name || '').endsWith(' AISI') ? m.name : (m.name + ' AISI');
+  if (!confirm(
+    'Раздвоить модель «' + m.name + '» на две?\n\n' +
+    '• Текущая модель станет фиксированным исполнением: «' + labelSt + '»\n' +
+    '• Будет создана новая модель: «' + newName + '» с исполнением «' + labelNe + '»\n\n' +
+    'BOM при раздвоении НЕ копируется — у новой будет пустой. Заполнишь через «Импорт BOM» или «Загрузить мастер-BOM».'
+  )) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/split-execution', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || e.detail || e.error || 'Не удалось', 'error');
+      return;
+    }
+    const d = await r.json();
+    if (d.error) {
+      showToast(d.error + (d.detail ? ': ' + d.detail : ''), 'error');
+      return;
+    }
+    if (d.skipped) {
+      showToast('Пропущено: ' + (d.reason || ''), 'info');
+      return;
+    }
+    showToast('Создана модель: ' + (d.new_name || ''), 'success');
+    cache.models = null;
+    closeModelDetail();
+    if (typeof loadModels === 'function') {
+      try { loadModels(); } catch (_) {}
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 async function runClimateSetup() {
