@@ -5697,22 +5697,24 @@
     margin-left: 14px;
   }
   .models-subgroup-toggle {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 10px;
     width: 100%;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 10px;
+    padding: 10px 14px;
     cursor: pointer;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text);
-    font-weight: 500;
-    transition: background 0.12s, border-color 0.12s;
+    font-weight: 600;
+    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+    border-left-width: 4px;
   }
   .models-subgroup-toggle:hover {
     background: var(--brand-bg);
     border-color: var(--brand);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
   .models-subgroup-chevron {
     transition: transform 0.2s;
@@ -5722,22 +5724,108 @@
   .models-subgroup-chevron.open {
     transform: rotate(90deg);
   }
-  .models-subgroup-toggle > span:first-of-type {
+  .models-subgroup-toggle .sg-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .models-subgroup-toggle .sg-name {
     flex: 1;
     text-align: left;
+    letter-spacing: 0.1px;
   }
   .models-subgroup-count {
     background: white;
     color: var(--brand);
-    padding: 1px 8px;
+    padding: 2px 10px;
     border-radius: 999px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
+    border: 1px solid currentColor;
   }
   .models-subgroup-body {
     padding-top: 6px;
     margin-bottom: 8px;
   }
+
+  /* v2.41.10: темы подгрупп — каждая своего цвета */
+  .models-subgroup.sg-outdoor .models-subgroup-toggle {
+    background: linear-gradient(135deg, #DBEAFE 0%, #EFF6FF 100%);
+    border-color: #BFDBFE;
+    border-left-color: #2563EB;
+    color: #1E3A8A;
+  }
+  .models-subgroup.sg-outdoor .sg-icon { color: #2563EB; }
+  .models-subgroup.sg-outdoor .models-subgroup-count { color: #1D4ED8; border-color: #93C5FD; background: #fff; }
+
+  .models-subgroup.sg-evaporator .models-subgroup-toggle {
+    background: linear-gradient(135deg, #CFFAFE 0%, #ECFEFF 100%);
+    border-color: #A5F3FC;
+    border-left-color: #0891B2;
+    color: #155E75;
+  }
+  .models-subgroup.sg-evaporator .sg-icon { color: #0891B2; }
+  .models-subgroup.sg-evaporator .models-subgroup-count { color: #0E7490; border-color: #67E8F9; background: #fff; }
+
+  .models-subgroup.sg-heater .models-subgroup-toggle {
+    background: linear-gradient(135deg, #FFEDD5 0%, #FFF7ED 100%);
+    border-color: #FED7AA;
+    border-left-color: #EA580C;
+    color: #7C2D12;
+  }
+  .models-subgroup.sg-heater .sg-icon { color: #EA580C; }
+  .models-subgroup.sg-heater .models-subgroup-count { color: #C2410C; border-color: #FDBA74; background: #fff; }
+
+  .models-subgroup.sg-humid .models-subgroup-toggle {
+    background: linear-gradient(135deg, #DBEAFE 0%, #F0F9FF 100%);
+    border-color: #BAE6FD;
+    border-left-color: #0EA5E9;
+    color: #075985;
+  }
+  .models-subgroup.sg-humid .sg-icon { color: #0EA5E9; }
+  .models-subgroup.sg-humid .models-subgroup-count { color: #0369A1; border-color: #7DD3FC; background: #fff; }
+
+  .models-subgroup.sg-defrost .models-subgroup-toggle {
+    background: linear-gradient(135deg, #E0F2FE 0%, #F0F9FF 100%);
+    border-color: #BAE6FD;
+    border-left-color: #0284C7;
+    color: #0C4A6E;
+  }
+  .models-subgroup.sg-defrost .sg-icon { color: #0284C7; }
+  .models-subgroup.sg-defrost .models-subgroup-count { color: #075985; border-color: #7DD3FC; background: #fff; }
+
+  .models-subgroup.sg-chiller .models-subgroup-toggle {
+    background: linear-gradient(135deg, #E0E7FF 0%, #EEF2FF 100%);
+    border-color: #C7D2FE;
+    border-left-color: #4F46E5;
+    color: #312E81;
+  }
+  .models-subgroup.sg-chiller .sg-icon { color: #4F46E5; }
+  .models-subgroup.sg-chiller .models-subgroup-count { color: #3730A3; border-color: #A5B4FC; background: #fff; }
+
+  .models-subgroup.sg-default .models-subgroup-toggle {
+    border-left-color: #6B7280;
+  }
+  .models-subgroup.sg-default .sg-icon { color: #6B7280; }
+
+  /* v2.41.10: подсветка слов AISI/Нерж */
+  .lbl-aisi {
+    color: #0891B2;
+    font-weight: 700;
+    background: #ECFEFF;
+    border: 1px solid #67E8F9;
+    border-radius: 4px;
+    padding: 0px 5px;
+    font-size: 0.92em;
+    margin: 0 1px;
+    white-space: nowrap;
+  }
+
+  /* v2.41.10: подсветка строки модели AISI */
+  .employee-row.model-row-aisi {
+    border-left: 3px solid #0891B2;
+    background: linear-gradient(90deg, #ECFEFF 0%, transparent 30%);
+  }
+
   @keyframes modelGroupExpand {
     from { opacity: 0; transform: translateY(-4px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -13822,7 +13910,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.9-ensure-aisi-pairs";
+const APP_VERSION = "v2.41.10-aisi-highlights-subgroups";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23144,6 +23232,18 @@ async function loadModels() {
   catch (e) { container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>'; }
 }
 
+// v2.41.10: иконка и палитра подгруппы по её имени/коду
+function _subgroupTheme(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('наружн')) return { icon: 'ti-building-broadcast-tower', cls: 'sg-outdoor' };
+  if (n.includes('воздухоохл')) return { icon: 'ti-snowflake',           cls: 'sg-evaporator' };
+  if (n.includes('донагрев') || n.startsWith('нпв')) return { icon: 'ti-flame', cls: 'sg-heater' };
+  if (n.includes('увлаж'))    return { icon: 'ti-droplet',                cls: 'sg-humid' };
+  if (n.includes('дефрост'))  return { icon: 'ti-temperature-snow',       cls: 'sg-defrost' };
+  if (n.includes('чиллер'))   return { icon: 'ti-thermometer',            cls: 'sg-chiller' };
+  return { icon: 'ti-folder', cls: 'sg-default' };
+}
+
 function renderModels(d) {
   const container = document.getElementById('models-list');
   if (!d.models || d.models.length === 0) {
@@ -23243,10 +23343,12 @@ function renderModels(d) {
       const sg = bySubgroup[sid];
       const subKey = dirId + ':' + sid;
       const subOpen = subKey in openSubMap ? !!openSubMap[subKey] : false;
-      html += '<div class="models-subgroup">' +
+      const theme = _subgroupTheme(sg.name);
+      html += '<div class="models-subgroup ' + theme.cls + '">' +
         '<button class="models-subgroup-toggle" data-subkey="' + subKey + '" onclick="toggleModelsSubgroup(\'' + subKey + '\')">' +
           '<i class="ti ti-chevron-right models-subgroup-chevron' + (subOpen ? ' open' : '') + '"></i>' +
-          '<span>' + escapeHtml(sg.name) + '</span>' +
+          '<i class="ti ' + theme.icon + ' sg-icon"></i>' +
+          '<span class="sg-name">' + escapeHtml(sg.name) + '</span>' +
           '<span class="models-subgroup-count">' + sg.items.length + '</span>' +
         '</button>' +
         '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">' +
@@ -23260,15 +23362,26 @@ function renderModels(d) {
   container.innerHTML = html;
 }
 
+// v2.41.10: подсветка слов «AISI» / «Нерж» в названиях моделей и компонентов
+function _highlightAisi(text) {
+  if (!text) return '';
+  const escaped = escapeHtml(text);
+  return escaped
+    .replace(/(AISI)/g, '<span class="lbl-aisi">$1</span>')
+    .replace(/(Нерж\.?(?:\s*AISI)?)/gi, m => '<span class="lbl-aisi">' + m + '</span>');
+}
+
 function _renderModelRow(m) {
   const title = m.name + (m.extra ? ' · ' + m.extra : '');
+  const isAisi = ((m.name || '').toUpperCase().includes('AISI')) ||
+                 ((m.exec_fixed || '').toLowerCase().startsWith('нерж'));
   const meta = [];
   if (m.article) meta.push(m.article);
   if (m.exec_mode === 'choice') meta.push('испол.: ' + m.exec_label_st + ' / ' + m.exec_label_ne);
   else if (m.exec_mode === 'fixed' && m.exec_fixed) meta.push('испол.: ' + m.exec_fixed);
   if (m.needs_ip) meta.push('IP');
   const inactiveCls = m.is_active ? '' : ' emp-inactive';
-  // v2.20.0: бейджи наличия и BOM-дефицита (когда with_stock=true)
+  const aisiRowCls = isAisi ? ' model-row-aisi' : '';
   let stockBadges = '';
   if (typeof m.assemblies_ready === 'number') {
     if (m.assemblies_ready > 0) {
@@ -23283,9 +23396,9 @@ function _renderModelRow(m) {
       stockBadges += '<span class="model-badge mb-ready" title="Все комплектующие в наличии — можно собирать"><i class="ti ti-tool"></i>К сборке</span>';
     }
   }
-  return '<div class="employee-row' + inactiveCls + '" style="cursor:pointer;" onclick="openModelDetail(' + m.id + ')">' +
-    '<div class="emp-info"><div class="emp-name">' + escapeHtml(title) + '</div>' +
-    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') +
+  return '<div class="employee-row' + inactiveCls + aisiRowCls + '" style="cursor:pointer;" onclick="openModelDetail(' + m.id + ')">' +
+    '<div class="emp-info"><div class="emp-name">' + _highlightAisi(title) + '</div>' +
+    '<div class="emp-meta">' + _highlightAisi(meta.join(' · ') || '—') +
       (stockBadges ? '<div class="model-badges-row">' + stockBadges + '</div>' : '') +
     '</div></div>' +
     '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
@@ -23417,9 +23530,9 @@ async function openModelDetail(modelId) {
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
         '<div>' +
-          '<h3 style="margin:0;">' + escapeHtml(m.name + (m.extra ? ' · ' + m.extra : '')) + '</h3>' +
+          '<h3 style="margin:0;">' + _highlightAisi(m.name + (m.extra ? ' · ' + m.extra : '')) + '</h3>' +
           '<div style="font-size:12px;color:var(--text-light);margin-top:4px;">' +
-            escapeHtml(dirName) + ' · ' + escapeHtml(subParts.join(' · ')) +
+            escapeHtml(dirName) + ' · ' + _highlightAisi(subParts.join(' · ')) +
           '</div>' +
         '</div>' +
         '<button class="modal-close" onclick="closeModelDetail()"><i class="ti ti-x"></i></button>' +
@@ -24159,7 +24272,7 @@ async function loadModelBom(modelId) {
       }
       html += '<div class="bom-row">' +
         '<div class="bom-row-main">' +
-          '<div class="bom-name">' + escapeHtml(it.component_name || '—') +
+          '<div class="bom-name">' + _highlightAisi(it.component_name || '—') +
             (it.component_sku ? ' <span class="comp-sku">' + escapeHtml(it.component_sku) + '</span>' : '') +
             (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
             stockBadge +
@@ -28685,7 +28798,7 @@ function renderComponentsList() {
       const zeroStock = (c.qty_on_stock <= 0);
       html += '<div class="comp-row">' +
         '<div class="comp-row-main" onclick="openComponentDetail(' + c.id + ')">' +
-          '<div class="comp-name">' + escapeHtml(c.name || '—') +
+          '<div class="comp-name">' + _highlightAisi(c.name || '—') +
             (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
             (c.execution_type === 'stainless' ? ' <span class="comp-exec-badge aisi" title="Нержавейка AISI">AISI</span>' : '') +
           '</div>' +
