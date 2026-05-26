@@ -13910,7 +13910,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.10-aisi-highlights-subgroups";
+const APP_VERSION = "v2.41.12-aisi-only-mode";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29503,6 +29503,9 @@ async function uploadMasterBom() {
     }
     const d = await r.json();
     state._masterBomSuggestions = d.suggestions || [];
+    // v2.41.11: сохраняем сами разобранные узлы — больше не полагаемся на серверный кэш
+    state._masterBomNodes = {};
+    (d.nodes || []).forEach(n => { state._masterBomNodes[n.name] = n; });
     // Подгружаем список моделей CRM для дропдаунов
     if (!cache.models) {
       try {
@@ -29595,6 +29598,7 @@ function masterBomToggleAll(value) {
 
 async function applyMasterBom() {
   const sugs = state._masterBomSuggestions || [];
+  const nodesMap = state._masterBomNodes || {};
   const createMissing = !!(document.getElementById('master-bom-create-missing') || {}).checked;
   const assignments = [];
   sugs.forEach((s, i) => {
@@ -29603,10 +29607,19 @@ async function applyMasterBom() {
     const sel = document.getElementById('mb-model-' + i);
     const model_id = sel && sel.value ? parseInt(sel.value, 10) : null;
     if (!model_id) return;
-    assignments.push({ node_name: s.node_name, model_id: model_id });
+    const node = nodesMap[s.node_name];
+    if (!node || !node.rows || !node.rows.length) {
+      console.warn('Нет rows для узла', s.node_name);
+      return;
+    }
+    assignments.push({
+      node_name: s.node_name,
+      model_id:  model_id,
+      rows:      node.rows,  // v2.41.11: передаём содержимое узла, чтобы не зависеть от кэша
+    });
   });
   if (!assignments.length) {
-    showToast('Не выбрано ни одного узла для применения', 'error');
+    showToast('Не выбрано ни одного узла для применения (или потеряны данные — загрузи файл заново)', 'error');
     return;
   }
   if (!confirm(
@@ -29629,7 +29642,7 @@ async function applyMasterBom() {
     });
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
-      if (preview) preview.innerHTML = '<div class="empty-block">' + escapeHtml(e.message || e.detail || 'Ошибка') + '</div>';
+      if (preview) preview.innerHTML = '<div class="empty-block">' + escapeHtml(e.message || e.detail || e.error || 'Ошибка') + '</div>';
       return;
     }
     const d = await r.json();
@@ -29637,7 +29650,7 @@ async function applyMasterBom() {
     cache.components = null;
     cache.models = null;
   } catch (e) {
-    if (preview) preview.innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+    if (preview) preview.innerHTML = '<div class="empty-block">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
   }
 }
 
@@ -29651,8 +29664,16 @@ function _renderMasterBomResult(data) {
         '<div><div class="afr-num">' + (data.total_skipped || 0) + '</div><div class="afr-lab">строк пропущено</div></div>' +
         '<div><div class="afr-num">' + (data.components_created || 0) + '</div><div class="afr-lab">компонентов создано</div></div>' +
       '</div>' +
-    '</div>' +
-    '<div class="bom-preview-list">';
+    '</div>';
+  // Если ничего не применилось — подсказка
+  if (!data.total_applied && results.length) {
+    html += '<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px 14px;margin-bottom:12px;color:#92400E;font-size:13px;">' +
+      '<i class="ti ti-alert-triangle"></i> <b>Ничего не применилось.</b> ' +
+      'Возможные причины: 1) кэш узлов потерян — нажми «Загрузить и разобрать» ещё раз; ' +
+      '2) на бэке ошибка — смотри подробности ниже.' +
+    '</div>';
+  }
+  html += '<div class="bom-preview-list">';
   results.forEach(r => {
     if (r.error) {
       html += '<div class="bom-preview-row bad">' +
@@ -29661,6 +29682,7 @@ function _renderMasterBomResult(data) {
           '<div class="bom-preview-raw"><b>' + escapeHtml(r.node_name || '') + '</b></div>' +
           '<div class="bom-preview-parsed" style="color:var(--danger);">Ошибка: ' + escapeHtml(r.error) +
             (r.detail ? ' · ' + escapeHtml(r.detail) : '') +
+            (r.message ? ' · ' + escapeHtml(r.message) : '') +
           '</div>' +
         '</div>' +
       '</div>';
@@ -29792,7 +29814,7 @@ function _renderClimateSetupPreview(p) {
   html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">';
   // Блок 1: раздвоение choice-моделей
   if (choice.length) {
-    html += '<div style="font-size:13px;color:var(--text-mid);margin-bottom:4px;">Раздвоить choice-модели (Стандарт / AISI):</div>' +
+    html += '<div style="font-size:13px;color:var(--text-mid);margin-bottom:4px;">Раздвоить choice-модели (Стандарт + AISI):</div>' +
       '<label class="cl-split-opt">' +
         '<input type="checkbox" id="cl-split-outdoor" ' +
           ((cbg['Наружные блоки'] || 0) > 0 ? 'checked' : '') +
@@ -29803,7 +29825,7 @@ function _renderClimateSetupPreview(p) {
         '<input type="checkbox" id="cl-split-evaporator" ' +
           ((cbg['Воздухоохладители'] || 0) === 0 ? ' disabled' : '') + '>' +
         '<span><b>Воздухоохладители</b> — раздвоится <b>' + (cbg['Воздухоохладители'] || 0) + '</b>. ' +
-          '<span style="color:var(--text-light);font-size:12px;">(в производстве только AISI)</span></span>' +
+          '<span style="color:var(--text-light);font-size:12px;">(не рекомендуется)</span></span>' +
       '</label>' +
       '<label class="cl-split-opt">' +
         '<input type="checkbox" id="cl-split-heater" ' +
@@ -29835,6 +29857,29 @@ function _renderClimateSetupPreview(p) {
         '<span><b>Донагреватели</b> — добавится <b>' + (mpbg['Донагреватели'] || 0) + '</b> AISI</span>' +
       '</label>';
   }
+  // Блок 3: AISI-only — choice превратить в fixed AISI без раздвоения
+  if (choice.length) {
+    html += '<div style="font-size:13px;color:var(--text-mid);margin:10px 0 4px;">' +
+      '<b>Оставить только <span class="lbl-aisi">AISI</span></b> (выбор «Стандарт» уберётся, новых моделей не появится):' +
+      '</div>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-aisi-outdoor" ' +
+          ((cbg['Наружные блоки'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Наружные блоки</b> — станет AISI-only: <b>' + (cbg['Наружные блоки'] || 0) + '</b></span>' +
+      '</label>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-aisi-evaporator" ' +
+          ((cbg['Воздухоохладители'] || 0) > 0 ? 'checked' : '') +
+          ((cbg['Воздухоохладители'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Воздухоохладители</b> — станет AISI-only: <b>' + (cbg['Воздухоохладители'] || 0) + '</b> ' +
+          '<span style="color:var(--text-light);font-size:12px;">(рекомендуется — в производстве только AISI)</span></span>' +
+      '</label>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-aisi-heater" ' +
+          ((cbg['Донагреватели'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Донагреватели</b> — станет AISI-only: <b>' + (cbg['Донагреватели'] || 0) + '</b></span>' +
+      '</label>';
+  }
   if (!choice.length && !mp.length) {
     html += '<div style="color:var(--text-light);font-style:italic;">' +
       'Все модели уже корректно разбиты на пары — раздваивать или добавлять нечего.' +
@@ -29857,6 +29902,7 @@ function _renderClimateSetupPreview(p) {
 async function runClimateSetup() {
   const splitSubgroups = [];
   const ensurePairsSubgroups = [];
+  const aisiOnlySubgroups = [];
   const map = [
     ['outdoor', 'Наружные блоки'],
     ['evaporator', 'Воздухоохладители'],
@@ -29867,15 +29913,24 @@ async function runClimateSetup() {
     if (sb && sb.checked && !sb.disabled) splitSubgroups.push(name);
     const pb = document.getElementById('cl-pair-' + slug);
     if (pb && pb.checked && !pb.disabled) ensurePairsSubgroups.push(name);
+    const ab = document.getElementById('cl-aisi-' + slug);
+    if (ab && ab.checked && !ab.disabled) aisiOnlySubgroups.push(name);
   });
-  if (!splitSubgroups.length && !ensurePairsSubgroups.length) {
+  // Защита от противоречий: нельзя одновременно раздваивать И делать AISI-only одну и ту же подгруппу
+  const conflict = splitSubgroups.filter(n => aisiOnlySubgroups.includes(n));
+  if (conflict.length) {
+    showToast('Нельзя одновременно «Раздвоить» и «AISI-only» для: ' + conflict.join(', '), 'error');
+    return;
+  }
+  if (!splitSubgroups.length && !ensurePairsSubgroups.length && !aisiOnlySubgroups.length) {
     showToast('Ничего не выбрано', 'info');
     return;
   }
   const lines = ['Применить настройку структуры Климатики?'];
   if (splitSubgroups.length) lines.push('• Раздвоить choice-модели: ' + splitSubgroups.join(', '));
   if (ensurePairsSubgroups.length) lines.push('• Достроить AISI-копии: ' + ensurePairsSubgroups.join(', '));
-  lines.push('\nЭто безопасно: ничего не удаляется.');
+  if (aisiOnlySubgroups.length) lines.push('• Сделать AISI-only (убрать «Стандарт»-выбор): ' + aisiOnlySubgroups.join(', '));
+  lines.push('\nЭто безопасно: модели не удаляются.');
   if (!confirm(lines.join('\n'))) return;
   const body = document.getElementById('climate-setup-body');
   if (body) body.innerHTML = '<div class="loading-block">Применяем структуру…</div>';
@@ -29887,6 +29942,7 @@ async function runClimateSetup() {
       body: JSON.stringify({
         split_subgroups:        splitSubgroups,
         ensure_pairs_subgroups: ensurePairsSubgroups,
+        aisi_only_subgroups:    aisiOnlySubgroups,
       }),
     });
     if (!r.ok) {
@@ -29909,8 +29965,10 @@ function _renderClimateSetupResult(d) {
   const a = d.assignment || {};
   const s = d.split || {};
   const p = d.ensure_pairs || {};
+  const ao = d.aisi_only || {};
   const splittedCount = s.splitted || 0;
   const createdPairs = p.created || 0;
+  const aisiOnlyCount = ao.converted || 0;
   const allNew = (s.new_models || []).concat(p.new_models || []);
   let html =
     '<div class="autofix-result">' +
@@ -29920,6 +29978,7 @@ function _renderClimateSetupResult(d) {
         '<div><div class="afr-num">' + (a.assigned || 0) + '</div><div class="afr-lab">моделей распределено</div></div>' +
         '<div><div class="afr-num">' + splittedCount + '</div><div class="afr-lab">моделей раздвоено</div></div>' +
         '<div><div class="afr-num">' + createdPairs + '</div><div class="afr-lab">AISI-пар достроено</div></div>' +
+        '<div><div class="afr-num">' + aisiOnlyCount + '</div><div class="afr-lab">сделано AISI-only</div></div>' +
         '<div><div class="afr-num">' + allNew.length + '</div><div class="afr-lab">новых AISI всего</div></div>' +
       '</div>' +
     '</div>';
@@ -29928,6 +29987,15 @@ function _renderClimateSetupResult(d) {
       '<ul style="margin:0 0 0 20px;color:var(--text);max-height:250px;overflow:auto;">';
     allNew.forEach(m => {
       html += '<li>' + escapeHtml(m.new_name) + '</li>';
+    });
+    html += '</ul>';
+  }
+  if (ao.models && ao.models.length) {
+    html += '<h4 style="margin:14px 0 6px;font-size:14px;">Переведены в AISI-only:</h4>' +
+      '<ul style="margin:0 0 0 20px;color:var(--text);max-height:200px;overflow:auto;">';
+    ao.models.forEach(m => {
+      html += '<li>' + escapeHtml(m.name) +
+        ' <span style="color:var(--text-light);font-size:11px;">(' + escapeHtml(m.article || '') + ')</span></li>';
     });
     html += '</ul>';
   }
