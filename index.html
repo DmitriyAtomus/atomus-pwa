@@ -13259,7 +13259,9 @@
         <div class="screen-header">
           <button class="back-btn" onclick="selectSidebarItem('sales-contracts')"><i class="ti ti-arrow-left"></i></button>
           <h2 id="scd-mobile-title">Договор</h2>
-          <button class="icon-btn" id="scd-mobile-edit" onclick="openEditContract()"><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" id="scd-mobile-actions" onclick="openContractMobileActions(this)" title="Действия">
+            <i class="ti ti-dots-vertical"></i>
+          </button>
         </div>
         <div class="page-header">
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -14592,7 +14594,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.5-production-to-warehouse";
+const APP_VERSION = "v2.43.6-contract-mobile-actions";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37148,6 +37150,30 @@ function showContractQrFromDetail() {
     return;
   }
   showContractQr(c.id, c.number || '#' + c.id, c.contractor_name || '');
+}
+
+// v2.43.6: kebab-меню действий с договором для мобильной шапки.
+// На десктопе кнопки QR/Чат/Доработка/Монтажнику/Редактировать/Удалить лежат в page-header.
+// На мобиле этот page-header скрыт CSS — поэтому собираем те же действия в простое меню.
+function openContractMobileActions(anchorEl) {
+  const c = state.lastLoadedContract;
+  if (!c || !c.id) {
+    showToast('Договор не загружен', 'error');
+    return;
+  }
+  const items = [
+    { label: 'QR-код',     icon: 'qrcode',         onclick: function () { showContractQrFromDetail(); } },
+    { label: 'Чат',        icon: 'message-circle', onclick: function () { openContractChat(); } },
+    { label: 'Доработка',  icon: 'alert-circle',   onclick: function () { openDefectFormForContract(); } },
+    { label: 'Монтажнику', icon: 'send',           onclick: function () { openShareWithInstallerForContract(); } },
+  ];
+  // Редактирование — только если есть права
+  if (typeof canManageSales !== 'function' || canManageSales()) {
+    items.push({ label: 'Редактировать', icon: 'edit', onclick: function () { openEditContract(); } });
+    items.push({ label: 'Удалить',       icon: 'trash', danger: true,
+                 onclick: function () { deleteCurrentContract(); } });
+  }
+  showSimpleMenu(anchorEl, items);
 }
 
 async function openEditContract() {
