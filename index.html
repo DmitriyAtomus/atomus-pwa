@@ -13822,7 +13822,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.8-climate-per-subgroup-split";
+const APP_VERSION = "v2.41.9-ensure-aisi-pairs";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29621,6 +29621,8 @@ function _renderClimateSetupPreview(p) {
   const byGroup = p.by_group_preview || {};
   const choice = p.choice_models_to_split || [];
   const cbg = p.choice_by_group || {};
+  const mpbg = p.missing_pair_by_group || {};
+  const mp = p.missing_pair_models || [];
   let html =
     '<div class="autofix-banner">' +
       '<div class="autofix-banner-text">' +
@@ -29628,7 +29630,7 @@ function _renderClimateSetupPreview(p) {
         '<div>' +
           '<div class="autofix-banner-title">Привести структуру Климатики в порядок</div>' +
           '<div class="autofix-banner-sub">' +
-            'Создаст подгруппы, разнесёт модели и по желанию раздвоит «Стандарт / AISI» на две отдельные. Выбирай ниже какие подгруппы раздваивать.' +
+            'Создаст подгруппы, разнесёт модели, раздвоит choice-модели и при необходимости достроит AISI-двойников для стандартных без пары.' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -29660,47 +29662,76 @@ function _renderClimateSetupPreview(p) {
       '</div>' +
       '<div class="dup-group-items" style="padding:6px 0;">';
     arr.forEach(m => {
-      const choiceTag = m.is_choice ? '<span class="bom-exec-tag aisi" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">Раздвоится</span>' : '';
+      let tag = '';
+      if (m.is_choice) tag = '<span class="bom-exec-tag aisi" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">Раздвоится</span>';
+      else if (m.is_aisi) tag = '<span class="bom-exec-tag aisi">AISI</span>';
+      else if (m.needs_aisi_pair) tag = '<span class="bom-exec-tag aisi" style="background:#E0F2FE;color:#0369A1;border-color:#BAE6FD;">Нужна AISI-пара</span>';
       html += '<div style="padding:4px 14px;font-size:13px;color:var(--text);">' +
         escapeHtml(m.name || '') +
         (m.article ? ' <span style="color:var(--text-light);font-size:11px;">' + escapeHtml(m.article) + '</span>' : '') +
-        ' ' + choiceTag +
+        ' ' + tag +
       '</div>';
     });
     html += '</div></div>';
   });
   // Раздвоение — чекбоксы по подгруппам
-  html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--text);">Раздвоение моделей на Стандарт ↔ AISI</h4>';
-  if (!choice.length) {
-    html += '<div style="color:var(--text-light);font-style:italic;">Нет моделей с пометкой «Стандарт / AISI» — раздваивать нечего.</div>';
-  } else {
-    html +=
-      '<p style="color:var(--text-mid);font-size:13px;margin:0 0 8px;">' +
-        'Выбери в каких подгруппах раздваивать модели:' +
-      '</p>' +
-      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">' +
-        '<label class="cl-split-opt">' +
-          '<input type="checkbox" id="cl-split-outdoor" ' +
-            ((cbg['Наружные блоки'] || 0) > 0 ? 'checked' : '') +
-            ((cbg['Наружные блоки'] || 0) === 0 ? ' disabled' : '') + '>' +
-          '<span><b>Наружные блоки</b> — раздвоится <b>' + (cbg['Наружные блоки'] || 0) + '</b></span>' +
-        '</label>' +
-        '<label class="cl-split-opt">' +
-          '<input type="checkbox" id="cl-split-evaporator" ' +
-            ((cbg['Воздухоохладители'] || 0) === 0 ? ' disabled' : '') + '>' +
-          '<span><b>Воздухоохладители</b> — раздвоится <b>' + (cbg['Воздухоохладители'] || 0) + '</b>. ' +
-            '<span style="color:var(--text-light);font-size:12px;">(не рекомендуется — в производстве только AISI)</span></span>' +
-        '</label>' +
-        '<label class="cl-split-opt">' +
-          '<input type="checkbox" id="cl-split-heater" ' +
-            ((cbg['Донагреватели'] || 0) > 0 ? 'checked' : '') +
-            ((cbg['Донагреватели'] || 0) === 0 ? ' disabled' : '') + '>' +
-          '<span><b>Донагреватели</b> — раздвоится <b>' + (cbg['Донагреватели'] || 0) + '</b></span>' +
-        '</label>' +
+  html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--text);">Что сделать</h4>';
+  html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">';
+  // Блок 1: раздвоение choice-моделей
+  if (choice.length) {
+    html += '<div style="font-size:13px;color:var(--text-mid);margin-bottom:4px;">Раздвоить choice-модели (Стандарт / AISI):</div>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-split-outdoor" ' +
+          ((cbg['Наружные блоки'] || 0) > 0 ? 'checked' : '') +
+          ((cbg['Наружные блоки'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Наружные блоки</b> — раздвоится <b>' + (cbg['Наружные блоки'] || 0) + '</b></span>' +
+      '</label>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-split-evaporator" ' +
+          ((cbg['Воздухоохладители'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Воздухоохладители</b> — раздвоится <b>' + (cbg['Воздухоохладители'] || 0) + '</b>. ' +
+          '<span style="color:var(--text-light);font-size:12px;">(в производстве только AISI)</span></span>' +
+      '</label>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-split-heater" ' +
+          ((cbg['Донагреватели'] || 0) > 0 ? 'checked' : '') +
+          ((cbg['Донагреватели'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Донагреватели</b> — раздвоится <b>' + (cbg['Донагреватели'] || 0) + '</b></span>' +
+      '</label>';
+  }
+  // Блок 2: достроить AISI-пары для уже fixed-моделей без пары
+  if (mp.length) {
+    html += '<div style="font-size:13px;color:var(--text-mid);margin:10px 0 4px;">' +
+      '<b>Достроить AISI-копии</b> (для стандартных без пары):' +
       '</div>' +
-      '<p style="color:var(--text-mid);font-size:12px;margin:8px 0 0;font-style:italic;">' +
-        'BOM при раздвоении НЕ копируется — у новых AISI-моделей он будет пустой, потом загрузишь через мастер-BOM.' +
-      '</p>';
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-pair-outdoor" ' +
+          ((mpbg['Наружные блоки'] || 0) > 0 ? 'checked' : '') +
+          ((mpbg['Наружные блоки'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Наружные блоки</b> — добавится <b>' + (mpbg['Наружные блоки'] || 0) + '</b> AISI</span>' +
+      '</label>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-pair-evaporator" ' +
+          ((mpbg['Воздухоохладители'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Воздухоохладители</b> — добавится <b>' + (mpbg['Воздухоохладители'] || 0) + '</b> AISI</span>' +
+      '</label>' +
+      '<label class="cl-split-opt">' +
+        '<input type="checkbox" id="cl-pair-heater" ' +
+          ((mpbg['Донагреватели'] || 0) > 0 ? 'checked' : '') +
+          ((mpbg['Донагреватели'] || 0) === 0 ? ' disabled' : '') + '>' +
+        '<span><b>Донагреватели</b> — добавится <b>' + (mpbg['Донагреватели'] || 0) + '</b> AISI</span>' +
+      '</label>';
+  }
+  if (!choice.length && !mp.length) {
+    html += '<div style="color:var(--text-light);font-style:italic;">' +
+      'Все модели уже корректно разбиты на пары — раздваивать или добавлять нечего.' +
+      '</div>';
+  }
+  html += '</div>';
+  if (choice.length || mp.length) {
+    html += '<p style="color:var(--text-mid);font-size:12px;margin:8px 0 0;font-style:italic;">' +
+      'BOM при создании AISI-моделей НЕ копируется — у новых он будет пустой, потом загрузишь через мастер-BOM.' +
+    '</p>';
   }
   html += '<div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
     '<button class="btn btn-primary" onclick="runClimateSetup()">' +
@@ -29712,21 +29743,27 @@ function _renderClimateSetupPreview(p) {
 
 async function runClimateSetup() {
   const splitSubgroups = [];
-  const outBtn = document.getElementById('cl-split-outdoor');
-  const evBtn = document.getElementById('cl-split-evaporator');
-  const heBtn = document.getElementById('cl-split-heater');
-  if (outBtn && outBtn.checked && !outBtn.disabled) splitSubgroups.push('Наружные блоки');
-  if (evBtn && evBtn.checked && !evBtn.disabled) splitSubgroups.push('Воздухоохладители');
-  if (heBtn && heBtn.checked && !heBtn.disabled) splitSubgroups.push('Донагреватели');
-  const confirmMsg =
-    'Применить настройку структуры Климатики?\n\n' +
-    '• Подгруппы создадутся (если не было)\n' +
-    '• Модели распределятся по подгруппам автоматом (учитывается артикул КЛМ-ВО/НПВ/НБ)\n' +
-    (splitSubgroups.length
-      ? '• Раздвоить модели в подгруппах: ' + splitSubgroups.join(', ') + '\n'
-      : '• Раздвоение НЕ выполняется\n') +
-    '\nЭто безопасно: ничего не удаляется.';
-  if (!confirm(confirmMsg)) return;
+  const ensurePairsSubgroups = [];
+  const map = [
+    ['outdoor', 'Наружные блоки'],
+    ['evaporator', 'Воздухоохладители'],
+    ['heater', 'Донагреватели'],
+  ];
+  map.forEach(([slug, name]) => {
+    const sb = document.getElementById('cl-split-' + slug);
+    if (sb && sb.checked && !sb.disabled) splitSubgroups.push(name);
+    const pb = document.getElementById('cl-pair-' + slug);
+    if (pb && pb.checked && !pb.disabled) ensurePairsSubgroups.push(name);
+  });
+  if (!splitSubgroups.length && !ensurePairsSubgroups.length) {
+    showToast('Ничего не выбрано', 'info');
+    return;
+  }
+  const lines = ['Применить настройку структуры Климатики?'];
+  if (splitSubgroups.length) lines.push('• Раздвоить choice-модели: ' + splitSubgroups.join(', '));
+  if (ensurePairsSubgroups.length) lines.push('• Достроить AISI-копии: ' + ensurePairsSubgroups.join(', '));
+  lines.push('\nЭто безопасно: ничего не удаляется.');
+  if (!confirm(lines.join('\n'))) return;
   const body = document.getElementById('climate-setup-body');
   if (body) body.innerHTML = '<div class="loading-block">Применяем структуру…</div>';
   try {
@@ -29734,7 +29771,10 @@ async function runClimateSetup() {
     const r = await fetch(API_BASE + '/api/climate/structure-setup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ split_subgroups: splitSubgroups }),
+      body: JSON.stringify({
+        split_subgroups:        splitSubgroups,
+        ensure_pairs_subgroups: ensurePairsSubgroups,
+      }),
     });
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
@@ -29755,29 +29795,34 @@ async function runClimateSetup() {
 function _renderClimateSetupResult(d) {
   const a = d.assignment || {};
   const s = d.split || {};
+  const p = d.ensure_pairs || {};
+  const splittedCount = s.splitted || 0;
+  const createdPairs = p.created || 0;
+  const allNew = (s.new_models || []).concat(p.new_models || []);
   let html =
     '<div class="autofix-result">' +
       '<div class="autofix-result-title"><i class="ti ti-circle-check" style="color:#15803D;"></i> Структура Климатики настроена</div>' +
       '<div class="autofix-result-grid">' +
         '<div><div class="afr-num">' + Object.keys(d.subgroups || {}).length + '</div><div class="afr-lab">подгруппы</div></div>' +
         '<div><div class="afr-num">' + (a.assigned || 0) + '</div><div class="afr-lab">моделей распределено</div></div>' +
-        '<div><div class="afr-num">' + (s.splitted || 0) + '</div><div class="afr-lab">моделей раздвоено</div></div>' +
-        '<div><div class="afr-num">' + ((s.new_models || []).length) + '</div><div class="afr-lab">новых AISI</div></div>' +
+        '<div><div class="afr-num">' + splittedCount + '</div><div class="afr-lab">моделей раздвоено</div></div>' +
+        '<div><div class="afr-num">' + createdPairs + '</div><div class="afr-lab">AISI-пар достроено</div></div>' +
+        '<div><div class="afr-num">' + allNew.length + '</div><div class="afr-lab">новых AISI всего</div></div>' +
       '</div>' +
     '</div>';
-  // Список новых AISI-моделей
-  if (s.new_models && s.new_models.length) {
+  if (allNew.length) {
     html += '<h4 style="margin:14px 0 6px;font-size:14px;">Созданы AISI-модели:</h4>' +
       '<ul style="margin:0 0 0 20px;color:var(--text);max-height:250px;overflow:auto;">';
-    s.new_models.forEach(m => {
+    allNew.forEach(m => {
       html += '<li>' + escapeHtml(m.new_name) + '</li>';
     });
     html += '</ul>';
   }
-  if (s.failures && s.failures.length) {
-    html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--danger);">Не удалось раздвоить:</h4>' +
+  const allFailures = (s.failures || []).concat(p.failures || []);
+  if (allFailures.length) {
+    html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--danger);">Не удалось:</h4>' +
       '<ul style="margin:0 0 0 20px;color:var(--text);">';
-    s.failures.forEach(f => {
+    allFailures.forEach(f => {
       html += '<li>' + escapeHtml(f.name) + ' — ' + escapeHtml(f.error || '') + '</li>';
     });
     html += '</ul>';
