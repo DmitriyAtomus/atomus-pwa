@@ -7121,6 +7121,63 @@
   .qr-actions {
     display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
   }
+  /* На мобиле кнопки QR-модалки растягиваем во всю ширину для удобного нажатия */
+  @media (max-width: 600px) {
+    .qr-modal-body { padding: 16px; }
+    .qr-actions { flex-direction: column; gap: 8px; }
+    .qr-actions .btn {
+      width: 100%;
+      justify-content: center;
+      min-height: 44px;  /* комфортный тап-таргет на мобиле */
+    }
+    .qr-canvas-wrap { padding: 12px; }
+  }
+
+  /* ============ ЭТАП 33.3 (v2.43.3): УНИВЕРСАЛЬНОЕ POPUP-МЕНЮ ============ */
+  .simple-menu {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    min-width: 180px;
+    padding: 6px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .simple-menu-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border: none; background: transparent;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+  }
+  .simple-menu-item:hover { background: var(--bg); }
+  .simple-menu-item.danger { color: var(--danger); }
+  .simple-menu-item.danger:hover { background: rgba(220, 53, 69, 0.08); }
+  .simple-menu-item i { font-size: 16px; flex: 0 0 16px; }
+
+  /* Кнопка-кебаб (⋮) в карточках на мобиле */
+  .dir-kebab-btn {
+    display: none;  /* По умолчанию скрыта — показываем только на мобиле через media query ниже */
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-mid);
+    align-items: center; justify-content: center;
+  }
+  .dir-kebab-btn i { font-size: 18px; }
+  .dir-kebab-btn:hover { background: var(--bg); color: var(--text); }
+
+  /* На узких экранах прячем три иконки и показываем кебаб */
+  @media (max-width: 760px) {
+    .dir-actions-desktop { display: none !important; }
+    .dir-kebab-btn { display: inline-flex; }
+  }
 
   /* ============ ЭТАП 33 (v2.43.2): СЕТЕВАЯ ПЕЧАТЬ — МОДАЛКА ============ */
   .np-body { padding: 20px 24px; }
@@ -14535,7 +14592,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.2-print-ui";
+const APP_VERSION = "v2.43.3-mobile-cleanup";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -24451,11 +24508,13 @@ function renderModels(d) {
           '<span class="models-group-name">' + escapeHtml(dirNamePretty) + '</span>' +
           '<span class="models-group-count">' + models.length + '</span>' +
           (canEdit && dir ?
-            '<span style="display:inline-flex;gap:4px;" onclick="event.stopPropagation()">' +
+            '<span class="dir-actions-desktop" style="display:inline-flex;gap:4px;" onclick="event.stopPropagation()">' +
               '<span role="button" tabindex="0" class="icon-btn" title="Переименовать раздел" onclick="event.stopPropagation();openEditDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-edit" style="font-size:14px;"></i></span>' +
               '<span role="button" tabindex="0" class="icon-btn" title="Дублировать раздел" onclick="event.stopPropagation();openDuplicateDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-copy" style="font-size:14px;"></i></span>' +
               '<span role="button" tabindex="0" class="icon-btn" title="Удалить раздел" onclick="event.stopPropagation();openDeleteDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;color:var(--danger);"><i class="ti ti-trash" style="font-size:14px;"></i></span>' +
-            '</span>' : '') +
+            '</span>' +
+            '<button class="dir-kebab-btn" title="Действия" onclick="event.stopPropagation();openDirectionKebabMenu(this, ' + dir.id + ')"><i class="ti ti-dots-vertical"></i></button>'
+            : '') +
         '</button>' +
         '<div class="models-group-body" data-dirid="' + dirId + '" style="' + (isOpen ? '' : 'display:none;') + '">';
 
@@ -41329,6 +41388,84 @@ function closeActionSheet25(e) {
   if (e && e.target && !e.target.classList.contains('sheet25-overlay') && !e.target.classList.contains('sheet25-cancel')) return;
   const sh = document.getElementById('action-sheet-25');
   if (sh) sh.classList.remove('visible');
+}
+
+// ============ УНИВЕРСАЛЬНОЕ POPUP-МЕНЮ (v2.43.3 mobile-cleanup) ============
+// Используется для kebab-меню (⋮) в карточках направлений и других мест.
+// items = [{ label, icon, onclick, danger? }]
+//   icon — класс Tabler ti-* без префикса (например 'edit')
+//   danger — если true, пункт красным
+// anchorEl — кнопка, рядом с которой открывать меню
+
+function showSimpleMenu(anchorEl, items) {
+  if (!anchorEl || !items || !items.length) return;
+  // Закрываем предыдущее меню если открыто
+  const existing = document.getElementById('simple-menu-popup');
+  if (existing) existing.remove();
+
+  const rect = anchorEl.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.id = 'simple-menu-popup';
+  menu.className = 'simple-menu';
+  menu.style.position = 'fixed';
+  menu.style.zIndex = '10000';
+  // Сначала добавим в DOM невидимо чтобы измерить размер, потом спозиционируем
+  menu.style.visibility = 'hidden';
+
+  items.forEach((it, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'simple-menu-item' + (it.danger ? ' danger' : '');
+    btn.innerHTML =
+      (it.icon ? '<i class="ti ti-' + it.icon + '"></i>' : '') +
+      '<span>' + escapeHtml(it.label || '') + '</span>';
+    btn.onclick = function (e) {
+      e.stopPropagation();
+      closeSimpleMenu();
+      try { if (typeof it.onclick === 'function') it.onclick(); } catch (err) { console.error(err); }
+    };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+
+  // Позиционируем под anchor, выравниваем по правому краю
+  const menuRect = menu.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let top = rect.bottom + 4;
+  let left = rect.right - menuRect.width;
+  if (left < 8) left = 8;
+  if (left + menuRect.width > vw - 8) left = vw - menuRect.width - 8;
+  // Если внизу не помещается — открыть вверх
+  if (top + menuRect.height > vh - 8) top = Math.max(8, rect.top - menuRect.height - 4);
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
+  menu.style.visibility = '';
+
+  // Закрытие по клику вне меню
+  setTimeout(() => {
+    document.addEventListener('click', _simpleMenuOutsideClick, true);
+    document.addEventListener('scroll', closeSimpleMenu, true);
+  }, 0);
+}
+
+function _simpleMenuOutsideClick(e) {
+  const menu = document.getElementById('simple-menu-popup');
+  if (menu && !menu.contains(e.target)) closeSimpleMenu();
+}
+
+function closeSimpleMenu() {
+  const menu = document.getElementById('simple-menu-popup');
+  if (menu) menu.remove();
+  document.removeEventListener('click', _simpleMenuOutsideClick, true);
+  document.removeEventListener('scroll', closeSimpleMenu, true);
+}
+
+// Обёртка для kebab-меню направления (используется в renderModels)
+function openDirectionKebabMenu(anchorEl, dirId) {
+  showSimpleMenu(anchorEl, [
+    { label: 'Переименовать', icon: 'edit',  onclick: function () { openEditDirectionModal(dirId); } },
+    { label: 'Дублировать',   icon: 'copy',  onclick: function () { openDuplicateDirectionModal(dirId); } },
+    { label: 'Удалить',       icon: 'trash', danger: true, onclick: function () { openDeleteDirectionModal(dirId); } },
+  ]);
 }
 
 // ============ ПОИСК ============
