@@ -14592,7 +14592,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.3-mobile-cleanup";
+const APP_VERSION = "v2.43.4-print-all-qr";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38559,6 +38559,12 @@ async function showContractQr(contractId, number, contractorName) {
       subtitle: contractorName || '',
       url: url,
       type: 'contract',
+      data: {
+        contractId: contractId,
+        number: number,
+        contractorName: contractorName,
+        token: r.public_token,
+      },
     });
   } catch (e) {
     showToast('Не удалось получить QR', 'error');
@@ -38567,17 +38573,22 @@ async function showContractQr(contractId, number, contractorName) {
 
 function openQrModal(opts) {
   const m = document.getElementById('qr-modal');
-  // ЭТАП 26: для коробок тоже показываем кнопку «Печать наклейки»
+  // ЭТАП 26: для коробок тоже показываем кнопку «Печать наклейки» (локальная)
   const showPrintBtn = (opts.type === 'assembly' || opts.type === 'box') && opts.data;
   const printOnclick = opts.type === 'box'
     ? "printSingleBoxLabel(" + JSON.stringify(opts.data) + ")"
     : "printSingleLabel(" + JSON.stringify(opts.data) + ")";
-  // ЭТАП 33 (v2.43.2): сетевая печать на офисный термопринтер
-  // Показываем только для сборок и только при наличии permission `labels_print`.
-  const showNetPrintBtn = opts.type === 'assembly' && opts.data &&
+  // ЭТАП 33 (v2.43.4): сетевая печать на офисный термопринтер — для ВСЕХ типов QR
+  // Кнопка появляется когда есть permission `labels_print` и есть opts.url.
+  // Подпись на этикетке генерится автоматически из opts (см. _netPrintCaption).
+  const showNetPrintBtn = !!opts.url &&
     typeof hasPermission === 'function' && hasPermission('labels_print');
   const netPrintData = showNetPrintBtn
-    ? Object.assign({}, opts.data, { qrUrl: opts.url, title: opts.title })
+    ? Object.assign({}, opts.data || {}, {
+        qrUrl: opts.url,
+        title: opts.title,
+        type: opts.type,
+      })
     : null;
   m.innerHTML =
     '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
@@ -38738,13 +38749,52 @@ function _renderNetworkPrintModal() {
 }
 
 function _netPrintCaption(data) {
-  // Подпись под QR — название модели + дата сборки (если есть)
-  // Бэк всё равно обрежет до 80 символов
-  const parts = [];
-  if (data && data.modelName) parts.push(String(data.modelName));
-  if (data && data.assemblyId) parts.push('#' + data.assemblyId);
-  if (parts.length === 0 && data && data.title) parts.push(String(data.title));
-  return parts.join(' · ').slice(0, 80) || 'Сборка';
+  // Подпись под QR — зависит от типа объекта
+  if (!data) return 'QR';
+  const t = data.type || '';
+
+  if (t === 'assembly') {
+    const parts = [];
+    if (data.modelName) parts.push(String(data.modelName));
+    if (data.assemblyId) parts.push('#' + data.assemblyId);
+    return parts.join(' · ').slice(0, 80) || 'Сборка';
+  }
+
+  if (t === 'contract') {
+    // «Договор №06ТД/04.26» (без двойного № — number уже содержит №)
+    const num = data.number ? String(data.number) : ('#' + (data.contractId || ''));
+    let caption = 'Договор ' + num;
+    if (data.contractorName) {
+      caption += ' · ' + String(data.contractorName);
+    }
+    return caption.slice(0, 80);
+  }
+
+  if (t === 'box') {
+    // «Коробка #ID» или название коробки, + договор/контрагент если есть
+    const parts = [];
+    if (data.boxName) parts.push(String(data.boxName));
+    else if (data.boxId) parts.push('Коробка #' + data.boxId);
+    if (data.contractNumber) parts.push('Дог.' + data.contractNumber);
+    return parts.join(' · ').slice(0, 80) || 'Коробка';
+  }
+
+  if (t === 'defect') {
+    const parts = [];
+    if (data.defectId) parts.push('Доработка #' + data.defectId);
+    if (data.modelName) parts.push(String(data.modelName));
+    return parts.join(' · ').slice(0, 80) || 'Доработка';
+  }
+
+  // Fallback — пробуем взять любые осмысленные поля
+  const fallbackParts = [];
+  if (data.modelName) fallbackParts.push(String(data.modelName));
+  if (data.assemblyId) fallbackParts.push('#' + data.assemblyId);
+  if (fallbackParts.length === 0 && data.title) {
+    // Очищаем title от префикса «QR-код · » если есть
+    fallbackParts.push(String(data.title).replace(/^QR-код\s*·\s*/i, ''));
+  }
+  return fallbackParts.join(' · ').slice(0, 80) || 'QR';
 }
 
 function _pluralize(n, one, few, many) {
