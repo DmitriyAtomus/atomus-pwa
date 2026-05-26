@@ -5959,6 +5959,108 @@
   }
   .cchat-input-bar .btn { flex-shrink: 0; height: 40px; padding: 0 14px; }
 
+  /* v2.42.3.1: вложения */
+  .cchat-attach-btn {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-mid);
+    transition: all 0.15s;
+  }
+  .cchat-attach-btn:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .cchat-attach-btn .ti { font-size: 18px; }
+
+  .cchat-attach-preview {
+    flex-shrink: 0;
+    padding: 0 12px;
+    background: #fff;
+  }
+  .cchat-attach-preview:empty { display: none; }
+  .cchat-attach-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 10px 0 6px;
+    border-top: 1px solid var(--border);
+  }
+  .cchat-attach-item {
+    width: 92px;
+    position: relative;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .cchat-attach-item img,
+  .cchat-attach-item .cchat-thumb-icon {
+    width: 92px; height: 70px;
+    object-fit: cover;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-light); font-size: 28px;
+    background: #f3f4f6;
+  }
+  .cchat-attach-item .cchat-attach-name {
+    font-size: 10.5px;
+    padding: 3px 6px;
+    color: var(--text-mid);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cchat-attach-remove {
+    position: absolute; top: 2px; right: 2px;
+    width: 20px; height: 20px;
+    border: none; background: rgba(0,0,0,0.6);
+    color: white; border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .cchat-attach-remove:hover { background: var(--danger); }
+
+  .cchat-msg-files {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 6px;
+  }
+  .cchat-file-img img {
+    max-width: 260px;
+    max-height: 280px;
+    border-radius: 8px;
+    display: block;
+    cursor: pointer;
+  }
+  .cchat-file-video {
+    max-width: 320px;
+    max-height: 280px;
+    border-radius: 8px;
+  }
+  .cchat-file-doc {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: inherit;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .cchat-file-doc:hover { background: rgba(255,255,255,0.9); }
+  .cchat-file-doc .ti { font-size: 22px; color: #4338CA; }
+  .cchat-file-doc-name {
+    font-size: 13px; font-weight: 500;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cchat-file-doc-size { font-size: 11px; color: var(--text-light); }
+
   .chat-unread-badge {
     background: var(--danger); color: #fff;
     font-size: 10px; font-weight: 700;
@@ -13960,7 +14062,12 @@
     <div class="cchat-messages" id="cchat-messages">
       <div class="loading-block">Загружаем сообщения…</div>
     </div>
+    <div class="cchat-attach-preview" id="cchat-attach-preview"></div>
     <div class="cchat-input-bar">
+      <input type="file" id="cchat-file-input" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" style="display:none;" onchange="onContractChatFilesSelected(this.files)">
+      <button class="cchat-attach-btn" type="button" onclick="document.getElementById('cchat-file-input').click()" title="Прикрепить файлы">
+        <i class="ti ti-paperclip"></i>
+      </button>
       <textarea id="cchat-input" placeholder="Напишите сообщение… (Enter — отправить, Shift+Enter — перенос)" rows="1"></textarea>
       <button class="btn btn-primary" id="cchat-send-btn" onclick="sendContractChatMessage()">
         <i class="ti ti-send"></i>
@@ -14193,7 +14300,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.42.3-contract-chat";
+const APP_VERSION = "v2.42.4-chat-files";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15421,6 +15528,8 @@ async function openContractChat() {
 function closeContractChat() {
   document.getElementById('contract-chat-modal').classList.remove('visible');
   if (_cchatRefreshTimer) { clearInterval(_cchatRefreshTimer); _cchatRefreshTimer = null; }
+  _cchatPendingFiles = [];
+  _renderChatAttachPreview();
 }
 
 async function loadContractChat(contractId, silent) {
@@ -15476,7 +15585,12 @@ function _renderContractChatMessages(r) {
     if (showHead && !isMine) {
       html += '<div class="cchat-msg-author">' + escapeHtml(author) + '</div>';
     }
-    html += '<div class="cchat-msg-body">' + _escapeChatText(m.text) + '</div>';
+    if (m.text) {
+      html += '<div class="cchat-msg-body">' + _escapeChatText(m.text) + '</div>';
+    }
+    if (m.files && m.files.length) {
+      html += _renderChatMessageFiles(m.files);
+    }
     html += '<div class="cchat-msg-meta">' + escapeHtml(time);
     if (isMine) {
       html += ' · <button class="cchat-del-btn" onclick="deleteContractMessage(' + m.id + ')" title="Удалить"><i class="ti ti-trash"></i></button>';
@@ -15501,22 +15615,131 @@ function _escapeChatText(t) {
   return escapeHtml(t || '').replace(/\n/g, '<br>');
 }
 
+// v2.42.3.1: прикреплённые файлы
+let _cchatPendingFiles = [];
+
+function onContractChatFilesSelected(files) {
+  if (!files || !files.length) return;
+  for (let i = 0; i < files.length; i++) {
+    if (_cchatPendingFiles.length >= 5) {
+      showToast('Не больше 5 файлов на сообщение', 'info');
+      break;
+    }
+    const f = files[i];
+    // Лимит: 20МБ для фото/документов, 100МБ для видео
+    const isVid = (f.type || '').startsWith('video/');
+    const maxSize = isVid ? 100 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (f.size > maxSize) {
+      showToast('Файл "' + f.name + '" слишком большой', 'error');
+      continue;
+    }
+    _cchatPendingFiles.push(f);
+  }
+  _renderChatAttachPreview();
+  document.getElementById('cchat-file-input').value = '';
+}
+
+function _renderChatAttachPreview() {
+  const wrap = document.getElementById('cchat-attach-preview');
+  if (!wrap) return;
+  if (!_cchatPendingFiles.length) { wrap.innerHTML = ''; return; }
+  let html = '<div class="cchat-attach-row">';
+  _cchatPendingFiles.forEach((f, i) => {
+    const isImg = (f.type || '').startsWith('image/');
+    const isVid = (f.type || '').startsWith('video/');
+    let thumb;
+    if (isImg) {
+      const url = URL.createObjectURL(f);
+      thumb = '<img src="' + url + '" alt="">';
+    } else if (isVid) {
+      thumb = '<div class="cchat-thumb-icon"><i class="ti ti-video"></i></div>';
+    } else {
+      thumb = '<div class="cchat-thumb-icon"><i class="ti ti-file"></i></div>';
+    }
+    html += '<div class="cchat-attach-item">' +
+      thumb +
+      '<div class="cchat-attach-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+      '<button class="cchat-attach-remove" onclick="removeChatAttachment(' + i + ')" title="Убрать">' +
+        '<i class="ti ti-x"></i>' +
+      '</button>' +
+    '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function removeChatAttachment(idx) {
+  _cchatPendingFiles.splice(idx, 1);
+  _renderChatAttachPreview();
+}
+
+function _renderChatMessageFiles(files) {
+  if (!files || !files.length) return '';
+  let html = '<div class="cchat-msg-files">';
+  files.forEach(f => {
+    const url = API_BASE + '/api/contracts/chat/files/' + f.id;
+    if (f.kind === 'photo') {
+      html += '<a href="' + url + '" target="_blank" class="cchat-file-img">' +
+        '<img src="' + url + '" alt="">' +
+      '</a>';
+    } else if (f.kind === 'video') {
+      html += '<video controls class="cchat-file-video"><source src="' + url + '" type="' + escapeHtml(f.content_type || '') + '"></video>';
+    } else {
+      const name = f.original_name || ('Файл #' + f.id);
+      const sz = f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '';
+      html += '<a href="' + url + '" target="_blank" class="cchat-file-doc">' +
+        '<i class="ti ti-file"></i>' +
+        '<div class="cchat-file-doc-meta">' +
+          '<div class="cchat-file-doc-name">' + escapeHtml(name) + '</div>' +
+          (sz ? '<div class="cchat-file-doc-size">' + sz + '</div>' : '') +
+        '</div>' +
+      '</a>';
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
 async function sendContractChatMessage() {
   const inp = document.getElementById('cchat-input');
   const btn = document.getElementById('cchat-send-btn');
   const text = (inp.value || '').trim();
-  if (!text) return;
+  if (!text && !_cchatPendingFiles.length) return;
   const cid = state.currentContractId;
   if (!cid) return;
   btn.disabled = true;
   try {
-    const r = await apiPost('/api/contracts/' + cid + '/chat', { text: text });
-    if (!r.ok) {
-      showToast((r.data && (r.data.message || r.data.error)) || 'Не отправилось', 'error');
+    const token = localStorage.getItem(TOKEN_KEY);
+    let response;
+    if (_cchatPendingFiles.length) {
+      // multipart
+      const fd = new FormData();
+      if (text) fd.append('text', text);
+      _cchatPendingFiles.forEach((f, i) => {
+        fd.append('file_' + (i + 1), f, f.name);
+      });
+      response = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd,
+      });
+    } else {
+      // JSON
+      response = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: text }),
+      });
+    }
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      showToast(e.message || e.error || 'Не отправилось', 'error');
       return;
     }
     inp.value = '';
     inp.style.height = '';
+    _cchatPendingFiles = [];
+    _renderChatAttachPreview();
     await loadContractChat(cid, /*silent*/true);
     const box = document.getElementById('cchat-messages');
     box.scrollTop = box.scrollHeight;
