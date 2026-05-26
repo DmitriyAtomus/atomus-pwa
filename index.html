@@ -14609,7 +14609,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.7-spec-badges-mobile";
+const APP_VERSION = "v2.43.8-spec-back-nav";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19869,7 +19869,12 @@ function _spTreeItemHtml(p) {
 
 // ============ ЭТАП 36: модалка с фото + характеристиками + действиями ============
 
-async function openSaleProductDetail(productId) {
+async function openSaleProductDetail(productId, returnTo) {
+  // v2.43.8: returnTo пробрасывается в openEditSaleProduct если карточка
+  // покажется как форма редактирования (когда нет картинки/specs).
+  // Также сохраняем его для модалки sp-detail-modal: если оттуда нажмут
+  // «Редактировать» — попадём в форму с тем же контекстом возврата.
+  state.saleProductFormReturnTo = returnTo || null;
   // Грузим полную карточку с linked_models
   let p;
   try {
@@ -19885,7 +19890,7 @@ async function openSaleProductDetail(productId) {
   const isLocked = !!p.is_locked;
   const hasMeta = !!(p.image_path || (p.specs && Object.keys(p.specs).length));
   if (!hasMeta && !isLocked) {
-    openEditSaleProduct(productId);
+    openEditSaleProduct(productId, returnTo);
     return;
   }
 
@@ -20418,6 +20423,7 @@ function openNewSaleProduct() {
   }
   state.saleProductFormMode = 'new';
   state.currentSaleProductId = null;
+  state.saleProductFormReturnTo = null;  // v2.43.8: чистим хвост от прежнего перехода
   state.saleProductForm = {
     name: '', description: '', product_type: 'goods', base_price: '', unit: 'шт.',
     category_id: null,    // ЭТАП 17
@@ -20426,11 +20432,14 @@ function openNewSaleProduct() {
   selectSidebarItem('sale-product-form');
 }
 
-async function openEditSaleProduct(productId) {
+async function openEditSaleProduct(productId, returnTo) {
   if (!canManageSales()) {
     showToast('Редактировать может директор, зам или менеджер', 'error');
     return;
   }
+  // v2.43.8: если функция вызвана с return-context — записываем,
+  // иначе явно сбрасываем (чтобы прежний контекст не сработал не в том месте).
+  state.saleProductFormReturnTo = returnTo || null;
   state.saleProductFormMode = 'edit';
   state.currentSaleProductId = productId;
   try {
@@ -20457,6 +20466,14 @@ async function openEditSaleProduct(productId) {
 }
 
 function cancelSaleProductForm() {
+  // v2.43.8: если в форму пришли из конкретного места (например, из спецификации
+  // договора) — возвращаемся туда, а не на общий список продажной номенклатуры.
+  const ret = state.saleProductFormReturnTo;
+  state.saleProductFormReturnTo = null;
+  if (ret && ret.screen === 'sales-contract-detail' && ret.contractId) {
+    openContractDetail(ret.contractId);
+    return;
+  }
   selectSidebarItem('sale-products');
 }
 
@@ -20651,7 +20668,16 @@ async function submitSaleProductForm() {
     }
     showToast(isEdit ? 'Позиция обновлена' : 'Позиция создана', 'success');
     cache.saleProducts = null;
-    setTimeout(() => selectSidebarItem('sale-products'), 200);
+    // v2.43.8: если форма открывалась из спецификации договора — возвращаемся туда
+    const ret = state.saleProductFormReturnTo;
+    state.saleProductFormReturnTo = null;
+    setTimeout(() => {
+      if (ret && ret.screen === 'sales-contract-detail' && ret.contractId) {
+        openContractDetail(ret.contractId);
+      } else {
+        selectSidebarItem('sale-products');
+      }
+    }, 200);
   } catch (e) {
     errEl.innerHTML = '<div class="sales-error">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
     btn.disabled = false;
@@ -27840,6 +27866,25 @@ async function cyclePurchaseStatus(itemId, newStatus) {
   }
 }
 
+// v2.43.8: обёртки клика по позиции спецификации — передают return-context
+// в openSaleProductDetail / openModelDetail / openComponentDetail,
+// чтобы стрелка «Назад» возвращала в этот же договор, а не на общий список.
+function _openSaleProductFromSpec(productId, contractId) {
+  openSaleProductDetail(productId, {
+    screen: 'sales-contract-detail',
+    contractId: contractId,
+  });
+}
+function _openModelFromSpec(modelId, contractId) {
+  // openModelDetail — модалка, закрытие возвращает в текущий экран (договор)
+  // автоматически. Контекст пока не нужен, но оставляем функцию-обёртку
+  // на будущее (если придётся добавлять кнопку «Редактировать» с переходом).
+  openModelDetail(modelId);
+}
+function _openComponentFromSpec(componentId, contractId) {
+  if (typeof openComponentDetail === 'function') openComponentDetail(componentId);
+}
+
 function renderContractItemsBlock(contractId) {
   const container = document.getElementById('scd-items-block');
   if (!container) return;
@@ -27915,16 +27960,18 @@ function renderContractItemsBlock(contractId) {
         const meta = metaParts.join(' · ');
         // ЭТАП 38 (v2.18.0): клик по названию → открыть карточку связанной сущности
         // v2.19.1: для свободного ввода — открыть форму редактирования позиции
+        // v2.43.8: запоминаем return-context чтобы стрелка «Назад» возвращала
+        // в карточку договора (а не на список продаж/моделей/комплектующих).
         let nameClickHandler = '';
         let nameLinkClass = '';
         if (it.sale_product_id) {
-          nameClickHandler = ' onclick="openSaleProductDetail(' + it.sale_product_id + ')"';
+          nameClickHandler = ' onclick="_openSaleProductFromSpec(' + it.sale_product_id + ',' + contractId + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (it.model_id) {
-          nameClickHandler = ' onclick="openModelDetail(' + it.model_id + ')"';
+          nameClickHandler = ' onclick="_openModelFromSpec(' + it.model_id + ',' + contractId + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (it.component_id) {
-          nameClickHandler = ' onclick="openComponentDetail(' + it.component_id + ')"';
+          nameClickHandler = ' onclick="_openComponentFromSpec(' + it.component_id + ',' + contractId + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (canEdit) {
           // v2.19.1: свободный ввод — клик открывает форму редактирования (если есть права)
