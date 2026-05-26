@@ -13707,7 +13707,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.2-component-merge";
+const APP_VERSION = "v2.41.3-backfill-sku";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29060,6 +29060,10 @@ async function openBomDiagnose() {
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  await _reloadBomDiagnose();
+}
+
+async function _reloadBomDiagnose() {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/bom/diagnose', {
@@ -29080,27 +29084,53 @@ async function openBomDiagnose() {
 
 function _renderBomDiagnose(report) {
   const ci = report.contract_items || {};
+  const bom = report.model_bom || {};
   let html =
     '<p style="margin:0 0 14px;color:var(--text-mid);">' +
-      'Программа прошла по спецификациям договоров и попыталась найти соответствие в справочнике комплектующих по артикулу.' +
+      '<b>Шаг 1.</b> Заполнить пустые артикулы в номенклатуре — программа извлечёт их из названий.' +
     '</p>' +
+    '<div style="margin-bottom:14px;">' +
+      '<button class="btn btn-secondary" onclick="runBackfillSku()">' +
+        '<i class="ti ti-wand"></i> Заполнить артикулы в номенклатуре' +
+      '</button>' +
+    '</div>' +
+    '<p style="margin:0 0 14px;color:var(--text-mid);">' +
+      '<b>Шаг 2.</b> Программа пройдёт по спецификациям и привяжет их к номенклатуре по артикулу.' +
+    '</p>';
+  // Сводка
+  const totalProblems = (ci.total_unbound || 0) + (bom.total_unbound || 0);
+  const totalCanFix = (ci.matched_exact || 0) + (bom.matched_exact || 0);
+  const totalWrongExec = (ci.wrong_execution || 0) + (bom.wrong_execution || 0);
+  const totalNoMatch = (ci.no_match || 0) + (bom.no_match || 0);
+  const totalNoArt = (ci.no_article || 0) + (bom.no_article || 0);
+  html +=
     '<div class="bom-preview-summary">' +
-      '<span class="bom-pill ok"><i class="ti ti-check"></i> Можно привязать: <b>' + (ci.matched_exact || 0) + '</b></span>' +
-      '<span class="bom-pill warn"><i class="ti ti-alert-triangle"></i> Другое исполнение: <b>' + (ci.wrong_execution || 0) + '</b></span>' +
-      '<span class="bom-pill bad"><i class="ti ti-x"></i> Не найдено: <b>' + (ci.no_match || 0) + '</b></span>' +
-      '<span class="bom-pill"><i class="ti ti-question-mark"></i> Нет артикула: <b>' + (ci.no_article || 0) + '</b></span>' +
-      '<span class="bom-pill"><i class="ti ti-list"></i> Всего без связи: <b>' + (ci.total_unbound || 0) + '</b></span>' +
+      '<span class="bom-pill ok"><i class="ti ti-check"></i> Можно привязать: <b>' + totalCanFix + '</b></span>' +
+      '<span class="bom-pill warn"><i class="ti ti-alert-triangle"></i> Другое исполнение: <b>' + totalWrongExec + '</b></span>' +
+      '<span class="bom-pill bad"><i class="ti ti-x"></i> Не найдено: <b>' + totalNoMatch + '</b></span>' +
+      '<span class="bom-pill"><i class="ti ti-question-mark"></i> Нет артикула: <b>' + totalNoArt + '</b></span>' +
+      '<span class="bom-pill"><i class="ti ti-list"></i> Всего проблем: <b>' + totalProblems + '</b></span>' +
     '</div>';
+  // Детализация по типам
+  html += '<div style="margin-top:12px;display:flex;gap:10px;font-size:12px;color:var(--text-light);flex-wrap:wrap;">' +
+    '<span>Строк договоров без связи: <b>' + (ci.total_unbound || 0) + '</b></span>' +
+    '<span>Строк BOM с битой связью: <b>' + (bom.total_unbound || 0) + '</b></span>' +
+  '</div>';
   const items = report.items_to_fix || [];
   if (items.length) {
-    html += '<div style="margin-top:14px;font-size:13px;color:var(--text-mid);">Первые ' + items.length + ' проблемных позиций:</div>' +
+    html += '<div style="margin-top:14px;font-size:13px;color:var(--text-mid);">' +
+      'Проблемные позиции (' + items.length + ' первых):</div>' +
       '<div class="bom-preview-list" style="margin-top:8px;">';
     items.slice(0, 30).forEach(it => {
       const cls = it.match === 'exact' ? 'ok' : 'warn';
+      const kindLabel = it.kind === 'model_bom' ? 'BOM ' + (it.model_name || '') : 'Договор';
       html += '<div class="bom-preview-row ' + cls + '">' +
         '<i class="ti ' + (it.match === 'exact' ? 'ti-check' : 'ti-alert-triangle') + '"></i>' +
         '<div class="bom-preview-main">' +
-          '<div class="bom-preview-raw">' + escapeHtml(it.raw || '') + '</div>' +
+          '<div class="bom-preview-raw">' +
+            '<span style="color:var(--brand);font-weight:600;">[' + escapeHtml(kindLabel) + ']</span> ' +
+            escapeHtml(it.raw || '') +
+          '</div>' +
           '<div class="bom-preview-parsed">артикул <b>' + escapeHtml(it.sku || '') + '</b>' +
             (it.match === 'wrong_execution' ? ' · найдено: <b>' + (it.found_execution === 'stainless' ? 'AISI' : 'Сталь') + '</b>' : '') +
           '</div>' +
@@ -29121,9 +29151,33 @@ function _renderBomDiagnose(report) {
   document.getElementById('bom-diagnose-body').innerHTML = html;
 }
 
+// v2.41.3: backfill артикулов в номенклатуре
+async function runBackfillSku() {
+  if (!confirm('Программа пройдёт по всем активным комплектующим с пустым артикулом и попытается извлечь артикул из их названий. Это не изменит названия — только заполнит поле «Артикул / SKU». Продолжить?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/backfill-sku', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || 'Не удалось', 'error');
+      return;
+    }
+    const d = await r.json();
+    showToast('Просканировано: ' + d.scanned + ', обновлено: ' + d.updated, 'success');
+    cache.components = null;
+    // Перезагружаем диагностику чтобы увидеть новые сопоставления
+    setTimeout(_reloadBomDiagnose, 300);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
 async function applyBomDiagFixes() {
   const acceptWrong = !!(document.getElementById('bom-diag-accept-wrong') || {}).checked;
-  if (!confirm('Применить найденные привязки? Это изменит существующие записи в спецификациях договоров.')) return;
+  if (!confirm('Применить найденные привязки? Это изменит существующие записи в спецификациях договоров и BOM моделей.')) return;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/bom/apply-fixes', {
@@ -29137,9 +29191,12 @@ async function applyBomDiagFixes() {
       return;
     }
     const d = await r.json();
-    showToast('Привязано: ' + d.fixed, 'success');
-    // Перезагрузим диагностику
-    openBomDiagnose();
+    const parts = [];
+    if (d.contract_items) parts.push('строк договоров: ' + d.contract_items);
+    if (d.model_bom) parts.push('строк BOM моделей: ' + d.model_bom);
+    showToast('Привязано: ' + (d.fixed || 0) + (parts.length ? ' (' + parts.join(', ') + ')' : ''), 'success');
+    // Перезагружаем
+    _reloadBomDiagnose();
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
