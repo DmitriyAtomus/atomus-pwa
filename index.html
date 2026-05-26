@@ -5843,6 +5843,94 @@
   .models-subgroup.sg-standard .sg-icon { color: #BA7517; }
   .models-subgroup.sg-standard .models-subgroup-count { color: #854F0B; border-color: #FAC775; background: #fff; }
 
+  /* v2.42.2: блок «Сейчас в работе» на главной */
+  .active-works-section {
+    margin: 0 0 16px;
+  }
+  .active-works-section:empty { display: none; }
+  .active-works-section .aw-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #FFEDD5 0%, #FFF7ED 100%);
+    border: 1px solid #FED7AA;
+    border-left: 4px solid #EA580C;
+    border-radius: 12px 12px 0 0;
+    color: #7C2D12;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .active-works-section .aw-head .ti { font-size: 18px; color: #EA580C; }
+  .active-works-section .aw-head .aw-title { flex: 1; }
+  .active-works-section .aw-head .aw-count {
+    background: #fff; color: #C2410C;
+    padding: 2px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 700;
+    border: 1px solid #FDBA74;
+  }
+  .active-works-section .aw-list {
+    background: #fff;
+    border: 1px solid #FED7AA;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+  }
+  .active-works-section .aw-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #FED7AA;
+  }
+  .active-works-section .aw-row:last-child { border-bottom: none; }
+  .active-works-section .aw-av {
+    width: 34px; height: 34px;
+    background: #FFEDD5; color: #C2410C;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .active-works-section .aw-body { flex: 1; min-width: 0; }
+  .active-works-section .aw-model {
+    font-size: 14px; font-weight: 500;
+    color: var(--text); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .active-works-section .aw-meta {
+    font-size: 11.5px; color: var(--text-light);
+    margin-top: 2px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .active-works-section .aw-qty {
+    background: #fff7ed; color: #7C2D12;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    border: 1px solid #FED7AA;
+    flex-shrink: 0;
+  }
+  .active-works-section .aw-finish-btn { flex-shrink: 0; }
+
+  /* v2.42.2: тоггл «Готово / Занимается» */
+  .status-toggle-btn {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-mid);
+    font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .status-toggle-btn:hover { border-color: var(--brand); color: var(--brand); }
+  .status-toggle-btn.active {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+    color: var(--brand);
+    font-weight: 600;
+  }
+  .status-toggle-btn .ti { font-size: 16px; }
+
   /* v2.41.10: подсветка слов AISI/Нерж */
   .lbl-aisi {
     color: #0891B2;
@@ -12588,8 +12676,17 @@
           </div>
 
           <div class="submit-bar">
+            <!-- v2.42.2: тоггл «Готово / Занимается» -->
+            <div class="status-toggle-row" style="display:flex;gap:8px;margin-bottom:12px;">
+              <button type="button" class="status-toggle-btn active" id="status-toggle-ready" onclick="setAssemblyStatusToggle('ready')">
+                <i class="ti ti-check"></i> Готово
+              </button>
+              <button type="button" class="status-toggle-btn" id="status-toggle-in-progress" onclick="setAssemblyStatusToggle('in_progress')">
+                <i class="ti ti-player-play"></i> Занимается сейчас
+              </button>
+            </div>
             <button class="btn btn-primary btn-full" id="submit-assembly-btn" onclick="submitAssembly()">
-              <i class="ti ti-check"></i> Записать
+              <i class="ti ti-check"></i> <span id="submit-assembly-label">Записать</span>
             </button>
             <div class="submit-error" id="submit-error"></div>
           </div>
@@ -13949,7 +14046,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.42.1-modelpicker-subgroups";
+const APP_VERSION = "v2.42.2-active-works";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -14996,6 +15093,9 @@ function renderDashboard(d) {
   const container = document.getElementById('dashboard-content');
   let html = '';
 
+  // v2.42.2: блок «Сейчас в работе» — заполняется отдельным запросом
+  html += '<div id="active-works-block" class="active-works-section"></div>';
+
   // ============ ЭТАП 25.1: МОБИЛЬНЫЕ БЛОКИ ============
   html += '<div class="m25-mobile-only">';
 
@@ -15136,6 +15236,77 @@ function renderDashboard(d) {
   // ЭТАП 31.4: блок «Договоры в работе» убран отсюда — теперь на главной приложения
 
   container.innerHTML = html;
+  // v2.42.2: подтягиваем активные работы (status='in_progress')
+  if (typeof loadActiveWorksBlock === 'function') {
+    try { loadActiveWorksBlock(); } catch (_) {}
+  }
+}
+
+// v2.42.2: «Сейчас в работе» — рендер блока на главной
+async function loadActiveWorksBlock() {
+  const wrap = document.getElementById('active-works-block');
+  if (!wrap) return;
+  try {
+    const r = await apiGet('/api/active-works');
+    const works = (r && r.works) || [];
+    if (!works.length) {
+      wrap.innerHTML = '';
+      return;
+    }
+    let html = '<div class="aw-head">' +
+      '<i class="ti ti-player-play"></i>' +
+      '<span class="aw-title">Сейчас в работе</span>' +
+      '<span class="aw-count">' + works.length + '</span>' +
+    '</div><div class="aw-list">';
+    works.forEach(w => {
+      const workers = (w.workers || []).map(x => x.name).join(', ') || '—';
+      const model = (w.model_name || w.description || '—');
+      const sub = [];
+      if (w.contract_number) sub.push('Договор ' + w.contract_number);
+      if (w.contractor_name) sub.push(w.contractor_name);
+      if (w.location) sub.push(w.location);
+      const subStr = sub.join(' · ');
+      const startedAt = (w.created_at || '').replace('T', ' ').slice(5, 16);
+      const finishBtn = (typeof canManageSales === 'function' && canManageSales())
+        ? '<button class="btn btn-primary btn-small aw-finish-btn" onclick="finishActiveWork(' + w.id + ')" title="Перевести в Готово и создать приход на склад">' +
+            '<i class="ti ti-check"></i> Завершить' +
+          '</button>'
+        : '';
+      html += '<div class="aw-row">' +
+        '<div class="aw-av">' + escapeHtml(getInitials(workers)) + '</div>' +
+        '<div class="aw-body">' +
+          '<div class="aw-model">' + (typeof _highlightAisi === 'function' ? _highlightAisi(model) : escapeHtml(model)) + '</div>' +
+          '<div class="aw-meta">' +
+            escapeHtml(workers) +
+            (subStr ? ' · ' + escapeHtml(subStr) : '') +
+            ' · с ' + escapeHtml(startedAt) +
+          '</div>' +
+        '</div>' +
+        '<div class="aw-qty">' + (w.quantity || 1) + ' шт.</div>' +
+        finishBtn +
+      '</div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+  } catch (e) {
+    wrap.innerHTML = '';
+  }
+}
+
+async function finishActiveWork(assemblyId) {
+  if (!confirm('Завершить работу? Сборка перейдёт в «Готово» и появится приход на складе.')) return;
+  try {
+    const r = await apiPost('/api/assemblies/' + assemblyId + '/finish', {});
+    if (r && r.ok && r.data && r.data.ok) {
+      showToast('Работа завершена', 'success');
+      if (typeof loadActiveWorksBlock === 'function') loadActiveWorksBlock();
+      if (typeof loadDashboard === 'function') loadDashboard();
+    } else {
+      showToast((r && r.data && (r.data.message || r.data.error)) || 'Не удалось завершить', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 
@@ -25173,9 +25344,11 @@ function initNewAssemblyForm() {
     description: '',             // что было сделано (для не-сборок)
     location: '',                // адрес/объект
     hours_spent: null,           // часы
+    initialStatus: 'ready',      // v2.42.2: 'ready' (готово) | 'in_progress' (занимается сейчас)
   };
   // алиас для inline-обработчиков
   state.newAssemblyForm = state.newAssembly;
+  if (typeof setAssemblyStatusToggle === 'function') setAssemblyStatusToggle('ready');
   document.getElementById('submit-error').textContent = '';
   document.getElementById('qty-input').value = 1;
   document.getElementById('comment-input').value = '';
@@ -25923,6 +26096,18 @@ document.getElementById('comment-input').addEventListener('input', function() {
   document.getElementById('comment-counter-text').textContent = this.value.length;
 });
 
+// v2.42.2: переключатель «Готово / Занимается» — хранит выбор в state
+function setAssemblyStatusToggle(status) {
+  state.newAssembly = state.newAssembly || {};
+  state.newAssembly.initialStatus = status;
+  const r = document.getElementById('status-toggle-ready');
+  const p = document.getElementById('status-toggle-in-progress');
+  const lbl = document.getElementById('submit-assembly-label');
+  if (r) r.classList.toggle('active', status === 'ready');
+  if (p) p.classList.toggle('active', status === 'in_progress');
+  if (lbl) lbl.textContent = status === 'in_progress' ? 'Взять в работу' : 'Записать';
+}
+
 async function submitAssembly() {
   const errEl = document.getElementById('submit-error');
   const btn = document.getElementById('submit-assembly-btn');
@@ -25930,6 +26115,8 @@ async function submitAssembly() {
 
   const a = state.newAssembly;
   const isAssembly = (a.workType || 'assembly') === 'assembly';
+  // v2.42.2: "in_progress" допустим только для сборок
+  const initialStatus = (a.initialStatus === 'in_progress' && isAssembly) ? 'in_progress' : 'ready';
   if (isAssembly) {
     if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
     if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
@@ -25964,20 +26151,26 @@ async function submitAssembly() {
     description: a.description || null,
     location: a.location || null,
     hours_spent: a.hours_spent || null,
+    initial_status: initialStatus,
   };
 
   btn.disabled = true;
-  btn.innerHTML = '<i class="ti ti-loader"></i> Записываем…';
+  const loadingLabel = initialStatus === 'in_progress' ? 'Берём в работу…' : 'Записываем…';
+  btn.innerHTML = '<i class="ti ti-loader"></i> ' + loadingLabel;
 
   try {
     const r = await apiPost('/api/assemblies', payload);
     if (!r.ok) {
       errEl.textContent = (r.data && (r.data.message || r.data.error)) || 'Ошибка записи';
       btn.disabled = false;
-      btn.innerHTML = '<i class="ti ti-check"></i> Записать';
+      const lbl = initialStatus === 'in_progress' ? 'Взять в работу' : 'Записать';
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + lbl;
       return;
     }
-    showToast('Запись сохранена: ID ' + r.data.id, 'success');
+    const okMsg = initialStatus === 'in_progress'
+      ? 'Работа взята в процесс: ID ' + r.data.id
+      : 'Запись сохранена: ID ' + r.data.id;
+    showToast(okMsg, 'success');
     // ЭТАП 32: уведомления о списании комплектующих
     if (r.data.bom_writeoff && r.data.bom_writeoff.count) {
       setTimeout(() => showToast('Списано со склада: ' + r.data.bom_writeoff.count + ' поз.', 'success'), 1200);
