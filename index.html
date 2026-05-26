@@ -13476,7 +13476,7 @@
             </button>
           </div>
         </div>
-        <div class="content-inner" id="dd-content" style="max-width: 900px;">
+        <div class="content-inner" id="dd-content" style="max-width: 100%;">
           <div class="loading-block">Загружаем…</div>
         </div>
       </div>
@@ -13941,7 +13941,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.15-panels-triple-split";
+const APP_VERSION = "v2.42.0-summary-colors-defect-wide";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17017,12 +17017,13 @@ function renderSummary(d) {
       (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
       '</h3>';
     html += '<div class="card"><div class="hbar-list">';
-    top.forEach(m => {
+    top.forEach((m, idx) => {
       const title = m.model_name + (m.model_extra ? ' · ' + m.model_extra : '');
       const pct = (m.qty / maxQty * 100);
+      const color = SUMMARY_PALETTE[idx % SUMMARY_PALETTE.length];
       html += '<div class="hbar-row">';
       html += '<div class="hbar-name">' + escapeHtml(title) + '</div>';
-      html += '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;"></div></div>';
+      html += '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
       html += '<div class="hbar-qty">' + m.qty + '</div></div>';
     });
     html += '</div></div></div>';
@@ -17104,12 +17105,25 @@ function onSummaryWorkerChange(val) {
   loadSummary();
 }
 
+// v2.42.0: разноцветная палитра вместо синих оттенков
+const SUMMARY_PALETTE = [
+  '#2563EB', // blue
+  '#EA580C', // orange
+  '#0891B2', // cyan
+  '#D4537E', // pink
+  '#1D9E75', // teal
+  '#7F77DD', // purple
+  '#BA7517', // amber
+  '#E24B4A', // red
+  '#0EA5E9', // sky
+  '#639922', // green
+];
+
 function renderPieChart(byDir, totalQty) {
-  const palette = ['#2D5F8B','#4A7FB5','#7AA3CF','#A8C5E3','#5FB3C9','#85A0AD','#3D8AA9'];
   let acc = 0, svgArcs = '', legendHtml = '';
   byDir.forEach((d, idx) => {
     const pct = d.qty / totalQty * 100;
-    const color = palette[idx % palette.length];
+    const color = SUMMARY_PALETTE[idx % SUMMARY_PALETTE.length];
     svgArcs += '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + color + '" stroke-width="3.2" ' +
                'stroke-dasharray="' + pct.toFixed(2) + ' ' + (100 - pct).toFixed(2) + '" ' +
                'stroke-dashoffset="' + (-acc).toFixed(2) + '" ' +
