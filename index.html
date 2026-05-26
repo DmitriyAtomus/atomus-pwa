@@ -7461,6 +7461,51 @@
     background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD;
   }
 
+  /* v2.41.2: модалка дублей */
+  .dup-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    background: var(--card);
+    overflow: hidden;
+  }
+  .dup-group-head {
+    padding: 10px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dup-group-head i { color: var(--brand); }
+  .dup-group-head b { color: var(--text); font-family: Menlo, Consolas, monospace; }
+  .dup-count {
+    margin-left: auto;
+    background: #FEF3C7;
+    color: #92400E;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .dup-group-items { padding: 8px 0; }
+  .dup-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .dup-item:hover { background: var(--bg); }
+  .dup-item input { margin-top: 4px; flex-shrink: 0; }
+  .dup-item-info { flex: 1; min-width: 0; }
+  .dup-item-name { font-size: 14px; color: var(--text); margin-bottom: 2px; }
+  .dup-item-meta { font-size: 12px; color: var(--text-light); }
+  .dup-item-meta b { color: var(--text); }
+  .dup-group-actions {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    display: flex; justify-content: flex-end;
+  }
+
     display: flex; align-items: center; justify-content: center;
     margin: 14px 0 6px;
     color: var(--text-light);
@@ -12074,6 +12119,9 @@
             <button class="btn btn-secondary" id="cc-diagnose-btn" onclick="openBomDiagnose()" title="Найти спецификации без привязки к номенклатуре" style="display:none;">
               <i class="ti ti-stethoscope"></i> Диагностика
             </button>
+            <button class="btn btn-secondary" id="cc-dups-btn" onclick="openComponentDuplicates()" title="Найти и склеить дубли по артикулу" style="display:none;">
+              <i class="ti ti-copy-x"></i> Дубли
+            </button>
             <button class="btn btn-primary" id="cc-new-btn" onclick="openComponentForm()" style="display:none;">
               <i class="ti ti-plus"></i> Новое комплектующее
             </button>
@@ -13659,8 +13707,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.1-hotfix-messages-load";
-const APP_VERSION_DATE = "25.05.2026";
+const APP_VERSION = "v2.41.2-component-merge";
+const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -28220,10 +28268,12 @@ async function loadComponentsCatalog() {
   const newBtn = document.getElementById('cc-new-btn');
   const newBtnM = document.getElementById('cc-mobile-new');
   const diagBtn = document.getElementById('cc-diagnose-btn');
+  const dupsBtn = document.getElementById('cc-dups-btn');
   const canEdit = canManageSales();
   if (newBtn) newBtn.style.display = canEdit ? '' : 'none';
   if (newBtnM) newBtnM.style.display = canEdit ? '' : 'none';
   if (diagBtn) diagBtn.style.display = canEdit ? '' : 'none';
+  if (dupsBtn) dupsBtn.style.display = canEdit ? '' : 'none';
 
   if (!cache.componentCategories) {
     try {
@@ -29090,6 +29140,143 @@ async function applyBomDiagFixes() {
     showToast('Привязано: ' + d.fixed, 'success');
     // Перезагрузим диагностику
     openBomDiagnose();
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
+// v2.41.2: поиск и слияние дублей в справочнике комплектующих
+async function openComponentDuplicates() {
+  let m = document.getElementById('comp-dups-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'comp-dups-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:880px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-copy-x"></i> Дубли в номенклатуре</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'comp-dups-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;max-height:70vh;overflow:auto;" id="comp-dups-body">' +
+        '<div class="loading-block">Ищем дубли…</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/duplicates', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      document.getElementById('comp-dups-body').innerHTML =
+        '<div class="empty-block">' + escapeHtml(e.message || 'Ошибка') + '</div>';
+      return;
+    }
+    const d = await r.json();
+    _renderComponentDuplicates(d);
+  } catch (e) {
+    document.getElementById('comp-dups-body').innerHTML = '<div class="empty-block">Ошибка соединения</div>';
+  }
+}
+
+function _renderComponentDuplicates(data) {
+  const groups = data.groups || [];
+  const body = document.getElementById('comp-dups-body');
+  if (!groups.length) {
+    body.innerHTML =
+      '<div style="text-align:center;padding:32px;color:var(--text-light);">' +
+        '<i class="ti ti-circle-check" style="font-size:40px;color:#15803D;"></i>' +
+        '<div style="margin-top:10px;">Дубли не найдены</div>' +
+        '<div style="font-size:13px;margin-top:6px;">У каждого артикула в справочнике только одна запись</div>' +
+      '</div>';
+    return;
+  }
+  let html =
+    '<p style="margin:0 0 14px;color:var(--text-mid);">' +
+      'Найдено групп: <b>' + groups.length + '</b>. ' +
+      'В каждой выбери запись, которую <b>оставить</b> — остальные склеятся в неё (остатки сложатся, все ссылки в BOM и договорах переведутся, дубли деактивируются).' +
+    '</p>';
+  groups.forEach((g, gi) => {
+    const execLabel = g.execution_type === 'stainless' ? 'AISI' : 'Сталь';
+    html += '<div class="dup-group">' +
+      '<div class="dup-group-head">' +
+        '<i class="ti ti-copy-x"></i> ' +
+        '<b>' + escapeHtml(g.sku) + '</b> · ' + execLabel + ' · <span class="dup-count">' + g.count + ' дубля</span>' +
+      '</div>' +
+      '<div class="dup-group-items">';
+    g.items.forEach((it, ii) => {
+      const keepId = 'dup-keep-' + gi + '-' + ii;
+      html += '<label class="dup-item">' +
+        '<input type="radio" name="dup-keep-' + gi + '" value="' + it.id + '"' + (ii === 0 ? ' checked' : '') + '>' +
+        '<div class="dup-item-info">' +
+          '<div class="dup-item-name">' + escapeHtml(it.name || '—') + '</div>' +
+          '<div class="dup-item-meta">' +
+            'id=' + it.id + ' · ' +
+            'категория: ' + escapeHtml(it.category_name || '—') + ' · ' +
+            '<b>' + _fmtQty(it.qty_on_stock || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</b>' +
+          '</div>' +
+        '</div>' +
+      '</label>';
+    });
+    html += '</div>' +
+      '<div class="dup-group-actions">' +
+        '<button class="btn btn-primary btn-small" onclick="mergeDuplicateGroup(' + gi + ')">' +
+          '<i class="ti ti-merge"></i> Склеить группу' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  });
+  body.innerHTML = html;
+  // Сохраним сами группы в state — пригодится для confirmMerge
+  state._dupGroups = groups;
+}
+
+async function mergeDuplicateGroup(gi) {
+  const groups = state._dupGroups || [];
+  const g = groups[gi];
+  if (!g) return;
+  const keepRadio = document.querySelector('input[name="dup-keep-' + gi + '"]:checked');
+  if (!keepRadio) { showToast('Выбери запись которую оставить', 'error'); return; }
+  const keepId = parseInt(keepRadio.value, 10);
+  const mergeIds = g.items.map(it => it.id).filter(id => id !== keepId);
+  if (!mergeIds.length) return;
+  const keepItem = g.items.find(it => it.id === keepId);
+  const lostNames = g.items.filter(it => it.id !== keepId).map(it => '• ' + it.name).join('\n');
+  if (!confirm('Склеить дубли артикула ' + g.sku + '?\n\n' +
+               'Оставится: ' + (keepItem ? keepItem.name : '#' + keepId) + '\n\n' +
+               'Будут деактивированы:\n' + lostNames + '\n\n' +
+               'Остатки сложатся, все ссылки в BOM и договорах будут перенесены на оставшуюся запись.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ keep_id: keepId, merge_ids: mergeIds }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || e.detail || 'Не удалось слить', 'error');
+      return;
+    }
+    const d = await r.json();
+    let msg = 'Слито: ' + (d.merged_count || 0);
+    if (d.updated) {
+      const u = d.updated;
+      const parts = [];
+      if (u.model_bom_moved)  parts.push('BOM связей: ' + u.model_bom_moved);
+      if (u.contract_items)   parts.push('строк договоров: ' + u.contract_items);
+      if (u.movements)        parts.push('движений: ' + u.movements);
+      if (parts.length) msg += ' (' + parts.join(', ') + ')';
+    }
+    showToast(msg, 'success');
+    // Перезагрузим
+    openComponentDuplicates();
+    cache.components = null;
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
