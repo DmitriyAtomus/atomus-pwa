@@ -7461,6 +7461,21 @@
     background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD;
   }
 
+  /* v2.41.8: чекбоксы раздвоения по подгруппам */
+  .cl-split-opt {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .cl-split-opt input { margin-top: 3px; flex-shrink: 0; }
+  .cl-split-opt:has(input:disabled) { opacity: 0.5; cursor: default; }
+  .cl-split-opt:hover:not(:has(input:disabled)) { background: var(--bg); }
+
   /* v2.41.6: модалка мастер-BOM */
   .master-bom-table {
     border: 1px solid var(--border);
@@ -13807,7 +13822,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.41.7-climate-structure";
+const APP_VERSION = "v2.41.8-climate-per-subgroup-split";
 const APP_VERSION_DATE = "26.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -29605,6 +29620,7 @@ function _renderClimateSetupPreview(p) {
   const ex = p.existing_subgroups || [];
   const byGroup = p.by_group_preview || {};
   const choice = p.choice_models_to_split || [];
+  const cbg = p.choice_by_group || {};
   let html =
     '<div class="autofix-banner">' +
       '<div class="autofix-banner-text">' +
@@ -29612,13 +29628,10 @@ function _renderClimateSetupPreview(p) {
         '<div>' +
           '<div class="autofix-banner-title">Привести структуру Климатики в порядок</div>' +
           '<div class="autofix-banner-sub">' +
-            'Создаст подгруппы Наружные блоки / Воздухоохладители / Донагреватели, разнесёт по ним существующие модели, и раздвоит модели «Стандарт / AISI» на две отдельные.' +
+            'Создаст подгруппы, разнесёт модели и по желанию раздвоит «Стандарт / AISI» на две отдельные. Выбирай ниже какие подгруппы раздваивать.' +
           '</div>' +
         '</div>' +
       '</div>' +
-      '<button class="btn btn-primary" onclick="runClimateSetup(true)">' +
-        '<i class="ti ti-wand"></i> Запустить' +
-      '</button>' +
     '</div>';
   // Подгруппы
   html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--text);">Подгруппы</h4>';
@@ -29656,25 +29669,40 @@ function _renderClimateSetupPreview(p) {
     });
     html += '</div></div>';
   });
-  // Раздвоение
-  html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--text);">Раздвоение моделей (Стандарт ↔ AISI)</h4>';
+  // Раздвоение — чекбоксы по подгруппам
+  html += '<h4 style="margin:14px 0 6px;font-size:14px;color:var(--text);">Раздвоение моделей на Стандарт ↔ AISI</h4>';
   if (!choice.length) {
     html += '<div style="color:var(--text-light);font-style:italic;">Нет моделей с пометкой «Стандарт / AISI» — раздваивать нечего.</div>';
   } else {
-    html += '<p style="color:var(--text-mid);font-size:13px;margin:0 0 6px;">Будут разделены на 2 модели каждая (' + choice.length + ' штук):</p>';
-    html += '<ul style="margin:0 0 0 20px;color:var(--text);max-height:200px;overflow:auto;">';
-    choice.forEach(m => {
-      html += '<li><b>' + escapeHtml(m.name) + '</b> → ' + escapeHtml(m.name) + ' (стандарт) + ' + escapeHtml(m.name) + ' AISI</li>';
-    });
-    html += '</ul>';
-    html += '<p style="color:var(--text-mid);font-size:12px;margin:8px 0 0;font-style:italic;">' +
-      'BOM при раздвоении НЕ копируется — у новых AISI-моделей он будет пустой, потом загрузишь через мастер-BOM.' +
-    '</p>';
+    html +=
+      '<p style="color:var(--text-mid);font-size:13px;margin:0 0 8px;">' +
+        'Выбери в каких подгруппах раздваивать модели:' +
+      '</p>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">' +
+        '<label class="cl-split-opt">' +
+          '<input type="checkbox" id="cl-split-outdoor" ' +
+            ((cbg['Наружные блоки'] || 0) > 0 ? 'checked' : '') +
+            ((cbg['Наружные блоки'] || 0) === 0 ? ' disabled' : '') + '>' +
+          '<span><b>Наружные блоки</b> — раздвоится <b>' + (cbg['Наружные блоки'] || 0) + '</b></span>' +
+        '</label>' +
+        '<label class="cl-split-opt">' +
+          '<input type="checkbox" id="cl-split-evaporator" ' +
+            ((cbg['Воздухоохладители'] || 0) === 0 ? ' disabled' : '') + '>' +
+          '<span><b>Воздухоохладители</b> — раздвоится <b>' + (cbg['Воздухоохладители'] || 0) + '</b>. ' +
+            '<span style="color:var(--text-light);font-size:12px;">(не рекомендуется — в производстве только AISI)</span></span>' +
+        '</label>' +
+        '<label class="cl-split-opt">' +
+          '<input type="checkbox" id="cl-split-heater" ' +
+            ((cbg['Донагреватели'] || 0) > 0 ? 'checked' : '') +
+            ((cbg['Донагреватели'] || 0) === 0 ? ' disabled' : '') + '>' +
+          '<span><b>Донагреватели</b> — раздвоится <b>' + (cbg['Донагреватели'] || 0) + '</b></span>' +
+        '</label>' +
+      '</div>' +
+      '<p style="color:var(--text-mid);font-size:12px;margin:8px 0 0;font-style:italic;">' +
+        'BOM при раздвоении НЕ копируется — у новых AISI-моделей он будет пустой, потом загрузишь через мастер-BOM.' +
+      '</p>';
   }
-  // Кнопки внизу
   html += '<div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
-    '<label style="margin-right:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);">' +
-      '<input type="checkbox" id="climate-do-split" checked> Раздваивать модели на Стандарт/AISI</label>' +
     '<button class="btn btn-primary" onclick="runClimateSetup()">' +
       '<i class="ti ti-check"></i> Применить' +
     '</button>' +
@@ -29682,15 +29710,23 @@ function _renderClimateSetupPreview(p) {
   document.getElementById('climate-setup-body').innerHTML = html;
 }
 
-async function runClimateSetup(fromBanner) {
-  const doSplit = fromBanner ? true : !!(document.getElementById('climate-do-split') || {}).checked;
-  if (!confirm(
+async function runClimateSetup() {
+  const splitSubgroups = [];
+  const outBtn = document.getElementById('cl-split-outdoor');
+  const evBtn = document.getElementById('cl-split-evaporator');
+  const heBtn = document.getElementById('cl-split-heater');
+  if (outBtn && outBtn.checked && !outBtn.disabled) splitSubgroups.push('Наружные блоки');
+  if (evBtn && evBtn.checked && !evBtn.disabled) splitSubgroups.push('Воздухоохладители');
+  if (heBtn && heBtn.checked && !heBtn.disabled) splitSubgroups.push('Донагреватели');
+  const confirmMsg =
     'Применить настройку структуры Климатики?\n\n' +
-    '• Создадутся подгруппы (если их нет)\n' +
-    '• Существующие модели распределятся по подгруппам автоматом\n' +
-    (doSplit ? '• Модели «Стандарт / AISI» будут раздвоены на 2 отдельные (BOM не копируется)\n' : '') +
-    '\nЭто безопасно: модели остаются, ничего не удаляется.'
-  )) return;
+    '• Подгруппы создадутся (если не было)\n' +
+    '• Модели распределятся по подгруппам автоматом (учитывается артикул КЛМ-ВО/НПВ/НБ)\n' +
+    (splitSubgroups.length
+      ? '• Раздвоить модели в подгруппах: ' + splitSubgroups.join(', ') + '\n'
+      : '• Раздвоение НЕ выполняется\n') +
+    '\nЭто безопасно: ничего не удаляется.';
+  if (!confirm(confirmMsg)) return;
   const body = document.getElementById('climate-setup-body');
   if (body) body.innerHTML = '<div class="loading-block">Применяем структуру…</div>';
   try {
@@ -29698,7 +29734,7 @@ async function runClimateSetup(fromBanner) {
     const r = await fetch(API_BASE + '/api/climate/structure-setup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ do_split: doSplit }),
+      body: JSON.stringify({ split_subgroups: splitSubgroups }),
     });
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
