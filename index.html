@@ -10747,6 +10747,32 @@
   .spec-item-reservation.r-none { background: #FEE2E2; color: #7F1D1D; }
   .spec-item-reservation .ti { font-size: 13px; }
 
+  /* v2.43.16: бейдж статуса assembly в списке сборок договора */
+  .a-status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; padding: 2px 7px;
+    border-radius: 5px; margin-left: 6px;
+    font-weight: 600; letter-spacing: 0.2px;
+    text-transform: uppercase; white-space: nowrap;
+    vertical-align: middle;
+  }
+  .a-status-badge .ti { font-size: 12px; }
+  .a-status-badge.a-st-inprog  { background: #DBEAFE; color: #1E3A8A; }
+  .a-status-badge.a-st-ready   { background: #DCFCE7; color: #14532D; }
+  .a-status-badge.a-st-shipped { background: #E0E7FF; color: #312E81; }
+
+  /* v2.43.16: кнопка «↩ Вернуть в работу» в строке сборки */
+  .cal-reopen-btn {
+    background: transparent; border: 1px solid #E5E7EB;
+    color: #6B7280;
+    padding: 3px 7px; border-radius: 6px;
+    cursor: pointer; font-size: 12px;
+    margin-left: 6px; line-height: 1;
+    transition: all 0.15s ease;
+  }
+  .cal-reopen-btn:hover { border-color: #3B82F6; color: #3B82F6; background: #EFF6FF; }
+  .cal-reopen-btn .ti { font-size: 14px; vertical-align: middle; }
+
   /* v2.43.13: прогресс-бар готовности договора */
   .contract-progress {
     background: #FFFFFF;
@@ -14905,7 +14931,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.15-default-in-progress";
+const APP_VERSION = "v2.43.16-reopen-and-split-tiles";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16592,6 +16618,29 @@ async function finishActiveWork(assemblyId) {
     }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+  }
+}
+
+// v2.43.16: откатить «готовую» сборку обратно в «в работе».
+// Используется когда мастер ошибочно отметил готовность.
+// Приходные движения склада автоматически отменяются.
+async function reopenAssembly(assemblyId, contractId) {
+  if (!confirm('Вернуть сборку в работу? Приход на склад отменится.\nДоступно только пока не было отгрузок.')) return;
+  try {
+    const r = await apiPatch('/api/assemblies/' + assemblyId + '/status', { status: 'in_progress' });
+    if (r) {
+      showToast('Сборка возвращена в работу', 'success');
+      // Сбрасываем кэш и перезагружаем карточку договора
+      cache.dashboard = null;
+      cache.productionKanban = null;
+      cache.contracts = null;
+      cache.contractsWithProgress = null;
+      if (contractId && typeof loadCurrentContract === 'function') {
+        loadCurrentContract();
+      }
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось вернуть в работу', 'error');
   }
 }
 
@@ -22855,7 +22904,16 @@ function renderContractsProgressForProduction() {
 function renderContractAssembliesBlock(c) {
   // Вызывается из renderContractDetail (вставляется в нужное место)
   const assemblies = c.assemblies || [];
-  const qty = c.assemblies_qty || 0;
+
+  // v2.43.16: считаем по статусам отдельно, чтобы не валить in_progress в «собрано»
+  let qtyReady = 0, qtyInProgress = 0, qtyShipped = 0;
+  assemblies.forEach(a => {
+    const q = Number(a.quantity || 0);
+    if (a.status === 'in_progress') qtyInProgress += q;
+    else if (a.status === 'shipped') qtyShipped += q;
+    else if (a.status === 'ready') qtyReady += q;
+  });
+  const qtyDoneTotal = qtyReady + qtyShipped; // готовые на складе + уже отгруженные
 
   let html = '';
   html += '<div class="section-label" style="margin-top: 20px;">Готовность по сборкам</div>';
@@ -22865,14 +22923,27 @@ function renderContractAssembliesBlock(c) {
   // после loadContractItemsBlock)
   html += '<div id="scd-progress-block" style="margin-bottom: 12px;"></div>';
 
-  // Итоговая плашка
-  html += '<div style="background: var(--brand-bg); padding: 14px 16px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">' +
+  // v2.43.16: две плашки — «Готово» и «В работе» — рядом
+  html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom: 12px;">';
+  // Готово
+  html += '<div style="background: #ECFDF5; padding: 14px 16px; border-radius: 10px; display:flex; justify-content:space-between; align-items:center; border:1px solid #A7F3D0;">' +
     '<div>' +
-      '<div style="font-size: 11px; color: var(--brand); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;">ВСЕГО СОБРАНО</div>' +
-      '<div style="font-size: 22px; font-weight: 700; color: var(--brand); margin-top: 2px;">' + qty + ' ' + pluralAssemblies(qty) + '</div>' +
+      '<div style="font-size: 11px; color: #047857; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;">ГОТОВО НА СКЛАДЕ</div>' +
+      '<div style="font-size: 22px; font-weight: 700; color: #065F46; margin-top: 2px;">' + qtyDoneTotal + ' ' + pluralAssemblies(qtyDoneTotal) +
+        (qtyShipped > 0 ? ' <span style="font-size:11px; color:#059669; font-weight:600;">· ' + qtyShipped + ' отгруж.</span>' : '') +
+      '</div>' +
     '</div>' +
-    '<i class="ti ti-package" style="font-size: 32px; color: var(--brand); opacity: 0.5;"></i>' +
+    '<i class="ti ti-package-import" style="font-size: 32px; color: #10B981; opacity: 0.6;"></i>' +
     '</div>';
+  // В работе
+  html += '<div style="background: #EFF6FF; padding: 14px 16px; border-radius: 10px; display:flex; justify-content:space-between; align-items:center; border:1px solid #BFDBFE;">' +
+    '<div>' +
+      '<div style="font-size: 11px; color: #1D4ED8; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;">В РАБОТЕ СЕЙЧАС</div>' +
+      '<div style="font-size: 22px; font-weight: 700; color: #1E3A8A; margin-top: 2px;">' + qtyInProgress + ' ' + pluralAssemblies(qtyInProgress) + '</div>' +
+    '</div>' +
+    '<i class="ti ti-tool" style="font-size: 32px; color: #3B82F6; opacity: 0.6;"></i>' +
+    '</div>';
+  html += '</div>';
 
   // ЭТАП 18: кнопка отгрузки по договору (если есть готовые сборки)
   // Считаем сколько сборок имеет потенциальный шанс быть отгруженными
@@ -22900,13 +22971,32 @@ function renderContractAssembliesBlock(c) {
       const ipExec = [];
       if (a.execution) ipExec.push(a.execution === 'st' ? (a.exec_label_st || 'Ст.') : (a.exec_label_ne || 'Нерж.'));
       if (a.ip_class) ipExec.push(a.ip_class);
+      // v2.43.16: цветной бейдж статуса assembly
+      let statusBadge = '';
+      if (a.status === 'in_progress') {
+        statusBadge = '<span class="a-status-badge a-st-inprog"><i class="ti ti-tool"></i>В работе</span>';
+      } else if (a.status === 'ready') {
+        statusBadge = '<span class="a-status-badge a-st-ready"><i class="ti ti-circle-check"></i>Готово</span>';
+      } else if (a.status === 'shipped') {
+        statusBadge = '<span class="a-status-badge a-st-shipped"><i class="ti ti-truck-delivery"></i>Отгружено</span>';
+      }
+      // v2.43.16: кнопка «↩ В работу» для готовых (если не отгружено)
+      let workersCellHtml = escapeHtml(workers);
+      if (a.status === 'ready' && canShip) {
+        workersCellHtml +=
+          ' <button class="cal-reopen-btn" title="Вернуть в работу (отменить готовность)" ' +
+                  'onclick="reopenAssembly(' + a.id + ',' + c.id + ')">' +
+            '<i class="ti ti-arrow-back-up"></i>' +
+          '</button>';
+      }
       html += '<div class="cal-row">' +
         '<div class="cal-date">' + formatDateShort(a.assembly_date) + '</div>' +
         '<div class="cal-name">' + escapeHtml(modelFull) +
+          ' ' + statusBadge +
           (ipExec.length ? '<small>' + escapeHtml(ipExec.join(' · ')) + '</small>' : '') +
         '</div>' +
         '<div class="cal-qty">' + a.quantity + ' шт.</div>' +
-        '<div class="cal-workers">' + escapeHtml(workers) + '</div>' +
+        '<div class="cal-workers">' + workersCellHtml + '</div>' +
         '</div>';
     });
     html += '</div>';
