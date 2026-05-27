@@ -10743,8 +10743,41 @@
   }
   .spec-item-reservation.r-full { background: #E8F5E9; color: #14532D; }
   .spec-item-reservation.r-partial { background: #FEF3C7; color: #78350F; }
+  .spec-item-reservation.r-inprod { background: #DBEAFE; color: #1E3A8A; }
   .spec-item-reservation.r-none { background: #FEE2E2; color: #7F1D1D; }
   .spec-item-reservation .ti { font-size: 13px; }
+
+  /* v2.43.13: прогресс-бар готовности договора */
+  .contract-progress {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .contract-progress .cp-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .contract-progress .cp-title {
+    font-size: 12px; font-weight: 600;
+    color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .contract-progress .cp-title .ti { font-size: 15px; }
+  .contract-progress .cp-pct {
+    font-size: 18px; font-weight: 700; color: var(--text);
+  }
+  .contract-progress .cp-bar {
+    display: flex; height: 10px; border-radius: 999px;
+    background: #F1F5F9; overflow: hidden;
+  }
+  .contract-progress .cp-seg { height: 100%; transition: width 0.3s ease; }
+  .contract-progress .cp-seg.cp-ready  { background: #22C55E; }   /* зелёный — готово */
+  .contract-progress .cp-seg.cp-inprod { background: #3B82F6; }   /* синий — в работе */
+  .contract-progress .cp-sub {
+    margin-top: 6px;
+    font-size: 12px; color: var(--text-light);
+  }
 
   /* v2.19.1: бейджи для покупных позиций (sale_product_id) — кликабельные */
   .spec-item-purchase {
@@ -14870,7 +14903,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.12-shipment-modal-redesign";
+const APP_VERSION = "v2.43.13-progress-and-inprod-badge";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -22826,6 +22859,10 @@ function renderContractAssembliesBlock(c) {
   html += '<div class="section-label" style="margin-top: 20px;">Готовность по сборкам</div>';
   html += '<div style="padding: 0 18px 16px;">';
 
+  // v2.43.13: контейнер прогресс-бара (заполняется renderContractProgressBar
+  // после loadContractItemsBlock)
+  html += '<div id="scd-progress-block" style="margin-bottom: 12px;"></div>';
+
   // Итоговая плашка
   html += '<div style="background: var(--brand-bg); padding: 14px 16px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">' +
     '<div>' +
@@ -28038,23 +28075,62 @@ async function loadContractItemsBlock(contractId) {
     state._specByContract[contractId] = {
       items: d.items || [],
       total: d.total || 0,
+      progress: d.progress || null,  // v2.43.13: прогресс готовности
       addingMode: false,
       editingId: null,
     };
     renderContractItemsBlock(contractId);
+    // v2.43.13: после загрузки спецификации обновляем прогресс-бар в шапке
+    renderContractProgressBar(contractId);
   } catch (e) {
     container.innerHTML = '';
     container.style.display = 'none';
   }
 }
 
+// v2.43.13: рендер прогресс-бара готовности договора
+function renderContractProgressBar(contractId) {
+  const host = document.getElementById('scd-progress-block');
+  if (!host) return;
+  const st = state._specByContract && state._specByContract[contractId];
+  const p = st && st.progress;
+  if (!p || !p.total) {
+    host.innerHTML = '';
+    return;
+  }
+  const pctReady = Math.max(0, Math.min(100, Number(p.pct_ready) || 0));
+  const pctInProd = Math.max(0, Math.min(100 - pctReady, Number(p.pct_in_prod) || 0));
+  const pctTotal = pctReady + pctInProd;
+  // Текст справа: «N% готов», доп. — «M% в работе»
+  const sub = [];
+  if (p.ready > 0) sub.push(_fmtQty(p.ready) + ' готово');
+  if (p.in_production > 0) sub.push(_fmtQty(p.in_production) + ' в работе');
+  if (p.pending > 0) sub.push(_fmtQty(p.pending) + ' к работе');
+  host.innerHTML =
+    '<div class="contract-progress">' +
+      '<div class="cp-head">' +
+        '<div class="cp-title">' +
+          '<i class="ti ti-progress-check"></i> Готовность договора' +
+        '</div>' +
+        '<div class="cp-pct">' + pctTotal + '%</div>' +
+      '</div>' +
+      '<div class="cp-bar">' +
+        '<div class="cp-seg cp-ready" style="width:' + pctReady + '%"></div>' +
+        '<div class="cp-seg cp-inprod" style="width:' + pctInProd + '%"></div>' +
+      '</div>' +
+      (sub.length ? '<div class="cp-sub">' + escapeHtml(sub.join(' · ')) + '</div>' : '') +
+    '</div>';
+}
+
 // v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции + свободный ввод)
+// v2.43.13: добавлен бейдж «Изготовляется» — для assemblies со статусом in_progress.
 function _renderReservationBadge(item) {
   if (!item) return '';
   // model_id / component_id — резерв через сборки/комплектующие
   if (item.model_id || item.component_id) {
     const qty = Number(item.qty) || 0;
     const reserved = Number(item.qty_reserved || 0);
+    const inProd = Number(item.qty_in_production || 0);
     if (qty <= 0) return '';
     let cls = 'r-none';
     let icon = 'ti-circle';
@@ -28067,6 +28143,19 @@ function _renderReservationBadge(item) {
       cls = 'r-partial';
       icon = 'ti-progress';
       txt = 'Резерв ' + _fmtQty(reserved) + ' из ' + _fmtQty(qty);
+      if (inProd > 0) {
+        txt += ' · ' + _fmtQty(inProd) + ' в работе';
+      }
+    } else if (inProd >= qty) {
+      // v2.43.13: всё в работе
+      cls = 'r-inprod';
+      icon = 'ti-tool';
+      txt = 'Изготовляется';
+    } else if (inProd > 0) {
+      // v2.43.13: частично в работе
+      cls = 'r-inprod';
+      icon = 'ti-tool';
+      txt = 'Изготовляется ' + _fmtQty(inProd) + ' из ' + _fmtQty(qty);
     } else {
       cls = 'r-none';
       icon = 'ti-circle-dashed';
