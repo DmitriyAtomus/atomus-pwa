@@ -15345,7 +15345,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.40-journal-with-assemblies";
+const APP_VERSION = "v2.43.42-activity-timeline";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19300,6 +19300,48 @@ async function quickExportSessions() {
   }
 }
 
+// v2.43.42: единый отчёт активности — сборки + помощь хронологически
+async function quickExportActivity() {
+  const period = state.summaryFilter || 'month';
+  const today = new Date();
+  const y = today.getFullYear(); const mo = today.getMonth(); const d = today.getDate();
+  let from, to;
+  if (period === 'day')             { from = new Date(y, mo, d);     to = new Date(y, mo, d); }
+  else if (period === 'week')       { from = new Date(y, mo, d - 6); to = new Date(y, mo, d); }
+  else if (period === 'month')      { from = new Date(y, mo, 1);     to = new Date(y, mo + 1, 0); }
+  else if (period === 'prev_month') { from = new Date(y, mo - 1, 1); to = new Date(y, mo, 0); }
+  else                              { from = new Date(y, mo - 1, d); to = new Date(y, mo, d); }
+  const toIso = (dt) => dt.toISOString().slice(0, 10);
+  const fromStr = toIso(from), toStr = toIso(to);
+
+  showToast('Готовим отчёт активности…', 'info');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    let url = API_BASE + '/api/production/activity/export?from=' + encodeURIComponent(fromStr) +
+              '&to=' + encodeURIComponent(toStr) + '&format=xlsx';
+    if (state.summaryEmployeeFilter) {
+      url += '&employee_id=' + encodeURIComponent(state.summaryEmployeeFilter);
+    }
+    const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось сформировать отчёт', 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const filename = 'atomus-aktivnost-' + fromStr + '_' + toStr + '.xlsx';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    showToast('Отчёт скачан', 'success');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
 function openExportAssembliesModal() {
   let m = document.getElementById('export-asm-modal');
   if (!m) {
@@ -19743,6 +19785,7 @@ function renderSummary(d) {
   html += '<button onclick="quickExportSummary(\'xlsx\')" title="Только сборки"><i class="ti ti-file-spreadsheet"></i>Excel сборок</button>';
   html += '<button onclick="quickExportSummary(\'pdf\')" title="Только сборки"><i class="ti ti-file-text"></i>PDF сборок</button>';
   html += '<button onclick="quickExportSessions()" title="Полный отчёт: и сборки, и журнал участия с часами и заметками"><i class="ti ti-history"></i>Полный по сборщику</button>';
+  html += '<button onclick="quickExportActivity()" title="Единый хронологический список — что делалось: сборки + помощь"><i class="ti ti-list-details"></i>Активность</button>';
   html += '</div>';
   html += '<div style="text-align:center;padding:6px 18px 14px;font-size:12px;color:var(--text-light);">' +
     'Нужны произвольные даты или фильтр по типам работ? <a onclick="openExportAssembliesModal()" style="color:var(--brand);cursor:pointer;font-weight:500;">Расширенные параметры</a>' +
