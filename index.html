@@ -6250,6 +6250,35 @@
   }
   .notif-item:hover { background: var(--bg); }
   .notif-item:last-child { border-bottom: none; }
+  /* v2.43.49: разделители-заголовки секций в панели */
+  .notif-section-title {
+    padding: 8px 16px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    background: var(--bg);
+    display: flex; align-items: center; gap: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .notif-section-title .ti { font-size: 13px; color: var(--brand); }
+  /* v2.43.49: глобальное уведомление (дефект/договор/сборка) */
+  .notif-global .notif-item-title .ti { color: #B45309; }
+  .notif-ack-x {
+    background: transparent;
+    border: none;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-light);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .notif-ack-x:hover { background: var(--bg); color: var(--text-dark); }
+  .notif-ack-x .ti { font-size: 14px; }
   .notif-item-head {
     display: flex; align-items: center; gap: 8px;
     margin-bottom: 2px;
@@ -15739,7 +15768,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.48-helpers-manual-and-notifs";
+const APP_VERSION = "v2.43.49-notif-routing-fix";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16996,15 +17025,26 @@ async function refreshNotifBadge() {
   const badge = document.getElementById('notif-badge');
   if (!badge) return;
   try {
-    const r = await apiGet('/api/notifications/unread');
-    const total = (r && r.total_unread) || 0;
+    // v2.43.49: запрашиваем оба источника параллельно
+    const [chats, notifs] = await Promise.all([
+      apiGet('/api/contract-chats/unread').catch(() => ({ total_unread: 0, contracts: [] })),
+      apiGet('/api/notifications/unread').catch(() => ({ items: [], count: 0 })),
+    ]);
+    const totalChats   = (chats && chats.total_unread) || 0;
+    const totalNotifs  = (notifs && (notifs.count != null ? notifs.count : (notifs.items || []).length)) || 0;
+    const total = totalChats + totalNotifs;
     if (total > 0) {
       badge.textContent = total > 99 ? '99+' : String(total);
       badge.style.display = '';
     } else {
       badge.style.display = 'none';
     }
-    state._notifSummary = r;
+    state._notifSummary = {
+      contracts:    (chats && chats.contracts) || [],
+      items:        (notifs && notifs.items) || [],
+      total_unread: totalChats,
+      total_global: totalNotifs,
+    };
   } catch (e) {
     // тихо
   }
@@ -17051,8 +17091,9 @@ function _notifOutsideClickHandler(e) {
 function _renderNotifPanel(r) {
   const body = document.getElementById('notif-panel-body');
   if (!body) return;
-  const items = (r && r.contracts) || [];
-  if (!items.length) {
+  const chats   = (r && r.contracts) || [];
+  const notifs  = (r && r.items) || [];
+  if (!chats.length && !notifs.length) {
     body.innerHTML = '<div class="notif-empty">' +
       '<i class="ti ti-check"></i>' +
       '<div>Все сообщения прочитаны</div>' +
@@ -17060,27 +17101,97 @@ function _renderNotifPanel(r) {
     return;
   }
   let html = '';
-  items.forEach(c => {
-    const lastTime = _chatPrettyTime(c.last_at);
-    const lastText = c.last_text || '';
-    const author = c.last_author ? (c.last_author + ': ') : '';
-    html += '<div class="notif-item" onclick="onNotifItemClick(' + c.contract_id + ')">' +
-      '<div class="notif-item-head">' +
-        '<div class="notif-item-title">' +
-          '<i class="ti ti-message-circle"></i>' +
-          'Договор ' + escapeHtml(c.contract_number || '#' + c.contract_id) +
+  // v2.43.49: сначала глобальные уведомления (дефекты, договоры, сборки)
+  if (notifs.length) {
+    html += '<div class="notif-section-title"><i class="ti ti-bell-ringing"></i> Уведомления</div>';
+    notifs.forEach(n => {
+      const time = _chatPrettyTime(n.created_at);
+      let icon = 'ti-bell';
+      let actionTitle = '';
+      if (n.type === 'defect_created') {
+        icon = 'ti-alert-triangle';
+        actionTitle = 'Открыть замечание';
+      } else if (n.type === 'defect_message_added') {
+        icon = 'ti-message-circle';
+        actionTitle = 'Открыть переписку';
+      } else if (n.type === 'contract_published') {
+        icon = 'ti-file-text';
+      } else if (n.type === 'assembly_created') {
+        icon = 'ti-tool';
+      }
+      const onClick = n.entity_type === 'defect'
+        ? 'onNotifGlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
+        : (n.entity_type === 'contract'
+            ? 'onNotifGlobalClick(' + n.id + ',\'contract\',' + (n.entity_id || 0) + ')'
+            : 'onNotifGlobalClick(' + n.id + ',\'\',\'\')');
+      html += '<div class="notif-item notif-global" onclick="' + onClick + '">' +
+        '<div class="notif-item-head">' +
+          '<div class="notif-item-title">' +
+            '<i class="ti ' + icon + '"></i>' +
+            escapeHtml(n.title || '') +
+          '</div>' +
+          '<button class="notif-ack-x" onclick="event.stopPropagation();ackOneNotif(' + n.id + ')" title="Отметить как прочитанное"><i class="ti ti-x"></i></button>' +
         '</div>' +
-        '<span class="notif-unread-badge">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' +
-      '</div>' +
-      (c.contractor_name ? '<div class="notif-item-sub">' + escapeHtml(c.contractor_name) + '</div>' : '') +
-      '<div class="notif-item-last">' +
-        '<span class="notif-author">' + escapeHtml(author) + '</span>' +
-        escapeHtml(_truncate(lastText, 80)) +
-      '</div>' +
-      '<div class="notif-item-time">' + escapeHtml(lastTime) + '</div>' +
-    '</div>';
-  });
+        (n.message ? '<div class="notif-item-last">' + escapeHtml(_truncate(n.message, 120)) + '</div>' : '') +
+        '<div class="notif-item-time">' + escapeHtml(time) + '</div>' +
+      '</div>';
+    });
+  }
+  // Затем — непрочитанные чаты договоров
+  if (chats.length) {
+    html += '<div class="notif-section-title"><i class="ti ti-messages"></i> Чаты по договорам</div>';
+    chats.forEach(c => {
+      const lastTime = _chatPrettyTime(c.last_at);
+      const lastText = c.last_text || '';
+      const author = c.last_author ? (c.last_author + ': ') : '';
+      html += '<div class="notif-item" onclick="onNotifItemClick(' + c.contract_id + ')">' +
+        '<div class="notif-item-head">' +
+          '<div class="notif-item-title">' +
+            '<i class="ti ti-message-circle"></i>' +
+            'Договор ' + escapeHtml(c.contract_number || '#' + c.contract_id) +
+          '</div>' +
+          '<span class="notif-unread-badge">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' +
+        '</div>' +
+        (c.contractor_name ? '<div class="notif-item-sub">' + escapeHtml(c.contractor_name) + '</div>' : '') +
+        '<div class="notif-item-last">' +
+          '<span class="notif-author">' + escapeHtml(author) + '</span>' +
+          escapeHtml(_truncate(lastText, 80)) +
+        '</div>' +
+        '<div class="notif-item-time">' + escapeHtml(lastTime) + '</div>' +
+      '</div>';
+    });
+  }
   body.innerHTML = html;
+}
+
+// v2.43.49: клик по глобальному уведомлению — переход + ack
+async function onNotifGlobalClick(notifId, entityType, entityId) {
+  // Ack
+  try { await apiPost('/api/notifications/' + notifId + '/ack', {}); } catch (e) {}
+  closeNotifPanel();
+  refreshNotifBadge();
+  // Навигация по типу
+  if (entityType === 'defect' && entityId) {
+    if (typeof openDefectDetail === 'function') {
+      openDefectDetail(entityId);
+    } else {
+      selectSidebarItem('defects');
+    }
+  } else if (entityType === 'contract' && entityId) {
+    if (typeof openContractDetail === 'function') {
+      openContractDetail(entityId);
+    }
+  }
+}
+
+// v2.43.49: точечный ack по крестику
+async function ackOneNotif(notifId) {
+  try {
+    await apiPost('/api/notifications/' + notifId + '/ack', {});
+    refreshNotifBadge().then(() => _renderNotifPanel(state._notifSummary));
+  } catch (e) {
+    showToast('Не удалось отметить', 'error');
+  }
 }
 
 function _truncate(s, n) {
@@ -38317,6 +38428,19 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.49',
+    date: '27.05.2026',
+    title: 'Фикс уведомлений — теперь приходят!',
+    features: [
+      '<b>Исправлен баг:</b> два endpoint\'а с одним именем перетирали друг друга, поэтому глобальные уведомления (дефекты, договоры, сборки) НИКОГДА не доходили в колокольчик',
+      '<b>Колокольчик теперь объединяет два источника:</b> чаты по договорам + глобальные уведомления (замечания, новые договоры, сборки)',
+      'В панели — две секции: «Уведомления» (с иконкой колокольчика) сверху и «Чаты по договорам» снизу',
+      'Клик по уведомлению о замечании — открывает замечание + автоматически отмечает прочитанным',
+      'Крестик на каждом уведомлении — отметить прочитанным без перехода',
+      'Бейдж теперь считает <b>сумму обоих</b> источников',
+    ],
+  },
   {
     version: 'v2.43.48',
     date: '27.05.2026',
