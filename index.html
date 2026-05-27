@@ -2558,39 +2558,64 @@
     background: white; border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden;
   }
+  .contracts-table .ct-row {
+    padding: 14px 18px 14px 14px;
+    display: grid;
+    grid-template-columns: 4px 110px 1fr 150px 100px 100px 130px 130px 36px;
+    gap: 12px;
+    /* v2.43.58: align-items: center — все колонки центрированы по высоте строки.
+       Цветная полоска слева растягивается на всю высоту через align-self: stretch. */
+    align-items: center;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+    line-height: 1.35;
+    position: relative;
+    transition: background 0.12s;
+  }
+  /* v2.43.58: цветная полоска слева — индикатор статуса */
+  .contracts-table .ct-row .ct-strip {
+    align-self: stretch;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin: -14px 0 -14px -4px;
+  }
+  .contracts-table .ct-row.s-production .ct-strip { background: #3B82F6; }
+  .contracts-table .ct-row.s-ready_to_ship .ct-strip { background: #F59E0B; }
+  .contracts-table .ct-row.s-shipped .ct-strip { background: #10B981; }
+  .contracts-table .ct-row.s-partially_shipped .ct-strip { background: #F97316; }
+  .contracts-table .ct-row.s-closed .ct-strip { background: #6B7280; }
+  .contracts-table .ct-row.s-draft .ct-strip { background: #9CA3AF; }
+  .contracts-table .ct-row:hover { background: var(--bg); }
+  /* Header теперь имеет такую же сетку (но без полоски — поставим пустую первую ячейку) */
   .contracts-table .ct-header {
-    background: #F8F9FB; padding: 11px 18px;
+    background: #F8F9FB; padding: 11px 18px 11px 14px;
     font-size: 11px; color: var(--text-light);
     text-transform: uppercase; letter-spacing: 0.4px;
     font-weight: 600;
     display: grid;
-    grid-template-columns: 110px 1fr 150px 100px 100px 130px 130px 36px;
+    grid-template-columns: 4px 110px 1fr 150px 100px 100px 130px 130px 36px;
     gap: 12px; align-items: center;
   }
-  .contracts-table .ct-row {
-    padding: 14px 18px;
-    display: grid;
-    grid-template-columns: 110px 1fr 150px 100px 100px 130px 130px 36px;
-    gap: 12px;
-    /* v2.43.57: align-items: start — первая строка всех колонок на одной горизонтальной линии.
-       Описание контрагента (small) уходит ниже отдельно. */
-    align-items: start;
-    border-top: 1px solid var(--border);
-    cursor: pointer;
-    line-height: 1.35;
+  .contracts-table .ct-number {
+    font-weight: 700; color: var(--brand); font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    background: var(--brand-bg);
+    padding: 4px 8px;
+    border-radius: 6px;
+    text-align: center;
   }
-  .contracts-table .ct-row:hover { background: var(--bg); }
-  .contracts-table .ct-number { font-weight: 600; color: var(--brand); font-size: 13.5px; }
-  .contracts-table .ct-name { font-weight: 500; font-size: 14px; }
+  .contracts-table .ct-name {
+    font-weight: 600; font-size: 14px; color: var(--text-dark);
+    min-width: 0;
+  }
   .contracts-table .ct-name small {
-    display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 2px;
+    display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  /* v2.43.57: бейдж статуса — подтянут на 2px вверх чтобы баseline его текста
-     совпал с baseline остальных колонок (font-size бейджа меньше + padding 3px) */
-  .contracts-table .ct-status { margin-top: -2px; }
-  .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); }
-  .contracts-table .ct-sum { font-weight: 600; font-size: 13.5px; text-align: right; }
+  .contracts-table .ct-status { display: flex; align-items: center; }
+  .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+  .contracts-table .ct-sum { font-weight: 700; font-size: 14px; text-align: right; color: var(--text-dark); font-variant-numeric: tabular-nums; }
   .contracts-table .ct-manager { font-size: 13px; color: var(--text-mid); }
   .contracts-table .ct-arrow { color: var(--text-light); font-size: 18px; text-align: right; }
 
@@ -15851,7 +15876,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.57-contracts-row-fix2";
+const APP_VERSION = "v2.43.58-kanban-split-and-contracts";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -30238,6 +30263,7 @@ function renderContractsList() {
   if (state.isDesktop) {
     let html = '<div style="padding: 0 0 16px;"><div class="contracts-table">';
     html += '<div class="ct-header">' +
+      '<div></div>' + // v2.43.58: место под цветную полоску статуса
       '<div>Номер</div><div>Контрагент / описание</div><div>Статус</div>' +
       '<div>Дата</div><div>Срок</div><div style="text-align: right;">Сумма</div>' +
       '<div>Менеджер</div><div></div>' +
@@ -30247,7 +30273,9 @@ function renderContractsList() {
       if (c.contract_type === 'supply_install') desc.push('поставка с монтажом');
       else desc.push('поставка');
       desc.push(legalEntityShortName(c.legal_entity));
-      html += '<div class="ct-row" onclick="openContract(' + c.id + ')">' +
+      const statusCls = c.status ? ('s-' + c.status) : '';
+      html += '<div class="ct-row ' + statusCls + '" onclick="openContract(' + c.id + ')">' +
+        '<div class="ct-strip"></div>' + // v2.43.58: цветной индикатор статуса
         '<div class="ct-number">' + escapeHtml(c.number || '—') + '</div>' +
         '<div class="ct-name">' + escapeHtml(c.contractor_name || '—') +
           '<small>' + escapeHtml(desc.join(' · ')) + '</small></div>' +
@@ -38730,6 +38758,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.58',
+    date: '27.05.2026',
+    title: 'Канбан по штукам + договоры повыразительнее',
+    features: [
+      '<b>Канбан — каждая штука отдельной карточкой.</b> Если в новой работе qty=2 — теперь создаются <b>2 независимые карточки</b> qty=1. Можно вести параллельно: разные сборщики, разное время, разный прогресс',
+      '<b>Договоры — цветная полоска слева</b> по статусу: синий = в производстве, оранжевый = готов к отгрузке, зелёный = отгружен, серый = закрыт. Сразу видно состояние',
+      '<b>Номер договора</b> теперь в фоновой плашке моноширинным шрифтом — выделяется',
+      '<b>Сумма</b> крупнее и жирнее, цифры в tabular-варианте — колонка ровная',
+      'Все колонки точно выровнены по одной центральной линии (раньше прыгали)',
+    ],
+  },
   {
     version: 'v2.43.57',
     date: '27.05.2026',
