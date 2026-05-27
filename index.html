@@ -13413,10 +13413,6 @@
       <i class="ti ti-bell"></i>
       <span class="notif-badge" id="notif-badge" style="display:none;">0</span>
     </button>
-    <!-- v2.43.46: кнопка Помощь — открывает существующий раздел Помощь / Что нового -->
-    <button class="notif-btn" id="help-btn" onclick="selectSidebarItem('help-changelog')" title="Помощь и что нового">
-      <i class="ti ti-help-circle"></i>
-    </button>
     <div class="user-block" onclick="selectSidebarItem('account')">
       <div class="user-text">
         <div class="user-name" id="top-username">—</div>
@@ -15768,7 +15764,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.49-notif-routing-fix";
+const APP_VERSION = "v2.43.50-remove-help-btn-topbar";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38428,6 +38424,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.50',
+    date: '27.05.2026',
+    title: 'Чистка шапки',
+    features: [
+      'Убрана кнопка <b>«?»</b> из верхней панели. Раздел Помощь по-прежнему доступен через сайдбар: <i>Помощь → Что нового / База знаний / FAQ / Контакты</i>',
+    ],
+  },
   {
     version: 'v2.43.49',
     date: '27.05.2026',
