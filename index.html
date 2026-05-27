@@ -9719,6 +9719,172 @@
     border-radius: 14px;
   }
 
+  /* ============ v2.43.10 (Этап 35): расширения экрана отгрузки ============ */
+  /* (B) Шапка с адресом и сроком */
+  .ship-delivery-info {
+    background: rgba(56, 110, 161, 0.06);
+    border: 1px solid rgba(56, 110, 161, 0.18);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ship-delivery-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .ship-delivery-row i { color: var(--brand); font-size: 16px; flex: 0 0 16px; }
+
+  /* (C) Сворачиваемые группы одинаковых сборок */
+  .ship-group {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .ship-group-head {
+    padding: 12px 14px;
+    display: flex; gap: 12px; align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ship-group-head:hover { background: var(--surface-soft, #F8FAFC); }
+  .ship-group-chevron { transition: transform 0.2s; color: var(--text-light); flex-shrink: 0; }
+  .ship-group.open .ship-group-chevron { transform: rotate(180deg); }
+  .ship-group-items { padding: 0 14px 8px; }
+  .ship-group-items .ship-item {
+    margin-bottom: 6px;
+    box-shadow: none;
+    border-radius: 10px;
+  }
+
+  /* (A) Модалка деталей сборки */
+  .ship-detail-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .ship-detail-badge.shipped {
+    background: #E8F5E9; color: #14532D;
+  }
+  .ship-detail-badge.pending {
+    background: #FEF3C7; color: #78350F;
+  }
+  .ship-detail-info {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ship-detail-info-row {
+    display: flex; gap: 12px;
+    font-size: 14px;
+  }
+  .ship-detail-info-label {
+    flex: 0 0 110px;
+    color: var(--text-light);
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: .03em;
+    padding-top: 2px;
+  }
+  .ship-detail-info-value {
+    flex: 1;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .ship-detail-actions {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .ship-detail-actions .btn {
+    justify-content: center;
+    min-height: 42px;
+  }
+
+  /* (E) История отгрузок */
+  .ship-log-section {
+    margin-top: 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .ship-log-toggle {
+    width: 100%;
+    padding: 14px 16px;
+    background: white;
+    border: none;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+    font-size: 14px; font-weight: 600;
+    color: var(--text);
+  }
+  .ship-log-toggle i { color: var(--text-mid); }
+  .ship-log-toggle:hover { background: var(--surface-soft, #F8FAFC); }
+  .ship-log-toggle span { flex: 1; text-align: left; }
+  .ship-log-chevron { transition: transform 0.2s; }
+  .ship-log-toggle.open .ship-log-chevron { transform: rotate(180deg); }
+  .ship-log-content {
+    padding: 0 16px 12px;
+    border-top: 1px solid var(--border);
+  }
+  .ship-log-loading {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+  .ship-log-entry {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ship-log-entry:last-child { border-bottom: none; }
+  .ship-log-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--surface-soft, #F8FAFC);
+    color: var(--text-mid);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .ship-log-body { flex: 1; min-width: 0; }
+  .ship-log-name {
+    font-size: 13px; font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ship-log-meta {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .ship-log-undo {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .ship-log-undo:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(220, 38, 38, 0.05);
+  }
+  /* ============ конец Этапа 35 ============ */
+
   /* ============ КОНЕЦ ЭТАПА 26 ============ */
 
   /* ============================================================
@@ -14609,8 +14775,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.8-spec-back-nav";
-const APP_VERSION_DATE = "26.05.2026";
+const APP_VERSION = "v2.43.10-shipment-pro";
+const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -42433,6 +42599,9 @@ function renderShipmentScreen(status) {
   const pct = total > 0 ? Math.round(shipped / total * 100) : 0;
   const isComplete = status.is_complete;
 
+  // v2.43.10: запоминаем последний статус в state, чтобы модалка тапа могла к нему обращаться
+  state._shipLastStatus = status;
+
   let html = '';
   // Шапка
   html += '<div style="position:sticky;top:0;z-index:5;background:var(--brand);color:white;padding:14px 16px;display:flex;align-items:center;gap:12px;">';
@@ -42445,6 +42614,20 @@ function renderShipmentScreen(status) {
   html += '</div>';
 
   html += '<div class="ship-screen-wrap">';
+
+  // v2.43.10 (B): инфо о доставке — адрес + срок (если есть в договоре)
+  const deliveryAddr = c.delivery_address || '';
+  const deliveryDate = c.delivery_date || '';
+  if (deliveryAddr || deliveryDate) {
+    html += '<div class="ship-delivery-info">';
+    if (deliveryAddr) {
+      html += '<div class="ship-delivery-row"><i class="ti ti-map-pin"></i><span>' + escapeHtml(deliveryAddr) + '</span></div>';
+    }
+    if (deliveryDate) {
+      html += '<div class="ship-delivery-row"><i class="ti ti-calendar"></i><span>' + escapeHtml(_fmtDateRu(deliveryDate)) + '</span></div>';
+    }
+    html += '</div>';
+  }
 
   // Прогресс
   html += '<div class="ship-progress-card">';
@@ -42462,7 +42645,7 @@ function renderShipmentScreen(status) {
   }
   html += '</div>';
 
-  // Список позиций
+  // Список позиций (с группировкой одинаковых сборок)
   if (total > 0) {
     const items = status.items || [];
     const shippedItems = items.filter(x => x.shipped);
@@ -42470,19 +42653,80 @@ function renderShipmentScreen(status) {
 
     if (pendingItems.length) {
       html += '<div class="ship-items-title">Ожидают отгрузки (' + pendingItems.length + ')</div>';
-      pendingItems.forEach(it => { html += renderShipItem(it); });
+      // v2.43.10 (C): группируем одинаковые сборки по имени
+      html += _renderShipItemsGrouped(pendingItems);
     }
     if (shippedItems.length) {
       html += '<div class="ship-items-title">Отгружено (' + shippedItems.length + ')</div>';
+      // У отгруженных не группируем — нужно видеть время каждой
       shippedItems.forEach(it => { html += renderShipItem(it); });
     }
   }
+
+  // v2.43.10 (E): аккордеон «История отгрузки»
+  html += '<div class="ship-log-section">' +
+    '<button class="ship-log-toggle" onclick="toggleShipmentLog()" id="ship-log-toggle-btn">' +
+      '<i class="ti ti-history"></i><span>История отгрузки</span>' +
+      '<i class="ti ti-chevron-down ship-log-chevron"></i>' +
+    '</button>' +
+    '<div class="ship-log-content" id="ship-log-content" style="display:none;"></div>' +
+  '</div>';
 
   html += '</div>';
 
   overlay.innerHTML = html;
   overlay.style.display = 'block';
   document.body.style.overflow = 'hidden';
+}
+
+// v2.43.10 (C): группировка ожидающих позиций по имени модели
+function _renderShipItemsGrouped(items) {
+  if (!items || !items.length) return '';
+  // Группируем по name + type, чтобы 2× «Наружный блок №12» свернулись
+  const groups = {};
+  items.forEach(it => {
+    const key = it.type + '::' + (it.name || '');
+    if (!groups[key]) groups[key] = { key: key, type: it.type, name: it.name, items: [] };
+    groups[key].items.push(it);
+  });
+  let html = '';
+  Object.values(groups).forEach(g => {
+    if (g.items.length === 1) {
+      // Одиночная позиция — рендерим как раньше
+      html += renderShipItem(g.items[0]);
+    } else {
+      // Группа из 2+ — заголовок-сводка + раскрытие
+      const groupId = 'shipgrp-' + Math.random().toString(36).slice(2, 8);
+      const iconCls = g.type === 'box' ? 'ti-package' : 'ti-tool';
+      const typeLabel = g.type === 'box' ? 'Коробки' : 'Сборки';
+      html += '<div class="ship-group" data-grp-id="' + groupId + '">' +
+        '<div class="ship-group-head" onclick="_toggleShipGroup(\'' + groupId + '\')">' +
+          '<div class="ship-item-type-icon"><i class="ti ' + iconCls + '"></i></div>' +
+          '<div class="ship-item-body">' +
+            '<div class="ship-item-name">' + escapeHtml(g.name || '—') + '</div>' +
+            '<div class="ship-item-sub">' + typeLabel + ' · ' + g.items.length + ' шт.</div>' +
+          '</div>' +
+          '<i class="ti ti-chevron-down ship-group-chevron"></i>' +
+        '</div>' +
+        '<div class="ship-group-items" id="' + groupId + '" style="display:none;">';
+      g.items.forEach(it => { html += renderShipItem(it); });
+      html += '</div></div>';
+    }
+  });
+  return html;
+}
+
+function _toggleShipGroup(groupId) {
+  const el = document.getElementById(groupId);
+  if (!el) return;
+  const grp = el.closest('.ship-group');
+  if (el.style.display === 'none') {
+    el.style.display = '';
+    if (grp) grp.classList.add('open');
+  } else {
+    el.style.display = 'none';
+    if (grp) grp.classList.remove('open');
+  }
 }
 
 function renderShipItem(it) {
@@ -42492,7 +42736,9 @@ function renderShipItem(it) {
   if (it.shipped && it.shipped_at) {
     sub += ' · отгружено ' + (String(it.shipped_at).slice(0, 16).replace('T', ' '));
   }
-  return '<div class="ship-item ' + (it.shipped ? 'shipped' : '') + '">' +
+  // v2.43.10 (A): тап по карточке открывает модалку с деталями
+  const clickAttr = ' onclick="openShipmentItemDetail(\'' + it.type + '\',' + it.id + ')"';
+  return '<div class="ship-item ' + (it.shipped ? 'shipped' : '') + '"' + clickAttr + ' style="cursor:pointer;">' +
     '<div class="ship-item-check"></div>' +
     '<div class="ship-item-type-icon"><i class="ti ' + iconCls + '"></i></div>' +
     '<div class="ship-item-body">' +
@@ -42518,6 +42764,300 @@ function closeShipmentScreen() {
   state._shipContractId = null;
   state._shipContract = null;
 }
+
+// ============ v2.43.10 (Этап 35): расширения экрана отгрузки ============
+
+// (A) Модалка деталей сборки/коробки по тапу
+async function openShipmentItemDetail(itemType, itemId) {
+  if (!itemType || !itemId) return;
+  let card;
+  try {
+    card = await apiGet('/api/shipment-card?type=' + encodeURIComponent(itemType) + '&id=' + itemId);
+  } catch (e) {
+    showToast('Не удалось загрузить карточку: ' + (e.message || e), 'error');
+    return;
+  }
+  if (!card) return;
+  _renderShipmentItemModal(card);
+}
+
+function _renderShipmentItemModal(card) {
+  let m = document.getElementById('ship-detail-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ship-detail-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const isBox = card.type === 'box';
+  const isShipped = !!card.shipped;
+  const title = isBox ? 'Коробка' : 'Сборка';
+
+  // Строим строки информации
+  let infoHtml = '';
+  if (!isBox && card.assembly_date) {
+    infoHtml += _shipInfoRow('Собрано', _fmtDateRu(card.assembly_date));
+  }
+  if (!isBox && card.workers && card.workers.length) {
+    const names = card.workers.map(w => w.name).join(', ');
+    infoHtml += _shipInfoRow('Исполнители', names);
+  }
+  if (!isBox && card.quantity && card.quantity > 1) {
+    infoHtml += _shipInfoRow('Количество', card.quantity + ' шт.');
+  }
+  if (!isBox && card.execution) {
+    const lbl = card.execution === 'stainless' ? 'Нержавейка' : 'Обычное';
+    infoHtml += _shipInfoRow('Исполнение', lbl);
+  }
+  if (!isBox && card.ip_class) {
+    infoHtml += _shipInfoRow('IP-класс', card.ip_class);
+  }
+  if (card.contract_number) {
+    infoHtml += _shipInfoRow('Договор', '№' + card.contract_number);
+  }
+  if (card.contractor_name) {
+    infoHtml += _shipInfoRow('Контрагент', card.contractor_name);
+  }
+  if (isBox && card.description) {
+    infoHtml += _shipInfoRow('Описание', card.description);
+  }
+  if (!isBox && card.comment) {
+    infoHtml += _shipInfoRow('Комментарий', card.comment);
+  }
+
+  // Бейдж статуса
+  let badge;
+  if (isShipped) {
+    const when = card.shipped_at ? ' · ' + String(card.shipped_at).slice(0, 16).replace('T', ' ') : '';
+    const by = card.shipped_by_name ? ' · ' + escapeHtml(card.shipped_by_name) : '';
+    badge = '<div class="ship-detail-badge shipped"><i class="ti ti-circle-check"></i> Отгружено' + when + by + '</div>';
+  } else {
+    badge = '<div class="ship-detail-badge pending"><i class="ti ti-circle-dashed"></i> Ожидает отгрузки</div>';
+  }
+
+  // Кнопки действий
+  let actionsHtml = '<div class="ship-detail-actions">';
+  if (!isShipped) {
+    actionsHtml +=
+      '<button class="btn btn-primary" onclick="markShipmentManual(\'' + card.type + '\',' + card.id + ')">' +
+        '<i class="ti ti-check"></i> Отметить отгруженным' +
+      '</button>';
+  } else {
+    actionsHtml +=
+      '<button class="btn btn-secondary" onclick="undoShipmentFromModal(' + card.shipment_id + ')">' +
+        '<i class="ti ti-arrow-back-up"></i> Отменить отгрузку' +
+      '</button>';
+  }
+  // Печать QR
+  if (card.public_token) {
+    actionsHtml +=
+      '<button class="btn btn-secondary" onclick="_reprintQrFromShipCard(' + JSON.stringify(card).replace(/"/g, '&quot;') + ')">' +
+        '<i class="ti ti-qrcode"></i> QR-код' +
+      '</button>';
+  }
+  // Открыть модель (только для сборок с привязкой)
+  if (!isBox && card.model_id) {
+    actionsHtml +=
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\'); openModelDetail(' + card.model_id + ')">' +
+        '<i class="ti ti-package"></i> Карточка модели' +
+      '</button>';
+  }
+  // Редактировать (для сборок)
+  if (!isBox && typeof openEditAssembly === 'function') {
+    actionsHtml +=
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\'); openEditAssembly(' + card.id + ')">' +
+        '<i class="ti ti-edit"></i> Редактировать сборку' +
+      '</button>';
+  }
+  // Упаковать в коробку (для сборок не отгруженных и не в коробке)
+  if (!isBox && !isShipped && typeof openAddAssemblyToBox === 'function') {
+    actionsHtml +=
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\'); openAddAssemblyToBox(' + card.id + ')">' +
+        '<i class="ti ti-package"></i> Упаковать в коробку' +
+      '</button>';
+  }
+  actionsHtml += '</div>';
+
+  m.innerHTML =
+    '<div class="modal-content" style="max-width:520px;" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<div>' +
+          '<div style="font-size:11px;color:var(--text-light);text-transform:uppercase;font-weight:600;letter-spacing:.04em;">' + title + '</div>' +
+          '<h3 style="margin:2px 0 0;font-size:18px;">' + escapeHtml(card.display_name || 'Без названия') + '</h3>' +
+        '</div>' +
+        '<button class="modal-close" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        badge +
+        '<div class="ship-detail-info">' + infoHtml + '</div>' +
+        actionsHtml +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function _shipInfoRow(label, value) {
+  return '<div class="ship-detail-info-row">' +
+    '<div class="ship-detail-info-label">' + escapeHtml(label) + '</div>' +
+    '<div class="ship-detail-info-value">' + escapeHtml(String(value || '—')) + '</div>' +
+  '</div>';
+}
+
+function _reprintQrFromShipCard(card) {
+  if (!card || !card.public_token) return;
+  document.getElementById('ship-detail-modal').classList.remove('visible');
+  const baseUrl = window.location.origin;
+  const url = baseUrl + (card.type === 'box' ? '/b/' : '/a/') + card.public_token;
+  if (typeof openQrModal === 'function') {
+    openQrModal({
+      title: 'QR-код · ' + (card.display_name || ''),
+      subtitle: card.contract_number ? 'Договор № ' + card.contract_number : '',
+      url: url,
+      type: card.type,
+      data: card,
+    });
+  }
+}
+
+// Отметка вручную
+async function markShipmentManual(itemType, itemId) {
+  if (!confirm('Отметить как отгруженное вручную (без сканирования QR)?')) return;
+  let r;
+  try {
+    r = await apiPost('/api/shipments/manual', { type: itemType, id: itemId });
+  } catch (e) {
+    showToast('Не удалось отметить: ' + (e.message || e), 'error');
+    return;
+  }
+  if (r && r.ok) {
+    showToast('✓ Отгрузка отмечена', 'success');
+    _handleShipmentStatusChange(r);
+    // Закрываем модалку и обновляем список
+    const m = document.getElementById('ship-detail-modal');
+    if (m) m.classList.remove('visible');
+    reloadShipmentStatus();
+  } else if (r && r.reason === 'already_shipped') {
+    showToast('Уже отгружено', 'info');
+  } else {
+    showToast('Не удалось отметить (' + (r && r.reason || 'unknown') + ')', 'error');
+  }
+}
+
+// Откат отгрузки
+async function undoShipmentFromModal(shipmentId) {
+  if (!shipmentId) return;
+  if (!confirm('Отменить отгрузку этой позиции? Запись будет удалена.')) return;
+  let r;
+  try {
+    r = await apiDelete('/api/shipments/' + shipmentId);
+  } catch (e) {
+    showToast('Не удалось отменить: ' + (e.message || e), 'error');
+    return;
+  }
+  if (r && r.ok) {
+    showToast('✓ Отгрузка отменена', 'success');
+    _handleShipmentStatusChange(r);
+    const m = document.getElementById('ship-detail-modal');
+    if (m) m.classList.remove('visible');
+    reloadShipmentStatus();
+    // Если открыта история — перерисуем
+    const log = document.getElementById('ship-log-content');
+    if (log && log.style.display !== 'none') loadShipmentLog();
+  } else {
+    showToast('Не удалось отменить', 'error');
+  }
+}
+
+// (D-упрощённый) Реакция на смену статуса договора
+function _handleShipmentStatusChange(response) {
+  if (!response || !response.contract_status_changed) return;
+  const newStatus = response.contract_status_changed;
+  let label = newStatus;
+  if (newStatus === 'shipped') label = 'Отгружено';
+  else if (newStatus === 'partially_shipped') label = 'Отгружено частично';
+  else if (newStatus === 'production') label = 'В производстве';
+  setTimeout(() => {
+    showToast('📋 Договор переведён в статус «' + label + '»', 'info');
+  }, 800);
+}
+
+// (E) История отгрузки — аккордеон
+async function toggleShipmentLog() {
+  const content = document.getElementById('ship-log-content');
+  const btn = document.getElementById('ship-log-toggle-btn');
+  if (!content || !btn) return;
+  if (content.style.display === 'none') {
+    content.style.display = '';
+    btn.classList.add('open');
+    await loadShipmentLog();
+  } else {
+    content.style.display = 'none';
+    btn.classList.remove('open');
+  }
+}
+
+async function loadShipmentLog() {
+  const content = document.getElementById('ship-log-content');
+  if (!content || !state._shipContractId) return;
+  content.innerHTML = '<div class="ship-log-loading">Загрузка…</div>';
+  let data;
+  try {
+    data = await apiGet('/api/contracts/' + state._shipContractId + '/shipment-log');
+  } catch (e) {
+    content.innerHTML = '<div class="ship-log-loading" style="color:var(--danger);">Ошибка: ' + escapeHtml(String(e.message || e)) + '</div>';
+    return;
+  }
+  const entries = (data && data.entries) || [];
+  if (!entries.length) {
+    content.innerHTML = '<div class="ship-log-loading">Отгрузок пока не было</div>';
+    return;
+  }
+  let html = '';
+  entries.forEach(e => {
+    const iconCls = e.type === 'box' ? 'ti-package' : 'ti-tool';
+    const when = e.shipped_at ? String(e.shipped_at).slice(0, 16).replace('T', ' ') : '';
+    const by = e.shipped_by_name || '';
+    html += '<div class="ship-log-entry">' +
+      '<div class="ship-log-icon"><i class="ti ' + iconCls + '"></i></div>' +
+      '<div class="ship-log-body">' +
+        '<div class="ship-log-name">' + escapeHtml(e.item_name) + '</div>' +
+        '<div class="ship-log-meta">' + escapeHtml(when) + (by ? ' · ' + escapeHtml(by) : '') + '</div>' +
+      '</div>' +
+      '<button class="ship-log-undo" onclick="undoShipmentFromLog(' + e.shipment_id + ')" title="Отменить отгрузку">' +
+        '<i class="ti ti-arrow-back-up"></i>' +
+      '</button>' +
+    '</div>';
+  });
+  content.innerHTML = html;
+}
+
+async function undoShipmentFromLog(shipmentId) {
+  if (!shipmentId) return;
+  if (!confirm('Отменить эту отгрузку? Запись будет удалена.')) return;
+  try {
+    const r = await apiDelete('/api/shipments/' + shipmentId);
+    if (r && r.ok) {
+      showToast('✓ Отгрузка отменена', 'success');
+      _handleShipmentStatusChange(r);
+      reloadShipmentStatus();
+      loadShipmentLog();
+    }
+  } catch (e) {
+    showToast('Не удалось отменить: ' + (e.message || e), 'error');
+  }
+}
+
+// Хелпер: дата YYYY-MM-DD → ДД.ММ.ГГГГ
+function _fmtDateRu(d) {
+  if (!d) return '';
+  const s = String(d).slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return m[3] + '.' + m[2] + '.' + m[1];
+  return s;
+}
+
+// ============ конец Этапа 35 ============
 
 function onShipmentAllDone() {
   // Просто моргнуть successом
