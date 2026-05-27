@@ -14959,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.21-no-cors-break";
+const APP_VERSION = "v2.43.24-convert-to-component";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -28382,6 +28382,29 @@ async function convertSpecItemToModel(contractId, itemId, modelId) {
   }
 }
 
+// v2.43.24: конвертация свободного ввода / продажной позиции в комплектующее склада.
+// Используется после загрузки УПД: на складе появилось комплектующее, а в договоре
+// эта же позиция всё ещё текстовая и не резервируется. Клик → связь со складом
+// + сразу создаётся резерв (если хватает остатка).
+async function convertSpecItemToComponent(contractId, itemId, componentId) {
+  if (!confirm('Связать позицию со складом? Если есть остаток — позиция уйдёт в резерв.')) return;
+  try {
+    const r = await apiPost('/api/contracts/items/' + itemId + '/convert-to-component', {
+      component_id: componentId,
+    });
+    if (r && r.ok) {
+      showToast('Позиция связана со складом', 'success');
+      await loadContractItemsBlock(contractId);
+      cache.dashboard = null;
+      cache.components = null;
+    } else {
+      showToast((r && r.data && r.data.message) || 'Не удалось связать', 'error');
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка связи со складом', 'error');
+  }
+}
+
 // v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции + свободный ввод)
 // v2.43.13: добавлен бейдж «Изготовляется» — для assemblies со статусом in_progress.
 function _renderReservationBadge(item) {
@@ -28620,6 +28643,17 @@ function renderContractItemsBlock(contractId) {
                   'title="Превратить в сборку: ' + escapeHtml(it.convertible_to_model_name || '') + '" ' +
                   'onclick="convertSpecItemToModel(' + contractId + ',' + it.id + ',' + it.convertible_to_model_id + ')">' +
                   '<i class="ti ti-arrow-up-right"></i>' +
+                '</button>'
+              ) : '') +
+              // v2.43.24: конвертация в комплектующее склада (для свободного ввода / sale_product)
+              (it.convertible_to_component_id ? (
+                '<button class="spec-item-act-btn" style="color:#15803D;" ' +
+                  'title="Связать со складом: ' + escapeHtml(it.convertible_to_component_name || '') +
+                    (it.convertible_to_component_on_stock != null
+                      ? ' (на складе: ' + _fmtQty(it.convertible_to_component_on_stock) + ')'
+                      : '') + '" ' +
+                  'onclick="convertSpecItemToComponent(' + contractId + ',' + it.id + ',' + it.convertible_to_component_id + ')">' +
+                  '<i class="ti ti-package-import"></i>' +
                 '</button>'
               ) : '') +
               '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
@@ -43936,7 +43970,7 @@ async function siHandleCameraDirect(event) {
   const files = event.target.files;
   if (!files || !files.length) return;
   // Загружаем без модалки — сразу с тостом
-  showToast('Загружаем фото · распознавание запустишь вручную', 'success');
+  showToast('Загружаем фото · распознавание запустишь вручную с компа', 'success');
   // Переключаемся на экран Приёмки УПД, чтобы было куда показать detail
   if (typeof selectSidebarItem === 'function' && state.currentScreen !== 'supply-invoice-intake') {
     selectSidebarItem('supply-invoice-intake');
