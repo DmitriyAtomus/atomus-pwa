@@ -10773,6 +10773,19 @@
   .cal-reopen-btn:hover { border-color: #3B82F6; color: #3B82F6; background: #EFF6FF; }
   .cal-reopen-btn .ti { font-size: 14px; vertical-align: middle; }
 
+  /* v2.43.17: кнопка «✓ Готово» — переводит in_progress → ready */
+  .cal-finish-btn {
+    background: #DCFCE7; border: 1px solid #86EFAC;
+    color: #15803D;
+    padding: 3px 7px; border-radius: 6px;
+    cursor: pointer; font-size: 12px;
+    margin-left: 6px; line-height: 1;
+    transition: all 0.15s ease;
+    font-weight: 600;
+  }
+  .cal-finish-btn:hover { background: #BBF7D0; border-color: #22C55E; }
+  .cal-finish-btn .ti { font-size: 14px; vertical-align: middle; }
+
   /* v2.43.13: прогресс-бар готовности договора */
   .contract-progress {
     background: #FFFFFF;
@@ -14931,7 +14944,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.16-reopen-and-split-tiles";
+const APP_VERSION = "v2.43.17-finish-button-and-cache-bust";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16630,17 +16643,44 @@ async function reopenAssembly(assemblyId, contractId) {
     const r = await apiPatch('/api/assemblies/' + assemblyId + '/status', { status: 'in_progress' });
     if (r) {
       showToast('Сборка возвращена в работу', 'success');
-      // Сбрасываем кэш и перезагружаем карточку договора
-      cache.dashboard = null;
-      cache.productionKanban = null;
-      cache.contracts = null;
-      cache.contractsWithProgress = null;
-      if (contractId && typeof loadCurrentContract === 'function') {
-        loadCurrentContract();
-      }
+      await _afterAssemblyStatusChange(contractId);
     }
   } catch (e) {
     showToast((e && e.message) || 'Не удалось вернуть в работу', 'error');
+  }
+}
+
+// v2.43.17: пометить сборку готовой (in_progress → ready)
+async function markAssemblyReady(assemblyId, contractId) {
+  if (!confirm('Отметить сборку готовой? Появится приход на склад, статус: «Готово».')) return;
+  try {
+    const r = await apiPatch('/api/assemblies/' + assemblyId + '/status', { status: 'ready' });
+    if (r) {
+      showToast('Сборка готова', 'success');
+      await _afterAssemblyStatusChange(contractId);
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось перевести в готово', 'error');
+  }
+}
+
+// v2.43.17: общая постобработка после смены статуса сборки —
+// сбрасываем кэши И жёстко перезагружаем спецификацию (бейджи В резерве/Изготовляется).
+async function _afterAssemblyStatusChange(contractId) {
+  cache.dashboard = null;
+  cache.productionKanban = null;
+  cache.contracts = null;
+  cache.contractsWithProgress = null;
+  // Сбрасываем кэш спецификации, иначе бейджи останутся старые
+  if (state._specByContract && contractId) {
+    delete state._specByContract[contractId];
+  }
+  if (contractId && typeof loadCurrentContract === 'function') {
+    await loadCurrentContract();
+  }
+  // На всякий случай дёргаем спецификацию ещё раз (loadCurrentContract её и сам тянет)
+  if (contractId && typeof loadContractItemsBlock === 'function') {
+    await loadContractItemsBlock(contractId);
   }
 }
 
@@ -22980,14 +23020,26 @@ function renderContractAssembliesBlock(c) {
       } else if (a.status === 'shipped') {
         statusBadge = '<span class="a-status-badge a-st-shipped"><i class="ti ti-truck-delivery"></i>Отгружено</span>';
       }
-      // v2.43.16: кнопка «↩ В работу» для готовых (если не отгружено)
+      // v2.43.16: кнопки управления статусом сборки
+      //   ready / shipped — нет кнопок (всё ок)
+      //   in_progress     — кнопка ✓ «Готово» (переводит ready)
+      //   ready (не shipped) — кнопка ↩ «Вернуть в работу» (для случая ошибки)
+      // v2.43.17: парная кнопка + жёсткая перезагрузка спецификации
       let workersCellHtml = escapeHtml(workers);
-      if (a.status === 'ready' && canShip) {
-        workersCellHtml +=
-          ' <button class="cal-reopen-btn" title="Вернуть в работу (отменить готовность)" ' +
-                  'onclick="reopenAssembly(' + a.id + ',' + c.id + ')">' +
-            '<i class="ti ti-arrow-back-up"></i>' +
-          '</button>';
+      if (canShip) {
+        if (a.status === 'in_progress') {
+          workersCellHtml +=
+            ' <button class="cal-finish-btn" title="Сборка готова (перевести на склад)" ' +
+                    'onclick="markAssemblyReady(' + a.id + ',' + c.id + ')">' +
+              '<i class="ti ti-check"></i>' +
+            '</button>';
+        } else if (a.status === 'ready') {
+          workersCellHtml +=
+            ' <button class="cal-reopen-btn" title="Ошиблись? Вернуть в работу (отменить готовность)" ' +
+                    'onclick="reopenAssembly(' + a.id + ',' + c.id + ')">' +
+              '<i class="ti ti-arrow-back-up"></i>' +
+            '</button>';
+        }
       }
       html += '<div class="cal-row">' +
         '<div class="cal-date">' + formatDateShort(a.assembly_date) + '</div>' +
