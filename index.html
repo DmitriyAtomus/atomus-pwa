@@ -14959,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.27-restore-contract-on-reload";
+const APP_VERSION = "v2.43.28-restore-full-context";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15617,23 +15617,33 @@ function _restoreLastView() {
   }
   // Восстанавливаем: сначала раздел (он откроет defaultScreen), потом меняем на сохранённый экран
   selectSection(last.section);
+  // v2.43.28: восстанавливаем ID-контекст ДО переключения экрана,
+  // чтобы loadXxx() видел правильные state.currentXxxId.
+  if (last.ctx && typeof last.ctx === 'object') {
+    if (last.ctx.contractId)    state.currentContractId    = last.ctx.contractId;
+    if (last.ctx.contractorId)  state.currentContractorId  = last.ctx.contractorId;
+    if (last.ctx.taskId)        state.currentTaskId        = last.ctx.taskId;
+    if (last.ctx.offerId)       state.currentOfferId       = last.ctx.offerId;
+    if (last.ctx.employeeId)    state.currentEmployeeId    = last.ctx.employeeId;
+    if (last.ctx.saleProductId) state.currentSaleProductId = last.ctx.saleProductId;
+    if (last.ctx.supplyOrderId) state.currentSupplyOrderId = last.ctx.supplyOrderId;
+  }
+  // v2.43.27 fallback: совместимость с предыдущей версией, где сохранялся
+  // только contractId в отдельном ключе
+  if (!state.currentContractId) {
+    try {
+      const savedCid = parseInt(localStorage.getItem('atomus_last_contract_id'), 10);
+      if (savedCid > 0) state.currentContractId = savedCid;
+    } catch (e) {}
+  }
   if (last.screen !== SECTION_CONFIG[last.section].defaultScreen) {
     // Дополнительная проверка — есть ли элемент экрана в DOM
     const screenEl = document.querySelector('.screen[data-screen="' + last.screen + '"]');
     if (screenEl) {
-      // v2.43.27: для экрана карточки договора нужно сначала восстановить
-      // state.currentContractId из localStorage, иначе loadCurrentContract
-      // покажет «Договор не выбран».
-      if (last.screen === 'sales-contract-detail') {
-        try {
-          const savedCid = parseInt(localStorage.getItem('atomus_last_contract_id'), 10);
-          if (savedCid > 0) state.currentContractId = savedCid;
-        } catch (e) {}
-        // Если id не нашли — лучше вернуться в список договоров
-        if (!state.currentContractId) {
-          selectSidebarItem('sales-contracts');
-          return;
-        }
+      // Если экран — карточка чего-то, а нужный id не подтянулся, лучше вернуться в список
+      if (last.screen === 'sales-contract-detail' && !state.currentContractId) {
+        selectSidebarItem('sales-contracts');
+        return;
       }
       selectSidebarItem(last.screen);
     }
@@ -15846,7 +15856,8 @@ function selectSidebarItem(screenName) {
     try { _stopDefectChatPolling && _stopDefectChatPolling(); } catch (_) {}
   }
 
-  // v2.8.2: сохраняем текущий раздел+экран чтобы при F5 вернуться сюда
+  // v2.8.2 / v2.43.28: сохраняем текущий раздел+экран+ID-контекст чтобы при F5
+  // оказаться ровно там, где был. Не сохраняем для form-экранов (там полузаполненные данные).
   try {
     const TRANSIENT_SCREENS = [
       'employee-form', 'task-form', 'contract-form', 'sale-offer-form',
@@ -15855,9 +15866,21 @@ function selectSidebarItem(screenName) {
       'wh-ship-qr',
     ];
     if (!TRANSIENT_SCREENS.includes(screenName)) {
+      // v2.43.28: расширенный snapshot — на каждом экране может быть открыт
+      // конкретный элемент (договор, задача, КП, контрагент, сотрудник и т.д.).
+      // Сохраняем все эти id, чтобы при F5 _restoreLastView мог восстановить.
+      const ctx = {};
+      if (state.currentContractId)     ctx.contractId     = state.currentContractId;
+      if (state.currentContractorId)   ctx.contractorId   = state.currentContractorId;
+      if (state.currentTaskId)         ctx.taskId         = state.currentTaskId;
+      if (state.currentOfferId)        ctx.offerId        = state.currentOfferId;
+      if (state.currentEmployeeId)     ctx.employeeId     = state.currentEmployeeId;
+      if (state.currentSaleProductId)  ctx.saleProductId  = state.currentSaleProductId;
+      if (state.currentSupplyOrderId)  ctx.supplyOrderId  = state.currentSupplyOrderId;
       localStorage.setItem('atomus_last_view', JSON.stringify({
         section: state.currentSection || 'home',
         screen: screenName,
+        ctx: ctx,
         ts: Date.now(),
       }));
     }
