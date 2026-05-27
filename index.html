@@ -14903,7 +14903,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.13-progress-and-inprod-badge";
+const APP_VERSION = "v2.43.14-kanban-sync-and-convert";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -28122,6 +28122,28 @@ function renderContractProgressBar(contractId) {
     '</div>';
 }
 
+// v2.43.13: конвертация позиции спецификации из «продажной» в «сборочную»
+// (sale_product_id → model_id). Используется когда чиллер случайно завели
+// как sale_product, а должна быть модель из производственной номенклатуры.
+async function convertSpecItemToModel(contractId, itemId, modelId) {
+  if (!confirm('Превратить позицию в сборку? Закупка отменится, появится задание в производстве.')) return;
+  try {
+    const r = await apiPost('/api/contracts/items/' + itemId + '/convert-to-model', {
+      model_id: modelId,
+    });
+    if (r && r.ok) {
+      showToast('Позиция переведена в производство', 'success');
+      await loadContractItemsBlock(contractId);
+      cache.dashboard = null;
+      cache.productionKanban = null;
+    } else {
+      showToast((r && r.data && r.data.message) || 'Не удалось конвертировать', 'error');
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка конвертации', 'error');
+  }
+}
+
 // v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции + свободный ввод)
 // v2.43.13: добавлен бейдж «Изготовляется» — для assemblies со статусом in_progress.
 function _renderReservationBadge(item) {
@@ -28336,6 +28358,14 @@ function renderContractItemsBlock(contractId) {
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
             (canEdit ? '<div class="spec-item-actions">' +
+              // v2.43.13: конвертация sale_product → model, если найдена одноимённая активная модель
+              (it.convertible_to_model_id ? (
+                '<button class="spec-item-act-btn" style="color:#1E40AF;" ' +
+                  'title="Превратить в сборку: ' + escapeHtml(it.convertible_to_model_name || '') + '" ' +
+                  'onclick="convertSpecItemToModel(' + contractId + ',' + it.id + ',' + it.convertible_to_model_id + ')">' +
+                  '<i class="ti ti-arrow-up-right"></i>' +
+                '</button>'
+              ) : '') +
               '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
               '<button class="spec-item-act-btn danger" title="Удалить" onclick="deleteSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-trash"></i></button>' +
             '</div>' : '') +
