@@ -11298,6 +11298,145 @@
   }
   .pkb-detail-actions .pkb-btn { font-size: 12px; height: 34px; padding: 0 12px; }
 
+  /* v2.43.31: блок прогресса в модалке работы */
+  .pwd-progress-block {
+    margin: 4px 18px 14px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .pwd-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 10px;
+  }
+  .pwd-progress-head .ti { margin-right: 6px; color: var(--brand); }
+  .pwd-progress-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brand);
+  }
+  .pwd-progress-slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #DBE2EA;
+    appearance: none; -webkit-appearance: none;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .pwd-progress-slider::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--brand);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 2px solid white;
+  }
+  .pwd-progress-slider::-moz-range-thumb {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--brand);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 2px solid white;
+  }
+  .pwd-progress-presets {
+    display: flex; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pwd-progress-preset {
+    flex: 1;
+    min-width: 50px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pwd-progress-preset:hover {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+  .pwd-progress-bar-wrap {
+    height: 10px;
+    background: #DBE2EA;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .pwd-progress-bar-fill {
+    height: 100%;
+    background: var(--brand);
+    transition: width 0.3s;
+  }
+
+  /* v2.43.31: блок комментария */
+  .pwd-comment-block {
+    margin: 4px 18px 14px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .pwd-comment-head {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+  }
+  .pwd-comment-head .ti { margin-right: 6px; color: var(--brand); }
+  .pwd-comment-textarea {
+    width: 100%;
+    min-height: 60px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+    box-sizing: border-box;
+    background: white;
+  }
+  .pwd-comment-textarea:focus {
+    border-color: var(--brand);
+    outline: none;
+  }
+  .pwd-comment-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    gap: 8px;
+  }
+  .pwd-comment-meta {
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+  .pwd-comment-text {
+    font-size: 13px;
+    color: var(--text-dark);
+    white-space: pre-wrap;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .pwd-comment-block .pkb-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   /* --- Формa создания работы --- */
   .pkb-form-modal .modal {
     max-width: 520px;
@@ -14968,7 +15107,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.30-workload-colors-and-estimate";
+const APP_VERSION = "v2.43.31-pwork-comment-and-progress";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17564,13 +17703,71 @@ function renderProductionWorkDetail(w) {
   }
   if (w.estimated_hours != null) html += '<dt>План часов</dt><dd>' + w.estimated_hours + 'ч</dd>';
   if (w.actual_hours != null) html += '<dt>Факт часов</dt><dd>' + w.actual_hours + 'ч</dd>';
-  if (w.progress != null && w.status === 'in_progress') html += '<dt>Прогресс</dt><dd>' + w.progress + '%</dd>';
+  // v2.43.31: прогресс — показываем всегда (для in_progress в виде редактируемого слайдера ниже)
+  if (w.progress != null && w.status !== 'in_progress' && w.status !== 'review' && w.status !== 'packing') {
+    html += '<dt>Прогресс</dt><dd>' + w.progress + '%</dd>';
+  }
   if (w.execution_type && w.execution_type !== 'standard') html += '<dt>Исполнение</dt><dd>' + escapeHtml(w.execution_type) + '</dd>';
   if (w.ip_rating) html += '<dt>IP</dt><dd>' + escapeHtml(w.ip_rating) + '</dd>';
   if (w.started_at)  html += '<dt>Начато</dt><dd>'    + escapeHtml(formatPkbDateTime(w.started_at)) + '</dd>';
   if (w.finished_at) html += '<dt>Завершено</dt><dd>' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</dd>';
   if (w.description) html += '<dt>Описание</dt><dd style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</dd>';
   html += '</dl>';
+
+  // v2.43.31: блок прогресса с возможностью редактирования (только in_progress/review/packing)
+  const canEditWork = hasPermission('production.manage') &&
+                      ['in_progress', 'review', 'packing'].includes(w.status);
+  if (canEditWork || (w.progress != null && ['in_progress', 'review', 'packing'].includes(w.status))) {
+    const curPct = Math.max(0, Math.min(100, Number(w.progress || 0)));
+    html += '<div class="pwd-progress-block">';
+    html +=   '<div class="pwd-progress-head">';
+    html +=     '<span><i class="ti ti-progress"></i> Прогресс</span>';
+    html +=     '<span class="pwd-progress-value" id="pwd-progress-value">' + curPct + '%</span>';
+    html +=   '</div>';
+    if (canEditWork) {
+      html +=   '<input type="range" min="0" max="100" step="5" value="' + curPct + '" ' +
+                'class="pwd-progress-slider" id="pwd-progress-slider" ' +
+                'oninput="document.getElementById(\'pwd-progress-value\').textContent = this.value + \'%\'; ' +
+                  'document.getElementById(\'pwd-progress-bar-fill\').style.width = this.value + \'%\';" ' +
+                'onchange="savePwdProgress(' + w.id + ', this.value)">';
+      html +=   '<div class="pwd-progress-presets">';
+      [0, 25, 50, 75, 100].forEach(p => {
+        html += '<button class="pwd-progress-preset" onclick="pwdSetProgressPreset(' + w.id + ',' + p + ')">' + p + '%</button>';
+      });
+      html +=   '</div>';
+    } else {
+      html +=   '<div class="pwd-progress-bar-wrap"><div class="pwd-progress-bar-fill" id="pwd-progress-bar-fill" style="width:' + curPct + '%;"></div></div>';
+    }
+    html += '</div>';
+  }
+
+  // v2.43.31: комментарий сборщика
+  if (canEditWork || w.comment) {
+    const safeComment = escapeHtml(w.comment || '');
+    html += '<div class="pwd-comment-block">';
+    html +=   '<div class="pwd-comment-head"><i class="ti ti-message-circle"></i> Комментарий</div>';
+    if (canEditWork) {
+      html += '<textarea class="pwd-comment-textarea" id="pwd-comment-textarea" rows="3" ' +
+                'placeholder="Заметки по работе: где остановился, что ждёт, на что обратить внимание…" ' +
+                'oninput="document.getElementById(\'pwd-comment-save\').disabled = (this.value === ' + JSON.stringify(w.comment || '') + ');">' +
+              safeComment + '</textarea>';
+      html += '<div class="pwd-comment-actions">';
+      if (w.comment_updated_at) {
+        html += '<span class="pwd-comment-meta">обновлено ' + escapeHtml(formatPkbDateTime(w.comment_updated_at)) + '</span>';
+      } else {
+        html += '<span></span>';
+      }
+      html += '<button class="pkb-btn primary" id="pwd-comment-save" disabled onclick="savePwdComment(' + w.id + ')">' +
+                '<i class="ti ti-device-floppy"></i> Сохранить</button>';
+      html += '</div>';
+    } else {
+      html += '<div class="pwd-comment-text">' + safeComment.replace(/\n/g, '<br>') + '</div>';
+      if (w.comment_updated_at) {
+        html += '<div class="pwd-comment-meta">обновлено ' + escapeHtml(formatPkbDateTime(w.comment_updated_at)) + '</div>';
+      }
+    }
+    html += '</div>';
+  }
 
   // v2.23.2 (Stage 29.5): блок выбора комплектности — только для не-done и при наличии прав
   if (w.status !== 'done' && w.status !== 'cancelled' && hasPermission('production.manage')) {
@@ -17599,6 +17796,46 @@ function pkbStatusToCss(status) {
     case 'done':        return 's-done';
     case 'cancelled':   return 's-cancel';
     default:            return 's-queue';
+  }
+}
+
+// v2.43.31: сохранение прогресса (слайдер onchange / preset onclick)
+async function savePwdProgress(workId, value) {
+  try {
+    const v = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+    await apiPatch('/api/production/works/' + workId + '/progress', { progress: v });
+    // Не закрываем модалку — пользователь может ещё подвигать
+    cache.productionKanban = null;
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка сохранения прогресса', 'error');
+  }
+}
+
+function pwdSetProgressPreset(workId, pct) {
+  const slider = document.getElementById('pwd-progress-slider');
+  const valueEl = document.getElementById('pwd-progress-value');
+  if (slider) slider.value = pct;
+  if (valueEl) valueEl.textContent = pct + '%';
+  savePwdProgress(workId, pct);
+}
+
+// v2.43.31: сохранение комментария по кнопке «Сохранить»
+async function savePwdComment(workId) {
+  const ta = document.getElementById('pwd-comment-textarea');
+  if (!ta) return;
+  const value = ta.value;
+  const btn = document.getElementById('pwd-comment-save');
+  if (btn) btn.disabled = true;
+  try {
+    await apiPatch('/api/production/works/' + workId + '/comment', { comment: value });
+    showToast('Комментарий сохранён', 'success');
+    // Перерисовываем модалку чтобы обновился штамп «обновлено …»
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+    cache.productionKanban = null;
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    showToast((e && e.message) || 'Ошибка сохранения', 'error');
   }
 }
 
