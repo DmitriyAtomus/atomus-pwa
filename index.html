@@ -11318,6 +11318,21 @@
   .pkb-section-actions {
     display: flex; gap: 8px; flex-shrink: 0;
   }
+  /* v2.43.53: на мобильной — горизонтальный скролл вместо обрезки */
+  @media (max-width: 720px) {
+    .pkb-section-actions {
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-width: 100%;
+      flex-wrap: nowrap;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .pkb-section-actions::-webkit-scrollbar { height: 4px; }
+    .pkb-section-actions::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+    .pkb-section-actions .pkb-btn { flex-shrink: 0; white-space: nowrap; }
+  }
   .pkb-btn {
     height: 36px; padding: 0 14px;
     border-radius: 8px;
@@ -12287,12 +12302,32 @@
   .pkb-wl-avatar.ac-6 { background: #CCFBF1; color: #115E59; border-color: #5EEAD4; }
   .pkb-wl-avatar.ac-7 { background: #F3E8FF; color: #6B21A8; border-color: #D8B4FE; }
   .pkb-wl-name {
+    display: flex; align-items: center; gap: 5px;
+    min-width: 0;
     font-size: 12.5px;
     color: var(--text-dark);
     font-weight: 500;
-    white-space: nowrap;
+  }
+  .pkb-wl-name-text {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  /* v2.43.53: мобильная раскладка строки загрузки — два ряда чтобы бейдж и имя помещались */
+  @media (max-width: 720px) {
+    .pkb-wl-row {
+      grid-template-columns: 28px 1fr auto;
+      grid-template-rows: auto auto;
+      grid-template-areas:
+        "ava name stat"
+        "ava bar  bar";
+      gap: 4px 8px;
+    }
+    .pkb-wl-avatar { grid-area: ava; align-self: start; }
+    .pkb-wl-name   { grid-area: name; min-width: 0; flex-wrap: wrap; }
+    .pkb-wl-status { grid-area: stat; }
+    .pkb-wl-bar    { grid-area: bar;  }
   }
   .pkb-wl-bar {
     position: relative;
@@ -15790,7 +15825,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.52-helping-timer";
+const APP_VERSION = "v2.43.53-mobile-workload-fix";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -18106,7 +18141,7 @@ function renderPkbWorkload(workload) {
 
     html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
     html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
-    html +=   '<div class="pkb-wl-name">' + escapeHtml(name) + nowBadge + '</div>';
+    html +=   '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + '</div>';
     html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
     if (works > 0) {
       html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
@@ -38629,6 +38664,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.53',
+    date: '27.05.2026',
+    title: 'Мобильная — фикс «кто чем занят»',
+    features: [
+      '<b>Бейдж «СЕЙЧАС · 1ч 23м»</b> теперь виден на мобильной — раньше прятался когда длинное ФИО',
+      'Строка сборщика в Загрузке на мобильной перестроена на <b>два ряда</b>: ФИО+бейдж сверху, полоска снизу — больше места имени и бейджу',
+      'Кнопки в шапке Производства (План/Аналитика/AI-анализ/...) на мобильной теперь <b>горизонтально прокручиваются</b> вместо обрезки',
+    ],
+  },
   {
     version: 'v2.43.52',
     date: '27.05.2026',
