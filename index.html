@@ -11565,6 +11565,75 @@
     background: #FEE2E2;
   }
 
+  /* v2.43.38: редактирование/удаление — обёртка для двух кнопок */
+  .pwd-session-actions {
+    display: flex; flex-direction: column; gap: 2px;
+    flex-shrink: 0;
+  }
+  .pwd-session-edit {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .pwd-session-edit:hover {
+    color: var(--brand);
+    background: var(--brand-bg);
+  }
+  /* Inline-форма редактирования */
+  .pwd-session-row.pwd-session-editing {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .pwd-session-edit-grid {
+    display: grid; grid-template-columns: 1fr 100px; gap: 10px;
+  }
+  .pwd-session-edit-grid label,
+  .pwd-session-body label {
+    display: block; font-size: 11px; color: var(--text-light);
+    margin-bottom: 3px;
+  }
+  .pwd-session-edit-grid input,
+  .pwd-session-edit-note {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    font-size: 13px;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  .pwd-session-edit-note {
+    resize: vertical;
+    margin-top: 0;
+  }
+  .pwd-session-edit-actions {
+    display: flex; gap: 6px; justify-content: flex-end;
+    margin-top: 8px;
+  }
+  /* Бейджи роли */
+  .pwd-role-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 9px;
+    text-transform: lowercase;
+    letter-spacing: 0.3px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .pwd-role-badge.pwd-role-main {
+    background: #DCFCE7; color: #15803D;
+    border: 1px solid #86EFAC;
+  }
+  .pwd-role-badge.pwd-role-co {
+    background: #E0E7FF; color: #4338CA;
+    border: 1px solid #C7D2FE;
+  }
+
   /* v2.43.36: блок записей журнала участия в сводке */
   .ssn-entries-list {
     margin: 0 18px 14px;
@@ -15280,7 +15349,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.37-summary-pdf-fix-and-tidy";
+const APP_VERSION = "v2.43.38-session-edit-and-role";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -18011,19 +18080,26 @@ function renderProductionWorkDetail(w) {
         const avColorIdx = ((s.employee_id || 0) % 8);
         const dateStr = s.session_date ? formatPkbDate(s.session_date) : '—';
         const hoursStr = (s.hours != null) ? (' · ' + formatHours(s.hours) + 'ч') : '';
-        const removeBtn = canEditWork
-          ? '<button class="pwd-session-del" title="Удалить запись" onclick="removePwdSession(' + s.id + ',' + w.id + ')"><i class="ti ti-trash"></i></button>'
+        const roleLabel = s.role === 'main' ? 'главный' : 'соисполнитель';
+        const roleCls   = s.role === 'main' ? 'pwd-role-main' : 'pwd-role-co';
+        const actions = canEditWork
+          ? ('<div class="pwd-session-actions">' +
+                '<button class="pwd-session-edit" title="Редактировать" onclick="editPwdSession(' + s.id + ',' + w.id + ')"><i class="ti ti-pencil"></i></button>' +
+                '<button class="pwd-session-del" title="Удалить запись" onclick="removePwdSession(' + s.id + ',' + w.id + ')"><i class="ti ti-trash"></i></button>' +
+              '</div>')
           : '';
-        html += '<div class="pwd-session-row">' +
+        html += '<div class="pwd-session-row" id="pwd-session-row-' + s.id + '" data-session-id="' + s.id + '" data-session-date="' + escapeHtml(s.session_date || '') + '" data-hours="' + (s.hours != null ? s.hours : '') + '" data-note="' + escapeHtml(s.note || '') + '">' +
                   '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
                   '<div class="pwd-session-body">' +
                     '<div class="pwd-session-top">' +
-                      '<span class="pwd-session-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
+                      '<span class="pwd-session-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
+                        ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
+                      '</span>' +
                       '<span class="pwd-session-meta">' + escapeHtml(dateStr + hoursStr) + '</span>' +
                     '</div>' +
                     (s.note ? '<div class="pwd-session-note">' + escapeHtml(s.note) + '</div>' : '') +
                   '</div>' +
-                  removeBtn +
+                  actions +
                 '</div>';
       });
       html += '</div>';
@@ -18281,6 +18357,57 @@ async function removePwdSession(sessionId, workId) {
   } catch (e) {
     showToast((e && e.message) || 'Ошибка', 'error');
   }
+}
+
+// v2.43.38: редактирование записи журнала (часы / заметка / дата) inline
+function editPwdSession(sessionId, workId) {
+  const row = document.getElementById('pwd-session-row-' + sessionId);
+  if (!row) return;
+  const curDate  = row.getAttribute('data-session-date') || '';
+  const curHours = row.getAttribute('data-hours') || '';
+  const curNote  = row.getAttribute('data-note') || '';
+  row.classList.add('pwd-session-editing');
+  row.innerHTML =
+    '<div class="pwd-session-body" style="flex:1;">' +
+      '<div class="pwd-session-edit-grid">' +
+        '<div><label>Дата</label><input type="date" id="pwd-es-date-' + sessionId + '" value="' + escapeHtml(curDate) + '"></div>' +
+        '<div><label>Часы</label><input type="number" id="pwd-es-hours-' + sessionId + '" step="0.5" min="0" max="24" value="' + escapeHtml(curHours) + '"></div>' +
+      '</div>' +
+      '<label style="font-size:11px;color:var(--text-light);margin-top:6px;display:block;">Что делал</label>' +
+      '<textarea id="pwd-es-note-' + sessionId + '" rows="2" class="pwd-session-edit-note">' + escapeHtml(curNote) + '</textarea>' +
+      '<div class="pwd-session-edit-actions">' +
+        '<button class="pkb-btn" onclick="cancelEditPwdSession(' + sessionId + ',' + workId + ')">Отмена</button>' +
+        '<button class="pkb-btn primary" onclick="saveEditedPwdSession(' + sessionId + ',' + workId + ')"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      '</div>' +
+    '</div>';
+}
+
+async function saveEditedPwdSession(sessionId, workId) {
+  const dateEl  = document.getElementById('pwd-es-date-' + sessionId);
+  const hoursEl = document.getElementById('pwd-es-hours-' + sessionId);
+  const noteEl  = document.getElementById('pwd-es-note-' + sessionId);
+  if (!dateEl) return;
+  const body = {
+    session_date: (dateEl.value || '').trim(),
+    hours:        hoursEl && hoursEl.value !== '' ? parseFloat(hoursEl.value) : null,
+    note:         noteEl ? noteEl.value : '',
+  };
+  try {
+    await apiPatch('/api/production/work-sessions/' + sessionId, body);
+    showToast('Запись обновлена', 'success');
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  }
+}
+
+async function cancelEditPwdSession(sessionId, workId) {
+  // Просто перезагружаем модалку — отменяет редактирование на исходную
+  try {
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+  } catch (e) {}
 }
 
 // v2.43.31: сохранение комментария по кнопке «Сохранить»
@@ -19589,11 +19716,15 @@ function renderSummary(d) {
         const contractStr = s.contract_number
           ? ('№' + s.contract_number + (s.contractor_name ? ' · ' + s.contractor_name : ''))
           : '';
+        const roleLabel = s.role === 'main' ? 'главный' : 'соисполнитель';
+        const roleCls   = s.role === 'main' ? 'pwd-role-main' : 'pwd-role-co';
         html += '<div class="ssn-entry">' +
                   '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:34px;height:34px;font-size:12px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
                   '<div class="ssn-entry-body">' +
                     '<div class="ssn-entry-top">' +
-                      '<span class="ssn-entry-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
+                      '<span class="ssn-entry-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
+                        ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
+                      '</span>' +
                       '<span class="ssn-entry-meta">' + escapeHtml(dateStr + hoursStr) + '</span>' +
                     '</div>' +
                     (modelStr || contractStr ? '<div class="ssn-entry-work">' +
