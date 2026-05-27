@@ -13501,16 +13501,12 @@
       <div class="screen" data-screen="summary" data-section="production">
         <div class="screen-header">
           <h2>Сводки и отчёты</h2>
-          <button class="icon-btn" onclick="openExportAssembliesModal()" title="Экспорт"><i class="ti ti-download"></i></button>
           <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
         </div>
         <div class="page-header">
           <div><h1>Сводки и отчёты</h1><div class="page-subtitle">Производственные показатели</div></div>
           <div class="page-actions">
             <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
-            <button class="btn btn-primary" onclick="openExportAssembliesModal()">
-              <i class="ti ti-download"></i> Экспорт
-            </button>
           </div>
         </div>
         <div class="content-inner">
@@ -15349,7 +15345,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.38-session-edit-and-role";
+const APP_VERSION = "v2.43.39-export-unified";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19749,7 +19745,7 @@ function renderSummary(d) {
   html += '<button onclick="quickExportSessions()" title="Журнал участия — детально кто, когда, что делал"><i class="ti ti-history"></i>Журнал Excel</button>';
   html += '</div>';
   html += '<div style="text-align:center;padding:6px 18px 14px;font-size:12px;color:var(--text-light);">' +
-    'Нужны другие параметры? Жми <a onclick="openExportAssembliesModal()" style="color:var(--brand);cursor:pointer;font-weight:500;">«Экспорт»</a> сверху' +
+    'Нужны произвольные даты или фильтр по типам работ? <a onclick="openExportAssembliesModal()" style="color:var(--brand);cursor:pointer;font-weight:500;">Расширенные параметры</a>' +
     '</div>';
   container.innerHTML = html;
 }
