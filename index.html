@@ -15345,7 +15345,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.39-export-unified";
+const APP_VERSION = "v2.43.40-journal-with-assemblies";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19287,7 +19287,7 @@ async function quickExportSessions() {
       return;
     }
     const blob = await r.blob();
-    const filename = 'atomus-journal-' + fromStr + '_' + toStr + '.xlsx';
+    const filename = 'atomus-otchet-rabotnika-' + fromStr + '_' + toStr + '.xlsx';
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -19740,9 +19740,9 @@ function renderSummary(d) {
     (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
     '</h3></div>';
   html += '<div class="report-buttons">';
-  html += '<button onclick="quickExportSummary(\'xlsx\')"><i class="ti ti-file-spreadsheet"></i>Excel</button>';
-  html += '<button onclick="quickExportSummary(\'pdf\')"><i class="ti ti-file-text"></i>PDF</button>';
-  html += '<button onclick="quickExportSessions()" title="Журнал участия — детально кто, когда, что делал"><i class="ti ti-history"></i>Журнал Excel</button>';
+  html += '<button onclick="quickExportSummary(\'xlsx\')" title="Только сборки"><i class="ti ti-file-spreadsheet"></i>Excel сборок</button>';
+  html += '<button onclick="quickExportSummary(\'pdf\')" title="Только сборки"><i class="ti ti-file-text"></i>PDF сборок</button>';
+  html += '<button onclick="quickExportSessions()" title="Полный отчёт: и сборки, и журнал участия с часами и заметками"><i class="ti ti-history"></i>Полный по сборщику</button>';
   html += '</div>';
   html += '<div style="text-align:center;padding:6px 18px 14px;font-size:12px;color:var(--text-light);">' +
     'Нужны произвольные даты или фильтр по типам работ? <a onclick="openExportAssembliesModal()" style="color:var(--brand);cursor:pointer;font-weight:500;">Расширенные параметры</a>' +
