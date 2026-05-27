@@ -2373,6 +2373,83 @@
     color: var(--brand);
   }
 
+  /* v2.43.47: блок «Помогаю сейчас» в модалке работы */
+  .pwd-help-block {
+    margin: 4px 18px 14px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #ECFDF5 0%, #DBEAFE 100%);
+    border-radius: 8px;
+    border: 1px solid #86EFAC;
+  }
+  .pwd-help-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; font-weight: 600; color: var(--text-dark);
+    margin-bottom: 8px;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .pwd-help-head .ti { margin-right: 6px; color: #15803D; }
+  .pwd-help-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: white;
+    color: #15803D;
+    border: 1.5px solid #15803D;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pwd-help-toggle:hover { background: #15803D; color: white; }
+  .pwd-help-toggle.on {
+    background: #15803D;
+    color: white;
+    box-shadow: 0 0 0 3px rgba(21,128,61,0.15);
+  }
+  .pwd-help-toggle.on:hover {
+    background: #B91C1C;
+    border-color: #B91C1C;
+    box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
+  }
+  .pwd-help-active {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .pwd-help-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: white;
+    border: 1px solid #86EFAC;
+    border-radius: 14px;
+    padding: 3px 10px 3px 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+  .pwd-help-empty {
+    font-size: 12px;
+    color: var(--text-mid);
+    font-style: italic;
+  }
+
+  /* v2.43.47: бейдж «сейчас» в блоке загрузки сборщиков */
+  .pkb-wl-now-badge {
+    display: inline-block;
+    background: #15803D;
+    color: white;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+    animation: pulse-now 2s ease-in-out infinite;
+  }
+  @keyframes pulse-now {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(21,128,61,0.5); }
+    50%      { box-shadow: 0 0 0 4px rgba(21,128,61,0); }
+  }
+
   /* ============ ПРОДАЖИ ============ */
 
   /* Статусы договоров (4 шт) */
@@ -15632,7 +15709,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.46-help-button";
+const APP_VERSION = "v2.43.47-workload-help-and-toggle";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17795,33 +17872,51 @@ function renderPkbWorkload(workload) {
     const hours       = (w.est_hours != null) ? w.est_hours : (w.total_hours || 0);
     const isEstimated = !!w.is_estimated;
     const works       = w.works_count || 0;
+    const mainN       = w.main_count || 0;
+    const helpN       = w.help_count || 0;
+    const helpingNow  = !!w.helping_now_work_id;
     const status      = w.status || 'undersized';
     const statusLabel =
       (status === 'overloaded') ? 'перегруз' :
       (status === 'normal')     ? 'норма'    :
       (works === 0)             ? 'свободен' : 'недогруз';
 
-    // Внутри полосы текст: "N работ · Mч" (с тильдой если часы оценочные)
+    // v2.43.47: текст с разбивкой главные/помощь
     const hoursPrefix = (isEstimated && hours > 0) ? '~' : '';
-    const barText = works > 0
-      ? (works + ' ' + plural(works, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч')
-      : 'нет работ';
-    // Tooltip с пояснением расчёта
-    const barTooltip = works > 0
-      ? (isEstimated
-          ? 'Часы оценочные: ' + defHrs + 'ч на каждую работу без указанного времени. ' +
-            'Заполните «расч. часы» в карточке работы для точности.'
-          : 'Часы — сумма «расчётных часов» по активным работам этого сборщика.')
-      : 'Активных работ нет';
+    let barText;
+    if (works === 0) {
+      barText = 'нет работ';
+    } else if (helpN > 0 && mainN > 0) {
+      barText = mainN + ' гл. + ' + helpN + ' пом. · ' + hoursPrefix + formatHours(hours) + 'ч';
+    } else if (helpN > 0) {
+      barText = 'помогает ' + helpN + ' ' + plural(helpN, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
+    } else {
+      barText = mainN + ' ' + plural(mainN, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
+    }
+    // Tooltip с пояснением
+    let barTooltip;
+    if (works === 0) {
+      barTooltip = 'Активных работ нет';
+    } else {
+      const parts = [];
+      if (mainN > 0) parts.push('Главный по ' + mainN + ' ' + plural(mainN, 'работе', 'работам', 'работам'));
+      if (helpN > 0) parts.push('Помогает ещё ' + helpN);
+      barTooltip = parts.join('. ') + (isEstimated
+        ? '. Часы оценочные: ' + defHrs + 'ч на работу без указанного времени.'
+        : '');
+    }
 
-    const fillWidth = Math.min(100, pct); // фактическая ширина заливки 0..100%
+    const fillWidth = Math.min(100, pct);
     const barEmptyCls = (works === 0) ? ' empty' : '';
-    // v2.43.30: цвет аватара по hash от employee_id (палитра 8 цветов)
     const avatarColorIdx = ((w.employee_id || 0) % 8);
+    // v2.43.47: бейдж «сейчас» если сотрудник помечен helping_now_work_id
+    const nowBadge = helpingNow
+      ? '<span class="pkb-wl-now-badge" title="Сейчас активно работает">сейчас</span>'
+      : '';
 
     html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
     html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
-    html +=   '<div class="pkb-wl-name">' + escapeHtml(name) + '</div>';
+    html +=   '<div class="pkb-wl-name">' + escapeHtml(name) + nowBadge + '</div>';
     html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
     if (works > 0) {
       html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
@@ -18294,6 +18389,36 @@ function renderProductionWorkDetail(w) {
   // v2.43.31: блок прогресса с возможностью редактирования (только in_progress/review/packing)
   const canEditWork = hasPermission('production.manage') &&
                       ['in_progress', 'review', 'packing'].includes(w.status);
+
+  // v2.43.47: Toggle «Помогаю сейчас» — для активных работ
+  if (['in_progress', 'review', 'packing'].includes(w.status)) {
+    const activeHelpers = w.active_helpers || [];
+    const iAmHelping = !!w.i_am_helping_this;
+    html += '<div class="pwd-help-block">';
+    html +=   '<div class="pwd-help-head">';
+    html +=     '<span><i class="ti ti-hand-stop"></i> Кто работает прямо сейчас</span>';
+    html +=     '<button class="pwd-help-toggle ' + (iAmHelping ? 'on' : '') + '" onclick="togglePwdHelp(' + w.id + ',' + (iAmHelping ? 'false' : 'true') + ')">' +
+                  '<i class="ti ' + (iAmHelping ? 'ti-player-stop-filled' : 'ti-player-play-filled') + '"></i>' +
+                  (iAmHelping ? 'Я закончил' : 'Я работаю над этим') +
+                '</button>';
+    html +=   '</div>';
+    if (activeHelpers.length) {
+      html += '<div class="pwd-help-active">';
+      activeHelpers.forEach(h => {
+        const initials = getInitials(h.short_name || h.full_name || '?');
+        const colorIdx = ((h.id || 0) % 8);
+        html += '<span class="pwd-help-chip" title="' + escapeHtml(h.full_name || h.short_name) + '">' +
+                  '<span class="pkb-wl-avatar ac-' + colorIdx + '" style="width:22px;height:22px;font-size:9px;border-width:1px;">' + escapeHtml(initials) + '</span>' +
+                  escapeHtml(h.short_name || h.full_name || ('#' + h.id)) +
+                '</span>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="pwd-help-empty">Никто сейчас не работает. Нажми «Я работаю над этим» когда возьмёшь работу в руки.</div>';
+    }
+    html += '</div>';
+  }
+
   if (canEditWork || (w.progress != null && ['in_progress', 'review', 'packing'].includes(w.status))) {
     const curPct = Math.max(0, Math.min(100, Number(w.progress || 0)));
     html += '<div class="pwd-progress-block">';
@@ -18419,6 +18544,30 @@ function pkbStatusToCss(status) {
     case 'done':        return 's-done';
     case 'cancelled':   return 's-cancel';
     default:            return 's-queue';
+  }
+}
+
+// v2.43.47: Toggle «Помогаю сейчас» — POST start-helping или stop-helping
+async function togglePwdHelp(workId, willStart) {
+  // willStart — строка 'true'/'false' из HTML
+  const isStart = (willStart === true || willStart === 'true');
+  try {
+    if (isStart) {
+      await apiPost('/api/production/works/' + workId + '/start-helping', {});
+      showToast('Подключился к работе', 'success');
+    } else {
+      await apiPost('/api/production/works/' + workId + '/stop-helping', {});
+      showToast('Закончил работу над задачей', 'success');
+    }
+    // Перерисовываем модалку + сбрасываем кэш kanban и workload
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+    cache.productionKanban = null;
+    if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
+      loadProductionDashboard();
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
   }
 }
 
@@ -38040,6 +38189,19 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.47',
+    date: '27.05.2026',
+    title: 'Загрузка с учётом помощи + кнопка «Я работаю сейчас»',
+    features: [
+      '<b>Загрузка сборщиков</b> в шапке производства теперь учитывает не только главных, но и <b>соисполнителей</b>. У Шевелева/Иванова больше не будет «свободен» если они помогают',
+      'Текст в полоске показывает разбивку: «1 гл. + 2 пом.» — сразу видно где главный, где помогает',
+      'Новый блок в модалке работы — <b>«Кто работает прямо сейчас»</b>. Кнопка «Я работаю над этим» — нажал, и ты подключился к этой работе',
+      'Бейдж <b>«СЕЙЧАС»</b> с пульсирующей зелёной подсветкой в блоке загрузки — видно кто на руках с какой задачей',
+      'При переключении на другую работу — статус с предыдущей автоматически снимается',
+      'Сотрудник автоматически добавляется в соисполнители при нажатии «Я работаю»',
+    ],
+  },
   {
     version: 'v2.43.46',
     date: '27.05.2026',
