@@ -10786,6 +10786,21 @@
   .cal-finish-btn:hover { background: #BBF7D0; border-color: #22C55E; }
   .cal-finish-btn .ti { font-size: 14px; vertical-align: middle; }
 
+  /* v2.43.18: быстрая кнопка-действие в позиции спецификации */
+  .spec-quick-act {
+    background: #F3F4F6; border: 1px solid #D1D5DB;
+    color: #4B5563;
+    padding: 2px 7px; border-radius: 5px;
+    cursor: pointer; font-size: 11px;
+    margin-left: 6px; line-height: 1;
+    vertical-align: middle;
+    transition: all 0.15s ease;
+  }
+  .spec-quick-act:hover { background: #DBEAFE; border-color: #60A5FA; color: #1E40AF; }
+  .spec-quick-act .ti { font-size: 13px; }
+  .spec-quick-act.sqa-ok { background: #DCFCE7; border-color: #86EFAC; color: #15803D; }
+  .spec-quick-act.sqa-ok:hover { background: #BBF7D0; border-color: #22C55E; color: #14532D; }
+
   /* v2.43.13: прогресс-бар готовности договора */
   .contract-progress {
     background: #FFFFFF;
@@ -14944,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.17-finish-button-and-cache-bust";
+const APP_VERSION = "v2.43.18-quick-action-in-spec";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -16681,6 +16696,73 @@ async function _afterAssemblyStatusChange(contractId) {
   // На всякий случай дёргаем спецификацию ещё раз (loadCurrentContract её и сам тянет)
   if (contractId && typeof loadContractItemsBlock === 'function') {
     await loadContractItemsBlock(contractId);
+  }
+}
+
+// v2.43.18: пакетный откат всех ready-assembly позиции спецификации в in_progress.
+// Находим assemblies этого договора с указанной моделью и status='ready', переключаем все.
+async function reopenSpecItemAssemblies(contractId, itemId, modelId) {
+  if (!confirm('Вернуть все готовые сборки этой позиции обратно в работу?\nПриходы на склад отменятся.')) return;
+  try {
+    // 1. Берём список assemblies из карточки договора (она уже загружена в state)
+    const c = state.lastLoadedContract || {};
+    const list = (c.assemblies || []).filter(a =>
+      a.model_id === modelId && a.status === 'ready' && a.is_active !== 0
+    );
+    if (!list.length) {
+      showToast('Нет готовых сборок для отката', 'error');
+      return;
+    }
+    // 2. Переключаем каждую через существующий endpoint
+    let ok = 0, failed = 0;
+    for (const a of list) {
+      try {
+        await apiPatch('/api/assemblies/' + a.id + '/status', { status: 'in_progress' });
+        ok++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    if (ok > 0) {
+      showToast('Возвращено в работу: ' + ok + ' шт.' + (failed ? ' (ошибок: ' + failed + ')' : ''), 'success');
+    } else {
+      showToast('Не удалось вернуть: ' + (failed || 0) + ' ошибок', 'error');
+    }
+    await _afterAssemblyStatusChange(contractId);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка операции', 'error');
+  }
+}
+
+// v2.43.18: пакетная пометка всех in_progress-assembly позиции спецификации готовыми.
+async function finishSpecItemAssemblies(contractId, itemId, modelId) {
+  if (!confirm('Отметить все сборки этой позиции готовыми? Появится приход на склад.')) return;
+  try {
+    const c = state.lastLoadedContract || {};
+    const list = (c.assemblies || []).filter(a =>
+      a.model_id === modelId && a.status === 'in_progress' && a.is_active !== 0
+    );
+    if (!list.length) {
+      showToast('Нет сборок в работе для перевода', 'error');
+      return;
+    }
+    let ok = 0, failed = 0;
+    for (const a of list) {
+      try {
+        await apiPatch('/api/assemblies/' + a.id + '/status', { status: 'ready' });
+        ok++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    if (ok > 0) {
+      showToast('Готовых: ' + ok + ' шт.' + (failed ? ' (ошибок: ' + failed + ')' : ''), 'success');
+    } else {
+      showToast('Не удалось перевести: ' + (failed || 0) + ' ошибок', 'error');
+    }
+    await _afterAssemblyStatusChange(contractId);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка операции', 'error');
   }
 }
 
@@ -28474,8 +28556,26 @@ function renderContractItemsBlock(contractId) {
         if (it.ip_rating) {
           metaParts.push('<span style="color: var(--c-prod-25); font-weight: 600;">' + escapeHtml(it.ip_rating) + '</span>');
         }
-        // v2.19.0: бейдж резерва (для model_id и component_id)
+        // v2.43.13: бейдж резерва (для model_id и component_id)
         const _reservedBadge = _renderReservationBadge(it);
+        // v2.43.18: быстрые action-кнопки прямо рядом с бейджем
+        // (для model_id-позиций — синхронизируем все assembly разом)
+        let _quickAction = '';
+        if (canEdit && it.model_id) {
+          const reserved = Number(it.qty_reserved || 0);
+          const inProd = Number(it.qty_in_production || 0);
+          if (reserved > 0) {
+            // Есть готовые → даём кнопку «↩» вернуть всё в работу
+            _quickAction = ' <button class="spec-quick-act" title="Вернуть все готовые сборки в работу" ' +
+              'onclick="reopenSpecItemAssemblies(' + contractId + ',' + it.id + ',' + it.model_id + ')">' +
+              '<i class="ti ti-arrow-back-up"></i></button>';
+          } else if (inProd > 0) {
+            // Есть в работе → даём кнопку «✓» отметить готовыми
+            _quickAction = ' <button class="spec-quick-act sqa-ok" title="Отметить все сборки в работе готовыми" ' +
+              'onclick="finishSpecItemAssemblies(' + contractId + ',' + it.id + ',' + it.model_id + ')">' +
+              '<i class="ti ti-check"></i></button>';
+          }
+        }
         const meta = metaParts.join(' · ');
         // ЭТАП 38 (v2.18.0): клик по названию → открыть карточку связанной сущности
         // v2.19.1: для свободного ввода — открыть форму редактирования позиции
@@ -28500,7 +28600,7 @@ function renderContractItemsBlock(contractId) {
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + _reservedBadge + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + _reservedBadge + _quickAction + '</div>' +
             '<div class="spec-item-meta">' + meta + '</div>' +
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
