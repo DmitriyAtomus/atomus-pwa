@@ -14959,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.25-model-assemblies-block";
+const APP_VERSION = "v2.43.27-restore-contract-on-reload";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15621,6 +15621,20 @@ function _restoreLastView() {
     // Дополнительная проверка — есть ли элемент экрана в DOM
     const screenEl = document.querySelector('.screen[data-screen="' + last.screen + '"]');
     if (screenEl) {
+      // v2.43.27: для экрана карточки договора нужно сначала восстановить
+      // state.currentContractId из localStorage, иначе loadCurrentContract
+      // покажет «Договор не выбран».
+      if (last.screen === 'sales-contract-detail') {
+        try {
+          const savedCid = parseInt(localStorage.getItem('atomus_last_contract_id'), 10);
+          if (savedCid > 0) state.currentContractId = savedCid;
+        } catch (e) {}
+        // Если id не нашли — лучше вернуться в список договоров
+        if (!state.currentContractId) {
+          selectSidebarItem('sales-contracts');
+          return;
+        }
+      }
       selectSidebarItem(last.screen);
     }
   }
@@ -28181,6 +28195,8 @@ function renderContractsList() {
 
 function openContract(contractId) {
   state.currentContractId = contractId;
+  // v2.43.27: запоминаем id, чтобы при F5 на странице договора восстановиться
+  try { localStorage.setItem('atomus_last_contract_id', String(contractId)); } catch (e) {}
   selectSidebarItem('sales-contract-detail');
 }
 
