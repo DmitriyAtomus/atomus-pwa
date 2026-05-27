@@ -2474,11 +2474,24 @@
     letter-spacing: 0.3px;
     vertical-align: middle;
     animation: pulse-now 2s ease-in-out infinite;
+    cursor: pointer; /* v2.43.51 — клик открывает работу */
+    transition: transform 0.12s;
   }
+  .pkb-wl-now-badge:hover { transform: scale(1.08); }
   @keyframes pulse-now {
     0%, 100% { box-shadow: 0 0 0 0 rgba(21,128,61,0.5); }
     50%      { box-shadow: 0 0 0 4px rgba(21,128,61,0); }
   }
+  /* v2.43.51: иконка-подсказка про расчёт часов */
+  .pkb-workload-info {
+    font-size: 14px;
+    color: var(--text-light);
+    cursor: help;
+    margin-left: 4px;
+    vertical-align: middle;
+    transition: color 0.12s;
+  }
+  .pkb-workload-info:hover { color: var(--brand); }
 
   /* ============ ПРОДАЖИ ============ */
 
@@ -15764,7 +15777,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.50-remove-help-btn-topbar";
+const APP_VERSION = "v2.43.51-now-badge-clickable";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17995,7 +18008,14 @@ function renderPkbWorkload(workload) {
 
   let html = '<div class="pkb-workload">';
   html +=   '<div class="pkb-workload-head">';
-  html +=     '<div class="pkb-workload-title">Загрузка сборщиков</div>';
+  html +=     '<div class="pkb-workload-title">Загрузка сборщиков ' +
+                '<i class="ti ti-info-circle pkb-workload-info" title="Как считается:&#10;' +
+                '• Главные работы (сотрудник — assignee) + работы где он соисполнитель.&#10;' +
+                '• Часы из поля «расч. часы» каждой работы.&#10;' +
+                '• Если «расч. часы» не указаны — берётся оценка по ' + defHrs + 'ч на работу.&#10;' +
+                '• Тильда (~) рядом со значением означает что часы оценочные.&#10;' +
+                '• Норма ' + norm + 'ч/неделю. Чтобы получить точные часы — заполните «расч. часы» в карточке работы."></i>' +
+              '</div>';
   html +=     '<div class="pkb-workload-norm" title="Норма ' + norm + 'ч в неделю. Работы без указанных часов считаются по ' + defHrs + 'ч.">' +
                 'норма ' + norm + 'ч / неделю' +
               '</div>';
@@ -18047,8 +18067,9 @@ function renderPkbWorkload(workload) {
     const barEmptyCls = (works === 0) ? ' empty' : '';
     const avatarColorIdx = ((w.employee_id || 0) % 8);
     // v2.43.47: бейдж «сейчас» если сотрудник помечен helping_now_work_id
+    // v2.43.51: бейдж кликабельный — открывает текущую работу
     const nowBadge = helpingNow
-      ? '<span class="pkb-wl-now-badge" title="Сейчас активно работает">сейчас</span>'
+      ? '<span class="pkb-wl-now-badge" onclick="event.stopPropagation();openProductionWorkDetail(' + w.helping_now_work_id + ')" title="Открыть текущую работу">сейчас</span>'
       : '';
 
     html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
@@ -38424,6 +38445,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.51',
+    date: '27.05.2026',
+    title: 'Загрузка сборщиков — клик и расшифровка',
+    features: [
+      'Бейдж <b>«СЕЙЧАС»</b> рядом с сотрудником теперь <b>кликабельный</b> — открывает ту работу, над которой он сейчас работает',
+      'Рядом с заголовком «Загрузка сборщиков» появилась иконка <i class="ti ti-info-circle"></i> с подсказкой про расчёт часов: «откуда 32ч» — это 2 работы × 16ч (дефолт когда «расч. часы» не указаны). Чтобы получить точные часы — заполните «расч. часы» в карточке работы',
+    ],
+  },
   {
     version: 'v2.43.50',
     date: '27.05.2026',
