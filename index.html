@@ -1013,6 +1013,44 @@
     margin: 6px 0 12px;
     flex-wrap: wrap;
   }
+  /* v2.43.43: панель произвольного периода */
+  .summary-custom-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 18px;
+    margin: 8px 0 12px;
+    flex-wrap: wrap;
+  }
+  .desktop-layout .summary-custom-range {
+    padding: 0 0 0 4px;
+  }
+  .summary-custom-range label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+  .summary-custom-range input[type="date"] {
+    padding: 7px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-dark);
+    background: white;
+    cursor: pointer;
+  }
+  .summary-custom-range input[type="date"]:focus {
+    border-color: var(--brand);
+    outline: none;
+  }
+  .summary-custom-range .btn-primary {
+    padding: 7px 16px;
+    font-size: 13px;
+  }
   .desktop-layout .summary-worker-row {
     padding: 0 0 0 4px;
   }
@@ -13515,6 +13553,13 @@
             <button class="filter-chip" data-sf="week">Неделя</button>
             <button class="filter-chip active" data-sf="month">Месяц</button>
             <button class="filter-chip" data-sf="prev_month">Прошлый</button>
+            <button class="filter-chip" data-sf="custom"><i class="ti ti-calendar" style="font-size:13px;"></i> Свой</button>
+          </div>
+          <!-- v2.43.43: панель выбора произвольного периода (скрыта по умолчанию) -->
+          <div class="summary-custom-range" id="summary-custom-range" style="display:none;">
+            <label>С <input type="date" id="summary-custom-from"></label>
+            <label>По <input type="date" id="summary-custom-to"></label>
+            <button class="btn btn-primary" onclick="applySummaryCustomRange()">Применить</button>
           </div>
           <!-- v2.35.0: фильтр по сборщику -->
           <div class="summary-worker-row" id="summary-worker-row">
@@ -15345,7 +15390,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.42-activity-timeline";
+const APP_VERSION = "v2.43.43-custom-period";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15400,6 +15445,8 @@ const state = {
   currentScreen: 'home-dashboard',
   historyFilter: 'month',
   summaryFilter: 'month',
+  summaryCustomFrom: null,
+  summaryCustomTo: null,
   summaryEmployeeFilter: null,     // v2.35.0: id сборщика или null = все
   isDesktop: false,
   newAssembly: {
@@ -19189,37 +19236,27 @@ function renderHistory(d) {
 
 // ============ ЭТАП 31.2: ЭКСПОРТ РАБОТ ЗА ПЕРИОД ============
 
+// v2.43.43: общий хелпер расчёта дат for-from-to из state (с учётом custom)
+function _summaryDateRange() {
+  const period = state.summaryFilter || 'month';
+  if (period === 'custom' && state.summaryCustomFrom && state.summaryCustomTo) {
+    return { from: state.summaryCustomFrom, to: state.summaryCustomTo };
+  }
+  const today = new Date();
+  const y = today.getFullYear(); const mo = today.getMonth(); const d = today.getDate();
+  let f, t;
+  if (period === 'day')             { f = new Date(y, mo, d);     t = new Date(y, mo, d); }
+  else if (period === 'week')       { f = new Date(y, mo, d - 6); t = new Date(y, mo, d); }
+  else if (period === 'month')      { f = new Date(y, mo, 1);     t = new Date(y, mo + 1, 0); }
+  else if (period === 'prev_month') { f = new Date(y, mo - 1, 1); t = new Date(y, mo, 0); }
+  else                              { f = new Date(y, mo - 1, d); t = new Date(y, mo, d); }
+  const toIso = (dt) => dt.toISOString().slice(0, 10);
+  return { from: toIso(f), to: toIso(t) };
+}
+
 // ЭТАП 31.9: быстрое скачивание отчёта Сводок за активный период
 async function quickExportSummary(fmt) {
-  const period = state.summaryFilter || 'month';
-
-  // Конвертим период (как в /api/summary) в даты from/to
-  const today = new Date();
-  const y = today.getFullYear();
-  const mo = today.getMonth();
-  const d = today.getDate();
-  let from, to;
-
-  if (period === 'day') {
-    from = new Date(y, mo, d);
-    to = new Date(y, mo, d);
-  } else if (period === 'week') {
-    from = new Date(y, mo, d - 6);
-    to = new Date(y, mo, d);
-  } else if (period === 'month') {
-    from = new Date(y, mo, 1);
-    to = new Date(y, mo + 1, 0); // последний день месяца
-  } else if (period === 'prev_month') {
-    from = new Date(y, mo - 1, 1);
-    to = new Date(y, mo, 0); // последний день предыдущего
-  } else {
-    from = new Date(y, mo - 1, d);
-    to = new Date(y, mo, d);
-  }
-
-  const toIso = (date) => date.toISOString().slice(0, 10);
-  const fromStr = toIso(from);
-  const toStr = toIso(to);
+  const { from: fromStr, to: toStr } = _summaryDateRange();
 
   showToast('Готовим файл…', 'info');
 
@@ -19260,17 +19297,7 @@ async function quickExportSummary(fmt) {
 
 // v2.43.36: быстрое скачивание журнала участия в XLSX
 async function quickExportSessions() {
-  const period = state.summaryFilter || 'month';
-  const today = new Date();
-  const y = today.getFullYear(); const mo = today.getMonth(); const d = today.getDate();
-  let from, to;
-  if (period === 'day')             { from = new Date(y, mo, d);     to = new Date(y, mo, d); }
-  else if (period === 'week')       { from = new Date(y, mo, d - 6); to = new Date(y, mo, d); }
-  else if (period === 'month')      { from = new Date(y, mo, 1);     to = new Date(y, mo + 1, 0); }
-  else if (period === 'prev_month') { from = new Date(y, mo - 1, 1); to = new Date(y, mo, 0); }
-  else                              { from = new Date(y, mo - 1, d); to = new Date(y, mo, d); }
-  const toIso = (dt) => dt.toISOString().slice(0, 10);
-  const fromStr = toIso(from), toStr = toIso(to);
+  const { from: fromStr, to: toStr } = _summaryDateRange();
 
   showToast('Готовим журнал…', 'info');
   try {
@@ -19302,17 +19329,7 @@ async function quickExportSessions() {
 
 // v2.43.42: единый отчёт активности — сборки + помощь хронологически
 async function quickExportActivity() {
-  const period = state.summaryFilter || 'month';
-  const today = new Date();
-  const y = today.getFullYear(); const mo = today.getMonth(); const d = today.getDate();
-  let from, to;
-  if (period === 'day')             { from = new Date(y, mo, d);     to = new Date(y, mo, d); }
-  else if (period === 'week')       { from = new Date(y, mo, d - 6); to = new Date(y, mo, d); }
-  else if (period === 'month')      { from = new Date(y, mo, 1);     to = new Date(y, mo + 1, 0); }
-  else if (period === 'prev_month') { from = new Date(y, mo - 1, 1); to = new Date(y, mo, 0); }
-  else                              { from = new Date(y, mo - 1, d); to = new Date(y, mo, d); }
-  const toIso = (dt) => dt.toISOString().slice(0, 10);
-  const fromStr = toIso(from), toStr = toIso(to);
+  const { from: fromStr, to: toStr } = _summaryDateRange();
 
   showToast('Готовим отчёт активности…', 'info');
   try {
@@ -19587,12 +19604,22 @@ async function doExportAssemblies() {
 async function loadSummary() {
   const period = state.summaryFilter;
   const empId = state.summaryEmployeeFilter;
-  const cacheKey = period + '|' + (empId || 'all');
+  // v2.43.43: произвольный период
+  const isCustom = period === 'custom' && state.summaryCustomFrom && state.summaryCustomTo;
+  const cacheKey = (isCustom
+    ? ('custom:' + state.summaryCustomFrom + '-' + state.summaryCustomTo)
+    : period) + '|' + (empId || 'all');
   const container = document.getElementById('summary-content');
   if (cache.summary[cacheKey]) { renderSummary(cache.summary[cacheKey]); return; }
   container.innerHTML = '<div class="loading-block">Считаем сводки…</div>';
   try {
-    let url = '/api/summary?period=' + period;
+    let url;
+    if (isCustom) {
+      url = '/api/summary?from=' + encodeURIComponent(state.summaryCustomFrom) +
+            '&to=' + encodeURIComponent(state.summaryCustomTo);
+    } else {
+      url = '/api/summary?period=' + period;
+    }
     if (empId) url += '&employee_id=' + encodeURIComponent(empId);
     const d = await apiGet(url);
     cache.summary[cacheKey] = d;
@@ -28931,10 +28958,52 @@ document.querySelectorAll('#summary-filters .filter-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('#summary-filters .filter-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    state.summaryFilter = chip.dataset.sf;
-    loadSummary();
+    const sf = chip.dataset.sf;
+    state.summaryFilter = sf;
+    const customPanel = document.getElementById('summary-custom-range');
+    if (sf === 'custom') {
+      // Показываем панель с from/to. По умолчанию: последние 7 дней.
+      if (customPanel) {
+        const today = new Date();
+        const weekAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
+        const toIso = (dt) => dt.toISOString().slice(0, 10);
+        const fromEl = document.getElementById('summary-custom-from');
+        const toEl   = document.getElementById('summary-custom-to');
+        if (fromEl && !fromEl.value) fromEl.value = toIso(weekAgo);
+        if (toEl   && !toEl.value)   toEl.value   = toIso(today);
+        customPanel.style.display = 'flex';
+      }
+      // Загружаем сразу за дефолтные даты
+      applySummaryCustomRange();
+    } else {
+      if (customPanel) customPanel.style.display = 'none';
+      state.summaryCustomFrom = null;
+      state.summaryCustomTo = null;
+      loadSummary();
+    }
   });
 });
+
+// v2.43.43: применение произвольного периода
+function applySummaryCustomRange() {
+  const fromEl = document.getElementById('summary-custom-from');
+  const toEl   = document.getElementById('summary-custom-to');
+  if (!fromEl || !toEl) return;
+  const from = (fromEl.value || '').trim();
+  const to   = (toEl.value   || '').trim();
+  if (!from || !to) {
+    showToast('Укажите обе даты', 'error');
+    return;
+  }
+  if (from > to) {
+    showToast('Дата «С» должна быть раньше «По»', 'error');
+    return;
+  }
+  state.summaryCustomFrom = from;
+  state.summaryCustomTo   = to;
+  state.summaryFilter     = 'custom';
+  loadSummary();
+}
 
 // ЭТАП 16В: фильтры задач
 document.querySelectorAll('#tasks-filters .filter-chip').forEach(chip => {
