@@ -9762,51 +9762,146 @@
     border-radius: 10px;
   }
 
-  /* (A) Модалка деталей сборки */
-  .ship-detail-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 13px; font-weight: 600;
-    margin-bottom: 14px;
+  /* (A) Модалка деталей сборки — v2.43.12: красивая версия */
+  .shipd-hero {
+    padding: 18px 20px 16px;
+    display: flex; gap: 14px; align-items: flex-start;
+    background: linear-gradient(135deg, #F8FAFC 0%, #EEF2F7 100%);
+    border-bottom: 1px solid var(--border);
+    position: relative;
   }
-  .ship-detail-badge.shipped {
-    background: #E8F5E9; color: #14532D;
+  .shipd-hero.shipped {
+    background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
   }
-  .ship-detail-badge.pending {
-    background: #FEF3C7; color: #78350F;
+  .shipd-hero-icon {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: white;
+    color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(20, 33, 61, 0.08);
   }
-  .ship-detail-info {
-    display: flex; flex-direction: column; gap: 8px;
+  .shipd-hero.shipped .shipd-hero-icon { color: #16A34A; }
+  .shipd-hero-icon i { font-size: 24px; }
+  .shipd-hero-text { flex: 1; min-width: 0; padding-right: 32px; }
+  .shipd-hero-type {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-light);
+    margin-bottom: 4px;
+  }
+  .shipd-hero-name {
+    font-size: 17px; font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .shipd-close {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    border: none;
+    color: var(--text-mid);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .shipd-close:hover { background: white; color: var(--text); }
+  .shipd-close i { font-size: 18px; }
+
+  /* Статус-блок */
+  .shipd-status {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: 12px;
     margin-bottom: 16px;
-    padding-bottom: 16px;
+  }
+  .shipd-status.shipped {
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+  }
+  .shipd-status.pending {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+  }
+  .shipd-status-icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .shipd-status.shipped .shipd-status-icon { background: #16A34A; color: white; }
+  .shipd-status.pending .shipd-status-icon { background: #F59E0B; color: white; }
+  .shipd-status-icon i { font-size: 18px; }
+  .shipd-status-text { flex: 1; min-width: 0; }
+  .shipd-status-title {
+    font-size: 14px; font-weight: 700;
+    color: var(--text);
+  }
+  .shipd-status.shipped .shipd-status-title { color: #14532D; }
+  .shipd-status.pending .shipd-status-title { color: #78350F; }
+  .shipd-status-sub {
+    font-size: 12px;
+    margin-top: 2px;
+    color: var(--text-mid);
+  }
+
+  /* Информационные строки */
+  .shipd-info {
+    display: flex; flex-direction: column;
+    gap: 4px;
+    margin-bottom: 18px;
+    padding: 4px 0;
+  }
+  .shipd-info-row {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 4px;
     border-bottom: 1px solid var(--border);
   }
-  .ship-detail-info-row {
-    display: flex; gap: 12px;
-    font-size: 14px;
+  .shipd-info-row:last-child { border-bottom: none; }
+  .shipd-info-icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: var(--surface-soft, #F8FAFC);
+    color: var(--text-mid);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
-  .ship-detail-info-label {
-    flex: 0 0 110px;
+  .shipd-info-icon i { font-size: 16px; }
+  .shipd-info-body { flex: 1; min-width: 0; padding-top: 1px; }
+  .shipd-info-label {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em;
     color: var(--text-light);
-    font-size: 12px;
-    text-transform: uppercase;
-    font-weight: 600;
-    letter-spacing: .03em;
-    padding-top: 2px;
+    margin-bottom: 2px;
   }
-  .ship-detail-info-value {
-    flex: 1;
+  .shipd-info-value {
+    font-size: 14px; font-weight: 500;
     color: var(--text);
-    font-weight: 500;
+    line-height: 1.35;
+    word-break: break-word;
   }
-  .ship-detail-actions {
-    display: flex; flex-direction: column; gap: 8px;
+
+  /* Действия */
+  .shipd-actions {
+    display: flex; flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
   }
-  .ship-detail-actions .btn {
+  .shipd-actions .btn {
     justify-content: center;
-    min-height: 42px;
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 12px;
+    gap: 8px;
   }
+  .shipd-action-primary { box-shadow: 0 2px 6px rgba(56, 110, 161, 0.25); }
+  .shipd-danger { color: #B91C1C !important; }
+  .shipd-danger:hover { background: #FEE2E2 !important; }
 
   /* (E) История отгрузок */
   .ship-log-section {
@@ -14775,7 +14870,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.11-shipment-pro-fix";
+const APP_VERSION = "v2.43.12-shipment-modal-redesign";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -42592,7 +42687,9 @@ function renderShipmentScreen(status) {
   }
 
   const c = state._shipContract || {};
-  const contractTitle = c.number ? ('№' + c.number) : ('Договор #' + state._shipContractId);
+  // v2.43.12: чистим ведущий № чтобы не было «№№06ТД/04.26»
+  const cleanCNumber = (c.number || '').replace(/^№\s*/, '');
+  const contractTitle = cleanCNumber ? ('№ ' + cleanCNumber) : ('Договор #' + state._shipContractId);
   const contractor = c.contractor_name || '';
   const total = status.total || 0;
   const shipped = status.shipped || 0;
@@ -42792,105 +42889,159 @@ function _renderShipmentItemModal(card) {
   }
   const isBox = card.type === 'box';
   const isShipped = !!card.shipped;
-  const title = isBox ? 'Коробка' : 'Сборка';
+  const typeLabel = isBox ? 'Коробка' : 'Сборка';
+  const heroIcon = isBox ? 'ti-package' : 'ti-tool';
 
-  // Строим строки информации
-  let infoHtml = '';
+  // v2.43.12: чистим ведущий № в номере договора (он часто уже есть в данных)
+  const cleanContractNum = (card.contract_number || '').replace(/^№\s*/, '');
+
+  // Строки информации
+  const infoRows = [];
   if (!isBox && card.assembly_date) {
-    infoHtml += _shipInfoRow('Собрано', _fmtDateRu(card.assembly_date));
+    infoRows.push({ label: 'Собрано', value: _fmtDateRu(card.assembly_date), icon: 'ti-calendar' });
   }
   if (!isBox && card.workers && card.workers.length) {
-    const names = card.workers.map(w => w.name).join(', ');
-    infoHtml += _shipInfoRow('Исполнители', names);
+    infoRows.push({
+      label: card.workers.length > 1 ? 'Исполнители' : 'Исполнитель',
+      value: card.workers.map(w => w.name).join(', '),
+      icon: 'ti-user',
+    });
   }
   if (!isBox && card.quantity && card.quantity > 1) {
-    infoHtml += _shipInfoRow('Количество', card.quantity + ' шт.');
+    infoRows.push({ label: 'Количество', value: card.quantity + ' шт.', icon: 'ti-stack-2' });
   }
   if (!isBox && card.execution) {
     const lbl = card.execution === 'stainless' ? 'Нержавейка' : 'Обычное';
-    infoHtml += _shipInfoRow('Исполнение', lbl);
+    infoRows.push({ label: 'Исполнение', value: lbl, icon: 'ti-settings' });
   }
   if (!isBox && card.ip_class) {
-    infoHtml += _shipInfoRow('IP-класс', card.ip_class);
+    infoRows.push({ label: 'IP-класс', value: card.ip_class, icon: 'ti-shield' });
   }
-  if (card.contract_number) {
-    infoHtml += _shipInfoRow('Договор', '№' + card.contract_number);
+  if (cleanContractNum) {
+    infoRows.push({ label: 'Договор', value: '№ ' + cleanContractNum, icon: 'ti-file-text' });
   }
   if (card.contractor_name) {
-    infoHtml += _shipInfoRow('Контрагент', card.contractor_name);
+    infoRows.push({ label: 'Контрагент', value: card.contractor_name, icon: 'ti-building' });
   }
   if (isBox && card.description) {
-    infoHtml += _shipInfoRow('Описание', card.description);
+    infoRows.push({ label: 'Описание', value: card.description, icon: 'ti-note' });
   }
   if (!isBox && card.comment) {
-    infoHtml += _shipInfoRow('Комментарий', card.comment);
+    infoRows.push({ label: 'Комментарий', value: card.comment, icon: 'ti-note' });
   }
 
+  let infoHtml = '';
+  infoRows.forEach(r => {
+    infoHtml += '<div class="shipd-info-row">' +
+      '<div class="shipd-info-icon"><i class="ti ' + r.icon + '"></i></div>' +
+      '<div class="shipd-info-body">' +
+        '<div class="shipd-info-label">' + escapeHtml(r.label) + '</div>' +
+        '<div class="shipd-info-value">' + escapeHtml(String(r.value || '—')) + '</div>' +
+      '</div>' +
+    '</div>';
+  });
+
   // Бейдж статуса
-  let badge;
+  let badgeHtml;
   if (isShipped) {
-    const when = card.shipped_at ? ' · ' + String(card.shipped_at).slice(0, 16).replace('T', ' ') : '';
-    const by = card.shipped_by_name ? ' · ' + escapeHtml(card.shipped_by_name) : '';
-    badge = '<div class="ship-detail-badge shipped"><i class="ti ti-circle-check"></i> Отгружено' + when + by + '</div>';
+    const when = card.shipped_at ? String(card.shipped_at).slice(0, 16).replace('T', ' ') : '';
+    const by = card.shipped_by_name || '';
+    badgeHtml =
+      '<div class="shipd-status shipped">' +
+        '<div class="shipd-status-icon"><i class="ti ti-circle-check"></i></div>' +
+        '<div class="shipd-status-text">' +
+          '<div class="shipd-status-title">Отгружено</div>' +
+          (when || by
+            ? '<div class="shipd-status-sub">' + escapeHtml(when) + (by ? ' · ' + escapeHtml(by) : '') + '</div>'
+            : '') +
+        '</div>' +
+      '</div>';
   } else {
-    badge = '<div class="ship-detail-badge pending"><i class="ti ti-circle-dashed"></i> Ожидает отгрузки</div>';
+    badgeHtml =
+      '<div class="shipd-status pending">' +
+        '<div class="shipd-status-icon"><i class="ti ti-circle-dashed"></i></div>' +
+        '<div class="shipd-status-text">' +
+          '<div class="shipd-status-title">Ожидает отгрузки</div>' +
+          '<div class="shipd-status-sub">Нажмите кнопку ниже после физической отгрузки</div>' +
+        '</div>' +
+      '</div>';
   }
 
   // Кнопки действий
-  let actionsHtml = '<div class="ship-detail-actions">';
+  const actions = [];
   if (!isShipped) {
-    actionsHtml +=
-      '<button class="btn btn-primary" onclick="markShipmentManual(\'' + card.type + '\',' + card.id + ')">' +
-        '<i class="ti ti-check"></i> Отметить отгруженным' +
-      '</button>';
+    actions.push({
+      cls: 'btn btn-primary shipd-action-primary',
+      onclick: "markShipmentManual('" + card.type + "'," + card.id + ")",
+      icon: 'ti-check',
+      label: 'Отметить отгруженным',
+    });
   } else {
-    actionsHtml +=
-      '<button class="btn btn-secondary" onclick="undoShipmentFromModal(' + card.shipment_id + ')">' +
-        '<i class="ti ti-arrow-back-up"></i> Отменить отгрузку' +
-      '</button>';
+    actions.push({
+      cls: 'btn btn-secondary',
+      onclick: 'undoShipmentFromModal(' + (card.shipment_id || 0) + ')',
+      icon: 'ti-arrow-back-up',
+      label: 'Отменить отгрузку',
+      danger: true,
+    });
   }
-  // Печать QR
   if (card.public_token) {
-    actionsHtml +=
-      '<button class="btn btn-secondary" onclick="_reprintQrFromShipCard(' + JSON.stringify(card).replace(/"/g, '&quot;') + ')">' +
-        '<i class="ti ti-qrcode"></i> QR-код' +
-      '</button>';
+    const cardJson = JSON.stringify(card).replace(/"/g, '&quot;');
+    actions.push({
+      cls: 'btn btn-secondary',
+      onclick: '_reprintQrFromShipCard(' + cardJson + ')',
+      icon: 'ti-qrcode',
+      label: 'QR-код',
+    });
   }
-  // Открыть модель (только для сборок с привязкой)
   if (!isBox && card.model_id) {
-    actionsHtml +=
-      '<button class="btn btn-secondary" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\'); openModelDetail(' + card.model_id + ')">' +
-        '<i class="ti ti-package"></i> Карточка модели' +
-      '</button>';
+    actions.push({
+      cls: 'btn btn-secondary',
+      onclick: "document.getElementById('ship-detail-modal').classList.remove('visible'); openModelDetail(" + card.model_id + ")",
+      icon: 'ti-package',
+      label: 'Карточка модели',
+    });
   }
-  // Редактировать (для сборок)
   if (!isBox && typeof openEditAssembly === 'function') {
-    actionsHtml +=
-      '<button class="btn btn-secondary" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\'); openEditAssembly(' + card.id + ')">' +
-        '<i class="ti ti-edit"></i> Редактировать сборку' +
-      '</button>';
+    actions.push({
+      cls: 'btn btn-secondary',
+      onclick: "document.getElementById('ship-detail-modal').classList.remove('visible'); openEditAssembly(" + card.id + ")",
+      icon: 'ti-edit',
+      label: 'Редактировать',
+    });
   }
-  // Упаковать в коробку (для сборок не отгруженных и не в коробке)
   if (!isBox && !isShipped && typeof openAddAssemblyToBox === 'function') {
-    actionsHtml +=
-      '<button class="btn btn-secondary" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\'); openAddAssemblyToBox(' + card.id + ')">' +
-        '<i class="ti ti-package"></i> Упаковать в коробку' +
-      '</button>';
+    actions.push({
+      cls: 'btn btn-secondary',
+      onclick: "document.getElementById('ship-detail-modal').classList.remove('visible'); openAddAssemblyToBox(" + card.id + ")",
+      icon: 'ti-package',
+      label: 'Упаковать в коробку',
+    });
   }
+
+  let actionsHtml = '<div class="shipd-actions">';
+  actions.forEach(a => {
+    actionsHtml +=
+      '<button class="' + a.cls + (a.danger ? ' shipd-danger' : '') + '" onclick="' + a.onclick + '">' +
+        '<i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.label) + '</span>' +
+      '</button>';
+  });
   actionsHtml += '</div>';
 
   m.innerHTML =
-    '<div class="modal-content" style="max-width:520px;" onclick="event.stopPropagation()">' +
-      '<div class="modal-header">' +
-        '<div>' +
-          '<div style="font-size:11px;color:var(--text-light);text-transform:uppercase;font-weight:600;letter-spacing:.04em;">' + title + '</div>' +
-          '<h3 style="margin:2px 0 0;font-size:18px;">' + escapeHtml(card.display_name || 'Без названия') + '</h3>' +
+    '<div class="modal" style="max-width:520px;" onclick="event.stopPropagation()">' +
+      // Кастомный хедер: цветная плашка с иконкой
+      '<div class="shipd-hero ' + (isShipped ? 'shipped' : 'pending') + '">' +
+        '<div class="shipd-hero-icon"><i class="ti ' + heroIcon + '"></i></div>' +
+        '<div class="shipd-hero-text">' +
+          '<div class="shipd-hero-type">' + typeLabel + '</div>' +
+          '<div class="shipd-hero-name">' + escapeHtml(card.display_name || 'Без названия') + '</div>' +
         '</div>' +
-        '<button class="modal-close" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+        '<button class="modal-close shipd-close" onclick="document.getElementById(\'ship-detail-modal\').classList.remove(\'visible\')" title="Закрыть"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div class="modal-body">' +
-        badge +
-        '<div class="ship-detail-info">' + infoHtml + '</div>' +
+      '<div class="modal-content">' +
+        badgeHtml +
+        (infoHtml ? '<div class="shipd-info">' + infoHtml + '</div>' : '') +
         actionsHtml +
       '</div>' +
     '</div>';
