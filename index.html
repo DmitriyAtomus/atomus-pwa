@@ -2473,6 +2473,26 @@
     font-style: italic;
   }
 
+  /* v2.43.55: кнопка удаления сборки в списке «Сборки этой модели» */
+  .mam-del-btn {
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    background: white;
+    color: #B91C1C;
+    border: 1px solid #FCA5A5;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .mam-del-btn .ti { font-size: 14px; }
+  .mam-del-btn:hover {
+    background: #B91C1C;
+    color: white;
+    border-color: #B91C1C;
+  }
+
   /* v2.43.47: бейдж «сейчас» в блоке загрузки сборщиков */
   .pkb-wl-now-badge {
     display: inline-block;
@@ -2552,21 +2572,25 @@
     display: grid;
     grid-template-columns: 110px 1fr 150px 100px 100px 130px 130px 36px;
     gap: 12px;
-    align-items: center;
+    /* v2.43.56: было align-items: center — из-за этого даты прыгали вниз при двухстрочном описании.
+       Теперь все колонки выровнены по верху → одна горизонтальная линия. */
+    align-items: start;
     border-top: 1px solid var(--border);
     cursor: pointer;
+    line-height: 1.35;
   }
   .contracts-table .ct-row:hover { background: var(--bg); }
-  .contracts-table .ct-number { font-weight: 600; color: var(--brand); font-size: 13.5px; }
+  .contracts-table .ct-number { font-weight: 600; color: var(--brand); font-size: 13.5px; padding-top: 1px; }
   .contracts-table .ct-name { font-weight: 500; font-size: 14px; }
   .contracts-table .ct-name small {
     display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 2px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); }
-  .contracts-table .ct-sum { font-weight: 600; font-size: 13.5px; text-align: right; }
-  .contracts-table .ct-manager { font-size: 13px; color: var(--text-mid); }
-  .contracts-table .ct-arrow { color: var(--text-light); font-size: 18px; text-align: right; }
+  .contracts-table .ct-status { padding-top: 0; }
+  .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); padding-top: 2px; }
+  .contracts-table .ct-sum { font-weight: 600; font-size: 13.5px; text-align: right; padding-top: 1px; }
+  .contracts-table .ct-manager { font-size: 13px; color: var(--text-mid); padding-top: 2px; }
+  .contracts-table .ct-arrow { color: var(--text-light); font-size: 18px; text-align: right; padding-top: 0; }
 
   /* Карточки договоров (мобильный) */
   .contract-cards { display: flex; flex-direction: column; gap: 12px; padding: 12px 18px 20px; }
@@ -15825,7 +15849,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.53-mobile-workload-fix";
+const APP_VERSION = "v2.43.56-contracts-row-align";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15946,6 +15970,14 @@ window.addEventListener('resize', detectLayout);
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// v2.43.54: формирует «№XXX» с защитой от двойного № (если в БД уже есть префикс).
+// Также экранирует HTML.
+function formatContractNum(num) {
+  if (num === null || num === undefined || num === '') return '—';
+  let s = String(num).trim().replace(/^[№#\s]+/, '');
+  return '№' + escapeHtml(s);
 }
 
 function formatDate(iso) {
@@ -18339,7 +18371,7 @@ function renderPkbWorkCard(w, colKey) {
 
   // Sub — договор + клиент
   const subParts = [];
-  if (w.contract_number) subParts.push('№' + w.contract_number);
+  if (w.contract_number) subParts.push('№' + String(w.contract_number).replace(/^[№#\s]+/, ''));
   if (w.contractor_name) subParts.push(w.contractor_name);
   if (subParts.length) {
     html += '<div class="pkb-wc-sub">' + escapeHtml(subParts.join(' · ')) + '</div>';
@@ -18559,7 +18591,7 @@ function renderProductionWorkDetail(w) {
 
   html += '<dl class="pkb-detail-grid">';
   if (w.contract_number) {
-    html += '<dt>Договор</dt><dd>№' + escapeHtml(w.contract_number) + (w.contractor_name ? (' · ' + escapeHtml(w.contractor_name)) : '') + '</dd>';
+    html += '<dt>Договор</dt><dd>' + formatContractNum(w.contract_number) + (w.contractor_name ? (' · ' + escapeHtml(w.contractor_name)) : '') + '</dd>';
   }
   html += '<dt>Кол-во</dt><dd>' + (w.qty || 1) + ' шт.</dd>';
   if (w.deadline_at) html += '<dt>Срок</dt><dd>' + escapeHtml(formatPkbDate(w.deadline_at)) + '</dd>';
@@ -20685,7 +20717,7 @@ function renderSummary(d) {
           ? ((s.model_article ? s.model_article + ' · ' : '') + s.model_name)
           : '';
         const contractStr = s.contract_number
-          ? ('№' + s.contract_number + (s.contractor_name ? ' · ' + s.contractor_name : ''))
+          ? ('№' + String(s.contract_number).replace(/^[№#\s]+/, '') + (s.contractor_name ? ' · ' + s.contractor_name : ''))
           : '';
         const roleLabel = s.role === 'main' ? 'главный' : 'соисполнитель';
         const roleCls   = s.role === 'main' ? 'pwd-role-main' : 'pwd-role-co';
@@ -27382,6 +27414,31 @@ async function openModelDetail(modelId) {
 }
 
 // v2.43.25: загрузка истории сборок модели для модалки
+// v2.43.55: удаление сборки (soft-delete) с диалогом подтверждения
+async function confirmDeleteAssembly(assemblyId, modelId) {
+  const reason = prompt('Удалить эту сборку?\n\nЕсли сборка готова и есть на складе — будет создано списание (write_off).\n\nУкажите причину (необязательно):', '');
+  // null = отмена; пустая строка тоже принимаем (без причины)
+  if (reason === null) return;
+  try {
+    const r = await apiDelete('/api/assemblies/' + assemblyId, { reason: reason || '' });
+    if (r && r.write_off_qty > 0) {
+      showToast('Сборка удалена · списано со склада: ' + r.write_off_qty, 'success');
+    } else {
+      showToast('Сборка удалена', 'success');
+    }
+    // Перезагрузить список сборок модели
+    if (modelId) {
+      await loadModelAssembliesBlock(modelId);
+    }
+    // Сбросить кэши чтобы Главная и Канбан подтянули свежее
+    cache.productionKanban = null;
+    if (cache.models) cache.models = null;
+    if (cache.dashboard) cache.dashboard = null;
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось удалить', 'error');
+  }
+}
+
 async function loadModelAssembliesBlock(modelId) {
   const container = document.getElementById('model-assemblies-list');
   if (!container) return;
@@ -27401,6 +27458,7 @@ async function loadModelAssembliesBlock(modelId) {
       'written_off': { cls: 'a-st-shipped', icon: 'ti-trash',        label: 'Списана' },
     };
     let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    const canDelete = hasPermission('production.manage');  // мастер или директор
     list.forEach(a => {
       const isCurrent = ctxContractId && a.contract_id === ctxContractId;
       const sb = statusBadgeMap[a.status] || statusBadgeMap['in_progress'];
@@ -27408,13 +27466,18 @@ async function loadModelAssembliesBlock(modelId) {
       const workersStr = workers.length ? workers.join(', ') : '<span style="color:var(--text-light);">—</span>';
       const dateStr = a.assembly_date ? formatDateShort(a.assembly_date) : '—';
       const contractStr = a.contract_number
-        ? (escapeHtml(a.contract_number) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : ''))
+        ? (escapeHtml(String(a.contract_number).replace(/^[№#\s]+/, '')) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : ''))
         : '<span style="color:var(--text-light);">без договора</span>';
+      // v2.43.55: кнопка удаления (для всех кроме отгруженной)
+      const showDelete = canDelete && a.status !== 'shipped';
+      const deleteBtn = showDelete
+        ? '<button class="mam-del-btn" onclick="confirmDeleteAssembly(' + a.id + ',' + (a.model_id || 'null') + ')" title="Удалить сборку"><i class="ti ti-trash"></i></button>'
+        : '';
       html += '<div class="mam-row" style="' +
         'background:' + (isCurrent ? 'var(--brand-bg)' : 'var(--bg)') + ';' +
         'border:1px solid ' + (isCurrent ? 'var(--brand)' : 'var(--border)') + ';' +
         'border-radius:8px; padding:10px 12px;' +
-        'display:grid; grid-template-columns: 70px 1fr auto; gap:10px; align-items:center; font-size:13px;">' +
+        'display:grid; grid-template-columns: 70px 1fr auto auto; gap:10px; align-items:center; font-size:13px;">' +
         '<div style="font-weight:600; color:var(--text-dark);">' + dateStr + '</div>' +
         '<div>' +
           '<div style="font-size:12px; color:var(--text-light); margin-bottom:2px;">Договор</div>' +
@@ -27425,6 +27488,7 @@ async function loadModelAssembliesBlock(modelId) {
           '<span class="a-status-badge ' + sb.cls + '"><i class="ti ' + sb.icon + '"></i>' + sb.label + '</span>' +
           '<div style="font-size:12px; color:var(--text-light);">' + a.quantity + ' шт.</div>' +
         '</div>' +
+        deleteBtn +
       '</div>';
     });
     html += '</div>';
@@ -38664,6 +38728,33 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.56',
+    date: '27.05.2026',
+    title: 'Договоры — ровные строки',
+    features: [
+      'В таблице <b>«Договоры»</b> номер / статус / даты / сумма / менеджер теперь идут в одной горизонтальной линии — раньше прыгали вниз когда у контрагента было длинное описание',
+    ],
+  },
+  {
+    version: 'v2.43.55',
+    date: '27.05.2026',
+    title: 'Удаление ошибочных сборок',
+    features: [
+      'В блоке <b>«Сборки этой модели»</b> у каждой сборки появилась красная кнопка <i class="ti ti-trash"></i> — удаление',
+      'Если сборка готова и на складе есть остаток — при удалении создаётся <b>списание (write_off)</b> для корректировки',
+      'Отгруженные сборки удалить нельзя (защита от потери истории отгрузок)',
+      'Доступно мастеру и директору',
+    ],
+  },
+  {
+    version: 'v2.43.54',
+    date: '27.05.2026',
+    title: 'Фикс «№№» в номере договора',
+    features: [
+      'Убран двойной символ <b>№</b> в отображении номера договора (в модалке работы, в журнале участия, в шапке карточки). Если в БД номер уже сохранён с «№» — лишний префикс срезается',
+    ],
+  },
   {
     version: 'v2.43.53',
     date: '27.05.2026',
