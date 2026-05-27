@@ -15280,7 +15280,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.36-sessions-everywhere";
+const APP_VERSION = "v2.43.37-summary-pdf-fix-and-tidy";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19532,58 +19532,74 @@ function renderSummary(d) {
     const sbTotal = sb.total || {};
     const totalHours = Number(sbTotal.total_hours || 0);
     const totalEntries = Number(sbTotal.total_entries || 0);
-    html += '<div class="section"><h3 class="section-title"><i class="ti ti-history"></i> Журнал участия</h3></div>';
-    // Карточки сверху
-    html += '<div class="kpi-cards">';
-    html += '<div class="kpi-card"><div class="kpi-label">Часов отработано</div><div class="kpi-value">' +
-              (totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)) + 'ч</div></div>';
-    html += '<div class="kpi-card"><div class="kpi-label">Записей</div><div class="kpi-value">' +
-              totalEntries + '</div></div>';
-    html += '<div class="kpi-card"><div class="kpi-label">Сборщиков</div><div class="kpi-value">' +
-              (sbTotal.employees_count || 0) + '</div></div>';
+    const totalEmployees = Number(sbTotal.employees_count || 0);
+    const fmtH = (h) => (h % 1 === 0 ? h : h.toFixed(1));
+
+    html += '<div class="section"><h3 class="section-title"><span><i class="ti ti-history" style="margin-right:6px;color:var(--brand);"></i>Журнал участия</span></h3></div>';
+    // 3 KPI-карточки с правильной структурой и цветами
+    html += '<div class="kpi-grid">';
+    html += '<div class="kpi-card kpi-amber"><div class="kpi-icon"><i class="ti ti-clock-hour-4"></i></div>' +
+              '<div class="kpi-text"><div class="label">Часов отработано</div>' +
+              '<div class="value">' + fmtH(totalHours) + 'ч</div></div></div>';
+    html += '<div class="kpi-card kpi-blue"><div class="kpi-icon"><i class="ti ti-list-numbers"></i></div>' +
+              '<div class="kpi-text"><div class="label">Записей</div>' +
+              '<div class="value">' + totalEntries + '</div></div></div>';
+    html += '<div class="kpi-card kpi-green"><div class="kpi-icon"><i class="ti ti-users"></i></div>' +
+              '<div class="kpi-text"><div class="label">Сборщиков</div>' +
+              '<div class="value">' + totalEmployees + '</div></div></div>';
     html += '</div>';
-    // По сотрудникам — таблица
+
+    // По сборщикам
     if ((sb.by_employee || []).length) {
-      html += '<div class="section"><h3 class="section-title">По сборщикам — часы</h3></div>';
+      html += '<div class="section"><h3 class="section-title"><span>По сборщикам — часы</span></h3></div>';
       html += '<div class="summary-table-wrap"><table class="summary-table">';
       html += '<thead><tr><th>Сборщик</th><th class="num">Часов</th><th class="num">Записей</th></tr></thead><tbody>';
       sb.by_employee.forEach(e => {
         const hrs = Number(e.hours || 0);
+        const initials = getInitials(e.short_name || e.full_name || '?');
+        const colorIdx = ((e.employee_id || 0) % 8);
         html += '<tr>' +
-                  '<td>' + escapeHtml(e.short_name || e.full_name || ('#' + e.employee_id)) + '</td>' +
-                  '<td class="num">' + (hrs % 1 === 0 ? hrs : hrs.toFixed(1)) + 'ч</td>' +
+                  '<td><div style="display:flex;align-items:center;gap:8px;">' +
+                    '<div class="pkb-wl-avatar ac-' + colorIdx + '" style="width:26px;height:26px;font-size:10px;">' + escapeHtml(initials) + '</div>' +
+                    '<span>' + escapeHtml(e.short_name || e.full_name || ('#' + e.employee_id)) + '</span>' +
+                  '</div></td>' +
+                  '<td class="num"><b>' + fmtH(hrs) + 'ч</b></td>' +
                   '<td class="num">' + (e.entries || 0) + '</td>' +
                 '</tr>';
       });
       html += '</tbody></table></div>';
     }
-    // Последние записи — раскрывающийся список
+
+    // Последние записи
     if ((sb.entries || []).length) {
-      html += '<div class="section"><h3 class="section-title">Последние записи ' +
-                '<small style="font-weight:400;color:var(--text-light);">' + sb.entries.length + ' из ' + totalEntries + '</small></h3></div>';
+      html += '<div class="section"><h3 class="section-title">' +
+                '<span>Последние записи</span>' +
+                '<span style="font-weight:400;color:var(--text-light);font-size:12.5px;">' + sb.entries.length + ' из ' + totalEntries + '</span>' +
+              '</h3></div>';
       html += '<div class="ssn-entries-list">';
       sb.entries.forEach(s => {
         const initials = getInitials(s.employee_short_name || s.employee_full_name || '?');
         const avColorIdx = ((s.employee_id || 0) % 8);
         const dateStr = s.session_date ? formatPkbDate(s.session_date) : '—';
         const hrs = (s.hours != null) ? Number(s.hours) : null;
-        const hoursStr = (hrs != null) ? (' · ' + (hrs % 1 === 0 ? hrs : hrs.toFixed(1)) + 'ч') : '';
+        const hoursStr = (hrs != null && hrs > 0) ? (' · ' + fmtH(hrs) + 'ч') : '';
         const modelStr = s.model_name
           ? ((s.model_article ? s.model_article + ' · ' : '') + s.model_name)
-          : '—';
+          : '';
         const contractStr = s.contract_number
           ? ('№' + s.contract_number + (s.contractor_name ? ' · ' + s.contractor_name : ''))
           : '';
         html += '<div class="ssn-entry">' +
-                  '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
+                  '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:34px;height:34px;font-size:12px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
                   '<div class="ssn-entry-body">' +
                     '<div class="ssn-entry-top">' +
                       '<span class="ssn-entry-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
                       '<span class="ssn-entry-meta">' + escapeHtml(dateStr + hoursStr) + '</span>' +
                     '</div>' +
-                    '<div class="ssn-entry-work">' + escapeHtml(modelStr) +
+                    (modelStr || contractStr ? '<div class="ssn-entry-work">' +
+                      escapeHtml(modelStr) +
                       (contractStr ? ' <span style="color:var(--text-light);">· ' + escapeHtml(contractStr) + '</span>' : '') +
-                    '</div>' +
+                    '</div>' : '') +
                     (s.note ? '<div class="ssn-entry-note">' + escapeHtml(s.note) + '</div>' : '') +
                   '</div>' +
                 '</div>';
