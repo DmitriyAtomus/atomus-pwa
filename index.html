@@ -2411,6 +2411,36 @@
     border-color: #B91C1C;
     box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
   }
+  /* v2.43.48: кнопка «Добавить» рядом с toggle */
+  .pwd-help-add {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: white;
+    color: var(--brand);
+    border: 1.5px solid var(--brand);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pwd-help-add:hover { background: var(--brand); color: white; }
+  .pwd-help-add .ti { font-size: 14px; }
+  /* v2.43.48: крестик у чипа активного помощника */
+  .pwd-help-chip-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.06);
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pwd-help-chip-x:hover {
+    background: #B91C1C;
+    color: white;
+  }
+  .pwd-help-chip-x .ti { font-size: 11px; }
   .pwd-help-active {
     display: flex; flex-wrap: wrap; gap: 6px;
   }
@@ -15709,7 +15739,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.47-workload-help-and-toggle";
+const APP_VERSION = "v2.43.48-helpers-manual-and-notifs";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -18391,30 +18421,44 @@ function renderProductionWorkDetail(w) {
                       ['in_progress', 'review', 'packing'].includes(w.status);
 
   // v2.43.47: Toggle «Помогаю сейчас» — для активных работ
+  // v2.43.48: добавлена возможность мастеру/директору ставить других + убирать любого
   if (['in_progress', 'review', 'packing'].includes(w.status)) {
     const activeHelpers = w.active_helpers || [];
     const iAmHelping = !!w.i_am_helping_this;
+    const canManageHelpers = hasPermission('production.manage');
     html += '<div class="pwd-help-block">';
     html +=   '<div class="pwd-help-head">';
     html +=     '<span><i class="ti ti-hand-stop"></i> Кто работает прямо сейчас</span>';
-    html +=     '<button class="pwd-help-toggle ' + (iAmHelping ? 'on' : '') + '" onclick="togglePwdHelp(' + w.id + ',' + (iAmHelping ? 'false' : 'true') + ')">' +
-                  '<i class="ti ' + (iAmHelping ? 'ti-player-stop-filled' : 'ti-player-play-filled') + '"></i>' +
-                  (iAmHelping ? 'Я закончил' : 'Я работаю над этим') +
-                '</button>';
+    html +=     '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    html +=       '<button class="pwd-help-toggle ' + (iAmHelping ? 'on' : '') + '" onclick="togglePwdHelp(' + w.id + ',' + (iAmHelping ? 'false' : 'true') + ')">' +
+                    '<i class="ti ' + (iAmHelping ? 'ti-player-stop-filled' : 'ti-player-play-filled') + '"></i>' +
+                    (iAmHelping ? 'Я закончил' : 'Я работаю над этим') +
+                  '</button>';
+    if (canManageHelpers) {
+      html +=     '<button class="pwd-help-add" onclick="openAddHelperModal(' + w.id + ')">' +
+                    '<i class="ti ti-user-plus"></i>Добавить' +
+                  '</button>';
+    }
+    html +=     '</div>';
     html +=   '</div>';
     if (activeHelpers.length) {
       html += '<div class="pwd-help-active">';
       activeHelpers.forEach(h => {
         const initials = getInitials(h.short_name || h.full_name || '?');
         const colorIdx = ((h.id || 0) % 8);
+        const closeBtn = canManageHelpers
+          ? '<span class="pwd-help-chip-x" onclick="event.stopPropagation();removePwdHelper(' + w.id + ',' + h.id + ')" title="Снять"><i class="ti ti-x"></i></span>'
+          : '';
         html += '<span class="pwd-help-chip" title="' + escapeHtml(h.full_name || h.short_name) + '">' +
                   '<span class="pkb-wl-avatar ac-' + colorIdx + '" style="width:22px;height:22px;font-size:9px;border-width:1px;">' + escapeHtml(initials) + '</span>' +
                   escapeHtml(h.short_name || h.full_name || ('#' + h.id)) +
+                  closeBtn +
                 '</span>';
       });
       html += '</div>';
     } else {
-      html += '<div class="pwd-help-empty">Никто сейчас не работает. Нажми «Я работаю над этим» когда возьмёшь работу в руки.</div>';
+      html += '<div class="pwd-help-empty">Никто сейчас не работает. Нажми «Я работаю над этим» когда возьмёшь работу в руки' +
+              (canManageHelpers ? ', или «Добавить» чтобы поставить другого сотрудника.' : '.') + '</div>';
     }
     html += '</div>';
   }
@@ -18549,7 +18593,6 @@ function pkbStatusToCss(status) {
 
 // v2.43.47: Toggle «Помогаю сейчас» — POST start-helping или stop-helping
 async function togglePwdHelp(workId, willStart) {
-  // willStart — строка 'true'/'false' из HTML
   const isStart = (willStart === true || willStart === 'true');
   try {
     if (isStart) {
@@ -18559,7 +18602,92 @@ async function togglePwdHelp(workId, willStart) {
       await apiPost('/api/production/works/' + workId + '/stop-helping', {});
       showToast('Закончил работу над задачей', 'success');
     }
-    // Перерисовываем модалку + сбрасываем кэш kanban и workload
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+    cache.productionKanban = null;
+    if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
+      loadProductionDashboard();
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  }
+}
+
+// v2.43.48: добавить ВРУЧНУЮ сотрудника в «работает сейчас» (мастер/директор)
+async function openAddHelperModal(workId) {
+  let employees = [];
+  try {
+    const d = await apiGet('/api/employees?limit=200');
+    employees = (d.items || d.employees || []).filter(e => e.is_active !== false);
+  } catch (e) {
+    showToast('Не удалось загрузить сотрудников', 'error');
+    return;
+  }
+  let w = null;
+  try { w = await apiGet('/api/production/works/' + workId); } catch (e) {}
+  // Исключаем тех кто уже активно помогает этой работе
+  const excluded = new Set();
+  (w && w.active_helpers || []).forEach(h => excluded.add(h.id));
+  const candidates = employees.filter(e => !excluded.has(e.id));
+  if (!candidates.length) {
+    showToast('Все сотрудники уже работают над этой задачей', 'success');
+    return;
+  }
+  let modal = document.getElementById('pwd-add-helper-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'pwd-add-helper-modal';
+  modal.className = 'modal-overlay visible pkb-form-modal';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  const listHtml = candidates.map(e => {
+    const initials = getInitials(e.short_name || e.full_name || '?');
+    const colorIdx = (e.id || 0) % 8;
+    return '<button class="pwd-co-pick-row" onclick="addPwdHelper(' + workId + ',' + e.id + ')">' +
+              '<div class="pkb-wl-avatar ac-' + colorIdx + '" style="width:30px;height:30px;font-size:11px;">' + escapeHtml(initials) + '</div>' +
+              '<div style="flex:1;text-align:left;">' +
+                '<div style="font-weight:500;">' + escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</div>' +
+                (e.full_name && e.short_name !== e.full_name ? '<div style="font-size:11px;color:var(--text-light);">' + escapeHtml(e.full_name) + '</div>' : '') +
+              '</div>' +
+            '</button>';
+  }).join('');
+  modal.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-hand-stop"></i> Кто сейчас работает?</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pwd-add-helper-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">' +
+          'Выбери сотрудника — он будет помечен как активно работающий над этой задачей. Если у него уже была другая работа в статусе «сейчас» — она автоматически снимется.' +
+        '</div>' +
+        listHtml +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+}
+
+async function addPwdHelper(workId, employeeId) {
+  try {
+    await apiPost('/api/production/works/' + workId + '/helpers', { employee_id: employeeId });
+    showToast('Сотрудник назначен', 'success');
+    const modal = document.getElementById('pwd-add-helper-modal');
+    if (modal) modal.remove();
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+    cache.productionKanban = null;
+    if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
+      loadProductionDashboard();
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  }
+}
+
+async function removePwdHelper(workId, employeeId) {
+  if (!confirm('Снять сотрудника с «работает сейчас»?')) return;
+  try {
+    await apiDelete('/api/production/works/' + workId + '/helpers/' + employeeId);
+    showToast('Снято', 'success');
     const fresh = await apiGet('/api/production/works/' + workId);
     renderProductionWorkDetail(fresh);
     cache.productionKanban = null;
@@ -38189,6 +38317,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.48',
+    date: '27.05.2026',
+    title: 'Гибкое управление помощниками + уведомления о замечаниях',
+    features: [
+      'В блоке <b>«Кто работает прямо сейчас»</b> мастер/директор может теперь <b>добавить любого сотрудника</b> вручную — кнопка «Добавить» рядом с «Я работаю над этим»',
+      'У каждого активного помощника появился <b>крестик</b> — снять одним кликом (для мастера/директора)',
+      'Сотрудник автоматически добавляется в соисполнители при ручном назначении',
+      '<b>Уведомления о замечаниях:</b> теперь при создании дефекта/замечания/вопроса приходит уведомление в колокольчик с типом, категорией, контекстом (по какой сборке / договору) и автором',
+      '<b>Сообщения в чате замечания</b> теперь тоже отправляют уведомление — никто не пропустит ответ',
+    ],
+  },
   {
     version: 'v2.43.47',
     date: '27.05.2026',
