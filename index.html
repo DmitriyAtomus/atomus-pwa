@@ -14959,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.24-convert-to-component";
+const APP_VERSION = "v2.43.25-model-assemblies-block";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25370,10 +25370,69 @@ async function openModelDetail(modelId) {
           '</div>' +
         '</div>' +
         '<div id="bom-list"><div class="loading-block">Загружаем…</div></div>' +
+        // v2.43.25: блок «История сборок» — кто и когда собирал, по каким договорам
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px;border-top:1px solid var(--border);padding-top:14px;">' +
+          '<h4 style="margin:0;font-size:15px;"><i class="ti ti-history"></i> Сборки этой модели</h4>' +
+        '</div>' +
+        '<div id="model-assemblies-list"><div class="loading-block">Загружаем историю…</div></div>' +
       '</div>' +
     '</div>';
   overlay.classList.add('visible');
   await loadModelBom(modelId);
+  loadModelAssembliesBlock(modelId);
+}
+
+// v2.43.25: загрузка истории сборок модели для модалки
+async function loadModelAssembliesBlock(modelId) {
+  const container = document.getElementById('model-assemblies-list');
+  if (!container) return;
+  try {
+    const d = await apiGet('/api/models/' + modelId + '/assemblies?limit=30');
+    const list = d.items || [];
+    if (!list.length) {
+      container.innerHTML = '<div style="background:var(--bg);border-radius:8px;padding:14px;font-size:13px;color:var(--text-light);text-align:center;">Сборок этой модели пока не было.</div>';
+      return;
+    }
+    // Контекст: подсвечиваем сборки текущего договора (если карточка открыта из договора)
+    const ctxContractId = (state && state.currentContractId) || null;
+    const statusBadgeMap = {
+      'in_progress': { cls: 'a-st-inprog',  icon: 'ti-tool',         label: 'В работе' },
+      'ready':       { cls: 'a-st-ready',   icon: 'ti-circle-check', label: 'Готово' },
+      'shipped':     { cls: 'a-st-shipped', icon: 'ti-truck-delivery', label: 'Отгружено' },
+      'written_off': { cls: 'a-st-shipped', icon: 'ti-trash',        label: 'Списана' },
+    };
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    list.forEach(a => {
+      const isCurrent = ctxContractId && a.contract_id === ctxContractId;
+      const sb = statusBadgeMap[a.status] || statusBadgeMap['in_progress'];
+      const workers = (a.workers || []).map(w => escapeHtml(w.short_name || w.full_name || '')).filter(Boolean);
+      const workersStr = workers.length ? workers.join(', ') : '<span style="color:var(--text-light);">—</span>';
+      const dateStr = a.assembly_date ? formatDateShort(a.assembly_date) : '—';
+      const contractStr = a.contract_number
+        ? (escapeHtml(a.contract_number) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : ''))
+        : '<span style="color:var(--text-light);">без договора</span>';
+      html += '<div class="mam-row" style="' +
+        'background:' + (isCurrent ? 'var(--brand-bg)' : 'var(--bg)') + ';' +
+        'border:1px solid ' + (isCurrent ? 'var(--brand)' : 'var(--border)') + ';' +
+        'border-radius:8px; padding:10px 12px;' +
+        'display:grid; grid-template-columns: 70px 1fr auto; gap:10px; align-items:center; font-size:13px;">' +
+        '<div style="font-weight:600; color:var(--text-dark);">' + dateStr + '</div>' +
+        '<div>' +
+          '<div style="font-size:12px; color:var(--text-light); margin-bottom:2px;">Договор</div>' +
+          '<div style="font-weight:500;">' + contractStr + '</div>' +
+          '<div style="font-size:12px; color:var(--text-light); margin-top:4px;">Сборщики: ' + workersStr + '</div>' +
+        '</div>' +
+        '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">' +
+          '<span class="a-status-badge ' + sb.cls + '"><i class="ti ' + sb.icon + '"></i>' + sb.label + '</span>' +
+          '<div style="font-size:12px; color:var(--text-light);">' + a.quantity + ' шт.</div>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div style="background:var(--bg);border-radius:8px;padding:12px;font-size:13px;color:var(--danger);">Не удалось загрузить историю: ' + escapeHtml(String(e.message || e)) + '</div>';
+  }
 }
 
 function closeModelDetail() {
