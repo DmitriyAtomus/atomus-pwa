@@ -14959,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.18-quick-action-in-spec";
+const APP_VERSION = "v2.43.19-cache-bust-on-reload";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -28131,13 +28131,15 @@ async function loadCurrentContract() {
   }
   container.innerHTML = '<div class="loading-block">Загружаем договор…</div>';
   try {
-    const c = await apiGet('/api/contracts/' + cid);
+    // v2.43.19: cache-busting (см. loadContractItemsBlock)
+    const ts = Date.now();
+    const c = await apiGet('/api/contracts/' + cid + '?_=' + ts);
     // ЭТАП 40 (v2.20.0): подгружаем готовность к отгрузке для замка 🔒 на кнопке «Отгружен».
     // Не блокируем рендер — если запрос упал, просто без замка.
     const showLock = c.status && !['draft', 'closed', 'shipped'].includes(c.status);
     if (showLock) {
       try {
-        const r = await apiGet('/api/contracts/' + cid + '/shipping-readiness');
+        const r = await apiGet('/api/contracts/' + cid + '/shipping-readiness?_=' + ts);
         c.shipping_readiness = r;
       } catch (e) { /* без замка тоже норм */ }
     }
@@ -28300,7 +28302,11 @@ async function loadContractItemsBlock(contractId) {
   const container = document.getElementById('scd-items-block');
   if (!container) return;
   try {
-    const d = await apiGet('/api/contracts/' + contractId + '/items');
+    // v2.43.19: cache-busting — Service Worker PWA может закэшировать GET-ответ
+    // и продолжить отдавать старые qty_reserved/qty_in_production даже после
+    // смены статуса сборки. Дёргаем уникальный URL чтобы обойти кэш.
+    const ts = Date.now();
+    const d = await apiGet('/api/contracts/' + contractId + '/items?_=' + ts);
     state._specByContract[contractId] = {
       items: d.items || [],
       total: d.total || 0,
