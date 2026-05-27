@@ -11454,9 +11454,19 @@
     background: var(--brand-bg);
     color: var(--brand);
     display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 600;
+    font-size: 10px; font-weight: 700;
     flex-shrink: 0;
+    border: 1.5px solid transparent;
   }
+  /* v2.43.30: цветные аватары — каждому сборщику свой цвет (по hash от id) */
+  .pkb-wl-avatar.ac-0 { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
+  .pkb-wl-avatar.ac-1 { background: #DCFCE7; color: #15803D; border-color: #86EFAC; }
+  .pkb-wl-avatar.ac-2 { background: #FEE2E2; color: #B91C1C; border-color: #FCA5A5; }
+  .pkb-wl-avatar.ac-3 { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+  .pkb-wl-avatar.ac-4 { background: #E0E7FF; color: #4338CA; border-color: #A5B4FC; }
+  .pkb-wl-avatar.ac-5 { background: #FCE7F3; color: #9D174D; border-color: #F9A8D4; }
+  .pkb-wl-avatar.ac-6 { background: #CCFBF1; color: #115E59; border-color: #5EEAD4; }
+  .pkb-wl-avatar.ac-7 { background: #F3E8FF; color: #6B21A8; border-color: #D8B4FE; }
   .pkb-wl-name {
     font-size: 12.5px;
     color: var(--text-dark);
@@ -11467,8 +11477,8 @@
   }
   .pkb-wl-bar {
     position: relative;
-    height: 16px;
-    background: #DBE2EA;
+    height: 18px;
+    background: #E5EBF1;
     border: 1px solid #C5CFDB;
     border-radius: 4px;
     overflow: hidden;
@@ -11477,6 +11487,7 @@
     position: absolute; top: 0; left: 0; bottom: 0;
     border-radius: 4px;
     transition: width 0.3s;
+    opacity: 0.55;
   }
   .pkb-wl-bar-fill.s-undersized { background: #BA7517; }
   .pkb-wl-bar-fill.s-normal     { background: #1D9E75; }
@@ -11486,16 +11497,14 @@
     z-index: 1;
     display: flex; align-items: center; justify-content: center;
     height: 100%;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    color: white;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+    color: #1F2937;
     padding: 0 6px;
     white-space: nowrap;
   }
   .pkb-wl-bar.empty .pkb-wl-bar-text {
-    color: #5A6776;
-    text-shadow: none;
+    color: #6B7280;
   }
   .pkb-wl-norm-line {
     position: absolute;
@@ -14959,7 +14968,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.28-restore-full-context";
+const APP_VERSION = "v2.43.30-workload-colors-and-estimate";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17089,6 +17098,7 @@ function pkbFilterOverdue() {
 function renderPkbWorkload(workload) {
   const workers = (workload && workload.workers) || [];
   const norm    = (workload && workload.norm_hours) || 40;
+  const defHrs  = (workload && workload.default_hours_per_work) || 16;
 
   // Скрываем виджет если нет сотрудников вовсе
   if (!workers.length) return '';
@@ -17106,33 +17116,47 @@ function renderPkbWorkload(workload) {
   let html = '<div class="pkb-workload">';
   html +=   '<div class="pkb-workload-head">';
   html +=     '<div class="pkb-workload-title">Загрузка сборщиков</div>';
-  html +=     '<div class="pkb-workload-norm">норма ' + norm + 'ч / неделю</div>';
+  html +=     '<div class="pkb-workload-norm" title="Норма ' + norm + 'ч в неделю. Работы без указанных часов считаются по ' + defHrs + 'ч.">' +
+                'норма ' + norm + 'ч / неделю' +
+              '</div>';
   html +=   '</div>';
 
   sorted.forEach(w => {
     const name     = w.short_name || w.full_name || ('Сотрудник #' + w.employee_id);
     const initials = getInitials(name);
     const pct      = Math.max(0, Math.min(200, w.pct || 0)); // обрезаем визуально 200%
-    const hours    = (w.total_hours != null) ? w.total_hours : 0;
-    const works    = w.works_count || 0;
-    const status   = w.status || 'undersized';
+    // v2.43.30: считаем по est_hours (с учётом оценочных часов) + флаг is_estimated
+    const hours       = (w.est_hours != null) ? w.est_hours : (w.total_hours || 0);
+    const isEstimated = !!w.is_estimated;
+    const works       = w.works_count || 0;
+    const status      = w.status || 'undersized';
     const statusLabel =
       (status === 'overloaded') ? 'перегруз' :
       (status === 'normal')     ? 'норма'    :
       (works === 0)             ? 'свободен' : 'недогруз';
 
-    // Внутри полосы текст: "N работ · Mч"
+    // Внутри полосы текст: "N работ · Mч" (с тильдой если часы оценочные)
+    const hoursPrefix = (isEstimated && hours > 0) ? '~' : '';
     const barText = works > 0
-      ? (works + ' ' + plural(works, 'работа', 'работы', 'работ') + ' · ' + formatHours(hours) + 'ч')
+      ? (works + ' ' + plural(works, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч')
       : 'нет работ';
+    // Tooltip с пояснением расчёта
+    const barTooltip = works > 0
+      ? (isEstimated
+          ? 'Часы оценочные: ' + defHrs + 'ч на каждую работу без указанного времени. ' +
+            'Заполните «расч. часы» в карточке работы для точности.'
+          : 'Часы — сумма «расчётных часов» по активным работам этого сборщика.')
+      : 'Активных работ нет';
 
     const fillWidth = Math.min(100, pct); // фактическая ширина заливки 0..100%
     const barEmptyCls = (works === 0) ? ' empty' : '';
+    // v2.43.30: цвет аватара по hash от employee_id (палитра 8 цветов)
+    const avatarColorIdx = ((w.employee_id || 0) % 8);
 
     html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
-    html +=   '<div class="pkb-wl-avatar">' + escapeHtml(initials) + '</div>';
+    html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
     html +=   '<div class="pkb-wl-name">' + escapeHtml(name) + '</div>';
-    html +=   '<div class="pkb-wl-bar' + barEmptyCls + '">';
+    html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
     if (works > 0) {
       html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
     }
