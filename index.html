@@ -14959,7 +14959,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.19-cache-bust-on-reload";
+const APP_VERSION = "v2.43.20-no-store-fetch";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -15168,8 +15168,15 @@ async function apiPatch(path, body) {
 async function apiGet(path) {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) throw new Error('Нет токена');
+  // v2.43.19: cache: 'no-store' + Cache-Control — обходим Service Worker PWA,
+  // который кэширует API-ответы и отдаёт устаревшие данные.
   const response = await fetch(API_BASE + path, {
-    headers: { 'Authorization': 'Bearer ' + token },
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+    },
+    cache: 'no-store',
   });
   if (response.status === 401 || response.status === 403) {
     logout();
