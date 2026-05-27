@@ -2572,25 +2572,27 @@
     display: grid;
     grid-template-columns: 110px 1fr 150px 100px 100px 130px 130px 36px;
     gap: 12px;
-    /* v2.43.56: было align-items: center — из-за этого даты прыгали вниз при двухстрочном описании.
-       Теперь все колонки выровнены по верху → одна горизонтальная линия. */
+    /* v2.43.57: align-items: start — первая строка всех колонок на одной горизонтальной линии.
+       Описание контрагента (small) уходит ниже отдельно. */
     align-items: start;
     border-top: 1px solid var(--border);
     cursor: pointer;
     line-height: 1.35;
   }
   .contracts-table .ct-row:hover { background: var(--bg); }
-  .contracts-table .ct-number { font-weight: 600; color: var(--brand); font-size: 13.5px; padding-top: 1px; }
+  .contracts-table .ct-number { font-weight: 600; color: var(--brand); font-size: 13.5px; }
   .contracts-table .ct-name { font-weight: 500; font-size: 14px; }
   .contracts-table .ct-name small {
     display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 2px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .contracts-table .ct-status { padding-top: 0; }
-  .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); padding-top: 2px; }
-  .contracts-table .ct-sum { font-weight: 600; font-size: 13.5px; text-align: right; padding-top: 1px; }
-  .contracts-table .ct-manager { font-size: 13px; color: var(--text-mid); padding-top: 2px; }
-  .contracts-table .ct-arrow { color: var(--text-light); font-size: 18px; text-align: right; padding-top: 0; }
+  /* v2.43.57: бейдж статуса — подтянут на 2px вверх чтобы баseline его текста
+     совпал с baseline остальных колонок (font-size бейджа меньше + padding 3px) */
+  .contracts-table .ct-status { margin-top: -2px; }
+  .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); }
+  .contracts-table .ct-sum { font-weight: 600; font-size: 13.5px; text-align: right; }
+  .contracts-table .ct-manager { font-size: 13px; color: var(--text-mid); }
+  .contracts-table .ct-arrow { color: var(--text-light); font-size: 18px; text-align: right; }
 
   /* Карточки договоров (мобильный) */
   .contract-cards { display: flex; flex-direction: column; gap: 12px; padding: 12px 18px 20px; }
@@ -15849,7 +15851,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.56-contracts-row-align";
+const APP_VERSION = "v2.43.57-contracts-row-fix2";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -30249,7 +30251,7 @@ function renderContractsList() {
         '<div class="ct-number">' + escapeHtml(c.number || '—') + '</div>' +
         '<div class="ct-name">' + escapeHtml(c.contractor_name || '—') +
           '<small>' + escapeHtml(desc.join(' · ')) + '</small></div>' +
-        '<div>' + statusBadgeHtml(c.status, c.status_label) + '</div>' +
+        '<div class="ct-status">' + statusBadgeHtml(c.status, c.status_label) + '</div>' +
         '<div class="ct-date">' + (c.sign_date ? formatDate(c.sign_date) + '.' + (c.sign_date.split('-')[0].slice(2)) : '—') + '</div>' +
         '<div class="ct-date">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</div>' +
         '<div class="ct-sum">' + formatMoney(c.sum_amount) + '</div>' +
@@ -38728,6 +38730,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.57',
+    date: '27.05.2026',
+    title: 'Договоры — выровнял бейджи',
+    features: [
+      'Бейджи статусов (в производстве / готов / отгружен) теперь точно на одной линии с номером, датой, суммой',
+      'Описание контрагента (поставка · ООО ...) уходит отдельной строкой ниже — не сбивает выравнивание',
+    ],
+  },
   {
     version: 'v2.43.56',
     date: '27.05.2026',
