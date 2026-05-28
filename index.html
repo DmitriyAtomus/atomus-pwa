@@ -19056,12 +19056,39 @@ function _formatHelpingDuration(startedAtIso) {
   const iso = startedAtIso.includes('T') ? startedAtIso : (startedAtIso.replace(' ', 'T') + 'Z');
   const startMs = Date.parse(iso);
   if (!startMs || isNaN(startMs)) return '';
-  const diffMin = Math.max(0, Math.floor((Date.now() - startMs) / 60000));
-  if (diffMin < 1) return 'только что';
-  if (diffMin < 60) return diffMin + 'м';
-  const h = Math.floor(diffMin / 60);
-  const m = diffMin % 60;
+  const nowMs = Date.now();
+  const elapsedMin = Math.max(0, Math.floor((nowMs - startMs) / 60000));
+  const lunchMin = _calculateLunchMinutes(startMs, nowMs);
+  const workMin = Math.max(0, elapsedMin - lunchMin);
+  if (workMin < 1) return 'только что';
+  if (workMin < 60) return workMin + 'м';
+  const h = Math.floor(workMin / 60);
+  const m = workMin % 60;
   return h + 'ч ' + (m > 0 ? m + 'м' : '');
+}
+
+function _calculateLunchMinutes(startMs, endMs) {
+  const startDate = new Date(startMs);
+  const endDate = new Date(endMs);
+  let lunchMinutes = 0;
+  const day = new Date(startDate);
+  day.setHours(0, 0, 0, 0);
+
+  while (day.getTime() <= endDate.getTime()) {
+    const lunchStart = new Date(day);
+    lunchStart.setHours(12, 0, 0, 0);
+    const lunchEnd = new Date(day);
+    lunchEnd.setHours(13, 0, 0, 0);
+
+    const overlapStart = Math.max(startMs, lunchStart.getTime());
+    const overlapEnd = Math.min(endMs, lunchEnd.getTime());
+    if (overlapEnd > overlapStart) {
+      lunchMinutes += Math.floor((overlapEnd - overlapStart) / 60000);
+    }
+    day.setDate(day.getDate() + 1);
+  }
+
+  return lunchMinutes;
 }
 
 // Глобальный интервал для обновления таймеров каждую минуту
