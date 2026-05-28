@@ -7420,28 +7420,52 @@
 
   /* Кнопка «Сканировать» в шапке */
   .scan-btn {
-    background: rgba(255, 255, 255, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     color: white;
-    padding: 7px 11px;
-    border-radius: 9px;
+    padding: 5px 10px;
+    border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    transition: background 0.15s, border-color 0.15s;
+    letter-spacing: 0.2px;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
     flex-shrink: 0;
   }
   .scan-btn:hover {
-    background: rgba(255, 255, 255, 0.28);
-    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.38);
   }
-  .scan-btn i { font-size: 17px; }
+  .scan-btn:active { transform: translateY(1px); }
+  .scan-btn i { font-size: 15px; }
+
+  /* v2.43.67: цветовые акценты для информативности */
+  .scan-btn--camera {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(134, 239, 172, 0.45);
+  }
+  .scan-btn--camera:hover {
+    background: rgba(34, 197, 94, 0.30);
+    border-color: rgba(134, 239, 172, 0.65);
+  }
+  .scan-btn--camera i { color: #BBF7D0; }
+
+  .scan-btn--qr {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: rgba(125, 211, 252, 0.45);
+  }
+  .scan-btn--qr:hover {
+    background: rgba(56, 189, 248, 0.30);
+    border-color: rgba(125, 211, 252, 0.65);
+  }
+  .scan-btn--qr i { color: #BAE6FD; }
+
   @media (max-width: 1100px) {
     .scan-btn-text { display: none; }
-    .scan-btn { padding: 7px 9px; }
+    .scan-btn { padding: 6px 8px; }
   }
 
   /* Фуллскрин-оверлей сканера QR */
@@ -13678,14 +13702,14 @@
         </button>
       </nav>
     </div>
-    <button class="scan-btn" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную">
+    <button class="scan-btn scan-btn--camera" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную">
       <i class="ti ti-camera"></i>
-      <span class="scan-btn-text">Снять</span>
+      <span class="scan-btn-text">Фото УПД</span>
     </button>
     <input type="file" id="si-camera-direct-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleCameraDirect(event)">
-    <button class="scan-btn" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
+    <button class="scan-btn scan-btn--qr" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
-      <span class="scan-btn-text">Скан</span>
+      <span class="scan-btn-text">QR-скан</span>
     </button>
     <!-- v2.42.5: уведомления -->
     <button class="notif-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Уведомления">
@@ -16046,8 +16070,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.67-contract-calendar-days";
-const APP_VERSION_DATE = "27.05.2026";
+const APP_VERSION = "v2.43.68-header-btns";
+const APP_VERSION_DATE = "28.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -39039,6 +39063,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.68',
+    date: '28.05.2026',
+    title: 'Кнопки «Фото УПД» и «QR-скан» в шапке',
+    features: [
+      'Кнопки в шапке стали <b>информативнее</b>: «Снять» → <b>«Фото УПД»</b>, «Скан» → <b>«QR-скан»</b>. Сразу понятно, что делает каждая',
+      'Кнопки <b>чуть компактнее</b>: меньше отступы и шрифт — не теснят навигацию',
+      '<b>Цветовые акценты</b>: «Фото УПД» — зелёный оттенок, «QR-скан» — голубой. Различаются с одного взгляда',
+    ],
+  },
   {
     version: 'v2.43.67',
     date: '28.05.2026',
