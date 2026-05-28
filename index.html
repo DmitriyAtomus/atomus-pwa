@@ -18794,10 +18794,13 @@ function closeProductionWorkDetail() {
 async function showProductionWorkQr(workId) {
   try {
     const w = await apiGet('/api/production/works/' + workId);
-    const aid = w.assembly_id || w.linked_assembly_id;
+    let aid = w.assembly_id || w.linked_assembly_id;
     if (!aid) {
-      showToast('У этой работы пока нет связанной сборки — QR появится после первой записи о сборке.', 'warn');
-      return;
+      // Создаём связанную запись сборки на лету (status='in_progress' — на склад не пойдёт).
+      const r = await apiPost('/api/production/works/' + workId + '/ensure-assembly', {});
+      aid = r && r.assembly_id;
+      if (!aid) throw new Error('ensure-assembly не вернул id');
+      if (r.created) showToast('Запись сборки создана — теперь у работы есть QR', 'info');
     }
     showAssemblyQr(aid, w.model_name || '', w.model_article || '', w.linked_assembly_date || w.finished_at || w.started_at || '');
   } catch (e) {
