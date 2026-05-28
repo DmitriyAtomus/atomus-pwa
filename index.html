@@ -14231,6 +14231,7 @@
         <div class="content-inner">
           <div class="filter-row" id="summary-filters">
             <button class="filter-chip" data-sf="day">День</button>
+            <button class="filter-chip" data-sf="yesterday">Вчера</button>
             <button class="filter-chip" data-sf="week">Неделя</button>
             <button class="filter-chip active" data-sf="month">Месяц</button>
             <button class="filter-chip" data-sf="prev_month">Прошлый</button>
@@ -20366,12 +20367,29 @@ function _summaryDateRange() {
   const y = today.getFullYear(); const mo = today.getMonth(); const d = today.getDate();
   let f, t;
   if (period === 'day')             { f = new Date(y, mo, d);     t = new Date(y, mo, d); }
+  else if (period === 'yesterday')  { f = new Date(y, mo, d - 1); t = new Date(y, mo, d - 1); }
   else if (period === 'week')       { f = new Date(y, mo, d - 6); t = new Date(y, mo, d); }
   else if (period === 'month')      { f = new Date(y, mo, 1);     t = new Date(y, mo + 1, 0); }
   else if (period === 'prev_month') { f = new Date(y, mo - 1, 1); t = new Date(y, mo, 0); }
   else                              { f = new Date(y, mo - 1, d); t = new Date(y, mo, d); }
   const toIso = (dt) => dt.toISOString().slice(0, 10);
   return { from: toIso(f), to: toIso(t) };
+}
+
+function summaryPeriodLabel() {
+  const period = state.summaryFilter || 'month';
+  if (period === 'day') return 'Сегодня';
+  if (period === 'yesterday') return 'Вчера';
+  if (period === 'week') return 'Последние 7 дней';
+  if (period === 'month') return 'Текущий месяц';
+  if (period === 'prev_month') return 'Прошлый месяц';
+  if (period === 'custom' && state.summaryCustomFrom && state.summaryCustomTo) {
+    if (state.summaryCustomFrom === state.summaryCustomTo) {
+      return 'За ' + formatDateShort(state.summaryCustomFrom);
+    }
+    return 'С ' + formatDateShort(state.summaryCustomFrom) + ' по ' + formatDateShort(state.summaryCustomTo);
+  }
+  return '';
 }
 
 // ЭТАП 31.9: быстрое скачивание отчёта Сводок за активный период
@@ -20753,10 +20771,10 @@ async function doExportAssemblies() {
 async function loadSummary() {
   const period = state.summaryFilter;
   const empId = state.summaryEmployeeFilter;
-  // v2.43.43: произвольный период
-  const isCustom = period === 'custom' && state.summaryCustomFrom && state.summaryCustomTo;
+  // v2.43.43: произвольный период или отдельная кнопка "Вчера"
+  const isCustom = period === 'custom' || period === 'yesterday';
   const cacheKey = (isCustom
-    ? ('custom:' + state.summaryCustomFrom + '-' + state.summaryCustomTo)
+    ? ('custom:' + _summaryDateRange().from + '-' + _summaryDateRange().to)
     : period) + '|' + (empId || 'all');
   const container = document.getElementById('summary-content');
   if (cache.summary[cacheKey]) { renderSummary(cache.summary[cacheKey]); return; }
@@ -20764,8 +20782,9 @@ async function loadSummary() {
   try {
     let url;
     if (isCustom) {
-      url = '/api/summary?from=' + encodeURIComponent(state.summaryCustomFrom) +
-            '&to=' + encodeURIComponent(state.summaryCustomTo);
+      const { from, to } = _summaryDateRange();
+      url = '/api/summary?from=' + encodeURIComponent(from) +
+            '&to=' + encodeURIComponent(to);
     } else {
       url = '/api/summary?period=' + period;
     }
@@ -20806,10 +20825,16 @@ function renderSummary(d) {
   let html = '';
 
   // Бейдж активного фильтра — над KPI
-  if (selectedName) {
-    html += '<div style="padding:0 18px 8px;">' +
-      '<span class="summary-filter-badge"><i class="ti ti-filter"></i>Сводка по: ' +
-      escapeHtml(selectedName) + '</span></div>';
+  const periodLabel = summaryPeriodLabel();
+  if (periodLabel || selectedName) {
+    html += '<div style="padding:0 18px 8px;display:flex;flex-wrap:wrap;gap:8px;">';
+    if (periodLabel) {
+      html += '<span class="summary-filter-badge"><i class="ti ti-calendar-event"></i>' + escapeHtml(periodLabel) + '</span>';
+    }
+    if (selectedName) {
+      html += '<span class="summary-filter-badge"><i class="ti ti-filter"></i>Сводка по: ' + escapeHtml(selectedName) + '</span>';
+    }
+    html += '</div>';
   }
 
   html += '<div class="kpi-grid">';
