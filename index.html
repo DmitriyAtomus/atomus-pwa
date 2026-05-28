@@ -3282,8 +3282,10 @@
   .calc-tab i { font-size: 14px; }
   .calc-tab.active {
     background: white; color: var(--brand);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    font-weight: 600;
   }
+  .calc-tab:active { transform: scale(0.97); }
 
   /* Калькулятор: математика — кнопочки */
   .calc-display {
@@ -3308,22 +3310,28 @@
   .calc-keys {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+    gap: 8px;
   }
   .calc-key {
-    background: var(--bg); color: var(--text-dark);
-    border: none; border-radius: 8px;
-    padding: 14px 0;
-    font-size: 16px; font-weight: 500;
+    background: #F3F5F9; color: var(--text-dark);
+    border: 1px solid #E5E9F0; border-radius: 12px;
+    padding: 16px 0;
+    font-size: 18px; font-weight: 600;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: transform 0.08s, box-shadow 0.12s, background 0.12s;
   }
-  .calc-key:hover { background: #E1E5EE; }
-  .calc-key.op { background: var(--brand-bg); color: var(--brand); font-weight: 600; }
+  .calc-key:hover { background: #E9EDF4; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .calc-key:active { transform: scale(0.95); }
+  .calc-key.op { background: var(--brand-bg); color: var(--brand); font-weight: 700; border-color: #C7DBF0; }
   .calc-key.op:hover { background: #D8E5F1; }
-  .calc-key.eq { background: var(--brand); color: white; font-weight: 600; }
-  .calc-key.eq:hover { background: var(--brand-light); }
-  .calc-key.clear { background: #FEE5E5; color: var(--danger); }
+  .calc-key.eq {
+    background: linear-gradient(135deg, var(--brand), var(--brand-light));
+    color: white; font-weight: 700; border: none;
+    box-shadow: 0 2px 8px rgba(44,82,130,0.25);
+  }
+  .calc-key.eq:hover { box-shadow: 0 3px 12px rgba(44,82,130,0.35); }
+  .calc-key.clear { background: #FEE5E5; color: var(--danger); border-color: #F8C9C9; }
+  .calc-key.clear:hover { background: #FCD6D6; }
 
   /* НДС калькулятор */
   .calc-vat-row {
@@ -3403,20 +3411,24 @@
   }
   .calc-fx-cell input {
     flex: 1; min-width: 0;
-    border-radius: 8px 0 0 8px;
+    border-radius: 10px 0 0 10px;
+    border: 1.5px solid var(--border-strong);
     border-right: none;
-    font-size: 16px; font-weight: 500;
+    font-size: 17px; font-weight: 600;
     text-align: right;
-    padding: 0 10px;
+    padding: 10px 12px;
     font-variant-numeric: tabular-nums;
   }
   .calc-fx-cell select {
-    flex: 0 0 64px;
-    border-radius: 0 8px 8px 0;
+    flex: 0 0 74px;
+    border-radius: 0 10px 10px 0;
+    border: 1.5px solid var(--border-strong);
     border-left: none;
-    background: var(--bg);
-    font-size: 13px; font-weight: 500;
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 14px; font-weight: 700;
     text-align: center;
+    cursor: pointer;
   }
   .calc-fx-arrow {
     display: flex; align-items: center; justify-content: center;
@@ -3436,6 +3448,19 @@
     transform: rotate(90deg);
     padding-top: 0;
     padding: 4px 0;
+  }
+  /* v2.43.63: модалка калькулятора живёт в body (вне .app), поэтому правила выше не действуют.
+     Внутри модалки валюты ВСЕГДА вертикально — чтобы не растягивалось. */
+  .calc-modal-inner .calc-fx-row {
+    grid-template-columns: 1fr;
+  }
+  .calc-modal-inner .calc-fx-arrow {
+    transform: rotate(90deg);
+    padding: 4px 0;
+  }
+  @media (max-width: 720px) {
+    .calc-fx-row { grid-template-columns: 1fr; }
+    .calc-fx-arrow { transform: rotate(90deg); padding: 4px 0; }
   }
 
   /* KPI секция «Сегодня» */
@@ -9743,8 +9768,7 @@
   }
   .app.mobile-layout .hamburger-btn:active { background: rgba(255, 255, 255, 0.28); }
   .app.mobile-layout .hamburger-btn i { font-size: 22px; }
-  /* Скрыт когда раздел home (drawer не нужен) */
-  .app.mobile-layout[data-section="home"] .hamburger-btn { display: none; }
+  /* v2.43.63: на home гамбургер теперь ТОЖЕ показан — открывает сайдбар с Сервисами (калькулятор) */
   /* Скрыт на десктопе */
   .app.desktop-layout .hamburger-btn { display: none; }
 
@@ -13566,10 +13590,6 @@
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">Скан</span>
     </button>
-    <!-- v2.43.62: калькулятор в шапке — показываем ТОЛЬКО на мобильной (на десктопе он в сайдбаре) -->
-    <button class="notif-btn calc-mobile-btn" id="calc-mobile-btn" onclick="openCalculatorModal()" title="Калькулятор">
-      <i class="ti ti-calculator"></i>
-    </button>
     <!-- v2.42.5: уведомления -->
     <button class="notif-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Уведомления">
       <i class="ti ti-bell"></i>
@@ -15929,7 +15949,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.62-mobile-calc-and-kpi";
+const APP_VERSION = "v2.43.63-calc-polish-and-hamburger";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38817,6 +38837,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.63',
+    date: '28.05.2026',
+    title: 'Калькулятор — полировка + меню на Главной',
+    features: [
+      '<b>Кнопка с тремя полосками</b> (☰) теперь есть и на Главной мобильной — открывает боковое меню с разделом «Сервисы» (там калькулятор)',
+      'Калькулятор убран из верхней панели мобильной — теперь только через меню',
+      '<b>Режим «Валюты»</b> больше не растягивается — поля идут вертикально: сумма → стрелка → результат',
+      '<b>Кнопки калькулятора стали симпатичнее:</b> скруглённые, с тенями, «=» с градиентом, нажатие с анимацией',
+      'Селекты валют округлены и выделены фирменным цветом',
+    ],
+  },
   {
     version: 'v2.43.62',
     date: '28.05.2026',
