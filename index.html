@@ -11556,11 +11556,15 @@
   .pkb-section-actions {
     display: flex; gap: 8px; flex-shrink: 0;
   }
-  /* v2.43.66: на мобильной — ровная сетка 2 колонки. «Новая работа» (primary) на всю ширину. */
+  /* v2.43.66: на мобильной — ровная сетка 2 колонки. «Новая работа» (primary) на всю ширину.
+     v2.43.72: разрешаем перенос строк и автовысоту, иначе длинные подписи
+     («Синхронизировать», «План недели») обрезаются ellipsis-ом. */
   @media (max-width: 720px) {
+    .pkb-section-header { flex-direction: column; padding: 14px 14px 10px; }
     .pkb-section-actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
+      width: 100%;
       max-width: 100%;
       gap: 8px;
       flex-shrink: 1;
@@ -11568,13 +11572,25 @@
     .pkb-section-actions .pkb-btn {
       width: 100%;
       min-width: 0;
-      white-space: nowrap;
+      height: auto;
+      min-height: 42px;
+      padding: 6px 8px;
+      font-size: 12.5px;
+      line-height: 1.15;
+      white-space: normal;
+      word-break: break-word;
+      text-align: center;
       justify-content: center;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+    .pkb-section-actions .pkb-btn .ti {
+      font-size: 15px;
+      flex-shrink: 0;
     }
     .pkb-section-actions .pkb-btn.primary {
       grid-column: 1 / -1; /* Новая работа — на всю ширину */
+      min-height: 46px;
+      font-size: 14px;
+      font-weight: 600;
     }
   }
   .pkb-btn {
