@@ -3181,6 +3181,14 @@
   }
 
   /* Калькулятор */
+  /* v2.43.60: калькулятор в модалке поверх окна */
+  .calc-modal-inner {
+    max-width: 420px;
+    width: 100%;
+  }
+  @media (max-width: 720px) {
+    .calc-modal-inner { max-width: 100%; }
+  }
   .calc-widget {
     background: white; border: 1px solid var(--border);
     border-radius: 12px; overflow: hidden;
@@ -13520,6 +13528,10 @@
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">Скан</span>
     </button>
+    <!-- v2.43.60: калькулятор — модалка поверх окна -->
+    <button class="notif-btn" id="calc-btn" onclick="openCalculatorModal()" title="Калькулятор">
+      <i class="ti ti-calculator"></i>
+    </button>
     <!-- v2.42.5: уведомления -->
     <button class="notif-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Уведомления">
       <i class="ti ti-bell"></i>
@@ -15876,7 +15888,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.59-autogen-on-item-add";
+const APP_VERSION = "v2.43.60-calc-modal";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25341,14 +25353,7 @@ function renderHomeSkeleton() {
     html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   }
 
-  // Калькулятор
-  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-calculator"></i>Инструменты</div>';
-  html += '<div id="home-calc-block"></div>';
-
   container.innerHTML = html;
-
-  // Рендер калькулятора (он не зависит от сети)
-  renderCalculator();
 
   // ЭТАП 25.0: рендер новых мобильных блоков
   renderQuickActions25();
@@ -25804,17 +25809,21 @@ function formatCbrDate(iso) {
 
 // ---------- Калькулятор ----------
 
-function renderCalculator() {
-  const el = document.getElementById('home-calc-block');
-  if (!el) return;
-  const expanded = state.calcExpanded ? '1' : '0';
-  let html = '<div class="calc-widget" data-expanded="' + expanded + '" id="calc-widget">';
-  html += '<div class="calc-head" onclick="toggleCalculator()">';
-  html += '<i class="ti ti-calculator"></i>';
-  html += '<div class="calc-title">Калькулятор</div>';
-  html += '<i class="ti ti-chevron-down calc-chevron"></i>';
+// v2.43.60: калькулятор открывается модалкой поверх окна (десктоп и мобильная)
+function openCalculatorModal() {
+  let modal = document.getElementById('calc-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'calc-modal';
+  modal.className = 'modal-overlay visible';
+  modal.onclick = (e) => { if (e.target === modal) closeCalculatorModal(); };
+
+  let html = '<div class="modal calc-modal-inner" onclick="event.stopPropagation()">';
+  html += '<div class="modal-header">';
+  html += '<h3><i class="ti ti-calculator"></i> Калькулятор</h3>';
+  html += '<button class="icon-btn" onclick="closeCalculatorModal()"><i class="ti ti-x"></i></button>';
   html += '</div>';
-  html += '<div class="calc-body">';
+  html += '<div class="modal-body" style="padding:14px 16px 18px;">';
   // Tabs
   html += '<div class="calc-tabs">';
   [['math','ti-math-symbols','Математика'],
@@ -25824,27 +25833,36 @@ function renderCalculator() {
             '<i class="ti ' + icon + '"></i>' + label + '</button>';
   });
   html += '</div>';
-  // Тело
   html += '<div id="calc-tab-content">' + renderCalcTabContent() + '</div>';
   html += '</div></div>';
-  el.innerHTML = html;
-  // Подвязка обработчиков
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
   bindCalcHandlers();
 }
 
+function closeCalculatorModal() {
+  const modal = document.getElementById('calc-modal');
+  if (modal) modal.remove();
+}
+
+// Совместимость: старый вызов renderCalculator больше ничего не делает на главной
+function renderCalculator() {
+  const el = document.getElementById('home-calc-block');
+  if (!el) return; // блок убран с главной в v2.43.60
+}
+
 function toggleCalculator() {
-  state.calcExpanded = !state.calcExpanded;
-  const w = document.getElementById('calc-widget');
-  if (w) w.setAttribute('data-expanded', state.calcExpanded ? '1' : '0');
+  // Старое поведение (inline) больше не используется — открываем модалку
+  openCalculatorModal();
 }
 
 function setCalcMode(mode) {
   state.calc.mode = mode;
   const inner = document.getElementById('calc-tab-content');
   if (inner) inner.innerHTML = renderCalcTabContent();
-  // Обновим active в табах
-  document.querySelectorAll('#calc-widget .calc-tab').forEach(t => t.classList.remove('active'));
-  const activeTab = document.querySelector('#calc-widget .calc-tab[onclick*="\'' + mode + '\'"]');
+  // Обновим active в табах (теперь в модалке)
+  document.querySelectorAll('#calc-modal .calc-tab, #calc-widget .calc-tab').forEach(t => t.classList.remove('active'));
+  const activeTab = document.querySelector('#calc-modal .calc-tab[onclick*="\'' + mode + '\'"], #calc-widget .calc-tab[onclick*="\'' + mode + '\'"]');
   if (activeTab) activeTab.classList.add('active');
   bindCalcHandlers();
 }
@@ -38758,6 +38776,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.60',
+    date: '28.05.2026',
+    title: 'Калькулятор — в шапку',
+    features: [
+      'Калькулятор убран из блока «Инструменты» на Главной',
+      'Теперь иконка <i class="ti ti-calculator"></i> в <b>верхней панели</b> рядом с колокольчиком — открывается модалкой поверх окна',
+      'Работает и на десктопе, и на мобильной',
+      'Все три режима на месте: Математика · НДС · Валюты',
+    ],
+  },
   {
     version: 'v2.43.59',
     date: '27.05.2026',
