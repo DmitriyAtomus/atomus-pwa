@@ -3339,36 +3339,40 @@
   }
   .calc-vat-row .calc-mode-btn {
     flex: 1;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: var(--bg); color: var(--text-mid);
-    border: 1.5px solid transparent;
-    font-size: 12px; font-weight: 500;
+    padding: 10px 10px;
+    border-radius: 10px;
+    background: #F3F5F9; color: var(--text-mid);
+    border: 1.5px solid #E5E9F0;
+    font-size: 12.5px; font-weight: 600;
     cursor: pointer;
     text-align: center;
+    transition: all 0.12s;
   }
+  .calc-vat-row .calc-mode-btn:active { transform: scale(0.97); }
   .calc-vat-row .calc-mode-btn.active {
     background: var(--brand-bg); color: var(--brand); border-color: var(--brand);
+    box-shadow: 0 1px 4px rgba(44,82,130,0.12);
   }
   .calc-input-row {
     display: flex; align-items: stretch;
     margin-bottom: 12px;
   }
   .calc-input-row input {
-    flex: 1; border-radius: 8px 0 0 8px;
+    flex: 1; border-radius: 10px 0 0 10px;
+    border: 1.5px solid var(--border-strong);
     border-right: none;
-    font-size: 16px; font-weight: 500;
+    font-size: 17px; font-weight: 600;
     text-align: right;
-    padding: 0 12px;
+    padding: 10px 12px;
     font-variant-numeric: tabular-nums;
   }
   .calc-input-row .calc-suffix {
-    padding: 0 14px; display: flex; align-items: center;
-    background: var(--bg);
-    border: 1px solid var(--border); border-left: none;
-    border-radius: 0 8px 8px 0;
-    font-size: 13px; color: var(--text-mid);
-    font-weight: 500;
+    padding: 0 16px; display: flex; align-items: center;
+    background: var(--brand-bg);
+    border: 1.5px solid var(--border-strong); border-left: none;
+    border-radius: 0 10px 10px 0;
+    font-size: 15px; color: var(--brand);
+    font-weight: 700;
   }
   .calc-result {
     background: var(--bg); border-radius: 8px;
@@ -11439,20 +11443,19 @@
   .pkb-section-actions {
     display: flex; gap: 8px; flex-shrink: 0;
   }
-  /* v2.43.53: на мобильной — горизонтальный скролл вместо обрезки */
+  /* v2.43.64: на мобильной — кнопки переносятся на новые строки (раньше был неудобный горизонтальный скролл) */
   @media (max-width: 720px) {
     .pkb-section-actions {
-      overflow-x: auto;
-      overflow-y: hidden;
+      flex-wrap: wrap;
       max-width: 100%;
-      flex-wrap: nowrap;
-      padding-bottom: 2px;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
+      gap: 6px;
     }
-    .pkb-section-actions::-webkit-scrollbar { height: 4px; }
-    .pkb-section-actions::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
-    .pkb-section-actions .pkb-btn { flex-shrink: 0; white-space: nowrap; }
+    .pkb-section-actions .pkb-btn {
+      flex: 1 1 auto;
+      min-width: calc(50% - 3px);
+      white-space: nowrap;
+      justify-content: center;
+    }
   }
   .pkb-btn {
     height: 36px; padding: 0 14px;
@@ -15949,7 +15952,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.63-calc-polish-and-hamburger";
+const APP_VERSION = "v2.43.64-calc-keyboard-vat-btns";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25899,11 +25902,40 @@ function openCalculatorModal() {
   modal.innerHTML = html;
   document.body.appendChild(modal);
   bindCalcHandlers();
+  // v2.43.64: ввод с физической клавиатуры (десктоп)
+  _calcKeydownHandler = (e) => _handleCalcKeydown(e);
+  document.addEventListener('keydown', _calcKeydownHandler);
 }
 
 function closeCalculatorModal() {
   const modal = document.getElementById('calc-modal');
   if (modal) modal.remove();
+  // v2.43.64: снять обработчик клавиатуры
+  if (_calcKeydownHandler) {
+    document.removeEventListener('keydown', _calcKeydownHandler);
+    _calcKeydownHandler = null;
+  }
+}
+
+// v2.43.64: обработка нажатий физической клавиатуры в калькуляторе
+let _calcKeydownHandler = null;
+function _handleCalcKeydown(e) {
+  if (!document.getElementById('calc-modal')) return;
+  // Escape — закрыть всегда
+  if (e.key === 'Escape') { e.preventDefault(); closeCalculatorModal(); return; }
+  // В режимах НДС/валюты фокус в input — нативный ввод, не перехватываем (кроме Escape)
+  if (state.calc.mode !== 'math') return;
+  const k = e.key;
+  if (k >= '0' && k <= '9') { e.preventDefault(); digitMath(k); }
+  else if (k === '.' || k === ',') { e.preventDefault(); dotMath(); }
+  else if (k === '+') { e.preventDefault(); opMath('+'); }
+  else if (k === '-') { e.preventDefault(); opMath('-'); }
+  else if (k === '*') { e.preventDefault(); opMath('*'); }
+  else if (k === '/') { e.preventDefault(); opMath('/'); }
+  else if (k === '%') { e.preventDefault(); percentMath(); }
+  else if (k === 'Enter' || k === '=') { e.preventDefault(); equalsMath(); }
+  else if (k === 'Backspace') { e.preventDefault(); backMath(); }
+  else if (k === 'c' || k === 'C' || k === 'Delete') { e.preventDefault(); clearMath(); }
 }
 
 // Совместимость: старый вызов renderCalculator больше ничего не делает на главной
@@ -38837,6 +38869,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.64',
+    date: '28.05.2026',
+    title: 'Калькулятор — клавиатура и НДС',
+    features: [
+      '<b>На компе калькулятор принимает ввод с клавиатуры:</b> цифры, + − × ÷, Enter (=), Backspace (⌫), Esc (закрыть), точка/запятая, C (сброс)',
+      'Режим <b>НДС</b> приведён в порядок: кнопки «Из суммы без НДС / с НДС» крупнее и аккуратнее, поле ввода и значок ₽ выразительнее',
+      'В <b>мобильной</b> кнопки в шапке Производства (План недели · Аналитика · AI-анализ · Синхронизировать) больше не надо листать вбок — они переносятся на строки',
+    ],
+  },
   {
     version: 'v2.43.63',
     date: '28.05.2026',
