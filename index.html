@@ -6121,6 +6121,30 @@
     margin-top: 4px;
     font-style: italic;
   }
+  /* v2.43.67: переключатель рабочие/календарные дни */
+  .ship-days-type {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .ship-days-type-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #F3F5F9;
+    color: var(--text-mid);
+    border: 1.5px solid #E5E9F0;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .ship-days-type-btn:active { transform: scale(0.97); }
+  .ship-days-type-btn.active {
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-color: var(--brand);
+  }
 
   /* Предпросмотр автосписания в форме сборки */
   .bom-preview-block {
@@ -16022,7 +16046,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.66-pkb-btns-and-cal-day";
+const APP_VERSION = "v2.43.67-contract-calendar-days";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -39016,6 +39040,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.43.67',
+    date: '28.05.2026',
+    title: 'Договор — рабочие или календарные дни',
+    features: [
+      'В сроке отгрузки договора теперь можно выбрать <b>«Рабочие дни» или «Календарные дни»</b>',
+      '<b>Рабочие</b> — выходные пропускаются (как раньше). <b>Календарные</b> — считаются подряд, включая выходные',
+      'Что ввёл — то и дата отгрузки: система сразу пересчитывает дату от даты оплаты (или подписания)',
+    ],
+  },
+  {
     version: 'v2.43.66',
     date: '28.05.2026',
     title: 'Кнопки производства + дни календаря',
@@ -40650,6 +40684,7 @@ function openNewContract() {
     delivery_address: '', manager_id: null, comment: '',
     payment_date: '',  // ЭТАП 37
     working_days: null, _delivery_manual: false,  // ЭТАП 36.3
+    days_type: 'working',  // v2.43.67: 'working' (рабочие) | 'calendar' (календарные)
   };
   selectSidebarItem('sales-contract-form');
 }
@@ -40804,17 +40839,21 @@ function renderContractForm() {
 
   // Срок отгрузки
   html += '<div class="sales-form-row cols-1">';
-  // ЭТАП 36.3: калькулятор срока отгрузки
+  // ЭТАП 36.3: калькулятор срока отгрузки. v2.43.67: + выбор рабочие/календарные дни
+  const daysType = f.days_type || 'working';
   html += '<div><label>Срок отгрузки</label>' +
           '<div class="ship-calc-row">' +
             '<input type="date" id="scf-delivery-date" value="' + escapeHtml(f.delivery_date) + '">' +
             '<div class="ship-calc-mini">' +
               '<input type="number" id="scf-working-days" placeholder="дни" min="1" max="365" value="' +
-                (f.working_days || '') + '" title="Рабочих дней изготовления">' +
-              '<span class="ship-calc-label">раб. дн.</span>' +
+                (f.working_days || '') + '" title="Срок изготовления в днях">' +
             '</div>' +
           '</div>' +
-          '<div class="ship-calc-hint" id="scf-ship-hint">Введи рабочих дней — дата отгрузки посчитается автоматически</div>' +
+          '<div class="ship-days-type">' +
+            '<button type="button" class="ship-days-type-btn' + (daysType === 'working' ? ' active' : '') + '" onclick="setContractDaysType(\'working\')">Рабочие дни</button>' +
+            '<button type="button" class="ship-days-type-btn' + (daysType === 'calendar' ? ' active' : '') + '" onclick="setContractDaysType(\'calendar\')">Календарные дни</button>' +
+          '</div>' +
+          '<div class="ship-calc-hint" id="scf-ship-hint">Введи количество дней — дата отгрузки посчитается автоматически</div>' +
         '</div>';
   html += '</div>';
 
@@ -40907,18 +40946,26 @@ function _recalcShipDate() {
   const signStr = state.contractForm.sign_date;
   const payStr = state.contractForm.payment_date;
   const days = parseInt(state.contractForm.working_days) || 0;
+  const daysType = state.contractForm.days_type || 'working';
   const hint = document.getElementById('scf-ship-hint');
   const input = document.getElementById('scf-delivery-date');
   // ЭТАП 37: база отсчёта = дата оплаты, если есть; иначе — подписания (с пометкой «прогноз»)
   const baseStr = payStr || signStr;
   const isForecast = !payStr;  // прогноз, пока оплата не получена
   if (!baseStr || !days) {
-    if (hint) hint.textContent = 'Введи рабочих дней — дата отгрузки посчитается автоматически';
+    if (hint) hint.textContent = 'Введи количество дней — дата отгрузки посчитается автоматически';
     return;
   }
   const baseDate = new Date(baseStr + 'T00:00:00');
   if (isNaN(baseDate)) return;
-  const shipDate = _addWorkingDaysRu(baseDate, days);
+  // v2.43.67: рабочие или календарные дни
+  let shipDate;
+  if (daysType === 'calendar') {
+    shipDate = new Date(baseDate);
+    shipDate.setDate(shipDate.getDate() + days);
+  } else {
+    shipDate = _addWorkingDaysRu(baseDate, days);
+  }
   const yyyy = shipDate.getFullYear();
   const mm = String(shipDate.getMonth() + 1).padStart(2, '0');
   const dd = String(shipDate.getDate()).padStart(2, '0');
@@ -40927,12 +40974,30 @@ function _recalcShipDate() {
   state.contractForm.delivery_date = iso;
   if (hint) {
     const dStr = dd + '.' + mm + '.' + yyyy;
+    const unitLabel = daysType === 'calendar' ? 'кал. дн.' : 'раб. дн.';
+    const fromLabel = isForecast ? 'от подписания' : 'от оплаты';
     if (isForecast) {
-      hint.textContent = '+' + days + ' раб. дн. от подписания → ' + dStr + ' (прогноз, уточнится после оплаты)';
+      hint.textContent = '+' + days + ' ' + unitLabel + ' ' + fromLabel + ' → ' + dStr + ' (прогноз, уточнится после оплаты)';
     } else {
-      hint.textContent = '+' + days + ' раб. дн. от оплаты → ' + dStr;
+      hint.textContent = '+' + days + ' ' + unitLabel + ' ' + fromLabel + ' → ' + dStr;
     }
   }
+}
+
+// v2.43.67: переключение рабочие/календарные дни
+function setContractDaysType(t) {
+  state.contractForm.days_type = t;
+  state.contractForm._delivery_manual = false; // снова авторасчёт
+  // Обновляем кнопки без полной перерисовки формы
+  document.querySelectorAll('.ship-days-type-btn').forEach(b => b.classList.remove('active'));
+  const btns = document.querySelectorAll('.ship-days-type-btn');
+  btns.forEach(b => {
+    if ((t === 'working' && b.textContent.includes('Рабоч')) ||
+        (t === 'calendar' && b.textContent.includes('Календар'))) {
+      b.classList.add('active');
+    }
+  });
+  _recalcShipDate();
 }
 
 function setContractType(t) {
