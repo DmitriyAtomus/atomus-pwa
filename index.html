@@ -320,18 +320,19 @@
   .section-switcher-wrap.fade-left::before { opacity: 1; }
   .section-switcher-wrap.fade-right::after { opacity: 1; }
   .section-tab {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border: 1px solid transparent;
     background: transparent;
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 13px; font-weight: 600;
-    cursor: pointer; border-radius: 9px;
-    display: flex; align-items: center; gap: 6px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; border-radius: 8px;
+    display: flex; align-items: center; gap: 4px;
     white-space: nowrap;
+    line-height: 1.2;
     transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
     flex-shrink: 0;
   }
-  .section-tab i { font-size: 17px; }
+  .section-tab i { font-size: 16px; }
   .section-tab:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.25);
@@ -7423,13 +7424,13 @@
     background: rgba(255, 255, 255, 0.14);
     border: 1px solid rgba(255, 255, 255, 0.22);
     color: white;
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 12px;
+    gap: 4px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.2px;
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
@@ -13670,34 +13671,34 @@
     </div>
     <div class="section-switcher-wrap" id="section-switcher-wrap">
       <nav class="section-switcher" id="section-switcher">
-        <button class="section-tab active" data-section="home">
+        <button class="section-tab active" data-section="home" title="Перейти на главную страницу">
           <i class="ti ti-home"></i>Главная
         </button>
-        <button class="section-tab" data-section="production">
+        <button class="section-tab" data-section="production" title="Открыть производство">
           <i class="ti ti-tool"></i>Производство
         </button>
-        <button class="section-tab" data-section="sales">
+        <button class="section-tab" data-section="sales" title="Открыть продажи и договоры">
           <i class="ti ti-briefcase"></i>Продажи
         </button>
-        <button class="section-tab" data-section="tasks">
+        <button class="section-tab" data-section="tasks" title="Открыть задачи и рабочие поручения">
           <i class="ti ti-checklist"></i>Задачи
         </button>
-        <button class="section-tab" data-section="warehouse">
+        <button class="section-tab" data-section="warehouse" title="Открыть складские операции">
           <i class="ti ti-building-warehouse"></i>Склад
         </button>
-        <button class="section-tab" data-section="logistics">
+        <button class="section-tab" data-section="logistics" title="Открыть логистику (скоро)">
           <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
         </button>
-        <button class="section-tab" data-section="supply">
+        <button class="section-tab" data-section="supply" title="Открыть снабжение">
           <i class="ti ti-shopping-cart"></i>Снабжение
         </button>
-        <button class="section-tab" data-section="defects">
+        <button class="section-tab" data-section="defects" title="Открыть сервис и доработки">
           <i class="ti ti-alert-circle"></i>Сервис
         </button>
-        <button class="section-tab" data-section="hr">
+        <button class="section-tab" data-section="hr" title="Открыть кадровый раздел">
           <i class="ti ti-id-badge"></i>Кадры
         </button>
-        <button class="section-tab" data-section="help">
+        <button class="section-tab" data-section="help" title="Открыть справку">
           <i class="ti ti-help-circle"></i>Помощь
         </button>
       </nav>
