@@ -18804,6 +18804,14 @@ function renderProductionWorkDetail(w) {
   html += '<div class="modal-header">';
   html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + '</h3>';
   html +=   '<span class="pkb-status-chip ' + statusCls + '">' + escapeHtml(statusLabel) + '</span>';
+  // v2.43.70: QR-код сборки прямо из карточки работы — нужен на упаковке/проверке,
+  // когда изделие физически готово, а до страницы «Сборки» идти неудобно.
+  if (w.assembly_id) {
+    const qrModelName = JSON.stringify(w.model_name || '').replace(/"/g, '&quot;');
+    const qrArticle   = JSON.stringify(w.model_article || '').replace(/"/g, '&quot;');
+    const qrDate      = JSON.stringify(w.linked_assembly_date || w.finished_at || w.started_at || '').replace(/"/g, '&quot;');
+    html += '<button class="btn-icon-qr" style="margin-right:6px;" onclick="showAssemblyQr(' + w.assembly_id + ', ' + qrModelName + ', ' + qrArticle + ', ' + qrDate + ')" title="QR-код сборки"><i class="ti ti-qrcode"></i> QR</button>';
+  }
   html +=   '<button class="icon-btn" onclick="closeProductionWorkDetail()"><i class="ti ti-x"></i></button>';
   html += '</div>';
   html += '<div class="modal-body">';
