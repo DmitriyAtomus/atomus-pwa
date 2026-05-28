@@ -4484,6 +4484,50 @@
     font-variant-numeric: tabular-nums;
   }
   .bigcal-day.is-weekend .bigcal-day-num { color: var(--danger); }
+  /* v2.43.66: день с событиями кликабелен */
+  .bigcal-day.has-events { cursor: pointer; }
+  .bigcal-day.has-events:hover { border-color: var(--brand); }
+  /* v2.43.66: точки-индикаторы (видны на мобильной, скрыты на десктопе) */
+  .bigcal-dots { display: none; gap: 3px; margin-top: 3px; flex-wrap: wrap; }
+  .bigcal-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    display: inline-block;
+  }
+  .bigcal-dot.ev-task     { background: #F59E0B; }
+  .bigcal-dot.ev-shipment { background: #3B82F6; }
+  .bigcal-dot.ev-supply   { background: #15803D; }
+  .bigcal-dot.ev-vacation { background: #9333EA; }
+  @media (max-width: 720px) {
+    /* На мобильной — точки вместо текста (текст не помещается) */
+    .bigcal-events-text { display: none; }
+    .bigcal-dots { display: flex; justify-content: center; }
+  }
+  /* v2.43.66: элементы карточки дня */
+  .cal-day-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: white;
+  }
+  .cal-day-item[onclick] { cursor: pointer; transition: all 0.12s; }
+  .cal-day-item[onclick]:hover { border-color: var(--brand); background: var(--bg); }
+  .cal-day-item-icon {
+    width: 38px; height: 38px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .cal-day-item.ev-task     .cal-day-item-icon { background: #FFF4E6; color: #B25E00; }
+  .cal-day-item.ev-shipment .cal-day-item-icon { background: #DCEEFF; color: #1C5BA5; }
+  .cal-day-item.ev-supply   .cal-day-item-icon { background: #E8F5E9; color: #15803D; }
+  .cal-day-item.ev-vacation .cal-day-item-icon { background: #F3E8FF; color: #6B21A8; }
+  .cal-day-item-body { flex: 1; min-width: 0; }
+  .cal-day-item-type {
+    font-size: 11px; color: var(--text-light); text-transform: uppercase;
+    letter-spacing: 0.4px; font-weight: 600; margin-bottom: 2px;
+  }
+  .cal-day-item-title { font-size: 13.5px; color: var(--text-dark); font-weight: 500; }
   .bigcal-event {
     font-size: 10.5px;
     padding: 2px 6px;
@@ -11462,18 +11506,25 @@
   .pkb-section-actions {
     display: flex; gap: 8px; flex-shrink: 0;
   }
-  /* v2.43.64: на мобильной — кнопки переносятся на новые строки (раньше был неудобный горизонтальный скролл) */
+  /* v2.43.66: на мобильной — ровная сетка 2 колонки. «Новая работа» (primary) на всю ширину. */
   @media (max-width: 720px) {
     .pkb-section-actions {
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       max-width: 100%;
-      gap: 6px;
+      gap: 8px;
+      flex-shrink: 1;
     }
     .pkb-section-actions .pkb-btn {
-      flex: 1 1 auto;
-      min-width: calc(50% - 3px);
+      width: 100%;
+      min-width: 0;
       white-space: nowrap;
       justify-content: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pkb-section-actions .pkb-btn.primary {
+      grid-column: 1 / -1; /* Новая работа — на всю ширину */
     }
   }
   .pkb-btn {
@@ -15971,7 +16022,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.65-calc-zindex-calendar-mobile";
+const APP_VERSION = "v2.43.66-pkb-btns-and-cal-day";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25592,6 +25643,9 @@ function renderBigCalendar() {
     }
   });
 
+  // v2.43.66: сохраняем события по датам для модалки дня
+  state.bigCalEvByDate = evByDate;
+
   let html = '<div class="bigcal">';
   html += '<div class="bigcal-grid">';
   DOW_NAMES_SHORT.forEach(d => html += '<div class="bigcal-dow">' + d + '</div>');
@@ -25604,19 +25658,33 @@ function renderBigCalendar() {
     const isOutside = cell.getMonth() !== month;
     const isToday = iso === todayIso;
     const isWeekend = dow >= 5;
+    const evs = evByDate[iso] || [];
     const cls = ['bigcal-day'];
     if (isOutside) cls.push('is-outside');
     if (isToday) cls.push('is-today');
     if (isWeekend) cls.push('is-weekend');
-    html += '<div class="' + cls.join(' ') + '">';
+    if (evs.length) cls.push('has-events');
+    // v2.43.66: клик по дню → карточка дня (если есть события)
+    const clickAttr = evs.length ? ' onclick="openCalDayModal(\'' + iso + '\')"' : '';
+    html += '<div class="' + cls.join(' ') + '"' + clickAttr + '>';
     html += '<div class="bigcal-day-num">' + dayNum + '</div>';
-    const evs = evByDate[iso] || [];
+    // Десктоп: текстовые плашки. Мобильная: точки-индикаторы (через CSS).
     const maxShow = 3;
-    evs.slice(0, maxShow).forEach(e => {
-      html += '<div class="bigcal-event ev-' + e.type + '" title="' + escapeHtml(e.title) + '">' + escapeHtml(e.title) + '</div>';
-    });
-    if (evs.length > maxShow) {
-      html += '<div class="bigcal-day-more">+ ещё ' + (evs.length - maxShow) + '</div>';
+    if (evs.length) {
+      // Текстовые плашки (видны на десктопе)
+      html += '<div class="bigcal-events-text">';
+      evs.slice(0, maxShow).forEach(e => {
+        html += '<div class="bigcal-event ev-' + e.type + '" title="' + escapeHtml(e.title) + '">' + escapeHtml(e.title) + '</div>';
+      });
+      if (evs.length > maxShow) {
+        html += '<div class="bigcal-day-more">+ ещё ' + (evs.length - maxShow) + '</div>';
+      }
+      html += '</div>';
+      // Точки-индикаторы (видны на мобильной) — по уникальным типам
+      const types = [...new Set(evs.map(e => e.type))];
+      html += '<div class="bigcal-dots">';
+      types.forEach(t => { html += '<span class="bigcal-dot ev-' + t + '"></span>'; });
+      html += '</div>';
     }
     html += '</div>';
     cell.setDate(cell.getDate() + 1);
@@ -25632,6 +25700,60 @@ function renderBigCalendar() {
   html += '</div>';
 
   el.innerHTML = html;
+}
+
+// v2.43.66: карточка событий дня — открывается по клику на день календаря
+function openCalDayModal(iso) {
+  const evs = (state.bigCalEvByDate && state.bigCalEvByDate[iso]) || [];
+  if (!evs.length) return;
+  let modal = document.getElementById('cal-day-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'cal-day-modal';
+  modal.className = 'modal-overlay visible';
+  modal.style.zIndex = '300';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  // Заголовок — дата по-русски
+  let dateLabel = iso;
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    const dows = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+    dateLabel = d.getDate() + ' ' + months[d.getMonth()] + ', ' + dows[d.getDay()];
+  } catch (e) {}
+
+  const typeMeta = {
+    task:     { icon: 'ti-checklist',     label: 'Задача',  cls: 'ev-task' },
+    shipment: { icon: 'ti-truck-delivery',label: 'Отгрузка',cls: 'ev-shipment' },
+    supply:   { icon: 'ti-package-import',label: 'Приёмка', cls: 'ev-supply' },
+    vacation: { icon: 'ti-beach',         label: 'Отпуск',  cls: 'ev-vacation' },
+  };
+
+  let html = '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">';
+  html += '<div class="modal-header">';
+  html += '<h3><i class="ti ti-calendar-event"></i> ' + escapeHtml(dateLabel) + '</h3>';
+  html += '<button class="icon-btn" onclick="document.getElementById(\'cal-day-modal\').remove()"><i class="ti ti-x"></i></button>';
+  html += '</div>';
+  html += '<div class="modal-body" style="padding:12px 16px 18px; max-height:70vh; overflow-y:auto;">';
+  evs.forEach(e => {
+    const m = typeMeta[e.type] || { icon: 'ti-circle', label: '', cls: '' };
+    // Навигация по типу
+    let onClick = '';
+    if (e.type === 'shipment' && e.eventId) onClick = 'onclick="document.getElementById(\'cal-day-modal\').remove();openContractDetail(' + e.eventId + ')"';
+    else if (e.type === 'task' && e.eventId) onClick = 'onclick="document.getElementById(\'cal-day-modal\').remove();openTaskDetail&&openTaskDetail(' + e.eventId + ')"';
+    html += '<div class="cal-day-item ' + m.cls + '" ' + onClick + '>' +
+              '<div class="cal-day-item-icon"><i class="ti ' + m.icon + '"></i></div>' +
+              '<div class="cal-day-item-body">' +
+                '<div class="cal-day-item-type">' + m.label + '</div>' +
+                '<div class="cal-day-item-title">' + escapeHtml(e.title) + '</div>' +
+              '</div>' +
+              (onClick ? '<i class="ti ti-chevron-right" style="color:var(--text-light);"></i>' : '') +
+            '</div>';
+  });
+  html += '</div></div>';
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
 }
 
 function bigCalPrev() {
@@ -38893,6 +39015,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.66',
+    date: '28.05.2026',
+    title: 'Кнопки производства + дни календаря',
+    features: [
+      'Кнопки в шапке Производства на мобильной выстроены <b>ровной сеткой</b> 2 в ряд, «Новая работа» — на всю ширину. Не обрезаются и не растягиваются',
+      '<b>В календаре день с событиями</b> помечается цветными точками (на мобильной). Нажми на день — откроется <b>карточка дня</b> со списком: отгрузки, задачи, приёмки, отпуска',
+      'Клик по отгрузке/задаче в карточке дня — переход к договору/задаче',
+    ],
+  },
   {
     version: 'v2.43.65',
     date: '28.05.2026',
