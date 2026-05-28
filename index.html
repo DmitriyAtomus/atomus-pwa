@@ -3498,6 +3498,108 @@
   }
   .desktop-layout .home-kpi-title i { font-size: 16px; }
 
+  /* ============ v2.43.75: РАДИО НА ГЛАВНОЙ ============ */
+  .home-radio-card {
+    margin: 14px 14px 4px;
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    color: white;
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
+    position: relative;
+  }
+  .desktop-layout .home-radio-card { margin: 0 0 16px; }
+  .home-radio-card .hr-play {
+    flex: 0 0 42px;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .home-radio-card .hr-play:hover { background: rgba(255, 255, 255, 0.2); }
+  .home-radio-card .hr-play:active { transform: scale(0.94); }
+  .home-radio-card .hr-play i { font-size: 22px; }
+  .home-radio-card .hr-text { flex: 1; min-width: 0; }
+  .home-radio-card .hr-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: 600;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .home-radio-card .hr-label i { font-size: 13px; }
+  .home-radio-card .hr-station {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .home-radio-card .hr-pick {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.10);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .home-radio-card .hr-pick:hover { background: rgba(255, 255, 255, 0.18); }
+  .home-radio-card.hr-loading .hr-play i { animation: hr-spin 0.9s linear infinite; }
+  @keyframes hr-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  /* "live" точка когда играет */
+  .home-radio-card .hr-live-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #ef4444;
+    margin-right: 4px;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+    animation: hr-pulse 1.6s ease-out infinite;
+  }
+  @keyframes hr-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+    70%  { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+  /* модал выбора станции */
+  .radio-station-list {
+    display: flex; flex-direction: column;
+  }
+  .radio-station-item {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    transition: background 0.12s;
+  }
+  .radio-station-item:hover { background: var(--bg); }
+  .radio-station-item.active {
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-weight: 600;
+  }
+  .radio-station-item .rsi-num {
+    width: 22px;
+    color: var(--text-faint);
+    font-size: 13px;
+    text-align: right;
+  }
+  .radio-station-item.active .rsi-num { color: var(--brand); }
+  .radio-station-item .rsi-name { flex: 1; font-size: 14.5px; }
+  .radio-station-item .rsi-check { color: var(--brand); font-size: 18px; }
+
   /* ============ ЭТАП 17: КАТЕГОРИИ НОМЕНКЛАТУРЫ ============ */
 
   /* Заголовок группы товаров (в списке номенклатуры) */
@@ -25623,6 +25725,9 @@ function renderHomeSkeleton() {
   if (!container) return;
   let html = '';
 
+  // v2.43.75: радио на главной — первая карточка сверху, доступна и на мобиле, и на десктопе.
+  html += '<div id="home-radio-card-wrap"></div>';
+
   // ============ ЭТАП 25.0: блоки только для мобилки ============
   // Они показываются ТОЛЬКО когда .app.mobile-layout (через inline CSS у обёртки)
   html += '<div class="m25-mobile-only" style="margin: 0 -18px 0;">';
@@ -25673,6 +25778,8 @@ function renderHomeSkeleton() {
   renderQuickActions25();
   renderWeekCal25();
   loadHomeWeekEvents();
+  // v2.43.75: радио-виджет
+  renderRadioWidget();
 }
 
 function escapeText(s) {
@@ -26176,6 +26283,168 @@ function renderCbrRates() {
 function formatCbrValue(v) {
   const n = Number(v) || 0;
   return n.toFixed(2).replace('.', ',');
+}
+
+// ============================================================
+// ============ v2.43.75: РАДИО НА ГЛАВНОЙ =====================
+// ============================================================
+// Простой плеер на HTMLAudioElement. URL'ы потоков — публичные стримы;
+// если какой-то перестанет работать, замени ссылку в этом массиве.
+const RADIO_STATIONS = [
+  { id: 'nashe',     name: 'Наше Радио',      url: 'https://nashe1.hostingradio.ru/nashe-128.mp3' },
+  { id: 'shanson',   name: 'Радио Шансон',    url: 'https://chanson.hostingradio.ru/chanson128.mp3' },
+  { id: 'retro',     name: 'Ретро ФМ',        url: 'https://retro.hostingradio.ru/retro128.mp3' },
+  { id: 'hits',      name: 'Хит ФМ',          url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
+  { id: 'ep',        name: 'Европа Плюс',     url: 'https://ep128.hostingradio.ru/ep128' },
+  { id: 'dfm',       name: 'DFM',             url: 'https://dfm.hostingradio.ru/dfm128.mp3' },
+  { id: 'avto',      name: 'Авторадио',       url: 'https://pub0201.101.ru/stream/air/aac/64/99' },
+  { id: 'energy',    name: 'Радио ENERGY',    url: 'https://nrjru.hostingradio.ru:8043/nrj_mp3_128kbps' },
+  { id: 'humor',     name: 'Юмор FM',         url: 'https://hum.hostingradio.ru/humorfm128.mp3' },
+  { id: 'relax',     name: 'Радио Relax',     url: 'https://relax-stream.hostingradio.ru/relax128.mp3' },
+];
+
+const RADIO_STORAGE_KEY = 'atomus_radio_v1';
+
+function _radioState() {
+  if (!window._radio) {
+    window._radio = {
+      audio: null,
+      stationId: null,
+      playing: false,
+      loading: false,
+    };
+    try {
+      const saved = JSON.parse(localStorage.getItem(RADIO_STORAGE_KEY) || 'null');
+      if (saved && saved.stationId) window._radio.stationId = saved.stationId;
+    } catch (e) {}
+  }
+  return window._radio;
+}
+
+function _radioGetStation(id) {
+  return RADIO_STATIONS.find(s => s.id === id) || null;
+}
+
+function _radioSave() {
+  const s = _radioState();
+  try {
+    localStorage.setItem(RADIO_STORAGE_KEY, JSON.stringify({ stationId: s.stationId }));
+  } catch (e) {}
+}
+
+function renderRadioWidget() {
+  const wrap = document.getElementById('home-radio-card-wrap');
+  if (!wrap) return;
+  const s = _radioState();
+  const station = s.stationId ? _radioGetStation(s.stationId) : null;
+  const stationName = station ? station.name : 'Выберите волну';
+  const isPlaying = s.playing;
+  const isLoading = s.loading;
+  const playIcon = isLoading ? 'ti-loader-2' : (isPlaying ? 'ti-player-pause-filled' : 'ti-player-play-filled');
+  const labelHtml = isPlaying
+    ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>В эфире'
+    : '<i class="ti ti-radio"></i>Радио';
+  wrap.innerHTML =
+    '<div class="home-radio-card' + (isLoading ? ' hr-loading' : '') + '">' +
+      '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Пауза' : 'Играть') + '">' +
+        '<i class="ti ' + playIcon + '"></i>' +
+      '</button>' +
+      '<div class="hr-text">' +
+        '<div class="hr-label">' + labelHtml + '</div>' +
+        '<div class="hr-station">' + escapeHtml(stationName) + '</div>' +
+      '</div>' +
+      '<button class="hr-pick" onclick="openRadioStationPicker()">' +
+        '<i class="ti ti-list"></i> Сменить' +
+      '</button>' +
+    '</div>';
+}
+
+function _radioEnsureAudio() {
+  const s = _radioState();
+  if (s.audio) return s.audio;
+  const a = new Audio();
+  a.preload = 'none';
+  a.addEventListener('playing', () => { s.playing = true; s.loading = false; renderRadioWidget(); });
+  a.addEventListener('pause',   () => { s.playing = false; s.loading = false; renderRadioWidget(); });
+  a.addEventListener('waiting', () => { s.loading = true; renderRadioWidget(); });
+  a.addEventListener('error',   () => {
+    s.playing = false; s.loading = false; renderRadioWidget();
+    showToast('Не удалось воспроизвести станцию — проверьте интернет или выберите другую', 'error');
+  });
+  s.audio = a;
+  return a;
+}
+
+function toggleRadioPlay() {
+  const s = _radioState();
+  const audio = _radioEnsureAudio();
+  if (!s.stationId) { openRadioStationPicker(); return; }
+  if (s.playing) {
+    audio.pause();
+    return;
+  }
+  const station = _radioGetStation(s.stationId);
+  if (!station) { openRadioStationPicker(); return; }
+  if (!audio.src || audio.src !== station.url) audio.src = station.url;
+  s.loading = true;
+  renderRadioWidget();
+  audio.play().catch(() => {
+    s.loading = false; s.playing = false; renderRadioWidget();
+    showToast('Не удалось воспроизвести — проверьте интернет или выберите другую', 'error');
+  });
+}
+
+function selectRadioStation(id) {
+  const station = _radioGetStation(id);
+  if (!station) return;
+  const s = _radioState();
+  const audio = _radioEnsureAudio();
+  s.stationId = id;
+  _radioSave();
+  audio.src = station.url;
+  s.loading = true;
+  renderRadioWidget();
+  audio.play().catch(() => {
+    s.loading = false; s.playing = false; renderRadioWidget();
+    showToast('Не удалось воспроизвести — проверьте интернет или выберите другую', 'error');
+  });
+  closeRadioStationPicker();
+}
+
+function openRadioStationPicker() {
+  // Удаляем предыдущий, если остался
+  const old = document.getElementById('radio-picker-modal');
+  if (old) old.remove();
+
+  const s = _radioState();
+  let items = '';
+  RADIO_STATIONS.forEach((st, i) => {
+    const active = st.id === s.stationId;
+    items += '<div class="radio-station-item' + (active ? ' active' : '') + '" onclick="selectRadioStation(\'' + st.id + '\')">' +
+               '<div class="rsi-num">' + (i + 1) + '.</div>' +
+               '<div class="rsi-name">' + escapeHtml(st.name) + '</div>' +
+               (active ? '<i class="ti ti-check rsi-check"></i>' : '') +
+             '</div>';
+  });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'radio-picker-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) closeRadioStationPicker(); };
+  overlay.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-radio"></i> Выберите волну</h3>' +
+        '<button class="icon-btn" onclick="closeRadioStationPicker()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body"><div class="radio-station-list">' + items + '</div></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function closeRadioStationPicker() {
+  const m = document.getElementById('radio-picker-modal');
+  if (m) m.remove();
 }
 
 function formatCbrDate(iso) {
