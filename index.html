@@ -767,10 +767,11 @@
   .greeting h1 { font-size: 22px; font-weight: 600; }
   .greeting p { margin-top: 4px; color: var(--text-light); font-size: 13px; }
 
-  /* KPI */
+  /* KPI
+     v2.43.73: уменьшили отступы и иконки на мобиле — больше карточек попадает на экран. */
   .kpi-grid {
-    padding: 16px 18px 8px;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 12px 14px 6px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
   }
   .desktop-layout .kpi-grid { padding: 0 0 24px; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 
@@ -779,16 +780,16 @@
   .kpi-card {
     background: white;
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px;
+    border-radius: 12px;
+    padding: 11px 12px;
     display: flex;
     align-items: flex-start;
-    gap: 14px;
+    gap: 10px;
     position: relative;
     overflow: hidden;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
   }
-  .desktop-layout .kpi-card { padding: 18px 20px; }
+  .desktop-layout .kpi-card { padding: 18px 20px; border-radius: 14px; gap: 14px; }
   /* Цветная полоса слева (акцент) */
   .kpi-card::before {
     content: '';
@@ -807,14 +808,15 @@
 
   /* Цветные кружки иконок */
   .kpi-icon {
-    flex: 0 0 44px;
-    width: 44px; height: 44px;
-    border-radius: 12px;
+    flex: 0 0 36px;
+    width: 36px; height: 36px;
+    border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
+    font-size: 18px;
     background: var(--kpi-bg, var(--brand-bg));
     color: var(--kpi-accent, var(--brand));
   }
+  .desktop-layout .kpi-icon { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 12px; font-size: 22px; }
   .kpi-text { flex: 1; min-width: 0; }
 
   /* Цветовые варианты */
@@ -843,20 +845,22 @@
   .kpi-card .trend.down { color: var(--danger); }
 
   /* v2.43.62: на мобильной — ровные карточки. Иконка сверху, под ней заголовок (фикс. высота),
-     крупная цифра, подпись внизу. Все карточки одной высоты в ряду. */
+     крупная цифра, подпись внизу. Все карточки одной высоты в ряду.
+     v2.43.73: уплотнили — иконка/цифра меньше, меньше padding, больше карточек видно. */
   @media (max-width: 720px) {
     .kpi-grid { align-items: stretch; }
     .kpi-card {
       flex-direction: column;
       align-items: flex-start;
-      gap: 10px;
-      padding: 14px 14px 14px 16px;
+      gap: 8px;
+      padding: 11px 12px 12px 14px;
       height: 100%;
     }
     .kpi-icon {
-      flex: 0 0 40px;
-      width: 40px; height: 40px;
-      font-size: 20px;
+      flex: 0 0 34px;
+      width: 34px; height: 34px;
+      font-size: 17px;
+      border-radius: 9px;
     }
     .kpi-text {
       width: 100%;
@@ -865,16 +869,17 @@
       flex: 1;
     }
     .kpi-card .label {
-      min-height: 2.7em;            /* место под 2 строки — заголовки выровнены */
+      min-height: 2.4em;            /* место под 2 строки — заголовки выровнены */
       display: flex; align-items: flex-start;
-      margin-bottom: 6px;
-      line-height: 1.3;
+      margin-bottom: 4px;
+      line-height: 1.25;
+      font-size: 11px;
     }
     .kpi-card .value {
-      font-size: 30px;
+      font-size: 24px;
       margin-top: auto;            /* цифра прижата к низу → на одной линии у всех */
     }
-    .kpi-card .trend { margin-top: 4px; min-height: 1em; }
+    .kpi-card .trend { margin-top: 2px; min-height: 1em; font-size: 11.5px; }
   }
 
   /* Sections */
@@ -3468,23 +3473,28 @@
     .calc-fx-arrow { transform: rotate(90deg); padding: 4px 0; }
   }
 
-  /* KPI секция «Сегодня» */
+  /* KPI секция «Сегодня»
+     v2.43.73: горизонтальные отступы 14px — выравниваем с .kpi-grid и .qa25-section-label,
+     чтобы заголовки секций и карточки начинались по одной вертикали. */
   .home-kpi-title {
-    font-size: 13px; color: var(--text-light);
+    font-size: 12px; color: var(--text-light);
     text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700;
-    margin: 4px 0 12px;
-    padding: 0 2px;
+    margin: 14px 14px 8px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
   .home-kpi-title i {
-    font-size: 16px;
+    font-size: 15px;
     color: var(--brand);
   }
   .desktop-layout .home-kpi-title {
-    margin-bottom: 14px;
+    margin: 4px 0 14px;
+    padding: 0 2px;
+    font-size: 13px;
+    gap: 8px;
   }
+  .desktop-layout .home-kpi-title i { font-size: 16px; }
 
   /* ============ ЭТАП 17: КАТЕГОРИИ НОМЕНКЛАТУРЫ ============ */
 
@@ -9506,24 +9516,25 @@
   }
   .sheet25-cancel:active { background: var(--brand-bg); }
 
-  /* ===== БЫСТРЫЕ ДЕЙСТВИЯ 2x2 НА ГЛАВНОЙ ===== */
+  /* ===== БЫСТРЫЕ ДЕЙСТВИЯ 2x2 НА ГЛАВНОЙ =====
+     v2.43.73: компактнее на мобиле — экономия экрана для KPI ниже. */
   .qa25-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
     padding: 0 14px;
   }
   .qa25-tile {
     background: white;
     border: 1px solid var(--border);
     border-radius: var(--r-xl-25);
-    padding: 14px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
     text-align: left;
-    min-height: 96px;
+    min-height: 80px;
     box-shadow: var(--shadow-sm-25);
     cursor: pointer;
     transition: transform 0.12s;
@@ -9531,21 +9542,21 @@
   }
   .qa25-tile:active { transform: scale(0.97); }
   .qa25-tile .qa-icon {
-    width: 38px; height: 38px;
-    border-radius: 12px;
+    width: 32px; height: 32px;
+    border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
+    font-size: 17px;
     background: var(--qa-bg);
     color: var(--qa-color);
   }
   .qa25-tile .qa-label {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     color: var(--text);
     line-height: 1.2;
   }
   .qa25-tile .qa-hint {
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--text-light);
     margin-top: 2px;
   }
