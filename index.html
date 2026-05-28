@@ -4426,8 +4426,27 @@
   }
   .bigcal-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 6px;
+  }
+  /* v2.43.65: на мобильной — компактный календарь, 7 колонок помещаются в экран */
+  @media (max-width: 720px) {
+    .bigcal-grid { gap: 3px; }
+    .bigcal-dow { font-size: 8.5px; padding: 4px 0 5px; }
+    .bigcal-day {
+      min-height: 56px;
+      padding: 3px 3px;
+      border-radius: 6px;
+      gap: 2px;
+    }
+    .bigcal-day-num { font-size: 11px; }
+    .bigcal-event {
+      font-size: 7.5px;
+      padding: 1px 3px;
+      border-radius: 3px;
+      line-height: 1.2;
+    }
+    .bigcal-day-more { font-size: 7.5px; }
   }
   .bigcal-dow {
     text-align: center;
@@ -15952,7 +15971,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.64-calc-keyboard-vat-btns";
+const APP_VERSION = "v2.43.65-calc-zindex-calendar-mobile";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25873,13 +25892,18 @@ function formatCbrDate(iso) {
 
 // ---------- Калькулятор ----------
 
-// v2.43.60: калькулятор открывается модалкой поверх окна (десктоп и мобильная)
+// v2.43.65: калькулятор открывается модалкой поверх окна (десктоп и мобильная)
 function openCalculatorModal() {
+  // Если открыт боковой drawer — закрываем его, чтобы калькулятор был поверх
+  if (typeof closeSectionDrawer === 'function') {
+    try { closeSectionDrawer(); } catch (e) {}
+  }
   let modal = document.getElementById('calc-modal');
   if (modal) modal.remove();
   modal = document.createElement('div');
   modal.id = 'calc-modal';
   modal.className = 'modal-overlay visible';
+  modal.style.zIndex = '400'; // выше drawer (250) и overlay (240)
   modal.onclick = (e) => { if (e.target === modal) closeCalculatorModal(); };
 
   let html = '<div class="modal calc-modal-inner" onclick="event.stopPropagation()">';
@@ -38869,6 +38893,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.65',
+    date: '28.05.2026',
+    title: 'Калькулятор поверх меню + календарь на мобильной',
+    features: [
+      '<b>Калькулятор</b> теперь открывается <b>поверх</b> бокового меню (раньше прятался под ним из-за слоёв). При открытии меню автоматически закрывается',
+      '<b>Календарь на мобильной</b> исправлен: показывались только 2 дня недели из 7 — теперь вся неделя помещается в экран, ячейки компактные',
+    ],
+  },
   {
     version: 'v2.43.64',
     date: '28.05.2026',
