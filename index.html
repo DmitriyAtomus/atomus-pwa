@@ -13528,10 +13528,6 @@
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">Скан</span>
     </button>
-    <!-- v2.43.60: калькулятор — модалка поверх окна -->
-    <button class="notif-btn" id="calc-btn" onclick="openCalculatorModal()" title="Калькулятор">
-      <i class="ti ti-calculator"></i>
-    </button>
     <!-- v2.42.5: уведомления -->
     <button class="notif-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Уведомления">
       <i class="ti ti-bell"></i>
@@ -13594,6 +13590,9 @@
 
       <!-- Внешние сервисы -->
       <div class="nav-section-label">СЕРВИСЫ</div>
+      <a class="nav-item" onclick="openCalculatorModal()" style="cursor:pointer;">
+        <i class="ti ti-calculator"></i><span>Калькулятор</span>
+      </a>
       <a class="nav-item ext-link" href="https://web.max.ru" target="_blank" rel="noopener">
         <i class="ti ti-message-circle-2"></i><span>Max</span>
         <i class="ti ti-external-link ext-arrow"></i>
@@ -15888,7 +15887,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.60-calc-modal";
+const APP_VERSION = "v2.43.61-calc-sidebar";
 const APP_VERSION_DATE = "27.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38776,6 +38775,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.43.61',
+    date: '28.05.2026',
+    title: 'Калькулятор — в сайдбар «Сервисы»',
+    features: [
+      'Калькулятор <i class="ti ti-calculator"></i> теперь в <b>левом меню → раздел «Сервисы»</b> (рядом с Max, Почта, Диск)',
+      'Открывается модалкой поверх окна — на десктопе и на мобильной (через меню)',
+      'Из шапки иконку убрали',
+    ],
+  },
   {
     version: 'v2.43.60',
     date: '28.05.2026',
