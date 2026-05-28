@@ -20816,7 +20816,13 @@ function renderSummary(d) {
   // Всегда обновляем выпадайку — даже когда данных нет, чтобы можно было сбросить фильтр.
   _updateSummaryWorkerSelect(d.available_workers || []);
 
-  if (!t || t.total_records === 0) {
+  const sessionsExist = d.sessions && (
+    (d.sessions.total && d.sessions.total.total_entries > 0) ||
+    (d.sessions.by_employee && d.sessions.by_employee.length > 0) ||
+    (d.sessions.entries && d.sessions.entries.length > 0)
+  );
+  const hasAssemblyData = t && t.total_records > 0;
+  if (!hasAssemblyData && !sessionsExist) {
     let empty = '<div class="empty-block"><i class="ti ti-chart-bar"></i>';
     empty += selectedName
       ? 'У сотрудника <b>' + escapeHtml(selectedName) + '</b> нет работ за этот период'
@@ -20825,7 +20831,16 @@ function renderSummary(d) {
     container.innerHTML = empty;
     return;
   }
+
   let html = '';
+  if (!hasAssemblyData) {
+    html += '<div class="empty-block"><i class="ti ti-info-circle"></i>';
+    html += selectedName
+      ? 'У сотрудника <b>' + escapeHtml(selectedName) + '</b> нет сборок за этот период.'
+      : 'За выбранный период нет сборок.';
+    html += ' Ниже отображается журнал участия, если он есть.';
+    html += '</div>';
+  }
 
   // Бейдж активного фильтра — над KPI
   const periodLabel = summaryPeriodLabel();
@@ -20840,17 +20855,18 @@ function renderSummary(d) {
     html += '</div>';
   }
 
-  html += '<div class="kpi-grid">';
-  html += kpiCard('записей', t.total_records, '—');
-  html += kpiCard('штук', t.total_qty, '—');
-  html += kpiCard('моделей', t.unique_models, '—');
-  // При фильтре по одному сборщику карточка «сборщиков» бессмысленна — скрываем.
-  if (!empId) {
-    html += kpiCard('сборщиков', t.unique_employees, '—');
-  }
-  html += '</div>';
+  if (hasAssemblyData) {
+    html += '<div class="kpi-grid">';
+    html += kpiCard('записей', t.total_records, '—');
+    html += kpiCard('штук', t.total_qty, '—');
+    html += kpiCard('моделей', t.unique_models, '—');
+    // При фильтре по одному сборщику карточка «сборщиков» бессмысленна — скрываем.
+    if (!empId) {
+      html += kpiCard('сборщиков', t.unique_employees, '—');
+    }
+    html += '</div>';
 
-  html += '<div class="row-2">';
+    html += '<div class="row-2">';
   if (d.by_direction && d.by_direction.length > 1) {
     html += '<div class="section"><h3 class="section-title">По направлениям' +
       (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
@@ -20876,6 +20892,7 @@ function renderSummary(d) {
     html += '</div></div></div>';
   }
   html += '</div>';
+  }
 
   // Топ сборщиков — только когда фильтра нет. При фильтре по одному сотруднику теряет смысл.
   if (!empId && d.by_employee && d.by_employee.length) {
@@ -21002,9 +21019,11 @@ function renderSummary(d) {
     (selectedName ? ' <small style="font-weight:400;color:var(--text-light);">· ' + escapeHtml(selectedName) + '</small>' : '') +
     '</h3></div>';
   html += '<div class="report-buttons">';
-  html += '<button onclick="quickExportSummary(\'xlsx\')" title="Только сборки за период"><i class="ti ti-file-spreadsheet"></i><span>Excel сборок</span></button>';
-  html += '<button onclick="quickExportSummary(\'pdf\')" title="Только сборки за период"><i class="ti ti-file-text"></i><span>PDF сборок</span></button>';
-  html += '<button onclick="quickExportSessions()" title="Excel: журнал + сборки за период"><i class="ti ti-history"></i><span>Полный по сборщику</span></button>';
+  if (hasAssemblyData) {
+    html += '<button onclick="quickExportSummary(\'xlsx\')" title="Только сборки за период"><i class="ti ti-file-spreadsheet"></i><span>Excel сборок</span></button>';
+    html += '<button onclick="quickExportSummary(\'pdf\')" title="Только сборки за период"><i class="ti ti-file-text"></i><span>PDF сборок</span></button>';
+  }
+  html += '<button onclick="quickExportSessions()" title="Excel: журнал участия за период"><i class="ti ti-history"></i><span>Excel журнал участия</span></button>';
   html += '<button onclick="askExportActivityFormat()" title="Хронологический отчёт: сборки + помощь"><i class="ti ti-list-details"></i><span>Активность</span></button>';
   html += '</div>';
   html += '<div style="text-align:center;padding:6px 18px 14px;font-size:12px;color:var(--text-light);">' +
