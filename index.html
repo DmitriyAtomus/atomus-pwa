@@ -20896,12 +20896,12 @@ function renderSummary(d) {
   }
 
   // v2.43.36: блок «Журнал участия» — из production_work_sessions
-  if (d.sessions && d.sessions.total) {
+  if (d.sessions && (d.sessions.total || (d.sessions.by_employee && d.sessions.by_employee.length) || (d.sessions.entries && d.sessions.entries.length))) {
     const sb = d.sessions;
     const sbTotal = sb.total || {};
-    const totalHours = Number(sbTotal.total_hours || 0);
-    const totalEntries = Number(sbTotal.total_entries || 0);
-    const totalEmployees = Number(sbTotal.employees_count || 0);
+    const totalHours = Number(sbTotal.total_hours || (sb.by_employee || []).reduce((sum, e) => sum + Number(e.hours || 0), 0));
+    const totalEntries = Number(sbTotal.total_entries || (sb.entries || []).length);
+    const totalEmployees = Number(sbTotal.employees_count || (sb.by_employee || []).length);
     const fmtH = (h) => (h % 1 === 0 ? h : h.toFixed(1));
     // v2.43.44: средняя нагрузка в день — по числу разных дат в by_day (не пустых)
     const workingDays = (sb.by_day || []).filter(x => Number(x.hours || 0) > 0).length;
