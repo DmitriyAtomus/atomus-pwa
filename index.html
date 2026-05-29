@@ -5714,7 +5714,10 @@
     max-width: none;
     padding: 22px 18px;
   }
-  .desktop-layout .screen[data-screen="task-detail"] {
+  /* v2.43.96: важно — флекс ТОЛЬКО для активного экрана, иначе .screen.active
+     не перебивает display:flex и старая карточка остаётся видна одновременно
+     со списком. */
+  .desktop-layout .screen.active[data-screen="task-detail"] {
     display: flex;
     flex-direction: column;
   }
