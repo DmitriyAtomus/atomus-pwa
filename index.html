@@ -3498,20 +3498,45 @@
   }
   .desktop-layout .home-kpi-title i { font-size: 16px; }
 
-  /* ============ v2.43.75: РАДИО НА ГЛАВНОЙ ============ */
+  /* ============ v2.43.75: РАДИО НА ГЛАВНОЙ ============
+     v2.43.76: на десктопе уезжает в правую колонку (sticky), на мобиле — верхняя карточка.
+     Добавлен ползунок громкости. */
+  .desktop-layout #home-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    column-gap: 24px;
+    align-items: start;
+  }
+  .desktop-layout #home-main-col { grid-column: 1; min-width: 0; }
+  .desktop-layout #home-radio-card-wrap {
+    grid-column: 2;
+    position: sticky;
+    top: 12px;
+  }
+  /* На очень узких десктопах схлопываем в одну колонку */
+  @media (max-width: 1100px) {
+    .desktop-layout #home-content { grid-template-columns: 1fr; }
+    .desktop-layout #home-radio-card-wrap { position: static; }
+  }
+
   .home-radio-card {
     margin: 14px 14px 4px;
     background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
     color: white;
     border-radius: 14px;
-    padding: 12px 14px;
+    padding: 14px 16px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 12px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
     position: relative;
   }
-  .desktop-layout .home-radio-card { margin: 0 0 16px; }
+  .desktop-layout .home-radio-card { margin: 0; padding: 16px; }
+  .home-radio-card .hr-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .home-radio-card .hr-play {
     flex: 0 0 42px;
     width: 42px; height: 42px;
@@ -3558,6 +3583,52 @@
   .home-radio-card .hr-pick:hover { background: rgba(255, 255, 255, 0.18); }
   .home-radio-card.hr-loading .hr-play i { animation: hr-spin 0.9s linear infinite; }
   @keyframes hr-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  /* Ползунок громкости */
+  .home-radio-card .hr-volume {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .home-radio-card .hr-volume i {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.55);
+    flex-shrink: 0;
+  }
+  .home-radio-card .hr-volume input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+  }
+  .home-radio-card .hr-volume input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+  .home-radio-card .hr-volume input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+  .home-radio-card .hr-vol-pct {
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.55);
+    min-width: 30px;
+    text-align: right;
+  }
   /* "live" точка когда играет */
   .home-radio-card .hr-live-dot {
     display: inline-block;
@@ -25726,7 +25797,9 @@ function renderHomeSkeleton() {
   let html = '';
 
   // v2.43.75: радио на главной — первая карточка сверху, доступна и на мобиле, и на десктопе.
+  // v2.43.76: на десктопе живёт в правой колонке (через CSS-grid на #home-content).
   html += '<div id="home-radio-card-wrap"></div>';
+  html += '<div id="home-main-col">';
 
   // ============ ЭТАП 25.0: блоки только для мобилки ============
   // Они показываются ТОЛЬКО когда .app.mobile-layout (через inline CSS у обёртки)
@@ -25771,6 +25844,9 @@ function renderHomeSkeleton() {
     html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-history"></i>Последние действия</div>';
     html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   }
+
+  // Закрываем #home-main-col, открытый перед mobile-only блоком (v2.43.76)
+  html += '</div>';
 
   container.innerHTML = html;
 
@@ -26288,19 +26364,47 @@ function formatCbrValue(v) {
 // ============================================================
 // ============ v2.43.75: РАДИО НА ГЛАВНОЙ =====================
 // ============================================================
-// Простой плеер на HTMLAudioElement. URL'ы потоков — публичные стримы;
-// если какой-то перестанет работать, замени ссылку в этом массиве.
+// Простой плеер на HTMLAudioElement. URL'ы потоков — публичные стримы.
+// v2.43.76: расширенный список + регулировка громкости. Если станция не
+// играет — открой DevTools → Network, посмотри ошибку, при необходимости
+// замени URL в этом массиве (обычная ситуация для интернет-радио).
 const RADIO_STATIONS = [
-  { id: 'nashe',     name: 'Наше Радио',      url: 'https://nashe1.hostingradio.ru/nashe-128.mp3' },
-  { id: 'shanson',   name: 'Радио Шансон',    url: 'https://chanson.hostingradio.ru/chanson128.mp3' },
-  { id: 'retro',     name: 'Ретро ФМ',        url: 'https://retro.hostingradio.ru/retro128.mp3' },
-  { id: 'hits',      name: 'Хит ФМ',          url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
+  // Хиты / поп
   { id: 'ep',        name: 'Европа Плюс',     url: 'https://ep128.hostingradio.ru/ep128' },
+  { id: 'hits',      name: 'Хит ФМ',          url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
+  { id: 'energy',    name: 'Радио ENERGY',    url: 'https://nrjru.hostingradio.ru/nrj-mp3.mp3' },
+  { id: 'love',      name: 'Love Radio',      url: 'https://pub0202.101.ru/stream/personal/aac/64/89' },
+  { id: 'maximum',   name: 'Радио Maximum',   url: 'https://maximum.hostingradio.ru/maximum128.mp3' },
+  { id: 'record',    name: 'Радио Record',    url: 'https://radiorecord.hostingradio.ru/rr_main96.aacp' },
+  { id: 'mfm',       name: 'Megapolis FM',    url: 'https://stream-mp3.megapolis.fm/MEGAPOLIS_FM_128.mp3' },
+  // Рок / альтернатива
+  { id: 'nashe',     name: 'Наше Радио',      url: 'https://nashe1.hostingradio.ru/nashe-128.mp3' },
+  { id: 'rock',      name: 'Радио Рок FM',    url: 'https://rockfm.hostingradio.ru/rockfm96.aacp' },
+  { id: 'ultra',     name: 'Ultra (рок)',     url: 'https://ic7.101.ru/v1_1' },
+  // Шансон / рус
+  { id: 'shanson',   name: 'Радио Шансон',    url: 'https://chanson.hostingradio.ru/chanson128.mp3' },
+  { id: 'doroga',    name: 'Дорожное Радио',  url: 'https://drr.hostingradio.ru:8079/dorognoe128.mp3' },
+  { id: 'zvezda',    name: 'Радио Звезда',    url: 'https://zvfm.hostingradio.ru/zvfm128.mp3' },
+  // Ретро
+  { id: 'retro',     name: 'Ретро ФМ',        url: 'https://retro.hostingradio.ru/retro128.mp3' },
+  { id: 'dacha',     name: 'Радио Дача',      url: 'https://radiodacha.hostingradio.ru/radiodacha128.mp3' },
+  { id: 'nostalgie', name: 'Радио Ностальжи', url: 'https://nostalgie.hostingradio.ru/nostalgie128.mp3' },
+  // Танцы / клуб
   { id: 'dfm',       name: 'DFM',             url: 'https://dfm.hostingradio.ru/dfm128.mp3' },
-  { id: 'avto',      name: 'Авторадио',       url: 'https://pub0201.101.ru/stream/air/aac/64/99' },
-  { id: 'energy',    name: 'Радио ENERGY',    url: 'https://nrjru.hostingradio.ru:8043/nrj_mp3_128kbps' },
-  { id: 'humor',     name: 'Юмор FM',         url: 'https://hum.hostingradio.ru/humorfm128.mp3' },
+  { id: 'mixfm',     name: 'Радио Mix',       url: 'https://mixfm.hostingradio.ru/mixfm128.mp3' },
+  // Спокойное / лаунж
   { id: 'relax',     name: 'Радио Relax',     url: 'https://relax-stream.hostingradio.ru/relax128.mp3' },
+  { id: 'romantika', name: 'Радио Romantika', url: 'https://radiorpr.hostingradio.ru/radiorpr-128.mp3' },
+  { id: 'jazz',      name: 'Радио Jazz',      url: 'https://radiojazzfm.hostingradio.ru/jazz-128.mp3' },
+  // Юмор
+  { id: 'humor',     name: 'Юмор FM',         url: 'https://hum.hostingradio.ru/humorfm128.mp3' },
+  { id: 'comedy',    name: 'Comedy Radio',    url: 'https://comedy.hostingradio.ru/comedyfm128.mp3' },
+  // Детское
+  { id: 'kids',      name: 'Детское Радио',   url: 'https://pub0202.101.ru/stream/personal/aac/64/102' },
+  // Авто / новости
+  { id: 'avto',      name: 'Авторадио',       url: 'https://pub0201.101.ru/stream/personal/aac/64/99' },
+  { id: 'vesti',     name: 'Вести FM',        url: 'https://icecast.vgtrk.cdnvideo.ru/vestifm_mp3_192kbps' },
+  { id: 'silver',    name: 'Серебряный дождь', url: 'https://icecast.silver.cdnvideo.ru/silver' },
 ];
 
 const RADIO_STORAGE_KEY = 'atomus_radio_v1';
@@ -26312,10 +26416,14 @@ function _radioState() {
       stationId: null,
       playing: false,
       loading: false,
+      volume: 0.7,
     };
     try {
       const saved = JSON.parse(localStorage.getItem(RADIO_STORAGE_KEY) || 'null');
       if (saved && saved.stationId) window._radio.stationId = saved.stationId;
+      if (saved && typeof saved.volume === 'number') {
+        window._radio.volume = Math.max(0, Math.min(1, saved.volume));
+      }
     } catch (e) {}
   }
   return window._radio;
@@ -26328,7 +26436,10 @@ function _radioGetStation(id) {
 function _radioSave() {
   const s = _radioState();
   try {
-    localStorage.setItem(RADIO_STORAGE_KEY, JSON.stringify({ stationId: s.stationId }));
+    localStorage.setItem(RADIO_STORAGE_KEY, JSON.stringify({
+      stationId: s.stationId,
+      volume:    s.volume,
+    }));
   } catch (e) {}
 }
 
@@ -26344,18 +26455,27 @@ function renderRadioWidget() {
   const labelHtml = isPlaying
     ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>В эфире'
     : '<i class="ti ti-radio"></i>Радио';
+  const volPct = Math.round((s.volume || 0) * 100);
+  const volIcon = volPct === 0 ? 'ti-volume-off' : (volPct < 40 ? 'ti-volume-2' : 'ti-volume');
   wrap.innerHTML =
     '<div class="home-radio-card' + (isLoading ? ' hr-loading' : '') + '">' +
-      '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Пауза' : 'Играть') + '">' +
-        '<i class="ti ' + playIcon + '"></i>' +
-      '</button>' +
-      '<div class="hr-text">' +
-        '<div class="hr-label">' + labelHtml + '</div>' +
-        '<div class="hr-station">' + escapeHtml(stationName) + '</div>' +
+      '<div class="hr-top">' +
+        '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Пауза' : 'Играть') + '">' +
+          '<i class="ti ' + playIcon + '"></i>' +
+        '</button>' +
+        '<div class="hr-text">' +
+          '<div class="hr-label">' + labelHtml + '</div>' +
+          '<div class="hr-station">' + escapeHtml(stationName) + '</div>' +
+        '</div>' +
+        '<button class="hr-pick" onclick="openRadioStationPicker()">' +
+          '<i class="ti ti-list"></i> Сменить' +
+        '</button>' +
       '</div>' +
-      '<button class="hr-pick" onclick="openRadioStationPicker()">' +
-        '<i class="ti ti-list"></i> Сменить' +
-      '</button>' +
+      '<div class="hr-volume">' +
+        '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
+        '<input type="range" min="0" max="100" value="' + volPct + '" oninput="setRadioVolume(this.value)">' +
+        '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
+      '</div>' +
     '</div>';
 }
 
@@ -26364,6 +26484,7 @@ function _radioEnsureAudio() {
   if (s.audio) return s.audio;
   const a = new Audio();
   a.preload = 'none';
+  a.volume = s.volume;
   a.addEventListener('playing', () => { s.playing = true; s.loading = false; renderRadioWidget(); });
   a.addEventListener('pause',   () => { s.playing = false; s.loading = false; renderRadioWidget(); });
   a.addEventListener('waiting', () => { s.loading = true; renderRadioWidget(); });
@@ -26373,6 +26494,23 @@ function _radioEnsureAudio() {
   });
   s.audio = a;
   return a;
+}
+
+function setRadioVolume(v) {
+  const s = _radioState();
+  const pct = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
+  s.volume = pct / 100;
+  if (s.audio) s.audio.volume = s.volume;
+  _radioSave();
+  // Обновляем только подпись и иконку, без полного перерендера — чтобы ползунок
+  // не «прыгал» во время перетаскивания.
+  const pctEl = document.getElementById('hr-vol-pct');
+  if (pctEl) pctEl.textContent = pct + '%';
+  const iconEl = document.getElementById('hr-vol-icon');
+  if (iconEl) {
+    const cls = pct === 0 ? 'ti-volume-off' : (pct < 40 ? 'ti-volume-2' : 'ti-volume');
+    iconEl.className = 'ti ' + cls;
+  }
 }
 
 function toggleRadioPlay() {
