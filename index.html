@@ -5704,52 +5704,155 @@
   .task-status-pill.done { background: #E8F5E9; color: var(--success); }
   .task-status-pill.cancelled { background: #F4F4F5; color: var(--text-faint); }
 
-  /* Карточка задачи (detail) */
+  /* Карточка задачи (detail)
+     v2.43.93: цветной hero сверху по статусу, сегментированный switch и
+     карточки-факты с иконками. */
   .task-detail-card {
     background: white;
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 18px 20px;
+    border-radius: 14px;
+    padding: 0;
     margin: 0 18px 12px;
+    overflow: hidden;
   }
+
+  /* Цветной hero — статусная полоса с большой подписью */
+  .task-detail-hero {
+    padding: 18px 22px 16px;
+    color: white;
+    background: linear-gradient(135deg, var(--brand), #4673AD);
+  }
+  .task-detail-hero.s-new         { background: linear-gradient(135deg, #2C5282, #3B82F6); }
+  .task-detail-hero.s-in_progress { background: linear-gradient(135deg, #B45309, #D97706); }
+  .task-detail-hero.s-done        { background: linear-gradient(135deg, #15803D, #22C55E); }
+  .task-detail-hero.s-cancelled   { background: linear-gradient(135deg, #4B5563, #6B7280); }
+  .task-detail-hero-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px;
+    opacity: 0.85; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .task-detail-hero-label i { font-size: 14px; }
+  .task-detail-hero-status {
+    font-size: 22px; font-weight: 700;
+    margin-top: 4px; line-height: 1.1;
+  }
+  .task-detail-hero-priority {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    font-size: 12px; font-weight: 600;
+  }
+  .task-detail-hero-priority i { font-size: 14px; }
+  .task-detail-hero-priority.urgent { background: rgba(255, 255, 255, 0.28); }
+
+  .task-detail-body {
+    padding: 18px 22px 18px;
+  }
+
+  /* Сегментированный switch статусов */
   .task-detail-status-row {
-    display: flex; gap: 8px; flex-wrap: wrap;
-    margin-bottom: 14px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 18px;
+    background: var(--bg);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
   }
   .task-detail-status-btn {
-    padding: 8px 14px;
+    padding: 7px 14px;
     border-radius: 8px;
-    border: 1.5px solid var(--border);
-    background: white;
+    border: none;
+    background: transparent;
     color: var(--text-mid);
     font-size: 12.5px; font-weight: 500;
     cursor: pointer;
-    transition: all 0.1s;
+    transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+    flex: 1;
+    min-width: 90px;
   }
-  .task-detail-status-btn:hover { background: var(--bg); }
+  .task-detail-status-btn:hover { background: rgba(0, 0, 0, 0.04); color: var(--text-dark); }
   .task-detail-status-btn.active {
-    background: var(--brand);
-    color: white;
-    border-color: var(--brand);
+    background: white;
+    color: var(--brand);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 700;
   }
-  .task-detail-status-btn.active.done {
-    background: var(--success); border-color: var(--success);
-  }
-  .task-detail-status-btn.active.cancelled {
-    background: var(--text-faint); border-color: var(--text-faint);
-  }
+  .task-detail-status-btn.active.new         { color: #2563EB; }
+  .task-detail-status-btn.active.in_progress { color: #C18B00; }
+  .task-detail-status-btn.active.done        { color: var(--success); }
+  .task-detail-status-btn.active.cancelled   { color: var(--text-faint); }
 
   .task-detail-description {
     background: var(--bg);
-    padding: 12px 14px;
-    border-radius: 8px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border-left: 3px solid var(--brand);
     font-size: 13px;
-    color: var(--text-mid);
-    line-height: 1.5;
-    margin-bottom: 14px;
+    color: var(--text);
+    line-height: 1.55;
+    margin-bottom: 18px;
     white-space: pre-wrap;
     word-break: break-word;
   }
+
+  /* Карточки-факты для деталей задачи */
+  .task-facts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  @media (max-width: 720px) {
+    .task-facts-grid { grid-template-columns: 1fr; }
+  }
+  .task-fact {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .task-fact.span-2 { grid-column: 1 / -1; }
+  .task-fact-icon {
+    flex: 0 0 32px;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .task-fact-icon.c-orange { background: #FFF4E6; color: #C18B00; }
+  .task-fact-icon.c-red    { background: rgba(220, 38, 38, 0.12); color: var(--danger); }
+  .task-fact-icon.c-green  { background: #E8F5E9; color: var(--success); }
+  .task-fact-icon.c-gray   { background: #F4F4F5; color: var(--text-light); }
+  .task-fact-icon.c-violet { background: #F3E8FF; color: #7E22CE; }
+  .task-fact-body { flex: 1; min-width: 0; }
+  .task-fact-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .task-fact-value {
+    font-size: 13.5px;
+    color: var(--text-dark);
+    margin-top: 4px;
+    font-weight: 500;
+    word-break: break-word;
+  }
+  .task-fact-value.muted { color: var(--text-light); font-weight: 400; }
+  .task-fact-value.urgent { color: var(--danger); font-weight: 600; }
+  .task-fact-value.soon   { color: #C18B00; font-weight: 600; }
+  .task-fact-value a.contract-link {
+    color: var(--brand); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .task-fact-value a.contract-link:hover { text-decoration: underline; }
 
   /* Виджет «Мои задачи» на главной */
   .home-tasks-widget {
@@ -27849,7 +27952,6 @@ function renderTaskDetail(t) {
 
   const container = document.getElementById('task-detail-content');
   const canEdit = canManageTasks();
-  // Кто может менять статус: создатель, исполнитель, директор/зам/менеджер
   const myChatId = state.user && state.user.chat_id;
   const myEmpId = state.user && state.user.employee_id;
   const isCreator = t.creator_chat_id === myChatId;
@@ -27857,14 +27959,45 @@ function renderTaskDetail(t) {
   const canChangeStatus = canEdit || isCreator || isAssignee;
   const canEditFully = canEdit || isCreator;
 
-  let html = '';
+  // v2.43.93: цветной hero сверху + сегментированный switch + карточки-факты
+  const status = t.status || 'new';
+  const statusIcon = status === 'new' ? 'ti-sparkles' :
+                     status === 'in_progress' ? 'ti-player-play' :
+                     status === 'done' ? 'ti-circle-check' :
+                     status === 'cancelled' ? 'ti-circle-x' : 'ti-circle';
+  const prio = t.priority || 'normal';
+  const prioMeta = prio === 'urgent' ? {icon: 'ti-flame', label: 'срочно', cls: 'urgent', factCls: 'c-red'} :
+                   prio === 'low' ? {icon: 'ti-arrow-down', label: 'низкий', cls: '', factCls: 'c-green'} :
+                                    {icon: 'ti-minus', label: 'обычный', cls: '', factCls: 'c-gray'};
 
-  // Карточка
-  html += '<div class="task-detail-card">';
+  // Дедлайн с подсветкой
+  let deadlineCls = '';
+  let deadlineFactCls = 'c-gray';
+  if (t.deadline) {
+    try {
+      const diff = Math.round((new Date(t.deadline) - new Date()) / 86400000);
+      if (status !== 'done' && diff < 0) { deadlineCls = 'urgent'; deadlineFactCls = 'c-red'; }
+      else if (status !== 'done' && diff <= 1) { deadlineCls = 'soon'; deadlineFactCls = 'c-orange'; }
+      else { deadlineFactCls = 'c-violet'; }
+    } catch (e) {}
+  }
+
+  let html = '<div class="task-detail-card">';
+
+  // === HERO === цветной блок со статусом и приоритетом
+  html += '<div class="task-detail-hero s-' + status + '">' +
+            '<div class="task-detail-hero-label"><i class="ti ' + statusIcon + '"></i>СТАТУС</div>' +
+            '<div class="task-detail-hero-status">' + escapeHtml(t.status_label || status) + '</div>' +
+            '<div class="task-detail-hero-priority' + (prio === 'urgent' ? ' urgent' : '') + '">' +
+              '<i class="ti ' + prioMeta.icon + '"></i>' +
+              'Приоритет: ' + escapeHtml(t.priority_label || prioMeta.label) +
+            '</div>' +
+          '</div>';
+
+  html += '<div class="task-detail-body">';
 
   // Переключатель статуса
   if (canChangeStatus) {
-    html += '<div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; font-weight: 600;">СТАТУС</div>';
     html += '<div class="task-detail-status-row">';
     TASK_STATUSES.forEach(s => {
       const active = s.code === t.status;
@@ -27873,9 +28006,6 @@ function renderTaskDetail(t) {
         escapeHtml(s.label) + '</button>';
     });
     html += '</div>';
-  } else {
-    html += '<div style="margin-bottom: 14px;">' +
-            '<span class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</span></div>';
   }
 
   // Описание
@@ -27883,53 +28013,84 @@ function renderTaskDetail(t) {
     html += '<div class="task-detail-description">' + escapeHtml(t.description).replace(/\n/g, '<br>') + '</div>';
   }
 
-  // Сетка деталей
-  html += '<div class="detail-grid">';
-  html += '<div class="detail-item"><div class="detail-label">Приоритет</div>' +
-          '<div class="detail-value">' +
-            (t.priority === 'urgent' ? '🔥 ' : '') +
-            escapeHtml(t.priority_label) + '</div></div>';
-  html += '<div class="detail-item"><div class="detail-label">Исполнитель</div>' +
-          '<div class="detail-value' + (t.assignee_name ? '' : ' muted') + '">' +
-          escapeHtml(t.assignee_name || 'не назначен') + '</div></div>';
-  html += '<div class="detail-item"><div class="detail-label">Дедлайн</div>' +
-          '<div class="detail-value' + (t.deadline ? '' : ' muted') + '">' +
-          escapeHtml(t.deadline ? formatTaskDeadline(t.deadline) : 'не указан') + '</div></div>';
-  if (t.source) {
-    html += '<div class="detail-item"><div class="detail-label">Источник</div>' +
-            '<div class="detail-value">' + escapeHtml(t.source) + '</div></div>';
+  // Карточки-факты
+  html += '<div class="task-facts-grid">';
+  // Исполнитель
+  html += '<div class="task-fact">' +
+            '<div class="task-fact-icon c-violet"><i class="ti ti-user"></i></div>' +
+            '<div class="task-fact-body">' +
+              '<div class="task-fact-label">Исполнитель</div>' +
+              '<div class="task-fact-value' + (t.assignee_name ? '' : ' muted') + '">' +
+                escapeHtml(t.assignee_name || 'не назначен') + '</div>' +
+            '</div></div>';
+  // Дедлайн
+  html += '<div class="task-fact">' +
+            '<div class="task-fact-icon ' + deadlineFactCls + '"><i class="ti ti-clock"></i></div>' +
+            '<div class="task-fact-body">' +
+              '<div class="task-fact-label">Дедлайн</div>' +
+              '<div class="task-fact-value ' + deadlineCls + (t.deadline ? '' : ' muted') + '">' +
+                escapeHtml(t.deadline ? formatTaskDeadline(t.deadline) : 'не указан') + '</div>' +
+            '</div></div>';
+  // Приоритет (дублируется в hero, но в фактах тоже наглядно)
+  html += '<div class="task-fact">' +
+            '<div class="task-fact-icon ' + prioMeta.factCls + '"><i class="ti ' + prioMeta.icon + '"></i></div>' +
+            '<div class="task-fact-body">' +
+              '<div class="task-fact-label">Приоритет</div>' +
+              '<div class="task-fact-value">' + escapeHtml(t.priority_label || prioMeta.label) + '</div>' +
+            '</div></div>';
+  // Создана
+  if (t.created_at) {
+    html += '<div class="task-fact">' +
+              '<div class="task-fact-icon c-gray"><i class="ti ti-calendar-plus"></i></div>' +
+              '<div class="task-fact-body">' +
+                '<div class="task-fact-label">Создана</div>' +
+                '<div class="task-fact-value muted">' + escapeHtml(formatTaskDateTime(t.created_at)) + '</div>' +
+              '</div></div>';
   }
-  // ЭТАП 16В-2: договор
+  // Источник
+  if (t.source) {
+    html += '<div class="task-fact">' +
+              '<div class="task-fact-icon c-orange"><i class="ti ti-tag"></i></div>' +
+              '<div class="task-fact-body">' +
+                '<div class="task-fact-label">Источник</div>' +
+                '<div class="task-fact-value">' + escapeHtml(t.source) + '</div>' +
+              '</div></div>';
+  }
+  // Завершена
+  if (t.done_at) {
+    html += '<div class="task-fact">' +
+              '<div class="task-fact-icon c-green"><i class="ti ti-circle-check"></i></div>' +
+              '<div class="task-fact-body">' +
+                '<div class="task-fact-label">Завершена</div>' +
+                '<div class="task-fact-value muted">' + escapeHtml(formatTaskDateTime(t.done_at)) + '</div>' +
+              '</div></div>';
+  }
+  // Договор — на всю ширину
   if (t.contract_id && t.contract_number) {
     const archived = !t.contract_is_active;
     const lbl = t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '');
-    html += '<div class="detail-item span-2"><div class="detail-label">Договор' +
-            (archived ? ' <span style="color:var(--text-light); text-transform:none; font-weight:400;">(в архиве)</span>' : '') +
-            '</div>' +
-            '<div class="detail-value">' +
-              '<a href="#" class="contract-link" onclick="event.preventDefault(); openContractFromTask(' + t.contract_id + ')">' +
-                '<i class="ti ti-file-text"></i> ' + escapeHtml(lbl) +
-              '</a>' +
-            '</div></div>';
+    html += '<div class="task-fact span-2">' +
+              '<div class="task-fact-icon"><i class="ti ti-file-text"></i></div>' +
+              '<div class="task-fact-body">' +
+                '<div class="task-fact-label">Договор' + (archived ? ' (в архиве)' : '') + '</div>' +
+                '<div class="task-fact-value">' +
+                  '<a href="#" class="contract-link" onclick="event.preventDefault(); openContractFromTask(' + t.contract_id + ')">' +
+                    '<i class="ti ti-external-link"></i> ' + escapeHtml(lbl) +
+                  '</a>' +
+                '</div>' +
+              '</div></div>';
   }
-  if (t.created_at) {
-    html += '<div class="detail-item"><div class="detail-label">Создана</div>' +
-            '<div class="detail-value muted">' + escapeHtml(formatTaskDateTime(t.created_at)) + '</div></div>';
-  }
-  if (t.done_at) {
-    html += '<div class="detail-item"><div class="detail-label">Завершена</div>' +
-            '<div class="detail-value muted">' + escapeHtml(formatTaskDateTime(t.done_at)) + '</div></div>';
-  }
-  html += '</div>';
+  html += '</div>'; // task-facts-grid
 
   // Действия
-  html += '<div style="margin-top: 16px; display: flex; gap: 8px;">';
   if (canEditFully) {
+    html += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
     html += '<button class="btn btn-secondary" onclick="openEditTask()"><i class="ti ti-edit"></i> Редактировать</button>';
     html += '<button class="btn btn-secondary" onclick="deleteCurrentTask()" style="color:var(--danger);"><i class="ti ti-trash"></i> Удалить</button>';
+    html += '</div>';
   }
-  html += '</div>';
 
+  html += '</div>';   // task-detail-body
   html += '</div>';   // task-detail-card
 
   container.innerHTML = html;
