@@ -12024,6 +12024,20 @@
   .pkb-col.c-review  .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(186,117,23,0.45); }
   .pkb-col.c-packing .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(126,34,206,0.45); }
   .pkb-col.c-done    .pkb-wc:not(.b-overdue):not(.b-today):not(.b-tomorrow) { border-left-color: rgba(29,158,117,0.45); }
+  /* v2.43.84: цвет рамки слева + точка перед договором — карточки одного договора
+     одного цвета. Срочность (b-overdue / b-today / b-tomorrow) перебивает. */
+  .pkb-col .pkb-wc.has-contract-color:not(.b-overdue):not(.b-today):not(.b-tomorrow) {
+    border-left-color: var(--ck);
+    border-left-width: 4px;
+  }
+  .pkb-wc-contract-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
 
   .pkb-wc-bar {
     display: inline-flex; align-items: center; gap: 3px;
@@ -18723,6 +18737,28 @@ async function pkbColDrop(ev, newStatus) {
   }
 }
 
+// v2.43.84: палитра цветов договоров — 12 различимых оттенков, выбираются
+// детерминированно по contract_id. Карточки одного договора одного цвета.
+const PKB_CONTRACT_PALETTE = [
+  '#2563EB', // blue
+  '#F97316', // orange
+  '#16A34A', // green
+  '#A855F7', // purple
+  '#D97706', // amber
+  '#0891B2', // cyan
+  '#DB2777', // pink
+  '#7C3AED', // violet
+  '#0EA5E9', // sky
+  '#059669', // emerald
+  '#E11D48', // rose
+  '#65A30D', // lime
+];
+function pkbContractColor(contractId) {
+  const id = parseInt(contractId, 10);
+  if (!id || isNaN(id)) return '';
+  return PKB_CONTRACT_PALETTE[Math.abs(id) % PKB_CONTRACT_PALETTE.length];
+}
+
 function renderPkbWorkCard(w, colKey) {
   const overdueClass = w.is_overdue ? ' b-overdue' : '';
   const isDone = (colKey === 'done');
@@ -18762,9 +18798,15 @@ function renderPkbWorkCard(w, colKey) {
     else if (p > 0)   progressCls = ' p-stage-1';
   }
 
-  let html = '<div class="pkb-wc' + borderCls + dimCls + blockedCls + progressCls + '"' +
+  // v2.43.84: цвет рамки/точки по contract_id для визуальной группировки в очереди
+  const contractColor = pkbContractColor(w.contract_id);
+  const contractColorCls = contractColor ? ' has-contract-color' : '';
+  const contractColorStyle = contractColor ? ' style="--ck: ' + contractColor + ';"' : '';
+
+  let html = '<div class="pkb-wc' + borderCls + dimCls + blockedCls + progressCls + contractColorCls + '"' +
              ' data-work-id="' + w.id + '"' +
              ' data-work-status="' + escapeHtml(w.status || '') + '"' +
+             contractColorStyle +
              dragAttrs +
              ' onclick="openProductionWorkDetail(' + w.id + ')">';
 
@@ -18832,7 +18874,11 @@ function renderPkbWorkCard(w, colKey) {
   if (w.contract_number) subParts.push('№' + String(w.contract_number).replace(/^[№#\s]+/, ''));
   if (w.contractor_name) subParts.push(w.contractor_name);
   if (subParts.length) {
-    html += '<div class="pkb-wc-sub">' + escapeHtml(subParts.join(' · ')) + '</div>';
+    // v2.43.84: точка цвета договора перед текстом
+    const dot = contractColor
+      ? '<span class="pkb-wc-contract-dot" style="background:' + contractColor + ';"></span>'
+      : '';
+    html += '<div class="pkb-wc-sub">' + dot + escapeHtml(subParts.join(' · ')) + '</div>';
   }
 
   // Прогресс/исполнитель для in_progress
