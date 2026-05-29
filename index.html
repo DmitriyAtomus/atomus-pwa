@@ -3604,6 +3604,199 @@
   }
   .home-top-row .top-stats b { color: var(--text-dark); font-weight: 600; }
 
+  /* v2.44.0: КАТАЛОГ ОБОРУДОВАНИЯ — табы разделов / список / карточка */
+  .catalog-tabs {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 0 0 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .catalog-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .catalog-tab i { font-size: 15px; }
+  .catalog-tab:hover { background: var(--bg); border-color: var(--brand-soft); }
+  .catalog-tab.active {
+    background: var(--brand); color: white; border-color: var(--brand);
+  }
+  .catalog-tab.active i { color: white; }
+
+  .catalog-toolbar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .catalog-brand-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .catalog-brand-chip {
+    padding: 5px 11px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: white;
+    font-size: 12px;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .catalog-brand-chip:hover { background: var(--bg); }
+  .catalog-brand-chip.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+
+  .catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 600px) {
+    .catalog-grid { grid-template-columns: 1fr; }
+  }
+
+  .catalog-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .catalog-card:hover {
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    border-color: var(--brand-soft);
+    transform: translateY(-1px);
+  }
+  .catalog-card-photo {
+    width: 100%; aspect-ratio: 4/3;
+    border-radius: 8px;
+    background: var(--bg);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-faint);
+    font-size: 32px;
+  }
+  .catalog-card-supplier {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    color: #16A34A;
+    background: #E8F5E9;
+    padding: 2px 8px; border-radius: 999px;
+    align-self: flex-start;
+  }
+  .catalog-card-code {
+    font-size: 11.5px; color: var(--text-light);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    letter-spacing: 0.2px;
+  }
+  .catalog-card-name {
+    font-size: 14px; font-weight: 600;
+    color: var(--text-dark);
+    line-height: 1.3;
+  }
+  .catalog-card-meta {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: auto;
+  }
+  .catalog-card-meta .chip {
+    font-size: 11px; padding: 2px 8px;
+    background: var(--bg); color: var(--text-mid);
+    border-radius: 6px;
+  }
+  .catalog-card-price {
+    font-size: 14px; font-weight: 700; color: var(--text-dark);
+    margin-top: 4px;
+  }
+  .catalog-card-price small { font-size: 11px; font-weight: 500; color: var(--text-light); }
+
+  /* Карточка-модал — детальный вид */
+  .catalog-detail-modal .modal-body { padding: 16px; }
+  .catalog-detail-hero {
+    display: grid; grid-template-columns: 200px 1fr; gap: 16px;
+    align-items: start;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  @media (max-width: 600px) {
+    .catalog-detail-hero { grid-template-columns: 1fr; }
+  }
+  .catalog-detail-photo {
+    width: 100%; aspect-ratio: 1/1;
+    border-radius: 10px;
+    background: var(--bg);
+    background-size: cover; background-position: center;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-faint); font-size: 48px;
+    position: relative;
+  }
+  .catalog-detail-photo-upload {
+    position: absolute; bottom: 6px; right: 6px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex; gap: 4px; align-items: center;
+  }
+  .catalog-detail-photo-upload:hover { background: white; }
+  .catalog-detail-meta h2 { margin: 6px 0 4px; font-size: 18px; }
+  .catalog-detail-meta .code { color: var(--text-light); font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  .catalog-detail-meta .desc { color: var(--text-mid); font-size: 13px; margin-top: 8px; line-height: 1.45; }
+
+  .catalog-bento {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+  }
+  @media (max-width: 600px) {
+    .catalog-bento { grid-template-columns: repeat(2, 1fr); }
+  }
+  .catalog-bento-cell {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .catalog-bento-cell .lbl {
+    font-size: 10px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-bottom: 2px;
+  }
+  .catalog-bento-cell .val {
+    font-size: 15px; font-weight: 600; color: var(--text-dark);
+  }
+  .catalog-bento-cell .val small { font-size: 11px; color: var(--text-light); font-weight: 500; }
+
+  .catalog-spec-section { margin-top: 14px; }
+  .catalog-spec-section h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-light); font-weight: 700;
+    margin: 0 0 8px;
+  }
+  .catalog-spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .catalog-spec-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .catalog-spec-table td:first-child {
+    color: var(--text-light); width: 45%;
+  }
+  .catalog-spec-table td:last-child {
+    color: var(--text-dark); font-weight: 500;
+  }
+
   /* KPI секция «Сегодня»
      v2.43.73: горизонтальные отступы 14px — выравниваем с .kpi-grid и .qa25-section-label,
      чтобы заголовки секций и карточки начинались по одной вертикали. */
@@ -14755,6 +14948,9 @@
         <button class="nav-item" data-nav="sales-offers" onclick="selectSidebarItem('sales-offers')">
           <i class="ti ti-file-invoice"></i><span>КП</span>
         </button>
+        <button class="nav-item" data-nav="catalog" onclick="selectSidebarItem('catalog')">
+          <i class="ti ti-books"></i><span>Каталог оборудования</span>
+        </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
           <button class="nav-item" data-nav="sales-contractors" onclick="selectSidebarItem('sales-contractors')">
@@ -15579,6 +15775,29 @@
         </div>
         <div class="content-inner" id="spf-content">
           <!-- Наполняется через initSaleProductForm() -->
+        </div>
+      </div>
+
+      <!-- ============ ЭТАП 47 (v2.44.0): КАТАЛОГ ОБОРУДОВАНИЯ (TZ-Stage 34 v2) ============ -->
+      <div class="screen" data-screen="catalog" data-section="sales">
+        <div class="screen-header">
+          <h2>Каталог</h2>
+          <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Каталог оборудования</h1>
+            <div class="page-subtitle">8 разделов, подбор по параметрам</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" id="cat-new-btn" onclick="openCatalogProductForm(null)" style="display:none">
+              <i class="ti ti-plus"></i> Добавить позицию
+            </button>
+          </div>
+        </div>
+        <div class="content-inner" id="catalog-content">
+          <div class="loading-block">Загружаем каталог…</div>
         </div>
       </div>
 
@@ -16749,7 +16968,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.98-home-upgrade";
+const APP_VERSION = "v2.44.0-catalog";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -17764,6 +17983,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sale-products') loadSaleProducts();
   if (screenName === 'sale-categories') loadSaleCategories();   // ЭТАП 17
   if (screenName === 'sale-product-form') initSaleProductForm();
+  if (screenName === 'catalog') loadCatalog();                   // ЭТАП 47 (v2.44.0)
   // КП (14Б)
   if (screenName === 'sales-offers') loadOffers();
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
@@ -17831,6 +18051,7 @@ function refreshCurrentScreen() {
   if (s === 'sales-contractors') cache.contractors = null;
   if (s === 'sale-products') { cache.saleProducts = null; cache.saleCategories = null; }   // ЭТАП 17
   if (s === 'sale-categories') cache.saleCategories = null;   // ЭТАП 17
+  if (s === 'catalog') { cache.catalogCategories = null; cache.catalogProducts = null; }    // ЭТАП 47
   if (s === 'sales-offers') { cache.offers = null; cache.offersCounts = null; }
   selectSidebarItem(s);
 }
@@ -25602,6 +25823,312 @@ function openSaleProductPickModal() {
 
 function closeSaleProductPickModal() {
   document.getElementById('sale-product-pick-modal').classList.remove('visible');
+}
+
+// ============================================================================
+// ЭТАП 47 (v2.44.0): КАТАЛОГ ОБОРУДОВАНИЯ — фронт (TZ-Stage 34 v2)
+// ============================================================================
+
+// Подписи и юниты для филд-чипов и Bento-сетки
+const CATALOG_CATEGORY_DEFAULTS = {
+  compressor:     { measureLabel: 'Мощность',     measureUnit: 'Вт' },
+  air_cooler:     { measureLabel: 'Мощность',     measureUnit: 'кВт' },
+  condenser:      { measureLabel: 'Рассеив-я',    measureUnit: 'кВт' },
+  heat_exchanger: { measureLabel: 'Мощность',     measureUnit: 'кВт' },
+  automation:     { measureLabel: '',             measureUnit: '' },
+  electronics:    { measureLabel: '',             measureUnit: '' },
+  materials:      { measureLabel: '',             measureUnit: '' },
+  refrigerants:   { measureLabel: '',             measureUnit: '' },
+};
+
+async function loadCatalog() {
+  const el = document.getElementById('catalog-content');
+  if (!el) return;
+  if (!cache.catalogState) cache.catalogState = { category: null, brand: null };
+
+  el.innerHTML = '<div class="loading-block">Загружаем каталог…</div>';
+  try {
+    if (!cache.catalogCategories) {
+      const d = await apiGet('/api/catalog/categories');
+      cache.catalogCategories = d.categories || [];
+    }
+  } catch (e) {
+    el.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+    return;
+  }
+
+  // По умолчанию открыта первая категория
+  if (!cache.catalogState.category && cache.catalogCategories.length) {
+    cache.catalogState.category = cache.catalogCategories[0].code;
+  }
+
+  // Кнопку «Добавить позицию» показываем только тем, кто может управлять
+  const newBtn = document.getElementById('cat-new-btn');
+  if (newBtn) {
+    const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
+    newBtn.style.display = canManage ? '' : 'none';
+  }
+
+  renderCatalogTabs();
+  await loadCatalogProducts(cache.catalogState.category);
+}
+
+function renderCatalogTabs() {
+  const el = document.getElementById('catalog-content');
+  if (!el) return;
+  const cats = cache.catalogCategories || [];
+  const active = cache.catalogState.category;
+
+  let html = '<div class="catalog-tabs">';
+  cats.forEach(c => {
+    const isActive = c.code === active ? ' active' : '';
+    html += '<button class="catalog-tab' + isActive + '" onclick="setCatalogCategory(\'' + escapeText(c.code) + '\')">' +
+      '<i class="ti ' + escapeText(c.icon || 'ti-package') + '"></i>' +
+      escapeText(c.name) +
+      '</button>';
+  });
+  html += '</div>';
+  html += '<div id="catalog-body"><div class="loading-block">Загружаем…</div></div>';
+  el.innerHTML = html;
+}
+
+async function setCatalogCategory(code) {
+  cache.catalogState.category = code;
+  cache.catalogState.brand = null;
+  renderCatalogTabs();
+  await loadCatalogProducts(code);
+}
+
+async function loadCatalogProducts(code) {
+  const body = document.getElementById('catalog-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const params = new URLSearchParams({ category: code });
+    if (cache.catalogState.brand) params.append('brand', cache.catalogState.brand);
+    const d = await apiGet('/api/catalog/products?' + params.toString());
+    cache.catalogProducts = d;
+    renderCatalogProducts();
+  } catch (e) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function setCatalogBrand(brand) {
+  cache.catalogState.brand = (cache.catalogState.brand === brand) ? null : brand;
+  loadCatalogProducts(cache.catalogState.category);
+}
+
+function renderCatalogProducts() {
+  const body = document.getElementById('catalog-body');
+  if (!body) return;
+  const d = cache.catalogProducts || { products: [], brands: [] };
+  const products = d.products || [];
+  const brands = d.brands || [];
+  const cat = (cache.catalogCategories || []).find(c => c.code === cache.catalogState.category) || {};
+  const defaults = CATALOG_CATEGORY_DEFAULTS[cat.code] || {};
+
+  let html = '';
+  // Бренд-чипы
+  if (brands.length) {
+    html += '<div class="catalog-toolbar"><div class="catalog-brand-chips">';
+    brands.forEach(b => {
+      const isActive = b === cache.catalogState.brand ? ' active' : '';
+      html += '<span class="catalog-brand-chip' + isActive + '" onclick="setCatalogBrand(' + JSON.stringify(b).replace(/"/g, '&quot;') + ')">' +
+        escapeText(b) + '</span>';
+    });
+    html += '</div></div>';
+  }
+
+  if (!products.length) {
+    html += '<div class="empty-block"><i class="ti ti-package-off"></i>В разделе «' + escapeText(cat.name || '') + '» пока нет позиций</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  html += '<div class="catalog-grid">';
+  products.forEach(p => {
+    const photoStyle = p.photo_key
+      ? "background-image: url('/api/catalog/products/" + p.id + "/photo?v=" + encodeURIComponent(p.photo_key) + "');"
+      : '';
+    const photoIcon = p.photo_key ? '' : '<i class="ti ti-photo"></i>';
+
+    let metaChips = '';
+    if (p.brand) metaChips += '<span class="chip">' + escapeText(p.brand) + '</span>';
+    if (p.subtype) metaChips += '<span class="chip">' + escapeText(p.subtype) + '</span>';
+    if (p.power_w && defaults.measureUnit === 'кВт') {
+      const kw = (p.power_w / 1000).toFixed(2).replace(/\.?0+$/, '');
+      metaChips += '<span class="chip">' + kw + ' кВт</span>';
+    } else if (p.power_w) {
+      metaChips += '<span class="chip">' + p.power_w + ' Вт</span>';
+    }
+
+    let price = '';
+    if (p.price_eur) {
+      price = '<div class="catalog-card-price">€' + p.price_eur.toFixed(2) + ' <small>с НДС</small></div>';
+    } else {
+      price = '<div class="catalog-card-price" style="color: var(--text-light);"><small>Цена по запросу</small></div>';
+    }
+
+    html += '<div class="catalog-card" onclick="openCatalogProduct(' + p.id + ')">' +
+      (p.supplier ? '<div class="catalog-card-supplier"><i class="ti ti-check"></i>' + escapeText(p.supplier) + '</div>' : '') +
+      '<div class="catalog-card-photo" style="' + photoStyle + '">' + photoIcon + '</div>' +
+      (p.code ? '<div class="catalog-card-code">' + escapeText(p.code) + '</div>' : '') +
+      '<div class="catalog-card-name">' + escapeText(p.name) + '</div>' +
+      (metaChips ? '<div class="catalog-card-meta">' + metaChips + '</div>' : '') +
+      price +
+      '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+async function openCatalogProduct(id) {
+  try {
+    const p = await apiGet('/api/catalog/products/' + id);
+    renderCatalogDetailModal(p);
+  } catch (e) {
+    showToast('Не удалось открыть позицию: ' + e, 'error');
+  }
+}
+
+function renderCatalogDetailModal(p) {
+  // Создаём модалку «на лету» если её ещё нет в DOM
+  let modal = document.getElementById('catalog-detail-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay catalog-detail-modal';
+    modal.id = 'catalog-detail-modal';
+    modal.onclick = (e) => { if (e.target === modal) closeCatalogDetail(); };
+    modal.innerHTML = '<div class="modal" style="max-width: 800px;">' +
+      '<div class="modal-header">' +
+        '<h3 id="catalog-detail-title">Карточка</h3>' +
+        '<button class="icon-btn" onclick="closeCatalogDetail()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" id="catalog-detail-body"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+
+  const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
+  const attrs = p.catalog_attrs || {};
+  const photoStyle = p.photo_key
+    ? "background-image: url('/api/catalog/products/" + p.id + "/photo?v=" + encodeURIComponent(p.photo_key) + "');"
+    : '';
+  const photoIcon = p.photo_key ? '' : '<i class="ti ti-photo"></i>';
+
+  let html = '<div class="catalog-detail-hero">';
+  html += '<div class="catalog-detail-photo" style="' + photoStyle + '">' + photoIcon;
+  if (canManage) {
+    html += '<label class="catalog-detail-photo-upload"><i class="ti ti-upload"></i>Фото<input type="file" accept="image/*" style="display:none" onchange="uploadCatalogPhoto(' + p.id + ', this)"></label>';
+  }
+  html += '</div>';
+  html += '<div class="catalog-detail-meta">';
+  if (p.supplier) html += '<div class="catalog-card-supplier" style="margin-bottom: 6px;"><i class="ti ti-check"></i>' + escapeText(p.supplier) + '</div>';
+  if (p.code) html += '<div class="code">' + escapeText(p.code) + '</div>';
+  html += '<h2>' + escapeText(p.name) + '</h2>';
+  if (p.brand || p.series) {
+    html += '<div class="code">' + [p.brand, p.series].filter(Boolean).map(escapeText).join(' / ') + '</div>';
+  }
+  if (p.description) html += '<div class="desc">' + escapeText(p.description) + '</div>';
+  if (p.price_eur) {
+    html += '<div class="catalog-card-price" style="margin-top: 10px;">€' + p.price_eur.toFixed(2) + ' <small>с НДС' + (p.price_source ? ' · ' + escapeText(p.price_source) : '') + '</small></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Bento: габариты и масса
+  if (p.length_mm || p.width_mm || p.height_mm || p.mass_kg) {
+    html += '<h3 class="catalog-spec-section" style="margin-top: 0;">Габариты и вес</h3>';
+    html += '<div class="catalog-bento">';
+    html += '<div class="catalog-bento-cell"><div class="lbl">Длина</div><div class="val">' + (p.length_mm || '—') + ' <small>мм</small></div></div>';
+    html += '<div class="catalog-bento-cell"><div class="lbl">Ширина</div><div class="val">' + (p.width_mm || '—') + ' <small>мм</small></div></div>';
+    html += '<div class="catalog-bento-cell"><div class="lbl">Высота</div><div class="val">' + (p.height_mm || '—') + ' <small>мм</small></div></div>';
+    html += '<div class="catalog-bento-cell"><div class="lbl">Масса</div><div class="val">' + (p.mass_kg || '—') + ' <small>кг</small></div></div>';
+    html += '</div>';
+  }
+
+  // Технические характеристики из catalog_attrs + первичных полей
+  const specs = [];
+  if (p.power_w) specs.push(['Мощность', p.power_w + ' Вт']);
+  if (p.power_standard) specs.push(['Условия номинала', p.power_standard]);
+  if (p.subtype) specs.push(['Подтип', p.subtype]);
+  Object.keys(attrs).forEach(k => {
+    const v = attrs[k];
+    if (v === null || v === undefined || v === '' || k === 'cooling_data') return;
+    specs.push([k, Array.isArray(v) ? v.join(', ') : String(v)]);
+  });
+
+  if (specs.length) {
+    html += '<div class="catalog-spec-section"><h3>Характеристики</h3>';
+    html += '<table class="catalog-spec-table">';
+    specs.forEach(([k, v]) => {
+      html += '<tr><td>' + escapeText(String(k)) + '</td><td>' + escapeText(String(v)) + '</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  // Таблица холодопроизводительности (если есть)
+  const cd = Array.isArray(attrs.cooling_data) ? attrs.cooling_data : null;
+  if (cd && cd.length) {
+    html += '<div class="catalog-spec-section"><h3>Холодопроизводительность</h3>';
+    html += '<table class="catalog-spec-table"><tr><td>Хладагент</td><td>DT, K</td><td>To, °C</td><td>Мощность, Вт</td></tr>';
+    cd.forEach(r => {
+      html += '<tr>' +
+        '<td>' + escapeText(String(r.refrigerant || '—')) + '</td>' +
+        '<td>' + escapeText(String(r.dt_k != null ? r.dt_k : '—')) + '</td>' +
+        '<td>' + escapeText(String(r.to_c != null ? r.to_c : '—')) + '</td>' +
+        '<td>' + escapeText(String(r.power_w != null ? r.power_w : '—')) + '</td>' +
+        '</tr>';
+    });
+    html += '</table></div>';
+  }
+
+  if (p.external_url) {
+    html += '<div style="margin-top: 14px;"><a href="' + escapeText(p.external_url) + '" target="_blank" rel="noopener" style="color: var(--brand); font-size: 13px;"><i class="ti ti-external-link"></i> Источник</a></div>';
+  }
+
+  document.getElementById('catalog-detail-title').textContent = p.code || p.name;
+  document.getElementById('catalog-detail-body').innerHTML = html;
+  modal.classList.add('visible');
+  window._catalogCurrentProductId = p.id;
+}
+
+function closeCatalogDetail() {
+  const modal = document.getElementById('catalog-detail-modal');
+  if (modal) modal.classList.remove('visible');
+}
+
+async function uploadCatalogPhoto(productId, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const resp = await fetch('/api/catalog/products/' + productId + '/photo', {
+      method: 'POST',
+      body: form,
+      credentials: 'include',
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      throw new Error(t || ('HTTP ' + resp.status));
+    }
+    showToast('Фото загружено', 'ok');
+    // Перерисовываем карточку и список
+    cache.catalogProducts = null;
+    await openCatalogProduct(productId);
+    if (cache.catalogState && cache.catalogState.category) {
+      loadCatalogProducts(cache.catalogState.category);
+    }
+  } catch (e) {
+    showToast('Не удалось загрузить фото: ' + e.message, 'error');
+  }
+}
+
+// Заглушка: форма создания/редактирования позиции — на 34.9
+function openCatalogProductForm(id) {
+  showToast('Форма каталога будет добавлена в Stage 34.9', 'info');
 }
 
 async function loadSaleProductsForPickModal(query) {
