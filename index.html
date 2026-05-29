@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.11-pdf-chunked";
+const APP_VERSION = "v2.44.12-form-factor";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26012,6 +26012,7 @@ function renderCatalogTabs() {
 async function setCatalogCategory(code) {
   cache.catalogState.category = code;
   cache.catalogState.brand = null;
+  cache.catalogState.formFactor = null;
   renderCatalogTabs();
   await loadCatalogProducts(code);
 }
@@ -26023,6 +26024,7 @@ async function loadCatalogProducts(code) {
   try {
     const params = new URLSearchParams({ category: code });
     if (cache.catalogState.brand) params.append('brand', cache.catalogState.brand);
+    if (cache.catalogState.formFactor) params.append('form_factor', cache.catalogState.formFactor);
     const d = await apiGet('/api/catalog/products?' + params.toString());
     cache.catalogProducts = d;
     renderCatalogProducts();
@@ -26036,25 +26038,46 @@ function setCatalogBrand(brand) {
   loadCatalogProducts(cache.catalogState.category);
 }
 
+function setCatalogFormFactor(ff) {
+  cache.catalogState.formFactor = (cache.catalogState.formFactor === ff) ? null : ff;
+  loadCatalogProducts(cache.catalogState.category);
+}
+
 function renderCatalogProducts() {
   const body = document.getElementById('catalog-body');
   if (!body) return;
-  const d = cache.catalogProducts || { products: [], brands: [] };
+  const d = cache.catalogProducts || { products: [], brands: [], form_factors: [] };
   const products = d.products || [];
   const brands = d.brands || [];
+  const formFactors = d.form_factors || [];
   const cat = (cache.catalogCategories || []).find(c => c.code === cache.catalogState.category) || {};
   const defaults = CATALOG_CATEGORY_DEFAULTS[cat.code] || {};
 
   let html = '';
-  // Бренд-чипы
-  if (brands.length) {
-    html += '<div class="catalog-toolbar"><div class="catalog-brand-chips">';
-    brands.forEach(b => {
-      const isActive = b === cache.catalogState.brand ? ' active' : '';
-      html += '<span class="catalog-brand-chip' + isActive + '" onclick="setCatalogBrand(' + JSON.stringify(b).replace(/"/g, '&quot;') + ')">' +
-        escapeText(b) + '</span>';
-    });
-    html += '</div></div>';
+  // Чипы фильтров: тип + бренд
+  if (formFactors.length || brands.length) {
+    html += '<div class="catalog-toolbar" style="flex-direction: column; align-items: stretch; gap: 6px;">';
+    if (formFactors.length) {
+      html += '<div class="catalog-brand-chips">';
+      html += '<span style="font-size: 11px; color: var(--text-light); align-self: center; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Тип:</span>';
+      formFactors.forEach(ff => {
+        const isActive = ff.code === cache.catalogState.formFactor ? ' active' : '';
+        html += '<span class="catalog-brand-chip' + isActive + '" onclick="setCatalogFormFactor(' + JSON.stringify(ff.code).replace(/"/g, '&quot;') + ')">' +
+          escapeText(ff.label) + '</span>';
+      });
+      html += '</div>';
+    }
+    if (brands.length) {
+      html += '<div class="catalog-brand-chips">';
+      html += '<span style="font-size: 11px; color: var(--text-light); align-self: center; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Бренд:</span>';
+      brands.forEach(b => {
+        const isActive = b === cache.catalogState.brand ? ' active' : '';
+        html += '<span class="catalog-brand-chip' + isActive + '" onclick="setCatalogBrand(' + JSON.stringify(b).replace(/"/g, '&quot;') + ')">' +
+          escapeText(b) + '</span>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
   }
 
   if (!products.length) {
