@@ -28467,9 +28467,10 @@ async function openModelDetail(modelId) {
       '</div>';
   }
 
-  // Кнопка «Редактировать» (для директора/зама)
+  // v2.43.86: кнопка «Изменить модель» теперь в шапке рядом с названием —
+  // раньше она лежала среди BOM-кнопок и многие думали что это редактирование BOM.
   const editBtn = canManageSales()
-    ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')"><i class="ti ti-edit"></i> Редактировать</button>'
+    ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')" title="Изменить название, описание, исполнение"><i class="ti ti-edit"></i> Изменить модель</button>'
     : '';
   // v2.41.13: кнопка «Раздвоить» для choice-моделей (только директор/зам)
   const splitBtn = (canManageSales() && m.exec_mode === 'choice')
@@ -28480,12 +28481,13 @@ async function openModelDetail(modelId) {
 
   overlay.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
-      '<div class="modal-header">' +
-        '<div>' +
+      '<div class="modal-header" style="align-items:flex-start;">' +
+        '<div style="flex:1;min-width:0;">' +
           '<h3 style="margin:0;">' + _highlightAisi(m.name + (m.extra ? ' · ' + m.extra : '')) + '</h3>' +
           '<div style="font-size:12px;color:var(--text-light);margin-top:4px;">' +
             escapeHtml(dirName) + ' · ' + _highlightAisi(subParts.join(' · ')) +
           '</div>' +
+          (editBtn ? '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' + editBtn + splitBtn + '</div>' : '') +
         '</div>' +
         '<button class="modal-close" onclick="closeModelDetail()"><i class="ti ti-x"></i></button>' +
       '</div>' +
@@ -28499,8 +28501,6 @@ async function openModelDetail(modelId) {
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-top:1px solid var(--border);padding-top:14px;">' +
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-            editBtn +
-            splitBtn +
             (canManageSales() ?
               '<button class="btn btn-secondary btn-small" onclick="openBomImportFromText(' + modelId + ', ' + JSON.stringify(m.name || '') + ')" title="Вставить BOM из Excel/текста">' +
                 '<i class="ti ti-clipboard-data"></i> Импорт BOM' +
