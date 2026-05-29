@@ -20049,6 +20049,9 @@ function renderPkbBomBlock(w) {
   html +=     '<i class="ti ' + titleIcon + '"></i>' + escapeHtml(titleText);
   html +=   '</div>';
   html +=   '<div class="pkb-bom-list">';
+  // v2.43.81: кнопка «Сопоставить со склада» — закрыть BOM-строку ручным списанием
+  // компонента с другим названием (поставщики иногда называют чуть иначе).
+  const canMan = (typeof hasPermission === 'function') && hasPermission('production.manage');
   missing.forEach(m => {
     const need = pkbFmtQty(m.need);
     const have = pkbFmtQty(m.available);
@@ -20059,6 +20062,11 @@ function renderPkbBomBlock(w) {
     html +=   '<span class="pkb-bom-item-name' + critCls + '">' + escapeHtml(m.component_name || '?') + '</span>';
     html +=   '<span class="pkb-bom-item-qty">нужно ' + need + ' / есть ' + have + ' ' + escapeHtml(unit) + '</span>';
     html +=   '<span class="pkb-bom-item-deficit">−' + def + '</span>';
+    if (canMan && m.bom_id) {
+      html += '<button class="btn btn-secondary btn-small" style="margin-left:8px;padding:3px 8px;font-size:11px;" ' +
+                'onclick="event.stopPropagation();openBomFulfillModal(' + w.id + ',' + m.bom_id + ',' + JSON.stringify(m.component_name || '').replace(/"/g, '&quot;') + ',' + m.need + ',' + JSON.stringify(unit).replace(/"/g, '&quot;') + ')" ' +
+                'title="Списать другой компонент со склада, чтобы закрыть эту строку"><i class="ti ti-arrow-merge"></i> Сопоставить</button>';
+    }
     html += '</div>';
   });
   html +=   '</div>';
@@ -20074,6 +20082,110 @@ function pkbFmtQty(n) {
   const v = parseFloat(n);
   if (isNaN(v)) return '0';
   return (v % 1 === 0) ? String(Math.round(v)) : v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+// v2.43.81: модал «Сопоставить со склада» — выбрать другой компонент и закрыть BOM-строку.
+async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
+  if (!cache.components) {
+    try { const r = await apiGet('/api/components'); cache.components = r.components || []; }
+    catch (e) { cache.components = []; }
+  }
+  state._bomFulfillSelectedId = null;
+  const overlay = document.createElement('div');
+  overlay.id = 'bom-fulfill-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.style.zIndex = '270';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-arrow-merge"></i> Сопоставить со склада</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'bom-fulfill-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 18px 0;">' +
+        '<div style="background:var(--brand-bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;">' +
+          '<div style="font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;">Закрыть строку</div>' +
+          '<div style="font-weight:600;font-size:14px;margin-top:2px;">' + escapeHtml(bomName) + '</div>' +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">Нужно ' + need + ' ' + escapeHtml(unit) + '</div>' +
+        '</div>' +
+        '<input type="text" id="bf-search" class="form-input" placeholder="Поиск компонента…" oninput="_bomFulfillFilter()" style="margin-bottom:10px;" />' +
+      '</div>' +
+      '<div id="bf-list" style="flex:1;overflow-y:auto;padding:0 18px;"></div>' +
+      '<div id="bf-qty-row" style="display:none;padding:14px 18px 0;border-top:1px solid var(--border);">' +
+        '<label class="form-label">Количество для списания</label>' +
+        '<input type="number" id="bf-qty" class="form-input" value="' + need + '" min="0.001" step="0.01" />' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'bom-fulfill-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="bf-submit" disabled onclick="submitBomFulfill(' + workId + ',' + bomId + ')"><i class="ti ti-check"></i> Списать</button>' +
+      '</div></div>';
+  document.body.appendChild(overlay);
+  _bomFulfillFilter();
+}
+
+function _bomFulfillFilter() {
+  const q = ((document.getElementById('bf-search') || {}).value || '').trim().toLowerCase();
+  const comps = cache.components || [];
+  const filtered = q
+    ? comps.filter(c => (c.name || '').toLowerCase().includes(q) || (c.sku || '').toLowerCase().includes(q))
+    : comps;
+  const list = document.getElementById('bf-list');
+  if (!list) return;
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-block" style="padding:14px;"><i class="ti ti-info-circle"></i>Ничего не найдено</div>';
+    return;
+  }
+  list.innerHTML = filtered.slice(0, 120).map(c => {
+    const stock = parseFloat(c.qty_on_stock || 0);
+    const stockCls = stock > 0 ? '' : ' style="color:var(--danger);"';
+    const sel = state._bomFulfillSelectedId === c.id ? ' style="background:var(--brand-bg);"' : '';
+    return '<div class="modal-item" onclick="_bomFulfillSelect(' + c.id + ')"' + sel + '>' +
+             '<div class="mi-text">' +
+               '<div class="mi-title">' + escapeHtml(c.name || '?') + (c.sku ? ' · ' + escapeHtml(c.sku) : '') + '</div>' +
+               '<div class="mi-meta"' + stockCls + '>на складе: ' + stock + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
+             '</div></div>';
+  }).join('');
+}
+
+function _bomFulfillSelect(componentId) {
+  state._bomFulfillSelectedId = componentId;
+  const submit = document.getElementById('bf-submit');
+  if (submit) submit.disabled = false;
+  const qtyRow = document.getElementById('bf-qty-row');
+  if (qtyRow) qtyRow.style.display = '';
+  _bomFulfillFilter();
+}
+
+async function submitBomFulfill(workId, bomId) {
+  const componentId = state._bomFulfillSelectedId;
+  const qty = parseFloat((document.getElementById('bf-qty') || {}).value || 0);
+  if (!componentId) { showToast('Выберите компонент', 'error'); return; }
+  if (!(qty > 0)) { showToast('Укажите кол-во > 0', 'error'); return; }
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/bom-fulfill', {
+      bom_id: bomId, component_id: componentId, qty: qty,
+    });
+    if (!r.ok) {
+      showToast((r.data && (r.data.message || r.data.error)) || 'Не удалось списать', 'error');
+      return;
+    }
+    showToast(r.data.message || 'Списано', 'success');
+    document.getElementById('bom-fulfill-modal').remove();
+    cache.productionKanban = null;
+    cache.components = null;
+    // Перезагружаем модалку работы — статус блокировки изменился
+    if (typeof openProductionWorkDetail === 'function') {
+      const cur = document.querySelector('#pkb-detail-modal [data-work-id]');
+      if (cur) {
+        const wid = parseInt(cur.dataset.workId, 10);
+        if (wid) openProductionWorkDetail(wid);
+      } else {
+        openProductionWorkDetail(workId);
+      }
+    }
+  } catch (e) {
+    showToast('Ошибка: ' + (e && e.message || e), 'error');
+  }
 }
 
 
