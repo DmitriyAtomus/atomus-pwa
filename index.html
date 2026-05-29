@@ -28426,7 +28426,7 @@ async function openModelDetail(modelId) {
     '</div>';
   }
 
-  // Характеристики (specs)
+  // Характеристики (specs) — legacy простой объект {key: value}
   let specsHtml = '';
   let specsObj = {};
   if (m.specs_json) {
@@ -28445,6 +28445,10 @@ async function openModelDetail(modelId) {
     });
     specsHtml += '</div>';
   }
+
+  // v2.43.85: новый блок «Характеристики (секции)» — структурированный, с фото и
+  // загрузкой/AI-разбором файла спецификации.
+  const charsHtml = _renderModelCharsBlock(m);
 
   // Описание
   let descHtml = '';
@@ -28491,6 +28495,7 @@ async function openModelDetail(modelId) {
         pricesHtml +
         descHtml +
         specsHtml +
+        charsHtml +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-top:1px solid var(--border);padding-top:14px;">' +
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
@@ -28517,6 +28522,8 @@ async function openModelDetail(modelId) {
   overlay.classList.add('visible');
   await loadModelBom(modelId);
   loadModelAssembliesBlock(modelId);
+  // v2.43.85: фото грузим лениво через blob — эндпоинт требует Bearer-токен
+  if (m.photo_key) _loadModelPhotoFromBackend(modelId);
 }
 
 // v2.43.25: загрузка истории сборок модели для модалки
@@ -28608,6 +28615,321 @@ function closeModelDetail() {
   const o = document.getElementById('model-detail-modal');
   if (o) o.classList.remove('visible');
   state._currentBomModelId = null;
+}
+
+// ============================================================
+// v2.43.85: Характеристики модели + фото + AI-разбор спецификации
+// ============================================================
+
+const CHILLER_CHARS_TEMPLATE = {
+  sections: [
+    { title: 'Параметры холодильного агрегата', items: [
+      {key:'Производитель',value:''},{key:'Наименование',value:''},
+      {key:'Холодопроизводительность, кВт',value:''},{key:'Хладагент',value:''},
+      {key:'Хладоноситель',value:''},{key:'Тип расширительного устройства',value:''},
+      {key:'Температура х/носителя на вход/выход',value:''},
+      {key:'Электропитание',value:''},{key:'Потребляемая мощность, кВт',value:''},
+    ]},
+    { title: 'Компрессор', items: [
+      {key:'Тип компрессора',value:''},{key:'Количество, шт',value:''},
+      {key:'Холодопроизводительность, кВт',value:''},
+      {key:'Температура кипения, °C',value:''},{key:'Температура конденсации, °C',value:''},
+    ]},
+    { title: 'Испаритель', items: [
+      {key:'Тип испарителя',value:''},
+    ]},
+    { title: 'Охлаждение', items: [
+      {key:'Конструктивное исполнение конденсатора',value:''},
+      {key:'Расход воздуха, м³/ч',value:''},{key:'Вентилятор, мм x кол-во',value:''},
+      {key:'Уровень шума, дБА x кол-во',value:''},
+      {key:'Габаритные размеры (Ш*Г*В), мм',value:''},{key:'Вес, кг',value:''},
+    ]},
+    { title: 'Присоединительные патрубки фреонового контура', items: [
+      {key:'Диаметр патрубка вход, дюйм (мм)',value:''},
+      {key:'Диаметр патрубка выход, дюйм (мм)',value:''},
+    ]},
+    { title: 'Гидромодуль', items: [
+      {key:'Объём аккумулирующего бака, л',value:''},{key:'Тип насоса',value:''},
+      {key:'Номинальная производительность, м³/ч',value:''},
+      {key:'Номинальный напор, м',value:''},
+    ]},
+    { title: 'Общие размеры агрегата', items: [
+      {key:'(Д*Ш*В), мм',value:''},{key:'Вес, кг',value:''},
+    ]},
+  ]
+};
+
+function _parseModelChars(m) {
+  if (!m || !m.characteristics) return { sections: [] };
+  try {
+    const o = JSON.parse(m.characteristics);
+    if (o && Array.isArray(o.sections)) return o;
+  } catch (e) {}
+  return { sections: [] };
+}
+
+function _renderModelCharsBlock(m) {
+  const chars = _parseModelChars(m);
+  const canEdit = (typeof canManageSales === 'function') && canManageSales();
+  const hasChars = chars.sections.length > 0;
+  const hasPhoto = !!m.photo_key;
+  const hasSpec = !!m.spec_file_key;
+
+  let html = '<div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:18px;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+  html += '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-check"></i> Характеристики</h4>';
+  if (canEdit) {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    html += '<button class="btn btn-secondary btn-small" onclick="openCharsEditor(' + m.id + ')"><i class="ti ti-edit"></i> Редактировать</button>';
+    html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
+              '<i class="ti ti-photo-plus"></i> Фото' +
+              '<input type="file" accept="image/*" style="display:none;" onchange="uploadModelPhoto(' + m.id + ', this)">' +
+            '</label>';
+    html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
+              '<i class="ti ti-file-upload"></i> Файл СП' +
+              '<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" style="display:none;" onchange="uploadModelSpec(' + m.id + ', this)">' +
+            '</label>';
+    if (hasSpec) {
+      html += '<button class="btn btn-primary btn-small" onclick="parseModelSpec(' + m.id + ')" title="Разобрать загруженный файл через AI"><i class="ti ti-sparkles"></i> Разобрать AI</button>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Фото (если есть)
+  if (hasPhoto) {
+    html += '<div id="model-photo-wrap-' + m.id + '" style="margin-bottom:14px;text-align:center;">' +
+              '<img id="model-photo-img-' + m.id + '" alt="Фото модели" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid var(--border);" />' +
+            '</div>';
+  }
+
+  // Файл СП (если есть)
+  if (hasSpec) {
+    const fname = escapeHtml(m.spec_file_name || 'файл');
+    html += '<div style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;">' +
+              '<i class="ti ti-file-text" style="font-size:18px;color:var(--brand);"></i>' +
+              '<span style="flex:1;color:var(--text-dark);">' + fname + '</span>' +
+              '<button class="btn btn-secondary btn-small" onclick="downloadModelSpec(' + m.id + ')"><i class="ti ti-download"></i> Скачать</button>' +
+            '</div>';
+  }
+
+  // Сами характеристики
+  if (hasChars) {
+    chars.sections.forEach(sec => {
+      if (!sec.title && (!sec.items || sec.items.length === 0)) return;
+      html += '<div style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:10px;">';
+      if (sec.title) {
+        html += '<div style="font-weight:600;font-size:13px;color:var(--text-dark);margin-bottom:6px;">' + escapeHtml(sec.title) + '</div>';
+      }
+      (sec.items || []).forEach(it => {
+        html += '<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px dashed var(--border);font-size:12.5px;">' +
+                  '<span style="color:var(--text-light);">' + escapeHtml(it.key || '') + '</span>' +
+                  '<span style="color:var(--text-dark);font-weight:500;text-align:right;">' + escapeHtml(it.value || '') + '</span>' +
+                '</div>';
+      });
+      html += '</div>';
+    });
+  } else if (!hasPhoto && !hasSpec) {
+    html += '<div style="font-size:12px;color:var(--text-light);padding:8px 0;">Характеристики не заполнены.' +
+            (canEdit ? ' Нажми «Редактировать» или «Файл СП → Разобрать AI».' : '') + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// Лениво подгружаем картинку как blob (фото-эндпоинт требует Bearer-токен).
+async function _loadModelPhotoFromBackend(modelId) {
+  const img = document.getElementById('model-photo-img-' + modelId);
+  if (!img) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/photo', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) return;
+    const blob = await r.blob();
+    img.src = URL.createObjectURL(blob);
+  } catch (e) {}
+}
+
+async function uploadModelPhoto(modelId, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { showToast('Фото больше 10 МБ', 'error'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/photo', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    if (!r.ok) { showToast('Не удалось загрузить фото', 'error'); return; }
+    showToast('Фото загружено', 'success');
+    cache.models = null;
+    openModelDetail(modelId);
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+  input.value = '';
+}
+
+async function uploadModelSpec(modelId, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { showToast('Файл больше 25 МБ', 'error'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/spec-file', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    if (!r.ok) { showToast('Не удалось загрузить файл', 'error'); return; }
+    showToast('Файл загружен', 'success');
+    cache.models = null;
+    openModelDetail(modelId);
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+  input.value = '';
+}
+
+async function downloadModelSpec(modelId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/spec-file', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось скачать', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'spec';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+}
+
+async function parseModelSpec(modelId) {
+  showToast('Просим AI разобрать файл (15-40 сек)…', 'info');
+  try {
+    const r = await apiPost('/api/models/' + modelId + '/parse-spec', {});
+    if (!r.ok || !r.data || !r.data.sections) {
+      showToast((r.data && r.data.message) || 'AI не смог разобрать', 'error');
+      return;
+    }
+    // Открываем редактор с распарсенными секциями для подтверждения
+    openCharsEditor(modelId, { sections: r.data.sections });
+    showToast('AI вернул ' + r.data.sections.length + ' секций — проверь и сохрани', 'success');
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+}
+
+// Редактор характеристик (модал поверх детали модели)
+function openCharsEditor(modelId, initial) {
+  // Если initial не передан — берём из кэша модели
+  let chars = initial;
+  if (!chars) {
+    const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+    chars = _parseModelChars(m);
+  }
+  state._charsEditing = JSON.parse(JSON.stringify(chars || {sections:[]}));
+  if (!state._charsEditing.sections) state._charsEditing.sections = [];
+
+  let overlay = document.getElementById('chars-editor-modal');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'chars-editor-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.style.zIndex = '260';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  _renderCharsEditor(modelId);
+}
+
+function _renderCharsEditor(modelId) {
+  const overlay = document.getElementById('chars-editor-modal');
+  if (!overlay) return;
+  const ce = state._charsEditing || {sections:[]};
+  let html =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-check"></i> Характеристики</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'chars-editor-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:12px 18px 0;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px;">' +
+        '<button class="btn btn-secondary btn-small" onclick="_charsApplyChillerTemplate()" title="Заменить структурой из ТЗ чиллера"><i class="ti ti-template"></i> Шаблон «Чиллер»</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="_charsAddSection()"><i class="ti ti-plus"></i> Добавить раздел</button>' +
+      '</div>' +
+      '<div id="chars-editor-body" style="flex:1;overflow-y:auto;padding:14px 18px;">';
+  ce.sections.forEach((sec, sIdx) => {
+    html += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:white;">' +
+              '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
+                '<input type="text" class="form-input" placeholder="Название раздела" value="' + escapeHtml(sec.title || '') + '" oninput="_charsSetSectionTitle(' + sIdx + ', this.value)" style="flex:1;margin:0;font-weight:600;" />' +
+                '<button class="btn btn-secondary btn-small" onclick="_charsRemoveSection(' + sIdx + ')" style="color:var(--danger);" title="Удалить раздел"><i class="ti ti-trash"></i></button>' +
+              '</div>';
+    (sec.items || []).forEach((it, iIdx) => {
+      html += '<div style="display:flex;gap:6px;margin-bottom:5px;">' +
+                '<input type="text" class="form-input" placeholder="Параметр" value="' + escapeHtml(it.key || '') + '" oninput="_charsSetItemKey(' + sIdx + ',' + iIdx + ', this.value)" style="flex:1;margin:0;font-size:12.5px;" />' +
+                '<input type="text" class="form-input" placeholder="Значение" value="' + escapeHtml(it.value || '') + '" oninput="_charsSetItemValue(' + sIdx + ',' + iIdx + ', this.value)" style="flex:1;margin:0;font-size:12.5px;" />' +
+                '<button class="btn btn-secondary btn-small" onclick="_charsRemoveItem(' + sIdx + ',' + iIdx + ')" style="color:var(--danger);" title="Удалить"><i class="ti ti-x"></i></button>' +
+              '</div>';
+    });
+    html += '<button class="btn btn-secondary btn-small" onclick="_charsAddItem(' + sIdx + ')" style="margin-top:4px;"><i class="ti ti-plus"></i> Параметр</button>';
+    html += '</div>';
+  });
+  if (ce.sections.length === 0) {
+    html += '<div class="empty-block" style="padding:16px;"><i class="ti ti-info-circle"></i>Нажми «Шаблон Чиллер» или «Добавить раздел»</div>';
+  }
+  html += '</div>' +
+    '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'chars-editor-modal\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" onclick="saveChars(' + modelId + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+    '</div></div>';
+  overlay.innerHTML = html;
+}
+
+function _charsApplyChillerTemplate() {
+  state._charsEditing = JSON.parse(JSON.stringify(CHILLER_CHARS_TEMPLATE));
+  _renderCharsEditor(state._currentBomModelId);
+}
+function _charsAddSection() {
+  state._charsEditing.sections.push({title: '', items: []});
+  _renderCharsEditor(state._currentBomModelId);
+}
+function _charsRemoveSection(i) {
+  state._charsEditing.sections.splice(i, 1);
+  _renderCharsEditor(state._currentBomModelId);
+}
+function _charsSetSectionTitle(i, v) { state._charsEditing.sections[i].title = v; }
+function _charsAddItem(i) {
+  state._charsEditing.sections[i].items = state._charsEditing.sections[i].items || [];
+  state._charsEditing.sections[i].items.push({key: '', value: ''});
+  _renderCharsEditor(state._currentBomModelId);
+}
+function _charsRemoveItem(i, j) {
+  state._charsEditing.sections[i].items.splice(j, 1);
+  _renderCharsEditor(state._currentBomModelId);
+}
+function _charsSetItemKey(i, j, v)   { state._charsEditing.sections[i].items[j].key = v; }
+function _charsSetItemValue(i, j, v) { state._charsEditing.sections[i].items[j].value = v; }
+
+async function saveChars(modelId) {
+  const payload = { sections: state._charsEditing.sections };
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/characteristics', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { showToast('Не удалось сохранить', 'error'); return; }
+    showToast('Сохранено', 'success');
+    document.getElementById('chars-editor-modal').remove();
+    cache.models = null;
+    openModelDetail(modelId);
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
 }
 
 // ============ ЭТАП 45 (v2.33.0): РЕДАКТИРОВАНИЕ МОДЕЛИ ============
