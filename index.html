@@ -3715,6 +3715,47 @@
     .catalog-row .row-supplier { display: none; }
   }
 
+  /* v2.44.6: панель «Подбор по параметрам» */
+  .catalog-selector-bar {
+    display: flex; gap: 10px; align-items: center;
+    margin-bottom: 12px;
+  }
+  .btn-sm {
+    padding: 6px 12px; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-link {
+    background: none; border: none;
+    color: var(--brand); cursor: pointer;
+    font-size: 12.5px; padding: 0 4px;
+    text-decoration: underline;
+  }
+  .selector-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    border-radius: 8px;
+    font-size: 12.5px; font-weight: 500;
+  }
+  .selector-status i { font-size: 14px; }
+
+  /* Маркеры результата подбора слева от артикула */
+  .row-marker {
+    display: inline-block;
+    min-width: 44px;
+    text-align: center;
+    padding: 2px 6px;
+    margin-right: 4px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .row-marker.m-green { background: #E8F5E9; color: #16A34A; }
+  .row-marker.m-amber { background: #FEF3E2; color: #D97706; }
+  .row-marker.m-red   { background: #FEE2E2; color: #DC2626; }
+
   /* Старая сетка карточек — оставлена на случай отката */
   .catalog-grid { display: none; }
   .catalog-card { display: none; }
@@ -16973,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.5-attrs-ru";
+const APP_VERSION = "v2.44.6-selector";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25928,6 +25969,7 @@ function renderCatalogTabs() {
   if (!el) return;
   const cats = cache.catalogCategories || [];
   const active = cache.catalogState.category;
+  const activeCat = cats.find(c => c.code === active);
 
   let html = '<div class="catalog-tabs">';
   cats.forEach(c => {
@@ -25938,6 +25980,22 @@ function renderCatalogTabs() {
       '</button>';
   });
   html += '</div>';
+
+  // Панель действий над списком — «Подбор по параметрам» + сброс
+  if (activeCat && activeCat.selector_kind) {
+    html += '<div class="catalog-selector-bar">';
+    const selectorActive = cache.catalogState.selectorResults != null;
+    if (selectorActive) {
+      html += '<div class="selector-status"><i class="ti ti-target"></i>Результаты подбора · ' +
+        (cache.catalogState.selectorResults.count || 0) + ' позиций' +
+        ' <button class="btn-link" onclick="resetCatalogSelector()">Сбросить</button></div>';
+    } else {
+      const label = activeCat.selector_kind === 'power' ? 'Подбор по мощности' : 'Подбор по характеристикам';
+      html += '<button class="btn btn-primary btn-sm" onclick="openCatalogSelectorModal()"><i class="ti ti-target"></i>' + label + '</button>';
+    }
+    html += '</div>';
+  }
+
   html += '<div id="catalog-body"><div class="loading-block">Загружаем…</div></div>';
   el.innerHTML = html;
 }
@@ -26077,22 +26135,12 @@ function renderCatalogDetailModal(p) {
     document.body.appendChild(modal);
   }
 
-  const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
   const attrs = p.catalog_attrs || {};
 
-  let html = '<div class="catalog-detail-hero">';
-  html += '<div class="catalog-detail-photo">';
-  if (p.photo_key) {
-    html += '<img id="catdetail-img-' + p.id + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;">';
-  } else {
-    html += '<i class="ti ti-photo"></i>';
-  }
-  if (canManage) {
-    html += '<label class="catalog-detail-photo-upload"><i class="ti ti-upload"></i>Фото<input type="file" accept="image/*" style="display:none" onchange="uploadCatalogPhoto(' + p.id + ', this)"></label>';
-  }
-  html += '</div>';
+  // v2.44.6: фото временно убираем из карточки — будет вместе с формой создания/редактирования
+  let html = '<div class="catalog-detail-hero" style="grid-template-columns: 1fr;">';
   html += '<div class="catalog-detail-meta">';
-  if (p.supplier) html += '<div class="catalog-card-supplier" style="margin-bottom: 6px;"><i class="ti ti-check"></i>' + escapeText(p.supplier) + '</div>';
+  if (p.supplier) html += '<div class="row-supplier" style="margin-bottom: 6px;"><i class="ti ti-check"></i>' + escapeText(p.supplier) + '</div>';
   if (p.code) html += '<div class="code">' + escapeText(p.code) + '</div>';
   html += '<h2>' + escapeText(p.name) + '</h2>';
   if (p.brand || p.series) {
@@ -26100,7 +26148,7 @@ function renderCatalogDetailModal(p) {
   }
   if (p.description) html += '<div class="desc">' + escapeText(p.description) + '</div>';
   if (p.price_eur) {
-    html += '<div class="catalog-card-price" style="margin-top: 10px;">€' + p.price_eur.toFixed(2) + ' <small>с НДС' + (p.price_source ? ' · ' + escapeText(p.price_source) : '') + '</small></div>';
+    html += '<div style="margin-top: 10px; font-size: 16px; font-weight: 700;">€' + p.price_eur.toFixed(2) + ' <small style="font-size: 12px; font-weight: 500; color: var(--text-light);">с НДС' + (p.price_source ? ' · ' + escapeText(p.price_source) : '') + '</small></div>';
   }
   html += '</div>';
   html += '</div>';
@@ -26166,7 +26214,6 @@ function renderCatalogDetailModal(p) {
   document.getElementById('catalog-detail-body').innerHTML = html;
   modal.classList.add('visible');
   window._catalogCurrentProductId = p.id;
-  if (p.photo_key) _loadCatalogPhotoBlob(p.id, 'catdetail-img-' + p.id);
 }
 
 function closeCatalogDetail() {
@@ -26205,6 +26252,166 @@ async function uploadCatalogPhoto(productId, input) {
 // Заглушка: форма создания/редактирования позиции — на 34.9
 function openCatalogProductForm(id) {
   showToast('Форма каталога будет добавлена в Stage 34.9', 'info');
+}
+
+// ============================================================================
+// ПОДБОР ПО ПАРАМЕТРАМ (Stage 34.6)
+// ============================================================================
+
+async function openCatalogSelectorModal() {
+  const code = cache.catalogState && cache.catalogState.category;
+  if (!code) return;
+  let cfg;
+  try {
+    cfg = await apiGet('/api/catalog/selector-fields?category=' + encodeURIComponent(code));
+  } catch (e) {
+    showToast('Не удалось открыть подбор: ' + e.message, 'error');
+    return;
+  }
+
+  let modal = document.getElementById('catalog-selector-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'catalog-selector-modal';
+    modal.onclick = (e) => { if (e.target === modal) closeCatalogSelector(); };
+    modal.innerHTML = '<div class="modal" style="max-width: 480px;">' +
+      '<div class="modal-header">' +
+        '<h3 id="catalog-selector-title">Подбор</h3>' +
+        '<button class="icon-btn" onclick="closeCatalogSelector()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" id="catalog-selector-body"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+
+  const cats = cache.catalogCategories || [];
+  const cat = cats.find(c => c.code === code) || {};
+  document.getElementById('catalog-selector-title').textContent =
+    cfg.selector_kind === 'power' ? 'Подбор по мощности — ' + cat.name : 'Подбор — ' + cat.name;
+
+  // Рендер полей
+  let body = '<form id="catalog-selector-form" onsubmit="event.preventDefault(); submitCatalogSelector();" style="display: flex; flex-direction: column; gap: 12px;">';
+  cfg.fields.forEach(f => {
+    body += '<label style="display: flex; flex-direction: column; gap: 4px;">';
+    body += '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">' + escapeText(f.label) +
+      (f.unit ? ', ' + escapeText(f.unit) : '') +
+      (f.required ? ' <span style="color: #DC2626;">*</span>' : '') + '</span>';
+    if (f.type === 'number') {
+      body += '<input type="number" step="any" name="' + escapeText(f.key) + '" ' +
+        (f.required ? 'required ' : '') +
+        'class="form-input" style="width: 100%;">';
+    } else if (f.type === 'select') {
+      body += '<select name="' + escapeText(f.key) + '" class="form-input" style="width: 100%;">';
+      body += '<option value="">— любой —</option>';
+      (f.options || []).forEach(o => {
+        body += '<option value="' + escapeText(String(o)) + '">' + escapeText(String(o)) + '</option>';
+      });
+      body += '</select>';
+    }
+    body += '</label>';
+  });
+  body += '<button type="submit" class="btn btn-primary" style="margin-top: 8px;"><i class="ti ti-target"></i>Подобрать</button>';
+  body += '</form>';
+  document.getElementById('catalog-selector-body').innerHTML = body;
+  modal.classList.add('visible');
+}
+
+function closeCatalogSelector() {
+  const m = document.getElementById('catalog-selector-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function submitCatalogSelector() {
+  const code = cache.catalogState && cache.catalogState.category;
+  if (!code) return;
+  const form = document.getElementById('catalog-selector-form');
+  if (!form) return;
+  const fd = new FormData(form);
+  const body = { category: code };
+  fd.forEach((v, k) => {
+    if (v === '' || v == null) return;
+    // Числа автоматом
+    const num = Number(v);
+    body[k] = (!Number.isNaN(num) && String(num) === String(v)) ? num : v;
+  });
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/select', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || ('HTTP ' + r.status));
+    }
+    const d = await r.json();
+    cache.catalogState.selectorResults = d;
+    closeCatalogSelector();
+    renderCatalogTabs();         // обновит панель с «Сбросить»
+    renderCatalogSelectorResults();
+  } catch (e) {
+    showToast('Ошибка подбора: ' + e.message, 'error');
+  }
+}
+
+function resetCatalogSelector() {
+  cache.catalogState.selectorResults = null;
+  renderCatalogTabs();
+  loadCatalogProducts(cache.catalogState.category);
+}
+
+function renderCatalogSelectorResults() {
+  const body = document.getElementById('catalog-body');
+  if (!body) return;
+  const d = cache.catalogState.selectorResults || {};
+  const results = d.results || [];
+  if (!results.length) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>Нет позиций, удовлетворяющих критериям</div>';
+    return;
+  }
+  let html = '<div class="catalog-list">';
+  results.forEach(r => {
+    // Маркер слева
+    const marker = '<span class="row-marker m-' + escapeText(r.marker) + '">' + escapeText(r.marker_label) + '</span>';
+
+    // Контекст: power_at_conditions или score
+    let metaParts = [];
+    if (r.brand) metaParts.push('<b>' + escapeText(r.brand) + '</b>');
+    if (r.power_at_conditions != null) {
+      const fmt = r.power_at_conditions >= 1000
+        ? (r.power_at_conditions / 1000).toFixed(2).replace(/\.?0+$/, '') + ' кВт'
+        : r.power_at_conditions + ' Вт';
+      let label = 'при заданных условиях: ' + fmt;
+      if (r.power_source === 'nominal') label += ' (номинал)';
+      else if (r.power_source === 'nominal_dt_scaled') label += ' (≈ по DT)';
+      metaParts.push(label);
+    }
+    if (r.subtype) metaParts.push(escapeText(r.subtype));
+
+    let priceCell;
+    if (r.price_eur) {
+      priceCell = '<div class="row-price">€' + r.price_eur.toFixed(2) + '<small>с НДС</small></div>';
+    } else {
+      priceCell = '<div class="row-price muted"><small>по запросу</small></div>';
+    }
+
+    html += '<div class="catalog-row" onclick="openCatalogProduct(' + r.id + ')">' +
+      '<div class="row-code">' + marker + ' ' + escapeText(r.code || '—') + '</div>' +
+      '<div class="row-main">' +
+        '<div class="row-name">' + escapeText(r.name) + '</div>' +
+        (metaParts.length ? '<div class="row-meta">' + metaParts.join(' · ') + '</div>' : '') +
+      '</div>' +
+      (r.supplier ? '<div class="row-supplier"><i class="ti ti-check"></i>' + escapeText(r.supplier) + '</div>' : '<div></div>') +
+      priceCell +
+      '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
 }
 
 // Разовый сидинг 5 демо-позиций — кнопка показывается на пустой категории.
