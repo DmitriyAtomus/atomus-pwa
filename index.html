@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.10-pdf-size-hint";
+const APP_VERSION = "v2.44.11-pdf-chunked";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26452,22 +26452,28 @@ function openCatalogPdfImport() {
   document.getElementById('catalog-pdf-body').innerHTML =
     '<div style="display: flex; flex-direction: column; gap: 14px;">' +
       '<div style="font-size: 13px; color: var(--text-mid); line-height: 1.5;">' +
-        'AI распознает позиции из PDF и покажет превью. Категория: <b>' + escapeText(cat.name || code) + '</b>' +
-      '</div>' +
-      '<div style="font-size: 12px; padding: 10px 12px; background: #FEF3E2; border-left: 3px solid #D97706; border-radius: 6px; line-height: 1.5; color: #92400E;">' +
-        '<b><i class="ti ti-bulb"></i> Совет:</b> грузи PDF <b>по секциям</b> (одна серия = один файл, обычно 5–30 страниц). ' +
-        'Целый каталог сразу не пройдёт — у AI лимит ~1 млн токенов на запрос, это около 400 страниц. ' +
-        'В Acrobat: <i>Печать → Microsoft Print to PDF → диапазон страниц</i>.' +
+        'AI разрежет PDF на куски и распознает позиции в фоне. Грузить можно любой размер — целый каталог поставщика тоже зайдёт.' +
+        '<br>Категория: <b>' + escapeText(cat.name || code) + '</b>' +
       '</div>' +
       '<label style="display: flex; flex-direction: column; gap: 4px;">' +
-        '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">PDF файл</span>' +
+        '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">PDF файл (до 50 МБ)</span>' +
         '<input type="file" id="catalog-pdf-file" accept="application/pdf">' +
       '</label>' +
       '<label style="display: flex; flex-direction: column; gap: 4px;">' +
         '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">Поставщик (опционально)</span>' +
         '<input type="text" id="catalog-pdf-supplier" placeholder="например, СПС-Холод" class="form-input">' +
       '</label>' +
-      '<button class="btn btn-primary" onclick="runCatalogPdfParse()"><i class="ti ti-sparkles"></i>Распознать</button>' +
+      '<div style="display: flex; gap: 12px; align-items: center;">' +
+        '<label style="display: flex; flex-direction: column; gap: 4px; flex: 1;">' +
+          '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">Чанк, страниц</span>' +
+          '<input type="number" id="catalog-pdf-chunk" value="10" min="2" max="30" class="form-input">' +
+        '</label>' +
+        '<label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-top: 18px;">' +
+          '<input type="checkbox" id="catalog-pdf-auto">' +
+          '<span style="font-size: 12.5px;">Загрузить автоматически по завершении</span>' +
+        '</label>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="runCatalogPdfImport()"><i class="ti ti-sparkles"></i>Запустить импорт</button>' +
       '<div id="catalog-pdf-result"></div>' +
     '</div>';
   modal.classList.add('visible');
@@ -26476,9 +26482,13 @@ function openCatalogPdfImport() {
 function closeCatalogPdfImport() {
   const m = document.getElementById('catalog-pdf-modal');
   if (m) m.classList.remove('visible');
+  if (window._catalogPollTimer) {
+    clearTimeout(window._catalogPollTimer);
+    window._catalogPollTimer = null;
+  }
 }
 
-async function runCatalogPdfParse() {
+async function runCatalogPdfImport() {
   const fileInput = document.getElementById('catalog-pdf-file');
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (!file) {
@@ -26487,39 +26497,142 @@ async function runCatalogPdfParse() {
   }
   const code = cache.catalogState && cache.catalogState.category;
   const supplier = (document.getElementById('catalog-pdf-supplier') || {}).value || '';
+  const chunkSize = (document.getElementById('catalog-pdf-chunk') || {}).value || '10';
+  const autoApply = (document.getElementById('catalog-pdf-auto') || {}).checked ? '1' : '0';
 
   const resultEl = document.getElementById('catalog-pdf-result');
-  resultEl.innerHTML = '<div class="loading-block" style="margin: 10px 0;">Распознаём через AI… ' +
-    '<small style="color: var(--text-light); display: block; margin-top: 4px;">Это может занять 30–90 секунд для большого PDF.</small></div>';
+  resultEl.innerHTML = '<div class="loading-block" style="margin: 10px 0;">Загружаем PDF на сервер…</div>';
 
   const form = new FormData();
   form.append('file', file);
   form.append('category_code', code);
   if (supplier) form.append('supplier', supplier);
+  form.append('chunk_size', chunkSize);
+  form.append('auto_apply', autoApply);
 
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/catalog/parse-pdf', {
+    const r = await fetch(API_BASE + '/api/catalog/import-pdf-chunked', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token },
       body: form,
     });
     if (!r.ok) {
-      // Пытаемся прочитать JSON для более понятной ошибки
       let errMsg = 'HTTP ' + r.status;
-      try {
-        const err = await r.json();
-        if (err && err.message) errMsg = err.message;
-      } catch (_) {
-        try { errMsg = await r.text() || errMsg; } catch (_) {}
-      }
+      try { const err = await r.json(); if (err && err.message) errMsg = err.message; } catch (_) {}
       throw new Error(errMsg);
     }
+    const d = await r.json();
+    window._catalogImportJobId = d.job_id;
+    pollCatalogImportStatus(d.job_id, d.total_chunks, d.total_pages);
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block" style="text-align: left; padding: 14px;"><div style="display: flex; gap: 10px; align-items: flex-start;"><i class="ti ti-alert-triangle" style="font-size: 20px; color: #DC2626;"></i><div>' + escapeText(e.message || String(e)) + '</div></div></div>';
+  }
+}
+
+async function pollCatalogImportStatus(jobId, totalChunks, totalPages) {
+  const resultEl = document.getElementById('catalog-pdf-result');
+  if (!resultEl) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-jobs/' + jobId, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const job = await r.json();
+
+    const pct = totalChunks > 0 ? Math.round((job.done_chunks || 0) / totalChunks * 100) : 0;
+    let html = '<div style="margin-top: 10px;">' +
+      '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">' +
+        '<span style="font-size: 13px; color: var(--text-mid);">' +
+          (job.status === 'completed' ? '<i class="ti ti-check" style="color: #16A34A;"></i> Готово' :
+           job.status === 'failed'    ? '<i class="ti ti-x" style="color: #DC2626;"></i> Ошибка' :
+                                        '<i class="ti ti-loader"></i> Обрабатываем') +
+          ' · чанк ' + (job.done_chunks || 0) + ' из ' + totalChunks +
+          ' · найдено позиций: <b>' + (job.products_count || 0) + '</b>' +
+        '</span>' +
+        '<span style="font-size: 13px; color: var(--text-light);">' + pct + '%</span>' +
+      '</div>' +
+      '<div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">' +
+        '<div style="height: 100%; background: var(--brand); width: ' + pct + '%; transition: width 0.3s;"></div>' +
+      '</div>';
+
+    if (job.status === 'failed') {
+      html += '<div style="margin-top: 10px; color: #DC2626; font-size: 12.5px;">' +
+        escapeText(job.error_message || 'Неизвестная ошибка') + '</div>';
+    }
+
+    if (job.status === 'completed') {
+      if (job.applied) {
+        let applyInfo = '';
+        try {
+          const m = JSON.parse(job.error_message || '{}');
+          if (m && (m.added != null || m.updated != null)) {
+            applyInfo = ' · добавлено ' + (m.added || 0) + ', обновлено ' + (m.updated || 0);
+          }
+        } catch (_) {}
+        html += '<div style="margin-top: 10px; padding: 10px 12px; background: #E8F5E9; border-radius: 8px; font-size: 13px; color: #16A34A;">' +
+          '<i class="ti ti-check"></i> Импорт завершён и применён к каталогу' + applyInfo + '</div>';
+      } else {
+        html += '<div style="margin-top: 10px; display: flex; gap: 10px;">' +
+          '<button class="btn btn-primary btn-sm" onclick="applyCatalogImport(' + jobId + ')"><i class="ti ti-check"></i>Загрузить в каталог</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="showCatalogImportPreview(' + jobId + ')"><i class="ti ti-eye"></i>Превью</button>' +
+        '</div>';
+      }
+    }
+    html += '</div>';
+    resultEl.innerHTML = html;
+
+    if (job.status === 'pending' || job.status === 'running') {
+      window._catalogPollTimer = setTimeout(
+        () => pollCatalogImportStatus(jobId, totalChunks, totalPages),
+        3000,
+      );
+    } else if (job.status === 'completed' && job.applied) {
+      // Обновляем список каталога
+      cache.catalogProducts = null;
+      loadCatalogProducts(cache.catalogState.category);
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block">Ошибка опроса: ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
+async function applyCatalogImport(jobId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-jobs/' + jobId + '/apply', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let errMsg = 'HTTP ' + r.status;
+      try { const err = await r.json(); if (err && err.message) errMsg = err.message; } catch (_) {}
+      throw new Error(errMsg);
+    }
+    const d = await r.json();
+    showToast('Загружено: ' + (d.added || 0) + ', обновлено: ' + (d.updated || 0) +
+              (d.errors_count ? ' (ошибок ' + d.errors_count + ')' : ''), 'ok');
+    closeCatalogPdfImport();
+    cache.catalogProducts = null;
+    loadCatalogProducts(cache.catalogState.category);
+  } catch (e) {
+    showToast('Не удалось загрузить: ' + e.message, 'error');
+  }
+}
+
+async function showCatalogImportPreview(jobId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-jobs/' + jobId + '/products', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     window._catalogParsedProducts = d.products || [];
     renderCatalogPdfPreview(d);
   } catch (e) {
-    resultEl.innerHTML = '<div class="empty-block" style="text-align: left; padding: 14px;"><div style="display: flex; gap: 10px; align-items: flex-start;"><i class="ti ti-alert-triangle" style="font-size: 20px; color: #DC2626;"></i><div>' + escapeText(e.message || String(e)) + '</div></div></div>';
+    showToast('Не удалось загрузить превью: ' + e.message, 'error');
   }
 }
 
