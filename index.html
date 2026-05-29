@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.12-form-factor";
+const APP_VERSION = "v2.44.13-power-kw-attrs";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25917,11 +25917,36 @@ const CATALOG_ATTR_LABELS = {
   net_weight_kg:   { label: 'Нетто',             unit: 'кг' },
   // materials
   diameter_mm:     { label: 'Диаметр',           unit: 'мм' },
+  // общие
+  mounting_dimensions: { label: 'Монтажные размеры' },
+  ip_rating:       { label: 'Степень защиты' },
+  noise_db:        { label: 'Уровень шума',      unit: 'дБ' },
+  power_kw:        { label: 'Мощность',          unit: 'кВт' },
+  current_a:       { label: 'Ток',               unit: 'А' },
+  rpm:             { label: 'Обороты вентилятора', unit: 'об/мин' },
+  pipe_d_in:       { label: 'Вход (труба)' },
+  pipe_d_out:      { label: 'Выход (труба)' },
+  fans_count:      { label: 'Кол-во вентиляторов' },
+  fans_diameter_mm:{ label: 'Диаметр вентиляторов', unit: 'мм' },
 };
+
+function _formatPowerW(power_w) {
+  if (power_w == null) return null;
+  if (power_w >= 1000) {
+    const kw = (power_w / 1000).toFixed(2).replace(/\.?0+$/, '');
+    return kw + ' кВт';
+  }
+  return power_w + ' Вт';
+}
 
 function _formatCatalogAttr(key, value) {
   // Возвращает { label, value } с локализованным лейблом и единицей.
-  const cfg = CATALOG_ATTR_LABELS[key] || { label: key };
+  let cfg = CATALOG_ATTR_LABELS[key];
+  if (!cfg) {
+    // Неизвестный ключ — делаем человекочитаемый fallback из snake_case.
+    const pretty = String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    cfg = { label: pretty };
+  }
   let v = value;
   if (Array.isArray(v)) v = v.join(', ');
   if (v === null || v === undefined) v = '';
@@ -26178,6 +26203,13 @@ function renderCatalogDetailModal(p) {
   if (p.brand || p.series) {
     html += '<div class="code">' + [p.brand, p.series].filter(Boolean).map(escapeText).join(' / ') + '</div>';
   }
+  // v2.44.13: мощность с условиями — заметная строка в hero
+  if (p.power_w || p.power_standard) {
+    const parts = [];
+    if (p.power_w) parts.push('<b>' + escapeText(_formatPowerW(p.power_w)) + '</b>');
+    if (p.power_standard) parts.push('<span style="color: var(--text-light);">' + escapeText(p.power_standard) + '</span>');
+    html += '<div style="margin-top: 6px; font-size: 13.5px;">' + parts.join(' · ') + '</div>';
+  }
   if (p.description) html += '<div class="desc">' + escapeText(p.description) + '</div>';
   if (p.price_eur) {
     html += '<div style="margin-top: 10px; font-size: 16px; font-weight: 700;">€' + p.price_eur.toFixed(2) + ' <small style="font-size: 12px; font-weight: 500; color: var(--text-light);">с НДС' + (p.price_source ? ' · ' + escapeText(p.price_source) : '') + '</small></div>';
@@ -26203,7 +26235,7 @@ function renderCatalogDetailModal(p) {
 
   // Технические характеристики из catalog_attrs + первичных полей
   const specs = [];
-  if (p.power_w) specs.push(['Мощность', p.power_w + ' Вт']);
+  if (p.power_w) specs.push(['Мощность', _formatPowerW(p.power_w)]);
   if (p.power_standard) specs.push(['Условия номинала', p.power_standard]);
   if (p.subtype) specs.push(['Подтип', p.subtype]);
   Object.keys(attrs).forEach(k => {
