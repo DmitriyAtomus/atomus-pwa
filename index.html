@@ -16968,7 +16968,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.1-catalog-demo";
+const APP_VERSION = "v2.44.2-demo-photos";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26148,7 +26148,10 @@ async function seedCatalogDemo() {
       throw new Error(t || ('HTTP ' + r.status));
     }
     const d = await r.json();
-    showToast('Загружено: ' + (d.added || 0) + ', пропущено: ' + (d.skipped || 0), 'ok');
+    const photoNote = (d.photos_added != null)
+      ? ' · фото: ' + (d.photos_added || 0) + (d.photos_failed ? ' (✕' + d.photos_failed + ')' : '')
+      : '';
+    showToast('Загружено: ' + (d.added || 0) + ', пропущено: ' + (d.skipped || 0) + photoNote, 'ok');
     cache.catalogProducts = null;
     if (cache.catalogState && cache.catalogState.category) {
       loadCatalogProducts(cache.catalogState.category);
