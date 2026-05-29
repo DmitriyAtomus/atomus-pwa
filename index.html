@@ -29170,7 +29170,7 @@ async function loadModelBom(modelId) {
           '<div class="bom-qty-lbl">в наличии</div></div>' +
         (canManageSales() ?
           '<div class="bom-actions">' +
-            '<button class="btn btn-secondary btn-small" onclick="openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\')" title="Изменить"><i class="ti ti-edit"></i></button>' +
+            '<button class="btn btn-secondary btn-small" onclick="openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',' + (it.component_id || 0) + ',\'' + escapeHtml(it.component_name || '').replace(/'/g, "\\'") + '\')" title="Изменить"><i class="ti ti-edit"></i></button>' +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
       '</div>';
@@ -29499,7 +29499,10 @@ async function submitBomAddItem(modelId) {
   } catch (e) { showToast('Ошибка', 'error'); }
 }
 
-function openBomEditItem(bomId, qty, isCritical, comment) {
+// v2.43.81: добавлено редактирование названия компонента прямо из BOM.
+// Имя живёт на самом компоненте (таблица components), поэтому переименование
+// затрагивает все модели, где этот компонент стоит.
+function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName) {
   let m = document.getElementById('bom-edit-modal');
   if (!m) {
     m = document.createElement('div');
@@ -29508,11 +29511,16 @@ function openBomEditItem(bomId, qty, isCritical, comment) {
     m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
     document.body.appendChild(m);
   }
+  const cName = componentName || '';
+  const cId = componentId || 0;
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
       '<div class="modal-header"><h3><i class="ti ti-edit"></i> Изменить позицию</h3>' +
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:18px;">' +
+        '<label class="form-label">Название компонента</label>' +
+        '<input type="text" id="bome-name" class="form-input" value="' + escapeHtml(cName) + '" data-orig="' + escapeHtml(cName) + '" style="margin-bottom:6px;" />' +
+        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Переименование затронет ВСЕ модели, где этот компонент используется (он живёт в общем справочнике).</div>' +
         '<label class="form-label">Количество на 1 ед. *</label>' +
         '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
@@ -29523,17 +29531,30 @@ function openBomEditItem(bomId, qty, isCritical, comment) {
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitBomEditItem(' + bomId + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+        '<button class="btn btn-primary" onclick="submitBomEditItem(' + bomId + ',' + cId + ')"><i class="ti ti-check"></i> Сохранить</button>' +
       '</div></div>';
   m.classList.add('visible');
 }
 
-async function submitBomEditItem(bomId) {
+async function submitBomEditItem(bomId, componentId) {
   const qty_required = parseFloat(document.getElementById('bome-qty').value);
   const is_critical = document.getElementById('bome-critical').checked;
   const comment = (document.getElementById('bome-comment').value || '').trim();
+  const nameInp = document.getElementById('bome-name');
+  const newName = (nameInp && nameInp.value || '').trim();
+  const origName = (nameInp && nameInp.dataset.orig || '').trim();
   try {
     const token = localStorage.getItem(TOKEN_KEY);
+    // 1) Имя — если поменялось, PATCH-им компонент в справочнике
+    if (componentId && newName && newName !== origName) {
+      const rn = await fetch(API_BASE + '/api/components/' + componentId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ name: newName }),
+      });
+      if (!rn.ok) { showToast('Не удалось переименовать компонент', 'error'); return; }
+    }
+    // 2) qty / critical / comment — патчим BOM-строку
     const r = await fetch(API_BASE + '/api/bom/' + bomId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -29543,6 +29564,8 @@ async function submitBomEditItem(bomId) {
     showToast('Сохранено', 'success');
     document.getElementById('bom-edit-modal').classList.remove('visible');
     if (state._currentBomModelId) await loadModelBom(state._currentBomModelId);
+    // Сбрасываем кэш каталога компонентов — имя могло измениться
+    cache.components = null;
   } catch (e) { showToast('Ошибка', 'error'); }
 }
 
