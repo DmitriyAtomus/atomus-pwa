@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.13-power-kw-attrs";
+const APP_VERSION = "v2.44.14-xlsx-import";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26021,7 +26021,8 @@ function renderCatalogTabs() {
       // Кнопки управления каталогом (для sales-manage)
       const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
       if (canManage) {
-        html += '<button class="btn btn-secondary btn-sm" onclick="openCatalogPdfImport()" title="AI-парсинг каталога поставщика из PDF"><i class="ti ti-file-import"></i>Импорт из PDF</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="openCatalogPdfImport()" title="AI-парсинг каталога поставщика из PDF"><i class="ti ti-file-import"></i>Импорт PDF</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="openCatalogXlsxImport()" title="Импорт прайс-листа поставщика в формате Excel (xlsx) — заливает все листы одним прогоном, без AI"><i class="ti ti-file-spreadsheet"></i>Импорт Excel-прайса</button>';
       }
       if (canManage && activeCat.code === 'air_cooler') {
         html += '<button class="btn btn-secondary btn-sm" onclick="seedBeliefBsTef()" title="Загрузить все воздухоохладители Belief: BS-TEF (16) + BS-TEB (14) + BS-TEM (2) = 32 модели"><i class="ti ti-database-import"></i>Belief воздухоохладители (32)</button>';
@@ -26761,6 +26762,142 @@ async function confirmCatalogPdfBulkCreate() {
     loadCatalogProducts(code);
   } catch (e) {
     showToast('Не удалось сохранить: ' + e.message, 'error');
+  }
+}
+
+// ============================================================================
+// Импорт Excel-прайса (все 41 лист одним заходом, без AI)
+// ============================================================================
+
+function openCatalogXlsxImport() {
+  let modal = document.getElementById('catalog-xlsx-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'catalog-xlsx-modal';
+    modal.onclick = (e) => { if (e.target === modal) closeCatalogXlsxImport(); };
+    modal.innerHTML = '<div class="modal" style="max-width: 720px;">' +
+      '<div class="modal-header">' +
+        '<h3>Импорт Excel-прайса</h3>' +
+        '<button class="icon-btn" onclick="closeCatalogXlsxImport()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" id="catalog-xlsx-body"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+  document.getElementById('catalog-xlsx-body').innerHTML =
+    '<div style="display: flex; flex-direction: column; gap: 14px;">' +
+      '<div style="font-size: 13px; color: var(--text-mid); line-height: 1.5;">' +
+        'Загрузи xlsx прайс-лист СПС-Холод. Сервер сам разложит позиции по 8 разделам каталога ' +
+        '(маппинг по префиксу листа: <code>18→Воздухоохладители</code>, <code>19→Конденсаторы</code>, ' +
+        '<code>22→Автоматика</code> и т.д.).' +
+      '</div>' +
+      '<div style="font-size: 12px; padding: 10px 12px; background: #E0F2FE; border-left: 3px solid #2563EB; border-radius: 6px; line-height: 1.5; color: #1E40AF;">' +
+        '<b><i class="ti ti-info-circle"></i> Логика:</b> позиции, у которых артикул производителя уже есть в каталоге ' +
+        '(BS-TEF027M ED, EA-130AE6-C05 и т.д.), <b>обновятся ценой и поставщиком</b>. Новые позиции добавятся с ' +
+        'кодом производителя если он распознан в названии, иначе — с кодом СПС-Холод.' +
+      '</div>' +
+      '<label style="display: flex; flex-direction: column; gap: 4px;">' +
+        '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">XLSX файл (до 50 МБ)</span>' +
+        '<input type="file" id="catalog-xlsx-file" accept=".xlsx">' +
+      '</label>' +
+      '<button class="btn btn-primary" onclick="runCatalogXlsxImport()"><i class="ti ti-sparkles"></i>Запустить импорт</button>' +
+      '<div id="catalog-xlsx-result"></div>' +
+    '</div>';
+  modal.classList.add('visible');
+}
+
+function closeCatalogXlsxImport() {
+  const m = document.getElementById('catalog-xlsx-modal');
+  if (m) m.classList.remove('visible');
+  if (window._catalogXlsxPollTimer) { clearTimeout(window._catalogXlsxPollTimer); window._catalogXlsxPollTimer = null; }
+}
+
+async function runCatalogXlsxImport() {
+  const fileInput = document.getElementById('catalog-xlsx-file');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) {
+    showToast('Выберите xlsx-файл', 'error');
+    return;
+  }
+  const resultEl = document.getElementById('catalog-xlsx-result');
+  resultEl.innerHTML = '<div class="loading-block" style="margin: 10px 0;">Загружаем прайс на сервер…</div>';
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-xlsx', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form,
+    });
+    if (!r.ok) {
+      let errMsg = 'HTTP ' + r.status;
+      try { const err = await r.json(); if (err && err.message) errMsg = err.message; } catch (_) {}
+      throw new Error(errMsg);
+    }
+    const d = await r.json();
+    pollCatalogXlsxStatus(d.job_id, d.total_chunks);
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block" style="text-align: left; padding: 14px;"><i class="ti ti-alert-triangle" style="color: #DC2626;"></i> ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
+async function pollCatalogXlsxStatus(jobId, totalChunks) {
+  const resultEl = document.getElementById('catalog-xlsx-result');
+  if (!resultEl) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-jobs/' + jobId, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const job = await r.json();
+    const pct = totalChunks > 0 ? Math.round((job.done_chunks || 0) / totalChunks * 100) : 0;
+    let html = '<div style="margin-top: 10px;">' +
+      '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">' +
+        '<span style="font-size: 13px; color: var(--text-mid);">' +
+          (job.status === 'completed' ? '<i class="ti ti-check" style="color: #16A34A;"></i> Готово' :
+           job.status === 'failed'    ? '<i class="ti ti-x" style="color: #DC2626;"></i> Ошибка' :
+                                        '<i class="ti ti-loader"></i> Обрабатываем') +
+          ' · лист ' + (job.done_chunks || 0) + ' из ' + totalChunks +
+          ' · позиций: <b>' + (job.products_count || 0) + '</b>' +
+        '</span>' +
+        '<span style="font-size: 13px; color: var(--text-light);">' + pct + '%</span>' +
+      '</div>' +
+      '<div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">' +
+        '<div style="height: 100%; background: var(--brand); width: ' + pct + '%; transition: width 0.3s;"></div>' +
+      '</div>';
+    if (job.status === 'failed') {
+      html += '<div style="margin-top: 10px; color: #DC2626; font-size: 12.5px;">' +
+        escapeText(job.error_message || 'Неизвестная ошибка') + '</div>';
+    }
+    if (job.status === 'completed') {
+      let summary = '';
+      try {
+        const m = JSON.parse(job.error_message || '{}');
+        if (m && (m.added != null || m.updated != null)) {
+          summary = ' · добавлено ' + (m.added || 0) + ', обновлено ' + (m.updated || 0);
+        }
+      } catch (_) {}
+      html += '<div style="margin-top: 10px; padding: 10px 12px; background: #E8F5E9; border-radius: 8px; font-size: 13px; color: #16A34A;">' +
+        '<i class="ti ti-check"></i> Прайс импортирован' + summary + '</div>';
+    }
+    html += '</div>';
+    resultEl.innerHTML = html;
+    if (job.status === 'pending' || job.status === 'running') {
+      window._catalogXlsxPollTimer = setTimeout(
+        () => pollCatalogXlsxStatus(jobId, totalChunks),
+        3000,
+      );
+    } else if (job.status === 'completed') {
+      cache.catalogProducts = null;
+      if (cache.catalogState && cache.catalogState.category) {
+        loadCatalogProducts(cache.catalogState.category);
+      }
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block">Ошибка опроса: ' + escapeText(e.message || String(e)) + '</div>';
   }
 }
 
