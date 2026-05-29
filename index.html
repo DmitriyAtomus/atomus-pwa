@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.9-pdf-ai-import";
+const APP_VERSION = "v2.44.10-pdf-size-hint";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26452,8 +26452,12 @@ function openCatalogPdfImport() {
   document.getElementById('catalog-pdf-body').innerHTML =
     '<div style="display: flex; flex-direction: column; gap: 14px;">' +
       '<div style="font-size: 13px; color: var(--text-mid); line-height: 1.5;">' +
-        'Загрузи PDF-секцию каталога поставщика (до 25 МБ). AI распознает позиции и покажет превью.' +
-        '<br>Категория: <b>' + escapeText(cat.name || code) + '</b>' +
+        'AI распознает позиции из PDF и покажет превью. Категория: <b>' + escapeText(cat.name || code) + '</b>' +
+      '</div>' +
+      '<div style="font-size: 12px; padding: 10px 12px; background: #FEF3E2; border-left: 3px solid #D97706; border-radius: 6px; line-height: 1.5; color: #92400E;">' +
+        '<b><i class="ti ti-bulb"></i> Совет:</b> грузи PDF <b>по секциям</b> (одна серия = один файл, обычно 5–30 страниц). ' +
+        'Целый каталог сразу не пройдёт — у AI лимит ~1 млн токенов на запрос, это около 400 страниц. ' +
+        'В Acrobat: <i>Печать → Microsoft Print to PDF → диапазон страниц</i>.' +
       '</div>' +
       '<label style="display: flex; flex-direction: column; gap: 4px;">' +
         '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">PDF файл</span>' +
@@ -26501,14 +26505,21 @@ async function runCatalogPdfParse() {
       body: form,
     });
     if (!r.ok) {
-      const t = await r.text();
-      throw new Error(t || ('HTTP ' + r.status));
+      // Пытаемся прочитать JSON для более понятной ошибки
+      let errMsg = 'HTTP ' + r.status;
+      try {
+        const err = await r.json();
+        if (err && err.message) errMsg = err.message;
+      } catch (_) {
+        try { errMsg = await r.text() || errMsg; } catch (_) {}
+      }
+      throw new Error(errMsg);
     }
     const d = await r.json();
     window._catalogParsedProducts = d.products || [];
     renderCatalogPdfPreview(d);
   } catch (e) {
-    resultEl.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeText(e.message || String(e)) + '</div>';
+    resultEl.innerHTML = '<div class="empty-block" style="text-align: left; padding: 14px;"><div style="display: flex; gap: 10px; align-items: flex-start;"><i class="ti ti-alert-triangle" style="font-size: 20px; color: #DC2626;"></i><div>' + escapeText(e.message || String(e)) + '</div></div></div>';
   }
 }
 
