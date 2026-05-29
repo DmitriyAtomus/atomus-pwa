@@ -820,10 +820,16 @@
   .kpi-text { flex: 1; min-width: 0; }
 
   /* Цветовые варианты */
-  .kpi-card.kpi-blue   { --kpi-accent: #2C5282; --kpi-bg: #E8EEF7; }
-  .kpi-card.kpi-amber  { --kpi-accent: #C18B00; --kpi-bg: #FFF4E6; }
-  .kpi-card.kpi-green  { --kpi-accent: #16a34a; --kpi-bg: #E8F5E9; }
-  .kpi-card.kpi-violet { --kpi-accent: #7e22ce; --kpi-bg: #F3E8FF; }
+  /* v2.43.98: насыщенные KPI — иконка в цветном круге с градиентом + полоска слева. */
+  .kpi-card.kpi-blue   { --kpi-accent: #2563EB; --kpi-bg: linear-gradient(135deg, #3B82F6, #2563EB); --kpi-bg-soft: #EBF2FF; }
+  .kpi-card.kpi-amber  { --kpi-accent: #D97706; --kpi-bg: linear-gradient(135deg, #F59E0B, #D97706); --kpi-bg-soft: #FEF3E2; }
+  .kpi-card.kpi-green  { --kpi-accent: #16A34A; --kpi-bg: linear-gradient(135deg, #22C55E, #16A34A); --kpi-bg-soft: #E8F5E9; }
+  .kpi-card.kpi-violet { --kpi-accent: #7E22CE; --kpi-bg: linear-gradient(135deg, #A855F7, #7E22CE); --kpi-bg-soft: #F3E8FF; }
+  .kpi-card .kpi-icon {
+    background: var(--kpi-bg);
+    color: white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
 
   .kpi-card .label {
     font-size: 11.5px; color: var(--text-light);
@@ -3482,6 +3488,121 @@
     .calc-fx-row { grid-template-columns: 1fr; }
     .calc-fx-arrow { transform: rotate(90deg); padding: 4px 0; }
   }
+
+  /* v2.43.98: sticky-обёртка для KPI «Сегодня» — цифры перед глазами при скролле */
+  .home-kpi-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg);
+    padding-top: 4px;
+    margin-top: -4px;
+  }
+  .desktop-layout .home-kpi-sticky { background: white; }
+
+  /* v2.43.98: воронка производства — горизонтальные ступеньки */
+  .home-funnel {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 0 14px;
+  }
+  @media (max-width: 600px) {
+    .home-funnel { grid-template-columns: repeat(2, 1fr); }
+  }
+  .home-funnel-stage {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex; flex-direction: column;
+    gap: 4px;
+    border-top: 3px solid var(--st-color, var(--text-faint));
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .home-funnel-stage:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .home-funnel-stage[data-st="queue"]       { --st-color: #4B5563; }
+  .home-funnel-stage[data-st="in_progress"] { --st-color: #2563EB; }
+  .home-funnel-stage[data-st="review"]      { --st-color: #D97706; }
+  .home-funnel-stage[data-st="packing"]     { --st-color: #7E22CE; }
+  .home-funnel-stage[data-st="done"]        { --st-color: #16A34A; }
+  .home-funnel-stage .stage-label {
+    font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: 0.4px; font-weight: 600;
+    color: var(--text-light);
+  }
+  .home-funnel-stage .stage-count {
+    font-size: 22px; font-weight: 700;
+    color: var(--st-color);
+    line-height: 1.1;
+  }
+
+  /* v2.43.98: алерты — компактный список с цветом по severity */
+  .home-alerts-list {
+    padding: 0 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .home-alert {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--alert-color, var(--text-faint));
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .home-alert:hover { background: var(--bg); }
+  .home-alert[data-sev="critical"] { --alert-color: #DC2626; }
+  .home-alert[data-sev="warning"]  { --alert-color: #D97706; }
+  .home-alert[data-sev="info"]     { --alert-color: #2563EB; }
+  .home-alert .alert-icon {
+    font-size: 18px; color: var(--alert-color);
+    flex-shrink: 0;
+  }
+  .home-alert .alert-body { flex: 1; min-width: 0; }
+  .home-alert .alert-title {
+    font-size: 13px; font-weight: 600; color: var(--text-dark);
+  }
+  .home-alert .alert-meta {
+    font-size: 11.5px; color: var(--text-light); margin-top: 2px;
+  }
+  .home-alert .alert-count {
+    font-size: 12px; font-weight: 700; color: var(--alert-color);
+    background: white; border: 1px solid var(--alert-color);
+    padding: 2px 8px; border-radius: 999px;
+  }
+
+  /* v2.43.98: ТОП сборщиков */
+  .home-top-assemblers {
+    padding: 0 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .home-top-row {
+    display: flex; align-items: center; gap: 10px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+  .home-top-row .top-rank {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    background: var(--bg); color: var(--text-mid);
+    flex-shrink: 0;
+  }
+  .home-top-row.r1 .top-rank { background: linear-gradient(135deg, #FCD34D, #F59E0B); color: white; }
+  .home-top-row.r2 .top-rank { background: linear-gradient(135deg, #E5E7EB, #9CA3AF); color: white; }
+  .home-top-row.r3 .top-rank { background: linear-gradient(135deg, #FCA5A5, #DC2626); color: white; }
+  .home-top-row .top-name { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--text-dark); }
+  .home-top-row .top-stats {
+    font-size: 12px; color: var(--text-light);
+    display: flex; gap: 10px; flex-shrink: 0;
+  }
+  .home-top-row .top-stats b { color: var(--text-dark); font-weight: 600; }
 
   /* KPI секция «Сегодня»
      v2.43.73: горизонтальные отступы 14px — выравниваем с .kpi-grid и .qa25-section-label,
@@ -16628,8 +16749,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.43.68-header-btns";
-const APP_VERSION_DATE = "28.05.2026";
+const APP_VERSION = "v2.43.98-home-upgrade";
+const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -26304,6 +26425,7 @@ async function loadHomeDashboard() {
   loadHomeMyTasks();      // ЭТАП 16В
   loadHomeShipments();    // ЭТАП 16Г
   loadHomeContractsProgress(); // ЭТАП 31.4
+  loadHomeDashboardExtras();   // v2.43.98: воронка / алерты / ТОП сборщиков
   // v2.8.2: лента «Последние действия» — только для директора
   if (state.user && (state.user.roles || []).includes('director')) {
     loadHomeActivity();
@@ -26357,30 +26479,47 @@ function renderHomeSkeleton() {
   html += '</div>';
   // ============ КОНЕЦ ЭТАПА 25.0 ============
 
-  // KPI placeholder
+  // v2.43.98: KPI «Сегодня» — sticky-обёртка, цифры всегда перед глазами при скролле
+  html += '<div class="home-kpi-sticky">';
   html += '<div class="home-kpi-title"><i class="ti ti-calendar-stats"></i>Сегодня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
+  html += '</div>';
+
+  // v2.43.98: Воронка производства — пять стадий с цифрами
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-stairs-up"></i>Воронка производства</div>';
+  html += '<div id="home-funnel-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+
+  // v2.43.98: Алерты (только директор/мастер/зам)
+  const _hasManage = (typeof hasPermission === 'function') && hasPermission('production.manage');
+  if (_hasManage) {
+    html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-alert-triangle"></i>Алерты</div>';
+    html += '<div id="home-alerts-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  }
+
+  // v2.43.98: ТОП сборщиков за неделю
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-trophy"></i>ТОП сборщиков за неделю</div>';
+  html += '<div id="home-top-assemblers-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // ЭТАП 16В: «Мои задачи»
-  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-checklist"></i>Мои задачи</div>';
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-checklist"></i>Мои задачи</div>';
   html += '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // ЭТАП 16Г: «Ближайшие отгрузки»
-  html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 24px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
+  html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 16px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
   html += '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // ЭТАП 31.4: «Договоры в работе» — переехало сюда с главной Производства
-  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-briefcase"></i>Договоры в работе</div>';
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-briefcase"></i>Договоры в работе</div>';
   html += '<div id="home-contracts-progress-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
   // Курс валют placeholder
-  html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
   html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
 
   // ЭТАП 16Г: «Последние действия» — только для директора (v2.8.2)
   const _isDirector = state.user && (state.user.roles || []).includes('director');
   if (_isDirector) {
-    html += '<div class="home-kpi-title" style="margin-top: 24px;"><i class="ti ti-history"></i>Последние действия</div>';
+    html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-history"></i>Последние действия</div>';
     html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   }
 
@@ -26816,6 +26955,109 @@ function renderHomeKpi() {
 function homeKpiClick(idx) {
   const fn = (window._homeKpiActions || [])[idx];
   if (typeof fn === 'function') fn();
+}
+
+// v2.43.98: загрузка расширенного дашборда (воронка, алерты, ТОП сборщиков)
+async function loadHomeDashboardExtras() {
+  try {
+    const d = await apiGet('/api/home/dashboard-extras');
+    cache.homeExtras = d;
+    renderHomeFunnel();
+    renderHomeAlerts();
+    renderHomeTopAssemblers();
+  } catch (e) {
+    const f = document.getElementById('home-funnel-block');
+    if (f) f.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить воронку</div>';
+    const a = document.getElementById('home-alerts-block');
+    if (a) a.innerHTML = '';
+    const t = document.getElementById('home-top-assemblers-block');
+    if (t) t.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить ТОП</div>';
+  }
+}
+
+function renderHomeFunnel() {
+  const el = document.getElementById('home-funnel-block');
+  if (!el) return;
+  const stages = (cache.homeExtras && cache.homeExtras.funnel) || [];
+  if (!stages.length) {
+    el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>Пока нет активных работ</div>';
+    return;
+  }
+  let html = '<div class="home-funnel">';
+  stages.forEach(s => {
+    html += '<div class="home-funnel-stage" data-st="' + escapeText(s.status) + '" onclick="homeFunnelClick(\'' + escapeText(s.status) + '\')">' +
+      '<div class="stage-label">' + escapeText(s.label) + '</div>' +
+      '<div class="stage-count">' + escapeText(String(s.count || 0)) + '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function homeFunnelClick(status) {
+  // Открыть канбан с подсветкой колонки (если возможно)
+  goToSection('production', 'dashboard');
+}
+
+function renderHomeAlerts() {
+  const el = document.getElementById('home-alerts-block');
+  if (!el) return;
+  const alerts = (cache.homeExtras && cache.homeExtras.alerts) || [];
+  if (!alerts.length) {
+    el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-circle-check"></i>Алертов нет — всё спокойно</div>';
+    return;
+  }
+  let html = '<div class="home-alerts-list">';
+  alerts.forEach((a, i) => {
+    html += '<div class="home-alert" data-sev="' + escapeText(a.severity || 'info') + '" onclick="homeAlertClick(' + i + ')">' +
+      '<i class="ti ' + escapeText(a.icon || 'ti-alert-triangle') + ' alert-icon"></i>' +
+      '<div class="alert-body">' +
+        '<div class="alert-title">' + escapeText(a.title || '') + '</div>' +
+        '<div class="alert-meta">' + escapeText(a.meta || '') + '</div>' +
+      '</div>' +
+      '<div class="alert-count">' + escapeText(String(a.count || 0)) + '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function homeAlertClick(idx) {
+  const alerts = (cache.homeExtras && cache.homeExtras.alerts) || [];
+  const a = alerts[idx];
+  if (!a) return;
+  if (a.link === 'production') {
+    goToSection('production', 'dashboard');
+  } else if (a.link === 'contracts') {
+    goToSection('sales', 'sales-contracts');
+  } else if (a.link === 'warehouse') {
+    goToSection('warehouse', 'warehouse-components');
+  }
+}
+
+function renderHomeTopAssemblers() {
+  const el = document.getElementById('home-top-assemblers-block');
+  if (!el) return;
+  const rows = (cache.homeExtras && cache.homeExtras.top_assemblers) || [];
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>За неделю никто не отметил часы</div>';
+    return;
+  }
+  let html = '<div class="home-top-assemblers">';
+  rows.forEach((r, i) => {
+    const rank = i + 1;
+    const rankCls = rank <= 3 ? ' r' + rank : '';
+    html += '<div class="home-top-row' + rankCls + '">' +
+      '<div class="top-rank">' + rank + '</div>' +
+      '<div class="top-name">' + escapeText(r.name || '—') + '</div>' +
+      '<div class="top-stats">' +
+        '<span><b>' + escapeText(String(r.hours || 0)) + '</b> ч</span>' +
+        '<span><b>' + escapeText(String(r.works || 0)) + '</b> работ</span>' +
+      '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function goToSection(sectionCode, navItem) {
