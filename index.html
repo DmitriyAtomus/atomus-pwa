@@ -42865,7 +42865,8 @@ function renderPublicAssemblyCard(a, token) {
     '</button>' +
   '</div>' +
   '<div class="public-footer">' +
-    'Внутренняя CRM-система ООО «Атомус Групп»' +
+    'Внутренняя CRM-система ООО «Атомус Групп»<br>' +
+    '<span style="font-size:11.5px;opacity:0.85;">Нужен полный доступ? Обратитесь в Атомус Групп.</span>' +
   '</div>';
 }
 
@@ -42936,7 +42937,8 @@ function renderPublicContractCard(c, token) {
     '</button>' +
   '</div>' +
   '<div class="public-footer">' +
-    'Внутренняя CRM-система ООО «Атомус Групп»' +
+    'Внутренняя CRM-система ООО «Атомус Групп»<br>' +
+    '<span style="font-size:11.5px;opacity:0.85;">Нужен полный доступ? Обратитесь в Атомус Групп.</span>' +
   '</div>';
 }
 
@@ -43028,7 +43030,9 @@ function renderPublicDefectCard(d, token) {
       _renderPublicDefectComposer() +
     '</div>' +
   '</div>' +
-  '<div class="public-footer">Внутренняя CRM-система ООО «Атомус Групп»</div>';
+  '<div class="public-footer">Внутренняя CRM-система ООО «Атомус Групп»<br>' +
+    '<span style="font-size:11.5px;opacity:0.85;">Нужен полный доступ? Обратитесь в Атомус Групп.</span>' +
+  '</div>';
 }
 
 function _renderPublicDefectComposer() {
@@ -43283,24 +43287,41 @@ function renderPublicBoxCard(b, token) {
     ) : '') +
   '</div>' +
   '<div class="public-footer">' +
-    'Внутренняя CRM-система ООО «Атомус Групп»' +
+    'Внутренняя CRM-система ООО «Атомус Групп»<br>' +
+    '<span style="font-size:11.5px;opacity:0.85;">Нужен полный доступ? Обратитесь в Атомус Групп.</span>' +
   '</div>';
 }
 
 
 function renderPublicError(status) {
-  const msg = status === 404
-    ? 'Запись не найдена. Возможно, токен устарел или ссылка неверна.'
-    : status === 'network'
-      ? 'Не удалось загрузить данные. Проверьте подключение.'
-      : 'Произошла ошибка (код ' + status + ').';
+  // v2.43.89: при отказе/ошибке показываем явное «Обратитесь в Атомус Групп»
+  // чтобы гость, у которого нет доступа, понимал куда идти.
+  const titleByStatus = (status === 404) ? 'Запись не найдена' :
+                        (status === 403) ? 'Нет доступа' :
+                        (status === 401) ? 'Нужен доступ' :
+                        (status === 'network') ? 'Нет связи' : 'Ошибка';
+  const explainByStatus = (status === 404)
+      ? 'Возможно, токен устарел или ссылка неверна.'
+      : (status === 403 || status === 401)
+        ? 'У вас нет прав на просмотр этой записи.'
+        : (status === 'network')
+          ? 'Не удалось загрузить данные. Проверьте подключение.'
+          : 'Произошла ошибка (код ' + status + ').';
   return '<div class="public-header">' +
     '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
-    '<h1 class="public-header-title">Ошибка</h1>' +
+    '<h1 class="public-header-title">' + escapeHtml(titleByStatus) + '</h1>' +
   '</div>' +
   '<div class="public-body" style="text-align: center; padding: 32px 24px;">' +
     '<i class="ti ti-mood-sad" style="font-size: 48px; color: var(--text-light); display: block; margin-bottom: 12px;"></i>' +
-    '<p style="color: var(--text); font-size: 14px;">' + escapeHtml(msg) + '</p>' +
+    '<p style="color: var(--text); font-size: 14px; margin-bottom: 18px;">' + escapeHtml(explainByStatus) + '</p>' +
+    '<div style="background: var(--brand-bg); border: 1px solid var(--brand); border-radius: 10px; padding: 14px 16px; text-align: left;">' +
+      '<div style="font-weight: 600; font-size: 14px; color: var(--brand); margin-bottom: 6px;">' +
+        '<i class="ti ti-info-circle"></i> Нужен доступ?' +
+      '</div>' +
+      '<div style="font-size: 13px; color: var(--text); line-height: 1.45;">' +
+        'Обратитесь в компанию <b>«Атомус Групп»</b> — мы выдадим доступ к карточке и расскажем про статус заказа.' +
+      '</div>' +
+    '</div>' +
   '</div>';
 }
 
@@ -43327,7 +43348,8 @@ function showPublicFeedbackPage() {
       '</button>' +
     '</div>' +
     '<div class="public-footer">' +
-      'Внутренняя CRM-система ООО «Атомус Групп»' +
+      'Внутренняя CRM-система ООО «Атомус Групп»<br>' +
+    '<span style="font-size:11.5px;opacity:0.85;">Нужен полный доступ? Обратитесь в Атомус Групп.</span>' +
     '</div>';
 }
 
