@@ -34563,12 +34563,16 @@ async function openComponentForm(componentId) {
     '<option value="' + cat.id + '"' + (c && c.category_id === cat.id ? ' selected' : '') + '>' +
     escapeHtml(cat.name) + '</option>'
   ).join('');
-  const supOptions = '<option value="">— Не указан —</option>' +
-    suppliers.map(s =>
-      '<option value="' + s.id + '"' +
-      (c && c.default_supplier_id === s.id ? ' selected' : '') + '>' +
-      escapeHtml(s.name) + '</option>'
-    ).join('');
+  // v2.43.87: поиск поставщика через <datalist> — нативный браузерный autocomplete.
+  // В datalist хранятся имена; скрытое поле cf-supplier держит id (как и раньше).
+  const supDatalist = suppliers.map(s =>
+    '<option value="' + escapeHtml(s.name) + '">'
+  ).join('');
+  const curSup = (c && c.default_supplier_id)
+    ? suppliers.find(s => s.id === c.default_supplier_id)
+    : null;
+  const curSupName = curSup ? curSup.name : '';
+  const curSupId = curSup ? curSup.id : '';
 
   // ЭТАП 28.3.1: подгружаем supply_items для выпадашки связи
   if (!cache.supplyCatalog) {
@@ -34585,13 +34589,14 @@ async function openComponentForm(componentId) {
       escapeHtml(si.name) + ' (' + escapeHtml(si.unit || 'шт.') + ')</option>'
     ).join('');
 
+  // v2.43.87: модалка с max-height + flex-column, тело внутри прокручивается
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:92vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-tool"></i> ' + (isEdit ? 'Редактировать' : 'Новое') + ' комплектующее</h3>' +
         '<button class="modal-close" onclick="closeComponentForm()"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div style="padding:18px;">' +
+      '<div style="padding:18px;flex:1;overflow-y:auto;min-height:0;">' +
         '<label class="form-label">Категория *</label>' +
         '<select id="cf-category" class="form-input" style="margin-bottom:14px;">' +
           (cats.length ? catOptions : '<option value="">— нет категорий —</option>') +
@@ -34618,13 +34623,18 @@ async function openComponentForm(componentId) {
             ((c && c.execution_type === 'stainless') ? ' checked' : '') + '> ' +
             '<span><i class="ti ti-shield"></i> AISI (нержавейка)</span></label>' +
         '</div>' +
-        '<label class="form-label">Основной поставщик</label>' +
+        '<label class="form-label">Основной поставщик <span style="color:var(--text-light);font-weight:400;font-size:11px;">(можно искать по названию)</span></label>' +
         '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:stretch;">' +
-          '<select id="cf-supplier" class="form-input" style="flex:1;margin:0;" onchange="onComponentSupplierChange()">' + supOptions + '</select>' +
+          '<input type="text" id="cf-supplier-name" list="cf-suppliers-dl" class="form-input" ' +
+            'style="flex:1;margin:0;" placeholder="Начни вводить название…" ' +
+            'value="' + escapeHtml(curSupName) + '" ' +
+            'oninput="onComponentSupplierChange()">' +
+          '<datalist id="cf-suppliers-dl">' + supDatalist + '</datalist>' +
+          '<input type="hidden" id="cf-supplier" value="' + (curSupId || '') + '">' +
           '<button type="button" class="btn btn-secondary" id="cf-sup-open-btn" ' +
             'onclick="openSupplierFromComponent()" ' +
             'title="Открыть карточку поставщика"' +
-            ((c && c.default_supplier_id) ? '' : ' disabled style="opacity:0.5;cursor:not-allowed;"') +
+            (curSupId ? '' : ' disabled style="opacity:0.5;cursor:not-allowed;"') +
             '><i class="ti ti-external-link"></i></button>' +
         '</div>' +
         // ЭТАП 34.1: кнопка корзины закупки (заглушка — раздел Снабжение скоро)
@@ -34666,13 +34676,27 @@ function closeComponentForm() {
 // ============ ЭТАП 34.1: кнопки «Карточка поставщика» и «Корзина закупки» ============
 
 function onComponentSupplierChange() {
-  const sel = document.getElementById('cf-supplier');
+  // v2.43.87: поставщик теперь ищется по имени через datalist. Тянем id из
+  // cache.suppliers по точному совпадению name и кладём в hidden cf-supplier.
+  const nameInp = document.getElementById('cf-supplier-name');
+  const hidden = document.getElementById('cf-supplier');
   const btn = document.getElementById('cf-sup-open-btn');
-  if (!sel || !btn) return;
-  const hasValue = !!sel.value;
-  btn.disabled = !hasValue;
-  btn.style.opacity = hasValue ? '' : '0.5';
-  btn.style.cursor = hasValue ? '' : 'not-allowed';
+  if (!hidden) return;
+  let supId = '';
+  if (nameInp) {
+    const name = (nameInp.value || '').trim();
+    if (name) {
+      const sup = (cache.suppliers || []).find(s => (s.name || '').trim() === name);
+      if (sup) supId = String(sup.id);
+    }
+  }
+  hidden.value = supId;
+  if (btn) {
+    const hasValue = !!supId;
+    btn.disabled = !hasValue;
+    btn.style.opacity = hasValue ? '' : '0.5';
+    btn.style.cursor = hasValue ? '' : 'not-allowed';
+  }
 }
 
 async function openSupplierFromComponent() {
