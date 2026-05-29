@@ -5707,8 +5707,22 @@
   /* Карточка задачи (detail)
      v2.43.93: цветной hero сверху по статусу, сегментированный switch и
      карточки-факты с иконками.
-     v2.43.94: карточка занимает всё рабочее пространство — без боковых
-     отступов, с min-height во всю высоту контента. */
+     v2.43.94+95: карточка-рабочее место — занимает весь экран по ширине и
+     высоте. На десктопе снимаем ограничение max-width на content-inner для
+     screen=task-detail и тянем карточку во всю высоту окна. */
+  .desktop-layout .screen[data-screen="task-detail"] .content-inner {
+    max-width: none;
+    padding: 22px 18px;
+  }
+  .desktop-layout .screen[data-screen="task-detail"] {
+    display: flex;
+    flex-direction: column;
+  }
+  .desktop-layout .screen[data-screen="task-detail"] #task-detail-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
   .task-detail-card {
     background: white;
     border: 1px solid var(--border);
@@ -5716,11 +5730,13 @@
     padding: 0;
     margin: 0;
     overflow: hidden;
-    min-height: calc(100vh - 220px);
+    min-height: calc(100vh - 200px);
+    flex: 1;
     display: flex;
     flex-direction: column;
   }
   .task-detail-card .task-detail-body { flex: 1; }
+  .task-detail-card .task-detail-hero { min-height: 140px; }
 
   /* Цветной hero — статусная полоса с большой подписью */
   .task-detail-hero {
