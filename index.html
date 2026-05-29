@@ -27296,8 +27296,8 @@ const TASK_PRIORITIES = [
 const TASK_STATUSES = [
   { code: 'new',         label: 'Новая' },
   { code: 'in_progress', label: 'В работе' },
-  { code: 'done',        label: 'Готова' },
-  { code: 'cancelled',   label: 'Отменена' },
+  { code: 'done',        label: 'Готово' },
+  { code: 'cancelled',   label: 'Отменено' },
 ];
 
 function canManageTasks() {
@@ -28568,7 +28568,7 @@ async function loadModelAssembliesBlock(modelId) {
       'in_progress': { cls: 'a-st-inprog',  icon: 'ti-tool',         label: 'В работе' },
       'ready':       { cls: 'a-st-ready',   icon: 'ti-circle-check', label: 'Готово' },
       'shipped':     { cls: 'a-st-shipped', icon: 'ti-truck-delivery', label: 'Отгружено' },
-      'written_off': { cls: 'a-st-shipped', icon: 'ti-trash',        label: 'Списана' },
+      'written_off': { cls: 'a-st-shipped', icon: 'ti-trash',        label: 'Списано' },
     };
     let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
     const canDelete = hasPermission('production.manage');  // мастер или директор
@@ -34175,11 +34175,14 @@ state.warehouseSearch = '';
 state.warehouseSearchTimer = null;
 state.movementsFilter = 'all';   // 'all' | 'in' | 'out' | 'write_off'
 
+// v2.43.88: гендер-нейтральные формы — лейбл универсален для «сборки», «блока»,
+// «узла», «изделия» и т.п. («блок готов», «сборка готова» — оба корректны
+// с одним лейблом «готово»).
 const ASSEMBLY_STATUS_LABELS = {
   in_progress: 'в работе',
-  ready:       'готова',
-  shipped:     'отгружена',
-  written_off: 'списана',
+  ready:       'готово',
+  shipped:     'отгружено',
+  written_off: 'списано',
 };
 
 const ASSEMBLY_STATUS_ORDER = ['in_progress', 'ready', 'shipped', 'written_off'];
@@ -37691,7 +37694,7 @@ function showAssemblyStockModal(d) {
   if (stateCanManage) {
     // Переключение статуса: показываем кнопки в зависимости от текущего состояния
     if (a.status === 'in_progress') {
-      actionsHtml += '<button class="btn btn-primary" onclick="changeAssemblyStatus(' + a.id + ', \'ready\')"><i class="ti ti-check"></i> Перевести в Готова (на склад)</button>';
+      actionsHtml += '<button class="btn btn-primary" onclick="changeAssemblyStatus(' + a.id + ', \'ready\')"><i class="ti ti-check"></i> Перевести в «Готово» (на склад)</button>';
     }
     if (a.stock_qty > 0) {
       actionsHtml += '<button class="btn btn-danger btn-secondary" onclick="promptWriteOff(' + a.id + ', ' + a.stock_qty + ')"><i class="ti ti-trash"></i> Списать</button>';
