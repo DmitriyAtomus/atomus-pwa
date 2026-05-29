@@ -3895,19 +3895,181 @@
 
   /* ============ ЭТАП 16В: ЗАДАЧИ ============ */
 
-  .task-row {
+  /* v2.43.92: счётчик в filter-chip («Новые 3») */
+  .filter-chip .chip-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 18px;
+    text-align: center;
+  }
+  .filter-chip.active .chip-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
+
+  /* v2.43.92: переключатель видов «Список / Доска» */
+  .tasks-view-toggle {
+    display: inline-flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2px;
+    margin-left: 12px;
+    flex-shrink: 0;
+  }
+  .tasks-view-toggle button {
+    background: none; border: none;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-light);
+    cursor: pointer;
+    border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.12s, color 0.12s;
+  }
+  .tasks-view-toggle button:hover { color: var(--text-dark); }
+  .tasks-view-toggle button.active {
+    background: white;
+    color: var(--brand);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+  }
+  .tasks-view-toggle button .ti { font-size: 15px; }
+
+  /* v2.43.92: канбан-доска задач */
+  .tasks-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 8px 18px 18px;
+  }
+  @media (max-width: 900px) {
+    .tasks-board { grid-template-columns: 1fr; }
+  }
+  .tasks-board-col {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+  }
+  .tasks-board-col.drag-over { background: var(--brand-bg); outline: 2px dashed var(--brand); outline-offset: -4px; }
+  .tasks-board-col-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .tasks-board-col-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tasks-board-col-title .col-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .tasks-board-col[data-col="new"] .col-dot         { background: var(--brand); }
+  .tasks-board-col[data-col="in_progress"] .col-dot { background: #C18B00; }
+  .tasks-board-col[data-col="done"] .col-dot        { background: var(--success); }
+  .tasks-board-col-count {
+    font-size: 11.5px;
+    color: var(--text-light);
+    background: white;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .tasks-board-col-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+  }
+  .tasks-board-card {
     background: white;
     border: 1px solid var(--border);
     border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-left: 4px solid var(--text-faint);
+    transition: box-shadow 0.12s, transform 0.1s;
+  }
+  .tasks-board-card.priority-urgent { border-left-color: var(--danger); }
+  .tasks-board-card.priority-low    { border-left-color: var(--success); }
+  .tasks-board-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); transform: translateY(-1px); }
+  .tasks-board-card.dragging { opacity: 0.4; }
+  .tasks-board-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .tasks-board-card-meta {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    font-size: 11px; color: var(--text-light);
+  }
+  .tasks-board-card-meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .tasks-board-empty {
+    font-size: 11.5px;
+    color: var(--text-faint);
+    padding: 14px;
+    text-align: center;
+    font-style: italic;
+  }
+
+
+  .task-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
     padding: 12px 14px;
     margin-bottom: 8px;
     display: flex; gap: 12px; align-items: flex-start;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s, box-shadow 0.15s;
   }
-  .task-row:hover { background: var(--bg); }
+  .task-row:hover {
+    background: var(--bg);
+    border-color: var(--text-light);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+  }
   .task-row.task-done { opacity: 0.6; }
   .task-row.task-done .task-row-title { text-decoration: line-through; }
+  .task-row .task-quick-done {
+    flex: 0 0 32px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-light);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    align-self: center;
+  }
+  .task-row .task-quick-done:hover {
+    background: #E8F5E9;
+    color: var(--success);
+    border-color: var(--success);
+  }
+  .task-row .task-quick-done i { font-size: 16px; }
 
   .task-row-priority {
     flex: 0 0 4px;
@@ -15666,12 +15828,18 @@
         </div>
         <div class="content-inner">
           <div class="desktop-layout">
-            <div class="filter-row" id="tasks-filters">
-              <button class="filter-chip active" data-tf="open">Открытые</button>
-              <button class="filter-chip" data-tf="new">Новые</button>
-              <button class="filter-chip" data-tf="in_progress">В работе</button>
-              <button class="filter-chip" data-tf="done">Готовые</button>
-              <button class="filter-chip" data-tf="all">Все</button>
+            <div class="filter-row" id="tasks-filters" style="display:flex;align-items:center;">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;flex:1;">
+                <button class="filter-chip active" data-tf="open">Открытые<span class="chip-count" id="tf-cnt-open">0</span></button>
+                <button class="filter-chip" data-tf="new">Новые<span class="chip-count" id="tf-cnt-new">0</span></button>
+                <button class="filter-chip" data-tf="in_progress">В работе<span class="chip-count" id="tf-cnt-in_progress">0</span></button>
+                <button class="filter-chip" data-tf="done">Готовые<span class="chip-count" id="tf-cnt-done">0</span></button>
+                <button class="filter-chip" data-tf="all">Все<span class="chip-count" id="tf-cnt-all">0</span></button>
+              </div>
+              <div class="tasks-view-toggle" id="tasks-view-toggle">
+                <button class="active" data-tv="list" onclick="setTasksView('list')"><i class="ti ti-list"></i> Список</button>
+                <button data-tv="board" onclick="setTasksView('board')"><i class="ti ti-layout-kanban"></i> Доска</button>
+              </div>
             </div>
           </div>
           <div id="tasks-list-content">
@@ -27337,32 +27505,81 @@ function canManageTasks() {
 }
 
 // ---- Список задач (общий рендер для трёх экранов) ----
+// v2.43.92: добавлен переключатель «Список / Доска» и счётчики в чипах.
+
+function _tasksViewInit() {
+  if (!state.tasksView) {
+    state.tasksView = localStorage.getItem('atomus_tasks_view') || 'list';
+  }
+}
+function setTasksView(view) {
+  state.tasksView = view;
+  try { localStorage.setItem('atomus_tasks_view', view); } catch (e) {}
+  document.querySelectorAll('#tasks-view-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tv === view);
+  });
+  // На доске статус-фильтр не имеет смысла — прячем чипы
+  const filterRow = document.querySelector('#tasks-filters > div:first-child');
+  if (filterRow) filterRow.style.visibility = (view === 'board') ? 'hidden' : '';
+  loadTasksList();
+}
 
 async function loadTasksList() {
+  _tasksViewInit();
+  const view = state.tasksView || 'list';
   const filter = state.tasksFilter;
   const container = document.getElementById('tasks-list-content');
-  if (cache.tasks[filter]) { renderTasksList(cache.tasks[filter]); return; }
+
+  // Обновим состояние переключателя (после перезахода на экран)
+  document.querySelectorAll('#tasks-view-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tv === view);
+  });
+  const filterRow = document.querySelector('#tasks-filters > div:first-child');
+  if (filterRow) filterRow.style.visibility = (view === 'board') ? 'hidden' : '';
+
+  // На доске всегда грузим всё (без фильтра по статусу). В списке — по текущему фильтру.
+  const cacheKey = (view === 'board') ? 'board' : filter;
+  if (cache.tasks[cacheKey]) {
+    renderTasksScreen(cache.tasks[cacheKey]);
+    return;
+  }
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
-    const q = (filter === 'all') ? '' : '?status=' + filter;
+    const q = (view === 'board' || filter === 'all') ? '' : '?status=' + filter;
     const d = await apiGet('/api/tasks' + q);
-    cache.tasks[filter] = d;
-    renderTasksList(d);
+    cache.tasks[cacheKey] = d;
+    renderTasksScreen(d);
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
   }
 }
 
-function renderTasksList(d) {
-  const container = document.getElementById('tasks-list-content');
+function renderTasksScreen(d) {
+  // Обновим счётчики в чипах и subtitle
+  const c = d.counts || {};
+  const cAll = (c.new || 0) + (c.in_progress || 0) + (c.done || 0) + (c.cancelled || 0);
+  const ids = [['open', c.open || 0], ['new', c.new || 0], ['in_progress', c.in_progress || 0],
+               ['done', c.done || 0], ['all', cAll]];
+  ids.forEach(([k, v]) => {
+    const el = document.getElementById('tf-cnt-' + k);
+    if (el) el.textContent = v;
+  });
   const subtitleEl = document.getElementById('tasks-list-subtitle');
   if (subtitleEl) {
-    const c = d.counts || {};
     subtitleEl.textContent = (c.open || 0) + ' открытых · ' + (c.done || 0) + ' готовых';
   }
   const newBtnEl = document.getElementById('tasks-new-btn');
   if (newBtnEl) newBtnEl.style.display = canManageTasks() ? '' : 'none';
 
+  if ((state.tasksView || 'list') === 'board') {
+    renderTasksBoard(d);
+  } else {
+    renderTasksList(d);
+  }
+}
+
+function renderTasksList(d) {
+  const container = document.getElementById('tasks-list-content');
   const tasks = d.tasks || [];
   if (!tasks.length) {
     let html = '<div class="empty-block"><i class="ti ti-checklist"></i>';
@@ -27378,6 +27595,117 @@ function renderTasksList(d) {
   tasks.forEach(t => { html += renderTaskRow(t); });
   html += '</div>';
   container.innerHTML = html;
+}
+
+// v2.43.92: канбан-доска задач
+function renderTasksBoard(d) {
+  const container = document.getElementById('tasks-list-content');
+  const tasks = d.tasks || [];
+  const cols = [
+    { key: 'new',         title: 'Новые',    empty: 'Здесь будут новые задачи' },
+    { key: 'in_progress', title: 'В работе', empty: 'Никто не взял в работу' },
+    { key: 'done',        title: 'Готовые',  empty: 'Пока пусто' },
+  ];
+  const byCol = { new: [], in_progress: [], done: [] };
+  tasks.forEach(t => {
+    if (byCol[t.status]) byCol[t.status].push(t);
+  });
+
+  let html = '<div class="tasks-board">';
+  cols.forEach(col => {
+    const items = byCol[col.key];
+    html += '<div class="tasks-board-col" data-col="' + col.key + '"' +
+            ' ondragover="event.preventDefault();this.classList.add(\'drag-over\');"' +
+            ' ondragleave="this.classList.remove(\'drag-over\');"' +
+            ' ondrop="_tasksBoardDrop(event, \'' + col.key + '\')">';
+    html += '<div class="tasks-board-col-header">' +
+              '<div class="tasks-board-col-title"><span class="col-dot"></span>' + escapeHtml(col.title) + '</div>' +
+              '<span class="tasks-board-col-count">' + items.length + '</span>' +
+            '</div>';
+    html += '<div class="tasks-board-col-body">';
+    if (items.length === 0) {
+      html += '<div class="tasks-board-empty">' + escapeHtml(col.empty) + '</div>';
+    } else {
+      items.forEach(t => { html += _renderTaskBoardCard(t); });
+    }
+    html += '</div></div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function _renderTaskBoardCard(t) {
+  const pri = t.priority || 'normal';
+  const meta = [];
+  if (t.assignee_name) meta.push('<span><i class="ti ti-user"></i>' + escapeHtml(t.assignee_name) + '</span>');
+  if (t.deadline) {
+    let cls = '';
+    try {
+      const diff = Math.round((new Date(t.deadline) - new Date()) / 86400000);
+      if (t.status !== 'done' && diff < 0) cls = ' urgent';
+      else if (t.status !== 'done' && diff <= 1) cls = ' soon';
+    } catch (e) {}
+    meta.push('<span class="task-meta-deadline' + cls + '"><i class="ti ti-clock"></i>' +
+              escapeHtml(formatTaskDeadline(t.deadline)) + '</span>');
+  }
+  if (t.contract_number) {
+    meta.push('<span class="task-meta-contract" onclick="event.stopPropagation();openContractFromTask(' + t.contract_id + ')"><i class="ti ti-file-text"></i>' + escapeHtml(t.contract_number) + '</span>');
+  }
+  return '<div class="tasks-board-card priority-' + pri + '"' +
+           ' draggable="true"' +
+           ' ondragstart="_tasksBoardDragStart(event,' + t.id + ',\'' + t.status + '\')"' +
+           ' ondragend="this.classList.remove(\'dragging\')"' +
+           ' onclick="openTaskDetail(' + t.id + ')">' +
+    '<div class="tasks-board-card-title">' + escapeHtml(t.title) + '</div>' +
+    (meta.length ? '<div class="tasks-board-card-meta">' + meta.join('') + '</div>' : '') +
+  '</div>';
+}
+
+let _tasksDraggingId = null;
+let _tasksDraggingFrom = null;
+function _tasksBoardDragStart(ev, taskId, fromStatus) {
+  _tasksDraggingId = taskId;
+  _tasksDraggingFrom = fromStatus;
+  ev.dataTransfer.effectAllowed = 'move';
+  ev.currentTarget.classList.add('dragging');
+}
+async function _tasksBoardDrop(ev, toStatus) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  const taskId = _tasksDraggingId;
+  const from = _tasksDraggingFrom;
+  _tasksDraggingId = null;
+  _tasksDraggingFrom = null;
+  if (!taskId || from === toStatus) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/' + taskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ status: toStatus }),
+    });
+    if (!r.ok) { showToast('Не удалось сменить статус', 'error'); return; }
+    showToast('Статус обновлён', 'success');
+    cache.tasks = {};
+    loadTasksList();
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+}
+
+// v2.43.92: быстрое завершение задачи без открытия деталей
+async function _tasksQuickDone(ev, taskId) {
+  ev.stopPropagation();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/' + taskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ status: 'done' }),
+    });
+    if (!r.ok) { showToast('Не удалось завершить', 'error'); return; }
+    showToast('Задача завершена', 'success');
+    cache.tasks = {};
+    loadTasksList();
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
 }
 
 function renderTaskRow(t) {
@@ -27409,6 +27737,10 @@ function renderTaskRow(t) {
     );
   }
 
+  // v2.43.92: быстрое «Готово» прямо на карточке для открытых задач
+  const quickDoneBtn = !isDone
+    ? '<button class="task-quick-done" onclick="_tasksQuickDone(event,' + t.id + ')" title="Отметить готовой"><i class="ti ti-check"></i></button>'
+    : '';
   return '<div class="task-row ' + (isDone ? 'task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
     '<div class="task-row-priority ' + priorityCls + '"></div>' +
     '<div class="task-row-body">' +
@@ -27416,6 +27748,7 @@ function renderTaskRow(t) {
       (meta.length ? '<div class="task-row-meta">' + meta.join('') + '</div>' : '') +
     '</div>' +
     '<div class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</div>' +
+    quickDoneBtn +
     '</div>';
 }
 
