@@ -30818,6 +30818,10 @@ async function submitAssembly() {
       ? 'Работа взята в процесс: ID ' + r.data.id
       : 'Запись сохранена: ID ' + r.data.id;
     showToast(okMsg, 'success');
+    // v2.43.80: если канбан-синк упал — показываем причину отдельным тостом
+    if (r.data.kanban_sync_error) {
+      setTimeout(() => showToast('Канбан не обновился: ' + r.data.kanban_sync_error, 'error'), 1600);
+    }
     // ЭТАП 32: уведомления о списании комплектующих
     if (r.data.bom_writeoff && r.data.bom_writeoff.count) {
       setTimeout(() => showToast('Списано со склада: ' + r.data.bom_writeoff.count + ' поз.', 'success'), 1200);
