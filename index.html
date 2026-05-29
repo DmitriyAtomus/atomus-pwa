@@ -18601,22 +18601,44 @@ function renderPkbWorkload(workload) {
       (status === 'normal')     ? 'норма'    :
       (works === 0)             ? 'свободен' : 'недогруз';
 
-    // v2.43.47: текст с разбивкой главные/помощь
+    // v2.43.91: вместо «помогает 1 работа» показываем чем именно занят —
+    // название первой работы (helping_now вперёд по сортировке с бэка) + счётчик
+    // остальных. Полный список с ролями уходит в title для всплывающей подсказки.
     const hoursPrefix = (isEstimated && hours > 0) ? '~' : '';
+    const worksList = w.works || [];
+    const primary = worksList[0];
+    const restCount = Math.max(0, worksList.length - 1);
+    function _trimTitle(s, n) {
+      s = String(s || '').trim();
+      return s.length > n ? s.slice(0, n - 1) + '…' : s;
+    }
     let barText;
     if (works === 0) {
       barText = 'нет работ';
+    } else if (primary && primary.title) {
+      const prefix = (primary.role === 'help' && mainN === 0) ? 'помогает: ' : '';
+      const tail = restCount > 0 ? ' +' + restCount : '';
+      barText = prefix + _trimTitle(primary.title, 28) + tail + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
     } else if (helpN > 0 && mainN > 0) {
+      // fallback на старый формат (если по какой-то причине нет данных по работам)
       barText = mainN + ' гл. + ' + helpN + ' пом. · ' + hoursPrefix + formatHours(hours) + 'ч';
     } else if (helpN > 0) {
       barText = 'помогает ' + helpN + ' ' + plural(helpN, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
     } else {
       barText = mainN + ' ' + plural(mainN, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
     }
-    // Tooltip с пояснением
+    // Tooltip с полным списком работ
     let barTooltip;
     if (works === 0) {
       barTooltip = 'Активных работ нет';
+    } else if (worksList.length) {
+      const lines = worksList.map(x => {
+        const role = x.role === 'help' ? '(помощь) ' : '';
+        return '• ' + role + (x.title || ('Работа #' + x.id));
+      });
+      barTooltip = lines.join('\n') + (isEstimated
+        ? '\nЧасы оценочные: ' + defHrs + 'ч на работу без указанного времени.'
+        : '');
     } else {
       const parts = [];
       if (mainN > 0) parts.push('Главный по ' + mainN + ' ' + plural(mainN, 'работе', 'работам', 'работам'));
