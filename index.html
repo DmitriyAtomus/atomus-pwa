@@ -3498,46 +3498,50 @@
   }
   .desktop-layout .home-kpi-title i { font-size: 16px; }
 
-  /* ============ v2.43.75: РАДИО НА ГЛАВНОЙ ============
-     v2.43.76: на десктопе уезжает в правую колонку (sticky), на мобиле — верхняя карточка.
-     Добавлен ползунок громкости. */
-  .desktop-layout #home-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    column-gap: 24px;
-    align-items: start;
-  }
-  .desktop-layout #home-main-col { grid-column: 1; min-width: 0; }
-  .desktop-layout #home-radio-card-wrap {
-    grid-column: 2;
-    position: sticky;
-    top: 12px;
-  }
-  /* На очень узких десктопах схлопываем в одну колонку */
-  @media (max-width: 1100px) {
-    .desktop-layout #home-content { grid-template-columns: 1fr; }
-    .desktop-layout #home-radio-card-wrap { position: static; }
-  }
+  /* ============ v2.43.75: РАДИО ============
+     v2.43.77: переехало в левый сайдбар (Главная) как nav-кнопка. Сам виджет
+     теперь содержимое модалки — открывается кликом по кнопке. */
 
-  .home-radio-card {
-    margin: 14px 14px 4px;
+  /* Кнопка «Радио» в сайдбаре с индикатором проигрывания */
+  .nav-item.nav-radio-btn { position: relative; }
+  .nav-item.nav-radio-btn.playing i { color: #5B9CFF; opacity: 1; }
+  .nav-item.nav-radio-btn.playing::after {
+    content: '';
+    position: absolute;
+    right: 12px; top: 50%;
+    width: 7px; height: 7px;
+    margin-top: -3px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+    animation: hr-pulse 1.6s ease-out infinite;
+  }
+  .nav-item.nav-radio-btn .nav-radio-station {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+  }
+  .nav-item.nav-radio-btn.playing .nav-radio-station { color: rgba(255, 255, 255, 0.7); }
+
+  /* Содержимое модалки «Радио» — тёмная панель сверху с управлением + список снизу */
+  .radio-modal-top {
     background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
     color: white;
-    border-radius: 14px;
-    padding: 14px 16px;
+    padding: 18px 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
-    position: relative;
+    gap: 14px;
   }
-  .desktop-layout .home-radio-card { margin: 0; padding: 16px; }
-  .home-radio-card .hr-top {
+  .radio-modal-top .hr-top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
-  .home-radio-card .hr-play {
+  .radio-modal-top .hr-play {
     flex: 0 0 42px;
     width: 42px; height: 42px;
     border-radius: 50%;
@@ -3548,11 +3552,11 @@
     cursor: pointer;
     transition: background 0.15s, transform 0.1s;
   }
-  .home-radio-card .hr-play:hover { background: rgba(255, 255, 255, 0.2); }
-  .home-radio-card .hr-play:active { transform: scale(0.94); }
-  .home-radio-card .hr-play i { font-size: 22px; }
-  .home-radio-card .hr-text { flex: 1; min-width: 0; }
-  .home-radio-card .hr-label {
+  .radio-modal-top .hr-play:hover { background: rgba(255, 255, 255, 0.2); }
+  .radio-modal-top .hr-play:active { transform: scale(0.94); }
+  .radio-modal-top .hr-play i { font-size: 22px; }
+  .radio-modal-top .hr-text { flex: 1; min-width: 0; }
+  .radio-modal-top .hr-label {
     font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
@@ -3560,8 +3564,8 @@
     font-weight: 600;
     display: flex; align-items: center; gap: 5px;
   }
-  .home-radio-card .hr-label i { font-size: 13px; }
-  .home-radio-card .hr-station {
+  .radio-modal-top .hr-label i { font-size: 13px; }
+  .radio-modal-top .hr-station {
     font-size: 15px;
     font-weight: 600;
     margin-top: 2px;
@@ -3569,7 +3573,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .home-radio-card .hr-pick {
+  .radio-modal-top .hr-pick {
     flex: 0 0 auto;
     padding: 7px 12px;
     border-radius: 8px;
@@ -3580,23 +3584,23 @@
     cursor: pointer;
     transition: background 0.15s;
   }
-  .home-radio-card .hr-pick:hover { background: rgba(255, 255, 255, 0.18); }
-  .home-radio-card.hr-loading .hr-play i { animation: hr-spin 0.9s linear infinite; }
+  .radio-modal-top .hr-pick:hover { background: rgba(255, 255, 255, 0.18); }
+  .radio-modal-top.hr-loading .hr-play i { animation: hr-spin 0.9s linear infinite; }
   @keyframes hr-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
   /* Ползунок громкости */
-  .home-radio-card .hr-volume {
+  .radio-modal-top .hr-volume {
     display: flex;
     align-items: center;
     gap: 10px;
     padding-top: 4px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
-  .home-radio-card .hr-volume i {
+  .radio-modal-top .hr-volume i {
     font-size: 16px;
     color: rgba(255, 255, 255, 0.55);
     flex-shrink: 0;
   }
-  .home-radio-card .hr-volume input[type="range"] {
+  .radio-modal-top .hr-volume input[type="range"] {
     flex: 1;
     height: 4px;
     -webkit-appearance: none;
@@ -3606,7 +3610,7 @@
     cursor: pointer;
     outline: none;
   }
-  .home-radio-card .hr-volume input[type="range"]::-webkit-slider-thumb {
+  .radio-modal-top .hr-volume input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 14px; height: 14px;
@@ -3615,7 +3619,7 @@
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
-  .home-radio-card .hr-volume input[type="range"]::-moz-range-thumb {
+  .radio-modal-top .hr-volume input[type="range"]::-moz-range-thumb {
     width: 14px; height: 14px;
     border-radius: 50%;
     background: white;
@@ -3623,14 +3627,14 @@
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
-  .home-radio-card .hr-vol-pct {
+  .radio-modal-top .hr-vol-pct {
     font-size: 11.5px;
     color: rgba(255, 255, 255, 0.55);
     min-width: 30px;
     text-align: right;
   }
   /* "live" точка когда играет */
-  .home-radio-card .hr-live-dot {
+  .radio-modal-top .hr-live-dot {
     display: inline-block;
     width: 6px; height: 6px;
     border-radius: 50%;
@@ -13973,6 +13977,11 @@
         <button class="nav-item" data-nav="home-calendar" onclick="selectSidebarItem('home-calendar')">
           <i class="ti ti-calendar"></i><span>Календарь</span>
         </button>
+        <!-- v2.43.77: Радио — кнопка-триггер модалки, состояние обновляется renderSidebarRadio() -->
+        <a class="nav-item nav-radio-btn" id="sidebar-radio-btn" onclick="openRadioModal()" style="cursor:pointer;">
+          <i class="ti ti-radio"></i><span>Радио</span>
+          <span class="nav-radio-station" id="sidebar-radio-station"></span>
+        </a>
       </div>
 
       <!-- Внешние сервисы -->
@@ -25796,10 +25805,7 @@ function renderHomeSkeleton() {
   if (!container) return;
   let html = '';
 
-  // v2.43.75: радио на главной — первая карточка сверху, доступна и на мобиле, и на десктопе.
-  // v2.43.76: на десктопе живёт в правой колонке (через CSS-grid на #home-content).
-  html += '<div id="home-radio-card-wrap"></div>';
-  html += '<div id="home-main-col">';
+  // v2.43.77: радио переехало в левый сайдбар (пункт «Радио»), открывается модалкой.
 
   // ============ ЭТАП 25.0: блоки только для мобилки ============
   // Они показываются ТОЛЬКО когда .app.mobile-layout (через inline CSS у обёртки)
@@ -25845,17 +25851,14 @@ function renderHomeSkeleton() {
     html += '<div id="home-activity-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   }
 
-  // Закрываем #home-main-col, открытый перед mobile-only блоком (v2.43.76)
-  html += '</div>';
-
   container.innerHTML = html;
 
   // ЭТАП 25.0: рендер новых мобильных блоков
   renderQuickActions25();
   renderWeekCal25();
   loadHomeWeekEvents();
-  // v2.43.75: радио-виджет
-  renderRadioWidget();
+  // v2.43.77: радио живёт в сайдбаре — обновим состояние кнопки
+  renderSidebarRadio();
 }
 
 function escapeText(s) {
@@ -26437,15 +26440,26 @@ function _radioSave() {
   const s = _radioState();
   try {
     localStorage.setItem(RADIO_STORAGE_KEY, JSON.stringify({
-      stationId: s.stationId,
-      volume:    s.volume,
+      stationId:  s.stationId,
+      volume:     s.volume,
+      wasPlaying: !!s.playing, // v2.43.77: для автозапуска после F5
     }));
   } catch (e) {}
 }
 
-function renderRadioWidget() {
-  const wrap = document.getElementById('home-radio-card-wrap');
-  if (!wrap) return;
+// Обновляет визуальное состояние кнопки «Радио» в сайдбаре (играет / станция).
+function renderSidebarRadio() {
+  const btn = document.getElementById('sidebar-radio-btn');
+  if (!btn) return;
+  const s = _radioState();
+  const station = s.stationId ? _radioGetStation(s.stationId) : null;
+  btn.classList.toggle('playing', !!s.playing);
+  const nameEl = document.getElementById('sidebar-radio-station');
+  if (nameEl) nameEl.textContent = (s.playing && station) ? station.name : '';
+}
+
+// Рендер тела модалки (тёмная панель с управлением + список станций).
+function _renderRadioModalBody() {
   const s = _radioState();
   const station = s.stationId ? _radioGetStation(s.stationId) : null;
   const stationName = station ? station.name : 'Выберите волну';
@@ -26457,8 +26471,20 @@ function renderRadioWidget() {
     : '<i class="ti ti-radio"></i>Радио';
   const volPct = Math.round((s.volume || 0) * 100);
   const volIcon = volPct === 0 ? 'ti-volume-off' : (volPct < 40 ? 'ti-volume-2' : 'ti-volume');
-  wrap.innerHTML =
-    '<div class="home-radio-card' + (isLoading ? ' hr-loading' : '') + '">' +
+
+  let items = '';
+  RADIO_STATIONS.forEach((st, i) => {
+    const active = st.id === s.stationId;
+    items += '<div class="radio-station-item' + (active ? ' active' : '') + '" onclick="selectRadioStation(\'' + st.id + '\')">' +
+               '<div class="rsi-num">' + (i + 1) + '.</div>' +
+               '<div class="rsi-name">' + escapeHtml(st.name) + '</div>' +
+               (active && isPlaying ? '<span class="hr-live-dot" style="margin-right:6px;"></span>' : '') +
+               (active ? '<i class="ti ti-check rsi-check"></i>' : '') +
+             '</div>';
+  });
+
+  return (
+    '<div class="radio-modal-top' + (isLoading ? ' hr-loading' : '') + '">' +
       '<div class="hr-top">' +
         '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Пауза' : 'Играть') + '">' +
           '<i class="ti ' + playIcon + '"></i>' +
@@ -26467,16 +26493,25 @@ function renderRadioWidget() {
           '<div class="hr-label">' + labelHtml + '</div>' +
           '<div class="hr-station">' + escapeHtml(stationName) + '</div>' +
         '</div>' +
-        '<button class="hr-pick" onclick="openRadioStationPicker()">' +
-          '<i class="ti ti-list"></i> Сменить' +
-        '</button>' +
       '</div>' +
       '<div class="hr-volume">' +
         '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
         '<input type="range" min="0" max="100" value="' + volPct + '" oninput="setRadioVolume(this.value)">' +
         '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+    '<div class="modal-body"><div class="radio-station-list">' + items + '</div></div>'
+  );
+}
+
+// Перерисовать содержимое уже открытой модалки (если она открыта).
+function _refreshRadioModal() {
+  const overlay = document.getElementById('radio-modal');
+  if (!overlay) return;
+  const inner = overlay.querySelector('.modal');
+  if (!inner) return;
+  // Сохраняем header, заменяем тело
+  inner.querySelector('.radio-modal-content').innerHTML = _renderRadioModalBody();
 }
 
 function _radioEnsureAudio() {
@@ -26485,11 +26520,12 @@ function _radioEnsureAudio() {
   const a = new Audio();
   a.preload = 'none';
   a.volume = s.volume;
-  a.addEventListener('playing', () => { s.playing = true; s.loading = false; renderRadioWidget(); });
-  a.addEventListener('pause',   () => { s.playing = false; s.loading = false; renderRadioWidget(); });
-  a.addEventListener('waiting', () => { s.loading = true; renderRadioWidget(); });
+  const onState = () => { _radioSave(); renderSidebarRadio(); _refreshRadioModal(); };
+  a.addEventListener('playing', () => { s.playing = true;  s.loading = false; onState(); });
+  a.addEventListener('pause',   () => { s.playing = false; s.loading = false; onState(); });
+  a.addEventListener('waiting', () => { s.loading = true; _refreshRadioModal(); });
   a.addEventListener('error',   () => {
-    s.playing = false; s.loading = false; renderRadioWidget();
+    s.playing = false; s.loading = false; onState();
     showToast('Не удалось воспроизвести станцию — проверьте интернет или выберите другую', 'error');
   });
   s.audio = a;
@@ -26516,18 +26552,23 @@ function setRadioVolume(v) {
 function toggleRadioPlay() {
   const s = _radioState();
   const audio = _radioEnsureAudio();
-  if (!s.stationId) { openRadioStationPicker(); return; }
+  if (!s.stationId) {
+    // Нет станции — просто откроем список (модалка уже открыта, но на случай прямого вызова)
+    if (!document.getElementById('radio-modal')) openRadioModal();
+    return;
+  }
   if (s.playing) {
     audio.pause();
     return;
   }
   const station = _radioGetStation(s.stationId);
-  if (!station) { openRadioStationPicker(); return; }
+  if (!station) return;
   if (!audio.src || audio.src !== station.url) audio.src = station.url;
   s.loading = true;
-  renderRadioWidget();
+  _refreshRadioModal();
+  renderSidebarRadio();
   audio.play().catch(() => {
-    s.loading = false; s.playing = false; renderRadioWidget();
+    s.loading = false; s.playing = false; _refreshRadioModal(); renderSidebarRadio();
     showToast('Не удалось воспроизвести — проверьте интернет или выберите другую', 'error');
   });
 }
@@ -26541,49 +26582,69 @@ function selectRadioStation(id) {
   _radioSave();
   audio.src = station.url;
   s.loading = true;
-  renderRadioWidget();
+  _refreshRadioModal();
+  renderSidebarRadio();
   audio.play().catch(() => {
-    s.loading = false; s.playing = false; renderRadioWidget();
+    s.loading = false; s.playing = false; _refreshRadioModal(); renderSidebarRadio();
     showToast('Не удалось воспроизвести — проверьте интернет или выберите другую', 'error');
   });
-  closeRadioStationPicker();
 }
 
-function openRadioStationPicker() {
+function openRadioModal() {
   // Удаляем предыдущий, если остался
-  const old = document.getElementById('radio-picker-modal');
+  const old = document.getElementById('radio-modal');
   if (old) old.remove();
 
-  const s = _radioState();
-  let items = '';
-  RADIO_STATIONS.forEach((st, i) => {
-    const active = st.id === s.stationId;
-    items += '<div class="radio-station-item' + (active ? ' active' : '') + '" onclick="selectRadioStation(\'' + st.id + '\')">' +
-               '<div class="rsi-num">' + (i + 1) + '.</div>' +
-               '<div class="rsi-name">' + escapeHtml(st.name) + '</div>' +
-               (active ? '<i class="ti ti-check rsi-check"></i>' : '') +
-             '</div>';
-  });
-
   const overlay = document.createElement('div');
-  overlay.id = 'radio-picker-modal';
+  overlay.id = 'radio-modal';
   overlay.className = 'modal-overlay visible';
-  overlay.onclick = function(e) { if (e.target === overlay) closeRadioStationPicker(); };
+  overlay.style.zIndex = '260';
+  overlay.onclick = function(e) { if (e.target === overlay) closeRadioModal(); };
   overlay.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-radio"></i> Выберите волну</h3>' +
-        '<button class="icon-btn" onclick="closeRadioStationPicker()"><i class="ti ti-x"></i></button>' +
+        '<h3><i class="ti ti-radio"></i> Радио</h3>' +
+        '<button class="icon-btn" onclick="closeRadioModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div class="modal-body"><div class="radio-station-list">' + items + '</div></div>' +
+      '<div class="radio-modal-content">' + _renderRadioModalBody() + '</div>' +
     '</div>';
   document.body.appendChild(overlay);
 }
 
-function closeRadioStationPicker() {
-  const m = document.getElementById('radio-picker-modal');
+function closeRadioModal() {
+  const m = document.getElementById('radio-modal');
   if (m) m.remove();
 }
+
+// v2.43.77: автозапуск после F5 — если радио играло до перезагрузки, пытаемся
+// возобновить. Браузерные autoplay-policy могут заблокировать — в этом случае
+// тихо остаёмся на паузе, пользователь нажмёт play вручную.
+async function _radioBootResume() {
+  const s = _radioState();
+  if (!s.stationId) { renderSidebarRadio(); return; }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(RADIO_STORAGE_KEY) || 'null'); } catch (e) {}
+  if (!saved || !saved.wasPlaying) { renderSidebarRadio(); return; }
+  const station = _radioGetStation(s.stationId);
+  if (!station) { renderSidebarRadio(); return; }
+  const audio = _radioEnsureAudio();
+  audio.src = station.url;
+  s.loading = true;
+  renderSidebarRadio();
+  try {
+    await audio.play();
+  } catch (e) {
+    s.loading = false;
+    s.playing = false;
+    renderSidebarRadio();
+    // Тихо — autoplay-policy. Кнопка останется на паузе.
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Дадим основному коду немного оттранслировать UI, потом пробуем возобновить.
+  setTimeout(_radioBootResume, 600);
+});
 
 function formatCbrDate(iso) {
   // iso = "2026-05-14"
