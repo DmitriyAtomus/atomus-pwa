@@ -3629,12 +3629,61 @@
     background: var(--brand); color: white; border-color: var(--brand);
   }
   .catalog-tab.active i { color: white; }
+
+  /* v2.44.17: мобильная навигация каталога — табы горизонтально-скроллируемые,
+     поиск+тулбар прилипают к верху */
   @media (max-width: 700px) {
+    /* Заголовок страницы — компакт на мобиле */
+    .screen[data-screen="catalog"] .page-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding: 10px 14px 4px;
+    }
+    .screen[data-screen="catalog"] .page-header h1 { font-size: 18px; }
+    .screen[data-screen="catalog"] .page-subtitle { font-size: 12px; }
+    .screen[data-screen="catalog"] .page-actions {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .screen[data-screen="catalog"] .content-inner {
+      padding: 0 14px 14px;
+    }
+
     .catalog-tab {
       padding: 6px 10px;
       font-size: 12px;
+      flex-shrink: 0;
     }
     .catalog-tab i { font-size: 14px; }
+    /* Табы — один горизонтально-скроллируемый ряд, выходят за края контейнера
+       чтобы первый/последний таб не упирался в padding страницы. */
+    .catalog-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding: 0 14px 8px;
+      margin: 0 -14px 8px;
+      border-bottom: 1px solid var(--border);
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .catalog-tabs::-webkit-scrollbar { display: none; }
+    .catalog-tab { scroll-snap-align: start; }
+
+    /* Sticky-блок «табы + поиск + фильтры» — чтобы при скролле списка
+       пользователь всегда мог переключить категорию и фильтр. */
+    .catalog-sticky-nav {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 20;
+      padding-top: 8px;
+      margin: -8px -14px 0;
+      padding-left: 14px; padding-right: 14px;
+      box-shadow: 0 4px 8px -4px rgba(0,0,0,0.08);
+    }
+    .catalog-selector-bar { margin-bottom: 10px; }
+    .catalog-search-row { margin-bottom: 8px; }
   }
 
   .catalog-toolbar {
@@ -3743,7 +3792,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0 12px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     transition: border-color 0.12s, box-shadow 0.12s;
   }
   .catalog-search-row:focus-within {
@@ -17105,7 +17154,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.16-catalog-search";
+const APP_VERSION = "v2.44.17-mobile-polish";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26087,7 +26136,9 @@ function renderCatalogTabs() {
   const active = cache.catalogState.category;
   const activeCat = cats.find(c => c.code === active);
 
-  let html = '<div class="catalog-tabs">';
+  // Sticky-навигация (только на мобиле, на десктопе ведёт себя обычно)
+  let html = '<div class="catalog-sticky-nav">';
+  html += '<div class="catalog-tabs">';
   cats.forEach(c => {
     const isActive = c.code === active ? ' active' : '';
     html += '<button class="catalog-tab' + isActive + '" onclick="setCatalogCategory(\'' + escapeText(c.code) + '\')">' +
@@ -26141,6 +26192,7 @@ function renderCatalogTabs() {
     html += '</div>';
   }
 
+  html += '</div>';  // /catalog-sticky-nav
   html += '<div id="catalog-body"><div class="loading-block">Загружаем…</div></div>';
   el.innerHTML = html;
 }
