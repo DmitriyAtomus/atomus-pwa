@@ -3527,7 +3527,20 @@
   }
   .nav-item.nav-radio-btn.playing .nav-radio-station { color: rgba(255, 255, 255, 0.7); }
 
-  /* Содержимое модалки «Радио» — тёмная панель сверху с управлением + список снизу */
+  /* Содержимое модалки «Радио» — тёмная панель сверху с управлением + список снизу.
+     Обёртка флекс-колонкой, чтобы список снизу растягивался и получал свой скролл. */
+  .radio-modal-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .radio-modal-content > .modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
   .radio-modal-top {
     background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
     color: white;
