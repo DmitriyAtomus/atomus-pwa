@@ -5706,15 +5706,21 @@
 
   /* Карточка задачи (detail)
      v2.43.93: цветной hero сверху по статусу, сегментированный switch и
-     карточки-факты с иконками. */
+     карточки-факты с иконками.
+     v2.43.94: карточка занимает всё рабочее пространство — без боковых
+     отступов, с min-height во всю высоту контента. */
   .task-detail-card {
     background: white;
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 0;
-    margin: 0 18px 12px;
+    margin: 0;
     overflow: hidden;
+    min-height: calc(100vh - 220px);
+    display: flex;
+    flex-direction: column;
   }
+  .task-detail-card .task-detail-body { flex: 1; }
 
   /* Цветной hero — статусная полоса с большой подписью */
   .task-detail-hero {
