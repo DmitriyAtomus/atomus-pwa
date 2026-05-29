@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.8-belief-3series";
+const APP_VERSION = "v2.44.9-pdf-ai-import";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25993,8 +25993,11 @@ function renderCatalogTabs() {
       const label = activeCat.selector_kind === 'power' ? 'Подбор по мощности' : 'Подбор по характеристикам';
       html += '<button class="btn btn-primary btn-sm" onclick="openCatalogSelectorModal()"><i class="ti ti-target"></i>' + label + '</button>';
 
-      // Кнопки заливки серий (для sales-manage). Доступны на соответствующих категориях.
+      // Кнопки управления каталогом (для sales-manage)
       const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
+      if (canManage) {
+        html += '<button class="btn btn-secondary btn-sm" onclick="openCatalogPdfImport()" title="AI-парсинг каталога поставщика из PDF"><i class="ti ti-file-import"></i>Импорт из PDF</button>';
+      }
       if (canManage && activeCat.code === 'air_cooler') {
         html += '<button class="btn btn-secondary btn-sm" onclick="seedBeliefBsTef()" title="Загрузить все воздухоохладители Belief: BS-TEF (16) + BS-TEB (14) + BS-TEM (2) = 32 модели"><i class="ti ti-database-import"></i>Belief воздухоохладители (32)</button>';
       }
@@ -26418,6 +26421,168 @@ function renderCatalogSelectorResults() {
   });
   html += '</div>';
   body.innerHTML = html;
+}
+
+// ============================================================================
+// AI-парсинг каталога поставщика из PDF
+// ============================================================================
+
+function openCatalogPdfImport() {
+  const code = cache.catalogState && cache.catalogState.category;
+  if (!code) return;
+  const cats = cache.catalogCategories || [];
+  const cat = cats.find(c => c.code === code) || {};
+
+  let modal = document.getElementById('catalog-pdf-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'catalog-pdf-modal';
+    modal.onclick = (e) => { if (e.target === modal) closeCatalogPdfImport(); };
+    modal.innerHTML = '<div class="modal" style="max-width: 920px;">' +
+      '<div class="modal-header">' +
+        '<h3>Импорт каталога из PDF</h3>' +
+        '<button class="icon-btn" onclick="closeCatalogPdfImport()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" id="catalog-pdf-body"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+
+  document.getElementById('catalog-pdf-body').innerHTML =
+    '<div style="display: flex; flex-direction: column; gap: 14px;">' +
+      '<div style="font-size: 13px; color: var(--text-mid); line-height: 1.5;">' +
+        'Загрузи PDF-секцию каталога поставщика (до 25 МБ). AI распознает позиции и покажет превью.' +
+        '<br>Категория: <b>' + escapeText(cat.name || code) + '</b>' +
+      '</div>' +
+      '<label style="display: flex; flex-direction: column; gap: 4px;">' +
+        '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">PDF файл</span>' +
+        '<input type="file" id="catalog-pdf-file" accept="application/pdf">' +
+      '</label>' +
+      '<label style="display: flex; flex-direction: column; gap: 4px;">' +
+        '<span style="font-size: 12px; color: var(--text-light); font-weight: 600;">Поставщик (опционально)</span>' +
+        '<input type="text" id="catalog-pdf-supplier" placeholder="например, СПС-Холод" class="form-input">' +
+      '</label>' +
+      '<button class="btn btn-primary" onclick="runCatalogPdfParse()"><i class="ti ti-sparkles"></i>Распознать</button>' +
+      '<div id="catalog-pdf-result"></div>' +
+    '</div>';
+  modal.classList.add('visible');
+}
+
+function closeCatalogPdfImport() {
+  const m = document.getElementById('catalog-pdf-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function runCatalogPdfParse() {
+  const fileInput = document.getElementById('catalog-pdf-file');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) {
+    showToast('Выберите PDF-файл', 'error');
+    return;
+  }
+  const code = cache.catalogState && cache.catalogState.category;
+  const supplier = (document.getElementById('catalog-pdf-supplier') || {}).value || '';
+
+  const resultEl = document.getElementById('catalog-pdf-result');
+  resultEl.innerHTML = '<div class="loading-block" style="margin: 10px 0;">Распознаём через AI… ' +
+    '<small style="color: var(--text-light); display: block; margin-top: 4px;">Это может занять 30–90 секунд для большого PDF.</small></div>';
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('category_code', code);
+  if (supplier) form.append('supplier', supplier);
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/parse-pdf', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form,
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || ('HTTP ' + r.status));
+    }
+    const d = await r.json();
+    window._catalogParsedProducts = d.products || [];
+    renderCatalogPdfPreview(d);
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
+function renderCatalogPdfPreview(d) {
+  const resultEl = document.getElementById('catalog-pdf-result');
+  const products = d.products || [];
+  if (!products.length) {
+    resultEl.innerHTML = '<div class="empty-block"><i class="ti ti-info-circle"></i>AI не нашёл позиций в этом PDF</div>';
+    return;
+  }
+
+  let html = '<div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">';
+  html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">' +
+    '<b style="font-size: 14px;">Распознано позиций: ' + products.length + '</b>' +
+    '<button class="btn btn-primary btn-sm" onclick="confirmCatalogPdfBulkCreate()"><i class="ti ti-check"></i>Загрузить в каталог</button>' +
+  '</div>';
+  html += '<div style="max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">';
+  html += '<table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">';
+  html += '<thead style="position: sticky; top: 0; background: var(--bg); z-index: 1;"><tr>' +
+    '<th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); width: 110px;">Артикул</th>' +
+    '<th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);">Название</th>' +
+    '<th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); width: 90px;">Бренд</th>' +
+    '<th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); width: 90px;">Мощность</th>' +
+    '<th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); width: 80px;">Цена EUR</th>' +
+    '</tr></thead><tbody>';
+  products.forEach(p => {
+    const pw = p.power_w ? (p.power_w >= 1000 ? (p.power_w / 1000).toFixed(2).replace(/\.?0+$/, '') + ' кВт' : p.power_w + ' Вт') : '—';
+    const price = (p.price_eur != null) ? '€' + Number(p.price_eur).toFixed(2) : '—';
+    html += '<tr>' +
+      '<td style="padding: 6px 10px; border-bottom: 1px solid var(--border); font-family: ui-monospace, Menlo, monospace; font-size: 11.5px;">' + escapeText(p.code || '—') + '</td>' +
+      '<td style="padding: 6px 10px; border-bottom: 1px solid var(--border);">' + escapeText(p.name || '—') + '</td>' +
+      '<td style="padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text-light);">' + escapeText(p.brand || '—') + '</td>' +
+      '<td style="padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: right;">' + escapeText(pw) + '</td>' +
+      '<td style="padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: right; font-weight: 600;">' + price + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  resultEl.innerHTML = html;
+}
+
+async function confirmCatalogPdfBulkCreate() {
+  const products = window._catalogParsedProducts || [];
+  const code = cache.catalogState && cache.catalogState.category;
+  if (!products.length || !code) return;
+  const resultEl = document.getElementById('catalog-pdf-result');
+  const status = document.createElement('div');
+  status.style.marginTop = '10px';
+  status.style.fontSize = '13px';
+  status.style.color = 'var(--text-light)';
+  status.textContent = 'Сохраняю…';
+  resultEl.appendChild(status);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/bulk-create', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ category_code: code, products }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || ('HTTP ' + r.status));
+    }
+    const d = await r.json();
+    showToast('Импорт: добавлено ' + (d.added || 0) + ', обновлено ' + (d.updated || 0) +
+              (d.errors_count ? ' (ошибок ' + d.errors_count + ')' : ''), 'ok');
+    closeCatalogPdfImport();
+    cache.catalogProducts = null;
+    loadCatalogProducts(code);
+  } catch (e) {
+    showToast('Не удалось сохранить: ' + e.message, 'error');
+  }
 }
 
 // Заливка полной серии Belief BS-TEF (16 моделей воздухоохладителей).
