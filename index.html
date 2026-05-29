@@ -3629,12 +3629,28 @@
     background: var(--brand); color: white; border-color: var(--brand);
   }
   .catalog-tab.active i { color: white; }
+  @media (max-width: 700px) {
+    .catalog-tab {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .catalog-tab i { font-size: 14px; }
+  }
 
   .catalog-toolbar {
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
     margin-bottom: 12px;
   }
-  .catalog-brand-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .catalog-brand-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .chips-label {
+    font-size: 10.5px;
+    color: var(--text-light);
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
   .catalog-brand-chip {
     padding: 5px 11px;
     border-radius: 14px;
@@ -3644,9 +3660,14 @@
     color: var(--text-mid);
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
+    white-space: nowrap;
   }
   .catalog-brand-chip:hover { background: var(--bg); }
   .catalog-brand-chip.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+  @media (max-width: 700px) {
+    .catalog-brand-chip { font-size: 11.5px; padding: 4px 10px; }
+    .chips-label { font-size: 10px; margin-right: 4px; }
+  }
 
   /* v2.44.4: список — компактные строки без фото (фото только в детальной карточке) */
   .catalog-list {
@@ -3715,15 +3736,42 @@
     .catalog-row .row-supplier { display: none; }
   }
 
-  /* v2.44.6: панель «Подбор по параметрам» */
+  /* v2.44.15: панель действий каталога — основная CTA + сгруппированный импорт */
   .catalog-selector-bar {
-    display: flex; gap: 10px; align-items: center;
-    margin-bottom: 12px;
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .catalog-selector-bar .toolbar-group {
+    display: inline-flex; gap: 4px;
+    background: var(--bg);
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
   }
   .btn-sm {
-    padding: 6px 12px; font-size: 13px;
+    padding: 7px 12px; font-size: 12.5px;
     display: inline-flex; align-items: center; gap: 6px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
   }
+  .btn-sm i { font-size: 14px; }
+  .btn-tool {
+    padding: 6px 10px;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text-mid);
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-weight: 500;
+    line-height: 1.2;
+    transition: background 0.12s, color 0.12s;
+  }
+  .btn-tool i { font-size: 13px; }
+  .btn-tool:hover { background: white; color: var(--text-dark); }
   .btn-link {
     background: none; border: none;
     color: var(--brand); cursor: pointer;
@@ -3732,13 +3780,19 @@
   }
   .selector-status {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px;
+    padding: 7px 12px;
     background: var(--brand-soft);
     color: var(--brand);
     border-radius: 8px;
     font-size: 12.5px; font-weight: 500;
   }
   .selector-status i { font-size: 14px; }
+  @media (max-width: 700px) {
+    .catalog-selector-bar { gap: 6px; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .btn-sm .btn-label-full { display: none; }
+    .btn-tool .btn-label-full { display: none; }
+  }
 
   /* Маркеры результата подбора слева от артикула */
   .row-marker {
@@ -17014,7 +17068,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.14-xlsx-import";
+const APP_VERSION = "v2.44.15-toolbar-polish";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -26006,7 +26060,7 @@ function renderCatalogTabs() {
   });
   html += '</div>';
 
-  // Панель действий над списком — «Подбор по параметрам» + сброс + кнопки сидинга серий
+  // Панель действий над списком: основная CTA «Подбор» + сгруппированный импорт + сидинг
   if (activeCat && activeCat.selector_kind) {
     html += '<div class="catalog-selector-bar">';
     const selectorActive = cache.catalogState.selectorResults != null;
@@ -26015,17 +26069,24 @@ function renderCatalogTabs() {
         (cache.catalogState.selectorResults.count || 0) + ' позиций' +
         ' <button class="btn-link" onclick="resetCatalogSelector()">Сбросить</button></div>';
     } else {
+      // Основная кнопка
       const label = activeCat.selector_kind === 'power' ? 'Подбор по мощности' : 'Подбор по характеристикам';
-      html += '<button class="btn btn-primary btn-sm" onclick="openCatalogSelectorModal()"><i class="ti ti-target"></i>' + label + '</button>';
+      html += '<button class="btn btn-primary btn-sm" onclick="openCatalogSelectorModal()">' +
+        '<i class="ti ti-target"></i><span>' + escapeText(label) + '</span></button>';
 
-      // Кнопки управления каталогом (для sales-manage)
+      // Действия импорта — в одной серой группе, чтобы визуально не конкурировали с CTA
       const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
       if (canManage) {
-        html += '<button class="btn btn-secondary btn-sm" onclick="openCatalogPdfImport()" title="AI-парсинг каталога поставщика из PDF"><i class="ti ti-file-import"></i>Импорт PDF</button>';
-        html += '<button class="btn btn-secondary btn-sm" onclick="openCatalogXlsxImport()" title="Импорт прайс-листа поставщика в формате Excel (xlsx) — заливает все листы одним прогоном, без AI"><i class="ti ti-file-spreadsheet"></i>Импорт Excel-прайса</button>';
-      }
-      if (canManage && activeCat.code === 'air_cooler') {
-        html += '<button class="btn btn-secondary btn-sm" onclick="seedBeliefBsTef()" title="Загрузить все воздухоохладители Belief: BS-TEF (16) + BS-TEB (14) + BS-TEM (2) = 32 модели"><i class="ti ti-database-import"></i>Belief воздухоохладители (32)</button>';
+        html += '<div class="toolbar-group">';
+        html += '<button class="btn-tool" onclick="openCatalogPdfImport()" title="AI-парсинг каталога поставщика из PDF">' +
+          '<i class="ti ti-file-text"></i><span class="btn-label-full">PDF</span></button>';
+        html += '<button class="btn-tool" onclick="openCatalogXlsxImport()" title="Импорт прайс-листа Excel (все листы одним прогоном)">' +
+          '<i class="ti ti-table"></i><span class="btn-label-full">Excel</span></button>';
+        if (activeCat.code === 'air_cooler') {
+          html += '<button class="btn-tool" onclick="seedBeliefBsTef()" title="Загрузить все воздухоохладители Belief (32 модели)">' +
+            '<i class="ti ti-snowflake"></i><span class="btn-label-full">Belief seed</span></button>';
+        }
+        html += '</div>';
       }
     }
     html += '</div>';
@@ -26080,12 +26141,22 @@ function renderCatalogProducts() {
   const defaults = CATALOG_CATEGORY_DEFAULTS[cat.code] || {};
 
   let html = '';
-  // Чипы фильтров: тип + бренд
-  if (formFactors.length || brands.length) {
+  // Чипы фильтров: тип + бренд. Дедуплицируем бренды case-insensitive
+  // (на случай если backfill ещё не пробежался).
+  const brandSeen = new Set();
+  const brandsDedup = [];
+  brands.forEach(b => {
+    const key = String(b || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    if (key && !brandSeen.has(key)) {
+      brandSeen.add(key);
+      brandsDedup.push(b);
+    }
+  });
+  if (formFactors.length || brandsDedup.length) {
     html += '<div class="catalog-toolbar" style="flex-direction: column; align-items: stretch; gap: 6px;">';
     if (formFactors.length) {
       html += '<div class="catalog-brand-chips">';
-      html += '<span style="font-size: 11px; color: var(--text-light); align-self: center; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Тип:</span>';
+      html += '<span class="chips-label">Тип</span>';
       formFactors.forEach(ff => {
         const isActive = ff.code === cache.catalogState.formFactor ? ' active' : '';
         html += '<span class="catalog-brand-chip' + isActive + '" onclick="setCatalogFormFactor(' + JSON.stringify(ff.code).replace(/"/g, '&quot;') + ')">' +
@@ -26093,11 +26164,11 @@ function renderCatalogProducts() {
       });
       html += '</div>';
     }
-    if (brands.length) {
+    if (brandsDedup.length) {
       html += '<div class="catalog-brand-chips">';
-      html += '<span style="font-size: 11px; color: var(--text-light); align-self: center; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Бренд:</span>';
-      brands.forEach(b => {
-        const isActive = b === cache.catalogState.brand ? ' active' : '';
+      html += '<span class="chips-label">Бренд</span>';
+      brandsDedup.forEach(b => {
+        const isActive = (b || '').toLowerCase() === (cache.catalogState.brand || '').toLowerCase() ? ' active' : '';
         html += '<span class="catalog-brand-chip' + isActive + '" onclick="setCatalogBrand(' + JSON.stringify(b).replace(/"/g, '&quot;') + ')">' +
           escapeText(b) + '</span>';
       });
