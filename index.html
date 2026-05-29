@@ -12381,6 +12381,19 @@
     line-height: 1.35;
     word-break: break-word;
   }
+  /* v2.43.97: бейдж часов из журнала на карточке канбана */
+  .pkb-wc-hours {
+    display: inline-flex; align-items: center; gap: 4px;
+    align-self: flex-start;
+    background: rgba(186, 117, 23, 0.10);
+    color: #854F0B;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    line-height: 1.2;
+  }
+  .pkb-wc-hours i { font-size: 12px; }
   .pkb-wc-meta {
     font-size: 10.5px;
     color: var(--text-light);
@@ -18900,7 +18913,7 @@ function renderPkbWorkload(workload) {
     // v2.43.91: вместо «помогает 1 работа» показываем чем именно занят —
     // название первой работы (helping_now вперёд по сортировке с бэка) + счётчик
     // остальных. Полный список с ролями уходит в title для всплывающей подсказки.
-    const hoursPrefix = (isEstimated && hours > 0) ? '~' : '';
+    // v2.43.97: часы из подписи убраны — они теперь на самих карточках канбана.
     const worksList = w.works || [];
     const primary = worksList[0];
     const restCount = Math.max(0, worksList.length - 1);
@@ -18914,14 +18927,13 @@ function renderPkbWorkload(workload) {
     } else if (primary && primary.title) {
       const prefix = (primary.role === 'help' && mainN === 0) ? 'помогает: ' : '';
       const tail = restCount > 0 ? ' +' + restCount : '';
-      barText = prefix + _trimTitle(primary.title, 28) + tail + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
+      barText = prefix + _trimTitle(primary.title, 28) + tail;
     } else if (helpN > 0 && mainN > 0) {
-      // fallback на старый формат (если по какой-то причине нет данных по работам)
-      barText = mainN + ' гл. + ' + helpN + ' пом. · ' + hoursPrefix + formatHours(hours) + 'ч';
+      barText = mainN + ' гл. + ' + helpN + ' пом.';
     } else if (helpN > 0) {
-      barText = 'помогает ' + helpN + ' ' + plural(helpN, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
+      barText = 'помогает ' + helpN + ' ' + plural(helpN, 'работа', 'работы', 'работ');
     } else {
-      barText = mainN + ' ' + plural(mainN, 'работа', 'работы', 'работ') + ' · ' + hoursPrefix + formatHours(hours) + 'ч';
+      barText = mainN + ' ' + plural(mainN, 'работа', 'работы', 'работ');
     }
     // Tooltip с полным списком работ
     let barTooltip;
@@ -19205,6 +19217,15 @@ function renderPkbWorkCard(w, colKey) {
       ? '<span class="pkb-wc-contract-dot" style="background:' + contractColor + ';"></span>'
       : '';
     html += '<div class="pkb-wc-sub">' + dot + escapeHtml(subParts.join(' · ')) + '</div>';
+  }
+
+  // v2.43.97: бейдж часов по этой работе из журнала участия
+  const sh = parseFloat(w.session_hours || 0);
+  if (sh > 0) {
+    const hrsStr = (sh % 1 === 0 ? Math.round(sh) : sh.toFixed(1)) + 'ч';
+    html += '<div class="pkb-wc-hours" title="Сумма часов по журналу участия">' +
+              '<i class="ti ti-clock-hour-4"></i>' + escapeHtml(hrsStr) +
+            '</div>';
   }
 
   // Прогресс/исполнитель для in_progress
