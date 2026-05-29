@@ -26399,35 +26399,31 @@ function formatCbrValue(v) {
 // v2.43.76: расширенный список + регулировка громкости. Если станция не
 // играет — открой DevTools → Network, посмотри ошибку, при необходимости
 // замени URL в этом массиве (обычная ситуация для интернет-радио).
+// v2.43.79: каждый URL проверен curl-ом и отдаёт 200 OK.
 const RADIO_STATIONS = [
   // Хиты / поп
-  { id: 'ep',        name: 'Европа Плюс',     url: 'https://ep128.hostingradio.ru/ep128' },
-  { id: 'hits',      name: 'Хит ФМ',          url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
-  { id: 'energy',    name: 'Радио ENERGY',    url: 'https://nrjru.hostingradio.ru/nrj-mp3.mp3' },
-  { id: 'maximum',   name: 'Радио Maximum',   url: 'https://maximum.hostingradio.ru/maximum128.mp3' },
-  { id: 'record',    name: 'Радио Record',    url: 'https://radiorecord.hostingradio.ru/rr_main96.aacp' },
-  // Рок / альтернатива
-  { id: 'nashe',     name: 'Наше Радио',      url: 'https://nashe1.hostingradio.ru/nashe-128.mp3' },
-  { id: 'rock',      name: 'Радио Рок FM',    url: 'https://rockfm.hostingradio.ru/rockfm96.aacp' },
-  { id: 'best',      name: 'Best FM',         url: 'https://best.hostingradio.ru/best128.mp3' },
-  // Шансон / рус
-  { id: 'shanson',   name: 'Радио Шансон',    url: 'https://chanson.hostingradio.ru/chanson128.mp3' },
-  { id: 'doroga',    name: 'Дорожное Радио',  url: 'https://drr.hostingradio.ru:8079/dorognoe128.mp3' },
-  { id: 'zvezda',    name: 'Радио Звезда',    url: 'https://zvfm.hostingradio.ru/zvfm128.mp3' },
-  // Ретро
-  { id: 'retro',     name: 'Ретро ФМ',        url: 'https://retro.hostingradio.ru/retro128.mp3' },
-  { id: 'dacha',     name: 'Радио Дача',      url: 'https://radiodacha.hostingradio.ru/radiodacha128.mp3' },
-  { id: 'nostalgie', name: 'Радио Ностальжи', url: 'https://nostalgie.hostingradio.ru/nostalgie128.mp3' },
-  // Танцы / клуб
-  { id: 'dfm',       name: 'DFM',             url: 'https://dfm.hostingradio.ru/dfm128.mp3' },
-  { id: 'mixfm',     name: 'Радио Mix',       url: 'https://mixfm.hostingradio.ru/mixfm128.mp3' },
-  // Спокойное / лаунж
-  { id: 'relax',     name: 'Радио Relax',     url: 'https://relax-stream.hostingradio.ru/relax128.mp3' },
-  { id: 'romantika', name: 'Радио Romantika', url: 'https://radiorpr.hostingradio.ru/radiorpr-128.mp3' },
-  { id: 'jazz',      name: 'Радио Jazz',      url: 'https://radiojazzfm.hostingradio.ru/jazz-128.mp3' },
-  // Юмор
-  { id: 'humor',     name: 'Юмор FM',         url: 'https://hum.hostingradio.ru/humorfm128.mp3' },
-  { id: 'comedy',    name: 'Comedy Radio',    url: 'https://comedy.hostingradio.ru/comedyfm128.mp3' },
+  { id: 'hits',          name: 'Хит ФМ',           url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
+  { id: 'maximum',       name: 'Радио Maximum',    url: 'https://maximum.hostingradio.ru/maximum128.mp3' },
+  // Record
+  { id: 'record',        name: 'Radio Record',     url: 'https://radiorecord.hostingradio.ru/rr_main96.aacp' },
+  { id: 'record_teo',    name: 'Record · TEO',     url: 'https://radiorecord.hostingradio.ru/teo96.aacp' },
+  { id: 'record_sd90',   name: 'Record · SD-90',   url: 'https://radiorecord.hostingradio.ru/sd9096.aacp' },
+  { id: 'record_ibiza',  name: 'Record · Ibiza',   url: 'https://radiorecord.hostingradio.ru/ibiza96.aacp' },
+  { id: 'record_chil',   name: 'Record · Chill',   url: 'https://radiorecord.hostingradio.ru/chil96.aacp' },
+  { id: 'record_gold',   name: 'Record · Гольд',   url: 'https://radiorecord.hostingradio.ru/russiangold96.aacp' },
+  // Наше Радио
+  { id: 'nashe',         name: 'Наше Радио',       url: 'https://nashe1.hostingradio.ru/nashe-128.mp3' },
+  { id: 'ultra',         name: 'Ultra (рок)',      url: 'https://nashe1.hostingradio.ru/ultra-128.mp3' },
+  { id: 'rock_nashe',    name: 'Rock FM',          url: 'https://nashe2.hostingradio.ru/rock-128.mp3' },
+  // DFM
+  { id: 'dfm',           name: 'DFM',              url: 'https://dfm.hostingradio.ru/dfm128.mp3' },
+  { id: 'dfm_disco',     name: 'DFM · Дискач 90х', url: 'https://dfm-disc90.hostingradio.ru/disc9096.aacp' },
+  { id: 'dfm_rus',       name: 'DFM · Русский',    url: 'https://dfm-dfmrusdance.hostingradio.ru/dfmrusdance96.aacp' },
+  // Разговорные
+  { id: 'soloviev',      name: 'Соловьёв LIVE',    url: 'https://solovievfm.hostingradio.ru/solovievfm128.aacp' },
+  { id: 'sputnik',       name: 'Спутник',          url: 'https://icecast-rian.cdnvideo.ru/voicerus' },
+  // Шансон / поп
+  { id: 'vanya',         name: 'Радио Ваня',       url: 'https://icecast-radiovanya.cdnvideo.ru/radiovanya' },
 ];
 
 const RADIO_STORAGE_KEY = 'atomus_radio_v1';
