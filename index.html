@@ -17014,7 +17014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.6-selector";
+const APP_VERSION = "v2.44.7-belief-series";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25981,7 +25981,7 @@ function renderCatalogTabs() {
   });
   html += '</div>';
 
-  // Панель действий над списком — «Подбор по параметрам» + сброс
+  // Панель действий над списком — «Подбор по параметрам» + сброс + кнопки сидинга серий
   if (activeCat && activeCat.selector_kind) {
     html += '<div class="catalog-selector-bar">';
     const selectorActive = cache.catalogState.selectorResults != null;
@@ -25992,6 +25992,12 @@ function renderCatalogTabs() {
     } else {
       const label = activeCat.selector_kind === 'power' ? 'Подбор по мощности' : 'Подбор по характеристикам';
       html += '<button class="btn btn-primary btn-sm" onclick="openCatalogSelectorModal()"><i class="ti ti-target"></i>' + label + '</button>';
+
+      // Кнопки заливки серий (для sales-manage). Доступны на соответствующих категориях.
+      const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
+      if (canManage && activeCat.code === 'air_cooler') {
+        html += '<button class="btn btn-secondary btn-sm" onclick="seedBeliefBsTef()" title="Загрузить полную серию Belief BS-TEF (16 моделей)"><i class="ti ti-database-import"></i>Belief BS-TEF (16)</button>';
+      }
     }
     html += '</div>';
   }
@@ -26412,6 +26418,29 @@ function renderCatalogSelectorResults() {
   });
   html += '</div>';
   body.innerHTML = html;
+}
+
+// Заливка полной серии Belief BS-TEF (16 моделей воздухоохладителей).
+async function seedBeliefBsTef() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/seed-belief-bs-tef', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || ('HTTP ' + r.status));
+    }
+    const d = await r.json();
+    showToast('Belief BS-TEF: добавлено ' + (d.added || 0) + ', обновлено ' + (d.updated || 0) + (d.errors ? ' (✕' + d.errors + ')' : ''), 'ok');
+    cache.catalogProducts = null;
+    if (cache.catalogState && cache.catalogState.category === 'air_cooler') {
+      loadCatalogProducts('air_cooler');
+    }
+  } catch (e) {
+    showToast('Не удалось загрузить серию: ' + e.message, 'error');
+  }
 }
 
 // Разовый сидинг 5 демо-позиций — кнопка показывается на пустой категории.
