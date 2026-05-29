@@ -16968,7 +16968,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.2-demo-photos";
+const APP_VERSION = "v2.44.3-catalog-fixapi";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25953,10 +25953,9 @@ function renderCatalogProducts() {
 
   html += '<div class="catalog-grid">';
   products.forEach(p => {
-    const photoStyle = p.photo_key
-      ? "background-image: url('/api/catalog/products/" + p.id + "/photo?v=" + encodeURIComponent(p.photo_key) + "');"
-      : '';
-    const photoIcon = p.photo_key ? '' : '<i class="ti ti-photo"></i>';
+    const photoCell = p.photo_key
+      ? '<div class="catalog-card-photo"><img id="catcard-img-' + p.id + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block;"></div>'
+      : '<div class="catalog-card-photo"><i class="ti ti-photo"></i></div>';
 
     let metaChips = '';
     if (p.brand) metaChips += '<span class="chip">' + escapeText(p.brand) + '</span>';
@@ -25977,7 +25976,7 @@ function renderCatalogProducts() {
 
     html += '<div class="catalog-card" onclick="openCatalogProduct(' + p.id + ')">' +
       (p.supplier ? '<div class="catalog-card-supplier"><i class="ti ti-check"></i>' + escapeText(p.supplier) + '</div>' : '') +
-      '<div class="catalog-card-photo" style="' + photoStyle + '">' + photoIcon + '</div>' +
+      photoCell +
       (p.code ? '<div class="catalog-card-code">' + escapeText(p.code) + '</div>' : '') +
       '<div class="catalog-card-name">' + escapeText(p.name) + '</div>' +
       (metaChips ? '<div class="catalog-card-meta">' + metaChips + '</div>' : '') +
@@ -25986,6 +25985,25 @@ function renderCatalogProducts() {
   });
   html += '</div>';
   body.innerHTML = html;
+
+  // v2.44.3: lazy-загрузка blob'ов фото — endpoint требует Bearer-токен
+  products.forEach(p => {
+    if (p.photo_key) _loadCatalogPhotoBlob(p.id, 'catcard-img-' + p.id);
+  });
+}
+
+async function _loadCatalogPhotoBlob(productId, imgElId) {
+  const img = document.getElementById(imgElId);
+  if (!img) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/products/' + productId + '/photo', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) return;
+    const blob = await r.blob();
+    img.src = URL.createObjectURL(blob);
+  } catch (e) {}
 }
 
 async function openCatalogProduct(id) {
@@ -26017,13 +26035,14 @@ function renderCatalogDetailModal(p) {
 
   const canManage = (typeof hasPermission === 'function') && hasPermission('sales.manage');
   const attrs = p.catalog_attrs || {};
-  const photoStyle = p.photo_key
-    ? "background-image: url('/api/catalog/products/" + p.id + "/photo?v=" + encodeURIComponent(p.photo_key) + "');"
-    : '';
-  const photoIcon = p.photo_key ? '' : '<i class="ti ti-photo"></i>';
 
   let html = '<div class="catalog-detail-hero">';
-  html += '<div class="catalog-detail-photo" style="' + photoStyle + '">' + photoIcon;
+  html += '<div class="catalog-detail-photo">';
+  if (p.photo_key) {
+    html += '<img id="catdetail-img-' + p.id + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;">';
+  } else {
+    html += '<i class="ti ti-photo"></i>';
+  }
   if (canManage) {
     html += '<label class="catalog-detail-photo-upload"><i class="ti ti-upload"></i>Фото<input type="file" accept="image/*" style="display:none" onchange="uploadCatalogPhoto(' + p.id + ', this)"></label>';
   }
@@ -26097,6 +26116,7 @@ function renderCatalogDetailModal(p) {
   document.getElementById('catalog-detail-body').innerHTML = html;
   modal.classList.add('visible');
   window._catalogCurrentProductId = p.id;
+  if (p.photo_key) _loadCatalogPhotoBlob(p.id, 'catdetail-img-' + p.id);
 }
 
 function closeCatalogDetail() {
@@ -26110,10 +26130,11 @@ async function uploadCatalogPhoto(productId, input) {
   const form = new FormData();
   form.append('file', file);
   try {
-    const resp = await fetch('/api/catalog/products/' + productId + '/photo', {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const resp = await fetch(API_BASE + '/api/catalog/products/' + productId + '/photo', {
       method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
       body: form,
-      credentials: 'include',
     });
     if (!resp.ok) {
       const t = await resp.text();
@@ -26139,9 +26160,10 @@ function openCatalogProductForm(id) {
 // Разовый сидинг 5 демо-позиций — кнопка показывается на пустой категории.
 async function seedCatalogDemo() {
   try {
-    const r = await fetch('/api/catalog/seed-demo', {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/seed-demo', {
       method: 'POST',
-      credentials: 'include',
+      headers: { 'Authorization': 'Bearer ' + token },
     });
     if (!r.ok) {
       const t = await r.text();
