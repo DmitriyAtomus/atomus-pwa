@@ -14798,7 +14798,7 @@
               </div>
               <!-- Упрощённый выбор договора для не-сборок (только Под договор / без договора) -->
               <div class="dest-choice" id="destination-choice-work" style="display: none;">
-                <button type="button" class="dest-option active" data-dest-w="none"
+                <button type="button" class="dest-option selected" data-dest-w="none"
                         onclick="setWorkContract(null)">
                   <i class="ti ti-circle-dashed"></i>
                   <div class="do-body">
@@ -18811,11 +18811,21 @@ function renderPkbWorkCard(w, colKey) {
     html += '<div class="pkb-wc-badges">' + badgesHtml + '</div>';
   }
 
-  // Title — название модели
-  const modelTitle = w.model_name || ('Модель #' + (w.model_id || '?'));
+  // Title — название модели или описание для не-сборок (v2.43.78)
+  const _wtLabels = {repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'};
+  const isService = w.work_type && w.work_type !== 'assembly';
+  const modelTitle = w.model_name || (isService
+    ? (w.description || _wtLabels[w.work_type] || 'Работа')
+    : ('Модель #' + (w.model_id || '?')));
   const modelExtra = w.model_extra ? (' ' + w.model_extra) : '';
   const qtyStr = (w.qty && w.qty > 1) ? (' × ' + w.qty) : '';
-  html += '<div class="pkb-wc-title">' + escapeHtml(modelTitle + modelExtra) + escapeHtml(qtyStr) + '</div>';
+  let titleHtml = '<div class="pkb-wc-title">' + escapeHtml(modelTitle + modelExtra) + escapeHtml(qtyStr);
+  if (isService) {
+    titleHtml += ' <span class="work-type-badge wt-' + w.work_type + '" style="margin-left:4px;font-size:10px;">' +
+                 escapeHtml(_wtLabels[w.work_type] || w.work_type) + '</span>';
+  }
+  titleHtml += '</div>';
+  html += titleHtml;
 
   // Sub — договор + клиент
   const subParts = [];
@@ -19037,7 +19047,12 @@ function renderProductionWorkDetail(w) {
   if (!overlay) return;
   const modal = overlay.querySelector('.modal');
 
-  const modelTitle = (w.model_name || ('Модель #' + (w.model_id || '?'))) + (w.model_extra ? (' ' + w.model_extra) : '');
+  // v2.43.78: для не-сборок (Проектирование и т.д.) модели нет — берём описание.
+  const _wtLabelsDetail = {repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'};
+  const _isServiceDetail = w.work_type && w.work_type !== 'assembly';
+  const modelTitle = (w.model_name || (_isServiceDetail
+    ? (w.description || _wtLabelsDetail[w.work_type] || 'Работа')
+    : ('Модель #' + (w.model_id || '?')))) + (w.model_extra ? (' ' + w.model_extra) : '');
   const statusLabel = w.status_label || w.status || '—';
   const statusCls = pkbStatusToCss(w.status);
 
@@ -30130,13 +30145,13 @@ function setWorkType(wt) {
 function setWorkContract(contractId) {
   if (!state.newAssembly) return;
   state.newAssembly.contractId = contractId || null;
-  document.querySelectorAll('#destination-choice-work .dest-option').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#destination-choice-work .dest-option').forEach(b => b.classList.remove('selected'));
   if (contractId) {
     const btn = document.querySelector('#destination-choice-work .dest-option[data-dest-w="contract"]');
-    if (btn) btn.classList.add('active');
+    if (btn) btn.classList.add('selected');
   } else {
     const btn = document.querySelector('#destination-choice-work .dest-option[data-dest-w="none"]');
-    if (btn) btn.classList.add('active');
+    if (btn) btn.classList.add('selected');
     const meta = document.getElementById('na-work-contract-meta');
     if (meta) meta.textContent = 'Выбрать договор';
   }
@@ -30152,9 +30167,9 @@ async function openContractPickerForWork() {
           state.newAssembly.contractId = c.id;
           state.newAssembly.contractLabel = (c.number || '') + (c.contractor_name ? ' · ' + c.contractor_name : '');
           // Подсветим вариант
-          document.querySelectorAll('#destination-choice-work .dest-option').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('#destination-choice-work .dest-option').forEach(b => b.classList.remove('selected'));
           const btn = document.querySelector('#destination-choice-work .dest-option[data-dest-w="contract"]');
-          if (btn) btn.classList.add('active');
+          if (btn) btn.classList.add('selected');
           const meta = document.getElementById('na-work-contract-meta');
           if (meta) meta.textContent = state.newAssembly.contractLabel;
         }
@@ -30751,8 +30766,8 @@ async function submitAssembly() {
 
   const a = state.newAssembly;
   const isAssembly = (a.workType || 'assembly') === 'assembly';
-  // v2.42.2: "in_progress" допустим только для сборок
-  const initialStatus = (a.initialStatus === 'in_progress' && isAssembly) ? 'in_progress' : 'ready';
+  // v2.43.78: in_progress теперь допустим для всех типов работ (карточка в канбане).
+  const initialStatus = (a.initialStatus === 'in_progress') ? 'in_progress' : 'ready';
   if (isAssembly) {
     if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
     if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
