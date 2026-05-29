@@ -16973,7 +16973,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.4-catalog-list";
+const APP_VERSION = "v2.44.5-attrs-ru";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25846,6 +25846,51 @@ const CATALOG_CATEGORY_DEFAULTS = {
   refrigerants:   { measureLabel: '',             measureUnit: '' },
 };
 
+// v2.44.5: лейблы и единицы для catalog_attrs — переводим английские ключи и форматируем значения.
+const CATALOG_ATTR_LABELS = {
+  // air_cooler
+  fin_pitch_mm:    { label: 'Шаг оребрения',     unit: 'мм' },
+  fans_spec:       { label: 'Вентиляторы' },
+  airflow_m3h:     { label: 'Расход воздуха',    unit: 'м³/ч' },
+  surface_m2:      { label: 'Площадь теплообмена', unit: 'м²' },
+  volume_liter:    { label: 'Внутренний объём',  unit: 'л' },
+  voltage:         { label: 'Напряжение' },
+  defrost_power_w: { label: 'Мощность оттайки',  unit: 'Вт' },
+  motor_power_w:   { label: 'Мощность двигателя', unit: 'Вт' },
+  motor_current_a: { label: 'Ток двигателя',     unit: 'А' },
+  throw_m:         { label: 'Длина воздушной струи', unit: 'м' },
+  inlet_size:      { label: 'Вход' },
+  outlet_size:     { label: 'Выход' },
+  drain_size:      { label: 'Дренаж' },
+  refrigerants:    { label: 'Хладагенты' },
+  // compressor
+  displacement_cm3: { label: 'Рабочий объём',    unit: 'см³' },
+  application:     { label: 'Применение' },
+  // automation
+  connection:      { label: 'Подключение' },
+  refrigerant:     { label: 'Хладагент' },
+  compatible_body: { label: 'Совместимый корпус' },
+  // refrigerants
+  fluid:           { label: 'Маркировка' },
+  package:         { label: 'Упаковка' },
+  net_weight_kg:   { label: 'Нетто',             unit: 'кг' },
+  // materials
+  diameter_mm:     { label: 'Диаметр',           unit: 'мм' },
+};
+
+function _formatCatalogAttr(key, value) {
+  // Возвращает { label, value } с локализованным лейблом и единицей.
+  const cfg = CATALOG_ATTR_LABELS[key] || { label: key };
+  let v = value;
+  if (Array.isArray(v)) v = v.join(', ');
+  if (v === null || v === undefined) v = '';
+  const text = String(v);
+  return {
+    label: cfg.label,
+    value: cfg.unit && text ? text + ' ' + cfg.unit : text,
+  };
+}
+
 async function loadCatalog() {
   const el = document.getElementById('catalog-content');
   if (!el) return;
@@ -26060,14 +26105,19 @@ function renderCatalogDetailModal(p) {
   html += '</div>';
   html += '</div>';
 
-  // Bento: габариты и масса
-  if (p.length_mm || p.width_mm || p.height_mm || p.mass_kg) {
+  // Bento: габариты и масса — показываем только заполненные ячейки.
+  const dims = [
+    { lbl: 'Длина',  val: p.length_mm, unit: 'мм' },
+    { lbl: 'Ширина', val: p.width_mm,  unit: 'мм' },
+    { lbl: 'Высота', val: p.height_mm, unit: 'мм' },
+    { lbl: 'Масса',  val: p.mass_kg,   unit: 'кг' },
+  ].filter(d => d.val != null && d.val !== '');
+  if (dims.length) {
     html += '<h3 class="catalog-spec-section" style="margin-top: 0;">Габариты и вес</h3>';
     html += '<div class="catalog-bento">';
-    html += '<div class="catalog-bento-cell"><div class="lbl">Длина</div><div class="val">' + (p.length_mm || '—') + ' <small>мм</small></div></div>';
-    html += '<div class="catalog-bento-cell"><div class="lbl">Ширина</div><div class="val">' + (p.width_mm || '—') + ' <small>мм</small></div></div>';
-    html += '<div class="catalog-bento-cell"><div class="lbl">Высота</div><div class="val">' + (p.height_mm || '—') + ' <small>мм</small></div></div>';
-    html += '<div class="catalog-bento-cell"><div class="lbl">Масса</div><div class="val">' + (p.mass_kg || '—') + ' <small>кг</small></div></div>';
+    dims.forEach(d => {
+      html += '<div class="catalog-bento-cell"><div class="lbl">' + escapeText(d.lbl) + '</div><div class="val">' + escapeText(String(d.val)) + ' <small>' + d.unit + '</small></div></div>';
+    });
     html += '</div>';
   }
 
@@ -26079,7 +26129,8 @@ function renderCatalogDetailModal(p) {
   Object.keys(attrs).forEach(k => {
     const v = attrs[k];
     if (v === null || v === undefined || v === '' || k === 'cooling_data') return;
-    specs.push([k, Array.isArray(v) ? v.join(', ') : String(v)]);
+    const fmt = _formatCatalogAttr(k, v);
+    if (fmt.value) specs.push([fmt.label, fmt.value]);
   });
 
   if (specs.length) {
