@@ -1723,6 +1723,30 @@
   .pt-row-dot.critical { background: #E24B4A; }
   .pt-row-dot.zero     { background: #E24B4A; box-shadow: 0 0 0 3px rgba(226,75,74,0.18); }
   .pt-row-dot.excess   { background: #534AB7; }
+  .pt-defect-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    background: rgba(226,75,74,0.10);
+    color: #8C2A2A;
+    border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .pt-defect-pill:hover { background: rgba(226,75,74,0.18); }
+  .pt-defect-pill i { font-size: 11px; }
+  .btn-defect-small {
+    margin-left: 6px;
+    padding: 6px 8px;
+    border: 0; background: transparent;
+    color: #B5302E;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-defect-small:hover { background: rgba(226,75,74,0.12); }
+  .btn-defect-small i { font-size: 15px; }
   .pt-row-name {
     font-size: 13px;
     font-weight: 500;
@@ -18700,7 +18724,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.63-defect-stock";
+const APP_VERSION = "v2.44.64-defect-warehouse-tab";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38192,6 +38216,16 @@ const ASSEMBLY_STATUS_ORDER = ['in_progress', 'ready', 'shipped', 'written_off']
 
 // ============ ЭТАП 32.2: Номенклатура комплектующих (справочник в Производстве) ============
 
+function openPtDefectsForComponent(componentId) {
+  // Переходим в Сервис с фильтром «по компоненту»
+  selectSection && selectSection('defects');
+  setTimeout(() => {
+    if (typeof selectSidebarItem === 'function') selectSidebarItem('defects-list-new');
+    // Фильтр по тексту артикула/названия будет проще через поиск — оставляем общий список,
+    // пользователь увидит свежую заявку наверху.
+  }, 50);
+}
+
 async function resolveComponentDefect(defectId, action) {
   const label = action === 'return' ? 'вернуть весь оставшийся брак в склад' : 'списать весь оставшийся брак';
   if (!confirm('Точно ' + label + '?')) return;
@@ -38292,8 +38326,10 @@ async function submitMarkDefective(componentId) {
     document.getElementById('mark-defective-modal')?.remove();
     showToast('Брак зафиксирован, заявка в Сервисе #' + j.defect_id, 'success');
     // Перезагрузим текущий экран
-    if (typeof loadComponentsCatalog === 'function' && document.querySelector('[data-screen="components-catalog"].active')) {
+    if (document.querySelector('[data-screen="components-catalog"].active') && typeof loadComponentsCatalog === 'function') {
       loadComponentsCatalog();
+    } else if (document.querySelector('[data-screen="warehouse-dashboard"].active') && typeof loadPartsDashboard === 'function') {
+      loadPartsDashboard();
     }
   } catch (e) {
     showToast('Сеть: не удалось пометить брак', 'error');
@@ -41519,6 +41555,10 @@ function _renderPtList() {
 function _renderPtRow(it) {
   const st = it.status;  // zero | critical | excess | normal
   const unit = it.unit || 'шт.';
+  const defectQty = parseFloat(it.qty_defective || 0);
+  const defectBadge = defectQty > 0
+    ? '<div class="pt-defect-pill" onclick="event.stopPropagation();openPtDefectsForComponent(' + it.id + ')" title="Заявки по этому комплектующему в Сервисе"><i class="ti ti-alert-triangle"></i>брак ' + _fmtNum(defectQty) + '</div>'
+    : '';
 
   // Stock колонка
   let stockHtml;
@@ -41526,10 +41566,12 @@ function _renderPtRow(it) {
     stockHtml = '<div class="pt-row-stock ' + st + '">' +
       _fmtNum(it.qty_on_stock) +
       ' <span class="pt-row-stock-sub">/ ' + _fmtNum(it.min_stock) + ' ' + escapeHtml(unit) + '</span>' +
+      defectBadge +
       '</div>';
   } else {
     stockHtml = '<div class="pt-row-stock ' + st + '">' +
       _fmtNum(it.qty_on_stock) + ' <span class="pt-row-stock-sub">' + escapeHtml(unit) + '</span>' +
+      defectBadge +
       '</div>';
   }
 
@@ -41543,25 +41585,21 @@ function _renderPtRow(it) {
   const badgeHtml = '<span class="pt-row-badge ' + st + '">' + labels[st] + '</span>';
 
   // Action
-  let actionHtml;
+  // v2.44.64: всегда добавляем мелкую кнопку «Брак» рядом с основным действием
+  const safeName = escapeHtml((it.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'"));
+  const defectBtn = (it.qty_on_stock || 0) > 0
+    ? '<button class="btn-defect-small" title="Пометить брак" onclick="event.stopPropagation();openMarkDefectiveModal(' + it.id + ',\'' + safeName + '\',' + (parseFloat(it.qty_on_stock) || 0) + ',\'' + escapeHtml(unit) + '\')"><i class="ti ti-alert-triangle"></i></button>'
+    : '';
+  let mainBtn;
   if (st === 'zero' || st === 'critical') {
-    // Рекомендованное к заказу: до min*2 - текущий
     const recommend = Math.max(1, Math.round((it.min_stock || 1) * 2 - (it.qty_on_stock || 0)));
-    actionHtml = '<div class="pt-row-action">' +
-      '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
-      '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span>' +
-      '</button></div>';
-  } else if (st === 'excess') {
-    actionHtml = '<div class="pt-row-action">' +
-      '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
-      '<i class="ti ti-minus"></i><span>Расход</span>' +
-      '</button></div>';
+    mainBtn = '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
+      '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span></button>';
   } else {
-    actionHtml = '<div class="pt-row-action">' +
-      '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
-      '<i class="ti ti-minus"></i><span>Расход</span>' +
-      '</button></div>';
+    mainBtn = '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
+      '<i class="ti ti-minus"></i><span>Расход</span></button>';
   }
+  const actionHtml = '<div class="pt-row-action">' + mainBtn + defectBtn + '</div>';
 
   return '<div class="pt-row s-' + st + '" onclick="openPtItemDetail(' + it.id + ')">' +
     '<span class="pt-row-dot ' + st + '"></span>' +
