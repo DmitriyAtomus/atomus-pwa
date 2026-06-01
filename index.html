@@ -6818,6 +6818,63 @@
     margin-left: 6px;
   }
   .comp-meta { font-size: 12px; }
+  /* v2.44.63: бэдж и кнопка «Брак» */
+  .comp-defect-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    margin-left: 6px;
+    padding: 2px 8px;
+    background: rgba(226,75,74,0.10);
+    color: #8C2A2A;
+    border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+  }
+  .comp-defect-badge i { font-size: 11px; }
+  .comp-defect-btn {
+    width: 30px; height: 30px;
+    border: 0; background: transparent;
+    color: var(--text-light); cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
+    align-self: center;
+  }
+  .comp-defect-btn:hover { background: rgba(226,75,74,0.10); color: #B5302E; }
+  .comp-defect-btn i { font-size: 16px; }
+  /* Модалка пометки брака */
+  .mark-defective-modal .modal { max-width: 460px; }
+  .mark-defective-row { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+  .mark-defective-row label {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); font-weight: 600; margin-bottom: 4px;
+  }
+  .mark-defective-row input, .mark-defective-row textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13.5px; font-family: inherit;
+    outline: 0;
+  }
+  .mark-defective-row textarea { min-height: 80px; resize: vertical; }
+  .mark-defective-row input:focus, .mark-defective-row textarea:focus {
+    border-color: rgba(226,75,74,0.5);
+  }
+  .mark-defective-hint {
+    font-size: 12px; color: var(--text-light);
+    background: rgba(226,75,74,0.05);
+    border: 1px solid rgba(226,75,74,0.2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .btn-defect-confirm {
+    padding: 9px 16px;
+    background: linear-gradient(135deg, #E24B4A, #B5302E);
+    color: white; font-weight: 600; font-size: 13px;
+    border: 0; border-radius: 8px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    box-shadow: 0 2px 6px rgba(226,75,74,0.25);
+  }
+  .btn-defect-confirm:hover { box-shadow: 0 4px 10px rgba(226,75,74,0.35); }
   .comp-cat-badge {
     display: inline-block;
     background: var(--brand-bg);
@@ -18643,7 +18700,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.62-inv-blank-url-tdz-fix";
+const APP_VERSION = "v2.44.63-defect-stock";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38135,6 +38192,114 @@ const ASSEMBLY_STATUS_ORDER = ['in_progress', 'ready', 'shipped', 'written_off']
 
 // ============ ЭТАП 32.2: Номенклатура комплектующих (справочник в Производстве) ============
 
+async function resolveComponentDefect(defectId, action) {
+  const label = action === 'return' ? 'вернуть весь оставшийся брак в склад' : 'списать весь оставшийся брак';
+  if (!confirm('Точно ' + label + '?')) return;
+  try {
+    const res = await fetch(API_BASE + '/api/defect-reports/' + defectId + '/resolve-defect', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || ('Ошибка ' + res.status), 'error');
+      return;
+    }
+    const j = await res.json();
+    showToast(action === 'return' ? 'Возвращено в склад' : 'Списано', 'success');
+    if (typeof openDefectDetail === 'function' && state.currentDefectId) {
+      openDefectDetail(state.currentDefectId);
+    }
+  } catch (e) {
+    showToast('Сеть: не удалось', 'error');
+  }
+}
+
+/* === v2.44.63: пометить брак комплектующего === */
+function openMarkDefectiveModal(componentId, componentName, currentStock, unit) {
+  const overlayId = 'mark-defective-modal';
+  let m = document.getElementById(overlayId);
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay mark-defective-modal';
+  m.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header">' +
+        '<h2 style="color:#8C2A2A;"><i class="ti ti-alert-triangle"></i> Пометить брак</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="mark-defective-hint">' +
+          '<b>«' + escapeHtml(componentName || '—') + '»</b><br>' +
+          'На складе сейчас: <b>' + _fmtQty(currentStock) + ' ' + escapeHtml(unit || 'шт.') + '</b><br>' +
+          'Указанное количество уйдёт из остатка в «брак», и автоматически создастся заявка в Сервисе для расследования.' +
+        '</div>' +
+        '<div class="mark-defective-row">' +
+          '<label>Количество (' + escapeHtml(unit || 'шт.') + ')</label>' +
+          '<input type="number" id="mark-defective-qty" min="0.001" step="0.001" max="' + (currentStock || 0) + '" value="1" autofocus>' +
+        '</div>' +
+        '<div class="mark-defective-row">' +
+          '<label>Причина (что не так)</label>' +
+          '<textarea id="mark-defective-reason" placeholder="Например: плата не запускается, обнаружено при сборке Atom-BBAS-7MT"></textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+        '<button class="btn-defect-confirm" onclick="submitMarkDefective(' + componentId + ')">' +
+          '<i class="ti ti-alert-triangle"></i> Пометить как брак' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  m.classList.add('visible');
+  setTimeout(() => document.getElementById('mark-defective-qty')?.focus(), 60);
+}
+
+async function submitMarkDefective(componentId) {
+  const qtyStr = document.getElementById('mark-defective-qty')?.value;
+  const reason = (document.getElementById('mark-defective-reason')?.value || '').trim();
+  const qty = parseFloat(qtyStr);
+  if (!qty || qty <= 0) {
+    showToast('Введи количество > 0', 'error');
+    return;
+  }
+  if (!reason) {
+    showToast('Опиши причину брака', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(API_BASE + '/api/components/' + componentId + '/mark-defective', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ qty, reason }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || ('Ошибка ' + res.status), 'error');
+      return;
+    }
+    const j = await res.json();
+    document.getElementById('mark-defective-modal')?.remove();
+    showToast('Брак зафиксирован, заявка в Сервисе #' + j.defect_id, 'success');
+    // Перезагрузим текущий экран
+    if (typeof loadComponentsCatalog === 'function' && document.querySelector('[data-screen="components-catalog"].active')) {
+      loadComponentsCatalog();
+    }
+  } catch (e) {
+    showToast('Сеть: не удалось пометить брак', 'error');
+  }
+}
+
 async function loadComponentsCatalog() {
   const newBtn = document.getElementById('cc-new-btn');
   const newBtnM = document.getElementById('cc-mobile-new');
@@ -38239,16 +38404,22 @@ function renderComponentsCatalogList() {
       '<div class="comp-group-body"' + (isOpen ? '' : ' style="display:none;"') + '>' +
         '<div class="comp-table">';
     items.forEach(c => {
-      html += '<div class="comp-row" style="grid-template-columns: 1fr auto;cursor:pointer;" onclick="openComponentForm(' + c.id + ')">' +
+      const defectQty = parseFloat(c.qty_defective || 0);
+      const defectBadge = defectQty > 0
+        ? ' <span class="comp-defect-badge" title="В браке — нажми чтобы посмотреть"><i class="ti ti-alert-triangle"></i>брак ' + _fmtQty(defectQty) + '</span>'
+        : '';
+      html += '<div class="comp-row" style="grid-template-columns: 1fr auto auto;cursor:pointer;" onclick="openComponentForm(' + c.id + ')">' +
         '<div class="comp-row-main">' +
           '<div class="comp-name">' + escapeHtml(c.name || '—') +
             (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
           '</div>' +
           '<div class="comp-meta">' +
             'на складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
+            defectBadge +
             (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
           '</div>' +
         '</div>' +
+        '<button class="comp-defect-btn" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (parseFloat(c.qty_on_stock) || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-alert-triangle"></i></button>' +
         '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
       '</div>';
     });
@@ -51868,6 +52039,19 @@ function renderDefectDetail(d) {
   if (d.author_name) addInfo('Имя', escapeHtml(d.author_name));
   if (d.author_phone) addInfo('Телефон', escapeHtml(d.author_phone));
   if (d.assignee_name) addInfo('Ответственный', escapeHtml(d.assignee_name));
+  // v2.44.63: если заявка про брак комплектующего — показываем привязку
+  if (d.component_id) {
+    const totalQty = parseFloat(d.component_qty || 0);
+    const resolved = parseFloat(d.component_qty_resolved || 0);
+    const remaining = totalQty - resolved;
+    let qtyHtml = '<b>' + _fmtQty(totalQty) + '</b> шт.';
+    if (resolved > 0 && remaining > 0.0001) {
+      qtyHtml += ' <span style="color:var(--text-light);">(' + _fmtQty(resolved) + ' уже разрешено, осталось ' + _fmtQty(remaining) + ')</span>';
+    } else if (remaining < 0.0001 && d.component_resolution) {
+      qtyHtml += ' <span style="color:#0A5B41;">(' + (d.component_resolution === 'return' ? 'вернули в склад' : 'списали') + ')</span>';
+    }
+    addInfo('Комплектующее', qtyHtml);
+  }
 
   // v2.36.0: галерея файлов — фото / видео / документы
   let filesBlock = '';
@@ -51895,6 +52079,17 @@ function renderDefectDetail(d) {
     if (d.status !== 'rejected') buttons.push('<button class="btn btn-secondary" onclick="changeDefectStatus(\'rejected\')" style="color: var(--danger);"><i class="ti ti-x"></i> Отклонить</button>');
     if (d.status !== 'new') buttons.push('<button class="btn btn-secondary" onclick="changeDefectStatus(\'new\')"><i class="ti ti-rewind-backward-5"></i> Вернуть в Новые</button>');
     actions = '<div class="defect-status-actions">' + buttons.join('') + '</div>';
+  }
+  // v2.44.63: для брака комплектующего — отдельные кнопки разрешения
+  const cmpRemaining = d.component_id
+    ? (parseFloat(d.component_qty || 0) - parseFloat(d.component_qty_resolved || 0))
+    : 0;
+  if (d.component_id && cmpRemaining > 0.0001) {
+    actions += '<div class="defect-status-actions" style="margin-top:8px;border-top:1px dashed var(--border);padding-top:10px;">' +
+      '<span style="color:var(--text-light);font-size:12px;margin-right:8px;">Брак (' + _fmtQty(cmpRemaining) + ' шт.):</span>' +
+      '<button class="btn btn-success" onclick="resolveComponentDefect(' + d.id + ', \'return\')"><i class="ti ti-arrow-back-up"></i> Вернуть в склад</button>' +
+      '<button class="btn btn-secondary" style="color:#B5302E;" onclick="resolveComponentDefect(' + d.id + ', \'writeoff\')"><i class="ti ti-trash"></i> Списать</button>' +
+    '</div>';
   }
 
   // v2.36.0: бейдж категории рядом с типом и статусом
