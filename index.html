@@ -17682,7 +17682,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.40-interactive-tour";
+const APP_VERSION = "v2.44.41-tour-fixes";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44576,26 +44576,33 @@ const TOURS = {
     summary: 'Пошагово: где находится канбан, как взять работу в руки, отметить прогресс и сдать на проверку.',
     steps: [
       {
+        section: 'production',
         screen: 'dashboard',
-        selector: '.section-tab[data-section="production"]',
+        selector: '.pkb-section-header, .page-header',
         title: 'Раздел «Производство»',
-        text: 'Это твоя основная вкладка. Тут всё, что касается работ: канбан, сборки, сводки.',
+        text: 'Мы переключились на твою основную вкладку. Тут всё, что касается работ: канбан, сборки, сводки.',
         pos: 'bottom',
       },
       {
-        selector: '[data-nav="dashboard"]',
-        title: 'Главная производства — канбан',
+        section: 'production',
+        screen: 'dashboard',
+        selector: '.pkb-col-tabs, .pkb-board',
+        title: 'Канбан производства',
         text: 'Канбан показывает все производственные работы по статусам: <b>В очереди</b> → <b>В работе</b> → <b>На проверке</b> → <b>Упаковка</b> → <b>Готово</b>.',
-        pos: 'right',
+        pos: 'top',
       },
       {
+        section: 'production',
+        screen: 'dashboard',
         selector: '.pkb-col.c-queue',
         title: 'Колонка «В очереди»',
         text: 'Здесь работы ждут, пока кто-то возьмёт их в руки. Найди работу, которую делаешь, и открой её карточку кликом.',
         pos: 'right',
       },
       {
-        selector: '.pkb-wc:first-child',
+        section: 'production',
+        screen: 'dashboard',
+        selector: '.pkb-col.c-queue .pkb-wc, .pkb-col.c-active .pkb-wc',
         title: 'Карточка работы',
         text: 'Открой любую карточку чтобы увидеть детали: что собираем, сколько штук, к какому договору, какие комплектующие нужны.',
         pos: 'right',
@@ -44633,16 +44640,20 @@ const TOURS = {
     summary: 'Если нашёл проблему в сборке — как занести её в Сервис.',
     steps: [
       {
-        selector: '.section-tab[data-section="defects"]',
+        section: 'defects',
+        screen: 'defects-list-new',
+        selector: '.page-header',
         title: 'Раздел «Сервис»',
         text: 'Тут регистрируются все доработки и претензии: и свои, и от клиентов.',
         pos: 'bottom',
       },
       {
-        selector: '[data-nav="defects-list-new"]',
+        section: 'defects',
+        screen: 'defects-list-new',
+        selector: '.page-header .btn-primary, [onclick*="openNewDefect"]',
         title: 'Новая доработка',
         text: 'Нажми «Новая» и опиши проблему: что не так, какая сборка, кто заметил. К доработке можно прикрепить фото.',
-        pos: 'right',
+        pos: 'left',
       },
       {
         title: 'Дальше',
@@ -44695,17 +44706,35 @@ async function goToTourStep(idx) {
   if (!step) { closeTour(); return; }
   tourState.stepIdx = idx;
 
-  // Переходим на нужный экран если задан
+  // Переключаем section если задан (selectSection меняет sidebar + screen)
+  if (step.section && typeof selectSection === 'function') {
+    selectSection(step.section);
+    await new Promise(r => setTimeout(r, 350));
+  }
+  // Переключаем конкретный экран внутри section
   if (step.screen) {
     selectSidebarItem(step.screen);
-    // Дать DOM-у время обновиться
     await new Promise(r => setTimeout(r, 280));
   }
 
-  // Ищем элемент для подсветки (если selector задан и не center)
+  // Ищем ВИДИМЫЙ элемент по селектору (пропускаем скрытые дубликаты desktop/mobile)
   let target = null;
   if (step.selector && step.pos !== 'center') {
-    target = document.querySelector(step.selector);
+    const candidates = document.querySelectorAll(step.selector);
+    for (const el of candidates) {
+      const r = el.getBoundingClientRect();
+      // Видимый: имеет ненулевые размеры, не display:none
+      if (r.width > 4 && r.height > 4 && el.offsetParent !== null) {
+        target = el;
+        break;
+      }
+    }
+    // Прокрутим в видимую область
+    if (target) {
+      try { target.scrollIntoView({ block: 'center', behavior: 'instant' }); }
+      catch (_) { target.scrollIntoView(); }
+      await new Promise(r => setTimeout(r, 150));
+    }
   }
 
   const overlay = document.getElementById('tour-overlay');
