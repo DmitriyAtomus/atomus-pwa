@@ -10006,10 +10006,26 @@
   }
   .ns-bulk-info { color: #7A4A00; flex: 1; }
   .ns-bulk-info b { color: #5C3500; font-weight: 700; }
-  /* v2.44.36: чекбоксы крупнее и заметнее */
+  /* v2.44.37: чекбоксы — заметная синяя обводка, видны на белом фоне */
+  .ns-check-cell {
+    width: 42px !important;
+    text-align: center !important;
+    padding: 0 !important;
+  }
+  .ns-check-label {
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1.5px solid #93C5FD;
+    background: white;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .ns-check-label:hover { background: #EFF5FF; border-color: #2563EB; }
   .ns-row-check, #ns-check-all {
     cursor: pointer;
-    width: 18px; height: 18px;
+    width: 16px; height: 16px;
     accent-color: #2563EB;
     margin: 0;
   }
@@ -17565,7 +17581,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.36-checkboxes-visible";
+const APP_VERSION = "v2.44.37-checkbox-box";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -41511,10 +41527,14 @@ function renderSupplyShopping(d) {
         ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>'
         : '';
       // v2.44.34: в группе «не назначен» — кнопка «Назначить поставщика» + чекбокс
+      // v2.44.37: рендерим чекбоксы как полноценный input в видимой обёртке
+      const isCheckedAttr = noSupplier && window._noSupSelected.has(it.component_id) ? ' checked' : '';
       const checkCell = noSupplier
-        ? '<td style="width:36px;text-align:center;"><input type="checkbox" class="ns-row-check" data-cid="' + it.component_id + '"' +
-            (window._noSupSelected.has(it.component_id) ? ' checked' : '') +
-            ' onclick="onNoSupRowCheck(this)"></td>'
+        ? '<td class="ns-check-cell"><label class="ns-check-label">' +
+            '<input type="checkbox" class="ns-row-check" data-cid="' + it.component_id + '"' +
+            isCheckedAttr +
+            ' onchange="onNoSupRowCheck(this)">' +
+          '</label></td>'
         : '';
       const assignCell = noSupplier
         ? '<td><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
@@ -41580,7 +41600,7 @@ function renderSupplyShopping(d) {
       '<table class="sup-shop-table">' +
         '<thead><tr>' +
           (noSupplier
-            ? '<th style="width:36px;text-align:center;"><input type="checkbox" id="ns-check-all" onclick="onNoSupCheckAll(this)" title="Выбрать все"></th>'
+            ? '<th class="ns-check-cell"><label class="ns-check-label"><input type="checkbox" id="ns-check-all" onchange="onNoSupCheckAll(this)" title="Выбрать все"></label></th>'
             : ''
           ) +
           '<th>Позиция</th>' +
