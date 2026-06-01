@@ -18015,7 +18015,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.46-developments";
+const APP_VERSION = "v2.44.47-dev-auth-fix";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45235,7 +45235,7 @@ async function loadDevelopments() {
   if (listEl) listEl.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
     const res = await fetch(API_BASE + '/api/developments', {
-      headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
     if (!res.ok) throw new Error('http ' + res.status);
     const data = await res.json();
@@ -45289,7 +45289,7 @@ async function openDevelopment(devId) {
   if (pane) pane.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
     const res = await fetch(API_BASE + '/api/developments/' + devId, {
-      headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
     if (!res.ok) throw new Error('http ' + res.status);
     const data = await res.json();
@@ -45451,7 +45451,7 @@ function renderDevelopmentFiles() {
 async function downloadDevelopmentFile(fileId) {
   try {
     const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId + '/files/' + fileId, {
-      headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
     if (!res.ok) throw new Error('http ' + res.status);
     const blob = await res.blob();
@@ -45474,7 +45474,7 @@ async function deleteDevelopmentFile(fileId) {
   try {
     const res = await fetch(API_BASE + '/api/development-files/' + fileId, {
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
     if (!res.ok) throw new Error('http ' + res.status);
     _devState.files = _devState.files.filter(f => f.id !== fileId);
@@ -45515,7 +45515,7 @@ async function uploadDevelopmentFiles(fileList) {
     try {
       const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId + '/files', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
         body: fd,
       });
       if (!res.ok) {
@@ -45577,7 +45577,7 @@ async function sendDevelopmentMessage() {
     const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId + '/chat', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + (state.sessionToken || ''),
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ text }),
@@ -45621,7 +45621,7 @@ async function _devSaveCurrent() {
     const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId, {
       method: 'PATCH',
       headers: {
-        'Authorization': 'Bearer ' + (state.sessionToken || ''),
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ name, description: desc, demo_url: url }),
@@ -45646,7 +45646,7 @@ async function deleteCurrentDevelopment() {
   try {
     const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId, {
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
     if (!res.ok) throw new Error('http ' + res.status);
     _devState.items = _devState.items.filter(x => x.id !== _devState.currentId);
@@ -45720,7 +45720,7 @@ async function submitNewDevelopment() {
     const res = await fetch(API_BASE + '/api/developments', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + (state.sessionToken || ''),
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ name, description: desc, demo_url: url }),
@@ -45750,7 +45750,7 @@ function _startDevChatPolling() {
     }
     try {
       const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId + '/chat', {
-        headers: { 'Authorization': 'Bearer ' + (state.sessionToken || '') },
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
       });
       if (!res.ok) return;
       const j = await res.json();
