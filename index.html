@@ -12789,6 +12789,20 @@
   }
   .pkb-col-body::-webkit-scrollbar { width: 6px; }
   .pkb-col-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  /* v2.44.22: «Готово» — скроллит внутри себя при раскрытии, не растягивает доску */
+  .pkb-col-body-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+    flex: 0 0 auto;
+  }
+  /* Свёрнутая колонка — компактный header, без body */
+  .pkb-col.is-collapsed {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  .pkb-col.is-collapsed .pkb-col-head {
+    border-bottom: none;
+  }
   .pkb-col-empty {
     padding: 24px 8px;
     text-align: center;
@@ -17154,7 +17168,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.18-responsible-label";
+const APP_VERSION = "v2.44.22-done-collapse";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19117,6 +19131,12 @@ async function finishSpecItemAssemblies(contractId, itemId, modelId) {
 cache.productionKanban = null;
 // Активная мобильная колонка
 let pkbMobileCol = 'queue';
+// v2.44.22: «Готово · 7 дней» свёрнута по умолчанию, чтобы не растягивать доску
+let pkbDoneCollapsed = true;
+function pkbToggleDoneColumn() {
+  pkbDoneCollapsed = !pkbDoneCollapsed;
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
 
 const PKB_COL_DEFS = [
   { key: 'queue',       title: 'В очереди',       cls: 'c-queue'   },
@@ -19259,18 +19279,30 @@ function renderProductionDashboard(d) {
         ' ondragleave="pkbColDragLeave(event)"' +
         ' ondrop="pkbColDrop(event, \'' + def.key + '\')"'
       : '';
-    html += '<div class="pkb-col ' + def.cls + activeCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
-    html +=   '<div class="pkb-col-head">';
+    // v2.44.22: колонка «Готово» — сворачиваемая, при раскрытии скроллится внутри
+    const isDoneCol = (def.key === 'done');
+    const collapsed = isDoneCol && pkbDoneCollapsed;
+    const colCollapsedCls = collapsed ? ' is-collapsed' : '';
+    const headClickAttr = isDoneCol ? ' onclick="pkbToggleDoneColumn()" style="cursor:pointer"' : '';
+    const chevron = isDoneCol
+      ? '<i class="ti ' + (collapsed ? 'ti-chevron-down' : 'ti-chevron-up') + '" style="margin-left:auto;font-size:14px;color:var(--text-light);"></i>'
+      : '';
+    html += '<div class="pkb-col ' + def.cls + activeCls + colCollapsedCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
+    html +=   '<div class="pkb-col-head"' + headClickAttr + '>';
     html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
     html +=     '<div class="pkb-col-count">' + items.length + '</div>';
+    html +=     chevron;
     html +=   '</div>';
-    html +=   '<div class="pkb-col-body">';
-    if (items.length === 0) {
-      html += '<div class="pkb-col-empty">' + escapeHtml(pkbEmptyText(def.key)) + '</div>';
-    } else {
-      items.forEach(w => html += renderPkbWorkCard(w, def.key));
+    if (!collapsed) {
+      const bodyExtra = isDoneCol ? ' pkb-col-body-scroll' : '';
+      html += '<div class="pkb-col-body' + bodyExtra + '">';
+      if (items.length === 0) {
+        html += '<div class="pkb-col-empty">' + escapeHtml(pkbEmptyText(def.key)) + '</div>';
+      } else {
+        items.forEach(w => html += renderPkbWorkCard(w, def.key));
+      }
+      html += '</div>';
     }
-    html +=   '</div>';
     html += '</div>';
   });
   html += '</div>';
