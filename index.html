@@ -17433,7 +17433,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.31-ten-multi";
+const APP_VERSION = "v2.44.32-bom-sync";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37704,7 +37704,18 @@ async function submitComponentForm(componentId) {
       showToast(d.message || 'Не удалось сохранить', 'error');
       return;
     }
-    showToast(componentId ? 'Сохранено' : 'Комплектующее добавлено', 'success');
+    // v2.44.32: если был sync BOM целевых моделей — показываем подробный тост
+    const resp = await r.json().catch(() => ({}));
+    const sync = resp && (resp.bom_sync || resp._bom_sync);
+    if (sync && sync.models_synced) {
+      const parts = ['Обновлено BOM в ' + sync.models_synced + ' ' +
+        (sync.models_synced === 1 ? 'модели' : 'моделях')];
+      if (sync.removed) parts.push('удалено старых ТЭНов: ' + sync.removed);
+      showToast((componentId ? 'Сохранено' : 'Комплектующее добавлено') +
+        ' · ' + parts.join(', '), 'success');
+    } else {
+      showToast(componentId ? 'Сохранено' : 'Комплектующее добавлено', 'success');
+    }
     closeComponentForm();
     cache.components = null;
     // Перезагрузим текущий активный таб (новый или старый рендер)
