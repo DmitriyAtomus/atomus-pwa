@@ -10006,7 +10006,22 @@
   }
   .ns-bulk-info { color: #7A4A00; flex: 1; }
   .ns-bulk-info b { color: #5C3500; font-weight: 700; }
-  .ns-row-check, #ns-check-all { cursor: pointer; width: 16px; height: 16px; }
+  /* v2.44.36: чекбоксы крупнее и заметнее */
+  .ns-row-check, #ns-check-all {
+    cursor: pointer;
+    width: 18px; height: 18px;
+    accent-color: #2563EB;
+    margin: 0;
+  }
+  .ns-hint {
+    padding: 8px 14px;
+    background: #F8FAFD;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-light);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ns-hint i { color: var(--brand); font-size: 14px; }
 
   /* v2.44.31: чипы выбранных целевых моделей для ТЭНа */
   .cf-tm-chip {
@@ -17550,7 +17565,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.35-bulk-assign";
+const APP_VERSION = "v2.44.36-checkboxes-visible";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -41545,7 +41560,11 @@ function renderSupplyShopping(d) {
       ) +
       // v2.44.35: bulk-action bar для группы без поставщика
       (noSupplier
-        ? '<div class="ns-bulk-bar" id="ns-bulk-bar" style="' +
+        ? '<div class="ns-hint">' +
+            '<i class="ti ti-info-circle"></i>' +
+            'Поставьте галочки на позиции — можно назначить одного поставщика сразу нескольким' +
+          '</div>' +
+          '<div class="ns-bulk-bar" id="ns-bulk-bar" style="' +
             (window._noSupSelected && window._noSupSelected.size > 0 ? '' : 'display:none;') + '">' +
             '<span class="ns-bulk-info">Выбрано <b id="ns-bulk-count">' +
               (window._noSupSelected ? window._noSupSelected.size : 0) + '</b> ' +
