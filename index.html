@@ -9916,6 +9916,86 @@
   }
 
   /* Тоггл "Сталь / AISI" в форме */
+  /* v2.44.33: экран «Что закупить» */
+  .sup-shop-group {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+  }
+  .sup-shop-group.no-supplier { border-color: #FBC97A; background: #FFFBF3; }
+  .sup-shop-group-head {
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #EFF5FF 0%, #DCE7FA 100%);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+  }
+  .sup-shop-group.no-supplier .sup-shop-group-head {
+    background: linear-gradient(135deg, #FEF3E2 0%, #FFE7CC 100%);
+    border-bottom-color: #FBC97A;
+  }
+  .sup-shop-group-name {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14.5px; font-weight: 600; color: #1E3A8A;
+  }
+  .sup-shop-group.no-supplier .sup-shop-group-name { color: #7A4A00; }
+  .sup-shop-group-name i { font-size: 18px; }
+  .sup-shop-group-count {
+    background: white;
+    color: #2563EB;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    margin-left: 8px;
+    box-shadow: 0 1px 2px rgba(30, 58, 138, 0.08);
+  }
+  .sup-shop-group.no-supplier .sup-shop-group-count { color: #B45309; }
+  .sup-shop-group-actions { display: flex; gap: 6px; }
+  .sup-shop-group-contact {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    padding: 6px 14px;
+    background: #F8FAFD;
+    font-size: 12px; color: var(--text-light);
+    border-bottom: 1px solid var(--border);
+  }
+  .sup-shop-group-contact i { font-size: 13px; margin-right: 4px; }
+
+  .sup-shop-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .sup-shop-table th {
+    text-align: left;
+    padding: 8px 14px;
+    background: #F8FAFD;
+    color: var(--text-light);
+    font-weight: 600;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sup-shop-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .sup-shop-table tr:last-child td { border-bottom: none; }
+  .sup-shop-table tbody tr:hover { background: #F8FAFD; }
+  .sup-shop-reason {
+    display: inline-block;
+    background: var(--bg);
+    color: var(--text-mid);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+  }
+
   /* v2.44.31: чипы выбранных целевых моделей для ТЭНа */
   .cf-tm-chip {
     display: inline-flex; align-items: center; gap: 6px;
@@ -15247,7 +15327,10 @@
         <i class="ti ti-shopping-cart"></i> Снабжение
       </div>
       <div class="sidebar-nav">
-        <button class="nav-item active" data-nav="supply-requests" onclick="selectSidebarItem('supply-requests')">
+        <button class="nav-item active" data-nav="supply-shopping" onclick="selectSidebarItem('supply-shopping')">
+          <i class="ti ti-shopping-cart-plus"></i><span>Что закупить</span>
+        </button>
+        <button class="nav-item" data-nav="supply-requests" onclick="selectSidebarItem('supply-requests')">
           <i class="ti ti-clipboard-list"></i><span>Заявки</span>
         </button>
         <button class="nav-item" data-nav="supply-orders" onclick="selectSidebarItem('supply-orders')">
@@ -16586,6 +16669,28 @@
 
       <!-- ============ РАЗДЕЛ СНАБЖЕНИЕ (Этап 19) ============ -->
 
+      <!-- v2.44.33: ЧТО ЗАКУПИТЬ -->
+      <div class="screen" data-screen="supply-shopping" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-shopping-cart-plus"></i>
+              <h1>Что закупить</h1>
+              <span class="page-counter" id="sup-shop-counter">0</span>
+            </div>
+            <div class="page-actions">
+              <button class="icon-btn" onclick="loadSupplyShopping()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            </div>
+          </div>
+          <div class="page-subtitle" style="padding: 0 18px 12px;">
+            Позиции с низким остатком и дефицитом под план производства, сгруппированы по поставщикам
+          </div>
+          <div id="sup-shop-content" style="padding: 0 18px 24px;">
+            <div class="loading-block">Загружаем…</div>
+          </div>
+        </div>
+      </div>
+
       <!-- ЗАЯВКИ -->
       <div class="screen" data-screen="supply-requests" data-section="supply">
         <div class="content-inner" style="max-width: 100%;">
@@ -17433,7 +17538,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.32-bom-sync";
+const APP_VERSION = "v2.44.33-shopping-list";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -18465,6 +18570,7 @@ function selectSidebarItem(screenName) {
   }
   if (screenName === 'components-catalog')   loadComponentsCatalog();
   // ЭТАП 19: снабжение
+  if (screenName === 'supply-shopping')     loadSupplyShopping();
   if (screenName === 'supply-requests')     loadSupplyRequests();
   if (screenName === 'supply-orders')       loadSupplyOrders();
   if (screenName === 'supply-order-detail') loadSupplyOrderDetail();
@@ -41327,6 +41433,100 @@ async function deleteSupplyItem(itemId) {
 }
 
 // ========== ЗАЯВКИ ==========
+
+// v2.44.33: «Что закупить» — список к закупке по поставщикам
+async function loadSupplyShopping() {
+  const container = document.getElementById('sup-shop-content');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Считаем что нужно закупить…</div>';
+  try {
+    const d = await apiGet('/api/supply/shopping-list');
+    const counter = document.getElementById('sup-shop-counter');
+    if (counter) counter.textContent = d.items_count || 0;
+    renderSupplyShopping(d);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e && e.message || e)) + '</div>';
+  }
+}
+
+function renderSupplyShopping(d) {
+  const container = document.getElementById('sup-shop-content');
+  if (!container) return;
+  const groups = (d && d.groups) || [];
+  if (!groups.length) {
+    container.innerHTML = '<div class="empty-block" style="padding: 32px 16px;">' +
+      '<i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
+      '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">' +
+        'Всё в норме — низкого остатка и дефицита не обнаружено.' +
+      '</div></div>';
+    return;
+  }
+  let html = '';
+  groups.forEach((g, idx) => {
+    const supName = g.supplier_name || '(поставщик не назначен)';
+    const noSupplier = !g.supplier_id;
+    const itemRows = (g.items || []).map(it => {
+      const reasonBadge = it.reason
+        ? '<span class="sup-shop-reason">' + escapeHtml(it.reason) + '</span>'
+        : '';
+      const critBadge = it.is_critical
+        ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>'
+        : '';
+      return '<tr>' +
+        '<td>' + critBadge + escapeHtml(it.component_name) +
+          (it.sku ? '<span style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
+        '</td>' +
+        '<td style="text-align:right;color:var(--text-light);font-size:12px;">' +
+          escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
+        '</td>' +
+        '<td style="text-align:right;font-weight:700;color:#2563EB;">' +
+          escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
+        '</td>' +
+        '<td>' + reasonBadge + '</td>' +
+      '</tr>';
+    }).join('');
+    html += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
+      '<div class="sup-shop-group-head">' +
+        '<div class="sup-shop-group-name">' +
+          '<i class="ti ti-truck"></i>' + escapeHtml(supName) +
+          '<span class="sup-shop-group-count">' + (g.items_count || 0) + ' ' +
+            (g.items_count === 1 ? 'позиция' : (g.items_count < 5 ? 'позиции' : 'позиций')) +
+          '</span>' +
+        '</div>' +
+        '<div class="sup-shop-group-actions">' +
+          (g.supplier_id
+            ? '<button class="btn btn-primary btn-sm" onclick="exportSupplierShoppingDocx(' + g.supplier_id + ')" title="Скачать заявку для поставщика в DOCX">' +
+                '<i class="ti ti-file-text"></i>Скачать DOCX</button>'
+            : '<span style="color:var(--text-light);font-size:12px;">Назначьте поставщика для экспорта</span>'
+          ) +
+        '</div>' +
+      '</div>' +
+      (g.supplier_email || g.supplier_phone || g.supplier_inn
+        ? '<div class="sup-shop-group-contact">' +
+            (g.supplier_inn ? '<span>ИНН ' + escapeHtml(g.supplier_inn) + '</span>' : '') +
+            (g.supplier_email ? '<span><i class="ti ti-mail"></i>' + escapeHtml(g.supplier_email) + '</span>' : '') +
+            (g.supplier_phone ? '<span><i class="ti ti-phone"></i>' + escapeHtml(g.supplier_phone) + '</span>' : '') +
+          '</div>'
+        : ''
+      ) +
+      '<table class="sup-shop-table">' +
+        '<thead><tr>' +
+          '<th>Позиция</th>' +
+          '<th style="text-align:right;width:120px;">остаток / мин.</th>' +
+          '<th style="text-align:right;width:140px;">Заказать</th>' +
+          '<th style="width:160px;">Причина</th>' +
+        '</tr></thead>' +
+        '<tbody>' + itemRows + '</tbody>' +
+      '</table>' +
+    '</div>';
+  });
+  container.innerHTML = html;
+}
+
+async function exportSupplierShoppingDocx(supplierId) {
+  // Заглушка пока — реализация в следующем шаге
+  showToast('Экспорт DOCX будет добавлен в следующем шаге', 'info');
+}
 
 async function loadSupplyRequests() {
   const container = document.getElementById('sup-req-list');
