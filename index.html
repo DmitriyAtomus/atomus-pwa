@@ -17408,7 +17408,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.29-supplier-picker";
+const APP_VERSION = "v2.44.30-ten-fields";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37214,6 +37214,27 @@ async function openComponentForm(componentId) {
   }
   // v2.44.27: siOptions больше не нужны — dropdown «Связь со снабжением» убран из формы
 
+  // v2.44.30: для ТЭНов — отдельные поля «куда идёт» и «кВт».
+  // Определяем по названию категории (содержит «тэн»).
+  const _isTenCategory = (catId) => {
+    if (!catId) return false;
+    const cat = cats.find(x => x.id === catId);
+    return !!(cat && /тэн/i.test(cat.name || ''));
+  };
+  const initialCatId = (c && c.category_id) || (cats[0] && cats[0].id) || 0;
+  const isTen = _isTenCategory(initialCatId);
+  // Подгружаем модели для пикера, если ТЭН
+  if (isTen && !cache.models) {
+    try {
+      cache.models = await apiGet('/api/models');
+    } catch (e) { cache.models = { models: [] }; }
+  }
+  const allModels = (cache.models && cache.models.models) || [];
+  const curTargetModel = (c && c.target_model_id)
+    ? allModels.find(m => m.id === c.target_model_id) : null;
+  const curTargetName = curTargetModel ? curTargetModel.name : '';
+  const curTargetId = curTargetModel ? curTargetModel.id : (c && c.target_model_id) || '';
+
   // v2.43.87: модалка с max-height + flex-column, тело внутри прокручивается
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:92vh;display:flex;flex-direction:column;">' +
@@ -37238,16 +37259,42 @@ async function openComponentForm(componentId) {
               ).join('') +
             '</select></div>' +
         '</div>' +
-        // v2.41.0: исполнение материала
-        '<label class="form-label">Исполнение материала</label>' +
-        '<div class="exec-toggle" style="margin-bottom:14px;">' +
+        // v2.41.0 / v2.44.30: исполнение материала.
+        // Для ТЭНов всегда нержавейка — toggle блокируется.
+        '<label class="form-label">Исполнение материала' +
+          (isTen ? ' <span style="color:var(--text-light);font-weight:400;font-size:11px;">(ТЭН всегда нержавейка)</span>' : '') +
+        '</label>' +
+        '<div class="exec-toggle" style="margin-bottom:14px;' + (isTen ? 'opacity:0.7;pointer-events:none;' : '') + '">' +
           '<label class="exec-toggle-opt"><input type="radio" name="cf-exec" value="standard"' +
-            (!(c && c.execution_type === 'stainless') ? ' checked' : '') + '> ' +
+            (!isTen && !(c && c.execution_type === 'stainless') ? ' checked' : '') +
+            (isTen ? ' disabled' : '') + '> ' +
             '<span><i class="ti ti-tools"></i> Сталь</span></label>' +
           '<label class="exec-toggle-opt"><input type="radio" name="cf-exec" value="stainless"' +
-            ((c && c.execution_type === 'stainless') ? ' checked' : '') + '> ' +
+            (isTen || (c && c.execution_type === 'stainless') ? ' checked' : '') + '> ' +
             '<span><i class="ti ti-shield"></i> AISI (нержавейка)</span></label>' +
         '</div>' +
+        // v2.44.30: для ТЭНов — целевая модель и мощность
+        (isTen ? (
+          '<label class="form-label">Куда идёт (модель из номенклатуры)</label>' +
+          '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:stretch;">' +
+            '<input type="text" id="cf-target-model-name" class="form-input" ' +
+              'style="flex:1;margin:0;" placeholder="Нажми 🔍 для выбора модели" ' +
+              'value="' + escapeHtml(curTargetName) + '" ' +
+              'onclick="openTargetModelPickerModal()" readonly>' +
+            '<input type="hidden" id="cf-target-model-id" value="' + (curTargetId || '') + '">' +
+            '<button type="button" class="btn btn-primary" onclick="openTargetModelPickerModal()" ' +
+              'title="Выбрать модель"><i class="ti ti-search"></i></button>' +
+            (curTargetId
+              ? '<button type="button" class="btn btn-secondary" onclick="clearTargetModel()" title="Очистить">' +
+                  '<i class="ti ti-x"></i></button>'
+              : ''
+            ) +
+          '</div>' +
+          '<label class="form-label">Мощность, кВт</label>' +
+          '<input type="number" id="cf-power-kw" class="form-input" min="0" step="0.1" ' +
+            'value="' + ((c && c.power_kw != null) ? c.power_kw : '') + '" ' +
+            'placeholder="Например: 2.5" style="margin-bottom:14px;" />'
+        ) : '') +
         '<label class="form-label">Основной поставщик</label>' +
         '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:stretch;">' +
           '<input type="text" id="cf-supplier-name" list="cf-suppliers-dl" class="form-input" ' +
@@ -37398,6 +37445,89 @@ function filterSupplierPicker(query) {
   }).join('');
 }
 
+// v2.44.30: пикер моделей для ТЭНов
+async function openTargetModelPickerModal() {
+  if (!cache.models) {
+    try { cache.models = await apiGet('/api/models'); }
+    catch (e) { cache.models = { models: [] }; }
+  }
+  const models = (cache.models && cache.models.models) || [];
+
+  let modal = document.getElementById('target-model-picker-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'target-model-picker-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+    modal.innerHTML = '<div class="modal" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package"></i> Выбрать модель</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'target-model-picker-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 16px;">' +
+        '<input type="text" id="tmp-search" class="form-input" placeholder="Поиск по названию или артикулу…" autocomplete="off" oninput="filterTargetModelPicker(this.value)">' +
+      '</div>' +
+      '<div id="tmp-list" style="flex:1;overflow-y:auto;padding:0 8px 8px;"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+
+  window._targetModelAll = models;
+  filterTargetModelPicker('');
+  modal.classList.add('visible');
+  setTimeout(() => {
+    const s = document.getElementById('tmp-search');
+    if (s) { s.value = ''; s.focus(); }
+  }, 50);
+}
+
+function filterTargetModelPicker(query) {
+  const list = document.getElementById('tmp-list');
+  if (!list) return;
+  const q = (query || '').trim().toLowerCase();
+  const all = window._targetModelAll || [];
+  const filtered = q
+    ? all.filter(m =>
+        ((m.name || '').toLowerCase().includes(q)) ||
+        ((m.article || '').toLowerCase().includes(q))
+      )
+    : all;
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-block" style="padding:18px;text-align:center;color:var(--text-light);">' +
+      (q ? 'Ничего не нашлось' : 'Список моделей пуст') + '</div>';
+    return;
+  }
+  const curHidden = document.getElementById('cf-target-model-id');
+  const curId = curHidden ? curHidden.value : '';
+  list.innerHTML = filtered.slice(0, 100).map(m => {
+    const isActive = String(m.id) === String(curId);
+    return '<button type="button" class="sup-pick-row' + (isActive ? ' active' : '') + '" ' +
+      'onclick="pickTargetModel(' + m.id + ', ' + JSON.stringify(m.name).replace(/"/g, '&quot;') + ')">' +
+      '<i class="ti ti-package"></i>' +
+      '<span class="sup-pick-name">' + escapeHtml(m.name || '—') + '</span>' +
+      (m.article ? '<span class="sup-pick-inn">' + escapeHtml(m.article) + '</span>' : '') +
+      (isActive ? '<i class="ti ti-check" style="margin-left:auto;color:var(--brand);"></i>' : '') +
+    '</button>';
+  }).join('');
+}
+
+function pickTargetModel(modelId, modelName) {
+  const nameInp = document.getElementById('cf-target-model-name');
+  const hidden = document.getElementById('cf-target-model-id');
+  if (nameInp) nameInp.value = modelName || '';
+  if (hidden) hidden.value = String(modelId);
+  const modal = document.getElementById('target-model-picker-modal');
+  if (modal) modal.classList.remove('visible');
+}
+
+function clearTargetModel() {
+  const nameInp = document.getElementById('cf-target-model-name');
+  const hidden = document.getElementById('cf-target-model-id');
+  if (nameInp) nameInp.value = '';
+  if (hidden) hidden.value = '';
+}
+
 function pickSupplierFromPicker(supplierId, supplierName) {
   const nameInp = document.getElementById('cf-supplier-name');
   const hidden = document.getElementById('cf-supplier');
@@ -37473,6 +37603,9 @@ async function submitComponentForm(componentId) {
   const supVal = (document.getElementById('cf-supplier') || {}).value || '';
   const siVal = (document.getElementById('cf-supply-item') || {}).value || '';
   const execRadio = document.querySelector('input[name="cf-exec"]:checked');
+  // v2.44.30: ТЭН-поля (могут отсутствовать в DOM если категория не ТЭН)
+  const tmInp = document.getElementById('cf-target-model-id');
+  const pwInp = document.getElementById('cf-power-kw');
   const data = {
     category_id: parseInt(document.getElementById('cf-category').value),
     name: (document.getElementById('cf-name').value || '').trim(),
@@ -37484,6 +37617,13 @@ async function submitComponentForm(componentId) {
     supply_item_id: siVal ? parseInt(siVal) : null,
     execution_type: execRadio ? execRadio.value : 'standard',
   };
+  if (tmInp) {
+    data.target_model_id = tmInp.value ? parseInt(tmInp.value) : null;
+  }
+  if (pwInp) {
+    const v = (pwInp.value || '').trim();
+    data.power_kw = v === '' ? null : parseFloat(v);
+  }
   if (!data.name) { showToast('Укажи название', 'error'); return; }
   if (!data.category_id) { showToast('Выбери категорию', 'error'); return; }
 
