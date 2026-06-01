@@ -18643,7 +18643,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.60-inv-category-picker";
+const APP_VERSION = "v2.44.61-notif-chat-landing";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19287,27 +19287,32 @@ function onNotifClick(notifId, entityType, entityId, notifType) {
 }
 
 function _devScrollToTarget(notifType) {
-  let selector = null;
-  if (notifType === 'dev_guest_message') {
-    selector = '#dev-chat-messages';
-  } else if (notifType === 'dev_guest_file') {
-    selector = '#dev-files-list';
+  // v2.44.61: и для сообщения, и для файла — проваливаем в чат
+  // (там единый «диалог» по разработке; файл можно посмотреть, проскроллив выше).
+  const chatBox  = document.getElementById('dev-chat-messages');
+  const chatWrap = chatBox && chatBox.closest('.dev-section');
+  const target = chatWrap || chatBox;
+  if (target) {
+    try { target.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    catch (_) { target.scrollIntoView(); }
+    target.style.transition = 'box-shadow 0.5s';
+    target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.40)';
+    setTimeout(() => { target.style.boxShadow = ''; }, 1800);
   }
-  if (!selector) return;
-  const el = document.querySelector(selector);
-  if (!el) return;
-  try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-  catch (_) { el.scrollIntoView(); }
-  // Краткая подсветка
-  const wrap = el.closest('.dev-section') || el;
-  wrap.style.transition = 'box-shadow 0.5s';
-  wrap.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.40), 0 0 0 9999px rgba(15,23,42,0)';
-  setTimeout(() => { wrap.style.boxShadow = ''; }, 1800);
-  // Для чата ещё и фокус в инпут
-  if (notifType === 'dev_guest_message') {
-    const input = document.getElementById('dev-chat-input');
-    if (input) setTimeout(() => input.focus(), 400);
+  // Для файлового уведомления ещё мягко подсветим строку файлов сверху,
+  // чтобы пользователь видел контекст.
+  if (notifType === 'dev_guest_file') {
+    const filesList = document.getElementById('dev-files-list');
+    const filesWrap = filesList && filesList.closest('.dev-section');
+    if (filesWrap) {
+      filesWrap.style.transition = 'box-shadow 0.5s';
+      filesWrap.style.boxShadow = '0 0 0 2px rgba(124,58,237,0.30)';
+      setTimeout(() => { filesWrap.style.boxShadow = ''; }, 1800);
+    }
   }
+  // Фокус в инпут чата — чтобы можно было сразу ответить
+  const input = document.getElementById('dev-chat-input');
+  if (input) setTimeout(() => input.focus(), 400);
 }
 
 // Кнопка-колокольчик: ручное открытие
