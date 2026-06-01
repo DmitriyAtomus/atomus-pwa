@@ -10006,6 +10006,155 @@
   }
   .ns-bulk-info { color: #7A4A00; flex: 1; }
   .ns-bulk-info b { color: #5C3500; font-weight: 700; }
+  /* === ЭТАП 49 (v2.44.56): ИНВЕНТАРИЗАЦИЯ ПО ФОТО === */
+  .inv-steps {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 700px) { .inv-steps { grid-template-columns: 1fr; } }
+  .inv-step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .inv-step-card .step-n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 700; font-size: 13px;
+  }
+  .inv-step-card h3 {
+    font-size: 14px; font-weight: 600; color: var(--text-dark); margin: 0;
+  }
+  .inv-step-card p { font-size: 13px; color: var(--text-mid); margin: 0; line-height: 1.45; }
+  .inv-step-card .step-action {
+    margin-top: 6px;
+  }
+  .inv-drop {
+    border: 2px dashed var(--border);
+    border-radius: 12px; padding: 18px;
+    text-align: center; color: var(--text-light); font-size: 13px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: background 0.15s, border 0.15s, color 0.15s;
+  }
+  .inv-drop.dragover {
+    background: rgba(37,99,235,0.06);
+    border-color: rgba(37,99,235,0.5); color: var(--brand);
+  }
+  .inv-drop i { font-size: 26px; margin-bottom: 6px; display: block; }
+  .inv-drop b { color: var(--text-mid); }
+  .inv-history-title {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); font-weight: 600; margin: 26px 0 8px;
+  }
+  .inv-history-list {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .inv-session-row {
+    display: grid;
+    grid-template-columns: 50px 1fr 130px 110px 110px;
+    gap: 10px; align-items: center;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  @media (max-width: 700px) {
+    .inv-session-row { grid-template-columns: 1fr auto; row-gap: 4px; }
+    .inv-session-row > :nth-child(1) { grid-column: 1 / -1; font-size: 11px; color: var(--text-light); }
+    .inv-session-row > :nth-child(3),
+    .inv-session-row > :nth-child(4) { display: none; }
+  }
+  .inv-session-row .inv-id { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--text-light); font-size: 12px; }
+  .inv-session-row .inv-status {
+    display: inline-block; padding: 3px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .inv-status.s-recognizing { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .inv-status.s-ready       { background: rgba(37,99,235,0.15);  color: #1E40AF; }
+  .inv-status.s-applied     { background: rgba(29,158,117,0.18); color: #0A5B41; }
+  .inv-status.s-error       { background: rgba(226,75,74,0.15);  color: #8C2A2A; }
+  .inv-session-row button {
+    padding: 5px 12px; font-size: 12.5px;
+  }
+  /* Карточка сессии (диффы) */
+  .inv-diff-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+  .inv-diff-row {
+    display: grid;
+    grid-template-columns: 28px 30px 1fr 90px 90px 90px;
+    gap: 10px;
+    padding: 10px 12px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .inv-diff-row.head {
+    background: var(--bg);
+    border-top: none;
+    padding: 8px 12px;
+    font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-weight: 600;
+    color: var(--text-light);
+  }
+  .inv-diff-row.is-mismatch { background: rgba(186,117,23,0.06); }
+  .inv-diff-row.is-not-found { background: rgba(226,75,74,0.06); }
+  .inv-diff-row .inv-d-delta {
+    text-align: right; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .inv-d-delta.up   { color: #0A5B41; }
+  .inv-d-delta.down { color: #8C2A2A; }
+  .inv-d-num input {
+    width: 70px; padding: 4px 6px;
+    border: 1px solid var(--border); border-radius: 6px;
+    text-align: right; font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .inv-d-num input:focus { border-color: rgba(37,99,235,0.5); outline: 0; }
+  .inv-diff-not-found-note {
+    font-size: 11.5px; color: #8C2A2A;
+  }
+  /* кастомный чекбокс — re-use паттерн */
+  .inv-check { display: flex; justify-content: center; }
+  .inv-check input[type="checkbox"] { display: none; }
+  .inv-check label {
+    display: inline-block; width: 20px; height: 20px;
+    border: 1.5px solid var(--border); border-radius: 5px;
+    background: white; cursor: pointer; position: relative;
+    transition: background 0.12s, border 0.12s;
+  }
+  .inv-check input[type="checkbox"]:checked + label {
+    background: linear-gradient(135deg, #2563EB, #7C3AED); border-color: transparent;
+  }
+  .inv-check input[type="checkbox"]:checked + label::after {
+    content: ''; position: absolute; left: 6px; top: 2px;
+    width: 5px; height: 10px;
+    border-right: 2px solid white; border-bottom: 2px solid white;
+    transform: rotate(45deg);
+  }
+  .inv-summary-bar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(37,99,235,0.07), rgba(124,58,237,0.05));
+    border: 1px solid rgba(37,99,235,0.20);
+    border-radius: 10px;
+    margin-top: 14px;
+    font-size: 13px;
+  }
+  .inv-summary-bar .inv-sum-num { font-weight: 700; color: var(--brand); }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
   /* === ЭТАП 48 (v2.44.46): РАЗРАБОТКА ОБОРУДОВАНИЯ === */
   .dev-screen-inner { padding: 0 !important; }
   .dev-layout {
@@ -16110,6 +16259,9 @@
         <button class="nav-item" data-nav="warehouse-movements" onclick="selectSidebarItem('warehouse-movements')">
           <i class="ti ti-history"></i><span>Журнал движений</span>
         </button>
+        <button class="nav-item" data-nav="inventory" onclick="selectSidebarItem('inventory')">
+          <i class="ti ti-clipboard-check"></i><span>Инвентаризация</span>
+        </button>
       </div>
       <div class="sidebar-footer">
         <div class="small-avatar" id="sb-avatar-warehouse">—</div>
@@ -17474,6 +17626,25 @@
       </div>
       <!-- ============ КОНЕЦ РАЗДЕЛА СКЛАД ============ -->
 
+      <!-- ============ ЭТАП 49 (v2.44.56): ИНВЕНТАРИЗАЦИЯ ПО ФОТО ============ -->
+      <div class="screen" data-screen="inventory" data-section="warehouse">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('warehouse-stock')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Инвентаризация</h2>
+          <button class="icon-btn" onclick="loadInventory()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Инвентаризация по фото</h1>
+            <div class="page-subtitle">Скачай бланк → распечатай → впиши факт от руки → сфотографируй → ИИ заполнит остатки</div>
+          </div>
+        </div>
+        <div class="content-inner" id="inventory-screen-body">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+      <!-- ============ КОНЕЦ ИНВЕНТАРИЗАЦИИ ============ -->
+
       <!-- ============ ЗАГЛУШКА: ЛОГИСТИКА ============ -->
       <div class="screen" data-screen="coming-logistics" data-section="logistics">
         <div class="content-inner" style="max-width: 100%;">
@@ -18382,7 +18553,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.55-service-work-flow";
+const APP_VERSION = "v2.44.56-inventory-vision";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19305,6 +19476,10 @@ function selectSidebarItem(screenName) {
   if (screenName !== 'developments') {
     try { _stopDevChatPolling && _stopDevChatPolling(); } catch (_) {}
   }
+  // v2.44.56: глушим poll инвентаризации при уходе
+  if (screenName !== 'inventory') {
+    try { _invStopPolling && _invStopPolling(); } catch (_) {}
+  }
 
   // v2.8.2 / v2.43.28: сохраняем текущий раздел+экран+ID-контекст чтобы при F5
   // оказаться ровно там, где был. Не сохраняем для form-экранов (там полузаполненные данные).
@@ -19403,6 +19578,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sale-product-form') initSaleProductForm();
   if (screenName === 'catalog') loadCatalog();                   // ЭТАП 47 (v2.44.0)
   if (screenName === 'developments') loadDevelopments();         // ЭТАП 48 (v2.44.46)
+  if (screenName === 'inventory') loadInventory();               // ЭТАП 49 (v2.44.56)
   // КП (14Б)
   if (screenName === 'sales-offers') loadOffers();
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
@@ -46660,6 +46836,441 @@ async function sendPublicDevelopmentMessage(token) {
   } finally {
     input.disabled = false;
     input.focus();
+  }
+}
+
+/* ============ ЭТАП 49 (v2.44.56): ИНВЕНТАРИЗАЦИЯ ПО ФОТО ============ */
+const _invState = {
+  sessions: [],
+  currentSession: null,
+  _pollTimer: null,
+  _selectedIds: new Set(),
+  _overrides: {},   // component_id → new_qty (если пользователь поправил)
+};
+
+async function loadInventory() {
+  await _invFetchSessions();
+  _invRenderHome();
+}
+
+async function _invFetchSessions() {
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/sessions', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const j = await res.json();
+    _invState.sessions = j.items || [];
+  } catch (e) {
+    _invState.sessions = [];
+  }
+}
+
+function _invRenderHome() {
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  const apiBase = API_BASE;
+  const token = localStorage.getItem(TOKEN_KEY) || '';
+
+  let html = '';
+  // 3 шага
+  html += '<div class="inv-steps">' +
+    '<div class="inv-step-card">' +
+      '<div class="step-n">1</div>' +
+      '<h3>Скачай бланк (Excel)</h3>' +
+      '<p>В файле — все активные комплектующие: артикул, название, категория, остаток по системе. Поле «Фактически» пустое — для записи от руки.</p>' +
+      '<div class="step-action">' +
+        '<button class="btn btn-primary" onclick="downloadInventoryBlank()">' +
+          '<i class="ti ti-file-spreadsheet"></i> Скачать бланк' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="inv-step-card">' +
+      '<div class="step-n">2</div>' +
+      '<h3>Распечатай и заполни</h3>' +
+      '<p>Пройди по складу с распечаткой, в колонке «Фактически» впиши реальное количество каждой позиции. Можно несколько листов.</p>' +
+    '</div>' +
+    '<div class="inv-step-card">' +
+      '<div class="step-n">3</div>' +
+      '<h3>Загрузи фото</h3>' +
+      '<p>Сфотографируй заполненные листы (можно сразу несколько) и загрузи сюда. Claude разберёт почерк и предложит обновить остатки.</p>' +
+      '<div class="inv-drop" id="inv-drop-zone" onclick="document.getElementById(\'inv-photo-input\').click()">' +
+        '<i class="ti ti-camera"></i>' +
+        '<div><b>Перетащи фото сюда</b> или нажми чтобы выбрать</div>' +
+        '<div style="font-size:11.5px;margin-top:3px;">До 12 МБ на фото · JPG/PNG/HEIC</div>' +
+        '<input type="file" id="inv-photo-input" multiple accept="image/*" style="display:none;" onchange="uploadInventoryPhotos(this.files)">' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  // История
+  html += '<div class="inv-history-title">История инвентаризаций</div>';
+  if (!_invState.sessions.length) {
+    html += '<div style="color:var(--text-light);font-size:13px;padding:18px;text-align:center;border:1px dashed var(--border);border-radius:10px;">Пока инвентаризаций не было</div>';
+  } else {
+    html += '<div class="inv-history-list">';
+    _invState.sessions.forEach(s => {
+      const statusKey = (s.status || '').toLowerCase();
+      const statusLabel =
+        statusKey === 'recognizing' ? 'Распознаём…' :
+        statusKey === 'ready'       ? 'Готова к проверке' :
+        statusKey === 'applied'     ? 'Применена' :
+        statusKey === 'error'       ? 'Ошибка ИИ' : (s.status || '—');
+      const dt = _devFormatDate(s.created_at);
+      const appliedText = s.applied_at
+        ? '<span style="color:var(--text-light);font-size:12px;">' + escapeHtml(_devFormatDate(s.applied_at)) + '</span>'
+        : '<span></span>';
+      const ctaLabel = statusKey === 'applied' ? 'Посмотреть' : 'Открыть';
+      html += '<div class="inv-session-row">' +
+        '<span class="inv-id">#' + s.id + '</span>' +
+        '<span>' + escapeHtml(dt) + '</span>' +
+        '<span class="inv-status s-' + statusKey + '">' + escapeHtml(statusLabel) + '</span>' +
+        appliedText +
+        '<button class="btn btn-secondary" onclick="openInventorySession(' + s.id + ')">' + ctaLabel + '</button>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+  _invSetupDropZone();
+}
+
+function _invSetupDropZone() {
+  const zone = document.getElementById('inv-drop-zone');
+  if (!zone) return;
+  ['dragenter','dragover'].forEach(ev => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); zone.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(ev => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); zone.classList.remove('dragover');
+  }));
+  zone.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files) {
+      uploadInventoryPhotos(e.dataTransfer.files);
+    }
+  });
+}
+
+async function downloadInventoryBlank() {
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/components-blank.xlsx', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dt = new Date();
+    const pad = (n) => String(n).padStart(2,'0');
+    a.download = 'inventory_blank_' + dt.getFullYear() + pad(dt.getMonth()+1) + pad(dt.getDate()) + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Бланк скачан. Распечатай — заполни — сфотографируй.', 'success');
+  } catch (e) {
+    showToast('Не удалось скачать бланк', 'error');
+  }
+}
+
+async function uploadInventoryPhotos(fileList) {
+  if (!fileList || !fileList.length) return;
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if (!files.length) {
+    showToast('Поддерживаются только изображения', 'error');
+    return;
+  }
+  const fd = new FormData();
+  files.forEach((f, i) => fd.append('photo_' + (i+1), f));
+  const body = document.getElementById('inventory-screen-body');
+  if (body) body.innerHTML = '<div class="loading-block">Загружаем фото и запускаем распознавание…</div>';
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/sessions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      body: fd,
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось загрузить', 'error');
+      _invRenderHome();
+      return;
+    }
+    const j = await res.json();
+    showToast('Фото загружены. ИИ распознаёт…', 'success');
+    openInventorySession(j.id);
+  } catch (e) {
+    showToast('Сеть: не удалось загрузить фото', 'error');
+    _invRenderHome();
+  }
+}
+
+async function openInventorySession(sessionId) {
+  _invState._selectedIds = new Set();
+  _invState._overrides = {};
+  await _invLoadSession(sessionId);
+}
+
+async function _invLoadSession(sessionId) {
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/sessions/' + sessionId, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const sess = await res.json();
+    _invState.currentSession = sess;
+    _invRenderSession(sess);
+    // если ещё распознаём — запускаем polling
+    if (sess.status === 'recognizing') _invStartPolling(sessionId);
+    else _invStopPolling();
+  } catch (e) {
+    body.innerHTML = '<div class="pkb-form-error" style="margin:12px 0;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить сессию</div>';
+  }
+}
+
+function _invStartPolling(sessionId) {
+  _invStopPolling();
+  _invState._pollTimer = setInterval(async () => {
+    if (!document.querySelector('.screen[data-screen="inventory"].active')) {
+      _invStopPolling();
+      return;
+    }
+    try {
+      const res = await fetch(API_BASE + '/api/inventory/sessions/' + sessionId, {
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      });
+      if (!res.ok) return;
+      const sess = await res.json();
+      if (sess.status !== 'recognizing') {
+        _invStopPolling();
+        _invState.currentSession = sess;
+        _invRenderSession(sess);
+      }
+    } catch (_) {}
+  }, 3000);
+}
+function _invStopPolling() {
+  if (_invState._pollTimer) { clearInterval(_invState._pollTimer); _invState._pollTimer = null; }
+}
+
+function _invRenderSession(sess) {
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  const isReady = sess.status === 'ready';
+  const isApplied = sess.status === 'applied';
+  const isError = sess.status === 'error';
+  const isRecognizing = sess.status === 'recognizing';
+  const recognized = sess.recognized || [];
+
+  let html = '';
+  html += '<div style="margin-bottom:14px;">' +
+    '<button class="btn btn-secondary" onclick="loadInventory()">' +
+      '<i class="ti ti-arrow-left"></i> Назад к инвентаризации' +
+    '</button>' +
+  '</div>';
+
+  // Шапка сессии
+  const headerLabel = isApplied ? 'Инвентаризация применена' :
+                      isReady ? 'Распознано — проверь и применяй' :
+                      isError ? 'Ошибка распознавания' :
+                      isRecognizing ? 'ИИ распознаёт фото…' : 'Сессия #' + sess.id;
+  html += '<div class="page-header" style="margin-bottom:14px;">' +
+            '<div>' +
+              '<h1 style="font-size:18px;">' + escapeHtml(headerLabel) + ' · #' + sess.id + '</h1>' +
+              '<div class="page-subtitle">Создано ' + escapeHtml(_devFormatDate(sess.created_at)) +
+                (sess.applied_at ? ' · применено ' + escapeHtml(_devFormatDate(sess.applied_at)) : '') +
+              '</div>' +
+            '</div>' +
+          '</div>';
+
+  if (isRecognizing) {
+    html += '<div style="text-align:center;padding:30px;color:var(--text-light);">' +
+              '<i class="ti ti-loader-2" style="font-size:32px;animation:spin 1.5s linear infinite;"></i>' +
+              '<div style="margin-top:10px;font-size:14px;">Claude разбирает рукописные значения. Это занимает 5–30 секунд.</div>' +
+            '</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  if (isError) {
+    html += '<div class="pkb-form-error" style="margin:12px 0;">' +
+              '<i class="ti ti-alert-triangle"></i>' + escapeHtml(sess.ai_error || 'Ошибка ИИ') +
+            '</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  if (!recognized.length) {
+    html += '<div style="text-align:center;padding:30px;color:var(--text-light);">Ничего не распознано</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  // Sortировка: сначала с расхождениями, потом совпадения, в конце не-найденные
+  const matched = recognized.filter(r => r.match === 'exact');
+  const notFound = recognized.filter(r => r.match !== 'exact');
+  const mismatched = matched.filter(r => Math.abs(r.delta || 0) > 0.0001);
+  const same = matched.filter(r => Math.abs(r.delta || 0) <= 0.0001);
+
+  // Если ещё не выбирали — авто-выберем все строки с расхождением
+  if (_invState._selectedIds.size === 0 && !isApplied) {
+    mismatched.forEach(r => { if (r.component_id) _invState._selectedIds.add(r.component_id); });
+  }
+
+  // Сводка
+  html += '<div class="inv-summary-bar">' +
+    '<i class="ti ti-info-circle" style="color:var(--brand);"></i>' +
+    '<span>Распознано <span class="inv-sum-num">' + recognized.length + '</span> позиций · ' +
+    'с расхождением: <span class="inv-sum-num">' + mismatched.length + '</span> · ' +
+    'совпало: <span class="inv-sum-num">' + same.length + '</span>' +
+    (notFound.length ? ' · не найдено: <span class="inv-sum-num">' + notFound.length + '</span>' : '') +
+    '</span>' +
+  '</div>';
+
+  // Таблица
+  const ordered = [...mismatched, ...same, ...notFound];
+  html += '<div class="inv-diff-table">';
+  html += '<div class="inv-diff-row head">' +
+    '<div class="inv-check">' +
+      (isApplied ? '' :
+        '<input type="checkbox" id="inv-check-all"' + (_invState._selectedIds.size > 0 && _invState._selectedIds.size === mismatched.length ? ' checked' : '') + ' onchange="_invToggleAll(this.checked)">' +
+        '<label for="inv-check-all"></label>'
+      ) +
+    '</div>' +
+    '<div></div>' +
+    '<div>Позиция</div>' +
+    '<div style="text-align:right;">По системе</div>' +
+    '<div style="text-align:right;">Факт</div>' +
+    '<div style="text-align:right;">Δ</div>' +
+  '</div>';
+
+  ordered.forEach(r => {
+    const isMismatch = r.match === 'exact' && Math.abs(r.delta || 0) > 0.0001;
+    const isNF = r.match !== 'exact';
+    const rowCls = 'inv-diff-row' + (isMismatch ? ' is-mismatch' : '') + (isNF ? ' is-not-found' : '');
+    const checked = r.component_id && _invState._selectedIds.has(r.component_id);
+    const checkbox = (isApplied || isNF)
+      ? ''
+      : '<input type="checkbox" id="inv-row-' + r.component_id + '"' + (checked ? ' checked' : '') +
+        ' onchange="_invToggleRow(' + r.component_id + ', this.checked)"><label for="inv-row-' + r.component_id + '"></label>';
+    const delta = r.delta;
+    const deltaCls = isMismatch ? (delta > 0 ? 'up' : 'down') : '';
+    const deltaStr = delta == null ? '—' : (delta > 0 ? '+' : '') + _formatNum(delta);
+    // Поле редактирования факта
+    const newQty = _invState._overrides[r.component_id] != null
+      ? _invState._overrides[r.component_id]
+      : r.recognized_qty;
+    const factCell = isApplied
+      ? '<div style="text-align:right;">' + _formatNum(r.recognized_qty) + '</div>'
+      : (isNF
+          ? '<div style="text-align:right;">' + _formatNum(r.recognized_qty) + '</div>'
+          : '<div class="inv-d-num" style="text-align:right;"><input type="number" step="0.01" value="' + newQty + '" ' +
+                'onchange="_invSetOverride(' + r.component_id + ', this.value)"></div>'
+        );
+    html += '<div class="' + rowCls + '">' +
+      '<div class="inv-check">' + checkbox + '</div>' +
+      '<div></div>' +
+      '<div>' +
+        '<div style="font-size:13px;color:var(--text-dark);">' + escapeHtml(r.name || (r.article || '—')) + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-light);">Артикул: ' + escapeHtml(r.article || '—') +
+          (isNF ? ' · <span class="inv-diff-not-found-note">нет в базе</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="text-align:right;font-variant-numeric:tabular-nums;">' +
+        (r.current_qty == null ? '—' : _formatNum(r.current_qty)) +
+      '</div>' +
+      factCell +
+      '<div class="inv-d-delta ' + deltaCls + '">' + escapeHtml(deltaStr) + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+
+  if (!isApplied) {
+    html += '<div style="display:flex;justify-content:flex-end;margin-top:14px;gap:8px;">' +
+      '<button class="btn btn-primary" onclick="applyInventorySession(' + sess.id + ')" id="inv-apply-btn">' +
+        '<i class="ti ti-check"></i> Применить <span id="inv-apply-count">' + _invState._selectedIds.size + '</span> позиций' +
+      '</button>' +
+    '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function _formatNum(n) {
+  if (n == null || isNaN(n)) return '—';
+  const num = Number(n);
+  if (Number.isInteger(num)) return String(num);
+  return num.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function _invToggleRow(componentId, checked) {
+  if (checked) _invState._selectedIds.add(componentId);
+  else _invState._selectedIds.delete(componentId);
+  const lbl = document.getElementById('inv-apply-count');
+  if (lbl) lbl.textContent = _invState._selectedIds.size;
+}
+
+function _invToggleAll(checked) {
+  const recognized = (_invState.currentSession && _invState.currentSession.recognized) || [];
+  const mismatched = recognized.filter(r => r.match === 'exact' && Math.abs(r.delta || 0) > 0.0001);
+  if (checked) mismatched.forEach(r => { if (r.component_id) _invState._selectedIds.add(r.component_id); });
+  else _invState._selectedIds.clear();
+  _invRenderSession(_invState.currentSession);
+}
+
+function _invSetOverride(componentId, val) {
+  const num = parseFloat(val);
+  if (isNaN(num)) {
+    delete _invState._overrides[componentId];
+    return;
+  }
+  _invState._overrides[componentId] = num;
+}
+
+async function applyInventorySession(sessionId) {
+  const recognized = (_invState.currentSession && _invState.currentSession.recognized) || [];
+  const items = [];
+  recognized.forEach(r => {
+    if (!r.component_id) return;
+    if (!_invState._selectedIds.has(r.component_id)) return;
+    const newQty = _invState._overrides[r.component_id] != null
+      ? _invState._overrides[r.component_id]
+      : r.recognized_qty;
+    items.push({ component_id: r.component_id, new_qty: newQty });
+  });
+  if (!items.length) {
+    showToast('Не выбрано ни одной позиции', 'error');
+    return;
+  }
+  if (!confirm('Применить инвентаризацию: ' + items.length + ' позиций? Изменения остатков нельзя будет откатить одним кликом.')) return;
+  const btn = document.getElementById('inv-apply-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/sessions/' + sessionId + '/apply', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ items }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось применить', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    const j = await res.json();
+    showToast('Применено: ' + (j.applied_count || 0) + ' позиций', 'success');
+    await _invLoadSession(sessionId);
+  } catch (e) {
+    showToast('Сеть: не удалось применить', 'error');
+    if (btn) btn.disabled = false;
   }
 }
 
