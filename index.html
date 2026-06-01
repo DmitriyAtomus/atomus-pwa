@@ -10156,15 +10156,47 @@
   }
   .dev-demo-link:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(37,99,235,0.35); }
   .dev-demo-link i { font-size: 15px; }
+  .dev-demo-iframe-wrap {
+    position: relative;
+    margin-top: 8px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #eef0f2;
+  }
+  .dev-demo-iframe-wrap:fullscreen,
+  .dev-demo-iframe-wrap:-webkit-full-screen {
+    border-radius: 0;
+    border: 0;
+    background: #eef0f2;
+    padding: 0;
+  }
   .dev-demo-iframe {
     width: 100%; height: 580px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    margin-top: 8px;
-    background: #eef0f2;
+    border: 0;
     display: block;
+    background: #eef0f2;
+  }
+  .dev-demo-iframe-wrap:fullscreen .dev-demo-iframe,
+  .dev-demo-iframe-wrap:-webkit-full-screen .dev-demo-iframe {
+    width: 100vw; height: 100vh;
   }
   @media (max-width: 700px) { .dev-demo-iframe { height: 420px; } }
+  .dev-demo-fs-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    padding: 7px 11px;
+    border: 0; border-radius: 8px;
+    background: rgba(15,23,42,0.65);
+    color: white; font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s;
+    z-index: 2;
+  }
+  .dev-demo-fs-btn:hover { background: rgba(15,23,42,0.85); }
+  .dev-demo-fs-btn i { font-size: 14px; }
   /* --- files --- */
   .dev-files-drop {
     border: 2px dashed var(--border);
@@ -18304,7 +18336,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.51-3d-viewer-embed";
+const APP_VERSION = "v2.44.52-3d-fullscreen-btn";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46066,7 +46098,26 @@ function _devIsEmbeddableDemoUrl(url) {
 
 function _devDemoEmbedHtml(url) {
   if (!_devIsEmbeddableDemoUrl(url)) return '';
-  return '<iframe src="' + escapeHtml(url) + '" class="dev-demo-iframe" allow="fullscreen"></iframe>';
+  const safeUrl = escapeHtml(url);
+  return '<div class="dev-demo-iframe-wrap">' +
+           '<button class="dev-demo-fs-btn" onclick="_devToggleDemoFullscreen(this)" title="На весь экран">' +
+             '<i class="ti ti-maximize"></i>На весь экран' +
+           '</button>' +
+           '<iframe src="' + safeUrl + '" class="dev-demo-iframe" allowfullscreen allow="fullscreen"></iframe>' +
+         '</div>';
+}
+
+function _devToggleDemoFullscreen(btn) {
+  const wrap = btn.closest('.dev-demo-iframe-wrap');
+  if (!wrap) return;
+  const doc = document;
+  const inFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+  if (inFs) {
+    (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc);
+  } else {
+    const req = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
+    if (req) req.call(wrap);
+  }
 }
 
 function _devUpdateDemoEmbed() {
@@ -46301,7 +46352,11 @@ function _renderPublicDevelopment(token, data) {
       '<div class="public-dev-section">' +
         '<div class="public-dev-section-title"><i class="ti ti-cube"></i>3D-демонстрация</div>' +
         (embedded
-          ? '<iframe src="' + escapeHtml(dev.demo_url) + '" class="dev-demo-iframe" allow="fullscreen"></iframe>'
+          ? '<div class="dev-demo-iframe-wrap">' +
+              '<button class="dev-demo-fs-btn" onclick="_devToggleDemoFullscreen(this)" title="На весь экран">' +
+                '<i class="ti ti-maximize"></i>На весь экран</button>' +
+              '<iframe src="' + escapeHtml(dev.demo_url) + '" class="dev-demo-iframe" allowfullscreen allow="fullscreen"></iframe>' +
+            '</div>'
           : '<a class="public-dev-demo-link" href="' + escapeHtml(dev.demo_url) + '" target="_blank" rel="noopener">' +
               '<i class="ti ti-external-link"></i>Открыть демонстрацию</a>'
         ) +
