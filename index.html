@@ -10006,29 +10006,56 @@
   }
   .ns-bulk-info { color: #7A4A00; flex: 1; }
   .ns-bulk-info b { color: #5C3500; font-weight: 700; }
-  /* v2.44.37: чекбоксы — заметная синяя обводка, видны на белом фоне */
+  /* v2.44.38: кастомный чекбокс — нативная отрисовка ✓ не работала.
+     Прячем нативный input, рисуем box и checkmark через ::before/::after. */
   .ns-check-cell {
     width: 42px !important;
     text-align: center !important;
     padding: 0 !important;
   }
   .ns-check-label {
-    display: inline-flex;
-    align-items: center; justify-content: center;
-    width: 26px; height: 26px;
-    border-radius: 6px;
-    border: 1.5px solid #93C5FD;
-    background: white;
+    position: relative;
+    display: inline-block;
+    width: 24px; height: 24px;
     cursor: pointer;
-    transition: background 0.12s, border-color 0.12s;
   }
-  .ns-check-label:hover { background: #EFF5FF; border-color: #2563EB; }
-  .ns-row-check, #ns-check-all {
+  .ns-check-label input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    width: 100%; height: 100%;
     cursor: pointer;
-    width: 16px; height: 16px;
-    accent-color: #2563EB;
     margin: 0;
   }
+  /* Сама «коробочка» */
+  .ns-check-label::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 6px;
+    border: 2px solid #93C5FD;
+    background: white;
+    transition: background 0.12s, border-color 0.12s;
+    box-sizing: border-box;
+  }
+  .ns-check-label:hover::before { border-color: #2563EB; background: #EFF5FF; }
+  /* Галочка ✓ — рисуем через rotated rectangle */
+  .ns-check-label::after {
+    content: '';
+    position: absolute;
+    left: 7px; top: 3px;
+    width: 7px; height: 12px;
+    border: solid white;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.1s;
+    pointer-events: none;
+  }
+  .ns-check-label:has(input:checked)::before {
+    background: #2563EB;
+    border-color: #2563EB;
+  }
+  .ns-check-label:has(input:checked)::after { opacity: 1; }
   .ns-hint {
     padding: 8px 14px;
     background: #F8FAFD;
@@ -17581,7 +17608,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.37-checkbox-box";
+const APP_VERSION = "v2.44.38-checkmark";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
