@@ -18564,7 +18564,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.58-dev-guest-uploads-remove-notif";
+const APP_VERSION = "v2.44.59-notif-deep-link";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19095,7 +19095,7 @@ function renderNotifModal() {
                 : n.type === 'dev_guest_file' ? 'ti-paperclip'
                 : 'ti-bell';
     const linkAttr = (n.entity_type && n.entity_id)
-      ? 'onclick="onNotifClick(' + n.id + ', \'' + escapeHtml(n.entity_type) + '\', ' + Number(n.entity_id) + ')" style="cursor:pointer;"'
+      ? 'onclick="onNotifClick(' + n.id + ', \'' + escapeHtml(n.entity_type) + '\', ' + Number(n.entity_id) + ', \'' + escapeHtml(n.type || '') + '\')" style="cursor:pointer;"'
       : '';
     html += '<div class="notif-card" ' + linkAttr + '>';
     html += '<div class="notif-card-icon ' + iconCls + '"><i class="ti ' + icon + '"></i></div>';
@@ -19182,7 +19182,7 @@ function closeNotifModalForced() {
   if (state.notif) state.notif.isModalOpen = false;
 }
 
-function onNotifClick(notifId, entityType, entityId) {
+function onNotifClick(notifId, entityType, entityId, notifType) {
   // Сначала ackнем (мягко), потом перейдём на сущность
   ackNotification(notifId);
   if (entityType === 'contract' && entityId) {
@@ -19190,16 +19190,44 @@ function onNotifClick(notifId, entityType, entityId) {
     openContractDetail(entityId);
   } else if (entityType === 'assembly' && entityId) {
     closeNotifModalForced();
-    // Журнал сборок — просто открываем historic с фильтром (упрощ. вариант)
     selectSidebarItem('history');
   } else if (entityType === 'development' && entityId) {
-    // v2.44.58: уведомления по разработкам — открываем нужную карточку
+    // v2.44.58/59: уведомления по разработкам — открываем нужную карточку,
+    // затем скроллим к чату (для сообщений) или к файлам (для загрузок)
     closeNotifModalForced();
     selectSection && selectSection('production');
     setTimeout(() => {
       selectSidebarItem('developments');
-      setTimeout(() => { if (typeof openDevelopment === 'function') openDevelopment(entityId); }, 250);
+      setTimeout(() => {
+        if (typeof openDevelopment === 'function') openDevelopment(entityId);
+        // Скролл и подсветка нужной секции
+        setTimeout(() => _devScrollToTarget(notifType), 700);
+      }, 250);
     }, 80);
+  }
+}
+
+function _devScrollToTarget(notifType) {
+  let selector = null;
+  if (notifType === 'dev_guest_message') {
+    selector = '#dev-chat-messages';
+  } else if (notifType === 'dev_guest_file') {
+    selector = '#dev-files-list';
+  }
+  if (!selector) return;
+  const el = document.querySelector(selector);
+  if (!el) return;
+  try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  catch (_) { el.scrollIntoView(); }
+  // Краткая подсветка
+  const wrap = el.closest('.dev-section') || el;
+  wrap.style.transition = 'box-shadow 0.5s';
+  wrap.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.40), 0 0 0 9999px rgba(15,23,42,0)';
+  setTimeout(() => { wrap.style.boxShadow = ''; }, 1800);
+  // Для чата ещё и фокус в инпут
+  if (notifType === 'dev_guest_message') {
+    const input = document.getElementById('dev-chat-input');
+    if (input) setTimeout(() => input.focus(), 400);
   }
 }
 
