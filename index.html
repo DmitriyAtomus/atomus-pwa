@@ -6882,56 +6882,144 @@
     margin: 0;
   }
 
-  /* ============ ЭТАП 35: дерево групп прайс-листа ZILON ============ */
+  /* ============ ЭТАП 35 / v2.44.23: дерево групп прайс-листа с объёмными карточками ============ */
   .sp-tree-group {
-    margin: 0 18px 10px;
+    margin: 0 18px 12px;
   }
   .sp-tree-subgroup {
-    margin: 6px 0 8px 24px;
+    margin: 8px 0 8px 28px;
+    position: relative;
   }
+  /* Соединительная линия от группы к подгруппе */
+  .sp-tree-subgroup::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 0; bottom: 50%;
+    width: 1px;
+    background: var(--border);
+  }
+  .sp-tree-subgroup::after {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    width: 10px;
+    height: 1px;
+    background: var(--border);
+  }
+
   .sp-tree-toggle {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 12px;
     width: 100%;
     border: 1px solid transparent;
-    border-radius: 10px;
-    padding: 10px 14px;
+    border-radius: 12px;
+    padding: 14px 18px;
     cursor: pointer;
     font-family: inherit;
     text-align: left;
-    transition: background 0.12s, border-color 0.12s;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, background 0.15s;
+    position: relative;
   }
+
+  /* Группа — заметная объёмная карточка с градиентом */
   .sp-tree-toggle.group {
-    background: var(--brand-bg);
-    color: var(--brand);
-    font-size: 14px;
+    background: linear-gradient(135deg, #EFF5FF 0%, #DCE7FA 100%);
+    color: #1E3A8A;
+    font-size: 14.5px;
     font-weight: 600;
+    border-color: rgba(59, 130, 246, 0.15);
+    box-shadow: 0 1px 2px rgba(30, 58, 138, 0.04), 0 2px 6px -2px rgba(30, 58, 138, 0.08);
   }
+  .sp-tree-toggle.group:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px -2px rgba(30, 58, 138, 0.18), 0 2px 4px rgba(30, 58, 138, 0.06);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+  .sp-tree-toggle.group:active { transform: translateY(0); }
+  .sp-tree-toggle.group.open {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  }
+  .sp-tree-toggle.group i.ti-folder {
+    font-size: 18px;
+    color: #2563EB;
+    flex-shrink: 0;
+  }
+  .sp-tree-toggle.group.open i.ti-folder {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Подгруппа — приглушённая, тоньше */
   .sp-tree-toggle.subgroup {
-    background: #f8f9fb;
+    background: white;
     color: var(--text);
     font-size: 13px;
     font-weight: 500;
+    border-color: var(--border);
+    padding: 10px 14px;
+    border-radius: 10px;
   }
-  .sp-tree-toggle:hover { border-color: var(--brand); }
+  .sp-tree-toggle.subgroup:hover {
+    background: #F8FAFD;
+    border-color: rgba(59, 130, 246, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px -2px rgba(0,0,0,0.06);
+  }
+  .sp-tree-toggle.subgroup.open {
+    background: var(--brand-bg);
+    border-color: var(--brand-soft);
+  }
+
   .sp-tree-chev {
     transition: transform 0.2s;
     font-size: 16px;
+    flex-shrink: 0;
+    opacity: 0.7;
   }
   .sp-tree-toggle.open .sp-tree-chev { transform: rotate(90deg); }
-  .sp-tree-toggle > span:first-of-type { flex: 1; }
+  .sp-tree-toggle > span:first-of-type {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .sp-tree-count {
     background: white;
-    color: var(--brand);
-    padding: 2px 10px;
+    color: #2563EB;
+    padding: 3px 12px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(30, 58, 138, 0.08);
+    flex-shrink: 0;
+  }
+  .sp-tree-toggle.group.open .sp-tree-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    box-shadow: none;
   }
   .sp-tree-count.subgroup {
-    background: white;
-    color: var(--text-light);
+    background: var(--bg);
+    color: var(--text-mid);
+    box-shadow: none;
+    font-weight: 600;
   }
-  .sp-tree-body { padding: 4px 0 0; }
+  .sp-tree-body { padding: 6px 0 4px; }
+
+  /* Мобильная адаптация */
+  @media (max-width: 700px) {
+    .sp-tree-group { margin: 0 10px 10px; }
+    .sp-tree-subgroup { margin-left: 18px; }
+    .sp-tree-subgroup::before, .sp-tree-subgroup::after { display: none; }
+    .sp-tree-toggle { padding: 11px 14px; }
+    .sp-tree-toggle.group { font-size: 13.5px; padding: 12px 14px; }
+    .sp-tree-toggle.subgroup { font-size: 12.5px; padding: 9px 12px; }
+    .sp-tree-toggle.group i.ti-folder { font-size: 16px; }
+  }
   .sp-tree-items { padding: 4px 0 0 0; }
   .sp-tree-item {
     display: flex; align-items: center; gap: 12px;
@@ -17168,7 +17256,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.22-done-collapse";
+const APP_VERSION = "v2.44.23-pretty-groups";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
