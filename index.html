@@ -17378,7 +17378,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.27-no-categories-nav";
+const APP_VERSION = "v2.44.28-no-supply-link";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37182,13 +37182,7 @@ async function openComponentForm(componentId) {
       cache.supplyCatalog = dCat.items || dCat.supply_items || [];
     } catch (e) { cache.supplyCatalog = []; }
   }
-  const supplyItems = (cache.supplyCatalog || []).filter(si => si.is_active !== 0);
-  const siOptions = '<option value="">— Не связано —</option>' +
-    supplyItems.map(si =>
-      '<option value="' + si.id + '"' +
-      (c && c.supply_item_id === si.id ? ' selected' : '') + '>' +
-      escapeHtml(si.name) + ' (' + escapeHtml(si.unit || 'шт.') + ')</option>'
-    ).join('');
+  // v2.44.27: siOptions больше не нужны — dropdown «Связь со снабжением» убран из формы
 
   // v2.43.87: модалка с max-height + flex-column, тело внутри прокручивается
   m.innerHTML =
@@ -37247,9 +37241,10 @@ async function openComponentForm(componentId) {
         '</div>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
-        // ЭТАП 28.3.1: связь с позицией Снабжения (для прозрачной кнопки «Заказать»)
-        '<label class="form-label">Связь со снабжением <span style="color:var(--text-light);font-weight:400;font-size:11px;">(необязательно — для авто-создания заявок)</span></label>' +
-        '<select id="cf-supply-item" class="form-input" style="margin-bottom:14px;">' + siOptions + '</select>' +
+        // v2.44.27: «Связь со снабжением» убрана из UI — путала пользователя
+        // (выпадающий список показывал кучу непонятных позиций). Поле в БД
+        // остаётся, можно проставить через PATCH /api/components/{id} если нужно.
+        '<input type="hidden" id="cf-supply-item" value="' + ((c && c.supply_item_id) || '') + '">' +
         '<label class="form-label">Комментарий</label>' +
         '<textarea id="cf-comment" class="form-input" rows="2" style="resize:vertical;">' + escapeHtml((c && c.comment) || '') + '</textarea>' +
       '</div>' +
