@@ -9995,6 +9995,18 @@
     border-radius: 6px;
     font-size: 11px;
   }
+  /* v2.44.35: bulk-action bar в группе «без поставщика» */
+  .ns-bulk-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: #FEF3E2;
+    border-top: 1px solid #FBC97A;
+    border-bottom: 1px solid #FBC97A;
+    font-size: 13px;
+  }
+  .ns-bulk-info { color: #7A4A00; flex: 1; }
+  .ns-bulk-info b { color: #5C3500; font-weight: 700; }
+  .ns-row-check, #ns-check-all { cursor: pointer; width: 16px; height: 16px; }
 
   /* v2.44.31: чипы выбранных целевых моделей для ТЭНа */
   .cf-tm-chip {
@@ -17538,7 +17550,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.34-assign-supplier";
+const APP_VERSION = "v2.44.35-bulk-assign";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -41462,6 +41474,17 @@ function renderSupplyShopping(d) {
     return;
   }
   let html = '';
+  // v2.44.35: selection state для bulk-assign в группе «не назначен»
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  // Чистим невалидные id (если строка ушла после прошлого назначения)
+  const allNoSupIds = new Set();
+  groups.forEach(g => {
+    if (!g.supplier_id) (g.items || []).forEach(it => allNoSupIds.add(it.component_id));
+  });
+  Array.from(window._noSupSelected).forEach(id => {
+    if (!allNoSupIds.has(id)) window._noSupSelected.delete(id);
+  });
+
   groups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
@@ -41472,12 +41495,17 @@ function renderSupplyShopping(d) {
       const critBadge = it.is_critical
         ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>'
         : '';
-      // v2.44.34: в группе «не назначен» — кнопка «Назначить поставщика» на каждой строке
+      // v2.44.34: в группе «не назначен» — кнопка «Назначить поставщика» + чекбокс
+      const checkCell = noSupplier
+        ? '<td style="width:36px;text-align:center;"><input type="checkbox" class="ns-row-check" data-cid="' + it.component_id + '"' +
+            (window._noSupSelected.has(it.component_id) ? ' checked' : '') +
+            ' onclick="onNoSupRowCheck(this)"></td>'
+        : '';
       const assignCell = noSupplier
         ? '<td><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
             '<i class="ti ti-truck"></i>Поставщик</button></td>'
         : '';
-      return '<tr>' +
+      return '<tr>' + checkCell +
         '<td>' + critBadge + escapeHtml(it.component_name) +
           (it.sku ? '<span style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
         '</td>' +
@@ -41515,8 +41543,27 @@ function renderSupplyShopping(d) {
           '</div>'
         : ''
       ) +
+      // v2.44.35: bulk-action bar для группы без поставщика
+      (noSupplier
+        ? '<div class="ns-bulk-bar" id="ns-bulk-bar" style="' +
+            (window._noSupSelected && window._noSupSelected.size > 0 ? '' : 'display:none;') + '">' +
+            '<span class="ns-bulk-info">Выбрано <b id="ns-bulk-count">' +
+              (window._noSupSelected ? window._noSupSelected.size : 0) + '</b> ' +
+              '<span id="ns-bulk-word">' + _plural(window._noSupSelected ? window._noSupSelected.size : 0, ['позиция','позиции','позиций']) + '</span>' +
+            '</span>' +
+            '<button class="btn btn-primary btn-sm" onclick="bulkAssignSupplier()">' +
+              '<i class="ti ti-truck"></i>Назначить поставщика всем</button>' +
+            '<button class="btn btn-secondary btn-sm" onclick="clearNoSupSelection()">' +
+              '<i class="ti ti-x"></i>Снять выбор</button>' +
+          '</div>'
+        : ''
+      ) +
       '<table class="sup-shop-table">' +
         '<thead><tr>' +
+          (noSupplier
+            ? '<th style="width:36px;text-align:center;"><input type="checkbox" id="ns-check-all" onclick="onNoSupCheckAll(this)" title="Выбрать все"></th>'
+            : ''
+          ) +
           '<th>Позиция</th>' +
           '<th style="text-align:right;width:120px;">остаток / мин.</th>' +
           '<th style="text-align:right;width:140px;">Заказать</th>' +
@@ -41533,6 +41580,134 @@ function renderSupplyShopping(d) {
 async function exportSupplierShoppingDocx(supplierId) {
   // Заглушка пока — реализация в следующем шаге
   showToast('Экспорт DOCX будет добавлен в следующем шаге', 'info');
+}
+
+// v2.44.35: bulk-выбор и назначение поставщика на N позиций сразу
+function onNoSupRowCheck(checkbox) {
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  const cid = parseInt(checkbox.dataset.cid, 10);
+  if (checkbox.checked) window._noSupSelected.add(cid);
+  else window._noSupSelected.delete(cid);
+  _refreshNoSupBulkBar();
+}
+
+function onNoSupCheckAll(headerCheck) {
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  const visible = document.querySelectorAll('.ns-row-check');
+  visible.forEach(cb => {
+    cb.checked = headerCheck.checked;
+    const cid = parseInt(cb.dataset.cid, 10);
+    if (headerCheck.checked) window._noSupSelected.add(cid);
+    else window._noSupSelected.delete(cid);
+  });
+  _refreshNoSupBulkBar();
+}
+
+function _refreshNoSupBulkBar() {
+  const bar = document.getElementById('ns-bulk-bar');
+  const count = window._noSupSelected ? window._noSupSelected.size : 0;
+  if (!bar) return;
+  bar.style.display = count > 0 ? '' : 'none';
+  const cntEl = document.getElementById('ns-bulk-count');
+  if (cntEl) cntEl.textContent = count;
+  const wrdEl = document.getElementById('ns-bulk-word');
+  if (wrdEl) wrdEl.textContent = _plural(count, ['позиция','позиции','позиций']);
+}
+
+function clearNoSupSelection() {
+  if (window._noSupSelected) window._noSupSelected.clear();
+  document.querySelectorAll('.ns-row-check').forEach(cb => { cb.checked = false; });
+  const headerCheck = document.getElementById('ns-check-all');
+  if (headerCheck) headerCheck.checked = false;
+  _refreshNoSupBulkBar();
+}
+
+async function bulkAssignSupplier() {
+  const ids = Array.from(window._noSupSelected || []);
+  if (!ids.length) return;
+
+  if (!cache.suppliers || !cache.suppliers.length) {
+    try {
+      const r = await apiGet('/api/suppliers');
+      cache.suppliers = r.suppliers || [];
+    } catch (e) { cache.suppliers = []; }
+  }
+  const suppliers = (cache.suppliers || []).filter(s => s.is_active !== 0);
+
+  let modal = document.getElementById('bulk-assign-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'bulk-assign-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+    modal.innerHTML = '<div class="modal" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-truck"></i> Назначить поставщика <span id="bulk-assign-count" style="color:var(--text-light);font-weight:400;font-size:13px;"></span></h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'bulk-assign-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 16px;">' +
+        '<input type="text" id="bulk-asgn-search" class="form-input" placeholder="Поиск по названию…" autocomplete="off" oninput="filterBulkAssignList(this.value)">' +
+      '</div>' +
+      '<div id="bulk-asgn-list" style="flex:1;overflow-y:auto;padding:0 8px 8px;"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+  document.getElementById('bulk-assign-count').textContent = '— ' + ids.length + ' ' + _plural(ids.length, ['позиции','позициям','позициям']);
+  window._bulkAssignAll = suppliers;
+  filterBulkAssignList('');
+  modal.classList.add('visible');
+  setTimeout(() => {
+    const s = document.getElementById('bulk-asgn-search');
+    if (s) { s.value = ''; s.focus(); }
+  }, 50);
+}
+
+function filterBulkAssignList(query) {
+  const list = document.getElementById('bulk-asgn-list');
+  if (!list) return;
+  const q = (query || '').trim().toLowerCase();
+  const all = window._bulkAssignAll || [];
+  const filtered = q ? all.filter(s => (s.name || '').toLowerCase().includes(q)) : all;
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-block" style="padding:18px;text-align:center;color:var(--text-light);">' +
+      (q ? 'Ничего не нашлось' : 'Список поставщиков пуст') + '</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(s =>
+    '<button type="button" class="sup-pick-row" onclick="doBulkAssign(' + s.id + ')">' +
+      '<i class="ti ti-truck"></i>' +
+      '<span class="sup-pick-name">' + escapeHtml(s.name || '—') + '</span>' +
+      (s.inn ? '<span class="sup-pick-inn">ИНН ' + escapeHtml(s.inn) + '</span>' : '') +
+    '</button>'
+  ).join('');
+}
+
+async function doBulkAssign(supplierId) {
+  const ids = Array.from(window._noSupSelected || []);
+  if (!ids.length) return;
+  const modal = document.getElementById('bulk-assign-modal');
+  if (modal) modal.classList.remove('visible');
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  let ok = 0, fail = 0;
+  for (const cid of ids) {
+    try {
+      const r = await fetch(API_BASE + '/api/components/' + cid, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_supplier_id: supplierId }),
+      });
+      if (r.ok) ok++;
+      else fail++;
+    } catch (_) { fail++; }
+  }
+  showToast(
+    'Поставщик назначен на ' + ok + ' ' + _plural(ok, ['позицию','позиции','позиций']) +
+    (fail ? ' (ошибок ' + fail + ')' : ''),
+    fail ? 'error' : 'success'
+  );
+  window._noSupSelected.clear();
+  loadSupplyShopping();
 }
 
 // v2.44.34: назначить поставщика компоненту прямо из «Что закупить»
