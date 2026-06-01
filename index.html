@@ -1495,37 +1495,119 @@
   /* KPI используют те же стили .fp-kpi-row / .fp-kpi и тоны */
   .pt-ai {
     margin: 4px 18px 14px;
-    padding: 12px 14px;
-    background: #EEEDFE;
-    border: 1px solid #CECBF6;
-    border-radius: 8px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #FEF3E2 0%, #FFE7CC 100%);
+    border: 1px solid #FBC97A;
+    border-radius: 12px;
     display: flex;
-    gap: 10px;
-    align-items: center;
-    color: #3C3489;
+    gap: 12px;
+    align-items: flex-start;
+    color: #7A4A00;
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.5;
+    box-shadow: 0 2px 8px -2px rgba(217, 119, 6, 0.15);
   }
-  .pt-ai .ti-sparkles { color: #534AB7; font-size: 18px; flex-shrink: 0; }
-  .pt-ai-body { flex: 1; }
-  .pt-ai-body b { color: #1F1A6B; }
+  .pt-ai .ti-sparkles { color: #D97706; font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+  .pt-ai-body { flex: 1; min-width: 0; }
+  .pt-ai-body b { color: #5C3500; font-weight: 600; }
   .pt-ai .btn { white-space: nowrap; flex-shrink: 0; }
-  .pt-ai.empty { background: var(--bg); border-color: var(--border); color: var(--text-light); }
+  .pt-ai.empty { background: var(--bg); border-color: var(--border); color: var(--text-light); box-shadow: none; }
   .pt-ai.empty .ti-sparkles { color: var(--text-light); }
+
+  /* v2.44.26: подробный baner с explainer */
+  .pt-ai-title {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 13.5px;
+    margin-bottom: 10px;
+  }
+  .pt-ai-title > span { flex: 1; min-width: 0; }
+  .pt-ai-how {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(217, 119, 6, 0.35);
+    color: #7A4A00;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: inherit;
+    font-weight: 500;
+    transition: background 0.12s;
+  }
+  .pt-ai-how:hover { background: white; }
+  .pt-ai-how i { font-size: 13px; }
+  .pt-ai-how.open i { transform: rotate(180deg); }
+  .pt-ai-explanation {
+    display: none;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(217, 119, 6, 0.25);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #5C3500;
+  }
+  .pt-ai-explanation.open { display: block; }
+  .pt-ai-explanation code {
+    background: rgba(217, 119, 6, 0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+
+  .pt-ai-items {
+    display: flex; flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .pt-ai-item {
+    background: rgba(255, 255, 255, 0.65);
+    border-radius: 8px;
+    padding: 8px 10px;
+    border-left: 3px solid #D97706;
+  }
+  .pt-ai-item-head {
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pt-ai-item-name {
+    font-weight: 600; color: #3D2400;
+  }
+  .pt-ai-item-need {
+    margin-left: auto;
+    font-size: 12px;
+    color: #7A4A00;
+    white-space: nowrap;
+  }
+  .pt-ai-item-why {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #7A4A00;
+    display: flex; align-items: flex-start; gap: 4px;
+    padding-left: 4px;
+  }
+  .pt-ai-rest {
+    font-size: 12px;
+    color: #7A4A00;
+    padding: 6px 10px;
+    font-style: italic;
+  }
+
   @media (max-width: 760px) {
     .pt-ai {
-      align-items: flex-start;
-      gap: 8px;
+      gap: 10px;
       padding: 12px;
-      font-size: 12px;
+      font-size: 12.5px;
     }
-    .pt-ai-body { min-width: 0; }
     .pt-ai .btn {
       width: 100%;
       justify-content: center;
       white-space: normal;
-      margin-top: 8px;
+      margin-top: 6px;
     }
+    .pt-ai-item-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .pt-ai-item-need { margin-left: 0; white-space: normal; }
   }
 
   .pt-chips {
@@ -17299,7 +17381,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.25-chips-global";
+const APP_VERSION = "v2.44.26-shortage-why";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -39441,24 +39523,61 @@ function _renderPtAiHint(d) {
     return;
   }
 
-  // Топ-3 по нехватке для текста (остальные — общим счётом)
+  // Топ-3 по нехватке для подробного блока, остальные общим счётом
   const top = shortage.slice(0, 3);
   const rest = shortage.length - top.length;
 
-  const parts = top.map(s =>
-    '<b>' + escapeHtml(s.component_name) + '</b> ' +
-    '(нужно ' + _fmtNum(s.need) + ', есть ' + _fmtNum(s.have) +
-    (s.unit && s.unit !== 'шт.' ? ' ' + escapeHtml(s.unit) : '') + ')'
-  );
+  // v2.44.26: каждый дефицитный компонент — отдельной строкой
+  // с пояснением «для каких моделей»
+  const itemsHtml = top.map(s => {
+    const unit = s.unit && s.unit !== 'шт.' ? ' ' + escapeHtml(s.unit) : ' шт';
+    const models = (s.models || []).filter(Boolean);
+    const modelsHtml = models.length
+      ? '<div class="pt-ai-item-why"><i class="ti ti-arrow-right" style="font-size:11px;"></i>нужен для: <b>' +
+          models.map(escapeHtml).join(', ') +
+        '</b></div>'
+      : '';
+    const critIcon = s.is_critical
+      ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>'
+      : '';
+    return '<div class="pt-ai-item">' +
+        '<div class="pt-ai-item-head">' +
+          critIcon +
+          '<span class="pt-ai-item-name">' + escapeHtml(s.component_name) + '</span>' +
+          '<span class="pt-ai-item-need">нужно <b>' + _fmtNum(s.need) + unit + '</b> · есть <b>' + _fmtNum(s.have) + '</b>' +
+            ' · <span style="color:#DC2626;font-weight:600;">не хватает ' + _fmtNum(s.shortage) + unit + '</span>' +
+          '</span>' +
+        '</div>' +
+        modelsHtml +
+      '</div>';
+  }).join('');
 
-  // Сериализуем shortage в data-атрибут, чтобы кнопка могла создать заявки разом
+  // Сериализуем shortage в data-атрибут для batch-кнопки
   const shortagePayload = JSON.stringify(shortage).replace(/"/g, '&quot;');
 
   body.innerHTML =
-    '<div style="margin-bottom:8px;">Под текущий план производства не хватит: ' +
-      parts.join(', ') +
-      (rest > 0 ? ', и ещё <b>' + rest + '</b> ' + _plural(rest, ['позиция', 'позиции', 'позиций']) : '') +
-      '.' +
+    '<div class="pt-ai-title">' +
+      '<i class="ti ti-alert-triangle" style="color:#D97706;"></i>' +
+      '<span>Под текущий план производства не хватит <b>' + shortage.length + '</b> ' +
+        _plural(shortage.length, ['позиции', 'позиций', 'позиций']) + '</span>' +
+      '<button class="pt-ai-how" type="button" onclick="this.parentNode.nextElementSibling.classList.toggle(\'open\'); this.classList.toggle(\'open\');">' +
+        '<i class="ti ti-help-circle"></i> Как считается?' +
+      '</button>' +
+    '</div>' +
+    '<div class="pt-ai-explanation">' +
+      '<div><b>Логика расчёта:</b></div>' +
+      '<ol style="margin:6px 0 0 18px; padding:0; line-height:1.55;">' +
+        '<li>Беру все договоры в статусах <i>в производстве / готов / частично отгружен</i>.</li>' +
+        '<li>Для каждой позиции считаю «осталось произвести» = qty договора − уже собранные сборки (in_progress / ready / shipped).</li>' +
+        '<li>Раскрываю по BOM модели: <code>осталось × qty_required</code> = потребность по каждому компоненту.</li>' +
+        '<li>Считаю дефицит: <code>потребность − qty_on_stock</code>. Резервы под другие работы не учитываются (только физический склад).</li>' +
+      '</ol>' +
+    '</div>' +
+    '<div class="pt-ai-items">' + itemsHtml +
+      (rest > 0
+        ? '<div class="pt-ai-rest">и ещё <b>' + rest + '</b> ' + _plural(rest, ['позиция', 'позиции', 'позиций']) + ' — раскрой кнопкой ниже</div>'
+        : ''
+      ) +
     '</div>' +
     '<button class="btn btn-secondary btn-small" ' +
             'onclick="openPtShortageBatchOrder(this)" ' +
