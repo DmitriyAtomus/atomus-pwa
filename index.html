@@ -9916,6 +9916,36 @@
   }
 
   /* Тоггл "Сталь / AISI" в форме */
+  /* v2.44.29: модал выбора поставщика — кликабельный список */
+  .sup-pick-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: transform 0.1s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+  }
+  .sup-pick-row:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: #F8FAFD;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px -2px rgba(0,0,0,0.08);
+  }
+  .sup-pick-row.active {
+    border-color: var(--brand);
+    background: var(--brand-soft);
+  }
+  .sup-pick-row > i.ti-truck { color: var(--brand); font-size: 18px; flex-shrink: 0; }
+  .sup-pick-name { flex: 1; font-size: 13.5px; color: var(--text-dark); font-weight: 500; }
+  .sup-pick-inn { font-size: 11.5px; color: var(--text-light); font-family: ui-monospace, Menlo, monospace; }
+
   .exec-toggle {
     display: flex; gap: 8px;
   }
@@ -17378,7 +17408,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.28-no-supply-link";
+const APP_VERSION = "v2.44.29-supplier-picker";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37218,14 +37248,17 @@ async function openComponentForm(componentId) {
             ((c && c.execution_type === 'stainless') ? ' checked' : '') + '> ' +
             '<span><i class="ti ti-shield"></i> AISI (нержавейка)</span></label>' +
         '</div>' +
-        '<label class="form-label">Основной поставщик <span style="color:var(--text-light);font-weight:400;font-size:11px;">(можно искать по названию)</span></label>' +
+        '<label class="form-label">Основной поставщик</label>' +
         '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:stretch;">' +
           '<input type="text" id="cf-supplier-name" list="cf-suppliers-dl" class="form-input" ' +
-            'style="flex:1;margin:0;" placeholder="Начни вводить название…" ' +
+            'style="flex:1;margin:0;" placeholder="Начни вводить название или нажми 🔍" ' +
             'value="' + escapeHtml(curSupName) + '" ' +
-            'oninput="onComponentSupplierChange()">' +
+            'oninput="onComponentSupplierChange()" ' +
+            'onclick="openSupplierPickerModal()" readonly>' +
           '<datalist id="cf-suppliers-dl">' + supDatalist + '</datalist>' +
           '<input type="hidden" id="cf-supplier" value="' + (curSupId || '') + '">' +
+          '<button type="button" class="btn btn-primary" onclick="openSupplierPickerModal()" ' +
+            'title="Выбрать поставщика из списка"><i class="ti ti-search"></i></button>' +
           '<button type="button" class="btn btn-secondary" id="cf-sup-open-btn" ' +
             'onclick="openSupplierFromComponent()" ' +
             'title="Открыть карточку поставщика"' +
@@ -37293,6 +37326,92 @@ function onComponentSupplierChange() {
     btn.style.opacity = hasValue ? '' : '0.5';
     btn.style.cursor = hasValue ? '' : 'not-allowed';
   }
+}
+
+// v2.44.29: модал выбора поставщика — кликабельный список с поиском.
+// Срабатывает по клику на input или на лупу.
+async function openSupplierPickerModal() {
+  // Гарантируем что cache.suppliers подгружен
+  if (!cache.suppliers || !cache.suppliers.length) {
+    try {
+      const r = await apiGet('/api/suppliers');
+      cache.suppliers = r.suppliers || [];
+    } catch (e) { cache.suppliers = []; }
+  }
+  const suppliers = (cache.suppliers || []).filter(s => s.is_active !== 0);
+
+  let modal = document.getElementById('sup-picker-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'sup-picker-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+    modal.innerHTML = '<div class="modal" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-truck"></i> Выбрать поставщика</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'sup-picker-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 16px;">' +
+        '<input type="text" id="sup-picker-search" class="form-input" placeholder="Поиск по названию…" autocomplete="off" oninput="filterSupplierPicker(this.value)">' +
+      '</div>' +
+      '<div id="sup-picker-list" style="flex:1;overflow-y:auto;padding:0 8px 8px;"></div>' +
+    '</div>';
+    document.body.appendChild(modal);
+  }
+
+  // Сохраняем суплаеров для фильтра + рендерим
+  window._supPickerAll = suppliers;
+  filterSupplierPicker('');
+  modal.classList.add('visible');
+  setTimeout(() => {
+    const s = document.getElementById('sup-picker-search');
+    if (s) { s.value = ''; s.focus(); }
+  }, 50);
+}
+
+function filterSupplierPicker(query) {
+  const list = document.getElementById('sup-picker-list');
+  if (!list) return;
+  const q = (query || '').trim().toLowerCase();
+  const all = window._supPickerAll || [];
+  const filtered = q
+    ? all.filter(s => (s.name || '').toLowerCase().includes(q))
+    : all;
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-block" style="padding:18px;text-align:center;color:var(--text-light);">' +
+      (q ? 'Ничего не нашлось' : 'Список поставщиков пуст') + '</div>';
+    return;
+  }
+
+  const curHidden = document.getElementById('cf-supplier');
+  const curId = curHidden ? curHidden.value : '';
+  list.innerHTML = filtered.map(s => {
+    const isActive = String(s.id) === String(curId);
+    return '<button type="button" class="sup-pick-row' + (isActive ? ' active' : '') + '" ' +
+      'onclick="pickSupplierFromPicker(' + s.id + ', ' + JSON.stringify(s.name).replace(/"/g, '&quot;') + ')">' +
+      '<i class="ti ti-truck"></i>' +
+      '<span class="sup-pick-name">' + escapeHtml(s.name || '—') + '</span>' +
+      (s.inn ? '<span class="sup-pick-inn">ИНН ' + escapeHtml(s.inn) + '</span>' : '') +
+      (isActive ? '<i class="ti ti-check" style="margin-left:auto;color:var(--brand);"></i>' : '') +
+    '</button>';
+  }).join('');
+}
+
+function pickSupplierFromPicker(supplierId, supplierName) {
+  const nameInp = document.getElementById('cf-supplier-name');
+  const hidden = document.getElementById('cf-supplier');
+  if (nameInp) nameInp.value = supplierName || '';
+  if (hidden) hidden.value = String(supplierId);
+  // Кнопка «Открыть карточку» становится активной
+  const btn = document.getElementById('cf-sup-open-btn');
+  if (btn) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+  }
+  const modal = document.getElementById('sup-picker-modal');
+  if (modal) modal.classList.remove('visible');
 }
 
 async function openSupplierFromComponent() {
