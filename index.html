@@ -10292,6 +10292,219 @@
   }
   .dev-new-field textarea { min-height: 70px; resize: vertical; }
   .dev-new-field input:focus, .dev-new-field textarea:focus { border-color: rgba(37,99,235,0.5); }
+  /* Участники + кнопка-ссылка в заголовке */
+  .dev-link-btn {
+    margin-left: auto;
+    padding: 3px 9px;
+    border: 0; background: rgba(37,99,235,0.10);
+    color: var(--brand); font-size: 11px; font-weight: 600;
+    border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+    text-transform: none; letter-spacing: 0;
+  }
+  .dev-link-btn:hover { background: rgba(37,99,235,0.18); }
+  .dev-participants-list { display: flex; flex-direction: column; gap: 6px; }
+  .dev-participant-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .dev-participant-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 700; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .dev-participant-info { flex: 1; min-width: 0; }
+  .dev-participant-name { font-size: 13.5px; font-weight: 500; color: var(--text-dark); }
+  .dev-participant-meta { font-size: 11.5px; color: var(--text-light); display: flex; gap: 8px; }
+  .dev-participant-meta a {
+    color: var(--brand); text-decoration: none;
+  }
+  /* Модалка приглашения */
+  .dev-invite-modal-body {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .dev-invite-link-row {
+    display: flex; gap: 6px;
+  }
+  .dev-invite-link-row input {
+    flex: 1;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12.5px;
+    background: var(--bg);
+    color: var(--text-dark);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .dev-invite-copy-btn {
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 600; font-size: 13px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    box-shadow: 0 2px 6px rgba(37,99,235,0.25);
+  }
+  .dev-invite-copy-btn:hover { box-shadow: 0 4px 10px rgba(37,99,235,0.35); }
+  .dev-invite-explain {
+    font-size: 12.5px; color: var(--text-light); line-height: 1.5;
+    background: rgba(37,99,235,0.05);
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+  .dev-invite-explain b { color: var(--text-mid); }
+  .dev-invite-participants-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); font-weight: 600;
+  }
+  /* Публичная страница разработки */
+  .public-dev-page {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #F4F6FB, #E8ECF5 80%);
+    padding: 24px 16px 48px;
+  }
+  .public-dev-card {
+    max-width: 720px; margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .public-dev-head {
+    padding: 22px 26px 18px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white;
+  }
+  .public-dev-head .public-brand {
+    font-size: 12px; opacity: 0.85;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .public-dev-head h1 {
+    font-size: 22px; margin: 0 0 4px; font-weight: 700;
+  }
+  .public-dev-head .public-dev-tagline {
+    font-size: 13px; opacity: 0.88;
+  }
+  .public-dev-body { padding: 22px 26px 26px; }
+  .public-dev-section { margin-bottom: 22px; }
+  .public-dev-section-title {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .public-dev-section-title i { color: var(--brand); font-size: 13px; }
+  .public-dev-desc {
+    font-size: 14px; color: var(--text-mid); line-height: 1.55;
+    white-space: pre-wrap;
+  }
+  .public-dev-demo-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 600; font-size: 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    box-shadow: 0 4px 10px rgba(37,99,235,0.25);
+  }
+  .public-dev-file-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    text-decoration: none;
+    color: var(--text-dark);
+  }
+  .public-dev-file-row:hover { background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .public-dev-reg-form {
+    background: var(--bg);
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 22px;
+  }
+  .public-dev-reg-form-title {
+    font-size: 15px; font-weight: 600; color: var(--text-dark); margin-bottom: 10px;
+  }
+  .public-dev-reg-form input {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 14px;
+    margin-bottom: 8px;
+    outline: 0;
+  }
+  .public-dev-reg-form input:focus { border-color: rgba(37,99,235,0.5); }
+  .public-dev-reg-form button {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 600; font-size: 14px;
+    border: 0; border-radius: 9px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(37,99,235,0.25);
+  }
+  .public-dev-reg-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .public-dev-reg-form .public-reg-hello {
+    color: var(--text-light); font-size: 12.5px; margin-top: 6px;
+  }
+  .public-dev-chat {
+    background: var(--bg); border-radius: 10px; padding: 12px;
+    max-height: 360px; overflow-y: auto;
+    margin-bottom: 10px;
+  }
+  .public-dev-chat-empty {
+    text-align: center; color: var(--text-light); font-size: 13px;
+    padding: 14px 4px;
+  }
+  .public-dev-chat-msg {
+    background: white;
+    padding: 9px 11px;
+    border-radius: 9px;
+    margin-bottom: 6px;
+    font-size: 13.5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .public-dev-chat-msg.is-mine {
+    background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(124,58,237,0.05));
+  }
+  .public-dev-chat-msg-head {
+    font-size: 11px; color: var(--text-light);
+    margin-bottom: 2px;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .public-dev-chat-msg-head .public-dev-chat-author {
+    color: var(--brand); font-weight: 600;
+  }
+  .public-dev-chat-input-row {
+    display: flex; gap: 8px; align-items: stretch;
+  }
+  .public-dev-chat-input-row textarea {
+    flex: 1; min-height: 40px; max-height: 120px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 13.5px;
+    resize: none;
+    font-family: inherit;
+    outline: 0;
+  }
+  .public-dev-chat-input-row textarea:focus { border-color: rgba(37,99,235,0.5); }
+  .public-dev-chat-input-row button {
+    padding: 0 16px;
+    border: 0; border-radius: 9px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 600; font-size: 13px;
+    cursor: pointer;
+  }
 
   /* v2.44.40: интерактивный гайд с подсветкой элементов */
   .tour-overlay {
@@ -18015,7 +18228,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.47-dev-auth-fix";
+const APP_VERSION = "v2.44.48-dev-invite";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45226,6 +45439,7 @@ const _devState = {
   current: null,
   files: [],
   messages: [],
+  participants: [],
   _saveTimer: null,
   _chatPollTimer: null,
 };
@@ -45332,6 +45546,8 @@ function renderDevelopmentDetail(dev) {
         '</div>' +
       '</div>' +
       '<div class="dev-detail-head-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="openDevInviteModal()" title="Пригласить на участие">' +
+          '<i class="ti ti-user-plus"></i><span class="dev-btn-label"> Пригласить</span></button>' +
         '<button class="icon-btn" onclick="deleteCurrentDevelopment()" title="Удалить разработку">' +
           '<i class="ti ti-trash"></i></button>' +
       '</div>' +
@@ -45370,6 +45586,15 @@ function renderDevelopmentDetail(dev) {
         '</div>' +
         '<div class="dev-files-list" id="dev-files-list"></div>' +
       '</div>' +
+      // Участники (приглашённые)
+      '<div class="dev-section" id="dev-participants-section" style="display:none;">' +
+        '<div class="dev-section-title">' +
+          '<i class="ti ti-users"></i>Приглашённые участники' +
+          '<button class="dev-link-btn" onclick="openDevInviteModal()" title="Скопировать ссылку приглашения">' +
+            '<i class="ti ti-share"></i>Ссылка</button>' +
+        '</div>' +
+        '<div class="dev-participants-list" id="dev-participants-list"></div>' +
+      '</div>' +
       // Чат
       '<div class="dev-section">' +
         '<div class="dev-section-title"><i class="ti ti-message-circle"></i>Обсуждение</div>' +
@@ -45389,6 +45614,142 @@ function renderDevelopmentDetail(dev) {
   _setupDevDropZone();
   renderDevelopmentFiles();
   renderDevelopmentMessages();
+  // подгрузить список участников и показать, если кто-то уже регнулся
+  loadDevelopmentParticipants();
+}
+
+async function loadDevelopmentParticipants() {
+  if (!_devState.currentId) return;
+  try {
+    const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId + '/participants', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) return;
+    const j = await res.json();
+    _devState.participants = j.items || [];
+    renderDevelopmentParticipants();
+  } catch (_) {}
+}
+
+function renderDevelopmentParticipants() {
+  const section = document.getElementById('dev-participants-section');
+  const list    = document.getElementById('dev-participants-list');
+  if (!section || !list) return;
+  const items = _devState.participants || [];
+  if (!items.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  list.innerHTML = items.map(p => {
+    const initials = (p.name || '?').trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase();
+    const phoneHtml = p.phone
+      ? '<span><i class="ti ti-phone" style="font-size:11px;"></i><a href="tel:' + escapeHtml(p.phone) + '">' + escapeHtml(p.phone) + '</a></span>'
+      : '';
+    return '<div class="dev-participant-row">' +
+      '<div class="dev-participant-avatar">' + escapeHtml(initials || '?') + '</div>' +
+      '<div class="dev-participant-info">' +
+        '<div class="dev-participant-name">' + escapeHtml(p.name) + '</div>' +
+        '<div class="dev-participant-meta">' +
+          phoneHtml +
+          '<span><i class="ti ti-clock" style="font-size:11px;"></i>' + escapeHtml(_devFormatDate(p.joined_at)) + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function openDevInviteModal() {
+  if (!_devState.currentId) return;
+  // 1) получаем (или создаём) public_token
+  let token = _devState.current && _devState.current.public_token;
+  if (!token) {
+    try {
+      const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId + '/invite', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      });
+      if (!res.ok) { showToast('Не удалось создать приглашение', 'error'); return; }
+      const j = await res.json();
+      token = j.public_token;
+      if (_devState.current) _devState.current.public_token = token;
+    } catch (e) { showToast('Сеть: не удалось создать приглашение', 'error'); return; }
+  }
+  const inviteUrl = window.location.origin + '/dev/' + token;
+
+  // 2) Перезагрузим участников, чтобы показать актуальный список
+  await loadDevelopmentParticipants();
+  const participants = _devState.participants || [];
+  const participantsHtml = participants.length
+    ? participants.map(p => {
+        const initials = (p.name || '?').trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase();
+        return '<div class="dev-participant-row">' +
+          '<div class="dev-participant-avatar">' + escapeHtml(initials) + '</div>' +
+          '<div class="dev-participant-info">' +
+            '<div class="dev-participant-name">' + escapeHtml(p.name) + '</div>' +
+            '<div class="dev-participant-meta">' +
+              (p.phone ? '<span><i class="ti ti-phone" style="font-size:11px;"></i>' + escapeHtml(p.phone) + '</span>' : '') +
+              '<span><i class="ti ti-clock" style="font-size:11px;"></i>' + escapeHtml(_devFormatDate(p.joined_at)) + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('')
+    : '<div style="color:var(--text-light);font-size:13px;padding:10px;text-align:center;">Пока никто не присоединился</div>';
+
+  const overlayId = 'dev-invite-modal';
+  let m = document.getElementById(overlayId);
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay';
+  m.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-user-plus"></i> Пригласить на участие</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="dev-invite-modal-body">' +
+          '<div class="dev-invite-explain">' +
+            '<b>Как это работает:</b> отправь ссылку коллеге, заказчику или любому, кого хочешь пригласить. ' +
+            'Он откроет страницу, введёт имя и телефон и сможет смотреть разработку, скачивать файлы и писать в чат.' +
+          '</div>' +
+          '<div>' +
+            '<div class="dev-invite-participants-title" style="margin-bottom:6px;">Ссылка-приглашение</div>' +
+            '<div class="dev-invite-link-row">' +
+              '<input type="text" id="dev-invite-url" value="' + escapeHtml(inviteUrl) + '" readonly onfocus="this.select()">' +
+              '<button class="dev-invite-copy-btn" onclick="copyDevInviteUrl()">' +
+                '<i class="ti ti-copy"></i>Скопировать</button>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="dev-invite-participants-title" style="margin-bottom:6px;">Кто уже присоединился (' + participants.length + ')</div>' +
+            '<div class="dev-participants-list">' + participantsHtml + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  m.classList.add('visible');
+}
+
+function copyDevInviteUrl() {
+  const input = document.getElementById('dev-invite-url');
+  if (!input) return;
+  input.select();
+  input.setSelectionRange(0, 99999);
+  try {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(input.value);
+    } else {
+      document.execCommand('copy');
+    }
+    showToast('Ссылка скопирована', 'success');
+  } catch (_) {
+    showToast('Не получилось скопировать. Выдели вручную.', 'error');
+  }
 }
 
 function _devFormatDate(s) {
@@ -45737,6 +46098,244 @@ async function submitNewDevelopment() {
     showToast('Разработка создана', 'success');
   } catch (e) {
     showToast('Сеть: не удалось создать', 'error');
+  }
+}
+
+/* === Публичная страница разработки /dev/{token} === */
+const DEV_GUEST_KEY_PREFIX = 'atomus_dev_guest_';
+
+async function showPublicDevelopment(token) {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  // Используем тот же public-page или свой контейнер
+  let page = document.getElementById('public-dev-page');
+  if (!page) {
+    page = document.createElement('div');
+    page.id = 'public-dev-page';
+    page.className = 'public-dev-page';
+    document.body.appendChild(page);
+  }
+  page.style.display = 'block';
+  page.innerHTML = '<div class="public-dev-card"><div class="public-dev-body" style="padding:40px;text-align:center;color:var(--text-light);">Загружаем…</div></div>';
+  try {
+    const res = await fetch(API_BASE + '/api/developments/public/' + encodeURIComponent(token));
+    if (!res.ok) {
+      page.innerHTML = '<div class="public-dev-card"><div class="public-dev-body">' +
+        renderPublicError(res.status) + '</div></div>';
+      return;
+    }
+    const data = await res.json();
+    _renderPublicDevelopment(token, data);
+  } catch (e) {
+    page.innerHTML = '<div class="public-dev-card"><div class="public-dev-body">' +
+      renderPublicError('network') + '</div></div>';
+  }
+}
+
+function _publicDevGetGuest(token) {
+  try {
+    const raw = localStorage.getItem(DEV_GUEST_KEY_PREFIX + token);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+function _publicDevSetGuest(token, guest) {
+  try { localStorage.setItem(DEV_GUEST_KEY_PREFIX + token, JSON.stringify(guest)); } catch (_) {}
+}
+
+function _renderPublicDevelopment(token, data) {
+  const page = document.getElementById('public-dev-page');
+  if (!page) return;
+  const dev = data.development || {};
+  const files = data.files || [];
+  const messages = data.messages || [];
+  const guest = _publicDevGetGuest(token);
+
+  let body = '';
+  // Регистрация — если ещё нет
+  if (!guest) {
+    body +=
+      '<div class="public-dev-reg-form">' +
+        '<div class="public-dev-reg-form-title"><i class="ti ti-user-plus"></i> Чтобы продолжить — представься</div>' +
+        '<input type="text" id="public-dev-name" placeholder="Имя и фамилия" autocomplete="name">' +
+        '<input type="tel"  id="public-dev-phone" placeholder="Телефон (опционально)" autocomplete="tel">' +
+        '<button onclick="registerPublicDevelopmentGuest(\'' + escapeHtml(token) + '\')">' +
+          '<i class="ti ti-arrow-right"></i> Войти как участник' +
+        '</button>' +
+        '<div class="public-reg-hello">После этого ты увидишь файлы, ссылку на 3D-демонстрацию и сможешь писать в чат.</div>' +
+      '</div>';
+  } else {
+    body +=
+      '<div class="public-dev-reg-form" style="background:rgba(37,99,235,0.04);">' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<div class="dev-participant-avatar">' +
+            escapeHtml((guest.name || '?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()) +
+          '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-weight:600;color:var(--text-dark);">' + escapeHtml(guest.name) + '</div>' +
+            '<div style="font-size:12px;color:var(--text-light);">' +
+              (guest.phone ? escapeHtml(guest.phone) + ' · ' : '') +
+              'участник' +
+            '</div>' +
+          '</div>' +
+          '<button class="dev-link-btn" onclick="logoutPublicDevelopmentGuest(\'' + escapeHtml(token) + '\')">Сменить</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Описание
+  if (dev.description) {
+    body +=
+      '<div class="public-dev-section">' +
+        '<div class="public-dev-section-title"><i class="ti ti-align-left"></i>Описание</div>' +
+        '<div class="public-dev-desc">' + escapeHtml(dev.description) + '</div>' +
+      '</div>';
+  }
+
+  // 3D / демка
+  if (dev.demo_url) {
+    body +=
+      '<div class="public-dev-section">' +
+        '<div class="public-dev-section-title"><i class="ti ti-cube"></i>3D-демонстрация</div>' +
+        '<a class="public-dev-demo-link" href="' + escapeHtml(dev.demo_url) + '" target="_blank" rel="noopener">' +
+          '<i class="ti ti-external-link"></i>Открыть демонстрацию</a>' +
+      '</div>';
+  }
+
+  // Файлы
+  if (files.length) {
+    body += '<div class="public-dev-section">' +
+      '<div class="public-dev-section-title"><i class="ti ti-paperclip"></i>Файлы</div>';
+    files.forEach(f => {
+      const icon = _devFileIcon(f.content_type, f.file_name);
+      const size = _devFormatSize(f.file_size);
+      const url  = API_BASE + '/api/developments/public/' + encodeURIComponent(token) + '/files/' + f.id;
+      body +=
+        '<a class="public-dev-file-row" href="' + url + '" target="_blank">' +
+          '<div class="dev-file-icon"><i class="ti ' + icon + '"></i></div>' +
+          '<div class="dev-file-info">' +
+            '<div class="dev-file-name">' + escapeHtml(f.file_name) + '</div>' +
+            '<div class="dev-file-meta">' + escapeHtml(size) + '</div>' +
+          '</div>' +
+          '<i class="ti ti-download" style="color:var(--text-light);"></i>' +
+        '</a>';
+    });
+    body += '</div>';
+  }
+
+  // Чат — только если гость зарегистрирован
+  if (guest) {
+    body += '<div class="public-dev-section">' +
+      '<div class="public-dev-section-title"><i class="ti ti-message-circle"></i>Обсуждение</div>' +
+      '<div class="public-dev-chat" id="public-dev-chat-box">' +
+        _renderPublicDevMessages(messages, guest) +
+      '</div>' +
+      '<div class="public-dev-chat-input-row">' +
+        '<textarea id="public-dev-chat-input" rows="1" placeholder="Написать сообщение…"></textarea>' +
+        '<button onclick="sendPublicDevelopmentMessage(\'' + escapeHtml(token) + '\')"><i class="ti ti-send"></i></button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  page.innerHTML =
+    '<div class="public-dev-card">' +
+      '<div class="public-dev-head">' +
+        '<div class="public-brand">Atom CRM · Разработка</div>' +
+        '<h1>' + escapeHtml(dev.name || '—') + '</h1>' +
+        '<div class="public-dev-tagline">Совместная работа над оборудованием — Атомус Групп</div>' +
+      '</div>' +
+      '<div class="public-dev-body">' + body + '</div>' +
+    '</div>';
+
+  // автоскролл чата
+  const box = document.getElementById('public-dev-chat-box');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function _renderPublicDevMessages(messages, guest) {
+  if (!messages || !messages.length) {
+    return '<div class="public-dev-chat-empty">Пока пусто. Напиши первое сообщение.</div>';
+  }
+  return messages.map(m => {
+    const mine = guest && m.author_participant_id && guest.participant_id === m.author_participant_id;
+    return '<div class="public-dev-chat-msg' + (mine ? ' is-mine' : '') + '">' +
+      '<div class="public-dev-chat-msg-head">' +
+        '<span class="public-dev-chat-author">' + escapeHtml(m.author_name || 'Кто-то') + '</span>' +
+        '<span>' + escapeHtml(_devFormatDate(m.created_at)) + '</span>' +
+      '</div>' +
+      '<div>' + escapeHtml(m.text || '') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function registerPublicDevelopmentGuest(token) {
+  const name  = (document.getElementById('public-dev-name')?.value || '').trim();
+  const phone = (document.getElementById('public-dev-phone')?.value || '').trim();
+  if (!name) { alert('Введите имя'); return; }
+  try {
+    const res = await fetch(API_BASE + '/api/developments/public/' + encodeURIComponent(token) + '/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert(j.message || 'Не удалось зарегистрироваться');
+      return;
+    }
+    const j = await res.json();
+    _publicDevSetGuest(token, {
+      name: j.participant.name,
+      phone: j.participant.phone,
+      participant_id: j.participant.id,
+      guest_token: j.guest_token,
+    });
+    // перерисуем страницу
+    showPublicDevelopment(token);
+  } catch (e) {
+    alert('Сеть: не удалось зарегистрироваться');
+  }
+}
+
+function logoutPublicDevelopmentGuest(token) {
+  try { localStorage.removeItem(DEV_GUEST_KEY_PREFIX + token); } catch (_) {}
+  showPublicDevelopment(token);
+}
+
+async function sendPublicDevelopmentMessage(token) {
+  const input = document.getElementById('public-dev-chat-input');
+  if (!input) return;
+  const text = (input.value || '').trim();
+  if (!text) return;
+  const guest = _publicDevGetGuest(token);
+  if (!guest) return;
+  input.disabled = true;
+  try {
+    const res = await fetch(API_BASE + '/api/developments/public/' + encodeURIComponent(token) + '/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Guest-Token': guest.guest_token,
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert(j.message || 'Не удалось отправить');
+      return;
+    }
+    const j = await res.json();
+    input.value = '';
+    // перерисуем сообщения
+    const box = document.getElementById('public-dev-chat-box');
+    if (box) {
+      box.innerHTML = _renderPublicDevMessages(j.messages || [], guest);
+      box.scrollTop = box.scrollHeight;
+    }
+  } catch (e) {
+    alert('Сеть: не удалось отправить');
+  } finally {
+    input.disabled = false;
+    input.focus();
   }
 }
 
@@ -54245,6 +54844,8 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
   const publicBoxMatch = path.match(/^\/b\/([A-Za-z0-9_\-]+)$/);
   // v2.37.0: публичная страница заявки /d/{token}
   const publicDefectMatch = path.match(/^\/d\/([A-Za-z0-9_\-]+)$/);
+  // v2.44.48: публичная страница разработки /dev/{token}
+  const publicDevMatch = path.match(/^\/dev\/([A-Za-z0-9_\-]+)$/);
   if (publicAsmMatch) {
     showPublicAssembly(publicAsmMatch[1]);
     return;
@@ -54261,12 +54862,22 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
     showPublicDefect(publicDefectMatch[1]);
     return;
   }
+  if (publicDevMatch) {
+    showPublicDevelopment(publicDevMatch[1]);
+    return;
+  }
   // v2.38.1: fallback на query ?d=<token> (если на Vercel нет rewrite для /d/)
   try {
     const usp = new URLSearchParams(window.location.search);
     const qDefect = usp.get('d');
     if (qDefect && /^[A-Za-z0-9_\-]+$/.test(qDefect)) {
       showPublicDefect(qDefect);
+      return;
+    }
+    // v2.44.48: fallback на ?dev=<token>
+    const qDev = usp.get('dev');
+    if (qDev && /^[A-Za-z0-9_\-]+$/.test(qDev)) {
+      showPublicDevelopment(qDev);
       return;
     }
   } catch (_) {}

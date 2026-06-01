@@ -4,6 +4,7 @@
     { "source": "/c/:token", "destination": "/" },
     { "source": "/b/:token", "destination": "/" },
     { "source": "/d/:token", "destination": "/" },
+    { "source": "/dev/:token", "destination": "/" },
     { "source": "/feedback", "destination": "/" },
     { "source": "/feedback/", "destination": "/" }
   ]
