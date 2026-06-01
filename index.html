@@ -17685,7 +17685,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.44-tour-modal-aside";
+const APP_VERSION = "v2.44.45-tour-display-fix";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44581,7 +44581,7 @@ const TOURS = {
       {
         section: 'production',
         screen: 'dashboard',
-        selector: '.pkb-section-header, .page-header',
+        selector: '.section-tab.active, .m-section-tabs button.active, .pkb-section-header',
         title: 'Раздел «Производство»',
         text: 'Мы переключились на твою основную вкладку. Тут всё, что касается работ: канбан, сборки, сводки.',
         pos: 'bottom',
@@ -44750,13 +44750,16 @@ async function goToTourStep(idx) {
   let target = null;
   if (step.selector && step.pos !== 'center') {
     const candidates = document.querySelectorAll(step.selector);
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     for (const el of candidates) {
+      if (el.offsetParent === null) continue;       // display:none предок
       const r = el.getBoundingClientRect();
-      // Видимый: имеет ненулевые размеры, не display:none
-      if (r.width > 4 && r.height > 4 && el.offsetParent !== null) {
-        target = el;
-        break;
-      }
+      if (r.width <= 4 || r.height <= 4) continue;  // нулевые размеры
+      if (r.right < 0 || r.left > vw) continue;     // полностью за пределами по X
+      if (r.bottom < 0 || r.top > vh + 800) continue; // далеко за пределами по Y (учитываем то что прокрутим)
+      target = el;
+      break;
     }
     // Прокрутим в видимую область
     if (target) {
@@ -44768,6 +44771,7 @@ async function goToTourStep(idx) {
 
   const overlay = document.getElementById('tour-overlay');
   if (!overlay) return;
+  overlay.style.display = '';                 // сбросить inline display:none, оставленный закрытием прошлого тура
   overlay.classList.add('active');
 
   // Заполняем тексты
