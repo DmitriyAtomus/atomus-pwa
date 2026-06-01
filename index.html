@@ -18643,7 +18643,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.61-notif-chat-landing";
+const APP_VERSION = "v2.44.62-inv-blank-url-tdz-fix";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47483,21 +47483,29 @@ async function downloadInventoryBlank() {
     const res = await fetch(url, {
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
-    if (!res.ok) throw new Error('http ' + res.status);
+    if (!res.ok) {
+      let detail = 'HTTP ' + res.status;
+      try {
+        const j = await res.json();
+        if (j && (j.message || j.error)) detail = j.message || j.error;
+      } catch (_) {}
+      throw new Error(detail);
+    }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const objUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = objUrl;
     const dt = new Date();
     const pad = (n) => String(n).padStart(2,'0');
     a.download = 'inventory_blank_' + dt.getFullYear() + pad(dt.getMonth()+1) + pad(dt.getDate()) + '.xlsx';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
     showToast('Бланк скачан. Распечатай — заполни — сфотографируй.', 'success');
   } catch (e) {
-    showToast('Не удалось скачать бланк', 'error');
+    showToast('Не удалось скачать бланк: ' + (e && e.message ? e.message : String(e)), 'error');
+    console.error('downloadInventoryBlank failed', e);
   }
 }
 
