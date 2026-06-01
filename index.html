@@ -1700,7 +1700,7 @@
   }
   .pt-row {
     display: grid;
-    grid-template-columns: 12px 1fr 110px 100px 100px 90px;
+    grid-template-columns: 12px 1fr 110px 100px 100px auto;
     gap: 12px;
     align-items: center;
     background: white;
@@ -1736,17 +1736,7 @@
   }
   .pt-defect-pill:hover { background: rgba(226,75,74,0.18); }
   .pt-defect-pill i { font-size: 11px; }
-  .btn-defect-small {
-    margin-left: 6px;
-    padding: 6px 8px;
-    border: 0; background: transparent;
-    color: #B5302E;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .btn-defect-small:hover { background: rgba(226,75,74,0.12); }
-  .btn-defect-small i { font-size: 15px; }
+  /* .btn-defect-small теперь оформлен внутри .pt-row-action (см. выше) */
   .pt-row-name {
     font-size: 13px;
     font-weight: 500;
@@ -1797,6 +1787,12 @@
   .pt-row-badge.critical { background: rgba(226,75,74,0.15);   color: #8C2A2A; }
   .pt-row-badge.zero     { background: rgba(226,75,74,0.20);   color: #8C2A2A; }
   .pt-row-badge.excess   { background: rgba(83,74,183,0.15);   color: #3C3489; }
+  .pt-row-action {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-end;
+  }
   .pt-row-action button {
     font-size: 12px;
     padding: 6px 10px;
@@ -1815,6 +1811,16 @@
   .pt-row-action .btn-order  { background: #2563EB; color: white; }
   .pt-row-action .btn-open   { background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); }
   .pt-row-action .btn-writeoff { background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); }
+  .pt-row-action .btn-defect-small {
+    background: var(--bg);
+    color: #B5302E;
+    border: 1px solid rgba(226,75,74,0.30);
+    font-size: 12px;
+    padding: 6px 10px;
+    margin: 0;
+  }
+  .pt-row-action .btn-defect-small:hover { background: rgba(226,75,74,0.08); }
+  .pt-row-action .btn-defect-small i { font-size: 14px; }
   @media (max-width: 900px) {
     .pt-row { grid-template-columns: 12px 1fr auto auto; gap: 8px; }
     .pt-row-consume, .pt-row-badge { display: none; }
@@ -6854,15 +6860,20 @@
   }
   .comp-defect-badge i { font-size: 11px; }
   .comp-defect-btn {
-    width: 30px; height: 30px;
-    border: 0; background: transparent;
-    color: var(--text-light); cursor: pointer;
-    border-radius: 8px;
-    transition: background 0.15s, color 0.15s;
+    padding: 5px 10px;
+    border: 1px solid rgba(226,75,74,0.30);
+    background: var(--bg);
+    color: #B5302E;
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: background 0.15s;
     align-self: center;
   }
-  .comp-defect-btn:hover { background: rgba(226,75,74,0.10); color: #B5302E; }
-  .comp-defect-btn i { font-size: 16px; }
+  .comp-defect-btn:hover { background: rgba(226,75,74,0.08); }
+  .comp-defect-btn i { font-size: 14px; }
   /* Модалка пометки брака */
   .mark-defective-modal .modal { max-width: 460px; }
   .mark-defective-row { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
@@ -18724,7 +18735,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.64-defect-warehouse-tab";
+const APP_VERSION = "v2.44.65-defect-btn-polish";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38455,7 +38466,7 @@ function renderComponentsCatalogList() {
             (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
           '</div>' +
         '</div>' +
-        '<button class="comp-defect-btn" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (parseFloat(c.qty_on_stock) || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-alert-triangle"></i></button>' +
+        '<button class="comp-defect-btn" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (parseFloat(c.qty_on_stock) || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-bandage"></i><span>Брак</span></button>' +
         '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
       '</div>';
     });
@@ -41585,10 +41596,10 @@ function _renderPtRow(it) {
   const badgeHtml = '<span class="pt-row-badge ' + st + '">' + labels[st] + '</span>';
 
   // Action
-  // v2.44.64: всегда добавляем мелкую кнопку «Брак» рядом с основным действием
+  // v2.44.65: кнопка «Брак» рядом с основным действием — текст + иконка-бинт
   const safeName = escapeHtml((it.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'"));
   const defectBtn = (it.qty_on_stock || 0) > 0
-    ? '<button class="btn-defect-small" title="Пометить брак" onclick="event.stopPropagation();openMarkDefectiveModal(' + it.id + ',\'' + safeName + '\',' + (parseFloat(it.qty_on_stock) || 0) + ',\'' + escapeHtml(unit) + '\')"><i class="ti ti-alert-triangle"></i></button>'
+    ? '<button class="btn-defect-small" title="Пометить брак" onclick="event.stopPropagation();openMarkDefectiveModal(' + it.id + ',\'' + safeName + '\',' + (parseFloat(it.qty_on_stock) || 0) + ',\'' + escapeHtml(unit) + '\')"><i class="ti ti-bandage"></i><span>Брак</span></button>'
     : '';
   let mainBtn;
   if (st === 'zero' || st === 'critical') {
