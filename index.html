@@ -17685,7 +17685,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.43-tour-auto-open-card";
+const APP_VERSION = "v2.44.44-tour-modal-aside";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44614,24 +44614,34 @@ const TOURS = {
         section: 'production',
         screen: 'dashboard',
         action: 'open-first-queue-card',
-        title: 'Я работаю над этим',
-        text: 'Открыл первую карточку очереди для примера. В модалке нажми <b>«Я работаю над этим»</b> — работа уходит из очереди в «В работе» и запускается счётчик часов.',
-        pos: 'center',
+        selector: '.pkb-detail-actions .pkb-btn.primary, button[onclick*="changeProductionWorkStatus"][onclick*="in_progress"]',
+        title: 'Взять в работу',
+        text: 'В подвале карточки нажми <b>«Взять в работу»</b> — работа уходит из «Очереди» в «В работе» и запускается счётчик часов.',
+        pos: 'right',
       },
       {
+        section: 'production',
+        screen: 'dashboard',
+        selector: '.pwd-progress-block, .pwd-progress-presets',
         title: 'Отмечай прогресс',
-        text: 'Используй кнопки <b>25 / 50 / 75 / 100%</b>, чтобы коллеги и директор видели где ты. В комментарий пиши о проблемах: «не пришла крышка», «надо точить заново».',
-        pos: 'center',
+        text: 'Используй кнопки <b>25 / 50 / 75 / 100%</b>, чтобы коллеги и директор видели где ты. В комментарий ниже пиши о проблемах: «не пришла крышка», «надо точить заново».',
+        pos: 'right',
       },
       {
+        section: 'production',
+        screen: 'dashboard',
+        selector: 'button[onclick*="openAddCoAssigneeModal"], .pwd-help-add',
         title: 'Соисполнители',
         text: 'Если тебе помогает кто-то ещё — нажми <b>«Подключить»</b> в строке Соисполнители и выбери его. Его часы тоже посчитаются.',
-        pos: 'center',
+        pos: 'right',
       },
       {
+        section: 'production',
+        screen: 'dashboard',
+        selector: '.pkb-detail-actions',
         title: 'Закончил — на проверку',
-        text: 'Когда работа готова, в подвале карточки нажми <b>«На проверку»</b>. Кладовщик/директор примет и переведёт в «Упаковку», затем «Готово».',
-        pos: 'center',
+        text: 'Когда работа готова, в подвале карточки нажми <b>«На проверку»</b> (появится после взятия в работу). Кладовщик/директор примет и переведёт в «Упаковку», затем «Готово».',
+        pos: 'right',
       },
       {
         title: 'Готово!',
@@ -44811,16 +44821,21 @@ function positionTour(target, pos) {
   ml.style.cssText = 'display:none;';
   mr.style.cssText = 'display:none;';
 
+  // Если target внутри модалки — tooltip уносим правее всей модалки,
+  // чтобы он не перекрывал её содержимое.
+  const inModal = target.closest('.modal-overlay.visible .modal');
+  const refRect = inModal ? inModal.getBoundingClientRect() : r;
+
   // Позиционируем tooltip рядом
   const tipW = 360;
   const tipH = 200;
   let tl, tt, posCls = 'pos-bottom';
   if (pos === 'right') {
-    tl = r.right + 14;
+    tl = refRect.right + 14;
     tt = r.top;
     posCls = 'pos-left';
   } else if (pos === 'left') {
-    tl = r.left - tipW - 14;
+    tl = refRect.left - tipW - 14;
     tt = r.top;
     posCls = 'pos-right';
   } else if (pos === 'top') {
