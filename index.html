@@ -18382,7 +18382,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.54-dev-delete-director";
+const APP_VERSION = "v2.44.55-service-work-flow";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21226,7 +21226,9 @@ function renderProductionWorkDetail(w) {
   const modelTitle = (w.model_name || (_isServiceDetail
     ? (w.description || _wtLabelsDetail[w.work_type] || 'Работа')
     : ('Модель #' + (w.model_id || '?')))) + (w.model_extra ? (' ' + w.model_extra) : '');
-  const statusLabel = w.status_label || w.status || '—';
+  // v2.44.55: для не-сборок «Готово» переименовываем в «Выполнено» (физического приёма нет)
+  let statusLabel = w.status_label || w.status || '—';
+  if (_isServiceDetail && w.status === 'done') statusLabel = 'Выполнено';
   const statusCls = pkbStatusToCss(w.status);
 
   let html = '';
@@ -22074,22 +22076,42 @@ function renderPkbDetailActions(w) {
   //   packing     → review, done, cancelled
   //   done        → review, packing
   //   cancelled   → queue
-  const transitions = {
-    queue:       [{ to: 'in_progress', label: 'Взять в работу', icon: 'ti-player-play', cls: 'primary' },
-                  { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
-    in_progress: [{ to: 'review',      label: 'На проверку',    icon: 'ti-checks', cls: 'primary' },
-                  { to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
-                  { to: 'queue',       label: 'Вернуть в очередь', icon: 'ti-arrow-back-up' },
-                  { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
-    review:      [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package', cls: 'primary' },
-                  { to: 'done',        label: 'Принять (Готово)', icon: 'ti-circle-check' },
-                  { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
-    packing:     [{ to: 'done',        label: 'Упаковано (Готово)', icon: 'ti-circle-check', cls: 'primary' },
-                  { to: 'review',      label: 'Вернуть на проверку', icon: 'ti-arrow-back-up' }],
-    done:        [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
-                  { to: 'review',      label: 'Откатить (ОТК)', icon: 'ti-arrow-back-up' }],
-    cancelled:   [{ to: 'queue',       label: 'Реактивировать', icon: 'ti-refresh' }],
-  };
+  // v2.44.55: для работ-сервисов (проектирование/ремонт/пусконаладка/ТО и т.п.)
+  // нет физической упаковки/проверки — упрощённая FSM: queue ↔ in_progress → done.
+  const isService = w.work_type && w.work_type !== 'assembly';
+  let transitions;
+  if (isService) {
+    transitions = {
+      queue:       [{ to: 'in_progress', label: 'Взять в работу', icon: 'ti-player-play', cls: 'primary' },
+                    { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
+      in_progress: [{ to: 'done',        label: 'Сделано',        icon: 'ti-circle-check', cls: 'primary' },
+                    { to: 'queue',       label: 'Вернуть в очередь', icon: 'ti-arrow-back-up' },
+                    { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
+      review:      [{ to: 'done',        label: 'Сделано',        icon: 'ti-circle-check', cls: 'primary' },
+                    { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
+      packing:     [{ to: 'done',        label: 'Сделано',        icon: 'ti-circle-check', cls: 'primary' },
+                    { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
+      done:        [{ to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
+      cancelled:   [{ to: 'queue',       label: 'Реактивировать', icon: 'ti-refresh' }],
+    };
+  } else {
+    transitions = {
+      queue:       [{ to: 'in_progress', label: 'Взять в работу', icon: 'ti-player-play', cls: 'primary' },
+                    { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
+      in_progress: [{ to: 'review',      label: 'На проверку',    icon: 'ti-checks', cls: 'primary' },
+                    { to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
+                    { to: 'queue',       label: 'Вернуть в очередь', icon: 'ti-arrow-back-up' },
+                    { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
+      review:      [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package', cls: 'primary' },
+                    { to: 'done',        label: 'Принять (Готово)', icon: 'ti-circle-check' },
+                    { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
+      packing:     [{ to: 'done',        label: 'Упаковано (Готово)', icon: 'ti-circle-check', cls: 'primary' },
+                    { to: 'review',      label: 'Вернуть на проверку', icon: 'ti-arrow-back-up' }],
+      done:        [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
+                    { to: 'review',      label: 'Откатить (ОТК)', icon: 'ti-arrow-back-up' }],
+      cancelled:   [{ to: 'queue',       label: 'Реактивировать', icon: 'ti-refresh' }],
+    };
+  }
   const allowed = transitions[w.status] || [];
   if (allowed.length === 0) return '';
   // Без прав на управление — только показ, никаких кнопок
