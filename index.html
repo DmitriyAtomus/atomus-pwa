@@ -10006,6 +10006,80 @@
   }
   .ns-bulk-info { color: #7A4A00; flex: 1; }
   .ns-bulk-info b { color: #5C3500; font-weight: 700; }
+  /* v2.44.40: интерактивный гайд с подсветкой элементов */
+  .tour-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    pointer-events: none;
+  }
+  .tour-overlay.active { pointer-events: auto; }
+  /* Затемнение всего экрана через 4 прямоугольника вокруг подсвеченной области */
+  .tour-mask {
+    position: fixed;
+    background: rgba(15, 23, 42, 0.55);
+    transition: all 0.25s ease;
+  }
+  .tour-spotlight {
+    position: fixed;
+    border-radius: 10px;
+    box-shadow: 0 0 0 3px #2563EB, 0 0 0 9999px rgba(15, 23, 42, 0.55);
+    pointer-events: none;
+    transition: all 0.25s ease;
+  }
+  .tour-tooltip {
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    padding: 16px 18px;
+    max-width: 360px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    z-index: 9100;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-dark);
+    transition: top 0.25s, left 0.25s;
+  }
+  .tour-tooltip-step {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .tour-tooltip-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+  }
+  .tour-tooltip-text { color: var(--text-mid); margin-bottom: 12px; }
+  .tour-tooltip-text b { color: var(--text-dark); }
+  .tour-tooltip-text code { background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  .tour-tooltip-actions {
+    display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;
+  }
+  .tour-tooltip-actions .btn-link {
+    margin-right: auto;
+    color: var(--text-light);
+    background: none; border: none; cursor: pointer;
+    font-size: 12px;
+  }
+  .tour-tooltip-actions .btn-link:hover { color: var(--text-dark); }
+  /* Стрелочка к подсвеченному элементу */
+  .tour-tooltip::before {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    background: white;
+    transform: rotate(45deg);
+  }
+  .tour-tooltip.pos-bottom::before { top: -6px; left: 24px; }
+  .tour-tooltip.pos-top::before    { bottom: -6px; left: 24px; }
+  .tour-tooltip.pos-right::before  { left: -6px; top: 24px; }
+  .tour-tooltip.pos-left::before   { right: -6px; top: 24px; }
+
   /* v2.44.38: кастомный чекбокс — нативная отрисовка ✓ не работала.
      Прячем нативный input, рисуем box и checkmark через ::before/::after. */
   .ns-check-cell {
@@ -17608,7 +17682,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.39-help-updated";
+const APP_VERSION = "v2.44.40-interactive-tour";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -42532,6 +42606,39 @@ function renderSupplyReceipts() {
 // Статьи базы знаний. Сгруппированы по категориям.
 // id — стабильный, body — массив параграфов/списков.
 const HELP_ARTICLES = [
+  // ---------- Гайды по шагам ----------
+  {
+    id: 'guide-master-first',
+    cat: 'guides', cat_label: 'Гайды по шагам', icon: 'ti-tool',
+    title: 'Моя первая работа (мастер) — интерактивный гайд',
+    summary: 'Подсказки с подсветкой каждого шага: где найти, что нажать, как сдать.',
+    body: [
+      { p: 'Гайд проведёт тебя по экранам приложения с подсветкой нужных кнопок. На каждом шаге будет короткое пояснение и кнопка «Дальше».' },
+      { h: 'Что покажем' },
+      { ul: [
+        'Где найти раздел Производства',
+        'Канбан и его колонки',
+        'Как открыть карточку работы',
+        '«Я работаю над этим» — забрать работу',
+        'Отметка прогресса 25/50/75/100%',
+        'Подключение соисполнителей',
+        'Сдача на проверку',
+      ] },
+      { tour: 'master-first-assembly', tour_label: '▶ Запустить интерактивный гайд' },
+      { note: 'В любой момент можно нажать «Пропустить», чтобы закрыть подсказки и продолжить самостоятельно.' },
+    ],
+  },
+  {
+    id: 'guide-master-defect',
+    cat: 'guides', cat_label: 'Гайды по шагам', icon: 'ti-alert-circle',
+    title: 'Как отметить брак / доработку',
+    summary: 'Короткий гайд: где зарегистрировать проблему в сборке.',
+    body: [
+      { p: 'Гайд покажет где в приложении регистрируются доработки и как описать проблему так, чтобы директор понял.' },
+      { tour: 'master-defect-report', tour_label: '▶ Запустить интерактивный гайд' },
+    ],
+  },
+
   // ---------- Старт ----------
   {
     id: 'start-login',
@@ -44455,7 +44562,257 @@ const HELP_CHANGELOG = [
 ];
 
 // ---------- Категории сайдбара для группировки ----------
+// ============================================================
+// v2.44.40: ИНТЕРАКТИВНЫЕ ГАЙДЫ ПО ШАГАМ
+// ============================================================
+// Туры описаны декларативно: для каждого шага можно указать
+// screen (куда перевести юзера), selector (что подсветить),
+// title + text (что объяснить), pos (где показывать tooltip).
+
+const TOURS = {
+  'master-first-assembly': {
+    title: 'Моя первая работа (для мастера)',
+    icon: 'ti-tool',
+    summary: 'Пошагово: где находится канбан, как взять работу в руки, отметить прогресс и сдать на проверку.',
+    steps: [
+      {
+        screen: 'dashboard',
+        selector: '.section-tab[data-section="production"]',
+        title: 'Раздел «Производство»',
+        text: 'Это твоя основная вкладка. Тут всё, что касается работ: канбан, сборки, сводки.',
+        pos: 'bottom',
+      },
+      {
+        selector: '[data-nav="dashboard"]',
+        title: 'Главная производства — канбан',
+        text: 'Канбан показывает все производственные работы по статусам: <b>В очереди</b> → <b>В работе</b> → <b>На проверке</b> → <b>Упаковка</b> → <b>Готово</b>.',
+        pos: 'right',
+      },
+      {
+        selector: '.pkb-col.c-queue',
+        title: 'Колонка «В очереди»',
+        text: 'Здесь работы ждут, пока кто-то возьмёт их в руки. Найди работу, которую делаешь, и открой её карточку кликом.',
+        pos: 'right',
+      },
+      {
+        selector: '.pkb-wc:first-child',
+        title: 'Карточка работы',
+        text: 'Открой любую карточку чтобы увидеть детали: что собираем, сколько штук, к какому договору, какие комплектующие нужны.',
+        pos: 'right',
+      },
+      {
+        title: 'Я работаю над этим',
+        text: 'В детальной модалке нажми <b>«Я работаю над этим»</b> — работа уходит из очереди в «В работе», и автоматически запускается счётчик часов.',
+        pos: 'center',
+      },
+      {
+        title: 'Отмечай прогресс',
+        text: 'Используй кнопки <b>25 / 50 / 75 / 100%</b>, чтобы коллеги и директор видели где ты. В комментарий пиши о проблемах: «не пришла крышка», «надо точить заново».',
+        pos: 'center',
+      },
+      {
+        title: 'Соисполнители',
+        text: 'Если тебе помогает кто-то ещё — нажми <b>«Подключить»</b> в строке Соисполнители и выбери его. Его часы тоже посчитаются.',
+        pos: 'center',
+      },
+      {
+        title: 'Закончил — на проверку',
+        text: 'Когда работа готова, в подвале карточки нажми <b>«На проверку»</b>. Кладовщик/директор примет и переведёт в «Упаковку», затем «Готово».',
+        pos: 'center',
+      },
+      {
+        title: 'Готово!',
+        text: 'Это полный круг от начала до сдачи работы. Если что-то непонятно — в Помощи есть отдельные статьи по каждому шагу.',
+        pos: 'center',
+      },
+    ],
+  },
+  'master-defect-report': {
+    title: 'Как отметить брак / доработку',
+    icon: 'ti-alert-circle',
+    summary: 'Если нашёл проблему в сборке — как занести её в Сервис.',
+    steps: [
+      {
+        selector: '.section-tab[data-section="defects"]',
+        title: 'Раздел «Сервис»',
+        text: 'Тут регистрируются все доработки и претензии: и свои, и от клиентов.',
+        pos: 'bottom',
+      },
+      {
+        selector: '[data-nav="defects-list-new"]',
+        title: 'Новая доработка',
+        text: 'Нажми «Новая» и опиши проблему: что не так, какая сборка, кто заметил. К доработке можно прикрепить фото.',
+        pos: 'right',
+      },
+      {
+        title: 'Дальше',
+        text: 'Директор увидит доработку в списке «Новые», назначит исполнителя и срок. Чат внутри карточки — для обсуждения.',
+        pos: 'center',
+      },
+    ],
+  },
+};
+
+let tourState = null;   // { tourId, stepIdx, tour }
+
+function startTour(tourId) {
+  const tour = TOURS[tourId];
+  if (!tour) { showToast('Гайд не найден', 'error'); return; }
+  tourState = { tourId, stepIdx: 0, tour };
+  ensureTourDom();
+  // Закроем модал помощи если открыт
+  document.querySelectorAll('.modal-overlay.visible').forEach(m => m.classList.remove('visible'));
+  goToTourStep(0);
+}
+
+function ensureTourDom() {
+  if (document.getElementById('tour-overlay')) return;
+  const o = document.createElement('div');
+  o.id = 'tour-overlay';
+  o.className = 'tour-overlay';
+  o.innerHTML =
+    '<div class="tour-mask" id="tour-mask-top"></div>' +
+    '<div class="tour-mask" id="tour-mask-bottom"></div>' +
+    '<div class="tour-mask" id="tour-mask-left"></div>' +
+    '<div class="tour-mask" id="tour-mask-right"></div>' +
+    '<div class="tour-spotlight" id="tour-spotlight" style="display:none;"></div>' +
+    '<div class="tour-tooltip pos-bottom" id="tour-tooltip">' +
+      '<div class="tour-tooltip-step" id="tour-step-label"></div>' +
+      '<div class="tour-tooltip-title" id="tour-step-title"></div>' +
+      '<div class="tour-tooltip-text" id="tour-step-text"></div>' +
+      '<div class="tour-tooltip-actions">' +
+        '<button class="btn-link" onclick="closeTour()">Пропустить</button>' +
+        '<button class="btn btn-secondary btn-sm" id="tour-prev-btn" onclick="tourPrev()"><i class="ti ti-arrow-left"></i>Назад</button>' +
+        '<button class="btn btn-primary btn-sm" id="tour-next-btn" onclick="tourNext()">Дальше<i class="ti ti-arrow-right"></i></button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(o);
+}
+
+async function goToTourStep(idx) {
+  if (!tourState) return;
+  const step = tourState.tour.steps[idx];
+  if (!step) { closeTour(); return; }
+  tourState.stepIdx = idx;
+
+  // Переходим на нужный экран если задан
+  if (step.screen) {
+    selectSidebarItem(step.screen);
+    // Дать DOM-у время обновиться
+    await new Promise(r => setTimeout(r, 280));
+  }
+
+  // Ищем элемент для подсветки (если selector задан и не center)
+  let target = null;
+  if (step.selector && step.pos !== 'center') {
+    target = document.querySelector(step.selector);
+  }
+
+  const overlay = document.getElementById('tour-overlay');
+  if (!overlay) return;
+  overlay.classList.add('active');
+
+  // Заполняем тексты
+  document.getElementById('tour-step-label').textContent =
+    'Шаг ' + (idx + 1) + ' из ' + tourState.tour.steps.length;
+  document.getElementById('tour-step-title').textContent = step.title || '';
+  document.getElementById('tour-step-text').innerHTML = step.text || '';
+  document.getElementById('tour-prev-btn').style.display = idx > 0 ? '' : 'none';
+  document.getElementById('tour-next-btn').textContent =
+    idx === tourState.tour.steps.length - 1 ? 'Завершить' : 'Дальше';
+
+  positionTour(target, step.pos || 'bottom');
+}
+
+function positionTour(target, pos) {
+  const spot = document.getElementById('tour-spotlight');
+  const tip = document.getElementById('tour-tooltip');
+  const mt = document.getElementById('tour-mask-top');
+  const mb = document.getElementById('tour-mask-bottom');
+  const ml = document.getElementById('tour-mask-left');
+  const mr = document.getElementById('tour-mask-right');
+
+  if (!target) {
+    // Без подсветки — затемнить весь экран, tooltip по центру
+    spot.style.display = 'none';
+    mt.style.cssText = 'top:0;left:0;right:0;bottom:0;';
+    mb.style.cssText = 'display:none;';
+    ml.style.cssText = 'display:none;';
+    mr.style.cssText = 'display:none;';
+    tip.style.left = '50%';
+    tip.style.top = '50%';
+    tip.style.transform = 'translate(-50%, -50%)';
+    tip.className = 'tour-tooltip';
+    return;
+  }
+
+  const r = target.getBoundingClientRect();
+  const pad = 6;
+  const sx = r.left - pad;
+  const sy = r.top - pad;
+  const sw = r.width + pad * 2;
+  const sh = r.height + pad * 2;
+  spot.style.display = '';
+  spot.style.left = sx + 'px';
+  spot.style.top = sy + 'px';
+  spot.style.width = sw + 'px';
+  spot.style.height = sh + 'px';
+  // Маски не нужны — spotlight даёт box-shadow на весь экран
+  mt.style.cssText = 'display:none;';
+  mb.style.cssText = 'display:none;';
+  ml.style.cssText = 'display:none;';
+  mr.style.cssText = 'display:none;';
+
+  // Позиционируем tooltip рядом
+  const tipW = 360;
+  const tipH = 200;
+  let tl, tt, posCls = 'pos-bottom';
+  if (pos === 'right') {
+    tl = r.right + 14;
+    tt = r.top;
+    posCls = 'pos-left';
+  } else if (pos === 'left') {
+    tl = r.left - tipW - 14;
+    tt = r.top;
+    posCls = 'pos-right';
+  } else if (pos === 'top') {
+    tl = r.left;
+    tt = r.top - tipH - 14;
+    posCls = 'pos-bottom';   // arrow pointing down
+  } else {
+    // bottom
+    tl = r.left;
+    tt = r.bottom + 14;
+    posCls = 'pos-top';
+  }
+  // Удерживаем в пределах окна
+  tl = Math.max(12, Math.min(window.innerWidth - tipW - 12, tl));
+  tt = Math.max(12, Math.min(window.innerHeight - tipH - 12, tt));
+  tip.style.left = tl + 'px';
+  tip.style.top = tt + 'px';
+  tip.style.transform = '';
+  tip.className = 'tour-tooltip ' + posCls;
+}
+
+function tourNext() {
+  if (!tourState) return;
+  const next = tourState.stepIdx + 1;
+  if (next >= tourState.tour.steps.length) { closeTour(); return; }
+  goToTourStep(next);
+}
+function tourPrev() {
+  if (!tourState) return;
+  if (tourState.stepIdx === 0) return;
+  goToTourStep(tourState.stepIdx - 1);
+}
+function closeTour() {
+  const o = document.getElementById('tour-overlay');
+  if (o) o.classList.remove('active');
+  tourState = null;
+}
+
 const HELP_CATEGORIES = [
+  { id: 'guides',     label: 'Гайды по шагам', icon: 'ti-route' },
   { id: 'start',      label: 'Старт',         icon: 'ti-rocket' },
   { id: 'home',       label: 'Главная',       icon: 'ti-home' },
   { id: 'production', label: 'Производство',  icon: 'ti-tool' },
@@ -45032,6 +45389,13 @@ function openHelpArticle(articleId) {
     if (b.ol)   bodyHtml += '<ol class="help-ol">' + b.ol.map(x => '<li>' + x + '</li>').join('') + '</ol>';
     if (b.ul)   bodyHtml += '<ul class="help-ul">' + b.ul.map(x => '<li>' + x + '</li>').join('') + '</ul>';
     if (b.note) bodyHtml += '<div class="help-note"><i class="ti ti-info-circle"></i><div>' + b.note + '</div></div>';
+    // v2.44.40: кнопка запуска интерактивного гайда
+    if (b.tour) {
+      bodyHtml += '<div style="margin: 14px 0; text-align: center;">' +
+        '<button class="btn btn-primary" style="font-size: 14px; padding: 10px 18px;" onclick="startTour(\'' +
+        b.tour + '\')"><i class="ti ti-player-play"></i>' + escapeHtml(b.tour_label || 'Запустить гайд') +
+      '</button></div>';
+    }
   });
 
   const m = document.getElementById('help-modal');
