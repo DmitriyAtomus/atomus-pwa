@@ -10333,6 +10333,52 @@
   }
   .dev-new-field textarea { min-height: 70px; resize: vertical; }
   .dev-new-field input:focus, .dev-new-field textarea:focus { border-color: rgba(37,99,235,0.5); }
+  /* Модалка «Описание» — большая, во весь экран на десктопе */
+  .dev-desc-modal .modal {
+    max-width: 860px;
+    width: 92vw;
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+  }
+  .dev-desc-modal .modal-content {
+    flex: 1; display: flex; flex-direction: column;
+    min-height: 0;
+    padding: 0;
+  }
+  .dev-desc-modal .dev-desc-title-input {
+    width: 100%;
+    border: 0; border-bottom: 1px solid var(--border);
+    padding: 14px 22px;
+    font-size: 17px; font-weight: 700; color: var(--text-dark);
+    outline: 0;
+    background: linear-gradient(135deg, rgba(37,99,235,0.04), rgba(124,58,237,0.03));
+  }
+  .dev-desc-modal .dev-desc-textarea {
+    flex: 1;
+    width: 100%;
+    padding: 18px 22px;
+    border: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--text-dark);
+    outline: 0;
+    resize: none;
+    font-family: inherit;
+    min-height: 300px;
+  }
+  .dev-desc-modal .modal-footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex; gap: 8px; justify-content: flex-end;
+    background: var(--bg);
+  }
+  .dev-desc-modal .modal-footer .dev-desc-saved-mark {
+    margin-right: auto;
+    color: var(--text-light); font-size: 12px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .dev-desc-modal .modal-footer .dev-desc-saved-mark.saving { color: var(--text-faint); }
+  .dev-desc-modal .modal-footer .dev-desc-saved-mark.saved  { color: #1D9E75; }
   /* Участники + кнопка-ссылка в заголовке */
   .dev-link-btn {
     margin-left: auto;
@@ -18336,7 +18382,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.52-3d-fullscreen-btn";
+const APP_VERSION = "v2.44.53-desc-modal";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45663,7 +45709,11 @@ function renderDevelopmentDetail(dev) {
     '<div class="dev-detail-body">' +
       // Описание
       '<div class="dev-section">' +
-        '<div class="dev-section-title"><i class="ti ti-align-left"></i>Описание</div>' +
+        '<div class="dev-section-title">' +
+          '<i class="ti ti-align-left"></i>Описание' +
+          '<button class="dev-link-btn" onclick="openDevDescriptionModal()" title="Открыть в отдельной карточке">' +
+            '<i class="ti ti-arrows-diagonal"></i>Раскрыть</button>' +
+        '</div>' +
         '<textarea class="dev-description-textarea" id="dev-desc-input" ' +
                   'placeholder="Что разрабатываем, зачем, кому нужно…" ' +
                   'oninput="_devScheduleSave()">' + safeDesc + '</textarea>' +
@@ -45842,6 +45892,85 @@ async function openDevInviteModal() {
   document.body.appendChild(m);
   m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
   m.classList.add('visible');
+}
+
+function openDevDescriptionModal() {
+  if (!_devState.currentId) return;
+  const dev = _devState.current || {};
+  const overlayId = 'dev-desc-modal';
+  const existing = document.getElementById(overlayId);
+  if (existing) existing.remove();
+
+  const m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay dev-desc-modal';
+  m.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-align-left"></i> Описание разработки</h2>' +
+        '<button class="icon-btn" onclick="closeDevDescriptionModal()" title="Закрыть">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<input type="text" class="dev-desc-title-input" id="dev-desc-modal-title" ' +
+               'value="' + escapeHtml(dev.name || '') + '" placeholder="Название разработки…" ' +
+               'oninput="_devDescModalChanged()">' +
+        '<textarea class="dev-desc-textarea" id="dev-desc-modal-textarea" ' +
+                  'placeholder="Что разрабатываем, зачем, кому нужно. Здесь можно писать длинный текст: технические требования, материалы, особенности конструкции, идеи доработок…" ' +
+                  'oninput="_devDescModalChanged()">' + escapeHtml(dev.description || '') + '</textarea>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<span class="dev-desc-saved-mark" id="dev-desc-saved-mark"><i class="ti ti-check"></i>Сохранено</span>' +
+        '<button class="btn btn-primary" onclick="closeDevDescriptionModal()">' +
+          '<i class="ti ti-check"></i>Готово</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) closeDevDescriptionModal(); });
+  m.classList.add('visible');
+  // Esc закрывает
+  m._escHandler = (e) => { if (e.key === 'Escape') closeDevDescriptionModal(); };
+  document.addEventListener('keydown', m._escHandler);
+  // Фокус в textarea, курсор в конец
+  setTimeout(() => {
+    const ta = document.getElementById('dev-desc-modal-textarea');
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }, 60);
+}
+
+function _devDescModalChanged() {
+  // Зеркалим в inline-поля на странице, чтобы при закрытии всё было сохранено через общий debounce
+  const tName = document.getElementById('dev-desc-modal-title');
+  const tDesc = document.getElementById('dev-desc-modal-textarea');
+  const iName = document.getElementById('dev-name-input');
+  const iDesc = document.getElementById('dev-desc-input');
+  if (tName && iName) iName.value = tName.value;
+  if (tDesc && iDesc) iDesc.value = tDesc.value;
+  const mark = document.getElementById('dev-desc-saved-mark');
+  if (mark) {
+    mark.className = 'dev-desc-saved-mark saving';
+    mark.innerHTML = '<i class="ti ti-loader-2"></i>Сохраняем…';
+  }
+  _devScheduleSave();
+  // через 700мс отметим как «сохранено»
+  if (_devState._descSavedTimer) clearTimeout(_devState._descSavedTimer);
+  _devState._descSavedTimer = setTimeout(() => {
+    const m = document.getElementById('dev-desc-saved-mark');
+    if (m) {
+      m.className = 'dev-desc-saved-mark saved';
+      m.innerHTML = '<i class="ti ti-check"></i>Сохранено';
+    }
+  }, 900);
+}
+
+function closeDevDescriptionModal() {
+  const m = document.getElementById('dev-desc-modal');
+  if (!m) return;
+  if (m._escHandler) document.removeEventListener('keydown', m._escHandler);
+  m.remove();
 }
 
 function copyDevInviteUrl() {
