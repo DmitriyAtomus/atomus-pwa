@@ -10153,6 +10153,85 @@
     font-size: 13px;
   }
   .inv-summary-bar .inv-sum-num { font-weight: 700; color: var(--brand); }
+  /* Модалка выбора разделов */
+  .inv-cat-list {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    background: var(--bg);
+    margin-bottom: 14px;
+  }
+  .inv-cat-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13.5px;
+    transition: background 0.12s;
+  }
+  .inv-cat-row:hover { background: rgba(37,99,235,0.06); }
+  .inv-cat-row input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .inv-cat-row input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    border-color: transparent;
+  }
+  .inv-cat-row input[type="checkbox"]:checked::after {
+    content: ''; position: absolute; left: 5px; top: 1px;
+    width: 5px; height: 9px;
+    border-right: 2px solid white; border-bottom: 2px solid white;
+    transform: rotate(45deg);
+  }
+  .inv-cat-name { flex: 1; color: var(--text-dark); }
+  .inv-cat-cnt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+  }
+  .inv-only-stock {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(37,99,235,0.03);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-mid);
+  }
+  .inv-only-stock input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .inv-only-stock input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    border-color: transparent;
+  }
+  .inv-only-stock input[type="checkbox"]:checked::after {
+    content: ''; position: absolute; left: 5px; top: 1px;
+    width: 5px; height: 9px;
+    border-right: 2px solid white; border-bottom: 2px solid white;
+    transform: rotate(45deg);
+  }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   /* === ЭТАП 48 (v2.44.46): РАЗРАБОТКА ОБОРУДОВАНИЯ === */
@@ -18564,7 +18643,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.59-notif-deep-link";
+const APP_VERSION = "v2.44.60-inv-category-picker";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47196,9 +47275,9 @@ function _invRenderHome() {
     '<div class="inv-step-card">' +
       '<div class="step-n">1</div>' +
       '<h3>Скачай бланк (Excel)</h3>' +
-      '<p>В файле — все активные комплектующие: артикул, название, категория, остаток по системе. Поле «Фактически» пустое — для записи от руки.</p>' +
+      '<p>Выбери разделы (например, без УТМ), при желании — только позиции с ненулевым остатком, и скачай бланк для печати.</p>' +
       '<div class="step-action">' +
-        '<button class="btn btn-primary" onclick="downloadInventoryBlank()">' +
+        '<button class="btn btn-primary" onclick="openInventoryBlankPicker()">' +
           '<i class="ti ti-file-spreadsheet"></i> Скачать бланк' +
         '</button>' +
       '</div>' +
@@ -47270,9 +47349,133 @@ function _invSetupDropZone() {
   });
 }
 
-async function downloadInventoryBlank() {
+async function openInventoryBlankPicker() {
+  // 1) Тянем список разделов комплектующих + список самих позиций (для счётчика)
+  let categories = [];
+  let allComponents = [];
   try {
-    const res = await fetch(API_BASE + '/api/inventory/components-blank.xlsx', {
+    const [catsRes, compsRes] = await Promise.all([
+      fetch(API_BASE + '/api/components/categories', {
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      }),
+      fetch(API_BASE + '/api/components?only_active=1', {
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      }),
+    ]);
+    const catsJ = await catsRes.json();
+    categories = catsJ.categories || catsJ.items || [];
+    const compsJ = await compsRes.json();
+    allComponents = compsJ.components || compsJ.items || [];
+  } catch (_) {
+    showToast('Не удалось загрузить разделы', 'error');
+    return;
+  }
+
+  // Считаем сколько позиций в каждом разделе
+  const countByCat = {};
+  let withStockTotal = 0;
+  allComponents.forEach(c => {
+    countByCat[c.category_id] = (countByCat[c.category_id] || 0) + 1;
+    if ((c.qty_on_stock || 0) > 0) withStockTotal++;
+  });
+
+  const overlayId = 'inv-blank-picker';
+  let m = document.getElementById(overlayId);
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay';
+  const rows = categories.map(c => {
+    const cnt = countByCat[c.id] || 0;
+    return '<label class="inv-cat-row">' +
+      '<input type="checkbox" data-cid="' + c.id + '" checked onchange="_invUpdateBlankCount()">' +
+      '<span class="inv-cat-name">' + escapeHtml(c.name || '—') + '</span>' +
+      '<span class="inv-cat-cnt">' + cnt + '</span>' +
+    '</label>';
+  }).join('');
+  m.innerHTML =
+    '<div class="modal" style="max-width:560px;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-list-check"></i> Что включить в бланк</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+          '<div style="font-size:12px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;">Разделы</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button class="dev-link-btn" onclick="_invBlankToggleAll(true)">Все</button>' +
+            '<button class="dev-link-btn" onclick="_invBlankToggleAll(false)">Снять</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="inv-cat-list" class="inv-cat-list">' + rows + '</div>' +
+        '<label class="inv-only-stock">' +
+          '<input type="checkbox" id="inv-only-with-stock" onchange="_invUpdateBlankCount()">' +
+          '<span>Только позиции с ненулевым остатком (' + withStockTotal + ')</span>' +
+        '</label>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<div id="inv-blank-count" style="font-size:13px;color:var(--text-mid);"></div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+          '<button class="btn btn-primary" id="inv-blank-download-btn" onclick="downloadInventoryBlank()">' +
+            '<i class="ti ti-download"></i> Скачать' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  m.classList.add('visible');
+  window._invBlankComps = allComponents;
+  _invUpdateBlankCount();
+}
+
+function _invBlankToggleAll(checked) {
+  document.querySelectorAll('#inv-cat-list input[type="checkbox"]').forEach(cb => {
+    cb.checked = checked;
+  });
+  _invUpdateBlankCount();
+}
+
+function _invUpdateBlankCount() {
+  const selected = new Set();
+  document.querySelectorAll('#inv-cat-list input[type="checkbox"]:checked').forEach(cb => {
+    selected.add(parseInt(cb.dataset.cid, 10));
+  });
+  const onlyStock = document.getElementById('inv-only-with-stock')?.checked;
+  const all = window._invBlankComps || [];
+  let cnt = 0;
+  all.forEach(c => {
+    if (selected.size > 0 && !selected.has(c.category_id)) return;
+    if (onlyStock && !((c.qty_on_stock || 0) > 0)) return;
+    cnt++;
+  });
+  const label = document.getElementById('inv-blank-count');
+  if (label) label.textContent = 'Будет в бланке: ' + cnt + ' позиций';
+  const btn = document.getElementById('inv-blank-download-btn');
+  if (btn) btn.disabled = (cnt === 0);
+}
+
+async function downloadInventoryBlank() {
+  // Если открыта модалка — берём фильтры из неё
+  const selected = [];
+  document.querySelectorAll('#inv-cat-list input[type="checkbox"]:checked').forEach(cb => {
+    selected.push(parseInt(cb.dataset.cid, 10));
+  });
+  const onlyStock = document.getElementById('inv-only-with-stock')?.checked;
+  const params = new URLSearchParams();
+  if (selected.length) params.set('category_ids', selected.join(','));
+  if (onlyStock) params.set('only_with_stock', '1');
+  const qs = params.toString();
+  const url = API_BASE + '/api/inventory/components-blank.xlsx' + (qs ? ('?' + qs) : '');
+
+  // Закрыть модалку
+  const m = document.getElementById('inv-blank-picker');
+  if (m) m.remove();
+
+  try {
+    const res = await fetch(url, {
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
     });
     if (!res.ok) throw new Error('http ' + res.status);
