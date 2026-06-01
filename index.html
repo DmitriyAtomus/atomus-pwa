@@ -4243,6 +4243,50 @@
     border-color: var(--brand);
   }
 
+  /* v2.44.24: объёмные чипы фильтров на экране Продажной номенклатуры */
+  #sp-filters .filter-chip,
+  #sp-categories-filters .filter-chip {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    padding: 9px 16px;
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  #sp-filters .filter-chip:hover,
+  #sp-categories-filters .filter-chip:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #2563EB;
+    box-shadow: 0 3px 8px -2px rgba(30, 58, 138, 0.15);
+  }
+  #sp-filters .filter-chip.active,
+  #sp-categories-filters .filter-chip.active {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    font-weight: 600;
+  }
+  #sp-filters .filter-chip.active:hover,
+  #sp-categories-filters .filter-chip.active:hover {
+    color: white;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
+  }
+  /* Счётчик «· N» внутри чипа — едва заметно подсвечиваем */
+  #sp-filters .filter-chip, #sp-categories-filters .filter-chip {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (max-width: 700px) {
+    #sp-filters .filter-chip,
+    #sp-categories-filters .filter-chip {
+      padding: 7px 12px;
+      font-size: 12px;
+    }
+  }
+
   /* Список категорий — строки в справочнике */
   .category-row {
     background: white;
@@ -17256,7 +17300,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.23-pretty-groups";
+const APP_VERSION = "v2.44.24-pretty-chips";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
