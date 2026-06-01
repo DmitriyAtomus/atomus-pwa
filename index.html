@@ -10156,6 +10156,15 @@
   }
   .dev-demo-link:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(37,99,235,0.35); }
   .dev-demo-link i { font-size: 15px; }
+  .dev-demo-iframe {
+    width: 100%; height: 580px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 8px;
+    background: #eef0f2;
+    display: block;
+  }
+  @media (max-width: 700px) { .dev-demo-iframe { height: 420px; } }
   /* --- files --- */
   .dev-files-drop {
     border: 2px dashed var(--border);
@@ -18295,7 +18304,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.50-upd-bulk-destination";
+const APP_VERSION = "v2.44.51-3d-viewer-embed";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45632,8 +45641,8 @@ function renderDevelopmentDetail(dev) {
         '<div class="dev-section-title"><i class="ti ti-cube"></i>Ссылка на 3D / демонстрацию</div>' +
         '<div class="dev-demo-row">' +
           '<input type="url" class="dev-demo-input" id="dev-demo-input" ' +
-                 'value="' + safeUrl + '" placeholder="https://claude.ai/chat/… или ссылка на 3D-модель" ' +
-                 'oninput="_devScheduleSave();_devUpdateDemoLink()">' +
+                 'value="' + safeUrl + '" placeholder="https://claude.ai/chat/… или /3d/humidifier_viewer.html" ' +
+                 'oninput="_devScheduleSave();_devUpdateDemoLink();_devUpdateDemoEmbed()">' +
           (dev.demo_url
             ? '<a class="dev-demo-link" id="dev-demo-link" href="' + safeUrl + '" target="_blank" rel="noopener">' +
                 '<i class="ti ti-external-link"></i>Открыть</a>'
@@ -45641,6 +45650,7 @@ function renderDevelopmentDetail(dev) {
                 '<i class="ti ti-external-link"></i>Открыть</a>'
           ) +
         '</div>' +
+        '<div id="dev-demo-embed">' + _devDemoEmbedHtml(dev.demo_url) + '</div>' +
       '</div>' +
       // Файлы
       '<div class="dev-section">' +
@@ -46040,6 +46050,32 @@ function _devUpdateDemoLink() {
   }
 }
 
+function _devIsEmbeddableDemoUrl(url) {
+  if (!url) return false;
+  url = url.trim();
+  if (!url) return false;
+  // Относительный URL — наш домен, можно
+  if (url.startsWith('/')) return true;
+  try {
+    const u = new URL(url, window.location.href);
+    // Same origin — можно встроить
+    if (u.origin === window.location.origin) return true;
+  } catch (_) { return false; }
+  return false;
+}
+
+function _devDemoEmbedHtml(url) {
+  if (!_devIsEmbeddableDemoUrl(url)) return '';
+  return '<iframe src="' + escapeHtml(url) + '" class="dev-demo-iframe" allow="fullscreen"></iframe>';
+}
+
+function _devUpdateDemoEmbed() {
+  const box   = document.getElementById('dev-demo-embed');
+  const input = document.getElementById('dev-demo-input');
+  if (!box || !input) return;
+  box.innerHTML = _devDemoEmbedHtml((input.value || '').trim());
+}
+
 async function _devSaveCurrent() {
   if (!_devState.currentId) return;
   const name = document.getElementById('dev-name-input')?.value || '';
@@ -46260,11 +46296,15 @@ function _renderPublicDevelopment(token, data) {
 
   // 3D / демка
   if (dev.demo_url) {
+    const embedded = _devIsEmbeddableDemoUrl(dev.demo_url);
     body +=
       '<div class="public-dev-section">' +
         '<div class="public-dev-section-title"><i class="ti ti-cube"></i>3D-демонстрация</div>' +
-        '<a class="public-dev-demo-link" href="' + escapeHtml(dev.demo_url) + '" target="_blank" rel="noopener">' +
-          '<i class="ti ti-external-link"></i>Открыть демонстрацию</a>' +
+        (embedded
+          ? '<iframe src="' + escapeHtml(dev.demo_url) + '" class="dev-demo-iframe" allow="fullscreen"></iframe>'
+          : '<a class="public-dev-demo-link" href="' + escapeHtml(dev.demo_url) + '" target="_blank" rel="noopener">' +
+              '<i class="ti ti-external-link"></i>Открыть демонстрацию</a>'
+        ) +
       '</div>';
   }
 
