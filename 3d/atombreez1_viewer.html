@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AtomBreez-1 — 3D, узлы, схема, расчёты, спецификация</title>
+<!--
+  Автономный просмотрщик изделия AtomBreez-1 (облегчённая версия).
+  Вкладки: Сборка 3D / Подставка 3D / Коллектор 3D / Поддон 3D / Схема работы / Расчёты / Спецификация.
+  Встраивание в CRM (iframe):
+    <iframe src="/static/3d/atombreez1_viewer.html" style="width:100%;height:820px;border:0;border-radius:12px"></iframe>
+  Закрытый контур без интернета: скачать three.min.js (r128) локально рядом с файлом
+  и заменить src в строке подключения ниже на относительный путь.
+  Это концепт-модель (облик, компоновка, предварительные размеры), НЕ рабочая КД/STEP.
+-->
+<style>
+  :root{--bg:#eef0f2;--panel:#fff;--panel2:#f1f3f5;--panel3:#e4e7ea;--border:#d4d8dc;--text:#1f2429;--text2:#5b636b;--text3:#9aa1a8;--accent:#d85a30;--accentT:#993c1d;--radius:12px}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--text);background:var(--bg)}
+  .wrap{max-width:1040px;margin:0 auto;padding:14px}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
+  .tab{border:none;border-bottom:2px solid transparent;background:transparent;padding:9px 13px;color:var(--text2);font-size:14px;cursor:pointer;border-radius:0}
+  .tab.on{border-bottom-color:var(--text);color:var(--text);font-weight:500}
+  .scene-h{position:relative}
+  canvas.scene{width:100%;height:520px;background:var(--bg);border-radius:var(--radius);cursor:grab;touch-action:none;display:block}
+  svg.anno{position:absolute;left:0;top:0;width:100%;height:520px;pointer-events:none}
+  .row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;font-size:13px}
+  button.ctl{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--panel);cursor:pointer;color:var(--text);font-size:13px}
+  button.ctl:hover{background:var(--panel2)}
+  button.ctl.on{background:var(--panel3)}
+  .hint{margin-left:auto;color:var(--text3);align-self:center}
+  .legend{display:flex;gap:9px 14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--text2)}
+  .legend .it{display:flex;align-items:center;gap:6px}
+  .legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .desc{font-size:13.5px;line-height:1.7;color:var(--text);margin-top:12px}
+  .desc b{font-weight:600}
+  table.t{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.t th{text-align:left;padding:8px 10px;background:var(--panel2);color:var(--text2);font-weight:600;border-bottom:1px solid var(--border)}
+  table.t td{padding:7px 10px;border-bottom:1px solid #e8eaec;vertical-align:top}
+  table.t .c{text-align:center}
+  table.t .buy td{color:var(--text2)}
+  .note{margin-top:14px;font-size:12px;color:var(--text2);line-height:1.7}
+  .h3{font-size:15px;font-weight:600;margin:18px 0 2px;color:var(--text)}
+  .formula{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--text2);background:var(--panel2);padding:8px 10px;border-radius:8px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab on" data-k="3d">Сборка 3D</button>
+    <button class="tab" data-k="rm">Подставка</button>
+    <button class="tab" data-k="cl">Коллектор</button>
+    <button class="tab" data-k="pd">Поддон</button>
+    <button class="tab" data-k="sx">Схема работы</button>
+    <button class="tab" data-k="rc">Расчёты</button>
+    <button class="tab" data-k="sp">Спецификация</button>
+  </div>
+
+  <div data-pane="3d">
+    <div class="scene-h"><canvas id="cv-main" class="scene"></canvas><svg id="an-main" class="anno"></svg></div>
+    <div class="row">
+      <button class="ctl rotB on" data-t="main">Вращение</button><button class="ctl vB" data-t="main" data-v="iso">Изометрия</button><button class="ctl vB" data-t="main" data-v="front">Спереди</button><button class="ctl vB" data-t="main" data-v="rightS">Сбоку</button><button class="ctl vB" data-t="main" data-v="top">Сверху</button>
+    </div>
+    <div class="row">
+      <button class="ctl on" id="proc">Туман и вода</button><button class="ctl" id="open">Открыть переход</button><button class="ctl" id="disc">Достать диск</button><button class="ctl" id="pan">Выдвинуть поддон</button><button class="ctl" id="cut">Прозрачный корпус</button><button class="ctl dimB on" data-t="main">Размеры</button>
+      <span class="hint">тяни — вращать · колесо — зум</span>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div data-pane="rm" style="display:none">
+    <div class="scene-h"><canvas id="cv-rm" class="scene" style="height:480px"></canvas><svg id="an-rm" class="anno" style="height:480px"></svg></div>
+    <div class="row"><button class="ctl rotB on" data-t="rm">Вращение</button><button class="ctl vB" data-t="rm" data-v="iso">Изометрия</button><button class="ctl vB" data-t="rm" data-v="front">Спереди</button><button class="ctl vB" data-t="rm" data-v="side">Сбоку</button><button class="ctl vB" data-t="rm" data-v="top">Сверху</button><button class="ctl dimB on" data-t="rm">Размеры</button></div>
+    <div class="desc"><b>Рама-подставка AB-01-008.000</b> — труба кв. 40×40×2. Габарит ширина 600 × длина 600, высота рамы 560 мм (≈680 с колёсами). Панель-противовес t1,5. Направляющие поддона — уголок 32×32×3. 4 колеса Ø100 (2 с тормозом).</div>
+  </div>
+
+  <div data-pane="cl" style="display:none">
+    <div class="scene-h"><canvas id="cv-cl" class="scene" style="height:480px"></canvas><svg id="an-cl" class="anno" style="height:480px"></svg></div>
+    <div class="row"><button class="ctl rotB on" data-t="cl">Вращение</button><button class="ctl vB" data-t="cl" data-v="iso">Изометрия</button><button class="ctl vB" data-t="cl" data-v="top">Сверху</button><button class="ctl vB" data-t="cl" data-v="front">Сбоку</button><button class="ctl dimB on" data-t="cl">Размеры</button></div>
+    <div class="desc"><b>Коллектор AB-01-002.000</b> — кольцо труба Ø16×1,5 (1/2"), средн. Ø ≈330 мм. 5 форсунок через 72°, бьют вверх. На 3 кронштейнах, съёмное вниз для мойки. Подвод: трубка → окно → БРС 1/2" → шланг. Форсунки EVSPRAY, ≈0,5–0,8 л/мин при 9–10 атм.</div>
+  </div>
+
+  <div data-pane="pd" style="display:none">
+    <div class="scene-h"><canvas id="cv-pd" class="scene" style="height:480px"></canvas><svg id="an-pd" class="anno" style="height:480px"></svg></div>
+    <div class="row"><button class="ctl rotB on" data-t="pd">Вращение</button><button class="ctl vB" data-t="pd" data-v="iso">Изометрия</button><button class="ctl vB" data-t="pd" data-v="front">Спереди</button><button class="ctl vB" data-t="pd" data-v="side">Сбоку</button><button class="ctl vB" data-t="pd" data-v="top">Сверху</button><button class="ctl dimB on" data-t="pd">Размеры</button></div>
+    <div class="desc"><b>Поддон-корыто AB-01-007.000</b> — гнутое корыто из листа t1,5. Дно ≈520×520, борт h60, уклон к сливу Ø40, снизу кран 1/2" (смещён от центра). Ручка-скоба, выдвигается как противень. Развёртка на лазер + гибка.</div>
+  </div>
+
+  <div data-pane="sx" style="display:none"></div>
+  <div data-pane="rc" style="display:none"></div>
+  <div data-pane="sp" style="display:none"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const NS="http://www.w3.org/2000/svg";
+let sceneByK={};
+const HAS3D=(typeof THREE!=="undefined");
+if(!HAS3D){
+  document.querySelectorAll('.scene-h').forEach(function(el){
+    el.innerHTML='<div style="height:480px;display:flex;align-items:center;justify-content:center;background:var(--panel2);border-radius:var(--radius);color:var(--text2);font-size:13px;text-align:center;padding:20px">3D-модель не загрузилась: нет доступа к библиотеке three.js.<br>Проверьте подключение к интернету или подайте three.min.js локально (см. комментарий в начале файла).</div>';
+  });
+}
+function mat(col,opt){return new THREE.MeshStandardMaterial(Object.assign({color:col,metalness:0.25,roughness:0.52,side:THREE.DoubleSide},opt||{}));}
+function addLights(s){s.add(new THREE.AmbientLight(0xffffff,0.8));const a=new THREE.DirectionalLight(0xffffff,0.62);a.position.set(7,12,8);s.add(a);const b=new THREE.DirectionalLight(0xffffff,0.36);b.position.set(-6,5,-7);s.add(b);}
+function makeScene(cvId,anId,h){const host=document.getElementById(cvId),anno=document.getElementById(anId);const SW=()=>host.clientWidth;let W=SW();
+ const scene=new THREE.Scene();const cam=new THREE.PerspectiveCamera(40,W/h,0.05,100);const rnd=new THREE.WebGLRenderer({canvas:host,antialias:true,alpha:true});rnd.setSize(W,h,false);rnd.setPixelRatio(Math.min(devicePixelRatio,2));addLights(scene);
+ const o={host,anno,scene,cam,rnd,SW,H:h,get W(){return W},ry:0.6,rx:0.28,tRy:0.6,tRx:0.28,dist:15,spin:true,drag:false,mpx:0,mpy:0,pinch:0,showDim:true,active:false,root:new THREE.Group(),dims:[],dimEls:[],lookY:1.05,camLift:1.3,rxClamp:[-0.5,1.35]};
+ scene.add(o.root);
+ const VIEWS={iso:[0.6,0.28],front:[0.001,0.05],rightS:[Math.PI/2,0.05],side:[Math.PI/2,0.1],top:[0.4,1.2]};
+ o.setView=v=>{const a=VIEWS[v];if(!a)return;o.tRy=a[0];o.tRx=a[1];o.spin=false;syncRot(o);};
+ host.addEventListener('mousedown',e=>{o.drag=true;o.spin=false;syncRot(o);o.mpx=e.clientX;o.mpy=e.clientY;host.style.cursor='grabbing';});
+ addEventListener('mouseup',()=>{o.drag=false;host.style.cursor='grab';});
+ addEventListener('mousemove',e=>{if(!o.drag)return;o.tRy+=(e.clientX-o.mpx)*0.01;o.tRx+=(e.clientY-o.mpy)*0.01;o.tRx=Math.max(o.rxClamp[0],Math.min(o.rxClamp[1],o.tRx));o.mpx=e.clientX;o.mpy=e.clientY;});
+ host.addEventListener('wheel',e=>{e.preventDefault();o.dist=Math.max(3,Math.min(30,o.dist+e.deltaY*0.012));},{passive:false});
+ host.addEventListener('touchstart',e=>{if(e.touches.length===1){o.drag=true;o.spin=false;syncRot(o);o.mpx=e.touches[0].clientX;o.mpy=e.touches[0].clientY;}else if(e.touches.length===2){o.drag=false;o.pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}},{passive:true});
+ host.addEventListener('touchend',()=>{o.drag=false;o.pinch=0;});
+ host.addEventListener('touchmove',e=>{if(e.touches.length===2){const dd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(o.pinch)o.dist=Math.max(3,Math.min(30,o.dist-(dd-o.pinch)*0.03));o.pinch=dd;e.preventDefault();}else if(o.drag&&e.touches.length===1){o.tRy+=(e.touches[0].clientX-o.mpx)*0.01;o.tRx+=(e.touches[0].clientY-o.mpy)*0.01;o.tRx=Math.max(o.rxClamp[0],Math.min(o.rxClamp[1],o.tRx));o.mpx=e.touches[0].clientX;o.mpy=e.touches[0].clientY;}},{passive:false});
+ anno.setAttribute("width",W);anno.setAttribute("height",h);
+ o.resize=()=>{W=SW();rnd.setSize(W,h,false);cam.aspect=W/h;cam.updateProjectionMatrix();anno.setAttribute("width",W);};
+ addEventListener('resize',o.resize);return o;}
+function buildDims(o){o.dimEls=o.dims.map(d=>{const g=document.createElementNS(NS,"g");
+ if(d.type==='lin'||d.type==='vH'){const m=document.createElementNS(NS,"line");m.setAttribute("stroke","#d85a30");m.setAttribute("stroke-width","1.3");
+  const e1=document.createElementNS(NS,"line");e1.setAttribute("stroke","#d85a30");e1.setAttribute("stroke-width","0.7");
+  const e2=document.createElementNS(NS,"line");e2.setAttribute("stroke","#d85a30");e2.setAttribute("stroke-width","0.7");
+  const r=document.createElementNS(NS,"rect");r.setAttribute("rx","4");r.setAttribute("fill","#fff");r.setAttribute("stroke","#d85a30");r.setAttribute("stroke-width","0.75");
+  const t=document.createElementNS(NS,"text");t.setAttribute("font-size","11.5");t.setAttribute("fill","#993c1d");t.setAttribute("text-anchor","middle");t.setAttribute("dominant-baseline","middle");t.textContent=d.t;
+  g.appendChild(m);g.appendChild(e1);g.appendChild(e2);g.appendChild(r);g.appendChild(t);o.anno.appendChild(g);return {g,m,e1,e2,r,t,d,lin:d.type==='lin',vH:d.type==='vH'};}
+ else{const line=document.createElementNS(NS,"line");line.setAttribute("stroke","#d85a30");line.setAttribute("stroke-width","1");
+  const dot=document.createElementNS(NS,"circle");dot.setAttribute("r","2.5");dot.setAttribute("fill","#d85a30");
+  const r=document.createElementNS(NS,"rect");r.setAttribute("rx","4");r.setAttribute("fill","#fff");r.setAttribute("stroke","#d85a30");r.setAttribute("stroke-width","0.75");
+  const t=document.createElementNS(NS,"text");t.setAttribute("font-size","11");t.setAttribute("fill","#993c1d");t.setAttribute("dominant-baseline","middle");t.textContent=d.t;
+  g.appendChild(line);g.appendChild(dot);g.appendChild(r);g.appendChild(t);o.anno.appendChild(g);return {g,line,dot,r,t,d,lin:false};}});
+ let li=0,ri=0;o.layout=o.dims.map(d=>{const left=(li+ri)%2===0;const idx=left?(li++):(ri++);return {left,ay:(d.baseAy||28)+idx*44};});}
+const _v=new THREE.Vector3();
+function proj(o,p){_v.set(p[0],p[1]+o.root.position.y,p[2]);_v.project(o.cam);return [(_v.x*0.5+0.5)*o.W,(-_v.y*0.5+0.5)*o.H,_v.z];}
+function renderDims(o){if(!o.showDim||o.W<2)return;o.dimEls.forEach(function(e,i){const d=e.d;
+ if(e.vH){const pa=proj(o,d.a),pb=proj(o,d.b);const vis=pa[2]<1&&pb[2]<1&&isFinite(pa[0])&&isFinite(pb[0]);e.g.style.display=vis?'block':'none';if(!vis)return;
+  const colX=o.W*0.5+(d.col||0);const y1=pa[1],y2=pb[1];
+  e.m.setAttribute("x1",colX);e.m.setAttribute("y1",y1);e.m.setAttribute("x2",colX);e.m.setAttribute("y2",y2);
+  e.e1.setAttribute("x1",pa[0]);e.e1.setAttribute("y1",y1);e.e1.setAttribute("x2",colX);e.e1.setAttribute("y2",y1);
+  e.e2.setAttribute("x1",pb[0]);e.e2.setAttribute("y1",y2);e.e2.setAttribute("x2",colX);e.e2.setAttribute("y2",y2);
+  const my=(y1+y2)/2,tw=(e.t.getComputedTextLength?e.t.getComputedTextLength():d.t.length*6.2)+12;
+  e.r.setAttribute("x",colX-tw/2);e.r.setAttribute("y",my-9);e.r.setAttribute("width",tw);e.r.setAttribute("height",18);e.t.setAttribute("x",colX);e.t.setAttribute("y",my);return;}
+ if(e.lin){const pa=proj(o,d.a),pb=proj(o,d.b);const vis=pa[2]<1&&pb[2]<1&&isFinite(pa[0])&&isFinite(pb[0]);e.g.style.display=vis?'block':'none';if(!vis)return;
+  e.m.setAttribute("x1",pa[0]);e.m.setAttribute("y1",pa[1]);e.m.setAttribute("x2",pb[0]);e.m.setAttribute("y2",pb[1]);
+  e.e1.setAttribute("x1",pa[0]);e.e1.setAttribute("y1",pa[1]-5);e.e1.setAttribute("x2",pa[0]);e.e1.setAttribute("y2",pa[1]+5);
+  e.e2.setAttribute("x1",pb[0]);e.e2.setAttribute("y1",pb[1]-5);e.e2.setAttribute("x2",pb[0]);e.e2.setAttribute("y2",pb[1]+5);
+  const mx=(pa[0]+pb[0])/2,my=(pa[1]+pb[1])/2,tw=(e.t.getComputedTextLength?e.t.getComputedTextLength():d.t.length*6.2)+12;
+  e.r.setAttribute("x",mx-tw/2);e.r.setAttribute("y",my-9);e.r.setAttribute("width",tw);e.r.setAttribute("height",18);e.t.setAttribute("x",mx);e.t.setAttribute("y",my);}
+ else{const sp=proj(o,d.p);const an=o.layout[i];const lx=an.left?12:o.W-12,ly=an.ay;const vis=sp[2]<1&&isFinite(sp[0])&&isFinite(lx);e.g.style.display=vis?'block':'none';if(!vis)return;
+  e.t.setAttribute("text-anchor",an.left?"start":"end");e.t.setAttribute("x",an.left?lx+6:lx-6);e.t.setAttribute("y",ly);
+  const tw=(e.t.getComputedTextLength?e.t.getComputedTextLength():d.t.length*6)+12;
+  e.r.setAttribute("x",an.left?lx:lx-tw);e.r.setAttribute("y",ly-9);e.r.setAttribute("width",tw);e.r.setAttribute("height",18);
+  e.dot.setAttribute("cx",sp[0]);e.dot.setAttribute("cy",sp[1]);const ex=an.left?lx+tw:lx-tw;
+  e.line.setAttribute("x1",ex);e.line.setAttribute("y1",ly);e.line.setAttribute("x2",sp[0]);e.line.setAttribute("y2",sp[1]);}});}
+function camUpd(o){o.ry+=(o.tRy-o.ry)*0.12;o.rx+=(o.tRx-o.rx)*0.12;o.cam.position.x=Math.sin(o.ry)*Math.cos(o.rx)*o.dist;o.cam.position.z=Math.cos(o.ry)*Math.cos(o.rx)*o.dist;o.cam.position.y=Math.sin(o.rx)*o.dist+o.camLift;o.cam.lookAt(0,o.lookY,0);}
+function syncRot(o){const b=document.querySelector('.rotB[data-t="'+o.key+'"]');if(b){b.textContent=(o.spin?'■ ':'▶ ')+'Вращение';b.classList.toggle('on',o.spin);}}
+const PX=(t,r)=>r*Math.sin(t),PZ=(t,r)=>r*Math.cos(t),TC=Math.PI/2;
+const mRama=mat(0x6c7378,{metalness:0.35,roughness:0.55}),mNap=mat(0x55656f),mKol=mat(0x202428,{metalness:0.1,roughness:0.7}),mColl=mat(0x3f6e78),mFor=mat(0x5a8e95),mPodT=mat(0x2f6285),mBrs=mat(0x8c8276,{metalness:0.5,roughness:0.4}),mPanel=mat(0x5a626a),mPod2=mat(0x2b3036,{metalness:0.32,roughness:0.46}),mKran=mat(0x8f4a45),mDrain=mat(0x3a4045,{metalness:0.4,roughness:0.45}),mCt=mat(0x2f4d72,{transparent:true,opacity:0.12});
+const mHoseW=mat(0x9aa0a6,{metalness:0.6,roughness:0.35}),mLever=mat(0xc23b34,{metalness:0.3,roughness:0.5}),mSteel=mat(0xb8bcc0,{metalness:0.7,roughness:0.3}),mHoseCore=mat(0x2c333a,{metalness:0.15,roughness:0.65});
+function makeHose(pts,r){const g=new THREE.Group();const curve=new THREE.CatmullRomCurve3(pts);const core=new THREE.Mesh(new THREE.TubeGeometry(curve,80,r,16,false),mHoseCore);g.add(core);
+ const N=120,seg=curve.getSpacedPoints(N),up=new THREE.Vector3(0,1,0),tmp=new THREE.Vector3();const wireR=r*0.22;
+ for(let i=1;i<N;i++){const p=seg[i];const tang=tmp.copy(seg[i]).sub(seg[i-1]).normalize();const nx=new THREE.Vector3().crossVectors(tang,up).normalize();const ny=new THREE.Vector3().crossVectors(tang,nx).normalize();const ph=i*0.9;const off=nx.clone().multiplyScalar(Math.cos(ph)*r).add(ny.clone().multiplyScalar(Math.sin(ph)*r));const bead=new THREE.Mesh(new THREE.SphereGeometry(wireR,6,6),mHoseW);bead.position.copy(p).add(off);g.add(bead);}
+ return g;}
+function makeBallValve(opt){opt=opt||{};const bodyR=opt.bodyR||0.075,len=opt.len||0.26,col=opt.col;const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.SphereGeometry(bodyR*1.35,18,14),mKran);g.add(body);
+ const p1=new THREE.Mesh(new THREE.CylinderGeometry(bodyR*0.62,bodyR*0.62,len*0.5,16),mKran);p1.rotation.z=Math.PI/2;p1.position.x=len*0.32;g.add(p1);
+ const p2=new THREE.Mesh(new THREE.CylinderGeometry(bodyR*0.62,bodyR*0.62,len*0.5,16),mKran);p2.rotation.z=Math.PI/2;p2.position.x=-len*0.32;g.add(p2);
+ const n1=new THREE.Mesh(new THREE.CylinderGeometry(bodyR*0.78,bodyR*0.78,len*0.12,6),mSteel);n1.rotation.z=Math.PI/2;n1.position.x=len*0.5;g.add(n1);
+ const n2=new THREE.Mesh(new THREE.CylinderGeometry(bodyR*0.78,bodyR*0.78,len*0.12,6),mSteel);n2.rotation.z=Math.PI/2;n2.position.x=-len*0.5;g.add(n2);
+ const stem=new THREE.Mesh(new THREE.CylinderGeometry(bodyR*0.3,bodyR*0.3,bodyR*0.7,12),mSteel);stem.position.y=bodyR*1.3;g.add(stem);
+ const lever=new THREE.Mesh(new THREE.BoxGeometry(len*0.95,bodyR*0.32,bodyR*0.5),mLever);lever.position.set(len*0.28,bodyR*1.75,0);g.add(lever);
+ const grip=new THREE.Mesh(new THREE.CylinderGeometry(bodyR*0.28,bodyR*0.28,bodyR*0.7,10),mLever);grip.position.set(len*0.72,bodyR*1.75,0);g.add(grip);
+ return g;}
+
+if(HAS3D){
+const main=makeScene('cv-main','an-main',520);main.key='main';main.active=true;
+const C={corpus:0x2f4d72,kreplenie:0x1a1d22,collector:0x3f6e78,forsun:0x5a8e95,podvod:0x2f6285,brs:0x8c8276,shlang:0x2c333a,disk:0x6a7488,perehod:0x4a5b6e,vent:0x2a3138,homut:0x6f6a60,rama:0x6c7378,poddon:0x2b3036,kran:0x8f4a45,kolesa:0x202428};
+const LEG=[['corpus','Труба Ø400'],['kreplenie','Буртик (тёмный)'],['collector','Коллектор'],['forsun','Форсунки 5шт'],['podvod','Подвод воды'],['disk','Каплеуловитель'],['perehod','Переход'],['vent','Вентилятор'],['rama','Рама'],['poddon','Поддон'],['kran','Кран'],['kolesa','Колёса']];
+const legEl=document.getElementById('legend');LEG.forEach(function(p){const k=p[0],t=p[1];const d=document.createElement('div');d.className='it';const sw=document.createElement('span');sw.className='sw';sw.style.background='#'+C[k].toString(16).padStart(6,'0');const l=document.createElement('span');l.textContent=t;d.appendChild(sw);d.appendChild(l);legEl.appendChild(d);});
+const mC=mat(C.corpus),mCt2=mat(C.corpus,{transparent:true,opacity:0.12}),mCp=mat(C.corpus,{transparent:true,opacity:0.28}),mKrep=mat(C.kreplenie,{metalness:0.4,roughness:0.45}),mShl=mat(C.shlang,{metalness:0.15,roughness:0.65}),mDisk=mat(C.disk),mPer=mat(C.perehod),mPerT=mat(C.perehod,{transparent:true,opacity:0.2}),mVent=mat(C.vent,{metalness:0.1,roughness:0.7}),mHom=mat(C.homut);
+const steelIn=new THREE.MeshStandardMaterial({color:0x24344a,metalness:0.2,roughness:0.6,side:THREE.BackSide});
+function perfTex(){const z=512,c=document.createElement('canvas');c.width=c.height=z;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,z,z);x.fillStyle='#000';const st=z/26,r=st*0.3;for(let i=0;i<26;i++)for(let j=0;j<26;j++){const ox=(j%2)?st*0.5:0,cx=i*st+ox+st*0.2,cy=j*st+st*0.2;if(Math.hypot(cx-z/2,cy-z/2)>z*0.46)continue;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();}return new THREE.CanvasTexture(c);}
+mDisk.alphaMap=perfTex();mDisk.transparent=true;
+function nameTex(){const cw=1024,chh=256,c=document.createElement('canvas');c.width=cw;c.height=chh;const x=c.getContext('2d');x.clearRect(0,0,cw,chh);x.fillStyle='#dfe7ee';x.font='bold 130px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText('AtomBreez-1',cw/2,chh/2);return new THREE.CanvasTexture(c);}
+(function(){const root=main.root;const R=1.0,ringR=R+0.34,Rframe=R+0.34,Rf=0.375,railTopY=0.5,baseY=-1.0,railY=-0.4,winHalf=0.14;
+ function beam(p0,p1,h,th){const dx=p1[0]-p0[0],dz=p1[2]-p0[2],len=Math.hypot(dx,dz);const m=new THREE.Mesh(new THREE.BoxGeometry(len,h,th),mRama);m.position.set((p0[0]+p1[0])/2,p0[1],(p0[2]+p1[2])/2);m.rotation.y=-Math.atan2(dz,dx);root.add(m);}
+ beam([-Rframe,railTopY,-Rframe],[Rframe,railTopY,-Rframe],0.12,0.12);beam([-Rframe,railTopY,Rframe],[Rframe,railTopY,Rframe],0.12,0.12);beam([-Rframe,railTopY,-Rframe],[-Rframe,railTopY,Rframe],0.12,0.12);beam([Rframe,railTopY,-Rframe],[Rframe,railTopY,Rframe],0.12,0.12);
+ [[-Rframe,-Rframe],[Rframe,-Rframe],[-Rframe,Rframe],[Rframe,Rframe]].forEach(function(p){const px=p[0],pz=p[1];const post=new THREE.Mesh(new THREE.BoxGeometry(0.1,railTopY-baseY,0.1),mRama);post.position.set(px,(railTopY+baseY)/2,pz);root.add(post);const w=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.06,20),mKol);w.rotation.x=Math.PI/2;w.position.set(px+0.04,baseY-0.18,pz);root.add(w);});
+ beam([-Rframe,railY,-Rframe],[Rframe,railY,-Rframe],0.1,0.1);const bp=new THREE.Mesh(new THREE.BoxGeometry(2*Rframe,0.4,0.04),mRama);bp.position.set(0,railY+0.15,-Rframe);root.add(bp);
+ const ps=Rframe-0.16,railShelfY=railY;[1,-1].forEach(function(xs){const inner=ps-0.02,outer=Rframe;const sh=new THREE.Mesh(new THREE.BoxGeometry(outer-inner,0.03,2*Rframe*0.92),mNap);sh.position.set(xs*(inner+outer)/2,railShelfY,0);root.add(sh);});
+ const pipeBot=railTopY+0.10,pipeTop=railTopY+3.0,winYC=pipeBot+0.45,winH=0.34,winYbot=winYC-winH/2,winYtop=winYC+winH/2;
+ const low=new THREE.Mesh(new THREE.CylinderGeometry(R,R,winYbot-pipeBot,64,1,true),mC);low.position.y=(winYbot+pipeBot)/2;root.add(low);
+ const up=new THREE.Mesh(new THREE.CylinderGeometry(R,R,pipeTop-winYtop,64,1,true),mC);up.position.y=(pipeTop+winYtop)/2;root.add(up);
+ const midArc=new THREE.Mesh(new THREE.CylinderGeometry(R,R,winH,64,1,true,TC+winHalf,Math.PI*2-2*winHalf),mC);midArc.position.y=winYC;root.add(midArc);
+ const inAll=new THREE.Mesh(new THREE.CylinderGeometry(R-0.025,R-0.025,pipeTop-pipeBot,64,1,true),steelIn);inAll.position.y=(pipeTop+pipeBot)/2;root.add(inAll);
+ const corpusParts=[low,up,midArc];
+ const namePlate=new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.32),new THREE.MeshStandardMaterial({map:nameTex(),transparent:true,metalness:0.2,roughness:0.6}));namePlate.position.set(0,winYtop+(pipeTop-winYtop)*0.62,R+0.012);root.add(namePlate);
+ const lip=new THREE.Mesh(new THREE.TorusGeometry(R,0.025,8,48),mC);lip.rotation.x=Math.PI/2;lip.position.y=pipeBot;root.add(lip);
+ const rt=new THREE.Mesh(new THREE.RingGeometry(R+0.005,ringR,48),mKrep);rt.rotation.x=-Math.PI/2;rt.position.y=pipeBot+0.05;root.add(rt);
+ const rb=new THREE.Mesh(new THREE.RingGeometry(R+0.005,ringR,48),mKrep);rb.rotation.x=Math.PI/2;rb.position.y=pipeBot-0.05;root.add(rb);
+ const re=new THREE.Mesh(new THREE.CylinderGeometry(ringR,ringR,0.1,48,1,true),mKrep);re.position.y=pipeBot;root.add(re);
+ const Rring=0.66,ringCY=pipeBot+0.26,tubeR=0.05;const torus=new THREE.Mesh(new THREE.TorusGeometry(Rring,tubeR,14,64),mColl);torus.rotation.x=Math.PI/2;torus.position.y=ringCY;root.add(torus);
+ const tips=[];for(let i=0;i<5;i++){const a=TC+(i+0.5)*(2*Math.PI/5),fx=PX(a,Rring),fz=PZ(a,Rring);const ri=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.18,12),mColl);ri.position.set(fx,ringCY+0.13,fz);root.add(ri);const bo=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.09,12),mFor);bo.position.set(fx,ringCY+0.25,fz);root.add(bo);const ti=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,12),mFor);ti.position.set(fx,ringCY+0.34,fz);root.add(ti);tips.push([fx,ringCY+0.4,fz]);}
+ for(let i=0;i<3;i++){const a=TC+Math.PI*0.5+i*(2*Math.PI/3),mx=PX(a,(Rring+R)/2),mz=PZ(a,(Rring+R)/2);const b=new THREE.Mesh(new THREE.BoxGeometry(R-Rring,0.03,0.05),mColl);b.position.set(mx,ringCY,mz);b.rotation.y=-(Math.PI/2-a);root.add(b);}
+ const upTu=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,winYC-ringCY,12),mPodT);upTu.position.set(R-0.06,(winYC+ringCY)/2,0);root.add(upTu);
+ const hout=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.3,12),mPodT);hout.position.set(R+0.1,winYC,0);hout.rotation.z=Math.PI/2;root.add(hout);
+ const bt=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.12,16),mBrs);bt.position.set(R+0.28,winYC,0);bt.rotation.z=Math.PI/2;root.add(bt);
+ const bb=new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.085,0.13,16),mBrs);bb.position.set(R+0.42,winYC,0);bb.rotation.z=Math.PI/2;root.add(bb);
+ const hosePts=[new THREE.Vector3(R+0.5,winYC,0),new THREE.Vector3(R+0.78,winYC-0.35,0.04),new THREE.Vector3(R+0.86,winYC-0.85,0.02),new THREE.Vector3(R+0.66,winYC-1.4,0),new THREE.Vector3(R+0.5,winYC-1.78,0.04)];root.add(makeHose(hosePts,0.05));
+ const discGrp=new THREE.Group();root.add(discGrp);const discY=pipeTop-0.18;const sr=new THREE.Mesh(new THREE.TorusGeometry(R-0.04,0.03,10,48),mDisk);sr.rotation.x=Math.PI/2;sr.position.y=discY-0.04;discGrp.add(sr);const disc=new THREE.Mesh(new THREE.CircleGeometry(R-0.05,48),mDisk);disc.rotation.x=-Math.PI/2;disc.position.y=discY;discGrp.add(disc);const bar=new THREE.Mesh(new THREE.TorusGeometry(0.25,0.022,8,20,Math.PI),mDisk);bar.position.set(0,discY+0.05,0);discGrp.add(bar);
+ const transGrp=new THREE.Group();root.add(transGrp);const redH=0.7,redY1=pipeTop+redH;const red=new THREE.Mesh(new THREE.CylinderGeometry(Rf,R,redH,48,1,true),mPer);red.position.y=pipeTop+redH/2;transGrp.add(red);const clamp=new THREE.Mesh(new THREE.TorusGeometry(R+0.04,0.05,10,48),mHom);clamp.rotation.x=Math.PI/2;clamp.position.y=pipeTop;transGrp.add(clamp);const fanY1=redY1+0.6;const fan=new THREE.Mesh(new THREE.CylinderGeometry(Rf,Rf,0.6,32,1,true),mVent);fan.position.y=(redY1+fanY1)/2;transGrp.add(fan);const bladeGrp=new THREE.Group();bladeGrp.position.y=(redY1+fanY1)/2;transGrp.add(bladeGrp);bladeGrp.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.14,16),mVent));for(let i=0;i<7;i++){const bl=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.014,0.1),mVent);const a=i/7*Math.PI*2;bl.position.set(Math.cos(a)*0.22,0,Math.sin(a)*0.22);bl.rotation.y=a;bl.rotation.z=0.4;bladeGrp.add(bl);}
+ const panGrp=new THREE.Group();root.add(panGrp);const pz2=Rframe*0.86,floorY=railShelfY+0.05,ph=0.4,ptt=0.05,drR=0.1;const shp=new THREE.Shape();shp.moveTo(-ps,-pz2);shp.lineTo(ps,-pz2);shp.lineTo(ps,pz2);shp.lineTo(-ps,pz2);shp.lineTo(-ps,-pz2);const hl=new THREE.Path();hl.absarc(-0.25,0,drR,0,Math.PI*2,true);shp.holes.push(hl);const pf=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:ptt,bevelEnabled:false}),mPod2);pf.rotation.x=-Math.PI/2;pf.position.y=floorY;panGrp.add(pf);
+ function pw(w,x,y,z,ry){const m=new THREE.Mesh(new THREE.BoxGeometry(w,ph,ptt),mPod2);m.position.set(x,y,z);m.rotation.y=ry;panGrp.add(m);}pw(2*ps,0,floorY+ph/2,pz2,0);pw(2*ps,0,floorY+ph/2,-pz2,0);pw(2*pz2,ps,floorY+ph/2,0,Math.PI/2);pw(2*pz2,-ps,floorY+ph/2,0,Math.PI/2);
+ const drainPipe=new THREE.Mesh(new THREE.CylinderGeometry(drR*0.7,drR*0.7,0.14,16),mDrain);drainPipe.position.set(-0.25,railShelfY-0.12,0);panGrp.add(drainPipe);
+ const valveMain=makeBallValve({bodyR:0.07,len:0.24});valveMain.position.set(-0.25,railShelfY-0.28,0);valveMain.rotation.z=-Math.PI/2;panGrp.add(valveMain);
+ const wf=new THREE.Mesh(new THREE.BoxGeometry(2*ps-0.06,0.02,2*pz2-0.06),new THREE.MeshStandardMaterial({color:0x3f7da0,transparent:true,opacity:0.5,metalness:0.2,roughness:0.3}));wf.position.set(0,floorY+0.06,0);panGrp.add(wf);
+ const mistN=220,mp=new Float32Array(mistN*3),md=[];function sm(i){const tp=tips[(Math.random()*tips.length)|0];md[i]={x:tp[0]+(Math.random()-0.5)*0.05,y:tp[1]+Math.random()*0.1,z:tp[2]+(Math.random()-0.5)*0.05,vx:(Math.random()-0.5)*0.004,vy:0.008+Math.random()*0.012,vz:(Math.random()-0.5)*0.004};}for(let i=0;i<mistN;i++){sm(i);md[i].y=ringCY+0.4+Math.random()*(discY-ringCY-0.5);mp[i*3]=md[i].x;mp[i*3+1]=md[i].y;mp[i*3+2]=md[i].z;}const mg=new THREE.BufferGeometry();mg.setAttribute('position',new THREE.BufferAttribute(mp,3));const mpts=new THREE.Points(mg,new THREE.PointsMaterial({color:0xcfe6ee,size:0.07,transparent:true,opacity:0.5,depthWrite:false,sizeAttenuation:true}));root.add(mpts);
+ const watN=140,wp=new Float32Array(watN*3),wd=[];function sw(i){const a=Math.random()*Math.PI*2,rr=R-0.03-Math.random()*0.04;wd[i]={a:a,r:rr,y:discY-0.1-Math.random()*0.3,vy:0.012+Math.random()*0.018};}for(let i=0;i<watN;i++){sw(i);wd[i].y=pipeBot+0.1+Math.random()*(discY-pipeBot-0.3);const d=wd[i];wp[i*3]=PX(d.a,d.r);wp[i*3+1]=d.y;wp[i*3+2]=PZ(d.a,d.r);}const wg=new THREE.BufferGeometry();wg.setAttribute('position',new THREE.BufferAttribute(wp,3));const wpts=new THREE.Points(wg,new THREE.PointsMaterial({color:0x5aa0c8,size:0.05,transparent:true,opacity:0.75,depthWrite:false,sizeAttenuation:true}));root.add(wpts);
+ root.position.y=-0.4;main.lookY=1.05;main.camLift=1.3;
+ const xH=Rframe+1.05, xH2=Rframe+0.55, botAll=baseY-0.18;
+ main.dims=[{p:[0,pipeTop,0],t:"Ø400×1,5",baseAy:28},{p:[0,(fanY1+redY1)/2,0],t:"вентилятор Ø150",baseAy:28},{p:[PX(TC+0.628,Rring),ringCY,PZ(TC+0.628,Rring)],t:"кольцо Ø330"},{p:tips[2],t:"5 форсунок"},{p:[0,discY,0],t:"перфодиск Ø390, t2"},{p:[R+0.4,winYC,0],t:"БРС 1/2\""},{p:[ringR,pipeBot,0],t:"буртик 35×4"},{p:[-0.25,railShelfY-0.36,0],t:"слив Ø40 + кран"},{p:[Rframe,railTopY,Rframe],t:"рама 600×600"},{p:[Rframe,baseY-0.18,Rframe],t:"колёса Ø100"},
+  {type:'vH',a:[0,botAll,0],b:[0,fanY1,0],col:225,t:"общая ≈1750"},
+  {type:'vH',a:[0,baseY,0],b:[0,railTopY,0],col:130,t:"рама 560"},
+  {type:'vH',a:[0,pipeBot,0],b:[0,pipeTop,0],col:130,t:"корпус ≈820"},
+  {type:'vH',a:[0,pipeTop,0],b:[0,fanY1,0],col:130,t:"переход+вент. ≈370"},
+  {type:'vH',a:[0,botAll,0],b:[0,baseY,0],col:130,t:"колёса 100"}];
+ buildDims(main);
+ let openV=0,openT=0,discV=0,discT=0,panV=0,panT=0,proc=true,transparent=false;
+ function updC(){const m=proc?mCp:(transparent?mCt2:mC);corpusParts.forEach(function(p){p.material=m;});red.material=(transparent||proc)?mPerT:mPer;namePlate.visible=!transparent;}
+ document.getElementById('proc').addEventListener('click',function(){proc=!proc;this.classList.toggle('on',proc);mpts.visible=proc;wpts.visible=proc;wf.visible=proc;updC();});
+ document.getElementById('open').addEventListener('click',function(){openT=openT?0:1;this.classList.toggle('on',!!openT);});
+ document.getElementById('disc').addEventListener('click',function(){discT=discT?0:1;if(discT){openT=1;document.getElementById('open').classList.add('on');}this.classList.toggle('on',!!discT);});
+ document.getElementById('pan').addEventListener('click',function(){panT=panT?0:1;this.classList.toggle('on',!!panT);});
+ document.getElementById('cut').addEventListener('click',function(){transparent=!transparent;this.classList.toggle('on',transparent);updC();});
+ const ma=mg.attributes.position,wa=wg.attributes.position;
+ main.tick=function(){if(main.spin&&!main.drag)main.tRy+=0.005;openV+=(openT-openV)*0.08;transGrp.position.y=openV*1.3;discV+=(discT-discV)*0.07;discGrp.position.y=Math.min(discV/0.45,1)*0.7;discGrp.position.x=Math.max((discV-0.45)/0.55,0)*1.9;panV+=(panT-panV)*0.1;panGrp.position.z=panV*2.3;if(proc){bladeGrp.rotation.y+=0.35;for(let i=0;i<mistN;i++){const d=md[i];d.y+=d.vy;d.x+=d.vx;d.z+=d.vz;const rr=Math.hypot(d.x,d.z);if(rr>R-0.08){d.x*=(R-0.08)/rr;d.z*=(R-0.08)/rr;}if(d.y>discY-0.12)sm(i);ma.array[i*3]=d.x;ma.array[i*3+1]=d.y;ma.array[i*3+2]=d.z;}ma.needsUpdate=true;for(let i=0;i<watN;i++){const d=wd[i];d.y-=d.vy;if(d.y<pipeBot+0.06)sw(i);wa.array[i*3]=PX(d.a,d.r);wa.array[i*3+1]=d.y;wa.array[i*3+2]=PZ(d.a,d.r);}wa.needsUpdate=true;}};
+ updC();
+})();
+
+const rm=makeScene('cv-rm','an-rm',480);rm.key='rm';rm.dist=10;rm.lookY=0.35;rm.camLift=0.6;rm.tRy=0.7;rm.ry=0.7;rm.tRx=0.32;rm.rx=0.32;rm.rxClamp=[-0.4,1.45];
+(function(){const root=rm.root;const half=1.0,top=0.9,bot=-0.05;
+ function bm(p0,p1){const dx=p1[0]-p0[0],dy=p1[1]-p0[1],dz=p1[2]-p0[2],len=Math.hypot(dx,dy,dz);const m=new THREE.Mesh(new THREE.BoxGeometry(0.08,len,0.08),mRama);m.position.set((p0[0]+p1[0])/2,(p0[1]+p1[1])/2,(p0[2]+p1[2])/2);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(dx,dy,dz).normalize());root.add(m);}
+ const cs=[[-half,-half],[half,-half],[-half,half],[half,half]];cs.forEach(function(p){bm([p[0],bot,p[1]],[p[0],top,p[1]]);});
+ bm([-half,top,-half],[half,top,-half]);bm([-half,top,half],[half,top,half]);bm([-half,top,-half],[-half,top,half]);bm([half,top,-half],[half,top,half]);
+ bm([-half,bot,-half],[half,bot,-half]);bm([-half,bot,half],[half,bot,half]);bm([-half,bot,-half],[-half,bot,half]);bm([half,bot,-half],[half,bot,half]);
+ cs.forEach(function(p){const x=p[0],z=p[1];const f=new THREE.Mesh(new THREE.BoxGeometry(0.11,0.1,0.11),mKol);f.position.set(x,bot-0.08,z);root.add(f);const w=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.05,20),mKol);w.rotation.x=Math.PI/2;w.position.set(x+0.03,bot-0.2,z);root.add(w);});
+ const bp=new THREE.Mesh(new THREE.BoxGeometry(2*half,0.5,0.03),mPanel);bp.position.set(0,bot+0.28,-half);root.add(bp);
+ [1,-1].forEach(function(s){const g=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,2*half*0.9),mNap);g.position.set(s*(half-0.12),top-0.18,0);root.add(g);const lip=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.02,2*half*0.9),mNap);lip.position.set(s*(half-0.16),top-0.205,0);root.add(lip);});
+ root.position.y=0.15;const off=0.42;
+ rm.dims=[{type:'lin',a:[-half,top+off*0.4,half+off],b:[half,top+off*0.4,half+off],t:"ширина 600"},{type:'lin',a:[half+off,top+off*0.2,-half],b:[half+off,top+off*0.2,half],t:"длина 600"},{type:'lin',a:[half+off,bot,half+off*0.3],b:[half+off,top,half+off*0.3],t:"высота 560"},{type:'lin',a:[-half-off,bot-0.25,half],b:[-half-off,top,half],t:"≈680 с колёс."},{p:[-half,bot,half],t:"труба 40×40×2",baseAy:330},{p:[half-0.12,top-0.18,0],t:"направл. 32×32×3",baseAy:330},{p:[0,bot+0.28,-half],t:"панель t1,5",baseAy:330},{p:[half+0.03,bot-0.2,half],t:"колёса Ø100",baseAy:330}];
+ buildDims(rm);rm.tick=function(){if(rm.spin&&!rm.drag)rm.tRy+=0.005;};
+})();
+
+const cl=makeScene('cv-cl','an-cl',480);cl.key='cl';cl.dist=4.6;cl.lookY=0.05;cl.camLift=0.4;cl.tRx=0.5;cl.rx=0.5;cl.rxClamp=[-0.3,1.45];
+(function(){const root=cl.root;const Rr=1.0,tubeR=0.05;const ring=new THREE.Mesh(new THREE.TorusGeometry(Rr,tubeR,16,80),mColl);ring.rotation.x=Math.PI/2;root.add(ring);
+ const tips=[];for(let i=0;i<5;i++){const a=-Math.PI/2+i*(2*Math.PI/5),fx=Math.cos(a)*Rr,fz=Math.sin(a)*Rr;const ri=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.22,14),mColl);ri.position.set(fx,0.15,fz);root.add(ri);const bo=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.13,14),mFor);bo.position.set(fx,0.32,fz);root.add(bo);const ti=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.13,14),mFor);ti.position.set(fx,0.44,fz);root.add(ti);tips.push([fx,0.5,fz]);}
+ const crA=[];for(let i=0;i<3;i++){const a=-Math.PI/2+Math.PI*0.5+i*(2*Math.PI/3);const br=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.04,0.06),mColl);br.position.set(Math.cos(a)*(Rr+0.2),0,Math.sin(a)*(Rr+0.2));br.rotation.y=-a;root.add(br);crA.push([Math.cos(a)*(Rr+0.38),0,Math.sin(a)*(Rr+0.38)]);}
+ const seg=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.6,14),mPodT);seg.rotation.z=Math.PI/2;seg.position.set(Rr+0.3,0,0);root.add(seg);const brs=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.2,16),mBrs);brs.rotation.z=Math.PI/2;brs.position.set(Rr+0.7,0,0);root.add(brs);
+ const wall=new THREE.Mesh(new THREE.CylinderGeometry(Rr+0.5,Rr+0.5,1.0,64,1,true),mCt);wall.position.y=0.2;root.add(wall);root.position.y=0;
+ cl.dims=[{p:[0,0,Rr],t:"кольцо Ø330",baseAy:320},{p:[Math.cos(-Math.PI/2+2*Math.PI/5)*Rr,0.1,Math.sin(-Math.PI/2+2*Math.PI/5)*Rr],t:"труба Ø16×1,5",baseAy:320},{p:tips[0],t:"5 форсунок, 72°"},{p:crA[0],t:"кронштейн 3шт"},{p:[Rr+0.7,0,0],t:"БРС 1/2\""},{p:[Rr+0.5,0.2,0],t:"стенка Ø400"},{type:'lin',a:[0,0,-Rr-0.35],b:[0,0.5,-Rr-0.35],t:"форсунка h≈110"}];
+ buildDims(cl);cl.tick=function(){if(cl.spin&&!cl.drag)cl.tRy+=0.006;};
+})();
+
+const pd=makeScene('cv-pd','an-pd',480);pd.key='pd';pd.dist=8;pd.lookY=0;pd.camLift=0.3;pd.tRx=0.42;pd.rx=0.42;pd.tRy=0.7;pd.ry=0.7;pd.rxClamp=[-0.3,1.45];
+(function(){const root=pd.root;const b=1.0,h=0.23,drainX=-0.42,drR=0.09;
+ const shp=new THREE.Shape();shp.moveTo(-b,-b);shp.lineTo(b,-b);shp.lineTo(b,b);shp.lineTo(-b,b);shp.lineTo(-b,-b);const hl=new THREE.Path();hl.absarc(drainX,0,drR,0,Math.PI*2,true);shp.holes.push(hl);
+ const floor=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:0.03,bevelEnabled:false}),mPod2);floor.rotation.x=-Math.PI/2;root.add(floor);
+ function wall(w,x,y,z,ry){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,0.03),mPod2);m.position.set(x,y,z);m.rotation.y=ry;root.add(m);}wall(2*b,0,h/2,b,0);wall(2*b,0,h/2,-b,0);wall(2*b,b,h/2,0,Math.PI/2);wall(2*b,-b,h/2,0,Math.PI/2);
+ const dc=new THREE.Mesh(new THREE.CylinderGeometry(drR,drR,0.05,20,1,true),mDrain);dc.position.set(drainX,0.01,0);root.add(dc);const dp=new THREE.Mesh(new THREE.CylinderGeometry(drR*0.8,drR*0.8,0.16,16),mDrain);dp.position.set(drainX,-0.1,0);root.add(dp);
+ const dpipe=new THREE.Mesh(new THREE.CylinderGeometry(drR*0.78,drR*0.78,0.22,16),mDrain);dpipe.position.set(drainX,-0.13,0);root.add(dpipe);const valvePd=makeBallValve({bodyR:0.085,len:0.3});valvePd.position.set(drainX,-0.34,0);valvePd.rotation.z=-Math.PI/2;root.add(valvePd);
+ const hd=new THREE.Mesh(new THREE.TorusGeometry(0.16,0.022,10,24,Math.PI),mPod2);hd.rotation.x=Math.PI/2;hd.position.set(0,h*0.6,b+0.13);root.add(hd);[-0.16,0.16].forEach(function(hx){const lg=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.15,10),mPod2);lg.rotation.x=Math.PI/2;lg.position.set(hx,h*0.6,b+0.065);root.add(lg);});
+ const wf=new THREE.Mesh(new THREE.BoxGeometry(2*b-0.04,0.012,2*b-0.04),new THREE.MeshStandardMaterial({color:0x3f7da0,transparent:true,opacity:0.42,metalness:0.2,roughness:0.3}));wf.position.set(0,0.05,0);root.add(wf);root.position.y=0.15;const off=0.4;
+ pd.dims=[{type:'lin',a:[-b,h+off*0.3,b+off],b:[b,h+off*0.3,b+off],t:"дно 520 (шир.)"},{type:'lin',a:[b+off,h+off*0.15,-b],b:[b+off,h+off*0.15,b],t:"дно 520 (длина)"},{type:'lin',a:[b+off,0,b+off*0.3],b:[b+off,h,b+off*0.3],t:"борт 60"},{p:[drainX,-0.1,0],t:"слив Ø40",baseAy:320},{p:[drainX,-0.34,0],t:"кран 1/2\"",baseAy:320},{p:[0,h/2,b],t:"лист t1,5",baseAy:320},{p:[0,h*0.6,b+0.13],t:"ручка-скоба",baseAy:320}];
+ buildDims(pd);pd.tick=function(){if(pd.spin&&!pd.drag)pd.tRy+=0.005;};
+})();
+
+const scenes=[main,rm,cl,pd];
+function loop(){requestAnimationFrame(loop);scenes.forEach(function(o){if(!o.active)return;if(o.tick)o.tick();camUpd(o);o.rnd.render(o.scene,o.cam);renderDims(o);});}
+loop();scenes.forEach(function(o){syncRot(o);});
+document.querySelectorAll('.rotB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.spin=!o.spin;syncRot(o);});});
+document.querySelectorAll('.vB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.setView(b.dataset.v);});});
+document.querySelectorAll('.dimB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.showDim=!o.showDim;b.classList.toggle('on',o.showDim);o.anno.style.display=o.showDim?'block':'none';});});
+
+sceneByK={'3d':main,'rm':rm,'cl':cl,'pd':pd};
+} // end if(HAS3D)
+
+const sxPane=document.querySelector('[data-pane="sx"]');
+sxPane.innerHTML='<svg viewBox="0 0 680 430" style="width:100%;height:auto;max-width:680px;margin:8px auto;display:block" role="img"><title>Схема работы AtomBreez-1</title>'+
+'<defs><marker id="aB" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M2,1 L8,5 L2,9" fill="none" stroke="#185fa5" stroke-width="1.5"/></marker>'+
+'<marker id="aW" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M2,1 L8,5 L2,9" fill="none" stroke="#1d9e75" stroke-width="1.5"/></marker></defs>'+
+'<rect x="250" y="60" width="180" height="280" rx="14" fill="#E6F1FB" stroke="#185fa5" stroke-width="0.6"/>'+
+'<text x="340" y="80" text-anchor="middle" font-size="13" font-weight="500" fill="#0c447c">Корпус Ø400 (воздуховод)</text>'+
+'<rect x="270" y="285" width="140" height="26" rx="6" fill="#E1F5EE" stroke="#0f6e56" stroke-width="0.6"/><text x="340" y="301" text-anchor="middle" font-size="12" fill="#085041">Коллектор · 5 форсунок ↑</text>'+
+'<rect x="270" y="120" width="140" height="24" rx="6" fill="#F1EFE8" stroke="#5f5e5a" stroke-width="0.6"/><text x="340" y="135" text-anchor="middle" font-size="12" fill="#444441">Перфодиск-каплеуловитель</text>'+
+'<rect x="285" y="20" width="110" height="30" rx="6" fill="#F1EFE8" stroke="#5f5e5a" stroke-width="0.6"/><text x="340" y="39" text-anchor="middle" font-size="12" fill="#444441">Вентилятор Ø150 →</text>'+
+'<rect x="262" y="316" width="156" height="22" rx="5" fill="#FAEEDA" stroke="#854f0b" stroke-width="0.6"/><text x="340" y="331" text-anchor="middle" font-size="11.5" fill="#633806">Поддон · слив + кран</text>'+
+'<line x1="340" y1="285" x2="340" y2="150" stroke="#185fa5" stroke-width="2" marker-end="url(#aB)"/>'+
+'<line x1="200" y1="328" x2="248" y2="328" stroke="#185fa5" stroke-width="2" marker-end="url(#aB)"/><text x="150" y="332" text-anchor="middle" font-size="11.5" fill="#0c447c">воздух из камеры</text>'+
+'<line x1="340" y1="60" x2="340" y2="52" stroke="#185fa5" stroke-width="2" marker-end="url(#aB)"/><text x="455" y="36" text-anchor="start" font-size="11.5" fill="#0c447c">увлажн. воздух → в камеру</text>'+
+'<rect x="40" y="240" width="120" height="40" rx="8" fill="#E1F5EE" stroke="#0f6e56" stroke-width="0.6"/><text x="100" y="256" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">Насос НД-1.5В</text><text x="100" y="271" text-anchor="middle" font-size="11" fill="#0f6e56">9–10 атм</text>'+
+'<rect x="40" y="170" width="120" height="26" rx="6" fill="#E1F5EE" stroke="#0f6e56" stroke-width="0.6"/><text x="100" y="186" text-anchor="middle" font-size="11.5" fill="#085041">Бак воды</text>'+
+'<line x1="100" y1="196" x2="100" y2="238" stroke="#1d9e75" stroke-width="2" marker-end="url(#aW)"/>'+
+'<line x1="160" y1="270" x2="200" y2="270" stroke="#1d9e75" stroke-width="2"/><line x1="200" y1="270" x2="200" y2="298" stroke="#1d9e75" stroke-width="2"/><line x1="200" y1="298" x2="268" y2="298" stroke="#1d9e75" stroke-width="2" marker-end="url(#aW)"/><text x="180" y="263" text-anchor="middle" font-size="11" fill="#0f6e56">БРС + шланг</text>'+
+'<line x1="340" y1="338" x2="340" y2="364" stroke="#1d9e75" stroke-width="2" marker-end="url(#aW)"/><text x="340" y="380" text-anchor="middle" font-size="11" fill="#0f6e56">конденсат → слив</text>'+
+'<rect x="470" y="240" width="14" height="14" fill="#E6F1FB" stroke="#185fa5" stroke-width="0.6"/><text x="492" y="251" font-size="11.5" fill="#444441">воздух</text>'+
+'<rect x="470" y="262" width="14" height="14" fill="#E1F5EE" stroke="#0f6e56" stroke-width="0.6"/><text x="492" y="273" font-size="11.5" fill="#444441">вода</text>'+
+'</svg>'+
+'<div class="desc">Тракт: воздух из камеры заходит снизу → кольцевой коллектор распыляет туман <b>вверх</b> 5 форсунками → поток идёт вверх → перфодиск-каплеуловитель сбивает крупные капли (стекают по стенкам в поддон) → переход Ø400→150 → канальный вентилятор гонит увлажнённый воздух обратно в камеру. Контур воды: насос НД-1.5В (9–10 атм) → шланг → БРС → окно в стенке → кольцо → форсунки; неунесённая вода и конденсат стекают в поддон и сливаются через кран.</div>';
+
+const rcPane=document.querySelector('[data-pane="rc"]');
+rcPane.innerHTML='<div class="h3">Исходные данные камеры</div>'+
+'<table class="t"><thead><tr><th>Параметр</th><th class="c">Значение</th><th>Примечание</th></tr></thead><tbody>'+
+'<tr><td>Объём камеры</td><td class="c">22,5 м³</td><td>3 × 2,5 × 3 м</td></tr>'+
+'<tr><td>Режим</td><td class="c">12 °C / 85 % RH</td><td>созревание сыра</td></tr>'+
+'<tr><td>Кратность рециркуляции</td><td class="c">k ≈ 5</td><td>оборотов в час</td></tr></tbody></table>'+
+'<div class="h3">Влагопроизводительность</div>'+
+'<div class="formula">G = V · k · ρ · Δd  →  принято ≈ 0,6 кг/ч (запас до 1,0)</div>'+
+'<table class="t"><thead><tr><th>Параметр</th><th class="c">Значение</th></tr></thead><tbody>'+
+'<tr><td>Расчётная влагопроизводительность</td><td class="c">≈ 0,6 кг/ч</td></tr>'+
+'<tr><td>С запасом (макс.)</td><td class="c">до 1,0 кг/ч</td></tr>'+
+'<tr><td>Суммарный расход форсунок</td><td class="c">≈ 0,5–0,8 л/мин</td></tr></tbody></table>'+
+'<div class="h3">Воздушный тракт</div>'+
+'<table class="t"><thead><tr><th>Параметр</th><th class="c">Значение</th><th>Примечание</th></tr></thead><tbody>'+
+'<tr><td>Расход воздуха</td><td class="c">≈ 112 м³/ч</td><td>V · k</td></tr>'+
+'<tr><td>Сечение трубы Ø400</td><td class="c">0,126 м²</td><td>π·0,2²</td></tr>'+
+'<tr><td>Скорость в трубе</td><td class="c">≈ 0,25 м/с</td><td>112/3600/0,126</td></tr>'+
+'<tr><td>Перфодиск: живое сечение</td><td class="c">≈ 27 %</td><td>отв. Ø5,5 шаг 9</td></tr>'+
+'<tr><td>Скорость в отверстиях</td><td class="c">≈ 0,9 м/с</td><td>0,25/0,27</td></tr></tbody></table>'+
+'<div class="h3">Насос и форсунки</div>'+
+'<table class="t"><thead><tr><th>Параметр</th><th class="c">Значение</th></tr></thead><tbody>'+
+'<tr><td>Насос дозирующий</td><td class="c">НД-1.5В</td></tr>'+
+'<tr><td>Рабочее давление</td><td class="c">9–10 атм</td></tr>'+
+'<tr><td>Форсунки</td><td class="c">5 шт, тип EVSPRAY/аналог</td></tr>'+
+'<tr><td>Распыление</td><td class="c">вверх, через 72°</td></tr></tbody></table>'+
+'<div class="note">Расчёты предварительные, на базе исходных данных ТЗ. Точные значения уточняются при наладке и разработке рабочей КД. Габариты ≈600×600, высота с вентилятором ≈1750 мм, масса ≈55 кг.</div>';
+
+const SPEC=[['1','AB-01-001.000','Форсунка распыла под давлением','5','тип EVSPRAY/аналог',1],['2','AB-01-002.000','Коллектор кольцевой','1','труба нерж. Ø16×1,5 (1/2")',0],['3','AB-01-003.000','Каплеуловитель перфорированный','1','лист AISI 304 t2,0',0],['4','AB-01-004.000','Переход Ø400→Ø150','1','лист AISI 304 t1,5',0],['5','—','Хомут быстросъёмный Tri-Clamp Ø400','1','нерж. (покупное)',1],['6','—','Вентилятор канальный Ø150','1','пластик (покупное)',1],['7','AB-01-005.000','Узел подвода воды (окно + БРС)','1','БРС 1/2" нерж.',0],['8','AB-01-006.000','Кольцо крепления (буртик)','1','полоса нерж. 35×4',0],['9','AB-01-007.000','Поддон-корыто','1','лист AISI 304 t1,5',0],['10','AB-01-008.000','Рама-подставка','1','труба кв. 40×40×2',0],['—','—','Направляющая поддона','2','уголок 32×32×3',0],['11','—','Колесо поворотное Ø100','4','покупное (2 — тормоз)',1],['12','—','Кран шаровой 1/2"','1','нерж. (покупное)',1],['13','AB-01-000.001','Труба корпуса (воздуховод)','1','труба нерж. Ø400×1,5',0],['14','—','Насос дозирующий НД-1.5В','1','покупное (9–10 атм)',1]];
+let sh='<table class="t"><thead><tr><th style="width:42px;text-align:center">Поз.</th><th style="width:132px">Обозначение</th><th>Наименование</th><th style="width:40px;text-align:center">Кол.</th><th style="width:180px">Материал / профиль</th></tr></thead><tbody>';
+SPEC.forEach(function(r){sh+='<tr class="'+(r[5]?'buy':'')+'"><td class="c" style="color:#9aa1a8">'+r[0]+'</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">'+r[1]+'</td><td>'+r[2]+'</td><td class="c">'+r[3]+'</td><td>'+r[4]+'</td></tr>';});
+sh+='</tbody></table><div class="note">Обозначения AB-01-xxx и размеры — предварительные (для разработки рабочей КД).<br>Покупные изделия (поз. 5, 6, 11, 12, 14) — по каталогам поставщиков.<br>Сварка аргонодуговая по ГОСТ 14806-80; материал — нерж. сталь AISI 304.</div>';
+document.querySelector('[data-pane="sp"]').innerHTML=sh;
+
+document.querySelectorAll('.tab').forEach(function(tb){tb.addEventListener('click',function(){const k=tb.dataset.k;
+ document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x===tb);});
+ document.querySelectorAll('[data-pane]').forEach(function(p){p.style.display=(p.dataset.pane===k)?'block':'none';});
+ Object.keys(sceneByK).forEach(function(kk){sceneByK[kk].active=false;});if(sceneByK[k]){const o=sceneByK[k];o.active=true;setTimeout(function(){o.resize();},30);}});});
+})();
+</script>
+</body>
+</html>
