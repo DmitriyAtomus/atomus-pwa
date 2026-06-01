@@ -15355,12 +15355,78 @@
   }
   .si-items-row {
     display: grid;
-    grid-template-columns: 14px 1fr 90px 165px 26px 26px;
+    grid-template-columns: 26px 14px 1fr 90px 165px 26px 26px;
     gap: 10px;
     padding: 10px 12px;
     align-items: center;
     border-top: 1px solid var(--border);
     font-size: 12.5px;
+  }
+  .si-items-row.is-selected {
+    background: rgba(37,99,235,0.06);
+    border-top-color: rgba(37,99,235,0.25);
+  }
+  .si-bulk-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(124,58,237,0.07));
+    border: 1px solid rgba(37,99,235,0.30);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-dark);
+  }
+  .si-bulk-bar-count { font-weight: 600; color: var(--brand); }
+  .si-bulk-bar select {
+    padding: 6px 10px;
+    border: 1px solid rgba(37,99,235,0.35);
+    border-radius: 8px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+  }
+  .si-bulk-bar-apply {
+    padding: 7px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: white; font-weight: 600; font-size: 13px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .si-bulk-bar-apply:hover { box-shadow: 0 4px 10px rgba(37,99,235,0.25); }
+  .si-bulk-bar-clear {
+    padding: 5px 8px; border: 0; background: transparent;
+    color: var(--text-light); cursor: pointer; font-size: 12px;
+    margin-left: auto;
+  }
+  .si-bulk-bar-clear:hover { color: var(--text-dark); }
+  .si-row-check {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .si-row-check input[type="checkbox"] { display: none; }
+  .si-row-check label {
+    display: inline-block; width: 20px; height: 20px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    background: white;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.12s, border 0.12s;
+  }
+  .si-row-check label:hover { border-color: rgba(37,99,235,0.5); }
+  .si-row-check input[type="checkbox"]:checked + label {
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    border-color: transparent;
+  }
+  .si-row-check input[type="checkbox"]:checked + label::after {
+    content: '';
+    position: absolute;
+    left: 6px; top: 2px;
+    width: 5px; height: 10px;
+    border-right: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(45deg);
   }
   .si-items-row.head {
     background: var(--bg);
@@ -15382,27 +15448,28 @@
   .app.mobile-layout .si-items-row-head { display: none; }
   .app.mobile-layout .si-items-row {
     display: grid;
-    grid-template-columns: 14px 60px 1fr 26px;
+    grid-template-columns: 26px 14px 60px 1fr 26px;
     grid-template-areas:
-      "dot  name name actions"
-      ".    qty  dest dest";
+      "check dot  name name actions"
+      "check .    qty  dest dest";
     column-gap: 8px;
     row-gap: 8px;
     padding: 12px;
     font-size: 13px;
   }
-  .app.mobile-layout .si-items-row > div:nth-child(1) { grid-area: dot;     align-self: start; padding-top: 4px; }
-  .app.mobile-layout .si-items-row > div:nth-child(2) { grid-area: name;    min-width: 0; }
-  .app.mobile-layout .si-items-row > div:nth-child(2) > div:first-child {
+  .app.mobile-layout .si-items-row > div:nth-child(1) { grid-area: check;   align-self: center; }
+  .app.mobile-layout .si-items-row > div:nth-child(2) { grid-area: dot;     align-self: start; padding-top: 4px; }
+  .app.mobile-layout .si-items-row > div:nth-child(3) { grid-area: name;    min-width: 0; }
+  .app.mobile-layout .si-items-row > div:nth-child(3) > div:first-child {
     word-break: break-word; line-height: 1.3; font-weight: 500;
   }
-  .app.mobile-layout .si-items-row > div:nth-child(3) {
+  .app.mobile-layout .si-items-row > div:nth-child(4) {
     grid-area: qty; text-align: left !important; font-size: 14px; font-weight: 600;
     padding: 6px 8px; background: var(--bg); border-radius: 6px;
   }
-  .app.mobile-layout .si-items-row > div:nth-child(4) { grid-area: dest;    min-width: 0; }
-  .app.mobile-layout .si-items-row > div:nth-child(4) select { width: 100%; }
-  .app.mobile-layout .si-items-row > div:nth-child(5) { grid-area: actions; align-self: start; }
+  .app.mobile-layout .si-items-row > div:nth-child(5) { grid-area: dest;    min-width: 0; }
+  .app.mobile-layout .si-items-row > div:nth-child(5) select { width: 100%; }
+  .app.mobile-layout .si-items-row > div:nth-child(6) { grid-area: actions; align-self: start; }
   /* Селект категории внутри подсказки — на всю ширину */
   .app.mobile-layout .si-cat-select { max-width: 100%; width: 100%; }
   /* Сама подсказка (внутри 2-го div) переносится по словам */
@@ -18228,7 +18295,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.49-dev-migration-order";
+const APP_VERSION = "v2.44.50-upd-bulk-destination";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -53305,10 +53372,12 @@ function finishShipmentScan() {
 // Состояние модуля
 const siState = {
   currentInvoiceId: null,
+  currentInvoice:   null,  // полный объект УПД, обновляем при render
   pollingTimer: null,
   pollingActive: false,
   itemsCache: [],
   categories: null,  // [{id, name, code, ...}] — кешируем для inline-select раздела
+  selected: new Set(), // v2.44.50: bulk-выбор позиций
 };
 
 // Загружаем категории компонентов один раз для всех селектов в карточке УПД
@@ -54006,6 +54075,7 @@ function renderSupplyInvoiceDetail(data) {
   const duplicate = data.duplicate_warning;
   siState.itemsCache = items;
   siState.currentInvoice = inv;  // нужно для renderSiItemsTable: показывать кнопку "+ позиция" только для draft
+  siState.currentData = data;    // для повторного рендера из bulk-handlers
 
   const recoState = inv.recognition_state || (inv.ai_recognized_at ? 'done' : (inv.ai_error ? 'error' : 'in_progress'));
   const isLoading = recoState === 'in_progress';
@@ -54302,9 +54372,26 @@ async function openSiNameEditPrompt(itemId, currentName) {
 function renderSiItemsTable(items) {
   // Скрываем split-parent (qty=0) когда есть дети
   const visible = items.filter(it => !(parseFloat(it.qty) === 0 && !it.is_refused));
+  if (!siState.selected) siState.selected = new Set();
+  // подчистим selected от исчезнувших id
+  const visibleIds = new Set(visible.map(it => it.id));
+  for (const id of Array.from(siState.selected)) {
+    if (!visibleIds.has(id)) siState.selected.delete(id);
+  }
 
-  let html = '<div class="si-items-table">';
+  let html = '';
+  // Bulk-bar — появляется когда что-то выбрано
+  html += renderSiBulkBar(visible);
+
+  html += '<div class="si-items-table">';
+  // Шапка с чекбоксом «выбрать все»
+  const allSelected = visible.length > 0 && visible.every(it => siState.selected.has(it.id));
   html += '<div class="si-items-row si-items-row-head">';
+  html +=   '<div class="si-row-check">' +
+              '<input type="checkbox" id="si-check-all"' + (allSelected ? ' checked' : '') +
+              ' onchange="siToggleAllSelect(this.checked)">' +
+              '<label for="si-check-all" title="Выбрать все"></label>' +
+            '</div>';
   html +=   '<div></div>';
   html +=   '<div>Позиция</div>';
   html +=   '<div style="text-align:right;">Кол-во</div>';
@@ -54333,9 +54420,16 @@ function renderSiItemRow(it) {
   const confKey = it.is_refused ? 'refused' : (it.match_confidence || 'low');
   const dotCls = it.is_refused ? 'refused' : confKey;
   const isWarn = it.match_confidence === 'medium' || it.match_confidence === 'low';
-  const rowCls = 'si-items-row' + (it.is_refused ? ' is-refused' : '') + (isWarn && !it.is_refused ? ' is-warn' : '');
+  const isSel  = siState.selected && siState.selected.has(it.id);
+  const rowCls = 'si-items-row' + (it.is_refused ? ' is-refused' : '') + (isWarn && !it.is_refused ? ' is-warn' : '') + (isSel ? ' is-selected' : '');
 
   let html = '<div class="' + rowCls + '">';
+  // checkbox для bulk-выбора
+  html += '<div class="si-row-check">' +
+            '<input type="checkbox" id="si-check-' + it.id + '"' + (isSel ? ' checked' : '') +
+            ' onchange="siToggleItemSelect(' + it.id + ', this.checked)">' +
+            '<label for="si-check-' + it.id + '"></label>' +
+          '</div>';
   // confidence dot
   html += '<div><span class="si-conf-dot ' + dotCls + '"></span></div>';
   // name + hint
@@ -54430,6 +54524,91 @@ function siParseAlternatives(raw) {
     const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return Array.isArray(a) ? a : [];
   } catch (e) { return []; }
+}
+
+function renderSiBulkBar(visible) {
+  const sel = siState.selected;
+  if (!sel || sel.size === 0) return '';
+  // Защищаемся от случая, когда выбраны только отказанные позиции — их перенести нельзя
+  const selectable = visible.filter(it => sel.has(it.id) && !it.is_refused);
+  if (!selectable.length) return '';
+  const count = selectable.length;
+  // Опции для перевода — без refused (для отказов есть свой dropdown)
+  let opts = '';
+  Object.keys(SI_DEST_DEF).forEach(k => {
+    if (k === 'refused') return;
+    opts += '<option value="' + k + '">' + SI_DEST_DEF[k].label + '</option>';
+  });
+  return (
+    '<div class="si-bulk-bar">' +
+      '<i class="ti ti-checks" style="color:var(--brand);font-size:16px;"></i>' +
+      '<span>Выбрано <span class="si-bulk-bar-count">' + count + '</span> позиций · Перенести в:</span>' +
+      '<select id="si-bulk-dest">' + opts + '</select>' +
+      '<button class="si-bulk-bar-apply" onclick="siApplyBulkDestination()"><i class="ti ti-arrow-right"></i>Применить</button>' +
+      '<button class="si-bulk-bar-clear" onclick="siClearSelection()">Снять выбор</button>' +
+    '</div>'
+  );
+}
+
+function siToggleItemSelect(itemId, checked) {
+  if (!siState.selected) siState.selected = new Set();
+  if (checked) siState.selected.add(itemId);
+  else siState.selected.delete(itemId);
+  if (siState.currentData) renderSupplyInvoiceDetail(siState.currentData);
+}
+
+function siToggleAllSelect(checked) {
+  if (!siState.selected) siState.selected = new Set();
+  const items = (siState.currentData && siState.currentData.items) || siState.itemsCache || [];
+  const selectable = items.filter(it =>
+    !(parseFloat(it.qty) === 0 && !it.is_refused) && !it.is_refused
+  );
+  if (checked) selectable.forEach(it => siState.selected.add(it.id));
+  else         selectable.forEach(it => siState.selected.delete(it.id));
+  if (siState.currentData) renderSupplyInvoiceDetail(siState.currentData);
+}
+
+function siClearSelection() {
+  if (siState.selected) siState.selected.clear();
+  if (siState.currentData) renderSupplyInvoiceDetail(siState.currentData);
+}
+
+async function siApplyBulkDestination() {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+  if (!siState.selected || !siState.selected.size) return;
+  const destSelect = document.getElementById('si-bulk-dest');
+  const dest = destSelect ? destSelect.value : 'production';
+  if (!dest || dest === 'refused') {
+    showToast('Для «Не принять» используй индивидуальный выбор причины', 'error');
+    return;
+  }
+  const ids = Array.from(siState.selected);
+  const applyBtn = document.querySelector('.si-bulk-bar-apply');
+  if (applyBtn) applyBtn.disabled = true;
+  let ok = 0, failed = 0;
+  for (const id of ids) {
+    try {
+      await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + id, {
+        destination: dest,
+        is_refused: false,
+        refuse_reason: null,
+      });
+      ok++;
+    } catch (_) {
+      failed++;
+    }
+  }
+  // снимем выбор и перезагрузим
+  siState.selected.clear();
+  try {
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+  } catch (_) {}
+  const label = SI_DEST_DEF[dest] ? SI_DEST_DEF[dest].label : dest;
+  if (failed === 0) showToast('Перенесено в «' + label + '»: ' + ok, 'success');
+  else if (ok === 0) showToast('Не удалось обновить позиции', 'error');
+  else showToast('Перенесено: ' + ok + ', не удалось: ' + failed, 'warning');
 }
 
 function renderSiDestSelect(it) {
