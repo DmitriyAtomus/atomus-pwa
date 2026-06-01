@@ -10560,6 +10560,17 @@
   .dev-participant-meta a {
     color: var(--brand); text-decoration: none;
   }
+  .dev-participant-x {
+    border: 0; background: transparent;
+    color: var(--text-light); cursor: pointer;
+    padding: 4px 8px; border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .dev-participant-x:hover {
+    color: #B5302E; background: rgba(181,48,46,0.10);
+  }
+  .dev-participant-x i { font-size: 14px; }
   /* Модалка приглашения */
   .dev-invite-modal-body {
     display: flex; flex-direction: column; gap: 14px;
@@ -18553,7 +18564,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.57-supply-docx-email-fix";
+const APP_VERSION = "v2.44.58-dev-guest-uploads-remove-notif";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19074,8 +19085,15 @@ function renderNotifModal() {
   }
   let html = '';
   items.forEach(n => {
-    const iconCls = n.type === 'contract_published' ? 't-contract' : (n.type === 'assembly_created' ? 't-assembly' : '');
-    const icon = n.type === 'contract_published' ? 'ti-file-text' : (n.type === 'assembly_created' ? 'ti-tool' : 'ti-bell');
+    const iconCls = n.type === 'contract_published' ? 't-contract'
+                   : n.type === 'assembly_created' ? 't-assembly'
+                   : (n.type === 'dev_guest_message' || n.type === 'dev_guest_file') ? 't-development'
+                   : '';
+    const icon = n.type === 'contract_published' ? 'ti-file-text'
+                : n.type === 'assembly_created' ? 'ti-tool'
+                : n.type === 'dev_guest_message' ? 'ti-message-circle'
+                : n.type === 'dev_guest_file' ? 'ti-paperclip'
+                : 'ti-bell';
     const linkAttr = (n.entity_type && n.entity_id)
       ? 'onclick="onNotifClick(' + n.id + ', \'' + escapeHtml(n.entity_type) + '\', ' + Number(n.entity_id) + ')" style="cursor:pointer;"'
       : '';
@@ -19174,6 +19192,14 @@ function onNotifClick(notifId, entityType, entityId) {
     closeNotifModalForced();
     // Журнал сборок — просто открываем historic с фильтром (упрощ. вариант)
     selectSidebarItem('history');
+  } else if (entityType === 'development' && entityId) {
+    // v2.44.58: уведомления по разработкам — открываем нужную карточку
+    closeNotifModalForced();
+    selectSection && selectSection('production');
+    setTimeout(() => {
+      selectSidebarItem('developments');
+      setTimeout(() => { if (typeof openDevelopment === 'function') openDevelopment(entityId); }, 250);
+    }, 80);
   }
 }
 
@@ -46172,10 +46198,14 @@ function renderDevelopmentParticipants() {
     return;
   }
   section.style.display = '';
+  const canRemove = _devUserIsDirector();
   list.innerHTML = items.map(p => {
     const initials = (p.name || '?').trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase();
     const phoneHtml = p.phone
       ? '<span><i class="ti ti-phone" style="font-size:11px;"></i><a href="tel:' + escapeHtml(p.phone) + '">' + escapeHtml(p.phone) + '</a></span>'
+      : '';
+    const removeBtn = canRemove
+      ? '<button class="dev-participant-x" onclick="removeDevelopmentParticipant(' + p.id + ', \'' + escapeHtml(p.name).replace(/'/g, "\\'") + '\')" title="Удалить участника"><i class="ti ti-x"></i></button>'
       : '';
     return '<div class="dev-participant-row">' +
       '<div class="dev-participant-avatar">' + escapeHtml(initials || '?') + '</div>' +
@@ -46186,8 +46216,38 @@ function renderDevelopmentParticipants() {
           '<span><i class="ti ti-clock" style="font-size:11px;"></i>' + escapeHtml(_devFormatDate(p.joined_at)) + '</span>' +
         '</div>' +
       '</div>' +
+      removeBtn +
     '</div>';
   }).join('');
+}
+
+async function removeDevelopmentParticipantFromInviteModal(participantId, name) {
+  await removeDevelopmentParticipant(participantId, name);
+  // перерисовать модалку — проще закрыть и переоткрыть
+  const m = document.getElementById('dev-invite-modal');
+  if (m) m.remove();
+  setTimeout(() => openDevInviteModal(), 50);
+}
+
+async function removeDevelopmentParticipant(participantId, name) {
+  if (!_devUserIsDirector()) return;
+  if (!confirm('Удалить участника «' + name + '»? Его доступ к разработке будет отозван.')) return;
+  try {
+    const res = await fetch(API_BASE + '/api/development-participants/' + participantId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось удалить', 'error');
+      return;
+    }
+    _devState.participants = _devState.participants.filter(p => p.id !== participantId);
+    renderDevelopmentParticipants();
+    showToast('Участник удалён', 'success');
+  } catch (e) {
+    showToast('Сеть: не удалось удалить', 'error');
+  }
 }
 
 async function openDevInviteModal() {
@@ -46211,9 +46271,13 @@ async function openDevInviteModal() {
   // 2) Перезагрузим участников, чтобы показать актуальный список
   await loadDevelopmentParticipants();
   const participants = _devState.participants || [];
+  const canRemoveInv = _devUserIsDirector();
   const participantsHtml = participants.length
     ? participants.map(p => {
         const initials = (p.name || '?').trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase();
+        const removeBtn = canRemoveInv
+          ? '<button class="dev-participant-x" onclick="removeDevelopmentParticipantFromInviteModal(' + p.id + ', \'' + escapeHtml(p.name).replace(/'/g, "\\'") + '\')" title="Удалить участника"><i class="ti ti-x"></i></button>'
+          : '';
         return '<div class="dev-participant-row">' +
           '<div class="dev-participant-avatar">' + escapeHtml(initials) + '</div>' +
           '<div class="dev-participant-info">' +
@@ -46223,6 +46287,7 @@ async function openDevInviteModal() {
               '<span><i class="ti ti-clock" style="font-size:11px;"></i>' + escapeHtml(_devFormatDate(p.joined_at)) + '</span>' +
             '</div>' +
           '</div>' +
+          removeBtn +
         '</div>';
       }).join('')
     : '<div style="color:var(--text-light);font-size:13px;padding:10px;text-align:center;">Пока никто не присоединился</div>';
@@ -46868,26 +46933,39 @@ function _renderPublicDevelopment(token, data) {
       '</div>';
   }
 
-  // Файлы
+  // Файлы — список + drop-zone для зарегистрированных гостей
+  body += '<div class="public-dev-section">' +
+    '<div class="public-dev-section-title"><i class="ti ti-paperclip"></i>Файлы и чертежи</div>';
+  if (guest) {
+    body += '<div class="dev-files-drop" id="public-dev-drop-zone" onclick="document.getElementById(\'public-dev-file-input\').click()">' +
+      '<i class="ti ti-cloud-upload"></i>' +
+      '<div><b>Перетащи файлы сюда</b> или нажми чтобы выбрать</div>' +
+      '<div style="font-size:11.5px;margin-top:2px;">До 50 МБ на файл · поделись чертежами, фото, 3D-моделями</div>' +
+      '<input type="file" id="public-dev-file-input" multiple style="display:none;" onchange="uploadPublicDevelopmentFiles(\'' + escapeHtml(token) + '\', this.files)">' +
+    '</div>';
+  }
   if (files.length) {
-    body += '<div class="public-dev-section">' +
-      '<div class="public-dev-section-title"><i class="ti ti-paperclip"></i>Файлы</div>';
     files.forEach(f => {
       const icon = _devFileIcon(f.content_type, f.file_name);
       const size = _devFormatSize(f.file_size);
       const url  = API_BASE + '/api/developments/public/' + encodeURIComponent(token) + '/files/' + f.id;
+      const author = f.uploaded_by_participant_name
+        ? ' · загрузил ' + escapeHtml(f.uploaded_by_participant_name)
+        : '';
       body +=
         '<a class="public-dev-file-row" href="' + url + '" target="_blank">' +
           '<div class="dev-file-icon"><i class="ti ' + icon + '"></i></div>' +
           '<div class="dev-file-info">' +
             '<div class="dev-file-name">' + escapeHtml(f.file_name) + '</div>' +
-            '<div class="dev-file-meta">' + escapeHtml(size) + '</div>' +
+            '<div class="dev-file-meta">' + escapeHtml(size) + author + '</div>' +
           '</div>' +
           '<i class="ti ti-download" style="color:var(--text-light);"></i>' +
         '</a>';
     });
-    body += '</div>';
+  } else if (!guest) {
+    body += '<div style="font-size:12.5px;color:var(--text-light);">Пока файлов нет.</div>';
   }
+  body += '</div>';
 
   // Чат — только если гость зарегистрирован
   if (guest) {
@@ -46916,6 +46994,51 @@ function _renderPublicDevelopment(token, data) {
   // автоскролл чата
   const box = document.getElementById('public-dev-chat-box');
   if (box) box.scrollTop = box.scrollHeight;
+  // drop-zone для гостя
+  _setupPublicDevDropZone(token);
+}
+
+function _setupPublicDevDropZone(token) {
+  const zone = document.getElementById('public-dev-drop-zone');
+  if (!zone) return;
+  ['dragenter','dragover'].forEach(ev => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); zone.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(ev => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); zone.classList.remove('dragover');
+  }));
+  zone.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files) {
+      uploadPublicDevelopmentFiles(token, e.dataTransfer.files);
+    }
+  });
+}
+
+async function uploadPublicDevelopmentFiles(token, fileList) {
+  if (!fileList || !fileList.length) return;
+  const guest = _publicDevGetGuest(token);
+  if (!guest) { alert('Сначала зарегистрируйся'); return; }
+  const files = Array.from(fileList);
+  let okCount = 0, errCount = 0;
+  for (const file of files) {
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Файл «' + file.name + '» больше 50 МБ');
+      continue;
+    }
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch(API_BASE + '/api/developments/public/' + encodeURIComponent(token) + '/files', {
+        method: 'POST',
+        headers: { 'X-Guest-Token': guest.guest_token },
+        body: fd,
+      });
+      if (!res.ok) { errCount++; continue; }
+      okCount++;
+    } catch (_) { errCount++; }
+  }
+  // перерисуем страницу
+  showPublicDevelopment(token);
 }
 
 function _renderPublicDevMessages(messages, guest) {
