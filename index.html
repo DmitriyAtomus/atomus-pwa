@@ -17685,7 +17685,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.42-tour-clickthrough";
+const APP_VERSION = "v2.44.43-tour-auto-open-card";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44611,8 +44611,11 @@ const TOURS = {
         pos: 'right',
       },
       {
+        section: 'production',
+        screen: 'dashboard',
+        action: 'open-first-queue-card',
         title: 'Я работаю над этим',
-        text: 'В детальной модалке нажми <b>«Я работаю над этим»</b> — работа уходит из очереди в «В работе», и автоматически запускается счётчик часов.',
+        text: 'Открыл первую карточку очереди для примера. В модалке нажми <b>«Я работаю над этим»</b> — работа уходит из очереди в «В работе» и запускается счётчик часов.',
         pos: 'center',
       },
       {
@@ -44718,6 +44721,19 @@ async function goToTourStep(idx) {
   if (step.screen) {
     selectSidebarItem(step.screen);
     await new Promise(r => setTimeout(r, 280));
+  }
+
+  // Дополнительное действие шага — например открыть карточку
+  if (step.action === 'open-first-queue-card') {
+    const card = document.querySelector('.pkb-col.c-queue .pkb-wc[data-work-id]')
+              || document.querySelector('.pkb-col.c-active .pkb-wc[data-work-id]');
+    if (card && typeof openProductionWorkDetail === 'function') {
+      const wid = parseInt(card.getAttribute('data-work-id'), 10);
+      if (wid) {
+        openProductionWorkDetail(wid);
+        await new Promise(r => setTimeout(r, 450));
+      }
+    }
   }
 
   // Ищем ВИДИМЫЙ элемент по селектору (пропускаем скрытые дубликаты desktop/mobile)
