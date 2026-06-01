@@ -1033,20 +1033,25 @@
     align-items: center;
   }
 
-  /* .filter-chip и .filter-tab — стилистически одно и то же. */
+  /* .filter-chip и .filter-tab — стилистически одно и то же.
+     v2.44.25: объёмные карточки с лифтом на hover и градиентом на active. */
   .filter-chip,
   .filter-tab {
-    background: var(--bg); color: var(--text-mid);
-    padding: 8px 16px;
+    background: white;
+    color: var(--text-mid);
+    padding: 9px 16px;
     border-radius: 999px;
-    font-size: 13px; font-weight: 500;
+    font-size: 12.5px;
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     flex-shrink: 0;
-    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
     font-family: inherit;
     line-height: 1.2;
+    font-variant-numeric: tabular-nums;
   }
   .desktop-layout .filter-chip,
   .desktop-layout .filter-tab {
@@ -1055,18 +1060,23 @@
   }
   .filter-chip:hover,
   .filter-tab:hover {
-    border-color: var(--brand);
-    color: var(--brand);
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #2563EB;
+    box-shadow: 0 3px 8px -2px rgba(30, 58, 138, 0.15);
   }
   .filter-chip.active,
   .filter-tab.active {
-    background: var(--brand);
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
     color: white;
-    border-color: var(--brand);
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    font-weight: 600;
   }
   .filter-chip.active:hover,
   .filter-tab.active:hover {
     color: white;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
   }
 
   /* ============ ЭТАП 28.1: ТАБЫ СКЛАДА ============ */
@@ -3613,7 +3623,7 @@
   }
   .catalog-tab {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 12px;
+    padding: 8px 13px;
     border: 1px solid var(--border);
     background: white;
     border-radius: 20px;
@@ -3621,13 +3631,24 @@
     font-weight: 500;
     color: var(--text-mid);
     cursor: pointer;
-    transition: all 0.15s;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
   }
   .catalog-tab i { font-size: 15px; }
-  .catalog-tab:hover { background: var(--bg); border-color: var(--brand-soft); }
-  .catalog-tab.active {
-    background: var(--brand); color: white; border-color: var(--brand);
+  .catalog-tab:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #2563EB;
+    box-shadow: 0 3px 8px -2px rgba(30, 58, 138, 0.15);
   }
+  .catalog-tab.active {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    font-weight: 600;
+  }
+  .catalog-tab.active:hover { color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32); }
   .catalog-tab.active i { color: white; }
 
   /* v2.44.17: мобильная навигация каталога — табы горизонтально-скроллируемые,
@@ -3701,18 +3722,31 @@
     flex-shrink: 0;
   }
   .catalog-brand-chip {
-    padding: 5px 11px;
+    padding: 6px 12px;
     border-radius: 14px;
     border: 1px solid var(--border);
     background: white;
     font-size: 12px;
     color: var(--text-mid);
     cursor: pointer;
-    transition: background 0.12s, border-color 0.12s;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
     white-space: nowrap;
   }
-  .catalog-brand-chip:hover { background: var(--bg); }
-  .catalog-brand-chip.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+  .catalog-brand-chip:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #2563EB;
+    box-shadow: 0 3px 8px -2px rgba(30, 58, 138, 0.15);
+  }
+  .catalog-brand-chip.active {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    border-color: transparent;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  }
+  .catalog-brand-chip.active:hover { color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32); }
   @media (max-width: 700px) {
     .catalog-brand-chip { font-size: 11.5px; padding: 4px 10px; }
     .chips-label { font-size: 10px; margin-right: 4px; }
@@ -4243,45 +4277,10 @@
     border-color: var(--brand);
   }
 
-  /* v2.44.24: объёмные чипы фильтров на экране Продажной номенклатуры */
-  #sp-filters .filter-chip,
-  #sp-categories-filters .filter-chip {
-    background: white;
-    border: 1px solid var(--border);
-    color: var(--text-mid);
-    padding: 9px 16px;
-    font-size: 12.5px;
-    font-weight: 500;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
-  }
-  #sp-filters .filter-chip:hover,
-  #sp-categories-filters .filter-chip:hover {
-    transform: translateY(-1px);
-    border-color: rgba(59, 130, 246, 0.4);
-    color: #2563EB;
-    box-shadow: 0 3px 8px -2px rgba(30, 58, 138, 0.15);
-  }
-  #sp-filters .filter-chip.active,
-  #sp-categories-filters .filter-chip.active {
-    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-    color: white;
-    border-color: transparent;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
-    font-weight: 600;
-  }
-  #sp-filters .filter-chip.active:hover,
-  #sp-categories-filters .filter-chip.active:hover {
-    color: white;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
-  }
-  /* Счётчик «· N» внутри чипа — едва заметно подсвечиваем */
-  #sp-filters .filter-chip, #sp-categories-filters .filter-chip {
-    font-variant-numeric: tabular-nums;
-  }
+  /* v2.44.25: scoped-стили sp-filters удалены — глобальные .filter-chip
+     теперь дают тот же объёмный вид во всех разделах. */
   @media (max-width: 700px) {
-    #sp-filters .filter-chip,
-    #sp-categories-filters .filter-chip {
+    .filter-chip, .filter-tab {
       padding: 7px 12px;
       font-size: 12px;
     }
@@ -17300,7 +17299,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.24-pretty-chips";
+const APP_VERSION = "v2.44.25-chips-global";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
