@@ -18382,7 +18382,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.53-desc-modal";
+const APP_VERSION = "v2.44.54-dev-delete-director";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45598,6 +45598,10 @@ const _devState = {
   _chatPollTimer: null,
 };
 
+function _devUserIsDirector() {
+  return !!(state.user && state.user.roles && state.user.roles.indexOf('director') >= 0);
+}
+
 async function loadDevelopments() {
   const listEl = document.getElementById('dev-list');
   if (listEl) listEl.innerHTML = '<div class="loading-block">Загружаем…</div>';
@@ -45702,8 +45706,11 @@ function renderDevelopmentDetail(dev) {
       '<div class="dev-detail-head-actions">' +
         '<button class="btn btn-secondary btn-sm" onclick="openDevInviteModal()" title="Пригласить на участие">' +
           '<i class="ti ti-user-plus"></i><span class="dev-btn-label"> Пригласить</span></button>' +
-        '<button class="icon-btn" onclick="deleteCurrentDevelopment()" title="Удалить разработку">' +
-          '<i class="ti ti-trash"></i></button>' +
+        (_devUserIsDirector()
+          ? '<button class="icon-btn" onclick="deleteCurrentDevelopment()" title="Удалить разработку">' +
+              '<i class="ti ti-trash"></i></button>'
+          : ''
+        ) +
       '</div>' +
     '</div>' +
     '<div class="dev-detail-body">' +
@@ -46286,6 +46293,10 @@ async function _devSaveCurrent() {
 
 async function deleteCurrentDevelopment() {
   if (!_devState.currentId) return;
+  if (!_devUserIsDirector()) {
+    showToast('Удалять разработки может только директор', 'error');
+    return;
+  }
   if (!confirm('Удалить разработку? Файлы и сообщения тоже будут удалены.')) return;
   try {
     const res = await fetch(API_BASE + '/api/developments/' + _devState.currentId, {
