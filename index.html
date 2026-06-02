@@ -18735,7 +18735,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.68-tour-poll-always";
+const APP_VERSION = "v2.44.69-tour-modal-fallback";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46245,16 +46245,32 @@ function positionTour(target, pos) {
   const mr = document.getElementById('tour-mask-right');
 
   if (!target) {
-    // Без подсветки — затемнить весь экран, tooltip по центру
     spot.style.display = 'none';
     mt.style.cssText = 'top:0;left:0;right:0;bottom:0;';
     mb.style.cssText = 'display:none;';
     ml.style.cssText = 'display:none;';
     mr.style.cssText = 'display:none;';
-    tip.style.left = '50%';
-    tip.style.top = '50%';
-    tip.style.transform = 'translate(-50%, -50%)';
-    tip.className = 'tour-tooltip';
+    tip.style.transform = '';
+    // Если открыта модалка — паркуем tooltip правее неё, чтобы не перекрывал.
+    const openModal = document.querySelector('.modal-overlay.visible .modal');
+    if (openModal) {
+      const mr2 = openModal.getBoundingClientRect();
+      const tipW = 360, tipH = 200;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let tl = mr2.right + 14;
+      // Не помещается справа — паркуем слева от модалки
+      if (tl + tipW + 12 > vw) tl = Math.max(12, mr2.left - tipW - 14);
+      let tt = Math.max(12, Math.min(vh - tipH - 12, mr2.top + 12));
+      tip.style.left = tl + 'px';
+      tip.style.top = tt + 'px';
+      tip.className = 'tour-tooltip pos-left';
+    } else {
+      // Нет модалки — tooltip по центру экрана
+      tip.style.left = '50%';
+      tip.style.top = '50%';
+      tip.style.transform = 'translate(-50%, -50%)';
+      tip.className = 'tour-tooltip';
+    }
     return;
   }
 
