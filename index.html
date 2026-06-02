@@ -5280,11 +5280,15 @@
   .sup-status-pill.st-received  { background: #E8F5E9; color: var(--success); }
   .sup-status-pill.st-cancelled { background: #F4F4F5; color: var(--text-faint); }
   /* статусы заказа */
-  .sup-status-pill.ord-draft     { background: var(--bg); color: var(--text-mid); }
-  .sup-status-pill.ord-sent      { background: var(--brand-bg); color: var(--brand); }
-  .sup-status-pill.ord-partial   { background: #FFF4E6; color: #C18B00; }
-  .sup-status-pill.ord-received  { background: #E8F5E9; color: var(--success); }
-  .sup-status-pill.ord-cancelled { background: #F4F4F5; color: var(--text-faint); }
+  .sup-status-pill.ord-draft             { background: var(--bg); color: var(--text-mid); }
+  .sup-status-pill.ord-sent              { background: var(--brand-bg); color: var(--brand); }
+  .sup-status-pill.ord-awaiting_invoice  { background: #FEF3C7; color: #92400E; }
+  .sup-status-pill.ord-invoice_received  { background: #EDE9FE; color: #5B21B6; }
+  .sup-status-pill.ord-to_pay            { background: #FFEDD5; color: #9A3412; }
+  .sup-status-pill.ord-paid              { background: #DBEAFE; color: #1E40AF; }
+  .sup-status-pill.ord-partial           { background: #FFF4E6; color: #C18B00; }
+  .sup-status-pill.ord-received          { background: #E8F5E9; color: var(--success); }
+  .sup-status-pill.ord-cancelled         { background: #F4F4F5; color: var(--text-faint); }
 
   /* Pill kind (material/product) */
   .sup-kind-pill {
@@ -18060,12 +18064,16 @@
           <div class="desktop-layout">
             <div class="filter-row">
               <div class="filter-tabs">
-                <button class="filter-tab active" data-sup-ord="open"      onclick="setSupplyOrdFilter('open')">Открытые</button>
-                <button class="filter-tab"        data-sup-ord="draft"     onclick="setSupplyOrdFilter('draft')">Черновики</button>
-                <button class="filter-tab"        data-sup-ord="sent"      onclick="setSupplyOrdFilter('sent')">Отправленные</button>
-                <button class="filter-tab"        data-sup-ord="partial"   onclick="setSupplyOrdFilter('partial')">Частично</button>
-                <button class="filter-tab"        data-sup-ord="received"  onclick="setSupplyOrdFilter('received')">Получены</button>
-                <button class="filter-tab"        data-sup-ord="all"       onclick="setSupplyOrdFilter('all')">Все</button>
+                <button class="filter-tab active" data-sup-ord="open"              onclick="setSupplyOrdFilter('open')">Открытые</button>
+                <button class="filter-tab"        data-sup-ord="draft"             onclick="setSupplyOrdFilter('draft')">Черновики</button>
+                <button class="filter-tab"        data-sup-ord="sent"              onclick="setSupplyOrdFilter('sent')">Отправлены</button>
+                <button class="filter-tab"        data-sup-ord="awaiting_invoice"  onclick="setSupplyOrdFilter('awaiting_invoice')">Ждут счёт</button>
+                <button class="filter-tab"        data-sup-ord="invoice_received"  onclick="setSupplyOrdFilter('invoice_received')">Счёт пришёл</button>
+                <button class="filter-tab"        data-sup-ord="to_pay"            onclick="setSupplyOrdFilter('to_pay')">К оплате</button>
+                <button class="filter-tab"        data-sup-ord="paid"              onclick="setSupplyOrdFilter('paid')">Оплачены</button>
+                <button class="filter-tab"        data-sup-ord="partial"           onclick="setSupplyOrdFilter('partial')">Частично</button>
+                <button class="filter-tab"        data-sup-ord="received"          onclick="setSupplyOrdFilter('received')">Получены</button>
+                <button class="filter-tab"        data-sup-ord="all"               onclick="setSupplyOrdFilter('all')">Все</button>
               </div>
             </div>
           </div>
@@ -18857,7 +18865,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.85-search-focus-fix";
+const APP_VERSION = "v2.44.86-orders-lifecycle";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44109,12 +44117,23 @@ async function loadSupplyOrderDetail() {
   }
 }
 
+function _fmtSupOrdTs(s) {
+  if (!s) return '';
+  return String(s).replace('T', ' ').substring(0, 16);
+}
+
 function renderSupplyOrderDetail(o) {
   const container = document.getElementById('sup-ord-detail');
   const canManage = canManageSupply();
   const canEdit = canManage && ['draft', 'sent', 'partial'].includes(o.status);
   const canSend = canManage && o.status === 'draft' && (o.items || []).length > 0;
   const canReceive = canManage && ['sent', 'partial'].includes(o.status);
+  // FSM-переходы для нового лайфцикла снабжения
+  const canUploadInvoice = canManage && ['sent', 'awaiting_invoice', 'invoice_received'].includes(o.status);
+  const canToPay         = canManage && o.status === 'invoice_received';
+  const canMarkPaid      = canManage && o.status === 'to_pay';
+  const canMarkReceived  = canManage && ['paid', 'partial'].includes(o.status);
+  const canCancel        = canManage && !['received', 'cancelled', 'draft'].includes(o.status);
 
   let html = '';
   // Шапка с возвратом
@@ -44136,10 +44155,56 @@ function renderSupplyOrderDetail(o) {
       (o.supplier_phone ? '<div class="detail-item"><div class="detail-label">Телефон</div><div class="detail-value">' + escapeHtml(o.supplier_phone) + '</div></div>' : '') +
       (o.supplier_email ? '<div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">' + escapeHtml(o.supplier_email) + '</div></div>' : '') +
       (o.expected_date ? '<div class="detail-item"><div class="detail-label">Ожидаем</div><div class="detail-value">' + escapeHtml(o.expected_date) + '</div></div>' : '') +
-      (o.sent_at ? '<div class="detail-item"><div class="detail-label">Отправлен</div><div class="detail-value">' + escapeHtml((o.sent_at || '').replace('T', ' ').substring(0, 16)) + '</div></div>' : '') +
+      (o.order_label ? '<div class="detail-item"><div class="detail-label">Метка</div><div class="detail-value" style="font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(o.order_label) + '</div></div>' : '') +
     '</div>' +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
+
+  // История переходов (только если есть хоть один таймстамп лайфцикла)
+  const tsEvents = [
+    { ts: o.sent_at,             label: 'Отправлен поставщику',   icon: 'send' },
+    { ts: o.awaiting_invoice_at, label: 'Ждём счёт',              icon: 'clock' },
+    { ts: o.invoice_received_at, label: 'Счёт получен',           icon: 'file-invoice' },
+    { ts: o.to_pay_at,           label: 'Передан на оплату',      icon: 'wallet' },
+    { ts: o.paid_at,             label: 'Оплачен',                icon: 'cash' },
+    { ts: o.fulfilled_at,        label: 'Получено на склад',      icon: 'package' },
+  ].filter(e => !!e.ts);
+  if (tsEvents.length) {
+    html += '<div class="detail-block">' +
+      '<div class="detail-block-title"><i class="ti ti-history"></i> История</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;padding:8px 4px;">' +
+        tsEvents.map(e =>
+          '<div style="display:flex;align-items:center;gap:10px;font-size:13px;">' +
+            '<i class="ti ti-' + e.icon + '" style="color:var(--brand);width:18px;text-align:center;"></i>' +
+            '<div style="min-width:170px;color:var(--text-mid);">' + escapeHtml(e.label) + '</div>' +
+            '<div style="color:var(--text-light);font-variant-numeric:tabular-nums;">' + escapeHtml(_fmtSupOrdTs(e.ts)) + '</div>' +
+          '</div>'
+        ).join('') +
+      '</div>' +
+    '</div>';
+  }
+
+  // Счёт от поставщика — отображение и загрузка
+  html += '<div class="detail-block">' +
+    '<div class="detail-block-title"><i class="ti ti-receipt"></i> Счёт от поставщика</div>' +
+    '<div style="padding:8px 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">';
+  if (o.invoice_file_key && o.invoice_filename) {
+    html += '<i class="ti ti-file-check" style="color:#0A5B41;font-size:20px;"></i>' +
+      '<div style="flex:1;min-width:200px;">' +
+        '<div style="font-size:13px;color:var(--text-dark);">' + escapeHtml(o.invoice_filename) + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-light);">Счёт привязан к заказу</div>' +
+      '</div>' +
+      '<button class="btn btn-secondary" onclick="downloadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-download"></i> Скачать</button>';
+    if (canUploadInvoice) {
+      html += '<button class="btn btn-secondary" onclick="uploadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-refresh"></i> Заменить</button>';
+    }
+  } else if (canUploadInvoice) {
+    html += '<div style="flex:1;color:var(--text-light);font-size:13px;">Счёт ещё не загружен. Прикрепи PDF/Excel/фото — система автоматически переведёт заказ в статус «Счёт пришёл».</div>' +
+      '<button class="btn btn-primary" onclick="uploadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-upload"></i> Загрузить счёт</button>';
+  } else {
+    html += '<div style="color:var(--text-light);font-size:13px;">Счёт ещё не загружен.</div>';
+  }
+  html += '</div></div>';
 
   // Позиции заказа
   html += '<div class="detail-block">' +
@@ -44184,13 +44249,20 @@ function renderSupplyOrderDetail(o) {
   // Кнопки действий
   let actions = [];
   if (canSend)    actions.push('<button class="btn btn-primary" onclick="sendOrder(' + o.id + ')"><i class="ti ti-send"></i> Отправить поставщику</button>');
-  if (canReceive) actions.push('<button class="btn btn-primary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Принять приёмку</button>');
+  // FSM-кнопки (последовательность статусов лайфцикла)
+  if (canToPay)        actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'to_pay\',\'Передать на оплату?\')"><i class="ti ti-wallet"></i> На оплату</button>');
+  if (canMarkPaid)     actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'paid\',\'Отметить заказ как оплаченный?\')"><i class="ti ti-cash"></i> Оплачен</button>');
+  if (canMarkReceived) actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'received\',\'Поставка получена на склад?\')"><i class="ti ti-package-import"></i> Получено</button>');
+  if (canReceive) actions.push('<button class="btn btn-secondary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Приёмка</button>');
   // Кнопки экспорта (доступны для черновика и отправленных)
   if (['draft', 'sent', 'partial'].includes(o.status)) {
     actions.push('<button class="btn btn-secondary" onclick="downloadSupplyOrderDocx(' + o.id + ')"><i class="ti ti-file-download"></i> Скачать DOCX</button>');
   }
   if (o.status === 'draft' && o.supplier_email) {
     actions.push('<button class="btn btn-secondary" onclick="sendSupplyOrderByEmail(' + o.id + ')"><i class="ti ti-mail-send"></i> Отправить по email</button>');
+  }
+  if (canCancel) {
+    actions.push('<button class="btn btn-tertiary" style="color:#B91C1C;" onclick="transitionSupplyOrder(' + o.id + ',\'cancelled\',\'Отменить заказ безвозвратно?\')"><i class="ti ti-x"></i> Отменить</button>');
   }
   if (actions.length) {
     html += '<div class="detail-actions">' + actions.join('') + '</div>';
@@ -44327,6 +44399,96 @@ async function sendOrder(orderId) {
     loadSupplyOrderDetail();
   } catch (e) {
     showToast('Ошибка', 'error');
+  }
+}
+
+// ========== ЭТАП 52.2: FSM-переходы статусов и счёт от поставщика ==========
+
+async function transitionSupplyOrder(orderId, newStatus, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/transition', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: newStatus }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('Не удалось (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    showToast('Статус обновлён', 'success');
+    cache.supplyOrders = null;
+    loadSupplyOrderDetail();
+  } catch (e) {
+    showToast('Сеть: не удалось обновить статус', 'error');
+  }
+}
+
+function uploadSupplyOrderInvoice(orderId) {
+  // Создаём скрытый <input type="file"> и кликаем по нему
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,image/*';
+  input.style.display = 'none';
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    showToast('Загружаем счёт…', 'info');
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/invoice', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd,
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        showToast(d.message || ('Не удалось загрузить (HTTP ' + r.status + ')'), 'error');
+        return;
+      }
+      showToast('Счёт загружен', 'success');
+      cache.supplyOrders = null;
+      loadSupplyOrderDetail();
+    } catch (e) {
+      showToast('Сеть: не удалось загрузить счёт', 'error');
+    }
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+
+async function downloadSupplyOrderInvoice(orderId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/invoice/download', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Счёт недоступен', 'error');
+      return;
+    }
+    // Получаем имя из Content-Disposition
+    const cd = r.headers.get('Content-Disposition') || '';
+    let filename = 'invoice_' + orderId;
+    const m = cd.match(/filename="?([^";]+)"?/i);
+    if (m) filename = m[1];
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    showToast('Не удалось скачать счёт', 'error');
   }
 }
 
