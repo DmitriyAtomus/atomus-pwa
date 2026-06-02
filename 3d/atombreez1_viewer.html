@@ -140,6 +140,38 @@
 (function(){
 const NS="http://www.w3.org/2000/svg";
 let sceneByK={};
+
+// MOBILE-FIX (Atomus, v2.44.89): обработчик вкладок регистрируем СРАЗУ при
+// загрузке, до создания 3D-сцен. На мобильных WebGL-лимит ~8 контекстов; если
+// 9-я сцена бросит исключение — вёрстка вкладок продолжит работать.
+// (Старый дубль ниже в файле теперь no-op — повторная регистрация безвредна.)
+document.querySelectorAll('.tab').forEach(function(tb){
+  tb.addEventListener('click',function(){
+    const k=tb.dataset.k;
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x===tb);});
+    document.querySelectorAll('[data-pane]').forEach(function(p){p.style.display=(p.dataset.pane===k)?'block':'none';});
+    Object.keys(sceneByK).forEach(function(kk){sceneByK[kk].active=false;});
+    if(sceneByK[k]){const o=sceneByK[k];o.active=true;setTimeout(function(){o.resize();},30);}
+  });
+});
+
+// MOBILE-FIX: если WebGL-контекст не создаётся — показываем дружелюбную
+// плашку вместо тихого падения всего скрипта.
+window.addEventListener('error',function(ev){
+  if(ev && ev.error && /WebGL|context/i.test(String(ev.error.message||''))){
+    document.querySelectorAll('canvas.scene').forEach(function(c){
+      if(!c.dataset.failNote){
+        c.dataset.failNote='1';
+        c.style.display='none';
+        const note=document.createElement('div');
+        note.style.cssText='height:480px;display:flex;align-items:center;justify-content:center;background:#f1f3f5;border-radius:12px;color:#5b636b;font-size:13px;text-align:center;padding:20px';
+        note.innerHTML='3D-модель не загрузилась.<br>На мобильных лимит WebGL-контекстов (обычно 8). Откройте модель на десктопе.';
+        c.parentNode.insertBefore(note,c);
+      }
+    });
+  }
+});
+
 const HAS3D=(typeof THREE!=="undefined");
 if(!HAS3D){
   document.querySelectorAll('.scene-h').forEach(function(el){
