@@ -18790,7 +18790,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.71-stage-for-any-helper";
+const APP_VERSION = "v2.44.72-stage-in-reports";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21915,12 +21915,17 @@ function renderProductionWorkDetail(w) {
                 '<button class="pwd-session-del" title="Удалить запись" onclick="removePwdSession(' + s.id + ',' + w.id + ')"><i class="ti ti-trash"></i></button>' +
               '</div>')
           : '';
+        // v2.44.72: бейдж этапа в журнале сессий
+        const stageBadge = s.stage_name
+          ? ' <span class="pwd-help-chip-stage" style="cursor:default;">' + escapeHtml(s.stage_name) + '</span>'
+          : '';
         html += '<div class="pwd-session-row" id="pwd-session-row-' + s.id + '" data-session-id="' + s.id + '" data-session-date="' + escapeHtml(s.session_date || '') + '" data-hours="' + (s.hours != null ? s.hours : '') + '" data-note="' + escapeHtml(s.note || '') + '">' +
                   '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
                   '<div class="pwd-session-body">' +
                     '<div class="pwd-session-top">' +
                       '<span class="pwd-session-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
                         ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
+                        stageBadge +
                       '</span>' +
                       '<span class="pwd-session-meta">' + escapeHtml(dateStr + hoursStr) + '</span>' +
                     '</div>' +
