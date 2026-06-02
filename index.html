@@ -18822,7 +18822,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.73-supply-order-preview";
+const APP_VERSION = "v2.44.74-supplier-contact-greeting";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -43189,9 +43189,10 @@ function renderSupplyShopping(d) {
           ) +
         '</div>' +
       '</div>' +
-      (g.supplier_email || g.supplier_phone || g.supplier_inn
+      (g.supplier_email || g.supplier_phone || g.supplier_inn || g.supplier_contact
         ? '<div class="sup-shop-group-contact">' +
             (g.supplier_inn ? '<span>ИНН ' + escapeHtml(g.supplier_inn) + '</span>' : '') +
+            (g.supplier_contact ? '<span><i class="ti ti-user"></i>' + escapeHtml(g.supplier_contact) + '</span>' : '') +
             (g.supplier_email ? '<span><i class="ti ti-mail"></i>' + escapeHtml(g.supplier_email) + '</span>' : '') +
             (g.supplier_phone ? '<span><i class="ti ti-phone"></i>' + escapeHtml(g.supplier_phone) + '</span>' : '') +
           '</div>'
