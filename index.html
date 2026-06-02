@@ -2587,6 +2587,61 @@
     border-color: #B91C1C;
     box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
   }
+  /* v2.44.70: этап работы внутри chip активного хелпера */
+  .pwd-help-chip-stage {
+    display: inline-flex; align-items: center;
+    padding: 1px 7px;
+    background: rgba(37,99,235,0.12);
+    color: #1E40AF;
+    border-radius: 999px;
+    font-size: 10.5px; font-weight: 600;
+    margin-left: 4px;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .pwd-help-chip-stage.empty {
+    background: transparent;
+    color: var(--text-light);
+    border: 1px dashed var(--border);
+  }
+  .pwd-help-chip-stage:hover {
+    background: rgba(37,99,235,0.20);
+  }
+  /* Stage picker modal */
+  .stage-picker-modal .stage-picker-grid {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 4px 0 10px;
+  }
+  .stage-chip {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: white;
+    cursor: pointer;
+    font-size: 13.5px;
+    color: var(--text-dark);
+    transition: background 0.15s, border 0.15s, color 0.15s;
+  }
+  .stage-chip:hover {
+    background: rgba(37,99,235,0.08);
+    border-color: rgba(37,99,235,0.4);
+    color: var(--brand);
+  }
+  .stage-picker-new {
+    display: flex; gap: 6px;
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+  .stage-picker-new input {
+    flex: 1;
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    outline: 0;
+  }
+  .stage-picker-new input:focus { border-color: rgba(37,99,235,0.5); }
   /* v2.43.48: кнопка «Добавить» рядом с toggle */
   .pwd-help-add {
     display: inline-flex; align-items: center; gap: 6px;
@@ -18735,7 +18790,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.69-tour-modal-fallback";
+const APP_VERSION = "v2.44.70-work-stages";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21748,9 +21803,20 @@ function renderProductionWorkDetail(w) {
         const timerHtml = startedAt
           ? '<span class="pwd-help-chip-timer" data-started-at="' + escapeHtml(startedAt) + '" data-label="">' + escapeHtml(elapsedFmt) + '</span>'
           : '';
+        // v2.44.70: бэдж с этапом + кнопка смены этапа для своего helper'а
+        const stageName = h.stage_name || '';
+        const isMe = !!h.is_me;
+        const stageHtml = stageName
+          ? '<span class="pwd-help-chip-stage" ' +
+              (isMe ? ('onclick="event.stopPropagation();openChangeMyStage(' + w.id + ')" title="Сменить этап"') : ('title="' + escapeHtml(stageName) + '"')) +
+              '>' + escapeHtml(stageName) + '</span>'
+          : (isMe
+              ? '<span class="pwd-help-chip-stage empty" onclick="event.stopPropagation();openChangeMyStage(' + w.id + ')" title="Выбрать этап">+ этап</span>'
+              : '');
         html += '<span class="pwd-help-chip" title="' + escapeHtml(h.full_name || h.short_name) + '">' +
                   '<span class="pkb-wl-avatar ac-' + colorIdx + '" style="width:22px;height:22px;font-size:9px;border-width:1px;">' + escapeHtml(initials) + '</span>' +
                   escapeHtml(h.short_name || h.full_name || ('#' + h.id)) +
+                  stageHtml +
                   timerHtml +
                   closeBtn +
                 '</span>';
@@ -21957,21 +22023,126 @@ _startHelpingTimerRefresh();
 
 // v2.43.47: Toggle «Помогаю сейчас» — POST start-helping или stop-helping
 // v2.43.52: при остановке открывает мини-окно «Что делал?» — заметка идёт в журнал
+/* === v2.44.70: этапы работы — каталог + пикер === */
+async function _loadWorkStages() {
+  // Кэшируем на сессию — список меняется редко
+  if (cache._workStages) return cache._workStages;
+  try {
+    const r = await apiGet('/api/work-stages');
+    cache._workStages = r.items || [];
+  } catch (_) {
+    cache._workStages = [];
+  }
+  return cache._workStages;
+}
+
+function _invalidateWorkStagesCache() { cache._workStages = null; }
+
+function openStagePicker({ title, stages, onPick, allowSkip }) {
+  const overlayId = 'stage-picker-modal';
+  let m = document.getElementById(overlayId);
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay stage-picker-modal';
+  const chips = (stages || []).map(s =>
+    '<button class="stage-chip" data-stage-id="' + s.id + '">' + escapeHtml(s.name) + '</button>'
+  ).join('');
+  m.innerHTML =
+    '<div class="modal" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-tools"></i> ' + escapeHtml(title || 'Выбери этап') + '</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="stage-picker-grid" id="stage-picker-grid">' + chips + '</div>' +
+        '<div class="stage-picker-new">' +
+          '<input type="text" id="stage-new-name" placeholder="Свой этап — введи и нажми «+»">' +
+          '<button class="btn btn-secondary btn-sm" onclick="_stagePickerAddNew()">' +
+            '<i class="ti ti-plus"></i></button>' +
+        '</div>' +
+        (allowSkip !== false
+          ? '<button class="dev-link-btn" style="margin-top:10px;" onclick="_stagePickerPick(null)">Пропустить — без этапа</button>'
+          : '') +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  m.classList.add('visible');
+  // Делегирование клика по чипам
+  m.querySelector('#stage-picker-grid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.stage-chip');
+    if (!btn) return;
+    _stagePickerPick(parseInt(btn.dataset.stageId, 10));
+  });
+  // Сохраним onPick в state модалки
+  m._onPick = onPick;
+}
+
+function _stagePickerPick(stageId) {
+  const m = document.getElementById('stage-picker-modal');
+  if (!m) return;
+  const cb = m._onPick;
+  m.remove();
+  if (typeof cb === 'function') cb(stageId);
+}
+
+async function _stagePickerAddNew() {
+  const input = document.getElementById('stage-new-name');
+  const name = (input?.value || '').trim();
+  if (!name) return;
+  try {
+    const r = await apiPost('/api/work-stages', { name });
+    _invalidateWorkStagesCache();
+    // Сразу пикаем созданный этап
+    _stagePickerPick(r.id);
+  } catch (e) {
+    showToast('Не удалось добавить этап: ' + ((e && e.message) || e), 'error');
+  }
+}
+
+async function openChangeMyStage(workId) {
+  const stages = await _loadWorkStages();
+  openStagePicker({
+    title: 'Сменить этап',
+    stages,
+    onPick: async (stageId) => {
+      try {
+        await apiPost('/api/employees/me/helping-stage', stageId ? { stage_id: stageId } : { stage_id: null });
+        const fresh = await apiGet('/api/production/works/' + workId);
+        renderProductionWorkDetail(fresh);
+      } catch (e) {
+        showToast((e && e.message) || 'Ошибка', 'error');
+      }
+    },
+  });
+}
+
 async function togglePwdHelp(workId, willStart) {
   const isStart = (willStart === true || willStart === 'true');
   if (isStart) {
-    try {
-      await apiPost('/api/production/works/' + workId + '/start-helping', {});
-      showToast('Часики пошли ⏱', 'success');
-      const fresh = await apiGet('/api/production/works/' + workId);
-      renderProductionWorkDetail(fresh);
-      cache.productionKanban = null;
-      if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
-        loadProductionDashboard();
-      }
-    } catch (e) {
-      showToast((e && e.message) || 'Ошибка', 'error');
-    }
+    // v2.44.70: спрашиваем какой этап работы
+    const stages = await _loadWorkStages();
+    openStagePicker({
+      title: 'Какой этап ты делаешь?',
+      stages,
+      onPick: async (stageId) => {
+        try {
+          await apiPost('/api/production/works/' + workId + '/start-helping',
+                        stageId ? { stage_id: stageId } : {});
+          showToast('Часики пошли ⏱', 'success');
+          const fresh = await apiGet('/api/production/works/' + workId);
+          renderProductionWorkDetail(fresh);
+          cache.productionKanban = null;
+          if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
+            loadProductionDashboard();
+          }
+        } catch (e) {
+          showToast((e && e.message) || 'Ошибка', 'error');
+        }
+      },
+    });
     return;
   }
   // Stop — открываем мини-окошко с полем «Что делал»
@@ -22115,20 +22286,32 @@ async function openAddHelperModal(workId) {
 }
 
 async function addPwdHelper(workId, employeeId) {
-  try {
-    await apiPost('/api/production/works/' + workId + '/helpers', { employee_id: employeeId });
-    showToast('Сотрудник назначен', 'success');
-    const modal = document.getElementById('pwd-add-helper-modal');
-    if (modal) modal.remove();
-    const fresh = await apiGet('/api/production/works/' + workId);
-    renderProductionWorkDetail(fresh);
-    cache.productionKanban = null;
-    if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
-      loadProductionDashboard();
-    }
-  } catch (e) {
-    showToast((e && e.message) || 'Ошибка', 'error');
-  }
+  // v2.44.70: после выбора сотрудника просим выбрать этап
+  const stages = await _loadWorkStages();
+  // Закроем модалку выбора сотрудника
+  const empModal = document.getElementById('pwd-add-helper-modal');
+  if (empModal) empModal.remove();
+  openStagePicker({
+    title: 'Какой этап будет делать?',
+    stages,
+    onPick: async (stageId) => {
+      try {
+        await apiPost('/api/production/works/' + workId + '/helpers', {
+          employee_id: employeeId,
+          ...(stageId ? { stage_id: stageId } : {}),
+        });
+        showToast('Сотрудник назначен', 'success');
+        const fresh = await apiGet('/api/production/works/' + workId);
+        renderProductionWorkDetail(fresh);
+        cache.productionKanban = null;
+        if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
+          loadProductionDashboard();
+        }
+      } catch (e) {
+        showToast((e && e.message) || 'Ошибка', 'error');
+      }
+    },
+  });
 }
 
 async function removePwdHelper(workId, employeeId) {
