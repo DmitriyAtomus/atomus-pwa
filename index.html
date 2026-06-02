@@ -18865,7 +18865,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.87-preview-edit-qty";
+const APP_VERSION = "v2.44.88-preview-edit-qty-debounce";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -43471,7 +43471,7 @@ function _opBuildItemsHTML(items) {
   let html = '<div style="display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:8px;">';
   items.forEach((it, idx) => {
     const unit = it.item_unit || 'шт.';
-    html += '<div style="display:grid;grid-template-columns:24px 1fr 110px;gap:8px;align-items:center;font-size:13px;">' +
+    html += '<div style="display:grid;grid-template-columns:24px 1fr 130px;gap:8px;align-items:center;font-size:13px;">' +
       '<span style="color:var(--text-light);text-align:right;">' + (idx + 1) + '.</span>' +
       '<div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(it.item_name || '') + '">' +
         escapeHtml(it.item_name || '—') +
@@ -43480,9 +43480,11 @@ function _opBuildItemsHTML(items) {
         '<input type="number" step="any" min="0.001" inputmode="decimal" ' +
           'data-op-item-id="' + it.id + '" ' +
           'value="' + (it.qty || 0) + '" ' +
-          'style="width:72px;padding:4px 6px;text-align:right;border:1px solid var(--border);border-radius:6px;font-size:13px;" ' +
-          'onchange="_opUpdateItemQty(' + it.id + ', this.value, this)">' +
-        '<span style="color:var(--text-light);min-width:34px;">' + escapeHtml(unit) + '</span>' +
+          'style="width:80px;padding:4px 6px;text-align:right;border:1px solid var(--border);border-radius:6px;font-size:13px;" ' +
+          'oninput="_opScheduleItemQty(' + it.id + ', this)" ' +
+          'onblur="_opFlushItemQty(' + it.id + ', this)">' +
+        '<span style="color:var(--text-light);min-width:30px;">' + escapeHtml(unit) + '</span>' +
+        '<span class="op-item-saving" data-op-saving-id="' + it.id + '" style="width:14px;color:var(--text-light);font-size:11px;display:inline-flex;align-items:center;justify-content:center;"></span>' +
       '</div>' +
     '</div>';
   });
@@ -43490,15 +43492,37 @@ function _opBuildItemsHTML(items) {
   return html;
 }
 
+// Дебаунсы по итему — чтобы не дёргать PATCH на каждый символ.
+const _opItemQtyTimers = {};
+
+function _opScheduleItemQty(itemId, inputEl) {
+  if (_opItemQtyTimers[itemId]) clearTimeout(_opItemQtyTimers[itemId]);
+  const saveIndicator = document.querySelector('[data-op-saving-id="' + itemId + '"]');
+  if (saveIndicator) saveIndicator.textContent = '…';
+  _opItemQtyTimers[itemId] = setTimeout(() => {
+    _opItemQtyTimers[itemId] = null;
+    _opUpdateItemQty(itemId, inputEl && inputEl.value, inputEl);
+  }, 600);
+}
+
+function _opFlushItemQty(itemId, inputEl) {
+  // На blur — немедленно (если ждали дебаунс)
+  if (_opItemQtyTimers[itemId]) {
+    clearTimeout(_opItemQtyTimers[itemId]);
+    _opItemQtyTimers[itemId] = null;
+    _opUpdateItemQty(itemId, inputEl && inputEl.value, inputEl);
+  }
+}
+
 async function _opUpdateItemQty(itemId, value, inputEl) {
   if (!_opCurrentDraft) return;
-  const qty = parseFloat(String(value).replace(',', '.'));
+  const qty = parseFloat(String(value || '').replace(',', '.'));
+  const saveIndicator = document.querySelector('[data-op-saving-id="' + itemId + '"]');
   if (!isFinite(qty) || qty <= 0) {
-    showToast('Кол-во должно быть положительным числом', 'error');
-    if (inputEl) inputEl.focus();
+    if (saveIndicator) { saveIndicator.textContent = '!'; saveIndicator.style.color = '#B91C1C'; }
     return;
   }
-  if (inputEl) inputEl.disabled = true;
+  if (saveIndicator) { saveIndicator.textContent = '…'; saveIndicator.style.color = 'var(--text-light)'; }
   try {
     const r = await fetch(API_BASE + '/api/supply-orders/items/' + itemId, {
       method: 'PATCH',
@@ -43511,14 +43535,28 @@ async function _opUpdateItemQty(itemId, value, inputEl) {
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
       showToast(j.message || ('Не удалось сохранить кол-во (HTTP ' + r.status + ')'), 'error');
+      if (saveIndicator) { saveIndicator.textContent = '!'; saveIndicator.style.color = '#B91C1C'; }
       return;
     }
     // Освежаем превью с сервера (он пересоберёт текст письма)
     await _opReloadDraft();
+    // Восстановим фокус — пользователь может продолжить править ту же ячейку
+    const fresh = document.querySelector('[data-op-item-id="' + itemId + '"]');
+    if (fresh && document.activeElement !== fresh && inputEl && document.activeElement === inputEl) {
+      // не трогаем — пользователь ещё в инпуте, _opReloadDraft переписал HTML
+    } else if (fresh) {
+      // если был фокус на старом инпуте — переносим на новый
+      if (inputEl && inputEl.dataset && inputEl.dataset.opItemId == itemId && document.activeElement === inputEl) {
+        fresh.focus();
+        const v = fresh.value;
+        fresh.setSelectionRange(v.length, v.length);
+      }
+    }
+    const freshIndicator = document.querySelector('[data-op-saving-id="' + itemId + '"]');
+    if (freshIndicator) { freshIndicator.textContent = '✓'; freshIndicator.style.color = '#0A5B41'; setTimeout(() => { freshIndicator.textContent = ''; }, 1200); }
   } catch (e) {
     showToast('Сеть: не удалось сохранить кол-во', 'error');
-  } finally {
-    if (inputEl) inputEl.disabled = false;
+    if (saveIndicator) { saveIndicator.textContent = '!'; saveIndicator.style.color = '#B91C1C'; }
   }
 }
 
@@ -43531,10 +43569,8 @@ async function _opReloadDraft() {
     if (!r.ok) return;
     const fresh = await r.json();
     _opCurrentDraft = fresh;
-    // Обновляем секции, которые могли измениться. Не трогаем поле «to» и
-    // поля темы/тела если юзер их редактировал руками.
-    const wrap = document.getElementById('op-items-wrap');
-    if (wrap) wrap.innerHTML = _opBuildItemsHTML(fresh.items || []);
+    // Items HTML НЕ перерисовываем — это убьёт фокус в инпуте кол-ва пока юзер
+    // ещё печатает. Значения qty уже корректны в state, сервер их подтвердил.
     const cnt = document.getElementById('op-items-count');
     if (cnt) cnt.textContent = fresh.items_count;
     if (!_opSubjectDirty) {
