@@ -18735,7 +18735,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.65-defect-btn-polish";
+const APP_VERSION = "v2.44.66-tour-rect-revalidate";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46186,18 +46186,29 @@ async function goToTourStep(idx) {
       target = el;
       break;
     }
-    // Прокрутим в видимую область
+    // Прокрутим в видимую область и переоценим rect после скролла
     if (target) {
-      try { target.scrollIntoView({ block: 'center', behavior: 'instant' }); }
+      try { target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); }
       catch (_) { target.scrollIntoView(); }
-      await new Promise(r => setTimeout(r, 150));
+      // Двойной requestAnimationFrame чтобы дождаться layout после скролла
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const r2 = target.getBoundingClientRect();
+      // Если после скролла rect всё ещё мусорный — отказываемся от target,
+      // упадём в no-target ветку (по центру + дим всего экрана).
+      if (r2.width <= 4 || r2.height <= 4 ||
+          r2.right < 20 || r2.left > vw - 20 ||
+          r2.bottom < 20 || r2.top > vh - 20) {
+        console.warn('Tour: target rect off-screen after scroll, falling back', r2);
+        target = null;
+      }
     }
   }
 
   const overlay = document.getElementById('tour-overlay');
   if (!overlay) return;
-  overlay.style.display = '';                 // сбросить inline display:none, оставленный закрытием прошлого тура
+  overlay.style.removeProperty('display');    // полностью убрать inline display, чтобы CSS-класс мог управлять
   overlay.classList.add('active');
+  overlay.style.display = 'block';            // и явно покажем — на случай если CSS не применился
 
   // Заполняем тексты
   document.getElementById('tour-step-label').textContent =
