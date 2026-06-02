@@ -10275,8 +10275,18 @@
   }
   .inv-session-row .inv-id { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--text-light); font-size: 12px; }
   .inv-session-row .inv-status {
-    display: inline-block; padding: 3px 9px; border-radius: 999px;
+    display: inline-block; padding: 4px 12px; border-radius: 999px;
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+    white-space: nowrap; line-height: 1.2;
+  }
+  .inv-session-row .inv-row-actions { display: flex; gap: 6px; align-items: center; }
+  .inv-session-row .inv-delete-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-light);
+    border-radius: 8px; padding: 5px 8px; cursor: pointer; line-height: 1;
+    transition: all .15s ease;
+  }
+  .inv-session-row .inv-delete-btn:hover {
+    color: #B91C1C; border-color: #FCA5A5; background: rgba(254,202,202,0.2);
   }
   .inv-status.s-recognizing { background: rgba(186,117,23,0.15); color: #854F0B; }
   .inv-status.s-ready       { background: rgba(37,99,235,0.15);  color: #1E40AF; }
@@ -18847,7 +18857,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.80-send-feedback";
+const APP_VERSION = "v2.44.82-pdf-inventory";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47974,12 +47984,12 @@ function _invRenderHome() {
     '<div class="inv-step-card">' +
       '<div class="step-n">3</div>' +
       '<h3>Загрузи фото</h3>' +
-      '<p>Сфотографируй заполненные листы (можно сразу несколько) и загрузи сюда. Claude разберёт почерк и предложит обновить остатки.</p>' +
+      '<p>Сфотографируй заполненные листы или отсканируй в PDF (можно сразу несколько) и загрузи сюда. Claude разберёт почерк и предложит обновить остатки.</p>' +
       '<div class="inv-drop" id="inv-drop-zone" onclick="document.getElementById(\'inv-photo-input\').click()">' +
         '<i class="ti ti-camera"></i>' +
-        '<div><b>Перетащи фото сюда</b> или нажми чтобы выбрать</div>' +
-        '<div style="font-size:11.5px;margin-top:3px;">До 12 МБ на фото · JPG/PNG/HEIC</div>' +
-        '<input type="file" id="inv-photo-input" multiple accept="image/*" style="display:none;" onchange="uploadInventoryPhotos(this.files)">' +
+        '<div><b>Перетащи файлы сюда</b> или нажми чтобы выбрать</div>' +
+        '<div style="font-size:11.5px;margin-top:3px;">JPG/PNG/HEIC до 12 МБ · PDF до 32 МБ (многостраничный)</div>' +
+        '<input type="file" id="inv-photo-input" multiple accept="image/*,application/pdf,.pdf" style="display:none;" onchange="uploadInventoryPhotos(this.files)">' +
       '</div>' +
     '</div>' +
   '</div>';
@@ -48007,7 +48017,12 @@ function _invRenderHome() {
         '<span>' + escapeHtml(dt) + '</span>' +
         '<span class="inv-status s-' + statusKey + '">' + escapeHtml(statusLabel) + '</span>' +
         appliedText +
-        '<button class="btn btn-secondary" onclick="openInventorySession(' + s.id + ')">' + ctaLabel + '</button>' +
+        '<div class="inv-row-actions">' +
+          '<button class="btn btn-secondary" onclick="openInventorySession(' + s.id + ')">' + ctaLabel + '</button>' +
+          '<button class="inv-delete-btn" title="Удалить" onclick="deleteInventorySession(' + s.id + ', \'' + statusKey + '\')">' +
+            '<i class="ti ti-trash"></i>' +
+          '</button>' +
+        '</div>' +
       '</div>';
     });
     html += '</div>';
@@ -48190,15 +48205,19 @@ async function downloadInventoryBlank() {
 
 async function uploadInventoryPhotos(fileList) {
   if (!fileList || !fileList.length) return;
-  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  const files = Array.from(fileList).filter(f => {
+    const t = (f.type || '').toLowerCase();
+    const n = (f.name || '').toLowerCase();
+    return t.startsWith('image/') || t === 'application/pdf' || n.endsWith('.pdf');
+  });
   if (!files.length) {
-    showToast('Поддерживаются только изображения', 'error');
+    showToast('Поддерживаются изображения (JPG/PNG/HEIC) и PDF', 'error');
     return;
   }
   const fd = new FormData();
   files.forEach((f, i) => fd.append('photo_' + (i+1), f));
   const body = document.getElementById('inventory-screen-body');
-  if (body) body.innerHTML = '<div class="loading-block">Загружаем фото и запускаем распознавание…</div>';
+  if (body) body.innerHTML = '<div class="loading-block">Загружаем файлы и запускаем распознавание…</div>';
   try {
     const res = await fetch(API_BASE + '/api/inventory/sessions', {
       method: 'POST',
@@ -48212,11 +48231,35 @@ async function uploadInventoryPhotos(fileList) {
       return;
     }
     const j = await res.json();
-    showToast('Фото загружены. ИИ распознаёт…', 'success');
+    showToast('Файлы загружены. ИИ распознаёт…', 'success');
     openInventorySession(j.id);
   } catch (e) {
-    showToast('Сеть: не удалось загрузить фото', 'error');
+    showToast('Сеть: не удалось загрузить файлы', 'error');
     _invRenderHome();
+  }
+}
+
+async function deleteInventorySession(id, statusKey) {
+  const warn = (statusKey === 'applied')
+    ? ('Инвентаризация #' + id + ' уже применена — движения склада останутся в истории, удалится только запись о сессии. Продолжить?')
+    : ('Удалить инвентаризацию #' + id + '?');
+  if (!confirm(warn)) return;
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/sessions/' + id, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось удалить (HTTP ' + res.status + ')'), 'error');
+      return;
+    }
+    showToast('Инвентаризация #' + id + ' удалена', 'success');
+    // Перезагружаем список с бэка (а не просто фильтруем локально, чтобы не врать)
+    await _invFetchSessions();
+    _invRenderHome();
+  } catch (e) {
+    showToast('Сеть: не удалось удалить', 'error');
   }
 }
 
