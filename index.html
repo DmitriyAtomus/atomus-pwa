@@ -10102,6 +10102,7 @@
   .op-attachment-link {
     margin-left: auto;
     color: var(--brand); font-weight: 500; font-size: 12.5px; text-decoration: none;
+    background: transparent; border: 0; padding: 0; cursor: pointer; font-family: inherit;
   }
   .op-attachment-link:hover { text-decoration: underline; }
 
@@ -18822,7 +18823,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.74-supplier-contact-greeting";
+const APP_VERSION = "v2.44.76-preview-docx-auth";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -43329,6 +43330,33 @@ async function openCreateOrderPreview(supplierId) {
   _renderOrderPreviewModal(draft);
 }
 
+// v2.44.76: проверка DOCX из превью — fetch с авторизацией, открываем blob в новой вкладке
+async function downloadOrderDraftDocx(orderId, label) {
+  try {
+    const resp = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/docx', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      showToast('Не удалось открыть: ' + (e.message || ('HTTP ' + resp.status)), 'error');
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    // Word-документ из blob браузер не покажет inline — даём «скачать»,
+    // пользователь откроет в Word на своей стороне.
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'order_' + (label || ('ORD-' + orderId)) + '.docx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 function _renderOrderPreviewModal(draft) {
   const overlayId = 'order-preview-modal';
   let m = document.getElementById(overlayId);
@@ -43360,7 +43388,7 @@ function _renderOrderPreviewModal(draft) {
         '<div class="op-attachment">' +
           '<i class="ti ti-paperclip"></i>' +
           '<span>Вложение: <b>order_' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '.docx</b> · ' + draft.items_count + ' позиций</span>' +
-          '<a href="' + docxUrl + '" target="_blank" class="op-attachment-link">Открыть для проверки</a>' +
+          '<button type="button" class="op-attachment-link" onclick="downloadOrderDraftDocx(' + draft.id + ',\'' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '\')">Открыть для проверки</button>' +
         '</div>' +
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
