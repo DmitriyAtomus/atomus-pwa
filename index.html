@@ -18790,7 +18790,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.70-work-stages";
+const APP_VERSION = "v2.44.71-stage-for-any-helper";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21803,15 +21803,22 @@ function renderProductionWorkDetail(w) {
         const timerHtml = startedAt
           ? '<span class="pwd-help-chip-timer" data-started-at="' + escapeHtml(startedAt) + '" data-label="">' + escapeHtml(elapsedFmt) + '</span>'
           : '';
-        // v2.44.70: бэдж с этапом + кнопка смены этапа для своего helper'а
+        // v2.44.70/71: бэдж с этапом — менять может сам сотрудник ИЛИ мастер/директор
         const stageName = h.stage_name || '';
         const isMe = !!h.is_me;
+        const canChangeStage = isMe || canManageHelpers;
+        const stageClickHandler = canChangeStage
+          ? (isMe
+              ? 'event.stopPropagation();openChangeMyStage(' + w.id + ')'
+              : 'event.stopPropagation();openChangeHelperStage(' + w.id + ',' + h.id + ',\'' + escapeHtml((h.short_name || h.full_name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\')'
+            )
+          : '';
         const stageHtml = stageName
           ? '<span class="pwd-help-chip-stage" ' +
-              (isMe ? ('onclick="event.stopPropagation();openChangeMyStage(' + w.id + ')" title="Сменить этап"') : ('title="' + escapeHtml(stageName) + '"')) +
+              (canChangeStage ? ('onclick="' + stageClickHandler + '" title="Сменить этап"') : ('title="' + escapeHtml(stageName) + '"')) +
               '>' + escapeHtml(stageName) + '</span>'
-          : (isMe
-              ? '<span class="pwd-help-chip-stage empty" onclick="event.stopPropagation();openChangeMyStage(' + w.id + ')" title="Выбрать этап">+ этап</span>'
+          : (canChangeStage
+              ? '<span class="pwd-help-chip-stage empty" onclick="' + stageClickHandler + '" title="Выбрать этап">+ этап</span>'
               : '');
         html += '<span class="pwd-help-chip" title="' + escapeHtml(h.full_name || h.short_name) + '">' +
                   '<span class="pkb-wl-avatar ac-' + colorIdx + '" style="width:22px;height:22px;font-size:9px;border-width:1px;">' + escapeHtml(initials) + '</span>' +
@@ -22110,6 +22117,26 @@ async function openChangeMyStage(workId) {
     onPick: async (stageId) => {
       try {
         await apiPost('/api/employees/me/helping-stage', stageId ? { stage_id: stageId } : { stage_id: null });
+        const fresh = await apiGet('/api/production/works/' + workId);
+        renderProductionWorkDetail(fresh);
+      } catch (e) {
+        showToast((e && e.message) || 'Ошибка', 'error');
+      }
+    },
+  });
+}
+
+async function openChangeHelperStage(workId, employeeId, employeeName) {
+  const stages = await _loadWorkStages();
+  openStagePicker({
+    title: 'Этап для «' + (employeeName || 'сотрудника') + '»',
+    stages,
+    onPick: async (stageId) => {
+      try {
+        await apiPost(
+          '/api/production/works/' + workId + '/helpers/' + employeeId + '/stage',
+          stageId ? { stage_id: stageId } : { stage_id: null },
+        );
         const fresh = await apiGet('/api/production/works/' + workId);
         renderProductionWorkDetail(fresh);
       } catch (e) {
