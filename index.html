@@ -18865,7 +18865,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.86-orders-lifecycle";
+const APP_VERSION = "v2.44.87-preview-edit-qty";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -43310,7 +43310,6 @@ async function downloadShoppingGroupDocx(supplierId) {
       body: JSON.stringify({
         supplier_id: supplierId,
         items: group.items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
-        comment: 'Из «Что закупить»',
       }),
     });
     if (!resp.ok) {
@@ -43366,7 +43365,6 @@ async function openCreateOrderPreview(supplierId) {
       body: JSON.stringify({
         supplier_id: supplierId,
         items: group.items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
-        comment: 'Из «Что закупить»',
       }),
     });
     if (!resp.ok) {
@@ -43409,16 +43407,24 @@ async function downloadOrderDraftDocx(orderId, label) {
   }
 }
 
+// Состояние превью-модалки. Храним последний draft, чтобы при изменении qty
+// поднимать только секцию позиций и тело письма (без сноса полей to/subject).
+let _opCurrentDraft = null;
+let _opBodyDirty = false;   // юзер вручную правил textarea — не перезаписываем
+let _opSubjectDirty = false;
+
 function _renderOrderPreviewModal(draft) {
+  _opCurrentDraft = draft;
+  _opBodyDirty = false;
+  _opSubjectDirty = false;
   const overlayId = 'order-preview-modal';
   let m = document.getElementById(overlayId);
   if (m) m.remove();
   m = document.createElement('div');
   m.id = overlayId;
   m.className = 'modal-overlay order-preview-modal';
-  const docxUrl = API_BASE + '/api/supply-orders/' + draft.id + '/docx';
   m.innerHTML =
-    '<div class="modal" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column;">' +
+    '<div class="modal" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
         '<h2><i class="ti ti-mail-send"></i> Заявка ' + escapeHtml(draft.order_label || ('#' + draft.id)) + ' · превью письма</h2>' +
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()">' +
@@ -43431,15 +43437,19 @@ function _renderOrderPreviewModal(draft) {
         '</div>' +
         '<div class="op-field">' +
           '<label>Тема письма <span style="color:var(--text-light);font-weight:400;font-size:11px;">— метка в квадратных скобках нужна для авто-приёмки счёта, лучше её не удалять</span></label>' +
-          '<input type="text" id="op-subject" value="' + escapeHtml(draft.preview.subject || '') + '">' +
+          '<input type="text" id="op-subject" oninput="_opSubjectDirty=true" value="' + escapeHtml(draft.preview.subject || '') + '">' +
+        '</div>' +
+        '<div class="op-field">' +
+          '<label>Позиции <span style="color:var(--text-light);font-weight:400;font-size:11px;">— меняй кол-во прямо здесь, текст письма и DOCX обновятся автоматически</span></label>' +
+          '<div id="op-items-wrap">' + _opBuildItemsHTML(draft.items || []) + '</div>' +
         '</div>' +
         '<div class="op-field" style="flex:1;display:flex;flex-direction:column;">' +
           '<label>Текст письма</label>' +
-          '<textarea id="op-body" style="min-height:200px;">' + escapeHtml(draft.preview.body || '') + '</textarea>' +
+          '<textarea id="op-body" oninput="_opBodyDirty=true" style="min-height:220px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;">' + escapeHtml(draft.preview.body || '') + '</textarea>' +
         '</div>' +
         '<div class="op-attachment">' +
           '<i class="ti ti-paperclip"></i>' +
-          '<span>Вложение: <b>order_' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '.docx</b> · ' + draft.items_count + ' позиций</span>' +
+          '<span>Вложение: <b>order_' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '.docx</b> · <span id="op-items-count">' + draft.items_count + '</span> позиций</span>' +
           '<button type="button" class="op-attachment-link" onclick="downloadOrderDraftDocx(' + draft.id + ',\'' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '\')">Открыть для проверки</button>' +
         '</div>' +
         '<div id="op-status" class="op-status" style="display:none;"></div>' +
@@ -43454,6 +43464,88 @@ function _renderOrderPreviewModal(draft) {
   document.body.appendChild(m);
   m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
   m.classList.add('visible');
+}
+
+function _opBuildItemsHTML(items) {
+  if (!items || !items.length) return '<div style="color:var(--text-light);font-size:13px;padding:8px 4px;">(позиций нет)</div>';
+  let html = '<div style="display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:8px;">';
+  items.forEach((it, idx) => {
+    const unit = it.item_unit || 'шт.';
+    html += '<div style="display:grid;grid-template-columns:24px 1fr 110px;gap:8px;align-items:center;font-size:13px;">' +
+      '<span style="color:var(--text-light);text-align:right;">' + (idx + 1) + '.</span>' +
+      '<div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(it.item_name || '') + '">' +
+        escapeHtml(it.item_name || '—') +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">' +
+        '<input type="number" step="any" min="0.001" inputmode="decimal" ' +
+          'data-op-item-id="' + it.id + '" ' +
+          'value="' + (it.qty || 0) + '" ' +
+          'style="width:72px;padding:4px 6px;text-align:right;border:1px solid var(--border);border-radius:6px;font-size:13px;" ' +
+          'onchange="_opUpdateItemQty(' + it.id + ', this.value, this)">' +
+        '<span style="color:var(--text-light);min-width:34px;">' + escapeHtml(unit) + '</span>' +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+async function _opUpdateItemQty(itemId, value, inputEl) {
+  if (!_opCurrentDraft) return;
+  const qty = parseFloat(String(value).replace(',', '.'));
+  if (!isFinite(qty) || qty <= 0) {
+    showToast('Кол-во должно быть положительным числом', 'error');
+    if (inputEl) inputEl.focus();
+    return;
+  }
+  if (inputEl) inputEl.disabled = true;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + itemId, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ qty }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось сохранить кол-во (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    // Освежаем превью с сервера (он пересоберёт текст письма)
+    await _opReloadDraft();
+  } catch (e) {
+    showToast('Сеть: не удалось сохранить кол-во', 'error');
+  } finally {
+    if (inputEl) inputEl.disabled = false;
+  }
+}
+
+async function _opReloadDraft() {
+  if (!_opCurrentDraft) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-orders/' + _opCurrentDraft.id + '/preview', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) return;
+    const fresh = await r.json();
+    _opCurrentDraft = fresh;
+    // Обновляем секции, которые могли измениться. Не трогаем поле «to» и
+    // поля темы/тела если юзер их редактировал руками.
+    const wrap = document.getElementById('op-items-wrap');
+    if (wrap) wrap.innerHTML = _opBuildItemsHTML(fresh.items || []);
+    const cnt = document.getElementById('op-items-count');
+    if (cnt) cnt.textContent = fresh.items_count;
+    if (!_opSubjectDirty) {
+      const s = document.getElementById('op-subject');
+      if (s && fresh.preview && fresh.preview.subject) s.value = fresh.preview.subject;
+    }
+    if (!_opBodyDirty) {
+      const b = document.getElementById('op-body');
+      if (b && fresh.preview && fresh.preview.body) b.value = fresh.preview.body;
+    }
+  } catch (_) {}
 }
 
 async function submitOrderPreview(orderId) {
