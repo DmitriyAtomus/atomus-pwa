@@ -18857,7 +18857,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.82-pdf-inventory";
+const APP_VERSION = "v2.44.83-manual-inventory";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47968,11 +47968,11 @@ function _invRenderHome() {
   html += '<div class="inv-steps">' +
     '<div class="inv-step-card">' +
       '<div class="step-n">1</div>' +
-      '<h3>Скачай бланк (Excel)</h3>' +
-      '<p>Выбери разделы (например, без УТМ), при желании — только позиции с ненулевым остатком, и скачай бланк для печати.</p>' +
+      '<h3>Открой бланк</h3>' +
+      '<p>Выбери разделы (например, без УТМ). Дальше — либо заполни прямо здесь в браузере, либо скачай Excel для распечатки.</p>' +
       '<div class="step-action">' +
         '<button class="btn btn-primary" onclick="openInventoryBlankPicker()">' +
-          '<i class="ti ti-file-spreadsheet"></i> Скачать бланк' +
+          '<i class="ti ti-list-check"></i> Выбрать разделы' +
         '</button>' +
       '</div>' +
     '</div>' +
@@ -48113,12 +48113,15 @@ async function openInventoryBlankPicker() {
           '<span>Только позиции с ненулевым остатком (' + withStockTotal + ')</span>' +
         '</label>' +
       '</div>' +
-      '<div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--border);">' +
+      '<div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
         '<div id="inv-blank-count" style="font-size:13px;color:var(--text-mid);"></div>' +
-        '<div style="display:flex;gap:8px;">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
           '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
-          '<button class="btn btn-primary" id="inv-blank-download-btn" onclick="downloadInventoryBlank()">' +
-            '<i class="ti ti-download"></i> Скачать' +
+          '<button class="btn btn-secondary" id="inv-blank-download-btn" onclick="downloadInventoryBlank()">' +
+            '<i class="ti ti-download"></i> Скачать Excel' +
+          '</button>' +
+          '<button class="btn btn-primary" id="inv-blank-manual-btn" onclick="openInventoryManualEntry()">' +
+            '<i class="ti ti-keyboard"></i> Заполнить здесь' +
           '</button>' +
         '</div>' +
       '</div>' +
@@ -48154,6 +48157,8 @@ function _invUpdateBlankCount() {
   if (label) label.textContent = 'Будет в бланке: ' + cnt + ' позиций';
   const btn = document.getElementById('inv-blank-download-btn');
   if (btn) btn.disabled = (cnt === 0);
+  const btn2 = document.getElementById('inv-blank-manual-btn');
+  if (btn2) btn2.disabled = (cnt === 0);
 }
 
 async function downloadInventoryBlank() {
@@ -48202,6 +48207,228 @@ async function downloadInventoryBlank() {
     console.error('downloadInventoryBlank failed', e);
   }
 }
+
+// ====== Ручная инвентаризация (без фото/AI) ===============================
+
+function _invPickFiltersFromModalAndClose() {
+  const selected = [];
+  document.querySelectorAll('#inv-cat-list input[type="checkbox"]:checked').forEach(cb => {
+    selected.push(parseInt(cb.dataset.cid, 10));
+  });
+  const onlyStock = !!document.getElementById('inv-only-with-stock')?.checked;
+  const m = document.getElementById('inv-blank-picker');
+  if (m) m.remove();
+  return { category_ids: selected, only_with_stock: onlyStock };
+}
+
+async function openInventoryManualEntry() {
+  const filters = _invPickFiltersFromModalAndClose();
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем номенклатуру…</div>';
+
+  const params = new URLSearchParams();
+  if (filters.category_ids.length) params.set('category_ids', filters.category_ids.join(','));
+  if (filters.only_with_stock) params.set('only_with_stock', '1');
+  const url = API_BASE + '/api/inventory/components-list' + (params.toString() ? ('?' + params.toString()) : '');
+
+  let items = [];
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const j = await res.json();
+    items = j.items || [];
+  } catch (e) {
+    body.innerHTML = '<div class="pkb-form-error" style="margin:12px 0;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить номенклатуру</div>';
+    return;
+  }
+
+  _invState._manual = { items, values: {}, search: '' };
+  _invRenderManualEntry();
+}
+
+function _invRenderManualEntry() {
+  const body = document.getElementById('inventory-screen-body');
+  if (!body || !_invState._manual) return;
+  const m = _invState._manual;
+  const all = m.items || [];
+  const search = (m.search || '').trim().toLowerCase();
+  const filtered = !search ? all : all.filter(c =>
+    ((c.sku || '').toLowerCase().includes(search) ||
+     (c.name || '').toLowerCase().includes(search))
+  );
+  const filledCount = Object.keys(m.values).length;
+
+  let html = '';
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">' +
+    '<button class="btn btn-secondary" onclick="_invCancelManualEntry()"><i class="ti ti-arrow-left"></i> Назад</button>' +
+    '<h2 style="margin:0;font-size:18px;">Заполнить инвентаризацию</h2>' +
+  '</div>';
+
+  html += '<div style="color:var(--text-light);font-size:13px;margin-bottom:12px;">' +
+    'Введи фактические количества в столбце «Факт». Пустые поля пропускаются. ' +
+    '<b>' + all.length + '</b> позиций в бланке.' +
+  '</div>';
+
+  html += '<input type="search" class="form-input" placeholder="Поиск по артикулу или названию…" ' +
+    'oninput="_invManualSearch(this.value)" ' +
+    'value="' + escapeHtml(m.search || '') + '" ' +
+    'style="margin-bottom:12px;max-width:420px;">';
+
+  if (!filtered.length) {
+    html += '<div style="color:var(--text-light);padding:24px;text-align:center;border:1px dashed var(--border);border-radius:10px;">Ничего не найдено</div>';
+  } else {
+    html += '<div class="inv-diff-table">' +
+      '<div class="inv-diff-row head">' +
+        '<div></div>' +
+        '<div></div>' +
+        '<div>Позиция</div>' +
+        '<div style="text-align:right;">По системе</div>' +
+        '<div style="text-align:right;">Факт</div>' +
+        '<div style="text-align:right;">Δ</div>' +
+      '</div>';
+
+    filtered.forEach((c) => {
+      const v = m.values[c.id];
+      const valStr = (v === undefined || v === null) ? '' : String(v);
+      const delta = (v !== undefined && v !== null) ? (v - (c.qty_on_stock || 0)) : null;
+      const deltaCls = delta == null ? '' : (delta > 0 ? 'up' : (delta < 0 ? 'down' : ''));
+      const deltaStr = delta == null ? '—' : (delta > 0 ? '+' : '') + _formatNum(delta);
+      const unit = c.unit || 'шт.';
+      html += '<div class="inv-diff-row">' +
+        '<div></div>' +
+        '<div></div>' +
+        '<div>' +
+          '<div style="font-size:13px;color:var(--text-dark);">' + escapeHtml(c.name || '—') + '</div>' +
+          '<div style="font-size:11.5px;color:var(--text-light);">' +
+            'Артикул: ' + escapeHtml(c.sku || '—') +
+            ' · ' + escapeHtml(c.category_name || '—') +
+          '</div>' +
+        '</div>' +
+        '<div style="text-align:right;font-variant-numeric:tabular-nums;">' +
+          _formatNum(c.qty_on_stock) + ' ' + escapeHtml(unit) +
+        '</div>' +
+        '<div class="inv-d-num" style="text-align:right;">' +
+          '<input type="number" step="any" min="0" inputmode="decimal" ' +
+            'data-cid="' + c.id + '" ' +
+            'value="' + valStr + '" placeholder="—" ' +
+            'oninput="_invManualSetValue(' + c.id + ', this.value)">' +
+        '</div>' +
+        '<div class="inv-d-delta ' + deltaCls + '" data-delta-cid="' + c.id + '">' +
+          escapeHtml(deltaStr) +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Sticky action bar
+  html += '<div class="inv-summary-bar" style="position:sticky;bottom:0;z-index:2;flex-wrap:wrap;">' +
+    '<span>Заполнено: <span class="inv-sum-num" id="inv-manual-filled">' + filledCount + '</span> из ' + all.length + '</span>' +
+    '<div style="flex:1;"></div>' +
+    '<button class="btn btn-secondary" onclick="_invCancelManualEntry()">Отмена</button>' +
+    '<button class="btn btn-primary" id="inv-manual-submit-btn" ' +
+      (filledCount === 0 ? 'disabled' : '') +
+      ' onclick="submitManualInventory()">' +
+      '<i class="ti ti-check"></i> Сохранить и применить (<span id="inv-manual-submit-count">' + filledCount + '</span>)' +
+    '</button>' +
+  '</div>';
+
+  body.innerHTML = html;
+}
+
+function _invManualSearch(v) {
+  if (!_invState._manual) return;
+  _invState._manual.search = v;
+  _invRenderManualEntry();
+}
+
+function _invManualSetValue(componentId, value) {
+  if (!_invState._manual) return;
+  const m = _invState._manual;
+  const cleaned = (value === '' || value == null) ? null : parseFloat(String(value).replace(',', '.'));
+  if (cleaned === null || isNaN(cleaned) || cleaned < 0) {
+    delete m.values[componentId];
+  } else {
+    m.values[componentId] = cleaned;
+  }
+  // Селективно обновляем счётчик + ячейку «Δ» — без перерендера, чтобы не сбить фокус.
+  const filledCount = Object.keys(m.values).length;
+  const filledLbl = document.getElementById('inv-manual-filled');
+  if (filledLbl) filledLbl.textContent = filledCount;
+  const submitBtn = document.getElementById('inv-manual-submit-btn');
+  const submitCnt = document.getElementById('inv-manual-submit-count');
+  if (submitBtn) submitBtn.disabled = (filledCount === 0);
+  if (submitCnt) submitCnt.textContent = filledCount;
+  // Δ-ячейка для этой строки
+  const c = m.items.find(it => it.id === componentId);
+  const deltaCell = document.querySelector('[data-delta-cid="' + componentId + '"]');
+  if (c && deltaCell) {
+    const newQty = m.values[componentId];
+    const delta = (newQty === undefined || newQty === null) ? null : (newQty - (c.qty_on_stock || 0));
+    deltaCell.classList.remove('up', 'down');
+    if (delta == null) {
+      deltaCell.textContent = '—';
+    } else {
+      if (delta > 0) deltaCell.classList.add('up');
+      else if (delta < 0) deltaCell.classList.add('down');
+      deltaCell.textContent = (delta > 0 ? '+' : '') + _formatNum(delta);
+    }
+  }
+}
+
+function _invCancelManualEntry() {
+  const filledCount = _invState._manual ? Object.keys(_invState._manual.values).length : 0;
+  if (filledCount > 0 && !confirm('Введённые значения (' + filledCount + ' шт.) будут потеряны. Уйти?')) return;
+  _invState._manual = null;
+  loadInventory();
+}
+
+async function submitManualInventory() {
+  if (!_invState._manual) return;
+  const m = _invState._manual;
+  const items = [];
+  Object.keys(m.values).forEach(cid => {
+    const v = m.values[cid];
+    if (v === undefined || v === null || isNaN(v)) return;
+    items.push({ component_id: parseInt(cid, 10), new_qty: Number(v) });
+  });
+  if (!items.length) return;
+  if (!confirm('Применить инвентаризацию ' + items.length + ' позиций? Дельты будут записаны в склад.')) return;
+
+  const submitBtn = document.getElementById('inv-manual-submit-btn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="ti ti-loader"></i> Применяем…';
+  }
+  try {
+    const res = await fetch(API_BASE + '/api/inventory/sessions/manual', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ items }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось применить (HTTP ' + res.status + ')'), 'error');
+      _invRenderManualEntry();
+      return;
+    }
+    const j = await res.json();
+    showToast('Применено: ' + (j.applied_count || 0) + ' позиций', 'success');
+    _invState._manual = null;
+    await loadInventory();
+  } catch (e) {
+    showToast('Сеть: не удалось применить', 'error');
+    _invRenderManualEntry();
+  }
+}
+
+// ====== /Ручная инвентаризация ============================================
 
 async function uploadInventoryPhotos(fileList) {
   if (!fileList || !fileList.length) return;
