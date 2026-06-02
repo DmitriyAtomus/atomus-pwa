@@ -10073,6 +10073,38 @@
     overflow: hidden;
   }
   .sup-shop-group.no-supplier { border-color: #FBC97A; background: #FFFBF3; }
+  /* v2.44.73: модалка превью заявки поставщику */
+  .order-preview-modal .modal-content { padding: 16px 18px; }
+  .op-field { display: flex; flex-direction: column; }
+  .op-field label {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); font-weight: 600; margin-bottom: 4px;
+  }
+  .op-field input, .op-field textarea {
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+    outline: 0;
+  }
+  .op-field textarea { resize: vertical; }
+  .op-field input:focus, .op-field textarea:focus { border-color: rgba(37,99,235,0.5); }
+  .op-attachment {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    background: rgba(37,99,235,0.05);
+    border: 1px solid rgba(37,99,235,0.2);
+    border-radius: 8px;
+    font-size: 13px; color: var(--text-mid);
+  }
+  .op-attachment i { color: var(--brand); font-size: 16px; }
+  .op-attachment-link {
+    margin-left: auto;
+    color: var(--brand); font-weight: 500; font-size: 12.5px; text-decoration: none;
+  }
+  .op-attachment-link:hover { text-decoration: underline; }
+
   .sup-shop-group-head {
     padding: 12px 14px;
     background: linear-gradient(135deg, #EFF5FF 0%, #DCE7FA 100%);
@@ -18790,7 +18822,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.72-stage-in-reports";
+const APP_VERSION = "v2.44.73-supply-order-preview";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -43141,9 +43173,19 @@ function renderSupplyShopping(d) {
         '</div>' +
         '<div class="sup-shop-group-actions">' +
           (g.supplier_id
-            ? '<button class="btn btn-primary btn-sm" onclick="exportSupplierShoppingDocx(' + g.supplier_id + ')" title="Скачать заявку для поставщика в DOCX">' +
-                '<i class="ti ti-file-text"></i>Скачать DOCX</button>'
-            : '<span style="color:var(--text-light);font-size:12px;">Назначьте поставщика для экспорта</span>'
+            ? (
+                // Скачать DOCX — просто файл, без отправки и без создания заказа
+                '<button class="btn btn-secondary btn-sm" onclick="downloadShoppingGroupDocx(' + g.supplier_id + ')" title="Скачать заявку для поставщика в DOCX (без отправки)">' +
+                  '<i class="ti ti-file-text"></i>Скачать DOCX</button>' +
+                // Сформировать заказ — превью письма + отправка
+                ' <button class="btn btn-primary btn-sm" ' +
+                  (g.supplier_email
+                    ? 'onclick="openCreateOrderPreview(' + g.supplier_id + ')" title="Создать заказ и отправить письмо поставщику"'
+                    : 'disabled title="У поставщика не указан email — заполни его в карточке поставщика"'
+                  ) + '>' +
+                  '<i class="ti ti-mail-send"></i>Сформировать заказ</button>'
+              )
+            : '<span style="color:var(--text-light);font-size:12px;">Сначала назначь поставщика — без этого не отправить заказ</span>'
           ) +
         '</div>' +
       '</div>' +
@@ -43193,112 +43235,176 @@ function renderSupplyShopping(d) {
   container.innerHTML = html;
 }
 
-async function exportSupplierShoppingDocx(supplierId) {
+/* ============ ЭТАП 52 (v2.44.73): заказ из shopping-list с превью ============ */
+
+// «Скачать DOCX» — создаём черновик заказа, скачиваем DOCX, и всё.
+// Черновик остаётся в Заказах для аудита. Письмо НЕ отправляем.
+async function downloadShoppingGroupDocx(supplierId) {
+  const d = await apiGet('/api/supply/shopping-list');
+  const group = (d.groups || []).find(g => g.supplier_id === supplierId);
+  if (!group || !group.items || !group.items.length) {
+    showToast('Нет позиций для экспорта', 'warning');
+    return;
+  }
   try {
-    // Получаем текущий shopping-list
-    const d = await apiGet('/api/supply/shopping-list');
-    const groups = d.groups || [];
-    
-    // Находим группу для этого поставщика
-    const group = groups.find(g => g.supplier_id === supplierId);
-    if (!group || !group.items || !group.items.length) {
-      showToast('Нет позиций для экспорта', 'warning');
-      return;
-    }
-    
-    // Получаем данные поставщика
-    if (!cache.suppliers) {
-      const r = await apiGet('/api/suppliers');
-      cache.suppliers = r.suppliers || [];
-    }
-    const supplier = cache.suppliers.find(s => s.id === supplierId);
-    if (!supplier) {
-      showToast('Поставщик не найден', 'error');
-      return;
-    }
-    
-    // Подтверждение
-    if (!confirm(`Создать заказ для "${supplier.name}" с ${group.items.length} позициями и отправить по email ${supplier.email || '(email не указан)'}?`)) {
-      return;
-    }
-    
-    showToast('Создаем заказ...', 'info');
-    
-    // 1. Создаём новый заказ
-    const orderResp = await fetch(API_BASE + '/api/supply-orders', {
+    const resp = await fetch(API_BASE + '/api/supply-orders/draft-from-shopping', {
       method: 'POST',
       headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY)
       },
       body: JSON.stringify({
         supplier_id: supplierId,
-        status: 'draft',
-        comment: `Автоматически создан из shopping-list`
-      })
+        items: group.items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
+        comment: 'Из «Что закупить»',
+      }),
     });
-    
-    if (!orderResp.ok) {
-      const e = await orderResp.json();
-      showToast('Ошибка при создании заказа: ' + (e.message || e.error), 'error');
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось создать заявку', 'error');
       return;
     }
-    
-    const orderData = await orderResp.json();
-    const orderId = orderData.id;
-    showToast(`Заказ #${orderId} создан`, 'success');
-    
-    // 2. Добавляем позиции в заказ
-    let addedCount = 0;
-    for (const item of group.items) {
-      try {
-        await fetch(API_BASE + `/api/supply-orders/${orderId}/items`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY)
-          },
-          body: JSON.stringify({
-            item_id: item.component_id,
-            qty: item.recommended_qty,
-            price: null,
-            comment: ''
-          })
-        });
-        addedCount++;
-      } catch (e) {
-        console.error('Error adding item:', e);
-      }
+    const draft = await resp.json();
+    // Скачиваем DOCX по созданному черновику
+    const docResp = await fetch(API_BASE + '/api/supply-orders/' + draft.id + '/docx', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!docResp.ok) {
+      showToast('Не удалось скачать DOCX', 'error');
+      return;
     }
-    
-    showToast(`${addedCount} позиций добавлены в заказ`, 'success');
-    
-    // 3. Отправляем по email
-    showToast('Отправляем по email...', 'info');
-    const sendResp = await fetch(API_BASE + `/api/supply-orders/${orderId}/send-email`, {
+    const blob = await docResp.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = 'order_' + (draft.order_label || ('ORD-' + draft.id)) + '.docx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+    showToast('Заявка ' + (draft.order_label || ('#' + draft.id)) + ' создана. Файл скачан.', 'success');
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// «Сформировать заказ» — создаём черновик, открываем модалку превью письма
+async function openCreateOrderPreview(supplierId) {
+  const d = await apiGet('/api/supply/shopping-list');
+  const group = (d.groups || []).find(g => g.supplier_id === supplierId);
+  if (!group || !group.items || !group.items.length) {
+    showToast('Нет позиций для экспорта', 'warning');
+    return;
+  }
+  if (!group.supplier_email) {
+    showToast('У поставщика не указан email', 'error');
+    return;
+  }
+  // Создаём draft + получаем превью
+  let draft;
+  try {
+    const resp = await fetch(API_BASE + '/api/supply-orders/draft-from-shopping', {
       method: 'POST',
       headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY)
       },
-      body: JSON.stringify({})
+      body: JSON.stringify({
+        supplier_id: supplierId,
+        items: group.items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
+        comment: 'Из «Что закупить»',
+      }),
     });
-    
-    if (!sendResp.ok) {
-      const e = await sendResp.json();
-      showToast('Ошибка при отправке: ' + (e.message || e.error), 'error');
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось создать заявку', 'error');
       return;
     }
-    
-    const result = await sendResp.json();
-    showToast(result.message || 'Заказ отправлен!', 'success');
-    
-    // Обновляем shopping-list
-    loadSupplyShopping();
-    
+    draft = await resp.json();
   } catch (e) {
-    showToast('Ошибка: ' + String(e), 'error');
-    console.error(e);
+    showToast('Сеть: ' + (e.message || e), 'error');
+    return;
+  }
+  _renderOrderPreviewModal(draft);
+}
+
+function _renderOrderPreviewModal(draft) {
+  const overlayId = 'order-preview-modal';
+  let m = document.getElementById(overlayId);
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay order-preview-modal';
+  const docxUrl = API_BASE + '/api/supply-orders/' + draft.id + '/docx';
+  m.innerHTML =
+    '<div class="modal" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-mail-send"></i> Заявка ' + escapeHtml(draft.order_label || ('#' + draft.id)) + ' · превью письма</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;">' +
+        '<div class="op-field">' +
+          '<label>Кому (email поставщика)</label>' +
+          '<input type="email" id="op-to" value="' + escapeHtml(draft.preview.to || '') + '">' +
+        '</div>' +
+        '<div class="op-field">' +
+          '<label>Тема письма <span style="color:var(--text-light);font-weight:400;font-size:11px;">— метка в квадратных скобках нужна для авто-приёмки счёта, лучше её не удалять</span></label>' +
+          '<input type="text" id="op-subject" value="' + escapeHtml(draft.preview.subject || '') + '">' +
+        '</div>' +
+        '<div class="op-field" style="flex:1;display:flex;flex-direction:column;">' +
+          '<label>Текст письма</label>' +
+          '<textarea id="op-body" style="min-height:200px;">' + escapeHtml(draft.preview.body || '') + '</textarea>' +
+        '</div>' +
+        '<div class="op-attachment">' +
+          '<i class="ti ti-paperclip"></i>' +
+          '<span>Вложение: <b>order_' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '.docx</b> · ' + draft.items_count + ' позиций</span>' +
+          '<a href="' + docxUrl + '" target="_blank" class="op-attachment-link">Открыть для проверки</a>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="op-send-btn" onclick="submitOrderPreview(' + draft.id + ')">' +
+          '<i class="ti ti-send"></i> Отправить' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  m.classList.add('visible');
+}
+
+async function submitOrderPreview(orderId) {
+  const to = (document.getElementById('op-to')?.value || '').trim();
+  const subject = (document.getElementById('op-subject')?.value || '').trim();
+  const body = (document.getElementById('op-body')?.value || '').trim();
+  if (!to) { showToast('Заполни email поставщика', 'error'); return; }
+  if (!subject) { showToast('Заполни тему', 'error'); return; }
+  if (!body) { showToast('Заполни текст письма', 'error'); return; }
+  const btn = document.getElementById('op-send-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const resp = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/send-email', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: to, subject, body }),
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось отправить', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    const j = await resp.json();
+    showToast(j.message || 'Заявка отправлена', 'success');
+    document.getElementById('order-preview-modal')?.remove();
+    loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) btn.disabled = false;
   }
 }
 
