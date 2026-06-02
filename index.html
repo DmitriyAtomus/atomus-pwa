@@ -18865,7 +18865,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.88-preview-edit-qty-debounce";
+const APP_VERSION = "v2.44.89-3d-cache-buster";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47755,7 +47755,19 @@ function _devIsEmbeddableDemoUrl(url) {
 
 function _devDemoEmbedHtml(url) {
   if (!_devIsEmbeddableDemoUrl(url)) return '';
-  const safeUrl = escapeHtml(url);
+  // Для same-origin ссылок (наши /3d/*-вьюверы) добавляем cache-buster,
+  // чтобы при обновлении файла на сервере браузер не показывал старую
+  // версию из кэша. Так пользователю не надо каждый раз переписывать
+  // URL в разработке вручную.
+  let bustedUrl = url;
+  try {
+    const u = new URL(url, window.location.href);
+    if (u.origin === window.location.origin) {
+      u.searchParams.set('v', String(Date.now()));
+      bustedUrl = u.toString();
+    }
+  } catch (_) {}
+  const safeUrl = escapeHtml(bustedUrl);
   return '<div class="dev-demo-iframe-wrap">' +
            '<button class="dev-demo-fs-btn" onclick="_devToggleDemoFullscreen(this)" title="На весь экран">' +
              '<i class="ti ti-maximize"></i>На весь экран' +
@@ -48009,6 +48021,16 @@ function _renderPublicDevelopment(token, data) {
   // 3D / демка
   if (dev.demo_url) {
     const embedded = _devIsEmbeddableDemoUrl(dev.demo_url);
+    // Тот же cache-buster что и в _devDemoEmbedHtml: для same-origin URL
+    // приклеиваем ?v=<timestamp>, чтобы свежий 3D-файл не блокировался кэшем.
+    let demoUrlBusted = dev.demo_url;
+    try {
+      const u = new URL(dev.demo_url, window.location.href);
+      if (u.origin === window.location.origin) {
+        u.searchParams.set('v', String(Date.now()));
+        demoUrlBusted = u.toString();
+      }
+    } catch (_) {}
     body +=
       '<div class="public-dev-section">' +
         '<div class="public-dev-section-title"><i class="ti ti-cube"></i>3D-демонстрация</div>' +
@@ -48016,7 +48038,7 @@ function _renderPublicDevelopment(token, data) {
           ? '<div class="dev-demo-iframe-wrap">' +
               '<button class="dev-demo-fs-btn" onclick="_devToggleDemoFullscreen(this)" title="На весь экран">' +
                 '<i class="ti ti-maximize"></i>На весь экран</button>' +
-              '<iframe src="' + escapeHtml(dev.demo_url) + '" class="dev-demo-iframe" allowfullscreen allow="fullscreen"></iframe>' +
+              '<iframe src="' + escapeHtml(demoUrlBusted) + '" class="dev-demo-iframe" allowfullscreen allow="fullscreen"></iframe>' +
             '</div>'
           : '<a class="public-dev-demo-link" href="' + escapeHtml(dev.demo_url) + '" target="_blank" rel="noopener">' +
               '<i class="ti ti-external-link"></i>Открыть демонстрацию</a>'

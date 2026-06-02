@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.84';
+const CACHE_VERSION = 'atomus-v1.8.85';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -83,6 +83,13 @@ self.addEventListener('fetch', (event) => {
 
   // Локальные ресурсы PWA — кэш-first
   if (url.origin === self.location.origin) {
+    // Исключение: /3d/* — это 3D-вьюверы, которые часто обновляются.
+    // Если их закэшировать — пользователь будет видеть старую модель после
+    // деплоя. Сетевой запрос с фолбэком на кэш (на случай оффлайна).
+    if (url.pathname.startsWith('/3d/')) {
+      event.respondWith(networkFirst(req));
+      return;
+    }
     event.respondWith(cacheFirst(req, STATIC_CACHE));
     return;
   }
