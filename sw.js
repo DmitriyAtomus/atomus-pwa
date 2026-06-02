@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.79';
+const CACHE_VERSION = 'atomus-v1.8.80';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -22,11 +22,13 @@ const STATIC_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css',
 ];
 
-// При установке — пополняем static cache
+// При установке — пополняем static cache. БЕЗ skipWaiting:
+// новый SW зависает в "waiting", пока страница не пошлёт ему SKIP_WAITING.
+// Это позволяет показать пользователю баннер «Доступно обновление» и дать ему
+// решить, когда переключиться — чтобы не сбросить заполненную форму.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
-      // Кэшируем каждый файл отдельно — если один упадёт, другие закэшируются
       return Promise.all(
         STATIC_ASSETS.map((url) =>
           cache.add(url).catch((err) => {
@@ -34,8 +36,16 @@ self.addEventListener('install', (event) => {
           })
         )
       );
-    }).then(() => self.skipWaiting())
+    })
   );
+});
+
+// Страница может попросить нас активироваться немедленно
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING' ||
+      (event.data && event.data.type === 'SKIP_WAITING')) {
+    self.skipWaiting();
+  }
 });
 
 // При активации — удаляем старые кэши

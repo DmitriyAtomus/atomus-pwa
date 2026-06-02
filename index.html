@@ -18857,7 +18857,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.83-manual-inventory";
+const APP_VERSION = "v2.44.84-update-banner-autosave";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47964,6 +47964,32 @@ function _invRenderHome() {
   const token = localStorage.getItem(TOKEN_KEY) || '';
 
   let html = '';
+  // Баннер «у тебя есть незавершённый черновик ручной инвентаризации»
+  const draft = _invLoadManualDraft();
+  if (draft && draft.values && Object.keys(draft.values).length) {
+    const cnt = Object.keys(draft.values).length;
+    const savedAtFmt = (function() {
+      try {
+        const d = new Date(draft.savedAt);
+        const pad = (n) => String(n).padStart(2, '0');
+        return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      } catch (_) { return ''; }
+    })();
+    html +=
+      '<div style="background:linear-gradient(135deg,rgba(37,99,235,0.07),rgba(124,58,237,0.05));' +
+      'border:1px solid rgba(37,99,235,0.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;' +
+      'display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+        '<i class="ti ti-file-text" style="font-size:22px;color:var(--brand);"></i>' +
+        '<div style="flex:1;min-width:200px;">' +
+          '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">Незавершённая ручная инвентаризация</div>' +
+          '<div style="font-size:12px;color:var(--text-light);">' + cnt + ' заполненных позиций · сохранено ' + escapeHtml(savedAtFmt) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button class="btn btn-primary" onclick="_invRestoreManualDraft()"><i class="ti ti-rotate-clockwise"></i> Восстановить</button>' +
+          '<button class="btn btn-secondary" onclick="_invDiscardManualDraft()"><i class="ti ti-trash"></i> Удалить</button>' +
+        '</div>' +
+      '</div>';
+  }
   // 3 шага
   html += '<div class="inv-steps">' +
     '<div class="inv-step-card">' +
@@ -48209,6 +48235,105 @@ async function downloadInventoryBlank() {
 }
 
 // ====== Ручная инвентаризация (без фото/AI) ===============================
+// Автосохранение черновика в localStorage: ключ ниже, сохраняем при каждом
+// изменении (debounce 500мс) — если вкладку закроют/перезагрузят, на главной
+// инвентаризации увидим баннер «восстановить черновик».
+const INV_MANUAL_DRAFT_KEY = 'atomus:inv-manual-draft-v1';
+const INV_MANUAL_DIRTY_KEY = 'inv-manual-entry';
+let _invManualSaveTimer = null;
+
+function _invSaveManualDraftSoon() {
+  if (_invManualSaveTimer) clearTimeout(_invManualSaveTimer);
+  _invManualSaveTimer = setTimeout(() => {
+    _invSaveManualDraftNow();
+  }, 500);
+}
+
+function _invSaveManualDraftNow() {
+  if (!_invState._manual) return;
+  const m = _invState._manual;
+  // Сохраняем только если есть хоть одно заполненное поле
+  if (!m.values || !Object.keys(m.values).length) {
+    try { localStorage.removeItem(INV_MANUAL_DRAFT_KEY); } catch (_) {}
+    markFormClean(INV_MANUAL_DIRTY_KEY);
+    return;
+  }
+  try {
+    localStorage.setItem(INV_MANUAL_DRAFT_KEY, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      filters: m.filters || null,
+      values: m.values,
+    }));
+    markFormDirty(INV_MANUAL_DIRTY_KEY);
+  } catch (e) {
+    console.warn('Не удалось сохранить черновик инвентаризации', e);
+  }
+}
+
+function _invLoadManualDraft() {
+  try {
+    const raw = localStorage.getItem(INV_MANUAL_DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
+function _invClearManualDraft() {
+  try { localStorage.removeItem(INV_MANUAL_DRAFT_KEY); } catch (_) {}
+  markFormClean(INV_MANUAL_DIRTY_KEY);
+}
+
+function _invDiscardManualDraft() {
+  if (!confirm('Удалить черновик безвозвратно?')) return;
+  _invClearManualDraft();
+  _invRenderHome();
+}
+
+async function _invRestoreManualDraft() {
+  const draft = _invLoadManualDraft();
+  if (!draft) return;
+  const filters = draft.filters || { category_ids: [], only_with_stock: false };
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-block">Загружаем номенклатуру для черновика…</div>';
+
+  const params = new URLSearchParams();
+  if (filters.category_ids && filters.category_ids.length) params.set('category_ids', filters.category_ids.join(','));
+  if (filters.only_with_stock) params.set('only_with_stock', '1');
+  const url = API_BASE + '/api/inventory/components-list' + (params.toString() ? ('?' + params.toString()) : '');
+
+  let items = [];
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const j = await res.json();
+    items = j.items || [];
+  } catch (e) {
+    showToast('Не удалось восстановить черновик: список номенклатуры недоступен', 'error');
+    return;
+  }
+
+  // Подчищаем values: если компонент удалили из базы — игнорим
+  const knownIds = new Set(items.map(it => it.id));
+  const cleanValues = {};
+  Object.keys(draft.values || {}).forEach(k => {
+    const id = parseInt(k, 10);
+    if (knownIds.has(id)) cleanValues[id] = draft.values[k];
+  });
+
+  _invState._manual = {
+    items,
+    values: cleanValues,
+    search: '',
+    filters,
+  };
+  markFormDirty(INV_MANUAL_DIRTY_KEY);
+  _invRenderManualEntry();
+}
 
 function _invPickFiltersFromModalAndClose() {
   const selected = [];
@@ -48245,7 +48370,7 @@ async function openInventoryManualEntry() {
     return;
   }
 
-  _invState._manual = { items, values: {}, search: '' };
+  _invState._manual = { items, values: {}, search: '', filters };
   _invRenderManualEntry();
 }
 
@@ -48354,6 +48479,8 @@ function _invManualSetValue(componentId, value) {
   } else {
     m.values[componentId] = cleaned;
   }
+  // Автосохранение в localStorage + отметка «есть несохранённое» (для beforeunload)
+  _invSaveManualDraftSoon();
   // Селективно обновляем счётчик + ячейку «Δ» — без перерендера, чтобы не сбить фокус.
   const filledCount = Object.keys(m.values).length;
   const filledLbl = document.getElementById('inv-manual-filled');
@@ -48381,7 +48508,15 @@ function _invManualSetValue(componentId, value) {
 
 function _invCancelManualEntry() {
   const filledCount = _invState._manual ? Object.keys(_invState._manual.values).length : 0;
-  if (filledCount > 0 && !confirm('Введённые значения (' + filledCount + ' шт.) будут потеряны. Уйти?')) return;
+  if (filledCount > 0) {
+    const choice = confirm(
+      'Введено значений: ' + filledCount + '. ' +
+      'OK — выйти и удалить черновик. Отмена — продолжить заполнение. ' +
+      'Чтобы сохранить черновик и вернуться позже — просто закрой вкладку.'
+    );
+    if (!choice) return;
+  }
+  _invClearManualDraft();
   _invState._manual = null;
   loadInventory();
 }
@@ -48420,6 +48555,7 @@ async function submitManualInventory() {
     }
     const j = await res.json();
     showToast('Применено: ' + (j.applied_count || 0) + ' позиций', 'success');
+    _invClearManualDraft();
     _invState._manual = null;
     await loadInventory();
   } catch (e) {
@@ -57450,27 +57586,154 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
   }
 })();
 
-// ============ SERVICE WORKER ============
+// ============ SERVICE WORKER + UPDATE BANNER ============
+// Стратегия: SW не активируется автоматически (см. sw.js — убран skipWaiting).
+// Когда есть новая версия — показываем баннер «Доступно обновление», пользователь
+// сам решает когда нажать кнопку. Если в этот момент он что-то заполняет —
+// успеет сохранить.
+
+let _swUpdateBannerShown = false;
+let _swReloadingNow = false;
+
+function _ensureUpdateBannerStyles() {
+  if (document.getElementById('sw-update-banner-styles')) return;
+  const css = document.createElement('style');
+  css.id = 'sw-update-banner-styles';
+  css.textContent = `
+    #sw-update-banner {
+      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      color: #fff; border-radius: 12px;
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 8px 32px rgba(37,99,235,0.35);
+      z-index: 999999;
+      max-width: 92vw;
+      animation: swUpdSlideUp 0.25s ease-out;
+    }
+    @keyframes swUpdSlideUp { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+    #sw-update-banner .swu-icon { font-size: 22px; opacity: 0.95; }
+    #sw-update-banner .swu-text { line-height: 1.25; }
+    #sw-update-banner .swu-text b { font-size: 14px; }
+    #sw-update-banner .swu-text small { display:block; font-size:12px; opacity: 0.85; margin-top:2px; }
+    #sw-update-banner button {
+      background: #fff; color: #2563EB; border: 0;
+      border-radius: 8px; padding: 8px 14px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    #sw-update-banner button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    #sw-update-banner button:last-of-type {
+      background: transparent; color: #fff; opacity: 0.7; padding: 8px;
+    }
+    #sw-update-banner button:last-of-type:hover { opacity: 1; box-shadow: none; transform: none; }
+  `;
+  document.head.appendChild(css);
+}
+
+function _showUpdateBanner() {
+  if (_swUpdateBannerShown || document.getElementById('sw-update-banner')) return;
+  _swUpdateBannerShown = true;
+  _ensureUpdateBannerStyles();
+  const banner = document.createElement('div');
+  banner.id = 'sw-update-banner';
+  banner.innerHTML =
+    '<i class="ti ti-refresh swu-icon"></i>' +
+    '<div class="swu-text"><b>Доступно обновление</b><small>Нажмите когда закончите работу с формой</small></div>' +
+    '<button onclick="applySWUpdate()">Обновить</button>' +
+    '<button onclick="dismissSWUpdate()" title="Скрыть"><i class="ti ti-x"></i></button>';
+  document.body.appendChild(banner);
+}
+
+function applySWUpdate() {
+  // Если есть несохранённые черновики — спрашиваем подтверждение
+  if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) {
+    if (!confirm('Есть несохранённые изменения в формах. Сохрани сначала их, иначе данные потеряются. Обновить всё равно?')) return;
+  }
+  _swReloadingNow = true;
+  navigator.serviceWorker.getRegistration().then(reg => {
+    if (reg && reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      // На случай если SW уже активировался — просто перезагружаемся
+      window.location.reload();
+    }
+  });
+}
+
+function dismissSWUpdate() {
+  const el = document.getElementById('sw-update-banner');
+  if (el) el.remove();
+  _swUpdateBannerShown = false;
+  // Появится снова через час
+  setTimeout(() => { _swUpdateBannerShown = false; }, 60 * 60 * 1000);
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
+        // Если есть уже ожидающий SW при загрузке (мы его пропустили в прошлый раз)
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          _showUpdateBanner();
+        }
+        // Слушаем установку нового SW
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                if (typeof showToast === 'function' && state.user) {
-                  showToast('Доступна новая версия. Обновите страницу.', 'success');
-                }
-              }
-            });
-          }
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              _showUpdateBanner();
+            }
+          });
         });
+        // Периодически проверяем наличие обновлений (раз в 60 сек, только когда вкладка активна)
+        setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            reg.update().catch(() => {});
+          }
+        }, 60 * 1000);
       })
       .catch((err) => console.warn('SW registration failed:', err));
+
+    // Когда новый SW взял управление — перезагружаемся (один раз)
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swReloadingNow) return;
+      _swReloadingNow = true;
+      window.location.reload();
+    });
   });
 }
+
+// ============ DIRTY-STATE TRACKER + beforeunload ============
+// Глобальный реестр «есть несохранённые изменения». Формы добавляют сюда свой
+// уникальный ключ при первой правке и удаляют после сохранения. Если что-то
+// в реестре — браузер спросит «Точно уйти?» при закрытии/обновлении вкладки.
+
+const _dirtyForms = new Set();
+
+function markFormDirty(key) {
+  if (!key) return;
+  _dirtyForms.add(String(key));
+}
+
+function markFormClean(key) {
+  if (!key) return;
+  _dirtyForms.delete(String(key));
+}
+
+function hasUnsavedChanges() {
+  return _dirtyForms.size > 0;
+}
+
+window.addEventListener('beforeunload', (e) => {
+  if (_swReloadingNow) return;     // мы сами инициировали обновление — не мешаем
+  if (!hasUnsavedChanges()) return;
+  // Современные браузеры показывают свой текст, наш игнорируют — но триггерим
+  e.preventDefault();
+  e.returnValue = '';
+  return '';
+});
 </script>
 
 <!-- ============ ЭТАП 39 (v2.19.0): МОДАЛКА УВЕДОМЛЕНИЙ ============ -->
