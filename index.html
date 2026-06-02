@@ -18735,7 +18735,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.67-tour-poll-target";
+const APP_VERSION = "v2.44.68-tour-poll-always";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46189,9 +46189,11 @@ async function goToTourStep(idx) {
   let target = null;
   if (step.selector && step.pos !== 'center') {
     target = _tourFindVisible(step.selector);
-    // Если есть `action` (открывается модалка) — ждём появления target до 2.5с
-    if (!target && step.action) {
-      const deadline = Date.now() + 2500;
+    // Поллим селектор — DOM может рендериться асинхронно (модалки, фетчи и т.п.).
+    // С action ждём дольше (модалка только что открыта), иначе короче.
+    if (!target) {
+      const budget = step.action ? 2500 : 800;
+      const deadline = Date.now() + budget;
       while (!target && Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 120));
         target = _tourFindVisible(step.selector);
