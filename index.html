@@ -18735,7 +18735,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.44.66-tour-rect-revalidate";
+const APP_VERSION = "v2.44.67-tour-poll-target";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46166,25 +46166,36 @@ async function goToTourStep(idx) {
       const wid = parseInt(card.getAttribute('data-work-id'), 10);
       if (wid) {
         openProductionWorkDetail(wid);
-        await new Promise(r => setTimeout(r, 450));
+        // Не ждём фиксированное время — селектор-поллинг ниже сам дождётся.
       }
     }
   }
 
-  // Ищем ВИДИМЫЙ элемент по селектору (пропускаем скрытые дубликаты desktop/mobile)
+  // Ищем ВИДИМЫЙ элемент по селектору (пропускаем скрытые дубликаты desktop/mobile).
+  // Поллим до 2.5с — модалки/контент рендерятся асинхронно после fetch.
+  function _tourFindVisible(sel) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const candidates = document.querySelectorAll(sel);
+    for (const el of candidates) {
+      if (el.offsetParent === null) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 4 || r.height <= 4) continue;
+      if (r.right < 0 || r.left > vw) continue;
+      if (r.bottom < 0 || r.top > vh + 800) continue;
+      return el;
+    }
+    return null;
+  }
   let target = null;
   if (step.selector && step.pos !== 'center') {
-    const candidates = document.querySelectorAll(step.selector);
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    for (const el of candidates) {
-      if (el.offsetParent === null) continue;       // display:none предок
-      const r = el.getBoundingClientRect();
-      if (r.width <= 4 || r.height <= 4) continue;  // нулевые размеры
-      if (r.right < 0 || r.left > vw) continue;     // полностью за пределами по X
-      if (r.bottom < 0 || r.top > vh + 800) continue; // далеко за пределами по Y (учитываем то что прокрутим)
-      target = el;
-      break;
+    target = _tourFindVisible(step.selector);
+    // Если есть `action` (открывается модалка) — ждём появления target до 2.5с
+    if (!target && step.action) {
+      const deadline = Date.now() + 2500;
+      while (!target && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 120));
+        target = _tourFindVisible(step.selector);
+      }
     }
     // Прокрутим в видимую область и переоценим rect после скролла
     if (target) {
@@ -46193,11 +46204,12 @@ async function goToTourStep(idx) {
       // Двойной requestAnimationFrame чтобы дождаться layout после скролла
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const r2 = target.getBoundingClientRect();
+      const vw2 = window.innerWidth, vh2 = window.innerHeight;
       // Если после скролла rect всё ещё мусорный — отказываемся от target,
       // упадём в no-target ветку (по центру + дим всего экрана).
       if (r2.width <= 4 || r2.height <= 4 ||
-          r2.right < 20 || r2.left > vw - 20 ||
-          r2.bottom < 20 || r2.top > vh - 20) {
+          r2.right < 20 || r2.left > vw2 - 20 ||
+          r2.bottom < 20 || r2.top > vh2 - 20) {
         console.warn('Tour: target rect off-screen after scroll, falling back', r2);
         target = null;
       }
