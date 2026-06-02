@@ -50,13 +50,18 @@
     <button class="tab on" data-k="3d">Сборка 3D</button>
     <button class="tab" data-k="rm">Подставка</button>
     <button class="tab" data-k="cl">Коллектор</button>
+    <button class="tab" data-k="ob">Обвязка (туман)</button>
     <button class="tab" data-k="pd">Поддон</button>
+    <button class="tab" data-k="pr">Поддон в раме</button>
     <button class="tab" data-k="dk">Каплеуловитель</button>
+    <button class="tab" data-k="pv">Переход+вентилятор</button>
     <button class="tab" data-k="sx">Схема работы</button>
     <button class="tab" data-k="gs">Гидросхема</button>
     <button class="tab" data-k="rc">Расчёты</button>
     <button class="tab" data-k="sp">Спецификация</button>
     <button class="tab" data-k="pz">Пояснительная</button>
+    <button class="tab" data-k="tz">ТЗ</button>
+    <button class="tab" data-k="room">В помещении</button>
   </div>
 
   <div data-pane="3d">
@@ -80,7 +85,14 @@
   <div data-pane="cl" style="display:none">
     <div class="scene-h"><canvas id="cv-cl" class="scene" style="height:480px"></canvas><svg id="an-cl" class="anno" style="height:480px"></svg></div>
     <div class="row"><button class="ctl rotB on" data-t="cl">Вращение</button><button class="ctl vB" data-t="cl" data-v="iso">Изометрия</button><button class="ctl vB" data-t="cl" data-v="top">Сверху</button><button class="ctl vB" data-t="cl" data-v="front">Сбоку</button><button class="ctl dimB on" data-t="cl">Размеры</button></div>
-    <div class="desc"><b>Коллектор AB-01-002.000</b> — кольцо труба Ø16×1,5 (1/2"), средн. Ø ≈330 мм. 5 форсунок через 72°, бьют вверх. На 3 кронштейнах, съёмное вниз для мойки. Подвод: трубка → окно → БРС 1/2" → шланг. Форсунки EVSPRAY, ≈0,5–0,8 л/мин при 9–10 атм.</div>
+    <div class="desc"><b>Коллектор-гребёнка AB-01-002.000</b> — магистраль нерж. трубка Ø9,52 в нижней части корпуса Ø400, 5 туманообразующих форсунок EVSPRAY 10/24-0.15 вверх через тройники и удлинители. Подвод: <b>шланг 8 мм</b> (армированный) от <b>мембранного насоса</b> через штуцер-ёлочку с накидной гайкой. Насос забирает воду из бака, подаёт под давлением на гребёнку. Узел съёмный для мойки.</div>
+  </div>
+
+  <div data-pane="ob" style="display:none">
+    <div class="scene-h"><canvas id="cv-ob" class="scene" style="height:480px"></canvas><svg id="an-ob" class="anno" style="height:480px"></svg></div>
+    <div class="row"><button class="ctl rotB on" data-t="ob">Вращение</button><button class="ctl vB" data-t="ob" data-v="iso">Изометрия</button><button class="ctl vB" data-t="ob" data-v="top">Сверху</button><button class="ctl vB" data-t="ob" data-v="front">Сбоку</button><button class="ctl" id="obClear">Прозрачный корпус</button><button class="ctl dimB on" data-t="ob">Размеры</button></div>
+    <div class="desc"><b>Обвязка-гребёнка в корпусе (вариант «туман ВД»)</b> — магистраль-трубка нерж. Ø9,52 входит <b>горизонтально через прорезь</b> в стенке корпуса Ø400, форсунки смотрят вверх. На магистрали 4 тройника 10/24 + торцевой отвод, от каждого удлинитель к туманообразующей форсунке EVSPRAY 10/24-0.15 (капли 110–330 мкм). <b>Крепление:</b> фланец-пластина снаружи (4 винта + прокладка, держит и герметизирует вход) и опорный ложемент на дальней стенке. Снаружи — фильтр и ввод от насоса высокого давления. Спецификация обвязки — ниже.</div>
+    <div data-spec="ob"></div>
   </div>
 
   <div data-pane="pd" style="display:none">
@@ -89,10 +101,22 @@
     <div class="desc"><b>Поддон-корыто AB-01-007.000</b> — гнутое корыто из листа t1,5. Дно ≈520×520, борт h60, уклон к сливу Ø40, снизу кран 1/2" (смещён от центра). Ручка-скоба, выдвигается как противень. Развёртка на лазер + гибка.</div>
   </div>
 
+  <div data-pane="pr" style="display:none">
+    <div class="scene-h"><canvas id="cv-pr" class="scene" style="height:480px"></canvas><svg id="an-pr" class="anno" style="height:480px"></svg></div>
+    <div class="row"><button class="ctl rotB on" data-t="pr">Вращение</button><button class="ctl vB" data-t="pr" data-v="iso">Изометрия</button><button class="ctl vB" data-t="pr" data-v="front">Спереди</button><button class="ctl vB" data-t="pr" data-v="top">Сверху</button><button class="ctl" id="prSlide">Выдвинуть / задвинуть</button><button class="ctl dimB on" data-t="pr">Размеры</button></div>
+    <div class="desc"><b>Поддон в раме</b> — поддон ложится краями на горизонтальные полки <b>направляющих-уголков 32×32×3</b> и выдвигается <b>вправо, со стороны подвода воды</b> (вдоль направляющих, как противень), за ручку-скобу. Кнопка «Выдвинуть / задвинуть» двигает поддон по направляющим.</div>
+  </div>
+
   <div data-pane="dk" style="display:none">
     <div class="scene-h"><canvas id="cv-dk" class="scene" style="height:480px"></canvas><svg id="an-dk" class="anno" style="height:480px"></svg></div>
     <div class="row"><button class="ctl rotB on" data-t="dk">Вращение</button><button class="ctl vB" data-t="dk" data-v="iso">Изометрия</button><button class="ctl vB" data-t="dk" data-v="top">Сверху</button><button class="ctl vB" data-t="dk" data-v="front">Сбоку</button><button class="ctl dimB on" data-t="dk">Размеры</button></div>
     <div class="desc"><b>Каплеуловитель AB-01-003.000</b> — перфорированный диск из листа AISI 304 t2,0, Ø390 с бортиком. Отверстия Ø5,5 в шахматном порядке с шагом 9 мм, живое сечение ~27 %. Сбивает крупные капли тумана (стекают по стенкам в поддон), пропуская увлажнённый воздух к вентилятору. Достаётся вверх для мойки.</div>
+  </div>
+
+  <div data-pane="pv" style="display:none">
+    <div class="scene-h"><canvas id="cv-pv" class="scene" style="height:480px"></canvas><svg id="an-pv" class="anno" style="height:480px"></svg></div>
+    <div class="row"><button class="ctl rotB on" data-t="pv">Вращение</button><button class="ctl vB" data-t="pv" data-v="iso">Изометрия</button><button class="ctl vB" data-t="pv" data-v="front">Сбоку</button><button class="ctl vB" data-t="pv" data-v="top">Сверху</button><button class="ctl" id="pvExp">Разнести</button><button class="ctl dimB on" data-t="pv">Размеры</button></div>
+    <div class="desc"><b>Узел перехода и вентилятора</b> — переход-конус <b>Ø400→220</b> заканчивается патрубком Ø220, на него приварено <b>внешнее монтажное кольцо (фланец)</b> с крепёжными приливами. Осевой вентилятор YWF Ø200 крепится к кольцу <b>четырьмя лапками на болтах</b>. Поток Ø200 проходит свободно, без сужения до Ø150. Кнопка «Разнести» показывает порядок сборки.</div>
   </div>
 
   <div data-pane="sx" style="display:none"></div>
@@ -100,6 +124,15 @@
   <div data-pane="rc" style="display:none"></div>
   <div data-pane="sp" style="display:none"></div>
   <div data-pane="pz" style="display:none"></div>
+  <div data-pane="tz" style="display:none"></div>
+  <div data-pane="room" style="display:none">
+    <div class="scene-h"><canvas id="cv-room" class="scene"></canvas><svg id="an-room" class="anno"></svg></div>
+    <div class="row">
+      <button class="ctl rotB on" data-t="room">Вращение</button><button class="ctl vB" data-t="room" data-v="iso">Изометрия</button><button class="ctl vB" data-t="room" data-v="top">Сверху</button><button class="ctl dimB on" data-t="room">Размеры</button>
+      <span class="hint">тяни — вращать · колесо — зум</span>
+    </div>
+    <div class="desc">Размещение установки «AtomBreez-1» в углу камеры созревания. Камера условно <b>3,0 × 2,5 м, высота 3,0 м</b>; установка <b>600 × 600 мм, высота ≈1750 мм</b> стоит в углу, рядом — стеллажи с продукцией вдоль стен. Компоновка показывает занимаемое место и проход; реальная планировка уточняется на объекте.</div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -203,7 +236,22 @@ function nameTex(){const cw=1024,chh=256,c=document.createElement('canvas');c.wi
  beam([-Rframe,railTopY,-Rframe],[Rframe,railTopY,-Rframe],0.12,0.12);beam([-Rframe,railTopY,Rframe],[Rframe,railTopY,Rframe],0.12,0.12);beam([-Rframe,railTopY,-Rframe],[-Rframe,railTopY,Rframe],0.12,0.12);beam([Rframe,railTopY,-Rframe],[Rframe,railTopY,Rframe],0.12,0.12);
  [[-Rframe,-Rframe],[Rframe,-Rframe],[-Rframe,Rframe],[Rframe,Rframe]].forEach(function(p){const px=p[0],pz=p[1];const post=new THREE.Mesh(new THREE.BoxGeometry(0.1,railTopY-baseY,0.1),mRama);post.position.set(px,(railTopY+baseY)/2,pz);root.add(post);const w=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.06,20),mKol);w.rotation.x=Math.PI/2;w.position.set(px+0.04,baseY-0.18,pz);root.add(w);});
  beam([-Rframe,railY,-Rframe],[Rframe,railY,-Rframe],0.1,0.1);const bp=new THREE.Mesh(new THREE.BoxGeometry(2*Rframe,0.4,0.04),mRama);bp.position.set(0,railY+0.15,-Rframe);root.add(bp);
- const ps=Rframe-0.16,railShelfY=railY;[1,-1].forEach(function(xs){const inner=ps-0.02,outer=Rframe;const sh=new THREE.Mesh(new THREE.BoxGeometry(outer-inner,0.03,2*Rframe*0.92),mNap);sh.position.set(xs*(inner+outer)/2,railShelfY,0);root.add(sh);});
+ const ps=Rframe-0.16,railShelfY=railY;
+ // === НАПРАВЛЯЮЩИЕ-УГОЛКИ 32×32×3 (L-профиль) вдоль X (ось выезда), по бокам z=±, полки НАВСТРЕЧУ (внутрь) ===
+ const guideY=railShelfY,gzS=Rframe-0.12,Lx=2*Rframe*0.94,fl=0.16,th=0.03,shelfTopY=railShelfY+th;
+ (function(){
+  [1,-1].forEach(function(s){const gz=s*gzS;
+   // сечение в плоскости (a=поперёк, b=вверх): вертикальная полка вверх у внешней стенки + горизонтальная полка к центру
+   // строим в XY, после rotation.y=PI/2 локальный +X -> мировой -Z, поэтому полку направляем так, чтобы в мире она шла к центру
+   const dir=(s>0)?1:-1; // в локальной X положить полку в сторону, которая после поворота укажет к центру
+   const sh=new THREE.Shape();sh.moveTo(0,0);sh.lineTo(dir*fl,0);sh.lineTo(dir*fl,th);sh.lineTo(dir*th,th);sh.lineTo(dir*th,fl);sh.lineTo(0,fl);sh.closePath();
+   const geo=new THREE.ExtrudeGeometry(sh,{depth:Lx,bevelEnabled:false,steps:1});
+   const ang=new THREE.Mesh(geo,mNap);ang.rotation.y=Math.PI/2;ang.position.set(-Lx/2,guideY,gz);root.add(ang);
+   [1,-1].forEach(function(xx){const br=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.05,Math.abs(Rframe-gzS)+0.05),mRama);br.position.set(xx*(Rframe-0.06),guideY+0.015,(gz+s*Rframe)/2);root.add(br);
+    const blt=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.04,6),mKol);blt.position.set(xx*(Rframe-0.06),guideY+0.05,gz);root.add(blt);});
+   const gus=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1,0.05),mRama);gus.position.set(0,guideY-0.05,gz);root.add(gus);
+  });
+ })();
  const pipeBot=railTopY+0.10,pipeTop=railTopY+3.0,winYC=pipeBot+0.45,winH=0.34,winYbot=winYC-winH/2,winYtop=winYC+winH/2;
  const low=new THREE.Mesh(new THREE.CylinderGeometry(R,R,winYbot-pipeBot,64,1,true),mC);low.position.y=(winYbot+pipeBot)/2;root.add(low);
  const up=new THREE.Mesh(new THREE.CylinderGeometry(R,R,pipeTop-winYtop,64,1,true),mC);up.position.y=(pipeTop+winYtop)/2;root.add(up);
@@ -215,17 +263,92 @@ function nameTex(){const cw=1024,chh=256,c=document.createElement('canvas');c.wi
  const rt=new THREE.Mesh(new THREE.RingGeometry(R+0.005,ringR,48),mKrep);rt.rotation.x=-Math.PI/2;rt.position.y=pipeBot+0.05;root.add(rt);
  const rb=new THREE.Mesh(new THREE.RingGeometry(R+0.005,ringR,48),mKrep);rb.rotation.x=Math.PI/2;rb.position.y=pipeBot-0.05;root.add(rb);
  const re=new THREE.Mesh(new THREE.CylinderGeometry(ringR,ringR,0.1,48,1,true),mKrep);re.position.y=pipeBot;root.add(re);
- const Rring=0.66,ringCY=pipeBot+0.26,tubeR=0.05;const torus=new THREE.Mesh(new THREE.TorusGeometry(Rring,tubeR,14,64),mColl);torus.rotation.x=Math.PI/2;torus.position.y=ringCY;root.add(torus);
- const tips=[];for(let i=0;i<5;i++){const a=TC+(i+0.5)*(2*Math.PI/5),fx=PX(a,Rring),fz=PZ(a,Rring);const ri=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.18,12),mColl);ri.position.set(fx,ringCY+0.13,fz);root.add(ri);const bo=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.09,12),mFor);bo.position.set(fx,ringCY+0.25,fz);root.add(bo);const ti=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,12),mFor);ti.position.set(fx,ringCY+0.34,fz);root.add(ti);tips.push([fx,ringCY+0.4,fz]);}
- for(let i=0;i<3;i++){const a=TC+Math.PI*0.5+i*(2*Math.PI/3),mx=PX(a,(Rring+R)/2),mz=PZ(a,(Rring+R)/2);const b=new THREE.Mesh(new THREE.BoxGeometry(R-Rring,0.03,0.05),mColl);b.position.set(mx,ringCY,mz);b.rotation.y=-(Math.PI/2-a);root.add(b);}
+ const ringCY=pipeBot+0.26,tubeR=0.05;
+ // === НОВЫЙ КОЛЛЕКТОР: гребёнка (магистраль вдоль X, форсунки вверх) ===
+ const mNozB=mat(0x7a818a,{metalness:0.55,roughness:0.4}),mNozH=mat(0xb4b9be,{metalness:0.68,roughness:0.28}),mNutG=mat(0x565d65,{metalness:0.55,roughness:0.42}),mBodyG=mat(0x717b85,{metalness:0.6,roughness:0.36});
+ function mkNoz(x,by,z){const g=new THREE.Group();g.position.set(x,by,z);
+  const hx=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.04,6),mNutG);hx.position.y=0.02;g.add(hx);
+  const bd=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.045,0.08,16),mNozB);bd.position.y=0.08;g.add(bd);
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.04,0.05,16),mNozB);sh.position.y=0.145;g.add(sh);
+  const hd=new THREE.Mesh(new THREE.CylinderGeometry(0.024,0.024,0.04,14),mNozH);hd.position.y=0.19;g.add(hd);
+  const tp=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.018,0.025,12),mNozH);tp.position.y=0.222;g.add(tp);
+  root.add(g);return [x,by+0.25,z];}
+ const gN=5,gxL=-R+0.12,gxR=R-0.26,gspan=gxR-gxL,gstep=gspan/(gN-1);
+ const gxs=[];for(let i=0;i<gN;i++)gxs.push(gxL+i*gstep);
+ const tips=[];
+ gxs.forEach(function(x,i){const end=(i===gN-1);
+  // тройник
+  const tb=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.13,16),mBodyG);tb.position.set(x,ringCY,0);root.add(tb);
+  const tn=new THREE.Mesh(new THREE.CylinderGeometry(0.082,0.082,0.04,6),mNutG);tn.position.set(x,ringCY-0.085,0);root.add(tn);
+  const pl=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.1,14),mBodyG);pl.rotation.z=Math.PI/2;pl.position.set(x-0.115,ringCY,0);root.add(pl);
+  if(!end){const pr=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.1,14),mBodyG);pr.rotation.z=Math.PI/2;pr.position.set(x+0.115,ringCY,0);root.add(pr);}
+  // магистраль между тройниками
+  if(!end){const seg=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,gstep-0.26,12),mColl);seg.rotation.z=Math.PI/2;seg.position.set(x+gstep/2,ringCY,0);root.add(seg);}
+  // удлинитель + форсунка вверх
+  const upLen=0.18+(i%2)*0.08;
+  const up=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,upLen,12),mColl);up.position.set(x,ringCY+0.1+upLen/2,0);root.add(up);
+  tips.push(mkNoz(x,ringCY+0.1+upLen,0));});
+ // продление магистрали к стенке (под подвод)
+ const gthr=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.4,12),mColl);gthr.rotation.z=Math.PI/2;gthr.position.set(gxR+0.2,ringCY,0);root.add(gthr);
  const upTu=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,winYC-ringCY,12),mPodT);upTu.position.set(R-0.06,(winYC+ringCY)/2,0);root.add(upTu);
  const hout=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.3,12),mPodT);hout.position.set(R+0.1,winYC,0);hout.rotation.z=Math.PI/2;root.add(hout);
  const bt=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.12,16),mBrs);bt.position.set(R+0.28,winYC,0);bt.rotation.z=Math.PI/2;root.add(bt);
  const bb=new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.085,0.13,16),mBrs);bb.position.set(R+0.42,winYC,0);bb.rotation.z=Math.PI/2;root.add(bb);
- const hosePts=[new THREE.Vector3(R+0.5,winYC,0),new THREE.Vector3(R+0.78,winYC-0.35,0.04),new THREE.Vector3(R+0.86,winYC-0.85,0.02),new THREE.Vector3(R+0.66,winYC-1.4,0),new THREE.Vector3(R+0.5,winYC-1.78,0.04)];root.add(makeHose(hosePts,0.05));
+ const hosePts=[new THREE.Vector3(R+0.5,winYC,0),new THREE.Vector3(R+0.6,winYC-0.2,-0.4),new THREE.Vector3(R+0.55,winYC-0.6,-0.9),new THREE.Vector3(Rframe-0.02,winYC-1.2,-Rframe+0.06),new THREE.Vector3(Rframe-0.02,winYC-1.78,-Rframe+0.06)];root.add(makeHose(hosePts,0.05));
  const discGrp=new THREE.Group();root.add(discGrp);const discY=pipeTop-0.18;const sr=new THREE.Mesh(new THREE.TorusGeometry(R-0.04,0.03,10,48),mDisk);sr.rotation.x=Math.PI/2;sr.position.y=discY-0.04;discGrp.add(sr);const disc=new THREE.Mesh(new THREE.CircleGeometry(R-0.05,48),mDisk);disc.rotation.x=-Math.PI/2;disc.position.y=discY;discGrp.add(disc);const bar=new THREE.Mesh(new THREE.TorusGeometry(0.25,0.022,8,20,Math.PI),mDisk);bar.position.set(0,discY+0.05,0);discGrp.add(bar);
- const transGrp=new THREE.Group();root.add(transGrp);const redH=0.7,redY1=pipeTop+redH;const red=new THREE.Mesh(new THREE.CylinderGeometry(Rf,R,redH,48,1,true),mPer);red.position.y=pipeTop+redH/2;transGrp.add(red);const clamp=new THREE.Mesh(new THREE.TorusGeometry(R+0.04,0.05,10,48),mHom);clamp.rotation.x=Math.PI/2;clamp.position.y=pipeTop;transGrp.add(clamp);const fanY1=redY1+0.6;const fan=new THREE.Mesh(new THREE.CylinderGeometry(Rf,Rf,0.6,32,1,true),mVent);fan.position.y=(redY1+fanY1)/2;transGrp.add(fan);const bladeGrp=new THREE.Group();bladeGrp.position.y=(redY1+fanY1)/2;transGrp.add(bladeGrp);bladeGrp.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.14,16),mVent));for(let i=0;i<7;i++){const bl=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.014,0.1),mVent);const a=i/7*Math.PI*2;bl.position.set(Math.cos(a)*0.22,0,Math.sin(a)*0.22);bl.rotation.y=a;bl.rotation.z=0.4;bladeGrp.add(bl);}
- const panGrp=new THREE.Group();root.add(panGrp);const pz2=Rframe*0.86,floorY=railShelfY+0.05,ph=0.4,ptt=0.05,drR=0.1;const shp=new THREE.Shape();shp.moveTo(-ps,-pz2);shp.lineTo(ps,-pz2);shp.lineTo(ps,pz2);shp.lineTo(-ps,pz2);shp.lineTo(-ps,-pz2);const hl=new THREE.Path();hl.absarc(-0.25,0,drR,0,Math.PI*2,true);shp.holes.push(hl);const pf=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:ptt,bevelEnabled:false}),mPod2);pf.rotation.x=-Math.PI/2;pf.position.y=floorY;panGrp.add(pf);
+ const transGrp=new THREE.Group();root.add(transGrp);const redH=0.7,redY1=pipeTop+redH;const red=new THREE.Mesh(new THREE.CylinderGeometry(Rf,R,redH,48,1,true),mPer);red.position.y=pipeTop+redH/2;transGrp.add(red);const clamp=new THREE.Mesh(new THREE.TorusGeometry(R+0.04,0.05,10,48),mHom);clamp.rotation.x=Math.PI/2;clamp.position.y=pipeTop;transGrp.add(clamp);const fanY1=redY1+0.6;
+ // === ОСЕВОЙ ВЕНТИЛЯТОР Weiguang YWF 2E-200 B92/25 G3S (Ø200, круглая решётка, IP54) ===
+ const mRingV=mat(0x23272c,{metalness:0.5,roughness:0.45}),mHubV=mat(0x1d2024,{metalness:0.45,roughness:0.5}),mWireV=mat(0x33383e,{metalness:0.55,roughness:0.4}),mBladeV=mat(0x2a2e33,{metalness:0.4,roughness:0.55});
+ const neck=new THREE.Mesh(new THREE.CylinderGeometry(Rf,Rf,0.1,32,1,true),mPer);neck.position.y=redY1+0.05;transGrp.add(neck);
+ const Rfan=0.3, fbY=redY1+0.1, fanYc=fbY+0.07;
+ // === ВНЕШНЕЕ МОНТАЖНОЕ КОЛЬЦО-ФЛАНЕЦ на патрубке (крепление вентилятора) ===
+ const mRingF=mat(0x8a9097,{metalness:0.55,roughness:0.4}),mLegV=mat(0x3a3f45,{metalness:0.5,roughness:0.45}),mBoltV=mat(0xb8bcc0,{metalness:0.7,roughness:0.3});
+ const ringY=redY1+0.08, ringBore=Rfan-0.03, ringOutR=Rf+0.12, ringTh=0.05;
+ const frTop=new THREE.Mesh(new THREE.RingGeometry(ringBore,ringOutR,48),mRingF);frTop.rotation.x=-Math.PI/2;frTop.position.y=ringY+ringTh/2;transGrp.add(frTop);
+ const frBot=new THREE.Mesh(new THREE.RingGeometry(ringBore,ringOutR,48),mRingF);frBot.rotation.x=Math.PI/2;frBot.position.y=ringY-ringTh/2;transGrp.add(frBot);
+ const frOut=new THREE.Mesh(new THREE.CylinderGeometry(ringOutR,ringOutR,ringTh,48,1,true),mRingF);frOut.position.y=ringY;transGrp.add(frOut);
+ const frIn=new THREE.Mesh(new THREE.CylinderGeometry(ringBore,ringBore,ringTh,48,1,true),mRingF);frIn.position.y=ringY;transGrp.add(frIn);
+ // 4 прилива-лапки на кольце под болты + Г-образные лапки вентилятора
+ for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;
+   const lug=new THREE.Mesh(new THREE.BoxGeometry(0.1,ringTh+0.01,0.09),mRingF);lug.position.set(Math.cos(a)*(ringOutR-0.02),ringY,Math.sin(a)*(ringOutR-0.02));lug.rotation.y=-a;transGrp.add(lug);
+   // Г-образная лапка вентилятора: верт. полка к ободу + пятка на кольцо + болт
+   const lg=new THREE.Group();lg.rotation.y=-a;transGrp.add(lg);const rx=Rfan+0.01;
+   const vert=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.12,0.07),mLegV);vert.position.set(rx,fanYc-0.05,0);lg.add(vert);
+   const heel=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.02,0.07),mLegV);heel.position.set(rx-0.03,ringY+ringTh/2+0.01,0);lg.add(heel);
+   const blt=new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.014,0.06,6),mBoltV);blt.position.set(rx-0.03,ringY+ringTh/2,0);lg.add(blt);
+   const nut=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.014,6),mBoltV);nut.position.set(rx-0.03,ringY+ringTh/2+0.03,0);lg.add(nut);
+ }
+
+ // обод-кольцо (толстое, как на фото)
+ const obod=new THREE.Mesh(new THREE.TorusGeometry(Rfan,0.03,12,48),mRingV);obod.rotation.x=Math.PI/2;obod.position.y=fanYc;transGrp.add(obod);
+ // короткая обечайка под ободом (корпус)
+ const shell=new THREE.Mesh(new THREE.CylinderGeometry(Rfan-0.005,Rfan-0.005,0.14,40,1,true),mRingV);shell.position.y=fbY+0.04;transGrp.add(shell);
+ // крупная центральная мотор-втулка (цилиндр) + крышка с болтами
+ const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.13,24),mHubV);motor.position.y=fanYc;transGrp.add(motor);
+ const motorFace=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.012,24),mWireV);motorFace.position.y=fanYc+0.066;transGrp.add(motorFace);
+ const axle=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.03,12),mWireV);axle.position.y=fanYc+0.08;transGrp.add(axle);
+ for(let i=0;i<6;i++){const a=i/6*Math.PI*2;const blt=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.016,6),mWireV);blt.position.set(Math.cos(a)*0.07,fanYc+0.07,Math.sin(a)*0.07);transGrp.add(blt);}
+ // === КРЫЛЬЧАТКА: 7 широких серповидных лопастей (под решёткой) ===
+ const bladeGrp=new THREE.Group();bladeGrp.position.y=fanYc;transGrp.add(bladeGrp);
+ for(let i=0;i<7;i++){const a=i/7*Math.PI*2;
+   const sh=new THREE.Shape();sh.moveTo(0.1,-0.05);sh.quadraticCurveTo(0.2,-0.02,Rfan-0.02,0.04);sh.quadraticCurveTo(Rfan-0.05,0.07,0.18,0.06);sh.quadraticCurveTo(0.12,0.05,0.1,-0.05);
+   const bl=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:0.01,bevelEnabled:false}),mBladeV);
+   bl.rotation.x=-Math.PI/2;bl.rotation.z=0;bl.position.y=0;
+   const holder=new THREE.Group();holder.add(bl);holder.rotation.y=a;holder.rotation.x=0;
+   // лёгкий наклон лопасти
+   bl.rotation.y=0.35;
+   bladeGrp.add(holder);}
+ // === ПЛОСКАЯ ПРОВОЛОЧНАЯ РЕШЁТКА спереди (радиальные спицы + кольца), слегка выпуклая ===
+ const gridY=fanYc+0.1;
+ for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const sp=new THREE.Mesh(new THREE.BoxGeometry(Rfan*2-0.02,0.006,0.006),mWireV);sp.position.set(0,gridY,0);sp.rotation.y=a;transGrp.add(sp);}
+ [0.075,0.15,0.225,Rfan-0.01].forEach(function(rr){const ring=new THREE.Mesh(new THREE.TorusGeometry(rr,0.006,6,40),mWireV);ring.rotation.x=Math.PI/2;ring.position.y=gridY;transGrp.add(ring);});
+ // центральная пуговица решётки
+ const knob=new THREE.Mesh(new THREE.SphereGeometry(0.016,10,8),mWireV);knob.position.y=gridY;transGrp.add(knob);
+ // ушки крепления решётки к ободу (4 шт)
+ for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;const ear=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.1,0.02),mRingV);ear.position.set(Math.cos(a)*Rfan,fanYc+0.05,Math.sin(a)*Rfan);transGrp.add(ear);}
+ // клеммная коробка сбоку
+ const box=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.05,0.11),mHubV);box.position.set(Rfan+0.04,fbY+0.04,0);transGrp.add(box);
+ const panGrp=new THREE.Group();root.add(panGrp);const pz2=Rframe-0.18,floorY=shelfTopY,ph=0.4,ptt=0.05,drR=0.1;const shp=new THREE.Shape();shp.moveTo(-ps,-pz2);shp.lineTo(ps,-pz2);shp.lineTo(ps,pz2);shp.lineTo(-ps,pz2);shp.lineTo(-ps,-pz2);const hl=new THREE.Path();hl.absarc(-0.25,0,drR,0,Math.PI*2,true);shp.holes.push(hl);const pf=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:ptt,bevelEnabled:false}),mPod2);pf.rotation.x=-Math.PI/2;pf.position.y=floorY;panGrp.add(pf);
  function pw(w,x,y,z,ry){const m=new THREE.Mesh(new THREE.BoxGeometry(w,ph,ptt),mPod2);m.position.set(x,y,z);m.rotation.y=ry;panGrp.add(m);}pw(2*ps,0,floorY+ph/2,pz2,0);pw(2*ps,0,floorY+ph/2,-pz2,0);pw(2*pz2,ps,floorY+ph/2,0,Math.PI/2);pw(2*pz2,-ps,floorY+ph/2,0,Math.PI/2);
  const drainPipe=new THREE.Mesh(new THREE.CylinderGeometry(drR*0.7,drR*0.7,0.14,16),mDrain);drainPipe.position.set(-0.25,railShelfY-0.12,0);panGrp.add(drainPipe);
  const valveMain=makeBallValve({bodyR:0.07,len:0.24});valveMain.position.set(-0.25,railShelfY-0.28,0);valveMain.rotation.z=-Math.PI/2;panGrp.add(valveMain);
@@ -233,10 +356,19 @@ function nameTex(){const cw=1024,chh=256,c=document.createElement('canvas');c.wi
  const mistN=600,mp=new Float32Array(mistN*3),md=[];function sm(i){const tp=tips[(Math.random()*tips.length)|0];md[i]={x:tp[0]+(Math.random()-0.5)*0.05,y:tp[1]+Math.random()*0.1,z:tp[2]+(Math.random()-0.5)*0.05,vx:(Math.random()-0.5)*0.006,vy:0.006+Math.random()*0.010,vz:(Math.random()-0.5)*0.006,life:0};}for(let i=0;i<mistN;i++){sm(i);md[i].y=ringCY+0.3+Math.random()*(discY-ringCY-0.4);mp[i*3]=md[i].x;mp[i*3+1]=md[i].y;mp[i*3+2]=md[i].z;}const mg=new THREE.BufferGeometry();mg.setAttribute('position',new THREE.BufferAttribute(mp,3));const mpts=new THREE.Points(mg,new THREE.PointsMaterial({map:TEX_SOFT,color:0xeaf2f5,size:0.34,transparent:true,opacity:0.13,depthWrite:false,sizeAttenuation:true,blending:THREE.NormalBlending}));root.add(mpts);
  // облако тумана на выходе вентилятора (увлажнённый воздух)
  const fogN=360,fp=new Float32Array(fogN*3),fd=[];const fogY0=fanY1+0.05;function sf(i){const a=Math.random()*Math.PI*2,rr=Math.random()*0.18;fd[i]={x:Math.cos(a)*rr,y:fogY0+Math.random()*0.1,z:Math.sin(a)*rr,vx:Math.cos(a)*(0.004+Math.random()*0.006),vy:0.012+Math.random()*0.016,vz:Math.sin(a)*(0.004+Math.random()*0.006),life:Math.random()};}for(let i=0;i<fogN;i++){sf(i);fd[i].y=fogY0+Math.random()*1.2;fp[i*3]=fd[i].x+fd[i].vx*40;fp[i*3+1]=fd[i].y;fp[i*3+2]=fd[i].z+fd[i].vz*40;}const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.BufferAttribute(fp,3));const fpts=new THREE.Points(fg,new THREE.PointsMaterial({map:TEX_SOFT,color:0xd2e2ea,size:0.42,transparent:true,opacity:0.16,depthWrite:false,sizeAttenuation:true,blending:THREE.NormalBlending}));root.add(fpts);
+ // === ПАР сквозь переход→шейку→вентилятор (показывает открытый проход) ===
+ const thrN=160,tp2=new Float32Array(thrN*3),tdd=[];
+ const thrBot=discY+0.05, thrTop=fanY1+0.05, thrR=Rf-0.03;
+ function stf(i){var r=Math.sqrt(Math.random())*thrR,a=Math.random()*Math.PI*2;tdd[i]={x:Math.cos(a)*r,z:Math.sin(a)*r,y:thrBot+Math.random()*0.2,vy:0.012+Math.random()*0.012};}
+ for(var i=0;i<thrN;i++){stf(i);tdd[i].y=thrBot+Math.random()*(thrTop-thrBot);tp2[i*3]=tdd[i].x;tp2[i*3+1]=tdd[i].y;tp2[i*3+2]=tdd[i].z;}
+ const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.BufferAttribute(tp2,3));
+ const thrPts=new THREE.Points(tg,new THREE.PointsMaterial({map:TEX_SOFT,color:0xeaf2f5,size:0.26,transparent:true,opacity:0.15,depthWrite:false,sizeAttenuation:true,blending:THREE.NormalBlending}));root.add(thrPts);main.thrPts=thrPts;
+ main.stepThr=function(){var pos=tg.attributes.position.array;for(var i=0;i<thrN;i++){tdd[i].y+=tdd[i].vy;var sprd=tdd[i].y>thrTop-0.2?1.0+(tdd[i].y-(thrTop-0.2))*0.8:1.0;if(tdd[i].y>thrTop)stf(i);pos[i*3]=tdd[i].x*sprd;pos[i*3+1]=tdd[i].y;pos[i*3+2]=tdd[i].z*sprd;}tg.attributes.position.needsUpdate=true;};
+
  const watN=140,wp=new Float32Array(watN*3),wd=[];function sw(i){const a=Math.random()*Math.PI*2,rr=R-0.03-Math.random()*0.04;wd[i]={a:a,r:rr,y:discY-0.1-Math.random()*0.3,vy:0.012+Math.random()*0.018};}for(let i=0;i<watN;i++){sw(i);wd[i].y=pipeBot+0.1+Math.random()*(discY-pipeBot-0.3);const d=wd[i];wp[i*3]=PX(d.a,d.r);wp[i*3+1]=d.y;wp[i*3+2]=PZ(d.a,d.r);}const wg=new THREE.BufferGeometry();wg.setAttribute('position',new THREE.BufferAttribute(wp,3));const wpts=new THREE.Points(wg,new THREE.PointsMaterial({color:0x4a93c4,size:0.04,transparent:true,opacity:0.85,depthWrite:false,sizeAttenuation:true}));root.add(wpts);
  root.position.y=-0.4;main.lookY=1.05;main.camLift=1.3;
  const xH=Rframe+1.05, xH2=Rframe+0.55, botAll=baseY-0.18;
- main.dims=[{p:[0,pipeTop,0],t:"Ø400×1,5",baseAy:28},{p:[0,(fanY1+redY1)/2,0],t:"вентилятор Ø150",baseAy:28},{p:[PX(TC+0.628,Rring),ringCY,PZ(TC+0.628,Rring)],t:"кольцо Ø330"},{p:tips[2],t:"5 форсунок"},{p:[0,discY,0],t:"перфодиск Ø390, t2"},{p:[R+0.4,winYC,0],t:"БРС 1/2\""},{p:[ringR,pipeBot,0],t:"буртик 35×4"},{p:[-0.25,railShelfY-0.36,0],t:"слив Ø40 + кран"},{p:[Rframe,railTopY,Rframe],t:"рама 600×600"},{p:[Rframe,baseY-0.18,Rframe],t:"колёса Ø100"},
+ main.dims=[{p:[0,pipeTop,0],t:"Ø400×1,5",baseAy:28},{p:[0,(fanY1+redY1)/2,0],t:"вентилятор осевой YWF 2E-200 (IP54)",baseAy:28},{p:[gxs[1],ringCY,0],t:"коллектор-гребёнка Ø9,52"},{p:tips[2],t:"5 форсунок (туман)"},{p:[0,discY,0],t:"перфодиск Ø390, t2"},{p:[R+0.4,winYC,0],t:"БРС 1/2\""},{p:[ringR,pipeBot,0],t:"буртик 35×4"},{p:[-0.25,railShelfY-0.36,0],t:"слив Ø40 + кран"},{p:[Rframe,railTopY,Rframe],t:"рама 600×600"},{p:[Rframe,baseY-0.18,Rframe],t:"колёса Ø100"},
   {type:'vH',a:[0,botAll,0],b:[0,fanY1,0],col:225,t:"общая ≈1750"},
   {type:'vH',a:[0,baseY,0],b:[0,railTopY,0],col:130,t:"рама 560"},
   {type:'vH',a:[0,pipeBot,0],b:[0,pipeTop,0],col:130,t:"корпус ≈820"},
@@ -245,13 +377,13 @@ function nameTex(){const cw=1024,chh=256,c=document.createElement('canvas');c.wi
  buildDims(main);
  let openV=0,openT=0,discV=0,discT=0,panV=0,panT=0,proc=true,transparent=false;
  function updC(){const m=proc?mCp:(transparent?mCt2:mC);corpusParts.forEach(function(p){p.material=m;});red.material=(transparent||proc)?mPerT:mPer;namePlate.visible=!transparent;}
- document.getElementById('proc').addEventListener('click',function(){proc=!proc;this.classList.toggle('on',proc);mpts.visible=proc;wpts.visible=proc;fpts.visible=proc;wf.visible=proc;updC();});
+ document.getElementById('proc').addEventListener('click',function(){proc=!proc;this.classList.toggle('on',proc);mpts.visible=proc;wpts.visible=proc;fpts.visible=proc;if(main.thrPts)main.thrPts.visible=proc;wf.visible=proc;updC();});
  document.getElementById('open').addEventListener('click',function(){openT=openT?0:1;this.classList.toggle('on',!!openT);});
  document.getElementById('disc').addEventListener('click',function(){discT=discT?0:1;if(discT){openT=1;document.getElementById('open').classList.add('on');}this.classList.toggle('on',!!discT);});
  document.getElementById('pan').addEventListener('click',function(){panT=panT?0:1;this.classList.toggle('on',!!panT);});
  document.getElementById('cut').addEventListener('click',function(){transparent=!transparent;this.classList.toggle('on',transparent);updC();});
  const ma=mg.attributes.position,wa=wg.attributes.position,fa=fg.attributes.position;
- main.tick=function(){if(main.spin&&!main.drag)main.tRy+=0.005;openV+=(openT-openV)*0.08;transGrp.position.y=openV*1.3;discV+=(discT-discV)*0.07;discGrp.position.y=Math.min(discV/0.45,1)*0.7;discGrp.position.x=Math.max((discV-0.45)/0.55,0)*1.9;panV+=(panT-panV)*0.1;panGrp.position.z=panV*2.3;if(proc){bladeGrp.rotation.y+=0.35;for(let i=0;i<mistN;i++){const d=md[i];d.y+=d.vy;d.x+=d.vx;d.z+=d.vz;const rr=Math.hypot(d.x,d.z);if(rr>R-0.08){d.x*=(R-0.08)/rr;d.z*=(R-0.08)/rr;}if(d.y>discY-0.12)sm(i);ma.array[i*3]=d.x;ma.array[i*3+1]=d.y;ma.array[i*3+2]=d.z;}ma.needsUpdate=true;for(let i=0;i<watN;i++){const d=wd[i];d.y-=d.vy;if(d.y<pipeBot+0.06)sw(i);wa.array[i*3]=PX(d.a,d.r);wa.array[i*3+1]=d.y;wa.array[i*3+2]=PZ(d.a,d.r);}wa.needsUpdate=true;for(let i=0;i<fogN;i++){const d=fd[i];d.x+=d.vx;d.y+=d.vy;d.z+=d.vz;d.life+=0.012;if(d.y>fogY0+1.5||d.life>1)sf(i);fa.array[i*3]=d.x;fa.array[i*3+1]=d.y;fa.array[i*3+2]=d.z;}fa.needsUpdate=true;}};
+ main.tick=function(){if(main.spin&&!main.drag)main.tRy+=0.005;openV+=(openT-openV)*0.08;transGrp.position.y=openV*1.3;discV+=(discT-discV)*0.07;discGrp.position.y=Math.min(discV/0.45,1)*0.7;discGrp.position.x=Math.max((discV-0.45)/0.55,0)*1.9;panV+=(panT-panV)*0.1;panGrp.position.x=panV*2.3;if(proc){bladeGrp.rotation.y+=0.35;if(main.stepThr)main.stepThr();for(let i=0;i<mistN;i++){const d=md[i];d.y+=d.vy;d.x+=d.vx;d.z+=d.vz;const rr=Math.hypot(d.x,d.z);if(rr>R-0.08){d.x*=(R-0.08)/rr;d.z*=(R-0.08)/rr;}if(d.y>discY-0.12)sm(i);ma.array[i*3]=d.x;ma.array[i*3+1]=d.y;ma.array[i*3+2]=d.z;}ma.needsUpdate=true;for(let i=0;i<watN;i++){const d=wd[i];d.y-=d.vy;if(d.y<pipeBot+0.06)sw(i);wa.array[i*3]=PX(d.a,d.r);wa.array[i*3+1]=d.y;wa.array[i*3+2]=PZ(d.a,d.r);}wa.needsUpdate=true;for(let i=0;i<fogN;i++){const d=fd[i];d.x+=d.vx;d.y+=d.vy;d.z+=d.vz;d.life+=0.012;if(d.y>fogY0+1.5||d.life>1)sf(i);fa.array[i*3]=d.x;fa.array[i*3+1]=d.y;fa.array[i*3+2]=d.z;}fa.needsUpdate=true;}};
  updC();
 })();
 
@@ -263,21 +395,140 @@ const rm=makeScene('cv-rm','an-rm',480);rm.key='rm';rm.dist=10;rm.lookY=0.35;rm.
  bm([-half,bot,-half],[half,bot,-half]);bm([-half,bot,half],[half,bot,half]);bm([-half,bot,-half],[-half,bot,half]);bm([half,bot,-half],[half,bot,half]);
  cs.forEach(function(p){const x=p[0],z=p[1];const f=new THREE.Mesh(new THREE.BoxGeometry(0.11,0.1,0.11),mKol);f.position.set(x,bot-0.08,z);root.add(f);const w=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.05,20),mKol);w.rotation.x=Math.PI/2;w.position.set(x+0.03,bot-0.2,z);root.add(w);});
  const bp=new THREE.Mesh(new THREE.BoxGeometry(2*half,0.5,0.03),mPanel);bp.position.set(0,bot+0.28,-half);root.add(bp);
- [1,-1].forEach(function(s){const g=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,2*half*0.9),mNap);g.position.set(s*(half-0.12),top-0.18,0);root.add(g);const lip=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.02,2*half*0.9),mNap);lip.position.set(s*(half-0.16),top-0.205,0);root.add(lip);});
+ [1,-1].forEach(function(s){const gx=s*(half-0.13),gy=top-0.205,L=2*half*0.92,fl=0.1,th=0.022;
+  // L-профиль уголка 32×32×3: сечение в плоскости XY, экструзия вдоль Z
+  const sh=new THREE.Shape();
+  // вертикальная полка вверх + горизонтальная полка внутрь (к центру, т.е. в сторону -s)
+  sh.moveTo(0,0);
+  sh.lineTo(-s*fl,0);          // горизонтальная полка внутрь
+  sh.lineTo(-s*fl,th);
+  sh.lineTo(-s*th,th);
+  sh.lineTo(-s*th,fl);         // вертикальная полка вверх
+  sh.lineTo(0,fl);
+  sh.closePath();
+  const geo=new THREE.ExtrudeGeometry(sh,{depth:L,bevelEnabled:false,steps:1});
+  const ang=new THREE.Mesh(geo,mNap);ang.position.set(gx,gy,-L/2);root.add(ang);
+  // кронштейны к угловым стойкам по концам + болт
+  [1,-1].forEach(function(zz){
+   const bw=Math.abs(half-gx*s);
+   const br=new THREE.Mesh(new THREE.BoxGeometry(bw,0.05,0.06),mRama);br.position.set((gx+s*half)/2,gy+0.02,zz*(half-0.02));root.add(br);
+   const gus=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.12,0.04),mRama);gus.position.set(gx,gy-0.04,zz*(half-0.05));root.add(gus);
+   const blt=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.03,6),mKol);blt.rotation.x=Math.PI/2;blt.position.set(gx+s*0.04,gy+0.02,zz*(half-0.02));root.add(blt);
+  });
+ });
  root.position.y=0.15;const off=0.42;
- rm.dims=[{type:'lin',a:[-half,top+off*0.4,half+off],b:[half,top+off*0.4,half+off],t:"ширина 600"},{type:'lin',a:[half+off,top+off*0.2,-half],b:[half+off,top+off*0.2,half],t:"длина 600"},{type:'lin',a:[half+off,bot,half+off*0.3],b:[half+off,top,half+off*0.3],t:"высота 560"},{type:'lin',a:[-half-off,bot-0.25,half],b:[-half-off,top,half],t:"≈680 с колёс."},{p:[-half,bot,half],t:"труба 40×40×2",baseAy:330},{p:[half-0.12,top-0.18,0],t:"направл. 32×32×3",baseAy:330},{p:[0,bot+0.28,-half],t:"панель t1,5",baseAy:330},{p:[half+0.03,bot-0.2,half],t:"колёса Ø100",baseAy:330}];
+ rm.dims=[{type:'lin',a:[-half,top+off*0.4,half+off],b:[half,top+off*0.4,half+off],t:"ширина 600"},{type:'lin',a:[half+off,top+off*0.2,-half],b:[half+off,top+off*0.2,half],t:"длина 600"},{type:'lin',a:[half+off,bot,half+off*0.3],b:[half+off,top,half+off*0.3],t:"высота 560"},{type:'lin',a:[-half-off,bot-0.25,half],b:[-half-off,top,half],t:"≈680 с колёс."},{p:[-half,bot,half],t:"труба 40×40×2",baseAy:330},{p:[half-0.12,top-0.18,0],t:"направл. 32×32×3 на кронштейнах",baseAy:330},{p:[0,bot+0.28,-half],t:"панель t1,5",baseAy:330},{p:[half+0.03,bot-0.2,half],t:"колёса Ø100",baseAy:330}];
  buildDims(rm);rm.tick=function(){if(rm.spin&&!rm.drag)rm.tRy+=0.005;};
 })();
 
-const cl=makeScene('cv-cl','an-cl',480);cl.key='cl';cl.dist=4.6;cl.lookY=0.05;cl.camLift=0.4;cl.tRx=0.5;cl.rx=0.5;cl.rxClamp=[-0.3,1.45];
-(function(){const root=cl.root;const Rr=1.0,tubeR=0.05;const ring=new THREE.Mesh(new THREE.TorusGeometry(Rr,tubeR,16,80),mColl);ring.rotation.x=Math.PI/2;root.add(ring);
- const tips=[];for(let i=0;i<5;i++){const a=-Math.PI/2+i*(2*Math.PI/5),fx=Math.cos(a)*Rr,fz=Math.sin(a)*Rr;const ri=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.22,14),mColl);ri.position.set(fx,0.15,fz);root.add(ri);const bo=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.13,14),mFor);bo.position.set(fx,0.32,fz);root.add(bo);const ti=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.13,14),mFor);ti.position.set(fx,0.44,fz);root.add(ti);tips.push([fx,0.5,fz]);}
- const crA=[];for(let i=0;i<3;i++){const a=-Math.PI/2+Math.PI*0.5+i*(2*Math.PI/3);const br=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.04,0.06),mColl);br.position.set(Math.cos(a)*(Rr+0.2),0,Math.sin(a)*(Rr+0.2));br.rotation.y=-a;root.add(br);crA.push([Math.cos(a)*(Rr+0.38),0,Math.sin(a)*(Rr+0.38)]);}
- const seg=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.6,14),mPodT);seg.rotation.z=Math.PI/2;seg.position.set(Rr+0.3,0,0);root.add(seg);const brs=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.2,16),mBrs);brs.rotation.z=Math.PI/2;brs.position.set(Rr+0.7,0,0);root.add(brs);
- const wall=new THREE.Mesh(new THREE.CylinderGeometry(Rr+0.5,Rr+0.5,1.0,64,1,true),mCt);wall.position.y=0.2;root.add(wall);root.position.y=0;
- cl.dims=[{p:[0,0,Rr],t:"кольцо Ø330",baseAy:320},{p:[Math.cos(-Math.PI/2+2*Math.PI/5)*Rr,0.1,Math.sin(-Math.PI/2+2*Math.PI/5)*Rr],t:"труба Ø16×1,5",baseAy:320},{p:tips[0],t:"5 форсунок, 72°"},{p:crA[0],t:"кронштейн 3шт"},{p:[Rr+0.7,0,0],t:"БРС 1/2\""},{p:[Rr+0.5,0.2,0],t:"стенка Ø400"},{type:'lin',a:[0,0,-Rr-0.35],b:[0,0.5,-Rr-0.35],t:"форсунка h≈110"}];
+
+const cl=makeScene('cv-cl','an-cl',480);cl.key='cl';cl.dist=5.0;cl.lookY=0.1;cl.camLift=0.42;cl.tRx=0.36;cl.rx=0.36;cl.tRy=0.7;cl.ry=0.7;cl.rxClamp=[-0.3,1.45];
+(function(){const root=cl.root;
+ const mTubeC=mat(0x8a93a0,{metalness:0.55,roughness:0.4}),mNozB=mat(0x7a818a,{metalness:0.55,roughness:0.4}),mNozH=mat(0xb4b9be,{metalness:0.68,roughness:0.28}),mNutC=mat(0x565d65,{metalness:0.55,roughness:0.42}),mBodyC=mat(0x717b85,{metalness:0.6,roughness:0.36}),mFilC=mat(0x3f6e78,{metalness:0.4,roughness:0.5}),mHose=mat(0x2c333a,{metalness:0.2,roughness:0.7}),mHoseN=mat(0x9aa0a6,{metalness:0.5,roughness:0.45}),mPump=mat(0x33383d,{metalness:0.4,roughness:0.55}),mPumpH=mat(0x6f7681,{metalness:0.5,roughness:0.45}),mCorpC=mat(0xaeb6bf,{transparent:true,opacity:0.13,metalness:0.2,roughness:0.7}),mRingC=mat(0x9fa7b0,{metalness:0.3,roughness:0.6});
+ const Rc=1.0,Hc=1.3;
+ // кусок корпуса (контекст)
+ const corp=new THREE.Mesh(new THREE.CylinderGeometry(Rc,Rc,Hc,64,1,true),mCorpC);corp.position.y=0.2;root.add(corp);
+ [Hc/2+0.2,-Hc/2+0.2].forEach(function(yy){const r=new THREE.Mesh(new THREE.TorusGeometry(Rc,0.02,10,64),mRingC);r.rotation.x=Math.PI/2;r.position.y=yy;root.add(r);});
+ // === детальная форсунка вверх ===
+ function mkNoz(x,by,z){const g=new THREE.Group();g.position.set(x,by,z);
+  const hx=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,0.045,6),mNutC);hx.position.y=0.022;g.add(hx);
+  const bd=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.05,0.09,16),mNozB);bd.position.y=0.09;g.add(bd);
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.045,0.055,16),mNozB);sh.position.y=0.16;g.add(sh);
+  const hd=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.026,0.045,14),mNozH);hd.position.y=0.21;g.add(hd);
+  const tp=new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.02,0.028,12),mNozH);tp.position.y=0.246;g.add(tp);
+  root.add(g);return [x,by+0.27,z];}
+ // === гребёнка вдоль X ===
+ const tubeR=0.05,n=5,xL=-Rc+0.12,xR=Rc-0.28,span=xR-xL,step=span/(n-1),yMag=-0.1;
+ const xs=[];for(let i=0;i<n;i++)xs.push(xL+i*step);
+ const tips=[];
+ xs.forEach(function(x,i){const end=(i===n-1);
+  const tb=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,16),mBodyC);tb.position.set(x,yMag,0);root.add(tb);
+  const tn=new THREE.Mesh(new THREE.CylinderGeometry(0.084,0.084,0.045,6),mNutC);tn.position.set(x,yMag-0.09,0);root.add(tn);
+  const pl=new THREE.Mesh(new THREE.CylinderGeometry(0.052,0.052,0.1,14),mBodyC);pl.rotation.z=Math.PI/2;pl.position.set(x-0.12,yMag,0);root.add(pl);
+  if(!end){const pr=new THREE.Mesh(new THREE.CylinderGeometry(0.052,0.052,0.1,14),mBodyC);pr.rotation.z=Math.PI/2;pr.position.set(x+0.12,yMag,0);root.add(pr);}
+  if(!end){const seg=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,step-0.26,12),mTubeC);seg.rotation.z=Math.PI/2;seg.position.set(x+step/2,yMag,0);root.add(seg);}
+  const upLen=0.2+(i%2)*0.1;
+  const up=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,upLen,12),mTubeC);up.position.set(x,yMag+0.1+upLen/2,0);root.add(up);
+  tips.push(mkNoz(x,yMag+0.1+upLen,0));});
+ // продление магистрали к стенке (выход наружу под подвод)
+ const thr=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.5,12),mTubeC);thr.rotation.z=Math.PI/2;thr.position.set(xL-0.22,yMag,0);root.add(thr);
+ // === ПРИСОЕДИНЕНИЕ: штуцер-ёлочка под шланг 8 мм + накидная гайка ===
+ const conNut=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.05,6),mNutC);conNut.rotation.z=Math.PI/2;conNut.position.set(xL-0.45,yMag,0);root.add(conNut);
+ // ёлочка (три конических пояска)
+ for(let k=0;k<3;k++){const barb=new THREE.Mesh(new THREE.CylinderGeometry(0.034,0.044,0.05,12),mHoseN);barb.rotation.z=Math.PI/2;barb.position.set(xL-0.52-k*0.05,yMag,0);root.add(barb);}
+ // === ШЛАНГ 8 мм (от насоса к штуцеру), армированная навивка ===
+ const hosePts=[new THREE.Vector3(xL-0.62,yMag,0),new THREE.Vector3(xL-0.95,yMag-0.18,0.05),new THREE.Vector3(xL-1.05,yMag-0.5,0),new THREE.Vector3(xL-0.85,yMag-0.78,-0.04),new THREE.Vector3(xL-0.55,yMag-0.92,0)];
+ const curve=new THREE.CatmullRomCurve3(hosePts);
+ const hcore=new THREE.Mesh(new THREE.TubeGeometry(curve,60,0.04,12,false),mHose);root.add(hcore);
+ const seg2=curve.getSpacedPoints(70),up0=new THREE.Vector3(0,1,0),tmp=new THREE.Vector3();
+ for(let i=1;i<70;i++){const p=seg2[i];const tang=tmp.copy(seg2[i]).sub(seg2[i-1]).normalize();const nx=new THREE.Vector3().crossVectors(tang,up0).normalize();const ny=new THREE.Vector3().crossVectors(tang,nx).normalize();const ph=i*0.95;const off=nx.clone().multiplyScalar(Math.cos(ph)*0.04).add(ny.clone().multiplyScalar(Math.sin(ph)*0.04));const bead=new THREE.Mesh(new THREE.SphereGeometry(0.009,6,6),mHoseN);bead.position.copy(p).add(off);root.add(bead);}
+ // === МЕМБРАННЫЙ НАСОС (корпус + головка + патрубки + мотор) ===
+ const pumpG=new THREE.Group();pumpG.position.set(xL-0.5,yMag-1.15,0);root.add(pumpG);
+ const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.26,20),mPump);motor.rotation.z=Math.PI/2;motor.position.x=-0.12;pumpG.add(motor);
+ const headB=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.18,0.2),mPumpH);headB.position.x=0.1;pumpG.add(headB);
+ const domeL=new THREE.Mesh(new THREE.SphereGeometry(0.06,12,10),mPumpH);domeL.position.set(0.14,0.06,0.05);pumpG.add(domeL);
+ const domeR=new THREE.Mesh(new THREE.SphereGeometry(0.06,12,10),mPumpH);domeR.position.set(0.14,0.06,-0.05);pumpG.add(domeR);
+ const outlet=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.1,12),mHoseN);outlet.position.set(0.1,0.16,0.05);pumpG.add(outlet);   // выход к шлангу вверх
+ const inlet=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.12,12),mHoseN);inlet.rotation.z=Math.PI/2;inlet.position.set(0.24,0.0,0);pumpG.add(inlet); // вход (от бака)
+ const foot=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.03,0.22),mPump);foot.position.set(0.02,-0.13,0);pumpG.add(foot);
+ root.position.y=0.1;
+ cl.dims=[{p:[xs[2],yMag,0],t:"тройник 10/24"},{p:tips[2],t:"форсунка 10/24-0.15"},{p:[xs[2]+step/2,yMag,0],t:"магистраль Ø9,52"},{p:[xL-0.52,yMag,0],t:"штуцер под шланг 8 мм"},{p:[xL-0.95,yMag-0.5,0],t:"шланг 8 мм (армир.)",baseAy:300},{p:[xL-0.4,yMag-1.1,0],t:"насос мембранный",baseAy:300},{p:[xL-0.26,yMag-1.15,0],t:"вход от бака",baseAy:340},{p:[0,Rc/2+0.2,0],t:"корпус Ø400",baseAy:30}];
  buildDims(cl);cl.tick=function(){if(cl.spin&&!cl.drag)cl.tRy+=0.006;};
 })();
+
+
+const ob=makeScene('cv-ob','an-ob',480);ob.key='ob';ob.dist=5.2;ob.lookY=0.1;ob.camLift=0.4;ob.tRx=0.34;ob.rx=0.34;ob.tRy=0.7;ob.ry=0.7;ob.rxClamp=[-0.3,1.45];
+(function(){const root=ob.root;
+ const mTubeO=mat(0x8a93a0,{metalness:0.55,roughness:0.4}),mNozB=mat(0x7a818a,{metalness:0.55,roughness:0.4}),mNozH=mat(0xb4b9be,{metalness:0.68,roughness:0.28}),mNutO=mat(0x565d65,{metalness:0.55,roughness:0.42}),mBodyO=mat(0x717b85,{metalness:0.6,roughness:0.36}),mFilO=mat(0x3f6e78,{metalness:0.4,roughness:0.5}),mFlange=mat(0x9097a0,{metalness:0.5,roughness:0.4}),mBolt=mat(0x44494f,{metalness:0.6,roughness:0.4}),mBrack=mat(0x6c7378,{metalness:0.4,roughness:0.5}),mGask=mat(0x394b2e,{roughness:0.8}),mCorpO=mat(0xaeb6bf,{transparent:true,opacity:0.14,metalness:0.2,roughness:0.7}),mCorpS=mat(0x9fa7b0,{metalness:0.3,roughness:0.6});
+ const Rc=1.0,Hc=2.0;
+ const corp=new THREE.Mesh(new THREE.CylinderGeometry(Rc,Rc,Hc,64,1,true),mCorpO);root.add(corp);ob.corp=corp;ob.mCorpO=mCorpO;ob.mCorpS=mCorpS;
+ [Hc/2,-Hc/2].forEach(function(yy){const r=new THREE.Mesh(new THREE.TorusGeometry(Rc,0.02,10,64),mCorpS);r.rotation.x=Math.PI/2;r.position.y=yy;root.add(r);});
+ // === детальная туманообразующая форсунка 10/24 (соплом вверх), basеY — низ форсунки ===
+ function makeNozzle(x,baseY,z){
+  const g=new THREE.Group();g.position.set(x,baseY,z);
+  const hex=new THREE.Mesh(new THREE.CylinderGeometry(0.062,0.062,0.05,6),mNutO);hex.position.y=0.025;g.add(hex);          // шестигр. основание
+  const bdy=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.055,0.1,18),mNozB);bdy.position.y=0.1;g.add(bdy);            // корпус
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.05,0.06,18),mNozB);sh.position.y=0.18;g.add(sh);            // плечо-сужение
+  const head=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.05,16),mNozH);head.position.y=0.235;g.add(head);      // головка
+  const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.022,0.03,14),mNozH);tip.position.y=0.275;g.add(tip);        // носик-сопло
+  const orif=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.012,10),mat(0x22262a,{roughness:0.9}));orif.position.y=0.292;g.add(orif); // отверстие
+  root.add(g);return [x,baseY+0.31,z];
+ }
+ // === ГРЕБЁНКА вдоль X ===
+ const tubeR=0.05,n=5,xL=-Rc+0.06,xR=Rc-0.22,span=xR-xL,step=span/(n-1),yMag=0.0;
+ const xs=[];for(let i=0;i<n;i++)xs.push(xL+i*step);
+ function makeTee(x,end){const gg=new THREE.Group();gg.position.set(x,yMag,0);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.15,18),mBodyO);gg.add(body);
+  const hexB=new THREE.Mesh(new THREE.CylinderGeometry(0.092,0.092,0.05,6),mNutO);hexB.position.y=-0.095;gg.add(hexB);
+  const pl=new THREE.Mesh(new THREE.CylinderGeometry(0.056,0.056,0.12,16),mBodyO);pl.rotation.z=Math.PI/2;pl.position.x=-0.13;gg.add(pl);
+  if(!end){const pr=new THREE.Mesh(new THREE.CylinderGeometry(0.056,0.056,0.12,16),mBodyO);pr.rotation.z=Math.PI/2;pr.position.x=0.13;gg.add(pr);}
+  const up=new THREE.Mesh(new THREE.CylinderGeometry(0.046,0.046,0.08,14),mNutO);up.position.y=0.13;gg.add(up);
+  root.add(gg);}
+ const tips=[];
+ xs.forEach(function(x,i){const end=(i===n-1);makeTee(x,end);
+  if(!end){const seg=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,step-0.3,14),mTubeO);seg.rotation.z=Math.PI/2;seg.position.set(x+step/2,yMag,0);root.add(seg);}
+  const upLen=0.26+(i%2)*0.1;
+  const up=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,upLen,14),mTubeO);up.position.set(x,yMag+0.17+upLen/2,0);root.add(up);
+  const t=makeNozzle(x,yMag+0.17+upLen,0);tips.push(t);});
+ // продление сквозь стенку
+ const through=new THREE.Mesh(new THREE.CylinderGeometry(tubeR,tubeR,0.5,14),mTubeO);through.rotation.z=Math.PI/2;through.position.set(xL-0.22,yMag,0);root.add(through);
+ // === ФЛАНЕЦ-ПЛАСТИНА + винты + прокладка ===
+ const plate=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.6,0.32),mFlange);plate.position.set(xL-0.02,yMag,0);root.add(plate);
+ const gask=new THREE.Mesh(new THREE.BoxGeometry(0.012,0.48,0.22),mGask);gask.position.set(xL+0.01,yMag,0);root.add(gask);
+ [[0.23,0.11],[0.23,-0.11],[-0.23,0.11],[-0.23,-0.11]].forEach(function(o){const b=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.06,6),mBolt);b.rotation.z=Math.PI/2;b.position.set(xL-0.04,yMag+o[0],o[1]);root.add(b);});
+ const fThr=new THREE.Mesh(new THREE.CylinderGeometry(0.058,0.058,0.1,12),mNutO);fThr.rotation.z=Math.PI/2;fThr.position.set(xL-0.06,yMag,0);root.add(fThr);
+ // фильтр + ввод снаружи
+ const fil=new THREE.Mesh(new THREE.CylinderGeometry(0.072,0.072,0.2,16),mFilO);fil.rotation.z=Math.PI/2;fil.position.set(xL-0.42,yMag,0);root.add(fil);
+ const inp=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.16,12),mTubeO);inp.rotation.z=Math.PI/2;inp.position.set(xL-0.62,yMag,0);root.add(inp);
+ // === ЛОЖЕМЕНТ на дальней стенке ===
+ const arm=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.04,0.05),mBrack);arm.position.set(Rc-0.11,yMag-0.02,0);root.add(arm);
+ const cradle=new THREE.Mesh(new THREE.TorusGeometry(0.066,0.016,8,16,Math.PI),mBrack);cradle.rotation.x=Math.PI/2;cradle.rotation.z=Math.PI;cradle.position.set(xR+0.02,yMag-0.05,0);root.add(cradle);
+ [0.05,-0.05].forEach(function(dz){const b=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.05,6),mBolt);b.rotation.z=Math.PI/2;b.position.set(Rc-0.02,yMag-0.02,dz);root.add(b);});
+
+ ob.dims=[{p:[0,Rc/2,0],t:"корпус Ø400",baseAy:30},{p:[xL-0.02,yMag+0.3,0],t:"фланец + винты"},{p:[xL-0.06,yMag,0],t:"вход через прорезь"},{p:[xR+0.02,yMag-0.05,0],t:"опорный ложемент"},{p:tips[2],t:"форсунка 10/24-0.15"},{p:[xs[2],yMag,0],t:"тройник 10/24"},{p:[xs[2]+step/2,yMag,0],t:"магистраль Ø9,52"},{p:[xL-0.42,yMag,0],t:"фильтр + ввод ВД",baseAy:300}];
+ buildDims(ob);ob.tick=function(){if(ob.spin&&!ob.drag)ob.tRy+=0.005;};
+})();
+
 
 const pd=makeScene('cv-pd','an-pd',480);pd.key='pd';pd.dist=8;pd.lookY=0;pd.camLift=0.3;pd.tRx=0.42;pd.rx=0.42;pd.tRy=0.7;pd.ry=0.7;pd.rxClamp=[-0.3,1.45];
 (function(){const root=pd.root;const b=1.0,h=0.23,drainX=-0.42,drR=0.09;
@@ -314,14 +565,205 @@ const dk=makeScene('cv-dk','an-dk',480);dk.key='dk';dk.dist=4.6;dk.lookY=0;dk.ca
  buildDims(dk);dk.tick=function(){if(dk.spin&&!dk.drag)dk.tRy+=0.006;};
 })();
 
-const scenes=[main,rm,cl,pd,dk];
+
+
+const pr=makeScene('cv-pr','an-pr',480);pr.key='pr';pr.dist=9.5;pr.lookY=0.3;pr.camLift=0.55;pr.tRy=0.9;pr.ry=0.9;pr.tRx=0.34;pr.rx=0.34;pr.rxClamp=[-0.4,1.45];
+(function(){const root=pr.root;const half=1.0,top=0.9,bot=-0.05;
+ const mWaterPR=mat(0x4a93c4,{transparent:true,opacity:0.5,metalness:0.1,roughness:0.3}),mSteelPR=mat(0xb8bcc0,{metalness:0.7,roughness:0.3}),mLeverPR=mat(0xc23b34),mTubePR=mat(0x8a93a0,{metalness:0.55,roughness:0.4}),mHosePR=mat(0x2c333a,{metalness:0.2,roughness:0.7});
+ function bm(p0,p1){const dx=p1[0]-p0[0],dy=p1[1]-p0[1],dz=p1[2]-p0[2],len=Math.hypot(dx,dy,dz);const m=new THREE.Mesh(new THREE.BoxGeometry(0.08,len,0.08),mRama);m.position.set((p0[0]+p1[0])/2,(p0[1]+p1[1])/2,(p0[2]+p1[2])/2);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(dx,dy,dz).normalize());root.add(m);}
+ const cs=[[-half,-half],[half,-half],[-half,half],[half,half]];
+ cs.forEach(function(p){bm([p[0],bot,p[1]],[p[0],top,p[1]]);});
+ bm([-half,top,-half],[half,top,-half]);bm([-half,top,half],[half,top,half]);bm([-half,top,-half],[-half,top,half]);bm([half,top,-half],[half,top,half]);
+ bm([-half,bot,-half],[half,bot,-half]);bm([-half,bot,half],[half,bot,half]);bm([-half,bot,-half],[-half,bot,half]);bm([half,bot,-half],[half,bot,half]);
+ cs.forEach(function(p){const x=p[0],z=p[1];const f=new THREE.Mesh(new THREE.BoxGeometry(0.11,0.1,0.11),mKol);f.position.set(x,bot-0.08,z);root.add(f);const w=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.05,20),mKol);w.rotation.x=Math.PI/2;w.position.set(x+0.03,bot-0.2,z);root.add(w);});
+ // панель-противовес СЛЕВА (−X, противоположно выезду вправо)
+ const bp=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.5,2*half),mPanel);bp.position.set(-half,bot+0.28,0);root.add(bp);
+ // === направляющие-уголки вдоль X (ось выезда вправо), по бокам (z=±), полки внутрь ===
+ const guideY=top-0.16,Lx=2*half*0.94,fl=0.1,th=0.022;
+ [1,-1].forEach(function(s){const gz=s*(half-0.13);
+  const sh=new THREE.Shape();sh.moveTo(0,0);sh.lineTo(-s*fl,0);sh.lineTo(-s*fl,th);sh.lineTo(-s*th,th);sh.lineTo(-s*th,fl);sh.lineTo(0,fl);sh.closePath();
+  const geo=new THREE.ExtrudeGeometry(sh,{depth:Lx,bevelEnabled:false,steps:1});
+  const ang=new THREE.Mesh(geo,mNap);ang.rotation.y=Math.PI/2;ang.position.set(-Lx/2,guideY,gz);root.add(ang);
+  [1,-1].forEach(function(xx){const bw=Math.abs(half-gz*s);const br=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.05,bw),mRama);br.position.set(xx*(half-0.02),guideY+0.02,(gz+s*half)/2);root.add(br);});
+ });
+ // === поддон (двигается вдоль +X — вправо) ===
+ const pan=new THREE.Group();root.add(pan);pr.pan=pan;
+ const innerZ=2*(half-0.13)-2*th, pw=innerZ+2*0.085, px=2*half*0.84, pbY=guideY+th+0.005, bh=0.14;
+ const base=new THREE.Mesh(new THREE.BoxGeometry(px,0.016,pw),mPod2);base.position.set(0,pbY,0);pan.add(base);
+ function wall(x,z,w,d){const m=new THREE.Mesh(new THREE.BoxGeometry(w,bh,d),mPod2);m.position.set(x,pbY+bh/2,z);pan.add(m);}
+ wall(0,pw/2,px,0.016);wall(0,-pw/2,px,0.016);wall(px/2,0,0.016,pw);wall(-px/2,0,0.016,pw);
+ const water=new THREE.Mesh(new THREE.BoxGeometry(px-0.04,0.02,pw-0.04),mWaterPR);water.position.set(0,pbY+0.035,0);pan.add(water);
+ // слив + кран снизу (смещён), на правой (выездной) половине
+ const drainX=px*0.26;
+ const dp=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.08,12),mKol);dp.position.set(drainX,pbY-0.05,0.12);pan.add(dp);
+ const ball=new THREE.Mesh(new THREE.SphereGeometry(0.05,14,12),mKran);ball.position.set(drainX,pbY-0.12,0.12);pan.add(ball);
+ const lever=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.02,0.03),mLeverPR);lever.position.set(drainX+0.08,pbY-0.12,0.12);pan.add(lever);
+ // ручка-скоба справа (+X, сторона выезда)
+ const hb=new THREE.Mesh(new THREE.TorusGeometry(0.14,0.012,8,24,Math.PI),mSteelPR);hb.rotation.y=Math.PI/2;hb.position.set(px/2+0.02,pbY+bh*0.6,0);pan.add(hb);
+ [0.14,-0.14].forEach(function(dz){const lg=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.08,8),mSteelPR);lg.rotation.z=Math.PI/2;lg.position.set(px/2+0.04,pbY+bh*0.6,dz);pan.add(lg);});
+ // === обозначение подвода воды СПРАВА (сторона выезда): шланг 8мм + штуцер у правой стойки ===
+ const inThr=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.12,12),mTubePR);inThr.rotation.z=Math.PI/2;inThr.position.set(half+0.07,top-0.02,half-0.13);root.add(inThr);
+ const inHose=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.5,12),mHosePR);inHose.position.set(half+0.16,top-0.27,half-0.13);root.add(inHose);
+ root.position.y=0.12;
+ // выдвижение вправо
+ var slidT=0.7,slid=0.7;pr.slideT=function(){slidT=(slidT>0.4)?0.0:0.7;};
+ pr.applySlide=function(){slid+=(slidT-slid)*0.12;pan.position.x=slid*(half*0.92);};
+ pr.dims=[{p:[0,guideY,half-0.13],t:"уголок-направляющая 32×32×3",baseAy:330},{p:[px/2+0.04,pbY+bh*0.6,0],t:"ручка-скоба (сторона воды)"},{p:[drainX,pbY-0.12,0.12],t:"кран слива 1/2\"",baseAy:330},{p:[half+0.1,top-0.1,half-0.13],t:"подвод воды (шланг 8 мм)",baseAy:30},{p:[0,top,half],t:"рама 40×40×2",baseAy:30}];
+ buildDims(pr);pr.tick=function(){pr.applySlide();if(pr.spin&&!pr.drag)pr.tRy+=0.005;};
+})();
+
+const pv=makeScene('cv-pv','an-pv',480);pv.key='pv';pv.dist=4.6;pv.lookY=0.4;pv.camLift=0.4;pv.tRy=0.7;pv.ry=0.7;pv.tRx=0.3;pv.rx=0.3;pv.rxClamp=[-0.3,1.45];
+(function(){const root=pv.root;
+ const mPerM=mat(0x556070,{metalness:0.4,roughness:0.5}),mRingF=mat(0x8a9097,{metalness:0.55,roughness:0.4}),mRingV=mat(0x23272c,{metalness:0.5,roughness:0.45}),mHubV=mat(0x1d2024,{metalness:0.45,roughness:0.5}),mWireV=mat(0x33383e,{metalness:0.55,roughness:0.4}),mBladeV=mat(0x2a2e33,{metalness:0.4,roughness:0.55}),mBoltV=mat(0xb8bcc0,{metalness:0.7,roughness:0.3}),mLegV=mat(0x3a3f45,{metalness:0.5,roughness:0.45});
+ const Rbig=1.0,Rstub=0.55,Rfan=0.5;
+ // переход Ø400→220
+ const cone=new THREE.Mesh(new THREE.CylinderGeometry(Rstub,Rbig,0.9,48,1,true),mPerM);cone.position.y=0.45;root.add(cone);
+ const clampB=new THREE.Mesh(new THREE.TorusGeometry(Rbig+0.02,0.04,10,48),mRingF);clampB.rotation.x=Math.PI/2;clampB.position.y=0;root.add(clampB);
+ const stub=new THREE.Mesh(new THREE.CylinderGeometry(Rstub,Rstub,0.18,40,1,true),mPerM);stub.position.y=0.99;root.add(stub);
+ // внешнее монтажное кольцо (фланец)
+ const ringGrp=new THREE.Group();root.add(ringGrp);pv.ringGrp=ringGrp;const ringY0=1.1;
+ const Rbore=Rfan-0.04;/*проходное отверстие Ø~200 под вентилятор*/ const ringTop=new THREE.Mesh(new THREE.RingGeometry(Rbore,Rstub+0.18,48),mRingF);ringTop.rotation.x=-Math.PI/2;ringTop.position.y=ringY0+0.035;ringGrp.add(ringTop);
+ const ringBot=new THREE.Mesh(new THREE.RingGeometry(Rbore,Rstub+0.18,48),mRingF);ringBot.rotation.x=Math.PI/2;ringBot.position.y=ringY0-0.035;ringGrp.add(ringBot);
+ const ringOut=new THREE.Mesh(new THREE.CylinderGeometry(Rstub+0.18,Rstub+0.18,0.07,48,1,true),mRingF);ringOut.position.y=ringY0;ringGrp.add(ringOut);
+ const ringIn=new THREE.Mesh(new THREE.CylinderGeometry(Rbore,Rbore,0.07,48,1,true),mRingF);ringIn.position.y=ringY0;ringGrp.add(ringIn);
+ for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;const lug=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.07,0.11),mRingF);lug.position.set(Math.cos(a)*(Rstub+0.16),ringY0,Math.sin(a)*(Rstub+0.16));lug.rotation.y=-a;ringGrp.add(lug);}
+ // вентилятор YWF Ø200 на лапках
+ const fanGrp=new THREE.Group();root.add(fanGrp);pv.fanGrp=fanGrp;const fanY0=ringY0+0.07,fanYc=fanY0+0.16;
+ const obod=new THREE.Mesh(new THREE.TorusGeometry(Rfan,0.05,12,48),mRingV);obod.rotation.x=Math.PI/2;obod.position.y=fanYc;fanGrp.add(obod);
+ const shell=new THREE.Mesh(new THREE.CylinderGeometry(Rfan-0.01,Rfan-0.01,0.24,40,1,true),mRingV);shell.position.y=fanYc;fanGrp.add(shell);
+ const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.24,24),mHubV);motor.position.y=fanYc;fanGrp.add(motor);
+ const motorFace=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.02,24),mWireV);motorFace.position.y=fanYc+0.12;fanGrp.add(motorFace);
+ for(let i=0;i<6;i++){const a=i/6*Math.PI*2;const bb=new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.014,0.025,6),mWireV);bb.position.set(Math.cos(a)*0.12,fanYc+0.13,Math.sin(a)*0.12);fanGrp.add(bb);}
+ const bladeGrp=new THREE.Group();bladeGrp.position.y=fanYc;fanGrp.add(bladeGrp);pv.bladeGrp=bladeGrp;
+ for(let i=0;i<7;i++){const a=i/7*Math.PI*2;const sh=new THREE.Shape();sh.moveTo(0.17,-0.08);sh.quadraticCurveTo(0.33,-0.03,Rfan-0.03,0.06);sh.quadraticCurveTo(Rfan-0.08,0.11,0.3,0.1);sh.quadraticCurveTo(0.2,0.08,0.17,-0.08);const bl=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:0.015,bevelEnabled:false}),mBladeV);bl.rotation.x=-Math.PI/2;bl.rotation.y=0.35;const hold=new THREE.Group();hold.add(bl);hold.rotation.y=a;bladeGrp.add(hold);}
+ const gridY=fanYc+0.17;
+ for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const sp=new THREE.Mesh(new THREE.BoxGeometry(Rfan*2-0.02,0.01,0.01),mWireV);sp.position.y=gridY;sp.rotation.y=a;fanGrp.add(sp);}
+ [0.13,0.26,Rfan-0.02].forEach(function(rr){const rg=new THREE.Mesh(new THREE.TorusGeometry(rr,0.01,6,40),mWireV);rg.rotation.x=Math.PI/2;rg.position.y=gridY;fanGrp.add(rg);});
+ // === Г-ОБРАЗНЫЕ ЛАПКИ крепления (4): верт. полка к ободу + горизонт. пятка на кольцо + болт ===
+ for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;
+  const lg=new THREE.Group();lg.position.set(0,0,0);lg.rotation.y=-a;fanGrp.add(lg);
+  const rx=Rfan+0.01;                         // радиус крепления (на ободе)
+  // вертикальная полка (прижата к ободу, идёт вниз вдоль корпуса)
+  const vert=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.16,0.09),mLegV);vert.position.set(rx,fanYc-0.06,0);lg.add(vert);
+  // горизонтальная пятка (загиб внутрь, ложится на кольцо-фланец)
+  const heel=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.025,0.09),mLegV);heel.position.set(rx-0.04,fanY0-0.05,0);lg.add(heel);
+  // ребро-косынка между полкой и пяткой
+  const gus=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.015),mLegV);gus.position.set(rx-0.01,fanY0+0.0,0);lg.add(gus);
+  // отверстие-болт через пятку в кольцо
+  const blt=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.07,6),mBoltV);blt.position.set(rx-0.05,fanY0-0.04,0);lg.add(blt);
+  const nut=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.026,0.018,6),mBoltV);nut.position.set(rx-0.05,fanY0-0.005,0);lg.add(nut);
+ }
+  // === ПАР: поток через патрубок Ø220 → вентилятор → наружу (показывает, что проход открыт) ===
+ const stN=240, sp=new Float32Array(stN*3), sd=[];
+ const stBotY=0.1, stTopY=fanYc+0.55, stRmax=Rfan-0.06;
+ function ssm(i){var r=Math.sqrt(Math.random())*stRmax, a=Math.random()*Math.PI*2;
+   sd[i]={x:Math.cos(a)*r, z:Math.sin(a)*r, y:stBotY+Math.random()*0.2, vy:0.010+Math.random()*0.010};}
+ for(var i=0;i<stN;i++){ssm(i); sd[i].y=stBotY+Math.random()*(stTopY-stBotY);
+   sp[i*3]=sd[i].x; sp[i*3+1]=sd[i].y; sp[i*3+2]=sd[i].z;}
+ const sg=new THREE.BufferGeometry(); sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+ const steamPts=new THREE.Points(sg,new THREE.PointsMaterial({map:(typeof TEX_SOFT!=='undefined'?TEX_SOFT:null),color:0xeaf2f5,size:0.22,transparent:true,opacity:0.16,depthWrite:false,sizeAttenuation:true,blending:THREE.NormalBlending}));
+ root.add(steamPts); pv.steam=steamPts;
+ pv.stepSteam=function(){var pos=sg.attributes.position.array;
+   for(var i=0;i<stN;i++){ sd[i].y+=sd[i].vy;
+     // лёгкое расширение струи выше вентилятора
+     var sprd = sd[i].y>fanYc ? 1.0+(sd[i].y-fanYc)*0.6 : 1.0;
+     if(sd[i].y>stTopY){ ssm(i); }
+     pos[i*3]=sd[i].x*sprd; pos[i*3+1]=sd[i].y; pos[i*3+2]=sd[i].z*sprd; }
+   sg.attributes.position.needsUpdate=true; };
+ root.position.y=-0.55;
+ // разнесение
+ var exT=0,ex=0;pv.expT=function(){exT=exT>0.5?0:1;};
+ pv.applyExp=function(){ex+=(exT-ex)*0.1;ringGrp.position.y=ex*0.55;fanGrp.position.y=ex*1.2;};
+ pv.dims=[{p:[0,0.45,Rbig*0.7],t:"переход Ø400→220",baseAy:30},{p:[0,0.99,Rstub],t:"патрубок Ø220"},{p:[Rstub+0.18,1.1,0],t:"внешнее кольцо-фланец",g:'ring'},{p:[Rfan-0.01,1.17,0],t:"Г-образная лапка ×4",g:"fan"},{p:[0,1.5,0],t:"вентилятор YWF Ø200",g:'fan',baseAy:30},{p:[Rstub+0.16,0.98,0],t:"болт ×4",g:'fan'}];
+ buildDims(pv);pv.tick=function(){pv.applyExp();if(pv.stepSteam)pv.stepSteam();if((pv.spin&&!pv.drag))pv.tRy+=0.005;if(pv.bladeGrp&&pv.spin)pv.bladeGrp.rotation.y+=0.2;};
+})();
+// === СЦЕНА «В ПОМЕЩЕНИИ»: установка в углу камеры + стеллажи ===
+const room=makeScene('cv-room','an-room',520);room.key='room';
+room.dist=24;room.lookY=3.0;room.camLift=3.5;room.tRy=0.9;room.ry=0.9;room.tRx=0.42;room.rx=0.42;room.rxClamp=[0.05,1.4];
+(function(){const root=room.root;
+ // масштаб: 1 ед = 0.2 м. Камера 3,0(X) × 2,5(Z) × 3,0(Y) м → 15 × 12,5 × 15 ед.
+ const RX=15, RZ=12.5, RH=15;            // размеры комнаты в ед.
+ const mFloor=mat(0xd9dde1,{metalness:0.05,roughness:0.85});
+ const mWall=mat(0xeceef0,{metalness:0.0,roughness:0.95,side:THREE.DoubleSide});
+ const mWall2=mat(0xe3e6e9,{metalness:0.0,roughness:0.95,side:THREE.DoubleSide});
+ const mShelf=mat(0x9aa1a8,{metalness:0.45,roughness:0.5});
+ const mShelfPost=mat(0x7c848b,{metalness:0.5,roughness:0.45});
+ const mCheese=mat(0xe8d48a,{metalness:0.05,roughness:0.7});
+ // угол комнаты в начале координат: стены по -X и -Z, пол снизу
+ // пол
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(RX,RZ),mFloor);floor.rotation.x=-Math.PI/2;floor.position.set(RX/2,0,RZ/2);root.add(floor);
+ // стена X (задняя, в плоскости z=0)
+ const wallA=new THREE.Mesh(new THREE.PlaneGeometry(RX,RH),mWall);wallA.position.set(RX/2,RH/2,0);root.add(wallA);
+ // стена Z (боковая, в плоскости x=0)
+ const wallB=new THREE.Mesh(new THREE.PlaneGeometry(RZ,RH),mWall2);wallB.rotation.y=Math.PI/2;wallB.position.set(0,RH/2,RZ/2);root.add(wallB);
+ // линии стыка (плинтус по углу)
+ const cz=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.3,RZ),mShelfPost);cz.position.set(0.03,0.15,RZ/2);root.add(cz);
+ const cx=new THREE.Mesh(new THREE.BoxGeometry(RX,0.3,0.06),mShelfPost);cx.position.set(RX/2,0.15,0.03);root.add(cx);
+
+ // === УСТАНОВКА AtomBreez-1 в углу — КЛОН детальной модели из «Сборки 3D» ===
+ // та же геометрия, что на главной сцене (корпус, рама, гребёнка с форсунками,
+ // перфодиск, переход, кольцо-фланец, вентилятор YWF, поддон, колёса).
+ const ux=2.6, uz=2.6;          // центр установки (отступ ~0,3 м от стен)
+ const inst=new THREE.Group();root.add(inst);room.inst=inst;
+ const instModel=main.root.clone(true);  // глубокий клон графа главной сборки
+ // на главной root сдвинут на -0.4, низ колёс ≈ baseY-0.18-0.4 = -1.58 → поднимаем на пол
+ instModel.position.set(0,1.58,0);
+ inst.add(instModel);
+ inst.position.set(ux,0,uz);
+ // высота клона (от пола до верха вентилятора) ≈ (fanY1+root) ≈ 8.7 ед = 1,74 м
+ const instTopY=8.75;
+
+ // === СТЕЛЛАЖИ вдоль стен (с головками сыра) ===
+ function shelf(x,z,len,ry){
+   const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;root.add(g);
+   const depth=2.0, postH=12.5; // глубина 0,4 м, высота 2,5 м
+   const half=len/2;
+   // стойки
+   [[-half,-depth/2],[half,-depth/2],[half,depth/2],[-half,depth/2]].forEach(function(p){
+     const post=new THREE.Mesh(new THREE.BoxGeometry(0.12,postH,0.12),mShelfPost);post.position.set(p[0],postH/2,p[1]);g.add(post);
+   });
+   // полки (4 яруса)
+   const levels=[2.2,5.0,7.8,10.6];
+   levels.forEach(function(ly){
+     const pl=new THREE.Mesh(new THREE.BoxGeometry(len,0.12,depth),mShelf);pl.position.set(0,ly,0);g.add(pl);
+     // головки сыра на полке
+     const n=Math.floor(len/1.4);
+     for(var i=0;i<n;i++){
+       const cx2=-half+0.9+i*1.4;
+       const wheel=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.5,18),mCheese);
+       wheel.position.set(cx2,ly+0.32,-0.3);g.add(wheel);
+       const wheel2=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.5,18),mCheese);
+       wheel2.position.set(cx2,ly+0.32,0.4);g.add(wheel2);
+     }
+   });
+   return g;
+ }
+ // стеллаж вдоль стены X (задней), правее установки
+ shelf(9.0,1.3,9.5,0);
+ // стеллаж вдоль стены Z (боковой), дальше от установки
+ shelf(1.3,8.0,7.0,Math.PI/2);
+
+ room.dims=[
+   {p:[ux,instTopY+0.3,uz],t:"AtomBreez-1 (600×600, h≈1750)",baseAy:30},
+   {type:'vH',a:[ux+1.6,0,uz],b:[ux+1.6,instTopY,uz],t:"≈1750 мм",col:150},
+   {p:[9.0,11,1.3],t:"стеллаж с продукцией"},
+   {p:[RX-1,0,RZ-1],t:"камера 3,0 × 2,5 × 3,0 м",baseAy:30}
+ ];
+ buildDims(room);
+ room.tick=function(){if(room.spin&&!room.drag)room.tRy+=0.004;};
+})();
+
+const scenes=[main,rm,cl,pd,dk,ob,pr,pv,room];
 function loop(){requestAnimationFrame(loop);scenes.forEach(function(o){if(!o.active)return;if(o.tick)o.tick();camUpd(o);o.rnd.render(o.scene,o.cam);renderDims(o);});}
 loop();scenes.forEach(function(o){syncRot(o);});
 document.querySelectorAll('.rotB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.spin=!o.spin;syncRot(o);});});
 document.querySelectorAll('.vB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.setView(b.dataset.v);});});
 document.querySelectorAll('.dimB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.showDim=!o.showDim;b.classList.toggle('on',o.showDim);o.anno.style.display=o.showDim?'block':'none';});});
 
-sceneByK={'3d':main,'rm':rm,'cl':cl,'pd':pd,'dk':dk};
+sceneByK={'3d':main,'rm':rm,'cl':cl,'ob':ob,'pd':pd,'pr':pr,'dk':dk,'pv':pv,'room':room};
+(function(){var b=document.getElementById('pvExp');if(b&&pv.expT){b.addEventListener('click',function(){pv.expT();this.classList.toggle('on');});}})();
+(function(){var b=document.getElementById('prSlide');if(b&&pr.slideT){b.addEventListener('click',function(){pr.slideT();});}})();
+(function(){var b=document.getElementById('obClear');if(b&&ob.corp){var clr=true;b.classList.add('on');b.addEventListener('click',function(){clr=!clr;this.classList.toggle('on',clr);ob.corp.material=clr?ob.mCorpO:ob.mCorpS;});}})();
 } // end if(HAS3D)
 
 const sxPane=document.querySelector('[data-pane="sx"]');
@@ -535,11 +977,33 @@ rcPane.innerHTML='<div class="h3">Исходные данные камеры</di
 '<tr><td>Распыление</td><td class="c">вверх, через 72°</td></tr></tbody></table>'+
 '<div class="note">Расчёты предварительные, на базе исходных данных ТЗ. Точные значения уточняются при наладке и разработке рабочей КД. Габариты ≈600×600, высота с вентилятором ≈1750 мм, масса ≈55 кг.</div>';
 
-const SPEC=[['1','AB-01-001.000','Форсунка распыла под давлением','5','тип EVSPRAY/аналог',1],['2','AB-01-002.000','Коллектор кольцевой','1','труба нерж. Ø16×1,5 (1/2")',0],['3','AB-01-003.000','Каплеуловитель перфорированный','1','лист AISI 304 t2,0',0],['4','AB-01-004.000','Переход Ø400→Ø150','1','лист AISI 304 t1,5',0],['5','—','Хомут быстросъёмный Tri-Clamp Ø400','1','нерж. (покупное)',1],['6','—','Вентилятор канальный Ø150','1','пластик (покупное)',1],['7','AB-01-005.000','Узел подвода воды (окно + БРС)','1','БРС 1/2" нерж.',0],['8','AB-01-006.000','Кольцо крепления (буртик)','1','полоса нерж. 35×4',0],['9','AB-01-007.000','Поддон-корыто','1','лист AISI 304 t1,5',0],['10','AB-01-008.000','Рама-подставка','1','труба кв. 40×40×2',0],['—','—','Направляющая поддона','2','уголок 32×32×3',0],['11','—','Колесо поворотное Ø100','4','покупное (2 — тормоз)',1],['12','—','Кран шаровой 1/2"','1','нерж. (покупное)',1],['13','AB-01-000.001','Труба корпуса (воздуховод)','1','труба нерж. Ø400×1,5',0],['14','—','Насос дозирующий НД-1.5В','1','покупное (9–10 атм)',1]];
-let sh='<table class="t"><thead><tr><th style="width:42px;text-align:center">Поз.</th><th style="width:132px">Обозначение</th><th>Наименование</th><th style="width:40px;text-align:center">Кол.</th><th style="width:180px">Материал / профиль</th></tr></thead><tbody>';
-SPEC.forEach(function(r){sh+='<tr class="'+(r[5]?'buy':'')+'"><td class="c" style="color:#9aa1a8">'+r[0]+'</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">'+r[1]+'</td><td>'+r[2]+'</td><td class="c">'+r[3]+'</td><td>'+r[4]+'</td></tr>';});
-sh+='</tbody></table><div class="note">Обозначения AB-01-xxx и размеры — предварительные (для разработки рабочей КД).<br>Покупные изделия (поз. 5, 6, 11, 12, 14) — по каталогам поставщиков.<br>Сварка аргонодуговая по ГОСТ 14806-80; материал — нерж. сталь AISI 304.</div>';
+const SPEC=[['1','AB-01-001.000','Форсунка распыла под давлением','5','тип EVSPRAY/аналог',1,'https://evspray.ru/catalog/product/melkodispersnaya-forsunka-nikelirovannaya-latun-3-16-0-15-filtr/'],['2','AB-01-002.000','Коллектор кольцевой','1','труба нерж. Ø16×1,5 (1/2")',0,''],['3','AB-01-003.000','Каплеуловитель перфорированный','1','лист AISI 304 t2,0',0,''],['4','AB-01-004.000','Переход Ø400→Ø150','1','лист AISI 304 t1,5',0,''],['5','—','Хомут быстросъёмный Tri-Clamp Ø400','1','нерж. (покупное)',1,''],['6','weiguang_102-1','Вентилятор осевой Ø200 (Weiguang YWF 2E-200 B92/25 G3S, 3 скор.)','1','780 м³/ч, 55 Вт, 220В, 2300 об/мин, IP54, ~8644 ₽',1,'https://xn----ctbbkcsvolucrc2k7b.xn--p1ai/product/ventilyator-tryohskorostnoy-ywf-2-e-200-b-92-25-g-3s-3-speeds'],['7','AB-01-005.000','Узел подвода воды (окно + БРС)','1','БРС 1/2" нерж.',0,''],['8','AB-01-006.000','Кольцо крепления (буртик)','1','полоса нерж. 35×4',0,''],['9','AB-01-007.000','Поддон-корыто','1','лист AISI 304 t1,5',0,''],['10','AB-01-008.000','Рама-подставка','1','труба кв. 40×40×2',0,''],['—','—','Направляющая поддона','2','уголок 32×32×3',0,''],['11','—','Колесо поворотное Ø100','4','покупное (2 — тормоз)',1,''],['12','—','Кран шаровой 1/2"','1','нерж. (покупное)',1,''],['13','AB-01-000.001','Труба корпуса (воздуховод)','1','труба нерж. Ø400×1,5',0,''],['14','—','Насос дозирующий НД-1.5В','1','покупное (9–10 атм)',1,'']];
+let sh='<table class="t"><thead><tr><th style="width:42px;text-align:center">Поз.</th><th style="width:128px">Обозначение</th><th>Наименование</th><th style="width:38px;text-align:center">Кол.</th><th style="width:170px">Материал / профиль</th><th style="width:96px">Где купить</th></tr></thead><tbody>';
+SPEC.forEach(function(r){var buy=r[6]?('<a href="'+r[6]+'" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">купить →</a>'):'<span style="color:var(--text3)">—</span>';sh+='<tr class="'+(r[5]?'buy':'')+'"><td class="c" style="color:#9aa1a8">'+r[0]+'</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">'+r[1]+'</td><td>'+r[2]+'</td><td class="c">'+r[3]+'</td><td>'+r[4]+'</td><td class="c">'+buy+'</td></tr>';});
+sh+='</tbody></table><div class="note">Обозначения AB-01-xxx и размеры — предварительные (для разработки рабочей КД).<br>Покупные изделия (поз. 5, 6, 11, 12, 14) — по каталогам поставщиков. Ссылки «купить» даны для проверенных позиций (форсунки EVSPRAY, вентилятор YWF); остальное подбирается по каталогам.<br>Сварка аргонодуговая по ГОСТ 14806-80; материал — нерж. сталь AISI 304.</div>';
 document.querySelector('[data-pane="sp"]').innerHTML=sh;
+
+(function(){var obSpec=[
+['1','Форсунка туманообразующая 10/24-0.15 + фильтр','5','никел. латунь, капли 110–330 мкм','245'],
+['2','Тройник 10/24F (проход + отвод вверх)','4','узлы гребёнки','370'],
+['3','Отвод/заглушка торцевая 10/24','1','конец магистрали','—'],
+['4','Держатель форсунки 10/24" под трубку 3/8" (9,5 мм)','5','сталь 304, под гайку','—'],
+['5','Кольцо герметизирующее 10/24','10','уплотнение стыков','40'],
+['6','Трубка-удлинитель нерж. Ø9,52×1 (отводы)','5','к форсункам, ~250–350 мм','—'],
+['7','Трубка-магистраль нерж. Ø9,52×1','~0,9 м','горизонт., через прорезь','—'],
+['8','Фланец-пластина входа + прокладка','1','крепит и герметизирует прорезь','—'],
+['9','Винт крепления фланца','4','к стенке корпуса','—'],
+['10','Кронштейн-ложемент опорный','1','дальний конец магистрали','—'],
+['11','Фильтр для форсунок (тонкая очистка)','1','защита сопел','—'],
+['12','Насос высокого давления (туманообразование)','1','для тонкого тумана, взамен НД-1.5В','—']
+];
+var h='<div class="h3" style="margin-top:8px">Спецификация обвязки (гребёнка, вариант «туман ВД»)</div>';
+h+='<table class="t"><thead><tr><th style="width:42px;text-align:center">Поз.</th><th>Наименование (модель EVSPRAY)</th><th style="width:64px;text-align:center">Кол.</th><th style="width:210px">Примечание</th><th style="width:80px;text-align:right">Цена, ₽</th></tr></thead><tbody>';
+obSpec.forEach(function(r){h+='<tr><td class="c" style="color:#9aa1a8">'+r[0]+'</td><td>'+r[1]+'</td><td class="c">'+r[2]+'</td><td>'+r[3]+'</td><td style="text-align:right">'+r[4]+'</td></tr>';});
+h+='</tbody></table><div class="note">Цены по каталогу EVSPRAY на момент подбора (за шт., ориентировочно): форсунка 245, угловой разъём 495, тройник 370, кольцо 40. Позиции с «—» уточняются у поставщика (трубка Ø9,52, держатель 10/24, фильтр, насос ВД). Это туманообразующий контур высокого давления: требует насоса ВД (не НД-1.5В) и почти не нуждается в каплеуловителе/переливе. Подбор предварительный, под разработку рабочей КД.</div>';
+document.querySelector('[data-spec="ob"]').innerHTML=h;
+})();
+
 document.querySelector('[data-pane="pz"]').innerHTML=''+
 '<div style="max-width:760px;line-height:1.7;font-size:13.5px;color:var(--text)">'+
 '<div class="h3" style="margin-top:4px">Пояснительная записка</div>'+
@@ -587,6 +1051,65 @@ document.querySelector('[data-pane="pz"]').innerHTML=''+
 '<div class="note">Документ предварительный (концепт-проект). Окончательные значения, обозначения и решения уточняются при разработке рабочей конструкторской документации и наладке опытного образца. Оформление итоговой ПЗ — по ГОСТ Р 15.301 и ГОСТ 2.106.</div>'+
 '</div>';
 
+
+document.querySelector('[data-pane="tz"]').innerHTML=''+
+'<div style="max-width:780px;line-height:1.7;font-size:13.5px;color:var(--text)">'+
+'<div class="h3" style="margin-top:4px">Техническое задание (исходные требования)</div>'+
+'<div style="color:var(--text2);font-size:12.5px;margin-bottom:6px">Система увлажнения воздуха «AtomBreez-1» (облегчённое исполнение) · AB-01-000.000 · ООО «Атомус Групп», г. Миасс</div>'+
+'<div style="background:var(--panel2);border-radius:8px;padding:8px 11px;font-size:12.5px;color:var(--text2);margin-bottom:10px">Документ описывает требования к облику, компоновке и составу изделия и служит исходными данными для рабочей КД. Это <b>не рабочая конструкторская документация</b>: точные размеры, материалы крепежа, толщины и сварные соединения определяет конструктор заказчика.</div>'+
+
+'<div class="h3">1. Назначение</div>'+
+'<p>Мобильная установка мелкодисперсного увлажнения воздуха с рециркуляцией для камеры созревания сыра (режим 12 °C / 85 % RH, объём камеры ≈22,5 м³). Принцип: вода распыляется форсунками высокого давления в восходящий поток, крупные капли улавливаются перфодиском, увлажнённый воздух возвращается в камеру осевым вентилятором.</p>'+
+
+'<div class="h3">2. Общая компоновка</div>'+
+'<p>Вертикальный аппарат на мобильной раме. Несущий элемент — труба-корпус Ø400, внутри снизу гребёнка с форсунками, выше перфодиск-каплеуловитель, сверху конус-переход с вентилятором. Под корпусом — выдвижной поддон-корыто. Габариты 600×600 мм, высота ≈1750 мм, масса ≈55 кг.</p>'+
+
+'<div class="h3">3. Материалы</div>'+
+'<table class="t"><tbody>'+
+'<tr><th>Узел</th><th>Материал / профиль</th></tr>'+
+'<tr><td>Корпус-воздуховод (труба)</td><td>нерж. AISI 304, труба Ø400×1,5, h≈820</td></tr>'+
+'<tr><td>Переход (конус) Ø400→220 + патрубок</td><td>нерж. AISI 304, лист 1,0–1,5</td></tr>'+
+'<tr><td>Перфодиск-каплеуловитель Ø390</td><td>нерж. AISI 304, лист t2,0, отв. Ø5,5 шаг 9 шахм.</td></tr>'+
+'<tr><td>Коллектор-гребёнка</td><td>нерж. трубка Ø9,52×1, фитинги 10/24</td></tr>'+
+'<tr><td>Поддон-корыто</td><td>нерж. AISI 304, лист t1,5</td></tr>'+
+'<tr><td>Подставка (рама)</td><td>нерж. AISI 304, труба квадр. 40×40×2</td></tr>'+
+'<tr><td>Направляющие поддона</td><td>нерж. уголок 32×32×3</td></tr>'+
+'<tr><td>Монтажное кольцо-фланец под вентилятор</td><td>нерж. AISI 304, лист 2–3 мм</td></tr>'+
+'<tr><td>Колёса (4 шт, 2 с тормозом)</td><td>покупные Ø100</td></tr>'+
+'<tr><td>Вентилятор осевой</td><td>покупной Weiguang YWF 2E-200 (Ø200, IP54)</td></tr>'+
+'<tr><td>Насос подачи воды</td><td>покупной мембранный (≈7–8 атм)</td></tr>'+
+'</tbody></table>'+
+
+'<div class="h3">4. Подставка (рама)</div>'+
+'<p>Рама сварная из нержавеющей квадратной трубы <b>40×40×2 мм</b>, габарит 600×600 мм, высота ≈560 мм. К раме закреплены <b>направляющие-уголки 32×32×3 мм</b> (полками навстречу) — по ним выдвигается поддон. Снизу 4 колеса Ø100, два из них с тормозом. Рама — несущая часть: воспринимает массу корпуса с водой и фиксирует аппарат. Сварные швы аргонодуговые, зачищены; острые кромки притуплены.</p>'+
+
+'<div class="h3">5. Воздуховод и переход</div>'+
+'<p>Воздуховодом служит сам корпус-труба Ø400. Сверху установлен <b>конический переход Ø400→220</b> с патрубком Ø220, через который увлажнённый воздух подаётся к вентилятору и далее в камеру. На патрубке — <b>внешнее монтажное кольцо-фланец</b> с приливами под крепёж; к нему на <b>четырёх Г-образных лапках с болтами</b> крепится осевой вентилятор YWF Ø200. Проход через кольцо открытый (Ø≈200) — поток пара идёт насквозь, без сужения до Ø150.</p>'+
+
+'<div class="h3">6. Разъёмность и съёмность (требование)</div>'+
+'<p>Изделие должно разбираться без специнструмента для мойки и обслуживания. Съёмными выполняются:</p>'+
+'<table class="t"><tbody>'+
+'<tr><th>Узел</th><th>Тип соединения</th><th>Назначение разъёма</th></tr>'+
+'<tr><td>Переход Ø400→220</td><td>хомут (Tri-Clamp / зажимной) по верхнему торцу корпуса</td><td>доступ внутрь корпуса, мойка</td></tr>'+
+'<tr><td>Вентилятор</td><td>4 болта через Г-лапки к кольцу-фланцу</td><td>снятие для обслуживания/замены</td></tr>'+
+'<tr><td>Перфодиск-каплеуловитель</td><td>укладка на буртик / съёмная посадка</td><td>извлечение для мойки</td></tr>'+
+'<tr><td>Коллектор-гребёнка</td><td>фланец-пластина снаружи (винты) + штуцер шланга</td><td>чистка форсунок, замена</td></tr>'+
+'<tr><td>Поддон-корыто</td><td>выдвигается по уголкам-направляющим (как противень)</td><td>слив, мойка</td></tr>'+
+'<tr><td>Подвод воды</td><td>штуцер-ёлочка с накидной гайкой на шланге 8 мм</td><td>отсоединение от насоса</td></tr>'+
+'</tbody></table>'+
+'<p style="color:var(--text2);font-size:12.5px">Поддон выдвигается <b>вправо — в сторону подвода воды</b>; шланг разведён так, чтобы поддон в него не упирался. Желателен стопор-ограничитель вылета поддона.</p>'+
+
+'<div class="h3">7. Требования к стыкам и герметичности</div>'+
+'<p>Стык «корпус — переход» — на зажимном хомуте с уплотнением (разъёмный). Стык «патрубок — вентилятор» — болтовой через кольцо-фланец (разъёмный, негерметичный, т.к. на выхлопе). Ввод коллектора в корпус — через прорезь, снаружи фланец-пластина с прокладкой (герметизирует и держит). Подвод воды — штуцер с накидной гайкой (разъёмный). Слив поддона — Ø40 с шаровым краном 1/2". Контур воды до ≈8 атм; контактные части — пищевая AISI 304.</p>'+
+
+'<div class="h3">8. Подвод воды и распыл</div>'+
+'<p>Вода подаётся <b>мембранным насосом</b> через фильтр и армированный <b>шланг 8 мм</b> к гребёнке. Гребёнка — горизонтальная магистраль Ø9,52 в нижней части корпуса, 4 тройника 10/24 + торцевой отвод, от каждого удлинитель к <b>туманообразующей форсунке EVSPRAY 10/24-0.15</b> (5 шт, капли 110–330 мкм), соплом вверх.</p>'+
+
+'<div class="h3">9. Безопасность и исполнение</div>'+
+'<p>Контактные части — нерж. AISI 304. Электрооборудование (насос, вентилятор) подключается через УЗО; вентилятор IP54. Сварные швы аргонодуговые по ГОСТ 14806-80, зачищены. Острые кромки притуплены. Мобильная рама фиксируется тормозами колёс на двух колёсах.</p>'+
+
+'<div class="note" style="margin-top:14px">Повторно: настоящее ТЗ задаёт облик, состав и требования к разъёмности. Рабочие чертежи, точные размеры стыков, толщины и спецификацию крепежа выпускает конструктор на основе этих требований.</div>'+
+'</div>';
 
 document.querySelectorAll('.tab').forEach(function(tb){tb.addEventListener('click',function(){const k=tb.dataset.k;
  document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x===tb);});
