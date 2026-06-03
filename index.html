@@ -18939,7 +18939,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.9-qr-logo-corner";
+const APP_VERSION = "v2.45.10-qr-logo-above";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38517,20 +38517,13 @@ function renderPackingListPrint(box) {
     (qrUrl ?
     '<script>window.addEventListener("DOMContentLoaded", function(){' +
       'var el=document.getElementById("qr-pl");' +
-      'new QRCode(el,{text:' + JSON.stringify(qrUrl) + ',width:90,height:90,correctLevel:QRCode.CorrectLevel.H});' +
-      // Накладываем логотип в центр канваса
-      'setTimeout(function(){' +
-        'var c=el.querySelector("canvas");if(!c)return;' +
-        'var img=new Image();img.crossOrigin="anonymous";' +
-        'img.onload=function(){' +
-          'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.14),off=Math.round(w*0.02),x=w-ls-off,y=w-ls-off,p=Math.round(ls*0.10);' +
-          'ctx.fillStyle="#fff";ctx.fillRect(x-p,y-p,ls+2*p,ls+2*p);ctx.drawImage(img,x,y,ls,ls);' +
-          'var di=el.querySelector("img");if(di){try{di.src=c.toDataURL("image/png");}catch(_){}}' +
-          'setTimeout(function(){window.print();},300);' +
-        '};' +
-        'img.onerror=function(){setTimeout(function(){window.print();},100);};' +
-        'img.src=' + JSON.stringify(window.location.origin + '/icons/logo.png') + ';' +
-      '},50);' +
+      // v2.45.10: лого сверху, потом QR (без лого внутри)
+      'var logo=document.createElement("img");logo.src=' + JSON.stringify(window.location.origin + '/icons/logo.png') + ';' +
+      'logo.style.cssText="display:block;width:55px;height:auto;margin:0 auto 4px auto;";' +
+      'el.appendChild(logo);' +
+      'var qrHost=document.createElement("div");el.appendChild(qrHost);' +
+      'new QRCode(qrHost,{text:' + JSON.stringify(qrUrl) + ',width:72,height:72,correctLevel:QRCode.CorrectLevel.M});' +
+      'setTimeout(function(){window.print();},400);' +
     '});<\/script>'
     : '<script>window.addEventListener("DOMContentLoaded", function(){setTimeout(function(){window.print();}, 200);});<\/script>') +
     '</body></html>';
@@ -52480,53 +52473,29 @@ function _getAtomusQrLogo() {
 function generateQrWithLogo(el, opts) {
   if (typeof QRCode === 'undefined' || !el) return null;
   el.innerHTML = '';
-  const size = opts.width || opts.height || 200;
-  const qr = new QRCode(el, {
+  // v2.45.10: лого больше НЕ накладывается на сам QR — оно идёт отдельным
+  // изображением сверху над QR (так как на физических стикерах). Сам QR
+  // остаётся компактным (по умолчанию 160 пикселей).
+  const size = opts.width || opts.height || 160;
+  // Создаём вертикальную вёрстку: логотип сверху, под ним QR
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px;';
+  const logoImg = document.createElement('img');
+  logoImg.src = ATOMUS_QR_LOGO_URL;
+  logoImg.alt = 'ATOMUS group';
+  logoImg.style.cssText = 'width:' + Math.round(size * 0.55) + 'px;height:auto;object-fit:contain;';
+  wrap.appendChild(logoImg);
+  const qrHost = document.createElement('div');
+  wrap.appendChild(qrHost);
+  el.appendChild(wrap);
+  const qr = new QRCode(qrHost, {
     text: opts.text || opts.url,
     width: size,
     height: size,
     colorDark: opts.colorDark || '#000000',
     colorLight: opts.colorLight || '#ffffff',
-    // Принудительно H — иначе наложение лого ломает считываемость
-    correctLevel: QRCode.CorrectLevel.H,
+    correctLevel: QRCode.CorrectLevel.M,
   });
-  // qrcodejs синхронно рисует canvas, потом ставит его data URL в <img> и
-  // канвас скрывает (видимая часть — это <img>). Чтобы лого появилось, надо:
-  // 1) дорисовать лого на canvas
-  // 2) перезаписать src у <img> через canvas.toDataURL()
-  setTimeout(() => {
-    const canvas = el.querySelector('canvas');
-    if (!canvas) return;
-    _getAtomusQrLogo().then((img) => {
-      try {
-        if (img) {
-          const ctx = canvas.getContext('2d');
-          const w = canvas.width;
-          // v2.45.9: лого в правом нижнем углу, ~14% от стороны.
-          // QR имеет три Finder Patterns (большие квадраты-ориентиры) в углах:
-          // левом-верхнем, правом-верхнем, левом-нижнем. Правый нижний угол —
-          // единственный свободный, туда можно безопасно положить лого. На
-          // уровне коррекции H (30%) перекрытие 14% данных читается уверенно.
-          const logoSize = Math.round(w * 0.14);
-          const offset = Math.round(w * 0.02);
-          const x = w - logoSize - offset;
-          const y = w - logoSize - offset;
-          // Белая подложка чуть больше лого
-          const padBg = Math.round(logoSize * 0.10);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(x - padBg, y - padBg, logoSize + 2 * padBg, logoSize + 2 * padBg);
-          ctx.drawImage(img, x, y, logoSize, logoSize);
-        }
-        // Перерисовываем видимый <img> из обновлённого canvas
-        const dupImg = el.querySelector('img');
-        if (dupImg) {
-          try { dupImg.src = canvas.toDataURL('image/png'); } catch (_) {}
-        }
-      } catch (e) {
-        console.warn('QR logo overlay failed:', e);
-      }
-    });
-  }, 0);
   return qr;
 }
 
@@ -52870,23 +52839,31 @@ function renderLabelsForPrint() {
     };
   });
 
+  // v2.45.10: новая вёрстка стикера — как на физическом образце.
+  // Сверху крупный ATOMUS group logo, под ним «ПОЛУЧАТЕЛЬ: <имя>», город,
+  // телефон, и компактный QR в нижней части без лого внутри.
+  const logoUrl = window.location.origin + '/icons/logo.png';
   const labelsBodies = labelsData.map((d, i) => {
-    let body;
+    let title, sub1, sub2;
     if (d.kind === 'box') {
-      body =
-        '<div class="lbl-model">' + escapeHtml(d.boxName || 'Коробка') + '</div>' +
-        (d.contractNumber ? '<div class="lbl-article">Договор № ' + escapeHtml(d.contractNumber) + '</div>' : '') +
-        (d.contractorName ? '<div class="lbl-date">' + escapeHtml(d.contractorName) + '</div>' : '');
+      title = d.boxName || 'Коробка';
+      sub1 = d.contractorName ? 'Договор № ' + (d.contractNumber || '—') : '';
+      sub2 = d.contractorName || '';
     } else {
-      body =
-        '<div class="lbl-model">' + escapeHtml(d.modelName || '—') + '</div>' +
-        (d.modelArticle ? '<div class="lbl-article">' + escapeHtml(d.modelArticle) + '</div>' : '') +
-        (d.assemblyDate ? '<div class="lbl-date">от ' + escapeHtml(d.assemblyDate) + '</div>' : '');
+      title = d.modelName || '—';
+      sub1 = d.modelArticle || '';
+      sub2 = d.assemblyDate ? 'от ' + d.assemblyDate : '';
     }
     return '<div class="label-58x60">' +
-      '<div class="lbl-brand">Atom CRM</div>' +
-      '<div class="lbl-qr-wrap" id="lbl-qr-' + i + '"></div>' +
-      '<div class="lbl-body">' + body + '</div>' +
+      '<img class="lbl-logo" src="' + logoUrl + '" alt="ATOMUS group">' +
+      '<div class="lbl-receiver-label">ПОЛУЧАТЕЛЬ:</div>' +
+      '<div class="lbl-receiver">' + escapeHtml(title) + '</div>' +
+      (sub1 ? '<div class="lbl-sub">' + escapeHtml(sub1) + '</div>' : '') +
+      (sub2 ? '<div class="lbl-sub">' + escapeHtml(sub2) + '</div>' : '') +
+      '<div class="lbl-qr-row">' +
+        '<div class="lbl-hint">Наведите камеру<br>телефона на QR-код<br>и перейдите на сайт.</div>' +
+        '<div class="lbl-qr-wrap" id="lbl-qr-' + i + '"></div>' +
+      '</div>' +
     '</div>';
   }).join('');
 
@@ -52900,42 +52877,29 @@ function renderLabelsForPrint() {
       'body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 0; background: #f4f5f7; }' +
       '.print-btn { position: fixed; top: 14px; right: 14px; background: #2D5F8B; color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }' +
       '.preview { display: grid; grid-template-columns: repeat(auto-fill, 58mm); gap: 6mm; padding: 20px; }' +
-      '.label-58x60 { width: 58mm; height: 60mm; padding: 3mm; border: 1px dashed #ccc; background: white; display: flex; flex-direction: column; align-items: center; justify-content: space-between; page-break-after: always; }' +
+      '.label-58x60 { width: 58mm; height: 60mm; padding: 3mm 3mm 2mm 3mm; border: 1px dashed #ccc; background: white; display: flex; flex-direction: column; align-items: center; page-break-after: always; }' +
       '.label-58x60:last-child { page-break-after: auto; }' +
-      '.lbl-brand { font-size: 9pt; font-weight: 600; color: #2D5F8B; letter-spacing: 0.5px; }' +
-      '.lbl-qr-wrap { width: 28mm; height: 28mm; display: flex; align-items: center; justify-content: center; }' +
+      '.lbl-logo { width: 30mm; height: auto; margin: 0 auto 2mm auto; display: block; }' +
+      '.lbl-receiver-label { font-size: 8pt; font-weight: 700; color: #1f2429; align-self: flex-start; margin-top: 1mm; letter-spacing: 0.3px; }' +
+      '.lbl-receiver { font-size: 11pt; font-weight: 700; color: #1f2429; align-self: flex-start; line-height: 1.15; word-wrap: break-word; margin-top: 0.5mm; }' +
+      '.lbl-sub { font-size: 7.5pt; color: #4b5563; align-self: flex-start; line-height: 1.2; margin-top: 0.5mm; }' +
+      '.lbl-qr-row { display: flex; align-items: center; gap: 2mm; margin-top: auto; width: 100%; padding-top: 1mm; }' +
+      '.lbl-hint { font-size: 6.5pt; color: #4b5563; line-height: 1.25; flex: 1; }' +
+      '.lbl-qr-wrap { width: 17mm; height: 17mm; display: flex; align-items: center; justify-content: center; flex: 0 0 17mm; }' +
       '.lbl-qr-wrap img, .lbl-qr-wrap canvas { width: 100%; height: 100%; }' +
-      '.lbl-body { text-align: center; width: 100%; }' +
-      '.lbl-model { font-size: 10pt; font-weight: 700; line-height: 1.15; margin-bottom: 2px; word-wrap: break-word; }' +
-      '.lbl-article { font-size: 8pt; color: #6E7689; font-family: monospace; }' +
-      '.lbl-date { font-size: 8pt; color: #6E7689; }' +
       '@media print { .print-btn { display: none; } .preview { padding: 0; gap: 0; grid-template-columns: 58mm; } .label-58x60 { border: none; } body { background: white; } }' +
     '</style></head><body>' +
     '<button class="print-btn" onclick="window.print()">🖨️ Печать (' + items.length + ' шт.)</button>' +
     '<div class="preview">' + labelsBodies + '</div>' +
     '<script>window.__labels = ' + JSON.stringify(labelsData) + ';' +
-    'window.__atomusLogoUrl = ' + JSON.stringify(window.location.origin + '/icons/logo.png') + ';' +
     'window.addEventListener("DOMContentLoaded", function(){' +
       'window.__labels.forEach(function(d, i){' +
         'var el = document.getElementById("lbl-qr-" + i);' +
         'if (!el) return;' +
-        'new QRCode(el, { text: d.url, width: 110, height: 110, correctLevel: QRCode.CorrectLevel.H });' +
+        // v2.45.10: QR без оверлея, лого живёт сверху в шапке стикера
+        'new QRCode(el, { text: d.url, width: 64, height: 64, correctLevel: QRCode.CorrectLevel.M });' +
       '});' +
-      // Накладываем логотип на каждый канвас после рендера QR
-      'setTimeout(function(){' +
-        'var img=new Image();img.crossOrigin="anonymous";' +
-        'img.onload=function(){' +
-          'document.querySelectorAll(".lbl-qr-wrap").forEach(function(wrap){' +
-            'var c=wrap.querySelector("canvas");if(!c)return;' +
-            'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.14),off=Math.round(w*0.02),x=w-ls-off,y=w-ls-off,p=Math.round(ls*0.10);' +
-            'ctx.fillStyle="#fff";ctx.fillRect(x-p,y-p,ls+2*p,ls+2*p);ctx.drawImage(img,x,y,ls,ls);' +
-            'var di=wrap.querySelector("img");if(di){try{di.src=c.toDataURL("image/png");}catch(_){}}' +
-          '});' +
-          'setTimeout(function(){window.print();},300);' +
-        '};' +
-        'img.onerror=function(){setTimeout(function(){window.print();},100);};' +
-        'img.src=window.__atomusLogoUrl;' +
-      '},100);' +
+      'setTimeout(function(){window.print();}, 400);' +
     '});<\/script>' +
     '</body></html>';
 
