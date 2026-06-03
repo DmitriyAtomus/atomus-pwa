@@ -19110,7 +19110,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.29-cold-calc";
+const APP_VERSION = "v2.45.30-cold-calc-ui";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -59868,77 +59868,162 @@ window.addEventListener('beforeunload', (e) => {
   }
   /* Полноэкранная модалка калькулятора */
   .cc-modal {
-    max-width: 980px;
+    max-width: 1040px;
     width: 96vw;
     max-height: 94vh;
     display: flex;
     flex-direction: column;
+    padding: 0;
   }
+  .cc-modal .modal-header {
+    background: linear-gradient(135deg, #0C4A6E, #0369A1);
+    color: white;
+    padding: 14px 18px;
+    border-radius: 12px 12px 0 0;
+  }
+  .cc-modal .modal-header h3 { color: white; margin: 0; font-size: 16px; }
+  .cc-modal .modal-header h3 i { color: #BAE6FD; margin-right: 6px; }
+  .cc-modal .modal-close { color: white; opacity: 0.85; }
+  .cc-modal .modal-close:hover { opacity: 1; }
+
   .cc-tabs {
     display: flex;
-    gap: 4px;
-    padding: 0 14px;
+    gap: 6px;
+    padding: 10px 14px;
+    background: #F1F5F9;
     border-bottom: 1px solid var(--border);
     overflow-x: auto;
     flex-shrink: 0;
   }
   .cc-tab {
-    background: none;
-    border: none;
-    padding: 12px 14px;
+    background: white;
+    border: 1px solid #E2E8F0;
+    padding: 8px 14px;
     font-size: 13px;
     color: var(--text-mid);
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-radius: 8px;
     white-space: nowrap;
     font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s ease;
   }
-  .cc-tab.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
-  .cc-tab:hover { color: var(--text-dark); }
+  .cc-tab i { font-size: 15px; }
+  .cc-tab:hover { background: #F8FAFC; color: var(--text-dark); border-color: #CBD5E1; }
+  .cc-tab.active {
+    background: #0C4A6E;
+    color: white;
+    border-color: #0C4A6E;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(12,74,110,0.3);
+  }
+  .cc-tab.active i { color: #BAE6FD; }
+
   .cc-body {
     flex: 1;
     overflow-y: auto;
     padding: 18px 22px;
+    background: #FAFBFC;
+  }
+  .cc-section {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
   }
   .cc-section h4 {
     margin: 0 0 12px;
-    font-size: 14px;
-    color: var(--text-dark);
-    font-weight: 600;
+    font-size: 13px;
+    color: #0C4A6E;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E2E8F0;
   }
+  .cc-section h4 i { color: #0369A1; margin-right: 4px; }
   .cc-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 10px 14px;
-    margin-bottom: 18px;
   }
-  .cc-grid .form-label { margin-bottom: 4px; font-size: 12px; color: var(--text-mid); }
-  .cc-grid .form-input { margin-bottom: 0; font-size: 13.5px; padding: 8px 10px; }
-  .cc-wall-row {
+  .cc-grid > div { display: flex; flex-direction: column; }
+  .cc-grid .form-label {
+    margin-bottom: 4px;
+    font-size: 11.5px;
+    color: var(--text-mid);
+    text-transform: none;
+    font-weight: 500;
+  }
+  .cc-grid .form-input { margin-bottom: 0; font-size: 13.5px; padding: 7px 10px; }
+
+  /* Таблица стен — компактная сетка из 5 колонок */
+  .cc-walls-table {
     display: grid;
-    grid-template-columns: 80px 1fr 80px 80px;
-    gap: 8px;
-    align-items: end;
-    padding: 8px 0;
-    border-bottom: 1px dashed var(--border);
+    grid-template-columns: 90px 2fr 1.4fr 95px 95px;
+    gap: 6px 10px;
+    align-items: center;
   }
-  .cc-wall-row:last-child { border-bottom: none; }
-  .cc-wall-row .lbl { font-weight: 600; color: var(--text-dark); padding-bottom: 8px; }
+  .cc-walls-table .hdr {
+    font-size: 10.5px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    padding: 2px 0;
+  }
+  .cc-walls-table .lbl {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 13px;
+    padding: 4px 0;
+  }
+  .cc-walls-table select.form-input,
+  .cc-walls-table input.form-input {
+    margin: 0;
+    padding: 6px 8px;
+    font-size: 13px;
+    height: 34px;
+  }
+  .cc-walls-table .row-sep {
+    grid-column: 1 / -1;
+    border-top: 1px dashed #E2E8F0;
+  }
+
+  .cc-hint {
+    background: #F0F9FF;
+    border-left: 3px solid #0369A1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #0C4A6E;
+    line-height: 1.5;
+    margin-top: 12px;
+  }
+  .cc-hint i { color: #0369A1; margin-right: 4px; }
+
   .cc-footer {
-    padding: 14px 22px;
+    padding: 12px 18px;
     border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
-    background: var(--bg);
+    background: white;
+    border-radius: 0 0 12px 12px;
   }
   .cc-footer-total {
     flex: 1;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-mid);
   }
-  .cc-footer-total b { font-size: 22px; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .cc-footer-total b { font-size: 22px; color: #0C4A6E; font-variant-numeric: tabular-nums; }
+  .cc-footer .btn-primary { background: #0C4A6E; border-color: #0C4A6E; }
+  .cc-footer .btn-primary:hover { background: #0369A1; border-color: #0369A1; }
+
   .cc-result {
     background: white;
     border: 1px solid var(--border);
@@ -59948,12 +60033,65 @@ window.addEventListener('beforeunload', (e) => {
   .cc-result-row {
     display: flex;
     justify-content: space-between;
-    padding: 6px 0;
+    padding: 7px 0;
     border-bottom: 1px dashed var(--border);
     font-size: 13.5px;
   }
   .cc-result-row:last-child { border-bottom: none; font-weight: 700; padding-top: 12px; }
   .cc-result-row .v { font-variant-numeric: tabular-nums; color: var(--text-dark); }
+
+  /* === Мобильная адаптация калькулятора === */
+  @media (max-width: 720px) {
+    .cc-modal {
+      width: 100vw;
+      max-width: 100vw;
+      max-height: 100vh;
+      height: 100vh;
+      border-radius: 0;
+    }
+    .cc-modal .modal-header { border-radius: 0; }
+    .cc-modal .modal-header h3 { font-size: 15px; }
+    .cc-tabs {
+      padding: 8px 10px;
+      gap: 4px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cc-tab {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .cc-tab span { display: none; }   /* на узких иконку оставляем, текст прячем */
+    .cc-tab .lbl-short { display: inline; }
+    .cc-body { padding: 12px 12px; }
+    .cc-section { padding: 12px 14px; margin-bottom: 10px; }
+    .cc-section h4 { font-size: 12px; }
+    .cc-grid { grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+    .cc-walls-table { grid-template-columns: 1fr; gap: 4px; }
+    .cc-walls-table .hdr { display: none; }
+    .cc-walls-table .lbl {
+      background: #F1F5F9; padding: 6px 10px; border-radius: 6px;
+      margin-top: 6px;
+    }
+    .cc-walls-table .row-sep { display: none; }
+    .cc-walls-table > div:not(.lbl):not(.hdr):not(.row-sep) {
+      padding: 0 0 4px;
+    }
+    .cc-walls-table > div:not(.lbl):not(.hdr):not(.row-sep)::before {
+      content: attr(data-mob-lbl);
+      display: block;
+      font-size: 10.5px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 2px;
+    }
+    .cc-footer { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+    .cc-footer-total { width: 100%; text-align: center; order: -1; }
+    .cc-footer-total b { font-size: 18px; }
+  }
+  @media (max-width: 480px) {
+    .cc-grid { grid-template-columns: 1fr; }
+  }
 </style>
 <script>
 // ============================================================
@@ -60149,8 +60287,8 @@ function _ccRenderModal() {
       '</div>' +
       '<div class="cc-tabs">' +
         tabs.map(([code, name, ico]) =>
-          '<button class="cc-tab' + (active === code ? ' active' : '') + '" onclick="_ccSwitchTab(\'' + code + '\')">' +
-            '<i class="ti ' + ico + '"></i> ' + name + '</button>'
+          '<button class="cc-tab' + (active === code ? ' active' : '') + '" onclick="_ccSwitchTab(\'' + code + '\')" title="' + name + '">' +
+            '<i class="ti ' + ico + '"></i><span>' + name + '</span></button>'
         ).join('') +
       '</div>' +
       '<div class="cc-body" id="cc-body">' + _ccRenderTab(active) + '</div>' +
@@ -60194,7 +60332,7 @@ function _ccTabCamera() {
   const floorArea = w * d;
   return '' +
     '<div class="cc-section">' +
-      '<h4>Размеры камеры</h4>' +
+      '<h4><i class="ti ti-ruler-measure"></i> Размеры камеры</h4>' +
       '<div class="cc-grid">' +
         '<div><label class="form-label">Высота, м</label>' +
           '<input type="number" class="form-input" id="cc-height" value="' + g.height + '" min="1.5" step="0.1" /></div>' +
@@ -60207,7 +60345,7 @@ function _ccTabCamera() {
         '<div><label class="form-label">Стена 4 (длина), м</label>' +
           '<input type="number" class="form-input" id="cc-w3-len" value="' + g.walls[3].len + '" min="0.5" step="0.1" /></div>' +
       '</div>' +
-      '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text-mid);">' +
+      '<div class="cc-hint">' +
         '<i class="ti ti-info-circle"></i> Объём камеры: <b>' + volume.toFixed(1) + ' м³</b>, ' +
         'площадь пола: <b>' + floorArea.toFixed(1) + ' м²</b>. ' +
         'Стены вводятся попарно противоположными (1↔3, 2↔4).' +
@@ -60221,50 +60359,43 @@ function _ccTabWalls() {
     '<option value="' + code + '">' + name + ' (λ=' + lam + ')</option>').join('');
   const wallMatOpts = CC_WALL_MATERIALS.map(([name, d, lam], i) =>
     '<option value="' + i + '">' + name + '</option>').join('');
-  function wallRow(idx, label) {
-    const w = g.walls[idx];
-    return '<div class="cc-wall-row">' +
-      '<div class="lbl">' + label + '</div>' +
-      '<div><label class="form-label">Конструкция</label>' +
-        '<select class="form-input" id="cc-w' + idx + '-mat">' +
-          wallMatOpts.replace('value="' + w.wallMat + '"', 'value="' + w.wallMat + '" selected') +
-        '</select></div>' +
-      '<div><label class="form-label">Изоляция</label>' +
-        '<select class="form-input" id="cc-w' + idx + '-iso">' +
-          isoOpts.replace('value="' + w.isoCode + '"', 'value="' + w.isoCode + '" selected') +
-        '</select></div>' +
-      '<div><label class="form-label">Толщ. изол., мм</label>' +
-        '<input type="number" class="form-input" id="cc-w' + idx + '-isom" value="' + w.isoMm + '" min="20" step="10" /></div>' +
-      '<div><label class="form-label">t° снаружи, °C</label>' +
-        '<input type="number" class="form-input" id="cc-w' + idx + '-tout" value="' + w.tOut + '" step="1" /></div>' +
-    '</div>';
+  function selWith(opts, sel) {
+    return opts.replace('value="' + sel + '"', 'value="' + sel + '" selected');
   }
-  const fl = g.floor, ce = g.ceiling;
-  return '<div class="cc-section"><h4>Стены, пол, потолок</h4>' +
-    wallRow(0, 'Стена 1') + wallRow(1, 'Стена 2') + wallRow(2, 'Стена 3') + wallRow(3, 'Стена 4') +
-    '<div class="cc-wall-row">' +
-      '<div class="lbl">Пол</div>' +
-      '<div></div>' +
-      '<div><label class="form-label">Изоляция</label>' +
-        '<select class="form-input" id="cc-fl-iso">' +
-          isoOpts.replace('value="' + fl.isoCode + '"', 'value="' + fl.isoCode + '" selected') +
-        '</select></div>' +
-      '<div><label class="form-label">Толщ., мм</label>' +
-        '<input type="number" class="form-input" id="cc-fl-isom" value="' + fl.isoMm + '" min="20" step="10" /></div>' +
-      '<div><label class="form-label">t° под полом, °C</label>' +
-        '<input type="number" class="form-input" id="cc-fl-tout" value="' + fl.tOut + '" step="1" /></div>' +
+  // Одна сетка из 5 колонок: имя | конструкция | изоляция | толщ. | t° снаружи
+  // Шапка повторяется один раз, дальше 6 строк (4 стены + пол + потолок).
+  function dataRow(prefix, label, hasWallMat, w, tooltipTout) {
+    const wallSel = hasWallMat
+      ? '<select class="form-input" id="' + prefix + '-mat">' +
+        selWith(wallMatOpts, w.wallMat || 0) + '</select>'
+      : '<span style="color:var(--text-light);font-size:12px;">—</span>';
+    return '<div class="lbl">' + label + '</div>' +
+      '<div data-mob-lbl="Конструкция">' + wallSel + '</div>' +
+      '<div data-mob-lbl="Изоляция"><select class="form-input" id="' + prefix + '-iso">' + selWith(isoOpts, w.isoCode) + '</select></div>' +
+      '<div data-mob-lbl="Толщ. изол., мм"><input type="number" class="form-input" id="' + prefix + '-isom" value="' + w.isoMm + '" min="20" step="10" /></div>' +
+      '<div data-mob-lbl="t° снаружи, °C"><input type="number" class="form-input" id="' + prefix + '-tout" value="' + w.tOut + '" step="1" title="' + (tooltipTout || '') + '" /></div>' +
+      '<div class="row-sep"></div>';
+  }
+  return '<div class="cc-section">' +
+    '<h4><i class="ti ti-wall"></i> Стены, пол, потолок</h4>' +
+    '<div class="cc-walls-table">' +
+      // Шапка
+      '<div class="hdr">Плоскость</div>' +
+      '<div class="hdr">Конструкция</div>' +
+      '<div class="hdr">Изоляция</div>' +
+      '<div class="hdr">Толщ. изол., мм</div>' +
+      '<div class="hdr">t° снаружи, °C</div>' +
+      '<div class="row-sep"></div>' +
+      dataRow('cc-w0', 'Стена 1', true, g.walls[0]) +
+      dataRow('cc-w1', 'Стена 2', true, g.walls[1]) +
+      dataRow('cc-w2', 'Стена 3', true, g.walls[2]) +
+      dataRow('cc-w3', 'Стена 4', true, g.walls[3]) +
+      dataRow('cc-fl', 'Пол', false, g.floor, 'Температура под полом') +
+      dataRow('cc-ce', 'Потолок', false, g.ceiling, 'Температура над потолком') +
     '</div>' +
-    '<div class="cc-wall-row">' +
-      '<div class="lbl">Потолок</div>' +
-      '<div></div>' +
-      '<div><label class="form-label">Изоляция</label>' +
-        '<select class="form-input" id="cc-ce-iso">' +
-          isoOpts.replace('value="' + ce.isoCode + '"', 'value="' + ce.isoCode + '" selected') +
-        '</select></div>' +
-      '<div><label class="form-label">Толщ., мм</label>' +
-        '<input type="number" class="form-input" id="cc-ce-isom" value="' + ce.isoMm + '" min="20" step="10" /></div>' +
-      '<div><label class="form-label">t° сверху, °C</label>' +
-        '<input type="number" class="form-input" id="cc-ce-tout" value="' + ce.tOut + '" step="1" /></div>' +
+    '<div class="cc-hint">' +
+      '<i class="ti ti-info-circle"></i> «Толщ. изол.» — толщина теплоизоляционного слоя в мм. ' +
+      '«t° снаружи» для пола = температура под полом, для потолка = температура над ним (чердак).' +
     '</div>' +
   '</div>';
 }
@@ -60278,7 +60409,7 @@ function _ccTabMode() {
   ];
   const opts = modes.map(([code, name]) =>
     '<option value="' + code + '"' + (_ccState.mode === code ? ' selected' : '') + '>' + name + '</option>').join('');
-  return '<div class="cc-section"><h4>Режим камеры</h4>' +
+  return '<div class="cc-section"><h4><i class="ti ti-temperature-snow"></i> Режим камеры</h4>' +
     '<div class="cc-grid">' +
       '<div><label class="form-label">Режим работы</label>' +
         '<select class="form-input" id="cc-mode">' + opts + '</select></div>' +
@@ -60289,7 +60420,7 @@ function _ccTabMode() {
       '<div><label class="form-label">Коэф. запаса, %</label>' +
         '<input type="number" class="form-input" id="cc-safety" value="' + _ccState.safety + '" min="0" max="100" step="1" /></div>' +
     '</div>' +
-    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);line-height:1.5;">' +
+    '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> «Время работы» — обычно 18–22 ч/сут (компрессор не работает 24/7, есть оттайки). ' +
       '«Запас» — на просчёты, износ компрессора, нестандартные нагрузки. Стандартно 10–20 %.' +
     '</div>' +
@@ -60303,7 +60434,7 @@ function _ccTabProduct() {
   const pkgOpts = CC_PACKAGES.map(([code, name], i) =>
     '<option value="' + i + '"' + (p.pkgIdx === i ? ' selected' : '') + '>' + name + '</option>').join('');
   const prod = CC_PRODUCTS[p.idx];
-  return '<div class="cc-section"><h4>Продукт</h4>' +
+  return '<div class="cc-section"><h4><i class="ti ti-meat"></i> Продукт</h4>' +
     '<div class="cc-grid">' +
       '<div style="grid-column: span 2;"><label class="form-label">Продукт</label>' +
         '<select class="form-input" id="cc-prod-idx" onchange="_ccProdChanged()">' + prodOpts + '</select></div>' +
@@ -60316,13 +60447,14 @@ function _ccTabProduct() {
       '<div><label class="form-label">t° конечная, °C</label>' +
         '<input type="number" class="form-input" id="cc-prod-t2" value="' + p.tEnd + '" step="1" /></div>' +
     '</div>' +
-    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);margin-bottom:14px;">' +
+    '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> Справочно для <b>' + prod[0] + '</b>: ' +
       'cp до зам = ' + prod[2] + ' кДж/(кг·К), ' +
       'cp после зам = ' + prod[3] + ' кДж/(кг·К), ' +
       'L кристалл. = ' + prod[4] + ' кДж/кг.' +
     '</div>' +
-    '<h4>Упаковка</h4>' +
+  '</div>' +
+  '<div class="cc-section"><h4><i class="ti ti-package"></i> Упаковка</h4>' +
     '<div class="cc-grid">' +
       '<div><label class="form-label">Вид упаковки</label>' +
         '<select class="form-input" id="cc-pkg-idx">' + pkgOpts + '</select></div>' +
@@ -60345,7 +60477,7 @@ function _ccProdChanged() {
 
 function _ccTabCond() {
   const c = _ccState.cond;
-  return '<div class="cc-section"><h4>Люди, освещение, двигатели</h4>' +
+  return '<div class="cc-section"><h4><i class="ti ti-user-cog"></i> Люди, освещение, двигатели</h4>' +
     '<div class="cc-grid">' +
       '<div><label class="form-label">Число людей в камере одновременно</label>' +
         '<input type="number" class="form-input" id="cc-people" value="' + c.people + '" min="0" step="1" /></div>' +
@@ -60356,7 +60488,7 @@ function _ccTabCond() {
       '<div><label class="form-label">Электродвигатели в камере, Вт</label>' +
         '<input type="number" class="form-input" id="cc-motors-w" value="' + c.motorsW + '" min="0" step="50" /></div>' +
     '</div>' +
-    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);line-height:1.5;">' +
+    '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> Каждый человек выделяет 280–470 Вт тепла (зависит от t° в камере). ' +
       'Освещение считается с учётом доли времени включения. Двигатели — берём ~50% номинала как ср. тепловыделение.' +
     '</div>' +
@@ -60365,7 +60497,7 @@ function _ccTabCond() {
 
 function _ccTabDoor() {
   const d = _ccState.door;
-  return '<div class="cc-section"><h4>Двери</h4>' +
+  return '<div class="cc-section"><h4><i class="ti ti-door"></i> Двери</h4>' +
     '<div class="cc-grid">' +
       '<div><label class="form-label">Высота проёма, мм</label>' +
         '<input type="number" class="form-input" id="cc-door-h" value="' + d.hMm + '" min="500" step="50" /></div>' +
@@ -60379,7 +60511,7 @@ function _ccTabDoor() {
           '<option value="1"' + (d.hasTambour ? ' selected' : '') + '>Есть</option>' +
         '</select></div>' +
     '</div>' +
-    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);">' +
+    '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> Тамбур снижает инфильтрацию через дверь примерно в 2 раза.' +
     '</div>' +
   '</div>';
@@ -60402,7 +60534,7 @@ function _ccTabResult() {
   const totalKw = r.total / 1000;
   const totalWithSafetyKw = r.totalWithSafety / 1000;
   return '<div class="cc-section">' +
-    '<h4>Разбивка теплопритоков</h4>' +
+    '<h4><i class="ti ti-chart-bar"></i> Разбивка теплопритоков</h4>' +
     '<div class="cc-result">' +
       rows.map(([n, v]) =>
         '<div class="cc-result-row"><span>' + n + '</span>' +
