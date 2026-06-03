@@ -5266,6 +5266,23 @@
     font-style: italic;
   }
   .sup-row-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+  .sup-row-delete {
+    flex: 0 0 32px;
+    width: 32px; height: 32px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: all .15s ease;
+  }
+  .sup-row-delete:hover {
+    color: #B91C1C;
+    border-color: #FCA5A5;
+    background: rgba(254, 202, 202, 0.25);
+  }
 
   /* Pill статуса заявки */
   .sup-status-pill {
@@ -18896,7 +18913,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.3-invoice-notify";
+const APP_VERSION = "v2.45.4-orders-delete-highlight";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44165,22 +44182,61 @@ function renderSupplyOrders() {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Под этот фильтр заказов нет</div>';
     return;
   }
+  const canDelete = canManageSupply();
   let html = '';
   list.forEach(o => {
     const total = o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '';
-    html += '<div class="sup-row" onclick="openSupplyOrder(' + o.id + ')">' +
+    const label = o.order_label || ('#' + o.id);
+    // Подсветка строки если есть новый счёт
+    const hasNew = !!o.has_new_invoice;
+    const hasInvoice = !!o.invoice_file_key;
+    const rowStyle = hasNew
+      ? 'style="border-left:4px solid #2563EB;background:linear-gradient(90deg,rgba(37,99,235,0.06),transparent 50%);"'
+      : '';
+    const newPill = hasNew
+      ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">📄 НОВЫЙ СЧЁТ</span>'
+      : (hasInvoice
+          ? '<span class="sup-status-pill" style="background:#E0E7FF;color:#3730A3;"><i class="ti ti-file-check"></i> счёт привязан</span>'
+          : '');
+    html += '<div class="sup-row" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">' +
       '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
       '<div class="sup-row-body">' +
-        '<div class="sup-row-title">Заказ #' + o.id + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
-        '<div class="sup-row-meta">' +
+        '<div class="sup-row-title">Заказ ' + escapeHtml(label) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+        '<div class="sup-row-meta" style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
+          newPill +
           '<span><i class="ti ti-list"></i>' + o.items_count + ' позиций</span>' +
           (total ? '<span><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span><i class="ti ti-calendar"></i>ожидаем ' + escapeHtml(o.expected_date) + '</span>' : '') +
         '</div>' +
-      '</div></div>';
+      '</div>' +
+      (canDelete
+        ? '<button class="sup-row-delete" title="Удалить заказ" onclick="event.stopPropagation();deleteSupplyOrder(' + o.id + ',\'' + escapeHtml(label) + '\')"><i class="ti ti-trash"></i></button>'
+        : '') +
+    '</div>';
   });
   container.innerHTML = html;
+}
+
+async function deleteSupplyOrder(orderId, label) {
+  if (!confirm('Удалить заказ ' + label + '?\n\nЗаказ будет скрыт из списков. Привязанные счета и история переписки сохранятся.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось удалить (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    showToast('Заказ ' + label + ' удалён', 'success');
+    cache.supplyOrders = null;
+    loadSupplyOrders();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 function setSupplyOrdFilter(f) {
