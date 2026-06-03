@@ -19014,7 +19014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.14-auto-link-stock";
+const APP_VERSION = "v2.45.16-manual-comp-picker";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36558,6 +36558,118 @@ async function convertSpecItemToComponent(contractId, itemId, componentId) {
   }
 }
 
+// v2.45.16: ручное сопоставление позиции спецификации с комплектующим на складе.
+// Когда автомат не нашёл совпадение (например «203 LUN» vs
+// «Воздухоохладитель 203 LUN» — слишком короткий артикул), пользователь
+// выбирает component руками из списка с поиском.
+async function openManualComponentPicker(contractId, itemId, hintName) {
+  // Грузим все активные комплектующие (если ещё не в кэше)
+  let components = (cache.components && cache.components.items) || cache.componentsList || null;
+  if (!components) {
+    try {
+      const d = await apiGet('/api/components?only_active=1');
+      components = d.components || d.items || [];
+      cache.componentsList = components;
+    } catch (e) {
+      showToast('Не удалось загрузить склад', 'error');
+      return;
+    }
+  }
+  if (!components || !components.length) {
+    showToast('На складе нет комплектующих', 'error');
+    return;
+  }
+  // Предварительный фильтр — токены из имени sale_product
+  const initialQuery = (hintName || '').trim();
+
+  const overlayId = 'manual-comp-picker';
+  let m = document.getElementById(overlayId); if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay';
+  m.innerHTML =
+    '<div class="modal" style="max-width:640px;display:flex;flex-direction:column;max-height:85vh;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-link"></i> Сопоставить со складом</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="display:flex;flex-direction:column;gap:10px;overflow:hidden;">' +
+        '<div style="color:var(--text-light);font-size:13px;">Выбери комплектующее со склада — позиция станет резервироваться из готовой продукции.</div>' +
+        '<input type="search" id="mcp-search" class="form-input" placeholder="Поиск по артикулу или названию…" autocomplete="off">' +
+        '<div id="mcp-list" style="overflow-y:auto;border:1px solid var(--border);border-radius:8px;max-height:50vh;"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.classList.add('visible');
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+
+  const searchInput = document.getElementById('mcp-search');
+  const listEl = document.getElementById('mcp-list');
+
+  const renderList = (q) => {
+    const query = (q || '').toLowerCase().trim();
+    const filtered = !query
+      ? components.slice(0, 100)
+      : components.filter(c =>
+          ((c.name || '') + ' ' + (c.sku || '')).toLowerCase().includes(query)
+        ).slice(0, 200);
+    if (!filtered.length) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-light);font-size:13px;">Ничего не найдено</div>';
+      return;
+    }
+    listEl.innerHTML = filtered.map(c => {
+      const stock = Number(c.qty_on_stock || 0);
+      const stockBadge = stock > 0
+        ? '<span style="background:#DCFCE7;color:#0A5B41;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">' + _fmtQty(stock) + ' шт</span>'
+        : '<span style="background:#FEE2E2;color:#8C2A2A;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">нет в наличии</span>';
+      return '<div style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.12s;" ' +
+        'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'transparent\'" ' +
+        'onclick="_pickManualComponent(' + contractId + ',' + itemId + ',' + c.id + ')">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;color:var(--text-dark);font-weight:600;">' + escapeHtml(c.name || '—') + '</div>' +
+          '<div style="font-size:11.5px;color:var(--text-light);">Артикул: ' + escapeHtml(c.sku || '—') + ' · ' + escapeHtml(c.category_name || '—') + '</div>' +
+        '</div>' +
+        stockBadge +
+      '</div>';
+    }).join('');
+  };
+
+  searchInput.addEventListener('input', () => renderList(searchInput.value));
+  // Стартуем с подсказкой по имени sale_product
+  if (initialQuery) {
+    searchInput.value = initialQuery;
+  }
+  renderList(searchInput.value);
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+async function _pickManualComponent(contractId, itemId, componentId) {
+  // Закрываем picker
+  const m = document.getElementById('manual-comp-picker');
+  if (m) m.remove();
+  // Делаем привязку через существующий endpoint convert-to-component
+  try {
+    const r = await apiPost('/api/contracts/items/' + itemId + '/convert-to-component', {
+      component_id: componentId,
+    });
+    if (!r || !r.ok) {
+      showToast((r && r.data && r.data.message) || 'Не удалось привязать', 'error');
+      return;
+    }
+    // Запускаем авторезерв для контракта
+    try {
+      await apiPost('/api/contracts/' + contractId + '/auto-link-stock', {});
+    } catch (_) {}
+    showToast('Связано со складом', 'success');
+    await loadContractItemsBlock(contractId);
+    cache.dashboard = null;
+    cache.components = null;
+    cache.componentsList = null;
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  }
+}
+
 // v2.45.14: «Быстрая кнопка починки» — авто-привязать все «продажные»
 // позиции спецификации к комплектующим на складе одним вызовом.
 async function autoLinkContractStock(contractId) {
@@ -36852,6 +36964,15 @@ function renderContractItemsBlock(contractId) {
                       : '') + '" ' +
                   'onclick="convertSpecItemToComponent(' + contractId + ',' + it.id + ',' + it.convertible_to_component_id + ')">' +
                   '<i class="ti ti-package-import"></i>' +
+                '</button>'
+              ) : '') +
+              // v2.45.16: ручное сопоставление со складом — для sale_product/свободного
+              // ввода, когда автомат не нашёл совпадения. Открывает picker с поиском.
+              ((!it.model_id && !it.component_id && (it.sale_product_id || !it.model_id)) ? (
+                '<button class="spec-item-act-btn" style="color:#2563EB;" ' +
+                  'title="Сопоставить со складом вручную" ' +
+                  'onclick="openManualComponentPicker(' + contractId + ',' + it.id + ',' + JSON.stringify(it.sale_product_name || it.name || '').replace(/"/g,'&quot;') + ')">' +
+                  '<i class="ti ti-link"></i>' +
                 '</button>'
               ) : '') +
               '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
@@ -52560,11 +52681,24 @@ function openQrModal(opts) {
       '</div>' +
     '</div>';
   m.classList.add('visible');
-  // Генерируем QR
+  // Генерируем QR — точно с тем caption который реально уйдёт на печать,
+  // чтобы предпросмотр совпадал со стикером (WYSIWYG)
   setTimeout(() => {
     const wrap = document.getElementById('qr-canvas-wrap');
     if (!wrap) return;
-    generateQrWithLogo(wrap, { text: opts.url, width: 220 });
+    let previewCaption = '';
+    try {
+      // _netPrintCaption использует data.type — а у нас в opts ещё нет type.
+      // Соберём суррогат: type из opts.type, остальные поля из opts.data.
+      previewCaption = _netPrintCaption(Object.assign(
+        {}, opts.data || {}, { type: opts.type || (opts.data && opts.data.type) || '' }
+      ));
+    } catch (_) { previewCaption = ''; }
+    generateQrWithLogo(wrap, {
+      text: opts.url,
+      width: 220,
+      caption: previewCaption,
+    });
   }, 50);
 }
 
@@ -52598,25 +52732,65 @@ function _getAtomusQrLogo() {
 function generateQrWithLogo(el, opts) {
   if (typeof QRCode === 'undefined' || !el) return null;
   el.innerHTML = '';
-  // v2.45.10: лого больше НЕ накладывается на сам QR — оно идёт отдельным
-  // изображением сверху над QR (так как на физических стикерах). Сам QR
-  // остаётся компактным (по умолчанию 160 пикселей).
-  const size = opts.width || opts.height || 160;
-  // Создаём вертикальную вёрстку: логотип сверху, под ним QR
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px;';
-  const logoImg = document.createElement('img');
-  logoImg.src = ATOMUS_QR_LOGO_URL;
-  logoImg.alt = 'ATOMUS group';
-  logoImg.style.cssText = 'width:' + Math.round(size * 0.55) + 'px;height:auto;object-fit:contain;';
-  wrap.appendChild(logoImg);
+  // v2.45.15: WYSIWYG-предпросмотр этикетки. Рендерим точную мини-копию
+  // того что физически печатается термопринтером по ZPL-шаблону:
+  //   • «ATOMUS» крупно
+  //   • «group» мельче
+  //   • QR (без оверлея лого внутри)
+  //   • опционально — caption под QR, с переносом
+  // Этикетка физически 58×60 мм (пропорция ~1:1.03), рамку рисуем чтоб
+  // юзер сразу видел границы реального стикера.
+  const size = opts.width || opts.height || 200;
+  // Внутренний контейнер — пропорции стикера 58×60 мм с белым фоном и рамкой
+  const labelW = Math.round(size * 1.5);
+  const labelH = Math.round(labelW * (60 / 58));
+  const sticker = document.createElement('div');
+  sticker.className = 'qr-sticker-preview';
+  sticker.style.cssText =
+    'width:' + labelW + 'px;height:' + labelH + 'px;' +
+    'background:#fff;border:1px solid var(--border, #d4d8dc);border-radius:8px;' +
+    'padding:' + Math.round(labelW * 0.06) + 'px;' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:space-between;' +
+    'box-shadow:0 2px 8px rgba(0,0,0,0.08);' +
+    'font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1f2429;';
+
+  // Бренд-блок: «ATOMUS» крупно + «group» мельче
+  const brand = document.createElement('div');
+  brand.style.cssText = 'text-align:center;line-height:1;';
+  brand.innerHTML =
+    '<div style="font-size:' + Math.round(labelW * 0.13) + 'px;font-weight:700;letter-spacing:0.5px;">ATOMUS</div>' +
+    '<div style="font-size:' + Math.round(labelW * 0.08) + 'px;font-weight:500;letter-spacing:0.3px;margin-top:2px;">group</div>';
+  sticker.appendChild(brand);
+
+  // QR (центр)
   const qrHost = document.createElement('div');
-  wrap.appendChild(qrHost);
-  el.appendChild(wrap);
+  qrHost.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+  sticker.appendChild(qrHost);
+
+  // Caption (если передан)
+  const caption = (opts.caption || '').trim();
+  if (caption) {
+    const cap = document.createElement('div');
+    cap.style.cssText =
+      'text-align:center;font-size:' + Math.round(labelW * 0.055) + 'px;' +
+      'line-height:1.25;word-break:break-word;max-width:100%;';
+    cap.textContent = caption;
+    sticker.appendChild(cap);
+  } else {
+    // Заглушка-распорка чтобы QR не уходил вниз
+    const spacer = document.createElement('div');
+    spacer.style.height = Math.round(labelW * 0.04) + 'px';
+    sticker.appendChild(spacer);
+  }
+
+  el.appendChild(sticker);
+
+  // QR-код примерно 50-55% от ширины стикера
+  const qrSize = Math.round(labelW * (caption ? 0.50 : 0.58));
   const qr = new QRCode(qrHost, {
     text: opts.text || opts.url,
-    width: size,
-    height: size,
+    width: qrSize,
+    height: qrSize,
     colorDark: opts.colorDark || '#000000',
     colorLight: opts.colorLight || '#ffffff',
     correctLevel: QRCode.CorrectLevel.M,
