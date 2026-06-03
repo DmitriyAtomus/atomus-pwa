@@ -8908,6 +8908,37 @@
     font-size: 18px;
     flex-shrink: 0;
   }
+  /* v2.45.27: статус пароля + быстрые кнопки на карточке сотрудника */
+  .emp-pwd-line {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-mid);
+    flex-wrap: wrap;
+  }
+  .emp-pwd-yes { color: #0A5B41; }
+  .emp-pwd-no  { color: var(--text-light); }
+  .emp-pwd-btn {
+    margin-left: 4px;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    color: var(--text-dark);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all .15s;
+  }
+  .emp-pwd-btn:hover { background: var(--bg); border-color: var(--text-mid); }
+  .emp-pwd-btn-primary { background: var(--brand); color: white; border-color: var(--brand); }
+  .emp-pwd-btn-primary:hover { background: var(--brand-dark, var(--brand)); filter: brightness(0.92); }
+  .emp-pwd-btn-danger { color: var(--danger); }
+  .emp-pwd-btn-danger:hover { background: #FEE; border-color: var(--danger); }
 
   /* Кнопка деактивации/активации */
   .danger-btn-text {
@@ -19079,7 +19110,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.27-bom-submodel-fix";
+const APP_VERSION = "v2.45.28-emp-passwords-bom-edit-fix";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25237,12 +25268,134 @@ function renderEmployeeRow(e, isDirector) {
   const inactiveClass = e.is_active ? '' : ' emp-inactive';
   const clickAttr = isDirector ? ' onclick="openEditEmployee(' + e.id + ')"' : '';
   const arrow = isDirector ? '<div class="emp-arrow"><i class="ti ti-chevron-right"></i></div>' : '';
+  // v2.45.27: для директора — статус пароля + быстрые кнопки прямо в карточке
+  let pwdLine = '';
+  if (isDirector) {
+    if (e.has_password) {
+      const setAt = e.password_set_at ? (' ' + _fmtPwdDate(e.password_set_at)) : '';
+      pwdLine = '<div class="emp-pwd-line emp-pwd-yes">' +
+        '<i class="ti ti-key" style="color:#0A5B41;"></i> Пароль установлен' + escapeHtml(setAt) +
+        '<button class="emp-pwd-btn" onclick="event.stopPropagation(); generateEmployeePassword(' + e.id + ',\'' + escapeHtml(e.full_name || '').replace(/'/g, "\\'") + '\',true)" title="Сгенерировать новый">' +
+          '<i class="ti ti-refresh"></i> Новый</button>' +
+        '<button class="emp-pwd-btn emp-pwd-btn-danger" onclick="event.stopPropagation(); clearEmployeePassword(' + e.id + ',\'' + escapeHtml(e.full_name || '').replace(/'/g, "\\'") + '\')" title="Сбросить пароль">' +
+          '<i class="ti ti-x"></i> Сбросить</button>' +
+      '</div>';
+    } else {
+      pwdLine = '<div class="emp-pwd-line emp-pwd-no">' +
+        '<i class="ti ti-key-off" style="color:var(--text-light);"></i> Пароль не установлен' +
+        '<button class="emp-pwd-btn emp-pwd-btn-primary" onclick="event.stopPropagation(); generateEmployeePassword(' + e.id + ',\'' + escapeHtml(e.full_name || '').replace(/'/g, "\\'") + '\',false)" title="Сгенерировать пароль">' +
+          '<i class="ti ti-key"></i> Сгенерировать</button>' +
+      '</div>';
+    }
+  }
   return '<div class="employee-row' + inactiveClass + '"' + clickAttr + '>' +
     '<div class="emp-info"><div class="emp-name">' + escapeHtml(e.full_name || e.short_name || '—') +
        (e.has_password ? ' <i class="ti ti-key" title="Установлен пароль для входа без Telegram" style="font-size:13px; color:var(--text-light); margin-left:4px; vertical-align:middle;"></i>' : '') +
     '</div>' +
-    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div></div>' +
+    '<div class="emp-meta">' + escapeHtml(meta.join(' · ') || '—') + '</div>' +
+    pwdLine +
+    '</div>' +
     arrow + '</div>';
+}
+
+// v2.45.27: «02.06.2026» из ISO даты password_set_at
+function _fmtPwdDate(iso) {
+  if (!iso) return '';
+  try {
+    const s = String(iso);
+    // ожидаем формат "YYYY-MM-DD HH:MM:SS" или "YYYY-MM-DDTHH:MM:SS"
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[3] + '.' + m[2] + '.' + m[1];
+    return s.slice(0, 10);
+  } catch (e) { return ''; }
+}
+
+async function generateEmployeePassword(empId, empName, hasOld) {
+  const msg = hasOld
+    ? 'Сгенерировать НОВЫЙ пароль для «' + empName + '»? Старый перестанет работать сразу.'
+    : 'Сгенерировать пароль для «' + empName + '»?';
+  if (!confirm(msg)) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/employees/' + empId + '/password/generate', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.password) {
+      showToast(d.message || 'Не удалось сгенерировать пароль', 'error');
+      return;
+    }
+    showOneTimePassword(empName, d.password);
+    // Перезагрузим список сотрудников чтобы обновился password_set_at
+    loadEmployees().catch(() => {});
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+async function clearEmployeePassword(empId, empName) {
+  if (!confirm('Снять пароль у «' + empName + '»? Вход по паролю перестанет работать (Telegram-вход останется).')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/employees/' + empId + '/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ password: null }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось сбросить пароль', 'error');
+      return;
+    }
+    showToast('Пароль снят', 'success');
+    loadEmployees().catch(() => {});
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+// v2.45.27: показываем сгенерированный пароль ОДИН раз — после закрытия модалки
+// он остаётся только в виде хеша в БД.
+function showOneTimePassword(empName, password) {
+  let m = document.getElementById('one-time-pwd-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'one-time-pwd-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-key"></i> Пароль сгенерирован</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:20px;">' +
+        '<div style="font-size:13.5px;color:var(--text-mid);margin-bottom:10px;">Сотрудник: <b>' + escapeHtml(empName) + '</b></div>' +
+        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;">' +
+          '<div id="otp-pwd-value" style="font-family:Menlo,Consolas,\'Courier New\',monospace;font-size:22px;letter-spacing:1.5px;color:var(--text-dark);user-select:all;font-weight:600;">' + escapeHtml(password) + '</div>' +
+          '<button class="btn btn-primary btn-small" id="otp-copy-btn" onclick="copyOneTimePassword(\'' + password.replace(/'/g, "\\'") + '\')">' +
+            '<i class="ti ti-copy"></i> Копия' +
+          '</button>' +
+        '</div>' +
+        '<div style="margin-top:14px;padding:12px 14px;background:#FFF3CD;border-radius:8px;color:#664D03;font-size:12.5px;line-height:1.5;">' +
+          '<i class="ti ti-alert-triangle"></i> <b>Покажем только один раз.</b> Скопируй и отправь сотруднику сейчас. Закроешь модалку — пароль больше не достать (в БД только хеш).' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-check"></i> Скопировал, закрыть</button>' +
+      '</div></div>';
+  m.classList.add('visible');
+}
+
+async function copyOneTimePassword(pwd) {
+  try {
+    await navigator.clipboard.writeText(pwd);
+    const btn = document.getElementById('otp-copy-btn');
+    if (btn) {
+      btn.innerHTML = '<i class="ti ti-check"></i> Скопировано';
+      setTimeout(() => { if (btn) btn.innerHTML = '<i class="ti ti-copy"></i> Копия'; }, 2000);
+    }
+    showToast('Пароль в буфере обмена', 'success');
+  } catch (e) {
+    showToast('Не удалось скопировать — выдели вручную', 'error');
+  }
 }
 
 // ============================================================================
@@ -34233,6 +34386,12 @@ async function loadModelBom(modelId) {
         '</div>';
       return;
     }
+    // v2.45.28: сохраняем строки BOM в state — клик по edit/delete будет читать
+    // данные по bom_id без эскейпинга имён в onclick (раньше ломалось на именах
+    // с кавычками и точкой с запятой, например «TRN 8/6-R "РИЛСАН"; D1=…»).
+    state._bomItemsById = {};
+    items.forEach(it => { state._bomItemsById[it.id] = it; });
+    state._currentBomModelId = modelId;
     let html = '<div class="bom-table">';
     items.forEach(it => {
       // v2.45.24: строка может быть «компонент» или «подсборка» (kind='model')
@@ -34240,7 +34399,6 @@ async function loadModelBom(modelId) {
       const have = parseFloat((isModel ? it.child_model_qty : it.component_qty) || 0);
       const need = parseFloat(it.qty_required || 0);
       const lowFlag = have < need;
-      const commentEsc = String(it.comment || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
       // v2.20.0: явный бейдж дефицита
       let stockBadge = '';
       if (need > 0) {
@@ -34264,10 +34422,8 @@ async function loadModelBom(modelId) {
       const categoryPart = isModel
         ? '<span class="comp-cat-badge" style="background:#EAF4EE;color:#0A5B41;">Подсборка</span>'
         : (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '');
-      // Edit-кнопка: для подсборки имя/единицу менять нечего — передаём «модельный» сценарий
-      const editCall = isModel
-        ? ('openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',0,\'\',\'\',\'\',true)')
-        : ('openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',' + (it.component_id || 0) + ',\'' + escapeHtml(it.component_name || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.unit_override || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.component_unit || '').replace(/'/g, "\\'") + '\',false)');
+      // v2.45.28: открываем редактор по bom_id — данные тянем из state, без эскейпинга
+      const editCall = 'openBomEditItemById(' + it.id + ')';
       html += '<div class="bom-row">' +
         '<div class="bom-row-main">' +
           '<div class="bom-name">' + displayName + skuPart +
@@ -34820,6 +34976,27 @@ async function submitBomAddItem(modelId) {
 // v2.43.81: добавлено редактирование названия компонента прямо из BOM.
 // Имя живёт на самом компоненте (таблица components), поэтому переименование
 // затрагивает все модели, где этот компонент стоит.
+// v2.45.28: открыть редактор BOM-строки по её id — данные берём из state (там
+// они уже без эскейпинга), это устойчиво к именам с кавычками и `;`.
+function openBomEditItemById(bomId) {
+  const it = (state._bomItemsById || {})[bomId];
+  if (!it) { showToast('Не нашли строку BOM в кэше — перезагрузи страницу', 'error'); return; }
+  const isModel = (it.kind === 'model');
+  const need = parseFloat(it.qty_required || 0);
+  if (isModel) {
+    openBomEditItem(it.id, need, !!it.is_critical, it.comment || '', 0, '', '', '', true);
+  } else {
+    openBomEditItem(
+      it.id, need, !!it.is_critical, it.comment || '',
+      it.component_id || 0,
+      it.component_name || '',
+      it.unit_override || '',
+      it.component_unit || '',
+      false,
+    );
+  }
+}
+
 function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName, unitOverride, componentUnit, isModel) {
   let m = document.getElementById('bom-edit-modal');
   if (!m) {
