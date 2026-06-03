@@ -18939,7 +18939,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.6-spec-mark-ready";
+const APP_VERSION = "v2.45.7-qr-logo";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38516,10 +38516,21 @@ function renderPackingListPrint(box) {
     '</div>' +
     (qrUrl ?
     '<script>window.addEventListener("DOMContentLoaded", function(){' +
-      'new QRCode(document.getElementById("qr-pl"), {' +
-        'text: ' + JSON.stringify(qrUrl) + ', width: 90, height: 90, correctLevel: QRCode.CorrectLevel.M' +
-      '});' +
-      'setTimeout(function(){window.print();}, 400);' +
+      'var el=document.getElementById("qr-pl");' +
+      'new QRCode(el,{text:' + JSON.stringify(qrUrl) + ',width:90,height:90,correctLevel:QRCode.CorrectLevel.H});' +
+      // Накладываем логотип в центр канваса
+      'setTimeout(function(){' +
+        'var c=el.querySelector("canvas");if(!c)return;' +
+        'var img=new Image();img.crossOrigin="anonymous";' +
+        'img.onload=function(){' +
+          'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.22),cx=Math.round((w-ls)/2),p=Math.round(ls*0.08);' +
+          'ctx.fillStyle="#fff";ctx.fillRect(cx-p,cx-p,ls+2*p,ls+2*p);ctx.drawImage(img,cx,cx,ls,ls);' +
+          'var di=el.querySelector("img");if(di)di.style.display="none";' +
+          'setTimeout(function(){window.print();},300);' +
+        '};' +
+        'img.onerror=function(){setTimeout(function(){window.print();},100);};' +
+        'img.src=' + JSON.stringify(window.location.origin + '/icons/logo.png') + ';' +
+      '},50);' +
     '});<\/script>'
     : '<script>window.addEventListener("DOMContentLoaded", function(){setTimeout(function(){window.print();}, 200);});<\/script>') +
     '</body></html>';
@@ -52435,20 +52446,75 @@ function openQrModal(opts) {
   setTimeout(() => {
     const wrap = document.getElementById('qr-canvas-wrap');
     if (!wrap) return;
-    wrap.innerHTML = '';
-    new QRCode(wrap, {
-      text: opts.url,
-      width: 220,
-      height: 220,
-      colorDark: '#000000',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M,
-    });
+    generateQrWithLogo(wrap, { text: opts.url, width: 220 });
   }, 50);
 }
 
 function closeQrModal() {
   document.getElementById('qr-modal').classList.remove('visible');
+}
+
+// ============================================================================
+// v2.45.7: QR с логотипом ATOMUS group в центре
+// ============================================================================
+// Берёт элемент-контейнер и опции для qrcodejs, рендерит QR, потом
+// поверх центрального квадрата накладывает /icons/logo.png через Canvas API.
+// Уровень коррекции ошибок принудительно поднимается до H (30%), чтобы
+// сканер мог прочитать QR даже когда центр перекрыт логотипом.
+const ATOMUS_QR_LOGO_URL = '/icons/logo.png';
+let _atomusQrLogoImage = null;
+function _getAtomusQrLogo() {
+  return new Promise((resolve) => {
+    if (_atomusQrLogoImage && _atomusQrLogoImage.complete && _atomusQrLogoImage.naturalWidth > 0) {
+      resolve(_atomusQrLogoImage);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { _atomusQrLogoImage = img; resolve(img); };
+    img.onerror = () => resolve(null);   // не нашли — рендерим QR без лого
+    img.src = ATOMUS_QR_LOGO_URL;
+  });
+}
+
+function generateQrWithLogo(el, opts) {
+  if (typeof QRCode === 'undefined' || !el) return null;
+  el.innerHTML = '';
+  const size = opts.width || opts.height || 200;
+  const qr = new QRCode(el, {
+    text: opts.text || opts.url,
+    width: size,
+    height: size,
+    colorDark: opts.colorDark || '#000000',
+    colorLight: opts.colorLight || '#ffffff',
+    // Принудительно H — иначе наложение лого ломает считываемость
+    correctLevel: QRCode.CorrectLevel.H,
+  });
+  // qrcodejs синхронно рисует, но для надёжности возьмём канвас на следующем тике
+  setTimeout(() => {
+    const canvas = el.querySelector('canvas');
+    if (!canvas) return;
+    _getAtomusQrLogo().then((img) => {
+      if (!img) return;
+      try {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const logoSize = Math.round(w * 0.22);      // ~22% от стороны QR
+        const cx = Math.round((w - logoSize) / 2);
+        // Белая подложка чуть больше лого — чтобы лого не путался с QR
+        const padBg = Math.round(logoSize * 0.08);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - padBg, cx - padBg, logoSize + 2 * padBg, logoSize + 2 * padBg);
+        ctx.drawImage(img, cx, cx, logoSize, logoSize);
+        // Скрываем дублирующий <img> который qrcodejs добавляет рядом с канвасом
+        const dupImg = el.querySelector('img');
+        if (dupImg) dupImg.style.display = 'none';
+      } catch (e) {
+        console.warn('QR logo overlay failed:', e);
+      }
+    });
+  }, 0);
+  return qr;
 }
 
 // ============================================================================
@@ -52835,12 +52901,27 @@ function renderLabelsForPrint() {
     '<button class="print-btn" onclick="window.print()">🖨️ Печать (' + items.length + ' шт.)</button>' +
     '<div class="preview">' + labelsBodies + '</div>' +
     '<script>window.__labels = ' + JSON.stringify(labelsData) + ';' +
+    'window.__atomusLogoUrl = ' + JSON.stringify(window.location.origin + '/icons/logo.png') + ';' +
     'window.addEventListener("DOMContentLoaded", function(){' +
       'window.__labels.forEach(function(d, i){' +
         'var el = document.getElementById("lbl-qr-" + i);' +
-        'if (el) new QRCode(el, { text: d.url, width: 110, height: 110, correctLevel: QRCode.CorrectLevel.M });' +
+        'if (!el) return;' +
+        'new QRCode(el, { text: d.url, width: 110, height: 110, correctLevel: QRCode.CorrectLevel.H });' +
       '});' +
-      'setTimeout(function(){ window.print(); }, 500);' +
+      // Накладываем логотип на каждый канвас после рендера QR
+      'setTimeout(function(){' +
+        'var img=new Image();img.crossOrigin="anonymous";' +
+        'img.onload=function(){' +
+          'document.querySelectorAll(".lbl-qr-wrap canvas").forEach(function(c){' +
+            'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.22),cx=Math.round((w-ls)/2),p=Math.round(ls*0.08);' +
+            'ctx.fillStyle="#fff";ctx.fillRect(cx-p,cx-p,ls+2*p,ls+2*p);ctx.drawImage(img,cx,cx,ls,ls);' +
+          '});' +
+          'document.querySelectorAll(".lbl-qr-wrap img").forEach(function(di){di.style.display="none";});' +
+          'setTimeout(function(){window.print();},300);' +
+        '};' +
+        'img.onerror=function(){setTimeout(function(){window.print();},100);};' +
+        'img.src=window.__atomusLogoUrl;' +
+      '},100);' +
     '});<\/script>' +
     '</body></html>';
 
@@ -54818,12 +54899,7 @@ function showShareInstallerModal(url, label) {
   setTimeout(() => {
     const wrap = document.getElementById('qr-canvas-wrap');
     if (!wrap) return;
-    wrap.innerHTML = '';
-    new QRCode(wrap, {
-      text: url, width: 220, height: 220,
-      colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M,
-    });
+    generateQrWithLogo(wrap, { text: url, width: 220 });
   }, 50);
 }
 
