@@ -14103,6 +14103,18 @@
   .cal-finish-btn:hover { background: #BBF7D0; border-color: #22C55E; }
   .cal-finish-btn .ti { font-size: 14px; vertical-align: middle; }
 
+  /* v2.45.20: кнопка удаления сборки */
+  .cal-delete-btn {
+    background: transparent; border: 1px solid #E5E7EB;
+    color: #9CA3AF;
+    padding: 3px 7px; border-radius: 6px;
+    cursor: pointer; font-size: 12px;
+    margin-left: 6px; line-height: 1;
+    transition: all 0.15s ease;
+  }
+  .cal-delete-btn:hover { border-color: #DC2626; color: #DC2626; background: #FEE2E2; }
+  .cal-delete-btn .ti { font-size: 14px; vertical-align: middle; }
+
   /* v2.43.18: быстрая кнопка-действие в позиции спецификации */
   .spec-quick-act {
     background: #F3F4F6; border: 1px solid #D1D5DB;
@@ -19067,7 +19079,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.19-inbox-direct-download";
+const APP_VERSION = "v2.45.20-delete-assembly";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20964,6 +20976,33 @@ async function finishActiveWork(assemblyId) {
     }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+  }
+}
+
+// v2.45.20: удаление сборки из карточки договора (например, после авто-привязки
+// позиции к component на складе — старая сборка-сирота больше не нужна).
+async function deleteAssemblyFromContract(assemblyId, contractId, modelTitle) {
+  const what = modelTitle ? ' «' + modelTitle.replace(/<[^>]+>/g, '') + '»' : '';
+  if (!confirm('Удалить сборку' + what + '? Это действие необратимо.\n\nПриход на склад (если был) — отменится. История переходов сохранится.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/assemblies/' + assemblyId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (r.status === 401 || r.status === 403) {
+      showToast('Сессия истекла — обнови страницу (F5)', 'error');
+      return;
+    }
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось удалить (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    showToast('Сборка удалена', 'success');
+    await _afterAssemblyStatusChange(contractId);
+  } catch (e) {
+    showToast('Сеть: не удалось удалить', 'error');
   }
 }
 
@@ -30101,6 +30140,16 @@ function renderContractAssembliesBlock(c) {
             ' <button class="cal-reopen-btn" title="Ошиблись? Вернуть в работу (отменить готовность)" ' +
                     'onclick="reopenAssembly(' + a.id + ',' + c.id + ')">' +
               '<i class="ti ti-arrow-back-up"></i>' +
+            '</button>';
+        }
+        // v2.45.20: кнопка удаления сборки (для случаев когда сборка создана
+        // ошибочно или больше не нужна, как у позиции 203 LUN после авто-привязки
+        // к component на складе)
+        if (a.status === 'in_progress' || a.status === 'ready') {
+          workersCellHtml +=
+            ' <button class="cal-delete-btn" title="Удалить сборку безвозвратно" ' +
+                    'onclick="deleteAssemblyFromContract(' + a.id + ',' + c.id + ',\'' + escapeHtml(modelFull).replace(/'/g, "\\'") + '\')">' +
+              '<i class="ti ti-trash"></i>' +
             '</button>';
         }
       }
