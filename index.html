@@ -13280,6 +13280,17 @@
   }
   .spec-export-btn i { font-size: 16px; }
   .spec-export-btn span { letter-spacing: 0.2px; }
+  /* v2.45.14: «Быстрая починка» — выделяющаяся гразиентная кнопка */
+  .spec-export-btn.spec-export-btn-fix {
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    color: #fff;
+    border-color: transparent;
+  }
+  .spec-export-btn.spec-export-btn-fix:hover {
+    background: linear-gradient(135deg, #1E40AF, #6D28D9);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+  }
   .spec-title {
     font-size: 14px;
     color: var(--text-light);
@@ -19003,7 +19014,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.13-login-password-first";
+const APP_VERSION = "v2.45.14-auto-link-stock";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36547,6 +36558,33 @@ async function convertSpecItemToComponent(contractId, itemId, componentId) {
   }
 }
 
+// v2.45.14: «Быстрая кнопка починки» — авто-привязать все «продажные»
+// позиции спецификации к комплектующим на складе одним вызовом.
+async function autoLinkContractStock(contractId) {
+  if (!confirm('Найти на складе совпадения для всех "К заказу" позиций и привязать?\n\nПозиции с найденным совпадением станут резервироваться из готовой продукции вместо «К заказу».')) return;
+  try {
+    const r = await apiPost('/api/contracts/' + contractId + '/auto-link-stock', {});
+    if (!r || !r.ok) {
+      showToast((r && r.data && r.data.message) || 'Не удалось выполнить', 'error');
+      return;
+    }
+    const linked  = (r.data && r.data.linked) || 0;
+    const skipped = (r.data && r.data.skipped) || 0;
+    if (linked > 0) {
+      showToast('Привязано к складу: ' + linked + (skipped ? ' · без совпадений: ' + skipped : ''), 'success');
+    } else if (skipped > 0) {
+      showToast('Не нашёл подходящих комплектующих на складе (' + skipped + ' позиций пропущено)', 'warning');
+    } else {
+      showToast('Привязывать нечего — все позиции уже корректные', 'info');
+    }
+    await loadContractItemsBlock(contractId);
+    cache.dashboard = null;
+    cache.components = null;
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка авто-привязки', 'error');
+  }
+}
+
 // v2.19.0: бейдж резерва для позиции спецификации (v2.19.1: + покупные позиции + свободный ввод)
 // v2.43.13: добавлен бейдж «Изготовляется» — для assemblies со статусом in_progress.
 function _renderReservationBadge(item) {
@@ -36674,8 +36712,19 @@ function renderContractItemsBlock(contractId) {
           (items.length ? '(' + items.length + ')' : '') + '</div>';
   // ЭТАП 27.4 (v2.21.4): кнопки скачивания спецификации в Word/PDF
   if (items.length) {
-    html += '<div class="spec-export-buttons">' +
-      '<button class="spec-export-btn" onclick="downloadContractSpecDocx(' + contractId + ')" title="Скачать Word">' +
+    html += '<div class="spec-export-buttons">';
+    // v2.45.14: «Быстрая починка» — авто-привязать sale_product к комплектующим
+    // на складе, чтобы не висели как «К заказу» когда реально на складе есть.
+    // Показываем только если есть хоть одна sale_product-позиция без model/component.
+    const hasFixable = items.some(it =>
+      it.sale_product_id && !it.model_id && !it.component_id
+    );
+    if (canEdit && hasFixable) {
+      html += '<button class="spec-export-btn spec-export-btn-fix" onclick="autoLinkContractStock(' + contractId + ')" title="Найти и привязать товары которые лежат на складе как комплектующие">' +
+        '<i class="ti ti-wand"></i><span>Привязать к складу</span>' +
+      '</button>';
+    }
+    html += '<button class="spec-export-btn" onclick="downloadContractSpecDocx(' + contractId + ')" title="Скачать Word">' +
         '<i class="ti ti-file-type-docx"></i><span>Word</span>' +
       '</button>' +
       '<button class="spec-export-btn" onclick="downloadContractSpecPdf(' + contractId + ')" title="Открыть PDF">' +
