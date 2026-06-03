@@ -19110,7 +19110,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.28-emp-passwords-bom-edit-fix";
+const APP_VERSION = "v2.45.29-cold-calc";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -30444,6 +30444,13 @@ function renderHomeSkeleton() {
   html += '<div class="home-kpi-title"><i class="ti ti-calendar-stats"></i>Сегодня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
   html += '</div>';
+
+  // v2.45.29: виджет «Калькулятор холода» — быстрая прикидка мощности
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-snowflake"></i>Калькулятор холода</div>';
+  html += '<div class="cold-calc-widget">' +
+    '<div class="ccw-text">Прикинуть требуемую холодопроизводительность камеры — за пару минут.</div>' +
+    '<button class="btn btn-primary" onclick="openColdCalculator()"><i class="ti ti-calculator"></i> Открыть калькулятор</button>' +
+  '</div>';
 
   // v2.43.98: Воронка производства — пять стадий с цифрами
   html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-stairs-up"></i>Воронка производства</div>';
@@ -59839,6 +59846,744 @@ window.addEventListener('beforeunload', (e) => {
 
 <!-- ============ ЭТАП 25.1: DRAWER OVERLAY ============ -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeSectionDrawer()"></div>
+
+<!-- ============ v2.45.29: КАЛЬКУЛЯТОР ХОЛОДА ============ -->
+<style>
+  .cold-calc-widget {
+    padding: 14px;
+    background: linear-gradient(135deg, #E0F2FE, #F0F9FF);
+    border: 1px solid #BAE6FD;
+    border-radius: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .cold-calc-widget .ccw-text {
+    flex: 1;
+    min-width: 200px;
+    font-size: 13px;
+    color: #0C4A6E;
+    line-height: 1.45;
+  }
+  /* Полноэкранная модалка калькулятора */
+  .cc-modal {
+    max-width: 980px;
+    width: 96vw;
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .cc-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .cc-tab {
+    background: none;
+    border: none;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--text-mid);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .cc-tab.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+  .cc-tab:hover { color: var(--text-dark); }
+  .cc-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 22px;
+  }
+  .cc-section h4 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+  .cc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 14px;
+    margin-bottom: 18px;
+  }
+  .cc-grid .form-label { margin-bottom: 4px; font-size: 12px; color: var(--text-mid); }
+  .cc-grid .form-input { margin-bottom: 0; font-size: 13.5px; padding: 8px 10px; }
+  .cc-wall-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 80px 80px;
+    gap: 8px;
+    align-items: end;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .cc-wall-row:last-child { border-bottom: none; }
+  .cc-wall-row .lbl { font-weight: 600; color: var(--text-dark); padding-bottom: 8px; }
+  .cc-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+  .cc-footer-total {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-mid);
+  }
+  .cc-footer-total b { font-size: 22px; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .cc-result {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .cc-result-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13.5px;
+  }
+  .cc-result-row:last-child { border-bottom: none; font-weight: 700; padding-top: 12px; }
+  .cc-result-row .v { font-variant-numeric: tabular-nums; color: var(--text-dark); }
+</style>
+<script>
+// ============================================================
+// v2.45.29 — Калькулятор холода (теплопритоки в холодильной камере)
+// ============================================================
+// Источники табличных данных: СП 50.13330, справочник «Холодильная техника»
+// под ред. Цойло, СНиП 2.11.02-87. Значения справочные, для прикидки.
+
+const CC_INSULATIONS = [
+  // [код, имя, λ Вт/(м·К)]
+  ['pir',    'Пенополиуретан (PIR/PUR)',   0.024],
+  ['eps',    'Пенополистирол (EPS/XPS)',   0.035],
+  ['minwool','Минеральная вата',           0.045],
+  ['penopl', 'Пенопласт ПСБ-С',            0.040],
+  ['fiber',  'Стекловолокно',              0.040],
+  ['ker',    'Керамзитовый гравий',        0.180],
+  ['opil',   'Опилки',                     0.070],
+  ['wood',   'Древесина (сосна)',          0.180],
+  ['conc',   'Бетон',                      1.510],
+  ['rconc',  'Железобетон',                1.920],
+  ['fcon',   'Пенобетон',                  0.290],
+  ['brick',  'Кирпич',                     0.810],
+  ['slag',   'Шлак',                       0.290],
+  ['glass',  'Стекло',                     0.760],
+  ['soil',   'Грунт',                      1.160],
+];
+
+const CC_PRODUCTS = [
+  // [имя, t хранения °C, cp до зам кДж/кг·К, cp после кДж/кг·К, L кристаллизации кДж/кг]
+  ['Мясо говядина',           0,    3.39, 1.84, 233],
+  ['Мясо свинина',            0,    3.18, 1.93, 192],
+  ['Мясо баранина',           0,    3.43, 1.93, 220],
+  ['Птица (тушка)',           0,    3.39, 1.93, 246],
+  ['Колбасы варёные',         2,    2.85, 1.80, 168],
+  ['Колбасы копчёные',        8,    2.10, 1.55, 120],
+  ['Субпродукты',             0,    3.51, 1.97, 240],
+  ['Рыба свежая',             -1,   3.43, 2.05, 271],
+  ['Рыба замороженная',       -18,  2.05, 1.80,   0],
+  ['Рыба солёная',            -2,   2.93, 1.93, 180],
+  ['Икра',                    -3,   3.20, 2.00, 200],
+  ['Молоко',                  4,    3.93, 2.05, 280],
+  ['Сливки',                  4,    3.81, 2.00, 270],
+  ['Творог',                  4,    3.43, 2.21, 230],
+  ['Сметана',                 4,    3.43, 2.10, 240],
+  ['Сыр твёрдый',             4,    2.65, 2.05, 158],
+  ['Сыр мягкий',              4,    3.10, 2.20, 200],
+  ['Масло сливочное',         -1,   2.18, 1.36, 100],
+  ['Маргарин',                4,    2.18, 1.36,  90],
+  ['Яйца',                    4,    3.18, 1.67, 256],
+  ['Яблоки',                  0,    3.81, 1.88, 271],
+  ['Груши',                   0,    3.77, 1.88, 265],
+  ['Цитрусовые',              4,    3.85, 1.93, 285],
+  ['Виноград',                0,    3.60, 1.88, 250],
+  ['Ягоды',                   0,    3.81, 1.88, 270],
+  ['Овощи листовые',          1,    3.93, 2.05, 290],
+  ['Овощи корнеплоды',        1,    3.60, 1.93, 250],
+  ['Картофель',               4,    3.43, 1.80, 247],
+  ['Капуста',                 0,    3.85, 1.97, 280],
+  ['Помидоры/огурцы',         8,    3.93, 2.05, 290],
+  ['Зелень',                  2,    3.93, 2.05, 290],
+  ['Грибы',                   1,    3.93, 2.05, 285],
+  ['Хлеб',                    16,   2.55, 1.59, 109],
+  ['Кондитерские изделия',    8,    2.50, 1.50,  90],
+  ['Мороженое',               -22,  3.30, 1.88, 240],
+  ['Полуфабрикаты охлажд.',   2,    3.10, 1.85, 200],
+  ['Полуфабрикаты заморож.',  -18,  2.20, 1.80,   0],
+  ['Цветы свежие',            4,    3.93, 2.05, 290],
+  ['Пиво / напитки',          6,    3.93, 2.05, 280],
+  ['Прочее (хранение)',       4,    3.50, 2.00, 250],
+];
+
+const CC_PACKAGES = [
+  // [код, имя, cp кДж/(кг·К)]
+  ['none',  'Без упаковки',  0],
+  ['wood',  'Дерево',         2.50],
+  ['paper', 'Бумага/картон',  1.34],
+  ['glass', 'Стекло',         0.83],
+  ['al',    'Алюминий',       0.92],
+  ['steel', 'Сталь',          0.48],
+  ['tin',   'Жесть',          0.46],
+  ['pe',    'Полиэтилен',     2.30],
+];
+
+const CC_WALL_MATERIALS = [
+  // [имя, толщина мм по умолчанию, λ Вт/(м·К)] — внешний слой стены/панели
+  ['Сэндвич-панель (металл, без λ)', 1, 50.0],
+  ['Бетон',                           150, 1.51],
+  ['Кирпич',                          250, 0.81],
+  ['Железобетон',                     150, 1.92],
+  ['Дерево',                          100, 0.18],
+  ['Без стены (одна изоляция)',         0, 0   ],
+];
+
+// Тепловыделение одного человека (Вт). Для камер с минусом — выше: организм
+// больше теплит при работе на холоде.
+function _ccPersonHeat(tInside) {
+  if (tInside <= -10) return 470;
+  if (tInside <= 0)   return 380;
+  return 280;
+}
+
+// Коэффициент инфильтрации через дверь (эмпирический):
+// Вт через 1 м² проёма при разнице температур ΔT, за минуту открытия.
+// Базовое значение «полное открытие = 8 Вт/(мин·м²·К)».
+function _ccDoorPsi(deltaT, hasTambour) {
+  const base = 8;
+  return base * Math.max(deltaT, 0) * (hasTambour ? 0.5 : 1.0);
+}
+
+// Внутренний R коэффициент пограничного слоя (1/α) — для камеры:
+//   α_внутр ≈ 9, α_внеш ≈ 23 Вт/(м²·К)
+const CC_R_INNER = 1 / 9;
+const CC_R_OUTER = 1 / 23;
+
+let _ccState = null;       // вся форма
+let _ccLastResult = null;  // последний расчёт
+
+function _ccDefaults() {
+  return {
+    activeTab: 'camera',
+    geom: {
+      height: 3.0,
+      walls: [
+        // {len, isoMm, isoCode, wallMat (idx), tOut}
+        { len: 6, isoMm: 100, isoCode: 'pir', wallMat: 0, tOut: 25 },
+        { len: 4, isoMm: 100, isoCode: 'pir', wallMat: 0, tOut: 25 },
+        { len: 6, isoMm: 100, isoCode: 'pir', wallMat: 0, tOut: 25 },
+        { len: 4, isoMm: 100, isoCode: 'pir', wallMat: 0, tOut: 25 },
+      ],
+      floor:   { isoMm: 100, isoCode: 'eps', tOut: 5  }, // под полом обычно прохладнее
+      ceiling: { isoMm: 100, isoCode: 'pir', tOut: 30 }, // потолок «греется» от чердака
+    },
+    mode: 'storage_mid',    // storage_mid | storage_low | freeze | cool
+    tInside: 0,
+    product: {
+      idx: 0,                // индекс из CC_PRODUCTS
+      massKg: 1000,
+      tStart: 20,
+      tEnd: 0,
+      tauHours: 24,          // время охл/зам, час
+      pkgIdx: 0,             // индекс из CC_PACKAGES (0 = без упаковки)
+      pkgPercent: 0,         // доля массы упаковки от массы продукта, %
+    },
+    cond: {
+      people: 1,
+      lightW: 100,           // суммарная мощность освещения
+      lightHrs: 8,           // часов в сутки
+      motorsW: 200,          // суммарная мощность электродвигателей в камере
+    },
+    door: {
+      hMm: 2000,
+      wMm: 900,
+      openMin: 30,           // минут в сутки
+      hasTambour: false,
+    },
+    safety: 15,              // коэф запаса, %
+    workHours: 18,           // часов работы оборудования в сутки
+  };
+}
+
+function openColdCalculator() {
+  if (!_ccState) _ccState = _ccDefaults();
+  let m = document.getElementById('cold-calc-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'cold-calc-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _ccRenderModal();
+  m.classList.add('visible');
+}
+
+function _ccRenderModal() {
+  const m = document.getElementById('cold-calc-modal');
+  if (!m) return;
+  const tabs = [
+    ['camera',  'Камера',     'ti-3d-cube-sphere'],
+    ['walls',   'Стены/изоляция', 'ti-wall'],
+    ['mode',    'Режим',      'ti-temperature-snow'],
+    ['product', 'Продукт',    'ti-meat'],
+    ['cond',    'Люди/свет/двигатели', 'ti-user-cog'],
+    ['door',    'Двери',      'ti-door'],
+    ['result',  'Результат',  'ti-chart-bar'],
+  ];
+  const active = _ccState.activeTab;
+  m.innerHTML =
+    '<div class="modal cc-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-snowflake"></i> Калькулятор холода</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="cc-tabs">' +
+        tabs.map(([code, name, ico]) =>
+          '<button class="cc-tab' + (active === code ? ' active' : '') + '" onclick="_ccSwitchTab(\'' + code + '\')">' +
+            '<i class="ti ' + ico + '"></i> ' + name + '</button>'
+        ).join('') +
+      '</div>' +
+      '<div class="cc-body" id="cc-body">' + _ccRenderTab(active) + '</div>' +
+      '<div class="cc-footer">' +
+        '<button class="btn btn-secondary" onclick="_ccReset()" title="Сбросить значения"><i class="ti ti-restore"></i> Сброс</button>' +
+        '<div class="cc-footer-total" id="cc-footer-total">' + _ccFooterText() + '</div>' +
+        '<button class="btn btn-primary" onclick="_ccCalculate()"><i class="ti ti-calculator"></i> Рассчитать</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _ccSwitchTab(code) {
+  _ccCollectFromInputs();   // не теряем введённое
+  _ccState.activeTab = code;
+  const body = document.getElementById('cc-body');
+  if (body) body.innerHTML = _ccRenderTab(code);
+}
+
+function _ccFooterText() {
+  if (!_ccLastResult) return 'Заполните разделы и жмите «Рассчитать».';
+  const kw = _ccLastResult.total / 1000;
+  return 'Требуется холода: <b>' + kw.toFixed(2) + ' кВт</b>';
+}
+
+function _ccRenderTab(code) {
+  if (code === 'camera')  return _ccTabCamera();
+  if (code === 'walls')   return _ccTabWalls();
+  if (code === 'mode')    return _ccTabMode();
+  if (code === 'product') return _ccTabProduct();
+  if (code === 'cond')    return _ccTabCond();
+  if (code === 'door')    return _ccTabDoor();
+  if (code === 'result')  return _ccTabResult();
+  return '';
+}
+
+function _ccTabCamera() {
+  const g = _ccState.geom;
+  const len1 = g.walls[0].len, len2 = g.walls[1].len, len3 = g.walls[2].len, len4 = g.walls[3].len;
+  const w = (len1 + len3) / 2, d = (len2 + len4) / 2;
+  const volume = w * d * g.height;
+  const floorArea = w * d;
+  return '' +
+    '<div class="cc-section">' +
+      '<h4>Размеры камеры</h4>' +
+      '<div class="cc-grid">' +
+        '<div><label class="form-label">Высота, м</label>' +
+          '<input type="number" class="form-input" id="cc-height" value="' + g.height + '" min="1.5" step="0.1" /></div>' +
+        '<div><label class="form-label">Стена 1 (длина), м</label>' +
+          '<input type="number" class="form-input" id="cc-w0-len" value="' + g.walls[0].len + '" min="0.5" step="0.1" /></div>' +
+        '<div><label class="form-label">Стена 2 (длина), м</label>' +
+          '<input type="number" class="form-input" id="cc-w1-len" value="' + g.walls[1].len + '" min="0.5" step="0.1" /></div>' +
+        '<div><label class="form-label">Стена 3 (длина), м</label>' +
+          '<input type="number" class="form-input" id="cc-w2-len" value="' + g.walls[2].len + '" min="0.5" step="0.1" /></div>' +
+        '<div><label class="form-label">Стена 4 (длина), м</label>' +
+          '<input type="number" class="form-input" id="cc-w3-len" value="' + g.walls[3].len + '" min="0.5" step="0.1" /></div>' +
+      '</div>' +
+      '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text-mid);">' +
+        '<i class="ti ti-info-circle"></i> Объём камеры: <b>' + volume.toFixed(1) + ' м³</b>, ' +
+        'площадь пола: <b>' + floorArea.toFixed(1) + ' м²</b>. ' +
+        'Стены вводятся попарно противоположными (1↔3, 2↔4).' +
+      '</div>' +
+    '</div>';
+}
+
+function _ccTabWalls() {
+  const g = _ccState.geom;
+  const isoOpts = CC_INSULATIONS.map(([code, name, lam]) =>
+    '<option value="' + code + '">' + name + ' (λ=' + lam + ')</option>').join('');
+  const wallMatOpts = CC_WALL_MATERIALS.map(([name, d, lam], i) =>
+    '<option value="' + i + '">' + name + '</option>').join('');
+  function wallRow(idx, label) {
+    const w = g.walls[idx];
+    return '<div class="cc-wall-row">' +
+      '<div class="lbl">' + label + '</div>' +
+      '<div><label class="form-label">Конструкция</label>' +
+        '<select class="form-input" id="cc-w' + idx + '-mat">' +
+          wallMatOpts.replace('value="' + w.wallMat + '"', 'value="' + w.wallMat + '" selected') +
+        '</select></div>' +
+      '<div><label class="form-label">Изоляция</label>' +
+        '<select class="form-input" id="cc-w' + idx + '-iso">' +
+          isoOpts.replace('value="' + w.isoCode + '"', 'value="' + w.isoCode + '" selected') +
+        '</select></div>' +
+      '<div><label class="form-label">Толщ. изол., мм</label>' +
+        '<input type="number" class="form-input" id="cc-w' + idx + '-isom" value="' + w.isoMm + '" min="20" step="10" /></div>' +
+      '<div><label class="form-label">t° снаружи, °C</label>' +
+        '<input type="number" class="form-input" id="cc-w' + idx + '-tout" value="' + w.tOut + '" step="1" /></div>' +
+    '</div>';
+  }
+  const fl = g.floor, ce = g.ceiling;
+  return '<div class="cc-section"><h4>Стены, пол, потолок</h4>' +
+    wallRow(0, 'Стена 1') + wallRow(1, 'Стена 2') + wallRow(2, 'Стена 3') + wallRow(3, 'Стена 4') +
+    '<div class="cc-wall-row">' +
+      '<div class="lbl">Пол</div>' +
+      '<div></div>' +
+      '<div><label class="form-label">Изоляция</label>' +
+        '<select class="form-input" id="cc-fl-iso">' +
+          isoOpts.replace('value="' + fl.isoCode + '"', 'value="' + fl.isoCode + '" selected') +
+        '</select></div>' +
+      '<div><label class="form-label">Толщ., мм</label>' +
+        '<input type="number" class="form-input" id="cc-fl-isom" value="' + fl.isoMm + '" min="20" step="10" /></div>' +
+      '<div><label class="form-label">t° под полом, °C</label>' +
+        '<input type="number" class="form-input" id="cc-fl-tout" value="' + fl.tOut + '" step="1" /></div>' +
+    '</div>' +
+    '<div class="cc-wall-row">' +
+      '<div class="lbl">Потолок</div>' +
+      '<div></div>' +
+      '<div><label class="form-label">Изоляция</label>' +
+        '<select class="form-input" id="cc-ce-iso">' +
+          isoOpts.replace('value="' + ce.isoCode + '"', 'value="' + ce.isoCode + '" selected') +
+        '</select></div>' +
+      '<div><label class="form-label">Толщ., мм</label>' +
+        '<input type="number" class="form-input" id="cc-ce-isom" value="' + ce.isoMm + '" min="20" step="10" /></div>' +
+      '<div><label class="form-label">t° сверху, °C</label>' +
+        '<input type="number" class="form-input" id="cc-ce-tout" value="' + ce.tOut + '" step="1" /></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _ccTabMode() {
+  const modes = [
+    ['cool',        'Охлаждение (t° > 0)'],
+    ['storage_mid', 'Хранение среднетемпературное (0…+5 °C)'],
+    ['storage_low', 'Хранение низкотемпературное (-18…-25 °C)'],
+    ['freeze',      'Заморозка'],
+  ];
+  const opts = modes.map(([code, name]) =>
+    '<option value="' + code + '"' + (_ccState.mode === code ? ' selected' : '') + '>' + name + '</option>').join('');
+  return '<div class="cc-section"><h4>Режим камеры</h4>' +
+    '<div class="cc-grid">' +
+      '<div><label class="form-label">Режим работы</label>' +
+        '<select class="form-input" id="cc-mode">' + opts + '</select></div>' +
+      '<div><label class="form-label">t° внутри камеры, °C</label>' +
+        '<input type="number" class="form-input" id="cc-tinside" value="' + _ccState.tInside + '" step="1" /></div>' +
+      '<div><label class="form-label">Время работы оборудования, ч/сут</label>' +
+        '<input type="number" class="form-input" id="cc-workhrs" value="' + _ccState.workHours + '" min="6" max="24" step="0.5" /></div>' +
+      '<div><label class="form-label">Коэф. запаса, %</label>' +
+        '<input type="number" class="form-input" id="cc-safety" value="' + _ccState.safety + '" min="0" max="100" step="1" /></div>' +
+    '</div>' +
+    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);line-height:1.5;">' +
+      '<i class="ti ti-info-circle"></i> «Время работы» — обычно 18–22 ч/сут (компрессор не работает 24/7, есть оттайки). ' +
+      '«Запас» — на просчёты, износ компрессора, нестандартные нагрузки. Стандартно 10–20 %.' +
+    '</div>' +
+  '</div>';
+}
+
+function _ccTabProduct() {
+  const p = _ccState.product;
+  const prodOpts = CC_PRODUCTS.map(([name], i) =>
+    '<option value="' + i + '"' + (p.idx === i ? ' selected' : '') + '>' + name + '</option>').join('');
+  const pkgOpts = CC_PACKAGES.map(([code, name], i) =>
+    '<option value="' + i + '"' + (p.pkgIdx === i ? ' selected' : '') + '>' + name + '</option>').join('');
+  const prod = CC_PRODUCTS[p.idx];
+  return '<div class="cc-section"><h4>Продукт</h4>' +
+    '<div class="cc-grid">' +
+      '<div style="grid-column: span 2;"><label class="form-label">Продукт</label>' +
+        '<select class="form-input" id="cc-prod-idx" onchange="_ccProdChanged()">' + prodOpts + '</select></div>' +
+      '<div><label class="form-label">Масса продукта, кг</label>' +
+        '<input type="number" class="form-input" id="cc-prod-mass" value="' + p.massKg + '" min="0" step="10" /></div>' +
+      '<div><label class="form-label">Время охлаждения/заморозки, ч</label>' +
+        '<input type="number" class="form-input" id="cc-prod-tau" value="' + p.tauHours + '" min="1" step="0.5" /></div>' +
+      '<div><label class="form-label">t° начальная, °C</label>' +
+        '<input type="number" class="form-input" id="cc-prod-t1" value="' + p.tStart + '" step="1" /></div>' +
+      '<div><label class="form-label">t° конечная, °C</label>' +
+        '<input type="number" class="form-input" id="cc-prod-t2" value="' + p.tEnd + '" step="1" /></div>' +
+    '</div>' +
+    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);margin-bottom:14px;">' +
+      '<i class="ti ti-info-circle"></i> Справочно для <b>' + prod[0] + '</b>: ' +
+      'cp до зам = ' + prod[2] + ' кДж/(кг·К), ' +
+      'cp после зам = ' + prod[3] + ' кДж/(кг·К), ' +
+      'L кристалл. = ' + prod[4] + ' кДж/кг.' +
+    '</div>' +
+    '<h4>Упаковка</h4>' +
+    '<div class="cc-grid">' +
+      '<div><label class="form-label">Вид упаковки</label>' +
+        '<select class="form-input" id="cc-pkg-idx">' + pkgOpts + '</select></div>' +
+      '<div><label class="form-label">Доля массы упаковки, %</label>' +
+        '<input type="number" class="form-input" id="cc-pkg-pct" value="' + p.pkgPercent + '" min="0" max="100" step="1" /></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _ccProdChanged() {
+  const sel = document.getElementById('cc-prod-idx');
+  if (!sel) return;
+  const idx = parseInt(sel.value, 10) || 0;
+  _ccState.product.idx = idx;
+  // Обновим инфо-плашку — перерисуем вкладку
+  _ccCollectFromInputs();
+  const body = document.getElementById('cc-body');
+  if (body) body.innerHTML = _ccTabProduct();
+}
+
+function _ccTabCond() {
+  const c = _ccState.cond;
+  return '<div class="cc-section"><h4>Люди, освещение, двигатели</h4>' +
+    '<div class="cc-grid">' +
+      '<div><label class="form-label">Число людей в камере одновременно</label>' +
+        '<input type="number" class="form-input" id="cc-people" value="' + c.people + '" min="0" step="1" /></div>' +
+      '<div><label class="form-label">Освещение суммарно, Вт</label>' +
+        '<input type="number" class="form-input" id="cc-light-w" value="' + c.lightW + '" min="0" step="10" /></div>' +
+      '<div><label class="form-label">Освещение, ч/сут</label>' +
+        '<input type="number" class="form-input" id="cc-light-h" value="' + c.lightHrs + '" min="0" max="24" step="0.5" /></div>' +
+      '<div><label class="form-label">Электродвигатели в камере, Вт</label>' +
+        '<input type="number" class="form-input" id="cc-motors-w" value="' + c.motorsW + '" min="0" step="50" /></div>' +
+    '</div>' +
+    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);line-height:1.5;">' +
+      '<i class="ti ti-info-circle"></i> Каждый человек выделяет 280–470 Вт тепла (зависит от t° в камере). ' +
+      'Освещение считается с учётом доли времени включения. Двигатели — берём ~50% номинала как ср. тепловыделение.' +
+    '</div>' +
+  '</div>';
+}
+
+function _ccTabDoor() {
+  const d = _ccState.door;
+  return '<div class="cc-section"><h4>Двери</h4>' +
+    '<div class="cc-grid">' +
+      '<div><label class="form-label">Высота проёма, мм</label>' +
+        '<input type="number" class="form-input" id="cc-door-h" value="' + d.hMm + '" min="500" step="50" /></div>' +
+      '<div><label class="form-label">Ширина проёма, мм</label>' +
+        '<input type="number" class="form-input" id="cc-door-w" value="' + d.wMm + '" min="500" step="50" /></div>' +
+      '<div><label class="form-label">Открыта в сутки, мин</label>' +
+        '<input type="number" class="form-input" id="cc-door-min" value="' + d.openMin + '" min="0" step="5" /></div>' +
+      '<div><label class="form-label">Тамбур (предкамера)</label>' +
+        '<select class="form-input" id="cc-door-tamb">' +
+          '<option value="0"' + (!d.hasTambour ? ' selected' : '') + '>Нет</option>' +
+          '<option value="1"' + (d.hasTambour ? ' selected' : '') + '>Есть</option>' +
+        '</select></div>' +
+    '</div>' +
+    '<div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-mid);">' +
+      '<i class="ti ti-info-circle"></i> Тамбур снижает инфильтрацию через дверь примерно в 2 раза.' +
+    '</div>' +
+  '</div>';
+}
+
+function _ccTabResult() {
+  if (!_ccLastResult) {
+    return '<div class="empty-block" style="padding:40px 0;">' +
+      '<i class="ti ti-calculator"></i>Жми «Рассчитать» внизу — здесь появится разбивка теплопритоков.</div>';
+  }
+  const r = _ccLastResult;
+  const rows = [
+    ['Через ограждения (Q1)', r.q1],
+    ['Охлаждение / заморозка продукта (Q2)', r.q2],
+    ['Тепло от людей (Q3)', r.q3],
+    ['Освещение (Q4)', r.q4],
+    ['Электродвигатели (Q5)', r.q5],
+    ['Инфильтрация через двери (Q6)', r.q6],
+  ];
+  const totalKw = r.total / 1000;
+  const totalWithSafetyKw = r.totalWithSafety / 1000;
+  return '<div class="cc-section">' +
+    '<h4>Разбивка теплопритоков</h4>' +
+    '<div class="cc-result">' +
+      rows.map(([n, v]) =>
+        '<div class="cc-result-row"><span>' + n + '</span>' +
+        '<span class="v">' + (v / 1000).toFixed(3) + ' кВт</span></div>').join('') +
+      '<div class="cc-result-row"><span>Сумма теплопритоков</span>' +
+        '<span class="v">' + totalKw.toFixed(2) + ' кВт</span></div>' +
+      '<div class="cc-result-row"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
+        '<span class="v">' + totalWithSafetyKw.toFixed(2) + ' кВт</span></div>' +
+    '</div>' +
+    '<div style="background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:10px;padding:16px;margin-top:16px;text-align:center;">' +
+      '<div style="font-size:13px;color:#0C4A6E;margin-bottom:4px;">Рекомендуемая мощность холода</div>' +
+      '<div style="font-size:36px;font-weight:700;color:#0C4A6E;line-height:1;">' + totalWithSafetyKw.toFixed(2) + ' кВт</div>' +
+      '<div style="font-size:12px;color:#0C4A6E;opacity:0.8;margin-top:6px;">с учётом работы оборудования ' + r.workHours + ' ч/сут</div>' +
+    '</div>' +
+  '</div>';
+}
+
+// === Сбор значений из input/select в state — без потери при переключении табов ===
+function _ccCollectFromInputs() {
+  const g = _ccState.geom;
+  const num = (id, def) => { const el = document.getElementById(id); return el && el.value !== '' ? parseFloat(el.value) : def; };
+  const str = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+  // Камера
+  g.height = num('cc-height', g.height);
+  for (let i = 0; i < 4; i++) {
+    g.walls[i].len = num('cc-w' + i + '-len', g.walls[i].len);
+    g.walls[i].isoMm = num('cc-w' + i + '-isom', g.walls[i].isoMm);
+    g.walls[i].tOut = num('cc-w' + i + '-tout', g.walls[i].tOut);
+    g.walls[i].isoCode = str('cc-w' + i + '-iso', g.walls[i].isoCode);
+    g.walls[i].wallMat = parseInt(str('cc-w' + i + '-mat', g.walls[i].wallMat), 10);
+  }
+  g.floor.isoMm = num('cc-fl-isom', g.floor.isoMm);
+  g.floor.isoCode = str('cc-fl-iso', g.floor.isoCode);
+  g.floor.tOut = num('cc-fl-tout', g.floor.tOut);
+  g.ceiling.isoMm = num('cc-ce-isom', g.ceiling.isoMm);
+  g.ceiling.isoCode = str('cc-ce-iso', g.ceiling.isoCode);
+  g.ceiling.tOut = num('cc-ce-tout', g.ceiling.tOut);
+  // Режим
+  _ccState.mode = str('cc-mode', _ccState.mode);
+  _ccState.tInside = num('cc-tinside', _ccState.tInside);
+  _ccState.workHours = num('cc-workhrs', _ccState.workHours);
+  _ccState.safety = num('cc-safety', _ccState.safety);
+  // Продукт
+  const p = _ccState.product;
+  p.idx = parseInt(str('cc-prod-idx', p.idx), 10);
+  p.massKg = num('cc-prod-mass', p.massKg);
+  p.tauHours = num('cc-prod-tau', p.tauHours);
+  p.tStart = num('cc-prod-t1', p.tStart);
+  p.tEnd = num('cc-prod-t2', p.tEnd);
+  p.pkgIdx = parseInt(str('cc-pkg-idx', p.pkgIdx), 10);
+  p.pkgPercent = num('cc-pkg-pct', p.pkgPercent);
+  // Условия
+  const c = _ccState.cond;
+  c.people = num('cc-people', c.people);
+  c.lightW = num('cc-light-w', c.lightW);
+  c.lightHrs = num('cc-light-h', c.lightHrs);
+  c.motorsW = num('cc-motors-w', c.motorsW);
+  // Двери
+  const d = _ccState.door;
+  d.hMm = num('cc-door-h', d.hMm);
+  d.wMm = num('cc-door-w', d.wMm);
+  d.openMin = num('cc-door-min', d.openMin);
+  d.hasTambour = (str('cc-door-tamb', d.hasTambour ? '1' : '0') === '1');
+}
+
+// === Основной расчёт теплопритоков ===
+function _ccCalculate() {
+  _ccCollectFromInputs();
+  const g = _ccState.geom;
+  const ti = _ccState.tInside;
+  const isoByCode = (code) => (CC_INSULATIONS.find(x => x[0] === code) || CC_INSULATIONS[0])[2];
+
+  // Q1 — теплоприток через ограждения (Вт).
+  // k = 1 / (1/α_в + δ_iso/λ_iso + δ_wall/λ_wall + 1/α_н)
+  let q1 = 0;
+  function planeQ(area, isoCode, isoMm, wallMatIdx, tOut) {
+    if (area <= 0) return 0;
+    const lamIso = isoByCode(isoCode);
+    const dIsoM = (isoMm || 0) / 1000;
+    const wm = CC_WALL_MATERIALS[wallMatIdx || 0];
+    const dWallM = (wm[1] || 0) / 1000;
+    const lamWall = wm[2] || 0;
+    const Rwall = (lamWall > 0 && dWallM > 0) ? (dWallM / lamWall) : 0;
+    const Riso = (lamIso > 0 && dIsoM > 0) ? (dIsoM / lamIso) : 0;
+    const R = CC_R_INNER + Riso + Rwall + CC_R_OUTER;
+    const k = R > 0 ? (1 / R) : 0;
+    const dT = Math.max(tOut - ti, 0);
+    return k * area * dT;
+  }
+  // Стены 1..4 — площадь = длина_стены × высота
+  for (let i = 0; i < 4; i++) {
+    const w = g.walls[i];
+    q1 += planeQ(w.len * g.height, w.isoCode, w.isoMm, w.wallMat, w.tOut);
+  }
+  // Пол / Потолок — площадь = средняя ширина × средняя глубина
+  const wAvg = (g.walls[0].len + g.walls[2].len) / 2;
+  const dAvg = (g.walls[1].len + g.walls[3].len) / 2;
+  const floorArea = wAvg * dAvg;
+  q1 += planeQ(floorArea, g.floor.isoCode, g.floor.isoMm, 0, g.floor.tOut);
+  q1 += planeQ(floorArea, g.ceiling.isoCode, g.ceiling.isoMm, 0, g.ceiling.tOut);
+
+  // Q2 — охлаждение / заморозка / просто хранение продукта (Вт).
+  // Q2 = (m × cp × ΔT [+ m × L]) / (τ × 3600)
+  const p = _ccState.product;
+  const prod = CC_PRODUCTS[p.idx] || CC_PRODUCTS[0];
+  const cp1 = prod[2] * 1000;  // в Дж/(кг·К)
+  const cp2 = prod[3] * 1000;
+  const L   = prod[4] * 1000;  // в Дж/кг
+  const tau = Math.max(p.tauHours, 0.1) * 3600;
+  const m   = Math.max(p.massKg, 0);
+  let energy = 0;
+  const mode = _ccState.mode;
+  if (mode === 'freeze') {
+    // Энергия = охлаждение до 0 + кристаллизация + домораживание до t_кон (если ниже 0)
+    const t1 = p.tStart, t2 = p.tEnd;
+    if (t1 > 0)        energy += m * cp1 * (t1 - 0);
+    energy += m * L;
+    if (t2 < 0)        energy += m * cp2 * (0 - t2);
+  } else if (mode === 'cool' || mode === 'storage_mid' || mode === 'storage_low') {
+    // Охлаждение без фазового перехода
+    const dT = Math.max(p.tStart - p.tEnd, 0);
+    const cp = (p.tStart >= 0 && p.tEnd >= 0) ? cp1
+             : (p.tStart < 0 && p.tEnd < 0)   ? cp2
+             : (cp1 + cp2) / 2;
+    energy = m * cp * dT;
+  }
+  // Упаковка: масса = m × pct%, cp по таблице, ΔT та же
+  const pkg = CC_PACKAGES[p.pkgIdx] || CC_PACKAGES[0];
+  const pkgMass = m * (p.pkgPercent / 100);
+  const pkgCp = pkg[2] * 1000;
+  const dTpkg = Math.max(p.tStart - p.tEnd, 0);
+  const energyPkg = pkgMass * pkgCp * dTpkg;
+  const q2 = (energy + energyPkg) / tau;
+
+  // Q3 — люди (Вт)
+  const q3 = _ccState.cond.people * _ccPersonHeat(ti);
+  // Q4 — освещение (Вт), усреднённое по суткам
+  const q4 = _ccState.cond.lightW * (_ccState.cond.lightHrs / 24);
+  // Q5 — электродвигатели (Вт)
+  const q5 = _ccState.cond.motorsW * 0.5;
+  // Q6 — инфильтрация через дверь
+  const dh = (_ccState.door.hMm || 0) / 1000;
+  const dw = (_ccState.door.wMm || 0) / 1000;
+  const doorArea = dh * dw;
+  const doorMin = _ccState.door.openMin || 0;
+  // Среднюю t° за дверью берём как (t_стен_среднюю) — упрощённо.
+  const tDoorOut = g.walls.reduce((s, w) => s + w.tOut, 0) / 4;
+  const dT_door = Math.max(tDoorOut - ti, 0);
+  // ψ × A × мин/сут / минут_в_сутках = Вт усреднённое по суткам.
+  const psi = _ccDoorPsi(dT_door, _ccState.door.hasTambour);
+  const q6 = psi * doorArea * (doorMin / 1440) * dT_door;
+  // (умножили на ΔT дважды? нет — psi уже линеен по ΔT, но он Вт/(мин·м²·К), а
+  // здесь у нас Вт/(м²·К). Скорректируем: убираем второй ΔT.)
+  // Перепишем чисто: средняя инфильтрация (Вт) = 8 × ΔT × A × (min/сут)/1440 × tamb_k
+  const _tambK = _ccState.door.hasTambour ? 0.5 : 1.0;
+  const q6Clean = 8 * dT_door * doorArea * (doorMin / 1440) * _tambK;
+
+  const total = q1 + q2 + q3 + q4 + q5 + q6Clean;
+  // С учётом «работы оборудования X ч/сут»: эффективная нагрузка выше
+  const workCoeff = Math.max(24 / _ccState.workHours, 1);
+  const safety = _ccState.safety || 0;
+  const totalWithSafety = total * workCoeff * (1 + safety / 100);
+  _ccLastResult = {
+    q1, q2, q3, q4, q5, q6: q6Clean,
+    total: total * workCoeff,
+    totalWithSafety,
+    workHours: _ccState.workHours,
+    safety,
+  };
+  // Подсветим вкладку «Результат» и переключимся туда
+  _ccState.activeTab = 'result';
+  _ccRenderModal();
+}
+
+function _ccReset() {
+  if (!confirm('Сбросить все значения калькулятора?')) return;
+  _ccState = _ccDefaults();
+  _ccLastResult = null;
+  _ccRenderModal();
+}
+</script>
 
 </body>
 </html>
