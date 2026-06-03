@@ -2821,6 +2821,69 @@
   .contracts-table .ct-row.s-closed .ct-strip { background: #6B7280; }
   .contracts-table .ct-row.s-draft .ct-strip { background: #9CA3AF; }
   .contracts-table .ct-row:hover { background: var(--bg); }
+
+  /* v2.45.13: подсветка строки по сроку отгрузки.
+     urg-* приоритетнее s-* потому что цвет статуса всё равно остаётся в bage,
+     а полоска слева — самое заметное место для красного флага.
+     Просрочен — пульсация и красный bg-tint, чтоб глаз сразу заметил. */
+  .contracts-table .ct-row.urg-overdue .ct-strip {
+    background: #DC2626 !important;
+    animation: ctStripPulse 1.6s ease-in-out infinite;
+  }
+  .contracts-table .ct-row.urg-overdue {
+    background: rgba(220, 38, 38, 0.06);
+  }
+  .contracts-table .ct-row.urg-overdue:hover {
+    background: rgba(220, 38, 38, 0.12);
+  }
+  .contracts-table .ct-row.urg-urgent .ct-strip {
+    background: #F59E0B !important;
+  }
+  .contracts-table .ct-row.urg-urgent {
+    background: rgba(245, 158, 11, 0.05);
+  }
+  .contracts-table .ct-row.urg-soon .ct-strip {
+    background: #FBBF24 !important;
+  }
+  .contracts-table .ct-row.urg-ok .ct-strip {
+    background: #10B981 !important;
+  }
+  @keyframes ctStripPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .contracts-table .ct-date.ct-date-overdue {
+    color: #B91C1C;
+    font-weight: 700;
+  }
+  .contracts-table .ct-date.ct-date-urgent {
+    color: #92400E;
+    font-weight: 600;
+  }
+  .ct-urg-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-left: 6px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .ct-urg-pill i { font-size: 12px; }
+  .ct-urg-overdue {
+    background: #FEE2E2; color: #B91C1C;
+    animation: ctPillPulse 1.6s ease-in-out infinite;
+  }
+  .ct-urg-urgent {
+    background: #FEF3C7; color: #92400E;
+  }
+  @keyframes ctPillPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
   /* Header теперь имеет такую же сетку (но без полоски — поставим пустую первую ячейку) */
   .contracts-table .ct-header {
     background: #F8F9FB; padding: 11px 18px 11px 14px;
@@ -16325,17 +16388,30 @@
       <h2>Вход в кабинет</h2>
 
       <!-- ЭТАП 28: вкладки выбора способа входа -->
+      <!-- v2.45.13: по умолчанию открыта "По паролю" (пользователи редко логинятся через Telegram) -->
       <div class="login-tabs">
-        <button class="login-tab active" data-login-tab="telegram" onclick="switchLoginTab('telegram')">
-          <i class="ti ti-brand-telegram"></i> Через Telegram
-        </button>
-        <button class="login-tab" data-login-tab="password" onclick="switchLoginTab('password')">
+        <button class="login-tab active" data-login-tab="password" onclick="switchLoginTab('password')">
           <i class="ti ti-key"></i> По паролю
+        </button>
+        <button class="login-tab" data-login-tab="telegram" onclick="switchLoginTab('telegram')">
+          <i class="ti ti-brand-telegram"></i> Через Telegram
         </button>
       </div>
 
+      <!-- Вкладка: Пароль (по умолчанию) -->
+      <div class="login-tab-body" id="login-body-password">
+        <p>Введите ваш пароль. Имя определится автоматически.</p>
+        <div class="steps" style="background:transparent; padding:0 0 12px;">
+          Пароль выдаёт директор. Если забыли — обратитесь к нему.
+        </div>
+        <input type="password" id="password-input" class="code-input"
+               placeholder="Ваш пароль" autocomplete="current-password"
+               style="letter-spacing:normal; font-size:18px; text-align:left; padding:14px 16px;">
+        <button class="btn btn-primary btn-full" id="password-submit-btn" onclick="submitPassword()">Войти</button>
+      </div>
+
       <!-- Вкладка: Telegram -->
-      <div class="login-tab-body" id="login-body-telegram">
+      <div class="login-tab-body" id="login-body-telegram" style="display:none;">
         <p>Получите одноразовый код у Telegram-бота и введите его ниже.</p>
         <div class="steps">
           1. Откройте <a href="https://t.me/AtomusgroupBot" target="_blank" class="telegram-link">@AtomusgroupBot</a><br/>
@@ -16346,18 +16422,6 @@
                placeholder="000000" maxlength="6"
                inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*">
         <button class="btn btn-primary btn-full" id="submit-btn" onclick="submitCode()">Войти</button>
-      </div>
-
-      <!-- Вкладка: Пароль -->
-      <div class="login-tab-body" id="login-body-password" style="display:none;">
-        <p>Введите ваш пароль. Имя определится автоматически.</p>
-        <div class="steps" style="background:transparent; padding:0 0 12px;">
-          Пароль выдаёт директор. Если забыли — обратитесь к нему.
-        </div>
-        <input type="password" id="password-input" class="code-input"
-               placeholder="Ваш пароль" autocomplete="current-password"
-               style="letter-spacing:normal; font-size:18px; text-align:left; padding:14px 16px;">
-        <button class="btn btn-primary btn-full" id="password-submit-btn" onclick="submitPassword()">Войти</button>
       </div>
 
       <div class="status" id="login-status"></div>
@@ -18939,7 +19003,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.10-qr-logo-above";
+const APP_VERSION = "v2.45.13-login-password-first";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -36144,14 +36208,26 @@ function renderContractsList() {
       else desc.push('поставка');
       desc.push(legalEntityShortName(c.legal_entity));
       const statusCls = c.status ? ('s-' + c.status) : '';
-      html += '<div class="ct-row ' + statusCls + '" onclick="openContract(' + c.id + ')">' +
+      // v2.45.13: подсветка по сроку отгрузки
+      const urgCls = getContractUrgencyClass(c);
+      const isOverdue = urgCls === 'urg-overdue';
+      const isUrgent  = urgCls === 'urg-urgent';
+      // Плашка ПРОСРОЧЕН / ГОРИТ рядом со статусом
+      let urgPill = '';
+      if (isOverdue) {
+        urgPill = ' <span class="ct-urg-pill ct-urg-overdue" title="Срок отгрузки прошёл"><i class="ti ti-alert-triangle"></i>ПРОСРОЧЕН</span>';
+      } else if (isUrgent) {
+        urgPill = ' <span class="ct-urg-pill ct-urg-urgent" title="Срок отгрузки ≤ 3 дней"><i class="ti ti-clock"></i>ГОРИТ</span>';
+      }
+      const deliveryCls = 'ct-date' + (isOverdue ? ' ct-date-overdue' : isUrgent ? ' ct-date-urgent' : '');
+      html += '<div class="ct-row ' + statusCls + ' ' + urgCls + '" onclick="openContract(' + c.id + ')">' +
         '<div class="ct-strip"></div>' + // v2.43.58: цветной индикатор статуса
         '<div class="ct-number">' + escapeHtml(c.number || '—') + '</div>' +
         '<div class="ct-name">' + escapeHtml(c.contractor_name || '—') +
           '<small>' + escapeHtml(desc.join(' · ')) + '</small></div>' +
-        '<div class="ct-status">' + statusBadgeHtml(c.status, c.status_label) + '</div>' +
+        '<div class="ct-status">' + statusBadgeHtml(c.status, c.status_label) + urgPill + '</div>' +
         '<div class="ct-date">' + (c.sign_date ? formatDate(c.sign_date) + '.' + (c.sign_date.split('-')[0].slice(2)) : '—') + '</div>' +
-        '<div class="ct-date">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</div>' +
+        '<div class="' + deliveryCls + '">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</div>' +
         '<div class="ct-sum">' + formatMoney(c.sum_amount) + '</div>' +
         '<div class="ct-manager">' + escapeHtml(c.manager_name || '—') + '</div>' +
         '<div class="ct-arrow"><i class="ti ti-chevron-right"></i></div>' +
