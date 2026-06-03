@@ -18939,7 +18939,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.8-qr-logo-fix";
+const APP_VERSION = "v2.45.9-qr-logo-corner";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38523,8 +38523,8 @@ function renderPackingListPrint(box) {
         'var c=el.querySelector("canvas");if(!c)return;' +
         'var img=new Image();img.crossOrigin="anonymous";' +
         'img.onload=function(){' +
-          'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.22),cx=Math.round((w-ls)/2),p=Math.round(ls*0.08);' +
-          'ctx.fillStyle="#fff";ctx.fillRect(cx-p,cx-p,ls+2*p,ls+2*p);ctx.drawImage(img,cx,cx,ls,ls);' +
+          'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.14),off=Math.round(w*0.02),x=w-ls-off,y=w-ls-off,p=Math.round(ls*0.10);' +
+          'ctx.fillStyle="#fff";ctx.fillRect(x-p,y-p,ls+2*p,ls+2*p);ctx.drawImage(img,x,y,ls,ls);' +
           'var di=el.querySelector("img");if(di){try{di.src=c.toDataURL("image/png");}catch(_){}}' +
           'setTimeout(function(){window.print();},300);' +
         '};' +
@@ -52502,13 +52502,20 @@ function generateQrWithLogo(el, opts) {
         if (img) {
           const ctx = canvas.getContext('2d');
           const w = canvas.width;
-          const logoSize = Math.round(w * 0.22);      // ~22% от стороны QR
-          const cx = Math.round((w - logoSize) / 2);
+          // v2.45.9: лого в правом нижнем углу, ~14% от стороны.
+          // QR имеет три Finder Patterns (большие квадраты-ориентиры) в углах:
+          // левом-верхнем, правом-верхнем, левом-нижнем. Правый нижний угол —
+          // единственный свободный, туда можно безопасно положить лого. На
+          // уровне коррекции H (30%) перекрытие 14% данных читается уверенно.
+          const logoSize = Math.round(w * 0.14);
+          const offset = Math.round(w * 0.02);
+          const x = w - logoSize - offset;
+          const y = w - logoSize - offset;
           // Белая подложка чуть больше лого
-          const padBg = Math.round(logoSize * 0.08);
+          const padBg = Math.round(logoSize * 0.10);
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(cx - padBg, cx - padBg, logoSize + 2 * padBg, logoSize + 2 * padBg);
-          ctx.drawImage(img, cx, cx, logoSize, logoSize);
+          ctx.fillRect(x - padBg, y - padBg, logoSize + 2 * padBg, logoSize + 2 * padBg);
+          ctx.drawImage(img, x, y, logoSize, logoSize);
         }
         // Перерисовываем видимый <img> из обновлённого canvas
         const dupImg = el.querySelector('img');
@@ -52920,8 +52927,8 @@ function renderLabelsForPrint() {
         'img.onload=function(){' +
           'document.querySelectorAll(".lbl-qr-wrap").forEach(function(wrap){' +
             'var c=wrap.querySelector("canvas");if(!c)return;' +
-            'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.22),cx=Math.round((w-ls)/2),p=Math.round(ls*0.08);' +
-            'ctx.fillStyle="#fff";ctx.fillRect(cx-p,cx-p,ls+2*p,ls+2*p);ctx.drawImage(img,cx,cx,ls,ls);' +
+            'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.14),off=Math.round(w*0.02),x=w-ls-off,y=w-ls-off,p=Math.round(ls*0.10);' +
+            'ctx.fillStyle="#fff";ctx.fillRect(x-p,y-p,ls+2*p,ls+2*p);ctx.drawImage(img,x,y,ls,ls);' +
             'var di=wrap.querySelector("img");if(di){try{di.src=c.toDataURL("image/png");}catch(_){}}' +
           '});' +
           'setTimeout(function(){window.print();},300);' +
