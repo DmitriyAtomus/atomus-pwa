@@ -1079,6 +1079,59 @@
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
   }
 
+  /* v2.45.18: цветовое кодирование вкладок «Заказы поставщикам».
+     Каждой стадии лайфцикла свой цвет — глаз сразу выхватывает где
+     лежит работа. Неактивные вкладки тонко окрашены, активная —
+     полный градиент в цвете статуса. Цвета согласованы с
+     .sup-status-pill.ord-*. */
+  .filter-tab[data-sup-ord] {
+    padding-left: 14px; padding-right: 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .filter-tab[data-sup-ord] i { font-size: 14px; }
+
+  /* Черновики — серый */
+  .filter-tab[data-sup-ord="draft"]                  { background:#F4F4F5;  color:#52525B; border-color:#E4E4E7; }
+  .filter-tab[data-sup-ord="draft"].active           { background:linear-gradient(135deg,#71717A,#52525B); color:white; box-shadow:0 2px 8px rgba(82,82,91,0.25); }
+
+  /* Отправлены — голубой */
+  .filter-tab[data-sup-ord="sent"]                   { background:#EFF6FF;  color:#1D4ED8; border-color:#DBEAFE; }
+  .filter-tab[data-sup-ord="sent"].active            { background:linear-gradient(135deg,#3B82F6,#2563EB); color:white; box-shadow:0 2px 8px rgba(37,99,235,0.30); }
+
+  /* Ждут счёт — янтарный */
+  .filter-tab[data-sup-ord="awaiting_invoice"]       { background:#FFFBEB;  color:#92400E; border-color:#FDE68A; }
+  .filter-tab[data-sup-ord="awaiting_invoice"].active{ background:linear-gradient(135deg,#F59E0B,#D97706); color:white; box-shadow:0 2px 8px rgba(217,119,6,0.30); }
+
+  /* Счёт пришёл — фиолетовый */
+  .filter-tab[data-sup-ord="invoice_received"]       { background:#F5F3FF;  color:#5B21B6; border-color:#DDD6FE; }
+  .filter-tab[data-sup-ord="invoice_received"].active{ background:linear-gradient(135deg,#8B5CF6,#7C3AED); color:white; box-shadow:0 2px 8px rgba(124,58,237,0.30); }
+
+  /* К оплате — оранжевый */
+  .filter-tab[data-sup-ord="to_pay"]                 { background:#FFF7ED;  color:#9A3412; border-color:#FED7AA; }
+  .filter-tab[data-sup-ord="to_pay"].active          { background:linear-gradient(135deg,#FB923C,#EA580C); color:white; box-shadow:0 2px 8px rgba(234,88,12,0.30); }
+
+  /* Оплачены — индиго */
+  .filter-tab[data-sup-ord="paid"]                   { background:#EEF2FF;  color:#3730A3; border-color:#C7D2FE; }
+  .filter-tab[data-sup-ord="paid"].active            { background:linear-gradient(135deg,#6366F1,#4F46E5); color:white; box-shadow:0 2px 8px rgba(79,70,229,0.30); }
+
+  /* Частично — лайм */
+  .filter-tab[data-sup-ord="partial"]                { background:#FEFCE8;  color:#854D0E; border-color:#FEF08A; }
+  .filter-tab[data-sup-ord="partial"].active         { background:linear-gradient(135deg,#EAB308,#CA8A04); color:white; box-shadow:0 2px 8px rgba(202,138,4,0.30); }
+
+  /* Получены — зелёный */
+  .filter-tab[data-sup-ord="received"]               { background:#ECFDF5;  color:#065F46; border-color:#A7F3D0; }
+  .filter-tab[data-sup-ord="received"].active        { background:linear-gradient(135deg,#10B981,#059669); color:white; box-shadow:0 2px 8px rgba(5,150,105,0.30); }
+
+  /* Открытые / Все — нейтральный синий */
+  .filter-tab[data-sup-ord="open"].active            { background:linear-gradient(135deg,#3B82F6,#2563EB); color:white; box-shadow:0 2px 8px rgba(37,99,235,0.30); }
+  .filter-tab[data-sup-ord="all"].active             { background:linear-gradient(135deg,#475569,#334155); color:white; box-shadow:0 2px 8px rgba(51,65,85,0.30); }
+
+  /* Hover: подсветка границы цветом таба */
+  .filter-tab[data-sup-ord]:not(.active):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px -2px rgba(15, 23, 42, 0.18);
+  }
+
   /* ============ ЭТАП 28.1: ТАБЫ СКЛАДА ============ */
   .wh-tabs {
     display: flex;
@@ -18185,16 +18238,16 @@
           <div class="desktop-layout">
             <div class="filter-row">
               <div class="filter-tabs">
-                <button class="filter-tab active" data-sup-ord="open"              onclick="setSupplyOrdFilter('open')">Открытые</button>
-                <button class="filter-tab"        data-sup-ord="draft"             onclick="setSupplyOrdFilter('draft')">Черновики</button>
-                <button class="filter-tab"        data-sup-ord="sent"              onclick="setSupplyOrdFilter('sent')">Отправлены</button>
-                <button class="filter-tab"        data-sup-ord="awaiting_invoice"  onclick="setSupplyOrdFilter('awaiting_invoice')">Ждут счёт</button>
-                <button class="filter-tab"        data-sup-ord="invoice_received"  onclick="setSupplyOrdFilter('invoice_received')">Счёт пришёл</button>
-                <button class="filter-tab"        data-sup-ord="to_pay"            onclick="setSupplyOrdFilter('to_pay')">К оплате</button>
-                <button class="filter-tab"        data-sup-ord="paid"              onclick="setSupplyOrdFilter('paid')">Оплачены</button>
-                <button class="filter-tab"        data-sup-ord="partial"           onclick="setSupplyOrdFilter('partial')">Частично</button>
-                <button class="filter-tab"        data-sup-ord="received"          onclick="setSupplyOrdFilter('received')">Получены</button>
-                <button class="filter-tab"        data-sup-ord="all"               onclick="setSupplyOrdFilter('all')">Все</button>
+                <button class="filter-tab active" data-sup-ord="open"              onclick="setSupplyOrdFilter('open')"><i class="ti ti-folder-open"></i> Открытые</button>
+                <button class="filter-tab"        data-sup-ord="draft"             onclick="setSupplyOrdFilter('draft')"><i class="ti ti-pencil"></i> Черновики</button>
+                <button class="filter-tab"        data-sup-ord="sent"              onclick="setSupplyOrdFilter('sent')"><i class="ti ti-send"></i> Отправлены</button>
+                <button class="filter-tab"        data-sup-ord="awaiting_invoice"  onclick="setSupplyOrdFilter('awaiting_invoice')"><i class="ti ti-clock"></i> Ждут счёт</button>
+                <button class="filter-tab"        data-sup-ord="invoice_received"  onclick="setSupplyOrdFilter('invoice_received')"><i class="ti ti-file-invoice"></i> Счёт пришёл</button>
+                <button class="filter-tab"        data-sup-ord="to_pay"            onclick="setSupplyOrdFilter('to_pay')"><i class="ti ti-wallet"></i> К оплате</button>
+                <button class="filter-tab"        data-sup-ord="paid"              onclick="setSupplyOrdFilter('paid')"><i class="ti ti-cash"></i> Оплачены</button>
+                <button class="filter-tab"        data-sup-ord="partial"           onclick="setSupplyOrdFilter('partial')"><i class="ti ti-progress"></i> Частично</button>
+                <button class="filter-tab"        data-sup-ord="received"          onclick="setSupplyOrdFilter('received')"><i class="ti ti-package-import"></i> Получены</button>
+                <button class="filter-tab"        data-sup-ord="all"               onclick="setSupplyOrdFilter('all')"><i class="ti ti-list"></i> Все</button>
               </div>
             </div>
           </div>
@@ -19014,7 +19067,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.17-inbox-body";
+const APP_VERSION = "v2.45.18-supply-tabs-colors";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
