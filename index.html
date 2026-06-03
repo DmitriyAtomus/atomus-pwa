@@ -19079,7 +19079,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.24-invoice-inline-preview";
+const APP_VERSION = "v2.45.25-invoice-preview-error";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45699,7 +45699,14 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     if (!r.ok) {
-      cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Не удалось загрузить счёт.</div>';
+      // v2.45.25: показываем реальный текст от сервера (он содержит ключ файла
+      // и подсказку «файл удалили из storage / сменили S3-bucket»).
+      let serverMsg = '';
+      try { const d = await r.json(); serverMsg = d.message || d.error || ''; } catch (e) {}
+      cont.innerHTML = '<div style="padding:14px;color:var(--danger);font-size:13px;line-height:1.5;">' +
+        '<b>Не удалось загрузить счёт (HTTP ' + r.status + ').</b>' +
+        (serverMsg ? '<br><span style="color:var(--text-mid);">' + escapeHtml(serverMsg) + '</span>' : '') +
+      '</div>';
       return;
     }
     const ct = (r.headers.get('Content-Type') || '').toLowerCase();
