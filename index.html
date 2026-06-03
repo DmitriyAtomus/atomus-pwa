@@ -18939,7 +18939,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.5-orders-bulk-delete";
+const APP_VERSION = "v2.45.6-spec-mark-ready";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20925,6 +20925,34 @@ async function reopenSpecItemAssemblies(contractId, itemId, modelId) {
 }
 
 // v2.43.18: пакетная пометка всех in_progress-assembly позиции спецификации готовыми.
+// v2.45.6: «Уже готово» — создаёт ready-assembly для модели позиции,
+// чтобы спецификация моментально стала «В резерве» (для случаев, когда
+// изделие физически уже сделано — не надо проходить полный pipeline).
+async function markSpecItemReady(contractId, itemId) {
+  if (!confirm('Создать готовую сборку для этой позиции и положить в резерв?\n\nИспользуй, если товар уже физически готов на складе и не нужно проходить производство.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/items/' + itemId + '/mark-ready', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    });
+    if (r.status === 401 || r.status === 403) {
+      showToast('Сессия истекла — обнови страницу (F5) и попробуй снова', 'error');
+      return;
+    }
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    const j = await r.json();
+    showToast('Готово — позиция в резерве (' + (j.qty || 0) + ' шт.)', 'success');
+    await _afterAssemblyStatusChange(contractId);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка операции', 'error');
+  }
+}
+
 async function finishSpecItemAssemblies(contractId, itemId, modelId) {
   if (!confirm('Отметить все сборки этой позиции готовыми? Появится приход на склад.')) return;
   try {
@@ -36644,6 +36672,13 @@ function renderContractItemsBlock(contractId) {
             _quickAction = ' <button class="spec-quick-act sqa-ok" title="Отметить все сборки в работе готовыми" ' +
               'onclick="finishSpecItemAssemblies(' + contractId + ',' + it.id + ',' + it.model_id + ')">' +
               '<i class="ti ti-check"></i></button>';
+          } else {
+            // v2.45.6: ничего нет → «К сборке». Кнопка «Уже готово»
+            // создаёт ready-assembly на нужный qty одним кликом — для случаев когда
+            // изделие физически уже сделано и не нужен полный production pipeline.
+            _quickAction = ' <button class="spec-quick-act sqa-ok" title="Уже готово — создать готовую сборку и положить в резерв" ' +
+              'onclick="markSpecItemReady(' + contractId + ',' + it.id + ')">' +
+              '<i class="ti ti-check"></i>&nbsp;Уже готово</button>';
           }
         }
         const meta = metaParts.join(' · ');
