@@ -19079,7 +19079,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.23-bom-unit-override";
+const APP_VERSION = "v2.45.24-invoice-inline-preview";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45391,11 +45391,14 @@ function renderSupplyOrderDetail(o) {
     '<div class="detail-block-title"><i class="ti ti-receipt"></i> Счёт от поставщика</div>' +
     '<div style="padding:8px 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">';
   if (o.invoice_file_key && o.invoice_filename) {
+    const fnEsc = escapeHtml(o.invoice_filename).replace(/'/g, "\\'");
     html += '<i class="ti ti-file-check" style="color:#0A5B41;font-size:20px;"></i>' +
       '<div style="flex:1;min-width:200px;">' +
         '<div style="font-size:13px;color:var(--text-dark);">' + escapeHtml(o.invoice_filename) + '</div>' +
         '<div style="font-size:11.5px;color:var(--text-light);">Счёт привязан к заказу</div>' +
       '</div>' +
+      // v2.45.24: inline-просмотр PDF/изображения без скачивания
+      '<button class="btn btn-secondary" onclick="toggleSupplyOrderInvoicePreview(' + o.id + ',\'' + fnEsc + '\')" id="sup-inv-preview-btn-' + o.id + '"><i class="ti ti-eye"></i> Просмотреть</button>' +
       '<button class="btn btn-secondary" onclick="downloadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-download"></i> Скачать</button>';
     if (canUploadInvoice) {
       html += '<button class="btn btn-secondary" onclick="uploadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-refresh"></i> Заменить</button>';
@@ -45406,7 +45409,12 @@ function renderSupplyOrderDetail(o) {
   } else {
     html += '<div style="color:var(--text-light);font-size:13px;">Счёт ещё не загружен.</div>';
   }
-  html += '</div></div>';
+  html += '</div>';
+  // v2.45.24: контейнер inline-предпросмотра — закрыт по умолчанию
+  if (o.invoice_file_key && o.invoice_filename) {
+    html += '<div id="sup-inv-preview-' + o.id + '" style="display:none;padding:0 4px 8px;" data-open="0"></div>';
+  }
+  html += '</div>';
 
   // Позиции заказа
   html += '<div class="detail-block">' +
@@ -45662,6 +45670,55 @@ function uploadSupplyOrderInvoice(orderId) {
   });
   document.body.appendChild(input);
   input.click();
+}
+
+// v2.45.24: раскрыть/свернуть просмотр счёта прямо в карточке (без скачивания).
+// PDF и картинки рендерим inline; для остальных типов оставляем сообщение
+// со ссылкой на «Скачать» — браузер не умеет показывать Excel.
+async function toggleSupplyOrderInvoicePreview(orderId, filename) {
+  const cont = document.getElementById('sup-inv-preview-' + orderId);
+  const btn  = document.getElementById('sup-inv-preview-btn-' + orderId);
+  if (!cont) return;
+  if (cont.dataset.open === '1') {
+    // Закрываем — освобождаем blob URL чтобы не текла память
+    const node = cont.querySelector('[data-blob-url]');
+    if (node && node.dataset.blobUrl) URL.revokeObjectURL(node.dataset.blobUrl);
+    cont.innerHTML = '';
+    cont.style.display = 'none';
+    cont.dataset.open = '0';
+    if (btn) btn.innerHTML = '<i class="ti ti-eye"></i> Просмотреть';
+    return;
+  }
+  cont.innerHTML = '<div style="padding:14px;color:var(--text-light);text-align:center;">Загружаем…</div>';
+  cont.style.display = 'block';
+  cont.dataset.open = '1';
+  if (btn) btn.innerHTML = '<i class="ti ti-eye-off"></i> Скрыть';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/invoice/download', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Не удалось загрузить счёт.</div>';
+      return;
+    }
+    const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const fn = (filename || '').toLowerCase();
+    const isPdf = ct.includes('pdf') || fn.endsWith('.pdf');
+    const isImg = ct.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/.test(fn);
+    if (isPdf) {
+      cont.innerHTML = '<iframe data-blob-url="' + url + '" src="' + url + '#view=FitH" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
+    } else if (isImg) {
+      cont.innerHTML = '<img data-blob-url="' + url + '" src="' + url + '" alt="Счёт" style="max-width:100%;max-height:80vh;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;" />';
+    } else {
+      URL.revokeObjectURL(url);
+      cont.innerHTML = '<div style="padding:14px;background:var(--bg);border-radius:8px;color:var(--text-mid);font-size:13px;">Этот формат не отображается в браузере (например, Excel). Жми <b>Скачать</b>, чтобы открыть в локальной программе.</div>';
+    }
+  } catch (e) {
+    cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Ошибка загрузки счёта.</div>';
+  }
 }
 
 async function downloadSupplyOrderInvoice(orderId) {
