@@ -19079,7 +19079,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.26-bom-submodel";
+const APP_VERSION = "v2.45.27-bom-submodel-fix";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -34560,19 +34560,17 @@ async function openBomModelPicker(parentModelId) {
   if (!cache.modelsForBom) {
     try {
       const r = await apiGet('/api/models');
-      // /api/models отдаёт {directions:[{name, models:[...]}, ...]} — расплющиваем
-      const list = [];
-      (r.directions || []).forEach(dir => {
-        (dir.models || []).forEach(mo => {
-          if (mo.is_active === 0) return;
-          list.push({
-            id: mo.id,
-            name: mo.name,
-            article: mo.article || '',
-            direction_name: dir.name || '',
-          });
-        });
-      });
+      // /api/models отдаёт {models:[{id,name,article,direction_id,is_active}, ...], directions:[...]}
+      const dirById = {};
+      (r.directions || []).forEach(d => { dirById[d.id] = d.name || ''; });
+      const list = (r.models || [])
+        .filter(mo => mo.is_active !== false && mo.is_active !== 0)
+        .map(mo => ({
+          id: mo.id,
+          name: mo.name,
+          article: mo.article || '',
+          direction_name: dirById[mo.direction_id] || '—',
+        }));
       cache.modelsForBom = list;
     } catch (e) { cache.modelsForBom = []; }
   }
