@@ -19079,8 +19079,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.20-delete-assembly";
-const APP_VERSION_DATE = "29.05.2026";
+const APP_VERSION = "v2.45.23-bom-unit-override";
+const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -34264,12 +34264,13 @@ async function loadModelBom(modelId) {
           '</div>' +
         '</div>' +
         '<div class="bom-qty"><div class="bom-qty-num">' + _fmtQty(need) + '</div>' +
-          '<div class="bom-qty-lbl">' + escapeHtml(it.component_unit || 'шт.') + ' / ед.</div></div>' +
+          // v2.45.23: показываем unit_override если задан, иначе components.unit
+          '<div class="bom-qty-lbl">' + escapeHtml(it.unit_override || it.component_unit || 'шт.') + ' / ед.</div></div>' +
         '<div class="bom-stock' + (lowFlag ? ' low' : '') + '"><div class="bom-stock-num">' + _fmtQty(have) + '</div>' +
           '<div class="bom-qty-lbl">в наличии</div></div>' +
         (canManageSales() ?
           '<div class="bom-actions">' +
-            '<button class="btn btn-secondary btn-small" onclick="openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',' + (it.component_id || 0) + ',\'' + escapeHtml(it.component_name || '').replace(/'/g, "\\'") + '\')" title="Изменить"><i class="ti ti-edit"></i></button>' +
+            '<button class="btn btn-secondary btn-small" onclick="openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',' + (it.component_id || 0) + ',\'' + escapeHtml(it.component_name || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.unit_override || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.component_unit || '').replace(/'/g, "\\'") + '\')" title="Изменить"><i class="ti ti-edit"></i></button>' +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
       '</div>';
@@ -34322,8 +34323,22 @@ async function openBomAddItem(modelId) {
             '<i class="ti ti-plus"></i> Новое' +
           '</button>' +
         '</div>' +
-        '<label class="form-label">Количество на 1 ед. изделия *</label>' +
-        '<input type="number" id="bom-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">' +
+          '<div>' +
+            '<label class="form-label">Количество на 1 ед. *</label>' +
+            '<input type="number" id="bom-qty" class="form-input" value="1" min="0.01" step="0.01" />' +
+          '</div>' +
+          '<div>' +
+            // v2.45.23: можно переопределить единицу для этой строки BOM
+            '<label class="form-label">Единица (можно сменить)</label>' +
+            '<input type="text" id="bom-unit-override" class="form-input" list="bom-unit-list" placeholder="из карточки комплектующего" />' +
+            '<datalist id="bom-unit-list">' +
+              ['шт.', 'м', 'м²', 'м³', 'кг', 'г', 'л', 'мл', 'упак.', 'компл.', 'рул.']
+                .map(u => '<option value="' + u + '"></option>').join('') +
+            '</datalist>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Пусто = единица берётся из карточки компонента. Заполните, если в этой модели нужно другое (например, трубки в метрах).</div>' +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
           '<input type="checkbox" id="bom-critical" checked />' +
           '<span><b>Критичное</b> — без него сборка не создаётся</span></label>' +
@@ -34576,6 +34591,8 @@ async function submitBomAddItem(modelId) {
   const qty_required = parseFloat(document.getElementById('bom-qty').value);
   const is_critical = document.getElementById('bom-critical').checked;
   const comment = (document.getElementById('bom-comment').value || '').trim();
+  // v2.45.23: единица переопределяется на уровне BOM-строки (пусто = из компонента)
+  const unit_override = (document.getElementById('bom-unit-override')?.value || '').trim();
   if (!component_id) { showToast('Выбери комплектующее из каталога', 'error'); return; }
   if (isNaN(qty_required) || qty_required <= 0) {
     showToast('Укажи количество', 'error'); return;
@@ -34585,7 +34602,7 @@ async function submitBomAddItem(modelId) {
     const r = await fetch(API_BASE + '/api/models/' + modelId + '/bom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ component_id, qty_required, is_critical, comment }),
+      body: JSON.stringify({ component_id, qty_required, is_critical, comment, unit_override }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -34601,7 +34618,7 @@ async function submitBomAddItem(modelId) {
 // v2.43.81: добавлено редактирование названия компонента прямо из BOM.
 // Имя живёт на самом компоненте (таблица components), поэтому переименование
 // затрагивает все модели, где этот компонент стоит.
-function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName) {
+function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName, unitOverride, componentUnit) {
   let m = document.getElementById('bom-edit-modal');
   if (!m) {
     m = document.createElement('div');
@@ -34612,6 +34629,10 @@ function openBomEditItem(bomId, qty, isCritical, comment, componentId, component
   }
   const cName = componentName || '';
   const cId = componentId || 0;
+  const uOver = (unitOverride || '').trim();
+  const cUnit = (componentUnit || 'шт.').trim();
+  // v2.45.23: список типовых единиц + плейсхолдер с базовой ед. компонента
+  const unitOpts = ['шт.', 'м', 'м²', 'м³', 'кг', 'г', 'л', 'мл', 'упак.', 'компл.', 'рул.'];
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
       '<div class="modal-header"><h3><i class="ti ti-edit"></i> Изменить позицию</h3>' +
@@ -34620,8 +34641,18 @@ function openBomEditItem(bomId, qty, isCritical, comment, componentId, component
         '<label class="form-label">Название компонента</label>' +
         '<input type="text" id="bome-name" class="form-input" value="' + escapeHtml(cName) + '" data-orig="' + escapeHtml(cName) + '" style="margin-bottom:6px;" />' +
         '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Переименование затронет ВСЕ модели, где этот компонент используется (он живёт в общем справочнике).</div>' +
-        '<label class="form-label">Количество на 1 ед. *</label>' +
-        '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">' +
+          '<div>' +
+            '<label class="form-label">Количество на 1 ед. *</label>' +
+            '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" />' +
+          '</div>' +
+          '<div>' +
+            '<label class="form-label">Единица в этой модели</label>' +
+            '<input type="text" id="bome-unit-override" class="form-input" list="bome-unit-list" value="' + escapeHtml(uOver) + '" placeholder="' + escapeHtml(cUnit) + ' (как в карточке)" />' +
+            '<datalist id="bome-unit-list">' + unitOpts.map(u => '<option value="' + u + '"></option>').join('') + '</datalist>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Базовая единица компонента: <b>' + escapeHtml(cUnit) + '</b>. Если в этой модели измеряется иначе (например, трубки в метрах) — впишите сюда. Пусто = брать из компонента.</div>' +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
           '<input type="checkbox" id="bome-critical"' + (isCritical ? ' checked' : '') + ' />' +
           '<span><b>Критичное</b></span></label>' +
@@ -34639,6 +34670,8 @@ async function submitBomEditItem(bomId, componentId) {
   const qty_required = parseFloat(document.getElementById('bome-qty').value);
   const is_critical = document.getElementById('bome-critical').checked;
   const comment = (document.getElementById('bome-comment').value || '').trim();
+  // v2.45.23: пустая строка → NULL → fallback на components.unit
+  const unit_override = (document.getElementById('bome-unit-override')?.value || '').trim();
   const nameInp = document.getElementById('bome-name');
   const newName = (nameInp && nameInp.value || '').trim();
   const origName = (nameInp && nameInp.dataset.orig || '').trim();
@@ -34653,11 +34686,11 @@ async function submitBomEditItem(bomId, componentId) {
       });
       if (!rn.ok) { showToast('Не удалось переименовать компонент', 'error'); return; }
     }
-    // 2) qty / critical / comment — патчим BOM-строку
+    // 2) qty / critical / comment / unit_override — патчим BOM-строку
     const r = await fetch(API_BASE + '/api/bom/' + bomId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ qty_required, is_critical, comment }),
+      body: JSON.stringify({ qty_required, is_critical, comment, unit_override }),
     });
     if (!r.ok) { showToast('Не удалось сохранить', 'error'); return; }
     showToast('Сохранено', 'success');
@@ -35778,7 +35811,7 @@ async function _doBomPreview() {
         '<div class="bom-preview-name">' + escapeHtml(it.component_name) +
           (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') + '</div>' +
         '<div class="bom-preview-qty">' +
-          '<b>' + _fmtQty(it.qty_need_total) + '</b> ' + escapeHtml(it.component_unit) +
+          '<b>' + _fmtQty(it.qty_need_total) + '</b> ' + escapeHtml(it.unit_override || it.component_unit || '') +
           '<span class="bom-preview-stock"> (есть ' + _fmtQty(it.qty_have) + ')</span>' +
         '</div></div>';
     });
