@@ -141,10 +141,9 @@
 const NS="http://www.w3.org/2000/svg";
 let sceneByK={};
 
-// MOBILE-FIX (Atomus, v2.44.89): обработчик вкладок регистрируем СРАЗУ при
-// загрузке, до создания 3D-сцен. На мобильных WebGL-лимит ~8 контекстов; если
-// 9-я сцена бросит исключение — вёрстка вкладок продолжит работать.
-// (Старый дубль ниже в файле теперь no-op — повторная регистрация безвредна.)
+// MOBILE-FIX (Atomus): обработчик вкладок регистрируем СРАЗУ при загрузке,
+// до создания 3D-сцен. На мобильных WebGL-лимит ~8 контекстов; если 9-я
+// сцена бросит исключение — вёрстка вкладок продолжит работать.
 document.querySelectorAll('.tab').forEach(function(tb){
   tb.addEventListener('click',function(){
     const k=tb.dataset.k;
@@ -791,6 +790,11 @@ loop();scenes.forEach(function(o){syncRot(o);});
 document.querySelectorAll('.rotB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.spin=!o.spin;syncRot(o);});});
 document.querySelectorAll('.vB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.setView(b.dataset.v);});});
 document.querySelectorAll('.dimB').forEach(function(b){b.addEventListener('click',function(){const o=scenes.find(function(s){return s.key===b.dataset.t;});o.showDim=!o.showDim;b.classList.toggle('on',o.showDim);o.anno.style.display=o.showDim?'block':'none';});});
+// На узких экранах (телефон) размеры по умолчанию выключены — иначе подписи налезают и обрезаются.
+if(window.matchMedia&&window.matchMedia('(max-width:640px)').matches){
+  scenes.forEach(function(o){o.showDim=false;if(o.anno)o.anno.style.display='none';});
+  document.querySelectorAll('.dimB').forEach(function(b){b.classList.remove('on');});
+}
 
 sceneByK={'3d':main,'rm':rm,'cl':cl,'ob':ob,'pd':pd,'pr':pr,'dk':dk,'pv':pv,'room':room};
 (function(){var b=document.getElementById('pvExp');if(b&&pv.expT){b.addEventListener('click',function(){pv.expT();this.classList.toggle('on');});}})();
