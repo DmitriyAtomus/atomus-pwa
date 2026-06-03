@@ -19079,7 +19079,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.25-invoice-preview-error";
+const APP_VERSION = "v2.45.26-bom-submodel";
 const APP_VERSION_DATE = "03.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -34235,7 +34235,9 @@ async function loadModelBom(modelId) {
     }
     let html = '<div class="bom-table">';
     items.forEach(it => {
-      const have = parseFloat(it.component_qty || 0);
+      // v2.45.24: строка может быть «компонент» или «подсборка» (kind='model')
+      const isModel = (it.kind === 'model');
+      const have = parseFloat((isModel ? it.child_model_qty : it.component_qty) || 0);
       const need = parseFloat(it.qty_required || 0);
       const lowFlag = have < need;
       const commentEsc = String(it.comment || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -34248,29 +34250,42 @@ async function loadModelBom(modelId) {
           const shortBy = _fmtQty(need - have);
           stockBadge = ' <span class="bom-stock-badge bsb-empty" title="Хватит только на часть"><i class="ti ti-alert-triangle"></i>Не хватает: ' + shortBy + '</span>';
         } else {
-          stockBadge = ' <span class="bom-stock-badge bsb-shortage" title="На складе нет"><i class="ti ti-shopping-cart"></i>К закупке</span>';
+          stockBadge = ' <span class="bom-stock-badge bsb-shortage" title="На складе нет"><i class="ti ti-shopping-cart"></i>' + (isModel ? 'Нужно собрать' : 'К закупке') + '</span>';
         }
       }
+      // Имя: для компонента — как раньше; для подсборки — c подкатегорией «Подсборка»
+      const displayName = isModel
+        ? ('<i class="ti ti-package" style="color:var(--brand);margin-right:4px;" title="Подсборка"></i>' + escapeHtml(it.child_model_name || '—'))
+        : _highlightAisi(it.component_name || '—');
+      const skuPart = isModel
+        ? (it.child_model_article ? ' <span class="comp-sku">' + escapeHtml(it.child_model_article) + '</span>' : '')
+        : (it.component_sku       ? ' <span class="comp-sku">' + escapeHtml(it.component_sku)        + '</span>' : '');
+      const unitLbl = isModel ? 'сборка' : (it.unit_override || it.component_unit || 'шт.');
+      const categoryPart = isModel
+        ? '<span class="comp-cat-badge" style="background:#EAF4EE;color:#0A5B41;">Подсборка</span>'
+        : (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '');
+      // Edit-кнопка: для подсборки имя/единицу менять нечего — передаём «модельный» сценарий
+      const editCall = isModel
+        ? ('openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',0,\'\',\'\',\'\',true)')
+        : ('openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',' + (it.component_id || 0) + ',\'' + escapeHtml(it.component_name || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.unit_override || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.component_unit || '').replace(/'/g, "\\'") + '\',false)');
       html += '<div class="bom-row">' +
         '<div class="bom-row-main">' +
-          '<div class="bom-name">' + _highlightAisi(it.component_name || '—') +
-            (it.component_sku ? ' <span class="comp-sku">' + escapeHtml(it.component_sku) + '</span>' : '') +
+          '<div class="bom-name">' + displayName + skuPart +
             (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
             stockBadge +
           '</div>' +
           '<div class="bom-meta">' +
-            (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '') +
+            categoryPart +
             (it.comment ? ' · ' + escapeHtml(it.comment) : '') +
           '</div>' +
         '</div>' +
         '<div class="bom-qty"><div class="bom-qty-num">' + _fmtQty(need) + '</div>' +
-          // v2.45.23: показываем unit_override если задан, иначе components.unit
-          '<div class="bom-qty-lbl">' + escapeHtml(it.unit_override || it.component_unit || 'шт.') + ' / ед.</div></div>' +
+          '<div class="bom-qty-lbl">' + escapeHtml(unitLbl) + ' / ед.</div></div>' +
         '<div class="bom-stock' + (lowFlag ? ' low' : '') + '"><div class="bom-stock-num">' + _fmtQty(have) + '</div>' +
           '<div class="bom-qty-lbl">в наличии</div></div>' +
         (canManageSales() ?
           '<div class="bom-actions">' +
-            '<button class="btn btn-secondary btn-small" onclick="openBomEditItem(' + it.id + ',' + need + ',' + (it.is_critical ? 'true' : 'false') + ',\'' + commentEsc + '\',' + (it.component_id || 0) + ',\'' + escapeHtml(it.component_name || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.unit_override || '').replace(/'/g, "\\'") + '\',\'' + escapeHtml(it.component_unit || '').replace(/'/g, "\\'") + '\')" title="Изменить"><i class="ti ti-edit"></i></button>' +
+            '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
       '</div>';
@@ -34301,34 +34316,60 @@ async function openBomAddItem(modelId) {
     m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
     document.body.appendChild(m);
   }
-  // Сбрасываем выбранное комплектующее
+  // Сбрасываем выбранное комплектующее / подсборку (v2.45.24)
   state._bomSelectedComponentId = null;
+  state._bomSelectedChildModelId = null;
+  state._bomAddKind = 'component'; // 'component' | 'model'
   const hasComponents = cache.components.length > 0;
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
       '<div class="modal-header"><h3><i class="ti ti-plus"></i> Позиция в тех. карту</h3>' +
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:18px;">' +
-        '<label class="form-label">Комплектующее *</label>' +
-        '<div style="display:flex;gap:8px;margin-bottom:14px;">' +
-          '<button type="button" id="bom-component-btn" class="form-input" ' +
-            'onclick="openBomComponentPicker(' + modelId + ')" ' +
-            'style="flex:1;margin:0;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:white;">' +
-            '<span style="color:var(--text-light);">' +
-              (hasComponents ? 'Выбрать из каталога…' : 'Каталог пуст, создай новое →') +
-            '</span>' +
+        // v2.45.24: переключатель «Комплектующее / Подсборка»
+        '<div style="display:flex;gap:0;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:14px;">' +
+          '<button type="button" id="bom-kind-component" onclick="switchBomAddKind(\'component\',' + modelId + ')" ' +
+            'style="flex:1;padding:8px 10px;border:none;border-radius:7px;background:white;font-weight:600;color:var(--text-dark);cursor:pointer;font-size:13px;">' +
+            '<i class="ti ti-puzzle"></i> Комплектующее</button>' +
+          '<button type="button" id="bom-kind-model" onclick="switchBomAddKind(\'model\',' + modelId + ')" ' +
+            'style="flex:1;padding:8px 10px;border:none;border-radius:7px;background:transparent;font-weight:600;color:var(--text-mid);cursor:pointer;font-size:13px;">' +
+            '<i class="ti ti-package"></i> Подсборка</button>' +
+        '</div>' +
+        // Picker для компонента (виден по умолчанию)
+        '<div id="bom-picker-component-block">' +
+          '<label class="form-label">Комплектующее *</label>' +
+          '<div style="display:flex;gap:8px;margin-bottom:14px;">' +
+            '<button type="button" id="bom-component-btn" class="form-input" ' +
+              'onclick="openBomComponentPicker(' + modelId + ')" ' +
+              'style="flex:1;margin:0;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:white;">' +
+              '<span style="color:var(--text-light);">' +
+                (hasComponents ? 'Выбрать из каталога…' : 'Каталог пуст, создай новое →') +
+              '</span>' +
+              '<i class="ti ti-chevron-down" style="color:var(--text-light);"></i>' +
+            '</button>' +
+            '<button type="button" class="btn btn-secondary" onclick="openQuickComponentForm(' + modelId + ')" title="Создать новое комплектующее">' +
+              '<i class="ti ti-plus"></i> Новое' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+        // Picker для подсборки (модели) — скрыт по умолчанию
+        '<div id="bom-picker-model-block" style="display:none;">' +
+          '<label class="form-label">Подсборка (модель из каталога) *</label>' +
+          '<button type="button" id="bom-model-btn" class="form-input" ' +
+            'onclick="openBomModelPicker(' + modelId + ')" ' +
+            'style="width:100%;margin:0 0 14px 0;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:white;">' +
+            '<span style="color:var(--text-light);">Выбрать модель…</span>' +
             '<i class="ti ti-chevron-down" style="color:var(--text-light);"></i>' +
           '</button>' +
-          '<button type="button" class="btn btn-secondary" onclick="openQuickComponentForm(' + modelId + ')" title="Создать новое комплектующее">' +
-            '<i class="ti ti-plus"></i> Новое' +
-          '</button>' +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:-8px;margin-bottom:14px;">Семантика: при сборке этой модели берём <b>N готовых сборок</b> выбранной модели со склада. Если их нет — система покажет «нужно собрать N штук».</div>' +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">' +
+        // Поле «Количество + единица» (единица скрыта для подсборки)
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;" id="bom-qty-unit-grid">' +
           '<div>' +
             '<label class="form-label">Количество на 1 ед. *</label>' +
             '<input type="number" id="bom-qty" class="form-input" value="1" min="0.01" step="0.01" />' +
           '</div>' +
-          '<div>' +
+          '<div id="bom-unit-block">' +
             // v2.45.23: можно переопределить единицу для этой строки BOM
             '<label class="form-label">Единица (можно сменить)</label>' +
             '<input type="text" id="bom-unit-override" class="form-input" list="bom-unit-list" placeholder="из карточки комплектующего" />' +
@@ -34338,7 +34379,7 @@ async function openBomAddItem(modelId) {
             '</datalist>' +
           '</div>' +
         '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Пусто = единица берётся из карточки компонента. Заполните, если в этой модели нужно другое (например, трубки в метрах).</div>' +
+        '<div id="bom-unit-hint" style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Пусто = единица берётся из карточки компонента. Заполните, если в этой модели нужно другое (например, трубки в метрах).</div>' +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
           '<input type="checkbox" id="bom-critical" checked />' +
           '<span><b>Критичное</b> — без него сборка не создаётся</span></label>' +
@@ -34350,6 +34391,37 @@ async function openBomAddItem(modelId) {
         '<button class="btn btn-primary" onclick="submitBomAddItem(' + modelId + ')"><i class="ti ti-check"></i> Добавить</button>' +
       '</div></div>';
   m.classList.add('visible');
+}
+
+// v2.45.24: переключатель типа строки BOM
+function switchBomAddKind(kind, modelId) {
+  state._bomAddKind = kind;
+  const btnC = document.getElementById('bom-kind-component');
+  const btnM = document.getElementById('bom-kind-model');
+  const blockC = document.getElementById('bom-picker-component-block');
+  const blockM = document.getElementById('bom-picker-model-block');
+  const unitBlock = document.getElementById('bom-unit-block');
+  const unitHint = document.getElementById('bom-unit-hint');
+  const qtyGrid = document.getElementById('bom-qty-unit-grid');
+  if (kind === 'model') {
+    btnC.style.background = 'transparent'; btnC.style.color = 'var(--text-mid)';
+    btnM.style.background = 'white';       btnM.style.color = 'var(--text-dark)';
+    blockC.style.display = 'none';
+    blockM.style.display = 'block';
+    if (unitBlock) unitBlock.style.display = 'none';
+    if (qtyGrid) qtyGrid.style.gridTemplateColumns = '1fr';
+    if (unitHint) unitHint.style.display = 'none';
+    state._bomSelectedComponentId = null;
+  } else {
+    btnC.style.background = 'white';       btnC.style.color = 'var(--text-dark)';
+    btnM.style.background = 'transparent'; btnM.style.color = 'var(--text-mid)';
+    blockC.style.display = 'block';
+    blockM.style.display = 'none';
+    if (unitBlock) unitBlock.style.display = 'block';
+    if (qtyGrid) qtyGrid.style.gridTemplateColumns = '1fr 1fr';
+    if (unitHint) unitHint.style.display = 'block';
+    state._bomSelectedChildModelId = null;
+  }
 }
 
 // ============ ЭТАП 33.1: PICKER комплектующего с поиском и категориями ============
@@ -34481,6 +34553,129 @@ function selectBomComponent(componentId) {
   closeBomComponentPicker();
 }
 
+// ============ v2.45.24: PICKER подсборки (модели из каталога) ============
+
+async function openBomModelPicker(parentModelId) {
+  // Загружаем модели если ещё нет в кэше
+  if (!cache.modelsForBom) {
+    try {
+      const r = await apiGet('/api/models');
+      // /api/models отдаёт {directions:[{name, models:[...]}, ...]} — расплющиваем
+      const list = [];
+      (r.directions || []).forEach(dir => {
+        (dir.models || []).forEach(mo => {
+          if (mo.is_active === 0) return;
+          list.push({
+            id: mo.id,
+            name: mo.name,
+            article: mo.article || '',
+            direction_name: dir.name || '',
+          });
+        });
+      });
+      cache.modelsForBom = list;
+    } catch (e) { cache.modelsForBom = []; }
+  }
+  state._bomModelPickerSearch = '';
+  state._bomModelParentId = parentModelId;
+  let m = document.getElementById('bom-model-picker-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bom-model-picker-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '10001';
+    m.onclick = (e) => { if (e.target === m) closeBomModelPicker(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-package"></i> Выбрать подсборку</h3>' +
+        '<button class="modal-close" onclick="closeBomModelPicker()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 18px 0;">' +
+        '<div class="search-box">' +
+          '<i class="ti ti-search"></i>' +
+          '<input type="text" id="bom-model-picker-search" placeholder="Поиск по названию или артикулу…" oninput="renderBomModelPicker()" />' +
+        '</div>' +
+      '</div>' +
+      '<div id="bom-model-picker-list" style="overflow-y:auto;flex:1;padding:14px 18px;">' +
+        '<div class="loading-block">Загружаем…</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => {
+    const inp = document.getElementById('bom-model-picker-search');
+    if (inp) inp.focus();
+    renderBomModelPicker();
+  }, 50);
+}
+
+function closeBomModelPicker() {
+  const m = document.getElementById('bom-model-picker-modal');
+  if (m) m.classList.remove('visible');
+}
+
+function renderBomModelPicker() {
+  const container = document.getElementById('bom-model-picker-list');
+  if (!container) return;
+  const q = ((document.getElementById('bom-model-picker-search') || {}).value || '').toLowerCase().trim();
+  state._bomModelPickerSearch = q;
+  const parentId = state._bomModelParentId;
+  const list = (cache.modelsForBom || []).filter(mo => {
+    if (mo.id === parentId) return false; // нельзя сам в себя
+    if (!q) return true;
+    return (mo.name || '').toLowerCase().includes(q) ||
+           (mo.article || '').toLowerCase().includes(q);
+  });
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-search-off"></i>Ничего не найдено</div>';
+    return;
+  }
+  // Группируем по направлению
+  const groups = {};
+  list.forEach(mo => {
+    const d = mo.direction_name || '—';
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(mo);
+  });
+  let html = '';
+  Object.keys(groups).forEach(dir => {
+    html += '<div class="bom-picker-group">' +
+      '<div class="bom-picker-toggle open" style="cursor:default;">' +
+        '<i class="ti ti-folder" style="opacity:0.6;"></i>' +
+        '<span>' + escapeHtml(dir) + '</span>' +
+        '<span class="bom-picker-count">' + groups[dir].length + '</span>' +
+      '</div>' +
+      '<div class="bom-picker-body">';
+    groups[dir].forEach(mo => {
+      html += '<button type="button" class="bom-picker-item" onclick="selectBomChildModel(' + mo.id + ')">' +
+        '<div class="bom-picker-item-name">' + escapeHtml(mo.name) + '</div>' +
+        '<div class="bom-picker-item-meta">' +
+          (mo.article ? escapeHtml(mo.article) : '') +
+        '</div>' +
+      '</button>';
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function selectBomChildModel(modelId) {
+  const mo = (cache.modelsForBom || []).find(x => x.id === modelId);
+  if (!mo) return;
+  state._bomSelectedChildModelId = modelId;
+  const btn = document.getElementById('bom-model-btn');
+  if (btn) {
+    btn.innerHTML =
+      '<span style="color:var(--text);font-weight:500;">' + escapeHtml(mo.name) +
+        (mo.article ? ' <span style="color:var(--text-light);font-weight:400;font-family:monospace;font-size:12px;">' + escapeHtml(mo.article) + '</span>' : '') +
+      '</span>' +
+      '<i class="ti ti-chevron-down" style="color:var(--text-light);"></i>';
+  }
+  closeBomModelPicker();
+}
+
 // ЭТАП 32.1: быстрое создание комплектующего из формы BOM
 async function openQuickComponentForm(modelId) {
   const cats = cache.componentCategories || [];
@@ -34587,13 +34782,22 @@ async function submitQuickComponent(modelId) {
 }
 
 async function submitBomAddItem(modelId) {
-  const component_id = state._bomSelectedComponentId;
+  const kind = state._bomAddKind || 'component';
   const qty_required = parseFloat(document.getElementById('bom-qty').value);
   const is_critical = document.getElementById('bom-critical').checked;
   const comment = (document.getElementById('bom-comment').value || '').trim();
   // v2.45.23: единица переопределяется на уровне BOM-строки (пусто = из компонента)
   const unit_override = (document.getElementById('bom-unit-override')?.value || '').trim();
-  if (!component_id) { showToast('Выбери комплектующее из каталога', 'error'); return; }
+  // v2.45.24: для подсборки шлём child_model_id
+  const payload = { qty_required, is_critical, comment };
+  if (kind === 'model') {
+    if (!state._bomSelectedChildModelId) { showToast('Выбери подсборку из каталога', 'error'); return; }
+    payload.child_model_id = state._bomSelectedChildModelId;
+  } else {
+    if (!state._bomSelectedComponentId) { showToast('Выбери комплектующее из каталога', 'error'); return; }
+    payload.component_id = state._bomSelectedComponentId;
+    payload.unit_override = unit_override;
+  }
   if (isNaN(qty_required) || qty_required <= 0) {
     showToast('Укажи количество', 'error'); return;
   }
@@ -34602,7 +34806,7 @@ async function submitBomAddItem(modelId) {
     const r = await fetch(API_BASE + '/api/models/' + modelId + '/bom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ component_id, qty_required, is_critical, comment, unit_override }),
+      body: JSON.stringify(payload),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -34618,7 +34822,7 @@ async function submitBomAddItem(modelId) {
 // v2.43.81: добавлено редактирование названия компонента прямо из BOM.
 // Имя живёт на самом компоненте (таблица components), поэтому переименование
 // затрагивает все модели, где этот компонент стоит.
-function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName, unitOverride, componentUnit) {
+function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName, unitOverride, componentUnit, isModel) {
   let m = document.getElementById('bom-edit-modal');
   if (!m) {
     m = document.createElement('div');
@@ -34633,26 +34837,35 @@ function openBomEditItem(bomId, qty, isCritical, comment, componentId, component
   const cUnit = (componentUnit || 'шт.').trim();
   // v2.45.23: список типовых единиц + плейсхолдер с базовой ед. компонента
   const unitOpts = ['шт.', 'м', 'м²', 'м³', 'кг', 'г', 'л', 'мл', 'упак.', 'компл.', 'рул.'];
+  // v2.45.24: для строки-«подсборки» имя/единицу менять нечего (живут на самой
+  // дочерней модели, переименуй её отдельно), показываем только qty/crit/comment.
+  const headerBlock = isModel
+    ? '<div style="padding:12px 14px;background:#EAF4EE;color:#0A5B41;border-radius:8px;margin-bottom:14px;font-size:13px;"><i class="ti ti-package"></i> Это подсборка. Имя и артикул живут на самой модели — переименуй её в каталоге.</div>'
+    : ('<label class="form-label">Название компонента</label>' +
+       '<input type="text" id="bome-name" class="form-input" value="' + escapeHtml(cName) + '" data-orig="' + escapeHtml(cName) + '" style="margin-bottom:6px;" />' +
+       '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Переименование затронет ВСЕ модели, где этот компонент используется (он живёт в общем справочнике).</div>');
+  const qtyUnitBlock = isModel
+    ? ('<label class="form-label">Количество подсборок на 1 ед. *</label>' +
+       '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" style="margin-bottom:14px;" />')
+    : ('<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">' +
+         '<div>' +
+           '<label class="form-label">Количество на 1 ед. *</label>' +
+           '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" />' +
+         '</div>' +
+         '<div>' +
+           '<label class="form-label">Единица в этой модели</label>' +
+           '<input type="text" id="bome-unit-override" class="form-input" list="bome-unit-list" value="' + escapeHtml(uOver) + '" placeholder="' + escapeHtml(cUnit) + ' (как в карточке)" />' +
+           '<datalist id="bome-unit-list">' + unitOpts.map(u => '<option value="' + u + '"></option>').join('') + '</datalist>' +
+         '</div>' +
+       '</div>' +
+       '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Базовая единица компонента: <b>' + escapeHtml(cUnit) + '</b>. Если в этой модели измеряется иначе (например, трубки в метрах) — впишите сюда. Пусто = брать из компонента.</div>');
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
       '<div class="modal-header"><h3><i class="ti ti-edit"></i> Изменить позицию</h3>' +
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:18px;">' +
-        '<label class="form-label">Название компонента</label>' +
-        '<input type="text" id="bome-name" class="form-input" value="' + escapeHtml(cName) + '" data-orig="' + escapeHtml(cName) + '" style="margin-bottom:6px;" />' +
-        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Переименование затронет ВСЕ модели, где этот компонент используется (он живёт в общем справочнике).</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">' +
-          '<div>' +
-            '<label class="form-label">Количество на 1 ед. *</label>' +
-            '<input type="number" id="bome-qty" class="form-input" value="' + qty + '" min="0.01" step="0.01" />' +
-          '</div>' +
-          '<div>' +
-            '<label class="form-label">Единица в этой модели</label>' +
-            '<input type="text" id="bome-unit-override" class="form-input" list="bome-unit-list" value="' + escapeHtml(uOver) + '" placeholder="' + escapeHtml(cUnit) + ' (как в карточке)" />' +
-            '<datalist id="bome-unit-list">' + unitOpts.map(u => '<option value="' + u + '"></option>').join('') + '</datalist>' +
-          '</div>' +
-        '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Базовая единица компонента: <b>' + escapeHtml(cUnit) + '</b>. Если в этой модели измеряется иначе (например, трубки в метрах) — впишите сюда. Пусто = брать из компонента.</div>' +
+        headerBlock +
+        qtyUnitBlock +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
           '<input type="checkbox" id="bome-critical"' + (isCritical ? ' checked' : '') + ' />' +
           '<span><b>Критичное</b></span></label>' +
