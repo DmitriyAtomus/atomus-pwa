@@ -18939,7 +18939,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.7-qr-logo";
+const APP_VERSION = "v2.45.8-qr-logo-fix";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38525,7 +38525,7 @@ function renderPackingListPrint(box) {
         'img.onload=function(){' +
           'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.22),cx=Math.round((w-ls)/2),p=Math.round(ls*0.08);' +
           'ctx.fillStyle="#fff";ctx.fillRect(cx-p,cx-p,ls+2*p,ls+2*p);ctx.drawImage(img,cx,cx,ls,ls);' +
-          'var di=el.querySelector("img");if(di)di.style.display="none";' +
+          'var di=el.querySelector("img");if(di){try{di.src=c.toDataURL("image/png");}catch(_){}}' +
           'setTimeout(function(){window.print();},300);' +
         '};' +
         'img.onerror=function(){setTimeout(function(){window.print();},100);};' +
@@ -52490,25 +52490,31 @@ function generateQrWithLogo(el, opts) {
     // Принудительно H — иначе наложение лого ломает считываемость
     correctLevel: QRCode.CorrectLevel.H,
   });
-  // qrcodejs синхронно рисует, но для надёжности возьмём канвас на следующем тике
+  // qrcodejs синхронно рисует canvas, потом ставит его data URL в <img> и
+  // канвас скрывает (видимая часть — это <img>). Чтобы лого появилось, надо:
+  // 1) дорисовать лого на canvas
+  // 2) перезаписать src у <img> через canvas.toDataURL()
   setTimeout(() => {
     const canvas = el.querySelector('canvas');
     if (!canvas) return;
     _getAtomusQrLogo().then((img) => {
-      if (!img) return;
       try {
-        const ctx = canvas.getContext('2d');
-        const w = canvas.width;
-        const logoSize = Math.round(w * 0.22);      // ~22% от стороны QR
-        const cx = Math.round((w - logoSize) / 2);
-        // Белая подложка чуть больше лого — чтобы лого не путался с QR
-        const padBg = Math.round(logoSize * 0.08);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(cx - padBg, cx - padBg, logoSize + 2 * padBg, logoSize + 2 * padBg);
-        ctx.drawImage(img, cx, cx, logoSize, logoSize);
-        // Скрываем дублирующий <img> который qrcodejs добавляет рядом с канвасом
+        if (img) {
+          const ctx = canvas.getContext('2d');
+          const w = canvas.width;
+          const logoSize = Math.round(w * 0.22);      // ~22% от стороны QR
+          const cx = Math.round((w - logoSize) / 2);
+          // Белая подложка чуть больше лого
+          const padBg = Math.round(logoSize * 0.08);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(cx - padBg, cx - padBg, logoSize + 2 * padBg, logoSize + 2 * padBg);
+          ctx.drawImage(img, cx, cx, logoSize, logoSize);
+        }
+        // Перерисовываем видимый <img> из обновлённого canvas
         const dupImg = el.querySelector('img');
-        if (dupImg) dupImg.style.display = 'none';
+        if (dupImg) {
+          try { dupImg.src = canvas.toDataURL('image/png'); } catch (_) {}
+        }
       } catch (e) {
         console.warn('QR logo overlay failed:', e);
       }
@@ -52912,11 +52918,12 @@ function renderLabelsForPrint() {
       'setTimeout(function(){' +
         'var img=new Image();img.crossOrigin="anonymous";' +
         'img.onload=function(){' +
-          'document.querySelectorAll(".lbl-qr-wrap canvas").forEach(function(c){' +
+          'document.querySelectorAll(".lbl-qr-wrap").forEach(function(wrap){' +
+            'var c=wrap.querySelector("canvas");if(!c)return;' +
             'var ctx=c.getContext("2d"),w=c.width,ls=Math.round(w*0.22),cx=Math.round((w-ls)/2),p=Math.round(ls*0.08);' +
             'ctx.fillStyle="#fff";ctx.fillRect(cx-p,cx-p,ls+2*p,ls+2*p);ctx.drawImage(img,cx,cx,ls,ls);' +
+            'var di=wrap.querySelector("img");if(di){try{di.src=c.toDataURL("image/png");}catch(_){}}' +
           '});' +
-          'document.querySelectorAll(".lbl-qr-wrap img").forEach(function(di){di.style.display="none";});' +
           'setTimeout(function(){window.print();},300);' +
         '};' +
         'img.onerror=function(){setTimeout(function(){window.print();},100);};' +
