@@ -18896,7 +18896,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1-imap-since-1min";
+const APP_VERSION = "v2.45.2-imap-diagnostics";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44198,8 +44198,13 @@ async function loadSupplyInbox() {
   list.innerHTML = '<div class="loading-block">Загружаем входящие письма…</div>';
   const filter = state.supplyInboxFilter || 'unmatched';
   try {
-    const d = await apiGet('/api/supply-inbox?status=' + encodeURIComponent(filter));
+    // Параллельно тянем список + статус робота
+    const [d, st] = await Promise.all([
+      apiGet('/api/supply-inbox?status=' + encodeURIComponent(filter)),
+      apiGet('/api/supply-inbox/status').catch(() => null),
+    ]);
     cache.supplyInbox = d.items || [];
+    cache.supplyInboxStatus = st || null;
     if (counter) counter.textContent = cache.supplyInbox.length;
     renderSupplyInbox();
     // Заодно — обновим бейдж в сайдбаре (число unmatched, независимо от фильтра)
@@ -44207,6 +44212,53 @@ async function loadSupplyInbox() {
   } catch (e) {
     list.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить (' + escapeHtml(String(e.message || e)) + ')</div>';
   }
+}
+
+function _supplyInboxStatusHTML() {
+  const st = cache.supplyInboxStatus;
+  if (!st || !st.state) return '';
+  const s = st.state;
+  const cfg = st.config || {};
+  // Не настроен — красная панель с инструкцией
+  if (!s.configured) {
+    return '<div style="background:#FEE2E2;border:1px solid #FCA5A5;color:#7F1D1D;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<i class="ti ti-alert-triangle" style="font-size:18px;"></i>' +
+      '<div>IMAP-робот не настроен. Добавь в Railway переменные <b>IMAP_USER</b> и <b>IMAP_PASSWORD</b>.</div>' +
+    '</div>';
+  }
+  let icon, color, bg, border;
+  if (s.ok === true) {
+    icon = 'ti-check'; color = '#0A5B41'; bg = 'rgba(34,197,94,0.08)'; border = 'rgba(34,197,94,0.25)';
+  } else if (s.ok === false) {
+    icon = 'ti-alert-triangle'; color = '#7F1D1D'; bg = '#FEE2E2'; border = '#FCA5A5';
+  } else {
+    icon = 'ti-loader'; color = 'var(--text-mid)'; bg = 'var(--bg)'; border = 'var(--border)';
+  }
+  let line2;
+  if (s.ok === false) {
+    line2 = 'Этап «' + escapeHtml(s.stage || 'unknown') + '»: ' + escapeHtml(s.error || 'неизвестная ошибка');
+  } else if (s.ok === true) {
+    const parts = [];
+    parts.push('Найдено в ящике: ' + (s.found_uids || 0));
+    parts.push('обработано новых: ' + (s.new_processed || 0));
+    if (s.matched)   parts.push('привязано к заказам: ' + s.matched);
+    if (s.unmatched) parts.push('требуют привязки: ' + s.unmatched);
+    if (s.ignored)   parts.push('служебных: ' + s.ignored);
+    if (s.errors)    parts.push('ошибок: ' + s.errors);
+    line2 = parts.join(' · ');
+  } else {
+    line2 = 'Робот ещё не запускался — подождите ' + (cfg.interval_sec || 60) + ' секунд или нажмите «Проверить»';
+  }
+  const ts = s.at ? escapeHtml(String(s.at).replace('T', ' ').substring(0, 16)) : '—';
+  return '<div style="background:' + bg + ';border:1px solid ' + border + ';color:' + color + ';border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:flex-start;gap:10px;">' +
+    '<i class="ti ' + icon + '" style="font-size:18px;flex-shrink:0;margin-top:1px;"></i>' +
+    '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:600;">Последняя проверка: ' + ts +
+        ' <span style="font-weight:400;opacity:0.8;">· сервер ' + escapeHtml(cfg.server || '?') + ', интервал ' + (cfg.interval_sec || 60) + 'с</span>' +
+      '</div>' +
+      '<div style="margin-top:2px;opacity:0.9;">' + line2 + '</div>' +
+    '</div>' +
+  '</div>';
 }
 
 async function refreshSupplyInboxBadge() {
@@ -44229,11 +44281,13 @@ function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
   const items = cache.supplyInbox || [];
+  const statusHtml = _supplyInboxStatusHTML();
   if (!items.length) {
-    list.innerHTML = '<div class="empty-block"><i class="ti ti-mailbox-off"></i>Писем нет. Робот проверяет почту orders@atomus-group.ru раз в минуту.</div>';
+    list.innerHTML = statusHtml +
+      '<div class="empty-block"><i class="ti ti-mailbox-off"></i>Писем нет. Робот проверяет почту orders@atomus-group.ru раз в минуту.</div>';
     return;
   }
-  let html = '<div class="sup-list-rows">';
+  let html = statusHtml + '<div class="sup-list-rows">';
   items.forEach(m => {
     const labelHtml = m.detected_label
       ? '<span class="sup-status-pill" style="background:var(--brand-bg);color:var(--brand);font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(m.detected_label) + '</span>'
@@ -44292,13 +44346,31 @@ async function forcePollSupplyInbox() {
       showToast(j.message || 'Ошибка опроса (HTTP ' + r.status + ')', 'error');
       return;
     }
-    const processed = j.processed || 0;
-    if (j.skipped) {
-      showToast('Робот пропустил: ' + (j.reason || 'неизвестно'), 'warning');
-    } else if (processed === 0) {
-      showToast('Новых писем нет', 'success');
+    const result = j.result || j;
+    const state = j.state || {};
+    if (result.skipped) {
+      const reason = result.reason || 'неизвестно';
+      const err = result.error ? ': ' + result.error : '';
+      showToast('Робот пропустил (' + reason + ')' + err, 'error');
+    } else if (state.ok === false) {
+      showToast('Ошибка на этапе «' + (state.stage || '?') + '»: ' + (state.error || 'неизвестно'), 'error');
     } else {
-      showToast('Обработано: ' + processed, 'success');
+      const found = result.found_uids || 0;
+      const processed = result.processed || 0;
+      if (found === 0) {
+        showToast('Почта пустая (за последние 14 дней писем нет)', 'warning');
+      } else if (processed === 0) {
+        showToast('Найдено ' + found + ' писем, все уже обработаны ранее', 'success');
+      } else {
+        const m = state.matched || 0;
+        const u = state.unmatched || 0;
+        const i = state.ignored || 0;
+        const bits = [];
+        if (m) bits.push(m + ' привязано к заказу');
+        if (u) bits.push(u + ' требует привязки');
+        if (i) bits.push(i + ' служебных');
+        showToast('Обработано ' + processed + ' новых: ' + (bits.join(', ') || ''), 'success');
+      }
     }
     await loadSupplyInbox();
   } catch (e) {
