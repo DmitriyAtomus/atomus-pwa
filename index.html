@@ -5283,6 +5283,32 @@
     border-color: #FCA5A5;
     background: rgba(254, 202, 202, 0.25);
   }
+  .sup-check-wrap {
+    flex: 0 0 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    position: relative;
+  }
+  .sup-check-wrap input[type="checkbox"] {
+    position: absolute; opacity: 0; width: 0; height: 0;
+  }
+  .sup-check-box {
+    display: inline-block; width: 20px; height: 20px;
+    border: 1.5px solid var(--border); border-radius: 5px;
+    background: white;
+    transition: background 0.12s, border 0.12s;
+    position: relative;
+  }
+  .sup-check-wrap input[type="checkbox"]:checked + .sup-check-box {
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    border-color: transparent;
+  }
+  .sup-check-wrap input[type="checkbox"]:checked + .sup-check-box::after {
+    content: ''; position: absolute; left: 6px; top: 2px;
+    width: 5px; height: 10px;
+    border-right: 2px solid white; border-bottom: 2px solid white;
+    transform: rotate(45deg);
+  }
 
   /* Pill статуса заявки */
   .sup-status-pill {
@@ -18913,7 +18939,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.4-orders-delete-highlight";
+const APP_VERSION = "v2.45.5-orders-bulk-delete";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -44174,32 +44200,67 @@ async function loadSupplyOrders() {
   }
 }
 
+// v2.45.5: множественный выбор заказов для удаления одним действием.
+state.supplyOrdersSelected = state.supplyOrdersSelected || new Set();
+
 function renderSupplyOrders() {
   const container = document.getElementById('sup-ord-list');
   const list = cache.supplyOrders || [];
   document.getElementById('sup-ord-counter').textContent = list.length;
+  // Подчистим выбранные id, которых уже нет в текущем списке
+  const visibleIds = new Set(list.map(o => o.id));
+  Array.from(state.supplyOrdersSelected).forEach(id => {
+    if (!visibleIds.has(id)) state.supplyOrdersSelected.delete(id);
+  });
+
   if (!list.length) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Под этот фильтр заказов нет</div>';
+    _renderSupplyOrdersActionBar();
     return;
   }
   const canDelete = canManageSupply();
+
   let html = '';
+  // Шапка-выделить-всё
+  if (canDelete) {
+    const allChecked = list.length > 0 && state.supplyOrdersSelected.size === list.length;
+    html += '<div class="sup-row" style="background:transparent;border:none;padding:6px 14px;cursor:default;align-items:center;">' +
+      '<label class="sup-check-wrap" title="Выделить все" onclick="event.stopPropagation();">' +
+        '<input type="checkbox" id="sup-ord-check-all" ' + (allChecked ? 'checked' : '') +
+          ' onchange="toggleAllSupplyOrders(this.checked)">' +
+        '<span class="sup-check-box"></span>' +
+      '</label>' +
+      '<div style="font-size:12.5px;color:var(--text-light);margin-left:8px;">Отметь заказы — кнопка «Удалить выбранные» появится снизу</div>' +
+    '</div>';
+  }
+
   list.forEach(o => {
     const total = o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '';
     const label = o.order_label || ('#' + o.id);
-    // Подсветка строки если есть новый счёт
     const hasNew = !!o.has_new_invoice;
     const hasInvoice = !!o.invoice_file_key;
-    const rowStyle = hasNew
-      ? 'style="border-left:4px solid #2563EB;background:linear-gradient(90deg,rgba(37,99,235,0.06),transparent 50%);"'
-      : '';
+    const isSel = state.supplyOrdersSelected.has(o.id);
+    let rowStyle = '';
+    if (isSel) {
+      rowStyle = 'style="border-color:#2563EB;background:rgba(37,99,235,0.05);"';
+    } else if (hasNew) {
+      rowStyle = 'style="border-left:4px solid #2563EB;background:linear-gradient(90deg,rgba(37,99,235,0.06),transparent 50%);"';
+    }
     const newPill = hasNew
       ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">📄 НОВЫЙ СЧЁТ</span>'
       : (hasInvoice
           ? '<span class="sup-status-pill" style="background:#E0E7FF;color:#3730A3;"><i class="ti ti-file-check"></i> счёт привязан</span>'
           : '');
-    html += '<div class="sup-row" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">' +
-      '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
+
+    html += '<div class="sup-row" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
+    if (canDelete) {
+      html += '<label class="sup-check-wrap" onclick="event.stopPropagation();">' +
+        '<input type="checkbox" ' + (isSel ? 'checked' : '') +
+          ' onchange="toggleSupplyOrderSelected(' + o.id + ', this.checked)">' +
+        '<span class="sup-check-box"></span>' +
+      '</label>';
+    }
+    html += '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
       '<div class="sup-row-body">' +
         '<div class="sup-row-title">Заказ ' + escapeHtml(label) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
         '<div class="sup-row-meta" style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;">' +
@@ -44216,6 +44277,82 @@ function renderSupplyOrders() {
     '</div>';
   });
   container.innerHTML = html;
+  _renderSupplyOrdersActionBar();
+}
+
+function toggleSupplyOrderSelected(id, checked) {
+  if (checked) state.supplyOrdersSelected.add(id);
+  else state.supplyOrdersSelected.delete(id);
+  _renderSupplyOrdersActionBar();
+  // Подсветить/снять подсветку строки
+  renderSupplyOrders();
+}
+
+function toggleAllSupplyOrders(checked) {
+  const list = cache.supplyOrders || [];
+  if (checked) {
+    list.forEach(o => state.supplyOrdersSelected.add(o.id));
+  } else {
+    state.supplyOrdersSelected.clear();
+  }
+  renderSupplyOrders();
+}
+
+function _renderSupplyOrdersActionBar() {
+  let bar = document.getElementById('sup-ord-action-bar');
+  const count = state.supplyOrdersSelected.size;
+  if (count === 0) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'sup-ord-action-bar';
+    bar.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);' +
+      'background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;border-radius:14px;' +
+      'padding:10px 16px;display:flex;align-items:center;gap:12px;' +
+      'box-shadow:0 8px 24px rgba(37,99,235,0.3);z-index:9999;max-width:92vw;';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML =
+    '<span style="font-weight:600;font-size:14px;">Выбрано: ' + count + '</span>' +
+    '<button class="btn btn-secondary" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);" onclick="clearSupplyOrdersSelection()">Снять</button>' +
+    '<button class="btn btn-primary" style="background:#fff;color:#B91C1C;border-color:#fff;" onclick="bulkDeleteSupplyOrders()"><i class="ti ti-trash"></i> Удалить выбранные</button>';
+}
+
+function clearSupplyOrdersSelection() {
+  state.supplyOrdersSelected.clear();
+  renderSupplyOrders();
+}
+
+async function bulkDeleteSupplyOrders() {
+  const ids = Array.from(state.supplyOrdersSelected);
+  if (!ids.length) return;
+  if (!confirm('Удалить выбранные заказы (' + ids.length + ')?\n\nЗаказы будут скрыты из списков. Привязанные счета и история переписки сохранятся.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/bulk-delete', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (r.status === 401 || r.status === 403) {
+      showToast('Сессия истекла — обнови страницу (F5) и попробуй снова', 'error');
+      return;
+    }
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || ('Не удалось удалить (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    const j = await r.json();
+    showToast('Удалено: ' + (j.count || 0) + (j.failed && j.failed.length ? ' (ошибок: ' + j.failed.length + ')' : ''), 'success');
+    state.supplyOrdersSelected.clear();
+    cache.supplyOrders = null;
+    loadSupplyOrders();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 async function deleteSupplyOrder(orderId, label) {
@@ -44226,6 +44363,10 @@ async function deleteSupplyOrder(orderId, label) {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer ' + token },
     });
+    if (r.status === 401 || r.status === 403) {
+      showToast('Сессия истекла — обнови страницу (F5) и попробуй снова', 'error');
+      return;
+    }
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
       showToast(j.message || ('Не удалось удалить (HTTP ' + r.status + ')'), 'error');
