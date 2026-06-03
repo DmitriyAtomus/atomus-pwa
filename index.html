@@ -18113,7 +18113,7 @@
             <div class="filter-row">
               <div class="filter-tabs">
                 <button class="filter-tab active" data-sup-inbox="unmatched" onclick="setSupplyInboxFilter('unmatched')">Не привязаны</button>
-                <button class="filter-tab"        data-sup-inbox="matched"   onclick="setSupplyInboxFilter('matched')">Привязаны</button>
+                <button class="filter-tab"        data-sup-inbox="matched"   onclick="setSupplyInboxFilter('matched')">Привязаны<span class="nav-badge" id="sup-inbox-matched-badge" style="display:none;margin-left:6px;"></span></button>
                 <button class="filter-tab"        data-sup-inbox="all"       onclick="setSupplyInboxFilter('all')">Все</button>
               </div>
             </div>
@@ -18896,7 +18896,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.2-imap-diagnostics";
+const APP_VERSION = "v2.45.3-invoice-notify";
 const APP_VERSION_DATE = "29.05.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19419,10 +19419,12 @@ function renderNotifModal() {
   items.forEach(n => {
     const iconCls = n.type === 'contract_published' ? 't-contract'
                    : n.type === 'assembly_created' ? 't-assembly'
+                   : n.type === 'supply_invoice_received' ? 't-contract'
                    : (n.type === 'dev_guest_message' || n.type === 'dev_guest_file') ? 't-development'
                    : '';
     const icon = n.type === 'contract_published' ? 'ti-file-text'
                 : n.type === 'assembly_created' ? 'ti-tool'
+                : n.type === 'supply_invoice_received' ? 'ti-receipt'
                 : n.type === 'dev_guest_message' ? 'ti-message-circle'
                 : n.type === 'dev_guest_file' ? 'ti-paperclip'
                 : 'ti-bell';
@@ -44206,9 +44208,27 @@ async function loadSupplyInbox() {
     cache.supplyInbox = d.items || [];
     cache.supplyInboxStatus = st || null;
     if (counter) counter.textContent = cache.supplyInbox.length;
+    // Бейдж "новые счета" на вкладке "Привязаны"
+    const matchedBadge = document.getElementById('sup-inbox-matched-badge');
+    const newCnt = (st && st.new_matched_count) || 0;
+    if (matchedBadge) {
+      if (newCnt > 0) {
+        matchedBadge.textContent = newCnt;
+        matchedBadge.style.display = '';
+      } else {
+        matchedBadge.style.display = 'none';
+      }
+    }
     renderSupplyInbox();
-    // Заодно — обновим бейдж в сайдбаре (число unmatched, независимо от фильтра)
     refreshSupplyInboxBadge();
+    // Если зашли на вкладку "Привязаны" — гасим "новые" бейджи на бэке
+    // (бейдж в шапке экрана + в сайдбаре пересчитаются при следующей загрузке)
+    if (filter === 'matched' && newCnt > 0) {
+      fetch(API_BASE + '/api/supply-inbox/mark-viewed', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      }).catch(() => {});
+    }
   } catch (e) {
     list.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить (' + escapeHtml(String(e.message || e)) + ')</div>';
   }
@@ -44292,8 +44312,11 @@ function renderSupplyInbox() {
     const labelHtml = m.detected_label
       ? '<span class="sup-status-pill" style="background:var(--brand-bg);color:var(--brand);font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(m.detected_label) + '</span>'
       : '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;">без метки</span>';
+    const newPill = m.is_new
+      ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">НОВЫЙ СЧЁТ</span>'
+      : '';
     const statusHtml = m.status === 'matched'
-      ? '<span class="sup-status-pill" style="background:#DCFCE7;color:#0A5B41;">привязано к ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>'
+      ? newPill + '<span class="sup-status-pill" style="background:#DCFCE7;color:#0A5B41;">привязано к ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>'
       : m.status === 'unmatched'
         ? '<span class="sup-status-pill" style="background:#FEE2E2;color:#8C2A2A;">требует привязки</span>'
         : m.status === 'error'
