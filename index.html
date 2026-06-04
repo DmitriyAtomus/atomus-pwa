@@ -19149,7 +19149,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.39-calc-home-cleanup";
+const APP_VERSION = "v2.45.40-label-drag";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47800,6 +47800,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.40',
+    date: '04.06.2026',
+    title: 'Этикетки: перетаскивание элементов мышкой',
+    features: [
+      'В редакторе этикеток теперь можно <b>перетаскивать</b> любой элемент (текст, QR, картинку) прямо на превью — наведи курсор, зажми, тащи',
+      'Координаты X/Y в полях справа обновляются в реальном времени, шаг 0.5 мм. Не вылезает за границы этикетки',
+      'Перетаскиваемый элемент выделен <b>синей рамкой</b>. На мобильном работает через касания (touch)',
+    ],
+  },
+  {
     version: 'v2.45.39',
     date: '04.06.2026',
     title: 'Калькулятор холода: убран из «Главной»',
@@ -60309,6 +60319,9 @@ function _leRender() {
       '</div>' +
     '</div>';
   _leDrawCanvas();
+  // v2.45.40: вешаем drag-and-drop на canvas. dataset.dragBound защищает
+  // от повторных биндов (метод повешен один раз на новый canvas-DOM-узел).
+  _leAttachCanvasDrag();
 }
 
 function _leRenderSide() {
@@ -60442,19 +60455,26 @@ function _leDrawCanvas() {
   const w = (_leState.widthMm || 58) * LE_PREVIEW_SCALE;
   const h = (_leState.heightMm || 40) * LE_PREVIEW_SCALE;
   c.width = w; c.height = h;
+  c.style.cursor = 'grab';
   const ctx = c.getContext('2d');
   ctx.fillStyle = 'white'; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
-  _leState.elements.forEach(el => {
+  // v2.45.40: bbox каждого элемента для drag-and-drop (в координатах canvas)
+  _leState._bboxes = [];
+  _leState.elements.forEach((el, idx) => {
     const x = (el.x || 0) * LE_PREVIEW_SCALE;
     const y = (el.y || 0) * LE_PREVIEW_SCALE;
+    let bw = 0, bh = 0;
     if (el.type === 'text') {
       const sizePx = (el.size || 18) / 2.5;   // dots → ~px (203 dpi: 1 dot = 0.125 мм)
-      ctx.font = (el.bold ? 'bold ' : '') + (sizePx * LE_PREVIEW_SCALE) + 'px sans-serif';
+      const fontPx = sizePx * LE_PREVIEW_SCALE;
+      ctx.font = (el.bold ? 'bold ' : '') + fontPx + 'px sans-serif';
       ctx.fillText(el.text || '', x, y);
+      const metrics = ctx.measureText(el.text || '');
+      bw = Math.max(metrics.width, 8);
+      bh = fontPx * 1.2;
     } else if (el.type === 'qr') {
-      // Превью QR — простой чёрный квадрат с надписью
       const sizeMm = (el.module || 5) * 21 / 8;  // ~ модуль×версия / коэф
       const sizePx = sizeMm * LE_PREVIEW_SCALE;
       ctx.fillStyle = '#000';
@@ -60464,21 +60484,124 @@ function _leDrawCanvas() {
       ctx.fillStyle = '#000';
       ctx.font = '10px monospace';
       ctx.fillText('QR', x + sizePx*0.4, y + sizePx*0.42);
+      bw = bh = sizePx;
     } else if (el.type === 'image' && el.dataUrl) {
-      const img = new Image();
-      img.onload = () => {
-        const wPx = (el.w || 20) * LE_PREVIEW_SCALE;
-        const hPx = (el.h || el.w || 20) * LE_PREVIEW_SCALE;
+      const wPx = (el.w || 20) * LE_PREVIEW_SCALE;
+      const hPx = (el.h || el.w || 20) * LE_PREVIEW_SCALE;
+      // Рисуем картинку: если уже в кэше (Image объект) — синхронно, иначе грузим
+      const img = _leImageCache[el.dataUrl] || (_leImageCache[el.dataUrl] = (() => {
+        const im = new Image();
+        im.onload = () => _leDrawCanvas();   // когда загрузится — перерисуем
+        im.src = el.dataUrl;
+        return im;
+      })());
+      if (img.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, x, y, wPx, hPx);
-      };
-      img.src = el.dataUrl;
+      } else {
+        // placeholder пока грузится
+        ctx.strokeStyle = '#9CA3AF';
+        ctx.strokeRect(x, y, wPx, hPx);
+      }
+      bw = wPx; bh = hPx;
+    }
+    _leState._bboxes.push({ idx, x, y, w: bw, h: bh });
+    // Подсветка выбранного / dragged элемента
+    if (_leState._dragIdx === idx) {
+      ctx.strokeStyle = '#2563EB';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 2, y - 2, bw + 4, bh + 4);
+      ctx.lineWidth = 1;
     }
   });
-  // Рамка-контур
+  // Рамка-контур этикетки
   ctx.strokeStyle = '#9CA3AF';
   ctx.setLineDash([4, 4]);
   ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
   ctx.setLineDash([]);
+}
+
+// Кэш загруженных Image'й (картинки), чтобы не пересоздавать на каждый redraw
+const _leImageCache = {};
+
+// === v2.45.40: drag-and-drop элементов прямо на canvas ===
+function _leAttachCanvasDrag() {
+  const c = document.getElementById('le-canvas');
+  if (!c || c.dataset.dragBound === '1') return;
+  c.dataset.dragBound = '1';
+
+  function pointAt(e) {
+    const rect = c.getBoundingClientRect();
+    const t = (e.touches && e.touches[0]) || e;
+    return {
+      x: ((t.clientX - rect.left) / rect.width) * c.width,
+      y: ((t.clientY - rect.top) / rect.height) * c.height,
+    };
+  }
+  function hitTest(px, py) {
+    // Берём верхний элемент (последний в массиве). Идём с конца.
+    const boxes = _leState._bboxes || [];
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const b = boxes[i];
+      if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return b;
+    }
+    return null;
+  }
+
+  function onDown(e) {
+    const p = pointAt(e);
+    const hit = hitTest(p.x, p.y);
+    if (!hit) return;
+    e.preventDefault();
+    _leState._dragIdx = hit.idx;
+    _leState._dragOffset = { x: p.x - hit.x, y: p.y - hit.y };
+    c.style.cursor = 'grabbing';
+    _leDrawCanvas();
+  }
+  function onMove(e) {
+    if (_leState._dragIdx === null || _leState._dragIdx === undefined) {
+      // hover-курсор
+      const p = pointAt(e);
+      const hit = hitTest(p.x, p.y);
+      c.style.cursor = hit ? 'grab' : 'default';
+      return;
+    }
+    e.preventDefault();
+    const p = pointAt(e);
+    const el = _leState.elements[_leState._dragIdx];
+    if (!el) return;
+    const off = _leState._dragOffset || { x: 0, y: 0 };
+    let newX = (p.x - off.x) / LE_PREVIEW_SCALE;
+    let newY = (p.y - off.y) / LE_PREVIEW_SCALE;
+    // Зажмём в пределы этикетки (с минимальным отступом так, чтобы хоть точка видна была)
+    newX = Math.max(0, Math.min(newX, (_leState.widthMm || 58) - 1));
+    newY = Math.max(0, Math.min(newY, (_leState.heightMm || 40) - 1));
+    el.x = Math.round(newX * 2) / 2;   // шаг 0.5 мм — удобно
+    el.y = Math.round(newY * 2) / 2;
+    _leDrawCanvas();
+    // Обновим только X/Y инпуты выбранного элемента, не пересоздавая всю таблицу
+    const rows = document.querySelectorAll('.le-el-row');
+    const row = rows[_leState._dragIdx];
+    if (row) {
+      const xs = row.querySelectorAll('input[type="number"]');
+      // порядок: X, Y, размер
+      if (xs[0]) xs[0].value = el.x;
+      if (xs[1]) xs[1].value = el.y;
+    }
+  }
+  function onUp() {
+    if (_leState._dragIdx !== null && _leState._dragIdx !== undefined) {
+      _leState._dragIdx = null;
+      _leState._dragOffset = null;
+      c.style.cursor = 'grab';
+      _leDrawCanvas();
+    }
+  }
+  c.addEventListener('mousedown', onDown);
+  c.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  c.addEventListener('touchstart', onDown, { passive: false });
+  c.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onUp);
 }
 
 // === ZPL генерация ===
