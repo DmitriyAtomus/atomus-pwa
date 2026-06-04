@@ -19171,7 +19171,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.56-admin-tools-menu";
+const APP_VERSION = "v2.45.57-admin-tools-password";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47945,6 +47945,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.57',
+    date: '04.06.2026',
+    title: 'Админ-инструменты — под паролем',
+    features: [
+      'Перед открытием модалки «Админ-инструменты» теперь система просит <b>пароль директора</b> (тот же, что для входа в CRM)',
+      'Один раз ввёл — до перезагрузки страницы или выхода из учётки больше не спрашивает',
+      'Это второй замок поверх роли — чтобы случайный клик в Снабжении не открыл массовые операции одной кнопкой',
+    ],
+  },
+  {
     version: 'v2.45.56',
     date: '04.06.2026',
     title: 'Сайдбар Снабжения: убрал лишние пункты в «Админ-инструменты»',
@@ -61976,9 +61986,88 @@ async function _ssdRun(dryRun) {
   .sat-card-desc { font-size: 12px; color: var(--text-mid); line-height: 1.4; }
 </style>
 <script>
+// v2.45.57: in-memory флаг — пароль уже введён в этой сессии браузера.
+// Чистится при reload или logout. Чтобы заново не вводить при каждом открытии.
+state._adminToolsUnlocked = false;
+
+async // v2.45.57: модалка с полем пароля. Возвращает Promise<bool> — true если
+// пароль директора верный. Используется как gate перед админ-инструментами.
+function _satPromptPassword() {
+  return new Promise(resolve => {
+    let pm = document.getElementById('sat-pwd-modal');
+    if (!pm) {
+      pm = document.createElement('div');
+      pm.id = 'sat-pwd-modal';
+      pm.className = 'modal-overlay';
+      document.body.appendChild(pm);
+    }
+    let done = false;
+    function close(ok) {
+      if (done) return;
+      done = true;
+      pm.classList.remove('visible');
+      resolve(ok);
+    }
+    pm.onclick = (e) => { if (e.target === pm) close(false); };
+    pm.innerHTML =
+      '<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">' +
+        '<div class="modal-header">' +
+          '<h3><i class="ti ti-lock"></i> Пароль директора</h3>' +
+          '<button class="modal-close" id="sat-pwd-cancel"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div style="padding:18px 20px;">' +
+          '<div style="font-size:13px;color:var(--text-mid);margin-bottom:12px;line-height:1.5;">Глубокие настройки каталога защищены повторным вводом пароля. Введи свой пароль входа в CRM.</div>' +
+          '<input type="password" id="sat-pwd-input" autocomplete="current-password" placeholder="Пароль" autofocus ' +
+            'style="width:100%;font-size:14px;padding:9px 12px;height:40px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;" />' +
+          '<div id="sat-pwd-error" style="display:none;color:var(--danger);font-size:12.5px;margin-top:6px;"></div>' +
+        '</div>' +
+        '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+          '<button class="btn btn-secondary" id="sat-pwd-cancel-btn"><i class="ti ti-x"></i> Отмена</button>' +
+          '<button class="btn btn-primary" id="sat-pwd-ok-btn"><i class="ti ti-check"></i> Войти</button>' +
+        '</div>' +
+      '</div>';
+    pm.classList.add('visible');
+    const input = document.getElementById('sat-pwd-input');
+    const errEl = document.getElementById('sat-pwd-error');
+    setTimeout(() => input && input.focus(), 50);
+    async function trySubmit() {
+      const pwd = (input.value || '').trim();
+      if (!pwd) {
+        errEl.style.display = ''; errEl.textContent = 'Введи пароль';
+        return;
+      }
+      try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const r = await fetch(API_BASE + '/api/admin/verify-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ password: pwd }),
+        });
+        if (!r.ok) {
+          errEl.style.display = ''; errEl.textContent = 'Неверный пароль';
+          input.select();
+          return;
+        }
+        close(true);
+      } catch (e) {
+        errEl.style.display = ''; errEl.textContent = 'Ошибка проверки';
+      }
+    }
+    document.getElementById('sat-pwd-ok-btn').onclick = trySubmit;
+    document.getElementById('sat-pwd-cancel-btn').onclick = () => close(false);
+    document.getElementById('sat-pwd-cancel').onclick = () => close(false);
+    input.onkeydown = (e) => { if (e.key === 'Enter') trySubmit(); else if (e.key === 'Escape') close(false); };
+  });
+}
+
 function openSupplyAdminTools() {
   const isDir = state.user && (state.user.roles || []).includes('director');
   if (!isDir) { showToast('Доступно только директору', 'error'); return; }
+  if (!state._adminToolsUnlocked) {
+    const ok = await _satPromptPassword();
+    if (!ok) return;
+    state._adminToolsUnlocked = true;
+  }
   let m = document.getElementById('sat-modal');
   if (!m) {
     m = document.createElement('div');
