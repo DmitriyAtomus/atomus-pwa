@@ -19239,7 +19239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.75-rename-category";
+const APP_VERSION = "v2.45.76-text-replace";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48202,6 +48202,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.76',
+    date: '04.06.2026',
+    title: 'Админ-инструмент «Массовая замена текста»',
+    features: [
+      'В <b>Снабжение → Админ-инструменты</b> добавился инструмент <b>«Замена текста»</b>',
+      'Вписываешь «Найти» и «Заменить на», выбираешь где искать (название/артикул моделей, имена подгрупп/категорий, имя/sku компонентов) → Предпросмотр → Заменить',
+      'Пример: <code>НПВ</code> → <code>НВП</code> по полям «Модели — название» и «Модели — артикул» переписывает оба поля у всех моделей',
+      'UNIQUE-коллизии для артикула модели попадают в «пропущенные», ничего не ломается',
+    ],
+  },
+  {
     version: 'v2.45.75',
     date: '04.06.2026',
     title: 'Переименование категории каталога + цветовая тема «нержавейка»',
@@ -62553,6 +62564,10 @@ async function openSupplyAdminTools() {
           tool('ti-transfer',       'Перенос компонентов',
                'Выбрать компоненты из категории A и перенести в категорию B, опционально дописав суффикс к артикулу (например «-ДБ»)',
                'openComponentsMove()') +
+          // v2.45.76: массовая замена текста в каталоге (НПВ → НВП и т.п.)
+          tool('ti-replace',        'Замена текста',
+               'Массово заменить подстроку в названиях и артикулах моделей/категорий/компонентов (например, переписать «НПВ» на «НВП» во всём каталоге)',
+               'openTextReplaceBulk()') +
         '</div>' +
       '</div>' +
     '</div>';
@@ -62979,6 +62994,167 @@ async function _cmvRun(dryRun) {
   } finally {
     _cmvState.loading = false;
     _cmvRender();
+  }
+}
+
+// ============ v2.45.76: МАССОВАЯ ЗАМЕНА ТЕКСТА ============
+let _trbState = null;
+const TRB_SCOPES = [
+  { key: 'models.name',     label: 'Модели — название' },
+  { key: 'models.article',  label: 'Модели — артикул' },
+  { key: 'subgroups.name',  label: 'Подгруппы — название' },
+  { key: 'categories.name', label: 'Категории — название' },
+  { key: 'components.name', label: 'Компоненты — название' },
+  { key: 'components.sku',  label: 'Компоненты — sku' },
+];
+
+function openTextReplaceBulk() {
+  _trbState = {
+    find: '', replace: '',
+    selectedScopes: new Set(['models.name', 'models.article']),
+    preview: null,
+    loading: false,
+  };
+  let m = document.getElementById('trb-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'trb-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _trbRender();
+  m.classList.add('visible');
+}
+
+function _trbRender() {
+  const m = document.getElementById('trb-modal');
+  if (!m) return;
+  const s = _trbState;
+  const scopesHtml = TRB_SCOPES.map(sc => {
+    const checked = s.selectedScopes.has(sc.key) ? 'checked' : '';
+    return '<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text-dark);padding:4px 0;cursor:pointer;">' +
+      '<input type="checkbox" ' + checked + ' onchange="_trbToggleScope(\'' + sc.key + '\', this.checked)" /> ' +
+      escapeHtml(sc.label) +
+    '</label>';
+  }).join('');
+  let resultsHtml = '';
+  if (s.preview) {
+    const blocks = Object.keys(s.preview.summary || {}).map(scKey => {
+      const sum = s.preview.summary[scKey];
+      const changes = (s.preview.changes && s.preview.changes[scKey]) || [];
+      const samples = changes.slice(0, 8).map(c =>
+        '<li style="font-size:11.5px;color:var(--text-mid);"><code>' + escapeHtml(c.old) + '</code> → <b>' + escapeHtml(c.new) + '</b></li>'
+      ).join('');
+      const more = changes.length > 8 ? '<li style="font-size:11.5px;color:var(--text-light);">…ещё ' + (changes.length - 8) + '</li>' : '';
+      const skipped = (s.preview.skipped && s.preview.skipped[scKey]) || [];
+      const skippedHtml = skipped.length
+        ? '<div style="margin-top:6px;color:#B91C1C;font-size:11.5px;">Пропущено (коллизия): ' +
+            skipped.slice(0, 5).map(sk => escapeHtml(sk.old) + '→' + escapeHtml(sk.new)).join(', ') +
+          '</div>'
+        : '';
+      return '<div style="margin-bottom:10px;">' +
+        '<div style="font-size:12.5px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">' +
+          escapeHtml(scKey) + ': изменено <b>' + sum.changed + '</b>' +
+          (sum.skipped ? ' · пропущено <b>' + sum.skipped + '</b>' : '') +
+        '</div>' +
+        (samples ? '<ul style="margin:4px 0 0 18px;padding:0;">' + samples + more + '</ul>' : '') +
+        skippedHtml +
+      '</div>';
+    }).join('');
+    resultsHtml = '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:10px 14px;margin-top:12px;">' +
+      (blocks || '<div style="color:var(--text-light);font-size:13px;">Ничего не найдено</div>') +
+    '</div>';
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-replace"></i> Массовая замена текста</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:16px 20px;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">' +
+          '<div><label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">Найти</label>' +
+            '<input type="text" value="' + escapeHtml(s.find) + '" placeholder="НПВ" oninput="_trbSetFind(this.value)" ' +
+              'style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;" /></div>' +
+          '<div><label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">Заменить на</label>' +
+            '<input type="text" value="' + escapeHtml(s.replace) + '" placeholder="НВП" oninput="_trbSetReplace(this.value)" ' +
+              'style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;" /></div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-mid);text-transform:uppercase;font-weight:600;margin-bottom:6px;">Где искать</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;">' +
+          scopesHtml +
+        '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-light);margin-top:8px;line-height:1.5;">' +
+          '<i class="ti ti-info-circle"></i> Замена — обычный <code>str.replace</code> по подстроке (регистр учитывается). Артикулы моделей с UNIQUE-коллизией попадают в «пропущенные».' +
+        '</div>' +
+        resultsHtml +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+        '<button class="btn btn-secondary" onclick="_trbRun(true)" ' + (s.loading ? 'disabled' : '') + '>' +
+          (s.loading ? '<i class="ti ti-loader-2"></i> Считаем…' : '<i class="ti ti-eye"></i> Предпросмотр') +
+        '</button>' +
+        '<button class="btn btn-primary" onclick="_trbRun(false)" ' + ((!s.preview || s.loading) ? 'disabled' : '') + '>' +
+          '<i class="ti ti-check"></i> Заменить' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _trbSetFind(v) { _trbState.find = v; _trbState.preview = null; _trbRender(); }
+function _trbSetReplace(v) { _trbState.replace = v; _trbState.preview = null; _trbRender(); }
+function _trbToggleScope(key, on) {
+  if (on) _trbState.selectedScopes.add(key);
+  else _trbState.selectedScopes.delete(key);
+  _trbState.preview = null;
+  _trbRender();
+}
+
+async function _trbRun(dryRun) {
+  if (_trbState.loading) return;
+  if (!_trbState.find) { showToast('Укажи что искать', 'error'); return; }
+  if (_trbState.find === _trbState.replace) { showToast('Find и Replace совпадают', 'error'); return; }
+  if (_trbState.selectedScopes.size === 0) { showToast('Выбери хотя бы одно поле', 'error'); return; }
+  if (!dryRun && !_trbState.preview) { showToast('Сначала «Предпросмотр»', 'error'); return; }
+  if (!dryRun) {
+    const total = Object.values(_trbState.preview.summary || {})
+      .reduce((acc, s) => acc + (s.changed || 0), 0);
+    if (!confirm('Применить замену «' + _trbState.find + '» → «' + _trbState.replace + '» в ' + total + ' записях?')) return;
+  }
+  _trbState.loading = true;
+  _trbRender();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/text-replace-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        find: _trbState.find,
+        replace: _trbState.replace,
+        scopes: Array.from(_trbState.selectedScopes),
+        dry_run: dryRun,
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status), 'error');
+      return;
+    }
+    const d = await r.json();
+    _trbState.preview = d;
+    if (!dryRun) {
+      const total = Object.values(d.summary || {}).reduce((a, s) => a + (s.changed || 0), 0);
+      showToast('Заменено ' + total + ' записей', 'success');
+      cache.models = null;
+      cache.components = null;
+    } else {
+      showToast('Предпросмотр готов', 'success');
+    }
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  } finally {
+    _trbState.loading = false;
+    _trbRender();
   }
 }
 </script>
