@@ -19118,7 +19118,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.34-supply-req-components";
+const APP_VERSION = "v2.45.35-invoice-detach";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45813,7 +45813,13 @@ function renderSupplyOrderDetail(o) {
   const canSend = canManage && o.status === 'draft' && (o.items || []).length > 0;
   const canReceive = canManage && ['sent', 'partial'].includes(o.status);
   // FSM-переходы для нового лайфцикла снабжения
-  const canUploadInvoice = canManage && ['sent', 'awaiting_invoice', 'invoice_received'].includes(o.status);
+  // v2.45.35: директор может перезалить счёт на любых открытых статусах,
+  // включая to_pay/paid/partial — например, если файл стёрло в storage.
+  const _isDir = state.user && (state.user.roles || []).includes('director');
+  const _canUploadStatuses = _isDir
+    ? ['sent', 'awaiting_invoice', 'invoice_received', 'to_pay', 'paid', 'partial']
+    : ['sent', 'awaiting_invoice', 'invoice_received'];
+  const canUploadInvoice = canManage && _canUploadStatuses.includes(o.status);
   const canToPay         = canManage && o.status === 'invoice_received';
   const canMarkPaid      = canManage && o.status === 'to_pay';
   const canMarkReceived  = canManage && ['paid', 'partial'].includes(o.status);
@@ -46185,9 +46191,19 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
       // и подсказку «файл удалили из storage / сменили S3-bucket»).
       let serverMsg = '';
       try { const d = await r.json(); serverMsg = d.message || d.error || ''; } catch (e) {}
+      // v2.45.35: если файла нет в storage и юзер директор — даём кнопку
+      // открепить мёртвую ссылку и загрузить счёт заново.
+      const isDir = state.user && (state.user.roles || []).includes('director');
+      const detachBtn = isDir
+        ? '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            '<button class="btn btn-secondary btn-small" onclick="detachSupplyOrderInvoice(' + orderId + ')"><i class="ti ti-unlink"></i> Открепить мёртвую ссылку</button>' +
+            '<button class="btn btn-primary btn-small" onclick="uploadSupplyOrderInvoice(' + orderId + ')"><i class="ti ti-upload"></i> Загрузить заново</button>' +
+          '</div>'
+        : '';
       cont.innerHTML = '<div style="padding:14px;color:var(--danger);font-size:13px;line-height:1.5;">' +
         '<b>Не удалось загрузить счёт (HTTP ' + r.status + ').</b>' +
         (serverMsg ? '<br><span style="color:var(--text-mid);">' + escapeHtml(serverMsg) + '</span>' : '') +
+        detachBtn +
       '</div>';
       return;
     }
@@ -46208,6 +46224,30 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
   } catch (e) {
     cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Ошибка загрузки счёта.</div>';
   }
+}
+
+// v2.45.35: открепить мёртвую ссылку на файл счёта (директор). Когда файл
+// исчез из storage (например, ephemeral диск стёр его при редеплое), запись
+// в БД продолжает указывать на потерянный ключ — заказ висит «со счётом» но
+// открыть его нельзя. Эта функция чистит ссылку, после чего можно залить
+// новый файл через «Заменить».
+async function detachSupplyOrderInvoice(orderId) {
+  if (!confirm('Открепить ссылку на счёт от заказа?\n\nЗапись в БД будет очищена. Файл из storage тоже будет удалён, если он там ещё есть. После этого можно загрузить новый счёт.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/invoice', {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status + ': не удалось открепить'), 'error');
+      return;
+    }
+    showToast('Ссылка на счёт откреплена', 'success');
+    // Перерисуем карточку заказа целиком
+    if (typeof openSupplyOrder === 'function') openSupplyOrder(orderId);
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 async function downloadSupplyOrderInvoice(orderId) {
@@ -47690,6 +47730,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.35',
+    date: '04.06.2026',
+    title: 'Открепить мёртвую ссылку на счёт',
+    features: [
+      'Если файл счёта пропал из хранилища (например, был сохранён до того как настроили S3), при «Просмотре» появится кнопка <b>«Открепить мёртвую ссылку»</b> + <b>«Загрузить заново»</b>',
+      'Только для директора. Чистит запись в БД и пытается удалить остатки из storage — после этого можно загрузить новый файл',
+      'Директор также может <b>заменить счёт на любом открытом статусе</b> (даже если заказ уже на оплате/оплачен) — раньше можно было только до «Счёт пришёл»',
+    ],
+  },
   {
     version: 'v2.45.34',
     date: '04.06.2026',
