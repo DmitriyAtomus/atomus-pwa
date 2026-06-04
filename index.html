@@ -19239,7 +19239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.74-dedup-models";
+const APP_VERSION = "v2.45.75-rename-category";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -33117,18 +33117,48 @@ async function loadModels() {
 }
 
 // v2.41.10: иконка и палитра подгруппы по её имени/коду
+// v2.45.75: проверку «нерж/AISI» ставим первой — чтобы категория вроде
+// «Воздухоохладители из нержавеющей стали» получила розово-стальную тему
+// (а не teal от «воздухоохл»).
 function _subgroupTheme(name) {
   const n = (name || '').toLowerCase();
+  if (n.includes('нерж') || n.includes('aisi'))      return { icon: 'ti-shield-check',     cls: 'sg-aisi' };
   if (n.includes('наружн')) return { icon: 'ti-building-broadcast-tower', cls: 'sg-outdoor' };
   if (n.includes('воздухоохл')) return { icon: 'ti-snowflake',           cls: 'sg-evaporator' };
   if (n.includes('донагрев') || n.startsWith('нпв')) return { icon: 'ti-flame', cls: 'sg-heater' };
   if (n.includes('увлаж'))    return { icon: 'ti-droplet',                cls: 'sg-humid' };
   if (n.includes('дефрост'))  return { icon: 'ti-temperature-snow',       cls: 'sg-defrost' };
   if (n.includes('чиллер'))   return { icon: 'ti-thermometer',            cls: 'sg-chiller' };
-  if (n.includes('нерж') || n.includes('aisi'))      return { icon: 'ti-shield-check',     cls: 'sg-aisi' };
   if (n.includes('влагозащ') || n.includes(' ip'))   return { icon: 'ti-droplet-half-2',   cls: 'sg-ip' };
   if (n === 'стандарт' || n.startsWith('стандарт'))  return { icon: 'ti-package',          cls: 'sg-standard' };
   return { icon: 'ti-folder', cls: 'sg-default' };
+}
+
+// v2.45.75: переименовать категорию каталога моделей.
+async function _renameCategoryPrompt(categoryId, currentName) {
+  const name = prompt('Новое имя категории:', currentName || '');
+  if (!name || !name.trim()) return;
+  if (name.trim() === (currentName || '').trim()) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/categories/' + categoryId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status), 'error');
+      return;
+    }
+    showToast('Категория переименована', 'success');
+    cache.models = null;
+    if (typeof loadModels === 'function') {
+      try { await loadModels(); } catch (e) {}
+    }
+  } catch (e) {
+    showToast('Ошибка', 'error');
+  }
 }
 
 // v2.45.65: создать новую категорию внутри направления (с поясняющим
@@ -33321,12 +33351,25 @@ function renderModels(d) {
         const cat = byCat[cid];
         const catKey = subKey + ':cat:' + cid;
         const catOpen = catKey in openSubMap ? !!openSubMap[catKey] : false;
-        html += '<div class="models-category" style="margin:6px 0 0 14px;">' +
-          '<button class="models-subgroup-toggle" data-subkey="' + catKey + '" onclick="toggleModelsSubgroup(\'' + catKey + '\')" style="padding-left:10px;background:#F8FAFC;">' +
+        // v2.45.75: цветовая тема категории по имени (нерж → розовая и т.д.)
+        const catTheme = _subgroupTheme(cat.name);
+        const isThemed = catTheme.cls !== 'sg-default';
+        // Для тёмной темы (aisi и т.п.) убираем светло-серый фон, чтобы
+        // подсветка пришла через models-subgroup.<cls>.
+        const catRowBg = isThemed ? '' : 'background:#F8FAFC;';
+        const renameBtn = (typeof canManageSales === 'function' && canManageSales())
+          ? '<button class="dev-link-btn" onclick="event.stopPropagation(); _renameCategoryPrompt(' + cid + ', ' + JSON.stringify(cat.name).replace(/"/g, '&quot;') + ')" ' +
+              'title="Переименовать категорию" style="margin-left:6px;padding:2px 6px;">' +
+              '<i class="ti ti-edit"></i>' +
+            '</button>'
+          : '';
+        html += '<div class="models-category models-subgroup ' + catTheme.cls + '" style="margin:6px 0 0 14px;">' +
+          '<button class="models-subgroup-toggle" data-subkey="' + catKey + '" onclick="toggleModelsSubgroup(\'' + catKey + '\')" style="padding-left:10px;' + catRowBg + '">' +
             '<i class="ti ti-chevron-right models-subgroup-chevron' + (catOpen ? ' open' : '') + '"></i>' +
-            '<i class="ti ti-folder sg-icon" style="opacity:0.7;"></i>' +
+            '<i class="ti ' + catTheme.icon + ' sg-icon"' + (isThemed ? '' : ' style="opacity:0.7;"') + '></i>' +
             '<span class="sg-name" style="font-size:13.5px;">' + escapeHtml(cat.name) + '</span>' +
             '<span class="models-subgroup-count">' + cat.items.length + '</span>' +
+            renameBtn +
           '</button>' +
           '<div class="models-subgroup-body" data-subkey="' + catKey + '" style="' + (catOpen ? '' : 'display:none;') + '">' +
             '<div class="card">';
@@ -48158,6 +48201,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.75',
+    date: '04.06.2026',
+    title: 'Переименование категории каталога + цветовая тема «нержавейка»',
+    features: [
+      'У каждой категории внутри подгруппы появилась кнопка-карандашик — переименовать без захода в админку',
+      'Если в имени категории есть «нерж» или «AISI» — она автоматически окрашивается в розово-стальную тему (как «Нерж. AISI» в моделях). Пример: переименуй «Воздухоохладители доработанные» в «Воздухоохладители из нержавеющей стали» — цвет поменяется сам',
+      'Цветовая тема работает и для подгрупп, и теперь для категорий',
+    ],
+  },
   {
     version: 'v2.45.74',
     date: '04.06.2026',
