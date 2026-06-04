@@ -16886,6 +16886,10 @@
         <a class="nav-item" onclick="openModelsRenumber()" style="cursor:pointer;">
           <i class="ti ti-arrows-sort"></i><span>Перенумерация</span>
         </a>
+        <!-- v2.45.52: подгруппы каталога по артикулу -->
+        <a class="nav-item" onclick="openSubgroupsSeed()" style="cursor:pointer;">
+          <i class="ti ti-list-tree"></i><span>Подгруппы каталога</span>
+        </a>
       </div>
       <div class="sidebar-footer">
         <div class="small-avatar" id="sb-avatar-supply">—</div>
@@ -19173,7 +19177,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.51-models-renumber";
+const APP_VERSION = "v2.45.52-catalog-subgroups";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47903,6 +47907,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.52',
+    date: '04.06.2026',
+    title: 'Подгруппы каталога по артикулу',
+    features: [
+      'В сайдбаре <b>Снабжение → Подгруппы каталога</b> — инструмент для разбивки моделей направления на подгруппы по первой цифре артикула',
+      'По умолчанию заполнены 5 подгрупп: 001.0 Камеры созревания, 002.0 Чиллера, 003.0 Холодильное оборудование, 004.0 Приточно-вытяжная вентиляция, 005.0 АСУ — можно править и добавлять свои',
+      'Выбираешь направление → жмёшь «Предпросмотр» → видишь сколько моделей привяжется и какие не распознаются → «Применить»',
+      'В каталоге моделей подгруппы уже умеют сворачиваться — после применения модели разлягутся по 5 секциям',
+    ],
+  },
+  {
     version: 'v2.45.51',
     date: '04.06.2026',
     title: 'Перенумерация моделей по префиксу (ЩУ001.000…)',
@@ -61584,6 +61599,206 @@ async function _mrnApply() {
     _mrnRender();
   } finally {
     _mrnState.loading = false;
+  }
+}
+</script>
+
+<!-- ============ v2.45.52: ПОДГРУППЫ КАТАЛОГА ПО АРТИКУЛУ ============ -->
+<style>
+  .ssd-modal { max-width: 760px; width: 96vw; max-height: 92vh; display: flex; flex-direction: column; }
+  .ssd-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .ssd-row { display: grid; grid-template-columns: 80px 1fr 32px; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .ssd-row input { font-size: 13px; padding: 6px 10px; height: 34px; border: 1px solid var(--border); border-radius: 8px; margin: 0; }
+  .ssd-results { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; max-height: 260px; overflow-y: auto; margin-top: 12px; }
+  .ssd-stat-line { padding: 3px 0; }
+</style>
+<script>
+let _ssdState = null;
+
+const SSD_DEFAULT_SUBGROUPS = [
+  { code: '001', name: '001.0 Камеры созревания' },
+  { code: '002', name: '002.0 Чиллера' },
+  { code: '003', name: '003.0 Холодильное оборудование' },
+  { code: '004', name: '004.0 Приточно-вытяжная вентиляция' },
+  { code: '005', name: '005.0 АСУ' },
+];
+
+async function openSubgroupsSeed() {
+  // Подгружаем направления
+  if (!cache.directionsList) {
+    try {
+      const r = await apiGet('/api/directions');
+      cache.directionsList = r.directions || r.items || r || [];
+    } catch (e) { cache.directionsList = []; }
+  }
+  _ssdState = {
+    direction_id: null,
+    subgroups: SSD_DEFAULT_SUBGROUPS.map(s => ({...s})),
+    auto_bind: true,
+    loading: false,
+    lastResult: null,
+    error: null,
+  };
+  let m = document.getElementById('ssd-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ssd-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _ssdRender();
+  m.classList.add('visible');
+}
+
+function _ssdRender() {
+  const m = document.getElementById('ssd-modal');
+  if (!m) return;
+  const s = _ssdState;
+  const dirs = cache.directionsList || [];
+  const dirOpts = '<option value="">— выбрать —</option>' +
+    dirs.map(d => '<option value="' + d.id + '"' + (s.direction_id === d.id ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>').join('');
+  const rowsHtml = s.subgroups.map((sg, i) =>
+    '<div class="ssd-row">' +
+      '<input type="text" value="' + escapeHtml(sg.code) + '" placeholder="001" oninput="_ssdEdit(' + i + ',\'code\',this.value)" />' +
+      '<input type="text" value="' + escapeHtml(sg.name) + '" placeholder="001.0 Камеры созревания" oninput="_ssdEdit(' + i + ',\'name\',this.value)" />' +
+      (i > 0
+        ? '<button class="btn btn-secondary btn-small" onclick="_ssdRemove(' + i + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-x"></i></button>'
+        : '<span></span>') +
+    '</div>'
+  ).join('');
+  const result = s.lastResult;
+  const resultsHtml = result
+    ? '<div class="ssd-results">' +
+        '<div class="ssd-stat-line"><b>' + (result.dry_run ? 'Предпросмотр' : 'Применено') + ':</b></div>' +
+        '<div class="ssd-stat-line">Создано подгрупп: <b>' + (result.subgroups_created || []).length + '</b></div>' +
+        '<div class="ssd-stat-line">Обновлено имён: <b>' + (result.subgroups_updated || []).length + '</b></div>' +
+        '<div class="ssd-stat-line">Привязано моделей: <b>' + result.bound_count + '</b></div>' +
+        (result.unmatched_count > 0
+          ? '<div class="ssd-stat-line" style="color:var(--danger);">Не распознано/без подгруппы: <b>' + result.unmatched_count + '</b></div>'
+          : '') +
+        ((result.unmatched || []).length > 0
+          ? '<div style="margin-top:8px;color:var(--text-light);font-size:11.5px;">' +
+              result.unmatched.slice(0, 30).map(u =>
+                '<div>• <code>' + escapeHtml(u.article) + '</code> — ' + escapeHtml(u.reason) + '</div>'
+              ).join('') +
+              (result.unmatched.length > 30 ? '<div>…и ещё ' + (result.unmatched.length - 30) + '</div>' : '') +
+            '</div>'
+          : '') +
+      '</div>'
+    : '';
+  m.innerHTML =
+    '<div class="modal ssd-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-tree"></i> Подгруппы каталога по артикулу</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="ssd-body">' +
+        '<div style="margin-bottom:12px;">' +
+          '<label class="form-label" style="font-size:11.5px;">Направление</label>' +
+          '<select id="ssd-dir" onchange="_ssdSetDir(this.value)" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;">' + dirOpts + '</select>' +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">Подгруппы и привязка создадутся в выбранном направлении.</div>' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label class="form-label" style="font-size:11.5px;">Подгруппы</label>' +
+          '<div class="ssd-row" style="font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;">' +
+            '<div>Код (3 цифры)</div><div>Название</div><div></div>' +
+          '</div>' +
+          rowsHtml +
+          '<button class="btn btn-secondary btn-small" onclick="_ssdAddRow()"><i class="ti ti-plus"></i> Ещё подгруппа</button>' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">' +
+            '<input type="checkbox"' + (s.auto_bind ? ' checked' : '') + ' onchange="_ssdState.auto_bind=this.checked;_ssdRender()" style="width:18px;height:18px;appearance:auto;accent-color:#0C4A6E;" />' +
+            '<span>Автоматически привязать модели к подгруппам по первой цифре артикула</span>' +
+          '</label>' +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">' +
+            'ЩУ-001-XXX → код 001, ЩУ-002-XXX → код 002 и так далее. Если у модели нет подходящей подгруппы — она останется как есть.' +
+          '</div>' +
+        '</div>' +
+        (s.error
+          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius:6px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
+          : '') +
+        resultsHtml +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+        (s.loading
+          ? '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);display:flex;align-items:center;gap:6px;">' +
+              '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…' +
+            '</div>'
+          : '') +
+        '<button class="btn btn-secondary" onclick="_ssdRun(true)" ' + (s.loading ? 'disabled' : '') + '>' +
+          '<i class="ti ti-eye"></i> Предпросмотр' +
+        '</button>' +
+        '<button class="btn btn-primary" onclick="_ssdRun(false)" ' + ((s.loading || !s.lastResult) ? 'disabled' : '') + '>' +
+          '<i class="ti ti-check"></i> Применить' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _ssdSetDir(v) { _ssdState.direction_id = v ? parseInt(v, 10) : null; }
+function _ssdEdit(i, key, val) {
+  if (!_ssdState.subgroups[i]) return;
+  _ssdState.subgroups[i][key] = val;
+}
+function _ssdAddRow() {
+  _ssdState.subgroups.push({ code: '', name: '' });
+  _ssdRender();
+}
+function _ssdRemove(i) {
+  if (_ssdState.subgroups.length <= 1) return;
+  _ssdState.subgroups.splice(i, 1);
+  _ssdRender();
+}
+
+async function _ssdRun(dryRun) {
+  if (_ssdState.loading) return;
+  if (!_ssdState.direction_id) { showToast('Выбери направление', 'error'); return; }
+  const sgs = _ssdState.subgroups.filter(s => (s.code || '').trim() && (s.name || '').trim());
+  if (!sgs.length) { showToast('Заполни хотя бы одну подгруппу', 'error'); return; }
+  if (!dryRun && !_ssdState.lastResult) {
+    showToast('Сначала «Предпросмотр»', 'error'); return;
+  }
+  if (!dryRun) {
+    const n = (_ssdState.lastResult.subgroups_created || []).length + _ssdState.lastResult.bound_count;
+    if (!confirm('Применить? Будут созданы подгруппы и привязаны модели (' + n + ' изменений).')) return;
+  }
+  _ssdState.loading = true;
+  _ssdState.error = null;
+  _ssdRender();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/subgroups/seed-and-bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        direction_id: _ssdState.direction_id,
+        subgroups: sgs,
+        auto_bind: _ssdState.auto_bind,
+        dry_run: dryRun,
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      _ssdState.error = d.message || ('HTTP ' + r.status);
+      showToast(_ssdState.error, 'error');
+      return;
+    }
+    const d = await r.json();
+    _ssdState.lastResult = d;
+    if (!dryRun) {
+      showToast('Готово · создано ' + (d.subgroups_created || []).length + ', привязано ' + d.bound_count, 'success');
+      // Сбросим кэш моделей чтобы при следующем рендере каталога подгруппы появились
+      cache.models = null;
+    } else {
+      showToast('Предпросмотр готов', 'success');
+    }
+  } catch (e) {
+    _ssdState.error = String(e && e.message || e);
+  } finally {
+    _ssdState.loading = false;
+    _ssdRender();
   }
 }
 </script>
