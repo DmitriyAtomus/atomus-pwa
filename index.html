@@ -16890,6 +16890,10 @@
         <a class="nav-item" onclick="openSubgroupsSeed()" style="cursor:pointer;">
           <i class="ti ti-list-tree"></i><span>Подгруппы каталога</span>
         </a>
+        <!-- v2.45.55: двухуровневая иерархия каталога (subgroup → category) -->
+        <a class="nav-item" onclick="openTwoLevelHierarchy()" style="cursor:pointer;">
+          <i class="ti ti-binary-tree-2"></i><span>2-уровневая иерархия</span>
+        </a>
       </div>
       <div class="sidebar-footer">
         <div class="small-avatar" id="sb-avatar-supply">—</div>
@@ -19177,7 +19181,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.54-subgroups-prefix";
+const APP_VERSION = "v2.45.55-two-level-hierarchy";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -33122,12 +33126,28 @@ function renderModels(d) {
       }
     }
 
-    // Затем подгруппы
+    // Затем подгруппы (level 1). v2.45.55: внутри каждой подгруппы группируем
+    // модели по category_id (level 2) — двухуровневая иерархия каталога.
     subgroupKeys.forEach(sid => {
       const sg = bySubgroup[sid];
       const subKey = dirId + ':' + sid;
       const subOpen = subKey in openSubMap ? !!openSubMap[subKey] : false;
       const theme = _subgroupTheme(sg.name);
+      // Группируем модели подгруппы по категориям
+      const byCat = {};
+      const noCat = [];
+      sg.items.forEach(m => {
+        if (m.category_id) {
+          const cid = String(m.category_id);
+          if (!byCat[cid]) byCat[cid] = { id: m.category_id, name: m.category_name || ('Категория #' + m.category_id), items: [] };
+          byCat[cid].items.push(m);
+        } else {
+          noCat.push(m);
+        }
+      });
+      const catKeys = Object.keys(byCat).sort((a, b) =>
+        (byCat[a].name || '').localeCompare(byCat[b].name || ''));
+      const hasCategories = catKeys.length > 0;
       html += '<div class="models-subgroup ' + theme.cls + '">' +
         '<button class="models-subgroup-toggle" data-subkey="' + subKey + '" onclick="toggleModelsSubgroup(\'' + subKey + '\')">' +
           '<i class="ti ti-chevron-right models-subgroup-chevron' + (subOpen ? ' open' : '') + '"></i>' +
@@ -33135,10 +33155,31 @@ function renderModels(d) {
           '<span class="sg-name">' + escapeHtml(sg.name) + '</span>' +
           '<span class="models-subgroup-count">' + sg.items.length + '</span>' +
         '</button>' +
-        '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">' +
-          '<div class="card">';
-      sg.items.forEach(m => { html += _renderModelRow(m); });
-      html += '</div></div></div>';
+        '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
+      // Без категории — карточкой как раньше
+      if (noCat.length) {
+        html += '<div class="card">';
+        noCat.forEach(m => { html += _renderModelRow(m); });
+        html += '</div>';
+      }
+      // Категории внутри подгруппы — отдельный сворачиваемый блок
+      catKeys.forEach(cid => {
+        const cat = byCat[cid];
+        const catKey = subKey + ':cat:' + cid;
+        const catOpen = catKey in openSubMap ? !!openSubMap[catKey] : false;
+        html += '<div class="models-category" style="margin:6px 0 0 14px;">' +
+          '<button class="models-subgroup-toggle" data-subkey="' + catKey + '" onclick="toggleModelsSubgroup(\'' + catKey + '\')" style="padding-left:10px;background:#F8FAFC;">' +
+            '<i class="ti ti-chevron-right models-subgroup-chevron' + (catOpen ? ' open' : '') + '"></i>' +
+            '<i class="ti ti-folder sg-icon" style="opacity:0.7;"></i>' +
+            '<span class="sg-name" style="font-size:13.5px;">' + escapeHtml(cat.name) + '</span>' +
+            '<span class="models-subgroup-count">' + cat.items.length + '</span>' +
+          '</button>' +
+          '<div class="models-subgroup-body" data-subkey="' + catKey + '" style="' + (catOpen ? '' : 'display:none;') + '">' +
+            '<div class="card">';
+        cat.items.forEach(m => { html += _renderModelRow(m); });
+        html += '</div></div></div>';
+      });
+      html += '</div></div>';
     });
 
     html += '</div></div>';
@@ -47907,6 +47948,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.55',
+    date: '04.06.2026',
+    title: '2-уровневая иерархия каталога: исполнение → 5 категорий',
+    features: [
+      'В каталоге оборудования теперь работает <b>двухуровневая иерархия</b>: внутри направления (напр. «Щиты управления») сначала идут подгруппы по исполнению (Стандартные / Нержавеющие / Влагозащищённые), а внутри каждой — 5 категорий (ЩУ-001.000 Камеры созревания и т.д.)',
+      'В сайдбаре <b>Снабжение → 2-уровневая иерархия</b> — инструмент для применения. Выбираешь направление → проверяешь маркеры (по каким словам относить модель к исполнению) → жмёшь «Предпросмотр» → «Применить». Старые «плоские» подгруппы деактивируются',
+      'В рендере каталога категории внутри подгруппы тоже сворачиваются — по одному клику на нужную ветку',
+    ],
+  },
+  {
     version: 'v2.45.54',
     date: '04.06.2026',
     title: 'Подгруппы каталога: префикс по исполнению',
@@ -61878,6 +61929,195 @@ async function _ssdRun(dryRun) {
   } finally {
     _ssdState.loading = false;
     _ssdRender();
+  }
+}
+</script>
+
+<!-- ============ v2.45.55: ДВУХУРОВНЕВАЯ ИЕРАРХИЯ КАТАЛОГА ============ -->
+<script>
+let _tlhState = null;
+
+const TLH_DEFAULT_LEVEL1 = [
+  { code: 'standard',   name: 'Стандартные',      match: ['Стандарт', 'standard'] },
+  { code: 'stainless',  name: 'Нержавеющие',      match: ['Нерж', 'AISI', 'stainless'] },
+  { code: 'waterproof', name: 'Влагозащищённые',  match: ['Влаг', 'IP', 'water'] },
+];
+
+const TLH_DEFAULT_LEVEL2 = [
+  { code: '001', name: 'ЩУ-001.000 Камеры созревания' },
+  { code: '002', name: 'ЩУ-002.000 Чиллера' },
+  { code: '003', name: 'ЩУ-003.000 Холодильное оборудование' },
+  { code: '004', name: 'ЩУ-004.000 Приточно-вытяжная вентиляция' },
+  { code: '005', name: 'ЩУ-005.000 АСУ' },
+];
+
+async function openTwoLevelHierarchy() {
+  if (!cache.directionsList) {
+    try {
+      const r = await apiGet('/api/directions');
+      cache.directionsList = r.directions || r.items || r || [];
+    } catch (e) { cache.directionsList = []; }
+  }
+  _tlhState = {
+    direction_id: null,
+    level1: TLH_DEFAULT_LEVEL1.map(s => ({...s, match: [...s.match]})),
+    level2: TLH_DEFAULT_LEVEL2.map(s => ({...s})),
+    deactivate_old: true,
+    loading: false,
+    lastResult: null,
+    error: null,
+  };
+  let m = document.getElementById('tlh-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'tlh-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _tlhRender();
+  m.classList.add('visible');
+}
+
+function _tlhRender() {
+  const m = document.getElementById('tlh-modal');
+  if (!m) return;
+  const s = _tlhState;
+  const dirs = cache.directionsList || [];
+  const dirOpts = '<option value="">— выбрать —</option>' +
+    dirs.map(d => '<option value="' + d.id + '"' + (s.direction_id === d.id ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>').join('');
+  const l1Rows = s.level1.map((sg, i) =>
+    '<div style="display:grid;grid-template-columns:90px 1fr 1.2fr 32px;gap:8px;margin-bottom:6px;align-items:center;">' +
+      '<input type="text" value="' + escapeHtml(sg.code) + '" placeholder="код" oninput="_tlhEditL1(' + i + ',\'code\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
+      '<input type="text" value="' + escapeHtml(sg.name) + '" placeholder="имя подгруппы" oninput="_tlhEditL1(' + i + ',\'name\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
+      '<input type="text" value="' + escapeHtml((sg.match || []).join(', ')) + '" placeholder="маркеры через запятую: Нерж, AISI" oninput="_tlhEditL1Match(' + i + ',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" title="Слова, по которым модель попадает в эту подгруппу. Ищется в exec_fixed и имени модели." />' +
+      (i > 0
+        ? '<button class="btn btn-secondary btn-small" onclick="_tlhRemoveL1(' + i + ')" style="color:var(--danger);"><i class="ti ti-x"></i></button>'
+        : '<span></span>') +
+    '</div>'
+  ).join('');
+  const l2Rows = s.level2.map((cat, i) =>
+    '<div style="display:grid;grid-template-columns:90px 1fr 32px;gap:8px;margin-bottom:6px;align-items:center;">' +
+      '<input type="text" value="' + escapeHtml(cat.code) + '" placeholder="001" oninput="_tlhEditL2(' + i + ',\'code\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
+      '<input type="text" value="' + escapeHtml(cat.name) + '" placeholder="ЩУ-001.000 Камеры созревания" oninput="_tlhEditL2(' + i + ',\'name\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
+      (i > 0
+        ? '<button class="btn btn-secondary btn-small" onclick="_tlhRemoveL2(' + i + ')" style="color:var(--danger);"><i class="ti ti-x"></i></button>'
+        : '<span></span>') +
+    '</div>'
+  ).join('');
+  const result = s.lastResult;
+  const resultsHtml = result
+    ? '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;font-size:12.5px;margin-top:12px;">' +
+        '<div style="font-weight:600;color:#0C4A6E;margin-bottom:6px;">' + (result.dry_run ? 'Предпросмотр' : 'Применено') + ':</div>' +
+        '<div>Создано подгрупп: <b>' + (result.created_subgroups || []).length + '</b></div>' +
+        '<div>Создано категорий: <b>' + (result.created_categories || []).length + '</b></div>' +
+        '<div>Привязано моделей: <b>' + result.bound_count + '</b></div>' +
+        ((result.unmatched_sg || []).length > 0
+          ? '<div style="color:var(--danger);">Не попали в подгруппу: <b>' + result.unmatched_sg.length + '</b></div>'
+          : '') +
+        ((result.unmatched_cat || []).length > 0
+          ? '<div style="color:var(--danger);">Не попали в категорию: <b>' + result.unmatched_cat.length + '</b></div>'
+          : '') +
+        ((result.deactivated || []).length > 0
+          ? '<div>Деактивировано старых подгрупп: <b>' + result.deactivated.length + '</b> (' +
+              result.deactivated.slice(0, 5).map(d => escapeHtml(d.name)).join(', ') +
+              (result.deactivated.length > 5 ? ' и ещё ' + (result.deactivated.length - 5) : '') +
+            ')</div>'
+          : '') +
+      '</div>'
+    : '';
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:880px;width:96vw;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-binary-tree-2"></i> 2-уровневая иерархия каталога</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="flex:1;overflow-y:auto;padding:16px 20px;">' +
+        '<div style="margin-bottom:14px;">' +
+          '<label class="form-label" style="font-size:11.5px;">Направление</label>' +
+          '<select onchange="_tlhSetDir(this.value)" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;">' + dirOpts + '</select>' +
+        '</div>' +
+        '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">' +
+          '<div style="font-weight:700;color:#0C4A6E;text-transform:uppercase;font-size:11.5px;letter-spacing:0.4px;margin-bottom:10px;">Level 1: Подгруппы (исполнения)</div>' +
+          '<div style="display:grid;grid-template-columns:90px 1fr 1.2fr 32px;gap:8px;font-size:10.5px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">' +
+            '<div>Код</div><div>Имя</div><div>Маркеры (через запятую)</div><div></div>' +
+          '</div>' +
+          l1Rows +
+          '<button class="btn btn-secondary btn-small" onclick="_tlhAddL1()" style="margin-top:6px;"><i class="ti ti-plus"></i> Подгруппу</button>' +
+        '</div>' +
+        '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">' +
+          '<div style="font-weight:700;color:#0C4A6E;text-transform:uppercase;font-size:11.5px;letter-spacing:0.4px;margin-bottom:10px;">Level 2: Категории (по первой цифре артикула)</div>' +
+          '<div style="display:grid;grid-template-columns:90px 1fr 32px;gap:8px;font-size:10.5px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">' +
+            '<div>Код</div><div>Имя</div><div></div>' +
+          '</div>' +
+          l2Rows +
+          '<button class="btn btn-secondary btn-small" onclick="_tlhAddL2()" style="margin-top:6px;"><i class="ti ti-plus"></i> Категорию</button>' +
+        '</div>' +
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:8px;">' +
+          '<input type="checkbox"' + (s.deactivate_old ? ' checked' : '') + ' onchange="_tlhState.deactivate_old=this.checked" style="width:18px;height:18px;appearance:auto;accent-color:#0C4A6E;" />' +
+          '<span>Деактивировать старые подгруппы (с другими кодами)</span>' +
+        '</label>' +
+        (s.error
+          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius:6px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
+          : '') +
+        resultsHtml +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+        (s.loading ? '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…</div>' : '') +
+        '<button class="btn btn-secondary" onclick="_tlhRun(true)" ' + (s.loading ? 'disabled' : '') + '><i class="ti ti-eye"></i> Предпросмотр</button>' +
+        '<button class="btn btn-primary" onclick="_tlhRun(false)" ' + ((s.loading || !s.lastResult) ? 'disabled' : '') + '><i class="ti ti-check"></i> Применить</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _tlhSetDir(v) { _tlhState.direction_id = v ? parseInt(v, 10) : null; }
+function _tlhEditL1(i, key, val) { if (_tlhState.level1[i]) _tlhState.level1[i][key] = val; }
+function _tlhEditL1Match(i, val) {
+  if (!_tlhState.level1[i]) return;
+  _tlhState.level1[i].match = val.split(',').map(s => s.trim()).filter(Boolean);
+}
+function _tlhEditL2(i, key, val) { if (_tlhState.level2[i]) _tlhState.level2[i][key] = val; }
+function _tlhAddL1() { _tlhState.level1.push({ code: '', name: '', match: [] }); _tlhRender(); }
+function _tlhRemoveL1(i) { if (_tlhState.level1.length > 1) { _tlhState.level1.splice(i, 1); _tlhRender(); } }
+function _tlhAddL2() { _tlhState.level2.push({ code: '', name: '' }); _tlhRender(); }
+function _tlhRemoveL2(i) { if (_tlhState.level2.length > 1) { _tlhState.level2.splice(i, 1); _tlhRender(); } }
+
+async function _tlhRun(dryRun) {
+  if (_tlhState.loading) return;
+  if (!_tlhState.direction_id) { showToast('Выбери направление', 'error'); return; }
+  if (!dryRun && !_tlhState.lastResult) { showToast('Сначала «Предпросмотр»', 'error'); return; }
+  if (!dryRun && !confirm('Применить двухуровневую иерархию? Это создаст подгруппы и категории, привяжет модели и деактивирует старые подгруппы.')) return;
+  _tlhState.loading = true;
+  _tlhState.error = null;
+  _tlhRender();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/restructure-two-level', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        direction_id: _tlhState.direction_id,
+        level1: _tlhState.level1.filter(s => s.code && s.name),
+        level2: _tlhState.level2.filter(s => s.code && s.name),
+        deactivate_old_subgroups: _tlhState.deactivate_old,
+        dry_run: dryRun,
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      _tlhState.error = d.message || ('HTTP ' + r.status);
+      showToast(_tlhState.error, 'error');
+      return;
+    }
+    const d = await r.json();
+    _tlhState.lastResult = d;
+    showToast(dryRun ? 'Предпросмотр готов' : 'Применено', 'success');
+    if (!dryRun) cache.models = null;
+  } catch (e) {
+    _tlhState.error = String(e && e.message || e);
+  } finally {
+    _tlhState.loading = false;
+    _tlhRender();
   }
 }
 </script>
