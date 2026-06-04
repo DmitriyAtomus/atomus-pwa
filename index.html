@@ -16683,10 +16683,8 @@
           <i class="ti ti-radio"></i><span>Радио</span>
           <span class="nav-radio-station" id="sidebar-radio-station"></span>
         </a>
-        <!-- v2.45.31: Калькулятор холода — открывает фуллскрин-модалку -->
-        <a class="nav-item" onclick="openColdCalculator()" style="cursor:pointer;">
-          <i class="ti ti-snowflake"></i><span>Калькулятор холода</span>
-        </a>
+        <!-- v2.45.39: пункт «Калькулятор холода» убран с главного сайдбара
+             (остался в Продажах). -->
       </div>
 
       <!-- Внешние сервисы -->
@@ -19151,7 +19149,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.38-label-editor";
+const APP_VERSION = "v2.45.39-calc-home-cleanup";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47801,6 +47799,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.39',
+    date: '04.06.2026',
+    title: 'Калькулятор холода: убран из «Главной»',
+    features: [
+      'Пункт <b>«Калькулятор холода»</b> убран из левого сайдбара «Главной» — там лишний',
+      'Открывается только из <b>Продаж</b> (в их сайдбаре пункт остался)',
+    ],
+  },
   {
     version: 'v2.45.38',
     date: '04.06.2026',
