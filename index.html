@@ -16878,21 +16878,11 @@
         <button class="nav-item" data-nav="supply-catalog" onclick="selectSidebarItem('supply-catalog')">
           <i class="ti ti-list-details"></i><span>Каталог</span>
         </button>
-        <!-- v2.45.47: массовое добавление BOM-строк через маркерный компонент -->
-        <a class="nav-item" onclick="openBomBulkAdd()" style="cursor:pointer;">
-          <i class="ti ti-stack-push"></i><span>Массовое BOM</span>
-        </a>
-        <!-- v2.45.51: массовая перенумерация моделей -->
-        <a class="nav-item" onclick="openModelsRenumber()" style="cursor:pointer;">
-          <i class="ti ti-arrows-sort"></i><span>Перенумерация</span>
-        </a>
-        <!-- v2.45.52: подгруппы каталога по артикулу -->
-        <a class="nav-item" onclick="openSubgroupsSeed()" style="cursor:pointer;">
-          <i class="ti ti-list-tree"></i><span>Подгруппы каталога</span>
-        </a>
-        <!-- v2.45.55: двухуровневая иерархия каталога (subgroup → category) -->
-        <a class="nav-item" onclick="openTwoLevelHierarchy()" style="cursor:pointer;">
-          <i class="ti ti-binary-tree-2"></i><span>2-уровневая иерархия</span>
+        <!-- v2.45.56: 4 админских инструмента (Массовое BOM, Перенумерация,
+             Подгруппы, 2-уровневая иерархия) спрятаны в одну модалку — чтобы
+             сайдбар Снабжения не разрастался. Видна только директору. -->
+        <a class="nav-item" id="sb-supply-admin-tools" onclick="openSupplyAdminTools()" style="cursor:pointer;">
+          <i class="ti ti-tool"></i><span>Админ-инструменты</span>
         </a>
       </div>
       <div class="sidebar-footer">
@@ -19181,7 +19171,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.55-two-level-hierarchy";
+const APP_VERSION = "v2.45.56-admin-tools-menu";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -25278,6 +25268,13 @@ function applyPermissionsToUI() {
   const canSeeHR = hasAnyPermission('hr.view_vacations', 'hr.create_vacations',
     'hr.manage_employees', 'hr.manage_positions', 'hr.manage_access');
   hrTabs.forEach(t => { t.style.display = canSeeHR ? '' : 'none'; });
+
+  // v2.45.56: Админ-инструменты в сайдбаре Снабжения — только директору
+  const adminTools = document.getElementById('sb-supply-admin-tools');
+  if (adminTools) {
+    const isDir = state.user && (state.user.roles || []).includes('director');
+    adminTools.style.display = isDir ? '' : 'none';
+  }
 }
 
 // ============================================================================
@@ -47948,6 +47945,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.56',
+    date: '04.06.2026',
+    title: 'Сайдбар Снабжения: убрал лишние пункты в «Админ-инструменты»',
+    features: [
+      'Четыре редко используемых пункта — <b>Массовое BOM</b>, <b>Перенумерация</b>, <b>Подгруппы каталога</b>, <b>2-уровневая иерархия</b> — теперь живут в одной модалке <b>«Админ-инструменты»</b>',
+      'Доступно только директору, видно отдельным пунктом сайдбара Снабжения',
+      'Сайдбар стал короче — повседневные пункты (Заявки, Заказы, Входящие счета, Приёмка УПД, Поставщики, Каталог) не теряются среди администраторской рутины',
+    ],
+  },
+  {
     version: 'v2.45.55',
     date: '04.06.2026',
     title: '2-уровневая иерархия каталога: исполнение → 5 категорий',
@@ -61930,6 +61937,90 @@ async function _ssdRun(dryRun) {
     _ssdState.loading = false;
     _ssdRender();
   }
+}
+</script>
+
+<!-- ============ v2.45.56: МОДАЛКА «АДМИН-ИНСТРУМЕНТЫ» ============ -->
+<style>
+  .sat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .sat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all .15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sat-card:hover {
+    border-color: #0C4A6E;
+    background: #F0F9FF;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(12,74,110,0.08);
+  }
+  .sat-card-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0C4A6E, #0369A1);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .sat-card-title { font-weight: 600; color: var(--text-dark); font-size: 14px; }
+  .sat-card-desc { font-size: 12px; color: var(--text-mid); line-height: 1.4; }
+</style>
+<script>
+function openSupplyAdminTools() {
+  const isDir = state.user && (state.user.roles || []).includes('director');
+  if (!isDir) { showToast('Доступно только директору', 'error'); return; }
+  let m = document.getElementById('sat-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sat-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  function tool(icon, title, desc, fn) {
+    return '<div class="sat-card" onclick="document.getElementById(\'sat-modal\').classList.remove(\'visible\');' + fn + '">' +
+      '<div class="sat-card-icon"><i class="ti ' + icon + '"></i></div>' +
+      '<div class="sat-card-title">' + title + '</div>' +
+      '<div class="sat-card-desc">' + desc + '</div>' +
+    '</div>';
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:780px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-tool"></i> Админ-инструменты</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px 20px;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:14px;line-height:1.5;">' +
+          '<i class="ti ti-info-circle"></i> Массовые операции над каталогом и BOM. Каждый инструмент сначала показывает <b>предпросмотр</b>, изменения применяются только после подтверждения.' +
+        '</div>' +
+        '<div class="sat-grid">' +
+          tool('ti-stack-push',     'Массовое BOM',
+               'Добавить позиции в BOM всех моделей, где уже стоит указанный компонент-маркер',
+               'openBomBulkAdd()') +
+          tool('ti-arrows-sort',    'Перенумерация',
+               'Привести имена и артикулы моделей к единому формату ЩУ001.000 / ЩУ-001-000',
+               'openModelsRenumber()') +
+          tool('ti-list-tree',      'Подгруппы каталога',
+               'Создать подгруппы в направлении и автопривязать модели по первой цифре артикула',
+               'openSubgroupsSeed()') +
+          tool('ti-binary-tree-2',  '2-уровневая иерархия',
+               'Внутри направления — подгруппы по исполнению (Стандарт/Нерж/Влаг) и категории ЩУ-001..',
+               'openTwoLevelHierarchy()') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
 }
 </script>
 
