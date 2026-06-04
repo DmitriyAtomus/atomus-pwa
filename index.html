@@ -19177,7 +19177,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.53-subgroups-naming";
+const APP_VERSION = "v2.45.54-subgroups-prefix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47907,6 +47907,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.54',
+    date: '04.06.2026',
+    title: 'Подгруппы каталога: префикс по исполнению',
+    features: [
+      'В инструменте «Подгруппы каталога» появилось поле <b>Префикс</b>. Он подставляется автоматически по имени выбранного направления: <b>Стандарт → ST</b>, <b>Нерж AISI → N</b>, <b>Влагозащита → IP</b>',
+      'Имена подгрупп тогда: <code>ЩУ-ST-001.000 Камеры созревания</code>, <code>ЩУ-N-001.000 …</code>, <code>ЩУ-IP-001.000 …</code>',
+      'Префикс можно править вручную — если автоматика не угадала или нужен другой формат',
+    ],
+  },
+  {
     version: 'v2.45.53',
     date: '04.06.2026',
     title: 'Подгруппы каталога: формат ЩУ-001.000',
@@ -61624,16 +61634,34 @@ async function _mrnApply() {
 <script>
 let _ssdState = null;
 
-// v2.45.53: формат как в номенклатуре ATOMUS — ЩУ-001.000 Название.
-// Когда дойдёт до нерж — заменишь префикс на ЩУ-N001.000,
-// для влагозащиты — на ЩУ-IP001.000 (или как договоримся).
-const SSD_DEFAULT_SUBGROUPS = [
-  { code: '001', name: 'ЩУ-001.000 Камеры созревания' },
-  { code: '002', name: 'ЩУ-002.000 Чиллера' },
-  { code: '003', name: 'ЩУ-003.000 Холодильное оборудование' },
-  { code: '004', name: 'ЩУ-004.000 Приточно-вытяжная вентиляция' },
-  { code: '005', name: 'ЩУ-005.000 АСУ' },
+// v2.45.54: префикс артикула подбирается из исполнения направления.
+// Стандарт → ST, Нерж → N, Влагозащита → IP. Имена подгрупп —
+// ЩУ-{prefix}-001.000 Камеры созревания и т.д. Код подгруппы остаётся
+// «001/002/…» — он используется для auto-bind по первой цифре article.
+const SSD_BASE_NAMES = [
+  { code: '001', label: 'Камеры созревания' },
+  { code: '002', label: 'Чиллера' },
+  { code: '003', label: 'Холодильное оборудование' },
+  { code: '004', label: 'Приточно-вытяжная вентиляция' },
+  { code: '005', label: 'АСУ' },
 ];
+
+// По названию направления угадываем префикс исполнения.
+function _ssdInferPrefix(directionName) {
+  const n = (directionName || '').toLowerCase();
+  if (/нерж|aisi|stainless/.test(n)) return 'N';
+  if (/влаг|ip|water/.test(n))       return 'IP';
+  return 'ST';   // всё остальное — стандарт
+}
+
+function _ssdBuildSubgroups(prefix) {
+  return SSD_BASE_NAMES.map(b => ({
+    code: b.code,
+    name: 'ЩУ-' + prefix + '-' + b.code + '.000 ' + b.label,
+  }));
+}
+
+const SSD_DEFAULT_SUBGROUPS = _ssdBuildSubgroups('ST');
 
 async function openSubgroupsSeed() {
   // Подгружаем направления
@@ -61645,6 +61673,7 @@ async function openSubgroupsSeed() {
   }
   _ssdState = {
     direction_id: null,
+    prefix: 'ST',
     subgroups: SSD_DEFAULT_SUBGROUPS.map(s => ({...s})),
     auto_bind: true,
     loading: false,
@@ -61706,10 +61735,18 @@ function _ssdRender() {
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="ssd-body">' +
-        '<div style="margin-bottom:12px;">' +
-          '<label class="form-label" style="font-size:11.5px;">Направление</label>' +
-          '<select id="ssd-dir" onchange="_ssdSetDir(this.value)" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;">' + dirOpts + '</select>' +
-          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">Подгруппы и привязка создадутся в выбранном направлении.</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 100px;gap:10px;margin-bottom:12px;">' +
+          '<div>' +
+            '<label class="form-label" style="font-size:11.5px;">Направление</label>' +
+            '<select id="ssd-dir" onchange="_ssdSetDir(this.value)" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;">' + dirOpts + '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label class="form-label" style="font-size:11.5px;">Префикс</label>' +
+            '<input type="text" id="ssd-prefix" value="' + escapeHtml(s.prefix) + '" oninput="_ssdSetPrefix(this.value)" placeholder="ST" maxlength="6" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;text-align:center;text-transform:uppercase;font-weight:600;" />' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-light);margin:-6px 0 12px;line-height:1.5;">' +
+          '<i class="ti ti-info-circle"></i> Префикс подставляется автоматически из имени направления: <b>Стандарт</b> → ST, <b>Нерж AISI</b> → N, <b>Влагозащита</b> → IP. Можно переопределить вручную.' +
         '</div>' +
         '<div style="margin-bottom:12px;">' +
           '<label class="form-label" style="font-size:11.5px;">Подгруппы</label>' +
@@ -61749,7 +61786,37 @@ function _ssdRender() {
     '</div>';
 }
 
-function _ssdSetDir(v) { _ssdState.direction_id = v ? parseInt(v, 10) : null; }
+function _ssdSetDir(v) {
+  _ssdState.direction_id = v ? parseInt(v, 10) : null;
+  // v2.45.54: автоопределение префикса по имени выбранного направления
+  if (_ssdState.direction_id) {
+    const dir = (cache.directionsList || []).find(d => d.id === _ssdState.direction_id);
+    if (dir) {
+      const newPrefix = _ssdInferPrefix(dir.name || '');
+      _ssdState.prefix = newPrefix;
+      _ssdState.subgroups = _ssdBuildSubgroups(newPrefix);
+    }
+  }
+  _ssdRender();
+}
+
+function _ssdSetPrefix(v) {
+  // Ручная правка префикса. Перегенерируем имена, сохраняя коды.
+  _ssdState.prefix = (v || '').trim().toUpperCase() || 'ST';
+  // Перегенерим имена только если они выглядят как наши авто-имена
+  // (чтобы не перетереть кастомные правки).
+  _ssdState.subgroups = _ssdState.subgroups.map((sg, i) => {
+    const base = SSD_BASE_NAMES.find(b => b.code === sg.code);
+    if (!base) return sg;
+    // Если текущее имя соответствует шаблону «ЩУ-<любой>-<code>.000 <label>» — обновляем
+    const tplRe = new RegExp('^ЩУ-[A-Za-zА-Я]+-' + sg.code + '\\.000 ' + base.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
+    if (tplRe.test(sg.name)) {
+      return { ...sg, name: 'ЩУ-' + _ssdState.prefix + '-' + sg.code + '.000 ' + base.label };
+    }
+    return sg;
+  });
+  _ssdRender();
+}
 function _ssdEdit(i, key, val) {
   if (!_ssdState.subgroups[i]) return;
   _ssdState.subgroups[i][key] = val;
