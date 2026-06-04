@@ -19149,7 +19149,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.41-label-58x60";
+const APP_VERSION = "v2.45.42-label-print";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47800,6 +47800,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.42',
+    date: '04.06.2026',
+    title: 'Этикетки: печать на термопринтер + копии',
+    features: [
+      'В редакторе этикеток новая кнопка <b>«Печать на термопринтер»</b> — отправляет готовый ZPL в очередь шлюза, тот печатает на офисном Zebra',
+      'Рядом с DPI принтера появилось поле <b>«Копий»</b> (1–50) — сколько штук напечатать одной кнопкой',
+      'Перед печатью просит подтверждение, чтобы случайно не отправить лишнее',
+    ],
+  },
+  {
     version: 'v2.45.41',
     date: '04.06.2026',
     title: 'Этикетки: дефолт 58×60 мм',
@@ -60284,6 +60294,7 @@ function _leDefaults() {
     title: '',
     // v2.45.41: дефолт 58×60 — стандартная заводская этикетка ATOMUS
     widthMm: 58, heightMm: 60, dpi: LE_DEFAULT_DPI,
+    copies: 1,
     elements: [
       // type: 'qr' | 'text' | 'image'
       { type: 'text', text: 'ATOMUS group', x: 4, y: 3, size: 24, bold: true },
@@ -60324,7 +60335,9 @@ function _leRender() {
         '<button class="btn btn-secondary" onclick="_leSavePreset()"><i class="ti ti-device-floppy"></i> Сохранить шаблон</button>' +
         '<div class="le-spacer"></div>' +
         '<button class="btn btn-secondary" onclick="_leDownloadPng()"><i class="ti ti-photo-down"></i> PNG</button>' +
-        '<button class="btn btn-primary" onclick="_leShowZpl()"><i class="ti ti-code"></i> Сгенерировать ZPL</button>' +
+        '<button class="btn btn-secondary" onclick="_leShowZpl()"><i class="ti ti-code"></i> ZPL</button>' +
+        // v2.45.42: печать через шлюз
+        '<button class="btn btn-primary" onclick="_lePrint()"><i class="ti ti-printer"></i> Печать на термопринтер</button>' +
       '</div>' +
     '</div>';
   _leDrawCanvas();
@@ -60355,10 +60368,15 @@ function _leRenderSide() {
       '<div><label class="form-label">Высота, мм</label>' +
         '<input type="number" class="form-input" id="le-h" value="' + s.heightMm + '" min="10" step="1" oninput="_leSyncFromInputs()" /></div>' +
     '</div>' +
-    '<div><label class="form-label">DPI принтера</label>' +
-      '<select class="form-input" id="le-dpi" onchange="_leSyncFromInputs()">' +
-        [203, 300, 600].map(d => '<option value="' + d + '"' + (s.dpi === d ? ' selected' : '') + '>' + d + ' dpi</option>').join('') +
-      '</select></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+      '<div><label class="form-label">DPI принтера</label>' +
+        '<select class="form-input" id="le-dpi" onchange="_leSyncFromInputs()">' +
+          [203, 300, 600].map(d => '<option value="' + d + '"' + (s.dpi === d ? ' selected' : '') + '>' + d + ' dpi</option>').join('') +
+        '</select></div>' +
+      // v2.45.42: количество копий для печати
+      '<div><label class="form-label">Копий</label>' +
+        '<input type="number" class="form-input" id="le-copies" value="' + (s.copies || 1) + '" min="1" max="50" step="1" oninput="_leSyncFromInputs()" /></div>' +
+    '</div>' +
     '<h4 style="margin-top:6px;">Шаблоны</h4>' +
     '<div class="le-presets">' + presetsHtml + '</div>' +
     '<div style="font-size:11.5px;color:var(--text-light);line-height:1.45;margin-top:6px;">' +
@@ -60421,8 +60439,13 @@ function _leRenderElementRow(el, i) {
 function _leSyncFromInputs() {
   const t = document.getElementById('le-title'); if (t) _leState.title = t.value;
   const w = document.getElementById('le-w');     if (w) _leState.widthMm = parseFloat(w.value) || 58;
-  const h = document.getElementById('le-h');     if (h) _leState.heightMm = parseFloat(h.value) || 40;
+  const h = document.getElementById('le-h');     if (h) _leState.heightMm = parseFloat(h.value) || 60;
   const d = document.getElementById('le-dpi');   if (d) _leState.dpi = parseInt(d.value, 10) || 203;
+  const cp = document.getElementById('le-copies');
+  if (cp) {
+    const n = parseInt(cp.value, 10);
+    _leState.copies = isNaN(n) ? 1 : Math.max(1, Math.min(50, n));
+  }
   _leDrawCanvas();
 }
 function _leSetField(i, key, val) {
@@ -60674,6 +60697,42 @@ function _leShowZpl() {
       '</div>' +
     '</div>';
   m.classList.add('visible');
+}
+
+// v2.45.42: отправка ZPL в очередь шлюза — шлюз пулит и печатает на Zebra.
+async function _lePrint() {
+  _leSyncFromInputs();
+  const zpl = _leGenerateZpl();
+  // Синтезируем qr_url/caption из первого QR и первого текстового элемента —
+  // это fallback для старых шлюзов, которые ещё не умеют raw_zpl.
+  const firstQr = _leState.elements.find(e => e.type === 'qr');
+  const firstText = _leState.elements.find(e => e.type === 'text');
+  const qrUrl = (firstQr && firstQr.text) || 'ATOMUS-LABEL';
+  const caption = (firstText && firstText.text) || (_leState.title || 'Этикетка');
+  const copies = Math.max(1, Math.min(50, parseInt(_leState.copies, 10) || 1));
+  if (!confirm('Отправить ' + copies + ' копи' + (copies === 1 ? 'ю' : (copies < 5 ? 'и' : 'й')) +
+               ' на термопринтер?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/labels/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        qr_url: qrUrl,
+        caption: caption,
+        copies: copies,
+        template_slug: 'custom_zpl',
+        raw_zpl: zpl,
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status + ': не удалось поставить в очередь'), 'error');
+      return;
+    }
+    const d = await r.json().catch(() => ({}));
+    showToast('Задание #' + d.queue_id + ' отправлено на принтер · ' + copies + ' шт.', 'success');
+  } catch (e) { showToast('Ошибка отправки на печать', 'error'); }
 }
 
 function _leDownloadPng() {
