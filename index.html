@@ -19149,7 +19149,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.42-label-print";
+const APP_VERSION = "v2.45.44-label-preview-fix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47800,6 +47800,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.44',
+    date: '04.06.2026',
+    title: 'Этикетки: превью совпадает с печатью',
+    features: [
+      'Превью этикетки теперь рисуется по той же формуле, что Zebra считает в ZPL — что видишь на экране, то и напечатается',
+      'Размер шрифта в редакторе указывается в <b>dots</b> (как в ZPL). В подсказке к полю виден эквивалент в мм для текущего DPI',
+      'Магнификация QR (1–10) — пояснение в подсказке: при магнификации 5 на 203 dpi QR будет ≈15 мм',
+      'Дефолтные размеры подняты: «ATOMUS group» 40 dots (≈5 мм), «Поз. 00-00000» 32 dots (≈4 мм) — нормально читается невооружённым глазом',
+    ],
+  },
+  {
     version: 'v2.45.42',
     date: '04.06.2026',
     title: 'Этикетки: печать на термопринтер + копии',
@@ -60295,11 +60306,13 @@ function _leDefaults() {
     // v2.45.41: дефолт 58×60 — стандартная заводская этикетка ATOMUS
     widthMm: 58, heightMm: 60, dpi: LE_DEFAULT_DPI,
     copies: 1,
+    // v2.45.44: дефолтные размеры подобраны под 203 dpi (8 dots/мм).
+    // 40 dots ≈ 5 мм по высоте — нормально читается.
     elements: [
       // type: 'qr' | 'text' | 'image'
-      { type: 'text', text: 'ATOMUS group', x: 4, y: 3, size: 24, bold: true },
-      { type: 'qr',   text: 'https://atomus-group.ru', x: 4, y: 12, module: 5 },
-      { type: 'text', text: 'Поз. 00-00000', x: 30, y: 12, size: 18, bold: false },
+      { type: 'text', text: 'ATOMUS group', x: 4, y: 3, size: 40, bold: true },
+      { type: 'qr',   text: 'https://atomus-group.ru', x: 4, y: 14, module: 5 },
+      { type: 'text', text: 'Поз. 00-00000', x: 4, y: 50, size: 32, bold: false },
     ],
   };
 }
@@ -60421,10 +60434,19 @@ function _leRenderElementRow(el, i) {
   } else {
     content = '<input type="text" class="form-input" value="' + escapeHtml(el.text || '') + '" oninput="_leSetField(' + i + ',\'text\',this.value)" />';
   }
+  // v2.45.44: подсказки размеров с примерным эквивалентом в мм по текущему DPI.
+  const dotsPerMm = _leDotsPerMm();
   const sizeField = (el.type === 'text')
-    ? '<input type="number" class="form-input" value="' + (el.size || 18) + '" min="6" max="200" step="1" oninput="_leSetField(' + i + ',\'size\',parseFloat(this.value))" title="размер шрифта, dots" />'
+    ? (() => {
+        const mm = ((el.size || 18) / dotsPerMm).toFixed(1);
+        return '<input type="number" class="form-input" value="' + (el.size || 18) + '" min="6" max="200" step="1" oninput="_leSetField(' + i + ',\'size\',parseFloat(this.value))" title="Высота шрифта в dots (' + mm + ' мм при ' + (_leState.dpi || 203) + ' dpi). Для нормального чтения: 30+" />';
+      })()
     : (el.type === 'qr')
-      ? '<input type="number" class="form-input" value="' + (el.module || 5) + '" min="1" max="20" step="1" oninput="_leSetField(' + i + ',\'module\',parseFloat(this.value))" title="модуль QR (1-20)" />'
+      ? (() => {
+          const mag = Math.max(1, Math.min(10, el.module || 5));
+          const mm = (LE_QR_MODULES * mag / dotsPerMm).toFixed(1);
+          return '<input type="number" class="form-input" value="' + (el.module || 5) + '" min="1" max="10" step="1" oninput="_leSetField(' + i + ',\'module\',parseFloat(this.value))" title="Магнификация QR 1-10. На печати: ~' + mm + ' мм" />';
+        })()
       : '<input type="number" class="form-input" value="' + (el.w || 20) + '" min="3" max="200" step="1" oninput="_leSetField(' + i + ',\'w\',parseFloat(this.value))" title="ширина, мм" />';
   return '<div class="le-el-row">' +
     '<div>' + typeLabel + (el.type === 'text' && el.bold ? ' <b>B</b>' : '') + '</div>' +
@@ -60478,20 +60500,28 @@ function _leSetImage(i, inputEl) {
   reader.readAsDataURL(file);
 }
 
-// Превью: 1 мм = 3 px (для удобства просмотра). Финальный размер пишется в ZPL.
+// Превью: 1 мм = 3 px на canvas. Чтобы превью совпадало с реальной печатью,
+// все размеры переводим dots → мм → px через текущее DPI принтера.
 const LE_PREVIEW_SCALE = 3;
+// v2.45.44: dots/мм для текущего DPI. Для Zebra 203 dpi → 8 dots/мм.
+function _leDotsPerMm() { return (_leState.dpi || 203) / 25.4; }
+// v2.45.44: число модулей в QR (примерно). Версия 2 = 25, версия 3 = 29 и т.д.
+// Берём 25 как среднее для коротких URL/артикулов — реальный размер QR на печати
+// окажется примерно таким же.
+const LE_QR_MODULES = 25;
 
 function _leDrawCanvas() {
   const c = document.getElementById('le-canvas');
   if (!c) return;
   const w = (_leState.widthMm || 58) * LE_PREVIEW_SCALE;
-  const h = (_leState.heightMm || 40) * LE_PREVIEW_SCALE;
+  const h = (_leState.heightMm || 60) * LE_PREVIEW_SCALE;
   c.width = w; c.height = h;
   c.style.cursor = 'grab';
   const ctx = c.getContext('2d');
   ctx.fillStyle = 'white'; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
+  const dotsPerMm = _leDotsPerMm();
   // v2.45.40: bbox каждого элемента для drag-and-drop (в координатах canvas)
   _leState._bboxes = [];
   _leState.elements.forEach((el, idx) => {
@@ -60499,23 +60529,26 @@ function _leDrawCanvas() {
     const y = (el.y || 0) * LE_PREVIEW_SCALE;
     let bw = 0, bh = 0;
     if (el.type === 'text') {
-      const sizePx = (el.size || 18) / 2.5;   // dots → ~px (203 dpi: 1 dot = 0.125 мм)
-      const fontPx = sizePx * LE_PREVIEW_SCALE;
+      // v2.45.44: размер шрифта в ZPL = высота в dots. Переводим в mm, потом в px.
+      const heightMm = (el.size || 18) / dotsPerMm;
+      const fontPx = heightMm * LE_PREVIEW_SCALE;
       ctx.font = (el.bold ? 'bold ' : '') + fontPx + 'px sans-serif';
       ctx.fillText(el.text || '', x, y);
       const metrics = ctx.measureText(el.text || '');
       bw = Math.max(metrics.width, 8);
       bh = fontPx * 1.2;
     } else if (el.type === 'qr') {
-      const sizeMm = (el.module || 5) * 21 / 8;  // ~ модуль×версия / коэф
+      // v2.45.44: размер QR = модули × магнификация × dots_per_mm в мм
+      const mag = Math.max(1, Math.min(10, el.module || 5));
+      const sizeMm = LE_QR_MODULES * mag / dotsPerMm;
       const sizePx = sizeMm * LE_PREVIEW_SCALE;
       ctx.fillStyle = '#000';
       ctx.fillRect(x, y, sizePx, sizePx);
       ctx.fillStyle = '#fff';
       ctx.fillRect(x + sizePx*0.15, y + sizePx*0.15, sizePx*0.7, sizePx*0.7);
       ctx.fillStyle = '#000';
-      ctx.font = '10px monospace';
-      ctx.fillText('QR', x + sizePx*0.4, y + sizePx*0.42);
+      ctx.font = Math.max(8, sizePx*0.18) + 'px monospace';
+      ctx.fillText('QR', x + sizePx*0.38, y + sizePx*0.42);
       bw = bh = sizePx;
     } else if (el.type === 'image' && el.dataUrl) {
       const wPx = (el.w || 20) * LE_PREVIEW_SCALE;
