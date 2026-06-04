@@ -18976,6 +18976,10 @@
   <div class="notif-panel-head">
     <h4><i class="ti ti-bell"></i> Уведомления</h4>
     <div style="display:flex;gap:6px;align-items:center;">
+      <!-- v2.45.79: тоггл звука -->
+      <button class="icon-btn" id="notif-sound-toggle" onclick="toggleNotifSound()" title="Звук уведомлений">
+        <i class="ti ti-volume" id="notif-sound-icon"></i>
+      </button>
       <!-- v2.45.62: кнопка «Очистить всё» прямо в шапке панели колокольчика -->
       <button class="notif-clear-all-btn" id="notif-panel-clear" onclick="ackAllFromPanel()" title="Отметить все как прочитанные">
         <i class="ti ti-checks"></i> Очистить всё
@@ -19239,7 +19243,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.78-trb-scroll-focus";
+const APP_VERSION = "v2.45.79-notif-sound";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19651,7 +19655,61 @@ state.notif = state.notif || {
   shownIds: new Set(),
   pollTimer: null,
   isModalOpen: false,
+  firstLoadDone: false,   // v2.45.79: на первом запросе НЕ играть звук
 };
+
+// v2.45.79: звуковое уведомление через Web Audio API.
+// Хранение настройки: localStorage 'atomus:notif-sound' = '1' | '0' (default '1')
+const NOTIF_SOUND_KEY = 'atomus:notif-sound';
+function notifSoundEnabled() {
+  const v = localStorage.getItem(NOTIF_SOUND_KEY);
+  return v !== '0';   // default включён
+}
+function _playNotifSound() {
+  if (!notifSoundEnabled()) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    // Двойной нежный «бим-бом» — частоты 880 и 660 Гц по 150 мс
+    function beep(freq, startAt, durMs) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      // Плавный envelope — без щелчка
+      gain.gain.setValueAtTime(0, startAt);
+      gain.gain.linearRampToValueAtTime(0.18, startAt + 0.02);
+      gain.gain.linearRampToValueAtTime(0, startAt + durMs / 1000);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(startAt);
+      osc.stop(startAt + durMs / 1000 + 0.05);
+    }
+    const t0 = ctx.currentTime;
+    beep(880, t0,       170);
+    beep(660, t0 + 0.18, 200);
+    // Освободим контекст через 0.5 сек
+    setTimeout(() => { try { ctx.close(); } catch (_) {} }, 600);
+  } catch (_) { /* тихо игнорим — браузер может блочить autoplay до клика */ }
+}
+function toggleNotifSound() {
+  const cur = notifSoundEnabled();
+  localStorage.setItem(NOTIF_SOUND_KEY, cur ? '0' : '1');
+  _updateNotifSoundIcon();
+  showToast(cur ? 'Звук уведомлений выключен' : 'Звук уведомлений включён', 'info');
+  if (!cur) _playNotifSound();   // короткая демонстрация при включении
+}
+function _updateNotifSoundIcon() {
+  const ic = document.getElementById('notif-sound-icon');
+  if (!ic) return;
+  if (notifSoundEnabled()) {
+    ic.className = 'ti ti-volume';
+    ic.parentElement.title = 'Звук уведомлений ВКЛ';
+  } else {
+    ic.className = 'ti ti-volume-off';
+    ic.parentElement.title = 'Звук уведомлений ВЫКЛ';
+  }
+}
 
 async function loadUnreadNotifications(options) {
   options = options || {};
@@ -19664,6 +19722,11 @@ async function loadUnreadNotifications(options) {
     // Автопоказ модалки: если есть новые id (которых раньше не показывали) — показать
     if (items.length > 0) {
       const newOnes = items.filter(x => !state.notif.shownIds.has(x.id));
+      // v2.45.79: звук только при реально новых уведомлениях, и не на самом первом
+      // запросе после логина (там shownIds пустой — иначе бимкнет на всю пачку старых).
+      if (newOnes.length > 0 && state.notif.firstLoadDone) {
+        _playNotifSound();
+      }
       if (newOnes.length > 0 && !state.notif.isModalOpen && !silent) {
         // Показывать только если юзер на главной (не отвлекать в форме создания)
         const screen = state.currentScreen || '';
@@ -19674,6 +19737,7 @@ async function loadUnreadNotifications(options) {
       // Помечаем что эти id уже видели (даже если модалка не показалась, бейдж обновлён)
       items.forEach(x => state.notif.shownIds.add(x.id));
     }
+    state.notif.firstLoadDone = true;
     // Если открыта модалка — обновляем содержимое
     if (state.notif.isModalOpen) {
       renderNotifModal();
@@ -20658,6 +20722,7 @@ function openNotifPanel() {
   if (!panel) return;
   panel.classList.add('open');
   _renderNotifPanel(state._notifSummary);
+  if (typeof _updateNotifSoundIcon === 'function') _updateNotifSoundIcon();
   // Подгрузить актуальное
   refreshNotifBadge().then(() => _renderNotifPanel(state._notifSummary));
   // Закрытие по клику вне
@@ -48201,6 +48266,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.79',
+    date: '04.06.2026',
+    title: 'Звук уведомлений',
+    features: [
+      'Когда приходит новое уведомление — короткий «бим-бом» (две ноты, ~370 мс)',
+      'В шапке панели колокольчика появилась кнопка-динамик: <i class="ti ti-volume"></i> — клик включает/выключает звук, настройка сохраняется в браузере',
+      'Звук играется только на действительно новых уведомлениях (не на первой загрузке после логина), и не дублируется в фокусированных формах создания',
+      'При первом включении проигрывается короткая демонстрация',
+    ],
+  },
   {
     version: 'v2.45.76',
     date: '04.06.2026',
