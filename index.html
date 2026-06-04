@@ -19239,7 +19239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.65-create-category-inline";
+const APP_VERSION = "v2.45.66-empty-categories";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -33135,7 +33135,7 @@ function _subgroupTheme(name) {
 // «в подгруппе X»). После успеха каталог перечитываем — категория появится
 // как ещё одна сворачиваемая ветка внутри той же подгруппы, когда туда
 // будет привязана хотя бы одна модель. Сразу после создания она пустая.
-async function openCreateCategoryPrompt(directionId, subgroupName) {
+async function openCreateCategoryPrompt(directionId, subgroupId, subgroupName) {
   const name = prompt('Имя новой категории в подгруппе «' + subgroupName + '»:', '');
   if (!name || !name.trim()) return;
   try {
@@ -33143,7 +33143,11 @@ async function openCreateCategoryPrompt(directionId, subgroupName) {
     const r = await fetch(API_BASE + '/api/admin/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ direction_id: directionId, name: name.trim() }),
+      body: JSON.stringify({
+        direction_id: directionId,
+        subgroup_id: subgroupId || null,
+        name: name.trim(),
+      }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -33200,7 +33204,8 @@ function renderModels(d) {
     models.forEach(m => {
       if (m.subgroup_id) {
         const sid = String(m.subgroup_id);
-        if (!bySubgroup[sid]) bySubgroup[sid] = { name: m.subgroup_name || ('Подгруппа #' + sid), items: [] };
+        // v2.45.66: храним id подгруппы — нужно для кнопки «+ Категория»
+        if (!bySubgroup[sid]) bySubgroup[sid] = { id: m.subgroup_id, name: m.subgroup_name || ('Подгруппа #' + sid), items: [] };
         bySubgroup[sid].items.push(m);
       } else {
         withoutSubgroup.push(m);
@@ -33273,25 +33278,37 @@ function renderModels(d) {
           noCat.push(m);
         }
       });
+      // v2.45.66: показываем ПУСТЫЕ категории, привязанные к этой подгруппе
+      // (их в d.categories отдаёт сервер с parent_subgroup_id).
+      const subId = sg.id;
+      (d.categories || []).forEach(cat => {
+        if (cat.parent_subgroup_id !== subId) return;
+        const cidStr = String(cat.id);
+        if (!byCat[cidStr]) {
+          byCat[cidStr] = { id: cat.id, name: cat.name, items: [] };
+        }
+      });
       const catKeys = Object.keys(byCat).sort((a, b) =>
         (byCat[a].name || '').localeCompare(byCat[b].name || ''));
       const hasCategories = catKeys.length > 0;
-      // v2.45.65: для директора показываем «+ Категория» прямо в шапке подгруппы.
-      // Кнопка останавливает propagation чтобы не свернуть/развернуть саму подгруппу.
+      // v2.45.66: button нельзя класть внутрь button — HTML невалиден,
+      // браузер ломает DOM и выкидывает inner button наружу. Поэтому шапка
+      // подгруппы теперь — div с теми же классами, ведёт себя как кнопка
+      // через onclick. Кнопка «+ Категория» лежит рядом, не вложена.
       const addCatBtn = canEdit
         ? '<button class="models-add-cat-btn" title="Создать категорию внутри подгруппы" ' +
-            'onclick="event.stopPropagation();openCreateCategoryPrompt(' + dirId + ',\'' + escapeHtml(sg.name).replace(/'/g, "\\'") + '\')">' +
+            'onclick="event.stopPropagation();openCreateCategoryPrompt(' + dirId + ',' + sg.id + ',\'' + escapeHtml(sg.name).replace(/'/g, "\\'") + '\')">' +
             '<i class="ti ti-folder-plus"></i> Категория' +
           '</button>'
         : '';
       html += '<div class="models-subgroup ' + theme.cls + '">' +
-        '<button class="models-subgroup-toggle" data-subkey="' + subKey + '" onclick="toggleModelsSubgroup(\'' + subKey + '\')">' +
+        '<div class="models-subgroup-toggle" role="button" tabindex="0" data-subkey="' + subKey + '" onclick="toggleModelsSubgroup(\'' + subKey + '\')">' +
           '<i class="ti ti-chevron-right models-subgroup-chevron' + (subOpen ? ' open' : '') + '"></i>' +
           '<i class="ti ' + theme.icon + ' sg-icon"></i>' +
           '<span class="sg-name">' + escapeHtml(sg.name) + '</span>' +
           '<span class="models-subgroup-count">' + sg.items.length + '</span>' +
           addCatBtn +
-        '</button>' +
+        '</div>' +
         '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
       // Без категории — карточкой как раньше
       if (noCat.length) {
@@ -48117,6 +48134,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.66',
+    date: '04.06.2026',
+    title: 'Каталог: новая категория сразу видна как пустая ветка',
+    features: [
+      'Кнопка <b>«+ Категория»</b> в шапке подгруппы теперь привязывает новую категорию к этой подгруппе — пустая ветка появляется внутри сразу после создания, не нужно сначала привязывать модель',
+      'Починили также вёрстку — кнопка «+ Категория» больше не выпадает под шапку (была невалидная вложенность button-в-button)',
+    ],
+  },
   {
     version: 'v2.45.65',
     date: '04.06.2026',
