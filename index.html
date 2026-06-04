@@ -19171,7 +19171,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.57-admin-tools-password";
+const APP_VERSION = "v2.45.58-inventory-xlsx";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -42130,11 +42130,41 @@ async function openComponentMovements(componentId) {
 }
 
 
+// v2.45.58: скачать Excel-файл для инвентаризации (ГП + комплектующие).
+async function downloadInventoryXlsx() {
+  showToast('Формируем файл инвентаризации…', 'info');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/warehouse/inventory-xlsx', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status), 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    let filename = 'inventory.xlsx';
+    const mm = cd.match(/filename="?([^";]+)"?/i);
+    if (mm) filename = mm[1];
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast('Файл готов · ' + filename, 'success');
+  } catch (e) { showToast('Не удалось скачать', 'error'); }
+}
+
 // ============ ЭТАП 28.1: переключатель табов склада ============
 
 const WH_TAB_ACTIONS = {
   // Кнопки в общей шапке, специфичные для каждого таба
   stock: [
+    // v2.45.58: выгрузка в Excel для инвентаризации (две вкладки: ГП и компоненты)
+    { label: 'Excel для инвентаризации', icon: 'ti-file-spreadsheet', cls: 'btn btn-secondary btn-small',
+      onclick: 'downloadInventoryXlsx()' },
     { label: 'Произвести отгрузку', icon: 'ti-truck-delivery', cls: 'btn btn-primary btn-small',
       onclick: 'openShipmentEntry()' },
   ],
@@ -42388,7 +42418,10 @@ function _renderFpRow(it) {
     subClass = 'reserved';
     const r = (it.reservations || [])[0];
     if (r) {
-      let resTxt = '<i class="ti ti-lock" style="font-size:12px;"></i>Резерв: №' + escapeHtml(r.contract_number || '—');
+      // v2.45.58: если в contract_number уже есть «№» в начале — не дублируем
+      const _rawN = String(r.contract_number || '—');
+      const _cleanN = _rawN.replace(/^№\s*/, '');
+      let resTxt = '<i class="ti ti-lock" style="font-size:12px;"></i>Резерв: №' + escapeHtml(_cleanN);
       if (r.contractor_name) resTxt += ' · ' + escapeHtml(r.contractor_name);
       if ((it.reservations || []).length > 1) {
         resTxt += ' <span style="color:var(--text-light);">+' + ((it.reservations.length - 1)) + ' договор.</span>';
@@ -47944,6 +47977,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.58',
+    date: '04.06.2026',
+    title: 'Склад: экспорт Excel для инвентаризации + двойной № в резерве',
+    features: [
+      'В разделе <b>Склад → Готовая продукция</b> новая кнопка <b>«Excel для инвентаризации»</b>. Выгружает два листа: <b>Готовая продукция</b> (со статусом и привязкой к договору) и <b>Комплектующие</b>. Колонки «Учёт / Факт / Расхождение / Примечание» — кладовщик заполняет руками во время сверки',
+      'Файл с именем <code>inventory_YYYY-MM-DD_HHMM.xlsx</code> и зафиксированной шапкой, готов к печати',
+      'Убран <b>двойной №</b> в строке «Резерв» когда номер договора уже начинается с <code>№</code> (раньше получалось «№№06ТД/04.26»)',
+    ],
+  },
   {
     version: 'v2.45.57',
     date: '04.06.2026',
