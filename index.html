@@ -19239,7 +19239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.69-comp-copy-mode";
+const APP_VERSION = "v2.45.70-comp-to-models";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48135,6 +48135,18 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.70',
+    date: '04.06.2026',
+    title: 'Перенос компонентов: копирование в номенклатуру производства',
+    features: [
+      'В «Перенос компонентов» добавлен переключатель <b>Куда</b>: «Комплектующие» (как было) или <b>«Номенклатура производства»</b>',
+      'В режиме «Номенклатура производства» появляются селекторы <b>Направление → Подгруппа → Категория</b> каталога моделей',
+      'Жмёшь <b>«Создать модели»</b> — выбранные компоненты создаются как модели в каталоге производства, артикул = sku компонента + суффикс (например <code>-ДБ</code>). Оригиналы остаются на складе',
+      'По умолчанию исходный компонент сразу добавляется первой строкой в BOM новой модели (галочка «Добавить компонент в BOM») — модель сразу готова к сборке',
+      'Артикул модели уникален: коллизии (например, если такая модель уже есть) попадают в «пропущенные»',
+    ],
+  },
+  {
     version: 'v2.45.69',
     date: '04.06.2026',
     title: 'Перенос компонентов: режим «Скопировать» и «Снять суффикс»',
@@ -62477,15 +62489,24 @@ async function openComponentsMove() {
   }
   _cmvState = {
     source_id: null,
-    target_id: null,
-    mode: 'move',           // 'move' | 'copy'
-    suffix: '-ДБ',          // что добавить в конец sku
-    strip_suffix: '',       // что убрать с конца sku (для отката)
+    target_kind: 'components',   // 'components' | 'models'  (v2.45.70)
+    target_id: null,             // для components — id категории компонентов
+    target_dir: null,            // для models — direction_id
+    target_subgroup: null,       // для models — subgroup_id
+    target_cat: null,            // для models — category_id (каталог производства)
+    add_to_bom: true,            // для models — добавить компонент первой строкой BOM
+    mode: 'move',                // 'move' | 'copy' (только для components)
+    suffix: '-ДБ',
+    strip_suffix: '',
     selected: new Set(),
     search: '',
     loading: false,
     lastResult: null,
   };
+  // Догружаем каталог моделей если ещё не загружен (для дропдаунов направления)
+  if (!cache.models) {
+    try { cache.models = await apiGet('/api/models'); } catch (e) {}
+  }
   let m = document.getElementById('cmv-modal');
   if (!m) {
     m = document.createElement('div');
@@ -62544,10 +62565,14 @@ function _cmvRender() {
       '</div>';
   const resultsHtml = s.lastResult
     ? '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:10px 14px;font-size:12.5px;margin-top:12px;color:#0C4A6E;">' +
-        (s.lastResult.mode === 'copy'
-          ? 'Скопировано: <b>' + (s.lastResult.copied_count || 0) + '</b> · '
-          : 'Перенесено: <b>' + (s.lastResult.moved_count || 0) + '</b> · ') +
-        'переименовано: <b>' + s.lastResult.renamed_count + '</b> · ' +
+        (s.target_kind === 'models'
+          ? 'Создано моделей: <b>' + (s.lastResult.created_count || 0) + '</b> · '
+          : (s.lastResult.mode === 'copy'
+              ? 'Скопировано: <b>' + (s.lastResult.copied_count || 0) + '</b> · '
+              : 'Перенесено: <b>' + (s.lastResult.moved_count || 0) + '</b> · ')) +
+        (s.target_kind !== 'models'
+          ? 'переименовано: <b>' + (s.lastResult.renamed_count || 0) + '</b> · '
+          : '') +
         'пропущено: <b>' + s.lastResult.skipped_count + '</b>' +
         ((s.lastResult.skipped || []).length > 0
           ? '<div style="margin-top:6px;font-size:11.5px;">Пропущенные:</div><ul style="margin:4px 0 0 18px;padding:0;font-size:11.5px;">' +
@@ -62563,34 +62588,83 @@ function _cmvRender() {
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="cmv-body">' +
+        // Селектор «Куда»: тип получателя
+        '<div class="cmv-mode-row" style="display:flex;gap:6px;margin:0 0 10px;align-items:center;flex-wrap:wrap;">' +
+          '<span style="font-size:12px;color:var(--text-mid);margin-right:4px;">Куда:</span>' +
+          '<button type="button" class="btn btn-small ' + (s.target_kind === 'components' ? 'btn-primary' : 'btn-secondary') + '" ' +
+            'onclick="_cmvSetTargetKind(\'components\')"><i class="ti ti-package"></i> Комплектующие</button>' +
+          '<button type="button" class="btn btn-small ' + (s.target_kind === 'models' ? 'btn-primary' : 'btn-secondary') + '" ' +
+            'onclick="_cmvSetTargetKind(\'models\')"><i class="ti ti-cube"></i> Номенклатура производства</button>' +
+          '<span style="font-size:11.5px;color:var(--text-light);margin-left:8px;">' +
+            (s.target_kind === 'models'
+              ? 'Создаст модели в каталоге производства. Оригинальный компонент остаётся на складе'
+              : 'Перенесёт/скопирует компоненты между категориями склада комплектующих') +
+          '</span>' +
+        '</div>' +
         '<div class="cmv-controls">' +
           '<div><label>Откуда (исходная категория)</label>' +
             '<select onchange="_cmvSetSrc(this.value)">' + catOpts(s.source_id) + '</select></div>' +
-          '<div>' +
-            '<label>Куда (целевая категория)' +
-              ' <button type="button" onclick="_cmvCreateNewCat()" title="Создать новую категорию компонентов" ' +
-                'style="margin-left:6px;background:none;border:none;color:var(--brand);font-size:11.5px;cursor:pointer;font-weight:600;padding:0;">' +
-                '+ Новая</button>' +
-            '</label>' +
-            '<select onchange="_cmvSetTarget(this.value)">' + catOpts(s.target_id) + '</select>' +
-          '</div>' +
+          (s.target_kind === 'components'
+            ? '<div>' +
+                '<label>Категория комплектующих' +
+                  ' <button type="button" onclick="_cmvCreateNewCat()" title="Создать новую категорию компонентов" ' +
+                    'style="margin-left:6px;background:none;border:none;color:var(--brand);font-size:11.5px;cursor:pointer;font-weight:600;padding:0;">' +
+                    '+ Новая</button>' +
+                '</label>' +
+                '<select onchange="_cmvSetTarget(this.value)">' + catOpts(s.target_id) + '</select>' +
+              '</div>'
+            : (function() {
+                const dirs = (cache.models && cache.models.directions) || [];
+                const dirOpts = '<option value="">— направление —</option>' +
+                  dirs.map(d => '<option value="' + d.id + '"' +
+                    (s.target_dir === d.id ? ' selected' : '') + '>' +
+                    escapeHtml(d.name || '') + '</option>').join('');
+                const subgroups = (dirs.find(d => d.id === s.target_dir) || {}).subgroups || [];
+                const subOpts = '<option value="">— подгруппа (опц.) —</option>' +
+                  subgroups.map(sg => '<option value="' + sg.id + '"' +
+                    (s.target_subgroup === sg.id ? ' selected' : '') + '>' +
+                    escapeHtml(sg.name || '') + '</option>').join('');
+                const allCats = (cache.models && cache.models.categories) || [];
+                const cats = allCats.filter(c =>
+                  c.direction_id === s.target_dir &&
+                  (!s.target_subgroup || c.parent_subgroup_id === s.target_subgroup));
+                const catOpts2 = '<option value="">— категория (опц.) —</option>' +
+                  cats.map(c => '<option value="' + c.id + '"' +
+                    (s.target_cat === c.id ? ' selected' : '') + '>' +
+                    escapeHtml(c.name || '') + '</option>').join('');
+                return '<div><label>Направление производства</label>' +
+                  '<select onchange="_cmvSetTargetDir(this.value)">' + dirOpts + '</select></div>' +
+                  '<div><label>Подгруппа</label>' +
+                  '<select onchange="_cmvSetTargetSubgroup(this.value)" ' +
+                    (s.target_dir ? '' : 'disabled') + '>' + subOpts + '</select></div>' +
+                  '<div><label>Категория</label>' +
+                  '<select onchange="_cmvSetTargetCat(this.value)" ' +
+                    (s.target_dir ? '' : 'disabled') + '>' + catOpts2 + '</select></div>';
+              })()) +
           '<div><label>Добавить суффикс</label>' +
             '<input type="text" value="' + escapeHtml(s.suffix) + '" placeholder="-ДБ" oninput="_cmvSetSuffix(this.value)" /></div>' +
           '<div><label>Снять суффикс (для отката)</label>' +
             '<input type="text" value="' + escapeHtml(s.strip_suffix) + '" placeholder="" oninput="_cmvSetStripSuffix(this.value)" /></div>' +
         '</div>' +
-        '<div class="cmv-mode-row" style="display:flex;gap:6px;margin:8px 0 4px;align-items:center;">' +
-          '<span style="font-size:12px;color:var(--text-mid);margin-right:4px;">Режим:</span>' +
-          '<button type="button" class="btn btn-small ' + (s.mode === 'move' ? 'btn-primary' : 'btn-secondary') + '" ' +
-            'onclick="_cmvSetMode(\'move\')"><i class="ti ti-transfer"></i> Перенести</button>' +
-          '<button type="button" class="btn btn-small ' + (s.mode === 'copy' ? 'btn-primary' : 'btn-secondary') + '" ' +
-            'onclick="_cmvSetMode(\'copy\')"><i class="ti ti-copy"></i> Скопировать</button>' +
-          '<span style="font-size:11.5px;color:var(--text-light);margin-left:8px;">' +
-            (s.mode === 'copy'
-              ? 'Создаст копии в целевой категории, оригиналы останутся на месте'
-              : 'Переместит компоненты, оригиналы пропадут из источника') +
-          '</span>' +
-        '</div>' +
+        (s.target_kind === 'components'
+          ? '<div class="cmv-mode-row" style="display:flex;gap:6px;margin:8px 0 4px;align-items:center;">' +
+              '<span style="font-size:12px;color:var(--text-mid);margin-right:4px;">Режим:</span>' +
+              '<button type="button" class="btn btn-small ' + (s.mode === 'move' ? 'btn-primary' : 'btn-secondary') + '" ' +
+                'onclick="_cmvSetMode(\'move\')"><i class="ti ti-transfer"></i> Перенести</button>' +
+              '<button type="button" class="btn btn-small ' + (s.mode === 'copy' ? 'btn-primary' : 'btn-secondary') + '" ' +
+                'onclick="_cmvSetMode(\'copy\')"><i class="ti ti-copy"></i> Скопировать</button>' +
+              '<span style="font-size:11.5px;color:var(--text-light);margin-left:8px;">' +
+                (s.mode === 'copy'
+                  ? 'Создаст копии в целевой категории, оригиналы останутся на месте'
+                  : 'Переместит компоненты, оригиналы пропадут из источника') +
+              '</span>' +
+            '</div>'
+          : '<div class="cmv-mode-row" style="display:flex;gap:6px;margin:8px 0 4px;align-items:center;">' +
+              '<label style="font-size:12.5px;color:var(--text-mid);display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+                '<input type="checkbox" ' + (s.add_to_bom ? 'checked' : '') + ' onchange="_cmvToggleAddBom(this.checked)" />' +
+                'Добавить исходный компонент первой строкой в BOM новой модели' +
+              '</label>' +
+            '</div>') +
         '<div class="cmv-controls-row">' +
           '<input type="text" placeholder="Поиск по имени или артикулу…" value="' + escapeHtml(s.search) + '" oninput="_cmvSetSearch(this.value)" style="flex:1;font-size:13px;padding:7px 10px;height:34px;border:1px solid var(--border);border-radius:8px;" />' +
           '<button class="btn btn-secondary btn-small" onclick="_cmvSelectAll(true)">Выбрать все видимые</button>' +
@@ -62610,7 +62684,10 @@ function _cmvRender() {
           (s.loading ? '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…' : '<i class="ti ti-eye"></i> Предпросмотр') +
         '</button>' +
         '<button class="btn btn-primary" onclick="_cmvRun(false)" ' + ((!s.lastResult || s.loading) ? 'disabled' : '') + '>' +
-          '<i class="ti ti-check"></i> ' + (s.mode === 'copy' ? 'Скопировать' : 'Перенести') +
+          '<i class="ti ti-check"></i> ' +
+          (s.target_kind === 'models'
+            ? 'Создать модели'
+            : (s.mode === 'copy' ? 'Скопировать' : 'Перенести')) +
         '</button>' +
       '</div>' +
     '</div>';
@@ -62647,11 +62724,38 @@ function _cmvSetSrc(v) {
   _cmvState.selected.clear();
   _cmvRender();
 }
-function _cmvSetTarget(v) { _cmvState.target_id = v ? parseInt(v, 10) : null; }
+function _cmvSetTarget(v) { _cmvState.target_id = v ? parseInt(v, 10) : null; _cmvState.lastResult = null; }
 function _cmvSetSuffix(v) { _cmvState.suffix = v; _cmvRender(); }
 function _cmvSetStripSuffix(v) { _cmvState.strip_suffix = v; _cmvRender(); }
 function _cmvSetMode(m) { _cmvState.mode = (m === 'copy') ? 'copy' : 'move'; _cmvState.lastResult = null; _cmvRender(); }
 function _cmvSetSearch(v) { _cmvState.search = v; _cmvRender(); }
+// v2.45.70: переключение типа цели + селекторы каталога производства
+function _cmvSetTargetKind(k) {
+  _cmvState.target_kind = (k === 'models') ? 'models' : 'components';
+  _cmvState.lastResult = null;
+  // дефолтный суффикс для моделей — оставим как было; чтобы не было пересечений по
+  // article при копировании в каталог производства, чаще всего нужен суффикс.
+  _cmvRender();
+}
+function _cmvSetTargetDir(v) {
+  _cmvState.target_dir = v ? parseInt(v, 10) : null;
+  _cmvState.target_subgroup = null;
+  _cmvState.target_cat = null;
+  _cmvState.lastResult = null;
+  _cmvRender();
+}
+function _cmvSetTargetSubgroup(v) {
+  _cmvState.target_subgroup = v ? parseInt(v, 10) : null;
+  _cmvState.target_cat = null;
+  _cmvState.lastResult = null;
+  _cmvRender();
+}
+function _cmvSetTargetCat(v) {
+  _cmvState.target_cat = v ? parseInt(v, 10) : null;
+  _cmvState.lastResult = null;
+  _cmvRender();
+}
+function _cmvToggleAddBom(v) { _cmvState.add_to_bom = !!v; }
 function _cmvToggle(id) {
   if (_cmvState.selected.has(id)) _cmvState.selected.delete(id);
   else _cmvState.selected.add(id);
@@ -62670,32 +62774,59 @@ function _cmvSelectAll(on) {
 
 async function _cmvRun(dryRun) {
   if (_cmvState.loading) return;
-  if (!_cmvState.target_id) { showToast('Выбери целевую категорию', 'error'); return; }
+  const isModels = _cmvState.target_kind === 'models';
+  if (isModels) {
+    if (!_cmvState.target_dir) { showToast('Выбери направление производства', 'error'); return; }
+  } else {
+    if (!_cmvState.target_id) { showToast('Выбери целевую категорию', 'error'); return; }
+  }
   if (_cmvState.selected.size === 0) { showToast('Отметь хотя бы один компонент', 'error'); return; }
   if (!dryRun && !_cmvState.lastResult) { showToast('Сначала «Предпросмотр»', 'error'); return; }
   if (!dryRun) {
-    const isCopy = _cmvState.mode === 'copy';
-    const n = isCopy
-      ? (_cmvState.lastResult.copied_count || 0)
-      : (_cmvState.lastResult.moved_count || 0);
-    const verb = isCopy ? 'Скопировать' : 'Перенести';
-    if (!confirm(verb + ' ' + n + ' компонентов в целевую категорию?')) return;
+    if (isModels) {
+      const n = _cmvState.lastResult.created_count || 0;
+      if (!confirm('Создать ' + n + ' моделей в каталоге производства?')) return;
+    } else {
+      const isCopy = _cmvState.mode === 'copy';
+      const n = isCopy
+        ? (_cmvState.lastResult.copied_count || 0)
+        : (_cmvState.lastResult.moved_count || 0);
+      const verb = isCopy ? 'Скопировать' : 'Перенести';
+      if (!confirm(verb + ' ' + n + ' компонентов в целевую категорию?')) return;
+    }
   }
   _cmvState.loading = true;
   _cmvRender();
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/admin/components/move-bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({
+    let url, body;
+    if (isModels) {
+      url = API_BASE + '/api/admin/components/copy-to-models';
+      body = {
+        component_ids: Array.from(_cmvState.selected),
+        target_direction_id: _cmvState.target_dir,
+        target_subgroup_id: _cmvState.target_subgroup || null,
+        target_category_id: _cmvState.target_cat || null,
+        sku_suffix: _cmvState.suffix || '',
+        sku_strip_suffix: _cmvState.strip_suffix || '',
+        add_to_bom: !!_cmvState.add_to_bom,
+        dry_run: dryRun,
+      };
+    } else {
+      url = API_BASE + '/api/admin/components/move-bulk';
+      body = {
         component_ids: Array.from(_cmvState.selected),
         target_category_id: _cmvState.target_id,
         mode: _cmvState.mode || 'move',
         sku_suffix: _cmvState.suffix || '',
         sku_strip_suffix: _cmvState.strip_suffix || '',
         dry_run: dryRun,
-      }),
+      };
+    }
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -62705,10 +62836,15 @@ async function _cmvRun(dryRun) {
     const d = await r.json();
     _cmvState.lastResult = d;
     if (!dryRun) {
-      const n = (d.mode === 'copy') ? (d.copied_count || 0) : (d.moved_count || 0);
-      const verb = (d.mode === 'copy') ? 'Скопировано' : 'Перенесено';
-      showToast(verb + ' ' + n + ' компонентов', 'success');
-      cache.components = null;   // принудительно перезагрузим при следующем открытии
+      if (isModels) {
+        showToast('Создано ' + (d.created_count || 0) + ' моделей', 'success');
+        cache.models = null;
+      } else {
+        const n = (d.mode === 'copy') ? (d.copied_count || 0) : (d.moved_count || 0);
+        const verb = (d.mode === 'copy') ? 'Скопировано' : 'Перенесено';
+        showToast(verb + ' ' + n + ' компонентов', 'success');
+        cache.components = null;
+      }
     } else {
       showToast('Предпросмотр готов', 'success');
     }
