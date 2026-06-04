@@ -16882,6 +16882,10 @@
         <a class="nav-item" onclick="openBomBulkAdd()" style="cursor:pointer;">
           <i class="ti ti-stack-push"></i><span>Массовое BOM</span>
         </a>
+        <!-- v2.45.51: массовая перенумерация моделей -->
+        <a class="nav-item" onclick="openModelsRenumber()" style="cursor:pointer;">
+          <i class="ti ti-arrows-sort"></i><span>Перенумерация</span>
+        </a>
       </div>
       <div class="sidebar-footer">
         <div class="small-avatar" id="sb-avatar-supply">—</div>
@@ -19169,7 +19173,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.50-bom-bulk-checkbox";
+const APP_VERSION = "v2.45.51-models-renumber";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47899,6 +47903,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.51',
+    date: '04.06.2026',
+    title: 'Перенумерация моделей по префиксу (ЩУ001.000…)',
+    features: [
+      'В сайдбаре <b>Снабжение → Перенумерация</b> — новый инструмент для приведения артикулов и имён моделей к единому формату',
+      'Указываешь префикс (например <code>ЩУ</code>) → получаешь таблицу всех моделей этого префикса в 3 исполнениях с предложением: <code>ЩУ001.001</code> / артикул <code>ЩУ-001-001</code>. Для нержи добавляется <code>-N</code>, для влагозащиты <code>-V</code>',
+      'Поля редактируемые — конфликты по UNIQUE подсвечены красным. «Применить» доступно только после устранения конфликтов',
+      'Перед применением — подтверждение, действие пишется в журнал',
+    ],
+  },
+  {
     version: 'v2.45.50',
     date: '04.06.2026',
     title: 'Массовое BOM: видимый чекбокс «Критично»',
@@ -61360,6 +61375,215 @@ async function _bbaRun(dryRun) {
   } finally {
     _bbaState._loading = null;
     _bbaRender();
+  }
+}
+</script>
+
+<!-- ============ v2.45.51: ПЕРЕНУМЕРАЦИЯ МОДЕЛЕЙ ============ -->
+<style>
+  .mrn-modal { max-width: 1100px; width: 96vw; max-height: 92vh; display: flex; flex-direction: column; }
+  .mrn-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .mrn-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .mrn-controls input[type="text"] { font-size: 13px; padding: 7px 10px; height: 34px; border: 1px solid var(--border); border-radius: 8px; min-width: 200px; }
+  .mrn-stats { font-size: 12.5px; color: var(--text-mid); display: flex; gap: 16px; flex-wrap: wrap; }
+  .mrn-stats b { color: var(--text-dark); }
+  .mrn-stats .mrn-bad { color: var(--danger); }
+  .mrn-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: white; }
+  .mrn-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .mrn-table th, .mrn-table td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; text-align: left; }
+  .mrn-table th { background: #F1F5F9; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-light); font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+  .mrn-table tr.mrn-conflict { background: #FEF2F2; }
+  .mrn-table tr.mrn-unchanged { opacity: 0.55; }
+  .mrn-table input { font-size: 12.5px; padding: 4px 6px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: white; width: 100%; box-sizing: border-box; }
+  .mrn-table input.mrn-changed { border-color: #0C4A6E; background: #F0F9FF; }
+  .mrn-exec-pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; }
+  .mrn-exec-standard  { background: #DCFCE7; color: #0A5B41; }
+  .mrn-exec-stainless { background: #FEE2E2; color: #8C2A2A; }
+  .mrn-exec-waterproof { background: #DBEAFE; color: #1E3A8A; }
+  .mrn-conflict-text { color: var(--danger); font-size: 11px; }
+</style>
+<script>
+let _mrnState = null;
+
+async function openModelsRenumber() {
+  _mrnState = { prefix: 'ЩУ', items: [], loading: false, error: null };
+  let m = document.getElementById('mrn-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'mrn-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _mrnRender();
+  m.classList.add('visible');
+}
+
+function _mrnRender() {
+  const m = document.getElementById('mrn-modal');
+  if (!m) return;
+  const s = _mrnState;
+  const total = s.items.length;
+  const changed = s.items.filter(it => it.proposed_article !== it.current_article || it.proposed_name !== it.current_name).length;
+  const conflicts = s.items.filter(it => it.conflict).length;
+  const tableHtml = !s.items.length
+    ? '<div class="empty-block" style="padding:24px 0;color:var(--text-light);">Нажми «Сформировать отчёт»</div>'
+    : '<div class="mrn-table-wrap"><table class="mrn-table">' +
+        '<thead><tr>' +
+          '<th>ID</th>' +
+          '<th>Исп.</th>' +
+          '<th>Текущее имя</th>' +
+          '<th>Текущий артикул</th>' +
+          '<th>→ Новое имя</th>' +
+          '<th>→ Новый артикул</th>' +
+          '<th>Конфликт</th>' +
+        '</tr></thead><tbody>' +
+        s.items.map((it, i) => {
+          const isChange = (it.proposed_article !== it.current_article || it.proposed_name !== it.current_name);
+          const cls = it.conflict ? 'mrn-conflict' : (isChange ? '' : 'mrn-unchanged');
+          const execLbl = it.execution === 'stainless' ? 'Нерж'
+                        : it.execution === 'waterproof' ? 'Влаг'
+                        : 'Станд';
+          return '<tr class="' + cls + '">' +
+            '<td>' + it.model_id + '</td>' +
+            '<td><span class="mrn-exec-pill mrn-exec-' + it.execution + '">' + execLbl + '</span></td>' +
+            '<td>' + escapeHtml(it.current_name) + '</td>' +
+            '<td><code>' + escapeHtml(it.current_article) + '</code></td>' +
+            '<td><input type="text" value="' + escapeHtml(it.proposed_name || "") + '" oninput="_mrnEdit(' + i + ',\'proposed_name\',this.value)" class="' + (it.proposed_name !== it.current_name ? 'mrn-changed' : '') + '" /></td>' +
+            '<td><input type="text" value="' + escapeHtml(it.proposed_article || "") + '" oninput="_mrnEdit(' + i + ',\'proposed_article\',this.value)" class="' + (it.proposed_article !== it.current_article ? 'mrn-changed' : '') + '" /></td>' +
+            '<td>' + (it.conflict ? '<span class="mrn-conflict-text">' + escapeHtml(it.conflict) + '</span>' : '') + '</td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table></div>';
+  m.innerHTML =
+    '<div class="modal mrn-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-arrows-sort"></i> Перенумерация моделей</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="mrn-body">' +
+        '<div class="mrn-controls">' +
+          '<label style="font-size:13px;color:var(--text-mid);">Префикс:</label>' +
+          '<input type="text" id="mrn-prefix" value="' + escapeHtml(s.prefix) + '" placeholder="ЩУ" oninput="_mrnSetPrefix(this.value)" />' +
+          '<button class="btn btn-secondary" onclick="_mrnLoadPreview()" ' + (s.loading ? 'disabled' : '') + '>' +
+            (s.loading
+              ? '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…'
+              : '<i class="ti ti-eye"></i> Сформировать отчёт') +
+          '</button>' +
+          (total > 0
+            ? '<div class="mrn-stats">' +
+                '<span>Всего: <b>' + total + '</b></span>' +
+                '<span>К изменению: <b>' + changed + '</b></span>' +
+                (conflicts > 0 ? '<span class="mrn-bad">Конфликтов: <b>' + conflicts + '</b></span>' : '') +
+              '</div>'
+            : '') +
+        '</div>' +
+        (s.error
+          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius:6px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
+          : '') +
+        tableHtml +
+        '<div style="font-size:11.5px;color:var(--text-light);margin-top:10px;line-height:1.55;">' +
+          '<i class="ti ti-info-circle"></i> Префикс <code>-N</code> в артикуле — нерж, <code>-V</code> — влагозащита, без префикса — стандарт. Имя не содержит префикса исполнения. Поля можно редактировать руками — изменённые подсвечены синим. Конфликтные строки выделены красным; их надо поправить руками или они будут пропущены при применении.' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+        '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);">' +
+          (total > 0 ? 'Применить можно после устранения конфликтов.' : '') +
+        '</div>' +
+        '<button class="btn btn-primary" onclick="_mrnApply()" ' + ((!total || conflicts > 0 || s.loading) ? 'disabled' : '') + '>' +
+          '<i class="ti ti-check"></i> Применить переименование (' + changed + ')' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _mrnSetPrefix(v) { _mrnState.prefix = v; }
+function _mrnEdit(idx, key, val) {
+  if (!_mrnState.items[idx]) return;
+  _mrnState.items[idx][key] = val;
+  // Сбрасываем конфликт у редактируемой строки если артикул изменился
+  if (key === 'proposed_article') {
+    // Пересчитаем дубликаты внутри редактируемого списка
+    const counts = {};
+    _mrnState.items.forEach(it => {
+      if (it.proposed_article) counts[it.proposed_article] = (counts[it.proposed_article] || 0) + 1;
+    });
+    _mrnState.items.forEach(it => {
+      if (it.proposed_article && counts[it.proposed_article] > 1) {
+        it.conflict = 'Дубликат артикула в этом отчёте';
+      } else if (it.conflict && it.conflict.startsWith('Тот же артикул') || it.conflict === 'Дубликат артикула в этом отчёте') {
+        it.conflict = null;
+      }
+    });
+    _mrnRender();
+  }
+}
+
+async function _mrnLoadPreview() {
+  const prefix = (_mrnState.prefix || '').trim();
+  if (prefix.length < 2) { showToast('Префикс от 2 символов', 'error'); return; }
+  _mrnState.loading = true;
+  _mrnState.error = null;
+  _mrnRender();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/models/renumber-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ prefix }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      _mrnState.error = d.message || ('HTTP ' + r.status);
+      showToast(_mrnState.error, 'error');
+      return;
+    }
+    const d = await r.json();
+    _mrnState.items = d.items || [];
+    showToast('Найдено ' + (d.count || 0) + ' моделей, конфликтов: ' + (d.conflicts_count || 0), 'success');
+  } catch (e) {
+    _mrnState.error = String(e && e.message || e);
+  } finally {
+    _mrnState.loading = false;
+    _mrnRender();
+  }
+}
+
+async function _mrnApply() {
+  const renames = _mrnState.items
+    .filter(it => !it.conflict)
+    .filter(it => it.proposed_article !== it.current_article || it.proposed_name !== it.current_name)
+    .map(it => ({
+      model_id:    it.model_id,
+      new_name:    it.proposed_name,
+      new_article: it.proposed_article,
+    }));
+  if (!renames.length) { showToast('Нечего применять', 'error'); return; }
+  if (!confirm('Применить переименование ' + renames.length + ' моделей? Это действие записывается в журнал, отменить можно только вручную.')) return;
+  _mrnState.loading = true;
+  _mrnRender();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/models/rename-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ renames, dry_run: false }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      _mrnState.error = d.message || ('HTTP ' + r.status);
+      showToast(_mrnState.error, 'error');
+      return;
+    }
+    const d = await r.json();
+    showToast('Применено: ' + d.applied_count + ', пропущено: ' + d.skipped_count, 'success');
+    // Перезагрузим отчёт
+    await _mrnLoadPreview();
+  } catch (e) {
+    _mrnState.error = String(e && e.message || e);
+    _mrnRender();
+  } finally {
+    _mrnState.loading = false;
   }
 }
 </script>
