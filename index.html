@@ -19147,7 +19147,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.36-inbox-row-buttons";
+const APP_VERSION = "v2.45.37-invoice-picker";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45508,6 +45508,14 @@ async function openInboxMessage(inboxId) {
     ? '<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13.5px;line-height:1.5;color:var(--text-dark);margin:0;background:var(--bg);padding:14px;border-radius:8px;max-height:400px;overflow-y:auto;">' + escapeHtml(bodyText) + '</pre>'
     : '<div style="color:var(--text-light);font-style:italic;padding:10px 0;">(тело письма пустое или не было сохранено)</div>';
 
+  // v2.45.37: если письмо привязано к заказу, рядом с каждым вложением даём
+  // кнопку «Использовать как счёт» — для ручного выбора если автоматика ошиблась.
+  const canReassign = !!msg.matched_order_id;
+  const reassignHint = (canReassign && msg.attachments && msg.attachments.length > 1)
+    ? '<div style="margin-top:8px;padding:8px 10px;background:#FFF7E6;border-left:3px solid #F59E0B;border-radius:6px;font-size:12px;color:#92400E;line-height:1.45;">' +
+        '<i class="ti ti-info-circle"></i> В письме несколько вложений. Робот привязал самое свежее по дате счёта. Если выбор неверный — жми «Использовать как счёт» рядом с нужным файлом.' +
+      '</div>'
+    : '';
   const attsHtml = (msg.attachments && msg.attachments.length)
     ? '<div style="margin-top:12px;">' +
         '<div style="font-size:12px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin-bottom:6px;">Вложения (' + msg.attachments.length + ')</div>' +
@@ -45517,8 +45525,12 @@ async function openInboxMessage(inboxId) {
             '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(a.name || '') + '">' + escapeHtml(a.name || '—') + '</span>' +
             '<span style="color:var(--text-light);font-size:11.5px;">' + Math.round((a.size || 0) / 1024) + ' КБ</span>' +
             '<button class="btn btn-secondary btn-small" onclick="downloadInboxAttachmentDirect(' + msg.id + ',' + i + ',\'' + escapeHtml(a.name || '').replace(/'/g, "\\'") + '\')" title="Скачать"><i class="ti ti-download"></i></button>' +
+            (canReassign
+              ? '<button class="btn btn-primary btn-small" onclick="useInboxAttachmentAsInvoice(' + msg.id + ',' + i + ')" title="Привязать этот файл как счёт заказа"><i class="ti ti-receipt-2"></i> Как счёт</button>'
+              : '') +
           '</div>'
         ).join('') +
+        reassignHint +
       '</div>'
     : '<div style="margin-top:10px;color:var(--text-light);font-size:13px;font-style:italic;">Без вложений</div>';
 
@@ -45681,6 +45693,31 @@ async function downloadInboxAttachment(inboxId, idx) {
   }
   const att = item.attachments[idx] || item.attachments[0];
   return downloadInboxAttachmentDirect(inboxId, idx || 0, att && att.name);
+}
+
+// v2.45.37: ручное переназначение «какой файл в письме = счёт» — для случаев,
+// когда поставщик прислал несколько PDF (свежий + старые из переписки) и робот
+// автовыбрал не тот. Работает только если письмо уже привязано к заказу.
+async function useInboxAttachmentAsInvoice(inboxId, idx) {
+  if (!confirm('Привязать ЭТО вложение к заказу как счёт?\n\nПредыдущая ссылка на счёт будет перезаписана.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/use-as-invoice', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status + ': не удалось'), 'error');
+      return;
+    }
+    const d = await r.json().catch(() => ({}));
+    showToast('Счёт привязан: ' + (d.attachment_name || '—'), 'success');
+    // Закрываем модалку письма + перерисовываем inbox
+    const m = document.getElementById('inbox-msg-modal');
+    if (m) m.remove();
+    if (typeof loadSupplyInbox === 'function') loadSupplyInbox().catch(() => {});
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 // v2.45.33: удаление inbox-сообщения (только директор). Кладёт DELETE на бэк,
@@ -47760,6 +47797,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.37',
+    date: '04.06.2026',
+    title: 'Несколько счетов в письме — ИИ выбирает свежий',
+    features: [
+      'Когда поставщик отвечает на заявку и его почтовик прикладывает <b>всю историю переписки</b> (свежий счёт + старые из ответов), робот теперь прогоняет все PDF через <b>ИИ-распознавание</b> и привязывает к заказу самый свежий по дате счёта',
+      'Если автоматика ошиблась — открой письмо, рядом с каждым вложением кнопка <b>«Как счёт»</b>: жмёшь на нужный файл и он сразу становится счётом заказа',
+      'Над списком вложений появилась подсказка-уведомление, что в письме их несколько',
+    ],
+  },
   {
     version: 'v2.45.36',
     date: '04.06.2026',
