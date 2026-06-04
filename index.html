@@ -12053,6 +12053,43 @@
     padding: 14px;
   }
 
+  /* v2.45.81: мобильная вёрстка tasks-list (как у defects-list) */
+  .m-tasks-view-row { display: none; }
+  .app.mobile-layout [data-screen="tasks-list"] .page-header { display: none; }
+  .app.mobile-layout [data-screen="tasks-list"] > .content-inner > .desktop-layout { display: none; }
+  .app.mobile-layout [data-screen="tasks-list"] #tasks-list-content { padding: 14px; }
+  .app.mobile-layout .m-tasks-view-row {
+    display: flex; gap: 8px;
+    padding: 8px 14px 10px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+  }
+  .m-view-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text-mid);
+    border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    cursor: pointer;
+  }
+  .m-view-btn.active {
+    background: var(--brand); border-color: var(--brand); color: white;
+  }
+  .m-chip-count {
+    background: rgba(255,255,255,0.25);
+    color: inherit; opacity: 0.85;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    margin-left: 4px;
+  }
+  .m-filter-chip:not(.active) .m-chip-count {
+    background: #F1F5F9; color: var(--text-mid);
+  }
+
   /* ============ КОНЕЦ МОБИЛЬНЫХ УЛУЧШЕНИЙ ============ */
 
   /* ЭТАП 23+: Кнопки выбора цели для замечания (К сборке / К договору) */
@@ -18584,6 +18621,18 @@
           <h2>Все задачи</h2>
           <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
         </div>
+        <!-- v2.45.81: мобильная полоса фильтров (горизонтальный скролл) -->
+        <div class="m-filter-chips" id="m-tasks-filter-chips">
+          <button class="m-filter-chip active" data-tf="open">Открытые <span class="m-chip-count" id="m-tf-cnt-open">0</span></button>
+          <button class="m-filter-chip" data-tf="new">Новые <span class="m-chip-count" id="m-tf-cnt-new">0</span></button>
+          <button class="m-filter-chip" data-tf="in_progress">В работе <span class="m-chip-count" id="m-tf-cnt-in_progress">0</span></button>
+          <button class="m-filter-chip" data-tf="done">Готовые <span class="m-chip-count" id="m-tf-cnt-done">0</span></button>
+          <button class="m-filter-chip" data-tf="all">Все <span class="m-chip-count" id="m-tf-cnt-all">0</span></button>
+        </div>
+        <div class="m-tasks-view-row" id="m-tasks-view-row">
+          <button class="m-view-btn active" data-tv="list" onclick="setTasksView('list')"><i class="ti ti-list"></i> Список</button>
+          <button class="m-view-btn" data-tv="board" onclick="setTasksView('board')"><i class="ti ti-layout-kanban"></i> Доска</button>
+        </div>
         <div class="page-header">
           <div><h1>Задачи</h1><div class="page-subtitle" id="tasks-list-subtitle">—</div></div>
           <button class="btn btn-primary" id="tasks-new-btn" onclick="openNewTask()">
@@ -18610,9 +18659,6 @@
             <div class="loading-block">Загружаем…</div>
           </div>
         </div>
-        <button class="fab" onclick="openNewTask()" aria-label="Новая задача">
-          <i class="ti ti-plus"></i>
-        </button>
       </div>
 
       <!-- Назначенные мне (только assigned_to_me) -->
@@ -19261,7 +19307,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.80-voice-task";
+const APP_VERSION = "v2.45.81-tasks-mobile";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -32127,9 +32173,15 @@ function setTasksView(view) {
   document.querySelectorAll('#tasks-view-toggle button').forEach(b => {
     b.classList.toggle('active', b.dataset.tv === view);
   });
+  // v2.45.81: синхронизация мобильных кнопок Список/Доска
+  document.querySelectorAll('#m-tasks-view-row .m-view-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tv === view);
+  });
   // На доске статус-фильтр не имеет смысла — прячем чипы
   const filterRow = document.querySelector('#tasks-filters > div:first-child');
   if (filterRow) filterRow.style.visibility = (view === 'board') ? 'hidden' : '';
+  const mChips = document.getElementById('m-tasks-filter-chips');
+  if (mChips) mChips.style.display = (view === 'board') ? 'none' : '';
   loadTasksList();
 }
 
@@ -32172,6 +32224,9 @@ function renderTasksScreen(d) {
   ids.forEach(([k, v]) => {
     const el = document.getElementById('tf-cnt-' + k);
     if (el) el.textContent = v;
+    // v2.45.81: дублируем счётчики на мобильных чипсах
+    const elM = document.getElementById('m-tf-cnt-' + k);
+    if (elM) elM.textContent = v;
   });
   const subtitleEl = document.getElementById('tasks-list-subtitle');
   if (subtitleEl) {
@@ -36963,11 +37018,26 @@ function applySummaryCustomRange() {
 }
 
 // ЭТАП 16В: фильтры задач
+function _syncTasksFilterActive(tf) {
+  document.querySelectorAll('#tasks-filters .filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.tf === tf);
+  });
+  document.querySelectorAll('#m-tasks-filter-chips .m-filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.tf === tf);
+  });
+}
 document.querySelectorAll('#tasks-filters .filter-chip').forEach(chip => {
   chip.addEventListener('click', () => {
-    document.querySelectorAll('#tasks-filters .filter-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
     state.tasksFilter = chip.dataset.tf;
+    _syncTasksFilterActive(chip.dataset.tf);
+    loadTasksList();
+  });
+});
+// v2.45.81: мобильные чипсы → синхронизация с десктопными и загрузка
+document.querySelectorAll('#m-tasks-filter-chips .m-filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    state.tasksFilter = chip.dataset.tf;
+    _syncTasksFilterActive(chip.dataset.tf);
     loadTasksList();
   });
 });
@@ -48356,6 +48426,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.81',
+    date: '04.06.2026',
+    title: 'Задачи: чистый мобильный список',
+    features: [
+      'На мобильной фильтры задач (Открытые / Новые / В работе / Готовые / Все) теперь идут одной строкой с горизонтальным скроллом — больше не разваливаются в столбец',
+      'Кнопки <b>Список / Доска</b> вынесены в отдельную полосу под фильтрами, во всю ширину',
+      'Убрана задвоенная плюс-кнопка (плавающая «+» внизу справа) — оставили только «+» в центральной таб-баре',
+      'Скрыт desktop-заголовок «Задачи» на мобильной — он дублировал название в шапке',
+    ],
+  },
   {
     version: 'v2.45.80',
     date: '04.06.2026',
