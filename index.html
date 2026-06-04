@@ -5381,7 +5381,36 @@
     margin-top: 4px;
     font-style: italic;
   }
-  .sup-row-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+  .sup-row-actions { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; }
+  /* v2.45.36: ровные кнопки в строке inbox — единая высота, текстовые и иконочные */
+  .sup-row-actions > .btn {
+    height: 32px !important;
+    min-width: 32px;
+    padding: 0 12px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13px !important;
+    line-height: 1;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  /* Иконочные кнопки — квадратные */
+  .sup-row-actions > .btn.sup-row-icon {
+    width: 32px;
+    padding: 0 !important;
+  }
+  /* Корзина — лёгкий отступ слева и «опасный» цвет */
+  .sup-row-actions > .btn.sup-row-trash {
+    margin-left: 4px;
+    color: var(--danger);
+    border-color: #FCD0D0;
+  }
+  .sup-row-actions > .btn.sup-row-trash:hover {
+    background: #FEE;
+    border-color: var(--danger);
+  }
   .sup-row-delete {
     flex: 0 0 32px;
     width: 32px; height: 32px;
@@ -19118,7 +19147,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.35-invoice-detach";
+const APP_VERSION = "v2.45.36-inbox-row-buttons";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45409,17 +45438,18 @@ function renderSupplyInbox() {
           ' · ' + escapeHtml(received) + ' · ' + attText +
         '</div>' +
       '</div>' +
-      '<div class="sup-row-actions" style="display:flex;gap:6px;align-items:center;">' +
-        '<button class="btn btn-secondary btn-small" onclick="openInboxMessage(' + m.id + ')" title="Открыть письмо"><i class="ti ti-mail-opened"></i> Открыть</button>' +
-        (attCount > 0 ? '<button class="btn btn-secondary btn-small" onclick="downloadInboxAttachmentDirect(' + m.id + ', 0, null)" title="Скачать первое вложение"><i class="ti ti-download"></i></button>' : '') +
+      // v2.45.36: ровные кнопки — иконочные с явным классом sup-row-icon
+      '<div class="sup-row-actions">' +
+        '<button class="btn btn-secondary" onclick="openInboxMessage(' + m.id + ')" title="Открыть письмо"><i class="ti ti-mail-opened"></i> Открыть</button>' +
+        (attCount > 0 ? '<button class="btn btn-secondary sup-row-icon" onclick="downloadInboxAttachmentDirect(' + m.id + ', 0, null)" title="Скачать первое вложение"><i class="ti ti-download"></i></button>' : '') +
         (m.status === 'unmatched'
-          ? '<button class="btn btn-primary btn-small" onclick="openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать</button>'
+          ? '<button class="btn btn-primary" onclick="openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать</button>'
           : (m.matched_order_id
-              ? '<button class="btn btn-secondary btn-small" onclick="openSupplyOrder(' + m.matched_order_id + ')">Открыть заказ</button>'
+              ? '<button class="btn btn-secondary" onclick="openSupplyOrder(' + m.matched_order_id + ')">Открыть заказ</button>'
               : '')) +
         // v2.45.33: удаление письма из inbox — только директору
         ((state.user && (state.user.roles || []).includes('director'))
-          ? '<button class="btn btn-secondary btn-small" onclick="deleteInboxMessage(' + m.id + ')" title="Удалить письмо" style="color:var(--danger);"><i class="ti ti-trash"></i></button>'
+          ? '<button class="btn btn-secondary sup-row-icon sup-row-trash" onclick="deleteInboxMessage(' + m.id + ')" title="Удалить письмо"><i class="ti ti-trash"></i></button>'
           : '') +
       '</div>' +
     '</div>';
@@ -47730,6 +47760,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.36',
+    date: '04.06.2026',
+    title: 'Входящие счета: ровные кнопки в строке',
+    features: [
+      'Кнопки в строке входящего счёта (<b>Открыть</b>, <b>Скачать</b>, <b>Привязать</b>, корзина) теперь одной высоты — независимо от того, есть ли вложение и видит ли пользователь корзину',
+      'Иконочные кнопки (скачать, удалить) стали ровными квадратами 32×32, корзина с подкрашенной обводкой',
+    ],
+  },
   {
     version: 'v2.45.35',
     date: '04.06.2026',
