@@ -8048,6 +8048,25 @@
     color: var(--text);
   }
   .notif-panel-head h4 .ti { color: var(--brand); }
+  /* v2.45.62: кнопка «Очистить всё» в шапке панели колокольчика */
+  .notif-clear-all-btn {
+    background: white;
+    color: var(--brand);
+    border: 1px solid var(--brand);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .notif-clear-all-btn:hover { background: var(--brand); color: white; }
+  .notif-clear-all-btn:disabled { opacity: 0.4; cursor: default; }
+  .notif-clear-all-btn .ti { font-size: 14px; }
   .notif-panel-body {
     flex: 1;
     overflow-y: auto;
@@ -18942,7 +18961,13 @@
 <div class="notif-panel" id="notif-panel" onclick="event.stopPropagation()">
   <div class="notif-panel-head">
     <h4><i class="ti ti-bell"></i> Уведомления</h4>
-    <button class="icon-btn" onclick="closeNotifPanel()"><i class="ti ti-x"></i></button>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <!-- v2.45.62: кнопка «Очистить всё» прямо в шапке панели колокольчика -->
+      <button class="notif-clear-all-btn" id="notif-panel-clear" onclick="ackAllFromPanel()" title="Отметить все как прочитанные">
+        <i class="ti ti-checks"></i> Очистить всё
+      </button>
+      <button class="icon-btn" onclick="closeNotifPanel()"><i class="ti ti-x"></i></button>
+    </div>
   </div>
   <div class="notif-panel-body" id="notif-panel-body">
     <div class="loading-block">Загружаем…</div>
@@ -19200,7 +19225,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.61-notif-badge-style";
+const APP_VERSION = "v2.45.62-notif-panel-clear";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20577,6 +20602,30 @@ async function refreshNotifBadge() {
     };
   } catch (e) {
     // тихо
+  }
+}
+
+// v2.45.62: «Очистить всё» прямо из панели колокольчика —
+// шлёт /api/notifications/ack-all и обновляет UI без перезагрузки.
+async function ackAllFromPanel() {
+  const btn = document.getElementById('notif-panel-clear');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiPost('/api/notifications/ack-all', {});
+    const cnt = (r && r.data && r.data.count) || 0;
+    // Обнулим состояние и UI
+    if (state.notif) state.notif.unread = [];
+    state._notifSummary = { items: [], contracts: [] };
+    updateNotifBadge(0);
+    _renderNotifPanel(state._notifSummary);
+    // Сразу обновим бейдж колокольчика (он считает и чаты тоже)
+    refreshNotifBadge().catch(() => {});
+    if (cnt > 0) showToast('Подтверждено: ' + cnt, 'success');
+    else        showToast('Нечего очищать', 'info');
+  } catch (e) {
+    showToast('Не удалось очистить', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -48018,6 +48067,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.62',
+    date: '04.06.2026',
+    title: 'Колокольчик: «Очистить всё» одним кликом',
+    features: [
+      'Клик на колокольчик в шапке открывает выпадашку уведомлений; в её шапке теперь кнопка <b>«Очистить всё»</b> — отмечает все уведомления прочитанными разом',
+      'Раньше кнопка была только в авто-модалке (которая всплывает сама при новых уведомлениях). Теперь и здесь',
+    ],
+  },
   {
     version: 'v2.45.61',
     date: '04.06.2026',
