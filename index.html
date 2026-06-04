@@ -19239,7 +19239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.76-text-replace";
+const APP_VERSION = "v2.45.77-trb-checkboxes";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -63033,8 +63033,10 @@ function _trbRender() {
   const s = _trbState;
   const scopesHtml = TRB_SCOPES.map(sc => {
     const checked = s.selectedScopes.has(sc.key) ? 'checked' : '';
-    return '<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text-dark);padding:4px 0;cursor:pointer;">' +
-      '<input type="checkbox" ' + checked + ' onchange="_trbToggleScope(\'' + sc.key + '\', this.checked)" /> ' +
+    return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text-dark);padding:6px 0;cursor:pointer;">' +
+      '<input type="checkbox" ' + checked +
+        ' style="appearance:auto;-webkit-appearance:auto;width:16px;height:16px;margin:0;accent-color:#0C4A6E;cursor:pointer;flex-shrink:0;"' +
+        ' onchange="_trbToggleScope(\'' + sc.key + '\', this.checked)" /> ' +
       escapeHtml(sc.label) +
     '</label>';
   }).join('');
