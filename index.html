@@ -5590,14 +5590,30 @@
     margin-bottom: 12px;
   }
   .rec-item-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 8px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 10px 12px;
     background: var(--bg);
     border-radius: 8px;
+  }
+  .rec-item-row .rec-item-head {
+    display: flex; align-items: center; gap: 12px;
   }
   .rec-item-name { flex: 1; font-size: 13.5px; }
   .rec-item-note { color: var(--text-light); font-size: 12px; font-weight: 400; }
   .rec-item-qty { width: 100px; }
+  /* v2.45.46: распределение позиции на склад/договоры */
+  .rec-allocs { display: flex; flex-direction: column; gap: 6px; padding-left: 6px; }
+  .rec-alloc-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 32px;
+    gap: 8px; align-items: center;
+  }
+  .rec-alloc-row .rec-alloc-qty,
+  .rec-alloc-row .rec-alloc-target {
+    height: 34px; font-size: 13px; padding: 4px 8px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: white;
+  }
 
   /* Универсальная заметка под модалкой */
   .modal-note {
@@ -19149,7 +19165,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.45-inbox-soft-delete";
+const APP_VERSION = "v2.45.46-receipt-allocations";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46360,47 +46376,126 @@ async function openReceiveOrder(orderId) {
     showToast('Не удалось загрузить заказ', 'error');
     return;
   }
+  // v2.45.46: подгружаем активные договоры — для выпадашки распределения
+  if (!cache.activeContracts) {
+    try {
+      const r = await apiGet('/api/contracts?status=in_work');
+      cache.activeContracts = (r.contracts || r.items || []).filter(c =>
+        c.status === 'published' || c.status === 'production' || c.status === 'in_work'
+      );
+    } catch (e) { cache.activeContracts = []; }
+  }
+  state._recAllocations = {}; // {orderItemId: [{qty, target_contract_id}]}
   const today = new Date().toISOString().substring(0, 10);
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    
     '<div class="modal modal-wide" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-package-import"></i> Приёмка заказа #' + o.id + '</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
-        '<div class="form-group"><label>Дата приёмки *</label><input type="date" id="rec-date" value="' + today + '"></div>' +
-        '<div class="form-group"><label>Комментарий</label><input type="text" id="rec-comment" placeholder="опционально"></div>' +
-        '<div class="rec-items-title">Что приехало:</div>' +
+        '<div class="form-group form-row-2">' +
+          '<div><label>Дата приёмки *</label><input type="date" id="rec-date" value="' + today + '"></div>' +
+          '<div><label>Комментарий</label><input type="text" id="rec-comment" placeholder="опционально"></div>' +
+        '</div>' +
+        '<div class="rec-items-title">Что приехало (и куда):</div>' +
         '<div class="rec-items-list">' +
           (o.items || []).map(oi => {
             const remaining = oi.qty - (oi.received_qty || 0);
             if (remaining <= 0) return '';
-            return '<div class="rec-item-row" data-oi-id="' + oi.id + '">' +
-              '<div class="rec-item-name">' + escapeHtml(oi.item_name) +
-                ' <span class="rec-item-note">из ' + oi.qty + ' ' + escapeHtml(oi.item_unit) +
-                (oi.received_qty > 0 ? ' (ещё ждём ' + remaining + ')' : '') +
-                '</span>' +
-              '</div>' +
-              '<input type="number" class="rec-item-qty" min="0" max="' + remaining + '" step="any" value="' + remaining + '" data-oi-id="' + oi.id + '">' +
-            '</div>';
+            // По умолчанию: всё на склад одной строкой
+            state._recAllocations[oi.id] = [{ qty: remaining, target_contract_id: null }];
+            return _recItemBlock(oi, remaining);
           }).join('') +
         '</div>' +
         '<div class="modal-actions"><button class="btn btn-primary" onclick="saveReceipt(' + orderId + ')"><i class="ti ti-check"></i> Принять</button></div>' +
-        '<div class="modal-note">Поставь 0 для позиций, которые ещё не приехали — они останутся открытыми.</div>' +
+        '<div class="modal-note">Можно поделить позицию между складом и одним-двумя договорами — кнопка <i class="ti ti-plus"></i> справа добавляет ещё одну строку.</div>' +
       '</div>' +
     '</div>';
   m.classList.add('visible');
 }
 
+// v2.45.46: рендер блока позиции в приёмке (несколько allocations)
+function _recItemBlock(oi, remaining) {
+  const allocs = state._recAllocations[oi.id] || [];
+  return '<div class="rec-item-row" data-oi-id="' + oi.id + '" id="rec-row-' + oi.id + '">' +
+    '<div class="rec-item-head">' +
+      '<div class="rec-item-name">' + escapeHtml(oi.item_name) +
+        ' <span class="rec-item-note">' + remaining + ' ' + escapeHtml(oi.item_unit) +
+        (oi.received_qty > 0 ? ' (из ' + oi.qty + ', ещё ждём)' : '') +
+        '</span>' +
+      '</div>' +
+      '<button class="btn btn-secondary btn-small" onclick="_recAddAlloc(' + oi.id + ',' + remaining + ')" title="Добавить строку"><i class="ti ti-plus"></i></button>' +
+    '</div>' +
+    '<div class="rec-allocs" id="rec-allocs-' + oi.id + '">' +
+      allocs.map((a, i) => _recAllocRow(oi.id, i, a, remaining)).join('') +
+    '</div>' +
+  '</div>';
+}
+
+function _recAllocRow(oiId, idx, alloc, remaining) {
+  const contracts = cache.activeContracts || [];
+  const opts = '<option value="">📦 На склад (свободный запас)</option>' +
+    contracts.map(c => {
+      const sel = (alloc.target_contract_id && Number(alloc.target_contract_id) === Number(c.id)) ? ' selected' : '';
+      const label = (c.number || '#' + c.id) + (c.contractor_name ? ' · ' + c.contractor_name : '');
+      return '<option value="' + c.id + '"' + sel + '>📋 ' + escapeHtml(label) + '</option>';
+    }).join('');
+  return '<div class="rec-alloc-row" data-oi="' + oiId + '" data-idx="' + idx + '">' +
+    '<input type="number" class="rec-alloc-qty" min="0" max="' + remaining + '" step="any" value="' + (alloc.qty || 0) + '" oninput="_recSetAlloc(' + oiId + ',' + idx + ',\'qty\',this.value)" />' +
+    '<select class="rec-alloc-target" onchange="_recSetAlloc(' + oiId + ',' + idx + ',\'target_contract_id\',this.value)">' + opts + '</select>' +
+    (idx > 0
+      ? '<button class="btn btn-secondary btn-small" onclick="_recRemoveAlloc(' + oiId + ',' + idx + ')" title="Убрать" style="color:var(--danger);"><i class="ti ti-x"></i></button>'
+      : '<span style="width:32px;"></span>') +
+  '</div>';
+}
+
+function _recSetAlloc(oiId, idx, key, val) {
+  const arr = state._recAllocations[oiId];
+  if (!arr || !arr[idx]) return;
+  if (key === 'qty') arr[idx].qty = parseFloat(val) || 0;
+  else if (key === 'target_contract_id') arr[idx].target_contract_id = val ? parseInt(val, 10) : null;
+}
+function _recAddAlloc(oiId, remaining) {
+  const arr = state._recAllocations[oiId] || (state._recAllocations[oiId] = []);
+  // Остаток = remaining минус уже распределённое
+  const used = arr.reduce((s, a) => s + (parseFloat(a.qty) || 0), 0);
+  arr.push({ qty: Math.max(0, remaining - used), target_contract_id: null });
+  const block = document.getElementById('rec-allocs-' + oiId);
+  if (block) {
+    block.innerHTML = arr.map((a, i) => _recAllocRow(oiId, i, a, remaining)).join('');
+  }
+}
+function _recRemoveAlloc(oiId, idx) {
+  const arr = state._recAllocations[oiId];
+  if (!arr || arr.length <= 1) return;
+  arr.splice(idx, 1);
+  // remaining не пересчитываем — это max-валидация, в backend всё равно проверится
+  const oiRow = document.querySelector('[data-oi-id="' + oiId + '"] .rec-item-note');
+  const remaining = parseFloat((oiRow?.textContent || '0').match(/\d+(\.\d+)?/)?.[0] || 0);
+  const block = document.getElementById('rec-allocs-' + oiId);
+  if (block) {
+    block.innerHTML = arr.map((a, i) => _recAllocRow(oiId, i, a, remaining)).join('');
+  }
+}
+
 async function saveReceipt(orderId) {
+  // v2.45.46: собираем по каждой позиции массив allocations
   const items = [];
-  document.querySelectorAll('.rec-item-qty').forEach(input => {
-    const qty = parseFloat(input.value || '0');
-    if (qty > 0) {
-      items.push({ order_item_id: parseInt(input.dataset.oiId), qty });
-    }
+  Object.keys(state._recAllocations || {}).forEach(oiKey => {
+    const oiId = parseInt(oiKey, 10);
+    const allocs = (state._recAllocations[oiId] || []).filter(a => (parseFloat(a.qty) || 0) > 0);
+    if (!allocs.length) return;
+    const totalQty = allocs.reduce((s, a) => s + (parseFloat(a.qty) || 0), 0);
+    items.push({
+      order_item_id: oiId,
+      qty: totalQty,
+      allocations: allocs.map(a => ({
+        qty: parseFloat(a.qty) || 0,
+        target_contract_id: a.target_contract_id || null,
+      })),
+    });
   });
   if (!items.length) { showToast('Не указано что приехало', 'error'); return; }
   const payload = {
@@ -47799,6 +47894,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.46',
+    date: '04.06.2026',
+    title: 'Приёмка: куда ушли позиции — склад или договор',
+    features: [
+      'При приёмке заказа поставщика каждую позицию можно <b>поделить</b>: «N шт на склад, M шт под договор №…»',
+      'Кнопка <i class="ti ti-plus"></i> справа от позиции — добавить ещё строку, чтобы развести между несколькими договорами',
+      'В выпадашке — все договоры в работе (published / production); по умолчанию первая строка идёт «на склад»',
+      'Связь сохраняется в БД — следующий этап (история закупок и блок «закуплено по договору» в карточке договора) уже на подходе',
+    ],
+  },
   {
     version: 'v2.45.45',
     date: '04.06.2026',
