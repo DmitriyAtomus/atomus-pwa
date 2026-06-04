@@ -13966,6 +13966,19 @@
     font-size: 12px; font-weight: 600;
     min-width: 22px; text-align: center;
   }
+  /* v2.45.60: кнопка «Очистить» в шапке модалки уведомлений */
+  .notif-head-ack {
+    background: white; color: var(--brand);
+    border: 1px solid var(--brand);
+    padding: 6px 12px; border-radius: 8px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .notif-head-ack:hover { background: var(--brand); color: white; }
+  .notif-head-ack:disabled { opacity: 0.4; cursor: default; }
+  .notif-head-ack .ti { font-size: 15px; }
   .notif-modal-body {
     padding: 8px 0;
     max-height: min(540px, 70vh);
@@ -19171,7 +19184,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.59-inventory-aggregated";
+const APP_VERSION = "v2.45.60-notif-clear-all";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19681,10 +19694,12 @@ function renderNotifModal() {
   const body = document.getElementById('notif-modal-body');
   const cnt = document.getElementById('notif-modal-count');
   const ackAll = document.getElementById('notif-ack-all-btn');
+  const ackHead = document.getElementById('notif-head-ack');
   if (!body) return;
   const items = (state.notif && state.notif.unread) || [];
   if (cnt) cnt.textContent = String(items.length);
-  if (ackAll) ackAll.disabled = (items.length === 0);
+  if (ackAll)  ackAll.disabled  = (items.length === 0);
+  if (ackHead) ackHead.disabled = (items.length === 0);
 
   if (items.length === 0) {
     body.innerHTML = '<div class="notif-modal-empty"><i class="ti ti-check" style="font-size:32px;color:var(--success);display:block;margin-bottom:8px;"></i>Все уведомления прочитаны</div>';
@@ -47978,6 +47993,15 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.60',
+    date: '04.06.2026',
+    title: 'Уведомления: кнопка «Очистить» в шапке',
+    features: [
+      'В модалке уведомлений (колокольчик) в правом верхнем углу появилась кнопка <b>«Очистить»</b> — отмечает все уведомления как прочитанные одним кликом',
+      'Раньше эта кнопка была в подвале — её приходилось искать. Внизу осталась как было («Прочитал всё»), просто продублировали наверх',
+    ],
+  },
+  {
     version: 'v2.45.59',
     date: '04.06.2026',
     title: 'Excel инвентаризации: агрегация по модели + правильный «Учёт»',
@@ -60388,6 +60412,10 @@ window.addEventListener('beforeunload', (e) => {
         Уведомления
         <span class="notif-modal-count" id="notif-modal-count">0</span>
       </div>
+      <!-- v2.45.60: мини-кнопка «Прочитать всё» в шапке — заметнее чем в подвале -->
+      <button class="notif-head-ack" id="notif-head-ack" onclick="ackAllNotifications()" title="Отметить все как прочитанные">
+        <i class="ti ti-checks"></i> Очистить
+      </button>
     </div>
     <div class="notif-modal-body" id="notif-modal-body">
       <div class="notif-modal-empty">Нет новых уведомлений</div>
