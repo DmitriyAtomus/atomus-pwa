@@ -6837,6 +6837,24 @@
     display: block; font-size: 28px; margin-bottom: 6px; color: var(--text-faint);
   }
 
+  /* v2.45.80: Кнопка-микрофон для голосового ввода */
+  .mic-btn {
+    width: 42px; min-height: 42px; flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: white; color: var(--text-mid);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.15s;
+  }
+  .mic-btn:hover { background: #F1F5F9; color: var(--text-dark); }
+  .mic-btn.recording {
+    background: #FEE2E2; color: #DC2626; border-color: #FCA5A5;
+    animation: mic-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+    50%      { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+  }
+
   /* Радио-кнопки приоритета в форме */
   .priority-row {
     display: flex; gap: 6px;
@@ -19243,7 +19261,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.79-notif-sound";
+const APP_VERSION = "v2.45.80-voice-task";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -32734,11 +32752,21 @@ function renderTaskForm() {
   html += '<div class="sales-form-section">';
   html += '<div class="sales-form-row cols-1"><div>' +
           '<label>Название задачи <span class="req">*</span></label>' +
-          '<input type="text" id="tf-title" value="' + escapeHtml(f.title) + '" maxlength="200" placeholder="Кратко: что нужно сделать">' +
+          '<div style="display:flex;gap:6px;align-items:stretch;">' +
+            '<input type="text" id="tf-title" value="' + escapeHtml(f.title) + '" maxlength="200" placeholder="Кратко: что нужно сделать" style="flex:1;">' +
+            '<button type="button" id="tf-title-mic" class="mic-btn" onclick="_voiceToField(\'tf-title\', \'title\')" title="Надиктовать (Chrome/Edge)">' +
+              '<i class="ti ti-microphone"></i>' +
+            '</button>' +
+          '</div>' +
           '</div></div>';
   html += '<div class="sales-form-row cols-1"><div>' +
           '<label>Описание <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
-          '<textarea id="tf-description" rows="3" placeholder="Подробности задачи">' + escapeHtml(f.description) + '</textarea>' +
+          '<div style="display:flex;gap:6px;align-items:stretch;">' +
+            '<textarea id="tf-description" rows="3" placeholder="Подробности задачи" style="flex:1;">' + escapeHtml(f.description) + '</textarea>' +
+            '<button type="button" id="tf-description-mic" class="mic-btn" onclick="_voiceToField(\'tf-description\', \'description\')" title="Надиктовать (Chrome/Edge)">' +
+              '<i class="ti ti-microphone"></i>' +
+            '</button>' +
+          '</div>' +
           '</div></div>';
   html += '</div>';
 
@@ -32813,6 +32841,68 @@ function renderTaskForm() {
       const opt = assigneeSel.selectedOptions[0];
       state.taskForm.assignee_name = opt ? opt.textContent : '';
     });
+  }
+}
+
+// v2.45.80: голосовой ввод текста в произвольное поле через Web Speech API.
+// Жмёшь mic → говоришь → текст ДОПИСЫВАЕТСЯ в поле (не затирает). Жмёшь
+// ещё раз — остановить. Хранение распознанного — в state.taskForm[stateKey],
+// чтобы сохранилось при перерендере.
+let _voiceRec = null;
+function _voiceToField(fieldId, stateKey) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showToast('Голосовой ввод недоступен в этом браузере. Используй Chrome или Edge.', 'error');
+    return;
+  }
+  const fld = document.getElementById(fieldId);
+  const btn = document.getElementById(fieldId + '-mic');
+  if (!fld) return;
+  // Повторное нажатие — остановить
+  if (_voiceRec && _voiceRec._fieldId === fieldId) {
+    try { _voiceRec.stop(); } catch (_) {}
+    return;
+  }
+  // Если запись активна на другом поле — остановим
+  if (_voiceRec) { try { _voiceRec.stop(); } catch (_) {} _voiceRec = null; }
+
+  const rec = new SR();
+  rec.lang = 'ru-RU';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec._fieldId = fieldId;
+  rec._baseText = fld.value || '';     // что было в поле до записи
+  rec._finalText = '';                 // окончательно распознанное за текущую сессию
+  rec.onresult = (ev) => {
+    let interim = '';
+    let final = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (final) rec._finalText += final;
+    const sep = rec._baseText && !/\s$/.test(rec._baseText) ? ' ' : '';
+    const newText = rec._baseText + sep + rec._finalText + (interim ? (rec._finalText ? ' ' : sep) + interim : '');
+    fld.value = newText;
+    if (state.taskForm && stateKey) state.taskForm[stateKey] = newText;
+  };
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed') showToast('Дай разрешение на микрофон в браузере', 'error');
+    else if (e.error === 'no-speech') showToast('Не услышал речь', 'info');
+    else showToast('Ошибка голосового ввода: ' + (e.error || ''), 'error');
+  };
+  rec.onend = () => {
+    if (btn) btn.classList.remove('recording');
+    if (_voiceRec === rec) _voiceRec = null;
+  };
+  try {
+    rec.start();
+    _voiceRec = rec;
+    if (btn) btn.classList.add('recording');
+    showToast('Говорите… (повторное нажатие — стоп)', 'info');
+  } catch (e) {
+    showToast('Не удалось запустить запись', 'error');
   }
 }
 
@@ -48266,6 +48356,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.80',
+    date: '04.06.2026',
+    title: 'Голосовой ввод в задачах',
+    features: [
+      'В форме «Новая задача» рядом с полями <b>«Название»</b> и <b>«Описание»</b> появилась кнопка-микрофон <i class="ti ti-microphone"></i>',
+      'Жмёшь → даёшь разрешение на микрофон (первый раз) → говоришь — текст автоматически появляется в поле',
+      'Повторное нажатие на микрофон останавливает запись. Распознанное добавляется к тому, что было — не затирает',
+      'Работает в Chrome и Edge (Web Speech API, бесплатно, без обращения к внешним сервисам). В Safari/iOS — недоступно',
+      'Можно надиктовать сразу несколько фраз подряд (continuous mode), включая запятые и числа («встреча с Иваном завтра в четырнадцать ноль ноль»)',
+    ],
+  },
   {
     version: 'v2.45.79',
     date: '04.06.2026',
