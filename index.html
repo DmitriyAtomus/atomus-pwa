@@ -16817,6 +16817,10 @@
         <button class="nav-item" data-nav="inventory" onclick="selectSidebarItem('inventory')">
           <i class="ti ti-clipboard-check"></i><span>Инвентаризация</span>
         </button>
+        <!-- v2.45.38: редактор этикеток с QR (для Zebra/ZPL) -->
+        <a class="nav-item" onclick="openLabelEditor()" style="cursor:pointer;">
+          <i class="ti ti-qrcode"></i><span>QR-этикетки</span>
+        </a>
       </div>
       <div class="sidebar-footer">
         <div class="small-avatar" id="sb-avatar-warehouse">—</div>
@@ -19147,7 +19151,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.37-invoice-picker";
+const APP_VERSION = "v2.45.38-label-editor";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -47798,6 +47802,18 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.38',
+    date: '04.06.2026',
+    title: 'Редактор этикеток с QR (Zebra ZPL)',
+    features: [
+      'В сайдбаре <b>Склад → QR-этикетки</b> — новый мини-редактор. Указываешь размер этикетки (мм), DPI принтера, добавляешь элементы: <b>QR-код</b>, <b>текст</b>, <b>картинку/лого</b>',
+      'Каждый элемент позиционируется по координатам X/Y в мм. Превью этикетки рисуется на canvas, рамка-контур показывает границы',
+      'Кнопка <b>«Сгенерировать ZPL»</b> выдаёт готовый ZPL-код (для Zebra TLP/GK/ZD) — копируешь и отправляешь на принтер через шлюз',
+      'Сохранение шаблонов в браузере: называешь, жмёшь «Сохранить шаблон» — он остаётся в списке слева, открывается одним кликом',
+      'Также можно <b>скачать PNG</b> — для печати на обычном принтере или предпросмотра',
+    ],
+  },
+  {
     version: 'v2.45.37',
     date: '04.06.2026',
     title: 'Несколько счетов в письме — ИИ выбирает свежий',
@@ -60134,6 +60150,458 @@ window.addEventListener('beforeunload', (e) => {
     </div>
   </div>
 </div>
+
+<!-- ============ v2.45.38: РЕДАКТОР ЭТИКЕТОК С QR (Zebra/ZPL) ============ -->
+<style>
+  .le-modal {
+    max-width: 1100px; width: 96vw; max-height: 94vh;
+    display: flex; flex-direction: column; padding: 0;
+  }
+  .le-modal .modal-header {
+    background: linear-gradient(135deg, #1F2937, #374151);
+    color: white; padding: 14px 18px; border-radius: 12px 12px 0 0;
+  }
+  .le-modal .modal-header h3 { color: white; margin: 0; font-size: 16px; }
+  .le-modal .modal-header h3 i { color: #9CA3AF; margin-right: 6px; }
+  .le-modal .modal-close { color: white; opacity: 0.85; }
+  .le-body {
+    flex: 1; overflow-y: auto; padding: 16px 18px;
+    background: #FAFBFC;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+  }
+  .le-side {
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    min-height: 0;
+  }
+  .le-side h4 {
+    margin: 0; font-size: 12px; color: #1F2937;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    padding-bottom: 6px; border-bottom: 1px solid #E2E8F0;
+  }
+  .le-side .form-label { font-size: 11.5px; color: var(--text-mid); margin-bottom: 3px; }
+  .le-side .form-input { font-size: 13px; padding: 6px 10px; margin-bottom: 0; }
+
+  .le-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .le-preview-wrap {
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .le-canvas {
+    background: white;
+    border: 1px solid #1F2937;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  }
+  .le-elements {
+    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 0;
+    overflow: hidden;
+  }
+  .le-elements .le-el-head {
+    display: grid;
+    grid-template-columns: 100px 1fr 60px 60px 60px 36px;
+    padding: 8px 12px; background: #F1F5F9;
+    font-size: 10.5px; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+  }
+  .le-elements .le-el-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 60px 60px 60px 36px;
+    align-items: center; gap: 6px;
+    padding: 6px 12px; border-top: 1px solid #E2E8F0;
+  }
+  .le-elements .le-el-row > * { font-size: 13px; }
+  .le-elements .form-input { padding: 5px 8px; font-size: 12.5px; margin: 0; height: 30px; }
+  .le-elements .le-el-add { padding: 10px 12px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; gap: 6px; }
+  .le-zpl-block textarea {
+    width: 100%; min-height: 160px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: #F9FAFB; resize: vertical;
+  }
+  .le-footer {
+    padding: 12px 18px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; align-items: center;
+    flex-shrink: 0; background: white; border-radius: 0 0 12px 12px;
+  }
+  .le-footer .le-spacer { flex: 1; }
+  .le-presets {
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .le-presets .lep-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px dashed #E2E8F0;
+    font-size: 12.5px;
+  }
+  .le-presets .lep-row:last-child { border-bottom: none; }
+  .le-presets .lep-row > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 720px) {
+    .le-modal { width: 100vw; max-width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; }
+    .le-modal .modal-header { border-radius: 0; }
+    .le-body { grid-template-columns: 1fr; padding: 10px 12px; }
+    .le-elements .le-el-head { display: none; }
+    .le-elements .le-el-row { grid-template-columns: 1fr 1fr; padding: 8px 10px; }
+  }
+</style>
+<script>
+// ============================================================
+// v2.45.38 — Редактор этикеток с QR для Zebra ZPL
+// ============================================================
+
+const LE_DEFAULT_DPI = 203;             // стандартный для Zebra TLP/GK
+const LE_HIST_KEY = 'atomus_label_editor_presets_v1';
+let _leState = null;
+
+function _leDefaults() {
+  return {
+    title: '',
+    widthMm: 58, heightMm: 40, dpi: LE_DEFAULT_DPI,
+    elements: [
+      // type: 'qr' | 'text' | 'image'
+      { type: 'text', text: 'ATOMUS group', x: 4, y: 3, size: 24, bold: true },
+      { type: 'qr',   text: 'https://atomus-group.ru', x: 4, y: 12, module: 5 },
+      { type: 'text', text: 'Поз. 00-00000', x: 30, y: 12, size: 18, bold: false },
+    ],
+  };
+}
+
+function openLabelEditor() {
+  if (!_leState) _leState = _leDefaults();
+  let m = document.getElementById('label-editor-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'label-editor-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _leRender();
+  m.classList.add('visible');
+}
+
+function _leRender() {
+  const m = document.getElementById('label-editor-modal');
+  if (!m) return;
+  m.innerHTML =
+    '<div class="modal le-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-qrcode"></i> Редактор этикеток (QR / Zebra ZPL)</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="le-body">' +
+        _leRenderSide() + _leRenderMain() +
+      '</div>' +
+      '<div class="le-footer">' +
+        '<button class="btn btn-secondary" onclick="_leReset()" title="Сбросить"><i class="ti ti-restore"></i> Сброс</button>' +
+        '<button class="btn btn-secondary" onclick="_leSavePreset()"><i class="ti ti-device-floppy"></i> Сохранить шаблон</button>' +
+        '<div class="le-spacer"></div>' +
+        '<button class="btn btn-secondary" onclick="_leDownloadPng()"><i class="ti ti-photo-down"></i> PNG</button>' +
+        '<button class="btn btn-primary" onclick="_leShowZpl()"><i class="ti ti-code"></i> Сгенерировать ZPL</button>' +
+      '</div>' +
+    '</div>';
+  _leDrawCanvas();
+}
+
+function _leRenderSide() {
+  const s = _leState;
+  const presets = _leLoadPresets();
+  const presetsHtml = presets.length
+    ? presets.map(p =>
+        '<div class="lep-row">' +
+          '<span title="' + escapeHtml(p.title) + '">' + escapeHtml(p.title || '— без названия —') + '</span>' +
+          '<button class="btn btn-secondary btn-small" onclick="_leLoadPreset(\'' + p.id + '\')" title="Открыть"><i class="ti ti-folder-open"></i></button>' +
+          '<button class="btn btn-secondary btn-small" onclick="_leDeletePreset(\'' + p.id + '\')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+        '</div>'
+      ).join('')
+    : '<div style="font-size:12px;color:var(--text-light);text-align:center;padding:6px 0;">Пока пусто</div>';
+  return '<div class="le-side">' +
+    '<h4>Этикетка</h4>' +
+    '<div><label class="form-label">Название шаблона</label>' +
+      '<input type="text" class="form-input" id="le-title" value="' + escapeHtml(s.title) + '" oninput="_leSyncFromInputs()" placeholder="Напр.: «Бирка комплектующего»" /></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+      '<div><label class="form-label">Ширина, мм</label>' +
+        '<input type="number" class="form-input" id="le-w" value="' + s.widthMm + '" min="10" step="1" oninput="_leSyncFromInputs()" /></div>' +
+      '<div><label class="form-label">Высота, мм</label>' +
+        '<input type="number" class="form-input" id="le-h" value="' + s.heightMm + '" min="10" step="1" oninput="_leSyncFromInputs()" /></div>' +
+    '</div>' +
+    '<div><label class="form-label">DPI принтера</label>' +
+      '<select class="form-input" id="le-dpi" onchange="_leSyncFromInputs()">' +
+        [203, 300, 600].map(d => '<option value="' + d + '"' + (s.dpi === d ? ' selected' : '') + '>' + d + ' dpi</option>').join('') +
+      '</select></div>' +
+    '<h4 style="margin-top:6px;">Шаблоны</h4>' +
+    '<div class="le-presets">' + presetsHtml + '</div>' +
+    '<div style="font-size:11.5px;color:var(--text-light);line-height:1.45;margin-top:6px;">' +
+      '<i class="ti ti-info-circle"></i> Координаты в мм от левого-верхнего угла этикетки. ZPL — для Zebra TLP/GK/ZD.' +
+    '</div>' +
+  '</div>';
+}
+
+function _leRenderMain() {
+  const s = _leState;
+  return '<div class="le-main">' +
+    '<div class="le-preview-wrap">' +
+      '<canvas id="le-canvas" class="le-canvas"></canvas>' +
+      '<div style="font-size:11.5px;color:var(--text-light);">Превью 1:3 (для прикидки). Финальный размер — в ZPL.</div>' +
+    '</div>' +
+    '<div class="le-elements">' +
+      '<div class="le-el-head">' +
+        '<div>Тип</div><div>Содержимое</div><div>X, мм</div><div>Y, мм</div><div>Размер</div><div></div>' +
+      '</div>' +
+      s.elements.map((el, i) => _leRenderElementRow(el, i)).join('') +
+      '<div class="le-el-add">' +
+        '<button class="btn btn-secondary btn-small" onclick="_leAddElement(\'text\')"><i class="ti ti-text-plus"></i> Текст</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="_leAddElement(\'qr\')"><i class="ti ti-qrcode"></i> QR</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="_leAddElement(\'image\')"><i class="ti ti-photo"></i> Картинка</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _leRenderElementRow(el, i) {
+  const typeLabel = el.type === 'qr' ? '🔳 QR' : el.type === 'image' ? '🖼 Картинка' : '🇦 Текст';
+  let content;
+  if (el.type === 'image') {
+    const has = !!el.dataUrl;
+    content = '<div style="display:flex;gap:4px;align-items:center;">' +
+        '<input type="file" accept="image/*" id="le-img-' + i + '" style="display:none;" onchange="_leSetImage(' + i + ', this)" />' +
+        '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'le-img-' + i + '\').click()">' +
+          '<i class="ti ti-upload"></i> ' + (has ? 'Заменить' : 'Загрузить') +
+        '</button>' +
+        (has ? '<span style="font-size:11.5px;color:var(--text-light);">' + ((el.dataUrl.length / 1024) | 0) + ' КБ</span>' : '') +
+      '</div>';
+  } else {
+    content = '<input type="text" class="form-input" value="' + escapeHtml(el.text || '') + '" oninput="_leSetField(' + i + ',\'text\',this.value)" />';
+  }
+  const sizeField = (el.type === 'text')
+    ? '<input type="number" class="form-input" value="' + (el.size || 18) + '" min="6" max="200" step="1" oninput="_leSetField(' + i + ',\'size\',parseFloat(this.value))" title="размер шрифта, dots" />'
+    : (el.type === 'qr')
+      ? '<input type="number" class="form-input" value="' + (el.module || 5) + '" min="1" max="20" step="1" oninput="_leSetField(' + i + ',\'module\',parseFloat(this.value))" title="модуль QR (1-20)" />'
+      : '<input type="number" class="form-input" value="' + (el.w || 20) + '" min="3" max="200" step="1" oninput="_leSetField(' + i + ',\'w\',parseFloat(this.value))" title="ширина, мм" />';
+  return '<div class="le-el-row">' +
+    '<div>' + typeLabel + (el.type === 'text' && el.bold ? ' <b>B</b>' : '') + '</div>' +
+    '<div>' + content + '</div>' +
+    '<div><input type="number" class="form-input" value="' + (el.x || 0) + '" min="0" step="0.5" oninput="_leSetField(' + i + ',\'x\',parseFloat(this.value))" /></div>' +
+    '<div><input type="number" class="form-input" value="' + (el.y || 0) + '" min="0" step="0.5" oninput="_leSetField(' + i + ',\'y\',parseFloat(this.value))" /></div>' +
+    '<div>' + sizeField + '</div>' +
+    '<div><button class="btn btn-secondary btn-small" onclick="_leRemoveElement(' + i + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button></div>' +
+  '</div>';
+}
+
+function _leSyncFromInputs() {
+  const t = document.getElementById('le-title'); if (t) _leState.title = t.value;
+  const w = document.getElementById('le-w');     if (w) _leState.widthMm = parseFloat(w.value) || 58;
+  const h = document.getElementById('le-h');     if (h) _leState.heightMm = parseFloat(h.value) || 40;
+  const d = document.getElementById('le-dpi');   if (d) _leState.dpi = parseInt(d.value, 10) || 203;
+  _leDrawCanvas();
+}
+function _leSetField(i, key, val) {
+  if (!_leState.elements[i]) return;
+  _leState.elements[i][key] = val;
+  _leDrawCanvas();
+}
+function _leAddElement(type) {
+  const base = { x: 5, y: 5 };
+  if (type === 'text') Object.assign(base, { type: 'text', text: 'Новый текст', size: 18, bold: false });
+  if (type === 'qr')   Object.assign(base, { type: 'qr',   text: 'ATM-0001', module: 5 });
+  if (type === 'image') Object.assign(base, { type: 'image', w: 20, h: 20, dataUrl: '' });
+  _leState.elements.push(base);
+  _leRender();
+}
+function _leRemoveElement(i) {
+  _leState.elements.splice(i, 1);
+  _leRender();
+}
+function _leSetImage(i, inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _leState.elements[i].dataUrl = e.target.result;
+    // дефолт размера — 20×20 мм если не задан
+    if (!_leState.elements[i].h) _leState.elements[i].h = _leState.elements[i].w || 20;
+    _leRender();
+  };
+  reader.readAsDataURL(file);
+}
+
+// Превью: 1 мм = 3 px (для удобства просмотра). Финальный размер пишется в ZPL.
+const LE_PREVIEW_SCALE = 3;
+
+function _leDrawCanvas() {
+  const c = document.getElementById('le-canvas');
+  if (!c) return;
+  const w = (_leState.widthMm || 58) * LE_PREVIEW_SCALE;
+  const h = (_leState.heightMm || 40) * LE_PREVIEW_SCALE;
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'white'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'top';
+  _leState.elements.forEach(el => {
+    const x = (el.x || 0) * LE_PREVIEW_SCALE;
+    const y = (el.y || 0) * LE_PREVIEW_SCALE;
+    if (el.type === 'text') {
+      const sizePx = (el.size || 18) / 2.5;   // dots → ~px (203 dpi: 1 dot = 0.125 мм)
+      ctx.font = (el.bold ? 'bold ' : '') + (sizePx * LE_PREVIEW_SCALE) + 'px sans-serif';
+      ctx.fillText(el.text || '', x, y);
+    } else if (el.type === 'qr') {
+      // Превью QR — простой чёрный квадрат с надписью
+      const sizeMm = (el.module || 5) * 21 / 8;  // ~ модуль×версия / коэф
+      const sizePx = sizeMm * LE_PREVIEW_SCALE;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(x, y, sizePx, sizePx);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x + sizePx*0.15, y + sizePx*0.15, sizePx*0.7, sizePx*0.7);
+      ctx.fillStyle = '#000';
+      ctx.font = '10px monospace';
+      ctx.fillText('QR', x + sizePx*0.4, y + sizePx*0.42);
+    } else if (el.type === 'image' && el.dataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        const wPx = (el.w || 20) * LE_PREVIEW_SCALE;
+        const hPx = (el.h || el.w || 20) * LE_PREVIEW_SCALE;
+        ctx.drawImage(img, x, y, wPx, hPx);
+      };
+      img.src = el.dataUrl;
+    }
+  });
+  // Рамка-контур
+  ctx.strokeStyle = '#9CA3AF';
+  ctx.setLineDash([4, 4]);
+  ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+  ctx.setLineDash([]);
+}
+
+// === ZPL генерация ===
+function _leGenerateZpl() {
+  const s = _leState;
+  // 1 мм = dpi / 25.4 dot
+  const mmToDot = (mm) => Math.round(mm * (s.dpi / 25.4));
+  let zpl = '^XA\n';
+  zpl += '^PW' + mmToDot(s.widthMm) + '\n';      // ширина в точках
+  zpl += '^LL' + mmToDot(s.heightMm) + '\n';     // длина (length) — для непрерывной ленты
+  zpl += '^CI28\n';                              // UTF-8
+  s.elements.forEach(el => {
+    const x = mmToDot(el.x || 0);
+    const y = mmToDot(el.y || 0);
+    if (el.type === 'text') {
+      // ^A0N,h,w — встроенный шрифт 0, normal-rotation, высота h, ширина w
+      const size = el.size || 18;
+      zpl += '^FO' + x + ',' + y + '^A0N,' + size + ',' + size + '^FH^FD' + _leZplEscape(el.text || '') + '^FS\n';
+    } else if (el.type === 'qr') {
+      // ^BQN,2,M — model 2, magnification M (1-10)
+      const mag = Math.min(10, Math.max(1, el.module || 5));
+      zpl += '^FO' + x + ',' + y + '^BQN,2,' + mag + '^FDLA,' + _leZplEscape(el.text || '') + '^FS\n';
+    } else if (el.type === 'image' && el.dataUrl) {
+      zpl += '; [картинка ' + (el.w || 20) + '×' + (el.h || el.w || 20) + ' мм: вставьте вручную через ZebraDesigner или сконвертируйте в ^GFA]\n';
+    }
+  });
+  zpl += '^XZ';
+  return zpl;
+}
+
+function _leZplEscape(s) {
+  // ^FH (Field Hex) включает преобразование _XX. Заменим ^ < ~ на безопасные.
+  return String(s || '').replace(/\^/g, '_5E').replace(/~/g, '_7E').replace(/\\/g, '_5C');
+}
+
+function _leShowZpl() {
+  _leSyncFromInputs();
+  const zpl = _leGenerateZpl();
+  let m = document.getElementById('le-zpl-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'le-zpl-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '10005';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-code"></i> ZPL для печати</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:16px;">' +
+        '<div class="le-zpl-block"><textarea id="le-zpl-text" readonly>' + escapeHtml(zpl) + '</textarea></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">' +
+          '<button class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById(\'le-zpl-text\').value).then(()=>showToast(\'ZPL скопирован\',\'success\'))"><i class="ti ti-copy"></i> Скопировать</button>' +
+          '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Готово</button>' +
+        '</div>' +
+        '<div style="margin-top:10px;font-size:11.5px;color:var(--text-light);line-height:1.5;">' +
+          '<i class="ti ti-info-circle"></i> Скопируй и отправь на принтер через шлюз / ZebraDesigner / прямо в порт. Картинки в ZPL вставляются как ^GFA — это нужно конвертировать отдельно (например, через labelary.com).' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function _leDownloadPng() {
+  _leSyncFromInputs();
+  const c = document.getElementById('le-canvas');
+  if (!c) return;
+  const url = c.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (_leState.title || 'label') + '.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function _leReset() {
+  if (!confirm('Сбросить редактор?')) return;
+  _leState = _leDefaults();
+  _leRender();
+}
+
+// === localStorage пресеты ===
+function _leLoadPresets() {
+  try {
+    const raw = localStorage.getItem(LE_HIST_KEY);
+    return raw ? (JSON.parse(raw) || []) : [];
+  } catch (e) { return []; }
+}
+function _leWritePresets(list) {
+  try { localStorage.setItem(LE_HIST_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function _leSavePreset() {
+  _leSyncFromInputs();
+  const title = (_leState.title || '').trim();
+  if (!title) {
+    showToast('Укажи название шаблона', 'error');
+    document.getElementById('le-title')?.focus();
+    return;
+  }
+  const list = _leLoadPresets();
+  const entry = {
+    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    title,
+    savedAt: new Date().toISOString(),
+    state: JSON.parse(JSON.stringify(_leState)),
+  };
+  list.unshift(entry);
+  while (list.length > 30) list.pop();
+  _leWritePresets(list);
+  showToast('Шаблон «' + title + '» сохранён', 'success');
+  _leRender();
+}
+function _leLoadPreset(id) {
+  const list = _leLoadPresets();
+  const p = list.find(x => x.id === id);
+  if (!p) { showToast('Шаблон не найден', 'error'); return; }
+  _leState = JSON.parse(JSON.stringify(p.state));
+  _leRender();
+  showToast('Загружен «' + p.title + '»', 'success');
+}
+function _leDeletePreset(id) {
+  if (!confirm('Удалить этот шаблон?')) return;
+  const list = _leLoadPresets().filter(x => x.id !== id);
+  _leWritePresets(list);
+  _leRender();
+}
+</script>
 
 <!-- ============ ЭТАП 25.1: DRAWER OVERLAY ============ -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeSectionDrawer()"></div>
