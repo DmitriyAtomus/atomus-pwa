@@ -12055,6 +12055,7 @@
 
   /* v2.45.81: мобильная вёрстка tasks-list (как у defects-list) */
   .m-tasks-view-row { display: none; }
+  .m-tasks-new-row { display: none; }
   .app.mobile-layout [data-screen="tasks-list"] .page-header { display: none; }
   .app.mobile-layout [data-screen="tasks-list"] > .content-inner > .desktop-layout { display: none; }
   .app.mobile-layout [data-screen="tasks-list"] #tasks-list-content { padding: 14px; }
@@ -12063,6 +12064,10 @@
     padding: 8px 14px 10px;
     background: white;
     border-bottom: 1px solid var(--border);
+  }
+  .app.mobile-layout .m-tasks-new-row {
+    display: block;
+    padding: 10px 14px 0;
   }
   .m-view-btn {
     flex: 1;
@@ -18619,7 +18624,11 @@
       <div class="screen" data-screen="tasks-list" data-section="tasks">
         <div class="screen-header">
           <h2>Все задачи</h2>
-          <button class="icon-btn" onclick="refreshCurrentScreen()"><i class="ti ti-refresh"></i></button>
+          <div style="display:flex;gap:6px;">
+            <button class="icon-btn" onclick="refreshCurrentScreen()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <!-- v2.45.83: «Новая задача» в шапке мобильной -->
+            <button class="icon-btn" onclick="openNewTask()" title="Новая задача" style="color:var(--brand);"><i class="ti ti-plus"></i></button>
+          </div>
         </div>
         <!-- v2.45.81: мобильная полоса фильтров (горизонтальный скролл) -->
         <div class="m-filter-chips" id="m-tasks-filter-chips">
@@ -18632,6 +18641,12 @@
         <div class="m-tasks-view-row" id="m-tasks-view-row">
           <button class="m-view-btn active" data-tv="list" onclick="setTasksView('list')"><i class="ti ti-list"></i> Список</button>
           <button class="m-view-btn" data-tv="board" onclick="setTasksView('board')"><i class="ti ti-layout-kanban"></i> Доска</button>
+        </div>
+        <!-- v2.45.83: кнопка «Новая задача» на мобильной (под view-toggle) -->
+        <div class="m-tasks-new-row">
+          <button class="btn btn-primary" onclick="openNewTask()" style="width:100%;justify-content:center;">
+            <i class="ti ti-plus"></i> Новая задача
+          </button>
         </div>
         <div class="page-header">
           <div><h1>Задачи</h1><div class="page-subtitle" id="tasks-list-subtitle">—</div></div>
@@ -19307,7 +19322,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.82-label-mobile-print";
+const APP_VERSION = "v2.45.83-tasks-new-mobile";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48426,6 +48441,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.83',
+    date: '04.06.2026',
+    title: 'Кнопка «Новая задача» на мобильной',
+    features: [
+      'Под фильтрами/переключателем «Список/Доска» появилась синяя кнопка <b>«+ Новая задача»</b> во всю ширину — нажать сложно мимо',
+      'Дополнительно в правом верхнем углу (рядом с обновить) есть иконка <i class="ti ti-plus"></i> — для тех, кто привык к компактному виду',
+    ],
+  },
   {
     version: 'v2.45.82',
     date: '04.06.2026',
