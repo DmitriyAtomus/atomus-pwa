@@ -19239,7 +19239,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.70-comp-to-models";
+const APP_VERSION = "v2.45.71-empty-sku-fallback";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48135,6 +48135,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.71',
+    date: '04.06.2026',
+    title: 'Создание моделей: artikul из имени, если sku пустой',
+    features: [
+      'Если у компонента не заполнен sku (как у воздухоохладителей со склада) — артикул новой модели формируется из имени',
+      'Правило: всё после последней закрывающей скобки в имени → артикул. Пример: «Воздухоохладитель (теплообменник) BS-TEF 027M 45» → артикул <code>BS-TEF 027M 45</code>, плюс суффикс <code>-ДБ</code>',
+      'Превью в строке компонента показывает будущий артикул заранее',
+    ],
+  },
+  {
     version: 'v2.45.70',
     date: '04.06.2026',
     title: 'Перенос компонентов: копирование в номенклатуру производства',
@@ -62537,9 +62547,14 @@ function _cmvRender() {
     return (c.name || '').toLowerCase().includes(q) ||
            (c.sku || '').toLowerCase().includes(q);
   });
-  function previewSku(sku) {
+  function previewSku(sku, name) {
     sku = (sku || '').trim();
     let r = sku;
+    // v2.45.70: в режиме «модели» для пустого sku бэк берёт код из name
+    if (!r && s.target_kind === 'models' && name) {
+      const m = name.match(/\)\s*(.+)$/);
+      r = (m ? m[1] : name).trim();
+    }
     // сначала снимаем (если задано), потом добавляем (если задано)
     if (s.strip_suffix && r.endsWith(s.strip_suffix)) {
       r = r.slice(0, -s.strip_suffix.length);
@@ -62552,12 +62567,17 @@ function _cmvRender() {
   const rowsHtml = filtered.length
     ? filtered.map(c => {
         const checked = s.selected.has(c.id) ? ' checked' : '';
-        const newSku = previewSku(c.sku);
+        const newSku = previewSku(c.sku, c.name);
+        const cur = (c.sku || '').trim();
         return '<div class="cmv-row">' +
           '<div><input type="checkbox"' + checked + ' onchange="_cmvToggle(' + c.id + ')" /></div>' +
           '<div class="cmv-name" title="' + escapeHtml(c.name || '') + '">' + escapeHtml(c.name || '—') + '</div>' +
-          '<div class="cmv-sku">' + escapeHtml(c.sku || '—') + '</div>' +
-          '<div class="cmv-preview-sku">' + (newSku !== c.sku ? '→ ' + escapeHtml(newSku) : '<span style="color:var(--text-light);">без изменений</span>') + '</div>' +
+          '<div class="cmv-sku">' + escapeHtml(cur || '—') + '</div>' +
+          '<div class="cmv-preview-sku">' +
+            (newSku && newSku !== cur
+              ? '→ ' + escapeHtml(newSku)
+              : '<span style="color:var(--text-light);">без изменений</span>') +
+          '</div>' +
         '</div>';
       }).join('')
     : '<div style="padding:30px;color:var(--text-light);text-align:center;font-size:13px;">' +
