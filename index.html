@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.113-product-respiration";
+const APP_VERSION = "v2.45.114-camera-iso-3d";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -65300,9 +65300,229 @@ function _ccRenderSchemaForPrint() {
   return full.replace(/^<div[^>]*>/, '').replace(/<\/div>$/, '');
 }
 
-// v2.45.103: SVG-схема камеры — план сверху (4 стены с материалами) и разрез сбоку
-// (пол / потолок / высота). Подписи: длины сторон, материалы стен, тип пола.
+// v2.45.114: изометрический 3D-вид камеры + легенда материалов
 function _ccRenderSchema() {
+  const g = _ccState.geom;
+  const ws = g.walls || [];
+  const matName = (idx) => {
+    const m = CC_WALL_MATERIALS[idx || 0];
+    return m ? m[0] : '—';
+  };
+  const isoName = (code) => {
+    const it = CC_INSULATIONS.find(x => x[0] === code);
+    return it ? it[1] : '—';
+  };
+  const matPattern = (matIdx) => {
+    const map = {
+      0: '#CBD5E1',                  // Сэндвич-панель
+      1: 'url(#cc-pat-concrete)',    // Бетон
+      2: 'url(#cc-pat-brick)',       // Кирпич
+      3: 'url(#cc-pat-concrete)',    // Железобетон
+      4: 'url(#cc-pat-wood)',        // Дерево
+      5: 'url(#cc-pat-block)',       // Пеноблок
+      6: 'url(#cc-pat-block)',       // Шлакоблок
+      7: 'url(#cc-pat-block)',       // Инсиблок
+      8: '#F1F5F9',                  // Без стены
+    };
+    return map[matIdx] || '#CBD5E1';
+  };
+
+  const w0 = ws[0] || {len: 0}, w1 = ws[1] || {len: 0};
+  const w2 = ws[2] || {len: 0}, w3 = ws[3] || {len: 0};
+  const aLen = (Number(w0.len) + Number(w2.len)) / 2;
+  const bLen = (Number(w1.len) + Number(w3.len)) / 2;
+  const h    = Number(g.height) || 0;
+
+  // === ИЗОМЕТРИЯ ===
+  // Угол 30°. Мировые координаты (x — вдоль А, y — вдоль Б, z — вверх).
+  // Преобразование в экранные:
+  //   sx = x*cos(30) + y*cos(30)
+  //   sy = x*sin(30) - y*sin(30) - z  (но с обратной осью y экрана)
+  const SVG_W = 760, SVG_H = 460;
+  const COS30 = Math.cos(Math.PI / 6);
+  const SIN30 = Math.sin(Math.PI / 6);
+
+  // Масштаб подбираем так, чтобы куб помещался в зону ~520×280
+  const maxDim = Math.max(aLen, bLen, h, 1);
+  const scale  = Math.min(220 / Math.max(aLen, 1),
+                          220 / Math.max(bLen, 1),
+                          200 / Math.max(h,    1));
+  // Центр на холсте
+  const CX = 380, CY = 250;
+  // Сдвиг чтобы куб был визуально по центру
+  const baseX = CX - (aLen * scale * COS30 - bLen * scale * COS30) / 2;
+  const baseY = CY + (aLen + bLen) * scale * SIN30 / 2 - h * scale / 2;
+
+  function proj(x, y, z) {
+    return {
+      x: baseX + x * scale * COS30 - y * scale * COS30,
+      y: baseY - x * scale * SIN30 - y * scale * SIN30 - z * scale,
+    };
+  }
+  // 8 вершин куба (нижние 0-3, верхние 4-7)
+  // x = вдоль А (0..aLen), y = вдоль Б (0..bLen), z = вверх (0..h)
+  const P = {
+    // Нижний пояс: задний-левый, перед-левый, перед-правый, задний-правый
+    bll: proj(0,    bLen, 0), bfl: proj(0,    0,    0),
+    bfr: proj(aLen, 0,    0), bbr: proj(aLen, bLen, 0),
+    // Верхний пояс
+    tll: proj(0,    bLen, h), tfl: proj(0,    0,    h),
+    tfr: proj(aLen, 0,    h), tbr: proj(aLen, bLen, h),
+  };
+  function pt(p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }
+  function poly(...pts) {
+    return pts.map(pt).join(' ');
+  }
+
+  // Видимые грани:
+  //  1) Передняя стена А-1 (front)  — bfl, bfr, tfr, tfl
+  //  2) Правая стена Б-2 (right)    — bfr, bbr, tbr, tfr
+  //  3) Потолок (top)               — tfl, tfr, tbr, tll
+  // Скрытые (рисуем пунктиром для глубины):
+  //  4) Левая стена Б-4             — bfl, bll, tll, tfl
+  //  5) Задняя стена А-3            — bbr, bll, tll, tbr
+  //  6) Пол                          — bfl, bfr, bbr, bll
+
+  // Полупрозрачная заливка чтобы видно было «через» стены
+  const FRONT_FILL = matPattern(w0.wallMat || 0);
+  const RIGHT_FILL = matPattern(w1.wallMat || 0);
+  const BACK_FILL  = matPattern(w2.wallMat || 0);
+  const LEFT_FILL  = matPattern(w3.wallMat || 0);
+
+  // Темнее = ближе. Делаем gradient через opacity.
+  const planSvg =
+    '<svg viewBox="0 0 ' + SVG_W + ' ' + SVG_H + '" xmlns="http://www.w3.org/2000/svg" ' +
+    'style="width:100%;height:auto;max-width:760px;display:block;margin:0 auto;" preserveAspectRatio="xMidYMid meet">' +
+      '<defs>' +
+        '<pattern id="cc-pat-brick" width="14" height="8" patternUnits="userSpaceOnUse">' +
+          '<rect width="14" height="8" fill="#FCA5A5"/>' +
+          '<path d="M0 0H14M0 8H14M7 0V4M0 4H14M0 4V8" stroke="#B91C1C" stroke-width="0.6" fill="none"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-concrete" width="10" height="10" patternUnits="userSpaceOnUse">' +
+          '<rect width="10" height="10" fill="#94A3B8"/>' +
+          '<circle cx="3" cy="3" r="0.7" fill="#475569"/>' +
+          '<circle cx="7" cy="7" r="0.5" fill="#475569"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-wood" width="14" height="6" patternUnits="userSpaceOnUse">' +
+          '<rect width="14" height="6" fill="#D6BB91"/>' +
+          '<path d="M0 6H14" stroke="#8B6A3F" stroke-width="0.6" fill="none"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-block" width="20" height="10" patternUnits="userSpaceOnUse">' +
+          '<rect width="20" height="10" fill="#E2E8F0"/>' +
+          '<path d="M0 0H20M0 10H20M10 0V10" stroke="#94A3B8" stroke-width="0.6" fill="none"/>' +
+        '</pattern>' +
+        '<linearGradient id="cc-floor-grad" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#E2E8F0"/>' +
+          '<stop offset="1" stop-color="#94A3B8"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+
+      '<text x="' + (SVG_W/2) + '" y="26" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#0C4A6E">КАМЕРА · ' +
+        aLen.toFixed(1) + ' × ' + bLen.toFixed(1) + ' × ' + h.toFixed(1) + ' м · ' +
+        (aLen * bLen).toFixed(1) + ' м² · ' + (aLen * bLen * h).toFixed(1) + ' м³' +
+      '</text>' +
+
+      // ПОЛ — снизу (видимый только через скос)
+      '<polygon points="' + poly(P.bfl, P.bfr, P.bbr, P.bll) + '" ' +
+        'fill="url(#cc-floor-grad)" stroke="#475569" stroke-width="1" opacity="0.85"/>' +
+
+      // ЗАДНЯЯ СТЕНА А-3 (полупрозрачная, видна за «прозрачными» передними)
+      '<polygon points="' + poly(P.bll, P.bbr, P.tbr, P.tll) + '" ' +
+        'fill="' + BACK_FILL + '" stroke="#475569" stroke-width="0.7" opacity="0.4" stroke-dasharray="3 3"/>' +
+
+      // ЛЕВАЯ СТЕНА Б-4 (тоже задняя)
+      '<polygon points="' + poly(P.bfl, P.bll, P.tll, P.tfl) + '" ' +
+        'fill="' + LEFT_FILL + '" stroke="#475569" stroke-width="0.7" opacity="0.4" stroke-dasharray="3 3"/>' +
+
+      // ПРАВАЯ СТЕНА Б-2 (видимая)
+      '<polygon points="' + poly(P.bfr, P.bbr, P.tbr, P.tfr) + '" ' +
+        'fill="' + RIGHT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      // ПЕРЕДНЯЯ СТЕНА А-1 (видимая)
+      '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" ' +
+        'fill="' + FRONT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      // ПОТОЛОК (видимый)
+      '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" ' +
+        'fill="#F0F9FF" stroke="#0C4A6E" stroke-width="1.5" opacity="0.85"/>' +
+
+      // === Подписи сторон ===
+      // А-1 (передняя стена) — внизу-в-центре передней грани
+      '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + ((P.bfl.y + P.bfr.y) / 2 + 28) +
+        '" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">' +
+        'А-1 · ' + aLen.toFixed(1) + ' м</text>' +
+      '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + ((P.bfl.y + P.bfr.y) / 2 + 42) +
+        '" text-anchor="middle" font-family="Arial" font-size="10.5" fill="#475569">' +
+        escapeHtml(matName(w0.wallMat || 0)) + '</text>' +
+      // Б-2 (правая стена) — справа от правой грани
+      '<text x="' + ((P.bfr.x + P.bbr.x) / 2 + 18) + '" y="' + ((P.bfr.y + P.bbr.y) / 2 + 6) +
+        '" text-anchor="start" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">' +
+        'Б-2 · ' + bLen.toFixed(1) + ' м</text>' +
+      '<text x="' + ((P.bfr.x + P.bbr.x) / 2 + 18) + '" y="' + ((P.bfr.y + P.bbr.y) / 2 + 20) +
+        '" text-anchor="start" font-family="Arial" font-size="10.5" fill="#475569">' +
+        escapeHtml(matName(w1.wallMat || 0)) + '</text>' +
+      // А-3 (задняя стена) — сверху-сзади
+      '<text x="' + ((P.tll.x + P.tbr.x) / 2) + '" y="' + ((P.tll.y + P.tbr.y) / 2 - 8) +
+        '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#475569">' +
+        'А-3 · ' + aLen.toFixed(1) + ' м (зад)</text>' +
+      // Б-4 (левая стена) — слева
+      '<text x="' + ((P.bfl.x + P.bll.x) / 2 - 12) + '" y="' + ((P.bfl.y + P.bll.y) / 2 + 18) +
+        '" text-anchor="end" font-family="Arial" font-size="11" font-weight="700" fill="#475569">' +
+        'Б-4 · ' + bLen.toFixed(1) + ' м (лев)</text>' +
+      // Высота H — вертикальная линия слева от передней-левой грани
+      '<line x1="' + (P.bfl.x - 20) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 20) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.bfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.tfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<text x="' + (P.bfl.x - 28) + '" y="' + ((P.bfl.y + P.tfl.y) / 2 + 4) +
+        '" text-anchor="end" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">H = ' + h.toFixed(1) + ' м</text>' +
+
+      // Потолок — подпись сверху
+      '<text x="' + ((P.tfl.x + P.tbr.x) / 2) + '" y="' + (Math.min(P.tll.y, P.tfl.y, P.tfr.y, P.tbr.y) - 6) +
+        '" text-anchor="middle" font-family="Arial" font-size="10.5" fill="#475569">' +
+        'Потолок · ' + escapeHtml(isoName(g.ceiling && g.ceiling.isoCode)) + '</text>' +
+      // Пол — подпись внизу справа от пола
+      '<text x="' + ((P.bbr.x + P.bll.x) / 2) + '" y="' + (Math.max(P.bfl.y, P.bfr.y, P.bbr.y, P.bll.y) + 70) +
+        '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#475569">' +
+        '🟫 Пол · ' + escapeHtml(isoName(g.floor && g.floor.isoCode)) + '</text>' +
+
+    '</svg>';
+
+  // === ЛЕГЕНДА МАТЕРИАЛОВ ===
+  const legendItems = [
+    { label: 'А-1 · ' + aLen.toFixed(1) + ' м · t° снаружи ' + (w0.tOut != null ? w0.tOut + '°C' : '—'), mat: matName(w0.wallMat || 0), iso: isoName(w0.isoCode), thick: w0.isoMm, color: matPattern(w0.wallMat || 0) },
+    { label: 'Б-2 · ' + bLen.toFixed(1) + ' м · t° снаружи ' + (w1.tOut != null ? w1.tOut + '°C' : '—'), mat: matName(w1.wallMat || 0), iso: isoName(w1.isoCode), thick: w1.isoMm, color: matPattern(w1.wallMat || 0) },
+    { label: 'А-3 · ' + aLen.toFixed(1) + ' м · t° снаружи ' + (w2.tOut != null ? w2.tOut + '°C' : '—'), mat: matName(w2.wallMat || 0), iso: isoName(w2.isoCode), thick: w2.isoMm, color: matPattern(w2.wallMat || 0) },
+    { label: 'Б-4 · ' + bLen.toFixed(1) + ' м · t° снаружи ' + (w3.tOut != null ? w3.tOut + '°C' : '—'), mat: matName(w3.wallMat || 0), iso: isoName(w3.isoCode), thick: w3.isoMm, color: matPattern(w3.wallMat || 0) },
+    { label: 'Пол · t° снизу ' + (g.floor && g.floor.tOut != null ? g.floor.tOut + '°C' : '—'),    mat: '—',                            iso: isoName(g.floor && g.floor.isoCode),    thick: g.floor && g.floor.isoMm,    color: 'url(#cc-floor-grad)' },
+    { label: 'Потолок · t° сверху ' + (g.ceiling && g.ceiling.tOut != null ? g.ceiling.tOut + '°C' : '—'), mat: '—',                       iso: isoName(g.ceiling && g.ceiling.isoCode), thick: g.ceiling && g.ceiling.isoMm, color: '#F0F9FF' },
+  ];
+  const legendHtml =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:14px;font-size:12px;">' +
+      legendItems.map(it =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:#FAFBFC;">' +
+          '<svg width="18" height="18" viewBox="0 0 18 18" style="flex-shrink:0;">' +
+            '<rect width="18" height="18" fill="' + it.color + '" stroke="#475569" stroke-width="0.7"/>' +
+          '</svg>' +
+          '<div style="flex:1;min-width:0;line-height:1.35;">' +
+            '<div style="font-weight:600;color:var(--text-dark);">' + escapeHtml(it.label) + '</div>' +
+            '<div style="color:var(--text-light);font-size:11px;">' +
+              escapeHtml(it.mat) + (it.iso ? ' / ' + escapeHtml(it.iso) : '') +
+              (it.thick ? ' · ' + it.thick + ' мм' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      ).join('') +
+    '</div>';
+
+  return '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="display:flex;justify-content:center;align-items:center;">' +
+      '<div style="max-width:100%;width:100%;text-align:center;">' + planSvg + '</div>' +
+    '</div>' +
+    legendHtml +
+  '</div>';
+}
+
+// СТАРАЯ ВЕРСИЯ оставлена ниже под именем _ccRenderSchemaOld — не используется,
+// но удалять не буду чтобы можно было откатиться. См. историю v2.45.103-105.
+function _ccRenderSchemaOld_unused() {
   // Берём актуальные размеры из state + материалы стен (если уже выбраны во вкладке Стены)
   const g = _ccState.geom;
   const ws = g.walls || [];
