@@ -16731,7 +16731,8 @@
     <button class="hamburger-btn" onclick="openSectionDrawer()" aria-label="Меню раздела">
       <i class="ti ti-menu-2"></i>
     </button>
-    <div class="brand-wrap" onclick="goHome()" title="На главную" style="cursor: pointer;">
+    <div class="brand-wrap" onclick="goHome()" ondblclick="deepReloadConfirm()"
+         title="Клик — на главную · Двойной клик — глубокое обновление" style="cursor: pointer;">
       <div class="brand-ball"></div>
       <div class="brand-name">Atom<span class="brand-name-accent">CRM</span></div>
     </div>
@@ -19344,7 +19345,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.118-helpers-list-fix";
+const APP_VERSION = "v2.45.119-deep-reload";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19705,6 +19706,47 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============ КОНЕЦ ЭТАПА 28 ============
+
+// v2.45.119: глубокое обновление — снимает service worker, чистит все кэши,
+// перезагружает страницу с явным cache-bust. Используется когда зависает
+// старая версия PWA (часто после деплоя backend несовместим с старым фронтом).
+// Запускается двойным кликом по логотипу Atom CRM.
+async function deepReloadConfirm() {
+  if (!confirm('Глубокое обновление приложения?\n\n' +
+    'Сейчас закроется service worker, удалятся все кэши и страница перезагрузится. ' +
+    'Это устранит «застрявшую» старую версию. Сохранённые черновики останутся.')) return;
+  try {
+    // 1) Останавливаем уведомления и фоновые задачи
+    if (typeof stopNotifPolling === 'function') stopNotifPolling();
+    // 2) Снимаем регистрацию service worker
+    if ('serviceWorker' in navigator) {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) {
+          try { await r.unregister(); } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    // 3) Удаляем все кэши
+    if ('caches' in window) {
+      try {
+        const keys = await caches.keys();
+        for (const k of keys) {
+          try { await caches.delete(k); } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    // 4) Сбрасываем кеш паролей (в памяти)
+    if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
+    // 5) Hard reload с cache-bust
+    const url = new URL(window.location.href);
+    url.searchParams.set('_r', String(Date.now()));
+    window.location.replace(url.toString());
+  } catch (e) {
+    // Если что-то пошло не так — просто грубый reload
+    try { window.location.reload(true); } catch (_) { window.location.reload(); }
+  }
+}
 
 function logout() {
   localStorage.removeItem(TOKEN_KEY);
