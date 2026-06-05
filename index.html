@@ -15535,6 +15535,20 @@
     color: var(--text-dark);
     font-weight: 500;
   }
+  /* v2.45.88: кнопка «Стоп» рядом с бейджем «СЕЙЧАС» */
+  .pkb-wl-stop-btn {
+    width: 22px; height: 22px;
+    border: 1px solid #FCA5A5;
+    background: #FEE2E2; color: #B91C1C;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    margin-left: 4px;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .pkb-wl-stop-btn:hover { background: #FECACA; color: #991B1B; }
   .pkb-wl-name-text {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -19322,7 +19336,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.87-helper-note";
+const APP_VERSION = "v2.45.88-helper-stop";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21918,10 +21932,19 @@ function renderPkbWorkload(workload) {
                   'onclick="event.stopPropagation();openProductionWorkDetail(' + w.helping_now_work_id + ')" ' +
                   'title="Открыть текущую работу">' + nowBadgeText + '</span>'
       : '';
+    // v2.45.88: кнопка «Стоп» — снять сотрудника с активной помощи/батча
+    // (для мастера/директора). Работает и для одиночной помощи, и для батча.
+    const stopBtn = helpingNow
+      ? '<button class="pkb-wl-stop-btn" ' +
+              'onclick="event.stopPropagation();_stopHelperFromWorkload(' + w.employee_id + ',' + w.helping_now_work_id + ')" ' +
+              'title="Остановить помощь (часы запишутся в журнал)">' +
+          '<i class="ti ti-player-stop"></i>' +
+        '</button>'
+      : '';
 
     html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
     html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
-    html +=   '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + '</div>';
+    html +=   '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + stopBtn + '</div>';
     html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
     if (works > 0) {
       html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
@@ -22216,6 +22239,37 @@ async function _hbStart() {
   }
 }
 // ============ /v2.45.84 ============
+
+// v2.45.88: остановить помощь сотрудника прямо из «Загрузки сборщиков».
+// Работает и для одиночной помощи, и для батча — бэк делит часы корректно.
+async function _stopHelperFromWorkload(employeeId, workId) {
+  if (!employeeId || !workId) return;
+  // Найдём сотрудника в текущем workload, чтобы в подтверждении было видно
+  // имя/операция/размер батча
+  let label = 'этого сотрудника';
+  let extra = '';
+  try {
+    const workers = (cache.productionKanban && cache.productionKanban.workload && cache.productionKanban.workload.workers) || [];
+    const w = workers.find(x => x.employee_id === employeeId);
+    if (w) {
+      label = (w.short_name || w.full_name || label);
+      const note = (w.helping_note || '').trim();
+      const bN = (w.helping_batch_work_ids || []).length;
+      if (note) extra += '\nОперация: ' + note;
+      if (bN > 1) extra += '\nБатч: ' + bN + ' сборок (часы поделятся поровну)';
+    }
+  } catch (e) {}
+  if (!confirm('Снять «' + label + '» с текущей помощи?\n\n' +
+    'Отработанные часы запишутся в журнал.' + extra)) return;
+  try {
+    await apiDelete('/api/production/works/' + workId + '/helpers/' + employeeId);
+    showToast('Снято. Часы записаны в журнал.', 'success');
+    cache.productionKanban = null;
+    if (typeof loadProductionDashboard === 'function') loadProductionDashboard();
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось снять', 'error');
+  }
+}
 
 function renderPkbWorkCard(w, colKey) {
   const overdueClass = w.is_overdue ? ' b-overdue' : '';
@@ -48724,6 +48778,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.88',
+    date: '05.06.2026',
+    title: 'Кнопка «Стоп» в Загрузке сборщиков',
+    features: [
+      'У каждого сотрудника с пометкой <b>«СЕЙЧАС»</b> справа появилась красная кнопка <i class="ti ti-player-stop"></i> — снять с текущей помощи/батча',
+      'Подтверждение показывает имя сотрудника, операцию и размер батча: «Шевелев · Операция: дверки · Батч: 3 сборок (часы поделятся поровну)»',
+      'Отработанные часы записываются в журнал по каждой сборке; для батча — поделятся между всеми',
+    ],
+  },
   {
     version: 'v2.45.87',
     date: '05.06.2026',
