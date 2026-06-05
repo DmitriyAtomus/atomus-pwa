@@ -19355,7 +19355,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.125-evap-family-names";
+const APP_VERSION = "v2.45.126-formula-reveal";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -66181,6 +66181,129 @@ function _ccTabDoor() {
   '</div>';
 }
 
+// v2.45.126: разворачивает формулу под строкой результата
+function _ccToggleFormula(rowEl) {
+  if (!rowEl) return;
+  const f = rowEl.querySelector('.cc-formula');
+  const chev = rowEl.querySelector('.cc-chev');
+  if (!f) return;
+  const isOpen = f.style.display !== 'none';
+  f.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+// v2.45.126: формирует HTML формулы и пошагового расчёта для строки результата
+function _ccFormulaHtml(key, det, qW) {
+  const fmt = (n, d) => Number(n).toFixed(d == null ? 1 : d);
+  const kw = (qW / 1000).toFixed(3);
+  if (key === 'q1') {
+    const planes = (det.q1 && det.q1.planes) || [];
+    let html = '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₁ — теплоприток через ограждения</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q₁ = Σ k · A · ΔT, &nbsp; k = 1 / (1/α_внутр + δ_изол/λ_изол + δ_стены/λ_стены + 1/α_внешн)' +
+      '</div>' +
+      '<div style="font-size:11.5px;color:var(--text-mid);margin-bottom:6px;">α_внутр = 9, α_внешн = 23 Вт/(м²·К) — коэффициенты теплоотдачи</div>';
+    if (planes.length) {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:11.5px;">' +
+        '<tr style="background:#E2E8F0;"><th style="padding:4px 6px;text-align:left;">Плоскость</th><th>Площадь, м²</th><th>Конструкция</th><th>k, Вт/(м²·К)</th><th>ΔT, °C</th><th style="text-align:right;">Q, Вт</th></tr>' +
+        planes.map(p =>
+          '<tr><td style="padding:4px 6px;">' + p.label + '</td>' +
+          '<td style="text-align:center;">' + p.area + '</td>' +
+          '<td style="font-size:10.5px;">' + p.wmNm + ' + ' + p.isoNm + ' (' + p.isoMm + ' мм)</td>' +
+          '<td style="text-align:center;">' + p.k + '</td>' +
+          '<td style="text-align:center;">' + p.dT + '</td>' +
+          '<td style="text-align:right;font-weight:600;">' + p.q + '</td></tr>'
+        ).join('') +
+      '</table>';
+    }
+    html += '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₁ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+    return html;
+  }
+  if (key === 'q2') {
+    const d = det.q2 || {};
+    const modeLabel = ({storage_mid:'хранение охл.',storage_low:'хранение зам.',freeze:'заморозка',cool:'охлаждение'})[d.mode] || d.mode;
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₂ — охлаждение/заморозка продукта</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q₂ = (m × cₚ × ΔT' + (d.mode === 'freeze' ? ' + m × L (кристаллизация)' : '') + ' + энергия_упаковки) / (τ × 3600)' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:11.5px;">' +
+        '<tr><td style="padding:3px 6px;">Продукт</td><td><b>' + (d.productName || '—') + '</b></td></tr>' +
+        '<tr><td style="padding:3px 6px;">Режим</td><td>' + modeLabel + '</td></tr>' +
+        '<tr><td style="padding:3px 6px;">Масса загрузки m</td><td>' + d.massKg + ' кг</td></tr>' +
+        '<tr><td style="padding:3px 6px;">Температуры</td><td>' + d.tStart + ' → ' + d.tEnd + ' °C</td></tr>' +
+        '<tr><td style="padding:3px 6px;">Время τ</td><td>' + d.tauHours + ' ч</td></tr>' +
+        '<tr><td style="padding:3px 6px;">cₚ до зам. / после</td><td>' + d.cp1 + ' / ' + d.cp2 + ' кДж/(кг·К)</td></tr>' +
+        (d.mode === 'freeze' ? '<tr><td style="padding:3px 6px;">L кристаллизации</td><td>' + d.L + ' кДж/кг</td></tr>' : '') +
+        '<tr><td style="padding:3px 6px;">Энергия продукта</td><td>' + d.energy + ' кДж</td></tr>' +
+        (Number(d.pkgMass) > 0 ? '<tr><td style="padding:3px 6px;">Упаковка</td><td>' + d.pkgName + ' (' + d.pkgMass + ' кг × ' + d.pkgCp + ' кДж/(кг·К) → ' + d.energyPkg + ' кДж)</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₂ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  if (key === 'q3') {
+    const d = det.q3 || {};
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₃ — тепло от людей</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q₃ = N × q_человека(t°)' +
+      '</div>' +
+      '<div>N = <b>' + d.people + '</b> чел; t° в камере = <b>' + d.ti + ' °C</b><br/>' +
+        'q_человека ≈ <b>' + d.perPerson + ' Вт</b> (280 при +10°C, до 470 при −20°C)</div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₃ = ' + d.people + ' × ' + d.perPerson + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  if (key === 'q4') {
+    const d = det.q4 || {};
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₄ — освещение</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q₄ = W_лампы × (часов_в_сутки / 24)' +
+      '</div>' +
+      '<div>W_лампы = <b>' + d.lightW + ' Вт</b>; часов работает = <b>' + d.lightHrs + ' ч/сут</b></div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₄ = ' + d.lightW + ' × ' + d.lightHrs + '/24 = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  if (key === 'q5') {
+    const d = det.q5 || {};
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₅ — электродвигатели + погрузчики</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q₅ = W_двигат × 0.5 + N_погрузчик × кВт × 1000 × (ч/24)' +
+      '</div>' +
+      '<div>Электродвигатели: <b>' + d.motorsW + ' Вт</b> × 50% = ' + d.q5motors + ' Вт</div>' +
+      (Number(d.forklifts) > 0
+        ? '<div>Погрузчики: <b>' + d.forklifts + ' шт</b> × ' + d.forkliftKw + ' кВт × ' + d.forkliftHrs + '/24 = ' + d.q5fork + ' Вт</div>'
+        : '<div style="color:var(--text-light);">Погрузчиков нет</div>') +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₅ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  if (key === 'q6') {
+    const d = det.q6 || {};
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₆ — инфильтрация через дверь</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q₆ = 8 × ΔT × A_двери × (минут/1440) × K_тамбура' +
+      '</div>' +
+      '<div>Дверь: <b>' + d.doorH + '×' + d.doorW + ' мм</b>, площадь A = ' + d.doorArea + ' м²<br/>' +
+        'Открытие: <b>' + d.doorMin + ' мин/сут</b> · ΔT за дверью: ' + d.dTdoor + ' °C · ' +
+        'K_тамбура = <b>' + d.tambK + '</b> ' + (d.tambour ? '(тамбур есть, ÷2)' : '(без тамбура)') +
+      '</div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₆ = 8 × ' + d.dTdoor + ' × ' + d.doorArea + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  if (key === 'qVent') {
+    const d = det.qVent || {};
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q-вент. — воздухообмен</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q = V × N × ρ × cₚ × ΔT / 86400, &nbsp; ρ_воздуха = 1.293 кг/м³, cₚ = 1005 Дж/(кг·К)' +
+      '</div>' +
+      '<div>Объём камеры V = <b>' + d.volume + ' м³</b>; обменов N = <b>' + d.airChanges + ' раз/сут</b>; ΔT = ' + d.dTdoor + ' °C</div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q-вент = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  if (key === 'qResp') {
+    const d = det.qResp || {};
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q-дыхания — тепловыделение продукта</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+        'Q_дых = (масса_хранения, т) × Вт/тонна' +
+      '</div>' +
+      '<div>Масса в камере = <b>' + d.mass + ' кг</b> = ' + (d.mass/1000).toFixed(3) + ' т; ' +
+        'тепловыделение = <b>' + d.wpt + ' Вт/тонна</b></div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q-дых = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+  }
+  return '<div style="color:var(--text-light);">Подробная формула не реализована для этой статьи.</div>';
+}
+
 function _ccTabResult() {
   if (!_ccLastResult) {
     return '<div class="empty-block" style="padding:40px 0;">' +
@@ -66216,23 +66339,39 @@ function _ccTabResult() {
           (cli.email ? '<i class="ti ti-mail" style="opacity:0.6;"></i> ' + escapeHtml(cli.email) : '') +
         '</div></div>'
     : '';
-  // v2.45.110: процент от общей суммы теплопритоков для каждой строки
+  // v2.45.110/126: процент от общей суммы + раскрываемые формулы
   const sumW = rows.reduce((s, [, v]) => s + (Number(v) || 0), 0) || 1;
+  const det = r.details || {};
+  // Сопоставляем строку с ключом details — по индексу:
+  const detKeys = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'qVent', 'qResp'];
   return clientBlock +
     '<div class="cc-section">' +
     '<h4><i class="ti ti-chart-bar"></i> Теплопритоки по составляющим</h4>' +
+    '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">' +
+      '<i class="ti ti-cursor-text"></i> Кликни на строку — раскроется формула и пошаговый расчёт' +
+    '</div>' +
     '<div class="cc-result">' +
-      rows.map(([n, v]) => {
+      rows.map(([n, v], i) => {
         const pct = ((v / sumW) * 100).toFixed(1);
-        return '<div class="cc-result-row"><span>' + n + '</span>' +
-          '<span class="v" style="text-align:right;">' +
-            (v / 1000).toFixed(3) + ' кВт ' +
-            '<span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + pct + '%)</span>' +
-          '</span></div>';
+        const key = detKeys[i] || '';
+        const formula = _ccFormulaHtml(key, det, v);
+        return '<div class="cc-result-row" style="cursor:pointer;border-bottom:1px solid #F1F5F9;flex-direction:column;align-items:stretch;" ' +
+          'onclick="_ccToggleFormula(this)">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<span><i class="ti ti-chevron-down cc-chev" style="font-size:11px;color:var(--text-light);margin-right:4px;transition:transform .15s;"></i>' + n + '</span>' +
+            '<span class="v" style="text-align:right;">' +
+              (v / 1000).toFixed(3) + ' кВт ' +
+              '<span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + pct + '%)</span>' +
+            '</span>' +
+          '</div>' +
+          '<div class="cc-formula" style="display:none;background:#F8FAFC;border-left:3px solid #0C4A6E;padding:10px 12px;margin-top:8px;border-radius:4px;font-size:12.5px;line-height:1.6;color:var(--text-dark);">' +
+            formula +
+          '</div>' +
+        '</div>';
       }).join('') +
-      '<div class="cc-result-row"><span>Сумма теплопритоков</span>' +
+      '<div class="cc-result-row" style="font-weight:600;"><span>Сумма теплопритоков</span>' +
         '<span class="v">' + totalKw.toFixed(2) + ' кВт</span></div>' +
-      '<div class="cc-result-row"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
+      '<div class="cc-result-row" style="font-weight:600;"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
         '<span class="v">' + totalWithSafetyKw.toFixed(2) + ' кВт</span></div>' +
     '</div>' +
     '<div style="background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:10px;padding:16px;margin-top:16px;text-align:center;">' +
@@ -67028,6 +67167,62 @@ function _ccCalculate() {
   const workCoeff = Math.max(24 / _ccState.workHours, 1);
   const safety = _ccState.safety || 0;
   const totalWithSafety = total * workCoeff * (1 + safety / 100);
+  // v2.45.126: пошаговые детали расчёта — для раскрывающихся блоков на вкладке Результат
+  const _planeDetail = (label, area, isoCode, isoMm, wallMatIdx, tOut) => {
+    if (area <= 0) return null;
+    const lamIso = isoByCode(isoCode);
+    const isoNm = (CC_INSULATIONS.find(x => x[0] === isoCode) || [])[1] || isoCode || '—';
+    const dIsoM = (isoMm || 0) / 1000;
+    const wm = CC_WALL_MATERIALS[wallMatIdx || 0];
+    const wmNm = wm[0];
+    const dWallM = (wm[1] || 0) / 1000;
+    const lamWall = wm[2] || 0;
+    const Rwall = (lamWall > 0 && dWallM > 0) ? (dWallM / lamWall) : 0;
+    const Riso = (lamIso > 0 && dIsoM > 0) ? (dIsoM / lamIso) : 0;
+    const R = CC_R_INNER + Riso + Rwall + CC_R_OUTER;
+    const k = R > 0 ? (1 / R) : 0;
+    const dT = Math.max(tOut - ti, 0);
+    const q = k * area * dT;
+    return {
+      label, area: area.toFixed(2), isoNm, isoMm: isoMm || 0, wmNm,
+      k: k.toFixed(3), dT: dT.toFixed(1), tOut: tOut, q: q.toFixed(1),
+    };
+  };
+  const planeDetails = [];
+  ['А-1', 'Б-2', 'А-3', 'Б-4'].forEach((lbl, i) => {
+    const w = g.walls[i];
+    const d = _planeDetail(lbl + ' (стена)', w.len * g.height, w.isoCode, w.isoMm, w.wallMat, w.tOut);
+    if (d) planeDetails.push(d);
+  });
+  const _floorD   = _planeDetail('Пол',     floorArea, g.floor.isoCode,   g.floor.isoMm,   0, g.floor.tOut);
+  const _ceilingD = _planeDetail('Потолок', floorArea, g.ceiling.isoCode, g.ceiling.isoMm, 0, g.ceiling.tOut);
+  if (_floorD)   planeDetails.push(_floorD);
+  if (_ceilingD) planeDetails.push(_ceilingD);
+  const details = {
+    q1: { planes: planeDetails },
+    q2: {
+      mode, productName: prod[0], massKg: m,
+      tStart: p.tStart, tEnd: p.tEnd, tauHours: p.tauHours,
+      cp1: prod[2], cp2: prod[3], L: prod[4],
+      pkgName: pkg[1] || 'Без упаковки', pkgMass: pkgMass.toFixed(1), pkgCp: pkg[2] || 0,
+      energy:    (energy    / 1000).toFixed(2),   // кДж
+      energyPkg: (energyPkg / 1000).toFixed(2),   // кДж
+    },
+    q3: { people: _ccState.cond.people, perPerson: _ccPersonHeat(ti).toFixed(0), ti },
+    q4: { lightW: _ccState.cond.lightW, lightHrs: _ccState.cond.lightHrs },
+    q5: { motorsW: cnd.motorsW || 0, q5motors: q5motors.toFixed(1),
+          forklifts: cnd.forklifts || 0, forkliftKw: cnd.forkliftKw || 0,
+          forkliftHrs: cnd.forkliftHrs || 0, q5fork: q5fork.toFixed(1) },
+    q6: { doorH: _ccState.door.hMm || 0, doorW: _ccState.door.wMm || 0,
+          doorArea: doorArea.toFixed(2), doorMin: doorMin,
+          dTdoor: dT_door.toFixed(1), tambour: _ccState.door.hasTambour ? 1 : 0,
+          tambK: _tambK },
+    qVent: { airChanges: airChanges, volume: cameraVolume.toFixed(1),
+             dTdoor: dT_door.toFixed(1) },
+    qResp: { mass: p2.storageMassKg || 0, wpt: p2.breathingHeatWPerTon || 0,
+             isOn: !!p2.isBreathing },
+  };
+
   _ccLastResult = {
     q1, q2, q3, q4, q5, q6: q6Clean,
     qVent,                          // v2.45.105
@@ -67036,6 +67231,7 @@ function _ccCalculate() {
     totalWithSafety,
     workHours: _ccState.workHours,
     safety,
+    details,                        // v2.45.126: раскрывающиеся формулы
   };
   // Подсветим вкладку «Результат» и переключимся туда
   _ccState.activeTab = 'result';
