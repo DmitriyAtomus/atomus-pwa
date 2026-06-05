@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.115-iso-center-fix";
+const APP_VERSION = "v2.45.116-door-on-camera";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -65140,7 +65140,8 @@ function _ccRenderModal() {
     ['mode',    'Режим',      'ti-temperature-snow'],
     ['product', 'Продукт',    'ti-meat'],
     ['cond',    'Люди/свет/двигатели', 'ti-user-cog'],
-    ['door',    'Двери',      'ti-door'],
+    // v2.45.116: вкладка «Двери» убрана — поля перенесены в «Камера»
+    // ['door',    'Двери',      'ti-door'],
     ['result',  'Результат',  'ti-chart-bar'],
     ['history', 'История',    'ti-history'],
   ];
@@ -65191,7 +65192,9 @@ function _ccRenderTab(code) {
   if (code === 'mode')    return _ccTabMode();
   if (code === 'product') return _ccTabProduct();
   if (code === 'cond')    return _ccTabCond();
-  if (code === 'door')    return _ccTabDoor();
+  // v2.45.116: вкладка «Двери» удалена — её поля живут в «Камере».
+  // Если activeTab из старого черновика — перенаправим на «Камера».
+  if (code === 'door')    { _ccState.activeTab = 'camera'; return _ccTabCamera(); }
   if (code === 'result')  return _ccTabResult();
   if (code === 'history') return _ccTabHistory();
   return '';
@@ -65284,9 +65287,32 @@ function _ccTabCamera() {
         'площадь пола: <b>' + floorArea.toFixed(1) + ' м²</b>. ' +
         'Стены вводятся попарно противоположными (А-1↔А-3, Б-2↔Б-4).' +
       '</div>' +
-      // v2.45.103: визуальная схема камеры (план + разрез)
-      '<div id="cc-camera-schema" style="margin-top:16px;">' + _ccRenderSchema() + '</div>' +
-    '</div>';
+    '</div>' +
+    // v2.45.116: блок «Дверь» — перенесён сюда со вкладки «Двери»
+    (() => {
+      const d = _ccState.door;
+      return '<div class="cc-section"><h4><i class="ti ti-door"></i> Дверь</h4>' +
+        '<div class="cc-grid">' +
+          '<div><label class="form-label">Высота проёма, мм</label>' +
+            '<input type="number" class="form-input" id="cc-door-h" value="' + d.hMm + '" min="500" step="50" oninput="_ccRedrawSchema()" /></div>' +
+          '<div><label class="form-label">Ширина проёма, мм</label>' +
+            '<input type="number" class="form-input" id="cc-door-w" value="' + d.wMm + '" min="500" step="50" oninput="_ccRedrawSchema()" /></div>' +
+          '<div><label class="form-label" title="Суммарное время открытия двери за сутки">Открытие двери в сутки, мин</label>' +
+            '<input type="number" class="form-input" id="cc-door-min" value="' + d.openMin + '" min="0" step="5" /></div>' +
+          '<div><label class="form-label">Тамбур (предкамера)</label>' +
+            '<select class="form-input" id="cc-door-tamb">' +
+              '<option value="0"' + (!d.hasTambour ? ' selected' : '') + '>Нет</option>' +
+              '<option value="1"' + (d.hasTambour ? ' selected' : '') + '>Есть</option>' +
+            '</select></div>' +
+        '</div>' +
+        '<div class="cc-hint">' +
+          '<i class="ti ti-info-circle"></i> Дверь рисуется на передней стене А-1 (по центру у пола). ' +
+          'Тамбур снижает инфильтрацию через дверь примерно в 2 раза.' +
+        '</div>' +
+      '</div>';
+    })() +
+    // v2.45.103: визуальная схема камеры (план + разрез)
+    '<div id="cc-camera-schema" style="margin-top:16px;">' + _ccRenderSchema() + '</div>';
 }
 
 // v2.45.105: схема для печатной формы (без обёртки и кнопок,
@@ -65325,6 +65351,21 @@ function _ccRenderSchema() {
       8: '#F1F5F9',                  // Без стены
     };
     return map[matIdx] || '#CBD5E1';
+  };
+  // v2.45.116: акцентный цвет материала для подписей (тёмная версия паттерна)
+  const matAccent = (matIdx) => {
+    const map = {
+      0: '#64748B',  // Сэндвич — slate
+      1: '#475569',  // Бетон — серо-синий
+      2: '#B91C1C',  // Кирпич — красный
+      3: '#475569',  // Железобетон — серый
+      4: '#8B6A3F',  // Дерево — коричневый
+      5: '#6B7280',  // Пеноблок
+      6: '#6B7280',  // Шлакоблок
+      7: '#6B7280',  // Инсиблок
+      8: '#94A3B8',  // Без стены
+    };
+    return map[matIdx] || '#0C4A6E';
   };
 
   const w0 = ws[0] || {len: 0}, w1 = ws[1] || {len: 0};
@@ -65465,32 +65506,58 @@ function _ccRenderSchema() {
       // ПЕРЕДНЯЯ СТЕНА А-1 (видимая)
       '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" ' +
         'fill="' + FRONT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      // v2.45.116: дверь на передней грани (А-1) — по центру стены у пола
+      (() => {
+        const door = _ccState.door || {};
+        const dwM = (Number(door.wMm) || 0) / 1000;
+        const dhM = (Number(door.hMm) || 0) / 1000;
+        if (dwM <= 0 || dhM <= 0 || aLen <= 0 || h <= 0) return '';
+        // Дверь у пола, по центру стены А-1 (передней)
+        const dxLeft  = Math.max(0, (aLen - dwM) / 2);
+        const dxRight = Math.min(aLen, dxLeft + dwM);
+        const dyTop   = Math.min(h, dhM);
+        const D1 = proj(dxLeft,  0, 0);
+        const D2 = proj(dxRight, 0, 0);
+        const D3 = proj(dxRight, 0, dyTop);
+        const D4 = proj(dxLeft,  0, dyTop);
+        return '<polygon points="' + poly(D1, D2, D3, D4) + '" ' +
+          'fill="#FEF3C7" stroke="#92400E" stroke-width="1.5" opacity="0.95"/>' +
+          // петля справа — короткая линия
+          '<line x1="' + D2.x + '" y1="' + D2.y + '" x2="' + D3.x + '" y2="' + D3.y + '" stroke="#92400E" stroke-width="2.5"/>' +
+          // подпись
+          '<text x="' + ((D1.x + D2.x) / 2) + '" y="' + ((D1.y + D4.y) / 2 + 4) + '" ' +
+            'text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#92400E">🚪 Дверь</text>' +
+          '<text x="' + ((D1.x + D2.x) / 2) + '" y="' + (D1.y + 14) + '" ' +
+            'text-anchor="middle" font-family="Arial" font-size="10" fill="#92400E">' +
+            (door.hMm || 0) + ' × ' + (door.wMm || 0) + ' мм</text>';
+      })() +
       // ПОТОЛОК (видимый)
       '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" ' +
         'fill="#F0F9FF" stroke="#0C4A6E" stroke-width="1.5" opacity="0.85"/>' +
 
-      // === Подписи сторон ===
+      // === Подписи сторон — цвет в тон материалу грани ===
+      // v2.45.116: каждая сторона и её название материала — одного цвета
       // А-1 (передняя стена) — внизу-в-центре передней грани
       '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + ((P.bfl.y + P.bfr.y) / 2 + 28) +
-        '" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">' +
+        '" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="' + matAccent(w0.wallMat || 0) + '">' +
         'А-1 · ' + aLen.toFixed(1) + ' м</text>' +
       '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + ((P.bfl.y + P.bfr.y) / 2 + 42) +
-        '" text-anchor="middle" font-family="Arial" font-size="10.5" fill="#475569">' +
+        '" text-anchor="middle" font-family="Arial" font-size="10.5" fill="' + matAccent(w0.wallMat || 0) + '" opacity="0.85">' +
         escapeHtml(matName(w0.wallMat || 0)) + '</text>' +
       // Б-2 (правая стена) — справа от правой грани
       '<text x="' + ((P.bfr.x + P.bbr.x) / 2 + 18) + '" y="' + ((P.bfr.y + P.bbr.y) / 2 + 6) +
-        '" text-anchor="start" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">' +
+        '" text-anchor="start" font-family="Arial" font-size="12" font-weight="700" fill="' + matAccent(w1.wallMat || 0) + '">' +
         'Б-2 · ' + bLen.toFixed(1) + ' м</text>' +
       '<text x="' + ((P.bfr.x + P.bbr.x) / 2 + 18) + '" y="' + ((P.bfr.y + P.bbr.y) / 2 + 20) +
-        '" text-anchor="start" font-family="Arial" font-size="10.5" fill="#475569">' +
+        '" text-anchor="start" font-family="Arial" font-size="10.5" fill="' + matAccent(w1.wallMat || 0) + '" opacity="0.85">' +
         escapeHtml(matName(w1.wallMat || 0)) + '</text>' +
       // А-3 (задняя стена) — на её НИЖНЕЙ кромке (между bll и bbr) — не пересекает шапку
       '<text x="' + ((P.bll.x + P.bbr.x) / 2) + '" y="' + ((P.bll.y + P.bbr.y) / 2 - 6) +
-        '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#64748B">' +
+        '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="' + matAccent(w2.wallMat || 0) + '" opacity="0.85">' +
         'А-3 · ' + aLen.toFixed(1) + ' м (зад)</text>' +
       // Б-4 (левая стена) — на её НИЖНЕЙ кромке (между bfl и bll)
       '<text x="' + ((P.bfl.x + P.bll.x) / 2 - 12) + '" y="' + ((P.bfl.y + P.bll.y) / 2 + 4) +
-        '" text-anchor="end" font-family="Arial" font-size="11" font-weight="600" fill="#64748B">' +
+        '" text-anchor="end" font-family="Arial" font-size="11" font-weight="600" fill="' + matAccent(w3.wallMat || 0) + '" opacity="0.85">' +
         'Б-4 · ' + bLen.toFixed(1) + ' м (лев)</text>' +
       // Высота H — вертикальная линия слева от передней-левой грани
       '<line x1="' + (P.bfl.x - 20) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 20) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
