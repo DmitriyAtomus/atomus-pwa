@@ -19340,7 +19340,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.95-batch-qr-components";
+const APP_VERSION = "v2.45.96-cold-calc-print";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48869,6 +48869,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.96',
+    date: '05.06.2026',
+    title: 'Калькулятор холода: печать и сохранение в PDF',
+    features: [
+      'Во вкладке <b>«Результат»</b> появилась кнопка <b>«Печать / PDF»</b> рядом с «Сохранить расчёт»',
+      'Открывается новое окно с готовым к печати отчётом: шапка ATOMUS group, данные клиента, параметры камеры, продукта, условий, разбивка теплопритоков и итоговая мощность',
+      'Системный диалог печати запускается автоматически — выбери реальный принтер или «Сохранить как PDF» / «Microsoft Print to PDF» для файла',
+      'Если браузер блокирует всплывающее окно — разреши попап для этого сайта и попробуй снова',
+    ],
+  },
+  {
     version: 'v2.45.95',
     date: '05.06.2026',
     title: 'Пакетная печать QR теперь включает комплектующие в резерве',
@@ -65189,10 +65200,146 @@ function _ccTabResult() {
       '<div style="font-size:12px;color:#0C4A6E;opacity:0.8;margin-top:6px;">с учётом работы оборудования ' + r.workHours + ' ч/сут</div>' +
     '</div>' +
     // v2.45.31: кнопка сохранения расчёта
-    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">' +
+    // v2.45.96: + печать / сохранение в PDF
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap;">' +
+      '<button class="btn btn-secondary" onclick="_ccPrintReport()"><i class="ti ti-printer"></i> Печать / PDF</button>' +
       '<button class="btn btn-secondary" onclick="_ccSaveResult()"><i class="ti ti-device-floppy"></i> Сохранить расчёт</button>' +
     '</div>' +
   '</div>';
+}
+
+// v2.45.96: печать / сохранение в PDF.
+// Открываем новое окно с автономной HTML-страницей расчёта (вёрстка
+// не зависит от стилей основного приложения), и сразу запускаем
+// диалог печати. Юзер выбирает реальный принтер или «Microsoft Print
+// to PDF» / «Сохранить как PDF» — сохраняет файл.
+function _ccPrintReport() {
+  if (!_ccLastResult) { showToast('Сначала жми «Рассчитать»', 'error'); return; }
+  _ccCollectFromInputs();
+  const r = _ccLastResult;
+  const cli = _ccState.client || {};
+  const g = _ccState.geom || {};
+  const product = _ccState.product || {};
+  const cond = _ccState.cond || {};
+  const door = _ccState.door || {};
+  const dt = new Date();
+  const dtStr = dt.toLocaleDateString('ru-RU') + ' ' +
+    dt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  const totalKw = (r.total / 1000).toFixed(2);
+  const totalWithSafetyKw = (r.totalWithSafety / 1000).toFixed(2);
+  // Размеры камеры
+  const walls = g.walls || [];
+  const len1 = (walls[0] || {}).len || 0;
+  const len2 = (walls[1] || {}).len || 0;
+  const len3 = (walls[2] || {}).len || 0;
+  const len4 = (walls[3] || {}).len || 0;
+  const w = (len1 + len3) / 2;
+  const d = (len2 + len4) / 2;
+  const volume = (w * d * (g.height || 0)).toFixed(1);
+  const floorArea = (w * d).toFixed(2);
+  const safeText = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const modeLabel = ({
+    'storage_mid':  'Хранение охлаждённое',
+    'storage_low':  'Хранение замороженное',
+    'freeze':       'Заморозка',
+    'cool':         'Охлаждение',
+  })[_ccState.mode] || _ccState.mode;
+  const rows = [
+    ['Через ограждения (Q₁)',          (r.q1 / 1000).toFixed(3)],
+    ['Охлаждение / заморозка (Q₂)',    (r.q2 / 1000).toFixed(3)],
+    ['Тепло от людей (Q₃)',            (r.q3 / 1000).toFixed(3)],
+    ['Освещение (Q₄)',                 (r.q4 / 1000).toFixed(3)],
+    ['Электродвигатели (Q₅)',          (r.q5 / 1000).toFixed(3)],
+    ['Инфильтрация через двери (Q₆)',  (r.q6 / 1000).toFixed(3)],
+  ];
+  const html =
+'<!doctype html><html lang="ru"><head><meta charset="utf-8"/>' +
+'<title>Расчёт холода — ' + safeText(cli.title || cli.company || dtStr) + '</title>' +
+'<style>' +
+'  *,*::before,*::after{box-sizing:border-box}' +
+'  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1B2030;background:#fff;margin:24px;font-size:13px;line-height:1.45;}' +
+'  h1{margin:0 0 4px;font-size:20px;color:#0C4A6E}' +
+'  h2{margin:18px 0 8px;font-size:14px;color:#0C4A6E;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #CBD5E1;padding-bottom:4px}' +
+'  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0C4A6E;padding-bottom:8px;margin-bottom:12px}' +
+'  .head .brand{font-size:13px;color:#475569}' +
+'  .head .brand b{color:#0C4A6E;font-size:15px}' +
+'  table{width:100%;border-collapse:collapse;margin:6px 0 0;}' +
+'  th,td{padding:5px 8px;border-bottom:1px solid #E2E8F0;text-align:left;vertical-align:top;}' +
+'  th{font-size:11px;text-transform:uppercase;color:#64748B;letter-spacing:0.3px;}' +
+'  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}' +
+'  .total{background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:8px;padding:14px;text-align:center;margin-top:10px;}' +
+'  .total .v{font-size:30px;font-weight:700;color:#0C4A6E;line-height:1;}' +
+'  .total .lbl{font-size:12px;color:#0C4A6E;}' +
+'  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;}' +
+'  .grid div{padding:2px 0;font-size:12.5px;}' +
+'  .grid b{color:#0C4A6E;}' +
+'  .foot{margin-top:24px;font-size:11px;color:#64748B;border-top:1px solid #CBD5E1;padding-top:6px;}' +
+'  @media print{@page{margin:14mm;} body{margin:0;}}' +
+'</style></head><body>' +
+'  <div class="head">' +
+'    <div><h1>Расчёт мощности холода</h1>' +
+'      <div style="font-size:12px;color:#64748B;">Сформировано: ' + safeText(dtStr) + '</div>' +
+'    </div>' +
+'    <div class="brand"><b>ATOMUS group</b><br/>atomus-group.ru</div>' +
+'  </div>' +
+(cli.title || cli.company || cli.contactName
+  ? '<h2>На кого расчёт</h2><div class="grid">' +
+      (cli.title       ? '<div><b>Название:</b> ' + safeText(cli.title) + '</div>' : '') +
+      (cli.company     ? '<div><b>Компания:</b> ' + safeText(cli.company) + '</div>' : '') +
+      (cli.contactName ? '<div><b>Контакт:</b> ' + safeText(cli.contactName) + '</div>' : '') +
+      (cli.note        ? '<div><b>Комментарий:</b> ' + safeText(cli.note) + '</div>' : '') +
+      (cli.phone       ? '<div><b>Телефон:</b> ' + safeText(cli.phone) + '</div>' : '') +
+      (cli.email       ? '<div><b>E-mail:</b> ' + safeText(cli.email) + '</div>' : '') +
+      (cli.inn         ? '<div><b>ИНН:</b> ' + safeText(cli.inn) + '</div>' : '') +
+    '</div>'
+  : '') +
+'  <h2>Параметры камеры</h2><div class="grid">' +
+'    <div><b>Длина 1 / 3:</b> ' + len1 + ' м / ' + len3 + ' м</div>' +
+'    <div><b>Длина 2 / 4:</b> ' + len2 + ' м / ' + len4 + ' м</div>' +
+'    <div><b>Высота:</b> ' + g.height + ' м</div>' +
+'    <div><b>Объём:</b> ' + volume + ' м³</div>' +
+'    <div><b>Площадь пола:</b> ' + floorArea + ' м²</div>' +
+'    <div><b>Режим:</b> ' + safeText(modeLabel) + '</div>' +
+'    <div><b>Температура в камере:</b> ' + _ccState.tInside + ' °C</div>' +
+'  </div>' +
+'  <h2>Продукт</h2><div class="grid">' +
+'    <div><b>Масса:</b> ' + (product.massKg || 0) + ' кг</div>' +
+'    <div><b>T нач → T кон:</b> ' + (product.tStart || 0) + '°C → ' + (product.tEnd || 0) + '°C</div>' +
+'    <div><b>Время охлаждения:</b> ' + (product.tauHours || 0) + ' ч</div>' +
+'    <div><b>Упаковка:</b> ' + (product.pkgPercent || 0) + ' %</div>' +
+'  </div>' +
+'  <h2>Условия</h2><div class="grid">' +
+'    <div><b>Людей:</b> ' + (cond.people || 0) + '</div>' +
+'    <div><b>Освещение:</b> ' + (cond.lightW || 0) + ' Вт × ' + (cond.lightHrs || 0) + ' ч/сут</div>' +
+'    <div><b>Двигатели:</b> ' + (cond.motorsW || 0) + ' Вт</div>' +
+'    <div><b>Дверь:</b> ' + (door.hMm || 0) + '×' + (door.wMm || 0) + ' мм, ' + (door.openMin || 0) + ' мин/сут' + (door.hasTambour ? ' (тамбур)' : '') + '</div>' +
+'    <div><b>Работа оборудования:</b> ' + (_ccState.workHours || 24) + ' ч/сут</div>' +
+'    <div><b>Коэф. запаса:</b> ' + (_ccState.safety || 0) + ' %</div>' +
+'  </div>' +
+'  <h2>Разбивка теплопритоков</h2>' +
+'  <table>' +
+'    <tr><th>Источник</th><th style="text-align:right;">кВт</th></tr>' +
+    rows.map(([n, v]) => '<tr><td>' + n + '</td><td class="num">' + v + '</td></tr>').join('') +
+'    <tr><td><b>Сумма теплопритоков</b></td><td class="num">' + totalKw + '</td></tr>' +
+'    <tr><td>С коэф. запаса (' + r.safety + ' %)</td><td class="num">' + totalWithSafetyKw + '</td></tr>' +
+'  </table>' +
+'  <div class="total">' +
+'    <div class="lbl">Рекомендуемая мощность холода</div>' +
+'    <div class="v">' + totalWithSafetyKw + ' кВт</div>' +
+'    <div class="lbl">с учётом работы оборудования ' + (r.workHours || 24) + ' ч/сут</div>' +
+'  </div>' +
+'  <div class="foot">Расчёт носит ориентировочный характер. Для подбора оборудования обратитесь в ATOMUS group.</div>' +
+'<script>window.addEventListener("load",()=>setTimeout(()=>window.print(),200));</' + 'script>' +
+'</body></html>';
+  const win = window.open('', '_blank');
+  if (!win) {
+    showToast('Браузер заблокировал всплывающее окно — разреши и попробуй снова', 'error');
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 }
 
 // === v2.45.31: localStorage история ===
