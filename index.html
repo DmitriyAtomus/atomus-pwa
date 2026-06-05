@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.104-qr-any-item";
+const APP_VERSION = "v2.45.105-cc-forklifts-vent";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48937,6 +48937,19 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.105',
+    date: '05.06.2026',
+    title: 'Калькулятор холода: погрузчики, воздухообмен, схема в PDF',
+    features: [
+      'На вкладке <b>«Люди/свет/двигатели»</b> добавлены поля: <b>Погрузчики (шт.)</b>, <b>Часов в сутки</b>, <b>Тепло от 1 погрузчика, кВт</b> (по умолчанию 4) и <b>Воздухообмен, раз/сутки</b>',
+      'Погрузчики добавлены в Q5; вентиляция — отдельный <b>Q-вент.</b> в разбивке (показывается только если есть)',
+      'В печатном отчёте (PDF) теперь рисуется <b>схема камеры</b> (план + разрез) — попадает на печать',
+      'Из PDF убраны строки <b>«Работа оборудования, ч/сут»</b> в условиях и в подписи под итогом — больше не печатается',
+      'Поле «Открыта в сутки, мин» переименовано в более понятное <b>«Открытие двери в сутки, мин»</b>',
+      'Схема в SVG расширена с 520→640 px по горизонтали, имена изоляции сокращаются («Пенополиуретан» → «PIR») — длинные подписи больше не выходят за края',
+    ],
+  },
+  {
     version: 'v2.45.104',
     date: '05.06.2026',
     title: 'Кнопка печати QR — у любой позиции в резерве',
@@ -64950,6 +64963,12 @@ function _ccDefaults() {
       lightW: 100,           // суммарная мощность освещения
       lightHrs: 8,           // часов в сутки
       motorsW: 200,          // суммарная мощность электродвигателей в камере
+      // v2.45.105: погрузчики
+      forklifts: 0,          // количество одновременно работающих
+      forkliftHrs: 4,        // часов в сутки
+      forkliftKw: 4,         // средняя тепловая мощность одного, кВт
+      // v2.45.105: вентиляция (воздухообмен в сутки)
+      airChangesPerDay: 1,   // сколько раз в сутки полностью обновляется воздух
     },
     door: {
       hMm: 2000,
@@ -65152,6 +65171,17 @@ function _ccTabCamera() {
     '</div>';
 }
 
+// v2.45.105: схема для печатной формы (без обёртки и кнопок,
+// внутри одного блока). Возвращает только SVG-разметку.
+function _ccRenderSchemaForPrint() {
+  // Соберём план + разрез без внешнего div
+  // Используем существующий _ccRenderSchema, но вырежем только SVG
+  const full = _ccRenderSchema();
+  // _ccRenderSchema возвращает '<div...>plan<sep>section</div>'
+  // Возьмём всё что внутри корневого div
+  return full.replace(/^<div[^>]*>/, '').replace(/<\/div>$/, '');
+}
+
 // v2.45.103: SVG-схема камеры — план сверху (4 стены с материалами) и разрез сбоку
 // (пол / потолок / высота). Подписи: длины сторон, материалы стен, тип пола.
 function _ccRenderSchema() {
@@ -65169,8 +65199,11 @@ function _ccRenderSchema() {
   // Сокращаем длинные имена материалов для подписей на схеме
   const short = (s) => {
     s = String(s || '');
-    s = s.replace('(металл, без λ)', '').replace('(газобетон)', '').replace('(арболит)', '').trim();
-    return s.length > 14 ? s.slice(0, 13) + '…' : s;
+    s = s.replace('(металл, без λ)', '').replace('(газобетон)', '').replace('(арболит)', '')
+         .replace('Пенополиуретан', 'PIR').replace('Пенополистирол', 'EPS')
+         .replace('(PIR/PUR)', '').replace('(EPS/XPS)', '').replace('Минеральная вата', 'Минвата')
+         .trim();
+    return s.length > 16 ? s.slice(0, 15) + '…' : s;
   };
   const w0 = ws[0] || {len: 0}; const w1 = ws[1] || {len: 0};
   const w2 = ws[2] || {len: 0}; const w3 = ws[3] || {len: 0};
@@ -65179,13 +65212,13 @@ function _ccRenderSchema() {
   const h    = Number(g.height) || 0;
 
   // ---- План сверху ----
-  // Контейнер 520×320. Внутри прямоугольник масштабируется по большей стороне.
+  // Контейнер 640×360 — больше места для подписей по краям, чтобы не выходили
   const planBoxW = 480, planBoxH = 240;
   const maxSide = Math.max(aLen, bLen, 1);
   const scale = Math.min(planBoxW / maxSide, planBoxH / maxSide) * 0.75;
   const rectW = Math.max(120, aLen * scale);
   const rectH = Math.max(80,  bLen * scale);
-  const cx = 260, cy = 160;
+  const cx = 320, cy = 180;
   const x0 = cx - rectW / 2, y0 = cy - rectH / 2;
   const x1 = x0 + rectW,     y1 = y0 + rectH;
 
@@ -65196,7 +65229,7 @@ function _ccRenderSchema() {
   }
 
   const planSvg =
-    '<svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px;">' +
+    '<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;" preserveAspectRatio="xMidYMid meet">' +
       // Стены — заливка по типу
       '<defs>' +
         '<pattern id="cc-pat-brick" width="14" height="8" patternUnits="userSpaceOnUse">' +
@@ -65240,7 +65273,7 @@ function _ccRenderSchema() {
       '<text x="' + (x1 + 36)     + '" y="' + (cy + 16)  + '" text-anchor="start" font-size="10.5" fill="#475569" transform="rotate(90,' + (x1 + 36) + ',' + (cy + 16) + ')">' + lblMat(w1) + '</text>' +
       '<text x="' + (x0 - 36)     + '" y="' + (cy + 16)  + '" text-anchor="start" font-size="10.5" fill="#475569" transform="rotate(-90,' + (x0 - 36) + ',' + (cy + 16) + ')">' + lblMat(w3) + '</text>' +
       // Подпись «План (вид сверху)»
-      '<text x="260" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">ПЛАН (вид сверху)</text>' +
+      '<text x="320" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">ПЛАН (вид сверху)</text>' +
       // Площадь и объём в центре
       '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="13" fill="#0C4A6E" font-weight="600">' + (aLen * bLen).toFixed(1) + ' м²</text>' +
       '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="11" fill="#475569">пол</text>' +
@@ -65248,10 +65281,10 @@ function _ccRenderSchema() {
 
   // ---- Разрез сбоку ----
   // Прямоугольник высотой h, шириной A
-  const sectionW = 520, sectionH = 200;
-  const sScale = Math.min((sectionW - 80) / Math.max(aLen, 1), (sectionH - 60) / Math.max(h, 1)) * 0.7;
-  const sW = Math.max(160, aLen * sScale);
-  const sH = Math.max(80,  h * sScale);
+  const sectionW = 640, sectionH = 220;
+  const sScale = Math.min((sectionW - 120) / Math.max(aLen, 1), (sectionH - 80) / Math.max(h, 1)) * 0.7;
+  const sW = Math.max(180, aLen * sScale);
+  const sH = Math.max(90,  h * sScale);
   const sx0 = (sectionW - sW) / 2;
   const sy0 = (sectionH - sH) / 2 + 10;
   const sx1 = sx0 + sW, sy1 = sy0 + sH;
@@ -65260,8 +65293,8 @@ function _ccRenderSchema() {
   const floorMatIdx = (g.floor && g.floor.isoCode) || '';
   const ceilMatIdx  = (g.ceiling && g.ceiling.isoCode) || '';
   const sectionSvg =
-    '<svg viewBox="0 0 520 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px;">' +
-      '<text x="260" y="15" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">РАЗРЕЗ (сбоку)</text>' +
+    '<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;" preserveAspectRatio="xMidYMid meet">' +
+      '<text x="320" y="15" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">РАЗРЕЗ (сбоку)</text>' +
       // Потолок (толстая верхняя полоса)
       '<rect x="' + (sx0 - 4) + '" y="' + (sy0 - 14) + '" width="' + (sW + 8) + '" height="12" fill="#E2E8F0" stroke="#64748B" stroke-width="0.8"/>' +
       '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 - 18) + '" text-anchor="middle" font-size="10.5" fill="#475569">Потолок · ' + short(isoName(g.ceiling && g.ceiling.isoCode)) + '</text>' +
@@ -65460,10 +65493,22 @@ function _ccTabCond() {
         '<input type="number" class="form-input" id="cc-light-h" value="' + c.lightHrs + '" min="0" max="24" step="0.5" /></div>' +
       '<div><label class="form-label">Электродвигатели в камере, Вт</label>' +
         '<input type="number" class="form-input" id="cc-motors-w" value="' + c.motorsW + '" min="0" step="50" /></div>' +
+      // v2.45.105: погрузчики
+      '<div><label class="form-label">Погрузчики (шт.)</label>' +
+        '<input type="number" class="form-input" id="cc-fork-n" value="' + (c.forklifts || 0) + '" min="0" step="1" /></div>' +
+      '<div><label class="form-label">Погрузчики, ч/сут</label>' +
+        '<input type="number" class="form-input" id="cc-fork-h" value="' + (c.forkliftHrs || 0) + '" min="0" max="24" step="0.5" /></div>' +
+      '<div><label class="form-label">Тепло от 1 погрузчика, кВт</label>' +
+        '<input type="number" class="form-input" id="cc-fork-kw" value="' + (c.forkliftKw || 4) + '" min="0" step="0.5" /></div>' +
+      // v2.45.105: воздухообмен / вентиляция
+      '<div><label class="form-label">Воздухообмен, раз/сутки</label>' +
+        '<input type="number" class="form-input" id="cc-airch" value="' + (c.airChangesPerDay || 0) + '" min="0" step="0.5" title="Сколько раз в сутки полностью обновляется воздух в камере" /></div>' +
     '</div>' +
     '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> Каждый человек выделяет 280–470 Вт тепла (зависит от t° в камере). ' +
-      'Освещение считается с учётом доли времени включения. Двигатели — берём ~50% номинала как ср. тепловыделение.' +
+      'Освещение считается с учётом доли времени включения. Двигатели — ~50% номинала как ср. тепловыделение. ' +
+      'Погрузчик: 1 ед. ≈ 3–6 кВт тепла; учитывается часами работы в сутки. ' +
+      'Воздухообмен — сколько раз в сутки приточная вентиляция замещает весь воздух камеры (для холодильника обычно 0–2).' +
     '</div>' +
   '</div>';
 }
@@ -65476,7 +65521,7 @@ function _ccTabDoor() {
         '<input type="number" class="form-input" id="cc-door-h" value="' + d.hMm + '" min="500" step="50" /></div>' +
       '<div><label class="form-label">Ширина проёма, мм</label>' +
         '<input type="number" class="form-input" id="cc-door-w" value="' + d.wMm + '" min="500" step="50" /></div>' +
-      '<div><label class="form-label">Открыта в сутки, мин</label>' +
+      '<div><label class="form-label" title="Суммарное время открытия двери за сутки">Открытие двери в сутки, мин</label>' +
         '<input type="number" class="form-input" id="cc-door-min" value="' + d.openMin + '" min="0" step="5" /></div>' +
       '<div><label class="form-label">Тамбур (предкамера)</label>' +
         '<select class="form-input" id="cc-door-tamb">' +
@@ -65501,8 +65546,10 @@ function _ccTabResult() {
     ['Охлаждение / заморозка продукта (Q2)', r.q2],
     ['Тепло от людей (Q3)', r.q3],
     ['Освещение (Q4)', r.q4],
-    ['Электродвигатели (Q5)', r.q5],
+    ['Электродвигатели + погрузчики (Q5)', r.q5],
     ['Инфильтрация через двери (Q6)', r.q6],
+    // v2.45.105: вентиляция/воздухообмен — показываем только если есть
+    ...(r.qVent && r.qVent > 0 ? [['Воздухообмен (Q-вент.)', r.qVent]] : []),
   ];
   const totalKw = r.total / 1000;
   const totalWithSafetyKw = r.totalWithSafety / 1000;
@@ -65599,13 +65646,17 @@ function _ccPrintReport() {
     { label: 'Потолок', w: g.ceiling || {}, hasMat: false },
   ];
   const rows = [
-    ['Через ограждения (Q₁)',          (r.q1 / 1000).toFixed(3)],
-    ['Охлаждение / заморозка (Q₂)',    (r.q2 / 1000).toFixed(3)],
-    ['Тепло от людей (Q₃)',            (r.q3 / 1000).toFixed(3)],
-    ['Освещение (Q₄)',                 (r.q4 / 1000).toFixed(3)],
-    ['Электродвигатели (Q₅)',          (r.q5 / 1000).toFixed(3)],
-    ['Инфильтрация через двери (Q₆)',  (r.q6 / 1000).toFixed(3)],
+    ['Через ограждения (Q₁)',                (r.q1 / 1000).toFixed(3)],
+    ['Охлаждение / заморозка (Q₂)',          (r.q2 / 1000).toFixed(3)],
+    ['Тепло от людей (Q₃)',                  (r.q3 / 1000).toFixed(3)],
+    ['Освещение (Q₄)',                       (r.q4 / 1000).toFixed(3)],
+    ['Электродвигатели + погрузчики (Q₅)',   (r.q5 / 1000).toFixed(3)],
+    ['Инфильтрация через двери (Q₆)',        (r.q6 / 1000).toFixed(3)],
   ];
+  // v2.45.105: Q-вентиляция — только если воздухообмен > 0
+  if (r.qVent && r.qVent > 0) {
+    rows.push(['Воздухообмен (Q-вент.)', (r.qVent / 1000).toFixed(3)]);
+  }
   const html =
 '<!doctype html><html lang="ru"><head><meta charset="utf-8"/>' +
 '<title>Расчёт холода — ' + safeText(cli.title || cli.company || dtStr) + '</title>' +
@@ -65684,9 +65735,19 @@ function _ccPrintReport() {
 '    <div><b>Людей:</b> ' + (cond.people || 0) + '</div>' +
 '    <div><b>Освещение:</b> ' + (cond.lightW || 0) + ' Вт × ' + (cond.lightHrs || 0) + ' ч/сут</div>' +
 '    <div><b>Двигатели:</b> ' + (cond.motorsW || 0) + ' Вт</div>' +
-'    <div><b>Дверь:</b> ' + (door.hMm || 0) + '×' + (door.wMm || 0) + ' мм, ' + (door.openMin || 0) + ' мин/сут' + (door.hasTambour ? ' (тамбур)' : '') + '</div>' +
-'    <div><b>Работа оборудования:</b> ' + (_ccState.workHours || 24) + ' ч/сут</div>' +
+// v2.45.105: погрузчики и вентиляция в условиях
+((cond.forklifts || 0) > 0
+  ? '<div><b>Погрузчики:</b> ' + cond.forklifts + ' × ' + (cond.forkliftKw || 4) +
+    ' кВт × ' + (cond.forkliftHrs || 0) + ' ч/сут</div>' : '') +
+((cond.airChangesPerDay || 0) > 0
+  ? '<div><b>Воздухообмен:</b> ' + cond.airChangesPerDay + ' раз/сутки</div>' : '') +
+'    <div><b>Открытие двери:</b> ' + (door.hMm || 0) + '×' + (door.wMm || 0) + ' мм, ' + (door.openMin || 0) + ' мин/сут' + (door.hasTambour ? ' (тамбур)' : '') + '</div>' +
 '    <div><b>Коэф. запаса:</b> ' + (_ccState.safety || 0) + ' %</div>' +
+'  </div>' +
+// v2.45.105: визуальная схема камеры в PDF — рендерим текущую схему
+'  <h2>Схема камеры</h2>' +
+'  <div style="text-align:center;border:1px solid #CBD5E1;border-radius:6px;padding:8px;margin:4px 0;">' +
+    _ccRenderSchemaForPrint() +
 '  </div>' +
 '  <h2>Разбивка теплопритоков</h2>' +
 '  <table>' +
@@ -65698,7 +65759,6 @@ function _ccPrintReport() {
 '  <div class="total">' +
 '    <div class="lbl">Рекомендуемая мощность холода</div>' +
 '    <div class="v">' + totalWithSafetyKw + ' кВт</div>' +
-'    <div class="lbl">с учётом работы оборудования ' + (r.workHours || 24) + ' ч/сут</div>' +
 '  </div>' +
 '  <div class="foot">Расчёт носит ориентировочный характер. Для подбора оборудования обратитесь в ATOMUS group.</div>' +
 '<script>window.addEventListener("load",()=>setTimeout(()=>window.print(),200));</' + 'script>' +
@@ -66056,6 +66116,11 @@ function _ccCollectFromInputs() {
   c.lightW = num('cc-light-w', c.lightW);
   c.lightHrs = num('cc-light-h', c.lightHrs);
   c.motorsW = num('cc-motors-w', c.motorsW);
+  // v2.45.105: погрузчики + воздухообмен
+  c.forklifts        = num('cc-fork-n',  c.forklifts || 0);
+  c.forkliftHrs      = num('cc-fork-h',  c.forkliftHrs || 0);
+  c.forkliftKw       = num('cc-fork-kw', c.forkliftKw || 4);
+  c.airChangesPerDay = num('cc-airch',   c.airChangesPerDay || 0);
   // Двери
   const d = _ccState.door;
   d.hMm = num('cc-door-h', d.hMm);
@@ -66137,8 +66202,13 @@ function _ccCalculate() {
   const q3 = _ccState.cond.people * _ccPersonHeat(ti);
   // Q4 — освещение (Вт), усреднённое по суткам
   const q4 = _ccState.cond.lightW * (_ccState.cond.lightHrs / 24);
-  // Q5 — электродвигатели (Вт)
-  const q5 = _ccState.cond.motorsW * 0.5;
+  // Q5 — электродвигатели + погрузчики (Вт)
+  // v2.45.105: погрузчик — forklifts × forkliftKw × 1000 × (часов/24)
+  const cnd = _ccState.cond;
+  const q5motors = (cnd.motorsW || 0) * 0.5;
+  const q5fork   = (cnd.forklifts || 0) * (cnd.forkliftKw || 0) * 1000 *
+                   ((cnd.forkliftHrs || 0) / 24);
+  const q5 = q5motors + q5fork;
   // Q6 — инфильтрация через дверь
   const dh = (_ccState.door.hMm || 0) / 1000;
   const dw = (_ccState.door.wMm || 0) / 1000;
@@ -66156,13 +66226,25 @@ function _ccCalculate() {
   const _tambK = _ccState.door.hasTambour ? 0.5 : 1.0;
   const q6Clean = 8 * dT_door * doorArea * (doorMin / 1440) * _tambK;
 
-  const total = q1 + q2 + q3 + q4 + q5 + q6Clean;
+  // v2.45.105: Q-вентиляция от приточного воздухообмена.
+  // V_воз = объём камеры × N_обменов; m = V × 1.293 кг/м³; cp_воз ≈ 1005 Дж/(кг·К);
+  // Q (Вт) = m × cp × ΔT / 86400 секунд_в_сутках.
+  const wAvg = (g.walls[0].len + g.walls[2].len) / 2;
+  const dAvg = (g.walls[1].len + g.walls[3].len) / 2;
+  const cameraVolume = wAvg * dAvg * (g.height || 0);
+  const airChanges = (cnd.airChangesPerDay || 0);
+  const qVent = (airChanges > 0 && cameraVolume > 0)
+    ? (cameraVolume * airChanges * 1.293 * 1005 * dT_door) / 86400
+    : 0;
+
+  const total = q1 + q2 + q3 + q4 + q5 + q6Clean + qVent;
   // С учётом «работы оборудования X ч/сут»: эффективная нагрузка выше
   const workCoeff = Math.max(24 / _ccState.workHours, 1);
   const safety = _ccState.safety || 0;
   const totalWithSafety = total * workCoeff * (1 + safety / 100);
   _ccLastResult = {
     q1, q2, q3, q4, q5, q6: q6Clean,
+    qVent,                          // v2.45.105
     total: total * workCoeff,
     totalWithSafety,
     workHours: _ccState.workHours,
