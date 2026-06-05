@@ -19355,7 +19355,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.126-formula-reveal";
+const APP_VERSION = "v2.45.127-walls-labels-ab";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -65999,10 +65999,10 @@ function _ccTabWalls() {
       '<div class="hdr">Толщ. изол., мм</div>' +
       '<div class="hdr">t° снаружи, °C</div>' +
       '<div class="row-sep"></div>' +
-      dataRow('cc-w0', 'Стена 1', true, g.walls[0]) +
-      dataRow('cc-w1', 'Стена 2', true, g.walls[1]) +
-      dataRow('cc-w2', 'Стена 3', true, g.walls[2]) +
-      dataRow('cc-w3', 'Стена 4', true, g.walls[3]) +
+      dataRow('cc-w0', 'Стена А-1', true, g.walls[0]) +
+      dataRow('cc-w1', 'Стена Б-2', true, g.walls[1]) +
+      dataRow('cc-w2', 'Стена А-3', true, g.walls[2]) +
+      dataRow('cc-w3', 'Стена Б-4', true, g.walls[3]) +
       dataRow('cc-fl', 'Пол', false, g.floor, 'Температура под полом') +
       dataRow('cc-ce', 'Потолок', false, g.ceiling, 'Температура над потолком') +
     '</div>' +
@@ -66193,9 +66193,18 @@ function _ccToggleFormula(rowEl) {
 }
 
 // v2.45.126: формирует HTML формулы и пошагового расчёта для строки результата
+// v2.45.127: защита от undefined для старых snapshot'ов без details
 function _ccFormulaHtml(key, det, qW) {
   const fmt = (n, d) => Number(n).toFixed(d == null ? 1 : d);
   const kw = (qW / 1000).toFixed(3);
+  // безопасный get — undefined → fallback
+  const G = (obj, k, fb) => (obj && obj[k] !== undefined && obj[k] !== null) ? obj[k] : (fb !== undefined ? fb : '—');
+  // Если у строки вообще нет блока details — попросим пересчитать
+  if (!det || !det[key]) {
+    return '<div style="color:var(--text-light);font-size:12px;">' +
+      '<i class="ti ti-refresh"></i> Подробный расчёт появится после нажатия «Рассчитать» — сохранённый результат был сделан в старой версии.' +
+      '</div>';
+  }
   if (key === 'q1') {
     const planes = (det.q1 && det.q1.planes) || [];
     let html = '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₁ — теплоприток через ограждения</div>' +
@@ -66436,10 +66445,10 @@ function _ccPrintReport() {
   };
   // Таблица ограждений: 4 стены + пол + потолок
   const planes = [
-    { label: 'Стена 1', w: walls[0] || {}, hasMat: true },
-    { label: 'Стена 2', w: walls[1] || {}, hasMat: true },
-    { label: 'Стена 3', w: walls[2] || {}, hasMat: true },
-    { label: 'Стена 4', w: walls[3] || {}, hasMat: true },
+    { label: 'Стена А-1', w: walls[0] || {}, hasMat: true },
+    { label: 'Стена Б-2', w: walls[1] || {}, hasMat: true },
+    { label: 'Стена А-3', w: walls[2] || {}, hasMat: true },
+    { label: 'Стена Б-4', w: walls[3] || {}, hasMat: true },
     { label: 'Пол',     w: g.floor   || {}, hasMat: false },
     { label: 'Потолок', w: g.ceiling || {}, hasMat: false },
   ];
