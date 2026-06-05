@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Чиллер 244 кВт · 2 контура — схема и спецификация · Atomus Group</title>
+<style>
+  :root{
+    --navy:#0B2C4F; --navy2:#134169; --cyan:#15B6DA;
+    --ink:#1a2733; --muted:#5a6b7a; --line:#e3eaf0; --bg:#f3f7fa;
+    --hot:#e8533a; --liq:#15B6DA; --suc:#3a78c2; --water:#1e8a4c;
+    --c1:#15B6DA; --c2:#e0992b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'PT Sans','Segoe UI',sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;}
+  h1,h2,h3,.mont{font-family:'Montserrat','Segoe UI',sans-serif;}
+  .topbar{height:60px;background:linear-gradient(120deg,var(--navy),var(--navy2));display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:relative;z-index:50;}
+  .logo{font-family:'Montserrat';font-weight:800;font-size:19px;color:#fff;letter-spacing:.5px;}
+  .logo .ac{color:var(--cyan);}
+  .logo small{display:block;font-size:8px;letter-spacing:3px;color:#9fc4dd;font-weight:600;margin-top:1px;}
+  .topbar .right{color:#9fc4dd;font-size:12px;text-align:right;}
+  .topbar .right b{color:#fff;font-family:'Montserrat';}
+  .tabs{display:flex;gap:4px;background:var(--navy);padding:0 22px;position:relative;z-index:40;box-shadow:0 2px 12px rgba(0,0,0,.18);}
+  .tab{font-family:'Montserrat';font-weight:600;font-size:13px;color:#9fc4dd;padding:13px 22px;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;transition:.2s;letter-spacing:.3px;}
+  .tab:hover{color:#cfe2f0;}
+  .tab.active{color:#fff;border-bottom-color:var(--cyan);}
+  .panel{display:none;position:absolute;top:103px;left:0;right:0;bottom:0;}
+  .panel.active{display:block;}
+  #scene{width:100%;height:100%;display:block;background:radial-gradient(circle at 50% 30%, #17406b 0%, #0a2540 55%, #051624 100%);}
+  .hud{position:absolute;}
+  .legend{top:18px;left:18px;background:rgba(11,44,79,.74);backdrop-filter:blur(8px);border:1px solid rgba(21,182,218,.3);border-radius:10px;padding:14px 16px;color:#dcebf5;font-size:12px;}
+  .legend h3{font-size:12px;color:var(--cyan);letter-spacing:1px;text-transform:uppercase;margin-bottom:9px;}
+  .legend .row{display:flex;align-items:center;gap:8px;margin:5px 0;}
+  .legend .dot{width:22px;height:5px;border-radius:3px;}
+  .legend .sep{height:1px;background:rgba(255,255,255,.12);margin:9px 0;}
+  .legend .ctag{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+  .controls{bottom:18px;left:50%;transform:translateX(-50%);background:rgba(11,44,79,.74);backdrop-filter:blur(8px);border:1px solid rgba(21,182,218,.3);border-radius:30px;padding:8px 10px;display:flex;gap:8px;align-items:center;}
+  .controls button{font-family:'Montserrat';font-weight:600;font-size:12px;background:rgba(255,255,255,.08);color:#dcebf5;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:20px;cursor:pointer;transition:.15s;}
+  .controls button:hover{background:var(--cyan);color:var(--navy);border-color:var(--cyan);}
+  .controls .sp{color:#6f93b3;font-size:11px;padding:0 4px;}
+  .titleHud{top:18px;right:18px;text-align:right;color:#cfe2f0;}
+  .titleHud .t{font-family:'Montserrat';font-weight:700;font-size:16px;color:#fff;}
+  .titleHud .s{font-size:11px;color:#9fc4dd;margin-top:2px;}
+  .tip{bottom:74px;left:50%;transform:translateX(-50%);color:#7fa8c9;font-size:11px;pointer-events:none;}
+  #tooltip{position:absolute;pointer-events:none;background:rgba(11,44,79,.96);border:1px solid var(--cyan);border-radius:8px;padding:9px 13px;color:#fff;font-size:12px;display:none;z-index:60;max-width:240px;line-height:1.5;}
+  #tooltip b{font-family:'Montserrat';color:var(--cyan);}
+  #kp{overflow-y:auto;background:var(--bg);}
+  .kp-wrap{max-width:920px;margin:0 auto;padding:26px 20px 80px;}
+  .kp-head{background:linear-gradient(120deg,var(--navy),var(--navy2));border-radius:14px;padding:26px 30px;color:#fff;position:relative;overflow:hidden;margin-bottom:22px;}
+  .kp-head::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(21,182,218,.25),transparent 70%);}
+  .kp-head .lbl{font-family:'Montserrat';font-size:10px;letter-spacing:4px;color:var(--cyan);text-transform:uppercase;}
+  .kp-head h1{font-size:23px;margin-top:6px;line-height:1.15;}
+  .kp-head .sub{color:#cfe2f0;font-size:13px;margin-top:8px;}
+  .kp-head .badge{display:inline-block;margin-top:10px;background:var(--cyan);color:#03263a;font-family:'Montserrat';font-weight:700;font-size:9px;letter-spacing:1px;padding:3px 9px;border-radius:3px;text-transform:uppercase;}
+  .arch{background:#fff;border:1px solid var(--line);border-left:4px solid var(--cyan);border-radius:10px;padding:14px 18px;margin-bottom:22px;font-size:13px;color:var(--muted);}
+  .arch b{color:var(--navy);font-family:'Montserrat';}
+  .cards{display:flex;gap:12px;margin-bottom:22px;}
+  .card{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;}
+  .card h4{font-family:'Montserrat';font-size:11px;color:var(--muted);font-weight:600;}
+  .card .big{font-family:'Montserrat';font-weight:800;font-size:23px;color:var(--cyan);margin-top:4px;}
+  .card .small{font-size:11px;color:var(--muted);margin-top:2px;}
+  .sec{font-family:'Montserrat';font-weight:700;font-size:16px;color:var(--navy);margin:24px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--cyan);display:flex;align-items:center;gap:10px;}
+  .sec .n{background:var(--navy);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(11,44,79,.06);}
+  thead td{background:var(--navy);color:#fff;font-family:'Montserrat';font-weight:600;font-size:11px;padding:10px;}
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:12px;vertical-align:top;}
+  tbody tr:nth-child(even){background:#f7fbfd;}
+  .grp td{background:#dff2f8 !important;color:var(--navy);font-family:'Montserrat';font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
+  .sub-tr td{background:#eef6fa !important;font-family:'Montserrat';font-weight:700;color:var(--navy);font-size:12px;}
+  .r{text-align:right;white-space:nowrap;}.c{text-align:center;}
+  .iname{font-weight:600;}.idesc{color:var(--muted);font-size:10.5px;}
+  .pos{color:#8aa0b2;font-size:10px;}
+  .total{background:var(--navy);color:#fff;border-radius:12px;padding:20px 24px;margin:22px 0;}
+  .total .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;}
+  .total .row:last-child{border:none;}
+  .total .lbl{color:#cfe2f0;}.total .val{font-family:'Montserrat';font-weight:700;}
+  .total .grand{margin-top:6px;padding-top:10px;}
+  .total .grand .lbl{color:var(--cyan);font-family:'Montserrat';font-weight:700;font-size:15px;}
+  .total .grand .val{font-size:22px;}
+  .notes{font-size:12px;color:var(--muted);background:#fff;border-radius:10px;padding:14px 18px;border:1px solid var(--line);}
+  .notes li{margin:6px 0 6px 18px;}
+  @media(max-width:680px){.cards{flex-direction:column;}.legend{display:none;}}
+  /* ---- 2D schema ---- */
+  #schema2d{overflow:auto;background:#0a2540;background-image:radial-gradient(circle at 50% 30%, #14375c 0%, #0a2540 60%, #061a2e 100%);}
+  .svg2d-wrap{min-width:1040px;padding:20px 24px 40px;}
+  .svg2d-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;color:#cfe2f0;}
+  .svg2d-bar .t{font-family:'Montserrat';font-weight:700;font-size:15px;color:#fff;}
+  .svg2d-bar .s{font-size:11px;color:#9fc4dd;}
+  .svg2d-bar .leg{display:flex;gap:16px;font-size:11px;}
+  .svg2d-bar .leg span{display:flex;align-items:center;gap:6px;}
+  .svg2d-bar .leg i{width:18px;height:4px;border-radius:2px;display:inline-block;}
+  svg.flow .dash{stroke-dasharray:7 9;animation:dashmove 1.1s linear infinite;}
+  @keyframes dashmove{to{stroke-dashoffset:-32;}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ATOM<span class="ac">US</span> GROUP<small>ПРОМЫШЛЕННОЕ ХОЛОДОСНАБЖЕНИЕ</small></div>
+  <div class="right">Чиллер <b>244 кВт</b> · 2 контура · вода 7/14&nbsp;°C<br>Dorin H5000CC ×5 · конденсатор Baer · кожухотрубный испаритель</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="schema">⟳ Гидравлическая схема (3D)</button>
+  <button class="tab" data-tab="schema2d">▭ Принципиальная схема (2D)</button>
+  <button class="tab" data-tab="kp">▦ Закупочная спецификация</button>
+</div>
+
+<div class="panel active" id="schema">
+  <canvas id="scene"></canvas>
+  <div class="hud legend">
+    <h3>Поток хладагента</h3>
+    <div class="row"><span class="dot" style="background:#e8533a"></span> Нагнетание · горячий газ</div>
+    <div class="row"><span class="dot" style="background:#15B6DA"></span> Жидкостная линия</div>
+    <div class="row"><span class="dot" style="background:#3a78c2"></span> Всасывание · пар</div>
+    <div class="row"><span class="dot" style="background:#1e8a4c"></span> Водяной контур 7/14&nbsp;°C</div>
+    <div class="sep"></div>
+    <div class="row"><span class="ctag" style="background:#15B6DA"></span> Контур 1 — 3 компрессора</div>
+    <div class="row"><span class="ctag" style="background:#e0992b"></span> Контур 2 — 2 компрессора</div>
+  </div>
+  <div class="hud titleHud">
+    <div class="t">2-контурная схема-поток</div>
+    <div class="s">кожухотрубный испаритель · 1 ТРВ + 1 соленоид на контур</div>
+  </div>
+  <div class="hud controls">
+    <button id="btnFlow">⏸ Поток</button>
+    <button id="btnSpin">⟳ Вращение</button>
+    <span class="sp">скорость</span>
+    <button id="btnSlow">–</button>
+    <button id="btnFast">+</button>
+    <button id="btnReset">⌖ Вид</button>
+  </div>
+  <div class="hud tip">Перетаскивайте мышью — поворот · колесо — зум · наведите на узел для описания</div>
+  <div id="tooltip"></div>
+</div>
+
+<!-- ============ 2D SCHEMA ============ -->
+<div class="panel" id="schema2d">
+  <div class="svg2d-wrap" style="min-width:1340px;">
+    <div class="svg2d-bar">
+      <div><div class="t">Принципиальная холодильная схема · 2 контура</div><div class="s">5 × Dorin H5000CC · конденсатор Baer · кожухотрубный испаритель · ТРВ TE 55</div></div>
+      <div class="leg">
+        <span><i style="background:#e8533a"></i>горячий газ (нагнетание)</span>
+        <span><i style="background:#15B6DA"></i>жидкость</span>
+        <span><i style="background:#3a78c2"></i>пар (всасывание)</span>
+        <span><i style="background:#1e8a4c"></i>вода</span>
+        <span style="margin-left:8px;color:#9fc4dd;">— К1 сплошн. &nbsp; ┄ К2 пунктир</span>
+      </div>
+    </div>
+
+    <svg class="flow" viewBox="0 0 1340 780" xmlns="http://www.w3.org/2000/svg" width="100%" font-family="Montserrat, Arial, sans-serif">
+      <defs>
+        <marker id="mHot" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e8533a"/></marker>
+        <marker id="mLiq" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15B6DA"/></marker>
+        <marker id="mSuc" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#3a78c2"/></marker>
+        <marker id="mW" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1e8a4c"/></marker>
+        <g id="arHot"><path d="M-5,-4 L5,0 L-5,4 L-2,0 Z" fill="#ff8a72"/></g>
+        <g id="arLiq"><path d="M-5,-4 L5,0 L-5,4 L-2,0 Z" fill="#5fd6f0"/></g>
+        <g id="arSuc"><path d="M-5,-4 L5,0 L-5,4 L-2,0 Z" fill="#8fb6e6"/></g>
+        <g id="arW"><path d="M-5,-4 L5,0 L-5,4 L-2,0 Z" fill="#5fd08c"/></g>
+      </defs>
+
+      <!-- ===================== CONDENSER (top-right) ===================== -->
+      <g>
+        <rect x="980" y="60" width="300" height="64" rx="8" fill="#0e3a5e" stroke="#15B6DA" stroke-width="2"/>
+        <g stroke="#2f7aa3" stroke-width="1.4">
+          <line x1="998" y1="70" x2="998" y2="114"/><line x1="1012" y1="70" x2="1012" y2="114"/><line x1="1026" y1="70" x2="1026" y2="114"/>
+        </g>
+        <text x="1150" y="88" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">КОНДЕНСАТОР Baer FNV</text>
+        <text x="1150" y="107" text-anchor="middle" fill="#9fc4dd" font-size="11">воздушный · 2 контура · ~295 кВт</text>
+        <circle cx="1210" cy="54" r="9" fill="none" stroke="#9fd6e8" stroke-width="1.5"/>
+        <circle cx="1238" cy="54" r="9" fill="none" stroke="#9fd6e8" stroke-width="1.5"/>
+        <circle cx="1266" cy="54" r="9" fill="none" stroke="#9fd6e8" stroke-width="1.5"/>
+        <text x="1282" y="58" fill="#7fa8c9" font-size="9">EC×4</text>
+      </g>
+
+      <!-- ===================== RECEIVERS (below condenser) ===================== -->
+      <g>
+        <rect x="1010" y="160" width="40" height="66" rx="13" fill="#103b5e" stroke="#15B6DA" stroke-width="1.6"/>
+        <text x="1030" y="198" text-anchor="middle" fill="#cfe2f0" font-size="8.5" transform="rotate(90 1030 198)">РЕСИВЕР К1</text>
+        <rect x="1085" y="160" width="40" height="66" rx="13" fill="#103b5e" stroke="#e0992b" stroke-width="1.6"/>
+        <text x="1105" y="198" text-anchor="middle" fill="#f2d3a0" font-size="8.5" transform="rotate(90 1105 198)">РЕСИВЕР К2</text>
+      </g>
+
+      <!-- ============================================================= -->
+      <!-- ======================= CIRCUIT 1 (top) ===================== -->
+      <!-- ============================================================= -->
+      <g>
+        <rect x="30" y="126" width="740" height="204" rx="10" fill="rgba(21,182,218,0.045)" stroke="#15B6DA" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="46" y="120" fill="#15B6DA" font-size="13" font-weight="700">КОНТУР 1 — 3 × Dorin H5000CC (сплошная линия)</text>
+
+        <!-- compressors -->
+        <g>
+          <circle cx="95" cy="235" r="22" fill="#0B2C4F" stroke="#15B6DA" stroke-width="2"/><text x="95" y="240" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">M</text><text x="95" y="273" text-anchor="middle" fill="#cfe2f0" font-size="9">К1-1</text>
+          <circle cx="155" cy="235" r="22" fill="#0B2C4F" stroke="#15B6DA" stroke-width="2"/><text x="155" y="240" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">M</text><text x="155" y="273" text-anchor="middle" fill="#cfe2f0" font-size="9">К1-2</text>
+          <circle cx="215" cy="235" r="22" fill="#0B2C4F" stroke="#15B6DA" stroke-width="2"/><text x="215" y="240" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">M</text><text x="215" y="273" text-anchor="middle" fill="#cfe2f0" font-size="9">К1-3</text>
+        </g>
+
+        <!-- discharge manifold (HOT, red) — отдельный верхний коридор -->
+        <path d="M 95 213 L 95 145 L 320 145" fill="none" stroke="#e8533a" stroke-width="2.2"/>
+        <path d="M 155 213 L 155 145" fill="none" stroke="#e8533a" stroke-width="2.2"/>
+        <path d="M 215 213 L 215 145" fill="none" stroke="#e8533a" stroke-width="2.2"/>
+        <g fill="#0a2540" stroke="#e8533a" stroke-width="1.4">
+          <path d="M 89 140 L 101 140 L 95 132 Z"/><path d="M 149 140 L 161 140 L 155 132 Z"/><path d="M 209 140 L 221 140 L 215 132 Z"/>
+        </g>
+        <text x="430" y="139" fill="#e8a08f" font-size="8">обр.кл. ×3 (нагнетание → конденсатор)</text>
+
+        <!-- suction manifold (SUC, blue) -->
+        <path d="M 95 257 L 95 300 L 320 300" fill="none" stroke="#3a78c2" stroke-width="2.2"/>
+        <path d="M 155 257 L 155 300" fill="none" stroke="#3a78c2" stroke-width="2.2"/>
+        <path d="M 215 257 L 215 300" fill="none" stroke="#3a78c2" stroke-width="2.2"/>
+        <rect x="320" y="287" width="42" height="26" rx="6" fill="#0a2540" stroke="#3a78c2" stroke-width="1.4"/>
+        <text x="341" y="304" text-anchor="middle" fill="#9fc4dd" font-size="9">ОЖ</text>
+
+        <!-- liquid train (LIQ, cyan): TRV <- solenoid <- sight <- filter -->
+        <g transform="translate(420,190)">
+          <path d="M -12 -12 L 12 -12 L 0 0 Z M -12 12 L 12 12 L 0 0 Z" fill="#0a2540" stroke="#15B6DA" stroke-width="2"/>
+          <circle cx="0" cy="-12" r="3.5" fill="#15B6DA"/>
+        </g>
+        <text x="420" y="226" text-anchor="middle" fill="#15B6DA" font-size="11" font-weight="700">ТРВ К1</text>
+        <text x="420" y="239" text-anchor="middle" fill="#7fa8c9" font-size="8">TE 55 + TEZ 55</text>
+
+        <rect x="480" y="178" width="40" height="24" rx="4" fill="#0a2540" stroke="#15B6DA" stroke-width="1.5"/><text x="500" y="194" text-anchor="middle" fill="#cfe2f0" font-size="8">EVR22</text><text x="500" y="172" text-anchor="middle" fill="#7fa8c9" font-size="8">соленоид</text>
+        <circle cx="560" cy="190" r="12" fill="#0a2540" stroke="#15B6DA" stroke-width="1.5"/><circle cx="560" cy="190" r="3.5" fill="#15B6DA"/><text x="560" y="170" text-anchor="middle" fill="#7fa8c9" font-size="8">SGN 22s</text>
+        <rect x="600" y="178" width="42" height="24" rx="4" fill="#0a2540" stroke="#15B6DA" stroke-width="1.5"/><text x="621" y="194" text-anchor="middle" fill="#cfe2f0" font-size="9">ФО</text><text x="621" y="172" text-anchor="middle" fill="#7fa8c9" font-size="8">DCL 309s</text>
+      </g>
+
+      <!-- ============================================================= -->
+      <!-- ======================= CIRCUIT 2 (mid) ===================== -->
+      <!-- ============================================================= -->
+      <g>
+        <rect x="30" y="346" width="740" height="194" rx="10" fill="rgba(224,153,43,0.045)" stroke="#e0992b" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="46" y="340" fill="#e0992b" font-size="13" font-weight="700">КОНТУР 2 — 2 × Dorin H5000CC (пунктирная линия)</text>
+
+        <g>
+          <circle cx="105" cy="440" r="22" fill="#0B2C4F" stroke="#e0992b" stroke-width="2"/><text x="105" y="445" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">M</text><text x="105" y="478" text-anchor="middle" fill="#f2d3a0" font-size="9">К2-1</text>
+          <circle cx="175" cy="440" r="22" fill="#0B2C4F" stroke="#e0992b" stroke-width="2"/><text x="175" y="445" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">M</text><text x="175" y="478" text-anchor="middle" fill="#f2d3a0" font-size="9">К2-2</text>
+        </g>
+
+        <!-- discharge (hot, dashed) — горизонтальный коллектор обоих компрессоров -->
+        <path d="M 105 418 L 105 350" fill="none" stroke="#e8533a" stroke-width="2.2" stroke-dasharray="9 5"/>
+        <path d="M 175 418 L 175 350" fill="none" stroke="#e8533a" stroke-width="2.2" stroke-dasharray="9 5"/>
+        <path d="M 105 350 L 320 350" fill="none" stroke="#e8533a" stroke-width="2.6" stroke-dasharray="9 5"/>
+        <g fill="#0a2540" stroke="#e8533a" stroke-width="1.4">
+          <path d="M 99 345 L 111 345 L 105 337 Z"/><path d="M 169 345 L 181 345 L 175 337 Z"/>
+        </g>
+        <text x="430" y="344" fill="#e8a08f" font-size="8">обр.кл. ×2 (нагнетание → конденсатор)</text>
+
+        <!-- suction (dashed) -->
+        <path d="M 105 462 L 105 500 L 320 500" fill="none" stroke="#3a78c2" stroke-width="2.2" stroke-dasharray="9 5"/>
+        <path d="M 175 462 L 175 500" fill="none" stroke="#3a78c2" stroke-width="2.2" stroke-dasharray="9 5"/>
+        <rect x="320" y="487" width="42" height="26" rx="6" fill="#0a2540" stroke="#3a78c2" stroke-width="1.4"/>
+        <text x="341" y="504" text-anchor="middle" fill="#9fc4dd" font-size="9">ОЖ</text>
+
+        <g transform="translate(420,400)">
+          <path d="M -12 -12 L 12 -12 L 0 0 Z M -12 12 L 12 12 L 0 0 Z" fill="#0a2540" stroke="#e0992b" stroke-width="2"/>
+          <circle cx="0" cy="-12" r="3.5" fill="#e0992b"/>
+        </g>
+        <text x="420" y="436" text-anchor="middle" fill="#e0992b" font-size="11" font-weight="700">ТРВ К2</text>
+
+        <rect x="480" y="388" width="40" height="24" rx="4" fill="#0a2540" stroke="#e0992b" stroke-width="1.5"/><text x="500" y="404" text-anchor="middle" fill="#f2d3a0" font-size="8">EVR22</text>
+        <circle cx="560" cy="400" r="12" fill="#0a2540" stroke="#e0992b" stroke-width="1.5"/><circle cx="560" cy="400" r="3.5" fill="#e0992b"/>
+        <rect x="600" y="388" width="42" height="24" rx="4" fill="#0a2540" stroke="#e0992b" stroke-width="1.5"/><text x="621" y="404" text-anchor="middle" fill="#f2d3a0" font-size="9">ФО</text>
+      </g>
+
+      <!-- ===================== ROUTING (no overlaps) ===================== -->
+      <!-- HOT: discharge K1 (solid) -> condenser left inlet -->
+      <path id="p_disc1" d="M 320 160 L 900 160 L 900 76 L 980 76" fill="none" stroke="#e8533a" stroke-width="2.4" marker-end="url(#mHot)"/>
+      <!-- HOT: discharge K2 (dashed) -> condenser left inlet, lower lane -->
+      <path id="p_disc2" d="M 320 350 L 880 350 L 880 108 L 980 108" fill="none" stroke="#e8533a" stroke-width="2.6" stroke-dasharray="9 5" marker-end="url(#mHot)"/>
+      <!-- inlet stubs on condenser -->
+      <rect x="972" y="72" width="10" height="8" fill="#e8533a"/>
+      <rect x="972" y="104" width="10" height="8" fill="#e8533a"/>
+
+      <!-- LIQ: condenser -> receiver K1 (solid) -->
+      <path id="p_cr1" d="M 1030 124 L 1030 160" fill="none" stroke="#15B6DA" stroke-width="2.2" marker-end="url(#mLiq)"/>
+      <!-- LIQ: condenser -> receiver K2 (dashed) -->
+      <path id="p_cr2" d="M 1105 124 L 1105 160" fill="none" stroke="#15B6DA" stroke-width="2.2" stroke-dasharray="9 5" marker-end="url(#mLiq)"/>
+
+      <!-- LIQ: receiver K1 -> filter train -> TRV K1 (solid) -->
+      <path id="p_liq1" d="M 1030 226 L 1030 250 L 700 250 L 700 190 L 642 190" fill="none" stroke="#15B6DA" stroke-width="2.2" marker-end="url(#mLiq)"/>
+      <path d="M 600 190 L 582 190" fill="none" stroke="#15B6DA" stroke-width="2.2"/>
+      <path d="M 548 190 L 532 190" fill="none" stroke="#15B6DA" stroke-width="2.2"/>
+      <path d="M 480 190 L 444 190" fill="none" stroke="#15B6DA" stroke-width="2.2"/>
+
+      <!-- LIQ: receiver K2 -> filter train -> TRV K2 (dashed) -->
+      <path id="p_liq2" d="M 1105 226 L 1105 268 L 940 268 L 940 340 L 700 340 L 700 400 L 642 400" fill="none" stroke="#15B6DA" stroke-width="2.2" stroke-dasharray="9 5" marker-end="url(#mLiq)"/>
+      <path d="M 600 400 L 582 400" fill="none" stroke="#15B6DA" stroke-width="2.2" stroke-dasharray="9 5"/>
+      <path d="M 548 400 L 532 400" fill="none" stroke="#15B6DA" stroke-width="2.2" stroke-dasharray="9 5"/>
+      <path d="M 480 400 L 444 400" fill="none" stroke="#15B6DA" stroke-width="2.2" stroke-dasharray="9 5"/>
+
+      <!-- ===================== EVAPORATOR (bottom) ===================== -->
+      <g>
+        <rect x="150" y="600" width="560" height="76" rx="8" fill="#0B2C4F" stroke="#15B6DA" stroke-width="2"/>
+        <text x="430" y="631" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">КОЖУХОТРУБНЫЙ ИСПАРИТЕЛЬ ~250 кВт</text>
+        <text x="430" y="652" text-anchor="middle" fill="#9fc4dd" font-size="11">2 фреоновых контура · общая водяная сторона · вода 14→7 °C</text>
+        <g stroke="#2f7aa3" stroke-width="1"><line x1="170" y1="608" x2="690" y2="608"/><line x1="170" y1="668" x2="690" y2="668"/></g>
+        <circle cx="300" cy="600" r="5" fill="#15B6DA"/><text x="300" y="592" text-anchor="middle" fill="#15B6DA" font-size="8">К1</text>
+        <circle cx="560" cy="600" r="5" fill="#e0992b"/><text x="560" y="592" text-anchor="middle" fill="#e0992b" font-size="8">К2</text>
+      </g>
+
+      <!-- LIQ injection: TRV K1 -> evaporator inlet K1 (solid cyan) -->
+      <path id="p_inj1" d="M 420 202 L 420 560 L 300 560 L 300 600" fill="none" stroke="#15B6DA" stroke-width="2.2" marker-end="url(#mLiq)"/>
+      <!-- LIQ injection: TRV K2 -> evaporator inlet K2 (dashed cyan) -->
+      <path id="p_inj2" d="M 420 412 L 420 545 L 560 545 L 560 600" fill="none" stroke="#15B6DA" stroke-width="2.2" stroke-dasharray="9 5" marker-end="url(#mLiq)"/>
+
+      <!-- SUC vapor: evaporator -> ОЖ -> suction manifold (blue) -->
+      <path id="p_suc1" d="M 260 600 L 260 300 L 362 300" fill="none" stroke="#3a78c2" stroke-width="2.2" marker-end="url(#mSuc)"/>
+      <path id="p_suc2" d="M 520 600 L 520 500 L 362 500" fill="none" stroke="#3a78c2" stroke-width="2.2" stroke-dasharray="9 5" marker-end="url(#mSuc)"/>
+
+      <!-- ===================== WATER CIRCUIT ===================== -->
+      <g>
+        <path id="p_wout" d="M 150 635 L 80 635 L 80 705" fill="none" stroke="#1e8a4c" stroke-width="2.6" marker-end="url(#mW)"/>
+        <text x="76" y="628" text-anchor="end" fill="#5fd08c" font-size="11" font-weight="700">вода 7 °C →</text>
+        <text x="76" y="642" text-anchor="end" fill="#7fb89a" font-size="9">потребителю</text>
+        <rect x="58" y="705" width="92" height="48" rx="8" fill="#0d3a26" stroke="#1e8a4c" stroke-width="2"/>
+        <text x="104" y="726" text-anchor="middle" fill="#9fe0bb" font-size="10" font-weight="700">БАК-АККУМ.</text>
+        <text x="104" y="741" text-anchor="middle" fill="#7fb89a" font-size="9">500–800 л</text>
+        <path id="p_wret" d="M 710 635 L 810 635 L 810 730 L 330 730" fill="none" stroke="#1e8a4c" stroke-width="2.6" marker-end="url(#mW)"/>
+        <text x="816" y="628" fill="#5fd08c" font-size="11" font-weight="700">← вода 14 °C</text>
+        <text x="816" y="642" fill="#7fb89a" font-size="9">обратка</text>
+        <circle cx="280" cy="730" r="22" fill="#0a2540" stroke="#1e8a4c" stroke-width="2"/>
+        <path d="M 280 730 L 298 730 M 280 730 L 271 744 M 280 730 L 271 716" stroke="#1e8a4c" stroke-width="2" fill="none"/>
+        <text x="280" y="772" text-anchor="middle" fill="#9fe0bb" font-size="10" font-weight="700">НАСОС 30 м³/ч</text>
+        <path id="p_wpump" d="M 258 730 L 150 730" fill="none" stroke="#1e8a4c" stroke-width="2.6" marker-end="url(#mW)"/>
+        <path id="p_wsup" d="M 302 730 L 350 730 L 350 676" fill="none" stroke="#1e8a4c" stroke-width="2.6" marker-end="url(#mW)"/>
+        <circle cx="870" cy="690" r="18" fill="#0d3a26" stroke="#1e8a4c" stroke-width="2"/>
+        <text x="870" y="694" text-anchor="middle" fill="#9fe0bb" font-size="9">расш.</text>
+        <path d="M 810 690 L 852 690" fill="none" stroke="#1e8a4c" stroke-width="2"/>
+        <text x="870" y="725" text-anchor="middle" fill="#7fb89a" font-size="8">расш.бак+ГБ</text>
+      </g>
+
+      <!-- ===================== SIDE LEGEND (clear zone bottom-right) ===================== -->
+      <g>
+        <rect x="980" y="290" width="350" height="288" rx="10" fill="rgba(11,44,79,0.9)" stroke="#2f5f86" stroke-width="1"/>
+        <text x="1002" y="322" fill="#fff" font-size="14" font-weight="700">Состав одного контура</text>
+        <text x="1002" y="352" fill="#cfe2f0" font-size="12">M — компрессоры Dorin (3 в К1, 2 в К2)</text>
+        <text x="1002" y="378" fill="#cfe2f0" font-size="12">▷ обр. клапан NRV — на каждый компр.</text>
+        <text x="1002" y="404" fill="#cfe2f0" font-size="12">ОЖ — отделитель жидкости (всас.)</text>
+        <text x="1002" y="430" fill="#cfe2f0" font-size="12">EVR22 — соленоид · 1 на контур</text>
+        <text x="1002" y="456" fill="#cfe2f0" font-size="12">◇ ФО — фильтр-осушитель DCL 309s</text>
+        <text x="1002" y="482" fill="#cfe2f0" font-size="12">◉ SGN 22s — смотровое стекло</text>
+        <text x="1002" y="508" fill="#cfe2f0" font-size="12">⧖ ТРВ TE 55 + термоэлемент TEZ 55</text>
+        <text x="1002" y="534" fill="#cfe2f0" font-size="12">Реле KP15 (ВД/НД) + MP55 (масло)</text>
+        <text x="1002" y="562" fill="#7fa8c9" font-size="10.5">Ступени 20/40/60/80/100 % — включением компр.</text>
+      </g>
+
+      <!-- ===================== MOVING FLOW ARROWS (colored by phase) ===================== -->
+      <use href="#arHot"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#p_disc1"/></animateMotion></use>
+      <use href="#arHot"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" rotate="auto"><mpath href="#p_disc1"/></animateMotion></use>
+      <use href="#arHot"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#p_disc2"/></animateMotion></use>
+      <use href="#arHot"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" rotate="auto"><mpath href="#p_disc2"/></animateMotion></use>
+
+      <use href="#arLiq"><animateMotion dur="3s" repeatCount="indefinite" rotate="auto"><mpath href="#p_liq1"/></animateMotion></use>
+      <use href="#arLiq"><animateMotion dur="3s" repeatCount="indefinite" rotate="auto"><mpath href="#p_liq2"/></animateMotion></use>
+      <use href="#arLiq"><animateMotion dur="2s" repeatCount="indefinite" rotate="auto"><mpath href="#p_inj1"/></animateMotion></use>
+      <use href="#arLiq"><animateMotion dur="2s" repeatCount="indefinite" rotate="auto"><mpath href="#p_inj2"/></animateMotion></use>
+
+      <use href="#arSuc"><animateMotion dur="2.4s" repeatCount="indefinite" rotate="auto"><mpath href="#p_suc1"/></animateMotion></use>
+      <use href="#arSuc"><animateMotion dur="2.4s" repeatCount="indefinite" rotate="auto"><mpath href="#p_suc2"/></animateMotion></use>
+
+      <use href="#arW"><animateMotion dur="2.2s" repeatCount="indefinite" rotate="auto"><mpath href="#p_wout"/></animateMotion></use>
+      <use href="#arW"><animateMotion dur="3s" repeatCount="indefinite" rotate="auto"><mpath href="#p_wret"/></animateMotion></use>
+      <use href="#arW"><animateMotion dur="1.6s" repeatCount="indefinite" rotate="auto"><mpath href="#p_wpump"/></animateMotion></use>
+      <use href="#arW"><animateMotion dur="1.6s" repeatCount="indefinite" rotate="auto"><mpath href="#p_wsup"/></animateMotion></use>
+          <!-- ===================== HOVER HITBOXES (tooltips) ===================== -->
+      <g fill="transparent" stroke="none">
+        <!-- compressors K1 -->
+        <circle cx="95" cy="235" r="24" data-name="Компрессор Dorin H5000CC · К1-1" data-info="Полугерметичный поршневой, серия H6, ~50 кВт. R407C/R513A. Контур 1 (3 компр. параллельно)."/>
+        <circle cx="155" cy="235" r="24" data-name="Компрессор Dorin H5000CC · К1-2" data-info="Полугерметичный поршневой, серия H6, ~50 кВт. R407C/R513A. Контур 1."/>
+        <circle cx="215" cy="235" r="24" data-name="Компрессор Dorin H5000CC · К1-3" data-info="Полугерметичный поршневой, серия H6, ~50 кВт. R407C/R513A. Контур 1."/>
+        <!-- compressors K2 -->
+        <circle cx="105" cy="440" r="24" data-name="Компрессор Dorin H5000CC · К2-1" data-info="Полугерметичный поршневой, серия H6, ~50 кВт. R407C/R513A. Контур 2 (2 компр. параллельно)."/>
+        <circle cx="175" cy="440" r="24" data-name="Компрессор Dorin H5000CC · К2-2" data-info="Полугерметичный поршневой, серия H6, ~50 кВт. R407C/R513A. Контур 2."/>
+        <!-- TRV -->
+        <rect x="404" y="174" width="32" height="32" data-name="ТРВ контур 1 — Danfoss TE 55" data-info="Терморегулирующий вентиль, корпус TE 55 + клапанный узел + термоэлемент TEZ 55 (R407C, MOP). Дросселирует жидкость на впрыск в испаритель. Под ~120 кВт."/>
+        <rect x="404" y="384" width="32" height="32" data-name="ТРВ контур 2 — Danfoss TE 55" data-info="Терморегулирующий вентиль, корпус TE 55 + TEZ 55 (R407C). Под ~95 кВт нагрузки контура 2."/>
+        <!-- solenoids -->
+        <rect x="480" y="178" width="40" height="24" data-name="Соленоид — Danfoss EVR 22" data-info="Электромагнитный клапан жидкостной линии, Ду22, + катушка BB230AS, 220В. Отсекает контур при остановке компрессоров."/>
+        <rect x="480" y="388" width="40" height="24" data-name="Соленоид — Danfoss EVR 22" data-info="Электромагнитный клапан жидкостной линии контура 2, Ду22, + катушка BB230AS."/>
+        <!-- sight glass -->
+        <circle cx="560" cy="190" r="13" data-name="Смотровое стекло — Danfoss SGN 22s" data-info="Индикатор потока и влажности на жидкостной линии. Контроль заправки контура."/>
+        <circle cx="560" cy="400" r="13" data-name="Смотровое стекло — Danfoss SGN 22s" data-info="Индикатор потока и влажности, контур 2."/>
+        <!-- filter -->
+        <rect x="600" y="178" width="42" height="24" data-name="Фильтр-осушитель — Danfoss DCL 309s" data-info="Паяный антикислотный фильтр-осушитель на жидкостной линии. Удаляет влагу и продукты разложения масла."/>
+        <rect x="600" y="388" width="42" height="24" data-name="Фильтр-осушитель — Danfoss DCL 309s" data-info="Паяный антикислотный фильтр-осушитель, контур 2."/>
+        <!-- liquid separators -->
+        <rect x="320" y="287" width="42" height="26" data-name="Отделитель жидкости (всасывание) — контур 1" data-info="Защита компрессоров от гидроудара на линии всасывания. 1 на контур."/>
+        <rect x="320" y="487" width="42" height="26" data-name="Отделитель жидкости (всасывание) — контур 2" data-info="Защита компрессоров от гидроудара, контур 2."/>
+        <!-- condenser -->
+        <rect x="980" y="60" width="300" height="64" data-name="Конденсатор Baer FNV ~295 кВт" data-info="Воздушный конденсатор, серия FNV (40–397 кВт), 2 независимых контура в одном корпусе. EC-вентиляторы ×4, регулировка по давлению конденсации. tк +40 / Δt 15."/>
+        <!-- receivers -->
+        <rect x="1010" y="160" width="40" height="66" data-name="Ресивер контур 1" data-info="Жидкостный ресивер 80–120 л, контур 1. Сервисные вентили Rotalock. Накапливает жидкий хладагент после конденсатора."/>
+        <rect x="1085" y="160" width="40" height="66" data-name="Ресивер контур 2" data-info="Жидкостный ресивер 80–120 л, контур 2."/>
+        <!-- evaporator -->
+        <rect x="150" y="600" width="560" height="76" data-name="Кожухотрубный испаритель ~250 кВт" data-info="DX-типа, 2 независимых фреоновых контура в общем кожухе. Вода течёт через трубный пучок, охлаждается 14→7 °C. Нерж. трубы."/>
+        <!-- pump -->
+        <circle cx="280" cy="730" r="24" data-name="Насос — Grundfos / Wilo, 30 м³/ч" data-info="Циркуляционный насос водяного контура. Прокачивает 30 м³/ч через испаритель к потребителю."/>
+        <!-- tank -->
+        <rect x="58" y="705" width="92" height="48" data-name="Бак-аккумулятор 500–800 л" data-info="Сглаживает нагрузку водяного контура, увеличивает инерционность системы."/>
+        <!-- expansion -->
+        <circle cx="870" cy="690" r="20" data-name="Расширительный бак + группа безопасности" data-info="Компенсация теплового расширения воды, предохранительный клапан, автовоздушник."/>
+      </g>
+</svg>
+  </div>
+</div>
+
+<div class="panel" id="kp">
+  <div class="kp-wrap">
+    <div class="kp-head">
+      <div class="lbl">Закупочная спецификация / BOM</div>
+      <h1>Чиллер 244 кВт — 2-контурная схема для самостоятельной сборки</h1>
+      <div class="sub">Dorin H5000CC ×5 · конденсатор Baer FNV · кожухотрубный 2-контурный испаритель · июнь 2026</div>
+      <span class="badge">Внутренний документ · не для клиента</span>
+    </div>
+
+    <div class="arch">
+      <b>Архитектура:</b> 5 компрессоров объединены в <b>2 независимых холодильных контура</b>. Контур&nbsp;1 — 3 компрессора Dorin параллельно, контур&nbsp;2 — 2 компрессора. На каждый контур <b>один ТРВ, один соленоид, один фильтр</b> (большего типоразмера). Испаритель — <b>кожухотрубный с двумя фреоновыми контурами</b> и общей водяной стороной. Ступенчатость 20/40/60/80/100 % обеспечивается включением компрессоров внутри контуров.
+    </div>
+
+    <div class="cards">
+      <div class="card"><h4>Холодопроизводительность</h4><div class="big">244 кВт</div><div class="small">вода 7/14 °C, ΔT = 7 °C</div></div>
+      <div class="card"><h4>Контуры хладагента</h4><div class="big">2 шт</div><div class="small">3 + 2 компрессора</div></div>
+      <div class="card"><h4>Теплосъём конденсатора</h4><div class="big">~295 кВт</div><div class="small">Q исп + работа сжатия</div></div>
+    </div>
+
+    <div class="sec"><span class="n">2</span>Основные узлы холодильного блока</div>
+    <table>
+      <thead><tr><td style="width:5%">№</td><td style="width:42%">Наименование / модель</td><td class="c" style="width:9%">Кол-во</td><td class="r" style="width:17%">Цена за ед., ₽</td><td class="r" style="width:17%">Сумма, ₽</td></tr></thead>
+      <tbody>
+        <tr><td class="pos">2.1</td><td><div class="iname">Компрессор Dorin H5000CC (серия H6)</div><div class="idesc">полугерметичный поршневой, ~50 кВт, R407C/R513A; 3 шт в контуре 1, 2 шт в контуре 2</div></td><td class="c">5</td><td class="r">480 000</td><td class="r">2 400 000</td></tr>
+        <tr><td class="pos">2.2</td><td><div class="iname">Кожухотрубный испаритель ~250 кВт, 2 контура</div><div class="idesc">DX-типа, 2 независимые фреоновые цепи + общая вода; нерж. трубный пучок</div></td><td class="c">1</td><td class="r">450 000</td><td class="r">450 000</td></tr>
+        <tr><td class="pos">2.3</td><td><div class="iname">Ресивер жидкостный 80–120 л</div><div class="idesc">по одному на контур; вентили Rotalock</div></td><td class="c">2</td><td class="r">48 000</td><td class="r">96 000</td></tr>
+        <tr class="sub-tr"><td colspan="4">Итого основные узлы</td><td class="r">2 946 000</td></tr>
+      </tbody>
+    </table>
+
+    <div class="sec"><span class="n">2.4</span>Холодильная обвязка (на 2 контура)</div>
+    <table>
+      <thead><tr><td style="width:5%">№</td><td style="width:42%">Наименование / артикул</td><td class="c" style="width:9%">Кол-во</td><td class="r" style="width:17%">Цена за ед., ₽</td><td class="r" style="width:17%">Сумма, ₽</td></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="5">Терморегулирование — 1 ТРВ на контур</td></tr>
+        <tr><td class="pos">а</td><td><div class="iname">ТРВ корпус Danfoss TE 55 + клапанный узел</div><div class="idesc">под ~120 кВт (контур 1) и ~95 кВт (контур 2), R407C, внешнее уравнивание</div></td><td class="c">2</td><td class="r">28 000</td><td class="r">56 000</td></tr>
+        <tr><td class="pos">б</td><td><div class="iname">Термоэлемент Danfoss TEZ 55 (R407C, MOP)</div><div class="idesc">диапазон N, баллон нерж., внешнее уравнивание</div></td><td class="c">2</td><td class="r">14 000</td><td class="r">28 000</td></tr>
+        <tr><td class="pos">в</td><td><div class="iname">Распределитель жидкости к испарителю</div><div class="idesc">после ТРВ — равномерный впрыск по секциям трубного пучка</div></td><td class="c">2</td><td class="r">12 000</td><td class="r">24 000</td></tr>
+        <tr class="grp"><td colspan="5">Запорно-регулирующая арматура — на контур</td></tr>
+        <tr><td class="pos">г</td><td><div class="iname">Соленоид Danfoss EVR 22 + катушка BB230AS</div><div class="idesc">Ду22, жидкостная линия контура, под пайку</div></td><td class="c">2</td><td class="r">9 800</td><td class="r">19 600</td></tr>
+        <tr><td class="pos">д</td><td><div class="iname">Смотровое стекло Danfoss SGN 22s</div><div class="idesc">с индикатором влажности, на жидк. линию контура</div></td><td class="c">2</td><td class="r">4 800</td><td class="r">9 600</td></tr>
+        <tr><td class="pos">е</td><td><div class="iname">Фильтр-осушитель Danfoss DCL 309s</div><div class="idesc">паяный, увеличенный, антикислотный — на контур</div></td><td class="c">2</td><td class="r">7 500</td><td class="r">15 000</td></tr>
+        <tr><td class="pos">ж</td><td><div class="iname">Обратный клапан нагнетания NRV — на компрессор</div><div class="idesc">развязка параллельных компрессоров в контуре</div></td><td class="c">5</td><td class="r">5 500</td><td class="r">27 500</td></tr>
+        <tr class="grp"><td colspan="5">Защита и контроль — на компрессор</td></tr>
+        <tr><td class="pos">з</td><td><div class="iname">Реле ВД/НД Danfoss KP15 (двойное)</div><div class="idesc">аварийное отключение по давлению, на каждый компрессор</div></td><td class="c">5</td><td class="r">5 800</td><td class="r">29 000</td></tr>
+        <tr><td class="pos">и</td><td><div class="iname">Реле давления масла Danfoss MP55</div><div class="idesc">контроль смазки, на каждый компрессор</div></td><td class="c">5</td><td class="r">11 000</td><td class="r">55 000</td></tr>
+        <tr><td class="pos">к</td><td><div class="iname">Виброгасители всас./нагнет. (пара)</div><div class="idesc">сильфонные, нерж., на каждый компрессор</div></td><td class="c">5</td><td class="r">7 200</td><td class="r">36 000</td></tr>
+        <tr class="grp"><td colspan="5">Общие узлы</td></tr>
+        <tr><td class="pos">л</td><td><div class="iname">Отделитель жидкости на всасывании — на контур</div><div class="idesc">защита компрессоров от гидроудара</div></td><td class="c">2</td><td class="r">28 000</td><td class="r">56 000</td></tr>
+        <tr><td class="pos">м</td><td><div class="iname">Манометры ВД/НД + порты Шредера</div><div class="idesc">сервисная панель, по контурам</div></td><td class="c">1 компл.</td><td class="r">18 000</td><td class="r">18 000</td></tr>
+        <tr class="sub-tr"><td colspan="4">Итого холодильная обвязка</td><td class="r">373 700</td></tr>
+      </tbody>
+    </table>
+
+    <div class="sec"><span class="n">3</span>Конденсатор Baer и гидромодуль</div>
+    <table>
+      <thead><tr><td style="width:5%">№</td><td style="width:42%">Наименование / модель</td><td class="c" style="width:9%">Кол-во</td><td class="r" style="width:17%">Цена за ед., ₽</td><td class="r" style="width:17%">Сумма, ₽</td></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="5">Выносной конденсатор — 2 независимые цепи</td></tr>
+        <tr><td class="pos">3.1</td><td><div class="iname">Конденсатор возд. охл. Baer FNV ~295 кВт</div><div class="idesc">серия FNV (40–397 кВт), 2 раздельных контура в одном корпусе; tк +40 / Δt 15</div></td><td class="c">1</td><td class="r">650 000</td><td class="r">650 000</td></tr>
+        <tr><td class="pos">3.2</td><td><div class="iname">EC-вентиляторы Ø630–800 мм</div><div class="idesc">ebmpapst / аналог, регулировка по давлению конденсации</div></td><td class="c">4</td><td class="r">55 000</td><td class="r">220 000</td></tr>
+        <tr><td class="pos">3.3</td><td><div class="iname">Контроллер давления конденсации (×2 контура)</div><div class="idesc">плавное управление вентиляторами</div></td><td class="c">2</td><td class="r">35 000</td><td class="r">70 000</td></tr>
+        <tr class="grp"><td colspan="5">Гидромодуль</td></tr>
+        <tr><td class="pos">3.4</td><td><div class="iname">Насос циркуляционный на 30 м³/ч</div><div class="idesc">Grundfos / Wilo</div></td><td class="c">1</td><td class="r">130 000</td><td class="r">130 000</td></tr>
+        <tr><td class="pos">3.5</td><td><div class="iname">Бак-аккумулятор 500–800 л</div><div class="idesc">нерж./окрашенная сталь, изоляция</div></td><td class="c">1</td><td class="r">110 000</td><td class="r">110 000</td></tr>
+        <tr><td class="pos">3.6</td><td><div class="iname">Расширительный бак, группа безопасности</div><div class="idesc">мембранный бак, клапаны, автовоздушник</div></td><td class="c">1 компл.</td><td class="r">40 000</td><td class="r">40 000</td></tr>
+        <tr class="sub-tr"><td colspan="4">Итого конденсатор + гидромодуль</td><td class="r">1 220 000</td></tr>
+      </tbody>
+    </table>
+
+    <div class="sec"><span class="n">4</span>Автоматика, рама, расходные материалы</div>
+    <table>
+      <thead><tr><td style="width:5%">№</td><td style="width:42%">Наименование</td><td class="c" style="width:9%">Кол-во</td><td class="r" style="width:17%">Цена за ед., ₽</td><td class="r" style="width:17%">Сумма, ₽</td></tr></thead>
+      <tbody>
+        <tr><td class="pos">4.1</td><td><div class="iname">Шкаф управления с ПЛК + панель</div><div class="idesc">управление 2 контурами, ротация компрессоров, защиты, диспетчеризация</div></td><td class="c">1</td><td class="r">290 000</td><td class="r">290 000</td></tr>
+        <tr><td class="pos">4.2</td><td><div class="iname">Силовая часть: автоматы, пускатели, ЧРП насоса</div><div class="idesc">Schneider / IEK, на 5 компрессоров</div></td><td class="c">1 компл.</td><td class="r">170 000</td><td class="r">170 000</td></tr>
+        <tr><td class="pos">4.3</td><td><div class="iname">Рама сварная + кожухи/панели</div><div class="idesc">профиль, порошковая окраска (свои работы — материалы)</div></td><td class="c">1</td><td class="r">150 000</td><td class="r">150 000</td></tr>
+        <tr><td class="pos">4.4</td><td><div class="iname">Медь, фитинги, припой, фреон R513A, масло</div><div class="idesc">трубы по 2 контурам, заправка, азот для опрессовки</div></td><td class="c">1 компл.</td><td class="r">230 000</td><td class="r">230 000</td></tr>
+        <tr><td class="pos">4.5</td><td><div class="iname">Изоляция, метизы, кабель, мелочёвка</div><div class="idesc">k-flex, клеммы, гофра, маркировка</div></td><td class="c">1 компл.</td><td class="r">90 000</td><td class="r">90 000</td></tr>
+        <tr class="sub-tr"><td colspan="4">Итого автоматика + рама + расходники</td><td class="r">930 000</td></tr>
+      </tbody>
+    </table>
+
+    <div class="total">
+      <div class="row"><span class="lbl">Холодильный блок (узлы + обвязка)</span><span class="val">3 319 700 ₽</span></div>
+      <div class="row"><span class="lbl">Конденсатор Baer + гидромодуль</span><span class="val">1 220 000 ₽</span></div>
+      <div class="row"><span class="lbl">Автоматика, рама, расходники</span><span class="val">930 000 ₽</span></div>
+      <div class="row grand"><span class="lbl">ИТОГО ЗАКУП</span><span class="val">≈ 5 470 000 ₽</span></div>
+    </div>
+
+    <ul class="notes">
+      <li>2-контурная схема дороже на ~0,2 млн (кожухотрубный испаритель + ТРВ TE 55 + сдвоенный конденсатор), но это реально собираемая и обслуживаемая конфигурация — в отличие от 5 отдельных контуров на паяном теплообменнике.</li>
+      <li>ТРВ подобраны корпусом TE 55 под нагрузку контура (~120 и ~95 кВт). Точный клапанный узел — в Danfoss Coolselector под фактические Ткип/Тконд.</li>
+      <li>Себестоимость закупа ≈5,47 млн ₽ без своего труда. Целевая отпускная — 7,0–7,8 млн ₽ (наценка 30–43 %). Линейные компоненты заменяемы аналогами (РИДАН/Sanhua) с экономией 30–50 %.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const COL={hot:0xe8533a, liq:0x15B6DA, suc:0x3a78c2, water:0x1e8a4c, navy:0x0B2C4F, cyan:0x15B6DA, c1:0x15B6DA, c2:0xe0992b};
+let scene,camera,renderer,raycaster,mouse,clock;
+let spin=true, flowOn=true, speed=1;
+const pickables=[]; const tubes=[]; const spinners=[];
+const canvas=document.getElementById('scene');
+const tooltip=document.getElementById('tooltip');
+
+function init(){
+  scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0x081f33, 70, 175);
+  camera=new THREE.PerspectiveCamera(45, 2, 0.1, 500);
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  scene.add(new THREE.AmbientLight(0x8fb2d0, 0.75));
+  const key=new THREE.DirectionalLight(0xffffff,0.95); key.position.set(34,54,28); scene.add(key);
+  const rim=new THREE.DirectionalLight(0x15B6DA,0.4); rim.position.set(-30,18,-30); scene.add(rim);
+  const fill=new THREE.PointLight(0x2a6fa0,0.5,220); fill.position.set(0,30,40); scene.add(fill);
+  const grid=new THREE.GridHelper(170,42,0x224f78,0x163a5c); grid.position.y=-15; scene.add(grid);
+  raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2(-2,-2); clock=new THREE.Clock();
+  buildSchema(); bindControls(); updateCam(); onResize(); animate();
+}
+
+function makeLabel(text, sub, w){
+  const cv=document.createElement('canvas'); cv.width=512; cv.height=150;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='rgba(11,44,79,0.92)'; roundRect(ctx,4,4,504,142,18); ctx.fill();
+  ctx.strokeStyle='#15B6DA'; ctx.lineWidth=3; roundRect(ctx,4,4,504,142,18); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='bold 42px Montserrat, Arial'; ctx.textAlign='center'; ctx.fillText(text,256,66);
+  if(sub){ctx.fillStyle='#9fc4dd'; ctx.font='26px Arial'; ctx.fillText(sub,256,108);}
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));
+  sp.scale.set(w||14,(w||14)*0.29,1); return sp;
+}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function mat(color,metal,rough,emi){return new THREE.MeshStandardMaterial({color,metalness:metal!=null?metal:0.55,roughness:rough!=null?rough:0.4,emissive:color,emissiveIntensity:emi!=null?emi:0.06});}
+function reg(mesh,name,info){mesh.userData={name,info,base:mesh.material.emissiveIntensity}; pickables.push(mesh);}
+function edges(mesh,op){const e=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),new THREE.LineBasicMaterial({color:0xbfe6f2,transparent:true,opacity:op||0.25})); mesh.add(e);}
+
+function compressor(x,y,z,col,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.7,4,30),mat(0x14334f,0.6,0.35)); grp.add(body); edges(body,0.2);
+  // cooling fins on motor body
+  for(let i=0;i<6;i++){
+    const fin=new THREE.Mesh(new THREE.TorusGeometry(1.74,0.06,6,28),mat(0x0f2c45,0.5,0.5));
+    fin.position.y=-1.4+i*0.55; fin.rotation.x=Math.PI/2; grp.add(fin);
+  }
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(1.7,24,16,0,Math.PI*2,0,Math.PI/2),mat(0x1a3e5e,0.6,0.35)); dome.position.y=2; grp.add(dome);
+  // valve plate / head on top
+  const head=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.8,1.6),mat(0x10314c,0.55,0.4)); head.position.y=2.5; grp.add(head); edges(head,0.25);
+  // suction & discharge stubs
+  const suc=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,1.2,14),mat(0x3a78c2,0.5,0.4,0.2)); suc.position.set(-1.7,1.2,0); suc.rotation.z=Math.PI/2; grp.add(suc);
+  const dis=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,1.2,14),mat(0xe8533a,0.5,0.4,0.2)); dis.position.set(1.7,1.6,0); dis.rotation.z=Math.PI/2; grp.add(dis);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.5,3),mat(0x0e2a44,0.5,0.5)); base.position.y=-2.1; grp.add(base);
+  // anti-vibration feet
+  for(let fx of [-1.7,1.7]) for(let fz of [-1,1]){
+    const ft=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,0.5,10),mat(0x081e30,0.3,0.7)); ft.position.set(fx,-2.4,fz); grp.add(ft);
+  }
+  const tb=new THREE.Mesh(new THREE.BoxGeometry(1.2,1,0.8),mat(0x0a2236,0.4,0.6)); tb.position.set(1.4,0.4,1.1); grp.add(tb);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.72,0.2,10,30),mat(col,0.4,0.4,0.55)); ring.position.y=0.3; ring.rotation.x=Math.PI/2; grp.add(ring);
+  reg(body,name,info); scene.add(grp); return grp;
+}
+function tank(x,y,z,r,h,col,name,info,horiz){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,30),mat(col,0.55,0.32));
+  if(horiz)m.rotation.z=Math.PI/2;
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(r,24,12,0,Math.PI*2,0,Math.PI/2),mat(col,0.55,0.32));
+  const e2=e1.clone();
+  if(horiz){e1.rotation.z=-Math.PI/2;e1.position.set(h/2,0,0);e2.rotation.z=Math.PI/2;e2.position.set(-h/2,0,0);}
+  else{e1.position.y=h/2;e2.rotation.x=Math.PI;e2.position.y=-h/2;}
+  m.add(e1); m.add(e2); edges(m,0.18); grp.add(m);
+  // banding rings
+  if(horiz){for(let bx of [-h*0.28,h*0.28]){const bnd=new THREE.Mesh(new THREE.TorusGeometry(r*1.02,0.07,8,30),mat(0x0b2335,0.4,0.5)); bnd.position.x=bx; bnd.rotation.y=Math.PI/2; grp.add(bnd);}}
+  else {for(let by of [-h*0.28,h*0.28]){const bnd=new THREE.Mesh(new THREE.TorusGeometry(r*1.02,0.07,8,30),mat(0x0b2335,0.4,0.5)); bnd.position.y=by; bnd.rotation.x=Math.PI/2; grp.add(bnd);}}
+  // support feet for vertical tanks
+  if(!horiz){for(let a=0;a<3;a++){const ang=a*2.094; const leg=new THREE.Mesh(new THREE.BoxGeometry(0.3,2,0.3),mat(0x0a2236,0.4,0.6)); leg.position.set(Math.cos(ang)*r*0.7,-h/2-1,Math.sin(ang)*r*0.7); grp.add(leg);} }
+  // nozzles
+  const nz=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1,12),mat(col,0.5,0.4,0.2));
+  if(horiz){nz.position.set(0,r+0.4,0);}else{nz.position.set(0,h/2+0.4,0);} grp.add(nz);
+  reg(m,name,info); scene.add(grp); return grp;
+}
+function shellTube(x,y,z,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  const shell=new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.2,30,36),mat(0x123a5c,0.6,0.3)); shell.rotation.z=Math.PI/2; grp.add(shell); edges(shell,0.15);
+  // banding rings along shell
+  for(let bx=-12;bx<=12;bx+=6){const bnd=new THREE.Mesh(new THREE.TorusGeometry(3.24,0.1,8,34),mat(0x0b2335,0.4,0.5)); bnd.position.x=bx; bnd.rotation.y=Math.PI/2; grp.add(bnd);}
+  for(let s of [-1,1]){
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(3.5,3.5,1.6,36),mat(0x1e8a4c,0.5,0.4)); cap.rotation.z=Math.PI/2; cap.position.x=s*15.5; grp.add(cap); edges(cap,0.2);
+    // bolt flange
+    const fl=new THREE.Mesh(new THREE.TorusGeometry(3.5,0.18,8,34),mat(0x14633f,0.5,0.5)); fl.position.x=s*14.7; fl.rotation.y=Math.PI/2; grp.add(fl);
+    // water nozzle
+    const wn=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,1.6,16),mat(0x1e8a4c,0.5,0.4,0.15)); wn.position.set(s*16.6,0,0); wn.rotation.z=Math.PI/2; grp.add(wn);
+  }
+  // freon inlet nozzles (2 circuits)
+  const n1=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,2.4,16),mat(COL.c1,0.5,0.4,0.3)); n1.position.set(-7,3.4,0); grp.add(n1);
+  const n2=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,2.4,16),mat(COL.c2,0.5,0.4,0.3)); n2.position.set(7,3.4,0); grp.add(n2);
+  // saddle supports
+  for(let sx of [-9,9]){const sad=new THREE.Mesh(new THREE.BoxGeometry(2,2,7),mat(0x0a2236,0.4,0.6)); sad.position.set(sx,-3.2,0); grp.add(sad);}
+  reg(shell,name,info); scene.add(grp); return grp;
+}
+function condenser(x,y,z,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  // основной корпус-короб (теплообменный блок)
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(36,8,10),mat(0x12466b,0.5,0.45,0.05)); grp.add(frame); edges(frame,0.22);
+  // оребрённые панели спереди и сзади (вертикальные)
+  for(let s of [-1,1]){
+    const panel=new THREE.Mesh(new THREE.BoxGeometry(34,6.4,0.4),mat(0x1d6f93,0.55,0.4,0.1));
+    panel.position.set(0,-0.3,s*5.05); grp.add(panel);
+    // вертикальные линии оребрения
+    for(let fx=-16;fx<=16;fx+=1.6){const fl=new THREE.Mesh(new THREE.BoxGeometry(0.05,6,0.42),mat(0x3a90b8,0.4,0.5)); fl.position.set(fx,-0.3,s*5.12); grp.add(fl);}
+  }
+  reg(frame,name,info);
+  // верхняя плита под вентиляторы
+  const topPlate=new THREE.Mesh(new THREE.BoxGeometry(36,0.4,10),mat(0x0e3a5e,0.5,0.5)); topPlate.position.y=4; grp.add(topPlate);
+  // 4 вентилятора СВЕРХУ, ось вращения вертикальная (Y)
+  for(let j of [-13,-4.5,4.5,13]){
+    const fg=new THREE.Group(); fg.position.set(j,4.3,0);
+    // обечайка (кольцо) — лежит горизонтально
+    const shroud=new THREE.Mesh(new THREE.TorusGeometry(2.0,0.22,10,32),mat(0x0c2c47,0.4,0.5)); shroud.rotation.x=Math.PI/2; fg.add(shroud);
+    // защитная решётка (статичная)
+    for(let g=0;g<8;g++){const bar=new THREE.Mesh(new THREE.BoxGeometry(4,0.05,0.08),mat(0x1a4a6e,0.4,0.6)); bar.rotation.y=g*Math.PI/8; bar.position.y=0.25; fg.add(bar);}
+    // вращающийся блок: ступица + лопасти в горизонтальной плоскости
+    const rot=new THREE.Group(); rot.position.y=0;
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.4,14),mat(0x081e30,0.4,0.5)); rot.add(hub);
+    for(let b=0;b<6;b++){
+      const bl=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.08,0.7),mat(0xaad8ea,0.3,0.5,0.12));
+      bl.position.set(1.0,0,0); bl.rotation.x=0.45;          // наклон лопасти (угол атаки)
+      const wrap=new THREE.Group(); wrap.rotation.y=b*Math.PI*2/6; wrap.add(bl); rot.add(wrap);
+    }
+    fg.add(rot); spinners.push(rot);
+  }
+  scene.add(grp); return grp;
+}
+function valveTRV(x,y,z,col,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  // valve body (brass-like)
+  const b=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,1.4,18),mat(0xb98b4a,0.7,0.35,0.05)); grp.add(b); edges(b,0.25);
+  // inlet/outlet ports
+  const pin=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,1.2,12),mat(0x15B6DA,0.5,0.4,0.2)); pin.position.set(-0.9,-0.2,0); pin.rotation.z=Math.PI/2; grp.add(pin);
+  const pout=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1.2,12),mat(0x15B6DA,0.5,0.4,0.2)); pout.position.set(0,-1,0); grp.add(pout);
+  // power head (диафрагма) on top
+  const head=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,0.7,18),mat(0xcfd8df,0.7,0.25)); head.position.y=1; grp.add(head); edges(head,0.2);
+  const headTop=new THREE.Mesh(new THREE.SphereGeometry(0.55,16,10,0,Math.PI*2,0,Math.PI/2),mat(0xe2e8ed,0.7,0.25)); headTop.position.y=1.35; grp.add(headTop);
+  // capillary tube + bulb (термобаллон)
+  const capPts=[new THREE.Vector3(0.4,1.2,0),new THREE.Vector3(1.4,0.8,0.6),new THREE.Vector3(2.2,0,1.2),new THREE.Vector3(2.6,-0.6,1.6)];
+  const cap=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(capPts),20,0.06,8,false),mat(0xcfd8df,0.6,0.3)); grp.add(cap);
+  const bulb=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.8,12),mat(0xcfd8df,0.6,0.3)); bulb.position.set(2.7,-0.7,1.7); bulb.rotation.z=0.5; grp.add(bulb);
+  // colored circuit collar
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(0.72,0.1,8,20),mat(col,0.4,0.4,0.5)); collar.rotation.x=Math.PI/2; collar.position.y=0.6; grp.add(collar);
+  reg(b,name,info); scene.add(grp); return grp;
+}
+function solenoid(x,y,z,col,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  // valve body
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.4,16),mat(0xb98b4a,0.7,0.35)); body.rotation.z=Math.PI/2; grp.add(body); edges(body,0.2);
+  // coil (catushka) on top — dark box
+  const coil=new THREE.Mesh(new THREE.BoxGeometry(0.9,1.1,0.9),mat(0x101b26,0.4,0.6)); coil.position.y=0.85; grp.add(coil); edges(coil,0.3);
+  // coil terminal
+  const term=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.4,8),mat(0x2a3a48,0.4,0.6)); term.position.set(0,1.5,0); grp.add(term);
+  // stem connecting coil to body
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.5,10),mat(0xcfd8df,0.6,0.3)); stem.position.y=0.35; grp.add(stem);
+  // ports
+  for(let s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.8,12),mat(col,0.5,0.4,0.2)); p.position.set(s*0.9,0,0); p.rotation.z=Math.PI/2; grp.add(p);}
+  reg(body,name,info); scene.add(grp); return grp;
+}
+function filterDrier(x,y,z,col,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  // cylindrical body horizontal
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,2.4,18),mat(0xc9cdd2,0.6,0.35)); body.rotation.z=Math.PI/2; grp.add(body); edges(body,0.2);
+  // domed ends
+  for(let s of [-1,1]){const e=new THREE.Mesh(new THREE.SphereGeometry(0.6,16,10,0,Math.PI*2,0,Math.PI/2),mat(0xc9cdd2,0.6,0.35)); e.rotation.z=s*Math.PI/2; e.position.set(s*1.2,0,0); grp.add(e);}
+  // ports
+  for(let s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.7,12),mat(col,0.5,0.4,0.2)); p.position.set(s*1.6,0,0); p.rotation.z=Math.PI/2; grp.add(p);}
+  reg(body,name,info); scene.add(grp); return grp;
+}
+function sightGlass(x,y,z,col,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.9,16),mat(0xb98b4a,0.7,0.35)); body.rotation.z=Math.PI/2; grp.add(body);
+  // glass dome on top
+  const glass=new THREE.Mesh(new THREE.SphereGeometry(0.3,16,12),new THREE.MeshStandardMaterial({color:0x8fd0e8,metalness:0.1,roughness:0.1,transparent:true,opacity:0.6,emissive:0x15B6DA,emissiveIntensity:0.3})); glass.position.y=0.4; grp.add(glass);
+  for(let s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.7,12),mat(col,0.5,0.4,0.2)); p.position.set(s*0.7,0,0); p.rotation.z=Math.PI/2; grp.add(p);}
+  reg(body,name,info); scene.add(grp); return grp;
+}
+function boxNode(x,y,z,w,h,d,col,name,info){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(col,0.5,0.4,0.15)); m.position.set(x,y,z); edges(m,0.3); reg(m,name,info); scene.add(m); return m;
+}
+function pump(x,y,z,col,name,info){
+  const grp=new THREE.Group(); grp.position.set(x,y,z);
+  // volute (snail housing)
+  const vol=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.7,1.5,28),mat(col,0.5,0.4)); vol.rotation.x=Math.PI/2; grp.add(vol); edges(vol,0.25);
+  // volute outer spiral hint
+  const volr=new THREE.Mesh(new THREE.TorusGeometry(1.7,0.25,10,28),mat(0x16633f,0.5,0.45)); grp.add(volr);
+  // suction inlet (axial, front)
+  const inlet=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,1.2,16),mat(col,0.5,0.4,0.15)); inlet.position.set(0,0,1.2); inlet.rotation.x=Math.PI/2; grp.add(inlet);
+  // discharge outlet (tangential, up)
+  const outlet=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.6,16),mat(col,0.5,0.4,0.15)); outlet.position.set(0,1.7,0); grp.add(outlet);
+  // motor
+  const motor=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,2.6,22),mat(0x14334f,0.6,0.35)); motor.rotation.z=Math.PI/2; motor.position.x=2.1; grp.add(motor); edges(motor,0.2);
+  // motor cooling fins
+  for(let i=0;i<5;i++){const fin=new THREE.Mesh(new THREE.TorusGeometry(1.08,0.05,6,22),mat(0x0f2c45,0.5,0.5)); fin.position.x=1.2+i*0.45; fin.rotation.y=Math.PI/2; grp.add(fin);}
+  // motor fan cap
+  const fan=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,0.5,14),mat(0x0a2236,0.4,0.6)); fan.rotation.z=Math.PI/2; fan.position.x=3.6; grp.add(fan);
+  // base plate
+  const base=new THREE.Mesh(new THREE.BoxGeometry(5,0.4,2.4),mat(0x0a2236,0.4,0.6)); base.position.set(1,-1.9,0); grp.add(base);
+  reg(vol,name,info); scene.add(grp); return grp;
+}
+
+function trvBulb(bx,by,bz, tx,ty,tz, col, name, info){
+  // термобаллон — небольшой цилиндр-хомут на всасывающей трубе
+  const bulb=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,1.1,14),mat(0xcfd8df,0.6,0.3,0.1));
+  bulb.position.set(bx,by,bz); bulb.rotation.x=Math.PI/2; // вдоль трубы (по z)
+  reg(bulb,name,info); scene.add(bulb);
+  // хомут-кольцо
+  const clamp=new THREE.Mesh(new THREE.TorusGeometry(0.42,0.06,8,18),mat(col,0.5,0.4,0.4)); clamp.position.set(bx,by,bz); clamp.rotation.y=Math.PI/2; scene.add(clamp);
+  // капилляр — тонкая трубка от баллона к головке ТРВ (ортогональными сегментами)
+  const cap=[[bx,by+0.4,bz],[bx,ty+1.5,bz],[bx,ty+1.5,tz],[tx,ty+1.5,tz]];
+  for(let i=0;i<cap.length-1;i++){
+    const a=new THREE.Vector3(...cap[i]), b=new THREE.Vector3(...cap[i+1]);
+    const d=new THREE.Vector3().subVectors(b,a); const len=d.length(); if(len<0.001)continue;
+    const seg=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,len,8),mat(0xcfd8df,0.6,0.3));
+    seg.position.copy(a).addScaledVector(d,0.5);
+    seg.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());
+    scene.add(seg);
+  }
+}
+function pipe(points,color,sf,radius){
+  const r=radius||0.22;
+  const vs=points.map(p=>new THREE.Vector3(...p));
+  const pmat=new THREE.MeshStandardMaterial({color,metalness:0.5,roughness:0.4,emissive:color,emissiveIntensity:0.12});
+  const grp=new THREE.Group();
+  // прямые сегменты-цилиндры
+  for(let i=0;i<vs.length-1;i++){
+    const a=vs[i], b=vs[i+1];
+    const dir=new THREE.Vector3().subVectors(b,a);
+    const len=dir.length(); if(len<0.001) continue;
+    const seg=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,12),pmat);
+    seg.position.copy(a).addScaledVector(dir,0.5);
+    seg.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());
+    grp.add(seg);
+  }
+  // колена (сферы на изломах)
+  for(let i=1;i<vs.length-1;i++){
+    const elbow=new THREE.Mesh(new THREE.SphereGeometry(r*1.05,12,10),pmat);
+    elbow.position.copy(vs[i]); grp.add(elbow);
+  }
+  scene.add(grp);
+  // частицы потока по ломаной (линейная интерполяция по сегментам)
+  const curve=new THREE.CatmullRomCurve3(vs,false,'catmullrom',0); // для расчёта длины и точек
+  const total=curve.getLength();
+  const N=Math.max(10,Math.floor(total/2.2));
+  const pg=new THREE.BufferGeometry(); const pos=new Float32Array(N*3);
+  pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const pts=new THREE.Points(pg,new THREE.PointsMaterial({color,size:1.6,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(pts);
+  const offs=[]; for(let i=0;i<N;i++)offs.push(i/N);
+  tubes.push({curve,pts,offs,sf:sf||1});
+}
+
+function buildSchema(){
+  condenser(0,19,-24,'Конденсатор Baer FNV','Воздушный, ~295 кВт. Два независимых контура в одном корпусе. EC-вентиляторы ×4, регулировка по давлению конденсации.');
+  const cl=makeLabel('КОНДЕНСАТОР Baer','2 контура · ~295 кВт',16); cl.position.set(0,26,-24); scene.add(cl);
+
+  tank(-9,12,-15,1.5,5,0x1d6f93,'Ресивер контур 1','Жидкостный ресивер контура 1 (3 компрессора). 80–120 л.',true);
+  tank(9,12,-15,1.5,4,0x1d6f93,'Ресивер контур 2','Жидкостный ресивер контура 2 (2 компрессора). 80–120 л.',true);
+
+  shellTube(0,-5,16,'Кожухотрубный испаритель','~250 кВт, DX-типа. Два независимых фреоновых контура в общем кожухе, вода течёт через трубный пучок. Охлаждает воду 14→7 °C.');
+  const el=makeLabel('ИСПАРИТЕЛЬ','кожухотрубный · 2 контура',17); el.position.set(0,1,16); scene.add(el);
+
+  tank(-28,-7,24,3.2,7,0x1e8a4c,'Бак-аккумулятор 500–800 л','Буферная ёмкость водяного контура, сглаживает нагрузку и увеличивает инерционность системы.',false);
+  pump(-14,-8,24,0x1e8a4c,'Насос 30 м³/ч','Grundfos/Wilo, прокачивает воду через испаритель к потребителю.');
+  tank(20,-8,24,1.5,3,0x1e8a4c,'Расширит. бак + группа безоп.','Компенсация теплового расширения, защита по давлению.',false);
+  const wl=makeLabel('ВОДЯНОЙ КОНТУР','7 / 14 °C',12); wl.position.set(-21,-2,24); scene.add(wl);
+
+  const c1x=[-22,-18,-14], c2x=[15,19];
+
+  // Контур 1: ресивер → фильтр → стекло → соленоид → ТРВ → испаритель (узлы в ряд по z=6)
+  filterDrier(-13,4.4,6,COL.c1,'Фильтр-осушитель — Danfoss DCL 309s (к.1)','Паяный антикислотный фильтр-осушитель. Удаляет влагу и продукты разложения масла. Первый в жидкостной линии после ресивера.');
+  sightGlass(-11,4.4,6,COL.c1,'Смотровое стекло — Danfoss SGN 22s (к.1)','Индикатор потока и влажности на жидкостной линии контура 1.');
+  solenoid(-9,4.4,6,COL.c1,'Соленоид — Danfoss EVR 22 (контур 1)','Электромагнитный клапан жидкостной линии Ду22 + катушка BB230AS. Отсекает контур при остановке компрессоров.');
+  valveTRV(-7,2,6,COL.c1,'ТРВ контур 1 — Danfoss TE 55','Терморегулирующий вентиль TE 55 + клапанный узел + термоэлемент TEZ 55 (R407C, MOP). Дросселирует жидкость на впрыск в испаритель.');
+
+  // Контур 2: зеркально
+  filterDrier(13,4.4,6,COL.c2,'Фильтр-осушитель — Danfoss DCL 309s (к.2)','Паяный антикислотный фильтр-осушитель, контур 2.');
+  sightGlass(11,4.4,6,COL.c2,'Смотровое стекло — Danfoss SGN 22s (к.2)','Индикатор потока и влажности, контур 2.');
+  solenoid(9,4.4,6,COL.c2,'Соленоид — Danfoss EVR 22 (контур 2)','Электромагнитный клапан жидкостной линии Ду22 + катушка BB230AS, контур 2.');
+  valveTRV(7,2,6,COL.c2,'ТРВ контур 2 — Danfoss TE 55','Терморегулирующий вентиль TE 55 + TEZ 55 (R407C). Впрыск в свою секцию испарителя.');
+
+  const l1=makeLabel('КОНТУР 1','3 × Dorin',8); l1.position.set(-18,8.5,2); scene.add(l1);
+  const l2=makeLabel('КОНТУР 2','2 × Dorin',8); l2.position.set(17,8.5,2); scene.add(l2);
+
+  // === КОНТУР 1: всасывающий коллектор от секции испарителя + отвод на каждый компрессор ===
+  pipe([[-7,-1.5,14],[-7,-1.5,4],[c1x[0],-1.5,4],[c1x[c1x.length-1],-1.5,4]], COL.suc, 0.9, 0.34);
+  // нагнетательный коллектор контура 1 (вдоль ряда на y=11,z=2) → к конденсатору
+  pipe([[c1x[0],11,2],[-7,11,2]], COL.hot, 1.15, 0.30);
+  pipe([[-7,11,2],[-7,11,-24],[-2,11,-24],[-2,17,-24]], COL.hot, 1.15, 0.30);
+  c1x.forEach((x,i)=>{
+    compressor(x,1,2,COL.c1,'Компрессор Dorin H5000CC · К1-'+(i+1),'Контур 1, компрессор '+(i+1)+' из 3. Параллельная работа, ступенчатое включение. ~50 кВт.');
+    // индивидуальный отвод нагнетания: компрессор → нагнетательный коллектор (y=11)
+    pipe([[x,3,2],[x,11,2]], COL.hot, 1.15, 0.22);
+    // индивидуальный всасывающий отвод: коллектор (z=4) → компрессор (z=2)
+    pipe([[x,-1.5,4],[x,-1.5,2],[x,0.5,2]], COL.suc, 0.9, 0.26);
+  });
+  // === КОНТУР 2 ===
+  pipe([[7,-1.5,14],[7,-1.5,4],[c2x[0],-1.5,4],[c2x[c2x.length-1],-1.5,4]], COL.suc, 0.9, 0.34);
+  pipe([[c2x[c2x.length-1],11,2],[7,11,2]], COL.hot, 1.15, 0.30);
+  pipe([[7,11,2],[7,11,-24],[2,11,-24],[2,17,-24]], COL.hot, 1.15, 0.30);
+  c2x.forEach((x,i)=>{
+    compressor(x,1,2,COL.c2,'Компрессор Dorin H5000CC · К2-'+(i+1),'Контур 2, компрессор '+(i+1)+' из 2. Параллельная работа. ~50 кВт.');
+    pipe([[x,3,2],[x,11,2]], COL.hot, 1.15, 0.22);
+    pipe([[x,-1.5,4],[x,-1.5,2],[x,0.5,2]], COL.suc, 0.9, 0.26);
+  });
+
+  // КОНДЕНСАТОР → ресиверы (жидкость) — ортогонально
+  pipe([[-6,17,-24],[-6,13,-24],[-9,13,-24],[-9,13,-15]], COL.c1, 1.0, 0.18);
+  pipe([[6,17,-24],[6,13,-24],[9,13,-24],[9,13,-15]], COL.c2, 1.0, 0.18);
+
+  // ЖИДКОСТЬ контур 1: ресивер(-9,12,-15) → фильтр(-13,4.4,6) — только 90°
+  pipe([[-9,12,-15],[-9,4.4,-15],[-13,4.4,-15],[-13,4.4,6]], COL.c1, 1.0, 0.18);
+  pipe([[-13,4.4,6],[-7,4.4,6]], COL.c1, 1.0, 0.18);                  // через ряд фильтр→стекло→соленоид→ТРВ
+  pipe([[-7,4.4,6],[-7,1.4,6]], COL.c1, 1.0, 0.18);                   // вход в ТРВ (сверху вниз)
+  // ЖИДКОСТЬ контур 2 (зеркально)
+  pipe([[9,12,-15],[9,4.4,-15],[13,4.4,-15],[13,4.4,6]], COL.c2, 1.0, 0.18);
+  pipe([[13,4.4,6],[7,4.4,6]], COL.c2, 1.0, 0.18);
+  pipe([[7,4.4,6],[7,1.4,6]], COL.c2, 1.0, 0.18);                     // вход в ТРВ
+
+  // ВПРЫСК (после ТРВ) → ВХОД секции испарителя (дальний торец, z=18) — ортогонально
+  pipe([[-7,1.4,6],[-7,1.4,18],[-7,-1.5,18]], COL.liq, 1.1, 0.16);
+  pipe([[7,1.4,6],[7,1.4,18],[7,-1.5,18]], COL.liq, 1.1, 0.16);
+
+  // ТЕРМОБАЛЛОН ТРВ на всасывающей линии (связь с газовой стороной) + капилляр к ТРВ
+  trvBulb(-7,-1.5,10, -7,2,6, COL.c1, 'Термобаллон ТРВ — контур 1','Термобаллон TEZ 55 закреплён на всасывающей линии после испарителя. Меряет перегрев пара и через капилляр управляет открытием ТРВ.');
+  trvBulb(7,-1.5,10, 7,2,6, COL.c2, 'Термобаллон ТРВ — контур 2','Термобаллон TEZ 55 на всасывающей линии контура 2. Управляет впрыском ТРВ по перегреву.');
+
+  // ВОДА — ортогонально
+  pipe([[-15.5,-5,16],[-15.5,-8,16],[-15.5,-8,24],[-14,-8,24]], COL.water, 0.7, 0.3);   // испаритель → насос
+  pipe([[-14,-8,24],[-28,-8,24]], COL.water, 0.7, 0.3);                                   // насос → бак
+  pipe([[-28,-3,24],[-28,4,24],[-28,4,16],[-15.5,4,16],[-15.5,-3,16]], COL.water,0.7,0.3);// бак → подача в испаритель
+  pipe([[15.5,-5,16],[15.5,-8,16],[15.5,-8,24],[20,-8,24]], COL.water, 0.7, 0.3);         // испаритель → расш.бак
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta();
+  if(spin) scene.rotation.y += dt*0.1;
+  spinners.forEach(f=>f.rotation.y += dt*4*speed);
+  if(flowOn){
+    tubes.forEach(tb=>{
+      const arr=tb.pts.geometry.attributes.position.array;
+      for(let i=0;i<tb.offs.length;i++){
+        tb.offs[i]=(tb.offs[i]+dt*0.055*speed*tb.sf)%1;
+        const p=tb.curve.getPointAt(tb.offs[i]);
+        arr[i*3]=p.x; arr[i*3+1]=p.y; arr[i*3+2]=p.z;
+      }
+      tb.pts.geometry.attributes.position.needsUpdate=true;
+    });
+  }
+  renderer.render(scene,camera);
+}
+
+let dragging=false, px=0,py=0, rotY=0.5,rotX=0.18, dist=66;
+canvas.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+window.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('pointermove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  if(dragging){const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;rotY+=dx*0.005;rotX=Math.max(-0.5,Math.min(0.95,rotX+dy*0.004));updateCam();}
+  else pick(e);
+});
+canvas.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(34,Math.min(130,dist+e.deltaY*0.05));updateCam();},{passive:false});
+function updateCam(){
+  camera.position.x=Math.sin(rotY)*Math.cos(rotX)*dist;
+  camera.position.z=Math.cos(rotY)*Math.cos(rotX)*dist;
+  camera.position.y=12+Math.sin(rotX)*dist;
+  camera.lookAt(0,3,-2);
+}
+let hovered=null;
+function pick(e){
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(pickables,false);
+  if(hovered){hovered.material.emissiveIntensity=hovered.userData.base||0.06;hovered=null;}
+  if(hits.length){
+    const o=hits[0].object;
+    if(o.userData&&o.userData.name){
+      o.material.emissiveIntensity=0.55; hovered=o;
+      tooltip.style.display='block';
+      tooltip.style.left=(e.clientX+14)+'px'; tooltip.style.top=(e.clientY+10)+'px';
+      tooltip.innerHTML='<b>'+o.userData.name+'</b><br>'+(o.userData.info||'');
+      canvas.style.cursor='pointer';
+    }
+  } else { tooltip.style.display='none'; canvas.style.cursor='grab'; }
+}
+
+function bindControls(){
+  document.getElementById('btnFlow').onclick=function(){flowOn=!flowOn;this.textContent=(flowOn?'⏸':'▶')+' Поток';};
+  document.getElementById('btnSpin').onclick=function(){spin=!spin;this.style.opacity=spin?1:0.5;};
+  document.getElementById('btnSlow').onclick=()=>{speed=Math.max(0.25,speed-0.5);};
+  document.getElementById('btnFast').onclick=()=>{speed=Math.min(4,speed+0.5);};
+  document.getElementById('btnReset').onclick=()=>{rotY=0.5;rotX=0.18;dist=66;scene.rotation.y=0;updateCam();};
+}
+function onResize(){
+  const panel=document.getElementById('schema');
+  const w=panel.clientWidth||window.innerWidth;
+  const h=panel.clientHeight||(window.innerHeight-103);
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',onResize);
+
+const tabs=document.querySelectorAll('.tab'), panels=document.querySelectorAll('.panel');
+tabs.forEach(t=>t.addEventListener('click',()=>{
+  tabs.forEach(x=>x.classList.remove('active')); panels.forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); document.getElementById(t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='schema') onResize();
+}));
+
+/* ====================== 2D TOOLTIPS ====================== */
+function init2dTooltips(){
+  const svg=document.querySelector('#schema2d svg');
+  if(!svg) return;
+  const els=svg.querySelectorAll('[data-info]');
+  els.forEach(el=>{
+    el.style.cursor='pointer';
+    el.addEventListener('mousemove',e=>{
+      tooltip.style.display='block';
+      tooltip.style.left=(e.clientX+14)+'px';
+      tooltip.style.top=(e.clientY+10)+'px';
+      tooltip.innerHTML='<b>'+el.getAttribute('data-name')+'</b><br>'+el.getAttribute('data-info');
+    });
+    el.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+  });
+}
+init2dTooltips();
+
+init();
+</script>
+</body>
+</html>

@@ -10852,6 +10852,50 @@
   .dev-empty i { font-size: 56px; color: var(--text-faint); margin-bottom: 14px; }
   .dev-empty-title { font-size: 15px; font-weight: 600; color: var(--text-mid); margin-bottom: 4px; }
   .dev-empty-sub { font-size: 13px; }
+
+  /* 3D-схемы */
+  .schemas-3d-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .schema-3d-card {
+    display: flex; flex-direction: column;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .schema-3d-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, #2563EB, #7C3AED);
+  }
+  .schema-3d-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(37,99,235,0.16);
+    border-color: rgba(37,99,235,0.35);
+  }
+  .schema-3d-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(124,58,237,0.12));
+    margin-bottom: 12px;
+  }
+  .schema-3d-icon i { font-size: 26px; color: #2563EB; }
+  .schema-3d-title { font-size: 16px; font-weight: 700; color: var(--text-dark); margin-bottom: 4px; }
+  .schema-3d-sub { font-size: 12.5px; color: var(--text-light); margin-bottom: 14px; }
+  .schema-3d-cta {
+    margin-top: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600; color: #2563EB;
+  }
   .dev-detail-head {
     padding: 16px 20px;
     border-bottom: 1px solid var(--border);
@@ -16909,6 +16953,9 @@
         <button class="nav-item" data-nav="developments" onclick="selectSidebarItem('developments')">
           <i class="ti ti-bulb"></i><span>Разработка оборудования</span>
         </button>
+        <button class="nav-item" data-nav="schemas-3d" onclick="selectSidebarItem('schemas-3d')">
+          <i class="ti ti-3d-cube-sphere"></i><span>3D-схемы</span>
+        </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
           <button class="nav-item" data-nav="models" onclick="selectSidebarItem('models')">
@@ -17525,6 +17572,36 @@
                 <div class="dev-empty-sub">или создай новую кнопкой «Новая разработка»</div>
               </div>
             </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 3D-СХЕМЫ (v2.45.129) ============ -->
+      <div class="screen" data-screen="schemas-3d" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>3D-схемы</h2>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>3D-схемы оборудования</h1>
+            <div class="page-subtitle">Интерактивные модели и схемы агрегатов</div>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div class="schemas-3d-grid">
+            <a class="schema-3d-card" href="/3d/atombreez1_viewer.html" target="_blank" rel="noopener">
+              <div class="schema-3d-icon"><i class="ti ti-wind"></i></div>
+              <div class="schema-3d-title">Атомбриз 1</div>
+              <div class="schema-3d-sub">Воздухоохладитель · 3D-вьювер</div>
+              <div class="schema-3d-cta"><i class="ti ti-external-link"></i> Открыть</div>
+            </a>
+            <a class="schema-3d-card" href="/3d/chiller_3d_schema.html" target="_blank" rel="noopener">
+              <div class="schema-3d-icon"><i class="ti ti-snowflake"></i></div>
+              <div class="schema-3d-title">Чиллер</div>
+              <div class="schema-3d-sub">3D-схема холодильной машины</div>
+              <div class="schema-3d-cta"><i class="ti ti-external-link"></i> Открыть</div>
+            </a>
           </div>
         </div>
       </div>
@@ -19355,7 +19432,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.128-callouts-colored";
+const APP_VERSION = "v2.45.129-3d-schemas";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -49085,6 +49162,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.129',
+    date: '05.06.2026',
+    title: '3D-схемы и цветные выноски в калькуляторе',
+    features: [
+      'В разделе <b>«Производство»</b> появился новый пункт <b>«3D-схемы»</b> — здесь живут интерактивные модели агрегатов (Атомбриз 1, Чиллер). Открываются в новой вкладке',
+      'В калькуляторе холода подписи стен (А-1, Б-2, А-3, Б-4, Потолок, Дверь) теперь — <b>цветные выноски снаружи камеры</b>: больше не пересекаются с дверью и не мешают читать схему',
+      'У каждой стороны свой цвет (А-1 синяя, Б-2 оранжевая, А-3 фиолетовая, Б-4 зелёная, потолок бирюзовый, дверь коричневая) — легко сопоставить с вкладками «Стены»',
+    ],
+  },
   {
     version: 'v2.45.105',
     date: '05.06.2026',
