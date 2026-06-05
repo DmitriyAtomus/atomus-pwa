@@ -19340,7 +19340,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.98-cc-walls-pdf-blocks";
+const APP_VERSION = "v2.45.99-spec-items-fix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -30817,9 +30817,11 @@ function renderContractAssembliesBlock(c) {
       '</div>';
   }
   // v2.45.93: пакетная печать QR-наклеек на все готовые сборки договора
-  // v2.45.95: + component-позиции в резерве тоже получают этикетку
+  // v2.45.95/99: + component-позиции в резерве тоже получают этикетку
   const canPrint = (typeof hasPermission === 'function') && hasPermission('labels_print');
-  const reservedCompCount = (c.items || []).filter(it =>
+  const _spec = (state._specByContract && state._specByContract[c.id]) || {};
+  const _items = (_spec.items && _spec.items.length) ? _spec.items : (c.items || []);
+  const reservedCompCount = _items.filter(it =>
     it && it.component_id && !it.model_id && Number(it.qty_reserved || 0) > 0
   ).length;
   const totalQrCount = readyCount + reservedCompCount;
@@ -38156,16 +38158,16 @@ async function _pickManualComponent(contractId, itemId, componentId) {
 // v2.45.97: печать QR-наклейки для одной component-позиции (для коробки).
 // Использует QR договора + кастомную подпись «Дог.№X · Имя позиции · N шт».
 async function printComponentItemQr(contractId, itemId) {
+  // v2.45.99: ищем позицию в spec-блоке (он живёт отдельно от
+  // state.lastLoadedContract — там хранится результат /api/contracts/{id}/items)
   const c = state.lastLoadedContract || {};
-  if (!c || c.id !== contractId) {
-    showToast('Открой карточку договора заново', 'error');
-    return;
-  }
-  const it = (c.items || []).find(x => x.id === itemId);
+  const spec = (state._specByContract && state._specByContract[contractId]) || {};
+  const items = (spec.items && spec.items.length) ? spec.items : (c.items || []);
+  const it = items.find(x => Number(x.id) === Number(itemId));
   if (!it) { showToast('Позиция не найдена', 'error'); return; }
   const itName = it.component_name || it.name || ('Поз. #' + it.id);
   const qty = Number(it.qty || it.qty_reserved || 1);
-  const contractNum = c.contract_number || ('#' + c.id);
+  const contractNum = (c && c.contract_number) || ('#' + contractId);
   const caption = ('Дог.' + contractNum + ' · ' + itName + ' · ' + qty + ' шт').slice(0, 80);
   if (!confirm('Отправить на термопринтер?\n\nЭтикетка: ' + caption)) return;
   try {
@@ -55294,9 +55296,12 @@ async function batchPrintContractQrs(contractId) {
     return;
   }
   const ready = (c.assemblies || []).filter(a => a.status === 'ready');
-  // v2.45.95: + component-позиции в резерве (кронштейны, пластины и т.д.) —
-  // на них клеим QR договора с подписью «Договор № · Имя · N шт»
-  const compItems = (c.items || []).filter(it =>
+  // v2.45.95/99: + component-позиции в резерве (кронштейны, пластины и т.д.)
+  // — на них клеим QR договора с подписью «Договор № · Имя · N шт».
+  // Спецификация в _specByContract, не в lastLoadedContract.
+  const spec = (state._specByContract && state._specByContract[contractId]) || {};
+  const items = (spec.items && spec.items.length) ? spec.items : (c.items || []);
+  const compItems = items.filter(it =>
     it && it.component_id && !it.model_id && Number(it.qty_reserved || 0) > 0
   );
   const total = ready.length + compItems.length;
