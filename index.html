@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.105-cc-forklifts-vent";
+const APP_VERSION = "v2.45.107-cc-fix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37926,6 +37926,9 @@ function renderContractDetail(c) {
   // ЭТАП 16В-2: блок задач по договору (контейнер, заполняется асинхронно)
   html += '<div id="scd-tasks-block"><div class="loading-block">Загружаем задачи…</div></div>';
 
+  // v2.45.106: журнал действий по договору
+  html += '<div id="scd-audit-block" style="margin-top:18px;"></div>';
+
   container.innerHTML = html;
 
   // Загрузим задачи по договору
@@ -37936,6 +37939,50 @@ function renderContractDetail(c) {
   loadContractBoxesBlock(c.id);
   // ЭТАП 27: загружаем спецификацию
   loadContractItemsBlock(c.id);
+  // v2.45.106: журнал действий
+  loadContractAuditBlock(c.id);
+}
+
+// v2.45.106: журнал действий по договору
+async function loadContractAuditBlock(contractId) {
+  const host = document.getElementById('scd-audit-block');
+  if (!host) return;
+  try {
+    const d = await apiGet('/api/contracts/' + contractId + '/audit');
+    const items = (d && d.items) || [];
+    if (!items.length) {
+      host.innerHTML = '';
+      return;
+    }
+    const ACTION_LABELS = {
+      'update_contract':       'Изменение',
+      'publish_contract':      'Публикация',
+      'create_contract':       'Создание',
+      'delete_contract':       'Удаление',
+      'ship_contract':         'Отгрузка',
+      'partial_ship':          'Частичная отгрузка',
+    };
+    let html = '<div class="card" style="padding:14px 18px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text-dark);">' +
+        '<i class="ti ti-history"></i> История изменений <span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + items.length + ')</span>' +
+      '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+    items.slice(0, 20).forEach(it => {
+      const dt = (it.created_at || '').replace('T', ' ').slice(0, 16);
+      const who = it.employee_name || ('chat#' + (it.chat_id || '—'));
+      const lbl = ACTION_LABELS[it.action] || it.action;
+      const payload = it.payload || '';
+      html += '<div style="display:flex;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed #E2E8F0;">' +
+        '<span style="color:var(--text-light);font-variant-numeric:tabular-nums;flex-shrink:0;">' + escapeHtml(dt) + '</span>' +
+        '<span style="font-weight:600;color:#0C4A6E;flex-shrink:0;">' + escapeHtml(who) + '</span>' +
+        '<span style="color:var(--text-mid);flex:1;">' + escapeHtml(lbl) + (payload ? ' · ' + escapeHtml(payload) : '') + '</span>' +
+      '</div>';
+    });
+    html += '</div></div>';
+    host.innerHTML = html;
+  } catch (e) {
+    host.innerHTML = '';
+  }
 }
 
 // ============================================================
@@ -53623,6 +53670,55 @@ function showRebuildDiagnosticsModal(data) {
 }
 
 
+// v2.45.106: модалка подтверждения паролем для критичных действий.
+// Возвращает строку-пароль (если введён и нажат «Подтвердить»), либо null (отмена).
+function _promptPasswordForAction(title, subtitle) {
+  return new Promise((resolve) => {
+    let m = document.getElementById('pwd-confirm-modal');
+    if (m) m.remove();
+    m = document.createElement('div');
+    m.id = 'pwd-confirm-modal';
+    m.className = 'modal-overlay visible';
+    m.innerHTML =
+      '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+        '<div class="modal-header">' +
+          '<h3><i class="ti ti-shield-lock"></i> Подтвердить паролем</h3>' +
+          '<button class="modal-close" id="pwd-close"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div style="padding:16px 20px;">' +
+          '<div style="font-size:14px;color:var(--text-dark);font-weight:600;margin-bottom:6px;">' +
+            (title || 'Действие') + '</div>' +
+          '<div style="font-size:12.5px;color:var(--text-mid);margin-bottom:14px;line-height:1.5;">' +
+            (subtitle || '') + '</div>' +
+          '<label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">Твой пароль</label>' +
+          '<input type="password" id="pwd-input" placeholder="••••••" autocomplete="current-password" ' +
+            'style="width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;letter-spacing:0.05em;" />' +
+        '</div>' +
+        '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+          '<button class="btn btn-secondary" id="pwd-cancel">Отмена</button>' +
+          '<button class="btn btn-primary"   id="pwd-ok"><i class="ti ti-check"></i> Подтвердить</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(m);
+    const cleanup = (val) => { m.remove(); resolve(val); };
+    const input = m.querySelector('#pwd-input');
+    setTimeout(() => input && input.focus(), 50);
+    m.querySelector('#pwd-close').onclick  = () => cleanup(null);
+    m.querySelector('#pwd-cancel').onclick = () => cleanup(null);
+    m.onclick = (e) => { if (e.target === m) cleanup(null); };
+    const submit = () => {
+      const v = (input.value || '').trim();
+      if (!v) { input.focus(); return; }
+      cleanup(v);
+    };
+    m.querySelector('#pwd-ok').onclick = submit;
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submit();
+      else if (e.key === 'Escape') cleanup(null);
+    });
+  });
+}
+
 async function changeContractStatus(contractId, newStatus) {
   // ЭТАП 38 (v2.18.0): проверяем что статус реально меняется (не клик по текущему)
   const currentContract = state.lastLoadedContract;
@@ -53639,9 +53735,12 @@ async function changeContractStatus(contractId, newStatus) {
   };
   const targetLabel = labels[newStatus] || newStatus;
   const contractNumber = currentContract ? currentContract.number : ('#' + contractId);
-  if (!confirm('Сменить статус договора ' + contractNumber + ' на «' + targetLabel + '»?')) {
-    return;
-  }
+  // v2.45.106: подтверждение паролем (объединяем подтверждение и пароль в одной модалке)
+  const password = await _promptPasswordForAction(
+    'Сменить статус договора ' + contractNumber + ' на «' + targetLabel + '»?',
+    'Подтверди личным паролем — событие будет записано в журнал договора.'
+  );
+  if (password === null) return;   // пользователь отменил
   // ЭТАП 26.1: если закрываем — проверяем прогресс отгрузки, чтобы дать понятное предупреждение
   let forceClose = false;
   if (newStatus === 'closed') {
@@ -53679,12 +53778,22 @@ async function changeContractStatus(contractId, newStatus) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify(forceClose
-        ? { status: newStatus, force_close: true }
-        : { status: newStatus }),
+      body: JSON.stringify(Object.assign(
+        { status: newStatus, password: password },
+        forceClose ? { force_close: true } : {}
+      )),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
+      // v2.45.106: неверный пароль / нет пароля
+      if (r.status === 401 && d.error === 'password_required') {
+        showToast('Нужно подтвердить паролем', 'error');
+        return;
+      }
+      if (r.status === 403 && d.error === 'wrong_password') {
+        showToast('Неверный пароль — статус не изменён', 'error');
+        return;
+      }
       // ЭТАП 26.1: 409 с error=shipment_incomplete — отдельное понятное сообщение
       if (r.status === 409 && d.error === 'shipment_incomplete') {
         showToast(d.message || 'Сначала отгрузите остаток', 'error');
@@ -65548,9 +65657,11 @@ function _ccTabResult() {
     ['Освещение (Q4)', r.q4],
     ['Электродвигатели + погрузчики (Q5)', r.q5],
     ['Инфильтрация через двери (Q6)', r.q6],
-    // v2.45.105: вентиляция/воздухообмен — показываем только если есть
-    ...(r.qVent && r.qVent > 0 ? [['Воздухообмен (Q-вент.)', r.qVent]] : []),
   ];
+  // v2.45.105: вентиляция/воздухообмен — показываем только если есть
+  if (r.qVent && r.qVent > 0) {
+    rows.push(['Воздухообмен (Q-вент.)', r.qVent]);
+  }
   const totalKw = r.total / 1000;
   const totalWithSafetyKw = r.totalWithSafety / 1000;
   const cli = _ccState.client || {};
