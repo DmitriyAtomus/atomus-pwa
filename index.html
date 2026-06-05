@@ -19355,7 +19355,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.123-product-tab-tidy";
+const APP_VERSION = "v2.45.124-blocks-only-label";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -66561,18 +66561,18 @@ function _odbRenderOutdoor() {
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;">' +
       byBrand[brand].map(({ unit, idx }) => {
         const isActive = idx === s.selectedOutdoor;
-        const modelShort = unit[0].replace(/\s*\([^)]+\)\s*/, '');
+        // v2.45.124: «9 блок» крупно + только кВт. Техническое название
+        // (XG-AJ28RHA-IDU) убрано — оно есть в сводке выбранного блока.
         const blockMatch = unit[0].match(/\((\d+\s+блок)\)/);
-        const blockLabel = blockMatch ? blockMatch[1] : '';
+        const blockLabel = blockMatch ? blockMatch[1] : unit[0];
         return '<button type="button" onclick="_odbSetOutdoor(' + idx + ')" ' +
-          'style="text-align:left;padding:10px 12px;border:2px solid ' +
+          'style="text-align:center;padding:14px 12px;border:2px solid ' +
           (isActive ? color : 'var(--border)') + ';background:' +
           (isActive ? color + '12' : 'white') + ';border-radius:10px;cursor:pointer;' +
           'transition:all 0.15s;font-family:inherit;' +
           (isActive ? 'box-shadow:0 2px 6px ' + color + '40;' : '') + '">' +
-          '<div style="font-size:11px;color:' + color + ';font-weight:600;">' + escapeHtml(blockLabel) + '</div>' +
-          '<div style="font-size:13px;font-weight:700;color:var(--text-dark);margin:2px 0 4px;line-height:1.2;">' + escapeHtml(modelShort) + '</div>' +
-          '<div style="font-size:18px;font-weight:700;color:' + color + ';line-height:1;">' + unit[2] + ' <span style="font-size:11px;font-weight:500;">кВт</span></div>' +
+          '<div style="font-size:13px;color:' + color + ';font-weight:700;text-transform:uppercase;letter-spacing:0.4px;">' + escapeHtml(blockLabel) + '</div>' +
+          '<div style="font-size:22px;font-weight:700;color:' + color + ';line-height:1;margin-top:8px;">' + unit[2] + ' <span style="font-size:12px;font-weight:500;">кВт</span></div>' +
         '</button>';
       }).join('') +
       '</div></div>';
