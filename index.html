@@ -19322,7 +19322,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.85-new-model-category";
+const APP_VERSION = "v2.45.86-helper-batch-employees";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -22043,20 +22043,35 @@ async function openHelperBatchModal() {
     showToast('Для батча нужно минимум 2 активные сборки (в очереди или в работе)', 'error');
     return;
   }
-  // Подгрузим сотрудников производства если нет
-  let emps = (cache.activeEmployees || []).filter(e => e.is_production || e.access_is_production);
-  if (!emps.length) {
+  // v2.45.86: берём сборщиков из workload (это и есть нужный список цеха).
+  // Если workload пустой — фолбэк на /api/employees/active (все активные).
+  let emps = [];
+  const workers = (cache.productionKanban && cache.productionKanban.workload && cache.productionKanban.workload.workers) || [];
+  if (workers.length) {
+    emps = workers.map(w => ({
+      id: w.employee_id,
+      short_name: w.short_name,
+      full_name: w.full_name,
+    }));
+  } else {
     try {
       const d = await apiGet('/api/employees/active');
       const list = Array.isArray(d) ? d : (d.items || []);
       cache.activeEmployees = list;
-      emps = list.filter(e => e.is_production || e.access_is_production || true); // если нет флага — берём всех
-    } catch (e) {}
+      emps = list;
+    } catch (e) {
+      showToast('Не удалось загрузить список сотрудников', 'error');
+      return;
+    }
   }
-  if (!emps.length) emps = cache.activeEmployees || [];
+  if (!emps.length) {
+    showToast('Нет активных сотрудников', 'error');
+    return;
+  }
   _hbState = {
     employee_id: null,
     selectedWorkIds: new Set(),
+    employees: emps,    // храним в state чтобы перерисовка не теряла список
     loading: false,
   };
   let m = document.getElementById('hb-modal');
@@ -22067,7 +22082,7 @@ async function openHelperBatchModal() {
     m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
     document.body.appendChild(m);
   }
-  _hbRender(emps, inProgress);
+  _hbRender(_hbState.employees, inProgress);
   m.classList.add('visible');
 }
 
@@ -22129,19 +22144,18 @@ function _hbRender(emps, works) {
     '</div>';
 }
 
+function _hbWorks() {
+  return (cache.productionKanban && cache.productionKanban.works || [])
+    .filter(w => w.status === 'in_progress' || w.status === 'queue');
+}
 function _hbSetEmp(v) {
   _hbState.employee_id = v ? parseInt(v, 10) : null;
-  // Перерисуем — обновится состояние кнопки
-  const works = (cache.productionKanban && cache.productionKanban.works || [])
-    .filter(w => w.status === 'in_progress' || w.status === 'queue');
-  _hbRender(cache.activeEmployees || [], works);
+  _hbRender(_hbState.employees || [], _hbWorks());
 }
 function _hbToggleWork(wid, on) {
   if (on) _hbState.selectedWorkIds.add(wid);
   else _hbState.selectedWorkIds.delete(wid);
-  const works = (cache.productionKanban && cache.productionKanban.works || [])
-    .filter(w => w.status === 'in_progress' || w.status === 'queue');
-  _hbRender(cache.activeEmployees || [], works);
+  _hbRender(_hbState.employees || [], _hbWorks());
 }
 
 async function _hbStart() {
@@ -22151,9 +22165,7 @@ async function _hbStart() {
   if (!empId || ids.length < 2) return;
   if (!confirm('Стартовать батч-помощь по ' + ids.length + ' сборкам?\n\nЕсли у сотрудника сейчас активна другая помощь — она будет автоматически остановлена и записана в журнал.')) return;
   _hbState.loading = true;
-  const works = (cache.productionKanban && cache.productionKanban.works || [])
-    .filter(w => w.status === 'in_progress' || w.status === 'queue');
-  _hbRender(cache.activeEmployees || [], works);
+  _hbRender(_hbState.employees || [], _hbWorks());
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/production/helpers/batch', {
@@ -22175,7 +22187,7 @@ async function _hbStart() {
   } catch (e) {
     showToast('Ошибка', 'error');
     _hbState.loading = false;
-    _hbRender(cache.activeEmployees || [], works);
+    _hbRender(_hbState.employees || [], _hbWorks());
   }
 }
 // ============ /v2.45.84 ============
