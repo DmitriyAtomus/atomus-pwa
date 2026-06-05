@@ -19355,7 +19355,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.127-walls-labels-ab";
+const APP_VERSION = "v2.45.128-callouts-colored";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -65696,57 +65696,68 @@ function _ccRenderSchema() {
       '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" ' +
         'fill="#F0F9FF" stroke="#0C4A6E" stroke-width="1.5" opacity="0.85"/>' +
 
-      // === Подписи сторон — цвет в тон материалу грани ===
-      // v2.45.116: каждая сторона и её название материала — одного цвета
-      // v2.45.122: подпись А-1 опускается под самую нижнюю точку основания
-      // (Math.max bfl.y / bfr.y) — иначе перекрывается дверью на нижней половине стены
-      '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + (Math.max(P.bfl.y, P.bfr.y) + 30) +
-        '" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="' + matAccent(w0.wallMat || 0) + '">' +
-        'А-1 · ' + aLen.toFixed(1) + ' м</text>' +
-      '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + (Math.max(P.bfl.y, P.bfr.y) + 46) +
-        '" text-anchor="middle" font-family="Arial" font-size="10.5" fill="' + matAccent(w0.wallMat || 0) + '" opacity="0.85">' +
-        escapeHtml(matName(w0.wallMat || 0)) + '</text>' +
-      // v2.45.123: размеры двери — отдельной строкой ниже А-1, цветом двери
-      ((() => {
+      // === v2.45.128: ВЫНОСКИ — линии от центра граней к разноцветным плашкам ===
+      (() => {
+        const sideC = { a1:'#2563EB', b2:'#EA580C', a3:'#7C3AED', b4:'#15803D',
+                        floor:'#B45309', ceiling:'#0891B2', door:'#92400E' };
+        function callout(fx, fy, tx, ty, color, title, sub) {
+          const w1 = title.length * 6.6 + 16;
+          const w2 = (sub || '').length * 5.4 + 16;
+          const boxW = Math.max(w1, w2, 64);
+          const boxH = sub ? 36 : 22;
+          const bx = tx - boxW / 2, by = ty - boxH / 2;
+          return '<line x1="' + fx + '" y1="' + fy + '" x2="' + tx + '" y2="' + ty +
+              '" stroke="' + color + '" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.7"/>' +
+            '<circle cx="' + fx + '" cy="' + fy + '" r="3" fill="' + color + '"/>' +
+            '<rect x="' + bx + '" y="' + by + '" width="' + boxW + '" height="' + boxH +
+              '" rx="6" ry="6" fill="' + color + '"/>' +
+            '<text x="' + tx + '" y="' + (ty + (sub ? -4 : 4)) +
+              '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="white">' +
+              title + '</text>' +
+            (sub ? '<text x="' + tx + '" y="' + (ty + 11) + '" text-anchor="middle" ' +
+              'font-family="Arial" font-size="9.5" fill="white" opacity="0.92">' + sub + '</text>' : '');
+        }
+        const cFront = { x:(P.bfl.x+P.bfr.x+P.tfl.x+P.tfr.x)/4, y:(P.bfl.y+P.bfr.y+P.tfl.y+P.tfr.y)/4 };
+        const cRight = { x:(P.bfr.x+P.bbr.x+P.tfr.x+P.tbr.x)/4, y:(P.bfr.y+P.bbr.y+P.tfr.y+P.tbr.y)/4 };
+        const cBack  = { x:(P.bll.x+P.bbr.x+P.tll.x+P.tbr.x)/4, y:(P.bll.y+P.bbr.y+P.tll.y+P.tbr.y)/4 };
+        const cLeft  = { x:(P.bfl.x+P.bll.x+P.tfl.x+P.tll.x)/4, y:(P.bfl.y+P.bll.y+P.tfl.y+P.tll.y)/4 };
+        const cTop   = { x:(P.tfl.x+P.tfr.x+P.tll.x+P.tbr.x)/4, y:(P.tfl.y+P.tfr.y+P.tll.y+P.tbr.y)/4 };
+        const lowY = Math.max(P.bfl.y, P.bfr.y, P.bbr.y, P.bll.y);
+        const a1Box  = { x: cFront.x,         y: lowY + 60 };
+        const b2Box  = { x: P.bbr.x + 80,     y: cRight.y + 10 };
+        const a3Box  = { x: P.tll.x - 30,     y: P.tll.y - 30 };
+        const b4Box  = { x: P.bfl.x - 80,     y: cLeft.y + 10 };
+        const topBox = { x: P.tfr.x + 60,     y: P.tfr.y - 30 };
+        let s = '';
+        s += callout(cFront.x, cFront.y, a1Box.x, a1Box.y, sideC.a1,
+          'А-1 · ' + aLen.toFixed(1) + ' м', short(matName(w0.wallMat || 0)));
+        s += callout(cRight.x, cRight.y, b2Box.x, b2Box.y, sideC.b2,
+          'Б-2 · ' + bLen.toFixed(1) + ' м', short(matName(w1.wallMat || 0)));
+        s += callout(cBack.x, cBack.y, a3Box.x, a3Box.y, sideC.a3,
+          'А-3 · ' + aLen.toFixed(1) + ' м', short(matName(w2.wallMat || 0)));
+        s += callout(cLeft.x, cLeft.y, b4Box.x, b4Box.y, sideC.b4,
+          'Б-4 · ' + bLen.toFixed(1) + ' м', short(matName(w3.wallMat || 0)));
+        s += callout(cTop.x, cTop.y, topBox.x, topBox.y, sideC.ceiling,
+          'Потолок', short(isoName(g.ceiling && g.ceiling.isoCode)));
+        // Дверь
         const door = _ccState.door || {};
-        if (!door.hMm || !door.wMm) return '';
-        return '<text x="' + ((P.bfl.x + P.bfr.x) / 2) + '" y="' + (Math.max(P.bfl.y, P.bfr.y) + 62) +
-          '" text-anchor="middle" font-family="Arial" font-size="10" fill="#92400E">' +
-          '🚪 ' + door.hMm + '×' + door.wMm + ' мм' +
-          (door.hasTambour ? ' · с тамбуром' : '') +
-          '</text>';
-      })()) +
-      // Б-2 (правая стена) — справа от правой грани
-      '<text x="' + ((P.bfr.x + P.bbr.x) / 2 + 18) + '" y="' + ((P.bfr.y + P.bbr.y) / 2 + 6) +
-        '" text-anchor="start" font-family="Arial" font-size="12" font-weight="700" fill="' + matAccent(w1.wallMat || 0) + '">' +
-        'Б-2 · ' + bLen.toFixed(1) + ' м</text>' +
-      '<text x="' + ((P.bfr.x + P.bbr.x) / 2 + 18) + '" y="' + ((P.bfr.y + P.bbr.y) / 2 + 20) +
-        '" text-anchor="start" font-family="Arial" font-size="10.5" fill="' + matAccent(w1.wallMat || 0) + '" opacity="0.85">' +
-        escapeHtml(matName(w1.wallMat || 0)) + '</text>' +
-      // А-3 (задняя стена) — на её НИЖНЕЙ кромке (между bll и bbr) — не пересекает шапку
-      '<text x="' + ((P.bll.x + P.bbr.x) / 2) + '" y="' + ((P.bll.y + P.bbr.y) / 2 - 6) +
-        '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="' + matAccent(w2.wallMat || 0) + '" opacity="0.85">' +
-        'А-3 · ' + aLen.toFixed(1) + ' м (зад)</text>' +
-      // Б-4 (левая стена) — на её НИЖНЕЙ кромке (между bfl и bll)
-      '<text x="' + ((P.bfl.x + P.bll.x) / 2 - 12) + '" y="' + ((P.bfl.y + P.bll.y) / 2 + 4) +
-        '" text-anchor="end" font-family="Arial" font-size="11" font-weight="600" fill="' + matAccent(w3.wallMat || 0) + '" opacity="0.85">' +
-        'Б-4 · ' + bLen.toFixed(1) + ' м (лев)</text>' +
-      // Высота H — вертикальная линия слева от передней-левой грани
+        if (door.hMm && door.wMm) {
+          // Точка двери — середина передней грани снизу
+          const dPx = (P.bfl.x + P.bfr.x) / 2 + 30;
+          const dPy = (P.bfl.y + P.bfr.y) / 2 - 8;
+          const dBox = { x: cFront.x + 150, y: lowY + 30 };
+          s += callout(dPx, dPy, dBox.x, dBox.y, sideC.door,
+            '🚪 ' + door.hMm + '×' + door.wMm + ' мм',
+            door.hasTambour ? 'с тамбуром' : null);
+        }
+        return s;
+      })() +
+      // Высота H — вертикальная линия слева от передней-левой грани (оставлена, отдельный размер)
       '<line x1="' + (P.bfl.x - 20) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 20) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
       '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.bfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
       '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.tfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
       '<text x="' + (P.bfl.x - 28) + '" y="' + ((P.bfl.y + P.tfl.y) / 2 + 4) +
         '" text-anchor="end" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">H = ' + h.toFixed(1) + ' м</text>' +
-
-      // Потолок — подпись сверху
-      '<text x="' + ((P.tfl.x + P.tbr.x) / 2) + '" y="' + (Math.min(P.tll.y, P.tfl.y, P.tfr.y, P.tbr.y) - 6) +
-        '" text-anchor="middle" font-family="Arial" font-size="10.5" fill="#475569">' +
-        'Потолок · ' + escapeHtml(isoName(g.ceiling && g.ceiling.isoCode)) + '</text>' +
-      // Пол — подпись внизу справа от пола
-      '<text x="' + ((P.bbr.x + P.bll.x) / 2) + '" y="' + (Math.max(P.bfl.y, P.bfr.y, P.bbr.y, P.bll.y) + 70) +
-        '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#475569">' +
-        '🟫 Пол · ' + escapeHtml(isoName(g.floor && g.floor.isoCode)) + '</text>' +
-
     '</svg>';
 
   // === ЛЕГЕНДА МАТЕРИАЛОВ ===
