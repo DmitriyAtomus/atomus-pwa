@@ -19322,7 +19322,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.84-helper-batch";
+const APP_VERSION = "v2.45.85-new-model-category";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35890,8 +35890,18 @@ function openNewModelForm() {
         // Подгруппа (если у выбранного направления есть подгруппы)
         '<div id="nm-subgroup-wrap" style="display:none;">' +
           '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Подгруппа <span style="color:var(--text-light);font-weight:400;">(необязательно)</span></label>' +
-          '<select id="nm-subgroup" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;background:white;font-family:inherit;">' +
+          '<select id="nm-subgroup" onchange="onNewModelSubgroupChange()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;background:white;font-family:inherit;">' +
             '<option value="">— Без подгруппы —</option>' +
+          '</select>' +
+        '</div>' +
+        // v2.45.85: Категория (внутри направления, опционально привязана к подгруппе)
+        '<div id="nm-category-wrap" style="display:none;">' +
+          '<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">' +
+            '<span style="flex:1;">Категория <span style="color:var(--text-light);font-weight:400;">(напр. «Балка монтажная»)</span></span>' +
+            '<button type="button" onclick="_nmCreateCategoryInline()" style="background:none;border:none;color:var(--brand);font-size:11.5px;cursor:pointer;font-weight:600;padding:0;">+ Новая</button>' +
+          '</label>' +
+          '<select id="nm-category" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;background:white;font-family:inherit;">' +
+            '<option value="">— Без категории —</option>' +
           '</select>' +
         '</div>' +
         // Название
@@ -35961,14 +35971,93 @@ function onNewModelDirectionChange() {
   if (subgroups.length === 0) {
     sgWrap.style.display = 'none';
     sgSel.innerHTML = '<option value="">— Без подгруппы —</option>';
+  } else {
+    sgWrap.style.display = '';
+    let opts = '<option value="">— Без подгруппы —</option>';
+    subgroups.forEach(sg => {
+      opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
+    });
+    sgSel.innerHTML = opts;
+  }
+  // v2.45.85: после смены направления — обновим категории
+  onNewModelSubgroupChange();
+}
+
+// v2.45.85: обновление списка категорий при смене направления/подгруппы.
+// Показываем только категории, привязанные к выбранной подгруппе через
+// parent_subgroup_id. Если подгруппа не выбрана — показываем категории
+// направления без parent_subgroup_id (плюс «привязки нет»).
+function onNewModelSubgroupChange() {
+  const dirSel = document.getElementById('nm-direction');
+  const sgSel  = document.getElementById('nm-subgroup');
+  const catWrap = document.getElementById('nm-category-wrap');
+  const catSel  = document.getElementById('nm-category');
+  if (!dirSel || !catWrap || !catSel) return;
+  const dirId = parseInt(dirSel.value);
+  const sgId  = sgSel && sgSel.value ? parseInt(sgSel.value) : null;
+  const allCats = (cache.models && cache.models.categories) || [];
+  const dirCats = allCats.filter(c => c.direction_id === dirId);
+  let cats;
+  if (sgId) {
+    cats = dirCats.filter(c => c.parent_subgroup_id === sgId);
+  } else {
+    cats = dirCats.filter(c => !c.parent_subgroup_id);
+  }
+  if (!dirCats.length) {
+    catWrap.style.display = 'none';
+    catSel.innerHTML = '<option value="">— Без категории —</option>';
     return;
   }
-  sgWrap.style.display = '';
-  let opts = '<option value="">— Без подгруппы —</option>';
-  subgroups.forEach(sg => {
-    opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
+  catWrap.style.display = '';
+  let opts = '<option value="">— Без категории —</option>';
+  cats.forEach(c => {
+    opts += '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
   });
-  sgSel.innerHTML = opts;
+  catSel.innerHTML = opts;
+}
+
+// v2.45.85: создать новую категорию прямо из формы «Новая модель»
+async function _nmCreateCategoryInline() {
+  const dirSel = document.getElementById('nm-direction');
+  const sgSel  = document.getElementById('nm-subgroup');
+  const dirId = parseInt(dirSel.value);
+  const sgId  = sgSel && sgSel.value ? parseInt(sgSel.value) : null;
+  const sgName = sgSel && sgSel.value ? (sgSel.options[sgSel.selectedIndex].textContent || '') : '';
+  const promptText = sgId
+    ? 'Имя новой категории в подгруппе «' + sgName + '»:'
+    : 'Имя новой категории направления:';
+  const name = prompt(promptText, '');
+  if (!name || !name.trim()) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        direction_id: dirId,
+        subgroup_id: sgId,
+        name: name.trim(),
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || ('HTTP ' + r.status), 'error');
+      return;
+    }
+    const d = await r.json();
+    // Добавляем в кэш категорий
+    if (cache.models && cache.models.categories) {
+      cache.models.categories.push({
+        id: d.id, direction_id: d.direction_id, code: d.code,
+        name: d.name, parent_subgroup_id: d.parent_subgroup_id,
+      });
+    }
+    // Обновим селект и выберем новую категорию
+    onNewModelSubgroupChange();
+    const catSel = document.getElementById('nm-category');
+    if (catSel) catSel.value = String(d.id);
+    showToast('Категория «' + d.name + '» создана', 'success');
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 function closeNewModelForm() {
@@ -35980,6 +36069,9 @@ async function submitNewModel() {
   const direction_id = parseInt(document.getElementById('nm-direction').value);
   const subgroupRaw = (document.getElementById('nm-subgroup') && document.getElementById('nm-subgroup').value) || '';
   const subgroup_id = subgroupRaw ? parseInt(subgroupRaw) : null;
+  // v2.45.85: категория (если выбрана)
+  const catRaw = (document.getElementById('nm-category') && document.getElementById('nm-category').value) || '';
+  const category_id = catRaw ? parseInt(catRaw) : null;
   const name = (document.getElementById('nm-name').value || '').trim();
   const article = (document.getElementById('nm-article').value || '').trim().toUpperCase();
   const extra = (document.getElementById('nm-extra').value || '').trim();
@@ -36001,7 +36093,7 @@ async function submitNewModel() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({
-        direction_id, subgroup_id, name, article, extra,
+        direction_id, subgroup_id, category_id, name, article, extra,
         needs_ip, exec_mode, exec_fixed, work_type,
       }),
     });
@@ -48595,6 +48687,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.85',
+    date: '05.06.2026',
+    title: 'Категория в форме «Новая модель»',
+    features: [
+      'В форме <b>«Новая модель»</b> после подгруппы появилось поле <b>«Категория»</b>',
+      'Список фильтруется по выбранной подгруппе (например, в «Донагревателях» появятся «Балка монтажная» и другие)',
+      'Рядом с лейблом кнопка <b>«+ Новая»</b> — создать категорию прямо отсюда и сразу её выбрать',
+      'Категория опциональна — если не выбрана, модель привязывается просто к подгруппе',
+    ],
+  },
   {
     version: 'v2.45.84',
     date: '05.06.2026',
