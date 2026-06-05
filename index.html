@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.117-password-cache";
+const APP_VERSION = "v2.45.118-helpers-list-fix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -23208,10 +23208,13 @@ function openStopHelpDialog(opts) {
 }
 
 // v2.43.48: добавить ВРУЧНУЮ сотрудника в «работает сейчас» (мастер/директор)
+// v2.45.118: используем /api/employees/active (доступен любому залогиненному)
+// вместо /api/employees — тот требует @require_director, и для Иванова
+// возвращает 403 → «Не удалось загрузить сотрудников».
 async function openAddHelperModal(workId) {
   let employees = [];
   try {
-    const d = await apiGet('/api/employees?limit=200');
+    const d = await apiGet('/api/employees/active');
     employees = (d.items || d.employees || []).filter(e => e.is_active !== false);
   } catch (e) {
     showToast('Не удалось загрузить сотрудников', 'error');
@@ -23355,10 +23358,10 @@ function pwdSetProgressPreset(workId, pct) {
 
 // v2.43.33: соисполнители — добавление через модалку выбора сотрудника
 async function openAddCoAssigneeModal(workId) {
-  // Грузим всех активных сотрудников с цеховым доступом
+  // v2.45.118: /api/employees/active вместо /api/employees (не требует director)
   let employees = [];
   try {
-    const d = await apiGet('/api/employees?limit=200');
+    const d = await apiGet('/api/employees/active');
     employees = (d.items || d.employees || []).filter(e => e.is_active !== false);
   } catch (e) {
     showToast('Не удалось загрузить сотрудников', 'error');
@@ -23441,10 +23444,10 @@ async function removePwdCoAssignee(workId, employeeId) {
 
 // v2.43.34: журнал участия — модалка для добавления новой записи
 async function openAddSessionForm(workId) {
-  // Грузим сотрудников
+  // v2.45.118: /api/employees/active вместо /api/employees (не требует director)
   let employees = [];
   try {
-    const d = await apiGet('/api/employees?limit=200');
+    const d = await apiGet('/api/employees/active');
     employees = (d.items || d.employees || []).filter(e => e.is_active !== false);
   } catch (e) {
     showToast('Не удалось загрузить сотрудников', 'error');
