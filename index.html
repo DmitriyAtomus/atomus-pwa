@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.109-password-optional";
+const APP_VERSION = "v2.45.110-cc-breathing-pct";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -53690,9 +53690,7 @@ function _promptPasswordForAction(title, subtitle) {
             (title || 'Действие') + '</div>' +
           '<div style="font-size:12.5px;color:var(--text-mid);margin-bottom:14px;line-height:1.5;">' +
             (subtitle || '') + '</div>' +
-          '<label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">' +
-            'Твой пароль <span style="color:var(--text-light);font-weight:400;">(необязательно — оставь пустым, если у тебя нет пароля)</span>' +
-          '</label>' +
+          '<label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">Твой пароль</label>' +
           '<input type="password" id="pwd-input" placeholder="••••••" autocomplete="current-password" ' +
             'style="width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;letter-spacing:0.05em;" />' +
         '</div>' +
@@ -53708,10 +53706,11 @@ function _promptPasswordForAction(title, subtitle) {
     m.querySelector('#pwd-close').onclick  = () => cleanup(null);
     m.querySelector('#pwd-cancel').onclick = () => cleanup(null);
     m.onclick = (e) => { if (e.target === m) cleanup(null); };
-    // v2.45.109: пароль опционален — пустое поле = «без пароля» (бэк пропустит)
+    // v2.45.110: пароль снова обязателен — пустое поле не пропускаем
     const submit = () => {
       const v = (input.value || '').trim();
-      cleanup(v);   // даже пустой пароль возвращаем (а не null) — null значит «отмена»
+      if (!v) { input.focus(); return; }
+      cleanup(v);
     };
     m.querySelector('#pwd-ok').onclick = submit;
     input.addEventListener('keydown', (e) => {
@@ -65193,7 +65192,7 @@ function _ccRenderTab(code) {
 // v2.45.31: «Клиент» — данные расчёта (на кого считаем)
 function _ccTabClient() {
   const c = _ccState.client || {};
-  return '<div class="cc-section"><h4><i class="ti ti-user"></i> На кого считаем</h4>' +
+  return '<div class="cc-section"><h4><i class="ti ti-user"></i> Заказчик</h4>' +
     '<div class="cc-grid">' +
       '<div style="grid-column: span 2;"><label class="form-label">Название расчёта *</label>' +
         '<input type="text" class="form-input" id="cc-cli-title" value="' + escapeHtml(c.title || "") + '" placeholder="Напр.: «Камера хранения мяса — ООО Прохлада»" /></div>' +
@@ -65340,7 +65339,7 @@ function _ccRenderSchema() {
   }
 
   const planSvg =
-    '<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;" preserveAspectRatio="xMidYMid meet">' +
+    '<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto;" preserveAspectRatio="xMidYMid meet">' +
       // Стены — заливка по типу
       '<defs>' +
         '<pattern id="cc-pat-brick" width="14" height="8" patternUnits="userSpaceOnUse">' +
@@ -65404,7 +65403,7 @@ function _ccRenderSchema() {
   const floorMatIdx = (g.floor && g.floor.isoCode) || '';
   const ceilMatIdx  = (g.ceiling && g.ceiling.isoCode) || '';
   const sectionSvg =
-    '<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;" preserveAspectRatio="xMidYMid meet">' +
+    '<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto;" preserveAspectRatio="xMidYMid meet">' +
       '<text x="320" y="15" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">РАЗРЕЗ (сбоку)</text>' +
       // Потолок (толстая верхняя полоса)
       '<rect x="' + (sx0 - 4) + '" y="' + (sy0 - 14) + '" width="' + (sW + 8) + '" height="12" fill="#E2E8F0" stroke="#64748B" stroke-width="0.8"/>' +
@@ -65426,10 +65425,15 @@ function _ccRenderSchema() {
       '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 + sH/2 + 4) + '" text-anchor="middle" font-size="14" font-weight="600" fill="#0C4A6E">' + (aLen * bLen * h).toFixed(1) + ' м³</text>' +
     '</svg>';
 
+  // v2.45.110: центрирование SVG через display:block + margin:auto
   return '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">' +
-    '<div style="text-align:center;">' + planSvg + '</div>' +
+    '<div style="display:flex;justify-content:center;align-items:center;">' +
+      '<div style="max-width:100%;width:100%;text-align:center;">' + planSvg + '</div>' +
+    '</div>' +
     '<div style="border-top:1px dashed var(--border);margin:10px 0;"></div>' +
-    '<div style="text-align:center;">' + sectionSvg + '</div>' +
+    '<div style="display:flex;justify-content:center;align-items:center;">' +
+      '<div style="max-width:100%;width:100%;text-align:center;">' + sectionSvg + '</div>' +
+    '</div>' +
   '</div>';
 }
 
@@ -65551,18 +65555,39 @@ function _ccTabProduct() {
   const pkgOpts = CC_PACKAGES.map(([code, name], i) =>
     '<option value="' + i + '"' + (p.pkgIdx === i ? ' selected' : '') + '>' + name + '</option>').join('');
   const prod = CC_PRODUCTS[p.idx];
+  // v2.45.110: дефолт для «дыхание продукта» — типовые овощи/фрукты ≈ 30 Вт/тонна
+  if (p.isBreathing === undefined) p.isBreathing = false;
+  if (p.breathingHeatWPerTon === undefined) p.breathingHeatWPerTon = 30;
+  if (p.storageMassKg === undefined) p.storageMassKg = p.massKg || 0;
   return '<div class="cc-section"><h4><i class="ti ti-meat"></i> Продукт</h4>' +
     '<div class="cc-grid">' +
       '<div style="grid-column: span 2;"><label class="form-label">Продукт</label>' +
         '<select class="form-input" id="cc-prod-idx" onchange="_ccProdChanged()">' + prodOpts + '</select></div>' +
-      '<div><label class="form-label">Масса продукта, кг</label>' +
+      '<div><label class="form-label" title="Сколько кг продукта поступает на охлаждение/заморозку за один цикл">Масса загрузки, кг</label>' +
         '<input type="number" class="form-input" id="cc-prod-mass" value="' + p.massKg + '" min="0" step="10" /></div>' +
+      '<div><label class="form-label" title="Сколько всего кг продукта одновременно хранится в камере (для расчёта дыхания)">Общая масса в камере, кг</label>' +
+        '<input type="number" class="form-input" id="cc-prod-storage-mass" value="' + p.storageMassKg + '" min="0" step="100" /></div>' +
       '<div><label class="form-label">Время охлаждения/заморозки, ч</label>' +
         '<input type="number" class="form-input" id="cc-prod-tau" value="' + p.tauHours + '" min="1" step="0.5" /></div>' +
       '<div><label class="form-label">t° начальная, °C</label>' +
         '<input type="number" class="form-input" id="cc-prod-t1" value="' + p.tStart + '" step="1" /></div>' +
       '<div><label class="form-label">t° конечная, °C</label>' +
         '<input type="number" class="form-input" id="cc-prod-t2" value="' + p.tEnd + '" step="1" /></div>' +
+    '</div>' +
+    // v2.45.110: «дышащий» продукт — выделяет тепло при хранении
+    '<div style="margin-top:12px;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dark);cursor:pointer;">' +
+        '<input type="checkbox" id="cc-prod-breathing" ' + (p.isBreathing ? 'checked' : '') + ' style="appearance:auto;-webkit-appearance:auto;width:16px;height:16px;accent-color:#15803D;" />' +
+        '<b>Дышащий продукт</b> <span style="color:var(--text-light);font-weight:400;">(овощи, фрукты, цветы — выделяют тепло при хранении)</span>' +
+      '</label>' +
+      '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:8px;align-items:center;">' +
+        '<div><label class="form-label">Тепло дыхания, Вт/тонна</label>' +
+          '<input type="number" class="form-input" id="cc-prod-breath-w" value="' + p.breathingHeatWPerTon + '" min="0" step="5" ' +
+            (p.isBreathing ? '' : 'disabled') + ' /></div>' +
+        '<div style="font-size:11.5px;color:var(--text-mid);line-height:1.4;">' +
+          'Типовые значения: яблоки 15–40, картофель 10–25, листовые овощи 50–120, цветы 30–60, грибы 70–250 Вт/т' +
+        '</div>' +
+      '</div>' +
     '</div>' +
     '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> Справочно для <b>' + prod[0] + '</b>: ' +
@@ -65664,6 +65689,10 @@ function _ccTabResult() {
   if (r.qVent && r.qVent > 0) {
     rows.push(['Воздухообмен (Q-вент.)', r.qVent]);
   }
+  // v2.45.110: дыхание продукта — показываем только если есть
+  if (r.qResp && r.qResp > 0) {
+    rows.push(['Дыхание продукта (Q-дыхания)', r.qResp]);
+  }
   const totalKw = r.total / 1000;
   const totalWithSafetyKw = r.totalWithSafety / 1000;
   const cli = _ccState.client || {};
@@ -65677,13 +65706,20 @@ function _ccTabResult() {
           (cli.email ? '<i class="ti ti-mail" style="opacity:0.6;"></i> ' + escapeHtml(cli.email) : '') +
         '</div></div>'
     : '';
+  // v2.45.110: процент от общей суммы теплопритоков для каждой строки
+  const sumW = rows.reduce((s, [, v]) => s + (Number(v) || 0), 0) || 1;
   return clientBlock +
     '<div class="cc-section">' +
-    '<h4><i class="ti ti-chart-bar"></i> Разбивка теплопритоков</h4>' +
+    '<h4><i class="ti ti-chart-bar"></i> Теплопритоки по составляющим</h4>' +
     '<div class="cc-result">' +
-      rows.map(([n, v]) =>
-        '<div class="cc-result-row"><span>' + n + '</span>' +
-        '<span class="v">' + (v / 1000).toFixed(3) + ' кВт</span></div>').join('') +
+      rows.map(([n, v]) => {
+        const pct = ((v / sumW) * 100).toFixed(1);
+        return '<div class="cc-result-row"><span>' + n + '</span>' +
+          '<span class="v" style="text-align:right;">' +
+            (v / 1000).toFixed(3) + ' кВт ' +
+            '<span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + pct + '%)</span>' +
+          '</span></div>';
+      }).join('') +
       '<div class="cc-result-row"><span>Сумма теплопритоков</span>' +
         '<span class="v">' + totalKw.toFixed(2) + ' кВт</span></div>' +
       '<div class="cc-result-row"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
@@ -65770,6 +65806,10 @@ function _ccPrintReport() {
   if (r.qVent && r.qVent > 0) {
     rows.push(['Воздухообмен (Q-вент.)', (r.qVent / 1000).toFixed(3)]);
   }
+  // v2.45.110: Q-дыхание продукта — только если включено
+  if (r.qResp && r.qResp > 0) {
+    rows.push(['Дыхание продукта (Q-дыхания)', (r.qResp / 1000).toFixed(3)]);
+  }
   const html =
 '<!doctype html><html lang="ru"><head><meta charset="utf-8"/>' +
 '<title>Расчёт холода — ' + safeText(cli.title || cli.company || dtStr) + '</title>' +
@@ -65801,7 +65841,7 @@ function _ccPrintReport() {
 '    <div class="brand"><b>ATOMUS group</b><br/>atomus-group.ru</div>' +
 '  </div>' +
 (cli.title || cli.company || cli.contactName
-  ? '<h2>На кого расчёт</h2><div class="grid">' +
+  ? '<h2>Заказчик</h2><div class="grid">' +
       (cli.title       ? '<div><b>Название:</b> ' + safeText(cli.title) + '</div>' : '') +
       (cli.company     ? '<div><b>Компания:</b> ' + safeText(cli.company) + '</div>' : '') +
       (cli.contactName ? '<div><b>Контакт:</b> ' + safeText(cli.contactName) + '</div>' : '') +
@@ -65862,12 +65902,18 @@ function _ccPrintReport() {
 '  <div style="text-align:center;border:1px solid #CBD5E1;border-radius:6px;padding:8px;margin:4px 0;">' +
     _ccRenderSchemaForPrint() +
 '  </div>' +
-'  <h2>Разбивка теплопритоков</h2>' +
+'  <h2>Теплопритоки по составляющим</h2>' +
 '  <table>' +
-'    <tr><th>Источник</th><th style="text-align:right;">кВт</th></tr>' +
-    rows.map(([n, v]) => '<tr><td>' + n + '</td><td class="num">' + v + '</td></tr>').join('') +
-'    <tr><td><b>Сумма теплопритоков</b></td><td class="num">' + totalKw + '</td></tr>' +
-'    <tr><td>С коэф. запаса (' + r.safety + ' %)</td><td class="num">' + totalWithSafetyKw + '</td></tr>' +
+'    <tr><th>Источник</th><th style="text-align:right;">кВт</th><th style="text-align:right;">% от суммы</th></tr>' +
+    (() => {
+      const sumKw = rows.reduce((s, [, v]) => s + Number(v), 0) || 1;
+      return rows.map(([n, v]) => {
+        const pct = ((Number(v) / sumKw) * 100).toFixed(1);
+        return '<tr><td>' + n + '</td><td class="num">' + v + '</td><td class="num">' + pct + ' %</td></tr>';
+      }).join('');
+    })() +
+'    <tr><td><b>Сумма теплопритоков</b></td><td class="num">' + totalKw + '</td><td class="num">100 %</td></tr>' +
+'    <tr><td>С коэф. запаса (' + r.safety + ' %)</td><td class="num">' + totalWithSafetyKw + '</td><td class="num">—</td></tr>' +
 '  </table>' +
 '  <div class="total">' +
 '    <div class="lbl">Рекомендуемая мощность холода</div>' +
@@ -66223,6 +66269,11 @@ function _ccCollectFromInputs() {
   p.tEnd = num('cc-prod-t2', p.tEnd);
   p.pkgIdx = parseInt(str('cc-pkg-idx', p.pkgIdx), 10);
   p.pkgPercent = num('cc-pkg-pct', p.pkgPercent);
+  // v2.45.110: масса хранения + дыхание продукта
+  p.storageMassKg = num('cc-prod-storage-mass', p.storageMassKg || 0);
+  const breathEl = document.getElementById('cc-prod-breathing');
+  if (breathEl) p.isBreathing = !!breathEl.checked;
+  p.breathingHeatWPerTon = num('cc-prod-breath-w', p.breathingHeatWPerTon || 30);
   // Условия
   const c = _ccState.cond;
   c.people = num('cc-people', c.people);
@@ -66349,7 +66400,14 @@ function _ccCalculate() {
     ? (cameraVolume * airChanges * 1.293 * 1005 * dT_door) / 86400
     : 0;
 
-  const total = q1 + q2 + q3 + q4 + q5 + q6Clean + qVent;
+  // v2.45.110: Q-дыхания продукта (для овощей/фруктов/цветов)
+  // Q (Вт) = (масса хранения в тоннах) × (Вт/тонна)
+  const p2 = _ccState.product || {};
+  const qResp = (p2.isBreathing && p2.storageMassKg > 0 && p2.breathingHeatWPerTon > 0)
+    ? (Number(p2.storageMassKg) / 1000) * Number(p2.breathingHeatWPerTon)
+    : 0;
+
+  const total = q1 + q2 + q3 + q4 + q5 + q6Clean + qVent + qResp;
   // С учётом «работы оборудования X ч/сут»: эффективная нагрузка выше
   const workCoeff = Math.max(24 / _ccState.workHours, 1);
   const safety = _ccState.safety || 0;
@@ -66357,6 +66415,7 @@ function _ccCalculate() {
   _ccLastResult = {
     q1, q2, q3, q4, q5, q6: q6Clean,
     qVent,                          // v2.45.105
+    qResp,                          // v2.45.110: дыхание продукта
     total: total * workCoeff,
     totalWithSafety,
     workHours: _ccState.workHours,
