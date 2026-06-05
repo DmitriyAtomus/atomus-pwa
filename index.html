@@ -19340,7 +19340,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.97-spec-item-qr";
+const APP_VERSION = "v2.45.98-cc-walls-pdf-blocks";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48912,6 +48912,15 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.98',
+    date: '05.06.2026',
+    title: 'Калькулятор холода: ограждения в PDF + новые материалы стен',
+    features: [
+      'В печатном отчёте калькулятора добавлена таблица <b>«Ограждения: материал, теплоизоляция, t° снаружи»</b> — для каждой стены, пола и потолка видно конструкцию, тип утеплителя, толщину изоляции в мм, длину и температуру снаружи',
+      'В список материалов стен добавлены <b>Пеноблок (газобетон)</b>, <b>Шлакоблок</b>, <b>Инсиблок (арболит)</b> со стандартными значениями λ — теперь можно выбрать в выпадашке во вкладке «Стены/изоляция»',
+    ],
+  },
+  {
     version: 'v2.45.97',
     date: '05.06.2026',
     title: 'Печать QR прямо из позиции спецификации',
@@ -64748,6 +64757,10 @@ const CC_WALL_MATERIALS = [
   ['Кирпич',                          250, 0.81],
   ['Железобетон',                     150, 1.92],
   ['Дерево',                          100, 0.18],
+  // v2.45.98: распространённые в РФ блочные материалы
+  ['Пеноблок (газобетон)',            300, 0.30],
+  ['Шлакоблок',                       300, 0.50],
+  ['Инсиблок (арболит)',              300, 0.15],
   ['Без стены (одна изоляция)',         0, 0   ],
 ];
 
@@ -65298,6 +65311,24 @@ function _ccPrintReport() {
     'freeze':       'Заморозка',
     'cool':         'Охлаждение',
   })[_ccState.mode] || _ccState.mode;
+  // v2.45.98: справочники теплоизоляции и материала стен — для PDF
+  const isoName = (code) => {
+    const it = CC_INSULATIONS.find(x => x[0] === code);
+    return it ? it[1] : (code || '—');
+  };
+  const wallMatName = (idx) => {
+    const i = (CC_WALL_MATERIALS[idx] || CC_WALL_MATERIALS[0]);
+    return i ? i[0] : '—';
+  };
+  // Таблица ограждений: 4 стены + пол + потолок
+  const planes = [
+    { label: 'Стена 1', w: walls[0] || {}, hasMat: true },
+    { label: 'Стена 2', w: walls[1] || {}, hasMat: true },
+    { label: 'Стена 3', w: walls[2] || {}, hasMat: true },
+    { label: 'Стена 4', w: walls[3] || {}, hasMat: true },
+    { label: 'Пол',     w: g.floor   || {}, hasMat: false },
+    { label: 'Потолок', w: g.ceiling || {}, hasMat: false },
+  ];
   const rows = [
     ['Через ограждения (Q₁)',          (r.q1 / 1000).toFixed(3)],
     ['Охлаждение / заморозка (Q₂)',    (r.q2 / 1000).toFixed(3)],
@@ -65356,6 +65387,24 @@ function _ccPrintReport() {
 '    <div><b>Режим:</b> ' + safeText(modeLabel) + '</div>' +
 '    <div><b>Температура в камере:</b> ' + _ccState.tInside + ' °C</div>' +
 '  </div>' +
+// v2.45.98: ограждения (теплоизоляция + температурные режимы снаружи)
+'  <h2>Ограждения: материал, теплоизоляция, t° снаружи</h2>' +
+'  <table>' +
+'    <tr><th>Плоскость</th><th>Конструкция</th><th>Теплоизоляция</th>' +
+'        <th style="text-align:right;">Толщина, мм</th>' +
+'        <th style="text-align:right;">Длина, м</th>' +
+'        <th style="text-align:right;">t° снаружи, °C</th></tr>' +
+    planes.map(p =>
+      '<tr>' +
+        '<td><b>' + safeText(p.label) + '</b></td>' +
+        '<td>' + safeText(p.hasMat ? wallMatName(p.w.wallMat || 0) : '—') + '</td>' +
+        '<td>' + safeText(isoName(p.w.isoCode)) + '</td>' +
+        '<td class="num">' + (p.w.isoMm != null ? p.w.isoMm : '—') + '</td>' +
+        '<td class="num">' + (p.w.len != null ? p.w.len : '—') + '</td>' +
+        '<td class="num">' + (p.w.tOut != null ? p.w.tOut : '—') + '</td>' +
+      '</tr>'
+    ).join('') +
+'  </table>' +
 '  <h2>Продукт</h2><div class="grid">' +
 '    <div><b>Масса:</b> ' + (product.massKg || 0) + ' кг</div>' +
 '    <div><b>T нач → T кон:</b> ' + (product.tStart || 0) + '°C → ' + (product.tEnd || 0) + '°C</div>' +
