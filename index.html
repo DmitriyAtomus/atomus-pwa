@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.116-door-on-camera";
+const APP_VERSION = "v2.45.117-password-cache";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19709,6 +19709,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem('atomus_last_view');  // v2.8.2
+  // v2.45.117: при выходе сбрасываем кеш пароля
+  if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
   state.user = null;
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -53670,9 +53672,38 @@ function showRebuildDiagnosticsModal(data) {
 }
 
 
+// v2.45.117: кеш проверенного пароля на 10 минут — чтобы не задалбывать
+// при каждой смене статуса. После успешной проверки храним пароль в памяти;
+// последующие действия не показывают модалку. По logout / reload — сбрасывается.
+const _PWD_CACHE_TTL_MS = 10 * 60 * 1000;   // 10 минут
+let _cachedPassword = null;
+let _cachedPasswordAt = 0;
+function _getCachedPassword() {
+  if (!_cachedPassword) return null;
+  if (Date.now() - _cachedPasswordAt > _PWD_CACHE_TTL_MS) {
+    _cachedPassword = null;
+    return null;
+  }
+  return _cachedPassword;
+}
+function _setCachedPassword(pw) {
+  _cachedPassword = pw;
+  _cachedPasswordAt = Date.now();
+}
+function _clearCachedPassword() {
+  _cachedPassword = null;
+  _cachedPasswordAt = 0;
+}
+
 // v2.45.106: модалка подтверждения паролем для критичных действий.
 // Возвращает строку-пароль (если введён и нажат «Подтвердить»), либо null (отмена).
+// v2.45.117: если пароль уже проверен в последние 10 мин — возвращаем кеш без модалки.
 function _promptPasswordForAction(title, subtitle) {
+  const cached = _getCachedPassword();
+  if (cached !== null) {
+    // Возвращаем сразу — без вопроса. Пароль уже верный (был принят бэком).
+    return Promise.resolve(cached);
+  }
   return new Promise((resolve) => {
     let m = document.getElementById('pwd-confirm-modal');
     if (m) m.remove();
@@ -53795,6 +53826,8 @@ async function changeContractStatus(contractId, newStatus) {
         return;
       }
       if (r.status === 403 && d.error === 'wrong_password') {
+        // v2.45.117: неверный пароль — сбросим кеш чтобы попросить снова
+        if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
         showToast('Неверный пароль — статус не изменён', 'error');
         return;
       }
@@ -53812,6 +53845,10 @@ async function changeContractStatus(contractId, newStatus) {
       return;
     }
     showToast('Статус изменён', 'success');
+    // v2.45.117: пароль точно верный — кешируем на 10 минут
+    if (password && typeof _setCachedPassword === 'function') {
+      _setCachedPassword(password);
+    }
     cache.contracts = null;
     cache.contractsCounts = null;
     loadCurrentContract();
