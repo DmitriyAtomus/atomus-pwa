@@ -17530,6 +17530,10 @@
             <button class="btn btn-secondary" onclick="exportNomenclatureXlsx()" title="Скачать всю номенклатуру в Excel">
               <i class="ti ti-file-spreadsheet"></i> <span>Excel</span>
             </button>
+            <!-- v2.45.90: сверка склада с потребностями BOM активных работ -->
+            <button class="btn btn-secondary" onclick="exportBomReconciliationXlsx()" title="Excel: сколько нужно по BOM активных работ vs остаток на складе">
+              <i class="ti ti-clipboard-check"></i> <span>Сверка склада</span>
+            </button>
             <!-- v2.45.63: «Структура Климатики», «Структура Щитов», «Импорт BOM»
                  переехали в Снабжение → Админ-инструменты (под паролем директора).
                  Здесь оставлен только «Excel» (повседневный экспорт) и «Новый раздел». -->
@@ -19336,7 +19340,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.88-helper-stop";
+const APP_VERSION = "v2.45.90-bom-reconciliation";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -35048,6 +35052,35 @@ async function exportNomenclatureXlsx() {
   }
 }
 
+// v2.45.90: Excel-сверка склада комплектующих с потребностями BOM
+async function exportBomReconciliationXlsx() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) { showToast('Сессия истекла', 'error'); return; }
+  showToast('Готовим сверку…', 'info');
+  try {
+    const r = await fetch(API_BASE + '/api/export/bom-reconciliation.xlsx', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      throw new Error('HTTP ' + r.status + ' ' + t.slice(0, 100));
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cd = r.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^"]+)"?/);
+    a.download = match ? match[1] : 'bom-reconciliation.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    showToast('Сверка скачана', 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 // ============ КОНЕЦ ЭТАПА 45.4 ============
 
 
@@ -48778,6 +48811,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.90',
+    date: '05.06.2026',
+    title: 'Сверка склада: Excel-выгрузка по BOM активных работ',
+    features: [
+      'В <b>Номенклатуре оборудования</b> рядом с кнопкой «Excel» появилась <b>«Сверка склада»</b>',
+      'Жмёшь → скачивается XLSX с колонками <i>Категория, Артикул, Название, Нужно, На складе, Дефицит, Ед., Статус</i>',
+      'Цветовая раскраска: 🟥 красный — нужны, но <b>на складе 0</b>; 🟨 жёлтый — есть, но не хватает; 🟩 зелёный — закрыто планом; без заливки — не используется в текущих работах',
+      'Колонка «Нужно» — сумма qty по BOM всех работ со статусом «В очереди» / «В работе»',
+      'Второй лист «Сводка» — счётчики по категориям (нет в наличии, не хватает, в наличии, не используется) — для общего понимания состояния',
+    ],
+  },
   {
     version: 'v2.45.88',
     date: '05.06.2026',
