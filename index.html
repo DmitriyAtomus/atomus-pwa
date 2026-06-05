@@ -19432,7 +19432,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.129-3d-schemas";
+const APP_VERSION = "v2.45.130-callout-short-fix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -65787,6 +65787,14 @@ function _ccRenderSchema() {
       (() => {
         const sideC = { a1:'#2563EB', b2:'#EA580C', a3:'#7C3AED', b4:'#15803D',
                         floor:'#B45309', ceiling:'#0891B2', door:'#92400E' };
+        const short = (s) => {
+          s = String(s || '')
+            .replace('(металл, без λ)', '').replace('(газобетон)', '').replace('(арболит)', '')
+            .replace('Пенополиуретан', 'PIR').replace('Пенополистирол', 'EPS')
+            .replace('(PIR/PUR)', '').replace('(EPS/XPS)', '').replace('Минеральная вата', 'Минвата')
+            .trim();
+          return s.length > 16 ? s.slice(0, 15) + '…' : s;
+        };
         function callout(fx, fy, tx, ty, color, title, sub) {
           const w1 = title.length * 6.6 + 16;
           const w2 = (sub || '').length * 5.4 + 16;
