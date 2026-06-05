@@ -19344,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.102-exec-label-fix";
+const APP_VERSION = "v2.45.103-camera-schema";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48933,6 +48933,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.103',
+    date: '05.06.2026',
+    title: 'Калькулятор холода: визуальная схема камеры',
+    features: [
+      'На вкладке <b>«Камера»</b> под полями размеров теперь рисуется <b>SVG-схема</b>: план сверху (вид сверху, 4 стены с цветными паттернами материалов и подписями «А-1», «Б-2», «А-3», «Б-4» с длинами) + разрез сбоку (с высотой H и подписью пола/потолка с типом изоляции)',
+      'Цветовые паттерны разных материалов: <b>кирпич</b> 🟥 (узор кирпичной кладки), <b>сэндвич</b> 🟦 (серая панель с полосками), <b>бетон/железобетон</b> ⚫ (точки), <b>дерево</b> 🟫 (горизонтальные полоски), <b>пеноблок/шлакоблок/инсиблок</b> ⬜ (крупная блочная сетка)',
+      'Схема автоматически обновляется при изменении размеров — длина сторон, высота, площадь и объём пересчитываются на лету',
+      'Поля размеров переименованы: «Сторона А-1 / Б-2 / А-3 / Б-4» — соответствуют подписям на схеме',
+    ],
+  },
+  {
     version: 'v2.45.102',
     date: '05.06.2026',
     title: 'Карточка сборки: корректные «Готово» и «Исполнение»',
@@ -65107,22 +65118,198 @@ function _ccTabCamera() {
       '<h4><i class="ti ti-ruler-measure"></i> Размеры камеры</h4>' +
       '<div class="cc-grid">' +
         '<div><label class="form-label">Высота, м</label>' +
-          '<input type="number" class="form-input" id="cc-height" value="' + g.height + '" min="1.5" step="0.1" /></div>' +
-        '<div><label class="form-label">Стена 1 (длина), м</label>' +
-          '<input type="number" class="form-input" id="cc-w0-len" value="' + g.walls[0].len + '" min="0.5" step="0.1" /></div>' +
-        '<div><label class="form-label">Стена 2 (длина), м</label>' +
-          '<input type="number" class="form-input" id="cc-w1-len" value="' + g.walls[1].len + '" min="0.5" step="0.1" /></div>' +
-        '<div><label class="form-label">Стена 3 (длина), м</label>' +
-          '<input type="number" class="form-input" id="cc-w2-len" value="' + g.walls[2].len + '" min="0.5" step="0.1" /></div>' +
-        '<div><label class="form-label">Стена 4 (длина), м</label>' +
-          '<input type="number" class="form-input" id="cc-w3-len" value="' + g.walls[3].len + '" min="0.5" step="0.1" /></div>' +
+          '<input type="number" class="form-input" id="cc-height" value="' + g.height + '" min="1.5" step="0.1" oninput="_ccRedrawSchema()" /></div>' +
+        '<div><label class="form-label">Сторона А-1, м</label>' +
+          '<input type="number" class="form-input" id="cc-w0-len" value="' + g.walls[0].len + '" min="0.5" step="0.1" oninput="_ccRedrawSchema()" /></div>' +
+        '<div><label class="form-label">Сторона Б-2, м</label>' +
+          '<input type="number" class="form-input" id="cc-w1-len" value="' + g.walls[1].len + '" min="0.5" step="0.1" oninput="_ccRedrawSchema()" /></div>' +
+        '<div><label class="form-label">Сторона А-3, м</label>' +
+          '<input type="number" class="form-input" id="cc-w2-len" value="' + g.walls[2].len + '" min="0.5" step="0.1" oninput="_ccRedrawSchema()" /></div>' +
+        '<div><label class="form-label">Сторона Б-4, м</label>' +
+          '<input type="number" class="form-input" id="cc-w3-len" value="' + g.walls[3].len + '" min="0.5" step="0.1" oninput="_ccRedrawSchema()" /></div>' +
       '</div>' +
       '<div class="cc-hint">' +
         '<i class="ti ti-info-circle"></i> Объём камеры: <b>' + volume.toFixed(1) + ' м³</b>, ' +
         'площадь пола: <b>' + floorArea.toFixed(1) + ' м²</b>. ' +
-        'Стены вводятся попарно противоположными (1↔3, 2↔4).' +
+        'Стены вводятся попарно противоположными (А-1↔А-3, Б-2↔Б-4).' +
       '</div>' +
+      // v2.45.103: визуальная схема камеры (план + разрез)
+      '<div id="cc-camera-schema" style="margin-top:16px;">' + _ccRenderSchema() + '</div>' +
     '</div>';
+}
+
+// v2.45.103: SVG-схема камеры — план сверху (4 стены с материалами) и разрез сбоку
+// (пол / потолок / высота). Подписи: длины сторон, материалы стен, тип пола.
+function _ccRenderSchema() {
+  // Берём актуальные размеры из state + материалы стен (если уже выбраны во вкладке Стены)
+  const g = _ccState.geom;
+  const ws = g.walls || [];
+  const matName = (idx) => {
+    const m = CC_WALL_MATERIALS[idx || 0];
+    return m ? m[0] : '—';
+  };
+  const isoName = (code) => {
+    const it = CC_INSULATIONS.find(x => x[0] === code);
+    return it ? it[1] : '';
+  };
+  // Сокращаем длинные имена материалов для подписей на схеме
+  const short = (s) => {
+    s = String(s || '');
+    s = s.replace('(металл, без λ)', '').replace('(газобетон)', '').replace('(арболит)', '').trim();
+    return s.length > 14 ? s.slice(0, 13) + '…' : s;
+  };
+  const w0 = ws[0] || {len: 0}; const w1 = ws[1] || {len: 0};
+  const w2 = ws[2] || {len: 0}; const w3 = ws[3] || {len: 0};
+  const aLen = (Number(w0.len) + Number(w2.len)) / 2;  // А — длина (горизонталь)
+  const bLen = (Number(w1.len) + Number(w3.len)) / 2;  // Б — ширина (вертикаль)
+  const h    = Number(g.height) || 0;
+
+  // ---- План сверху ----
+  // Контейнер 520×320. Внутри прямоугольник масштабируется по большей стороне.
+  const planBoxW = 480, planBoxH = 240;
+  const maxSide = Math.max(aLen, bLen, 1);
+  const scale = Math.min(planBoxW / maxSide, planBoxH / maxSide) * 0.75;
+  const rectW = Math.max(120, aLen * scale);
+  const rectH = Math.max(80,  bLen * scale);
+  const cx = 260, cy = 160;
+  const x0 = cx - rectW / 2, y0 = cy - rectH / 2;
+  const x1 = x0 + rectW,     y1 = y0 + rectH;
+
+  function lblMat(w, fallback) {
+    const mat = short(matName(w.wallMat || 0));
+    const iso = short(isoName(w.isoCode));
+    return mat + (iso ? ' / ' + iso : '');
+  }
+
+  const planSvg =
+    '<svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px;">' +
+      // Стены — заливка по типу
+      '<defs>' +
+        '<pattern id="cc-pat-brick" width="14" height="8" patternUnits="userSpaceOnUse">' +
+          '<rect width="14" height="8" fill="#FCA5A5"/>' +
+          '<path d="M0 0H14M0 8H14M7 0V4M0 4H14M0 4V8" stroke="#B91C1C" stroke-width="0.6" fill="none"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-sandwich" width="6" height="6" patternUnits="userSpaceOnUse">' +
+          '<rect width="6" height="6" fill="#CBD5E1"/>' +
+          '<path d="M0 3H6" stroke="#64748B" stroke-width="0.5" fill="none"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-concrete" width="10" height="10" patternUnits="userSpaceOnUse">' +
+          '<rect width="10" height="10" fill="#94A3B8"/>' +
+          '<circle cx="3" cy="3" r="0.7" fill="#475569"/>' +
+          '<circle cx="7" cy="7" r="0.5" fill="#475569"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-wood" width="14" height="6" patternUnits="userSpaceOnUse">' +
+          '<rect width="14" height="6" fill="#D6BB91"/>' +
+          '<path d="M0 6H14" stroke="#8B6A3F" stroke-width="0.6" fill="none"/>' +
+        '</pattern>' +
+        '<pattern id="cc-pat-block" width="20" height="10" patternUnits="userSpaceOnUse">' +
+          '<rect width="20" height="10" fill="#E2E8F0"/>' +
+          '<path d="M0 0H20M0 10H20M10 0V10" stroke="#94A3B8" stroke-width="0.6" fill="none"/>' +
+        '</pattern>' +
+      '</defs>' +
+      // Сама камера
+      '<rect x="' + x0 + '" y="' + y0 + '" width="' + rectW + '" height="' + rectH +
+        '" fill="#F0F9FF" stroke="#0C4A6E" stroke-width="2"/>' +
+      // 4 стены — толстые цветные полоски снаружи
+      _ccWallStripe(x0, y0 - 14, rectW, 12, w0.wallMat || 0) +  // верх — Сторона А-1
+      _ccWallStripe(x1 + 2, y0, 12, rectH, w1.wallMat || 0) +    // право — Сторона Б-2
+      _ccWallStripe(x0, y1 + 2, rectW, 12, w2.wallMat || 0) +    // низ — Сторона А-3
+      _ccWallStripe(x0 - 14, y0, 12, rectH, w3.wallMat || 0) +   // лево — Сторона Б-4
+      // Подписи сторон
+      '<text x="' + (x0 + rectW/2) + '" y="' + (y0 - 22) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0C4A6E">А-1 · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x1 + 22)     + '" y="' + (cy)        + '" text-anchor="start" font-size="13" font-weight="700" fill="#0C4A6E" transform="rotate(90,' + (x1 + 22) + ',' + cy + ')">Б-2 · ' + (bLen ? bLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x0 + rectW/2) + '" y="' + (y1 + 28) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0C4A6E">А-3 · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x0 - 22)     + '" y="' + (cy)        + '" text-anchor="start" font-size="13" font-weight="700" fill="#0C4A6E" transform="rotate(-90,' + (x0 - 22) + ',' + cy + ')">Б-4 · ' + (bLen ? bLen.toFixed(1) + ' м' : '—') + '</text>' +
+      // Материалы стен — мелким шрифтом ниже подписей
+      '<text x="' + (x0 + rectW/2) + '" y="' + (y0 - 8) + '" text-anchor="middle" font-size="10.5" fill="#475569">' + lblMat(w0) + '</text>' +
+      '<text x="' + (x0 + rectW/2) + '" y="' + (y1 + 44) + '" text-anchor="middle" font-size="10.5" fill="#475569">' + lblMat(w2) + '</text>' +
+      '<text x="' + (x1 + 36)     + '" y="' + (cy + 16)  + '" text-anchor="start" font-size="10.5" fill="#475569" transform="rotate(90,' + (x1 + 36) + ',' + (cy + 16) + ')">' + lblMat(w1) + '</text>' +
+      '<text x="' + (x0 - 36)     + '" y="' + (cy + 16)  + '" text-anchor="start" font-size="10.5" fill="#475569" transform="rotate(-90,' + (x0 - 36) + ',' + (cy + 16) + ')">' + lblMat(w3) + '</text>' +
+      // Подпись «План (вид сверху)»
+      '<text x="260" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">ПЛАН (вид сверху)</text>' +
+      // Площадь и объём в центре
+      '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="13" fill="#0C4A6E" font-weight="600">' + (aLen * bLen).toFixed(1) + ' м²</text>' +
+      '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="11" fill="#475569">пол</text>' +
+    '</svg>';
+
+  // ---- Разрез сбоку ----
+  // Прямоугольник высотой h, шириной A
+  const sectionW = 520, sectionH = 200;
+  const sScale = Math.min((sectionW - 80) / Math.max(aLen, 1), (sectionH - 60) / Math.max(h, 1)) * 0.7;
+  const sW = Math.max(160, aLen * sScale);
+  const sH = Math.max(80,  h * sScale);
+  const sx0 = (sectionW - sW) / 2;
+  const sy0 = (sectionH - sH) / 2 + 10;
+  const sx1 = sx0 + sW, sy1 = sy0 + sH;
+
+  // Пол / потолок — отдельные элементы
+  const floorMatIdx = (g.floor && g.floor.isoCode) || '';
+  const ceilMatIdx  = (g.ceiling && g.ceiling.isoCode) || '';
+  const sectionSvg =
+    '<svg viewBox="0 0 520 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:520px;">' +
+      '<text x="260" y="15" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">РАЗРЕЗ (сбоку)</text>' +
+      // Потолок (толстая верхняя полоса)
+      '<rect x="' + (sx0 - 4) + '" y="' + (sy0 - 14) + '" width="' + (sW + 8) + '" height="12" fill="#E2E8F0" stroke="#64748B" stroke-width="0.8"/>' +
+      '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 - 18) + '" text-anchor="middle" font-size="10.5" fill="#475569">Потолок · ' + short(isoName(g.ceiling && g.ceiling.isoCode)) + '</text>' +
+      // Сама камера
+      '<rect x="' + sx0 + '" y="' + sy0 + '" width="' + sW + '" height="' + sH +
+        '" fill="#F0F9FF" stroke="#0C4A6E" stroke-width="2"/>' +
+      // Пол (толстая нижняя полоса)
+      '<rect x="' + (sx0 - 4) + '" y="' + (sy1 + 2) + '" width="' + (sW + 8) + '" height="14" fill="url(#cc-pat-concrete)" stroke="#64748B" stroke-width="0.8"/>' +
+      '<text x="' + (sx0 + sW/2) + '" y="' + (sy1 + 30) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">ПОЛ · ' + short(isoName(g.floor && g.floor.isoCode)) + '</text>' +
+      // Подпись высоты слева
+      '<line x1="' + (sx0 - 26) + '" y1="' + sy0 + '" x2="' + (sx0 - 26) + '" y2="' + sy1 + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<line x1="' + (sx0 - 30) + '" y1="' + sy0 + '" x2="' + (sx0 - 22) + '" y2="' + sy0 + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<line x1="' + (sx0 - 30) + '" y1="' + sy1 + '" x2="' + (sx0 - 22) + '" y2="' + sy1 + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<text x="' + (sx0 - 32) + '" y="' + (sy0 + sH/2) + '" text-anchor="end" font-size="13" font-weight="700" fill="#0C4A6E">H = ' + (h ? h.toFixed(1) + ' м' : '—') + '</text>' +
+      // Подпись стороны А внизу
+      '<text x="' + (sx0 + sW/2) + '" y="' + (sy1 + 50) + '" text-anchor="middle" font-size="12" fill="#0C4A6E">↔ Сторона А · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
+      // Внутри — объём
+      '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 + sH/2 + 4) + '" text-anchor="middle" font-size="14" font-weight="600" fill="#0C4A6E">' + (aLen * bLen * h).toFixed(1) + ' м³</text>' +
+    '</svg>';
+
+  return '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="text-align:center;">' + planSvg + '</div>' +
+    '<div style="border-top:1px dashed var(--border);margin:10px 0;"></div>' +
+    '<div style="text-align:center;">' + sectionSvg + '</div>' +
+  '</div>';
+}
+
+// Цветная полоса стены — определяет паттерн по индексу материала
+function _ccWallStripe(x, y, w, h, matIdx) {
+  // Соответствие index → паттерн SVG / fill
+  const fills = {
+    0: '#CBD5E1',                  // Сэндвич-панель
+    1: 'url(#cc-pat-concrete)',    // Бетон
+    2: 'url(#cc-pat-brick)',       // Кирпич
+    3: 'url(#cc-pat-concrete)',    // Железобетон
+    4: 'url(#cc-pat-wood)',        // Дерево
+    5: 'url(#cc-pat-block)',       // Пеноблок
+    6: 'url(#cc-pat-block)',       // Шлакоблок
+    7: 'url(#cc-pat-block)',       // Инсиблок
+    8: '#F1F5F9',                  // Без стены
+  };
+  const fill = fills[matIdx] || '#CBD5E1';
+  return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
+    '" fill="' + fill + '" stroke="#64748B" stroke-width="0.8"/>';
+}
+
+// Перерисовка схемы при изменении полей размеров — без потери фокуса инпутов
+function _ccRedrawSchema() {
+  const g = _ccState.geom;
+  const h  = parseFloat((document.getElementById('cc-height') || {}).value);
+  const v0 = parseFloat((document.getElementById('cc-w0-len') || {}).value);
+  const v1 = parseFloat((document.getElementById('cc-w1-len') || {}).value);
+  const v2 = parseFloat((document.getElementById('cc-w2-len') || {}).value);
+  const v3 = parseFloat((document.getElementById('cc-w3-len') || {}).value);
+  if (!isNaN(h)  && h > 0)  g.height = h;
+  if (!isNaN(v0) && v0 > 0) g.walls[0].len = v0;
+  if (!isNaN(v1) && v1 > 0) g.walls[1].len = v1;
+  if (!isNaN(v2) && v2 > 0) g.walls[2].len = v2;
+  if (!isNaN(v3) && v3 > 0) g.walls[3].len = v3;
+  const host = document.getElementById('cc-camera-schema');
+  if (host) host.innerHTML = _ccRenderSchema();
+  if (typeof _ccSaveDraftSoon === 'function') _ccSaveDraftSoon();
 }
 
 function _ccTabWalls() {
