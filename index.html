@@ -17186,6 +17186,10 @@
         <a class="nav-item" onclick="openColdCalculator()" style="cursor:pointer;">
           <i class="ti ti-snowflake"></i><span>Калькулятор холода</span>
         </a>
+        <!-- v2.45.101: справочник «Расчёт наружных блоков и воздухоохладителей» -->
+        <a class="nav-item" onclick="openOutdoorBlocksCalc()" style="cursor:pointer;">
+          <i class="ti ti-air-conditioning"></i><span>Расчёт наружных блоков</span>
+        </a>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
           <button class="nav-item" data-nav="sales-contractors" onclick="selectSidebarItem('sales-contractors')">
@@ -19340,7 +19344,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.100-split-comp-qr";
+const APP_VERSION = "v2.45.102-exec-label-fix";
 const APP_VERSION_DATE = "04.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -48929,6 +48933,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.102',
+    date: '05.06.2026',
+    title: 'Карточка сборки: корректные «Готово» и «Исполнение»',
+    features: [
+      'Статус сборки «готова» заменён на нейтральное <b>«готово»</b> — подходит и к «Наружный блок» (м.р.), и к «Сборка» (ж.р.), и к «Изделие» (с.р.)',
+      'Поле <b>«Исполнение»</b> в карточке сборки теперь читается из самой модели: для воздухоохладителя с выбранной нержавейкой пишет <b>«Нерж. AISI»</b> (а не «Обычное»), для щита с fixed «Стандарт» пишет именно <b>«Стандарт»</b>',
+      'Соответствует ярлыкам которые директор задаёт в модели — exec_label_st / exec_label_ne',
+    ],
+  },
+  {
     version: 'v2.45.100',
     date: '05.06.2026',
     title: 'Печать QR на комплектующие — по этикетке на каждый комплект',
@@ -59534,9 +59548,27 @@ function _renderShipmentItemModal(card) {
   if (!isBox && card.quantity && card.quantity > 1) {
     infoRows.push({ label: 'Количество', value: card.quantity + ' шт.', icon: 'ti-stack-2' });
   }
-  if (!isBox && card.execution) {
-    const lbl = card.execution === 'stainless' ? 'Нержавейка' : 'Обычное';
-    infoRows.push({ label: 'Исполнение', value: lbl, icon: 'ti-settings' });
+  if (!isBox) {
+    // v2.45.102: правильное исполнение для всех сценариев модели
+    //  - exec_mode='fixed' → всегда exec_fixed (например, «Стандарт» у ЩУ)
+    //  - exec_mode='choice' + execution=stainless/ne → exec_label_ne || «Нерж. AISI»
+    //  - exec_mode='choice' + execution=standard/st → exec_label_st || «Стандарт»
+    let execLabel = '';
+    if (card.exec_mode === 'fixed' && card.exec_fixed) {
+      execLabel = card.exec_fixed;
+    } else {
+      const ex = (card.execution || '').toLowerCase();
+      if (ex === 'stainless' || ex === 'ne' || ex === 'нерж' || ex === 'aisi') {
+        execLabel = card.exec_label_ne || 'Нерж. AISI';
+      } else if (ex === 'standard' || ex === 'st' || ex === 'стандарт') {
+        execLabel = card.exec_label_st || 'Стандарт';
+      } else if (card.execution) {
+        execLabel = String(card.execution);
+      }
+    }
+    if (execLabel) {
+      infoRows.push({ label: 'Исполнение', value: execLabel, icon: 'ti-settings' });
+    }
   }
   if (!isBox && card.ip_class) {
     infoRows.push({ label: 'IP-класс', value: card.ip_class, icon: 'ti-shield' });
@@ -65479,6 +65511,217 @@ function _ccPrintReport() {
   win.document.write(html);
   win.document.close();
 }
+
+// ============ v2.45.101: РАСЧЁТ НАРУЖНЫХ БЛОКОВ И ВОЗДУХООХЛАДИТЕЛЕЙ ============
+// Данные из «Расчет наружных блоков.xlsx» (от 18.05.2026). При смене температуры
+// испарения (кипения) холодопроизводительность падает на 4% за каждый градус
+// ниже +5 °C — формула: kW(T) = nominal * (1 - lossPct[T]).
+
+const ODB_OUTDOOR_UNITS = [
+  // [model, brand, nominalKwAt7C]
+  ['XG-AJ22RHA-IDU (7 блок)',   'Хигма',           2.2  ],
+  ['XG-AJ28RHA-IDU (9 блок)',   'Хигма',           2.8  ],
+  ['XG-AJ37RHA-IDU (12 блок)',  'Хигма',           3.7  ],
+  ['XG-AJ56RHA-IDU (18 блок)',  'Хигма',           5.6  ],
+  ['XG-AJ77RHA-IDU (24 блок)',  'Хигма',           7.7  ],
+  ['GC-A30HR (30 блок)',        'General Climate', 8.56 ],
+  ['GC-A36HRi (36 блок)',       'General Climate', 10.55],
+  ['GC-DN48HW (48 блок)',       'General Climate', 14.1 ],
+  ['GC-DN60HW (60 блок)',       'General Climate', 17.6 ],
+];
+
+// Стандартная таблица потерь (одинакова для всех 9 блоков)
+const ODB_LOSS_TABLE = [
+  { evapT:  5, lossPct:  4 },
+  { evapT:  4, lossPct:  8 },
+  { evapT:  3, lossPct: 12 },
+  { evapT:  2, lossPct: 16 },
+  { evapT:  1, lossPct: 20 },
+  { evapT:  0, lossPct: 24 },
+  { evapT: -1, lossPct: 28 },
+  { evapT: -2, lossPct: 32 },
+  { evapT: -3, lossPct: 36 },
+  { evapT: -4, lossPct: 40 },
+  { evapT: -5, lossPct: 44 },
+];
+
+// Воздухоохладители — модель, длина струи (м), поток (м³/ч),
+// холодопроизводительность по температурам кипения
+const ODB_EVAPORATORS = [
+  // TEB family
+  { model: 'BS-TEB104M ED',  jet: 3,   airflow: 223,  kw: {7: 0.512, 5: 0.512, 0: 0.512, '-5': 0.481} },
+  { model: 'BS-TEB106M ED',  jet: 2.5, airflow: 195,  kw: {7: 0.625, 5: 0.625, 0: 0.625, '-5': 0.588} },
+  { model: 'BS-TEB 210M ED', jet: 3,   airflow: 382,  kw: {7: 0.981, 5: 0.981, 0: 0.981, '-5': 0.922} },
+  { model: 'BS-TEB 213M ED', jet: 2.5, airflow: 337,  kw: {7: 1.194, 5: 1.194, 0: 1.194, '-5': 1.123} },
+  { model: 'BS-TEB 318M ED', jet: 3,   airflow: 705,  kw: {7: 1.989, 5: 1.989, 0: 1.989, '-5': 1.872} },
+  { model: 'BS-TEB 329M ED', jet: 2.5, airflow: 595,  kw: {7: 2.416, 5: 2.416, 0: 2.416, '-5': 2.273} },
+  { model: 'BS-TEB 438M ED', jet: 2.5, airflow: 784,  kw: {7: 2.956, 5: 2.956, 0: 2.956, '-5': 2.781} },
+  // TEF family
+  { model: 'BS-TEF 021M ED', jet: 9,   airflow: 1100, kw: {7: 2.458, 5: 2.458, 0: 2.458, '-5': 2.458, '-10': 2.116} },
+  { model: 'BS-TEF 027M ED', jet: 9,   airflow: 1035, kw: {7: 3.136, 5: 3.136, 0: 3.136, '-5': 3.136, '-10': 2.700} },
+  { model: 'BS-TEF 043M ED', jet: 11,  airflow: 2020, kw: {7: 4.917, 5: 4.917, 0: 4.917, '-5': 4.917, '-10': 4.233} },
+  { model: 'BS-TEF 052M ED', jet: 11,  airflow: 2070, kw: {7: 6.528, 5: 6.528, 0: 6.528, '-5': 6.528, '-10': 5.619} },
+  { model: 'BS-TEF 064M ED', jet: 12,  airflow: 3300, kw: {7: 8.122, 5: 8.122, 0: 8.122, '-5': 8.122, '-10': 6.992} },
+  { model: 'BS-TEF 077M ED', jet: 12,  airflow: 3105, kw: {7: 9.729, 5: 9.729, 0: 9.729, '-5': 9.729, '-10': 8.376} },
+];
+
+let _odbState = { tab: 'outdoor', selectedOutdoor: 0, selectedEvap: 0, roomDelta: 8 };
+
+function openOutdoorBlocksCalc() {
+  let m = document.getElementById('odb-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'odb-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _odbRender();
+  m.classList.add('visible');
+}
+
+function _odbRender() {
+  const m = document.getElementById('odb-modal');
+  if (!m) return;
+  const s = _odbState;
+  const isOutdoor = s.tab === 'outdoor';
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:880px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-air-conditioning"></i> Расчёт наружных блоков и воздухоохладителей</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;padding:10px 14px;background:#F1F5F9;border-bottom:1px solid var(--border);flex-shrink:0;">' +
+        '<button class="btn btn-small ' + (isOutdoor ? 'btn-primary' : 'btn-secondary') + '" ' +
+          'onclick="_odbSetTab(\'outdoor\')"><i class="ti ti-snowflake"></i> Наружные блоки (ККБ)</button>' +
+        '<button class="btn btn-small ' + (!isOutdoor ? 'btn-primary' : 'btn-secondary') + '" ' +
+          'onclick="_odbSetTab(\'evap\')"><i class="ti ti-wind"></i> Воздухоохладители</button>' +
+      '</div>' +
+      '<div style="padding:16px 20px;overflow-y:auto;flex:1;background:#FAFBFC;">' +
+        (isOutdoor ? _odbRenderOutdoor() : _odbRenderEvap()) +
+      '</div>' +
+    '</div>';
+}
+
+function _odbSetTab(t) {
+  _odbState.tab = (t === 'evap') ? 'evap' : 'outdoor';
+  _odbRender();
+}
+
+function _odbRenderOutdoor() {
+  const s = _odbState;
+  const opts = ODB_OUTDOOR_UNITS.map((u, i) =>
+    '<option value="' + i + '"' + (s.selectedOutdoor === i ? ' selected' : '') + '>' +
+    escapeHtml(u[0]) + ' · ' + escapeHtml(u[1]) + ' · ' + u[2] + ' кВт</option>'
+  ).join('');
+  const u = ODB_OUTDOOR_UNITS[s.selectedOutdoor];
+  const nominal = u[2];
+  const roomDelta = Number(s.roomDelta) || 8;
+  const rows = _odbOutdoorRows(nominal, roomDelta);
+  return '' +
+    '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px;">' +
+      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:end;">' +
+        '<div><label class="form-label">Модель блока</label>' +
+          '<select class="form-input" onchange="_odbSetOutdoor(this.value)">' + opts + '</select></div>' +
+        '<div><label class="form-label" title="Разница между температурой кипения хладагента и температурой в камере">ΔT (камера − кипение), °C</label>' +
+          '<input type="number" class="form-input" min="0" max="20" step="1" value="' + roomDelta + '" oninput="_odbSetDelta(this.value)" /></div>' +
+      '</div>' +
+      '<div style="margin-top:10px;font-size:13px;color:var(--text-mid);">' +
+        '<b>' + escapeHtml(u[0]) + '</b> · ' + escapeHtml(u[1]) +
+        ' · номинальная при +7 °C: <b>' + nominal + ' кВт</b>' +
+      '</div>' +
+    '</div>' +
+    '<div style="background:white;border:1px solid var(--border);border-radius:10px;overflow:hidden;">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<thead><tr style="background:#0C4A6E;color:white;">' +
+          '<th style="padding:8px 10px;text-align:center;">T кипения</th>' +
+          '<th style="padding:8px 10px;text-align:right;">Холодопр., кВт</th>' +
+          '<th style="padding:8px 10px;text-align:right;">Потери, кВт</th>' +
+          '<th style="padding:8px 10px;text-align:right;">% потерь</th>' +
+          '<th style="padding:8px 10px;text-align:center;">T в камере (≈)</th>' +
+        '</tr></thead><tbody id="odb-outdoor-tbody">' + rows + '</tbody>' +
+      '</table>' +
+    '</div>' +
+    '<div style="margin-top:10px;font-size:11.5px;color:var(--text-light);line-height:1.5;">' +
+      '<i class="ti ti-info-circle"></i> Холодопроизводительность падает на 4% за каждый градус ' +
+      'снижения температуры кипения хладагента ниже +5 °C. Формула: <code>kW(T) = nominal × (1 − потери%)</code>. ' +
+      '<br/>«T в камере» — приближённая температура в холодильной камере при заданной T кипения (T кип + ΔT).' +
+    '</div>';
+}
+
+function _odbOutdoorRows(nominal, roomDelta) {
+  let rows = '';
+  ODB_LOSS_TABLE.forEach(r => {
+    const kw = (nominal * (1 - r.lossPct / 100)).toFixed(3);
+    const lost = (nominal * r.lossPct / 100).toFixed(3);
+    const roomT = r.evapT + roomDelta;
+    rows +=
+      '<tr>' +
+        '<td style="text-align:center;font-weight:600;">' + r.evapT + ' °C</td>' +
+        '<td class="num">' + kw + '</td>' +
+        '<td class="num" style="color:#B91C1C;">−' + lost + '</td>' +
+        '<td class="num">' + r.lossPct + '%</td>' +
+        '<td style="text-align:center;color:#0C4A6E;font-weight:600;">' + roomT + ' °C</td>' +
+      '</tr>';
+  });
+  return rows;
+}
+
+function _odbRenderEvap() {
+  const s = _odbState;
+  const opts = ODB_EVAPORATORS.map((e, i) =>
+    '<option value="' + i + '"' + (s.selectedEvap === i ? ' selected' : '') + '>' +
+    escapeHtml(e.model) + '</option>'
+  ).join('');
+  const e = ODB_EVAPORATORS[s.selectedEvap];
+  const tempKeys = Object.keys(e.kw).sort((a, b) => Number(b) - Number(a));
+  let rows = '';
+  tempKeys.forEach(t => {
+    rows +=
+      '<tr>' +
+        '<td style="text-align:center;font-weight:600;">' + (Number(t) > 0 ? '+' : '') + t + ' °C</td>' +
+        '<td class="num">' + e.kw[t] + '</td>' +
+      '</tr>';
+  });
+  return '' +
+    '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px;">' +
+      '<label class="form-label">Модель воздухоохладителя</label>' +
+      '<select class="form-input" onchange="_odbSetEvap(this.value)">' + opts + '</select>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;font-size:13px;">' +
+        '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:10px 12px;">' +
+          '<div style="font-size:11px;color:#0C4A6E;text-transform:uppercase;font-weight:600;">Длина струи</div>' +
+          '<div style="font-size:20px;font-weight:700;color:#0C4A6E;margin-top:2px;">' + e.jet + ' м</div>' +
+        '</div>' +
+        '<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;">' +
+          '<div style="font-size:11px;color:#15803D;text-transform:uppercase;font-weight:600;">Воздушный поток</div>' +
+          '<div style="font-size:20px;font-weight:700;color:#15803D;margin-top:2px;">' + e.airflow + ' м³/ч</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="background:white;border:1px solid var(--border);border-radius:10px;overflow:hidden;">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<thead><tr style="background:#0C4A6E;color:white;">' +
+          '<th style="padding:8px 10px;text-align:center;">T кипения</th>' +
+          '<th style="padding:8px 10px;text-align:right;">Холодопр., кВт</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody>' +
+      '</table>' +
+    '</div>' +
+    '<div style="margin-top:10px;font-size:11.5px;color:var(--text-light);line-height:1.5;">' +
+      '<i class="ti ti-info-circle"></i> Значения из паспорта производителя. Длина струи — на сколько метров ' +
+      'воздухоохладитель «выдувает» холодный воздух (важно при размещении в камере).' +
+    '</div>';
+}
+
+function _odbSetOutdoor(v) { _odbState.selectedOutdoor = parseInt(v, 10) || 0; _odbRender(); }
+function _odbSetEvap(v)    { _odbState.selectedEvap    = parseInt(v, 10) || 0; _odbRender(); }
+function _odbSetDelta(v)   {
+  // Обновляем без перерисовки — иначе input теряет фокус.
+  // Перерисуем только таблицу.
+  _odbState.roomDelta = Number(v) || 0;
+  const body = document.querySelector('#odb-modal .modal > div:last-child');
+  if (body) body.innerHTML = _odbRenderOutdoor();
+}
+// ============ /v2.45.101 ============
 
 // === v2.45.31: localStorage история ===
 const CC_HIST_KEY = 'atomus_cold_calc_history_v1';
