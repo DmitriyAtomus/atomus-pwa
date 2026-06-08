@@ -19560,7 +19560,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.140-upd-invoice-notif";
+const APP_VERSION = "v2.45.141-upd-bulk-category";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -49365,6 +49365,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.141',
+    date: '08.06.2026',
+    title: 'Приёмка УПД: массовый раздел + память по поставщику',
+    features: [
+      'В приёмке УПД можно <b>выбрать несколько позиций и разом задать раздел</b> (например, «Сантехника») — в нижней панели выбора рядом с «Перенести в» появился выбор раздела и кнопка «Задать раздел»',
+      'Система теперь <b>учится по истории поставщика</b>: если раньше его позиции уже клали в «Сантехника», новые непривязанные позиции по умолчанию пойдут туда же (раньше училось только по подтверждённым связкам, теперь — и по прошлым УПД, по ИНН или имени поставщика)',
+      'Это работает для позиций, которые создаются как новые. Позиции с «N вариантов» — это совпадения с уже существующими карточками, у них раздел берётся от выбранной карточки',
+    ],
+  },
+  {
     version: 'v2.45.140',
     date: '08.06.2026',
     title: 'Уведомления: фото УПД и приход счёта',
@@ -61921,12 +61931,23 @@ function renderSiBulkBar(visible) {
     if (k === 'refused') return;
     opts += '<option value="' + k + '">' + SI_DEST_DEF[k].label + '</option>';
   });
+  // v2.45.141: массовое проставление РАЗДЕЛА (категории) выбранным позициям —
+  // удобно когда вся УПД от одного поставщика одной тематики (напр. сантехника).
+  const cats = (siState && siState.categories) || [];
+  let catOpts = '<option value="">Раздел: Разное</option>';
+  cats.forEach(c => {
+    if ((c.code || '').toLowerCase() === 'misc' || (c.name || '').toLowerCase() === 'разное') return;
+    catOpts += '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
+  });
   return (
     '<div class="si-bulk-bar">' +
       '<i class="ti ti-checks" style="color:var(--brand);font-size:16px;"></i>' +
       '<span>Выбрано <span class="si-bulk-bar-count">' + count + '</span> позиций · Перенести в:</span>' +
       '<select id="si-bulk-dest">' + opts + '</select>' +
       '<button class="si-bulk-bar-apply" onclick="siApplyBulkDestination()"><i class="ti ti-arrow-right"></i>Применить</button>' +
+      '<span style="opacity:.5;">|</span>' +
+      '<select id="si-bulk-cat" title="Создавать выбранные позиции в этом разделе склада">' + catOpts + '</select>' +
+      '<button class="si-bulk-bar-apply" onclick="siApplyBulkCategory()" style="background:#0C4A6E;"><i class="ti ti-folder"></i>Задать раздел</button>' +
       '<button class="si-bulk-bar-clear" onclick="siClearSelection()">Снять выбор</button>' +
     '</div>'
   );
@@ -61991,6 +62012,40 @@ async function siApplyBulkDestination() {
   if (failed === 0) showToast('Перенесено в «' + label + '»: ' + ok, 'success');
   else if (ok === 0) showToast('Не удалось обновить позиции', 'error');
   else showToast('Перенесено: ' + ok + ', не удалось: ' + failed, 'warning');
+}
+
+// v2.45.141: массово проставить РАЗДЕЛ (категорию) выбранным позициям
+async function siApplyBulkCategory() {
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) return;
+  if (!siState.selected || !siState.selected.size) return;
+  const catSelect = document.getElementById('si-bulk-cat');
+  const catVal = catSelect ? catSelect.value : '';
+  const catId = catVal ? parseInt(catVal, 10) : null;
+  const ids = Array.from(siState.selected);
+  const btns = document.querySelectorAll('.si-bulk-bar-apply');
+  btns.forEach(b => b.disabled = true);
+  let ok = 0, failed = 0;
+  for (const id of ids) {
+    try {
+      await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + id,
+                     { suggested_category_id: catId });
+      ok++;
+    } catch (_) {
+      failed++;
+    }
+  }
+  siState.selected.clear();
+  try {
+    const data = await apiGet('/api/supply/invoices/' + invoiceId);
+    renderSupplyInvoiceDetail(data);
+  } catch (_) {}
+  const catName = catId
+    ? (((siState.categories || []).find(c => String(c.id) === String(catId)) || {}).name || 'раздел')
+    : 'Разное';
+  if (failed === 0) showToast('Раздел «' + catName + '» проставлен: ' + ok, 'success');
+  else if (ok === 0) showToast('Не удалось обновить позиции', 'error');
+  else showToast('Обновлено: ' + ok + ', не удалось: ' + failed, 'warning');
 }
 
 function renderSiDestSelect(it) {
