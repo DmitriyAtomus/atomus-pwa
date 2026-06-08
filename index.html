@@ -19518,7 +19518,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.135-order-item-delete";
+const APP_VERSION = "v2.45.136-box-thermal-print";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -49286,6 +49286,15 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.136',
+    date: '08.06.2026',
+    title: 'QR коробки — печать на термопринтер прямо из модалки',
+    features: [
+      'В окне <b>QR-кода коробки</b> (и сборки) теперь есть кнопка <b>«🖨 На термопринтер»</b> — наклейка уходит в очередь офисного термопринтера сразу, не нужно открывать отдельную печать',
+      'Раньше эта кнопка требовала особое право и не показывалась на упаковке/складе — теперь для коробок и сборок доступна так же, как обычная «Печать наклейки»',
+    ],
+  },
+  {
     version: 'v2.45.135',
     date: '08.06.2026',
     title: 'В превью заказа можно удалить позицию',
@@ -56034,8 +56043,13 @@ function openQrModal(opts) {
   // ЭТАП 33 (v2.43.4): сетевая печать на офисный термопринтер — для ВСЕХ типов QR
   // Кнопка появляется когда есть permission `labels_print` и есть opts.url.
   // Подпись на этикетке генерится автоматически из opts (см. _netPrintCaption).
+  // v2.45.136: для коробок и сборок термопечать доступна так же, как локальная
+  // «Печать наклейки» (showPrintBtn) — это физические объекты, которым нужен
+  // стикер; на упаковке/складе аккаунт может быть без права labels_print, но
+  // печатать этикетку коробки ему нужно. Для прочих типов — по праву.
   const showNetPrintBtn = !!opts.url &&
-    typeof hasPermission === 'function' && hasPermission('labels_print');
+    (showPrintBtn ||
+      (typeof hasPermission === 'function' && hasPermission('labels_print')));
   const netPrintData = showNetPrintBtn
     ? Object.assign({}, opts.data || {}, {
         qrUrl: opts.url,
