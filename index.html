@@ -19432,8 +19432,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.130-callout-short-fix";
-const APP_VERSION_DATE = "04.06.2026";
+const APP_VERSION = "v2.45.131-packlist-signature";
+const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -40152,7 +40152,7 @@ function renderBoxDetail(box) {
   const subtitle =
     '<div style="padding:12px 18px 14px;border-bottom:1px solid var(--border);">' +
       '<div style="font-size:13px;color:var(--text-light);">' +
-        (box.contract_number ? 'Договор № ' + escapeHtml(box.contract_number) : '—') +
+        (box.contract_number ? 'Договор № ' + escapeHtml(String(box.contract_number).replace(/^\s*№\s*/, '')) : '—') +
         (box.contractor_name ? ' · ' + escapeHtml(box.contractor_name) : '') +
       '</div>' +
     '</div>';
@@ -40498,13 +40498,9 @@ function renderPackingListPrint(box) {
   const yyyy = today.getFullYear();
   const todayStr = dd + '.' + mm + '.' + yyyy;
 
-  const qrUrl = box.qr_token ? (window.location.origin + '/b/' + box.qr_token) : '';
-  const userName = (state.user && (state.user.full_name || state.user.short_name)) || '';
-
   const html =
     '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">' +
     '<title>Упаковочный лист — ' + escapeHtml(box.name || ('Коробка #' + box.id)) + '</title>' +
-    '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>' +
     '<style>' +
       '@page { size: A4 portrait; margin: 16mm 14mm; }' +
       '* { box-sizing: border-box; }' +
@@ -40526,12 +40522,9 @@ function renderPackingListPrint(box) {
       'td.qty { text-align: right; white-space: nowrap; width: 90px; font-weight: 600; }' +
       'td.unit { text-align: center; width: 60px; }' +
       'tr.total td { font-weight: 700; background: #F4F6FA; }' +
-      '.footer-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 30px; align-items: flex-end; margin-top: 28px; }' +
+      '.footer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: flex-end; margin-top: 28px; }' +
       '.sign { border-bottom: 1px solid #1B2030; min-height: 38px; padding: 6px 0; font-size: 9.5pt; color: #6E7689; }' +
       '.sign-label { font-size: 9pt; color: #6E7689; margin-top: 4px; text-align: center; }' +
-      '.qr-block { text-align: center; }' +
-      '.qr-block img, .qr-block canvas { width: 90px; height: 90px; }' +
-      '.qr-url { font-size: 8pt; color: #6E7689; margin-top: 4px; word-break: break-all; max-width: 110px; }' +
       '.print-btn { position: fixed; top: 14px; right: 14px; background: #2D5F8B; color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }' +
       '.no-print { display: block; }' +
       '@media print { .no-print { display: none; } body { padding: 0; } }' +
@@ -40543,7 +40536,7 @@ function renderPackingListPrint(box) {
     '</div>' +
     '<h1>УПАКОВОЧНЫЙ ЛИСТ</h1>' +
     '<div class="subtitle">' +
-      (box.contract_number ? 'к договору № ' + escapeHtml(box.contract_number) : 'без договора') +
+      (box.contract_number ? 'к договору № ' + escapeHtml(String(box.contract_number).replace(/^\s*№\s*/, '')) : 'без договора') +
       (box.contract_sign_date ? ' от ' + escapeHtml(box.contract_sign_date) : '') +
     '</div>' +
     '<div class="meta">' +
@@ -40570,24 +40563,11 @@ function renderPackingListPrint(box) {
       : '<p style="text-align:center;color:#6E7689;margin:30px 0;">Содержимое коробки не указано.</p>'
     ) +
     '<div class="footer-row">' +
-      '<div><div class="sign">' + escapeHtml(userName) + '</div><div class="sign-label">Упаковал (подпись)</div></div>' +
+      // Имя упаковщика не подставляем — линия пустая, расписываются от руки.
+      '<div><div class="sign">&nbsp;</div><div class="sign-label">Упаковал (подпись)</div></div>' +
       '<div><div class="sign">&nbsp;</div><div class="sign-label">Принял (подпись)</div></div>' +
-      '<div class="qr-block">' +
-        (qrUrl ? '<div id="qr-pl"></div><div class="qr-url">' + escapeHtml(qrUrl) + '</div>' : '') +
-      '</div>' +
     '</div>' +
-    (qrUrl ?
-    '<script>window.addEventListener("DOMContentLoaded", function(){' +
-      'var el=document.getElementById("qr-pl");' +
-      // v2.45.10: лого сверху, потом QR (без лого внутри)
-      'var logo=document.createElement("img");logo.src=' + JSON.stringify(window.location.origin + '/icons/logo.png') + ';' +
-      'logo.style.cssText="display:block;width:55px;height:auto;margin:0 auto 4px auto;";' +
-      'el.appendChild(logo);' +
-      'var qrHost=document.createElement("div");el.appendChild(qrHost);' +
-      'new QRCode(qrHost,{text:' + JSON.stringify(qrUrl) + ',width:72,height:72,correctLevel:QRCode.CorrectLevel.M});' +
-      'setTimeout(function(){window.print();},400);' +
-    '});<\/script>'
-    : '<script>window.addEventListener("DOMContentLoaded", function(){setTimeout(function(){window.print();}, 200);});<\/script>') +
+    '<script>window.addEventListener("DOMContentLoaded", function(){setTimeout(function(){window.print();}, 200);});<\/script>' +
     '</body></html>';
 
   const w = window.open('', '_blank');
@@ -49162,6 +49142,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.131',
+    date: '08.06.2026',
+    title: 'Упаковочный лист и подпись в письмах поставщикам',
+    features: [
+      'В <b>упаковочном листе</b> убран QR-код — лист стал чище, место под подписи шире',
+      'Строка «Упаковал (подпись)» больше <b>не подставляет имя</b> автоматически — пустая линия, расписываются от руки',
+      'Исправлено <b>задвоение «№ №»</b> в номере договора (было «к договору № №06ТД/04.26» → стало «к договору № 06ТД/04.26»). Поправлено и в карточке коробки',
+      'В письме поставщику подпись теперь содержит <b>имя директора и телефон</b> («С уважением, Подкорытов Дмитрий … Тел.: …») — раньше для директора подставлялось только название компании',
+    ],
+  },
   {
     version: 'v2.45.129',
     date: '05.06.2026',
@@ -59590,7 +59581,7 @@ async function _addExternalShipItemFromToken(rawText) {
       type: info.type,
       id: info.id,
       label: (info.type === 'box' ? '📦 ' : '🔧 ') + (info.name || ('#' + info.id)) +
-             (info.contract_number ? ' · договор № ' + info.contract_number : ''),
+             (info.contract_number ? ' · договор № ' + String(info.contract_number).replace(/^\s*№\s*/, '') : ''),
     });
     showToast('Добавлено', 'success');
     // Если форма закрыта (запускали сканер) — открыть снова
