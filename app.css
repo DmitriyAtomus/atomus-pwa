@@ -8152,6 +8152,17 @@
   .notif-clear-all-btn:hover { background: var(--brand); color: white; }
   .notif-clear-all-btn:disabled { opacity: 0.4; cursor: default; }
   .notif-clear-all-btn .ti { font-size: 14px; }
+  /* v2.45.168: на узком экране контролы шапки не влезали в строку и обрезались
+     (крестик/«Очистить всё» уезжали за край). Переносим их на отдельную строку
+     во всю ширину, выравниваем вправо, при нехватке — переносим внутри. */
+  @media (max-width: 480px) {
+    .notif-panel-head { flex-wrap: wrap; row-gap: 8px; }
+    .notif-panel-head > div {
+      flex: 1 1 100%;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+  }
   .notif-panel-body {
     flex: 1;
     overflow-y: auto;
