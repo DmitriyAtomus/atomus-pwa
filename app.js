@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.163-update-banner";
+const APP_VERSION = "v2.45.164-drilldown";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -6099,7 +6099,10 @@ function renderSummary(d) {
           html += '<div class="ssn-date-divider"><i class="ti ti-calendar-event"></i> ' + escapeHtml(dateStr) + '</div>';
           prevDate = s.session_date;
         }
-        html += '<div class="ssn-entry">' +
+        // v2.45.164: проваливаемся в карточку работы (что за работа, кто и что делал)
+        const _clickable = !!s.work_id;
+        html += '<div class="ssn-entry' + (_clickable ? ' ssn-entry-click' : '') + '"' +
+                  (_clickable ? ' onclick="openProductionWorkDetail(' + s.work_id + ')" style="cursor:pointer;"' : '') + '>' +
                   '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:36px;height:36px;font-size:12px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
                   '<div class="ssn-entry-body">' +
                     '<div class="ssn-entry-top">' +
@@ -6112,8 +6115,10 @@ function renderSummary(d) {
                       (modelStr ? '<i class="ti ti-package"></i> ' + escapeHtml(modelStr) : '') +
                       (contractStr ? ' <span style="color:var(--text-light);">· ' + escapeHtml(contractStr) + '</span>' : '') +
                     '</div>' : '') +
+                    (s.stage_name ? '<div class="ssn-entry-work" style="color:var(--text-light);"><i class="ti ti-tool"></i> ' + escapeHtml(s.stage_name) + '</div>' : '') +
                     (s.note ? '<div class="ssn-entry-note">' + escapeHtml(s.note) + '</div>' : '') +
                   '</div>' +
+                  (_clickable ? '<i class="ti ti-chevron-right" style="color:var(--text-light);align-self:center;flex-shrink:0;font-size:18px;"></i>' : '') +
                 '</div>';
       });
       html += '</div>';
@@ -30347,6 +30352,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.164',
+    date: '09.06.2026',
+    title: 'Провалиться в запись из Сводок',
+    features: [
+      'В <b>Сводках</b> (раздел «Последние записи») запись теперь <b>кликабельна</b> — нажал и открылась карточка работы: что за работа, по какому договору, кто и что делал по дням, сколько часов',
+      'В строке записи теперь видно <b>этап</b> (что делали), если он указан',
+    ],
+  },
   {
     version: 'v2.45.163',
     date: '09.06.2026',
