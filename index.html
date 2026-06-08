@@ -2771,7 +2771,11 @@
   <div class="toast-text" id="toast-text">—</div>
 </div>
 
-<script src="/app.js"></script>
+<!-- v2.45.175: app.js разнесён на 4 части (побайтово, грузятся строго по порядку = эквивалент одного скрипта) -->
+<script src="/app-1.js"></script>
+<script src="/app-2.js"></script>
+<script src="/app-3.js"></script>
+<script src="/app-4.js"></script>
 
 <!-- ============ ЭТАП 39 (v2.19.0): МОДАЛКА УВЕДОМЛЕНИЙ ============ -->
 <div class="notif-modal-overlay" id="notif-modal" onclick="closeNotifModal(event)">
