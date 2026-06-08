@@ -752,7 +752,7 @@
   .desktop-layout .content-inner { padding: 22px 30px; max-width: 1140px; }
 
   /* Приветствие — только мобильный */
-  .greeting { padding: 20px 18px 4px; }
+  .greeting { padding: 20px 14px 4px; }   /* v2.45.173: 14px — в один край с контентом и карточками */
   .desktop-layout .greeting { display: none; }
   .greeting h1 { font-size: 22px; font-weight: 600; }
   .greeting p { margin-top: 4px; color: var(--text-light); font-size: 13px; }
@@ -815,10 +815,18 @@
   .kpi-card.kpi-amber  { --kpi-accent: #D97706; --kpi-bg: linear-gradient(135deg, #F59E0B, #D97706); --kpi-bg-soft: #FEF3E2; }
   .kpi-card.kpi-green  { --kpi-accent: #16A34A; --kpi-bg: linear-gradient(135deg, #22C55E, #16A34A); --kpi-bg-soft: #E8F5E9; }
   .kpi-card.kpi-violet { --kpi-accent: #7E22CE; --kpi-bg: linear-gradient(135deg, #A855F7, #7E22CE); --kpi-bg-soft: #F3E8FF; }
+  /* v2.45.173: объёмные (3D) иконки KPI — блик сверху, тень-«подъём» в цвет,
+     лёгкая внутренняя тень снизу (как у быстрых действий). */
   .kpi-card .kpi-icon {
-    background: var(--kpi-bg);
+    background:
+      linear-gradient(160deg, rgba(255,255,255,0.40) 0%, rgba(255,255,255,0) 46%, rgba(0,0,0,0.16) 100%),
+      var(--kpi-bg);
     color: white;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    box-shadow:
+      0 6px 14px -5px var(--kpi-accent),
+      0 2px 4px rgba(15, 23, 42, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 5px rgba(0, 0, 0, 0.12);
   }
 
   .kpi-card .label {
@@ -12656,7 +12664,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-xl-25);
     padding: 12px 8px 8px;
-    margin: 0 14px 8px;
+    margin: 0 18px 8px;   /* v2.45.173: 18px в обёртке -18px = 14px от края, в ряд с остальным */
     box-shadow: var(--shadow-sm-25);
   }
   .week-cal25-head {
@@ -12952,10 +12960,11 @@
   }
   /* Внутри m25-mobile-only — без отрицательного margin */
   .m25-mobile-only .kpi-strip { margin: 0; padding: 0 14px 8px; }
-  /* v2.45.172: обёртка m25-mobile-only имеет margin:0 -18px, из-за чего заголовок
-     секции при margin 14px «съезжал» левее текста карточек и обрезался. Выравниваем
-     заголовок по тексту карточек (≈ край сетки + внутр. отступ плитки). */
-  .m25-mobile-only .qa25-section-label { margin-left: 28px; margin-right: 28px; }
+  /* v2.45.173: единый левый край 14px для всего блока главной (обёртка имеет
+     margin:0 -18px, поэтому внутренние отступы = 18px дают 14px от края экрана).
+     Так заголовок секции, календарь и карточки выровнены друг с другом. */
+  .m25-mobile-only .qa25-section-label { margin-left: 18px; margin-right: 18px; }
+  .m25-mobile-only .qa25-grid { padding: 0 18px; }
 
   /* ЭТАП 25.1: на мобиле скрываем десктопные блоки production dashboard
      (они заменены мобильными m25-блоками выше) */
