@@ -19574,7 +19574,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.151-order-tab-counts";
+const APP_VERSION = "v2.45.152-catalog-clean";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45554,7 +45554,8 @@ function renderSupplyCatalog() {
           '<span class="sup-kind-pill ' + kindCls + '">' + escapeHtml(i.kind_label) + '</span>' +
           '<span><i class="ti ti-ruler"></i>' + escapeHtml(i.unit) + '</span>' +
         '</div>' +
-        (i.comment ? '<div class="sup-row-comment">' + escapeHtml(i.comment) + '</div>' : '') +
+        // v2.45.152: убрали «россыпь» (НС-код · категория · подкатегория из comment)
+        // из списка — захламляла. Комментарий по-прежнему виден в карточке позиции.
       '</div>' +
       (canManage ? '<div class="sup-row-actions"><button class="btn-icon-warning" onclick="event.stopPropagation(); deleteSupplyItem(' + i.id + ')" title="Удалить"><i class="ti ti-trash"></i></button></div>' : '') +
       '</div>';
@@ -49541,6 +49542,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.152',
+    date: '08.06.2026',
+    title: 'Каталог закупок — чище список',
+    features: [
+      'Из списка <b>«Каталог закупок»</b> убрана строка-«россыпь» под позициями (НС-код · категория · подкатегория) — список стал чище. Сам комментарий остался в карточке позиции',
+    ],
+  },
   {
     version: 'v2.45.151',
     date: '08.06.2026',
