@@ -1099,6 +1099,16 @@
     display: inline-flex; align-items: center; gap: 6px;
   }
   .filter-tab[data-sup-ord] i { font-size: 14px; }
+  /* v2.45.151: счётчик-бейдж на вкладке статуса заказов */
+  .sup-ord-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 9px; font-size: 11px; font-weight: 700;
+    background: rgba(0,0,0,0.12); color: inherit; line-height: 1;
+  }
+  .filter-tab[data-sup-ord].active .sup-ord-tab-count {
+    background: rgba(255,255,255,0.35);
+  }
 
   /* Черновики — серый */
   .filter-tab[data-sup-ord="draft"]                  { background:#F4F4F5;  color:#52525B; border-color:#E4E4E7; }
@@ -19564,7 +19574,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.150-webpush-diag2";
+const APP_VERSION = "v2.45.151-order-tab-counts";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -46731,6 +46741,8 @@ async function loadSupplyOrders() {
     if (state.supplyOrdFilter !== 'all') params.set('status', state.supplyOrdFilter);
     const d = await apiGet('/api/supply-orders' + (params.toString() ? '?' + params.toString() : ''));
     cache.supplyOrders = d.orders || [];
+    cache.supplyOrdersCounts = d.counts || {};
+    _renderSupplyOrdTabCounts();
     renderSupplyOrders();
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
@@ -46739,6 +46751,26 @@ async function loadSupplyOrders() {
 
 // v2.45.5: множественный выбор заказов для удаления одним действием.
 state.supplyOrdersSelected = state.supplyOrdersSelected || new Set();
+
+// v2.45.151: бейджи-счётчики на вкладках статусов заказов
+function _renderSupplyOrdTabCounts() {
+  const counts = cache.supplyOrdersCounts || {};
+  document.querySelectorAll('[data-sup-ord]').forEach(btn => {
+    const key = btn.getAttribute('data-sup-ord');
+    const n = Number(counts[key] || 0);
+    let badge = btn.querySelector('.sup-ord-tab-count');
+    if (n > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'sup-ord-tab-count';
+        btn.appendChild(badge);
+      }
+      badge.textContent = n;
+    } else if (badge) {
+      badge.remove();
+    }
+  });
+}
 
 function renderSupplyOrders() {
   const container = document.getElementById('sup-ord-list');
@@ -49509,6 +49541,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.151',
+    date: '08.06.2026',
+    title: 'Счётчики на вкладках заказов поставщикам',
+    features: [
+      'На вкладках статусов в «Заказы поставщикам» появились <b>счётчики</b> — сразу видно, сколько заказов «К оплате», «Ждут счёт», «Оплачены» и т.д.',
+    ],
+  },
   {
     version: 'v2.45.148',
     date: '08.06.2026',
