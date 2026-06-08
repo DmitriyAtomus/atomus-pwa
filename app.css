@@ -6933,7 +6933,11 @@
     display: flex; align-items: center; gap: 10px;
     text-align: left;
     transition: all 0.1s;
+    min-width: 0;   /* v2.45.172: даём grid-колонкам сжиматься, иначе вторая плашка уезжала за край */
   }
+  /* v2.45.172: на телефоне «На склад / Под договор» — в столбик, на всю ширину
+     (раньше вторая плашка обрезалась справа) */
+  .app.mobile-layout .dest-choice { grid-template-columns: 1fr; }
   .dest-option:hover { background: var(--bg); }
   .dest-option > i:first-child {
     font-size: 22px; color: var(--text-mid);
@@ -12948,6 +12952,10 @@
   }
   /* Внутри m25-mobile-only — без отрицательного margin */
   .m25-mobile-only .kpi-strip { margin: 0; padding: 0 14px 8px; }
+  /* v2.45.172: обёртка m25-mobile-only имеет margin:0 -18px, из-за чего заголовок
+     секции при margin 14px «съезжал» левее текста карточек и обрезался. Выравниваем
+     заголовок по тексту карточек (≈ край сетки + внутр. отступ плитки). */
+  .m25-mobile-only .qa25-section-label { margin-left: 28px; margin-right: 28px; }
 
   /* ЭТАП 25.1: на мобиле скрываем десктопные блоки production dashboard
      (они заменены мобильными m25-блоками выше) */
