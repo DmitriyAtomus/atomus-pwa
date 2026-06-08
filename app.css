@@ -8120,11 +8120,13 @@
   }
   .notif-panel.open { display: flex; }
   .notif-panel-head {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; gap: 8px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
+  .notif-panel-head h4 { flex: 1 1 auto; min-width: 0; }
+  .notif-head-actions { display: flex; gap: 6px; align-items: center; }
   .notif-panel-head h4 {
     margin: 0;
     font-size: 14px;
@@ -8152,15 +8154,16 @@
   .notif-clear-all-btn:hover { background: var(--brand); color: white; }
   .notif-clear-all-btn:disabled { opacity: 0.4; cursor: default; }
   .notif-clear-all-btn .ti { font-size: 14px; }
-  /* v2.45.168: на узком экране контролы шапки не влезали в строку и обрезались
-     (крестик/«Очистить всё» уезжали за край). Переносим их на отдельную строку
-     во всю ширину, выравниваем вправо, при нехватке — переносим внутри. */
+  /* v2.45.169: на телефоне — заголовок и крестик сверху одной строкой,
+     4 кнопки действий ровным рядом снизу (симметрично, без обрезки). */
   @media (max-width: 480px) {
-    .notif-panel-head { flex-wrap: wrap; row-gap: 8px; }
-    .notif-panel-head > div {
+    .notif-panel-head { flex-wrap: wrap; row-gap: 12px; }
+    .notif-panel-head h4 { order: 0; flex: 1 1 auto; }
+    .notif-panel-head .notif-head-close { order: 1; }
+    .notif-head-actions {
+      order: 2;
       flex: 1 1 100%;
-      justify-content: flex-end;
-      flex-wrap: wrap;
+      justify-content: space-between;
     }
   }
   .notif-panel-body {

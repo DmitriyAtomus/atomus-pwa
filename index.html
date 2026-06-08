@@ -2488,7 +2488,7 @@
 <div class="notif-panel" id="notif-panel" onclick="event.stopPropagation()">
   <div class="notif-panel-head">
     <h4><i class="ti ti-bell"></i> Уведомления</h4>
-    <div style="display:flex;gap:6px;align-items:center;">
+    <div class="notif-head-actions">
       <!-- v2.45.148: пуш на телефон -->
       <button class="icon-btn" id="notif-push-toggle" onclick="enablePushNotifications()" title="Уведомления на телефон (пуш)">
         <i class="ti ti-device-mobile-message" id="notif-push-icon"></i>
@@ -2505,8 +2505,8 @@
       <button class="notif-clear-all-btn" id="notif-panel-clear" onclick="ackAllFromPanel()" title="Отметить все как прочитанные">
         <i class="ti ti-checks"></i> Очистить всё
       </button>
-      <button class="icon-btn" onclick="closeNotifPanel()"><i class="ti ti-x"></i></button>
     </div>
+    <button class="icon-btn notif-head-close" onclick="closeNotifPanel()" title="Закрыть"><i class="ti ti-x"></i></button>
   </div>
   <div class="notif-panel-body" id="notif-panel-body">
     <div class="loading-block">Загружаем…</div>
