@@ -19560,7 +19560,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.141-upd-bulk-category";
+const APP_VERSION = "v2.45.142-ship-rollback";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -39970,6 +39970,38 @@ function renderComponentsTree() {
 
 // ============ ЭТАП 26: блок отгрузки в карточке договора ============
 
+// v2.45.142: откат отгрузки по QR с подтверждением паролём
+async function rollbackContractShipment(contractId) {
+  const password = await _promptPasswordForAction(
+    'Откатить отгрузку по QR?',
+    'Все отметки об отгрузке снимутся (счётчик вернётся к 0), статус — в «Готов к отгрузке». Подтверди личным паролём.'
+  );
+  if (password === null) return;   // отменили
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/shipments/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ password: password }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 401 && d.error === 'password_required') { showToast('Нужно подтвердить паролем', 'error'); return; }
+      if (r.status === 403 && d.error === 'wrong_password') {
+        if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
+        showToast('Неверный пароль — откат не выполнен', 'error'); return;
+      }
+      showToast(d.message || 'Не удалось откатить отгрузку', 'error'); return;
+    }
+    showToast('Отгрузка откачена', 'success');
+    // Перерисовываем всю карточку договора — статус, сборки и счётчик станут актуальны
+    if (typeof openContractDetail === 'function') openContractDetail(contractId);
+    else loadContractShipmentBlock(contractId);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 async function loadContractShipmentBlock(contractId) {
   const container = document.getElementById('scd-shipment-block');
   if (!container) return;
@@ -39999,6 +40031,14 @@ async function loadContractShipmentBlock(contractId) {
         html += '<button class="ship-start-btn complete" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-check-circle"></i> Всё отгружено · открыть</button>';
       } else {
         html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Начать отгрузку</button>';
+      }
+      // v2.45.142: откат отгрузки (под паролем) — если что-то уже отгружено
+      if (shipped > 0 && canManageSales()) {
+        html += '<button onclick="rollbackContractShipment(' + contractId + ')" ' +
+          'style="width:100%;margin-top:8px;background:none;border:1px solid #FCA5A5;color:#B91C1C;' +
+          'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+          'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+          '<i class="ti ti-arrow-back-up"></i> Откатить отгрузку (' + shipped + ')</button>';
       }
     } else {
       html += '<div style="font-size:13px;color:var(--text-light);padding:8px 0;text-align:center;">К договору не привязано ни одной сборки или коробки.<br>Добавьте сборки или создайте коробки.</div>';
@@ -49364,6 +49404,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.142',
+    date: '08.06.2026',
+    title: 'Откат отгрузки по QR (под паролем)',
+    features: [
+      'В блоке <b>«Отгрузка по QR»</b> появилась кнопка <b>«Откатить отгрузку»</b> — снимает все отметки об отгрузке, счётчик возвращается к 0',
+      'Откат требует <b>подтверждения личным паролём</b> (как смена статуса) и пишется в журнал договора',
+      'Если договор был «Отгружен» / «Отгружен частично» — после отката возвращается в «Готов к отгрузке»',
+    ],
+  },
   {
     version: 'v2.45.141',
     date: '08.06.2026',
