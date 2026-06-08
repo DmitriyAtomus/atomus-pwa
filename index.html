@@ -10521,6 +10521,92 @@
     border-radius: 6px;
     font-size: 11px;
   }
+  /* Подпись «остаток/мин:» нужна только в мобильной карточке (на десктопе есть шапка) */
+  .ssp-meta-label { display: none; }
+
+  /* v2.45.132: мобильная карточная раскладка списка закупки — на узком экране
+     табличные колонки не влезают, поэтому разворачиваем строку в аккуратную
+     карточку: чекбокс слева, название + кол-во сверху, под ними остаток/причина/действие. */
+  @media (max-width: 760px) {
+    .sup-shop-table thead { display: none; }
+    .sup-shop-table,
+    .sup-shop-table tbody,
+    .sup-shop-table tr,
+    .sup-shop-table td { display: block; }
+    .sup-shop-table td {
+      padding: 0;
+      border: none;
+      min-width: 0;
+      text-align: left !important;
+    }
+    .sup-shop-table tr {
+      display: grid;
+      column-gap: 10px;
+      row-gap: 3px;
+      padding: 11px 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sup-shop-table tr:last-child { border-bottom: none; }
+
+    /* Группа БЕЗ поставщика: есть чекбокс и кнопка «Поставщик» */
+    .sup-shop-group.no-supplier .sup-shop-table tr {
+      grid-template-columns: 26px minmax(0, 1fr) auto;
+      grid-template-areas:
+        "chk name qty"
+        "chk stk  stk"
+        "chk rsn  rsn"
+        "chk act  act";
+      align-items: start;
+    }
+    /* Группа С поставщиком: без чекбокса и кнопки */
+    .sup-shop-group:not(.no-supplier) .sup-shop-table tr {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "name qty"
+        "stk  stk"
+        "rsn  rsn";
+      align-items: start;
+    }
+
+    .sup-shop-table td.ns-check-cell {
+      grid-area: chk;
+      width: auto !important;
+      padding: 0 !important;
+      margin-top: 1px;
+    }
+    .sup-shop-table td.ssp-name {
+      grid-area: name;
+      font-size: 13px;
+      line-height: 1.34;
+      font-weight: 500;
+    }
+    .sup-shop-table td.ssp-name .ssp-sku {
+      display: block;
+      margin-left: 0 !important;
+      margin-top: 2px;
+    }
+    .sup-shop-table td.ssp-qty {
+      grid-area: qty;
+      text-align: right !important;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+    .sup-shop-table td.ssp-stock {
+      grid-area: stk;
+      font-size: 11.5px !important;
+      color: var(--text-light) !important;
+    }
+    .sup-shop-table td.ssp-reason-cell { grid-area: rsn; }
+    .sup-shop-table td.ssp-reason-cell:empty,
+    .sup-shop-table td.ssp-action:empty { display: none; }
+    .sup-shop-table td.ssp-action {
+      grid-area: act;
+      margin-top: 6px;
+    }
+    .sup-shop-table td.ssp-action .btn { width: 100%; justify-content: center; }
+
+    .ssp-meta-label { display: inline; }
+  }
   /* v2.44.35: bulk-action bar в группе «без поставщика» */
   .ns-bulk-bar {
     display: flex; align-items: center; gap: 10px;
@@ -19432,7 +19518,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.131-packlist-signature";
+const APP_VERSION = "v2.45.132-shoplist-mobile";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -45391,20 +45477,21 @@ function renderSupplyShopping(d) {
           '</label></td>'
         : '';
       const assignCell = noSupplier
-        ? '<td><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
+        ? '<td class="ssp-action"><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
             '<i class="ti ti-truck"></i>Поставщик</button></td>'
         : '';
       return '<tr>' + checkCell +
-        '<td>' + critBadge + escapeHtml(it.component_name) +
-          (it.sku ? '<span style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
+        '<td class="ssp-name">' + critBadge + escapeHtml(it.component_name) +
+          (it.sku ? '<span class="ssp-sku" style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
         '</td>' +
-        '<td style="text-align:right;color:var(--text-light);font-size:12px;">' +
+        '<td class="ssp-stock" style="text-align:right;color:var(--text-light);font-size:12px;">' +
+          '<span class="ssp-meta-label">остаток/мин: </span>' +
           escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
         '</td>' +
-        '<td style="text-align:right;font-weight:700;color:#2563EB;">' +
+        '<td class="ssp-qty" style="text-align:right;font-weight:700;color:#2563EB;">' +
           escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
         '</td>' +
-        '<td>' + reasonBadge + '</td>' +
+        '<td class="ssp-reason-cell">' + reasonBadge + '</td>' +
         assignCell +
       '</tr>';
     }).join('');
@@ -49142,6 +49229,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.132',
+    date: '08.06.2026',
+    title: 'Список закупки — аккуратный вид на телефоне',
+    features: [
+      'Раздел <b>«Что закупить»</b> на телефоне больше не «разъезжается»: позиции теперь показываются <b>ровными карточками</b> вместо широкой таблицы',
+      'В каждой карточке: слева галочка, сверху название и количество к заказу, ниже — артикул, «остаток/мин» и причина, а кнопка <b>«Поставщик»</b> растянута на всю ширину',
+      'На компьютере вид прежний (таблица) — изменения только для узких экранов',
+    ],
+  },
   {
     version: 'v2.45.131',
     date: '08.06.2026',
