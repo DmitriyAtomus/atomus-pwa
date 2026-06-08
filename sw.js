@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.207';
+const CACHE_VERSION = 'atomus-v1.8.208';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -126,6 +126,40 @@ async function cacheFirst(req, cacheName) {
     throw err;
   }
 }
+
+// === v2.45.148: Web Push (PWA-уведомления) ===
+// Сервер шлёт зашифрованный пуш; здесь показываем системное уведомление.
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch (e) {
+    payload = { title: 'Atom CRM', body: (event.data && event.data.text()) || '' };
+  }
+  const title = payload.title || 'Atom CRM';
+  const options = {
+    body: payload.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/favicon-32.png',
+    tag: payload.tag || undefined,
+    renotify: !!payload.tag,
+    data: { url: payload.url || '/' },
+    vibrate: [120, 60, 120],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Клик по уведомлению — открыть/сфокусировать приложение
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const c of clients) {
+        if ('focus' in c) { c.focus(); return; }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
+});
 
 async function networkFirst(req) {
   try {

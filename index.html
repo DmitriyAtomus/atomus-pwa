@@ -19284,6 +19284,10 @@
   <div class="notif-panel-head">
     <h4><i class="ti ti-bell"></i> Уведомления</h4>
     <div style="display:flex;gap:6px;align-items:center;">
+      <!-- v2.45.148: пуш на телефон -->
+      <button class="icon-btn" id="notif-push-toggle" onclick="enablePushNotifications()" title="Уведомления на телефон (пуш)">
+        <i class="ti ti-device-mobile-message" id="notif-push-icon"></i>
+      </button>
       <!-- v2.45.79: тоггл звука -->
       <button class="icon-btn" id="notif-sound-toggle" onclick="toggleNotifSound()" title="Звук уведомлений">
         <i class="ti ti-volume" id="notif-sound-icon"></i>
@@ -19560,7 +19564,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.147-contract-qr-thermal";
+const APP_VERSION = "v2.45.148-webpush";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20364,6 +20368,54 @@ function onNotifClick(notifId, entityType, entityId, notifType) {
         setTimeout(() => _devScrollToTarget(notifType), 700);
       }, 250);
     }, 80);
+  }
+}
+
+// v2.45.148: Web Push — подписка на пуш-уведомления на телефон
+function _urlB64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function enablePushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    showToast('Этот браузер/телефон не поддерживает пуш-уведомления', 'error');
+    return;
+  }
+  try {
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      showToast('Уведомления не разрешены — включи их в настройках браузера/приложения', 'warning');
+      return;
+    }
+    const token = localStorage.getItem(TOKEN_KEY);
+    const kr = await fetch(API_BASE + '/api/push/vapid-key', { headers: { 'Authorization': 'Bearer ' + token } });
+    const kd = await kr.json().catch(() => ({}));
+    if (!kd.available || !kd.key) { showToast('Пуш на сервере пока недоступен', 'error'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlB64ToUint8Array(kd.key),
+      });
+    }
+    const sr = await fetch(API_BASE + '/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    if (!sr.ok) { showToast('Не удалось сохранить подписку на сервере', 'error'); return; }
+    showToast('📱 Пуш-уведомления включены на этом телефоне', 'success');
+    const icon = document.getElementById('notif-push-icon');
+    if (icon) icon.style.color = 'var(--success)';
+  } catch (e) {
+    showToast('Не удалось включить пуш: ' + (e.message || e), 'error');
   }
 }
 
@@ -49430,6 +49482,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.148',
+    date: '08.06.2026',
+    title: 'Пуш-уведомления на телефон (приход счёта)',
+    features: [
+      'Появились <b>пуш-уведомления на телефон</b>: в колокольчике — иконка 📱, нажми её один раз, разреши уведомления — и телефон будет пикать',
+      'Сейчас пуш приходит <b>директору и бухгалтеру, когда поступает счёт</b> от поставщика (на оплату)',
+      'Включать нужно на каждом телефоне отдельно (один раз). На iPhone работает только если приложение добавлено на экран «Домой»',
+    ],
+  },
   {
     version: 'v2.45.147',
     date: '08.06.2026',
