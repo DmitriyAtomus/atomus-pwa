@@ -399,7 +399,9 @@
         <button class="nav-item" data-nav="supply-suppliers" onclick="selectSidebarItem('supply-suppliers')">
           <i class="ti ti-truck-loading"></i><span>Поставщики</span>
         </button>
-        <button class="nav-item" data-nav="supply-catalog" onclick="selectSidebarItem('supply-catalog')">
+        <!-- v2.45.171: «Каталог» в Снабжении временно скрыт по просьбе директора
+             (пока не решено что с ним делать). Чтобы вернуть — убрать display:none. -->
+        <button class="nav-item" data-nav="supply-catalog" onclick="selectSidebarItem('supply-catalog')" style="display:none;">
           <i class="ti ti-list-details"></i><span>Каталог</span>
         </button>
         <!-- v2.45.56: 4 админских инструмента (Массовое BOM, Перенумерация,

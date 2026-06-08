@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.170-3d-icons";
+const APP_VERSION = "v2.45.171-hide-supply-catalog";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -30358,6 +30358,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.171',
+    date: '09.06.2026',
+    title: 'Снабжение: скрыт пункт «Каталог»',
+    features: [
+      'Пункт <b>«Каталог»</b> в разделе Снабжение временно скрыт из меню — вернём, когда определимся с его назначением',
+    ],
+  },
   {
     version: 'v2.45.170',
     date: '09.06.2026',
