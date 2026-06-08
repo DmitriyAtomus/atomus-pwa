@@ -19560,7 +19560,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.144-ship-refresh-btn";
+const APP_VERSION = "v2.45.145-ship-scan-fix";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -49420,6 +49420,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.145',
+    date: '08.06.2026',
+    title: 'Отгрузка по QR — починена логика подтверждения',
+    features: [
+      'Исправлено: при сканировании имя позиции показывалось как «Позиция», а уже отгружённый код предлагал отгрузить повторно',
+      'Теперь при наведении видно <b>название позиции</b>; если код <b>уже отгружён</b> (в т.ч. в составе короба) — пишет «Уже отгружено», а не предлагает кнопку',
+      'Кнопка «Отгрузить» теперь реально отрабатывает и обновляет счётчик сразу',
+    ],
+  },
+  {
     version: 'v2.45.144',
     date: '08.06.2026',
     title: 'Кнопка «Обновить» в блоке отгрузки',
@@ -60732,24 +60742,34 @@ async function handleContinuousShipmentScan(decodedText) {
     return;
   }
 
-  if (resp.ok) {
+  // v2.45.145: apiPost возвращает {ok: HTTP-статус, data: тело}. Реальные поля
+  // (ok/item/reason/progress) лежат в resp.data — раньше брали из resp напрямую,
+  // из-за чего «уже отгружено» показывалось как «Отгрузить», а имя было пустым.
+  const d = (resp && resp.data) || {};
+  if (!resp.ok) {
+    // HTTP-ошибка (400/500 и т.п.)
+    flashScanner('error'); playBeep('error'); vibrate([100, 50, 100]);
+    showShipLast('error', d.message || 'Ошибка сервера', '');
+    return;
+  }
+  if (d.progress) {
+    updateShipCounter(d.progress.shipped || 0, d.progress.total || 0,
+      (d.item && d.item.name) || '');
+  }
+  if (d.ok) {
     // Совпадает по договору и ещё не отгружено — показываем подтверждение
     flashScanner('success');
     playBeep('success');
     vibrate(40);
-    state._shipPendingConfirm = { token: token, item: resp.item || {} };
-    _showShipConfirm(resp.item || {});
+    state._shipPendingConfirm = { token: token, item: d.item || {} };
+    _showShipConfirm(d.item || {});
   } else {
-    // Ошибка (другой договор / уже отгружено / не распознан) — показываем тост
+    // already_shipped / wrong_contract / unknown — показываем тост-ошибку
     flashScanner('error');
     playBeep('error');
     vibrate([100, 50, 100]);
-    if (resp.progress) {
-      updateShipCounter(resp.progress.shipped || 0, resp.progress.total || 0,
-        (resp.item && resp.item.name) || '');
-    }
-    const reasonText = _SHIP_REASON_TEXT[resp.reason] || 'Ошибка';
-    showShipLast('error', reasonText, (resp.item && resp.item.name) || '');
+    const reasonText = _SHIP_REASON_TEXT[d.reason] || 'Ошибка';
+    showShipLast('error', reasonText, (d.item && d.item.name) || '');
   }
 }
 
@@ -60792,23 +60812,25 @@ async function confirmShipCurrent() {
       qr_token: pending.token,
       contract_id: state._shipContractId,
     });
-    if (resp.progress) {
-      const name = (resp.item && resp.item.name) || (pending.item && pending.item.name) || '';
-      updateShipCounter(resp.progress.shipped || 0, resp.progress.total || 0, name);
+    // v2.45.145: поля в resp.data, не в resp (см. apiPost)
+    const d = (resp && resp.data) || {};
+    if (d.progress) {
+      const name = (d.item && d.item.name) || (pending.item && pending.item.name) || '';
+      updateShipCounter(d.progress.shipped || 0, d.progress.total || 0, name);
     }
-    if (resp.ok) {
+    if (resp.ok && d.ok) {
       flashScanner('success');
       playBeep('success');
       vibrate(80);
-      const item = resp.item || pending.item || {};
+      const item = d.item || pending.item || {};
       showShipLast('success', '✓ ' + (item.name || 'Отгружено'),
-        (resp.progress ? (resp.progress.shipped + ' из ' + resp.progress.total) : ''));
+        (d.progress ? (d.progress.shipped + ' из ' + d.progress.total) : ''));
     } else {
       flashScanner('error');
       playBeep('error');
       vibrate([100, 50, 100]);
-      const reasonText = _SHIP_REASON_TEXT[resp.reason] || 'Ошибка';
-      showShipLast('error', reasonText, (resp.item && resp.item.name) || '');
+      const reasonText = _SHIP_REASON_TEXT[d.reason] || (d.message || 'Ошибка');
+      showShipLast('error', reasonText, (d.item && d.item.name) || '');
     }
   } catch (e) {
     flashScanner('error');
