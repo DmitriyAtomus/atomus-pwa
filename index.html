@@ -19587,7 +19587,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.158-push-test";
+const APP_VERSION = "v2.45.159-push-persist";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20469,6 +20469,63 @@ async function enablePushNotifications() {
   }
 }
 
+function _markPushEnabledUI() {
+  const icon = document.getElementById('notif-push-icon');
+  if (icon) icon.style.color = 'var(--success)';
+}
+
+// Достаёт applicationServerKey текущей подписки в base64url (для сверки с VAPID).
+function _subAppServerKeyB64(sub) {
+  try {
+    const k = (sub.options || {}).applicationServerKey;
+    if (!k) return '';
+    const bytes = new Uint8Array(k);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } catch (_) { return ''; }
+}
+
+// v2.45.159: тихая пере-синхронизация пуш-подписки на старте/после обновления.
+// Раньше после refresh/обновления SW подписка «слетала» (иконка гасла, пуш не
+// приходил), т.к. подписку никто не пере-сохранял на сервере. Теперь если
+// разрешение уже выдано — переподписываемся (пересоздаём при смене VAPID-ключа)
+// и сохраняем подписку заново. Ничего не спрашиваем у пользователя.
+async function syncPushSubscription() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;  // не выдано — не трогаем
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    const kr = await fetch(API_BASE + '/api/push/vapid-key', { headers: { 'Authorization': 'Bearer ' + token } });
+    const kd = await kr.json().catch(() => ({}));
+    if (!kd.available || !kd.key) return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    // Подписка под другим VAPID-ключом «протухла» (пуш не дойдёт) — пересоздаём
+    if (sub) {
+      const curKey = _subAppServerKeyB64(sub);
+      if (curKey && curKey !== kd.key) {
+        try { await sub.unsubscribe(); } catch (_) {}
+        sub = null;
+      }
+    }
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlB64ToUint8Array(kd.key),
+      });
+    }
+    await fetch(API_BASE + '/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    _markPushEnabledUI();
+    state._pushSynced = true;
+  } catch (e) { /* тихо — не мешаем работе приложения */ }
+}
+
 // v2.45.158: тестовый пуш по кнопке — отправляет уведомление на телефоны,
 // где включён пуш (📱). Если подписок нет — подсказывает нажать 📱.
 async function sendTestPush() {
@@ -21195,6 +21252,9 @@ function startNotifPolling() {
   refreshNotifBadge();
   if (_notifRefreshTimer) clearInterval(_notifRefreshTimer);
   _notifRefreshTimer = setInterval(refreshNotifBadge, 30000);
+  // v2.45.159: пере-синхронизировать пуш-подписку, чтобы она не «слетала»
+  // после обновления страницы / Service Worker (иконка гасла, пуш не приходил)
+  try { syncPushSubscription(); } catch (_) {}
 }
 
 async function refreshNotifBadge() {
@@ -49692,6 +49752,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.159',
+    date: '08.06.2026',
+    title: 'Пуш больше не «слетает» после обновления',
+    features: [
+      'Раньше после обновления страницы значок пуша гас и уведомления переставали приходить — приходилось включать заново. Теперь при каждом запуске приложение само пере-подписывает телефон и сохраняет подписку',
+      'Если поменялся ключ сервера — подписка автоматически пересоздаётся, ничего нажимать не нужно',
+    ],
+  },
   {
     version: 'v2.45.158',
     date: '08.06.2026',
