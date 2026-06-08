@@ -5387,6 +5387,7 @@
     font-size: 18px;
   }
   .sup-row-body { flex: 1; min-width: 0; }
+  .sup-row-main { flex: 1; min-width: 0; }
   .sup-row-title {
     font-size: 14.5px; font-weight: 600; color: var(--text);
     margin-bottom: 4px;
@@ -5402,6 +5403,24 @@
     font-style: italic;
   }
   .sup-row-actions { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; }
+  /* v2.45.167: на телефоне карточка строится сверху-вниз — текст во всю ширину,
+     кнопки снизу ровным рядом (раньше кнопки выдавливали текст и уезжали за край) */
+  .app.mobile-layout .sup-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .app.mobile-layout .sup-row-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .app.mobile-layout .sup-row-actions > .btn {
+    flex: 1 1 auto;
+  }
+  .app.mobile-layout .sup-row-actions > .btn.sup-row-icon,
+  .app.mobile-layout .sup-row-actions > .btn.sup-row-trash {
+    flex: 0 0 auto;
+  }
   /* v2.45.36: ровные кнопки в строке inbox — единая высота, текстовые и иконочные */
   .sup-row-actions > .btn {
     height: 32px !important;
