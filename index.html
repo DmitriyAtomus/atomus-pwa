@@ -7780,6 +7780,14 @@
   .bom-preview-name { flex: 1; }
   .bom-preview-qty { font-variant-numeric: tabular-nums; }
   .bom-preview-stock { color: var(--text-light); font-size: 11px; }
+  .bom-relink-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 4px; padding: 3px 8px;
+    background: #fff; color: #2C5282;
+    border: 1px solid #90B4DE; border-radius: 6px;
+    font-size: 11.5px; font-weight: 600; cursor: pointer;
+  }
+  .bom-relink-btn:hover { background: #EAF2FB; }
 
   /* ============ ЭТАП 30.6 + v2.33.7: сворачиваемые группы моделей (новый дизайн) ============ */
   .models-group {
@@ -19575,7 +19583,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.156-ship-writeoff";
+const APP_VERSION = "v2.45.157-bom-relink";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -37571,9 +37579,17 @@ async function _doBomPreview() {
     html += '<div class="bom-preview-list">';
     data.items.forEach(it => {
       const shortCls = !it.enough ? (it.is_critical ? ' shortage-critical' : ' shortage-warn') : '';
+      // Дефицитную складскую позицию (компонент) можно сопоставить вручную —
+      // когда авто-матч указал не на ту складскую позицию (дубль/иная привязка).
+      const relinkBtn = (it.kind === 'component' && !it.enough && it.bom_id)
+        ? '<button class="bom-relink-btn" onclick="openBomRelink(' + it.bom_id + ', ' +
+            JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ')">' +
+            '<i class="ti ti-arrows-exchange"></i> Сопоставить со складом</button>'
+        : '';
       html += '<div class="bom-preview-row' + shortCls + '">' +
         '<div class="bom-preview-name">' + escapeHtml(it.component_name) +
-          (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') + '</div>' +
+          (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
+          relinkBtn + '</div>' +
         '<div class="bom-preview-qty">' +
           '<b>' + _fmtQty(it.qty_need_total) + '</b> ' + escapeHtml(it.unit_override || it.component_unit || '') +
           '<span class="bom-preview-stock"> (есть ' + _fmtQty(it.qty_have) + ')</span>' +
@@ -37600,6 +37616,97 @@ async function _doBomPreview() {
   } catch (e) {
     section.style.display = 'none';
   }
+}
+
+// ---- Ручное сопоставление строки спецификации со складской позицией ----
+// Когда авто-матч не нашёл остаток (позиция показана «есть 0», хотя на складе
+// она есть под другой/дублирующей записью) — даём выбрать нужную вручную.
+function openBomRelink(bomId, name) {
+  state._bomRelink = { bomId: bomId, name: name || '' };
+  let ov = document.getElementById('bom-relink-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'bom-relink-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    ov.onclick = function (e) { if (e.target === ov) closeBomRelink(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML =
+    '<div onclick="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:540px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
+      '<div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);">' +
+        '<h3 style="margin:0;font-size:16px;"><i class="ti ti-arrows-exchange"></i> Сопоставить со складом</h3>' +
+        '<button class="modal-close" onclick="closeBomRelink()" style="background:none;border:none;font-size:20px;cursor:pointer;"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:14px 18px;overflow:auto;">' +
+        '<div style="font-size:13px;color:var(--text-light);margin-bottom:10px;line-height:1.45;">' +
+          'Позиция спецификации: <b>' + escapeHtml(name || '') + '</b>.<br>Выберите складскую позицию, которой она соответствует — спецификация модели будет привязана к ней (повлияет на будущие сборки).' +
+        '</div>' +
+        '<input id="bom-relink-search" type="text" placeholder="Поиск по названию или артикулу…" ' +
+          'oninput="_bomRelinkSearchDebounced(this.value)" ' +
+          'style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;margin-bottom:10px;font-size:14px;">' +
+        '<div id="bom-relink-results">Загрузка…</div>' +
+      '</div>' +
+    '</div>';
+  ov.style.display = 'flex';
+  _doBomRelinkSearch(name || '');
+  setTimeout(function () {
+    const i = document.getElementById('bom-relink-search');
+    if (i) { i.value = name || ''; i.focus(); i.select(); }
+  }, 50);
+}
+
+let _bomRelinkDebounce = null;
+function _bomRelinkSearchDebounced(q) {
+  clearTimeout(_bomRelinkDebounce);
+  _bomRelinkDebounce = setTimeout(function () { _doBomRelinkSearch(q); }, 250);
+}
+
+async function _doBomRelinkSearch(q) {
+  const box = document.getElementById('bom-relink-results');
+  if (!box) return;
+  try {
+    const data = await apiGet('/api/components?search=' + encodeURIComponent(q || ''));
+    const comps = (data.components || []).slice(0, 50);
+    if (!comps.length) {
+      box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);">Ничего не найдено</div>';
+      return;
+    }
+    box.innerHTML = comps.map(function (c) {
+      const stock = (c.qty_on_stock !== undefined && c.qty_on_stock !== null) ? c.qty_on_stock : 0;
+      const sku = c.sku ? ('<span style="color:var(--text-light);font-size:12px;"> · ' + escapeHtml(c.sku) + '</span>') : '';
+      const stockColor = stock > 0 ? '#15803D' : '#B25E00';
+      return '<div class="bom-relink-row" onclick="relinkBomComponent(' + c.id + ')" ' +
+        'style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+        '<div><div style="font-weight:600;">' + escapeHtml(c.name || '') + sku + '</div>' +
+          (c.category_name ? '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(c.category_name) + '</div>' : '') + '</div>' +
+        '<div style="white-space:nowrap;font-weight:700;color:' + stockColor + ';">' + _fmtQty(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<div style="padding:16px;text-align:center;color:#c0392b;">Ошибка загрузки</div>';
+  }
+}
+
+async function relinkBomComponent(componentId) {
+  const st = state._bomRelink || {};
+  if (!st.bomId) return;
+  try {
+    const resp = await apiPost('/api/model-bom/' + st.bomId + '/relink', { component_id: componentId });
+    if (resp && resp.ok) {
+      showToast('Позиция сопоставлена со складом', 'success');
+      closeBomRelink();
+      _doBomPreview();
+    } else {
+      showToast((resp && resp.data && resp.data.message) || 'Не удалось сопоставить', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка сопоставления', 'error');
+  }
+}
+
+function closeBomRelink() {
+  const ov = document.getElementById('bom-relink-overlay');
+  if (ov) ov.style.display = 'none';
 }
 
 document.querySelectorAll('#ip-section .chip-option').forEach(c => {
@@ -49547,6 +49654,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.157',
+    date: '08.06.2026',
+    title: 'Ручное сопоставление позиции спецификации со складом',
+    features: [
+      'Если в «Новой работе» позиция спецификации показана как «есть 0», хотя на складе она есть (например, заведена дублем под другой записью) — у дефицитной позиции появилась кнопка <b>«Сопоставить со складом»</b>',
+      'По кнопке выбираешь нужную складскую позицию (с её остатком) — спецификация модели привязывается к ней, и количество подтягивается правильно (для будущих сборок тоже)',
+    ],
+  },
   {
     version: 'v2.45.156',
     date: '08.06.2026',
