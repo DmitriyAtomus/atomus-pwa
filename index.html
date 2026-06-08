@@ -19307,6 +19307,10 @@
       <button class="icon-btn" id="notif-push-toggle" onclick="enablePushNotifications()" title="Уведомления на телефон (пуш)">
         <i class="ti ti-device-mobile-message" id="notif-push-icon"></i>
       </button>
+      <!-- v2.45.158: тестовый пуш — нажал и посмотрел как пришло на телефон -->
+      <button class="notif-clear-all-btn" id="notif-push-test" onclick="sendTestPush()" title="Прислать тестовый пуш на телефон">
+        <i class="ti ti-send"></i> Тест
+      </button>
       <!-- v2.45.79: тоггл звука -->
       <button class="icon-btn" id="notif-sound-toggle" onclick="toggleNotifSound()" title="Звук уведомлений">
         <i class="ti ti-volume" id="notif-sound-icon"></i>
@@ -19583,7 +19587,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.157-bom-relink";
+const APP_VERSION = "v2.45.158-push-test";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20462,6 +20466,40 @@ async function enablePushNotifications() {
     } catch (_) {}
   } catch (e) {
     alert('Пуш не включился на шаге «' + step + '»:\n' + (e && (e.message || e.name)) + '\n\n' + (e && e.stack ? String(e.stack).slice(0, 300) : ''));
+  }
+}
+
+// v2.45.158: тестовый пуш по кнопке — отправляет уведомление на телефоны,
+// где включён пуш (📱). Если подписок нет — подсказывает нажать 📱.
+async function sendTestPush() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) { showToast('Нет сессии', 'error'); return; }
+  const btn = document.getElementById('notif-push-test');
+  if (btn) btn.disabled = true;
+  try {
+    showToast('Отправляю тестовый пуш…', 'info');
+    const tr = await fetch(API_BASE + '/api/push/test', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const td = await tr.json().catch(() => ({}));
+    if (td && td.sent > 0) {
+      showToast('✅ Тест отправлен на ' + td.sent + ' устр. — посмотри телефон', 'success');
+    } else {
+      // sent=0 — нет подписок или не доставилось
+      const hasResults = td && td.results && td.results.length;
+      if (!hasResults) {
+        if (confirm('На этом устройстве/аккаунте пуш ещё не включён.\nВключить сейчас (нажать 📱)?')) {
+          enablePushNotifications();
+        }
+      } else {
+        const det = (td.results || []).map(r => 'хост=' + (r.host || '?') + ' код=' + r.code + (r.detail ? ' (' + r.detail + ')' : '')).join('\n');
+        alert('Пуш не доставлен (sent=0).\nДетали:\n' + det);
+      }
+    }
+  } catch (e) {
+    showToast('Ошибка отправки теста', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -49654,6 +49692,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.158',
+    date: '08.06.2026',
+    title: 'Кнопка «Тест» уведомления на телефон',
+    features: [
+      'В шапке панели уведомлений (колокольчик) появилась кнопка <b>«Тест»</b> — нажал и сразу проверил, как пуш приходит на телефон',
+      'Если пуш на устройстве ещё не включён — кнопка предложит включить (нажать 📱)',
+    ],
+  },
   {
     version: 'v2.45.157',
     date: '08.06.2026',
