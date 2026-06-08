@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.216';
+const CACHE_VERSION = 'atomus-v1.8.217';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -13,6 +13,9 @@ const API_CACHE = `${CACHE_VERSION}-api`;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  // v2.45.162: CSS и JS вынесены из index.html в отдельные файлы
+  '/app.css',
+  '/app.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
