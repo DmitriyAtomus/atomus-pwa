@@ -19564,7 +19564,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.149-webpush-diag";
+const APP_VERSION = "v2.45.150-webpush-diag2";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20437,7 +20437,8 @@ async function enablePushNotifications() {
       });
       const td = await tr.json().catch(() => ({}));
       if (td && td.sent === 0) {
-        alert('Подписка сохранена, но сервер не смог доставить тестовый пуш (sent=0). Возможно, на телефоне нет сервиса доставки (Google Play Services). Покажи это сообщение.');
+        const det = (td.results || []).map(r => 'хост=' + (r.host || '?') + ' код=' + r.code + (r.detail ? ' (' + r.detail + ')' : '')).join('\n') || '(нет подписок на сервере)';
+        alert('Подписка сохранена, но пуш не доставлен (sent=0).\nДетали отправки:\n' + det + '\n\nПокажи это сообщение.');
       }
     } catch (_) {}
   } catch (e) {
