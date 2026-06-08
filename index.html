@@ -13191,6 +13191,39 @@
   .ship-finish-btn.visible { display: flex; }
   .ship-finish-btn:active { transform: translateX(-50%) scale(0.96); }
 
+  /* v2.45.137: панель подтверждения отгрузки (скан → проверка → «Отгрузить») */
+  .ship-confirm {
+    position: absolute;
+    bottom: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(22, 163, 74, 0.97);
+    color: white;
+    padding: 14px 16px 16px;
+    border-radius: 18px;
+    z-index: 6;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+    width: calc(100% - 32px);
+    max-width: 360px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    animation: shipLastIn 0.2s ease;
+  }
+  .ship-confirm.visible { display: flex; }
+  .ship-confirm-title { font-size: 13px; font-weight: 700; opacity: 0.95; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .ship-confirm-name { font-size: 16px; font-weight: 700; line-height: 1.25; margin: 2px 0 10px; }
+  .ship-confirm-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+  .ship-confirm-actions button {
+    border: none; border-radius: 12px; padding: 12px 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .ship-confirm-cancel { background: rgba(255, 255, 255, 0.22); color: white; }
+  .ship-confirm-ok { background: white; color: #166534; }
+  .ship-confirm-actions button:active { transform: scale(0.97); }
+
   /* ===== Экран отгрузки (вне сканера — список позиций) ===== */
   .ship-screen-wrap { padding: 14px; }
   .ship-progress-card {
@@ -19490,6 +19523,15 @@
       <div class="ship-last-title" id="ship-last-title">—</div>
       <div class="ship-last-sub" id="ship-last-sub">—</div>
     </div>
+    <!-- v2.45.137: подтверждение перед отгрузкой (скан → проверка → «Отгрузить») -->
+    <div class="ship-confirm" id="ship-confirm">
+      <div class="ship-confirm-title" id="ship-confirm-title"><i class="ti ti-circle-check"></i> Совпадает по договору</div>
+      <div class="ship-confirm-name" id="ship-confirm-name">—</div>
+      <div class="ship-confirm-actions">
+        <button class="ship-confirm-cancel" onclick="cancelShipConfirm()"><i class="ti ti-x"></i> Отмена</button>
+        <button class="ship-confirm-ok" onclick="confirmShipCurrent()"><i class="ti ti-truck-delivery"></i> Отгрузить</button>
+      </div>
+    </div>
     <!-- ЭТАП 26: кнопка "Завершить" -->
     <button class="ship-finish-btn" id="ship-finish-btn" onclick="finishShipmentScan()">
       <i class="ti ti-check"></i> Завершить
@@ -19518,7 +19560,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.136-box-thermal-print";
+const APP_VERSION = "v2.45.137-ship-confirm";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -49286,6 +49328,17 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.137',
+    date: '08.06.2026',
+    title: 'Отгрузка по QR — подтверждение перед списанием',
+    features: [
+      'При сканировании на отгрузку теперь сначала появляется зелёная плашка <b>«Совпадает по договору»</b> с названием позиции и кнопкой <b>«Отгрузить»</b> — позиция уходит только после нажатия',
+      'Это страхует от случайной отгрузки не той позиции: навёл → проверил → отгрузил → наводишь следующую',
+      'Если позиция из другого договора или уже отгружена — плашка не появится, покажется ошибка',
+      'Счётчик «X из 8» работает как раньше, в конце видно сколько отгружено',
+    ],
+  },
+  {
     version: 'v2.45.136',
     date: '08.06.2026',
     title: 'QR коробки — печать на термопринтер прямо из модалки',
@@ -60463,6 +60516,8 @@ async function startShipmentScan() {
 
   // Включаем continuous-режим
   state._qrContinuousMode = true;
+  state._shipPendingConfirm = null;   // v2.45.137: на старте нет неподтверждённых
+  _hideShipConfirm();
   // Показываем UI continuous
   const overlay = document.getElementById('qr-scanner-overlay');
   if (overlay) overlay.classList.add('continuous-mode');
@@ -60474,8 +60529,19 @@ async function startShipmentScan() {
   await openQrScanner();
 }
 
+const _SHIP_REASON_TEXT = {
+  'unknown':         'QR не распознан',
+  'no_contract':     'Объект не привязан к договору',
+  'wrong_contract':  'Объект из другого договора',
+  'already_shipped': 'Уже отгружено',
+};
+
+// v2.45.137: скан → ПРОВЕРКА (dry_run, без списания) → показываем «Совпадает
+// по договору» + кнопку «Отгрузить». Реальная отгрузка — только по нажатию.
 async function handleContinuousShipmentScan(decodedText) {
   if (!state._shipContractId) return;
+  // Пока висит неподтверждённая позиция — игнорируем новые сканы
+  if (state._shipPendingConfirm) return;
   // Извлекаем токен из URL если это полная ссылка
   let token = decodedText;
   try {
@@ -60492,6 +60558,7 @@ async function handleContinuousShipmentScan(decodedText) {
     resp = await apiPost('/api/shipments/scan', {
       qr_token: token,
       contract_id: state._shipContractId,
+      dry_run: true,   // только проверка
     });
   } catch (e) {
     flashScanner('error');
@@ -60501,42 +60568,100 @@ async function handleContinuousShipmentScan(decodedText) {
     return;
   }
 
-  // Обновляем прогресс
-  if (resp.progress) {
-    const name = (resp.item && resp.item.name) || '';
-    updateShipCounter(resp.progress.shipped || 0, resp.progress.total || 0, name);
-  }
-
   if (resp.ok) {
+    // Совпадает по договору и ещё не отгружено — показываем подтверждение
     flashScanner('success');
     playBeep('success');
-    vibrate(80);
-    const item = resp.item || {};
-    showShipLast('success', '✓ ' + (item.name || 'Отгружено'),
-      (resp.progress ? (resp.progress.shipped + ' из ' + resp.progress.total) : ''));
+    vibrate(40);
+    state._shipPendingConfirm = { token: token, item: resp.item || {} };
+    _showShipConfirm(resp.item || {});
   } else {
+    // Ошибка (другой договор / уже отгружено / не распознан) — показываем тост
     flashScanner('error');
     playBeep('error');
     vibrate([100, 50, 100]);
-    const reasonText = {
-      'unknown':         'QR не распознан',
-      'no_contract':     'Объект не привязан к договору',
-      'wrong_contract':  'Объект из другого договора',
-      'already_shipped': 'Уже отгружено',
-    }[resp.reason] || 'Ошибка';
-    const item = resp.item || {};
-    showShipLast('error', reasonText, item.name || '');
+    if (resp.progress) {
+      updateShipCounter(resp.progress.shipped || 0, resp.progress.total || 0,
+        (resp.item && resp.item.name) || '');
+    }
+    const reasonText = _SHIP_REASON_TEXT[resp.reason] || 'Ошибка';
+    showShipLast('error', reasonText, (resp.item && resp.item.name) || '');
+  }
+}
+
+function _showShipConfirm(item) {
+  const el = document.getElementById('ship-confirm');
+  if (!el) return;
+  const nm = document.getElementById('ship-confirm-name');
+  if (nm) nm.textContent = (item && item.name) || 'Позиция';
+  const last = document.getElementById('ship-last');
+  if (last) last.classList.remove('visible');   // чтобы тост не перекрывал
+  el.classList.add('visible');
+}
+
+function _hideShipConfirm() {
+  const el = document.getElementById('ship-confirm');
+  if (el) el.classList.remove('visible');
+}
+
+// Отмена — позиция не отгружается, продолжаем сканировать
+function cancelShipConfirm() {
+  state._shipPendingConfirm = null;
+  _hideShipConfirm();
+}
+
+// «Отгрузить» — реальная отгрузка подтверждённой позиции
+async function confirmShipCurrent() {
+  const pending = state._shipPendingConfirm;
+  if (!pending || state._shipConfirmBusy) return;
+  state._shipConfirmBusy = true;
+  const okBtn = document.querySelector('.ship-confirm-ok');
+  if (okBtn) okBtn.disabled = true;
+  try {
+    const resp = await apiPost('/api/shipments/scan', {
+      qr_token: pending.token,
+      contract_id: state._shipContractId,
+    });
+    if (resp.progress) {
+      const name = (resp.item && resp.item.name) || (pending.item && pending.item.name) || '';
+      updateShipCounter(resp.progress.shipped || 0, resp.progress.total || 0, name);
+    }
+    if (resp.ok) {
+      flashScanner('success');
+      playBeep('success');
+      vibrate(80);
+      const item = resp.item || pending.item || {};
+      showShipLast('success', '✓ ' + (item.name || 'Отгружено'),
+        (resp.progress ? (resp.progress.shipped + ' из ' + resp.progress.total) : ''));
+    } else {
+      flashScanner('error');
+      playBeep('error');
+      vibrate([100, 50, 100]);
+      const reasonText = _SHIP_REASON_TEXT[resp.reason] || 'Ошибка';
+      showShipLast('error', reasonText, (resp.item && resp.item.name) || '');
+    }
+  } catch (e) {
+    flashScanner('error');
+    playBeep('error');
+    showShipLast('error', 'Ошибка связи', String(e));
+  } finally {
+    state._shipPendingConfirm = null;
+    state._shipConfirmBusy = false;
+    if (okBtn) okBtn.disabled = false;
+    _hideShipConfirm();
   }
 }
 
 function finishShipmentScan() {
   state._qrContinuousMode = false;
+  state._shipPendingConfirm = null;   // v2.45.137: сбрасываем неподтверждённое
   // Прячем continuous UI
   const overlay = document.getElementById('qr-scanner-overlay');
   if (overlay) overlay.classList.remove('continuous-mode');
   const cnt = document.getElementById('ship-counter');     if (cnt) cnt.classList.remove('visible');
   const fb  = document.getElementById('ship-finish-btn');  if (fb)  fb.classList.remove('visible');
   const last = document.getElementById('ship-last');       if (last) last.classList.remove('visible');
+  _hideShipConfirm();
   closeQrScanner();
   // Перерисовываем экран отгрузки (актуальный список)
   setTimeout(reloadShipmentStatus, 200);
