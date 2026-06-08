@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.162-split";
+const APP_VERSION = "v2.45.163-update-banner";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -30348,6 +30348,16 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
+    version: 'v2.45.163',
+    date: '09.06.2026',
+    title: 'Аккуратный баннер обновления + показ версии',
+    features: [
+      'Баннер <b>«Доступно обновление»</b> больше не сжимается на телефоне — текст и кнопки читаемы, на узком экране кнопка переносится вниз на всю ширину',
+      'В баннере теперь видно, <b>какая версия</b> готова к установке (номер и краткое описание)',
+      'Описание версии — человеческое, на русском',
+    ],
+  },
+  {
     version: 'v2.45.162',
     date: '08.06.2026',
     title: 'Техническое: разнесли код приложения по файлам',
@@ -43858,30 +43868,37 @@ function _ensureUpdateBannerStyles() {
     #sw-update-banner {
       position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
       background: linear-gradient(135deg, #2563EB, #7C3AED);
-      color: #fff; border-radius: 12px;
-      padding: 12px 16px;
-      display: flex; align-items: center; gap: 12px;
+      color: #fff; border-radius: 14px;
+      padding: 12px 14px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       box-shadow: 0 8px 32px rgba(37,99,235,0.35);
       z-index: 999999;
-      max-width: 92vw;
+      width: min(460px, calc(100vw - 24px));
+      box-sizing: border-box;
       animation: swUpdSlideUp 0.25s ease-out;
     }
     @keyframes swUpdSlideUp { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-    #sw-update-banner .swu-icon { font-size: 22px; opacity: 0.95; }
-    #sw-update-banner .swu-text { line-height: 1.25; }
-    #sw-update-banner .swu-text b { font-size: 14px; }
-    #sw-update-banner .swu-text small { display:block; font-size:12px; opacity: 0.85; margin-top:2px; }
-    #sw-update-banner button {
+    #sw-update-banner .swu-icon { font-size: 22px; opacity: 0.95; flex-shrink: 0; }
+    #sw-update-banner .swu-text { line-height: 1.3; flex: 1; min-width: 0; }
+    #sw-update-banner .swu-text b { font-size: 14px; display: block; }
+    #sw-update-banner .swu-text small { display:block; font-size:12px; opacity: 0.9; margin-top:2px; }
+    #sw-update-banner .swu-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+    #sw-update-banner button.swu-go {
       background: #fff; color: #2563EB; border: 0;
-      border-radius: 8px; padding: 8px 14px;
-      font-size: 13px; font-weight: 600; cursor: pointer;
+      border-radius: 9px; padding: 9px 16px;
+      font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
       transition: transform .12s ease, box-shadow .12s ease;
     }
-    #sw-update-banner button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    #sw-update-banner button:last-of-type {
-      background: transparent; color: #fff; opacity: 0.7; padding: 8px;
+    #sw-update-banner button.swu-go:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    #sw-update-banner button.swu-close {
+      background: transparent; color: #fff; opacity: 0.75; border: 0;
+      padding: 6px; cursor: pointer; font-size: 16px; line-height: 1;
     }
-    #sw-update-banner button:last-of-type:hover { opacity: 1; box-shadow: none; transform: none; }
+    #sw-update-banner button.swu-close:hover { opacity: 1; }
+    @media (max-width: 460px) {
+      #sw-update-banner .swu-actions { width: 100%; justify-content: flex-end; margin-top: 2px; }
+      #sw-update-banner button.swu-go { flex: 1; }
+    }
   `;
   document.head.appendChild(css);
 }
@@ -43894,10 +43911,30 @@ function _showUpdateBanner() {
   banner.id = 'sw-update-banner';
   banner.innerHTML =
     '<i class="ti ti-refresh swu-icon"></i>' +
-    '<div class="swu-text"><b>Доступно обновление</b><small>Нажмите когда закончите работу с формой</small></div>' +
-    '<button onclick="applySWUpdate()">Обновить</button>' +
-    '<button onclick="dismissSWUpdate()" title="Скрыть"><i class="ti ti-x"></i></button>';
+    '<div class="swu-text"><b>Доступно обновление</b><small id="swu-ver">Узнаём версию…</small></div>' +
+    '<div class="swu-actions">' +
+      '<button class="swu-go" onclick="applySWUpdate()">Обновить</button>' +
+      '<button class="swu-close" onclick="dismissSWUpdate()" title="Скрыть"><i class="ti ti-x"></i></button>' +
+    '</div>';
   document.body.appendChild(banner);
+  // Подтягиваем какая именно версия готова к установке
+  fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(v => {
+      const el = document.getElementById('swu-ver');
+      if (!el) return;
+      if (v && v.version) {
+        el.innerHTML = 'Версия <b>' + escapeHtml(v.version) + '</b>' +
+          (v.label ? ' · ' + escapeHtml(v.label) : '') +
+          '<br>Нажмите, когда закончите с формой';
+      } else {
+        el.textContent = 'Нажмите, когда закончите с формой';
+      }
+    })
+    .catch(() => {
+      const el = document.getElementById('swu-ver');
+      if (el) el.textContent = 'Нажмите, когда закончите с формой';
+    });
 }
 
 function applySWUpdate() {

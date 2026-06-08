@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.217';
+const CACHE_VERSION = 'atomus-v1.8.218';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -90,6 +90,11 @@ self.addEventListener('fetch', (event) => {
     // Если их закэшировать — пользователь будет видеть старую модель после
     // деплоя. Сетевой запрос с фолбэком на кэш (на случай оффлайна).
     if (url.pathname.startsWith('/3d/')) {
+      event.respondWith(networkFirst(req));
+      return;
+    }
+    // version.json — всегда свежий (показывает какая версия доступна к установке)
+    if (url.pathname === '/version.json') {
       event.respondWith(networkFirst(req));
       return;
     }
