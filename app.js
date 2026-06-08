@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.169-notif-head2";
+const APP_VERSION = "v2.45.170-3d-icons";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1170,19 +1170,25 @@ function renderProfile() {
   document.getElementById('profile-name').textContent = name;
   document.getElementById('profile-roles').textContent = roles || 'без роли';
 
-  // Sidebars (все типы сайдбаров)
-  ['sb-avatar', 'sb-avatar-help', 'sb-avatar-sales', 'sb-avatar-coming'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.textContent = initials;
-  });
-  ['sb-username', 'sb-username-help', 'sb-username-sales', 'sb-username-coming'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.textContent = name;
-  });
-  ['sb-userrole', 'sb-userrole-help', 'sb-userrole-sales', 'sb-userrole-coming'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.textContent = roles || 'без роли';
-  });
+  // Sidebars — заполняем по КЛАССАМ внутри .sidebar-footer, чтобы покрыть ВСЕ
+  // секции (включая главный «-home»). Раньше шёл жёсткий список id без -home,
+  // из-за чего на главном сайдбаре висели прочерки «—».
+  document.querySelectorAll('.sidebar-footer .small-avatar').forEach(el => { el.textContent = initials; });
+  document.querySelectorAll('.sidebar-footer .un').forEach(el => { el.textContent = name; });
+  document.querySelectorAll('.sidebar-footer .ur').forEach(el => { el.textContent = roles || 'без роли'; });
 
-  // Версия приложения (в Аккаунте и в сайдбаре десктопа)
-  const versionText = APP_VERSION + ' · ' + APP_VERSION_DATE;
+  // Версия приложения — по-русски: номер + краткое описание из changelog,
+  // без технического суффикса вроде «-notif-head».
+  let _verNum = APP_VERSION;
+  const _vm = APP_VERSION.match(/^v[\d.]+/);
+  if (_vm) _verNum = _vm[0];
+  let _verTitle = '';
+  try {
+    if (typeof HELP_CHANGELOG !== 'undefined' && HELP_CHANGELOG[0] && HELP_CHANGELOG[0].title) {
+      _verTitle = HELP_CHANGELOG[0].title;
+    }
+  } catch (e) {}
+  const versionText = _verNum + (_verTitle ? ' · ' + _verTitle : '') + ' · ' + APP_VERSION_DATE;
   const vMobile = document.getElementById('version-info-mobile');
   if (vMobile) vMobile.textContent = versionText;
   document.querySelectorAll('.sidebar-version-text').forEach(el => {
@@ -30352,6 +30358,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.170',
+    date: '09.06.2026',
+    title: 'Объёмные значки и версия по-русски',
+    features: [
+      'Значки быстрых действий на главной (Новая работа, Новый договор, Новая задача, Доработка) стали <b>крупнее и объёмными</b> (3D) — приятный цветной вид',
+      'В подвале меню версия теперь пишется <b>по-русски</b> (номер + краткое описание), без технических английских хвостов',
+      'Убраны прочерки «—» в подвале главного меню: аватар, имя и роль теперь подставляются корректно',
+    ],
+  },
   {
     version: 'v2.45.169',
     date: '09.06.2026',
