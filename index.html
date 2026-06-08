@@ -20411,9 +20411,15 @@ async function enablePushNotifications() {
       body: JSON.stringify(sub.toJSON()),
     });
     if (!sr.ok) { showToast('Не удалось сохранить подписку на сервере', 'error'); return; }
-    showToast('📱 Пуш-уведомления включены на этом телефоне', 'success');
+    showToast('📱 Пуш включён — сейчас придёт тестовое уведомление', 'success');
     const icon = document.getElementById('notif-push-icon');
     if (icon) icon.style.color = 'var(--success)';
+    // Тестовый пуш — чтобы сразу убедиться, что цепочка работает
+    try {
+      await fetch(API_BASE + '/api/push/test', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token },
+      });
+    } catch (_) {}
   } catch (e) {
     showToast('Не удалось включить пуш: ' + (e.message || e), 'error');
   }
