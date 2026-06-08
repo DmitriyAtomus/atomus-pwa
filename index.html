@@ -390,7 +390,7 @@
           <i class="ti ti-file-invoice"></i><span>Заказы</span>
         </button>
         <button class="nav-item" data-nav="supply-inbox" onclick="selectSidebarItem('supply-inbox')">
-          <i class="ti ti-mailbox"></i><span>Входящие счета</span><span class="nav-badge" id="supply-inbox-badge" style="display:none;"></span>
+          <i class="ti ti-mailbox"></i><span>Входящие счета от поставщиков</span><span class="nav-badge" id="supply-inbox-badge" style="display:none;"></span>
         </button>
         <button class="nav-item" data-nav="supply-invoice-intake" onclick="selectSidebarItem('supply-invoice-intake')">
           <i class="ti ti-sparkles"></i><span>Приёмка УПД</span>
@@ -1897,7 +1897,7 @@
           </div>
           <div class="desktop-layout">
             <div class="filter-row">
-              <div class="filter-tabs">
+              <div class="filter-tabs sup-ord-tabs">
                 <button class="filter-tab active" data-sup-ord="open"              onclick="setSupplyOrdFilter('open')"><i class="ti ti-folder-open"></i> Открытые</button>
                 <button class="filter-tab"        data-sup-ord="draft"             onclick="setSupplyOrdFilter('draft')"><i class="ti ti-pencil"></i> Черновики</button>
                 <button class="filter-tab"        data-sup-ord="sent"              onclick="setSupplyOrdFilter('sent')"><i class="ti ti-send"></i> Отправлены</button>

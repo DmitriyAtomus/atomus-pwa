@@ -1078,6 +1078,26 @@
     padding-left: 14px; padding-right: 14px;
     display: inline-flex; align-items: center; gap: 6px;
   }
+  /* v2.45.165: на мобиле статус-фильтры заказов — ровная сетка 2 в ряд */
+  .app.mobile-layout .sup-ord-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  .app.mobile-layout .sup-ord-tabs .filter-tab {
+    justify-content: center;
+    padding: 11px 8px;
+    width: 100%;
+  }
+  /* v2.45.165: показываем шапку с кнопкой «назад» на мобиле в карточке заказа */
+  .app.mobile-layout #sup-ord-detail .page-header {
+    display: flex;
+    padding: 12px 14px 10px;
+    margin: 0 0 12px;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .app.mobile-layout #sup-ord-detail .page-header h1 { font-size: 18px; }
   .filter-tab[data-sup-ord] i { font-size: 14px; }
   /* v2.45.151: счётчик-бейдж на вкладке статуса заказов */
   .sup-ord-tab-count {
