@@ -19564,7 +19564,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.148-webpush";
+const APP_VERSION = "v2.45.149-webpush-diag";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -20382,22 +20382,35 @@ function _urlB64ToUint8Array(base64String) {
 }
 
 async function enablePushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    showToast('Этот браузер/телефон не поддерживает пуш-уведомления', 'error');
-    return;
-  }
+  // v2.45.149: пошаговая диагностика — alert на каждом провале, чтобы было видно где стопор
+  let step = 'старт';
   try {
+    if (!('serviceWorker' in navigator)) { alert('Пуш недоступен: нет Service Worker в этом браузере'); return; }
+    if (!('PushManager' in window))      { alert('Пуш недоступен: браузер/телефон не поддерживает Web Push (часто на телефонах без Google-сервисов, напр. Huawei). Попробуй Chrome.'); return; }
+    if (!('Notification' in window))     { alert('Пуш недоступен: нет Notification API'); return; }
+
+    step = 'разрешение';
     let perm = Notification.permission;
     if (perm === 'default') perm = await Notification.requestPermission();
     if (perm !== 'granted') {
-      showToast('Уведомления не разрешены — включи их в настройках браузера/приложения', 'warning');
+      alert('Уведомления не разрешены (статус: ' + perm + '). Разреши их для сайта в настройках браузера.');
       return;
     }
+
+    step = 'VAPID-ключ';
     const token = localStorage.getItem(TOKEN_KEY);
     const kr = await fetch(API_BASE + '/api/push/vapid-key', { headers: { 'Authorization': 'Bearer ' + token } });
     const kd = await kr.json().catch(() => ({}));
-    if (!kd.available || !kd.key) { showToast('Пуш на сервере пока недоступен', 'error'); return; }
-    const reg = await navigator.serviceWorker.ready;
+    if (!kd.available || !kd.key) { alert('Сервер: пуш недоступен (available=' + kd.available + ')'); return; }
+
+    step = 'Service Worker ready';
+    // не даём зависнуть навсегда — таймаут 8 сек
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Service Worker не активировался (таймаут). Обнови страницу и попробуй снова.')), 8000)),
+    ]);
+
+    step = 'подписка (subscribe)';
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
       sub = await reg.pushManager.subscribe({
@@ -20405,23 +20418,30 @@ async function enablePushNotifications() {
         applicationServerKey: _urlB64ToUint8Array(kd.key),
       });
     }
+
+    step = 'сохранение подписки';
     const sr = await fetch(API_BASE + '/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(sub.toJSON()),
     });
-    if (!sr.ok) { showToast('Не удалось сохранить подписку на сервере', 'error'); return; }
+    if (!sr.ok) { alert('Не удалось сохранить подписку на сервере (HTTP ' + sr.status + ')'); return; }
+
     showToast('📱 Пуш включён — сейчас придёт тестовое уведомление', 'success');
     const icon = document.getElementById('notif-push-icon');
     if (icon) icon.style.color = 'var(--success)';
-    // Тестовый пуш — чтобы сразу убедиться, что цепочка работает
+    step = 'тестовый пуш';
     try {
-      await fetch(API_BASE + '/api/push/test', {
+      const tr = await fetch(API_BASE + '/api/push/test', {
         method: 'POST', headers: { 'Authorization': 'Bearer ' + token },
       });
+      const td = await tr.json().catch(() => ({}));
+      if (td && td.sent === 0) {
+        alert('Подписка сохранена, но сервер не смог доставить тестовый пуш (sent=0). Возможно, на телефоне нет сервиса доставки (Google Play Services). Покажи это сообщение.');
+      }
     } catch (_) {}
   } catch (e) {
-    showToast('Не удалось включить пуш: ' + (e.message || e), 'error');
+    alert('Пуш не включился на шаге «' + step + '»:\n' + (e && (e.message || e.name)) + '\n\n' + (e && e.stack ? String(e.stack).slice(0, 300) : ''));
   }
 }
 
