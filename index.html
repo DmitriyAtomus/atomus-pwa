@@ -19560,7 +19560,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.137-ship-confirm";
+const APP_VERSION = "v2.45.138-ship-reset-ru";
 const APP_VERSION_DATE = "08.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -38281,6 +38281,31 @@ async function loadContractAuditBlock(contractId) {
       'delete_contract':       'Удаление',
       'ship_contract':         'Отгрузка',
       'partial_ship':          'Частичная отгрузка',
+      // v2.45.138: дополняем, чтобы в истории не было английских кодов
+      'refresh_reservations':  'Пересборка резервов',
+      'download_spec_pdf':     'Скачан PDF спецификации',
+      'download_spec_docx':    'Скачан Word спецификации',
+      'create_box':            'Создана коробка',
+      'delete_box':            'Удалена коробка',
+      'rename_box':            'Переименована коробка',
+      'create_box_item':       'Добавлено в коробку',
+      'remove_box_item':       'Убрано из коробки',
+      'shipment_scan_ok':      'Отгрузка по QR',
+      'remove_supply_order_item': 'Удалена позиция заказа',
+    };
+    // v2.45.138: перевод технического payload (и старых англоязычных записей)
+    const _prettyAuditPayload = (txt) => {
+      if (!txt) return '';
+      return String(txt)
+        .replace(/\bstatus:/g, 'Статус:')
+        .replace(/\bpartially_shipped\b/g, 'отгружен частично')
+        .replace(/\bproduction\b/g, 'в производстве')
+        .replace(/\bready\b/g, 'готов к отгрузке')
+        .replace(/\bshipped\b/g, 'отгружен')
+        .replace(/\bclosed\b/g, 'закрыт')
+        .replace(/\bassemblies=/g, 'сборок=')
+        .replace(/\bcomponents=/g, 'комплектующих=')
+        .replace(/\bneed_buy=/g, 'к закупке=');
     };
     let html = '<div class="card" style="padding:14px 18px;">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text-dark);">' +
@@ -38289,9 +38314,9 @@ async function loadContractAuditBlock(contractId) {
     html += '<div style="display:flex;flex-direction:column;gap:6px;">';
     items.slice(0, 20).forEach(it => {
       const dt = (it.created_at || '').replace('T', ' ').slice(0, 16);
-      const who = it.employee_name || ('chat#' + (it.chat_id || '—'));
+      const who = it.employee_name || (it.chat_id ? ('chat#' + it.chat_id) : 'Система');
       const lbl = ACTION_LABELS[it.action] || it.action;
-      const payload = it.payload || '';
+      const payload = _prettyAuditPayload(it.payload || '');
       html += '<div style="display:flex;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed #E2E8F0;">' +
         '<span style="color:var(--text-light);font-variant-numeric:tabular-nums;flex-shrink:0;">' + escapeHtml(dt) + '</span>' +
         '<span style="font-weight:600;color:#0C4A6E;flex-shrink:0;">' + escapeHtml(who) + '</span>' +
@@ -49327,6 +49352,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.138',
+    date: '08.06.2026',
+    title: 'Сброс отгрузки при возврате статуса + русская история',
+    features: [
+      'Если вернуть договор из «Отгружен частично» в <b>«Готов к отгрузке»</b> (или «В производстве») — прогресс <b>«Отгрузка по QR» обнуляется</b> (был баг: счётчик оставался 3/8)',
+      'В <b>«Истории изменений»</b> убраны английские слова: статусы и действия теперь по-русски («Статус: отгружен частично → готов к отгрузке», «Пересборка резервов» и т.п.)',
+    ],
+  },
   {
     version: 'v2.45.137',
     date: '08.06.2026',
