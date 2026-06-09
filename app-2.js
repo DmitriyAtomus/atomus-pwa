@@ -8399,10 +8399,16 @@ function renderContractItemsBlock(contractId) {
           parts.push(it.sale_product_name);
           displayName = parts.join(' · ');
           sourceTag = '<span style="font-size:10px; color:var(--brand); text-transform:uppercase; margin-left:4px;">продажа</span>';
-          // v2.45.190: вид (группа каталога) лидером строки — «Электроприводы», «Гибкие вставки»…
+          // v2.45.191: вид лидером строки — берём ПОДГРУППУ (она конкретнее:
+          // «Приточные установки…», «Гибкие вставки…»), а группа — это слишком
+          // общо («Компакты ZILON», «Сетевые элементы»). Если подгруппы нет — группа.
+          const _sub = (it.sale_product_subgroup_name || '').trim();
           const _grp = (it.sale_product_group_name || '').trim();
-          if (_grp && _grp !== '(без группы)') {
-            typeChip = '<span style="font-size:11px; font-weight:700; color:#1E40AF; margin-right:6px;">' + escapeHtml(_grp) + '</span>';
+          let _type = '';
+          if (_sub && _sub !== '(без подгруппы)') _type = _sub;
+          else if (_grp && _grp !== '(без группы)') _type = _grp;
+          if (_type) {
+            typeChip = '<span style="font-size:11px; font-weight:700; color:#1E40AF; margin-right:6px;">' + escapeHtml(_type) + '</span>';
           }
         } else {
           displayName = it.name;
