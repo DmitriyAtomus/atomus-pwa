@@ -3367,6 +3367,21 @@ async function openCreateCategoryPrompt(directionId, subgroupId, subgroupName) {
   } catch (e) { showToast('Ошибка', 'error'); }
 }
 
+// v2.45.196: удалить подгруппу. Модели из неё переезжают в «Без подгруппы»
+// (не удаляются), категории-потомки открепляются. Для чистки лишних подгрупп.
+async function deleteSubgroupPrompt(subgroupId, name, count) {
+  const msg = count > 0
+    ? 'Удалить подгруппу «' + name + '»?\n\n' + count + ' модель(ей) переедут в «Без подгруппы» (НЕ удалятся) — потом сможешь разложить их по нужным группам.'
+    : 'Удалить пустую подгруппу «' + name + '»?';
+  if (!confirm(msg)) return;
+  try {
+    await apiDelete('/api/subgroups/' + subgroupId);
+    showToast('Подгруппа «' + name + '» удалена', 'success');
+    cache.models = null;
+    if (typeof loadModels === 'function') loadModels();
+  } catch (e) { showToast(e.message || 'Ошибка удаления', 'error'); }
+}
+
 function renderModels(d) {
   const container = document.getElementById('models-list');
   if (!d.models || d.models.length === 0) {
@@ -3506,13 +3521,21 @@ function renderModels(d) {
             '<i class="ti ti-folder-plus"></i> Категория' +
           '</button>'
         : '';
+      // v2.45.196: удалить подгруппу (модели переезжают в «Без подгруппы», не удаляются)
+      const delSgBtn = canEdit
+        ? '<button class="models-add-cat-btn" style="border-color:var(--danger);color:var(--danger);" ' +
+            'title="Удалить подгруппу (модели переедут в «Без подгруппы»)" ' +
+            'onclick="event.stopPropagation();deleteSubgroupPrompt(' + sg.id + ',\'' + escapeHtml(sg.name).replace(/'/g, "\\'") + '\',' + sg.items.length + ')">' +
+            '<i class="ti ti-trash"></i>' +
+          '</button>'
+        : '';
       html += '<div class="models-subgroup ' + theme.cls + '">' +
         '<div class="models-subgroup-toggle" role="button" tabindex="0" data-subkey="' + subKey + '" onclick="toggleModelsSubgroup(\'' + subKey + '\')">' +
           '<i class="ti ti-chevron-right models-subgroup-chevron' + (subOpen ? ' open' : '') + '"></i>' +
           '<i class="ti ' + theme.icon + ' sg-icon"></i>' +
           '<span class="sg-name">' + escapeHtml(sg.name) + '</span>' +
           '<span class="models-subgroup-count">' + sg.items.length + '</span>' +
-          addCatBtn +
+          addCatBtn + delSgBtn +
         '</div>' +
         '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
       // Без категории — карточкой как раньше
@@ -4277,7 +4300,13 @@ async function openEditModelModal(modelId) {
         '</div>' +
         '<div class="form-group" id="em-subgroup-wrap" style="display:none;">' +
           '<label>Подгруппа <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально)</span></label>' +
-          '<select id="em-subgroup"><option value="">— Без подгруппы —</option></select>' +
+          '<select id="em-subgroup" onchange="_onEmSubgroupChange()"><option value="">— Без подгруппы —</option></select>' +
+        '</div>' +
+        // v2.45.196: категория (подраздел внутри подгруппы) — чтобы перенести
+        // модель в нужную группу (напр. «ЩУ-004.000 Приточно-вытяжная вентиляция»).
+        '<div class="form-group" id="em-category-wrap" style="display:none;">' +
+          '<label>Категория <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(подраздел, опционально)</span></label>' +
+          '<select id="em-category"><option value="">— Без категории —</option></select>' +
         '</div>' +
         '<div class="modal-section-title">Основное</div>' +
         '<div class="form-group">' +
@@ -4351,6 +4380,10 @@ async function openEditModelModal(modelId) {
   setTimeout(() => {
     const sgSel = document.getElementById('em-subgroup');
     if (sgSel && m.subgroup_id) sgSel.value = String(m.subgroup_id);
+    // v2.45.196: подтянуть категории под подгруппу и выставить текущую категорию
+    _onEmSubgroupChange();
+    const catSel = document.getElementById('em-category');
+    if (catSel && m.category_id) catSel.value = String(m.category_id);
   }, 50);
 }
 
@@ -4366,14 +4399,43 @@ function _onEmDirChange() {
   if (!subgroups.length) {
     sgWrap.style.display = 'none';
     sgSel.innerHTML = '<option value="">— Без подгруппы —</option>';
+  } else {
+    sgWrap.style.display = '';
+    let opts = '<option value="">— Без подгруппы —</option>';
+    subgroups.forEach(sg => {
+      opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
+    });
+    sgSel.innerHTML = opts;
+  }
+  // v2.45.196: обновляем категории под выбранную подгруппу
+  _onEmSubgroupChange();
+}
+
+// v2.45.196: список категорий (подразделов) под выбранную подгруппу — для
+// переноса модели в нужную группу из формы редактирования. Зеркало
+// onNewModelSubgroupChange, но для полей em-*.
+function _onEmSubgroupChange() {
+  const dirSel = document.getElementById('em-direction');
+  const sgSel = document.getElementById('em-subgroup');
+  const catWrap = document.getElementById('em-category-wrap');
+  const catSel = document.getElementById('em-category');
+  if (!dirSel || !catWrap || !catSel) return;
+  const dirId = parseInt(dirSel.value);
+  const sgId = sgSel && sgSel.value ? parseInt(sgSel.value) : null;
+  const allCats = (cache.models && cache.models.categories) || [];
+  const dirCats = allCats.filter(c => c.direction_id === dirId);
+  const cats = sgId
+    ? dirCats.filter(c => c.parent_subgroup_id === sgId)
+    : dirCats.filter(c => !c.parent_subgroup_id);
+  if (!dirCats.length) {
+    catWrap.style.display = 'none';
+    catSel.innerHTML = '<option value="">— Без категории —</option>';
     return;
   }
-  sgWrap.style.display = '';
-  let opts = '<option value="">— Без подгруппы —</option>';
-  subgroups.forEach(sg => {
-    opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
-  });
-  sgSel.innerHTML = opts;
+  catWrap.style.display = '';
+  let opts = '<option value="">— Без категории —</option>';
+  cats.forEach(c => { opts += '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>'; });
+  catSel.innerHTML = opts;
 }
 
 function _onEmExecModeChange() {
@@ -4436,6 +4498,10 @@ async function submitEditModel(modelId) {
   const sgSel = document.getElementById('em-subgroup');
   const subgroupRaw = sgSel ? sgSel.value : '';
   const subgroupId = subgroupRaw ? parseInt(subgroupRaw) : null;
+  // v2.45.196: категория (подраздел)
+  const catSelEm = document.getElementById('em-category');
+  const categoryRaw = catSelEm ? catSelEm.value : '';
+  const categoryId = categoryRaw ? parseInt(categoryRaw) : null;
 
   // Собираем specs из state
   const specs = {};
@@ -4459,6 +4525,7 @@ async function submitEditModel(modelId) {
     specs: specs,
     direction_id: directionId,
     subgroup_id: subgroupId,
+    category_id: categoryId,
   };
 
   try {
