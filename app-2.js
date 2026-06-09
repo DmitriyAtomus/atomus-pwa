@@ -8557,11 +8557,26 @@ function renderContractItemsBlock(contractId) {
           nameClickHandler = ' onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"';
           nameLinkClass = ' spec-item-name--link';
         }
+        // v2.45.198: пометка «закуп в другом городе, отгрузка сразу на объекте»
+        let _altBadge = '', _altLine = '';
+        if (it.alt_supply) {
+          _altBadge = ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#B45309;background:rgba(180,83,9,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;"><i class="ti ti-truck-delivery" style="font-size:11px;vertical-align:-1px;"></i> закуп в др. городе</span>';
+          const _ap = [];
+          if (it.alt_supply_city) _ap.push(escapeHtml(it.alt_supply_city));
+          if (it.alt_supply_phone) _ap.push('тел. ' + escapeHtml(it.alt_supply_phone));
+          if (it.alt_supply_comment) _ap.push(escapeHtml(it.alt_supply_comment));
+          let _apHtml = _ap.join(' · ');
+          if (it.alt_supply_file_key) {
+            _apHtml += (_apHtml ? ' · ' : '') + '<a href="#" onclick="_openSpecAltFile(' + it.id + ');return false;" style="color:var(--brand);"><i class="ti ti-paperclip" style="vertical-align:-1px;"></i> ' + escapeHtml(it.alt_supply_file_name || 'файл') + '</a>';
+          }
+          _altLine = '<div class="spec-item-meta" style="color:#B45309;margin-top:2px;">Отгрузка сразу на объекте' + (_apHtml ? ' · ' + _apHtml : '') + '</div>';
+        }
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + typeChip + escapeHtml(displayName) + sourceTag + _reservedBadge + _quickAction + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + typeChip + escapeHtml(displayName) + sourceTag + _altBadge + _reservedBadge + _quickAction + '</div>' +
             '<div class="spec-item-meta">' + meta + '</div>' +
+            _altLine +
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
             (canEdit ? '<div class="spec-item-actions">' +
@@ -8717,6 +8732,32 @@ function renderSpecForm(contractId, existing) {
   // ЭТАП 37: контейнер для условных полей Исполнение/IP
   html += '<div id="spec-form-conditional" style="grid-column: 1 / -1;">';
   html += _renderSpecConditionalFieldsHTML(e);
+  html += '</div>';
+  // v2.45.198: «закуп в другом городе, отгрузка сразу на объекте» + контакты/файл
+  const altOn = !!e.alt_supply;
+  html += '<div style="grid-column: 1 / -1; margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 10px;">';
+  html += '<label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--text-dark);">' +
+    '<input type="checkbox" id="spec-form-alt-supply"' + (altOn ? ' checked' : '') + ' onchange="_toggleSpecAlt()" style="width:auto;flex-shrink:0;">' +
+    '<span><i class="ti ti-truck-delivery" style="vertical-align:-2px;color:#B45309;"></i> Закуп в другом городе (отгрузка сразу на объекте)</span>' +
+    '</label>';
+  html += '<div id="spec-form-alt-details" style="' + (altOn ? '' : 'display:none;') + 'margin-top:10px;">';
+  html += '<div class="spec-form-row-2">';
+  html += '<div class="spec-form-field"><label>Город закупа</label>' +
+    '<input type="text" id="spec-form-alt-city" value="' + escapeHtml(e.alt_supply_city || '') + '" placeholder="напр. Новосибирск" maxlength="120"></div>';
+  html += '<div class="spec-form-field"><label>Телефон</label>' +
+    '<input type="text" id="spec-form-alt-phone" value="' + escapeHtml(e.alt_supply_phone || '') + '" placeholder="+7…" maxlength="60"></div>';
+  html += '</div>';
+  html += '<div class="spec-form-field" style="margin-top:8px;"><label>Комментарий</label>' +
+    '<textarea id="spec-form-alt-comment" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;resize:vertical;" placeholder="поставщик, условия, что заказать…">' + escapeHtml(e.alt_supply_comment || '') + '</textarea></div>';
+  html += '<div class="spec-form-field" style="margin-top:8px;"><label>Файл (счёт / спека / фото — до 25 МБ)</label>' +
+    '<input type="file" id="spec-form-alt-file" onchange="_onSpecAltFilePick(this)">';
+  if (isEdit && e.alt_supply_file_key) {
+    html += '<div style="font-size:12px;margin-top:4px;">Прикреплён: ' +
+      '<a href="#" onclick="_openSpecAltFile(' + existing.id + ');return false;" style="color:var(--brand);">' +
+      escapeHtml(e.alt_supply_file_name || 'файл') + '</a></div>';
+  }
+  html += '</div>';
+  html += '</div>';
   html += '</div>';
   // Кнопки
   html += '<div class="spec-form-row-2">';
@@ -9014,6 +9055,13 @@ async function submitSpecForm(contractId, itemId) {
     execution_type: execEl ? (execEl.value || '') : '',
     ip_rating: ipEl ? (ipEl.value || '') : '',
   };
+  // v2.45.198: закуп в другом городе
+  const altCb = document.getElementById('spec-form-alt-supply');
+  const altOn = !!(altCb && altCb.checked);
+  payload.alt_supply = altOn ? 1 : 0;
+  payload.alt_supply_city = altOn ? ((document.getElementById('spec-form-alt-city') || {}).value || '').trim() : '';
+  payload.alt_supply_phone = altOn ? ((document.getElementById('spec-form-alt-phone') || {}).value || '').trim() : '';
+  payload.alt_supply_comment = altOn ? ((document.getElementById('spec-form-alt-comment') || {}).value || '').trim() : '';
 
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -9038,6 +9086,19 @@ async function submitSpecForm(contractId, itemId) {
       showToast(d.message || 'Не удалось сохранить', 'error');
       return;
     }
+    // v2.45.198: если выбран файл к «закупу в другом городе» — грузим после сохранения
+    const _saved = await r.json().catch(() => ({}));
+    const _savedId = itemId || (_saved && _saved.id);
+    if (altOn && _savedId && state._specAltFile) {
+      try {
+        const _fd = new FormData();
+        _fd.append('file', state._specAltFile);
+        await fetch(API_BASE + '/api/contracts/items/' + _savedId + '/alt-file', {
+          method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: _fd,
+        });
+      } catch (e) { /* файл не критичен */ }
+    }
+    state._specAltFile = null;
     showToast(itemId ? 'Позиция обновлена' : 'Позиция добавлена', 'success');
     // Сбрасываем режимы и перезагружаем блок
     state._specByContract[contractId].addingMode = false;
@@ -9046,6 +9107,29 @@ async function submitSpecForm(contractId, itemId) {
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
+}
+
+// v2.45.198: «закуп в другом городе» — тоггл деталей, выбор файла, открытие файла
+function _toggleSpecAlt() {
+  const cb = document.getElementById('spec-form-alt-supply');
+  const det = document.getElementById('spec-form-alt-details');
+  if (det) det.style.display = (cb && cb.checked) ? '' : 'none';
+}
+function _onSpecAltFilePick(input) {
+  state._specAltFile = (input && input.files && input.files[0]) || null;
+}
+async function _openSpecAltFile(itemId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/items/' + itemId + '/alt-file', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Файл не найден', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Ошибка открытия файла', 'error'); }
 }
 
 async function deleteSpecItem(contractId, itemId) {
