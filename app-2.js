@@ -8377,6 +8377,9 @@ function renderContractItemsBlock(contractId) {
         // Имя: либо актуальное из связанной сущности, либо snapshot
         let displayName;
         let sourceTag = '';
+        // v2.45.190: вид позиции (group_name) — «Электропривод», «Гибкая вставка»…,
+        // чтобы по строке было понятно ЧТО это, а не только коды/артикул.
+        let typeChip = '';
         if (it.model_id && it.model_name) {
           const parts = [];
           if (it.model_article) parts.push(it.model_article);
@@ -8396,6 +8399,11 @@ function renderContractItemsBlock(contractId) {
           parts.push(it.sale_product_name);
           displayName = parts.join(' · ');
           sourceTag = '<span style="font-size:10px; color:var(--brand); text-transform:uppercase; margin-left:4px;">продажа</span>';
+          // v2.45.190: вид (группа каталога) лидером строки — «Электроприводы», «Гибкие вставки»…
+          const _grp = (it.sale_product_group_name || '').trim();
+          if (_grp && _grp !== '(без группы)') {
+            typeChip = '<span style="font-size:11px; font-weight:700; color:#1E40AF; margin-right:6px;">' + escapeHtml(_grp) + '</span>';
+          }
         } else {
           displayName = it.name;
           sourceTag = '<span style="font-size:10px; color:var(--text-light); text-transform:uppercase; margin-left:4px;">свободный ввод</span>';
@@ -8473,7 +8481,7 @@ function renderContractItemsBlock(contractId) {
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + _reservedBadge + _quickAction + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + typeChip + escapeHtml(displayName) + sourceTag + _reservedBadge + _quickAction + '</div>' +
             '<div class="spec-item-meta">' + meta + '</div>' +
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
