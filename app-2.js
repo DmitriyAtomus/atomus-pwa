@@ -4275,11 +4275,8 @@ async function openEditModelModal(modelId) {
             ).join('');
           })() + '</select>' +
         '</div>' +
-        '<div class="form-group" id="em-subgroup-wrap">' +
-          '<label style="display:flex;align-items:center;gap:8px;">' +
-            '<span style="flex:1;">Подгруппа (подраздел) <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально)</span></span>' +
-            '<button type="button" onclick="createEmSubgroup()" style="background:none;border:none;color:var(--brand);font-size:11.5px;cursor:pointer;font-weight:600;padding:0;">+ Новая</button>' +
-          '</label>' +
+        '<div class="form-group" id="em-subgroup-wrap" style="display:none;">' +
+          '<label>Подгруппа <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(опционально)</span></label>' +
           '<select id="em-subgroup"><option value="">— Без подгруппы —</option></select>' +
         '</div>' +
         '<div class="modal-section-title">Основное</div>' +
@@ -4366,33 +4363,17 @@ function _onEmDirChange() {
   const directions = (cache.models && cache.models.directions) || [];
   const dir = directions.find(d => d.id === dirId);
   const subgroups = (dir && dir.subgroups) || [];
-  // v2.45.193: всегда показываем поле подгруппы — чтобы можно было создать новую
-  // (кнопка «+ Новая») даже если у направления подгрупп ещё нет.
+  if (!subgroups.length) {
+    sgWrap.style.display = 'none';
+    sgSel.innerHTML = '<option value="">— Без подгруппы —</option>';
+    return;
+  }
   sgWrap.style.display = '';
   let opts = '<option value="">— Без подгруппы —</option>';
   subgroups.forEach(sg => {
     opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
   });
   sgSel.innerHTML = opts;
-}
-
-// v2.45.193: создать подгруппу (подраздел) прямо из формы редактирования модели
-async function createEmSubgroup() {
-  const dirSel = document.getElementById('em-direction');
-  if (!dirSel || !dirSel.value) { showToast('Сначала выберите направление', 'error'); return; }
-  const dirId = parseInt(dirSel.value);
-  const name = prompt('Название новой подгруппы (подраздела):', '');
-  if (!name || !name.trim()) return;
-  const r = await apiPost('/api/directions/' + dirId + '/subgroups', { name: name.trim() });
-  if (!r || !r.ok) { showToast((r && r.data && r.data.message) || 'Не удалось создать подгруппу', 'error'); return; }
-  const sg = r.data;
-  const directions = (cache.models && cache.models.directions) || [];
-  const dir = directions.find(d => d.id === dirId);
-  if (dir) { dir.subgroups = dir.subgroups || []; dir.subgroups.push({ id: sg.id, code: sg.code, name: sg.name }); }
-  _onEmDirChange();
-  const sgSel = document.getElementById('em-subgroup');
-  if (sgSel) sgSel.value = String(sg.id);
-  showToast('Подгруппа «' + sg.name + '» создана', 'success');
 }
 
 function _onEmExecModeChange() {
@@ -5737,10 +5718,7 @@ function openNewModelForm() {
         '</select>' +
         // Подгруппа (если у выбранного направления есть подгруппы)
         '<div id="nm-subgroup-wrap" style="display:none;">' +
-          '<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">' +
-            '<span style="flex:1;">Подгруппа (подраздел) <span style="color:var(--text-light);font-weight:400;">(необязательно)</span></span>' +
-            '<button type="button" onclick="createNmSubgroup()" style="background:none;border:none;color:var(--brand);font-size:11.5px;cursor:pointer;font-weight:600;padding:0;">+ Новая</button>' +
-          '</label>' +
+          '<label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-light);font-weight:500;">Подгруппа <span style="color:var(--text-light);font-weight:400;">(необязательно)</span></label>' +
           '<select id="nm-subgroup" onchange="onNewModelSubgroupChange()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:14px;background:white;font-family:inherit;">' +
             '<option value="">— Без подгруппы —</option>' +
           '</select>' +
@@ -5819,35 +5797,19 @@ function onNewModelDirectionChange() {
   const directions = (cache.models && cache.models.directions) || [];
   const dir = directions.find(d => d.id === dirId);
   const subgroups = (dir && dir.subgroups) || [];
-  // v2.45.193: всегда показываем поле подгруппы — чтобы была доступна кнопка «+ Новая»
-  sgWrap.style.display = '';
-  let opts = '<option value="">— Без подгруппы —</option>';
-  subgroups.forEach(sg => {
-    opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
-  });
-  sgSel.innerHTML = opts;
+  if (subgroups.length === 0) {
+    sgWrap.style.display = 'none';
+    sgSel.innerHTML = '<option value="">— Без подгруппы —</option>';
+  } else {
+    sgWrap.style.display = '';
+    let opts = '<option value="">— Без подгруппы —</option>';
+    subgroups.forEach(sg => {
+      opts += '<option value="' + sg.id + '">' + escapeHtml(sg.name) + '</option>';
+    });
+    sgSel.innerHTML = opts;
+  }
   // v2.45.85: после смены направления — обновим категории
   onNewModelSubgroupChange();
-}
-
-// v2.45.193: создать подгруппу (подраздел) прямо из формы новой модели
-async function createNmSubgroup() {
-  const dirSel = document.getElementById('nm-direction');
-  if (!dirSel || !dirSel.value) { showToast('Сначала выберите направление', 'error'); return; }
-  const dirId = parseInt(dirSel.value);
-  const name = prompt('Название новой подгруппы (подраздела):', '');
-  if (!name || !name.trim()) return;
-  const r = await apiPost('/api/directions/' + dirId + '/subgroups', { name: name.trim() });
-  if (!r || !r.ok) { showToast((r && r.data && r.data.message) || 'Не удалось создать подгруппу', 'error'); return; }
-  const sg = r.data;
-  const directions = (cache.models && cache.models.directions) || [];
-  const dir = directions.find(d => d.id === dirId);
-  if (dir) { dir.subgroups = dir.subgroups || []; dir.subgroups.push({ id: sg.id, code: sg.code, name: sg.name }); }
-  onNewModelDirectionChange();
-  const sgSel = document.getElementById('nm-subgroup');
-  if (sgSel) sgSel.value = String(sg.id);
-  onNewModelSubgroupChange();
-  showToast('Подгруппа «' + sg.name + '» создана', 'success');
 }
 
 // v2.45.85: обновление списка категорий при смене направления/подгруппы.
@@ -7635,7 +7597,7 @@ function renderContractsList() {
         '<div class="ct-status">' + statusBadgeHtml(c.status, c.status_label) + urgPill + '</div>' +
         '<div class="ct-date">' + (c.sign_date ? formatDate(c.sign_date) + '.' + (c.sign_date.split('-')[0].slice(2)) : '—') + '</div>' +
         '<div class="' + deliveryCls + '">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</div>' +
-        '<div class="ct-sum">' + formatMoney(c.sum_amount) + '</div>' +
+        '<div class="ct-sum">' + (canSeeMoney() ? formatMoney(c.sum_amount) : '') + '</div>' +
         '<div class="ct-manager">' + escapeHtml(c.manager_name || '—') + '</div>' +
         '<div class="ct-arrow"><i class="ti ti-chevron-right"></i></div>' +
         '</div>';
@@ -7656,7 +7618,7 @@ function renderContractsList() {
         '<div class="cc-meta">' +
           '<span>' + escapeHtml(c.contract_type === 'supply_install' ? 'поставка с монтажом' : 'поставка') + '</span>' +
           (c.delivery_date ? '<span><b>срок</b> ' + formatDate(c.delivery_date) + '</span>' : '') +
-          (c.sum_amount ? '<span><b>сумма</b> ' + formatMoney(c.sum_amount) + '</span>' : '') +
+          (canSeeMoney() && c.sum_amount ? '<span><b>сумма</b> ' + formatMoney(c.sum_amount) + '</span>' : '') +
         '</div>' +
         '</div>';
     });
@@ -7797,8 +7759,10 @@ function renderContractDetail(c) {
           '<div class="detail-value">' + escapeHtml(legalEntityShortName(c.legal_entity)) +
           (c.legal_entity_with_vat ? ' <small style="color:var(--text-light); font-weight:400;">(с НДС ' + (c.legal_entity_vat_rate || 22) + '%)</small>' : ' <small style="color:var(--text-light); font-weight:400;">(без НДС)</small>') +
           '</div></div>';
-  html += '<div class="detail-item"><div class="detail-label">Сумма</div>' +
-          '<div class="detail-value">' + escapeHtml(formatMoney(c.sum_amount)) + '</div></div>';
+  if (canSeeMoney()) {
+    html += '<div class="detail-item"><div class="detail-label">Сумма</div>' +
+            '<div class="detail-value">' + escapeHtml(formatMoney(c.sum_amount)) + '</div></div>';
+  }
   html += '<div class="detail-item"><div class="detail-label">Срок отгрузки</div>' +
           '<div class="detail-value' + (c.delivery_date ? '' : ' muted') + '">' +
           (c.delivery_date ? formatDateLong(c.delivery_date) : 'не указан') + '</div></div>';

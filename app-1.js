@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.193-create-subgroup";
+const APP_VERSION = "v2.45.194-master-money";
 const APP_VERSION_DATE = "09.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -214,7 +214,10 @@ async function apiPatch(path, body) {
   const response = await fetch(API_BASE + path, {
     method: 'PATCH', headers, body: JSON.stringify(body || {}),
   });
-  if (response.status === 401 || response.status === 403) {
+  // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
+  // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
+  // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
+  if (response.status === 401) {
     logout();
     throw new Error('Сессия истекла');
   }
@@ -235,7 +238,10 @@ async function apiGet(path) {
     headers: { 'Authorization': 'Bearer ' + token },
     cache: 'no-store',
   });
-  if (response.status === 401 || response.status === 403) {
+  // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
+  // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
+  // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
+  if (response.status === 401) {
     logout();
     throw new Error('Сессия истекла');
   }
@@ -255,7 +261,10 @@ async function apiDelete(path, body) {
     opts.body = JSON.stringify(body);
   }
   const response = await fetch(API_BASE + path, opts);
-  if (response.status === 401 || response.status === 403) {
+  // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
+  // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
+  // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
+  if (response.status === 401) {
     logout();
     throw new Error('Сессия истекла');
   }
@@ -1274,6 +1283,16 @@ function canManageSales() {
   return state.user.roles.includes('director')
       || state.user.roles.includes('zam')
       || state.user.roles.includes('manager');
+}
+
+// v2.45.194: кто видит суммы договоров/цены. Мастер (производство) — НЕ видит.
+// Любая другая роль (директор/зам/менеджер/бухгалтер/инженер) — видит.
+// Чистый мастер: суммы скрыты, но в договоры заходить может (без сумм).
+function canSeeMoney() {
+  if (!state.user || !state.user.roles) return false;
+  const r = state.user.roles;
+  return r.includes('director') || r.includes('zam') || r.includes('manager')
+      || r.includes('accountant') || r.includes('engineer');
 }
 
 // ============ ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ ============
