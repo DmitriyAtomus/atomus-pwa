@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.208-item-qr";
+const APP_VERSION = "v2.45.209-stop-confirm";
 const APP_VERSION_DATE = "09.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4097,50 +4097,27 @@ async function togglePwdHelp(workId, willStart) {
     });
     return;
   }
-  // Stop — открываем мини-окошко с полем «Что делал»
-  // Сначала узнаём сколько времени работал (для отображения в модалке)
-  let elapsedLabel = '';
-  let workTitle = '';
+  // v2.45.209: при остановке — простое подтверждение, без повторного вопроса
+  // «что делал» (сотрудник уже указал операцию при старте — она и идёт в журнал).
+  if (!confirm('Точно закрыть работу?')) return;
   try {
-    const w = await apiGet('/api/production/works/' + workId);
-    if (w && w.active_helpers) {
-      const me = (w.active_helpers || []).find(h => h.is_me || w.i_am_helping_this);
-      const started = me ? me.helping_started_at : null;
-      // если active_helpers содержит флаг is_me — берём её started_at; иначе ищем по i_am_helping_this
-      if (w.i_am_helping_this) {
-        const myHelper = (w.active_helpers || []).find(h => h.helping_started_at);
-        if (myHelper) {
-          elapsedLabel = _formatHelpingDuration(myHelper.helping_started_at);
-        }
-      }
+    const r = await apiPost('/api/production/works/' + workId + '/stop-helping', { note: '' });
+    const mins = (r && r.minutes) || 0;
+    if (mins > 0) {
+      const fmtMin = mins < 60 ? (mins + ' мин') : (Math.floor(mins/60) + 'ч ' + (mins%60) + 'м');
+      showToast('Записано в журнал: ' + fmtMin, 'success');
+    } else {
+      showToast('Закончил (меньше 5 мин — в журнал не пошло)', 'info');
     }
-    workTitle = (w && w.model_name) ? w.model_name : ('работой #' + workId);
-  } catch (e) {}
-  openStopHelpDialog({
-    workId,
-    elapsedLabel,
-    workTitle,
-    onConfirm: async (note) => {
-      try {
-        const r = await apiPost('/api/production/works/' + workId + '/stop-helping', { note: note || '' });
-        const mins = (r && r.minutes) || 0;
-        if (mins > 0) {
-          const fmtMin = mins < 60 ? (mins + ' мин') : (Math.floor(mins/60) + 'ч ' + (mins%60) + 'м');
-          showToast('Записано в журнал: ' + fmtMin, 'success');
-        } else {
-          showToast('Закончил (меньше 5 мин — в журнал не пошло)', 'info');
-        }
-        const fresh = await apiGet('/api/production/works/' + workId);
-        renderProductionWorkDetail(fresh);
-        cache.productionKanban = null;
-        if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
-          loadProductionDashboard();
-        }
-      } catch (e) {
-        showToast((e && e.message) || 'Ошибка', 'error');
-      }
-    },
-  });
+    const fresh = await apiGet('/api/production/works/' + workId);
+    renderProductionWorkDetail(fresh);
+    cache.productionKanban = null;
+    if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') {
+      loadProductionDashboard();
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  }
 }
 
 // v2.43.52: мини-окно с заметкой при остановке таймера
