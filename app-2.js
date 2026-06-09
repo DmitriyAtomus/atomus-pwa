@@ -8477,9 +8477,13 @@ function renderContractItemsBlock(contractId) {
           // общо («Компакты ZILON», «Сетевые элементы»). Если подгруппы нет — группа.
           const _sub = (it.sale_product_subgroup_name || '').trim();
           const _grp = (it.sale_product_group_name || '').trim();
+          const _cat = (it.sale_product_category_name || '').trim();
           let _type = '';
           if (_sub && _sub !== '(без подгруппы)') _type = _sub;
           else if (_grp && _grp !== '(без группы)') _type = _grp;
+          // v2.45.205: если ни подгруппы, ни группы — берём категорию товара,
+          // чтобы было видно «что это» (напр. «Решётки и диффузоры»).
+          else if (_cat && _cat !== '(без категории)') _type = _cat;
           if (_type) {
             typeChip = '<span style="font-size:11px; font-weight:700; color:#1E40AF; margin-right:6px;">' + escapeHtml(_type) + '</span>';
           }
