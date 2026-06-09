@@ -3629,7 +3629,7 @@ function openQrModal(opts) {
   const _physQrType = ['assembly', 'box', 'contract', 'defect'].includes(opts.type);
   const showNetPrintBtn = !!opts.url &&
     (showPrintBtn || _physQrType ||
-      (typeof hasPermission === 'function' && hasPermission('labels_print')));
+      (typeof canPrintLabels === 'function' && canPrintLabels()));
   const netPrintData = showNetPrintBtn
     ? Object.assign({}, opts.data || {}, {
         qrUrl: opts.url,

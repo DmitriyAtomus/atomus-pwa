@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.181-inventory-list";
+const APP_VERSION = "v2.45.182-print-roles";
 const APP_VERSION_DATE = "09.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -21,6 +21,15 @@ function hasPermission(key) {
     return false;
   }
   return perms.indexOf(key) >= 0;
+}
+// v2.45.182: печать QR-наклеек доступна не только по праву labels_print, но и
+// ролям директор/менеджер/зам/мастер (как и на бэкенде — _user_has_labels_print).
+// Раньше у менеджера (Малахова) и мастера кнопка печати была скрыта.
+function canPrintLabels() {
+  if (hasPermission('labels_print')) return true;
+  const roles = (state.user && state.user.roles) || [];
+  return roles.indexOf('director') >= 0 || roles.indexOf('manager') >= 0
+      || roles.indexOf('zam') >= 0 || roles.indexOf('master') >= 0;
 }
 // Удобная shortcut для проверки списка разрешений (любое из):
 function hasAnyPermission(/* ...keys */) {

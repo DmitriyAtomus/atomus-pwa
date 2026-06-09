@@ -504,7 +504,7 @@ function renderContractAssembliesBlock(c) {
   // v2.45.93: пакетная печать QR-наклеек на все готовые сборки договора
   // v2.45.95/99/100: + component-позиции в резерве тоже получают этикетку
   // v2.45.133: _reservedComps/_reservedQtySum уже посчитаны выше (для плашки готовности)
-  const canPrint = (typeof hasPermission === 'function') && hasPermission('labels_print');
+  const canPrint = (typeof canPrintLabels === 'function') && canPrintLabels();
   const totalQrCount = readyCount + _reservedQtySum;
   if (totalQrCount > 0 && canPrint) {
     let labelParts = [];
@@ -8506,7 +8506,7 @@ function renderContractItemsBlock(contractId) {
               // Раньше работало только для component_id-позиций, теперь и для model_id
               // (балки, готовые модели) — qty этикеток с подписью «… · 1 шт».
               ((Number(it.qty_reserved || 0) > 0 &&
-                typeof hasPermission === 'function' && hasPermission('labels_print')) ? (
+                typeof canPrintLabels === 'function' && canPrintLabels()) ? (
                 '<button class="spec-item-act-btn" style="color:#0C4A6E;" ' +
                   'title="Печать QR-наклейки (на коробку/изделие этой позиции)" ' +
                   'onclick="printComponentItemQr(' + contractId + ',' + it.id + ')">' +
