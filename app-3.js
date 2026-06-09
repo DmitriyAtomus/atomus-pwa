@@ -738,6 +738,10 @@ async function openComponentForm(componentId) {
         '</div>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
+        // v2.45.217: кратность закупки (фасовка/бухта) — в «Что закупить» количество
+        // округляется вверх до кратного (наконечники по 100, провод по 40/50 м).
+        '<label class="form-label">Кратность закупки <span style="color:var(--text-light);font-weight:400;font-size:11px;">(фасовка/бухта — закупаем кратно; пусто = поштучно)</span></label>' +
+        '<input type="number" id="cf-pack" class="form-input" value="' + ((c && c.purchase_pack) || '') + '" min="0" step="0.01" placeholder="напр. 100 (наконечники) или 40 (провод)" style="margin-bottom:14px;" />' +
         // v2.44.27: «Связь со снабжением» убрана из UI — путала пользователя
         // (выпадающий список показывал кучу непонятных позиций). Поле в БД
         // остаётся, можно проставить через PATCH /api/components/{id} если нужно.
@@ -1070,6 +1074,8 @@ async function submitComponentForm(componentId) {
     sku: (document.getElementById('cf-sku').value || '').trim(),
     unit: document.getElementById('cf-unit').value,
     min_stock: parseFloat(document.getElementById('cf-min').value || 0),
+    purchase_pack: ((document.getElementById('cf-pack') || {}).value || '').trim() === ''
+      ? null : parseFloat(document.getElementById('cf-pack').value),
     comment: (document.getElementById('cf-comment').value || '').trim(),
     default_supplier_id: supVal ? parseInt(supVal) : null,
     supply_item_id: siVal ? parseInt(siVal) : null,
@@ -8731,6 +8737,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.217',
+    date: '09.06.2026',
+    title: 'Закупка пачками/бухтами (кратность)',
+    features: [
+      'У комплектующего появилось поле <b>«Кратность закупки»</b> (фасовка/бухта). В разделе «Что закупить» количество <b>округляется вверх до кратного</b>',
+      'Например: наконечники/хомуты — кратность 100 (нужно 29 → к закупке 100), провод — 40/50 м (нужно 2 м → 40 м). Пусто = как раньше, поштучно',
+    ],
+  },
   {
     version: 'v2.45.216',
     date: '09.06.2026',
