@@ -4633,29 +4633,37 @@ async function openFinishedInventory() {
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  // Грузим весь каталог один раз и показываем списком; поиск фильтрует на месте.
+  _fiLoadModels();
   setTimeout(() => { const i = document.getElementById('fi-search'); if (i) i.focus(); }, 50);
 }
-let _fiDebounce = null;
-function _fiSearch(q) {
-  const box = document.getElementById('fi-results');
-  if (box && (q || '').trim()) box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Поиск…</div>';
-  clearTimeout(_fiDebounce);
-  _fiDebounce = setTimeout(() => _fiDoSearch(q), 250);
-}
-async function _fiDoSearch(q) {
+async function _fiLoadModels() {
   const box = document.getElementById('fi-results'); if (!box) return;
-  q = (q || '').trim();
-  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Загрузка каталога…</div>';
   try {
-    const d = await apiGet('/api/models?search=' + encodeURIComponent(q));
-    const models = (d.models || []).slice(0, 30);
-    if (!models.length) { box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Модель не найдена. Возможно, это комплектующее, а не готовая продукция.</div>'; return; }
-    box.innerHTML = models.map(mm =>
-      '<div class="bom-relink-row" onclick="_fiPick(' + mm.id + ', ' + JSON.stringify(mm.name || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(mm.article || '').replace(/"/g, '&quot;') + ')" ' +
-      'style="display:flex;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;">' +
-      '<span style="font-weight:600;">' + escapeHtml(mm.name || '') + '</span>' +
-      '<span style="color:var(--text-light);font-size:12px;">' + escapeHtml(mm.article || '') + '</span></div>').join('');
-  } catch (e) { box.innerHTML = '<div style="padding:10px;color:#c0392b;">Ошибка поиска: ' + escapeHtml(String((e && e.message) || e)) + '</div>'; }
+    const d = await apiGet('/api/models');
+    state._fiModels = (d && d.models) || [];
+    _fiRenderList('');
+  } catch (e) {
+    box.innerHTML = '<div style="padding:10px;color:#c0392b;">Не удалось загрузить каталог: ' + escapeHtml(String((e && e.message) || e)) + '</div>';
+  }
+}
+function _fiSearch(q) { _fiRenderList(q); }
+function _fiRenderList(q) {
+  const box = document.getElementById('fi-results'); if (!box) return;
+  const all = state._fiModels || [];
+  const ql = (q || '').trim().toLowerCase();
+  let list = all;
+  if (ql) list = all.filter(mm => ((mm.name || '') + ' ' + (mm.article || '')).toLowerCase().indexOf(ql) !== -1);
+  const shown = list.slice(0, 100);
+  if (!all.length) { box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Каталог пуст</div>'; return; }
+  if (!shown.length) { box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Ничего не найдено по запросу</div>'; return; }
+  box.innerHTML = shown.map(mm =>
+    '<div class="bom-relink-row" onclick="_fiPick(' + mm.id + ', ' + JSON.stringify(mm.name || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(mm.article || '').replace(/"/g, '&quot;') + ')" ' +
+    'style="display:flex;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;">' +
+    '<span style="font-weight:600;">' + escapeHtml(mm.name || '') + '</span>' +
+    '<span style="color:var(--text-light);font-size:12px;">' + escapeHtml(mm.article || '') + '</span></div>').join('') +
+    (list.length > shown.length ? '<div style="padding:8px;text-align:center;color:var(--text-light);font-size:12px;">…ещё ' + (list.length - shown.length) + '. Уточните поиск.</div>' : '');
 }
 async function _fiPick(id, name, article) {
   state._fiSel = { id: id, name: name, article: article };
