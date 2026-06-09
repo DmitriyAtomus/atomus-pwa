@@ -2812,10 +2812,13 @@ function setStoredPublicPw(token, pw) {
 
 // Загружает публичный объект с учётом пароля. kind: 'assembly'|'contract'|'box'.
 // Возвращает {ok, data, status, needPassword, badPassword}.
-async function fetchPublicObject(kind, token) {
+async function fetchPublicObject(kind, token, itemId) {
   const pw = getStoredPublicPw(token);
   let url = API_BASE + '/api/public/' + kind + '/' + encodeURIComponent(token);
-  if (pw) url += '?pw=' + encodeURIComponent(pw);
+  const _qs = [];
+  if (pw) _qs.push('pw=' + encodeURIComponent(pw));
+  if (itemId) _qs.push('item=' + encodeURIComponent(itemId));  // v2.45.208: карточка позиции
+  if (_qs.length) url += '?' + _qs.join('&');
   // Если пользователь вошёл в CRM — шлём токен сессии (сотрудник без пароля)
   const _t = localStorage.getItem(TOKEN_KEY);
   const opts = { cache: 'no-store' };
@@ -2861,7 +2864,7 @@ function submitPublicPassword(kind, token) {
   if (!pw) { if (inp) inp.focus(); return; }
   setStoredPublicPw(token, pw);
   if (kind === 'assembly') showPublicAssembly(token);
-  else if (kind === 'contract') showPublicContract(token);
+  else if (kind === 'contract') showPublicContract(token, window._pubPendingItem || null);
   else if (kind === 'box') showPublicBox(token);
 }
 
@@ -2955,7 +2958,7 @@ function renderPublicAssemblyCard(a, token) {
 
 // ---- Публичная страница договора ----
 
-async function showPublicContract(token) {
+async function showPublicContract(token, itemId) {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'none';
   const page = document.getElementById('public-page');
@@ -2963,9 +2966,11 @@ async function showPublicContract(token) {
   const body = document.getElementById('public-card-body');
   body.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-light);">Загружаем…</div>';
   try {
-    const res = await fetchPublicObject('contract', token);
+    const res = await fetchPublicObject('contract', token, itemId);
     if (res.needPassword) {
       body.innerHTML = renderPublicPasswordGate('contract', token, res.badPassword);
+      // пароль введём один раз — после открытия снова покажем эту же позицию
+      window._pubPendingItem = itemId || null;
       const inp = document.getElementById('public-pw-input'); if (inp) inp.focus();
       return;
     }
@@ -2973,10 +2978,51 @@ async function showPublicContract(token) {
       body.innerHTML = renderPublicError(res.status);
       return;
     }
-    body.innerHTML = renderPublicContractCard(res.data, token);
+    // v2.45.208: QR изделия → карточка конкретной позиции
+    if (itemId && res.data && res.data.item) {
+      body.innerHTML = renderPublicItemCard(res.data.item, res.data, token);
+    } else {
+      body.innerHTML = renderPublicContractCard(res.data, token);
+    }
   } catch (e) {
     body.innerHTML = renderPublicError('network');
   }
+}
+
+// v2.45.208: карточка конкретного изделия (QR позиции спецификации)
+function renderPublicItemCard(it, c, token) {
+  let rows = '';
+  const addRow = (label, value) => {
+    if (!value) return;
+    rows += '<div class="public-row"><span class="public-row-label">' + label +
+      '</span><span class="public-row-value">' + value + '</span></div>';
+  };
+  if (it.type) addRow('Вид', '<b>' + escapeHtml(it.type) + '</b>');
+  if (it.article) addRow('Артикул', escapeHtml(it.article));
+  addRow('Количество', escapeHtml(String(it.qty || 0)) + ' ' + escapeHtml(it.unit || 'шт.'));
+  if (it.execution_type === 'stainless') addRow('Исполнение', 'Нержавейка');
+  else if (it.execution_type === 'standard') addRow('Исполнение', 'Обычное');
+  if (it.ip_rating) addRow('Влагозащита', escapeHtml(it.ip_rating));
+  addRow('Статус', '<span class="public-status-pill">' + escapeHtml(it.status_label || '') + '</span>');
+  if (it.system_tag) addRow('Система / объект', escapeHtml(it.system_tag));
+  if (it.alt_supply) {
+    const ap = [];
+    if (it.alt_supply_city) ap.push(escapeHtml(it.alt_supply_city));
+    if (it.alt_supply_phone) ap.push('тел. ' + escapeHtml(it.alt_supply_phone));
+    if (it.alt_supply_comment) ap.push(escapeHtml(it.alt_supply_comment));
+    addRow('Закуп в другом городе', 'отгрузка сразу на объекте' + (ap.length ? '<br>' + ap.join(' · ') : ''));
+  }
+  addRow('Договор', escapeHtml(c.number || '') + (c.contractor_name ? ' · ' + escapeHtml(c.contractor_name) : ''));
+
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">' + escapeHtml(it.name || 'Позиция') + '</h1>' +
+    '<div class="public-header-sub"><i class="ti ti-qrcode"></i> Изделие по договору № ' + escapeHtml((c.number || '').replace(/^№#\s*/, '')) + '</div>' +
+  '</div>' +
+  '<div class="public-body" style="padding: 18px;">' + rows +
+    '<div style="margin-top:14px;"><a href="/c/' + encodeURIComponent(token) + '" style="color:var(--brand);font-size:13px;"><i class="ti ti-arrow-right"></i> Весь договор</a></div>' +
+  '</div>' +
+  '<div class="public-footer">Внутренняя CRM-система ООО «Атомус Групп»</div>';
 }
 
 function renderPublicContractCard(c, token) {
@@ -4685,6 +4731,16 @@ async function handleQrScanResult(decodedText) {
       const m = url.pathname.match(/^\/[abc]\/([A-Za-z0-9_\-]+)$/);
       if (m) {
         token = m[1];
+        // v2.45.208: QR изделия — /c/{token}?item=ID → карточка позиции
+        if (url.pathname.indexOf('/c/') === 0) {
+          const _itm = url.searchParams.get('item');
+          if (_itm) {
+            await closeQrScanner();
+            state._qrScanProcessing = false;
+            showPublicContract(token, _itm);
+            return;
+          }
+        }
       } else {
         // Это URL, но не наш — спросим
         if (confirm('Распознана ссылка:\n\n' + text + '\n\nОткрыть в новой вкладке?')) {
@@ -10026,7 +10082,9 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
     return;
   }
   if (publicContractMatch) {
-    showPublicContract(publicContractMatch[1]);
+    var _pItem = null;
+    try { _pItem = new URLSearchParams(window.location.search).get('item'); } catch (_) {}
+    showPublicContract(publicContractMatch[1], _pItem);
     return;
   }
   if (publicBoxMatch) {

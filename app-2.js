@@ -8218,7 +8218,8 @@ async function printComponentItemQr(contractId, itemId) {
                'На каждой: ' + caption)) return;
   try {
     const ct = await apiGet('/api/contracts/' + contractId + '/public-token');
-    const url = window.location.origin + '/c/' + ct.public_token;
+    // v2.45.208: QR конкретного изделия — /c/{token}?item=ID (скан → карточка позиции)
+    const url = window.location.origin + '/c/' + ct.public_token + '?item=' + itemId;
     const resp = await apiPost('/api/labels/print', {
       qr_url: url,
       caption: caption,
@@ -8620,15 +8621,14 @@ function renderContractItemsBlock(contractId) {
                   '<i class="ti ti-link"></i>' +
                 '</button>'
               ) : '') +
-              // v2.45.97/104: печать QR для любой позиции в резерве — на коробку/изделие.
-              // Раньше работало только для component_id-позиций, теперь и для model_id
-              // (балки, готовые модели) — qty этикеток с подписью «… · 1 шт».
-              ((Number(it.qty_reserved || 0) > 0 &&
-                typeof canPrintLabels === 'function' && canPrintLabels()) ? (
+              // v2.45.208: QR у КАЖДОГО изделия (раньше — только у позиций в
+              // резерве). Печать этикетки; скан QR открывает карточку позиции
+              // (/c/{token}?item=ID). qty этикеток по кол-ву.
+              ((typeof canPrintLabels === 'function' && canPrintLabels()) ? (
                 '<button class="spec-item-act-btn" style="color:#0C4A6E;" ' +
-                  'title="Печать QR-наклейки (на коробку/изделие этой позиции)" ' +
+                  'title="Печать QR-этикетки изделия (скан → карточка позиции)" ' +
                   'onclick="printComponentItemQr(' + contractId + ',' + it.id + ')">' +
-                  '<i class="ti ti-printer"></i>' +
+                  '<i class="ti ti-qrcode"></i>' +
                 '</button>'
               ) : '') +
               '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
