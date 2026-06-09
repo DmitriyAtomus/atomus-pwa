@@ -672,7 +672,7 @@ async function openComponentForm(componentId) {
           (cats.length ? catOptions : '<option value="">— нет категорий —</option>') +
         '</select>' +
         '<label class="form-label">Название *</label>' +
-        '<input type="text" id="cf-name" class="form-input" placeholder="Например: Реле РЭК-77/4" value="' + escapeHtml((c && c.name) || '') + '" style="margin-bottom:14px;" />' +
+        '<input type="text" id="cf-name" class="form-input" placeholder="Например: Реле РЭК-77/4" value="' + escapeHtml((c && c.name) || '') + '" oninput="_cfAutoUnit(this.value)" style="margin-bottom:14px;" />' +
         '<div style="display:flex;gap:10px;margin-bottom:14px;">' +
           '<div style="flex:2;"><label class="form-label">Артикул / SKU</label>' +
             '<input type="text" id="cf-sku" class="form-input" value="' + escapeHtml((c && c.sku) || '') + '" /></div>' +
@@ -764,6 +764,14 @@ async function openComponentForm(componentId) {
 function closeComponentForm() {
   const m = document.getElementById('comp-form-modal');
   if (m) m.classList.remove('visible');
+}
+
+// v2.45.213: кабель/провод меряется в метрах — авто-переключаем единицу с «шт.»
+// на «м» при вводе названия (вручную можно вернуть назад).
+function _cfAutoUnit(name) {
+  const sel = document.getElementById('cf-unit');
+  if (!sel) return;
+  if (/кабель|провод/i.test(name || '') && sel.value === 'шт.') sel.value = 'м';
 }
 
 // ============ ЭТАП 34.1: кнопки «Карточка поставщика» и «Корзина закупки» ============
@@ -8723,6 +8731,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.213',
+    date: '09.06.2026',
+    title: 'Кабель/провод — в метрах везде',
+    features: [
+      'Все комплектующие с «кабель»/«провод» в названии переведены в единицу <b>«м»</b> — на складе, в номенклатуре, в BOM и в спецификациях договоров (разовая нормализация по всей базе)',
+      'При создании нового кабеля/провода единица сама ставится <b>«м»</b> (можно вручную поменять)',
+    ],
+  },
   {
     version: 'v2.45.212',
     date: '09.06.2026',
