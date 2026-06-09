@@ -3786,11 +3786,11 @@ async function openModelDetail(modelId) {
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
             (canManageSales() ?
-              '<button class="btn btn-secondary btn-small" onclick="openBomCopyFrom(' + modelId + ', ' + JSON.stringify(m.name || '') + ')" title="Скопировать тех.карту из другой модели">' +
+              '<button class="btn btn-secondary btn-small" onclick="openBomCopyFrom(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Скопировать тех.карту из другой модели">' +
                 '<i class="ti ti-copy"></i> Взять BOM' +
               '</button>' : '') +
             (canManageSales() ?
-              '<button class="btn btn-secondary btn-small" onclick="openBomImportFromText(' + modelId + ', ' + JSON.stringify(m.name || '') + ')" title="Вставить BOM из Excel/текста">' +
+              '<button class="btn btn-secondary btn-small" onclick="openBomImportFromText(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Вставить BOM из Excel/текста">' +
                 '<i class="ti ti-clipboard-data"></i> Импорт BOM' +
               '</button>' : '') +
             (canManageSales() ?
@@ -9052,9 +9052,15 @@ async function submitSpecForm(contractId, itemId) {
   const modelId = parseInt(document.getElementById('spec-form-model-id').value) || null;
   const componentId = parseInt(document.getElementById('spec-form-component-id').value) || null;
   const saleProductId = parseInt(document.getElementById('spec-form-sale-product-id').value) || null;
-  const name = (document.getElementById('spec-form-name').value || '').trim();
+  let name = (document.getElementById('spec-form-name').value || '').trim();
+  // v2.45.204: свободный ввод вручную — если из каталога ничего не выбрано,
+  // берём то, что вписали в поле поиска (для закупа в другом городе и т.п.).
   if (!modelId && !componentId && !saleProductId && !name) {
-    showToast('Выберите позицию из каталога', 'error');
+    const _searchEl = document.getElementById('spec-form-search');
+    name = ((_searchEl && _searchEl.value) || '').trim();
+  }
+  if (!modelId && !componentId && !saleProductId && !name) {
+    showToast('Выберите позицию из каталога или впишите название вручную', 'error');
     return;
   }
   // ЭТАП 37: условные поля
