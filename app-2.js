@@ -9272,6 +9272,24 @@ function renderProductionTree() {
 // (group_name → subgroup_name), а не по category_id с дроблением на «серии».
 // Спокойно открываешь группу, потом подгруппу — и выбираешь. Используем те же
 // .sp-tree-* стили, что и на странице справочника.
+// v2.45.192: краткое превью характеристик прямо в списке выбора — чтобы
+// не уходить смотреть характеристики, а сравнивать и выбирать на месте
+// (например, электроприводы по крутящему моменту). Показываем до 6 непустых.
+function _salePickSpecsPreview(specs) {
+  if (!specs || typeof specs !== 'object') return '';
+  const keys = Object.keys(specs).filter(k => {
+    const v = specs[k];
+    return v !== null && v !== undefined && String(v).trim() !== '';
+  });
+  if (!keys.length) return '';
+  const MAX = 6;
+  const shown = keys.slice(0, MAX);
+  let s = shown.map(k =>
+    escapeHtml(k) + ': <b style="color:var(--text);font-weight:600;">' + escapeHtml(String(specs[k])) + '</b>'
+  ).join(' · ');
+  if (keys.length > shown.length) s += ' · …';
+  return s;
+}
 function _salePickItemHtml(p, catName) {
   const article = p.article || '';
   const name = p.name || '';
@@ -9281,6 +9299,7 @@ function _salePickItemHtml(p, catName) {
   const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
   const unitJson = JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;');
   const catJson = JSON.stringify(catName || '').replace(/"/g, '&quot;');
+  const specsLine = _salePickSpecsPreview(p.specs);
   return '<div class="sp-tree-item" onclick="pickNomSaleProduct(' + labelJson + ',' + unitJson + ',' + p.id + ',' + catJson + ')">' +
     '<div class="sp-tree-item-main">' +
       '<div class="sp-tree-item-name">' + (article ? '<b>' + escapeHtml(article) + '</b> ' : '') + escapeHtml(name) + '</div>' +
@@ -9288,6 +9307,7 @@ function _salePickItemHtml(p, catName) {
         (nc ? '<span style="font-family:monospace;font-size:11px;">' + escapeHtml(nc) + '</span> ' : '') +
         (unit ? 'ед.изм.: ' + escapeHtml(unit) : '') +
       '</div>' +
+      (specsLine ? '<div class="sp-pick-specs" style="font-size:11.5px; color:var(--text-light); margin-top:3px; line-height:1.45;">' + specsLine + '</div>' : '') +
     '</div>' +
   '</div>';
 }
