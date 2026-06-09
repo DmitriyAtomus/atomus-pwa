@@ -8587,11 +8587,13 @@ function renderContractItemsBlock(contractId) {
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + typeChip + escapeHtml(displayName) + sourceTag + _sysChip + _altBadge + _reservedBadge + _quickAction + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + '</div>' +
+            ((typeChip || _sysChip || _altBadge) ? '<div class="spec-item-chips">' + typeChip + _sysChip + _altBadge + '</div>' : '') +
+            ((_reservedBadge || _quickAction) ? '<div class="spec-item-status">' + _reservedBadge + _quickAction + '</div>' : '') +
             '<div class="spec-item-meta">' + meta + '</div>' +
             _altLine +
           '</div>' +
-          '<div style="display:flex; align-items:center; gap:8px;">' +
+          '<div class="spec-item-act-col">' +
             (canEdit ? '<div class="spec-item-actions">' +
               // v2.43.13: конвертация sale_product → model, если найдена одноимённая активная модель
               (it.convertible_to_model_id ? (
