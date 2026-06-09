@@ -8478,11 +8478,14 @@ function renderContractItemsBlock(contractId) {
           const _sub = (it.sale_product_subgroup_name || '').trim();
           const _grp = (it.sale_product_group_name || '').trim();
           const _cat = (it.sale_product_category_name || '').trim();
+          const _desc = (it.sale_product_description || '').trim();
           let _type = '';
           if (_sub && _sub !== '(без подгруппы)') _type = _sub;
           else if (_grp && _grp !== '(без группы)') _type = _grp;
-          // v2.45.205: если ни подгруппы, ни группы — берём категорию товара,
-          // чтобы было видно «что это» (напр. «Решётки и диффузоры»).
+          // v2.45.206: описание товара конкретнее категории («ВЕНТИЛЯТОРЫ ZILON»
+          // против общей «Вентиляция и кондиционирование») — берём его, если есть.
+          else if (_desc) _type = (_desc.length > 60 ? _desc.slice(0, 60) + '…' : _desc);
+          // v2.45.205: иначе — категория товара (чтобы было видно «что это»).
           else if (_cat && _cat !== '(без категории)') _type = _cat;
           if (_type) {
             typeChip = '<span style="font-size:11px; font-weight:700; color:#1E40AF; margin-right:6px;">' + escapeHtml(_type) + '</span>';
