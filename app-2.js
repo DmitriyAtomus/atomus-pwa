@@ -9253,48 +9253,91 @@ function renderProductionTree() {
   body.innerHTML = html;
 }
 
-// v2.45.187: серия позиции = название без хвостового размера («1 WA 100*100» → «1 WA»),
-// чтобы дробить огромные категории на удобные подгруппы.
-function _saleSeriesKey(name) {
-  let s = (name || '').trim();
-  s = s.replace(/\s*[Øø]?\s*\d+([.,]\d+)?\s*[*xхXХ×]\s*[Øø]?\s*\d+([.,]\d+)?\s*$/i, ''); // WxH
-  s = s.replace(/\s*[Øø]\s*\d+([.,]\d+)?\s*$/i, '');   // Ø300
-  s = s.replace(/\s*\d{2,}([.,]\d+)?\s*$/i, '');        // хвостовое большое число
-  s = s.trim();
-  return s || (name || '').trim() || '—';
-}
-function _saleItemHtml(p, catName) {
+// v2.45.189: модалка «Выбор позиции» рендерится так же, как справочник
+// «Продажная номенклатура» — по реальной иерархии каталога
+// (group_name → subgroup_name), а не по category_id с дроблением на «серии».
+// Спокойно открываешь группу, потом подгруппу — и выбираешь. Используем те же
+// .sp-tree-* стили, что и на странице справочника.
+function _salePickItemHtml(p, catName) {
   const article = p.article || '';
   const name = p.name || '';
   const unit = p.unit_name || p.unit || '';
+  const nc = p.nc_code || '';
   const label = (article ? article + ' · ' : '') + name;
   const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
   const unitJson = JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;');
   const catJson = JSON.stringify(catName || '').replace(/"/g, '&quot;');
-  return '<div class="nom-item" onclick="pickNomSaleProduct(' + labelJson + ',' + unitJson + ',' + p.id + ',' + catJson + ')">' +
-    '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>' +
-    (unit ? '<div class="nom-item-meta">ед.изм.: ' + escapeHtml(unit) + '</div>' : '') +
-    '</div>';
+  return '<div class="sp-tree-item" onclick="pickNomSaleProduct(' + labelJson + ',' + unitJson + ',' + p.id + ',' + catJson + ')">' +
+    '<div class="sp-tree-item-main">' +
+      '<div class="sp-tree-item-name">' + (article ? '<b>' + escapeHtml(article) + '</b> ' : '') + escapeHtml(name) + '</div>' +
+      '<div class="sp-tree-item-meta">' +
+        (nc ? '<span style="font-family:monospace;font-size:11px;">' + escapeHtml(nc) + '</span> ' : '') +
+        (unit ? 'ед.изм.: ' + escapeHtml(unit) : '') +
+      '</div>' +
+    '</div>' +
+  '</div>';
 }
-function _renderSaleSeries(list, cat, autoOpen) {
-  const bySeries = {};
-  list.forEach(p => { const s = _saleSeriesKey(p.name); (bySeries[s] = bySeries[s] || []).push(p); });
-  const names = Object.keys(bySeries).sort((a, b) => a.localeCompare(b, 'ru'));
-  let h = '';
-  names.forEach((sname, idx) => {
-    const items = bySeries[sname];
-    if (items.length === 1) { h += _saleItemHtml(items[0], cat.name); return; }
-    const skey = 'sale:' + cat.id + ':' + idx;
-    const sOpen = autoOpen || state._nomPicker.openGroups[skey];
-    h += '<div class="nom-group nom-subgroup ' + (sOpen ? 'open' : '') + '">';
-    h += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + skey + '\')">';
-    h += '<div class="name"><i class="ti ti-folder"></i>' + escapeHtml(sname) + '</div>';
-    h += '<div style="display:flex;align-items:center;gap:8px;"><div class="count">' + items.length + '</div><i class="ti ti-chevron-right chevron"></i></div>';
-    h += '</div><div class="nom-group-items">';
-    items.forEach(p => { h += _saleItemHtml(p, cat.name); });
-    h += '</div></div>';
+function _renderSalePickTree(list, autoOpen, catNameById) {
+  // group_name → subgroup_name → товары (как на странице «Продажная номенклатура»)
+  const tree = {};
+  list.forEach(p => {
+    const g = p.group_name || p.category_name || (catNameById[p.category_id] || '') || '(без группы)';
+    const sg = p.subgroup_name || '(без подгруппы)';
+    if (!tree[g]) tree[g] = {};
+    if (!tree[g][sg]) tree[g][sg] = [];
+    tree[g][sg].push(p);
   });
-  return h;
+  const og = state._nomPicker.openGroups;
+  const groupNames = Object.keys(tree).sort((a, b) => a.localeCompare(b, 'ru'));
+  let html = '<div style="padding: 4px 0 12px;">';
+  groupNames.forEach(gName => {
+    const subgroups = tree[gName];
+    const subNames = Object.keys(subgroups).sort((a, b) => a.localeCompare(b, 'ru'));
+    const groupCount = subNames.reduce((acc, sg) => acc + subgroups[sg].length, 0);
+    const gKey = 'spg:' + gName;
+    const gOpen = autoOpen || !!og[gKey];
+    // Если у группы только «(без подгруппы)» — показываем товары сразу под ней
+    const flatOnly = subNames.length === 1 && subNames[0] === '(без подгруппы)';
+    html += '<div class="sp-tree-group">' +
+      '<button type="button" class="sp-tree-toggle group' + (gOpen ? ' open' : '') + '" ' +
+        'onclick="toggleNomGroup(\'' + gKey.replace(/'/g, "\\'") + '\')">' +
+        '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+        '<i class="ti ti-folder" style="font-size:16px;"></i>' +
+        '<span>' + escapeHtml(gName) + '</span>' +
+        '<span class="sp-tree-count">' + groupCount + '</span>' +
+      '</button>';
+    if (gOpen) {
+      html += '<div class="sp-tree-body">';
+      if (flatOnly) {
+        html += '<div class="sp-tree-items">';
+        subgroups['(без подгруппы)'].forEach(p => { html += _salePickItemHtml(p, p.category_name || catNameById[p.category_id] || ''); });
+        html += '</div>';
+      } else {
+        subNames.forEach(sgName => {
+          const items = subgroups[sgName];
+          const sgKey = 'spsg:' + gName + '||' + sgName;
+          const sgOpen = autoOpen || !!og[sgKey];
+          html += '<div class="sp-tree-subgroup">' +
+            '<button type="button" class="sp-tree-toggle subgroup' + (sgOpen ? ' open' : '') + '" ' +
+              'onclick="toggleNomGroup(\'' + sgKey.replace(/'/g, "\\'") + '\')">' +
+              '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+              '<span>' + escapeHtml(sgName) + '</span>' +
+              '<span class="sp-tree-count subgroup">' + items.length + '</span>' +
+            '</button>';
+          if (sgOpen) {
+            html += '<div class="sp-tree-items">';
+            items.forEach(p => { html += _salePickItemHtml(p, p.category_name || catNameById[p.category_id] || ''); });
+            html += '</div>';
+          }
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
 }
 
 function renderSaleTree() {
@@ -9304,84 +9347,25 @@ function renderSaleTree() {
   if (!d) return;
 
   const filter = state._nomPicker.filter;
-  const filteredProducts = d.products.filter(p => {
+  const list = d.products.filter(p => {
     if (!filter) return true;
     return (p.name || '').toLowerCase().includes(filter) ||
            (p.article || '').toLowerCase().includes(filter) ||
            (p.description || '').toLowerCase().includes(filter);
   });
 
-  if (!filteredProducts.length) {
+  if (!list.length) {
     body.innerHTML = '<div class="nom-empty"><i class="ti ti-search-off" style="font-size:24px; display:block; margin-bottom:6px;"></i>' +
       (filter ? 'По запросу ничего не найдено' : 'Продажная номенклатура пуста') + '</div>';
     return;
   }
 
-  // Группируем по category_id
-  const byCat = {};
-  filteredProducts.forEach(p => {
-    const cid = p.category_id || 0;
-    if (!byCat[cid]) byCat[cid] = [];
-    byCat[cid].push(p);
-  });
+  // Карта category_id → имя (на случай, если у позиции нет group_name)
+  const catNameById = {};
+  (d.categories || []).forEach(c => { catNameById[c.id] = c.name; });
 
-  const autoOpen = !!filter;
-  let html = '';
-  (d.categories || []).forEach(c => {
-    const list = byCat[c.id] || [];
-    if (!list.length) return;
-    const key = 'sale:' + c.id;
-    const isOpen = autoOpen || state._nomPicker.openGroups[key];
-    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
-    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
-    html += '<div class="name"><i class="ti ti-folder"></i>' + escapeHtml(c.name) + '</div>';
-    html += '<div style="display:flex; align-items:center; gap:8px;">';
-    html += '<div class="count">' + list.length + '</div>';
-    html += '<i class="ti ti-chevron-right chevron"></i>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div class="nom-group-items">';
-    // Большую категорию (>25 поз.) дробим на серии (подгруппы), маленькую — плоско
-    if (list.length > 25 && !filter) {
-      html += _renderSaleSeries(list, c, autoOpen);
-    } else {
-      list.forEach(p => { html += _saleItemHtml(p, c.name); });
-    }
-    html += '</div>';
-    html += '</div>';
-  });
-
-  // Товары без категории
-  const noCat = byCat[0] || [];
-  if (noCat.length) {
-    const key = 'sale:0';
-    const isOpen = autoOpen || state._nomPicker.openGroups[key];
-    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
-    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
-    html += '<div class="name"><i class="ti ti-folder-off"></i>Без категории</div>';
-    html += '<div style="display:flex; align-items:center; gap:8px;">';
-    html += '<div class="count">' + noCat.length + '</div>';
-    html += '<i class="ti ti-chevron-right chevron"></i>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div class="nom-group-items">';
-    noCat.forEach(p => {
-      const article = p.article || '';
-      const name = p.name || '';
-      const unit = p.unit_name || p.unit || '';
-      const label = (article ? article + ' · ' : '') + name;
-      const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
-      const unitJson = JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;');
-      html += '<div class="nom-item" onclick="pickNomSaleProduct(' + labelJson + ',' + unitJson + ',' + p.id + ',\'\')">';
-      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
-      if (unit) html += '<div class="nom-item-meta">ед.изм.: ' + escapeHtml(unit) + '</div>';
-      html += '</div>';
-    });
-    html += '</div>';
-    html += '</div>';
-  }
-
-  body.innerHTML = html;
+  // При поиске — раскрываем всё, иначе всё свёрнуто (спокойный просмотр)
+  body.innerHTML = _renderSalePickTree(list, !!filter, catNameById);
 }
 
 function toggleNomGroup(key) {
