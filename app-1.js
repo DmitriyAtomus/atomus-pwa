@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.176-offsite-backup";
+const APP_VERSION = "v2.45.177-alerts";
 const APP_VERSION_DATE = "09.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -446,6 +446,25 @@ async function deepReloadConfirm() {
   } catch (e) {
     // Если что-то пошло не так — просто грубый reload
     try { window.location.reload(true); } catch (_) { window.location.reload(); }
+  }
+}
+
+// v2.45.177: тест системы тревог о сбоях (директору) — Телеграм + пуш
+async function testAlerts() {
+  try {
+    showToast('Отправляю тестовую тревогу…', 'info');
+    const resp = await apiPost('/api/admin/alert/test', {});
+    if (resp && resp.status === 403) { showToast('Только для директора', 'error'); return; }
+    if (resp && resp.ok && resp.data && resp.data.ok) {
+      showToast(resp.data.delivered
+        ? '✅ Тревога отправлена — проверь Телеграм и пуш'
+        : 'Отправлено, но получателей нет (нужна роль директора; для пуша — включить 📱)',
+        resp.data.delivered ? 'success' : 'info');
+    } else {
+      showToast('Не удалось отправить тревогу', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка отправки', 'error');
   }
 }
 
