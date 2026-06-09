@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.215-spec-card-mobile";
+const APP_VERSION = "v2.45.216-activity-ru";
 const APP_VERSION_DATE = "09.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
