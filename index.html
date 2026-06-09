@@ -4636,7 +4636,12 @@ async function openFinishedInventory() {
   setTimeout(() => { const i = document.getElementById('fi-search'); if (i) i.focus(); }, 50);
 }
 let _fiDebounce = null;
-function _fiSearch(q) { clearTimeout(_fiDebounce); _fiDebounce = setTimeout(() => _fiDoSearch(q), 250); }
+function _fiSearch(q) {
+  const box = document.getElementById('fi-results');
+  if (box && (q || '').trim()) box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Поиск…</div>';
+  clearTimeout(_fiDebounce);
+  _fiDebounce = setTimeout(() => _fiDoSearch(q), 250);
+}
 async function _fiDoSearch(q) {
   const box = document.getElementById('fi-results'); if (!box) return;
   q = (q || '').trim();
@@ -4644,13 +4649,13 @@ async function _fiDoSearch(q) {
   try {
     const d = await apiGet('/api/models?search=' + encodeURIComponent(q));
     const models = (d.models || []).slice(0, 30);
-    if (!models.length) { box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Не найдено</div>'; return; }
+    if (!models.length) { box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Модель не найдена. Возможно, это комплектующее, а не готовая продукция.</div>'; return; }
     box.innerHTML = models.map(mm =>
       '<div class="bom-relink-row" onclick="_fiPick(' + mm.id + ', ' + JSON.stringify(mm.name || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(mm.article || '').replace(/"/g, '&quot;') + ')" ' +
       'style="display:flex;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;">' +
       '<span style="font-weight:600;">' + escapeHtml(mm.name || '') + '</span>' +
       '<span style="color:var(--text-light);font-size:12px;">' + escapeHtml(mm.article || '') + '</span></div>').join('');
-  } catch (e) { box.innerHTML = '<div style="padding:10px;color:#c0392b;">Ошибка</div>'; }
+  } catch (e) { box.innerHTML = '<div style="padding:10px;color:#c0392b;">Ошибка поиска: ' + escapeHtml(String((e && e.message) || e)) + '</div>'; }
 }
 async function _fiPick(id, name, article) {
   state._fiSel = { id: id, name: name, article: article };
