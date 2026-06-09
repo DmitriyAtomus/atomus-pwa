@@ -9263,6 +9263,11 @@ function openNomPicker(contractId, itemId) {
   state._nomPicker.tab = 'production';
   state._nomPicker.filter = '';
   state._nomPicker.openGroups = {};
+  // v2.45.210: сбрасываем кэш — чтобы свежесозданные позиции (модели/товары/
+  // комплектующие) сразу появлялись в пикере, а не после перезагрузки страницы.
+  state._nomPicker.productionData = null;
+  state._nomPicker.saleData = null;
+  state._nomPicker.componentsData = null;
 
   const ov = document.getElementById('nom-picker-overlay');
   if (ov) ov.classList.add('visible');
@@ -9362,96 +9367,100 @@ function onNomPickerFilter(value) {
   else if (state._nomPicker.tab === 'components') renderComponentsTree();
 }
 
+// v2.45.210: позиция-модель в дереве пикера производства (кликабельна для выбора)
+function _prodPickItem(m, dirName) {
+  const article = m.article || '';
+  const name = m.name || '';
+  const extra = m.extra || '';
+  const label = (article ? article + ' · ' : '') + name;
+  const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
+  const dirJson = JSON.stringify(dirName || '').replace(/"/g, '&quot;');
+  return '<div class="sp-tree-item" onclick="pickNomModel(' + m.id + ',' + labelJson + ',' + dirJson + ')">' +
+    '<div class="sp-tree-item-main">' +
+      '<div class="sp-tree-item-name">' + (article ? '<b>' + escapeHtml(article) + '</b> ' : '') + escapeHtml(name) + '</div>' +
+      (extra ? '<div class="sp-tree-item-meta">' + escapeHtml(extra) + '</div>' : '') +
+    '</div>' +
+  '</div>';
+}
+
+// v2.45.210: дерево производства по разделам → подразделам (как каталог), а не
+// плоским списком. Те же .sp-tree-* стили, что и на вкладке «Продажи».
 function renderProductionTree() {
   const body = document.getElementById('nom-picker-body');
   if (!body) return;
   const d = state._nomPicker.productionData;
   if (!d) return;
-
   const filter = state._nomPicker.filter;
-  // Фильтруем модели
-  const filteredModels = d.models.filter(m => {
+  const list = d.models.filter(m => {
     if (!m.is_active) return false;
     if (!filter) return true;
     return (m.name || '').toLowerCase().includes(filter) ||
            (m.article || '').toLowerCase().includes(filter) ||
            (m.extra || '').toLowerCase().includes(filter);
   });
-
-  // Группируем по направлениям
-  const byDir = {};
-  filteredModels.forEach(m => {
-    const did = m.direction_id || 0;
-    if (!byDir[did]) byDir[did] = [];
-    byDir[did].push(m);
-  });
-
-  if (!filteredModels.length) {
+  if (!list.length) {
     body.innerHTML = '<div class="nom-empty"><i class="ti ti-search-off" style="font-size:24px; display:block; margin-bottom:6px;"></i>' +
       (filter ? 'По запросу ничего не найдено' : 'Номенклатура пуста') + '</div>';
     return;
   }
-
-  // Авто-разворачиваем группы при поиске
+  const og = state._nomPicker.openGroups;
   const autoOpen = !!filter;
-  let html = '';
-  d.directions.forEach(dir => {
-    const list = byDir[dir.id] || [];
-    if (!list.length) return;
-    const key = 'production:' + dir.id;
-    const isOpen = autoOpen || state._nomPicker.openGroups[key];
-    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
-    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
-    html += '<div class="name"><i class="ti ti-folder"></i>' + escapeHtml(dir.name) + '</div>';
-    html += '<div style="display:flex; align-items:center; gap:8px;">';
-    html += '<div class="count">' + list.length + '</div>';
-    html += '<i class="ti ti-chevron-right chevron"></i>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div class="nom-group-items">';
-    list.forEach(m => {
-      const article = m.article || '';
-      const name = m.name || '';
-      const extra = m.extra ? ' · ' + escapeHtml(m.extra) : '';
-      const label = (article ? article + ' · ' : '') + name;
-      const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
-      const dirJson = JSON.stringify(dir.name || '').replace(/"/g, '&quot;');
-      html += '<div class="nom-item" onclick="pickNomModel(' + m.id + ',' + labelJson + ',' + dirJson + ')">';
-      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
-      if (extra) html += '<div class="nom-item-meta">' + extra.replace(/^ · /, '') + '</div>';
-      html += '</div>';
-    });
-    html += '</div>';
-    html += '</div>';
-  });
+  const byDir = {};
+  list.forEach(m => { const id = m.direction_id || 0; (byDir[id] = byDir[id] || []).push(m); });
 
-  // Модели без направления
-  const noDir = byDir[0] || [];
-  if (noDir.length) {
-    const key = 'production:0';
-    const isOpen = autoOpen || state._nomPicker.openGroups[key];
-    html += '<div class="nom-group ' + (isOpen ? 'open' : '') + '">';
-    html += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + key + '\')">';
-    html += '<div class="name"><i class="ti ti-folder-off"></i>Без направления</div>';
-    html += '<div style="display:flex; align-items:center; gap:8px;">';
-    html += '<div class="count">' + noDir.length + '</div>';
-    html += '<i class="ti ti-chevron-right chevron"></i>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div class="nom-group-items">';
-    noDir.forEach(m => {
-      const article = m.article || '';
-      const name = m.name || '';
-      const label = (article ? article + ' · ' : '') + name;
-      const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
-      html += '<div class="nom-item" onclick="pickNomModel(' + m.id + ',' + labelJson + ',\'\')">';
-      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
-      html += '</div>';
-    });
-    html += '</div>';
-    html += '</div>';
+  function _renderDir(dirId, dirName, models) {
+    if (!models.length) return '';
+    const dKey = 'pd:' + dirId;
+    const dOpen = autoOpen || !!og[dKey];
+    let h = '<div class="sp-tree-group">' +
+      '<button type="button" class="sp-tree-toggle group' + (dOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + dKey + '\')">' +
+        '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+        '<i class="ti ti-folder" style="font-size:16px;"></i>' +
+        '<span>' + escapeHtml(dirName) + '</span>' +
+        '<span class="sp-tree-count">' + models.length + '</span>' +
+      '</button>';
+    if (dOpen) {
+      h += '<div class="sp-tree-body">';
+      const bySg = {}; const noSg = [];
+      models.forEach(m => {
+        if (m.subgroup_id) {
+          const s = String(m.subgroup_id);
+          if (!bySg[s]) bySg[s] = { id: m.subgroup_id, name: m.subgroup_name || ('Подгруппа #' + s), items: [] };
+          bySg[s].items.push(m);
+        } else noSg.push(m);
+      });
+      if (noSg.length) {
+        h += '<div class="sp-tree-items">';
+        noSg.forEach(m => { h += _prodPickItem(m, dirName); });
+        h += '</div>';
+      }
+      Object.keys(bySg).sort((a, b) => (bySg[a].name || '').localeCompare(bySg[b].name || '', 'ru')).forEach(s => {
+        const sg = bySg[s];
+        const sKey = 'psg:' + dirId + ':' + s;
+        const sOpen = autoOpen || !!og[sKey];
+        h += '<div class="sp-tree-subgroup">' +
+          '<button type="button" class="sp-tree-toggle subgroup' + (sOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + sKey + '\')">' +
+            '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+            '<span>' + escapeHtml(sg.name) + '</span>' +
+            '<span class="sp-tree-count subgroup">' + sg.items.length + '</span>' +
+          '</button>';
+        if (sOpen) {
+          h += '<div class="sp-tree-items">';
+          sg.items.forEach(m => { h += _prodPickItem(m, dirName); });
+          h += '</div>';
+        }
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
   }
 
+  let html = '<div style="padding:4px 0 12px;">';
+  (d.directions || []).forEach(dir => { html += _renderDir(dir.id, dir.name, byDir[dir.id] || []); });
+  if ((byDir[0] || []).length) html += _renderDir(0, 'Без направления', byDir[0]);
+  html += '</div>';
   body.innerHTML = html;
 }
 
