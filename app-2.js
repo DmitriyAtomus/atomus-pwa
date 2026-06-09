@@ -4424,8 +4424,9 @@ function _onEmSubgroupChange() {
   const sgId = sgSel && sgSel.value ? parseInt(sgSel.value) : null;
   const allCats = (cache.models && cache.models.categories) || [];
   const dirCats = allCats.filter(c => c.direction_id === dirId);
+  // v2.45.197: привязанные к подгруппе + непривязанные (легаси) категории
   const cats = sgId
-    ? dirCats.filter(c => c.parent_subgroup_id === sgId)
+    ? dirCats.filter(c => c.parent_subgroup_id === sgId || !c.parent_subgroup_id)
     : dirCats.filter(c => !c.parent_subgroup_id);
   if (!dirCats.length) {
     catWrap.style.display = 'none';
@@ -5895,7 +5896,10 @@ function onNewModelSubgroupChange() {
   const dirCats = allCats.filter(c => c.direction_id === dirId);
   let cats;
   if (sgId) {
-    cats = dirCats.filter(c => c.parent_subgroup_id === sgId);
+    // v2.45.197: показываем категории, привязанные к этой подгруппе, ПЛЮС
+    // непривязанные (parent_subgroup_id пустой) — это легаси-категории вроде
+    // «ЩУ-004.000 Приточно-вытяжная вентиляция», которые иначе не выбрать.
+    cats = dirCats.filter(c => c.parent_subgroup_id === sgId || !c.parent_subgroup_id);
   } else {
     cats = dirCats.filter(c => !c.parent_subgroup_id);
   }
