@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.217-purchase-pack";
+const APP_VERSION = "v2.45.218-kp-picker-tree";
 const APP_VERSION_DATE = "09.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9944,10 +9944,14 @@ window.selectContractor = function(contractorId) {
 // --------- МОДАЛКА ВЫБОРА ПРОДАЖНОЙ ПОЗИЦИИ ----------
 
 function openSaleProductPickModal() {
+  // v2.45.218: иерархический пикер с вкладками (Продажи / Производство)
+  state._offerPick = { tab: 'sale', filter: '', openGroups: {} };
   document.getElementById('sale-product-pick-modal').classList.add('visible');
-  document.getElementById('sp-pick-search').value = '';
-  loadSaleProductsForPickModal('');
-  setTimeout(() => document.getElementById('sp-pick-search').focus(), 100);
+  const si = document.getElementById('sp-pick-search'); if (si) si.value = '';
+  document.querySelectorAll('.nom-picker-tab[data-opick-tab]').forEach(t =>
+    t.classList.toggle('active', t.getAttribute('data-opick-tab') === 'sale'));
+  _renderOfferPick();
+  setTimeout(() => { const f = document.getElementById('sp-pick-search'); if (f) f.focus(); }, 100);
 }
 
 function closeSaleProductPickModal() {
@@ -11091,44 +11095,169 @@ async function seedCatalogDemo() {
   }
 }
 
-async function loadSaleProductsForPickModal(query) {
+// v2.45.218: КП-пикер стал иерархическим — продажная номенклатура по
+// группа→подгруппа, производственная по направление→подгруппа. Те же .sp-tree-*.
+function loadSaleProductsForPickModal(query) {
+  if (!state._offerPick) state._offerPick = { tab: 'sale', filter: '', openGroups: {} };
+  state._offerPick.filter = (query || '').trim().toLowerCase();
+  _renderOfferPick();
+}
+
+function switchOfferPickTab(tab) {
+  if (!state._offerPick) state._offerPick = { tab: 'sale', filter: '', openGroups: {} };
+  state._offerPick.tab = tab;
+  state._offerPick.openGroups = {};
+  document.querySelectorAll('.nom-picker-tab[data-opick-tab]').forEach(t =>
+    t.classList.toggle('active', t.getAttribute('data-opick-tab') === tab));
+  _renderOfferPick();
+}
+
+function toggleOfferPickGroup(key) {
+  if (!state._offerPick) return;
+  state._offerPick.openGroups[key] = !state._offerPick.openGroups[key];
+  _renderOfferPick();
+}
+
+async function _renderOfferPick() {
   const container = document.getElementById('sp-pick-body');
+  if (!container) return;
+  const st = state._offerPick || (state._offerPick = { tab: 'sale', filter: '', openGroups: {} });
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
-    if (!cache.saleProducts) {
-      const d = await apiGet('/api/sale-products');
-      cache.saleProducts = d;
+    if (st.tab === 'production') {
+      if (!cache.models) cache.models = await apiGet('/api/models');
+      container.innerHTML = _offerProductionTreeHtml(st);
+    } else {
+      if (!cache.saleProducts) cache.saleProducts = await apiGet('/api/sale-products');
+      container.innerHTML = _offerSaleTreeHtml(st);
     }
-    let list = ((cache.saleProducts && cache.saleProducts.products) || []).filter(p => p.is_active);
-    if (query) {
-      const q = query.toLowerCase();
-      list = list.filter(p =>
-        (p.name || '').toLowerCase().includes(q) ||
-        (p.description || '').toLowerCase().includes(q)
-      );
-    }
-    if (!list.length) {
-      container.innerHTML = '<div class="empty-block"><i class="ti ti-search"></i>Не найдено. Можно добавить произвольную позицию (без каталога) кнопкой внизу.</div>';
-      return;
-    }
-    let html = '';
-    list.forEach(p => {
-      const isService = p.product_type === 'service';
-      const iconCls = isService ? 'ti-tools' : 'ti-package';
-      const priceText = (p.base_price !== null && p.base_price !== undefined)
-        ? formatMoney(p.base_price) + ' / ' + p.unit
-        : 'цена по запросу';
-      html += '<div class="modal-item" onclick="pickSaleProductForOffer(' + p.id + ')">' +
-        '<div class="mi-icon"' + (isService ? ' style="background:#F0EAFA; color:#6A4B9C;"' : '') + '><i class="ti ' + iconCls + '"></i></div>' +
-        '<div class="mi-text">' +
-          '<div class="mi-title">' + escapeHtml(p.name) + '</div>' +
-          '<div class="mi-meta">' + escapeHtml(p.product_type_label) + ' · ' + escapeHtml(priceText) + '</div>' +
-        '</div></div>';
-    });
-    container.innerHTML = html;
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
   }
+}
+
+function _offerPickEmpty() {
+  return '<div class="empty-block"><i class="ti ti-search"></i>Не найдено. Можно добавить произвольную позицию кнопкой внизу.</div>';
+}
+function _offerGroupTpl(key, name, count, open, inner) {
+  return '<div class="sp-tree-group">' +
+    '<button type="button" class="sp-tree-toggle group' + (open ? ' open' : '') + '" onclick="toggleOfferPickGroup(\'' + key.replace(/'/g, "\\'") + '\')">' +
+      '<i class="ti ti-chevron-right sp-tree-chev"></i><i class="ti ti-folder" style="font-size:16px;"></i>' +
+      '<span>' + escapeHtml(name) + '</span><span class="sp-tree-count">' + count + '</span>' +
+    '</button>' + (open ? ('<div class="sp-tree-body">' + inner + '</div>') : '') +
+  '</div>';
+}
+function _offerSubTpl(key, name, count, open, inner) {
+  return '<div class="sp-tree-subgroup">' +
+    '<button type="button" class="sp-tree-toggle subgroup' + (open ? ' open' : '') + '" onclick="toggleOfferPickGroup(\'' + key.replace(/'/g, "\\'") + '\')">' +
+      '<i class="ti ti-chevron-right sp-tree-chev"></i><span>' + escapeHtml(name) + '</span>' +
+      '<span class="sp-tree-count subgroup">' + count + '</span>' +
+    '</button>' + (open ? ('<div class="sp-tree-items">' + inner + '</div>') : '') +
+  '</div>';
+}
+function _offerSaleItem(p) {
+  const priceText = (p.base_price != null) ? formatMoney(p.base_price) + ' / ' + (p.unit || 'шт.') : 'цена по запросу';
+  const nc = p.nc_code ? '<span style="font-family:monospace;font-size:11px;">' + escapeHtml(p.nc_code) + '</span> · ' : '';
+  return '<div class="sp-tree-item" onclick="pickSaleProductForOffer(' + p.id + ')">' +
+    '<div class="sp-tree-item-main">' +
+      '<div class="sp-tree-item-name">' + escapeHtml(p.name || '') + '</div>' +
+      '<div class="sp-tree-item-meta">' + nc + escapeHtml(p.product_type_label || 'Товар') + ' · ' + escapeHtml(priceText) + '</div>' +
+    '</div></div>';
+}
+function _offerModelItem(m) {
+  const article = m.article || '', name = m.name || '';
+  const priceText = (m.base_price != null) ? formatMoney(m.base_price) + ' / шт.' : 'цена по запросу';
+  return '<div class="sp-tree-item" onclick="pickModelForOffer(' + m.id + ')">' +
+    '<div class="sp-tree-item-main">' +
+      '<div class="sp-tree-item-name">' + (article ? '<b>' + escapeHtml(article) + '</b> ' : '') + escapeHtml(name) + '</div>' +
+      '<div class="sp-tree-item-meta">Производство · ' + escapeHtml(priceText) + '</div>' +
+    '</div></div>';
+}
+function _offerSaleTreeHtml(st) {
+  const all = ((cache.saleProducts && cache.saleProducts.products) || []).filter(p => p.is_active);
+  const f = st.filter;
+  const list = all.filter(p => !f ||
+    (p.name || '').toLowerCase().includes(f) ||
+    (p.description || '').toLowerCase().includes(f) ||
+    (p.nc_code || '').toLowerCase().includes(f));
+  if (!list.length) return _offerPickEmpty();
+  const catNameById = {};
+  ((cache.saleProducts && cache.saleProducts.categories) || []).forEach(c => { catNameById[c.id] = c.name; });
+  const auto = !!f;
+  const tree = {};
+  list.forEach(p => {
+    const g = (p.group_name || p.category_name || catNameById[p.category_id] || '(без группы)');
+    const sg = (p.subgroup_name || '(без подгруппы)');
+    tree[g] = tree[g] || {}; (tree[g][sg] = tree[g][sg] || []).push(p);
+  });
+  let html = '<div style="padding:4px 0 12px;">';
+  Object.keys(tree).sort((a, b) => a.localeCompare(b, 'ru')).forEach(g => {
+    const subs = tree[g];
+    const subNames = Object.keys(subs).sort((a, b) => a.localeCompare(b, 'ru'));
+    const gcount = subNames.reduce((a, x) => a + subs[x].length, 0);
+    const gKey = 'osg:' + g;
+    const gOpen = auto || !!st.openGroups[gKey];
+    let inner = '';
+    if (subNames.length === 1 && subNames[0] === '(без подгруппы)') {
+      inner = '<div class="sp-tree-items">' + subs['(без подгруппы)'].map(_offerSaleItem).join('') + '</div>';
+    } else {
+      subNames.forEach(sg => {
+        const items = subs[sg], sKey = 'ossg:' + g + '|' + sg;
+        inner += _offerSubTpl(sKey, sg, items.length, auto || !!st.openGroups[sKey], items.map(_offerSaleItem).join(''));
+      });
+    }
+    html += _offerGroupTpl(gKey, g, gcount, gOpen, inner);
+  });
+  return html + '</div>';
+}
+function _offerProductionTreeHtml(st) {
+  const d = cache.models || {};
+  const all = (d.models || []).filter(m => m.is_active);
+  const f = st.filter;
+  const list = all.filter(m => !f ||
+    (m.name || '').toLowerCase().includes(f) ||
+    (m.article || '').toLowerCase().includes(f) ||
+    (m.extra || '').toLowerCase().includes(f));
+  if (!list.length) return _offerPickEmpty();
+  const auto = !!f;
+  const byDir = {};
+  list.forEach(m => { const id = m.direction_id || 0; (byDir[id] = byDir[id] || []).push(m); });
+  function renderDir(dirId, dirName, models) {
+    if (!models.length) return '';
+    const dKey = 'opd:' + dirId, dOpen = auto || !!st.openGroups[dKey];
+    const bySg = {}, noSg = [];
+    models.forEach(m => {
+      if (m.subgroup_id) { const s = String(m.subgroup_id); (bySg[s] = bySg[s] || { name: m.subgroup_name || ('Подгруппа #' + s), items: [] }).items.push(m); }
+      else noSg.push(m);
+    });
+    let inner = '';
+    if (noSg.length) inner += '<div class="sp-tree-items">' + noSg.map(_offerModelItem).join('') + '</div>';
+    Object.keys(bySg).sort((a, b) => (bySg[a].name || '').localeCompare(bySg[b].name || '', 'ru')).forEach(s => {
+      const sg = bySg[s], sKey = 'opsg:' + dirId + ':' + s;
+      inner += _offerSubTpl(sKey, sg.name, sg.items.length, auto || !!st.openGroups[sKey], sg.items.map(_offerModelItem).join(''));
+    });
+    return _offerGroupTpl(dKey, dirName, models.length, dOpen, inner);
+  }
+  let html = '<div style="padding:4px 0 12px;">';
+  (d.directions || []).forEach(dir => { html += renderDir(dir.id, dir.name, byDir[dir.id] || []); });
+  if ((byDir[0] || []).length) html += renderDir(0, 'Без направления', byDir[0]);
+  return html + '</div>';
+}
+function pickModelForOffer(modelId) {
+  const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+  if (!m) return;
+  const label = (m.article ? m.article + ' · ' : '') + (m.name || '');
+  state.offerForm.items.push({
+    sale_product_id: null,
+    name: label,
+    description: m.extra || m.description || '',
+    unit: 'шт.',
+    qty: 1,
+    price: Number(m.base_price) || 0,
+    discount_pct: 0,
+  });
+  closeSaleProductPickModal();
+  renderOfferForm();
 }
 
 function pickSaleProductForOffer(productId) {

@@ -2650,8 +2650,13 @@
       <h3>Выберите позицию из каталога</h3>
       <button class="icon-btn" onclick="closeSaleProductPickModal()"><i class="ti ti-x"></i></button>
     </div>
+    <!-- v2.45.218: вкладки — продажная и производственная номенклатура -->
+    <div class="nom-picker-tabs" style="display:flex;gap:6px;padding:8px 18px 0;">
+      <button class="nom-picker-tab active" data-opick-tab="sale" onclick="switchOfferPickTab('sale')"><i class="ti ti-shopping-cart"></i> Продажи</button>
+      <button class="nom-picker-tab" data-opick-tab="production" onclick="switchOfferPickTab('production')"><i class="ti ti-tools"></i> Производство</button>
+    </div>
     <div class="modal-search">
-      <input type="text" id="sp-pick-search" placeholder="Поиск по названию…">
+      <input type="text" id="sp-pick-search" placeholder="Поиск по названию или артикулу…">
     </div>
     <div class="modal-body" id="sp-pick-body">
       <div class="loading-block">Загружаем…</div>
