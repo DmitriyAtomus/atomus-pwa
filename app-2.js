@@ -9225,7 +9225,7 @@ async function downloadContractSpecPdf(contractId) {
   }
   showToast('Готовим PDF…', 'success');
   try {
-    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/spec/pdf', {
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/spec/pdf?base=' + encodeURIComponent(window.location.origin), {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     if (!r.ok) {
