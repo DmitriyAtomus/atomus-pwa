@@ -9249,6 +9249,50 @@ function renderProductionTree() {
   body.innerHTML = html;
 }
 
+// v2.45.187: серия позиции = название без хвостового размера («1 WA 100*100» → «1 WA»),
+// чтобы дробить огромные категории на удобные подгруппы.
+function _saleSeriesKey(name) {
+  let s = (name || '').trim();
+  s = s.replace(/\s*[Øø]?\s*\d+([.,]\d+)?\s*[*xхXХ×]\s*[Øø]?\s*\d+([.,]\d+)?\s*$/i, ''); // WxH
+  s = s.replace(/\s*[Øø]\s*\d+([.,]\d+)?\s*$/i, '');   // Ø300
+  s = s.replace(/\s*\d{2,}([.,]\d+)?\s*$/i, '');        // хвостовое большое число
+  s = s.trim();
+  return s || (name || '').trim() || '—';
+}
+function _saleItemHtml(p, catName) {
+  const article = p.article || '';
+  const name = p.name || '';
+  const unit = p.unit_name || p.unit || '';
+  const label = (article ? article + ' · ' : '') + name;
+  const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
+  const unitJson = JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;');
+  const catJson = JSON.stringify(catName || '').replace(/"/g, '&quot;');
+  return '<div class="nom-item" onclick="pickNomSaleProduct(' + labelJson + ',' + unitJson + ',' + p.id + ',' + catJson + ')">' +
+    '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>' +
+    (unit ? '<div class="nom-item-meta">ед.изм.: ' + escapeHtml(unit) + '</div>' : '') +
+    '</div>';
+}
+function _renderSaleSeries(list, cat, autoOpen) {
+  const bySeries = {};
+  list.forEach(p => { const s = _saleSeriesKey(p.name); (bySeries[s] = bySeries[s] || []).push(p); });
+  const names = Object.keys(bySeries).sort((a, b) => a.localeCompare(b, 'ru'));
+  let h = '';
+  names.forEach((sname, idx) => {
+    const items = bySeries[sname];
+    if (items.length === 1) { h += _saleItemHtml(items[0], cat.name); return; }
+    const skey = 'sale:' + cat.id + ':' + idx;
+    const sOpen = autoOpen || state._nomPicker.openGroups[skey];
+    h += '<div class="nom-group nom-subgroup ' + (sOpen ? 'open' : '') + '">';
+    h += '<div class="nom-group-header" onclick="toggleNomGroup(\'' + skey + '\')">';
+    h += '<div class="name"><i class="ti ti-folder"></i>' + escapeHtml(sname) + '</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;"><div class="count">' + items.length + '</div><i class="ti ti-chevron-right chevron"></i></div>';
+    h += '</div><div class="nom-group-items">';
+    items.forEach(p => { h += _saleItemHtml(p, cat.name); });
+    h += '</div></div>';
+  });
+  return h;
+}
+
 function renderSaleTree() {
   const body = document.getElementById('nom-picker-body');
   if (!body) return;
@@ -9293,19 +9337,12 @@ function renderSaleTree() {
     html += '</div>';
     html += '</div>';
     html += '<div class="nom-group-items">';
-    list.forEach(p => {
-      const article = p.article || '';
-      const name = p.name || '';
-      const unit = p.unit_name || p.unit || '';
-      const label = (article ? article + ' · ' : '') + name;
-      const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
-      const unitJson = JSON.stringify(unit || 'шт.').replace(/"/g, '&quot;');
-      const catJson = JSON.stringify(c.name || '').replace(/"/g, '&quot;');
-      html += '<div class="nom-item" onclick="pickNomSaleProduct(' + labelJson + ',' + unitJson + ',' + p.id + ',' + catJson + ')">';
-      html += '<div class="nom-item-title">' + (article ? '<b>' + escapeHtml(article) + '</b>' : '') + escapeHtml(name) + '</div>';
-      if (unit) html += '<div class="nom-item-meta">ед.изм.: ' + escapeHtml(unit) + '</div>';
-      html += '</div>';
-    });
+    // Большую категорию (>25 поз.) дробим на серии (подгруппы), маленькую — плоско
+    if (list.length > 25 && !filter) {
+      html += _renderSaleSeries(list, c, autoOpen);
+    } else {
+      list.forEach(p => { html += _saleItemHtml(p, c.name); });
+    }
     html += '</div>';
     html += '</div>';
   });

@@ -14193,7 +14193,7 @@
     margin-top: 6px;
     padding-left: 12px;
   }
-  .nom-group.open .nom-group-items { display: block; }
+  .nom-group.open > .nom-group-items { display: block; }   /* v2.45.187: direct-child — чтобы работали вложенные подгруппы (серии внутри категории) */
 
   .nom-item {
     padding: 10px 12px;
