@@ -7764,9 +7764,13 @@ function renderContractDetail(c) {
   html += '<div class="detail-item"><div class="detail-label">Срок отгрузки</div>' +
           '<div class="detail-value' + (c.delivery_date ? '' : ' muted') + '">' +
           (c.delivery_date ? formatDateLong(c.delivery_date) : 'не указан') + '</div></div>';
-  html += '<div class="detail-item"><div class="detail-label">Менеджер</div>' +
-          '<div class="detail-value' + (c.manager_name ? '' : ' muted') + '">' +
-          escapeHtml(c.manager_name || 'не назначен') + '</div></div>';
+  // v2.45.188: менеджер + доп. менеджеры
+  const _coMgrNames = (c.co_managers || []).map(m => m.name).filter(Boolean);
+  const _mgrLabel = _coMgrNames.length ? 'Менеджеры' : 'Менеджер';
+  const _mgrAll = [(c.manager_name || '').trim()].filter(Boolean).concat(_coMgrNames);
+  html += '<div class="detail-item"><div class="detail-label">' + _mgrLabel + '</div>' +
+          '<div class="detail-value' + (_mgrAll.length ? '' : ' muted') + '">' +
+          escapeHtml(_mgrAll.length ? _mgrAll.join(', ') : 'не назначен') + '</div></div>';
   if (c.delivery_address) {
     html += '<div class="detail-item span-2"><div class="detail-label">Адрес доставки</div>' +
             '<div class="detail-value">' + escapeHtml(c.delivery_address) + '</div></div>';

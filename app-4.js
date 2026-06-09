@@ -1828,6 +1828,7 @@ function openNewContract() {
     payment_date: '',  // ЭТАП 37
     working_days: null, _delivery_manual: false,  // ЭТАП 36.3
     days_type: 'working',  // v2.43.67: 'working' (рабочие) | 'calendar' (календарные)
+    co_managers: [],  // v2.45.188: доп. менеджеры [{id, name}]
   };
   selectSidebarItem('sales-contract-form');
 }
@@ -1892,6 +1893,7 @@ async function openEditContract() {
       _contractor_name: c.contractor_name || '',
       _contractor_inn: c.contractor_inn || '',
       _manager_name: c.manager_name || '',
+      co_managers: Array.isArray(c.co_managers) ? c.co_managers.slice() : [],  // v2.45.188
     };
     selectSidebarItem('sales-contract-form');
   } catch (e) {
@@ -2014,6 +2016,12 @@ function renderContractForm() {
   }
   html += '<i class="ti ti-chevron-right chev"></i>';
   html += '</div></div></div>';
+
+  // v2.45.188: Доп. менеджеры (может вести несколько)
+  html += '<div class="sales-form-row cols-1"><div><label>Доп. менеджеры</label>';
+  html += '<div id="scf-co-managers">' + _renderCoManagersChips() + '</div>';
+  html += '<button type="button" class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="openManagerModal(\'co\')"><i class="ti ti-user-plus"></i> Добавить менеджера</button>';
+  html += '</div></div>';
 
   // Комментарий
   html += '<div class="sales-form-row cols-1"><div><label>Комментарий</label>' +
@@ -2178,6 +2186,8 @@ async function submitContractForm() {
   if (f.delivery_date) payload.delivery_date = f.delivery_date;
   if (f.delivery_address) payload.delivery_address = f.delivery_address.trim();
   if (f.manager_id) payload.manager_id = f.manager_id;
+  // v2.45.188: доп. менеджеры — всегда передаём (можно очистить), список id
+  payload.co_manager_ids = (f.co_managers || []).map(m => m.id);
   if (f.comment) payload.comment = f.comment.trim();
   // ЭТАП 37: дата оплаты (PATCH-семантика: всегда передаём, чтобы можно было очистить → "")
   if (state.contractFormMode === 'edit') {
@@ -2322,7 +2332,8 @@ function openNewContractorFromModal() {
 
 // --------- МОДАЛКА ВЫБОРА МЕНЕДЖЕРА ----------
 
-function openManagerModal() {
+function openManagerModal(mode) {
+  state._managerPickMode = (mode === 'co') ? 'co' : 'main';
   document.getElementById('manager-modal').classList.add('visible');
   document.getElementById('manager-modal-search').value = '';
   loadManagersForModal('');
@@ -2331,6 +2342,36 @@ function openManagerModal() {
 
 function closeManagerModal() {
   document.getElementById('manager-modal').classList.remove('visible');
+  if (state._managerPickMode === 'co') {
+    state._managerPickMode = 'main';
+    if (typeof renderContractForm === 'function') renderContractForm();
+  }
+}
+
+// v2.45.188: доп. менеджеры — чипы и переключение
+function _renderCoManagersChips() {
+  const co = (state.contractForm && state.contractForm.co_managers) || [];
+  if (!co.length) return '<div style="font-size:12.5px;color:var(--text-light);">Никого (необязательно)</div>';
+  return '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + co.map(m =>
+    '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--brand-bg);color:var(--brand);border-radius:14px;padding:4px 10px;font-size:13px;font-weight:600;">' +
+    escapeHtml(m.name || ('#' + m.id)) +
+    '<i class="ti ti-x" style="cursor:pointer;" onclick="removeCoManager(' + m.id + ')"></i></span>'
+  ).join('') + '</div>';
+}
+function removeCoManager(id) {
+  const co = (state.contractForm && state.contractForm.co_managers) || [];
+  state.contractForm.co_managers = co.filter(m => m.id !== id);
+  if (typeof renderContractForm === 'function') renderContractForm();
+}
+function toggleCoManager(id) {
+  const co = state.contractForm.co_managers || (state.contractForm.co_managers = []);
+  const idx = co.findIndex(m => m.id === id);
+  if (idx >= 0) { co.splice(idx, 1); }
+  else {
+    const m = (cache.managersForPicker || []).find(x => x.id === id);
+    if (m) co.push({ id: id, name: m.short_name || m.full_name || ('#' + id) });
+  }
+  loadManagersForModal(((document.getElementById('manager-modal-search') || {}).value) || '');
 }
 
 async function loadManagersForModal(query) {
@@ -2352,15 +2393,27 @@ async function loadManagersForModal(query) {
       container.innerHTML = '<div class="empty-block"><i class="ti ti-search"></i>Не найдено</div>';
       return;
     }
+    const coMode = state._managerPickMode === 'co';
+    const co = (state.contractForm && state.contractForm.co_managers) || [];
+    const coIds = co.map(m => m.id);
+    const mainId = state.contractForm && state.contractForm.manager_id;
     let html = '';
-    // Вариант «не назначен»
-    html += '<div class="modal-item" onclick="selectManager(null)">' +
-      '<div class="mi-icon" style="background: var(--bg); color: var(--text-light);"><i class="ti ti-x"></i></div>' +
-      '<div class="mi-text"><div class="mi-title">Не назначен</div><div class="mi-meta">Без менеджера</div></div></div>';
+    if (coMode) {
+      // В режиме доп.менеджеров: мультивыбор, кнопка «Готово», без «Не назначен»
+      html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">' +
+        '<button class="btn btn-primary btn-small" onclick="closeManagerModal()"><i class="ti ti-check"></i> Готово</button></div>';
+    } else {
+      html += '<div class="modal-item" onclick="selectManager(null)">' +
+        '<div class="mi-icon" style="background: var(--bg); color: var(--text-light);"><i class="ti ti-x"></i></div>' +
+        '<div class="mi-text"><div class="mi-title">Не назначен</div><div class="mi-meta">Без менеджера</div></div></div>';
+    }
     list.forEach(e => {
+      if (coMode && e.id === mainId) return;  // основной не может быть доп.
       const name = e.short_name || e.full_name || '—';
-      html += '<div class="modal-item" onclick="selectManager(' + e.id + ')">' +
-        '<div class="mi-icon"><i class="ti ti-user"></i></div>' +
+      const picked = coMode && coIds.indexOf(e.id) >= 0;
+      const click = coMode ? ('toggleCoManager(' + e.id + ')') : ('selectManager(' + e.id + ')');
+      html += '<div class="modal-item" onclick="' + click + '"' + (picked ? ' style="background:var(--brand-bg);"' : '') + '>' +
+        '<div class="mi-icon">' + (picked ? '<i class="ti ti-check" style="color:var(--brand);"></i>' : '<i class="ti ti-user"></i>') + '</div>' +
         '<div class="mi-text">' +
           '<div class="mi-title">' + escapeHtml(name) + '</div>' +
           '<div class="mi-meta">' + escapeHtml((e.roles || []).join(', ')) + '</div>' +
