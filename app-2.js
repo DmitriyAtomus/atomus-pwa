@@ -8557,6 +8557,11 @@ function renderContractItemsBlock(contractId) {
           nameClickHandler = ' onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"';
           nameLinkClass = ' spec-item-name--link';
         }
+        // v2.45.199: к какой системе/объекту относится позиция
+        let _sysChip = '';
+        if (it.system_tag) {
+          _sysChip = ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#0E7490;background:rgba(14,116,144,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;" title="Относится к системе / объекту"><i class="ti ti-layout-grid" style="font-size:10px;vertical-align:-1px;"></i> ' + escapeHtml(it.system_tag) + '</span>';
+        }
         // v2.45.198: пометка «закуп в другом городе, отгрузка сразу на объекте»
         let _altBadge = '', _altLine = '';
         if (it.alt_supply) {
@@ -8574,7 +8579,7 @@ function renderContractItemsBlock(contractId) {
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
-            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + typeChip + escapeHtml(displayName) + sourceTag + _altBadge + _reservedBadge + _quickAction + '</div>' +
+            '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + typeChip + escapeHtml(displayName) + sourceTag + _sysChip + _altBadge + _reservedBadge + _quickAction + '</div>' +
             '<div class="spec-item-meta">' + meta + '</div>' +
             _altLine +
           '</div>' +
@@ -8729,6 +8734,17 @@ function renderSpecForm(contractId, existing) {
             '<option value="упак.">' +
           '</datalist>' +
           '</div>';
+  // v2.45.199: к какой системе/объекту относится позиция (напр. AtomCold№24).
+  // datalist — из уже введённых по этому договору тегов (удобно переиспользовать).
+  const _existingSysTags = Array.from(new Set(((state._specByContract[contractId] || {}).items || [])
+    .map(x => (x.system_tag || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ru'));
+  html += '<div class="spec-form-field" style="grid-column: 1 / -1;"><label>Относится к системе / объекту ' +
+    '<span style="text-transform:none;color:var(--text-light);font-weight:400;">(напр. AtomCold№24 — необязательно)</span></label>' +
+    '<input type="text" id="spec-form-system-tag" value="' + escapeHtml(e.system_tag || '') + '" ' +
+    'placeholder="напр. AtomCold№24" maxlength="120" list="spec-system-tags">' +
+    '<datalist id="spec-system-tags">' +
+    _existingSysTags.map(t => '<option value="' + escapeHtml(t) + '">').join('') +
+    '</datalist></div>';
   // ЭТАП 37: контейнер для условных полей Исполнение/IP
   html += '<div id="spec-form-conditional" style="grid-column: 1 / -1;">';
   html += _renderSpecConditionalFieldsHTML(e);
@@ -9062,6 +9078,8 @@ async function submitSpecForm(contractId, itemId) {
   payload.alt_supply_city = altOn ? ((document.getElementById('spec-form-alt-city') || {}).value || '').trim() : '';
   payload.alt_supply_phone = altOn ? ((document.getElementById('spec-form-alt-phone') || {}).value || '').trim() : '';
   payload.alt_supply_comment = altOn ? ((document.getElementById('spec-form-alt-comment') || {}).value || '').trim() : '';
+  // v2.45.199: система/объект
+  payload.system_tag = ((document.getElementById('spec-form-system-tag') || {}).value || '').trim();
 
   try {
     const token = localStorage.getItem(TOKEN_KEY);
