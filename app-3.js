@@ -4574,6 +4574,8 @@ async function uploadSupplierPriceExcel(supplierId, inputEl, sheetName) {
       return;
     }
     if (!(j.lines || []).length) { showToast('На этом листе не нашлось названий', 'error'); return; }
+    // v2.45.243: метка прайса — позиции лягут в свою вкладку каталога
+    state._supPriceSelSource = j.label || '';
     // v2.45.242: интерактивный выбор позиций галочками вместо текстового окна
     _showSupplierPriceSelect(supplierId, j.lines);
   } catch (e) {
@@ -4727,7 +4729,7 @@ async function _supPriceSelectSave(supplierId, assignToItem) {
         'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ names }),
+      body: JSON.stringify({ names, source: state._supPriceSelSource || '' }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { showToast(j.message || 'Не удалось сохранить', 'error'); return; }
@@ -5661,12 +5663,17 @@ async function openOpAliasPicker(orderItemId) {
     return;
   }
   state._opAliasPickerItemId = orderItemId;
-  let items = [];
+  let items = [], detailed = [], files = [];
   try {
     const d = await apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-items');
     items = d.items || [];
-  } catch (e) { items = []; }
+    detailed = d.detailed || items.map(n => ({ name: n, source: null }));
+    files = d.files || [];
+  } catch (e) { items = []; detailed = []; files = []; }
   state._opAliasPickerItems = items;
+  state._opAliasPickerDetailed = detailed;   // v2.45.243: с источником (вкладки)
+  state._opAliasPickerFiles = files;
+  state._opAliasPickerTab = '';              // '' = Все
 
   let m = document.getElementById('op-alias-picker-modal');
   if (m) m.remove();
@@ -5691,6 +5698,8 @@ async function openOpAliasPicker(orderItemId) {
           '<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;" onchange="uploadSupplierPriceExcel(' + _opCurrentDraft.supplier_id + ', this)">' +
         '</label>' +
       '</div>' +
+      // v2.45.243: вкладки по прайсам (если их несколько) + открыть оригинал Excel
+      '<div id="op-ap-tabs" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 18px 0;"></div>' +
       '<div id="op-ap-list" style="overflow-y:auto;flex:1;padding:10px 18px 18px;"></div>' +
     '</div>';
   document.body.appendChild(m);
@@ -5698,17 +5707,88 @@ async function openOpAliasPicker(orderItemId) {
   setTimeout(() => { const i = document.getElementById('op-ap-search'); if (i) i.focus(); }, 50);
 }
 
+// v2.45.243: вкладки прайсов в каталоге
+function _opApSetTab(src) {
+  state._opAliasPickerTab = src || '';
+  _renderOpAliasPickerList();
+}
+
+function _renderOpApTabs() {
+  const box = document.getElementById('op-ap-tabs');
+  if (!box) return;
+  const detailed = state._opAliasPickerDetailed || [];
+  const sources = [];
+  detailed.forEach(r => {
+    const s = r.source || '';
+    if (!sources.includes(s)) sources.push(s);
+  });
+  const files = state._opAliasPickerFiles || [];
+  if (sources.length <= 1 && !files.length) { box.innerHTML = ''; return; }
+  const cur = state._opAliasPickerTab || '';
+  const chip = (src, label) => {
+    const on = cur === src;
+    return '<button type="button" onclick="_opApSetTab(' + JSON.stringify(src).replace(/"/g, '&quot;') + ')" ' +
+      'style="border:1px solid ' + (on ? 'var(--brand)' : 'var(--border)') + ';background:' + (on ? 'var(--brand)' : 'var(--bg)') + ';' +
+      'color:' + (on ? '#fff' : 'var(--text)') + ';border-radius:14px;padding:3px 12px;font-size:12px;cursor:pointer;">' +
+      escapeHtml(label) + '</button>';
+  };
+  let html = chip('', 'Все');
+  sources.forEach(s => { if (s) html += chip(s, s); });
+  if (sources.includes('')) html += sources.length > 1 ? chip('__none__', 'Прочее') : '';
+  // Открыть Excel-оригинал активной вкладки (или все файлы на «Все»)
+  const showFiles = cur && cur !== '__none__'
+    ? files.filter(f => (f.label || '') === cur)
+    : files;
+  showFiles.forEach(f => {
+    html += '<button type="button" title="' + escapeHtml(f.file_name || '') + '" onclick="downloadSupplierPriceFile(' + f.id + ')" ' +
+      'style="border:1px dashed var(--border);background:none;border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--brand);">' +
+      '<i class="ti ti-file-spreadsheet"></i> Excel: ' + escapeHtml(f.label || f.file_name || ('#' + f.id)) +
+    '</button>';
+  });
+  box.innerHTML = html;
+}
+
+async function downloadSupplierPriceFile(fileId) {
+  if (!_opCurrentDraft || !_opCurrentDraft.supplier_id) return;
+  try {
+    const r = await fetch(API_BASE + '/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fileId, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) { showToast('Файл не найден', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cd = r.headers.get('Content-Disposition') || '';
+    const mm = cd.match(/filename="?([^";]+)"?/);
+    a.download = mm ? mm[1] : 'price.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 function _renderOpAliasPickerList() {
+  _renderOpApTabs();   // v2.45.243
   const box = document.getElementById('op-ap-list');
   if (!box) return;
-  const all = state._opAliasPickerItems || [];
-  if (!all.length) {
+  const detailed = state._opAliasPickerDetailed || (state._opAliasPickerItems || []).map(n => ({ name: n, source: null }));
+  if (!detailed.length) {
     box.innerHTML = '<div class="empty-block" style="padding:30px 10px;color:var(--text-light);text-align:center;">' +
       '<i class="ti ti-file-spreadsheet" style="font-size:28px;"></i><br>' +
       'Прайс этого поставщика ещё не загружен.<br>Нажми <b>«Прайс из Excel»</b> выше и выбери файл прайс-листа (XIGMA, Royal Clima…).' +
     '</div>';
     return;
   }
+  // фильтр по вкладке-прайсу
+  const tab = state._opAliasPickerTab || '';
+  let scoped = detailed;
+  if (tab === '__none__') scoped = detailed.filter(r => !r.source);
+  else if (tab) scoped = detailed.filter(r => (r.source || '') === tab);
+  const all = scoped.map(r => r.name);
   const q = ((document.getElementById('op-ap-search') || {}).value || '').toLowerCase().trim();
   const list = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
   if (!list.length) {
@@ -5747,6 +5827,7 @@ async function _opAliasPickerDelete(btn) {
     });
     if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
     state._opAliasPickerItems = (state._opAliasPickerItems || []).filter(n => n !== name);
+    state._opAliasPickerDetailed = (state._opAliasPickerDetailed || []).filter(r => r.name !== name);
     _renderOpAliasPickerList();
     showToast('Удалено из прайса', 'success');
   } catch (e) {
@@ -9459,6 +9540,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.243',
+    date: '10.06.2026',
+    title: 'Каталог поставщика — вкладки по прайсам',
+    features: [
+      'У поставщика может быть несколько прайсов (XIGMA, ROYAL Clima…) — в каталоге они теперь <b>вкладками</b>: загрузил 3–4 прайса и переключаешься',
+      'Excel-оригинал каждого прайса сохраняется — кнопка <b>«Excel: …»</b> скачивает его, можно полистать с фото и ценами',
+      'Удаление прайс-файла убирает и его позиции из каталога',
+    ],
+  },
   {
     version: 'v2.45.242',
     date: '10.06.2026',
