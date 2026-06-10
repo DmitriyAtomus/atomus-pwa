@@ -4392,7 +4392,12 @@ async function openEditModelModal(modelId) {
       '<div class="modal-body" style="overflow-y:auto;">' +
         '<div class="form-hint" style="margin-bottom:14px;">' +
           '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
-          'Артикул <b>' + escapeHtml(m.article) + '</b> менять нельзя. Раздел и подгруппу — можно (модель переедет).' +
+          'Раздел, подгруппу и категорию можно менять — модель переедет.' +
+        '</div>' +
+        // v2.45.237: артикул редактируемый (с проверкой уникальности на сервере)
+        '<div class="form-group">' +
+          '<label>Артикул * <span style="text-transform:none;color:var(--text-faint);font-weight:400;">(уникальный; история сборок сохранится)</span></label>' +
+          '<input type="text" id="em-article" value="' + escapeHtml(m.article || '') + '" style="font-family:monospace;text-transform:uppercase;" />' +
         '</div>' +
         '<div class="modal-section-title">Раздел</div>' +
         '<div class="form-group">' +
@@ -4591,6 +4596,10 @@ function removeEmSpec(idx) {
 async function submitEditModel(modelId) {
   const name = (document.getElementById('em-name').value || '').trim();
   if (!name) { showToast('Название не может быть пустым', 'error'); return; }
+  // v2.45.237: артикул
+  const articleEl = document.getElementById('em-article');
+  const article = articleEl ? (articleEl.value || '').trim().toUpperCase() : '';
+  if (articleEl && !article) { showToast('Артикул не может быть пустым', 'error'); return; }
   const extra = (document.getElementById('em-extra').value || '').trim();
   const description = (document.getElementById('em-description').value || '').trim();
   const basePriceRaw = document.getElementById('em-base-price').value;
@@ -4620,6 +4629,7 @@ async function submitEditModel(modelId) {
 
   const body = {
     name,
+    article: article,
     extra: extra || '',
     description: description || '',
     base_price: basePriceRaw === '' ? null : parseFloat(basePriceRaw),
