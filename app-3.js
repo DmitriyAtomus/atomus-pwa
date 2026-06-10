@@ -5735,15 +5735,21 @@ function _renderOpApTabs() {
   let html = chip('', 'Все');
   sources.forEach(s => { if (s) html += chip(s, s); });
   if (sources.includes('')) html += sources.length > 1 ? chip('__none__', 'Прочее') : '';
-  // Открыть Excel-оригинал активной вкладки (или все файлы на «Все»)
-  const showFiles = cur && cur !== '__none__'
-    ? files.filter(f => (f.label || '') === cur)
-    : files;
-  showFiles.forEach(f => {
-    html += '<button type="button" title="' + escapeHtml(f.file_name || '') + '" onclick="downloadSupplierPriceFile(' + f.id + ')" ' +
-      'style="border:1px dashed var(--border);background:none;border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--brand);">' +
-      '<i class="ti ti-file-spreadsheet"></i> Excel: ' + escapeHtml(f.label || f.file_name || ('#' + f.id)) +
-    '</button>';
+  // v2.45.244: клик по прайсу — открывает его позиции прямо здесь (листай и
+  // выбирай). Маленькая ⬇ рядом — скачать Excel-оригинал.
+  files.forEach(f => {
+    const on = cur === ('__file__' + f.id);
+    html += '<span style="display:inline-flex;align-items:center;border:1px ' + (on ? 'solid var(--brand)' : 'dashed var(--border)') + ';border-radius:14px;overflow:hidden;' +
+        (on ? 'background:var(--brand);' : '') + '">' +
+      '<button type="button" title="Открыть прайс: ' + escapeHtml(f.file_name || '') + '" onclick="_opOpenPriceFile(' + f.id + ')" ' +
+        'style="border:none;background:none;padding:3px 4px 3px 10px;font-size:12px;cursor:pointer;color:' + (on ? '#fff' : 'var(--brand)') + ';">' +
+        '<i class="ti ti-file-spreadsheet"></i> ' + escapeHtml(f.label || f.file_name || ('#' + f.id)) +
+      '</button>' +
+      '<button type="button" title="Скачать Excel-оригинал" onclick="downloadSupplierPriceFile(' + f.id + ')" ' +
+        'style="border:none;background:none;padding:3px 8px 3px 4px;font-size:12px;cursor:pointer;color:' + (on ? '#fff' : 'var(--text-light)') + ';">' +
+        '<i class="ti ti-download"></i>' +
+      '</button>' +
+    '</span>';
   });
   box.innerHTML = html;
 }
@@ -5771,20 +5777,89 @@ async function downloadSupplierPriceFile(fileId) {
   }
 }
 
+// v2.45.244: открыть позиции сохранённого прайса по клику на вкладку-файл
+async function _opOpenPriceFile(fileId) {
+  state._opAliasPickerTab = '__file__' + fileId;
+  state._opAliasPickerFileLines = null;   // null = загружается
+  state._opAliasPickerFileLabel = '';
+  _renderOpAliasPickerList();
+  try {
+    const d = await apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fileId + '/items');
+    state._opAliasPickerFileLines = d.lines || [];
+    state._opAliasPickerFileLabel = d.label || '';
+  } catch (e) {
+    state._opAliasPickerFileLines = [];
+    showToast('Не удалось открыть прайс', 'error');
+  }
+  _renderOpAliasPickerList();
+}
+
+// Клик по строке открытого прайса: добавляем в каталог (тихо) + подставляем в позицию
+async function _opPriceLineChoose(el) {
+  const name = el.getAttribute('data-name') || '';
+  if (!name) return;
+  const sid = _opCurrentDraft && _opCurrentDraft.supplier_id;
+  const itemId = state._opAliasPickerItemId;
+  try {
+    await fetch(API_BASE + '/api/suppliers/' + sid + '/price-items/import', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ names: [name], source: state._opAliasPickerFileLabel || '' }),
+    });
+  } catch (e) { /* каталог — приятный бонус, не блокируем выбор */ }
+  const m = document.getElementById('op-alias-picker-modal');
+  if (m) m.remove();
+  if (!itemId) return;
+  const input = document.querySelector('[data-op-alias-id="' + itemId + '"]');
+  if (input) input.value = name;
+  await _opUpdateItemAlias(itemId, name);
+  showToast('Сопоставлено: ' + name, 'success');
+}
+
 function _renderOpAliasPickerList() {
   _renderOpApTabs();   // v2.45.243
   const box = document.getElementById('op-ap-list');
   if (!box) return;
+  // v2.45.244: режим «открыт прайс-файл» — листаем его позиции
+  const tab = state._opAliasPickerTab || '';
+  if (tab.indexOf('__file__') === 0) {
+    const lines = state._opAliasPickerFileLines;
+    if (lines === null) {
+      box.innerHTML = '<div class="loading-block">Открываем прайс…</div>';
+      return;
+    }
+    const q = ((document.getElementById('op-ap-search') || {}).value || '').toLowerCase().trim();
+    const list = q ? lines.filter(n => n.toLowerCase().includes(q)) : lines;
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-block" style="padding:24px 10px;color:var(--text-light);">' +
+        (q ? 'Ничего не нашлось по «' + escapeHtml(q) + '»' : 'В этом прайсе позиций не нашлось') + '</div>';
+      return;
+    }
+    box.innerHTML = '<div style="font-size:11.5px;color:var(--text-light);padding:2px 0 6px;">Нажми на позицию — она подставится в заявку</div>' +
+      list.slice(0, 400).map(n =>
+        '<div onclick="_opPriceLineChoose(this)" data-name="' + escapeHtml(n) + '" ' +
+          'style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;" ' +
+          'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+          escapeHtml(n) +
+        '</div>'
+      ).join('') + (list.length > 400 ? '<div style="padding:8px 10px;color:var(--text-light);font-size:12px;">…показаны первые 400, уточни поиск</div>' : '');
+    return;
+  }
   const detailed = state._opAliasPickerDetailed || (state._opAliasPickerItems || []).map(n => ({ name: n, source: null }));
   if (!detailed.length) {
+    const hasFiles = (state._opAliasPickerFiles || []).length > 0;
     box.innerHTML = '<div class="empty-block" style="padding:30px 10px;color:var(--text-light);text-align:center;">' +
       '<i class="ti ti-file-spreadsheet" style="font-size:28px;"></i><br>' +
-      'Прайс этого поставщика ещё не загружен.<br>Нажми <b>«Прайс из Excel»</b> выше и выбери файл прайс-листа (XIGMA, Royal Clima…).' +
+      (hasFiles
+        ? 'Каталог пока пуст, но прайсы загружены.<br><b>Нажми на прайс выше</b> — откроются его позиции, выбирай из них.'
+        : 'Прайс этого поставщика ещё не загружен.<br>Нажми <b>«Прайс из Excel»</b> выше и выбери файл прайс-листа (XIGMA, Royal Clima…).') +
     '</div>';
     return;
   }
-  // фильтр по вкладке-прайсу
-  const tab = state._opAliasPickerTab || '';
+  // фильтр по вкладке-прайсу (tab объявлен выше)
   let scoped = detailed;
   if (tab === '__none__') scoped = detailed.filter(r => !r.source);
   else if (tab) scoped = detailed.filter(r => (r.source || '') === tab);
@@ -9540,6 +9615,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.244',
+    date: '10.06.2026',
+    title: 'Прайс открывается по клику',
+    features: [
+      'В каталоге поставщика нажми на прайс (XIGMA, ROYAL Clima…) — <b>откроются его позиции прямо в окне</b>: листай, ищи, нажал на строку — она подставилась в заявку',
+      'Ничего предварительно «добавлять в каталог» не нужно — система сама запоминает выбранное',
+      'Скачать Excel-оригинал — маленькая стрелка ⬇ рядом с названием прайса',
+    ],
+  },
   {
     version: 'v2.45.243',
     date: '10.06.2026',
