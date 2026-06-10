@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.272';
+const CACHE_VERSION = 'atomus-v1.8.274';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -60,7 +60,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys
-          .filter((key) => !key.startsWith(CACHE_VERSION))
+          // v2.45.222: atomus-share-intake — буфер «Поделиться», не трогаем
+          .filter((key) => !key.startsWith(CACHE_VERSION) && key !== 'atomus-share-intake')
           .map((key) => caches.delete(key))
       );
     }).then(() => self.clients.claim())
@@ -71,6 +72,33 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
+
+  // v2.45.222: Web Share Target — «Поделиться → Atom» из любого приложения.
+  // Файл счёта складываем в cache, редиректим в приложение — оно подхватит
+  // и загрузит во «Входящие счета».
+  if (req.method === 'POST' && url.origin === self.location.origin && url.pathname === '/share-invoice') {
+    event.respondWith((async () => {
+      try {
+        const formData = await req.formData();
+        const files = formData.getAll('file');
+        const cache = await caches.open('atomus-share-intake');
+        let i = 0;
+        for (const f of files) {
+          if (!f || typeof f.arrayBuffer !== 'function') continue;
+          await cache.put('/share-intake/' + i, new Response(f, {
+            headers: {
+              'X-Name': encodeURIComponent(f.name || ('file' + i)),
+              'Content-Type': f.type || 'application/octet-stream',
+            },
+          }));
+          i++;
+        }
+        await cache.put('/share-intake/meta', new Response(JSON.stringify({ count: i })));
+      } catch (e) { /* не валим редирект */ }
+      return Response.redirect('/?share=invoice', 303);
+    })());
+    return;
+  }
 
   // Только GET запросы кэшируем
   if (req.method !== 'GET') return;

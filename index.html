@@ -563,6 +563,10 @@
         <button class="nav-item" data-nav="sales-offers" onclick="selectSidebarItem('sales-offers')">
           <i class="ti ti-file-invoice"></i><span>КП</span>
         </button>
+        <!-- v2.45.223: опросные листы (анкеты клиентов) -->
+        <button class="nav-item" data-nav="sales-surveys" onclick="selectSidebarItem('sales-surveys')">
+          <i class="ti ti-clipboard-text"></i><span>Опросные листы</span>
+        </button>
         <button class="nav-item" data-nav="catalog" onclick="selectSidebarItem('catalog')">
           <i class="ti ti-books"></i><span>Каталог оборудования</span>
         </button>
@@ -1399,6 +1403,31 @@
         </div>
         <div class="content-inner" id="ctrf-content">
           <!-- Форма наполняется через initContractorForm() -->
+        </div>
+      </div>
+
+      <!-- v2.45.223: ОПРОСНЫЕ ЛИСТЫ -->
+      <div class="screen" data-screen="sales-surveys" data-section="sales">
+        <div class="screen-header">
+          <h2>Опросные листы</h2>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Опросные листы</h1>
+            <div class="page-subtitle">Анкеты для клиентов — отправь ссылку или заполни сам</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadSurveys()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-secondary" onclick="copySurveyLink()" title="Скопировать ссылку для клиента">
+              <i class="ti ti-link"></i> Ссылка для клиента
+            </button>
+            <button class="btn btn-primary" onclick="openSurveyForm()" title="Открыть форму и заполнить">
+              <i class="ti ti-pencil"></i> Заполнить самому
+            </button>
+          </div>
+        </div>
+        <div class="content-inner" id="surveys-list">
+          <div class="loading-block">Загружаем…</div>
         </div>
       </div>
 

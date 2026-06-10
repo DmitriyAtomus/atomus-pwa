@@ -9,6 +9,22 @@
   "orientation": "any",
   "theme_color": "#2D5F8B",
   "background_color": "#2D5F8B",
+  "share_target": {
+    "action": "/share-invoice",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "file",
+          "accept": ["application/pdf", "image/*", ".xls", ".xlsx", ".heic"]
+        }
+      ]
+    }
+  },
   "icons": [
     {
       "src": "/icons/icon-192.png",

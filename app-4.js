@@ -10059,13 +10059,185 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
 // ============ КОНЕЦ ЭТАПА 26 (v2.25.0) ============
 
 
+// ============ v2.45.223: ОПРОСНЫЕ ЛИСТЫ (Продажи) ============
+
+const SURVEY_FORMS = {
+  syrovarnya: { title: 'Сыроварня', file: '/oprosnik-syrovarnya.html' },
+};
+
+function _surveyLink(kind) {
+  const f = SURVEY_FORMS[kind || 'syrovarnya'] || SURVEY_FORMS.syrovarnya;
+  return window.location.origin + f.file;
+}
+
+function copySurveyLink() {
+  const url = _surveyLink('syrovarnya');
+  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => {
+    showToast('Ссылка скопирована — отправь клиенту', 'success');
+  }).catch(() => { prompt('Скопируйте ссылку:', url); });
+}
+
+function openSurveyForm() {
+  window.open(_surveyLink('syrovarnya'), '_blank');
+}
+
+async function loadSurveys() {
+  const box = document.getElementById('surveys-list');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/surveys');
+    const list = (d && d.surveys) || [];
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-block"><i class="ti ti-clipboard-text"></i>Заполненных опросных листов пока нет.<br>' +
+        '<span style="font-size:13px;color:var(--text-light);">Нажми «Ссылка для клиента» и отправь её в мессенджер — заполненная анкета появится здесь.</span></div>';
+      return;
+    }
+    let html = '<div class="spec-list" style="padding:12px 0 20px;">';
+    list.forEach(s => {
+      const who = s.org || s.contact || 'Без названия';
+      const meta = [];
+      if (s.contact && s.org) meta.push(escapeHtml(s.contact));
+      if (s.phone) meta.push(escapeHtml(s.phone));
+      if (s.email) meta.push(escapeHtml(s.email));
+      const kindLabel = (SURVEY_FORMS[s.kind] || {}).title || s.kind || '';
+      html += '<div class="spec-item" style="cursor:pointer;" onclick="openSurveyDetail(' + s.id + ')">' +
+        '<div class="spec-item-no"><i class="ti ti-clipboard-text"></i></div>' +
+        '<div class="spec-item-body">' +
+          '<div class="spec-item-name">' + escapeHtml(who) +
+            ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#0E7490;background:rgba(14,116,144,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;">' + escapeHtml(kindLabel) + '</span>' +
+          '</div>' +
+          '<div class="spec-item-meta">' + (meta.join(' · ') || '—') +
+            (s.created_at ? ' · ' + escapeHtml(formatNotifTime(s.created_at)) : '') + '</div>' +
+        '</div>' +
+        '<div class="spec-item-act-col"><i class="ti ti-chevron-right" style="color:var(--text-light);"></i></div>' +
+      '</div>';
+    });
+    html += '</div>';
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
+  }
+}
+
+async function openSurveyDetail(surveyId) {
+  let s = null;
+  try { s = await apiGet('/api/surveys/' + surveyId); } catch (e) {}
+  if (!s) { showToast('Не удалось открыть', 'error'); return; }
+  let modal = document.getElementById('survey-detail-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'survey-detail-modal';
+  modal.className = 'modal-overlay visible';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  const who = s.org || s.contact || 'Опросный лист';
+  const canDel = (typeof canManageSales === 'function') && canManageSales();
+  modal.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-clipboard-text"></i> ' + escapeHtml(who) + '</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'survey-detail-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="overflow-y:auto;padding:16px 18px;">' +
+        '<div style="font-size:13px;color:var(--text-light);margin-bottom:10px;">' +
+          [s.contact, s.phone, s.email].filter(Boolean).map(escapeHtml).join(' · ') +
+          (s.created_at ? ' · ' + escapeHtml(formatNotifTime(s.created_at)) : '') +
+        '</div>' +
+        '<pre style="white-space:pre-wrap;font-family:inherit;font-size:13.5px;line-height:1.55;background:var(--bg);border-radius:10px;padding:14px;margin:0;">' +
+          escapeHtml(s.answers_text || '') + '</pre>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="copySurveyAnswers(' + s.id + ')"><i class="ti ti-copy"></i> Скопировать ответы</button>' +
+        (canDel ? '<button class="btn btn-secondary" style="color:var(--danger);" onclick="deleteSurvey(' + s.id + ')"><i class="ti ti-trash"></i> Удалить</button>' : '') +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+  window._lastSurveyText = s.answers_text || '';
+}
+
+function copySurveyAnswers(id) {
+  const t = window._lastSurveyText || '';
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => {
+    showToast('Ответы скопированы', 'success');
+  }).catch(() => { prompt('Скопируйте текст:', t); });
+}
+
+async function deleteSurvey(id) {
+  if (!confirm('Удалить этот опросный лист?')) return;
+  try {
+    await apiDelete('/api/surveys/' + id);
+    const m = document.getElementById('survey-detail-modal');
+    if (m) m.remove();
+    showToast('Удалено', 'success');
+    loadSurveys();
+  } catch (e) { showToast('Не удалось удалить', 'error'); }
+}
+
 // ============ INIT ============
+
+// v2.45.222: приём файла из системного «Поделиться» (Web Share Target).
+// SW складывает файлы в cache 'atomus-share-intake', мы подхватываем и грузим
+// во «Входящие счета» (тот же /api/supply/invoices/upload, что и ручная загрузка).
+async function _processSharedInvoiceFiles() {
+  try {
+    const cache = await caches.open('atomus-share-intake');
+    const metaResp = await cache.match('/share-intake/meta');
+    if (!metaResp) return;
+    const meta = await metaResp.json().catch(() => ({ count: 0 }));
+    const n = Number(meta.count) || 0;
+    const files = [];
+    for (let i = 0; i < n; i++) {
+      const r = await cache.match('/share-intake/' + i);
+      if (!r) continue;
+      const blob = await r.blob();
+      const name = decodeURIComponent(r.headers.get('X-Name') || ('file' + i));
+      files.push(new File([blob], name, { type: blob.type || 'application/octet-stream' }));
+    }
+    await caches.delete('atomus-share-intake');
+    if (!files.length) return;
+    showToast('Файл из «Поделиться» — загружаем счёт…', 'success');
+    const fd = new FormData();
+    files.forEach(f => fd.append('file', f, f.name));
+    // как и в ручной загрузке: на телефоне распознавание откладываем
+    if (state && !state.isDesktop) fd.append('defer_recognition', '1');
+    const token = localStorage.getItem(TOKEN_KEY);
+    const res = await fetch(API_BASE + '/api/supply/invoices/upload', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(d.message || 'Не удалось загрузить счёт', 'error'); return; }
+    showToast('Счёт загружен во «Входящие счета»', 'success');
+    try { selectSection('supply'); selectSidebarItem('supply-invoice-intake'); } catch (e) {}
+  } catch (e) { console.error('share intake:', e); }
+}
+
+function _scheduleSharedInvoiceIntake() {
+  // Ждём входа (до ~60с): токен + загруженный профиль, потом грузим
+  let tries = 0;
+  const t = setInterval(() => {
+    tries++;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token && state && state.user) {
+      clearInterval(t);
+      _processSharedInvoiceFiles();
+    } else if (tries > 120) {
+      clearInterval(t);
+      showToast('Чтобы загрузить счёт — войдите и поделитесь файлом ещё раз', 'error');
+    }
+  }, 500);
+}
 
 (function init() {
   detectLayout();
   // ЭТАП 22.1: подключаем обработчики прокрутки табов
   attachSectionTabsWheelHandler();
   setTimeout(updateSectionScrollState, 50);
+  // v2.45.222: если в буфере «Поделиться» лежит файл — подхватим после входа
+  try {
+    if ('caches' in window) {
+      caches.has('atomus-share-intake').then(has => { if (has) _scheduleSharedInvoiceIntake(); });
+    }
+  } catch (e) {}
   // ЭТАП 21: проверяем — если URL это /a/{token} или /c/{token},
   // показываем публичную страницу БЕЗ требования логина
   const path = window.location.pathname;
