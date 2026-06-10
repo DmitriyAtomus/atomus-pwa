@@ -34,7 +34,7 @@
   input, textarea { -webkit-appearance: none; appearance: none; }
   /* v2.45.230: галочки BOM — глобальный appearance:none прятал нативные
      чекбоксы (рисовались пустыми/невидимыми). Возвращаем вид. */
-  .bom-check, #bom-check-all {
+  .bom-check, #bom-check-all, .cp-check {
     -webkit-appearance: checkbox !important;
     appearance: auto !important;
     width: 16px !important;

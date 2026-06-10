@@ -4859,43 +4859,116 @@ async function loadSupplyShopping() {
   }
 }
 
-// v2.45.233: блок «Покупные позиции по договорам» (К заказу/Заказано)
+// v2.45.233/235: блок «Покупные позиции по договорам» — галочки, назначение
+// поставщика (в т.ч. сразу нескольким), группировка по поставщикам.
+function _cpRowHtml(it) {
+  const stBadge = it.purchase_status === 'ordered'
+    ? '<span style="font-size:11px;font-weight:700;color:#78350F;background:#FEF3C7;padding:1px 8px;border-radius:6px;">Заказано</span>'
+    : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
+  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
+    '<input type="checkbox" class="cp-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
+    '<span style="flex:1;font-size:13px;color:var(--text-dark);cursor:pointer;" ' +
+      'onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" ' +
+      'title="Открыть договор ' + escapeHtml(it.contract_number || '') + '">' +
+      escapeHtml(it.item_name || '—') +
+      (it.nc_code ? ' <span style="font-family:monospace;font-size:11px;color:var(--text-light);">' + escapeHtml(it.nc_code) + '</span>' : '') +
+      ' <span style="font-size:11px;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
+    '</span>' +
+    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+    stBadge +
+  '</div>';
+}
+
 function _contractPurchasesBlockHtml(items) {
   if (!items || !items.length) return '';
-  // Группируем по договору
-  const byContract = {};
+  state._cpItems = items;
+  // Группируем по поставщику (не назначен — первым, по нему и работаем)
+  const bySup = {};
   items.forEach(it => {
-    const k = it.contract_id;
-    if (!byContract[k]) byContract[k] = { number: it.contract_number, contractor: it.contractor_name, items: [] };
-    byContract[k].items.push(it);
+    const k = it.supplier_id || 0;
+    if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
+    bySup[k].items.push(it);
   });
   let h = '<div class="sup-shop-group" style="border-left:3px solid #B45309;">' +
     '<div class="sup-shop-group-head">' +
       '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart" style="color:#B45309;"></i> Покупные позиции по договорам' +
         '<span class="sup-shop-group-count">' + items.length + ' ' + (items.length === 1 ? 'позиция' : (items.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
       '</div>' +
+      '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
+        '<i class="ti ti-truck"></i> Назначить поставщика (<span id="cp-assign-count">0</span>)</button>' +
     '</div>' +
-    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Товары из спецификаций со статусом «К заказу» — статус меняется в самом договоре (клик по строке откроет его)</div>';
-  Object.keys(byContract).forEach(cid => {
-    const g = byContract[cid];
-    h += '<div style="font-size:12.5px;font-weight:700;color:var(--text-dark);padding:6px 14px 2px;">Договор ' +
-      escapeHtml(g.number || ('#' + cid)) + (g.contractor ? ' · ' + escapeHtml(g.contractor) : '') + '</div>';
-    g.items.forEach(it => {
-      const stBadge = it.purchase_status === 'ordered'
-        ? '<span style="font-size:11px;font-weight:700;color:#78350F;background:#FEF3C7;padding:1px 8px;border-radius:6px;">Заказано</span>'
-        : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);cursor:pointer;" ' +
-        'onclick="state.currentContractId=' + cid + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');">' +
-        '<span style="flex:1;font-size:13px;color:var(--text-dark);">' + escapeHtml(it.item_name || '—') +
-          (it.nc_code ? ' <span style="font-family:monospace;font-size:11px;color:var(--text-light);">' + escapeHtml(it.nc_code) + '</span>' : '') +
-        '</span>' +
-        '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
-        stBadge +
-      '</div>';
-    });
+    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Отметь позиции галочками → «Назначить поставщика» — для запроса счёта. Клик по названию откроет договор.</div>';
+  const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? -1 : b === '0' ? 1 : 0));
+  keys.forEach(k => {
+    const g = bySup[k];
+    if (k === '0') {
+      h += '<div style="font-size:12.5px;font-weight:700;color:#7F1D1D;padding:6px 14px 2px;"><i class="ti ti-alert-triangle"></i> Поставщик не назначен</div>';
+    } else {
+      const contacts = [g.contact, g.email, g.phone].filter(Boolean).map(escapeHtml).join(' · ');
+      h += '<div style="font-size:12.5px;font-weight:700;color:var(--text-dark);padding:8px 14px 2px;"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+        escapeHtml(g.name || '—') +
+        (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</div>';
+    }
+    g.items.forEach(it => { h += _cpRowHtml(it); });
   });
   h += '</div>';
   return h;
+}
+
+function _cpBulkUpdate() {
+  const n = document.querySelectorAll('.cp-check:checked').length;
+  const btn = document.getElementById('cp-assign-btn');
+  const cnt = document.getElementById('cp-assign-count');
+  if (cnt) cnt.textContent = n;
+  if (btn) btn.style.display = n > 0 ? '' : 'none';
+}
+
+// v2.45.235: пикер поставщика для выбранных покупных позиций
+async function openCpSupplierPicker() {
+  const ids = [...document.querySelectorAll('.cp-check:checked')].map(c => parseInt(c.getAttribute('data-cpid')));
+  if (!ids.length) return;
+  let suppliers = [];
+  try {
+    const d = await apiGet('/api/suppliers');
+    suppliers = d.suppliers || d.items || [];
+  } catch (e) { showToast('Не удалось загрузить поставщиков', 'error'); return; }
+  let m = document.getElementById('cp-supplier-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'cp-supplier-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const rows = suppliers.map(s =>
+    '<div class="modal-item" onclick="assignCpSupplier(' + s.id + ')">' +
+      '<div class="mi-icon"><i class="ti ti-truck"></i></div>' +
+      '<div class="mi-text"><div class="mi-title">' + escapeHtml(s.name || '—') + '</div>' +
+        '<div class="mi-meta">' + [s.contact_person, s.email, s.phone].filter(Boolean).map(escapeHtml).join(' · ') + '</div>' +
+      '</div></div>'
+  ).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:540px;max-height:88vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-truck"></i> Поставщик для ' + ids.length + ' позиций</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'cp-supplier-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-search"><input type="text" id="cp-sup-search" placeholder="Поиск поставщика…" ' +
+        'oninput="[...document.querySelectorAll(\'#cp-sup-list .modal-item\')].forEach(r=>{r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?\'\':\'none\';})"></div>' +
+      '<div class="modal-body" id="cp-sup-list" style="overflow-y:auto;">' + (rows || '<div class="empty-block">Поставщиков нет</div>') + '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  window._cpAssignIds = ids;
+  setTimeout(() => { const f = document.getElementById('cp-sup-search'); if (f) f.focus(); }, 80);
+}
+
+async function assignCpSupplier(supplierId) {
+  const ids = window._cpAssignIds || [];
+  if (!ids.length) return;
+  try {
+    const r = await apiPost('/api/supply/contract-purchases/assign-supplier', { item_ids: ids, supplier_id: supplierId });
+    if (!r || !r.ok) { showToast((r && r.data && r.data.message) || 'Не удалось назначить', 'error'); return; }
+    const m = document.getElementById('cp-supplier-modal');
+    if (m) m.remove();
+    showToast('Поставщик назначен: ' + ids.length + ' поз.', 'success');
+    loadSupplyShopping();
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 function renderSupplyShopping(d) {
@@ -8843,6 +8916,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.235',
+    date: '10.06.2026',
+    title: 'Покупные позиции: поставщик галочками',
+    features: [
+      'В блоке «Покупные позиции по договорам» — <b>галочки</b>: отметь несколько → <b>«Назначить поставщика»</b> → выбери одного на всех (для запроса счёта). Позиции группируются по поставщикам с контактами',
+      'Импорт BOM больше <b>не плодит дубли</b>: если позиция с таким именем уже есть — переиспользует её. Инструмент «Дубли» теперь находит и дубликаты <b>по имени</b> (без артикула) — можно склеить существующие',
+    ],
+  },
   {
     version: 'v2.45.233',
     date: '10.06.2026',
