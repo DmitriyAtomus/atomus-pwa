@@ -4905,9 +4905,15 @@ function _contractPurchasesBlockHtml(items) {
       h += '<div style="font-size:12.5px;font-weight:700;color:#7F1D1D;padding:6px 14px 2px;"><i class="ti ti-alert-triangle"></i> Поставщик не назначен</div>';
     } else {
       const contacts = [g.contact, g.email, g.phone].filter(Boolean).map(escapeHtml).join(' · ');
-      h += '<div style="font-size:12.5px;font-weight:700;color:var(--text-dark);padding:8px 14px 2px;"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+      const pendingIds = g.items.filter(x => x.purchase_status !== 'ordered').map(x => x.id);
+      h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
+        '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
         escapeHtml(g.name || '—') +
-        (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</div>';
+        (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</span>' +
+        // v2.45.236: сформировать заказ снабжения из позиций «К заказу» этого поставщика
+        (pendingIds.length ? '<button class="btn btn-primary btn-sm" onclick="createCpOrder(' + g.id + ')">' +
+          '<i class="ti ti-mail-send"></i> Сформировать заказ (' + pendingIds.length + ')</button>' : '') +
+      '</div>';
     }
     g.items.forEach(it => { h += _cpRowHtml(it); });
   });
@@ -4956,6 +4962,30 @@ async function openCpSupplierPicker() {
   document.body.appendChild(m);
   window._cpAssignIds = ids;
   setTimeout(() => { const f = document.getElementById('cp-sup-search'); if (f) f.focus(); }, 80);
+}
+
+// v2.45.236: сформировать заказ снабжения из покупных позиций поставщика
+async function createCpOrder(supplierId) {
+  const items = (state._cpItems || []).filter(x => x.supplier_id === supplierId && x.purchase_status !== 'ordered');
+  if (!items.length) { showToast('Нет позиций «К заказу» у этого поставщика', 'error'); return; }
+  if (!confirm('Сформировать заказ поставщику из ' + items.length + ' позиций?\n\nПозиции станут «Заказано», заказ появится в «Заказах» и пойдёт по статусам (счёт, оплата, приёмка).')) return;
+  try {
+    const resp = await fetch(API_BASE + '/api/supply/contract-purchases/create-order', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ supplier_id: supplierId, item_ids: items.map(x => x.id) }),
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось создать заказ', 'error');
+      return;
+    }
+    const draft = await resp.json();
+    showToast('Заказ ' + (draft.order_label || ('#' + draft.id)) + ' создан', 'success');
+    // То же превью письма, что у обычных заказов снабжения
+    if (typeof _renderOrderPreviewModal === 'function') _renderOrderPreviewModal(draft);
+    loadSupplyShopping();
+  } catch (e) { showToast('Сеть: ' + (e.message || e), 'error'); }
 }
 
 async function assignCpSupplier(supplierId) {
@@ -8916,6 +8946,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.236',
+    date: '10.06.2026',
+    title: 'Заказ поставщику из покупных позиций',
+    features: [
+      'У группы поставщика в «Покупных позициях по договорам» — кнопка <b>«Сформировать заказ»</b>: создаётся заказ снабжения с письмом-превью (как у комплектующих)',
+      'Дальше заказ живёт в <b>«Заказах»</b> по статусам: Отправлен → <b>Ожидаем счёт</b> → Счёт получен → На оплате → Оплачен → Получено. Позиции договора автоматически становятся «Заказано»',
+    ],
+  },
   {
     version: 'v2.45.235',
     date: '10.06.2026',
