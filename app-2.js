@@ -5106,7 +5106,18 @@ async function loadModelBom(modelId) {
     state._bomItemsById = {};
     items.forEach(it => { state._bomItemsById[it.id] = it; });
     state._currentBomModelId = modelId;
-    let html = '<div class="bom-table">';
+    // v2.45.229: панель массового выбора/удаления позиций BOM
+    let html = '';
+    if (canManageSales()) {
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 2px 10px;flex-wrap:wrap;">' +
+        '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-light);cursor:pointer;">' +
+          '<input type="checkbox" id="bom-check-all" onchange="_bomToggleAll(this)" style="width:auto;"> выбрать все' +
+        '</label>' +
+        '<button class="btn btn-secondary btn-small" id="bom-bulk-del-btn" style="display:none;color:var(--danger);" ' +
+          'onclick="bulkDeleteBomItems(' + modelId + ')"><i class="ti ti-trash"></i> Удалить выбранные (<span id="bom-bulk-count">0</span>)</button>' +
+      '</div>';
+    }
+    html += '<div class="bom-table">';
     items.forEach(it => {
       // v2.45.24: строка может быть «компонент» или «подсборка» (kind='model')
       const isModel = (it.kind === 'model');
@@ -5140,7 +5151,9 @@ async function loadModelBom(modelId) {
       const editCall = 'openBomEditItemById(' + it.id + ')';
       html += '<div class="bom-row">' +
         '<div class="bom-row-main">' +
-          '<div class="bom-name">' + displayName + skuPart +
+          '<div class="bom-name">' +
+            (canManageSales() ? '<input type="checkbox" class="bom-check" data-bomid="' + it.id + '" onchange="_bomBulkUpdate()" style="width:auto;margin-right:8px;vertical-align:-2px;cursor:pointer;">' : '') +
+            displayName + skuPart +
             (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
             stockBadge +
           '</div>' +
@@ -5165,6 +5178,38 @@ async function loadModelBom(modelId) {
   } catch (e) {
     container.innerHTML = '<div class="empty-block">Ошибка загрузки</div>';
   }
+}
+
+// v2.45.229: массовый выбор и удаление позиций BOM
+function _bomToggleAll(cb) {
+  document.querySelectorAll('.bom-check').forEach(c => { c.checked = cb.checked; });
+  _bomBulkUpdate();
+}
+function _bomBulkUpdate() {
+  const checked = document.querySelectorAll('.bom-check:checked').length;
+  const btn = document.getElementById('bom-bulk-del-btn');
+  const cnt = document.getElementById('bom-bulk-count');
+  if (cnt) cnt.textContent = checked;
+  if (btn) btn.style.display = checked > 0 ? '' : 'none';
+}
+async function bulkDeleteBomItems(modelId) {
+  const ids = [...document.querySelectorAll('.bom-check:checked')].map(c => parseInt(c.getAttribute('data-bomid')));
+  if (!ids.length) return;
+  if (!confirm('Удалить выбранные позиции из тех. карты (' + ids.length + ' шт.)?')) return;
+  const btn = document.getElementById('bom-bulk-del-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Удаляем…'; }
+  let ok = 0, fail = 0;
+  const token = localStorage.getItem(TOKEN_KEY);
+  for (const id of ids) {
+    try {
+      const r = await fetch(API_BASE + '/api/bom/' + id, {
+        method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (r.ok) ok++; else fail++;
+    } catch (e) { fail++; }
+  }
+  showToast('Удалено: ' + ok + (fail ? ' · не удалось: ' + fail : ''), fail ? 'error' : 'success');
+  loadModelBom(modelId);
 }
 
 async function openBomAddItem(modelId) {
