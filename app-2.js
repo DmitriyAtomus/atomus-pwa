@@ -3714,7 +3714,12 @@ async function openModelDetail(modelId) {
   }
   if (Object.keys(specsObj).length) {
     specsHtml = '<div class="sp-detail-specs" style="margin-bottom:18px;">' +
-      '<div class="sp-detail-section-title"><i class="ti ti-list-details"></i> Характеристики</div>';
+      '<div class="sp-detail-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+        '<span><i class="ti ti-list-details"></i> Характеристики</span>' +
+        // v2.45.219: правка характеристик (параметров) прямо из карточки —
+        // открывает форму модели, где их можно добавить/изменить/удалить.
+        (canManageSales() ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')" title="Редактировать характеристики"><i class="ti ti-edit"></i> Редактировать</button>' : '') +
+      '</div>';
     Object.keys(specsObj).forEach(k => {
       specsHtml += '<div class="sp-spec-row">' +
         '<div class="sp-spec-key">' + escapeHtml(k) + '</div>' +
