@@ -4545,13 +4545,21 @@ async function _refreshSupplierPriceCount(supplierId) {
   }
 }
 
-async function uploadSupplierPriceExcel(supplierId, inputEl) {
-  const file = inputEl && inputEl.files && inputEl.files[0];
+async function uploadSupplierPriceExcel(supplierId, inputEl, sheetName) {
+  // v2.45.241: файл может прийти из input или из повтора с выбранным листом
+  let file = null;
+  if (inputEl && inputEl.files && inputEl.files[0]) {
+    file = inputEl.files[0];
+    state._supPriceFile = file;     // запоминаем для повтора с листом
+    inputEl.value = '';
+  } else {
+    file = state._supPriceFile;
+  }
   if (!file) return;
-  inputEl.value = '';
   showToast('Читаем прайс…', 'info');
   const fd = new FormData();
   fd.append('file', file);
+  if (sheetName) fd.append('sheet', sheetName);
   try {
     const r = await fetch(API_BASE + '/api/suppliers/' + supplierId + '/price-items/excel', {
       method: 'POST',
@@ -4560,11 +4568,44 @@ async function uploadSupplierPriceExcel(supplierId, inputEl) {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { showToast(j.message || 'Не удалось прочитать Excel', 'error'); return; }
-    if (!(j.lines || []).length) { showToast('В файле не нашлось названий', 'error'); return; }
+    // Несколько листов — даём выбрать нужный (например «ПОЛУПРОМ On-Off»)
+    if (j.sheets && j.sheets.length) {
+      _showSupplierPriceSheetPicker(supplierId, j.sheets);
+      return;
+    }
+    if (!(j.lines || []).length) { showToast('На этом листе не нашлось названий', 'error'); return; }
     _showSupplierPriceReview(supplierId, j.lines, false);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
+}
+
+// v2.45.241: выбор листа Excel-прайса (Скидка / РАСПРОДАЖА / ПОЛУПРОМ On-Off …)
+function _showSupplierPriceSheetPicker(supplierId, sheets) {
+  let m = document.getElementById('sup-price-sheet-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'sup-price-sheet-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10002';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-table"></i> Какой лист прайса взять?</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'sup-price-sheet-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">В файле несколько листов — выбери нужный (например «ПОЛУПРОМ On-Off»). Остальные не тронем.</div>' +
+        sheets.map(sn =>
+          '<button type="button" class="btn btn-secondary" style="display:block;width:100%;text-align:left;margin-bottom:6px;" ' +
+            'onclick="document.getElementById(\'sup-price-sheet-modal\').remove(); uploadSupplierPriceExcel(' + supplierId + ', null, ' + JSON.stringify(sn).replace(/"/g, '&quot;') + ')">' +
+            '<i class="ti ti-file-spreadsheet"></i> ' + escapeHtml(sn) +
+          '</button>'
+        ).join('') +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
 }
 
 async function openSupplierPriceEditor(supplierId) {
@@ -5537,12 +5578,42 @@ function _renderOpAliasPickerList() {
     return;
   }
   box.innerHTML = list.slice(0, 300).map(n =>
-    '<div onclick="_opAliasPickerChoose(this)" data-name="' + escapeHtml(n) + '" ' +
-      'style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;" ' +
-      'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
-      escapeHtml(n) +
+    '<div style="display:flex;align-items:center;border-bottom:1px solid var(--border);">' +
+      '<div onclick="_opAliasPickerChoose(this)" data-name="' + escapeHtml(n) + '" ' +
+        'style="flex:1;padding:8px 10px;cursor:pointer;font-size:13px;" ' +
+        'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+        escapeHtml(n) +
+      '</div>' +
+      // v2.45.241: убрать мусорную строку из прайса навсегда
+      '<button type="button" data-name="' + escapeHtml(n) + '" title="Удалить из прайса" ' +
+        'onclick="_opAliasPickerDelete(this)" ' +
+        'style="border:none;background:none;cursor:pointer;color:var(--text-light);padding:6px 10px;font-size:14px;" ' +
+        'onmouseover="this.style.color=\'#B91C1C\'" onmouseout="this.style.color=\'var(--text-light)\'">' +
+        '<i class="ti ti-x"></i></button>' +
     '</div>'
   ).join('') + (list.length > 300 ? '<div style="padding:8px 10px;color:var(--text-light);font-size:12px;">…показаны первые 300, уточни поиск</div>' : '');
+}
+
+// v2.45.241: удалить строку из прайса поставщика прямо из каталога
+async function _opAliasPickerDelete(btn) {
+  const name = btn.getAttribute('data-name') || '';
+  if (!name || !_opCurrentDraft || !_opCurrentDraft.supplier_id) return;
+  try {
+    const r = await fetch(API_BASE + '/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-items/delete', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ names: [name] }),
+    });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    state._opAliasPickerItems = (state._opAliasPickerItems || []).filter(n => n !== name);
+    _renderOpAliasPickerList();
+    showToast('Удалено из прайса', 'success');
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 async function _opAliasPickerChoose(el) {
@@ -9250,6 +9321,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.241',
+    date: '10.06.2026',
+    title: 'Прайс поставщика — точнее и чище',
+    features: [
+      'Если в Excel-прайсе несколько листов (Скидка, РАСПРОДАЖА, ПОЛУПРОМ On-Off…) — система спросит, <b>какой лист взять</b>, и прочитает только его',
+      'Парсер больше не тащит характеристики («3 СКОРОСТИ ВЕНТИЛЯТОРА», «мин./макс.», «3+2 ГОДА») — только модели',
+      'В каталоге поставщика у каждой строки крестик — <b>удалить мусор из прайса</b> навсегда',
+    ],
+  },
   {
     version: 'v2.45.240',
     date: '10.06.2026',
