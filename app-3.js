@@ -5794,10 +5794,28 @@ async function _opOpenPriceFile(fileId) {
   _renderOpAliasPickerList();
 }
 
+// v2.45.245: переключатель вида прайса (список / таблица как в Excel)
+function _opApSetFileView(v) {
+  state._opApFileView = v;
+  _renderOpAliasPickerList();
+}
+
+// v2.45.245: клик по строке Excel-таблицы (делегирование на обёртке)
+function _opXlsRowClick(e) {
+  const tr = e.target && e.target.closest ? e.target.closest('tr.xls-pick') : null;
+  if (!tr) return;
+  const name = tr.getAttribute('data-pick') || '';
+  if (name) _opPriceNameChoose(name);
+}
+
 // Клик по строке открытого прайса: добавляем в каталог (тихо) + подставляем в позицию
 async function _opPriceLineChoose(el) {
   const name = el.getAttribute('data-name') || '';
   if (!name) return;
+  await _opPriceNameChoose(name);
+}
+
+async function _opPriceNameChoose(name) {
   const sid = _opCurrentDraft && _opCurrentDraft.supplier_id;
   const itemId = state._opAliasPickerItemId;
   try {
@@ -5826,19 +5844,45 @@ function _renderOpAliasPickerList() {
   // v2.45.244: режим «открыт прайс-файл» — листаем его позиции
   const tab = state._opAliasPickerTab || '';
   if (tab.indexOf('__file__') === 0) {
+    const fid = parseInt(tab.slice(8), 10);
+    // v2.45.245: переключатель вида — список или таблица «как в Excel»
+    const view = state._opApFileView || 'list';
+    const toggle =
+      '<div style="display:flex;gap:6px;padding:2px 0 8px;">' +
+        '<button type="button" onclick="_opApSetFileView(\'list\')" class="btn btn-secondary" style="padding:3px 12px;font-size:12px;' + (view === 'list' ? 'border-color:var(--brand);color:var(--brand);' : '') + '">Список</button>' +
+        '<button type="button" onclick="_opApSetFileView(\'table\')" class="btn btn-secondary" style="padding:3px 12px;font-size:12px;' + (view === 'table' ? 'border-color:var(--brand);color:var(--brand);' : '') + '">Как в Excel (с фото)</button>' +
+      '</div>';
+    if (view === 'table') {
+      const cache = state._opApFileHtmlCache || (state._opApFileHtmlCache = {});
+      if (!cache[fid]) {
+        box.innerHTML = toggle + '<div class="loading-block">Рисуем таблицу с картинками…</div>';
+        if (cache['_loading_' + fid]) return;
+        cache['_loading_' + fid] = true;
+        apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fid + '/view')
+          .then(d => { cache[fid] = d.html || '<div class="empty-block">Пусто</div>'; })
+          .catch(() => { cache[fid] = '<div class="empty-block">Не удалось отрисовать таблицу</div>'; })
+          .finally(() => { delete cache['_loading_' + fid]; _renderOpAliasPickerList(); });
+        return;
+      }
+      box.innerHTML = toggle +
+        '<div style="font-size:11.5px;color:var(--text-light);padding:0 0 6px;">Нажми на строку товара — он подставится в заявку. Таблицу можно листать вбок</div>' +
+        '<div class="xls-wrap" onclick="_opXlsRowClick(event)">' + cache[fid] + '</div>';
+      return;
+    }
     const lines = state._opAliasPickerFileLines;
     if (lines === null) {
-      box.innerHTML = '<div class="loading-block">Открываем прайс…</div>';
+      box.innerHTML = toggle + '<div class="loading-block">Открываем прайс…</div>';
       return;
     }
     const q = ((document.getElementById('op-ap-search') || {}).value || '').toLowerCase().trim();
     const list = q ? lines.filter(n => n.toLowerCase().includes(q)) : lines;
     if (!list.length) {
-      box.innerHTML = '<div class="empty-block" style="padding:24px 10px;color:var(--text-light);">' +
+      box.innerHTML = toggle + '<div class="empty-block" style="padding:24px 10px;color:var(--text-light);">' +
         (q ? 'Ничего не нашлось по «' + escapeHtml(q) + '»' : 'В этом прайсе позиций не нашлось') + '</div>';
       return;
     }
-    box.innerHTML = '<div style="font-size:11.5px;color:var(--text-light);padding:2px 0 6px;">Нажми на позицию — она подставится в заявку</div>' +
+    box.innerHTML = toggle +
+      '<div style="font-size:11.5px;color:var(--text-light);padding:2px 0 6px;">Нажми на позицию — она подставится в заявку</div>' +
       list.slice(0, 400).map(n =>
         '<div onclick="_opPriceLineChoose(this)" data-name="' + escapeHtml(n) + '" ' +
           'style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;" ' +
@@ -9615,6 +9659,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.245',
+    date: '10.06.2026',
+    title: 'Прайс «как в Excel» — с фото',
+    features: [
+      'В открытом прайсе поставщика переключатель <b>«Как в Excel (с фото)»</b>: лист рисуется таблицей — картинки, характеристики, цены, объединённые ячейки',
+      'Строки товаров кликабельны: нажал — позиция подставилась в заявку',
+    ],
+  },
   {
     version: 'v2.45.244',
     date: '10.06.2026',
