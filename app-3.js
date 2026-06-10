@@ -4505,14 +4505,149 @@ function showSupplierModal(s) {
           '<div><label>Email</label><input type="email" id="sm-email" value="' + escapeHtml(isEdit ? s.email : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
         '</div>' +
         '<div class="form-group"><label>Комментарий</label><textarea id="sm-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? s.comment : '') + '</textarea></div>' +
+        // v2.45.239: прайс поставщика — его номенклатура для сопоставления в заявках
+        (isEdit && canManage ?
+          '<div class="form-group">' +
+            '<label>Прайс поставщика <span style="text-transform:none;font-weight:400;color:var(--text-light);">— его названия для подстановки в заявки</span></label>' +
+            '<div id="sm-price-count" style="font-size:12px;color:var(--text-light);margin:2px 0 8px;">Загружаем…</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+              '<label class="btn btn-secondary" style="cursor:pointer;margin:0;">' +
+                '<i class="ti ti-file-spreadsheet"></i> Загрузить из Excel' +
+                '<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;" onchange="uploadSupplierPriceExcel(' + s.id + ', this)">' +
+              '</label>' +
+              '<button type="button" class="btn btn-secondary" onclick="openSupplierPriceEditor(' + s.id + ')"><i class="ti ti-list"></i> Посмотреть / править</button>' +
+            '</div>' +
+          '</div>'
+        : '') +
         (canManage ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveSupplier(' + (isEdit ? s.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>' : '') +
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  if (isEdit && canManage) _refreshSupplierPriceCount(s.id);
 }
 
 function closeSupplyModal() {
   document.getElementById('supply-modal').classList.remove('visible');
+}
+
+// ============ v2.45.239: прайс поставщика (номенклатура для заявок) ============
+
+async function _refreshSupplierPriceCount(supplierId) {
+  const el = document.getElementById('sm-price-count');
+  if (!el) return;
+  try {
+    const d = await apiGet('/api/suppliers/' + supplierId + '/price-items');
+    el.textContent = d.count
+      ? ('В прайсе: ' + d.count + ' позиций — подсказываются в поле «У поставщика» при заявке')
+      : 'Прайс пока пуст. Загрузи Excel — названия будут подсказываться при сопоставлении в заявке.';
+  } catch (e) {
+    el.textContent = '';
+  }
+}
+
+async function uploadSupplierPriceExcel(supplierId, inputEl) {
+  const file = inputEl && inputEl.files && inputEl.files[0];
+  if (!file) return;
+  inputEl.value = '';
+  showToast('Читаем прайс…', 'info');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch(API_BASE + '/api/suppliers/' + supplierId + '/price-items/excel', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      body: fd,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.message || 'Не удалось прочитать Excel', 'error'); return; }
+    if (!(j.lines || []).length) { showToast('В файле не нашлось названий', 'error'); return; }
+    _showSupplierPriceReview(supplierId, j.lines, false);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+async function openSupplierPriceEditor(supplierId) {
+  try {
+    const d = await apiGet('/api/suppliers/' + supplierId + '/price-items');
+    _showSupplierPriceReview(supplierId, d.items || [], true);
+  } catch (e) {
+    showToast('Не удалось загрузить прайс', 'error');
+  }
+}
+
+// Окно проверки: из Excel приходит «всё подряд» — пользователь оставляет только
+// нужные строки (например только полупром) и сохраняет.
+function _showSupplierPriceReview(supplierId, lines, isEditMode) {
+  let m = document.getElementById('sup-price-review-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'sup-price-review-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10002';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-check"></i> ' + (isEditMode ? 'Прайс поставщика' : 'Проверка прайса') + '</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'sup-price-review-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">' +
+          (isEditMode
+            ? 'Одна строка — одна позиция. Правь и сохраняй (список заменится целиком).'
+            : 'Нашлось <b>' + lines.length + '</b> строк. <b>Удали лишнее</b> (заголовки, ненужные серии — оставь, например, только полупром) и сохрани. Одна строка — одна позиция.') +
+        '</div>' +
+        '<textarea id="sup-price-review-ta" style="flex:1;min-height:300px;font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre;overflow:auto;">' +
+          escapeHtml(lines.join('\n')) +
+        '</textarea>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:space-between;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" style="color:#B91C1C;" onclick="_clearSupplierPrice(' + supplierId + ')"><i class="ti ti-trash"></i> Очистить прайс</button>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button class="btn btn-secondary" onclick="document.getElementById(\'sup-price-review-modal\').remove()">Отмена</button>' +
+          '<button class="btn btn-primary" onclick="_saveSupplierPrice(' + supplierId + ', ' + (isEditMode ? 'true' : 'false') + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+async function _saveSupplierPrice(supplierId, replace) {
+  const ta = document.getElementById('sup-price-review-ta');
+  const names = (ta ? ta.value : '').split('\n').map(s => s.trim()).filter(s => s.length >= 3);
+  if (!names.length && !replace) { showToast('Список пуст', 'error'); return; }
+  try {
+    const r = await fetch(API_BASE + '/api/suppliers/' + supplierId + '/price-items/import', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ names, replace: !!replace }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.message || 'Не удалось сохранить', 'error'); return; }
+    showToast('Сохранено: +' + j.added + ' (всего в прайсе ' + j.total + ')', 'success');
+    const m = document.getElementById('sup-price-review-modal');
+    if (m) m.remove();
+    _refreshSupplierPriceCount(supplierId);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+async function _clearSupplierPrice(supplierId) {
+  if (!confirm('Удалить весь прайс этого поставщика? Сопоставления «у поставщика» в позициях не пострадают.')) return;
+  try {
+    await apiDelete('/api/suppliers/' + supplierId + '/price-items');
+    showToast('Прайс очищен', 'success');
+    const m = document.getElementById('sup-price-review-modal');
+    if (m) m.remove();
+    _refreshSupplierPriceCount(supplierId);
+  } catch (e) {
+    showToast('Не удалось очистить', 'error');
+  }
 }
 
 // ============ ЭТАП 34.2: Picker контрагентов в форме поставщика ============
@@ -5291,6 +5426,8 @@ function _renderOrderPreviewModal(draft) {
         '<div class="op-field">' +
           '<label>Позиции <span style="color:var(--text-light);font-weight:400;font-size:11px;">— меняй кол-во прямо здесь, текст письма и DOCX обновятся автоматически</span></label>' +
           '<div id="op-items-wrap">' + _opBuildItemsHTML(draft.items || []) + '</div>' +
+          // v2.45.239: подсказки из прайса поставщика для поля «У поставщика»
+          '<datalist id="op-alias-dl"></datalist>' +
         '</div>' +
         '<div class="op-field" style="flex:1;display:flex;flex-direction:column;">' +
           '<label>Текст письма</label>' +
@@ -5313,6 +5450,17 @@ function _renderOrderPreviewModal(draft) {
   document.body.appendChild(m);
   m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
   m.classList.add('visible');
+  // v2.45.239: подгружаем прайс поставщика в datalist (подсказки «У поставщика»)
+  if (draft.supplier_id) _opFillAliasDatalist(draft.supplier_id);
+}
+
+async function _opFillAliasDatalist(supplierId) {
+  try {
+    const d = await apiGet('/api/suppliers/' + supplierId + '/price-items');
+    const dl = document.getElementById('op-alias-dl');
+    if (!dl || !(d.items || []).length) return;
+    dl.innerHTML = d.items.map(n => '<option value="' + escapeHtml(n) + '"></option>').join('');
+  } catch (e) { /* подсказки опциональны */ }
 }
 
 function _opBuildItemsHTML(items) {
@@ -5344,9 +5492,9 @@ function _opBuildItemsHTML(items) {
     // Запоминается на пару (позиция, поставщик) — в следующей заявке подставится само.
     '<div style="display:grid;grid-template-columns:24px 1fr 30px;gap:8px;align-items:center;margin-top:-2px;">' +
       '<span></span>' +
-      '<input type="text" data-op-alias-id="' + it.id + '" ' +
+      '<input type="text" data-op-alias-id="' + it.id + '" list="op-alias-dl" ' +
         'value="' + escapeHtml(it.supplier_item_name || '') + '" ' +
-        'placeholder="У поставщика: название из его прайса (напр. XIGMA XG-TXC50RHA-ODU, HC-1596058)" ' +
+        'placeholder="У поставщика: название из его прайса (начни печатать — подскажем)" ' +
         'style="padding:3px 6px;border:1px dashed var(--border);border-radius:6px;font-size:12px;color:var(--brand);" ' +
         'oninput="_opScheduleItemAlias(' + it.id + ', this)" ' +
         'onblur="_opFlushItemAlias(' + it.id + ', this)">' +
@@ -9002,6 +9150,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.239',
+    date: '10.06.2026',
+    title: 'Прайс поставщика из Excel',
+    features: [
+      'В карточке поставщика — блок <b>«Прайс поставщика»</b>: загрузи его Excel-прайс, система вытащит названия, лишнее удаляешь (например, оставляешь только полупром) и сохраняешь',
+      'В превью заявки поле «У поставщика» теперь подсказывает названия из загруженного прайса — начни печатать и выбери из списка',
+    ],
+  },
   {
     version: 'v2.45.238',
     date: '10.06.2026',
