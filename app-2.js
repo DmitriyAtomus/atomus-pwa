@@ -4007,20 +4007,25 @@ function _renderModelCharsBlock(m) {
   }
   html += '</div>';
 
-  // Фото (если есть)
+  // Фото (если есть). v2.45.225: крестик удаления в углу
   if (hasPhoto) {
-    html += '<div id="model-photo-wrap-' + m.id + '" style="margin-bottom:14px;text-align:center;">' +
+    html += '<div id="model-photo-wrap-' + m.id + '" style="margin-bottom:14px;text-align:center;position:relative;display:block;">' +
               '<img id="model-photo-img-' + m.id + '" alt="Фото модели" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid var(--border);" />' +
+              (canEdit ?
+                '<button onclick="deleteModelPhoto(' + m.id + ')" title="Удалить фото" ' +
+                  'style="position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,0.95);color:var(--danger);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' +
+                  '<i class="ti ti-trash"></i></button>' : '') +
             '</div>';
   }
 
-  // Файл СП (если есть)
+  // Файл СП (если есть). v2.45.225: кнопка удаления
   if (hasSpec) {
     const fname = escapeHtml(m.spec_file_name || 'файл');
-    html += '<div style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;">' +
+    html += '<div style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">' +
               '<i class="ti ti-file-text" style="font-size:18px;color:var(--brand);"></i>' +
-              '<span style="flex:1;color:var(--text-dark);">' + fname + '</span>' +
+              '<span style="flex:1;color:var(--text-dark);min-width:120px;">' + fname + '</span>' +
               '<button class="btn btn-secondary btn-small" onclick="downloadModelSpec(' + m.id + ')"><i class="ti ti-download"></i> Скачать</button>' +
+              (canEdit ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);" onclick="deleteModelSpecFile(' + m.id + ')" title="Удалить файл СП"><i class="ti ti-trash"></i></button>' : '') +
             '</div>';
   }
 
@@ -4061,6 +4066,25 @@ async function _loadModelPhotoFromBackend(modelId) {
     const blob = await r.blob();
     img.src = URL.createObjectURL(blob);
   } catch (e) {}
+}
+
+// v2.45.225: удаление фото / файла СП модели
+async function deleteModelPhoto(modelId) {
+  if (!confirm('Удалить фото модели?')) return;
+  try {
+    await apiDelete('/api/models/' + modelId + '/photo');
+    showToast('Фото удалено', 'success');
+    openModelDetail(modelId);
+  } catch (e) { showToast((e && e.message) || 'Не удалось удалить', 'error'); }
+}
+
+async function deleteModelSpecFile(modelId) {
+  if (!confirm('Удалить файл СП? (разобранные характеристики останутся)')) return;
+  try {
+    await apiDelete('/api/models/' + modelId + '/spec-file');
+    showToast('Файл СП удалён', 'success');
+    openModelDetail(modelId);
+  } catch (e) { showToast((e && e.message) || 'Не удалось удалить', 'error'); }
 }
 
 async function uploadModelPhoto(modelId, input) {

@@ -10062,7 +10062,12 @@ async function deleteConfirmedSupplyInvoice(invoiceId) {
 // ============ v2.45.223: ОПРОСНЫЕ ЛИСТЫ (Продажи) ============
 
 const SURVEY_FORMS = {
-  syrovarnya: { title: 'Сыроварня', file: '/oprosnik-syrovarnya.html' },
+  syrovarnya: {
+    title: 'Проектирование сыроварни',
+    subtitle: 'Сыроварня «под ключ» — оборудование, камеры созревания, вентиляция, электрика',
+    icon: 'ti-building-factory-2',
+    file: '/oprosnik-syrovarnya.html',
+  },
 };
 
 function _surveyLink(kind) {
@@ -10070,15 +10075,37 @@ function _surveyLink(kind) {
   return window.location.origin + f.file;
 }
 
-function copySurveyLink() {
-  const url = _surveyLink('syrovarnya');
+function copySurveyLink(kind) {
+  const url = _surveyLink(kind || 'syrovarnya');
   (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => {
     showToast('Ссылка скопирована — отправь клиенту', 'success');
   }).catch(() => { prompt('Скопируйте ссылку:', url); });
 }
 
-function openSurveyForm() {
-  window.open(_surveyLink('syrovarnya'), '_blank');
+function openSurveyForm(kind) {
+  window.open(_surveyLink(kind || 'syrovarnya'), '_blank');
+}
+
+// v2.45.224: карточки доступных анкет — видно, какие опросные листы есть
+function _surveyFormsBlockHtml() {
+  let h = '<div style="padding:12px 0 4px;">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">Доступные анкеты</div>';
+  Object.keys(SURVEY_FORMS).forEach(kind => {
+    const f = SURVEY_FORMS[kind];
+    h += '<div class="spec-item" style="align-items:center;">' +
+      '<div class="spec-item-no" style="color:var(--brand);"><i class="ti ' + (f.icon || 'ti-clipboard-text') + '"></i></div>' +
+      '<div class="spec-item-body">' +
+        '<div class="spec-item-name">Опросный лист — ' + escapeHtml(f.title) + '</div>' +
+        '<div class="spec-item-meta">' + escapeHtml(f.subtitle || '') + '</div>' +
+      '</div>' +
+      '<div class="spec-item-act-col" style="flex-wrap:wrap;gap:6px;">' +
+        '<button class="btn btn-secondary btn-small" onclick="copySurveyLink(\'' + kind + '\')"><i class="ti ti-link"></i> Ссылка для клиента</button>' +
+        '<button class="btn btn-primary btn-small" onclick="openSurveyForm(\'' + kind + '\')"><i class="ti ti-pencil"></i> Заполнить</button>' +
+      '</div>' +
+    '</div>';
+  });
+  h += '</div>';
+  return h;
 }
 
 async function loadSurveys() {
@@ -10088,12 +10115,16 @@ async function loadSurveys() {
   try {
     const d = await apiGet('/api/surveys');
     const list = (d && d.surveys) || [];
+    const formsBlock = _surveyFormsBlockHtml();
     if (!list.length) {
-      box.innerHTML = '<div class="empty-block"><i class="ti ti-clipboard-text"></i>Заполненных опросных листов пока нет.<br>' +
+      box.innerHTML = formsBlock +
+        '<div class="empty-block"><i class="ti ti-clipboard-text"></i>Заполненных опросных листов пока нет.<br>' +
         '<span style="font-size:13px;color:var(--text-light);">Нажми «Ссылка для клиента» и отправь её в мессенджер — заполненная анкета появится здесь.</span></div>';
       return;
     }
-    let html = '<div class="spec-list" style="padding:12px 0 20px;">';
+    let html = formsBlock +
+      '<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 8px;">Заполненные (' + list.length + ')</div>' +
+      '<div class="spec-list" style="padding:0 0 20px;">';
     list.forEach(s => {
       const who = s.org || s.contact || 'Без названия';
       const meta = [];
