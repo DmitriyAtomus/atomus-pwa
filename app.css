@@ -32,6 +32,16 @@
   button, input, select, textarea { font-family: inherit; font-size: inherit; }
   a { color: inherit; text-decoration: none; }
   input, textarea { -webkit-appearance: none; appearance: none; }
+  /* v2.45.230: галочки BOM — глобальный appearance:none прятал нативные
+     чекбоксы (рисовались пустыми/невидимыми). Возвращаем вид. */
+  .bom-check, #bom-check-all {
+    -webkit-appearance: checkbox !important;
+    appearance: auto !important;
+    width: 16px !important;
+    height: 16px !important;
+    accent-color: var(--brand, #2D5F8B);
+    cursor: pointer;
+  }
 
   /* ============ ЛОГИН с полным лого ============ */
   .login-page {
