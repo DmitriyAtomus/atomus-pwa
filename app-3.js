@@ -1196,6 +1196,9 @@ function openBomImportFromText(modelId, modelName) {
             '<input type="checkbox" id="bom-replace-existing"> Заменить существующий BOM</label>' +
           '<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);">' +
             '<input type="checkbox" id="bom-accept-wrong"> Принимать с другим исполнением</label>' +
+          // v2.45.221: создавать новые позиции для «не найденных» строк
+          '<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);" title="Если позиции нет в каталоге — создать её и добавить в BOM">' +
+            '<input type="checkbox" id="bom-create-missing" checked onchange="_updateBomImportGo()"> Создавать недостающие позиции</label>' +
         '</div>' +
         '<div id="bom-import-preview" style="margin-top:14px;"></div>' +
       '</div>' +
@@ -1272,8 +1275,7 @@ async function previewBomImport() {
     const d = await r.json();
     state._bomImportPreview = d;
     _renderBomPreview(box, d);
-    const goBtn = document.getElementById('bom-import-go');
-    if (goBtn) goBtn.disabled = d.summary.matched_exact === 0 && d.summary.wrong_execution === 0;
+    _updateBomImportGo();
   } catch (e) {
     box.innerHTML = '<div class="empty-block">Ошибка соединения</div>';
   }
@@ -1320,12 +1322,25 @@ function _renderBomPreview(box, data) {
   box.innerHTML = html;
 }
 
+// v2.45.221: кнопка «Импортировать» активна если есть совпадения ИЛИ включено
+// «создавать недостающие» (тогда импортируем даже не найденные строки).
+function _updateBomImportGo() {
+  const goBtn = document.getElementById('bom-import-go');
+  if (!goBtn) return;
+  const d = state._bomImportPreview;
+  if (!d || !d.summary) { goBtn.disabled = true; return; }
+  const cm = !!(document.getElementById('bom-create-missing') || {}).checked;
+  const hasMatched = (d.summary.matched_exact > 0) || (d.summary.wrong_execution > 0);
+  goBtn.disabled = !(hasMatched || (cm && d.summary.total > 0));
+}
+
 async function confirmBomImport() {
   const modelId = state._bomImportModelId;
   if (!modelId) return;
   const text = (document.getElementById('bom-import-text') || {}).value || '';
   const replaceExisting = !!(document.getElementById('bom-replace-existing') || {}).checked;
   const acceptWrongExecution = !!(document.getElementById('bom-accept-wrong') || {}).checked;
+  const createMissing = !!(document.getElementById('bom-create-missing') || {}).checked;
   if (!text.trim()) return;
   if (replaceExisting && !confirm('Существующий BOM будет полностью заменён. Продолжить?')) return;
   const btn = document.getElementById('bom-import-go');
@@ -1339,6 +1354,7 @@ async function confirmBomImport() {
         text: text,
         replace_existing: replaceExisting,
         accept_wrong_execution: acceptWrongExecution,
+        create_missing: createMissing,
       }),
     });
     if (!r.ok) {
@@ -1348,6 +1364,7 @@ async function confirmBomImport() {
     }
     const d = await r.json();
     showToast('Импортировано: ' + d.imported + ' из ' + d.total +
+              (d.created ? ' (новых: ' + d.created + ')' : '') +
               (d.skipped && d.skipped.length ? ' (пропущено ' + d.skipped.length + ')' : ''), 'success');
     closeBomImportModal();
     // Перезагрузим карточку модели если она открыта
@@ -8781,6 +8798,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.221',
+    date: '10.06.2026',
+    title: 'Импорт BOM: создаёт недостающие позиции',
+    features: [
+      'При импорте BOM строки, которых нет в каталоге, теперь можно <b>создавать автоматически</b> (галочка «Создавать недостающие позиции») — они заводятся в категории «Прочее (импорт)» и сразу попадают в BOM',
+      'Распознаются <b>числовые артикулы поставщиков</b> (напр. 0-18-0035), а не только коды вида AG-…',
+    ],
+  },
   {
     version: 'v2.45.220',
     date: '10.06.2026',
