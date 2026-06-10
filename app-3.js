@@ -4846,27 +4846,72 @@ async function loadSupplyShopping() {
   container.innerHTML = '<div class="loading-block">Считаем что нужно закупить…</div>';
   try {
     const d = await apiGet('/api/supply/shopping-list');
+    // v2.45.233: покупные позиции договоров («К заказу») — отдельный блок сверху
+    try {
+      const cp = await apiGet('/api/supply/contract-purchases');
+      d._contract_purchases = (cp && cp.items) || [];
+    } catch (e2) { d._contract_purchases = []; }
     const counter = document.getElementById('sup-shop-counter');
-    if (counter) counter.textContent = d.items_count || 0;
+    if (counter) counter.textContent = (d.items_count || 0) + (d._contract_purchases.length || 0);
     renderSupplyShopping(d);
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e && e.message || e)) + '</div>';
   }
 }
 
+// v2.45.233: блок «Покупные позиции по договорам» (К заказу/Заказано)
+function _contractPurchasesBlockHtml(items) {
+  if (!items || !items.length) return '';
+  // Группируем по договору
+  const byContract = {};
+  items.forEach(it => {
+    const k = it.contract_id;
+    if (!byContract[k]) byContract[k] = { number: it.contract_number, contractor: it.contractor_name, items: [] };
+    byContract[k].items.push(it);
+  });
+  let h = '<div class="sup-shop-group" style="border-left:3px solid #B45309;">' +
+    '<div class="sup-shop-group-head">' +
+      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart" style="color:#B45309;"></i> Покупные позиции по договорам' +
+        '<span class="sup-shop-group-count">' + items.length + ' ' + (items.length === 1 ? 'позиция' : (items.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Товары из спецификаций со статусом «К заказу» — статус меняется в самом договоре (клик по строке откроет его)</div>';
+  Object.keys(byContract).forEach(cid => {
+    const g = byContract[cid];
+    h += '<div style="font-size:12.5px;font-weight:700;color:var(--text-dark);padding:6px 14px 2px;">Договор ' +
+      escapeHtml(g.number || ('#' + cid)) + (g.contractor ? ' · ' + escapeHtml(g.contractor) : '') + '</div>';
+    g.items.forEach(it => {
+      const stBadge = it.purchase_status === 'ordered'
+        ? '<span style="font-size:11px;font-weight:700;color:#78350F;background:#FEF3C7;padding:1px 8px;border-radius:6px;">Заказано</span>'
+        : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);cursor:pointer;" ' +
+        'onclick="state.currentContractId=' + cid + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');">' +
+        '<span style="flex:1;font-size:13px;color:var(--text-dark);">' + escapeHtml(it.item_name || '—') +
+          (it.nc_code ? ' <span style="font-family:monospace;font-size:11px;color:var(--text-light);">' + escapeHtml(it.nc_code) + '</span>' : '') +
+        '</span>' +
+        '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+        stBadge +
+      '</div>';
+    });
+  });
+  h += '</div>';
+  return h;
+}
+
 function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
   const groups = (d && d.groups) || [];
+  const cpBlock = _contractPurchasesBlockHtml(d && d._contract_purchases);
   if (!groups.length) {
-    container.innerHTML = '<div class="empty-block" style="padding: 32px 16px;">' +
+    container.innerHTML = cpBlock + '<div class="empty-block" style="padding: 32px 16px;">' +
       '<i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
       '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">' +
         'Всё в норме — низкого остатка и дефицита не обнаружено.' +
       '</div></div>';
     return;
   }
-  let html = '';
+  let html = cpBlock;
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
@@ -8798,6 +8843,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.233',
+    date: '10.06.2026',
+    title: '«Что закупить» видит покупные позиции договоров',
+    features: [
+      'В разделе <b>Снабжение → «Что закупить»</b> появился блок <b>«Покупные позиции по договорам»</b>: товары спецификаций со статусом «К заказу»/«Заказано» (ZPW, ZFC и т.д.), сгруппированы по договорам',
+      'Раньше там был только дефицит комплектующих под производство — покупные позиции было видно лишь внутри договора. Клик по строке открывает договор',
+    ],
+  },
   {
     version: 'v2.45.232',
     date: '10.06.2026',
