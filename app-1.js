@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.230-bom-checkbox-fix";
+const APP_VERSION = "v2.45.232-work-docs";
 const APP_VERSION_DATE = "10.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3810,6 +3810,12 @@ function renderProductionWorkDetail(w) {
     html += '</div>';
   }
 
+  // v2.45.232: документы модели (схема PDF / файл СП / фото) — чтобы сборщик
+  // мог открыть прямо из карточки работы. Заполняется асинхронно.
+  if (w.model_id) {
+    html += '<div id="pwd-model-docs" data-model-id="' + w.model_id + '" style="display:none;margin:10px 0;"></div>';
+  }
+
   // v2.43.34: журнал участия — список записей «кто, когда, что делал, сколько часов»
   {
     const sessions = w.sessions || [];
@@ -3877,6 +3883,53 @@ function renderProductionWorkDetail(w) {
   html += renderPkbDetailActions(w);
 
   modal.innerHTML = html;
+  // v2.45.232: подгружаем документы модели (схема/файл СП/фото)
+  if (w.model_id) _fillWorkModelDocs(w.model_id);
+}
+
+// v2.45.232: блок «Документы модели» в карточке работы — схема PDF, файл СП, фото
+async function _fillWorkModelDocs(modelId) {
+  const box = document.getElementById('pwd-model-docs');
+  if (!box) return;
+  try {
+    if (!cache.models) cache.models = await apiGet('/api/models');
+    const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
+    if (!m) return;
+    const btns = [];
+    if (m.scheme_file_key) {
+      btns.push('<button class="pkb-btn" onclick="downloadModelScheme(' + modelId + ')">' +
+        '<i class="ti ti-schema" style="color:#7C3AED;"></i> Схема (PDF)</button>');
+    }
+    if (m.spec_file_key) {
+      btns.push('<button class="pkb-btn" onclick="downloadModelSpec(' + modelId + ')">' +
+        '<i class="ti ti-file-text" style="color:var(--brand);"></i> Файл СП</button>');
+    }
+    if (m.photo_key) {
+      btns.push('<button class="pkb-btn" onclick="openModelPhotoBlob(' + modelId + ')">' +
+        '<i class="ti ti-photo" style="color:#0E7490;"></i> Фото</button>');
+    }
+    if (!btns.length) return;
+    box.innerHTML =
+      '<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">' +
+        '<i class="ti ti-paperclip"></i> Документы модели</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + btns.join('') + '</div>';
+    box.style.display = '';
+  } catch (e) { /* не критично */ }
+}
+
+// v2.45.232: открыть фото модели в новой вкладке (эндпоинт требует Bearer)
+async function openModelPhotoBlob(modelId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/photo', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Фото не найдено', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Ошибка открытия фото', 'error'); }
 }
 
 function pkbStatusToCss(status) {
