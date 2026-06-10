@@ -3695,12 +3695,17 @@ async function openModelDetail(modelId) {
   }
 
   // Картинка из связанной продажной (или из самой модели если поле есть)
+  // v2.45.228: + кнопка удаления (можно убрать у всех моделей с такой же картинкой)
   let imgHtml = '';
   if (m.image_path) {
-    imgHtml = '<div class="sp-detail-image" style="margin-bottom:14px;">' +
+    imgHtml = '<div class="sp-detail-image" style="margin-bottom:14px;position:relative;">' +
       '<img src="' + API_BASE + '/static/images/' + escapeHtml(m.image_path) + '" ' +
         'alt="' + escapeHtml(m.name) + '" ' +
         'onerror="this.parentNode.style.display=\'none\'" />' +
+      (canManageSales() ?
+        '<button onclick="deleteModelImage(' + modelId + ')" title="Убрать картинку" ' +
+          'style="position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,0.95);color:var(--danger);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' +
+          '<i class="ti ti-trash"></i></button>' : '') +
     '</div>';
   }
 
@@ -4000,6 +4005,11 @@ function _renderModelCharsBlock(m) {
               '<i class="ti ti-file-upload"></i> Файл СП' +
               '<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" style="display:none;" onchange="uploadModelSpec(' + m.id + ', this)">' +
             '</label>';
+    // v2.45.228: принципиальная схема (PDF)
+    html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
+              '<i class="ti ti-schema"></i> Схема (PDF)' +
+              '<input type="file" accept=".pdf,image/*" style="display:none;" onchange="uploadModelScheme(' + m.id + ', this)">' +
+            '</label>';
     if (hasSpec) {
       html += '<button class="btn btn-primary btn-small" onclick="parseModelSpec(' + m.id + ')" title="Разобрать загруженный файл через AI"><i class="ti ti-sparkles"></i> Разобрать AI</button>';
     }
@@ -4015,6 +4025,17 @@ function _renderModelCharsBlock(m) {
                 '<button onclick="deleteModelPhoto(' + m.id + ')" title="Удалить фото" ' +
                   'style="position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,0.95);color:var(--danger);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' +
                   '<i class="ti ti-trash"></i></button>' : '') +
+            '</div>';
+  }
+
+  // v2.45.228: принципиальная схема (если есть)
+  if (m.scheme_file_key) {
+    const sname = escapeHtml(m.scheme_file_name || 'схема.pdf');
+    html += '<div style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">' +
+              '<i class="ti ti-schema" style="font-size:18px;color:#7C3AED;"></i>' +
+              '<span style="flex:1;color:var(--text-dark);min-width:120px;">Принципиальная схема: ' + sname + '</span>' +
+              '<button class="btn btn-secondary btn-small" onclick="downloadModelScheme(' + m.id + ')"><i class="ti ti-download"></i> Открыть</button>' +
+              (canEdit ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);" onclick="deleteModelSchemeFile(' + m.id + ')" title="Удалить схему"><i class="ti ti-trash"></i></button>' : '') +
             '</div>';
   }
 
@@ -4145,6 +4166,62 @@ async function downloadModelSpec(modelId) {
     a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
   } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+}
+
+// v2.45.228: принципиальная схема (PDF) у модели
+async function uploadModelScheme(modelId, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { showToast('Файл больше 25 МБ', 'error'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/scheme-file', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    if (!r.ok) { showToast('Не удалось загрузить схему', 'error'); return; }
+    showToast('Схема сохранена', 'success');
+    cache.models = null;
+    openModelDetail(modelId);
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+  input.value = '';
+}
+
+async function downloadModelScheme(modelId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/models/' + modelId + '/scheme-file', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось открыть', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+}
+
+async function deleteModelSchemeFile(modelId) {
+  if (!confirm('Удалить принципиальную схему?')) return;
+  try {
+    await apiDelete('/api/models/' + modelId + '/scheme-file');
+    showToast('Схема удалена', 'success');
+    cache.models = null;
+    openModelDetail(modelId);
+  } catch (e) { showToast((e && e.message) || 'Не удалось удалить', 'error'); }
+}
+
+// v2.45.228: убрать картинку (image_path) — у этой модели или у всех с такой же
+async function deleteModelImage(modelId) {
+  const all = confirm('Убрать эту картинку у ВСЕХ моделей, где она используется?\n\nОК — у всех (например, у всех копий ATOM HNR)\nОтмена — только у этой модели');
+  if (!all && !confirm('Убрать картинку только у этой модели?')) return;
+  try {
+    const r = await apiDelete('/api/models/' + modelId + '/image' + (all ? '?all_same=1' : ''));
+    showToast('Картинка убрана' + (r && r.cleared > 1 ? ' у ' + r.cleared + ' моделей' : ''), 'success');
+    cache.models = null;
+    openModelDetail(modelId);
+  } catch (e) { showToast((e && e.message) || 'Не удалось убрать', 'error'); }
 }
 
 async function parseModelSpec(modelId) {

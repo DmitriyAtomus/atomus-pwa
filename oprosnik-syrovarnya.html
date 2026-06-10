@@ -514,11 +514,11 @@ input:focus, textarea:focus, select:focus{ outline:none; border-color:var(--cyan
 
 <!-- SUBMIT -->
 <div class="submitcard">
-  <h3>Готово? Отправьте ответы</h3>
-  <p>Нажмите <b>«Скачать PDF с ответами»</b> и пришлите файл нам на почту или вашему менеджеру — либо нажмите <b>«Отправить на e-mail»</b>, и письмо с ответами сформируется автоматически. В течение <b>2 рабочих дней</b> мы подготовим концепцию расстановки, спецификацию оборудования и предварительный расчёт стоимости.</p>
+  <h3>Готово? Сохраните ответы</h3>
+  <p>Нажмите <b>«Сохранить и отправить»</b> — ответы сразу попадут к нам. Как проведём расчёт — всё скинем: концепцию расстановки, спецификацию оборудования и предварительный расчёт стоимости. При желании можно также <b>скачать PDF</b> с ответами себе.</p>
   <div class="actions">
-    <button class="btn gold" type="button" onclick="window.print()">⬇ Скачать PDF с ответами</button>
-    <button class="btn cyan" type="button" onclick="sendMail()">✉ Отправить на e-mail</button>
+    <button class="btn gold" type="button" onclick="sendMail()">💾 Сохранить и отправить</button>
+    <button class="btn cyan" type="button" onclick="window.print()">⬇ Скачать PDF с ответами</button>
     <button class="btn ghost" type="button" onclick="copyAnswers(this)">Скопировать ответы</button>
     <button class="btn ghost" type="button" onclick="resetForm()">Очистить</button>
   </div>
@@ -638,7 +638,7 @@ function sendMail(){
   if(CONFIG.endpoint){
     const gv = n => { const el = document.querySelector('[name='+n+']'); return el ? el.value.trim() : ''; };
     fetch(CONFIG.endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({form:'syrovarnya', text: body, org: gv('org'), contact: gv('contact'), phone: gv('phone'), email: gv('email'), ts: Date.now()})})
-      .then(r=> ok(r.ok ? 'Ответы отправлены! Мы свяжемся с вами в течение 2 рабочих дней.' : 'Не удалось отправить — скачайте PDF и пришлите на '+CONFIG.email))
+      .then(r=> ok(r.ok ? 'Ответы сохранены и отправлены в «Атомус Групп»! Как проведём расчёт — всё скинем.' : 'Не удалось отправить — скачайте PDF и пришлите на '+CONFIG.email))
       .catch(()=> ok('Нет связи с сервером — скачайте PDF и пришлите на '+CONFIG.email));
     return;
   }
