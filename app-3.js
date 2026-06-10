@@ -5339,10 +5339,66 @@ function _opBuildItemsHTML(items) {
         'style="border:none;background:none;cursor:pointer;color:var(--text-light);padding:2px;display:flex;align-items:center;justify-content:center;font-size:15px;" ' +
         'onmouseover="this.style.color=\'#B91C1C\'" onmouseout="this.style.color=\'var(--text-light)\'">' +
         '<i class="ti ti-trash"></i></button>' +
+    '</div>' +
+    // v2.45.238: «у поставщика» — название из его прайса, оно уйдёт в письмо и DOCX.
+    // Запоминается на пару (позиция, поставщик) — в следующей заявке подставится само.
+    '<div style="display:grid;grid-template-columns:24px 1fr 30px;gap:8px;align-items:center;margin-top:-2px;">' +
+      '<span></span>' +
+      '<input type="text" data-op-alias-id="' + it.id + '" ' +
+        'value="' + escapeHtml(it.supplier_item_name || '') + '" ' +
+        'placeholder="У поставщика: название из его прайса (напр. XIGMA XG-TXC50RHA-ODU, HC-1596058)" ' +
+        'style="padding:3px 6px;border:1px dashed var(--border);border-radius:6px;font-size:12px;color:var(--brand);" ' +
+        'oninput="_opScheduleItemAlias(' + it.id + ', this)" ' +
+        'onblur="_opFlushItemAlias(' + it.id + ', this)">' +
+      '<span></span>' +
     '</div>';
   });
   html += '</div>';
   return html;
+}
+
+// v2.45.238: дебаунс-сохранение «названия у поставщика»
+const _opItemAliasTimers = {};
+
+function _opScheduleItemAlias(itemId, inputEl) {
+  if (_opItemAliasTimers[itemId]) clearTimeout(_opItemAliasTimers[itemId]);
+  _opItemAliasTimers[itemId] = setTimeout(() => {
+    _opItemAliasTimers[itemId] = null;
+    _opUpdateItemAlias(itemId, inputEl && inputEl.value);
+  }, 900);
+}
+
+function _opFlushItemAlias(itemId, inputEl) {
+  if (_opItemAliasTimers[itemId]) {
+    clearTimeout(_opItemAliasTimers[itemId]);
+    _opItemAliasTimers[itemId] = null;
+    _opUpdateItemAlias(itemId, inputEl && inputEl.value);
+  }
+}
+
+async function _opUpdateItemAlias(itemId, value) {
+  if (!_opCurrentDraft) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + itemId, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ supplier_name: (value || '').trim() }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось сохранить название', 'error');
+      return;
+    }
+    // Перегенерируем письмо, но не сносим инпут, если пользователь ещё печатает в нём
+    const active = document.activeElement;
+    const stillTyping = active && active.dataset && active.dataset.opAliasId == itemId;
+    if (!stillTyping) await _opReloadDraft();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 // Дебаунсы по итему — чтобы не дёргать PATCH на каждый символ.
@@ -8946,6 +9002,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.238',
+    date: '10.06.2026',
+    title: 'Заявка поставщику — название из его прайса',
+    features: [
+      'В превью заявки под каждой позицией появилось поле <b>«У поставщика»</b>: впиши название из прайса поставщика (например, наш «Наружный блок 18» = «XIGMA XG-TXC50RHA-ODU, HC-1596058» у БИС) — именно оно уйдёт в письмо и DOCX',
+      'Соответствие запоминается на пару «позиция + поставщик»: один раз сопоставил — в следующих заявках этому поставщику подставится автоматически',
+    ],
+  },
   {
     version: 'v2.45.237',
     date: '10.06.2026',
