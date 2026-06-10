@@ -4632,6 +4632,14 @@ async function _saveSupplierPrice(supplierId, replace) {
     const m = document.getElementById('sup-price-review-modal');
     if (m) m.remove();
     _refreshSupplierPriceCount(supplierId);
+    // v2.45.240: если прайс грузили из окна выбора в заявке — обновляем каталог
+    if (document.getElementById('op-alias-picker-modal') && state._opAliasPickerItemId) {
+      openOpAliasPicker(state._opAliasPickerItemId);
+    }
+    // и подсказки datalist в превью заявки
+    if (typeof _opCurrentDraft !== 'undefined' && _opCurrentDraft && _opCurrentDraft.supplier_id === supplierId) {
+      _opFillAliasDatalist(supplierId);
+    }
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
@@ -5463,6 +5471,92 @@ async function _opFillAliasDatalist(supplierId) {
   } catch (e) { /* подсказки опциональны */ }
 }
 
+// ============ v2.45.240: выбор из каталога поставщика (кнопка 📋 в заявке) ============
+
+state._opAliasPickerItemId = null;
+state._opAliasPickerItems = [];
+
+async function openOpAliasPicker(orderItemId) {
+  if (!_opCurrentDraft || !_opCurrentDraft.supplier_id) {
+    showToast('Не определён поставщик заявки', 'error');
+    return;
+  }
+  state._opAliasPickerItemId = orderItemId;
+  let items = [];
+  try {
+    const d = await apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-items');
+    items = d.items || [];
+  } catch (e) { items = []; }
+  state._opAliasPickerItems = items;
+
+  let m = document.getElementById('op-alias-picker-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'op-alias-picker-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10001';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;max-height:88vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-search"></i> Каталог: ' + escapeHtml(_opCurrentDraft.supplier_name || 'поставщик') + '</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'op-alias-picker-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:12px 18px 0;display:flex;gap:8px;align-items:center;">' +
+        '<div class="search-box" style="flex:1;">' +
+          '<i class="ti ti-search"></i>' +
+          '<input type="text" id="op-ap-search" placeholder="Поиск по прайсу…" oninput="_renderOpAliasPickerList()">' +
+        '</div>' +
+        '<label class="btn btn-secondary" style="cursor:pointer;margin:0;white-space:nowrap;" title="Догрузить прайс-лист этого поставщика (XIGMA, Royal Clima и т.д.)">' +
+          '<i class="ti ti-file-spreadsheet"></i> Прайс из Excel' +
+          '<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;" onchange="uploadSupplierPriceExcel(' + _opCurrentDraft.supplier_id + ', this)">' +
+        '</label>' +
+      '</div>' +
+      '<div id="op-ap-list" style="overflow-y:auto;flex:1;padding:10px 18px 18px;"></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  _renderOpAliasPickerList();
+  setTimeout(() => { const i = document.getElementById('op-ap-search'); if (i) i.focus(); }, 50);
+}
+
+function _renderOpAliasPickerList() {
+  const box = document.getElementById('op-ap-list');
+  if (!box) return;
+  const all = state._opAliasPickerItems || [];
+  if (!all.length) {
+    box.innerHTML = '<div class="empty-block" style="padding:30px 10px;color:var(--text-light);text-align:center;">' +
+      '<i class="ti ti-file-spreadsheet" style="font-size:28px;"></i><br>' +
+      'Прайс этого поставщика ещё не загружен.<br>Нажми <b>«Прайс из Excel»</b> выше и выбери файл прайс-листа (XIGMA, Royal Clima…).' +
+    '</div>';
+    return;
+  }
+  const q = ((document.getElementById('op-ap-search') || {}).value || '').toLowerCase().trim();
+  const list = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+  if (!list.length) {
+    box.innerHTML = '<div class="empty-block" style="padding:24px 10px;color:var(--text-light);">Ничего не нашлось по «' + escapeHtml(q) + '»</div>';
+    return;
+  }
+  box.innerHTML = list.slice(0, 300).map(n =>
+    '<div onclick="_opAliasPickerChoose(this)" data-name="' + escapeHtml(n) + '" ' +
+      'style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;" ' +
+      'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+      escapeHtml(n) +
+    '</div>'
+  ).join('') + (list.length > 300 ? '<div style="padding:8px 10px;color:var(--text-light);font-size:12px;">…показаны первые 300, уточни поиск</div>' : '');
+}
+
+async function _opAliasPickerChoose(el) {
+  const name = el.getAttribute('data-name') || '';
+  const itemId = state._opAliasPickerItemId;
+  const m = document.getElementById('op-alias-picker-modal');
+  if (m) m.remove();
+  if (!itemId || !name) return;
+  const input = document.querySelector('[data-op-alias-id="' + itemId + '"]');
+  if (input) input.value = name;
+  await _opUpdateItemAlias(itemId, name);  // сам перегенерит письмо
+  showToast('Сопоставлено: ' + name, 'success');
+}
+
 function _opBuildItemsHTML(items) {
   if (!items || !items.length) return '<div style="color:var(--text-light);font-size:13px;padding:8px 4px;">(позиций нет)</div>';
   let html = '<div style="display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:8px;">';
@@ -5490,14 +5584,20 @@ function _opBuildItemsHTML(items) {
     '</div>' +
     // v2.45.238: «у поставщика» — название из его прайса, оно уйдёт в письмо и DOCX.
     // Запоминается на пару (позиция, поставщик) — в следующей заявке подставится само.
+    // v2.45.240: кнопка 📋 — выбрать из каталога (загруженных прайсов поставщика).
     '<div style="display:grid;grid-template-columns:24px 1fr 30px;gap:8px;align-items:center;margin-top:-2px;">' +
       '<span></span>' +
-      '<input type="text" data-op-alias-id="' + it.id + '" list="op-alias-dl" ' +
-        'value="' + escapeHtml(it.supplier_item_name || '') + '" ' +
-        'placeholder="У поставщика: название из его прайса (начни печатать — подскажем)" ' +
-        'style="padding:3px 6px;border:1px dashed var(--border);border-radius:6px;font-size:12px;color:var(--brand);" ' +
-        'oninput="_opScheduleItemAlias(' + it.id + ', this)" ' +
-        'onblur="_opFlushItemAlias(' + it.id + ', this)">' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+        '<input type="text" data-op-alias-id="' + it.id + '" list="op-alias-dl" ' +
+          'value="' + escapeHtml(it.supplier_item_name || '') + '" ' +
+          'placeholder="У поставщика: выбери из каталога → или впиши вручную" ' +
+          'style="flex:1;padding:3px 6px;border:1px dashed var(--border);border-radius:6px;font-size:12px;color:var(--brand);" ' +
+          'oninput="_opScheduleItemAlias(' + it.id + ', this)" ' +
+          'onblur="_opFlushItemAlias(' + it.id + ', this)">' +
+        '<button type="button" title="Выбрать из каталога поставщика" onclick="openOpAliasPicker(' + it.id + ')" ' +
+          'style="border:1px solid var(--border);background:var(--bg);border-radius:6px;cursor:pointer;color:var(--brand);padding:3px 8px;display:flex;align-items:center;justify-content:center;font-size:14px;">' +
+          '<i class="ti ti-list-search"></i></button>' +
+      '</div>' +
       '<span></span>' +
     '</div>';
   });
@@ -9150,6 +9250,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.240',
+    date: '10.06.2026',
+    title: 'Выбор «у поставщика» из каталога',
+    features: [
+      'В превью заявки рядом с полем «У поставщика» — кнопка <b>каталога</b>: открывается прайс поставщика с поиском, кликнул по позиции — сопоставилось',
+      'Если прайс ещё не загружен — кнопка «Прайс из Excel» прямо в этом окне: выбери файл (XIGMA, Royal Clima…), удали лишние строки и сохрани',
+    ],
+  },
   {
     version: 'v2.45.239',
     date: '10.06.2026',
