@@ -4574,7 +4574,8 @@ async function uploadSupplierPriceExcel(supplierId, inputEl, sheetName) {
       return;
     }
     if (!(j.lines || []).length) { showToast('На этом листе не нашлось названий', 'error'); return; }
-    _showSupplierPriceReview(supplierId, j.lines, false);
+    // v2.45.242: интерактивный выбор позиций галочками вместо текстового окна
+    _showSupplierPriceSelect(supplierId, j.lines);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
@@ -4617,8 +4618,145 @@ async function openSupplierPriceEditor(supplierId) {
   }
 }
 
-// Окно проверки: из Excel приходит «всё подряд» — пользователь оставляет только
-// нужные строки (например только полупром) и сохраняет.
+// ============ v2.45.242: выбор позиций из Excel галочками ============
+// «Открыл прайс, полистал, тыкнул — ушло в каталог (и сразу в позицию заявки)».
+
+state._supPriceSelLines = [];
+state._supPriceSelSet = null;
+
+function _showSupplierPriceSelect(supplierId, lines) {
+  state._supPriceSelLines = lines;
+  state._supPriceSelSet = new Set();
+  let m = document.getElementById('sup-price-select-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'sup-price-select-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10002';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const fromPicker = !!state._opAliasPickerItemId && !!document.getElementById('op-alias-picker-modal');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-check"></i> Прайс: выбери позиции (' + lines.length + ')</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'sup-price-select-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:10px 18px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+        '<div class="search-box" style="flex:1;min-width:200px;">' +
+          '<i class="ti ti-search"></i>' +
+          '<input type="text" id="sps-search" placeholder="Поиск по прайсу…" oninput="_renderSupPriceSelectList()">' +
+        '</div>' +
+        '<button type="button" class="btn btn-secondary" onclick="_supPriceSelectAll(true)">Выбрать видимое</button>' +
+        '<button type="button" class="btn btn-secondary" onclick="_supPriceSelectAll(false)">Снять</button>' +
+      '</div>' +
+      '<div id="sps-list" style="overflow-y:auto;flex:1;padding:8px 18px;"></div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'sup-price-select-modal\').remove()">Отмена</button>' +
+        (fromPicker ?
+          '<button class="btn btn-primary" id="sps-add-assign-btn" disabled onclick="_supPriceSelectSave(' + supplierId + ', true)">' +
+            '<i class="ti ti-arrow-bar-to-down"></i> Добавить и подставить в позицию</button>' : '') +
+        '<button class="btn btn-primary" id="sps-add-btn" disabled onclick="_supPriceSelectSave(' + supplierId + ', false)">' +
+          '<i class="ti ti-check"></i> Добавить в каталог (<span id="sps-count">0</span>)</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  _renderSupPriceSelectList();
+  setTimeout(() => { const i = document.getElementById('sps-search'); if (i) i.focus(); }, 50);
+}
+
+function _spsVisibleIdx() {
+  const q = ((document.getElementById('sps-search') || {}).value || '').toLowerCase().trim();
+  const out = [];
+  (state._supPriceSelLines || []).forEach((n, i) => {
+    if (!q || n.toLowerCase().includes(q)) out.push(i);
+  });
+  return out;
+}
+
+function _renderSupPriceSelectList() {
+  const box = document.getElementById('sps-list');
+  if (!box) return;
+  const sel = state._supPriceSelSet || new Set();
+  const idxs = _spsVisibleIdx();
+  if (!idxs.length) {
+    box.innerHTML = '<div class="empty-block" style="padding:24px 10px;color:var(--text-light);">Ничего не нашлось</div>';
+  } else {
+    box.innerHTML = idxs.slice(0, 400).map(i => {
+      const n = state._supPriceSelLines[i];
+      const on = sel.has(i);
+      return '<div onclick="_spsToggle(' + i + ')" ' +
+        'style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;' +
+          (on ? 'background:rgba(45,95,139,0.08);' : '') + '">' +
+        '<i class="ti ' + (on ? 'ti-square-check-filled' : 'ti-square') + '" style="font-size:17px;color:' + (on ? 'var(--brand)' : 'var(--text-light)') + ';flex-shrink:0;"></i>' +
+        '<span>' + escapeHtml(n) + '</span>' +
+      '</div>';
+    }).join('') + (idxs.length > 400 ? '<div style="padding:8px 10px;color:var(--text-light);font-size:12px;">…показаны первые 400, уточни поиск</div>' : '');
+  }
+  _spsUpdateButtons();
+}
+
+function _spsToggle(i) {
+  const sel = state._supPriceSelSet;
+  if (sel.has(i)) sel.delete(i); else sel.add(i);
+  _renderSupPriceSelectList();
+}
+
+function _supPriceSelectAll(on) {
+  const sel = state._supPriceSelSet;
+  _spsVisibleIdx().forEach(i => { if (on) sel.add(i); else sel.delete(i); });
+  _renderSupPriceSelectList();
+}
+
+function _spsUpdateButtons() {
+  const n = (state._supPriceSelSet || new Set()).size;
+  const cnt = document.getElementById('sps-count');
+  if (cnt) cnt.textContent = n;
+  const addBtn = document.getElementById('sps-add-btn');
+  if (addBtn) addBtn.disabled = !n;
+  const aaBtn = document.getElementById('sps-add-assign-btn');
+  if (aaBtn) aaBtn.disabled = (n !== 1);  // подставить можно ровно одну
+}
+
+async function _supPriceSelectSave(supplierId, assignToItem) {
+  const names = Array.from(state._supPriceSelSet || []).map(i => state._supPriceSelLines[i]).filter(Boolean);
+  if (!names.length) return;
+  try {
+    const r = await fetch(API_BASE + '/api/suppliers/' + supplierId + '/price-items/import', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ names }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.message || 'Не удалось сохранить', 'error'); return; }
+    const m = document.getElementById('sup-price-select-modal');
+    if (m) m.remove();
+    showToast('В каталог: +' + j.added + ' (всего ' + j.total + ')', 'success');
+    // Подставить выбранную позицию прямо в строку заявки
+    if (assignToItem && names.length === 1 && state._opAliasPickerItemId) {
+      const itemId = state._opAliasPickerItemId;
+      const pm = document.getElementById('op-alias-picker-modal');
+      if (pm) pm.remove();
+      const input = document.querySelector('[data-op-alias-id="' + itemId + '"]');
+      if (input) input.value = names[0];
+      await _opUpdateItemAlias(itemId, names[0]);
+      showToast('Сопоставлено: ' + names[0], 'success');
+    } else if (document.getElementById('op-alias-picker-modal') && state._opAliasPickerItemId) {
+      openOpAliasPicker(state._opAliasPickerItemId);  // обновить каталог
+    }
+    if (typeof _opCurrentDraft !== 'undefined' && _opCurrentDraft && _opCurrentDraft.supplier_id === supplierId) {
+      _opFillAliasDatalist(supplierId);
+    }
+    if (document.getElementById('sm-price-count')) _refreshSupplierPriceCount(supplierId);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// Окно проверки: текстовый редактор прайса (используется из «Посмотреть / править»
+// в карточке поставщика — для массовой чистки).
 function _showSupplierPriceReview(supplierId, lines, isEditMode) {
   let m = document.getElementById('sup-price-review-modal');
   if (m) m.remove();
@@ -9321,6 +9459,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.242',
+    date: '10.06.2026',
+    title: 'Прайс из Excel — выбор галочками',
+    features: [
+      'После загрузки Excel прайс открывается <b>списком с галочками</b>: листаешь, ищешь, отмечаешь нужное — «Добавить в каталог». Текстовое окно больше не мучает',
+      'Если открывал из позиции заявки: отметил одну строку → <b>«Добавить и подставить в позицию»</b> — она сразу уходит и в каталог, и в письмо',
+    ],
+  },
   {
     version: 'v2.45.241',
     date: '10.06.2026',
