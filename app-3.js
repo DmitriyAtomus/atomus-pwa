@@ -1173,13 +1173,20 @@ function openBomImportFromText(modelId, modelName) {
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:880px;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-clipboard-data"></i> Импорт BOM из текста' +
+        '<h3><i class="ti ti-clipboard-data"></i> Импорт BOM (Excel / текст)' +
           (modelName ? ' — ' + escapeHtml(modelName) : '') + '</h3>' +
         '<button class="modal-close" onclick="closeBomImportModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="padding:18px;max-height:70vh;overflow:auto;">' +
+        // v2.45.220: загрузка Excel + скачивание шаблона
+        '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">' +
+          '<button class="btn btn-secondary btn-small" onclick="downloadBomTemplate()"><i class="ti ti-file-download"></i> Скачать шаблон Excel</button>' +
+          '<label class="btn btn-secondary btn-small" style="cursor:pointer;"><i class="ti ti-file-upload"></i> Загрузить Excel' +
+            '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="uploadBomExcel(this)"></label>' +
+        '</div>' +
         '<p style="margin:0 0 10px;color:var(--text-mid);">' +
-          'Скопируй колонку с позициями (как в Excel) и вставь сюда. Программа сама разберёт количество, артикул и материал. <b>«N» в скобках = AISI</b>.' +
+          '<b>Excel:</b> скачай шаблон, заполни (Кол-во · Исполнение · Артикул · Наименование) и загрузи — строки подставятся ниже. ' +
+          '<b>Или текст:</b> скопируй колонку из Excel и вставь сюда. <b>«N» в скобках = AISI</b>.' +
         '</p>' +
         '<textarea id="bom-import-text" rows="8" placeholder="(1) AG-16.002.002 Кронштейн левый (лист 1мм) ГИБКА&#10;(0,8N) AG-10.002.004 Прижим ГИБКА&#10;..." ' +
           'style="width:100%;box-sizing:border-box;font-family:Menlo,Consolas,monospace;font-size:13px;padding:10px;border:1px solid var(--border);border-radius:8px;"></textarea>' +
@@ -1205,6 +1212,43 @@ function closeBomImportModal() {
   const m = document.getElementById('bom-import-modal');
   if (m) m.classList.remove('visible');
   state._bomImportPreview = null;
+}
+
+// v2.45.220: скачать шаблон Excel для BOM
+async function downloadBomTemplate() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/bom/template.xlsx', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Не удалось скачать шаблон', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'bom_template.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (e) { showToast('Ошибка скачивания', 'error'); }
+}
+
+// v2.45.220: загрузить Excel → подставить строки в текст BOM → авто-проверка
+async function uploadBomExcel(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const box = document.getElementById('bom-import-preview');
+  if (box) box.innerHTML = '<div class="loading-block">Читаем Excel…</div>';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(API_BASE + '/api/bom/excel-to-text', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { if (box) box.innerHTML = ''; showToast(d.message || 'Не удалось прочитать Excel', 'error'); input.value = ''; return; }
+    const ta = document.getElementById('bom-import-text');
+    if (ta) ta.value = d.text || '';
+    if (box) box.innerHTML = '';
+    showToast('Загружено строк: ' + (d.rows || 0) + '. Проверяем…', 'success');
+    if (typeof previewBomImport === 'function') previewBomImport();
+  } catch (e) { showToast('Ошибка загрузки файла', 'error'); }
+  input.value = '';
 }
 
 async function previewBomImport() {
@@ -8737,6 +8781,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.220',
+    date: '10.06.2026',
+    title: 'Импорт BOM из Excel + шаблон',
+    features: [
+      'В окне импорта BOM появились кнопки <b>«Скачать шаблон Excel»</b> и <b>«Загрузить Excel»</b> — заполняешь таблицу (Кол-во · Исполнение · Артикул · Наименование), загружаешь, строки подставляются и проверяются',
+      'Текстовая вставка тоже осталась — как было',
+    ],
+  },
   {
     version: 'v2.45.219',
     date: '10.06.2026',
