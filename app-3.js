@@ -5427,6 +5427,18 @@ function renderSupplyShopping(d) {
       const reasonBadge = it.reason
         ? '<span class="sup-shop-reason">' + escapeHtml(it.reason) + '</span>'
         : '';
+      // v2.45.274: живой статус заказа по этой позиции (счёт запрошен / оплачен …)
+      let orderBadge = '';
+      if (it.order_status && typeof _CP_ORDER_STATUS_RU !== 'undefined') {
+        const s = _CP_ORDER_STATUS_RU[it.order_status];
+        if (s) {
+          orderBadge = '<span style="font-size:11px;font-weight:700;color:' + s[1] + ';background:' + s[2] + ';' +
+            'padding:1px 8px;border-radius:6px;white-space:nowrap;margin-left:6px;" ' +
+            'title="Статус обновляется по заказу в «Заказах»">' +
+            escapeHtml(s[0]) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') +
+          '</span>';
+        }
+      }
       const critBadge = it.is_critical
         ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>'
         : '';
@@ -5462,7 +5474,7 @@ function renderSupplyShopping(d) {
         '<td class="ssp-qty" style="text-align:right;font-weight:700;color:#2563EB;">' +
           escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
         '</td>' +
-        '<td class="ssp-reason-cell">' + reasonBadge + '</td>' +
+        '<td class="ssp-reason-cell">' + reasonBadge + orderBadge + '</td>' +
         assignCell +
       '</tr>';
     }).join('');
@@ -10064,6 +10076,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.274',
+    date: '11.06.2026',
+    title: '«Что закупить» — статус заказа у всех позиций',
+    features: [
+      'Обычные позиции (низкий остаток / план производства) теперь тоже показывают <b>живой статус заказа</b>: создал заказ у «Все инструменты» — у позиций появится «Счёт запрошен ORD-N», потом «Счёт получен», «Оплачен»…',
+      'Раньше это работало только у покупных позиций договоров',
+    ],
+  },
   {
     version: 'v2.45.273',
     date: '11.06.2026',
