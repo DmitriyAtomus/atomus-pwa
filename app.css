@@ -16954,7 +16954,8 @@
 .xls-tbl td {
   border: 1px solid #e2e2e2;
   padding: 3px 7px;
-  vertical-align: top;
+  /* v2.45.249: как в Excel — контент по центру вертикали */
+  vertical-align: middle;
   min-width: 56px;
   max-width: 340px;
   white-space: normal;
@@ -16962,10 +16963,11 @@
   word-break: normal;
 }
 .xls-tbl img {
-  max-width: 120px;
-  max-height: 100px;
+  max-width: 130px;
+  max-height: 110px;
   display: block;
   object-fit: contain;
+  margin: 0 auto;
 }
 .xls-tbl tr.xls-pick { cursor: pointer; }
 .xls-tbl tr.xls-pick:hover td { background: rgba(45,95,139,0.08); }

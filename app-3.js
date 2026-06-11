@@ -5674,6 +5674,7 @@ async function openOpAliasPicker(orderItemId) {
   state._opAliasPickerDetailed = detailed;   // v2.45.243: с источником (вкладки)
   state._opAliasPickerFiles = files;
   state._opAliasPickerTab = '';              // '' = Все
+  state._opApFileHtmlCache = {};             // v2.45.249: всегда свежая отрисовка таблиц
 
   let m = document.getElementById('op-alias-picker-modal');
   if (m) m.remove();
@@ -9684,6 +9685,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.249',
+    date: '11.06.2026',
+    title: 'Прайс «как в Excel» — мелкие доводки',
+    features: [
+      'Таблица прайса всегда перерисовывается свежей при открытии каталога (раньше могла показаться старая из кэша окна)',
+      'Содержимое ячеек по центру вертикали, фото чуть крупнее — ближе к оригиналу',
+    ],
+  },
   {
     version: 'v2.45.248',
     date: '11.06.2026',
