@@ -6980,7 +6980,12 @@ function clearSupplyOrdersSelection() {
 async function bulkDeleteSupplyOrders() {
   const ids = Array.from(state.supplyOrdersSelected);
   if (!ids.length) return;
-  if (!confirm('Удалить выбранные заказы (' + ids.length + ')?\n\nЗаказы будут скрыты из списков. Привязанные счета и история переписки сохранятся.')) return;
+  if (!confirm('Удалить выбранные заказы (' + ids.length + ')?\n\nЗаказы будут скрыты из списков. Привязанные счета и история переписки сохранятся. Позиции договоров вернутся в «К заказу».')) return;
+  // v2.45.258: удаление — под пароль
+  if (typeof _satPromptPassword === 'function') {
+    const ok = await _satPromptPassword();
+    if (!ok) return;
+  }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders/bulk-delete', {
@@ -7008,7 +7013,12 @@ async function bulkDeleteSupplyOrders() {
 }
 
 async function deleteSupplyOrder(orderId, label) {
-  if (!confirm('Удалить заказ ' + label + '?\n\nЗаказ будет скрыт из списков. Привязанные счета и история переписки сохранятся.')) return;
+  if (!confirm('Удалить заказ ' + label + '?\n\nЗаказ будет скрыт из списков. Привязанные счета и история переписки сохранятся. Позиции договоров по этому заказу вернутся в «К заказу».')) return;
+  // v2.45.258: удаление заказа — под пароль (тот же, что вход в CRM)
+  if (typeof _satPromptPassword === 'function') {
+    const ok = await _satPromptPassword();
+    if (!ok) return;
+  }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders/' + orderId, {
@@ -9712,6 +9722,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.258',
+    date: '11.06.2026',
+    title: 'Удаление заказов — под пароль',
+    features: [
+      'Удаление заказа в «Заказах» (и массовое тоже) теперь требует <b>повторный ввод пароля</b> — случайно не снесёшь',
+      'При удалении заказа покупные позиции договоров автоматически возвращаются в <b>«К заказу»</b> — можно заказать заново',
+    ],
+  },
   {
     version: 'v2.45.257',
     date: '11.06.2026',
