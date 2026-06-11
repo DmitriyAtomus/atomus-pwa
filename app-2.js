@@ -8082,9 +8082,57 @@ async function loadContractAuditBlock(contractId) {
       'remove_supply_order_item': 'Удалена позиция заказа',
     };
     // v2.45.138: перевод технического payload (и старых англоязычных записей)
+    // v2.45.276: + перевод имён полей в «fields: a, b, c»
+    const FIELD_LABELS = {
+      number:          'номер',
+      sign_date:       'дата подписания',
+      contractor_id:   'контрагент',
+      contractor:      'контрагент',
+      contract_type:   'тип договора',
+      contract_kind:   'тип договора',
+      legal_entity:    'юр. лицо',
+      legal_entity_id: 'юр. лицо',
+      sum_amount:      'сумма',
+      sum:             'сумма',
+      delivery_date:   'дата отгрузки',
+      ship_date:       'дата отгрузки',
+      payment_date:    'дата оплаты',
+      pay_date:        'дата оплаты',
+      manager_id:      'менеджер',
+      manager:         'менеджер',
+      co_manager_ids:  'соменеджеры',
+      co_managers:     'соменеджеры',
+      days_type:       'тип дней',
+      days_count:      'количество дней',
+      days:            'дни',
+      priority:        'приоритет',
+      status:          'статус',
+      comment:         'комментарий',
+      comment_text:    'комментарий',
+      notes:           'примечание',
+      title:           'название',
+      contract_number: 'номер договора',
+      address:         'адрес',
+      phone:           'телефон',
+      email:           'email',
+      prepay_amount:   'аванс',
+      prepay:          'аванс',
+      discount:        'скидка',
+      currency:        'валюта',
+      vat:             'НДС',
+      published_at:    'дата публикации',
+      created_at:      'дата создания',
+      updated_at:      'дата изменения',
+    };
+    const _translateFieldsList = (csv) => csv
+      .split(',')
+      .map(s => s.trim())
+      .map(s => FIELD_LABELS[s] || s)
+      .join(', ');
     const _prettyAuditPayload = (txt) => {
       if (!txt) return '';
       return String(txt)
+        .replace(/\bfields:\s*([a-z_,\s]+)/gi, (_m, list) => 'поля: ' + _translateFieldsList(list))
         .replace(/\bstatus:/g, 'Статус:')
         .replace(/\bpartially_shipped\b/g, 'отгружен частично')
         .replace(/\bproduction\b/g, 'в производстве')
