@@ -7745,8 +7745,11 @@ function renderSupplyOrderDetail(o) {
     }
     // v2.45.261: распознанные реквизиты счёта — с копированием в один клик
     if (o.invoice_number || o.invoice_total) {
+      // v2.45.263: дата по-людски (11.06.2026), как в самом счёте — копируется дословно
+      const dm = String(o.invoice_date || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const invDateRu = dm ? (dm[3] + '.' + dm[2] + '.' + dm[1]) : (o.invoice_date || '');
       const invTitle = 'Счёт № ' + (o.invoice_number || '—') +
-        (o.invoice_date ? ' от ' + o.invoice_date : '') +
+        (invDateRu ? ' от ' + invDateRu : '') +
         (o.invoice_org ? ' · ' + o.invoice_org : '');
       const invTotal = (o.invoice_total !== null && o.invoice_total !== undefined)
         ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
@@ -9835,6 +9838,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.263',
+    date: '11.06.2026',
+    title: 'Дата счёта — по-людски',
+    features: [
+      'В чипах реквизитов дата теперь в привычном виде «от 11.06.2026» (а не «2026-06-11») — копируется дословно для платёжки',
+    ],
+  },
   {
     version: 'v2.45.262',
     date: '11.06.2026',
