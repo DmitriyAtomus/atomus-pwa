@@ -2563,7 +2563,21 @@ async function deleteComponent(componentId) {
   }
 }
 
-function openComponentDetail(componentId) {
+async function openComponentDetail(componentId) {
+  // v2.45.256: карточку открывают и из других разделов («Что закупить») —
+  // если справочник ещё не загружен, подтягиваем, иначе форма будет пустой.
+  if (!(cache.components || []).find(x => x.id === componentId)) {
+    try {
+      const r = await apiGet('/api/components');
+      cache.components = r.components || [];
+    } catch (e) { /* откроем как есть */ }
+  }
+  if (!(cache.componentCategories || []).length) {
+    try {
+      const r = await apiGet('/api/components/categories');
+      cache.componentCategories = r.categories || [];
+    } catch (e) {}
+  }
   // Открываем форму редактирования
   openComponentForm(componentId);
 }
@@ -5381,7 +5395,14 @@ function renderSupplyShopping(d) {
             '<i class="ti ti-truck"></i>Поставщик</button></td>'
         : '';
       return '<tr>' + checkCell +
-        '<td class="ssp-name">' + critBadge + escapeHtml(it.component_name) +
+        // v2.45.256: клик по названию — открыть карточку комплектующего
+        '<td class="ssp-name">' + critBadge +
+          '<span onclick="openComponentDetail(' + it.component_id + ')" ' +
+            'style="cursor:pointer;" title="Открыть карточку комплектующего" ' +
+            'onmouseover="this.style.color=\'var(--brand)\';this.style.textDecoration=\'underline\'" ' +
+            'onmouseout="this.style.color=\'\';this.style.textDecoration=\'\'">' +
+            escapeHtml(it.component_name) +
+          '</span>' +
           (it.sku ? '<span class="ssp-sku" style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
         '</td>' +
         '<td class="ssp-stock" style="text-align:right;color:var(--text-light);font-size:12px;">' +
@@ -9668,6 +9689,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.256',
+    date: '11.06.2026',
+    title: '«Что закупить» — карточка по клику',
+    features: [
+      'Клик по названию позиции в «Что закупить» открывает <b>карточку комплектующего</b> — можно сразу посмотреть/поправить артикул, мин. остаток, кратность закупки, поставщика',
+    ],
+  },
   {
     version: 'v2.45.255',
     date: '11.06.2026',
