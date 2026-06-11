@@ -5243,7 +5243,34 @@ function _cpRowHtml(it) {
     '</span>' +
     '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
     stBadge +
+    // v2.45.260: убрать из закупки (позиция в договоре остаётся)
+    '<button type="button" title="Убрать из закупки (в договоре останется)" ' +
+      'onclick="event.stopPropagation();_cpSkipItem(' + it.id + ', ' + JSON.stringify(it.item_name || '').replace(/"/g, '&quot;') + ')" ' +
+      'style="border:none;background:none;cursor:pointer;color:var(--text-light);padding:2px 4px;font-size:14px;display:flex;align-items:center;" ' +
+      'onmouseover="this.style.color=\'#B91C1C\'" onmouseout="this.style.color=\'var(--text-light)\'">' +
+      '<i class="ti ti-x"></i></button>' +
   '</div>';
+}
+
+// v2.45.260: «не закупать» — позиция уходит из «Что закупить», в договоре остаётся
+async function _cpSkipItem(itemId, name) {
+  if (!confirm('Убрать «' + name + '» из закупки?\n\nПозиция в договоре останется, но в «Что закупить» больше не появится.')) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply/contract-purchases/skip', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_ids: [itemId] }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось убрать', 'error');
+      return;
+    }
+    showToast('Позиция убрана из закупки', 'success');
+    loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 function _contractPurchasesBlockHtml(items) {
@@ -9722,6 +9749,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.260',
+    date: '11.06.2026',
+    title: '«Что закупить» — убрать позицию из закупки',
+    features: [
+      'У покупных позиций договоров появился <b>крестик</b>: убирает позицию из «Что закупить» (например, закупили мимо системы). Позиция в договоре остаётся',
+    ],
+  },
   {
     version: 'v2.45.259',
     date: '11.06.2026',
