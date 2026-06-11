@@ -7745,12 +7745,15 @@ function renderSupplyOrderDetail(o) {
     }
     // v2.45.261: распознанные реквизиты счёта — с копированием в один клик
     if (o.invoice_number || o.invoice_total) {
-      // v2.45.263: дата по-людски (11.06.2026), как в самом счёте — копируется дословно
+      // v2.45.264: заголовок дословно как в счёте — «Счет № 05-0223915 от 11 июня 2026 г.»
       const dm = String(o.invoice_date || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
-      const invDateRu = dm ? (dm[3] + '.' + dm[2] + '.' + dm[1]) : (o.invoice_date || '');
-      const invTitle = 'Счёт № ' + (o.invoice_number || '—') +
-        (invDateRu ? ' от ' + invDateRu : '') +
-        (o.invoice_org ? ' · ' + o.invoice_org : '');
+      const ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+      const invDateRu = dm
+        ? (parseInt(dm[3], 10) + ' ' + (ruMonths[parseInt(dm[2], 10) - 1] || dm[2]) + ' ' + dm[1] + ' г.')
+        : (o.invoice_date || '');
+      const invTitle = 'Счет № ' + (o.invoice_number || '—') +
+        (invDateRu ? ' от ' + invDateRu : '');
       const invTotal = (o.invoice_total !== null && o.invoice_total !== undefined)
         ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
       const chip = (label, copyVal, mono) =>
@@ -7763,6 +7766,7 @@ function renderSupplyOrderDetail(o) {
         chip('<b>' + escapeHtml(invTitle) + '</b>', invTitle, false) +
         (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
         (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
+        (o.invoice_org ? chip(escapeHtml(o.invoice_org), o.invoice_org, false) : '') +
       '</div>';
     } else {
       html += '<div style="width:100%;padding-top:8px;">' +
@@ -9838,6 +9842,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.264',
+    date: '11.06.2026',
+    title: 'Чип счёта — дословно как в счёте',
+    features: [
+      'Главный чип копирует текст ровно как в шапке счёта: <b>«Счет № 05-0223915 от 11 июня 2026 г.»</b> — вставляй в платёжку без правок. Организация — отдельным чипом',
+    ],
+  },
   {
     version: 'v2.45.263',
     date: '11.06.2026',
