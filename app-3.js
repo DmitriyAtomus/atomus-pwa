@@ -7103,6 +7103,10 @@ async function loadEdoUpd() {
       const st = u.matched_order_id
         ? '<span style="font-size:11px;font-weight:700;color:#065F46;background:#D1FAE5;padding:1px 8px;border-radius:6px;">Привязан ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span>'
         : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">Не привязан</span>';
+      // v2.45.268: пометка «оприходован» прямо в списке
+      const intakeBadge = u.intake_invoice_id
+        ? ' <span style="font-size:11px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:1px 8px;border-radius:6px;"><i class="ti ti-package-import" style="font-size:11px;"></i> В приёмке</span>'
+        : '';
       return '<div class="sup-row" onclick="openEdoUpdDetail(' + u.id + ')" style="cursor:pointer;">' +
         '<div class="sup-row-icon"><i class="ti ti-file-text"></i></div>' +
         '<div class="sup-row-body">' +
@@ -7112,7 +7116,7 @@ async function loadEdoUpd() {
             '<span>' + escapeHtml(u.seller_name || '—') + '</span>' +
             (total ? '<span style="font-weight:700;color:var(--text-dark);">' + total + '</span>' : '') +
             (u.function ? '<span style="color:var(--text-light);">' + escapeHtml(u.function) + '</span>' : '') +
-            st +
+            st + intakeBadge +
           '</div>' +
         '</div>' +
       '</div>';
@@ -10060,6 +10064,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.268',
+    date: '11.06.2026',
+    title: 'УПД из ЭДО — пометка в списке',
+    features: [
+      'После «Оприходовать» УПД помечается в списке синим бейджем <b>«В приёмке»</b> — сразу видно, что уже отправлен на склад, и он уходит из счётчика новых',
+    ],
+  },
   {
     version: 'v2.45.267',
     date: '11.06.2026',
