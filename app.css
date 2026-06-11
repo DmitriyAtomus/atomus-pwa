@@ -16971,3 +16971,12 @@
 }
 .xls-tbl tr.xls-pick { cursor: pointer; }
 .xls-tbl tr.xls-pick:hover td { background: rgba(45,95,139,0.08); }
+/* v2.45.250: несколько фото в одном объединённом блоке — рядом, как в Excel */
+.xls-tbl .xls-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.xls-tbl .xls-imgs img { margin: 0; }
