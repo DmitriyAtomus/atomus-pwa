@@ -7743,6 +7743,31 @@ function renderSupplyOrderDetail(o) {
     if (canUploadInvoice) {
       html += '<button class="btn btn-secondary" onclick="uploadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-refresh"></i> Заменить</button>';
     }
+    // v2.45.261: распознанные реквизиты счёта — с копированием в один клик
+    if (o.invoice_number || o.invoice_total) {
+      const invTitle = 'Счёт № ' + (o.invoice_number || '—') +
+        (o.invoice_date ? ' от ' + o.invoice_date : '') +
+        (o.invoice_org ? ' · ' + o.invoice_org : '');
+      const invTotal = (o.invoice_total !== null && o.invoice_total !== undefined)
+        ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
+      const chip = (label, copyVal, mono) =>
+        '<span onclick="_copyTxt(' + JSON.stringify(String(copyVal)).replace(/"/g, '&quot;') + ')" ' +
+          'title="Нажми — скопируется" ' +
+          'style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg);border:1px dashed var(--border);' +
+          'border-radius:8px;padding:4px 10px;font-size:12.5px;' + (mono ? 'font-family:ui-monospace,Consolas,monospace;' : '') + '">' +
+          label + ' <i class="ti ti-copy" style="color:var(--text-light);font-size:13px;"></i></span>';
+      html += '<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;">' +
+        chip('<b>' + escapeHtml(invTitle) + '</b>', invTitle, false) +
+        (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
+        (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
+      '</div>';
+    } else {
+      html += '<div style="width:100%;padding-top:8px;">' +
+        '<button class="btn btn-secondary btn-small" id="sup-inv-parse-btn-' + o.id + '" onclick="parseSupplyOrderInvoice(' + o.id + ')">' +
+          '<i class="ti ti-sparkles"></i> Распознать номер и сумму</button>' +
+        '<span style="font-size:11.5px;color:var(--text-light);margin-left:8px;">ИИ вытащит № счёта, дату и сумму из PDF / фото / Excel / Word</span>' +
+      '</div>';
+    }
   } else if (canUploadInvoice) {
     html += '<div style="flex:1;color:var(--text-light);font-size:13px;">Счёт ещё не загружен. Прикрепи PDF/Excel/фото — система автоматически переведёт заказ в статус «Счёт пришёл».</div>' +
       '<button class="btn btn-primary" onclick="uploadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-upload"></i> Загрузить счёт</button>';
@@ -8015,6 +8040,48 @@ function uploadSupplyOrderInvoice(orderId) {
 // v2.45.24: раскрыть/свернуть просмотр счёта прямо в карточке (без скачивания).
 // PDF и картинки рендерим inline; для остальных типов оставляем сообщение
 // со ссылкой на «Скачать» — браузер не умеет показывать Excel.
+// v2.45.261: копирование в буфер + тост
+function _copyTxt(text) {
+  const done = () => showToast('Скопировано: ' + (text.length > 40 ? text.slice(0, 40) + '…' : text), 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => _copyTxtFallback(text, done));
+  } else {
+    _copyTxtFallback(text, done);
+  }
+}
+function _copyTxtFallback(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { showToast('Не удалось скопировать', 'error'); }
+  ta.remove();
+}
+
+// v2.45.261: распознать реквизиты счёта (номер/дата/сумма) через ИИ
+async function parseSupplyOrderInvoice(orderId) {
+  const btn = document.getElementById('sup-inv-parse-btn-' + orderId);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Распознаём…'; }
+  try {
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/invoice/parse', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(j.message || 'Не распозналось', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-sparkles"></i> Распознать номер и сумму'; }
+      return;
+    }
+    showToast('Счёт № ' + (j.number || '—') + (j.total ? ' · ' + Number(j.total).toLocaleString('ru-RU') + ' ₽' : ''), 'success');
+    loadSupplyOrderDetail();   // перерисуем карточку с чипами
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-sparkles"></i> Распознать номер и сумму'; }
+  }
+}
+
 async function toggleSupplyOrderInvoicePreview(orderId, filename) {
   const cont = document.getElementById('sup-inv-preview-' + orderId);
   const btn  = document.getElementById('sup-inv-preview-btn-' + orderId);
@@ -8065,6 +8132,25 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
     const fn = (filename || '').toLowerCase();
     const isPdf = ct.includes('pdf') || fn.endsWith('.pdf');
     const isImg = ct.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/.test(fn);
+    // v2.45.261: Excel-счёт — рисуем таблицей прямо в карточке
+    const isXls = /\.(xlsx|xlsm|xls)$/.test(fn) || ct.includes('spreadsheet') || ct.includes('ms-excel');
+    if (isXls) {
+      URL.revokeObjectURL(url);
+      try {
+        const vr = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/invoice/view', {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const vj = await vr.json().catch(() => ({}));
+        if (vr.ok && vj.html) {
+          cont.innerHTML = '<div class="xls-wrap" style="max-height:75vh;">' + vj.html + '</div>';
+        } else {
+          cont.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Не удалось отрисовать Excel — скачай файл кнопкой «Скачать».</div>';
+        }
+      } catch (e2) {
+        cont.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Не удалось отрисовать Excel — скачай файл.</div>';
+      }
+      return;
+    }
     if (isPdf) {
       cont.innerHTML = '<iframe data-blob-url="' + url + '" src="' + url + '#view=FitH" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
     } else if (isImg) {
@@ -9749,6 +9835,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.261',
+    date: '11.06.2026',
+    title: 'Счёт от поставщика — реквизиты и Excel',
+    features: [
+      'В карточке заказа под счётом — чипы <b>«Счёт № … от … · сумма»</b>: нажал на чип — скопировалось (номер, сумма, всё целиком)',
+      'Реквизиты вытаскивает ИИ из <b>PDF, фото, Excel и Word</b> — кнопка «Распознать номер и сумму»; для новых счетов с почты распознаётся само',
+      '<b>Excel-счета</b> теперь открываются прямо в карточке таблицей (кнопка «Просмотреть»), как PDF и фото',
+    ],
+  },
   {
     version: 'v2.45.260',
     date: '11.06.2026',
