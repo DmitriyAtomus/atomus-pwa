@@ -5205,10 +5205,33 @@ async function loadSupplyShopping() {
 
 // v2.45.233/235: блок «Покупные позиции по договорам» — галочки, назначение
 // поставщика (в т.ч. сразу нескольким), группировка по поставщикам.
+// v2.45.257: живой статус связанного заказа снабжения вместо вечного «Заказано»
+const _CP_ORDER_STATUS_RU = {
+  draft:            ['Заказ создан',          '#1E40AF', '#DBEAFE'],
+  sent:             ['Счёт запрошен',         '#92400E', '#FEF3C7'],
+  awaiting_invoice: ['Счёт запрошен',         '#92400E', '#FEF3C7'],
+  invoice_received: ['Счёт получен',          '#3730A3', '#E0E7FF'],
+  to_pay:           ['На оплате',             '#9A3412', '#FFEDD5'],
+  paid:             ['Оплачен · ждём поставку', '#065F46', '#D1FAE5'],
+  partial:          ['Доставка частично',     '#065F46', '#D1FAE5'],
+  received:         ['Получено',              '#15803D', '#DCFCE7'],
+  cancelled:        ['Заказ отменён',         '#7F1D1D', '#FEE2E2'],
+};
+
 function _cpRowHtml(it) {
-  const stBadge = it.purchase_status === 'ordered'
-    ? '<span style="font-size:11px;font-weight:700;color:#78350F;background:#FEF3C7;padding:1px 8px;border-radius:6px;">Заказано</span>'
-    : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
+  let stBadge;
+  if (it.purchase_status === 'ordered') {
+    const st = _CP_ORDER_STATUS_RU[it.order_status];
+    const label = st ? st[0] : 'Заказано';
+    const fg = st ? st[1] : '#78350F';
+    const bg = st ? st[2] : '#FEF3C7';
+    stBadge = '<span style="font-size:11px;font-weight:700;color:' + fg + ';background:' + bg + ';padding:1px 8px;border-radius:6px;white-space:nowrap;" ' +
+      'title="' + escapeHtml((it.order_label ? 'Заказ ' + it.order_label + ' · ' : '') + 'статус обновляется по заказу в «Заказах»') + '">' +
+      escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') +
+    '</span>';
+  } else {
+    stBadge = '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
+  }
   return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
     '<input type="checkbox" class="cp-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
     '<span style="flex:1;font-size:13px;color:var(--text-dark);cursor:pointer;" ' +
@@ -9689,6 +9712,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.257',
+    date: '11.06.2026',
+    title: 'Покупные позиции — живой статус заказа',
+    features: [
+      'В «Что закупить» покупные позиции договоров показывают <b>статус своего заказа</b>, а не вечное «Заказано»: Счёт запрошен → Счёт получен → На оплате → Оплачен · ждём поставку → Получено (+ номер ORD-N)',
+      'Статус обновляется сам по мере движения заказа в «Заказах» (включая авто-приёмку счёта по почте)',
+      'Старые заказанные позиции привязались к своим заказам автоматически',
+    ],
+  },
   {
     version: 'v2.45.256',
     date: '11.06.2026',
