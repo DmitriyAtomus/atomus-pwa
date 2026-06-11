@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.264-invoice-verbatim";
+const APP_VERSION = "v2.45.265-edo-upd";
 const APP_VERSION_DATE = "10.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1485,6 +1485,8 @@ function selectSidebarItem(screenName) {
   if (screenName === 'supply-inbox')        loadSupplyInbox();
   // v2.25.0 (Этап 26): авто-приёмка УПД через ИИ
   if (screenName === 'supply-invoice-intake') loadSupplyInvoicesList();
+  // v2.45.265: УПД из 1С-ЭДО
+  if (screenName === 'supply-edo-upd')      loadEdoUpd();
   if (screenName === 'supply-suppliers')    loadSuppliers();
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
   // Помощь

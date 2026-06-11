@@ -7075,6 +7075,191 @@ function setSupplyOrdFilter(f) {
   loadSupplyOrders();
 }
 
+// ============ v2.45.265: ПРИЁМ УПД ИЗ 1С-ЭДО ============
+
+async function loadEdoUpd() {
+  const box = document.getElementById('edo-upd-list');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-block">Загружаем УПД из ЭДО…</div>';
+  try {
+    const d = await apiGet('/api/edo/upd');
+    const items = d.items || [];
+    const counter = document.getElementById('edo-upd-counter');
+    if (counter) counter.textContent = items.length;
+    const badge = document.getElementById('edo-upd-badge');
+    const fresh = items.filter(u => u.status === 'new').length;
+    if (badge) {
+      badge.textContent = fresh;
+      badge.style.display = fresh ? '' : 'none';
+    }
+    if (!items.length) {
+      box.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-download"></i>УПД из ЭДО пока не приходили.<br>' +
+        '<span style="font-size:12px;color:var(--text-light);">Как только 1С отправит документ — он появится здесь и придёт пуш.</span></div>';
+      return;
+    }
+    box.innerHTML = items.map(u => {
+      const total = u.total_with_vat
+        ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽' : '';
+      const st = u.matched_order_id
+        ? '<span style="font-size:11px;font-weight:700;color:#065F46;background:#D1FAE5;padding:1px 8px;border-radius:6px;">Привязан ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span>'
+        : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">Не привязан</span>';
+      return '<div class="sup-row" onclick="openEdoUpdDetail(' + u.id + ')" style="cursor:pointer;">' +
+        '<div class="sup-row-icon"><i class="ti ti-file-text"></i></div>' +
+        '<div class="sup-row-body">' +
+          '<div class="sup-row-title">УПД № ' + escapeHtml(u.number || 'б/н') +
+            (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '') + '</div>' +
+          '<div class="sup-row-meta" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+            '<span>' + escapeHtml(u.seller_name || '—') + '</span>' +
+            (total ? '<span style="font-weight:700;color:var(--text-dark);">' + total + '</span>' : '') +
+            (u.function ? '<span style="color:var(--text-light);">' + escapeHtml(u.function) + '</span>' : '') +
+            st +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e && e.message || e)) + '</div>';
+  }
+}
+
+function _edoDateRu(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : String(iso || '');
+}
+
+async function openEdoUpdDetail(updId) {
+  let u;
+  try {
+    u = await apiGet('/api/edo/upd/' + updId);
+  } catch (e) { showToast('Не удалось загрузить УПД', 'error'); return; }
+  let m = document.getElementById('edo-upd-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'edo-upd-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const total = u.total_with_vat ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
+  const rows = (u.items || []).map((it, i) =>
+    '<tr><td style="text-align:right;color:var(--text-light);">' + (i + 1) + '</td>' +
+    '<td>' + escapeHtml(it.name || '—') + '</td>' +
+    '<td style="text-align:right;">' + (it.qty !== null && it.qty !== undefined ? it.qty : '') + ' ' + escapeHtml(it.unit || '') + '</td>' +
+    '<td style="text-align:right;">' + (it.price !== null && it.price !== undefined ? Number(it.price).toLocaleString('ru-RU') : '') + '</td>' +
+    '<td style="text-align:right;font-weight:600;">' + (it.sum !== null && it.sum !== undefined ? Number(it.sum).toLocaleString('ru-RU') : '') + '</td></tr>'
+  ).join('');
+  const fileBtns = (u.files || []).map((f, i) =>
+    '<button class="btn btn-secondary btn-small" onclick="downloadEdoUpdFile(' + u.id + ',' + i + ')">' +
+      '<i class="ti ti-download"></i> ' + escapeHtml(f.name || ('файл ' + (i + 1))) + '</button>'
+  ).join(' ');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-text"></i> УПД № ' + escapeHtml(u.number || 'б/н') + (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '') + '</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'edo-upd-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;">' +
+          '<span><b>' + escapeHtml(u.seller_name || '—') + '</b>' + (u.seller_inn ? ' · ИНН ' + escapeHtml(u.seller_inn) : '') + '</span>' +
+          (u.function ? '<span style="color:var(--text-light);">' + escapeHtml(u.function) + '</span>' : '') +
+          (total ? '<span style="font-weight:700;">' + total + ' ₽</span>' : '') +
+        '</div>' +
+        (u.linked_doc ? '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">1С: ' + escapeHtml(u.linked_doc) + '</div>' : '') +
+        '<div style="margin-bottom:10px;">' +
+          (u.matched_order_id
+            ? '<span style="font-size:12px;font-weight:700;color:#065F46;background:#D1FAE5;padding:2px 10px;border-radius:6px;">Привязан к заказу ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span> ' +
+              '<button class="btn btn-secondary btn-small" onclick="state.currentSupplyOrderId=' + u.matched_order_id + ';document.getElementById(\'edo-upd-modal\').remove();selectSidebarItem(\'supply-order-detail\');">Открыть заказ</button> ' +
+              '<button class="btn btn-secondary btn-small" onclick="attachEdoUpd(' + u.id + ', null)">Отвязать</button>'
+            : '<span style="font-size:12px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:2px 10px;border-radius:6px;">Не привязан</span> ' +
+              '<button class="btn btn-primary btn-small" onclick="openEdoUpdOrderPicker(' + u.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>') +
+        '</div>' +
+        (rows
+          ? '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:12.5px;" class="xls-tbl">' +
+              '<tr style="font-weight:700;background:var(--bg);"><td>№</td><td>Наименование</td><td style="text-align:right;">Кол-во</td><td style="text-align:right;">Цена</td><td style="text-align:right;">Сумма</td></tr>' +
+              rows +
+            '</table></div>'
+          : '<div class="empty-block" style="padding:18px;">Строк из XML не извлеклось</div>') +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + fileBtns + '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+async function downloadEdoUpdFile(updId, idx) {
+  try {
+    const r = await fetch(API_BASE + '/api/edo/upd/' + updId + '/file/' + idx, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) { showToast('Файл не найден', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const cd = r.headers.get('Content-Disposition') || '';
+    const mm = cd.match(/filename="?([^";]+)"?/);
+    a.href = url; a.download = mm ? mm[1] : 'upd.bin';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { showToast('Сеть: ' + (e.message || e), 'error'); }
+}
+
+async function openEdoUpdOrderPicker(updId) {
+  let orders = [];
+  try {
+    const d = await apiGet('/api/supply-orders?status=open');
+    orders = d.orders || d.items || [];
+  } catch (e) { orders = []; }
+  if (!orders.length) {
+    try {
+      const d2 = await apiGet('/api/supply-orders');
+      orders = d2.orders || d2.items || [];
+    } catch (e) {}
+  }
+  let m = document.getElementById('edo-upd-pick-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'edo-upd-pick-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10001';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-link"></i> К какому заказу привязать?</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'edo-upd-pick-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' +
+        (orders.length ? orders.map(o =>
+          '<div class="modal-item" onclick="attachEdoUpd(' + updId + ',' + o.id + ')">' +
+            '<div class="mi-icon"><i class="ti ti-file-invoice"></i></div>' +
+            '<div class="mi-text"><div class="mi-title">' + escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+              '<div class="mi-meta">' + escapeHtml(o.status_label || o.status || '') + (o.total_amount ? ' · ' + Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '') + '</div>' +
+            '</div></div>'
+        ).join('') : '<div class="empty-block">Заказов нет</div>') +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+async function attachEdoUpd(updId, orderId) {
+  try {
+    const r = await fetch(API_BASE + '/api/edo/upd/' + updId + '/attach', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось', 'error');
+      return;
+    }
+    showToast(orderId ? 'УПД привязан к заказу' : 'УПД отвязан', 'success');
+    const pm = document.getElementById('edo-upd-pick-modal');
+    if (pm) pm.remove();
+    const dm = document.getElementById('edo-upd-modal');
+    if (dm) dm.remove();
+    loadEdoUpd();
+    openEdoUpdDetail(updId);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 // ============ ЭТАП 52.3 (v2.45.0): ВХОДЯЩИЕ СЧЕТА (IMAP) ============
 
 state.supplyInboxFilter = state.supplyInboxFilter || 'unmatched';
@@ -9842,6 +10027,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.265',
+    date: '11.06.2026',
+    title: 'Приём УПД от ЭДО (синхронизация с 1С)',
+    features: [
+      'Новый раздел в Снабжении — <b>«Приём УПД от ЭДО»</b>: 1С отправляет УПД прямо в CRM, новые документы появляются здесь первыми (+ пуш директору и бухгалтеру)',
+      'CRM сама разбирает XML ФНС: номер, дата, продавец, суммы и таблица строк; XML/PDF скачиваются из карточки',
+      'Автопривязка к заказу поставщику по ИНН и сумме (±1%); не привязалось — кнопка «Привязать к заказу» вручную',
+    ],
+  },
   {
     version: 'v2.45.264',
     date: '11.06.2026',

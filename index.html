@@ -395,6 +395,10 @@
         <button class="nav-item" data-nav="supply-invoice-intake" onclick="selectSidebarItem('supply-invoice-intake')">
           <i class="ti ti-sparkles"></i><span>Приёмка УПД</span>
         </button>
+        <!-- v2.45.265: УПД из 1С-ЭДО (синхронизация 1С ↔ CRM) -->
+        <button class="nav-item" data-nav="supply-edo-upd" onclick="selectSidebarItem('supply-edo-upd')">
+          <i class="ti ti-cloud-download"></i><span>Приём УПД от ЭДО</span><span class="nav-badge" id="edo-upd-badge" style="display:none;"></span>
+        </button>
         <div class="nav-section-label">СПРАВОЧНИКИ</div>
         <button class="nav-item" data-nav="supply-suppliers" onclick="selectSidebarItem('supply-suppliers')">
           <i class="ti ti-truck-loading"></i><span>Поставщики</span>
@@ -1986,6 +1990,22 @@
       </div>
 
       <!-- ПРИЁМКИ -->
+      <!-- v2.45.265: ПРИЁМ УПД ИЗ 1С-ЭДО -->
+      <div class="screen" data-screen="supply-edo-upd" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-cloud-download"></i>
+              <h1>Приём УПД от ЭДО</h1>
+              <span class="page-counter" id="edo-upd-counter">0</span>
+            </div>
+            <button class="btn btn-secondary" onclick="loadEdoUpd()"><i class="ti ti-refresh"></i> Обновить</button>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-light);margin:0 0 12px;">Сюда автоматически прилетают УПД из 1С-ЭДО. Привязанные к заказу помечены меткой ORD-N, остальные привяжи вручную из карточки.</div>
+          <div id="edo-upd-list"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+
       <!-- v2.25.0: ПРИЁМКА УПД (ЭТАП 26) -->
       <div class="screen" data-screen="supply-invoice-intake" data-section="supply">
         <div class="content-inner" style="max-width: 100%;">
