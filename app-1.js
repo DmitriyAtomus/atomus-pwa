@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.271-pay-block";
+const APP_VERSION = "v2.45.272-pay-sidebar";
 const APP_VERSION_DATE = "10.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1727,6 +1727,26 @@ function renderDashboard(d) {
   try { _fillPayDueBlock(); } catch (_) {}
 }
 
+// v2.45.272: пункт «На оплате» в левой колонке — открывает Заказы с фильтром «К оплате»
+function openSupplyPayList() {
+  selectSidebarItem('supply-orders');
+  setTimeout(() => {
+    try { setSupplyOrdFilter('to_pay'); } catch (_) {}
+  }, 150);
+}
+
+// v2.45.272: бейдж количества «к оплате» на пункте меню
+async function _updateSupplyPayBadge() {
+  const badge = document.getElementById('supply-pay-badge');
+  if (!badge) return;
+  try {
+    const d = await apiGet('/api/supply-orders?status=to_pay');
+    const n = (d.counts && d.counts.to_pay) || (d.orders || []).length || 0;
+    badge.textContent = n;
+    badge.style.display = n ? '' : 'none';
+  } catch (_) {}
+}
+
 // v2.45.271: блок «На оплате» на главной — заказы в статусе to_pay с кнопкой «Оплатил»
 async function _fillPayDueBlock() {
   const box = document.getElementById('pay-due-block');
@@ -1736,6 +1756,12 @@ async function _fillPayDueBlock() {
   try {
     const d = await apiGet('/api/supply-orders?status=to_pay');
     const list = d.orders || d.items || [];
+    // v2.45.272: заодно обновляем бейдж на пункте меню «На оплате»
+    const badge = document.getElementById('supply-pay-badge');
+    if (badge) {
+      badge.textContent = list.length;
+      badge.style.display = list.length ? '' : 'none';
+    }
     if (!list.length) { box.innerHTML = ''; return; }
     let h = '<div class="section" style="margin-bottom:16px;">' +
       '<h3 class="section-title" style="color:#9A3412;"><i class="ti ti-wallet"></i> На оплате (' + list.length + ') ' +

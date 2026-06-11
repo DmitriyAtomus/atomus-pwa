@@ -389,6 +389,10 @@
         <button class="nav-item" data-nav="supply-orders" onclick="selectSidebarItem('supply-orders')">
           <i class="ti ti-file-invoice"></i><span>Заказы</span>
         </button>
+        <!-- v2.45.272: быстрый вход в «К оплате» (для бухгалтера) -->
+        <button class="nav-item" data-nav="supply-pay" id="sb-supply-pay" onclick="openSupplyPayList()">
+          <i class="ti ti-wallet"></i><span>На оплате</span><span class="nav-badge" id="supply-pay-badge" style="display:none;"></span>
+        </button>
         <button class="nav-item" data-nav="supply-inbox" onclick="selectSidebarItem('supply-inbox')">
           <i class="ti ti-mailbox"></i><span>Входящие счета от поставщиков</span><span class="nav-badge" id="supply-inbox-badge" style="display:none;"></span>
         </button>
