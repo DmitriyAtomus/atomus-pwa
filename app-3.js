@@ -7163,13 +7163,18 @@ async function openEdoUpdDetail(updId) {
           (total ? '<span style="font-weight:700;">' + total + ' ₽</span>' : '') +
         '</div>' +
         (u.linked_doc ? '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">1С: ' + escapeHtml(u.linked_doc) + '</div>' : '') +
-        '<div style="margin-bottom:10px;">' +
+        '<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
           (u.matched_order_id
             ? '<span style="font-size:12px;font-weight:700;color:#065F46;background:#D1FAE5;padding:2px 10px;border-radius:6px;">Привязан к заказу ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span> ' +
               '<button class="btn btn-secondary btn-small" onclick="state.currentSupplyOrderId=' + u.matched_order_id + ';document.getElementById(\'edo-upd-modal\').remove();selectSidebarItem(\'supply-order-detail\');">Открыть заказ</button> ' +
               '<button class="btn btn-secondary btn-small" onclick="attachEdoUpd(' + u.id + ', null)">Отвязать</button>'
             : '<span style="font-size:12px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:2px 10px;border-radius:6px;">Не привязан</span> ' +
-              '<button class="btn btn-primary btn-small" onclick="openEdoUpdOrderPicker(' + u.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>') +
+              '<button class="btn btn-secondary btn-small" onclick="openEdoUpdOrderPicker(' + u.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>') +
+          // v2.45.267: оприходование — в конвейер «Приёмка УПД» → склад
+          (u.intake_invoice_id
+            ? '<span style="font-size:12px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:2px 10px;border-radius:6px;">Отправлен в приёмку</span> ' +
+              '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'edo-upd-modal\').remove();selectSidebarItem(\'supply-invoice-intake\');"><i class="ti ti-arrow-right"></i> Открыть приёмку</button>'
+            : '<button class="btn btn-primary btn-small" id="edo-intake-btn-' + u.id + '" onclick="edoUpdToIntake(' + u.id + ')"><i class="ti ti-package-import"></i> Оприходовать (на склад)</button>') +
         '</div>' +
         (rows
           ? '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:12.5px;" class="xls-tbl">' +
@@ -7234,6 +7239,34 @@ async function openEdoUpdOrderPicker(updId) {
       '</div>' +
     '</div>';
   document.body.appendChild(m);
+}
+
+// v2.45.267: оприходовать УПД из ЭДО — создаёт приёмку (конвейер «Приёмка УПД»),
+// дальше обычный путь: проверка сопоставления → подтверждение → приход на склад
+async function edoUpdToIntake(updId) {
+  if (!confirm('Оприходовать УПД?\n\nПозиции уйдут в «Приёмку УПД»: система сопоставит их с номенклатурой, после твоего подтверждения комплектующие лягут на склад.')) return;
+  const btn = document.getElementById('edo-intake-btn-' + updId);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Создаём приёмку…'; }
+  try {
+    const r = await fetch(API_BASE + '/api/edo/upd/' + updId + '/to-intake', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(j.message || 'Не удалось создать приёмку', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-package-import"></i> Оприходовать (на склад)'; }
+      return;
+    }
+    showToast('Приёмка создана — сопоставляем номенклатуру…', 'success');
+    const dm = document.getElementById('edo-upd-modal');
+    if (dm) dm.remove();
+    loadEdoUpd();
+    selectSidebarItem('supply-invoice-intake');
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-package-import"></i> Оприходовать (на склад)'; }
+  }
 }
 
 async function attachEdoUpd(updId, orderId) {
@@ -10027,6 +10060,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.267',
+    date: '11.06.2026',
+    title: 'УПД из ЭДО — оприходование на склад',
+    features: [
+      'В карточке УПД из ЭДО — кнопка <b>«Оприходовать (на склад)»</b>: документ уходит в «Приёмку УПД», система сопоставляет позиции с номенклатурой',
+      'Дальше обычный путь приёмки: проверил сопоставление → подтвердил → комплектующие легли на склад',
+      'Данные берутся из XML (точные, без распознавания фото) — сопоставление надёжнее',
+    ],
+  },
   {
     version: 'v2.45.266',
     date: '11.06.2026',
