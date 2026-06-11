@@ -16973,6 +16973,19 @@
 }
 .xls-tbl tr.xls-pick { cursor: pointer; }
 .xls-tbl tr.xls-pick:hover td { background: rgba(45,95,139,0.08); }
+/* v2.45.273: подсвеченный пункт «На оплате» на главном сайдбаре */
+.nav-pay-highlight {
+  background: linear-gradient(135deg, rgba(180,83,9,0.14), rgba(245,158,11,0.10)) !important;
+  border: 1px solid rgba(180,83,9,0.45) !important;
+  border-radius: 10px;
+  color: #F59E0B !important;
+  font-weight: 700;
+}
+.nav-pay-highlight i { color: #F59E0B !important; }
+.nav-pay-highlight:hover {
+  background: linear-gradient(135deg, rgba(180,83,9,0.24), rgba(245,158,11,0.18)) !important;
+}
+
 /* v2.45.250: несколько фото в одном объединённом блоке — рядом, как в Excel.
    v2.45.255: лента прижата к ЛЕВОМУ краю — иначе на широкой таблице
    «центр» оказывается за экраном и фото уезжают вправо. */

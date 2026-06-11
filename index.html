@@ -215,6 +215,10 @@
         <button class="nav-item" data-nav="home-calendar" onclick="selectSidebarItem('home-calendar')">
           <i class="ti ti-calendar"></i><span>Календарь</span>
         </button>
+        <!-- v2.45.273: «На оплате» на главном сайдбаре — подсвеченная, для бухгалтера -->
+        <button class="nav-item nav-pay-highlight" id="sb-home-pay" onclick="openSupplyPayList()">
+          <i class="ti ti-wallet"></i><span>На оплате</span><span class="nav-badge" id="home-pay-badge" style="display:none;"></span>
+        </button>
         <!-- v2.43.77: Радио — кнопка-триггер модалки, состояние обновляется renderSidebarRadio() -->
         <a class="nav-item nav-radio-btn" id="sidebar-radio-btn" onclick="openRadioModal()" style="cursor:pointer;">
           <i class="ti ti-radio"></i><span>Радио</span>

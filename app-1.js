@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.272-pay-sidebar";
+const APP_VERSION = "v2.45.273-pay-home-sidebar";
 const APP_VERSION_DATE = "10.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1756,12 +1756,14 @@ async function _fillPayDueBlock() {
   try {
     const d = await apiGet('/api/supply-orders?status=to_pay');
     const list = d.orders || d.items || [];
-    // v2.45.272: заодно обновляем бейдж на пункте меню «На оплате»
-    const badge = document.getElementById('supply-pay-badge');
-    if (badge) {
-      badge.textContent = list.length;
-      badge.style.display = list.length ? '' : 'none';
-    }
+    // v2.45.272/273: заодно обновляем бейджи на пунктах меню «На оплате»
+    ['supply-pay-badge', 'home-pay-badge'].forEach(id => {
+      const badge = document.getElementById(id);
+      if (badge) {
+        badge.textContent = list.length;
+        badge.style.display = list.length ? '' : 'none';
+      }
+    });
     if (!list.length) { box.innerHTML = ''; return; }
     let h = '<div class="section" style="margin-bottom:16px;">' +
       '<h3 class="section-title" style="color:#9A3412;"><i class="ti ti-wallet"></i> На оплате (' + list.length + ') ' +
