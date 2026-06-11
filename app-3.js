@@ -4573,11 +4573,17 @@ async function uploadSupplierPriceExcel(supplierId, inputEl, sheetName) {
       _showSupplierPriceSheetPicker(supplierId, j.sheets);
       return;
     }
-    if (!(j.lines || []).length) { showToast('На этом листе не нашлось названий', 'error'); return; }
-    // v2.45.243: метка прайса — позиции лягут в свою вкладку каталога
+    // v2.45.254: окно с галочками убрано — файл уже сохранён на сервере,
+    // сразу открываем его таблицей «как в Excel». Выбор позиций — кликом по строке.
     state._supPriceSelSource = j.label || '';
-    // v2.45.242: интерактивный выбор позиций галочками вместо текстового окна
-    _showSupplierPriceSelect(supplierId, j.lines);
+    showToast('Прайс сохранён: ' + (j.label || ''), 'success');
+    const pickerOpen = document.getElementById('op-alias-picker-modal') && state._opAliasPickerItemId;
+    if (pickerOpen) {
+      await openOpAliasPicker(state._opAliasPickerItemId);  // перечитать список прайсов
+      if (j.price_file_id) _opOpenPriceFile(j.price_file_id);
+    } else if (document.getElementById('sm-price-count')) {
+      _refreshSupplierPriceCount(supplierId);
+    }
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
@@ -9662,6 +9668,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.254',
+    date: '11.06.2026',
+    title: 'Загрузка прайса — сразу таблица',
+    features: [
+      'После «Прайс из Excel» → выбора листа прайс <b>сразу сохраняется и открывается таблицей</b> — окно с галочками убрано. Позиции выбираются кликом по строке таблицы',
+    ],
+  },
   {
     version: 'v2.45.253',
     date: '11.06.2026',
