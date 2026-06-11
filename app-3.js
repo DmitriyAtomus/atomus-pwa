@@ -5682,11 +5682,18 @@ async function openOpAliasPicker(orderItemId) {
   m.className = 'modal-overlay visible';
   m.style.zIndex = '10001';
   m.onclick = (e) => { if (e.target === m) m.remove(); };
+  // v2.45.247: режим «во весь экран» (запоминается)
+  const apFull = localStorage.getItem('atomus_ap_full') === '1';
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;max-height:88vh;display:flex;flex-direction:column;">' +
+    '<div class="modal" id="op-ap-modal" onclick="event.stopPropagation()" style="display:flex;flex-direction:column;' +
+      (apFull ? 'max-width:98vw;width:98vw;max-height:96vh;height:96vh;' : 'max-width:620px;max-height:88vh;') + '">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-list-search"></i> Каталог: ' + escapeHtml(_opCurrentDraft.supplier_name || 'поставщик') + '</h3>' +
-        '<button class="modal-close" onclick="document.getElementById(\'op-alias-picker-modal\').remove()"><i class="ti ti-x"></i></button>' +
+        '<div style="display:flex;gap:4px;align-items:center;">' +
+          '<button class="modal-close" title="Развернуть / свернуть" onclick="_opApToggleFull()">' +
+            '<i class="ti ' + (apFull ? 'ti-arrows-minimize' : 'ti-arrows-maximize') + '" id="op-ap-full-icon"></i></button>' +
+          '<button class="modal-close" onclick="document.getElementById(\'op-alias-picker-modal\').remove()"><i class="ti ti-x"></i></button>' +
+        '</div>' +
       '</div>' +
       '<div style="padding:12px 18px 0;display:flex;gap:8px;align-items:center;">' +
         '<div class="search-box" style="flex:1;">' +
@@ -5705,6 +5712,24 @@ async function openOpAliasPicker(orderItemId) {
   document.body.appendChild(m);
   _renderOpAliasPickerList();
   setTimeout(() => { const i = document.getElementById('op-ap-search'); if (i) i.focus(); }, 50);
+}
+
+// v2.45.247: развернуть каталог во весь экран (и обратно)
+function _opApToggleFull() {
+  const full = localStorage.getItem('atomus_ap_full') === '1' ? '0' : '1';
+  localStorage.setItem('atomus_ap_full', full);
+  const md = document.getElementById('op-ap-modal');
+  if (md) {
+    if (full === '1') {
+      md.style.maxWidth = '98vw'; md.style.width = '98vw';
+      md.style.maxHeight = '96vh'; md.style.height = '96vh';
+    } else {
+      md.style.maxWidth = '620px'; md.style.width = '';
+      md.style.maxHeight = '88vh'; md.style.height = '';
+    }
+  }
+  const ic = document.getElementById('op-ap-full-icon');
+  if (ic) ic.className = 'ti ' + (full === '1' ? 'ti-arrows-minimize' : 'ti-arrows-maximize');
 }
 
 // v2.45.243: вкладки прайсов в каталоге
@@ -9659,6 +9684,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.247',
+    date: '11.06.2026',
+    title: 'Каталог — во весь экран',
+    features: [
+      'В окне каталога поставщика кнопка <b>развернуть</b> (рядом с крестиком): окно раскрывается на весь экран — прайс «как в Excel» смотреть гораздо удобнее. Выбор запоминается',
+    ],
+  },
   {
     version: 'v2.45.246',
     date: '10.06.2026',
