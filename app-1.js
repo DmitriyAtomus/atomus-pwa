@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.268-edo-intake-badge";
+const APP_VERSION = "v2.45.269-edo-notif";
 const APP_VERSION_DATE = "10.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -712,11 +712,13 @@ function renderNotifModal() {
     const iconCls = n.type === 'contract_published' ? 't-contract'
                    : n.type === 'assembly_created' ? 't-assembly'
                    : n.type === 'supply_invoice_received' ? 't-contract'
+                   : n.type === 'edo_upd_received' ? 't-contract'
                    : (n.type === 'dev_guest_message' || n.type === 'dev_guest_file') ? 't-development'
                    : '';
     const icon = n.type === 'contract_published' ? 'ti-file-text'
                 : n.type === 'assembly_created' ? 'ti-tool'
                 : n.type === 'supply_invoice_received' ? 'ti-receipt'
+                : n.type === 'edo_upd_received' ? 'ti-cloud-download'
                 : n.type === 'dev_guest_message' ? 'ti-message-circle'
                 : n.type === 'dev_guest_file' ? 'ti-paperclip'
                 : 'ti-bell';
@@ -825,6 +827,11 @@ function onNotifClick(notifId, entityType, entityId, notifType) {
     // v2.45.140: счёт привязан к заказу → Заказы
     closeNotifModalForced();
     selectSidebarItem('supply-orders');
+  } else if (entityType === 'edo_upd') {
+    // v2.45.269: УПД из 1С-ЭДО → раздел приёма + карточка
+    closeNotifModalForced();
+    selectSidebarItem('supply-edo-upd');
+    if (entityId && typeof openEdoUpdDetail === 'function') setTimeout(() => openEdoUpdDetail(entityId), 300);
   } else if (entityType === 'inbox') {
     // v2.45.140: непривязанный счёт → Входящие счета
     closeNotifModalForced();
