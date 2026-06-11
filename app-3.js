@@ -5772,8 +5772,13 @@ function _renderOpApTabs() {
         '<i class="ti ti-file-spreadsheet"></i> ' + escapeHtml(f.label || f.file_name || ('#' + f.id)) +
       '</button>' +
       '<button type="button" title="Скачать Excel-оригинал" onclick="downloadSupplierPriceFile(' + f.id + ')" ' +
-        'style="border:none;background:none;padding:3px 8px 3px 4px;font-size:12px;cursor:pointer;color:' + (on ? '#fff' : 'var(--text-light)') + ';">' +
+        'style="border:none;background:none;padding:3px 4px;font-size:12px;cursor:pointer;color:' + (on ? '#fff' : 'var(--text-light)') + ';">' +
         '<i class="ti ti-download"></i>' +
+      '</button>' +
+      // v2.45.252: удалить прайс (файл + его позиции из каталога)
+      '<button type="button" title="Удалить прайс" onclick="_opDeletePriceFile(' + f.id + ')" ' +
+        'style="border:none;background:none;padding:3px 8px 3px 2px;font-size:12px;cursor:pointer;color:' + (on ? '#fff' : 'var(--text-light)') + ';">' +
+        '<i class="ti ti-trash"></i>' +
       '</button>' +
     '</span>';
   });
@@ -5803,27 +5808,29 @@ async function downloadSupplierPriceFile(fileId) {
   }
 }
 
-// v2.45.244: открыть позиции сохранённого прайса по клику на вкладку-файл
+// v2.45.244: открыть сохранённый прайс по клику на вкладку-файл
+// v2.45.252: сразу таблицей «как в Excel»; метку берём из списка файлов
 async function _opOpenPriceFile(fileId) {
   state._opAliasPickerTab = '__file__' + fileId;
-  state._opAliasPickerFileLines = null;   // null = загружается
-  state._opAliasPickerFileLabel = '';
-  _renderOpAliasPickerList();
-  try {
-    const d = await apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fileId + '/items');
-    state._opAliasPickerFileLines = d.lines || [];
-    state._opAliasPickerFileLabel = d.label || '';
-  } catch (e) {
-    state._opAliasPickerFileLines = [];
-    showToast('Не удалось открыть прайс', 'error');
-  }
+  const f = (state._opAliasPickerFiles || []).find(x => x.id === fileId);
+  state._opAliasPickerFileLabel = f ? (f.label || f.file_name || '') : '';
   _renderOpAliasPickerList();
 }
 
-// v2.45.245: переключатель вида прайса (список / таблица как в Excel)
-function _opApSetFileView(v) {
-  state._opApFileView = v;
-  _renderOpAliasPickerList();
+// v2.45.252: удалить прайс-файл (и его позиции из каталога)
+async function _opDeletePriceFile(fileId) {
+  if (!_opCurrentDraft || !_opCurrentDraft.supplier_id) return;
+  const f = (state._opAliasPickerFiles || []).find(x => x.id === fileId);
+  const nm = f ? (f.label || f.file_name || ('#' + fileId)) : ('#' + fileId);
+  if (!confirm('Удалить прайс «' + nm + '»?\nЕго позиции тоже уйдут из каталога. Новый можно загрузить кнопкой «Прайс из Excel».')) return;
+  try {
+    await apiDelete('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fileId);
+    showToast('Прайс удалён', 'success');
+    // Перезагружаем каталог целиком (вкладки, datalist, список)
+    openOpAliasPicker(state._opAliasPickerItemId);
+  } catch (e) {
+    showToast('Не удалось удалить прайс', 'error');
+  }
 }
 
 // v2.45.245: клик по строке Excel-таблицы (делегирование на обёртке)
@@ -5871,51 +5878,21 @@ function _renderOpAliasPickerList() {
   const tab = state._opAliasPickerTab || '';
   if (tab.indexOf('__file__') === 0) {
     const fid = parseInt(tab.slice(8), 10);
-    // v2.45.245: переключатель вида — список или таблица «как в Excel»
-    const view = state._opApFileView || 'list';
-    const toggle =
-      '<div style="display:flex;gap:6px;padding:2px 0 8px;">' +
-        '<button type="button" onclick="_opApSetFileView(\'list\')" class="btn btn-secondary" style="padding:3px 12px;font-size:12px;' + (view === 'list' ? 'border-color:var(--brand);color:var(--brand);' : '') + '">Список</button>' +
-        '<button type="button" onclick="_opApSetFileView(\'table\')" class="btn btn-secondary" style="padding:3px 12px;font-size:12px;' + (view === 'table' ? 'border-color:var(--brand);color:var(--brand);' : '') + '">Как в Excel (с фото)</button>' +
-      '</div>';
-    if (view === 'table') {
-      const cache = state._opApFileHtmlCache || (state._opApFileHtmlCache = {});
-      if (!cache[fid]) {
-        box.innerHTML = toggle + '<div class="loading-block">Рисуем таблицу с картинками…</div>';
-        if (cache['_loading_' + fid]) return;
-        cache['_loading_' + fid] = true;
-        apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fid + '/view')
-          .then(d => { cache[fid] = d.html || '<div class="empty-block">Пусто</div>'; })
-          .catch(() => { cache[fid] = '<div class="empty-block">Не удалось отрисовать таблицу</div>'; })
-          .finally(() => { delete cache['_loading_' + fid]; _renderOpAliasPickerList(); });
-        return;
-      }
-      box.innerHTML = toggle +
-        '<div style="font-size:11.5px;color:var(--text-light);padding:0 0 6px;">Нажми на строку товара — он подставится в заявку. Таблицу можно листать вбок</div>' +
-        '<div class="xls-wrap" onclick="_opXlsRowClick(event)">' + cache[fid] + '</div>';
+    // v2.45.252: всегда «как в Excel» — переключатель «Список» убран
+    const cache = state._opApFileHtmlCache || (state._opApFileHtmlCache = {});
+    if (!cache[fid]) {
+      box.innerHTML = '<div class="loading-block">Рисуем таблицу с картинками…</div>';
+      if (cache['_loading_' + fid]) return;
+      cache['_loading_' + fid] = true;
+      apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fid + '/view')
+        .then(d => { cache[fid] = d.html || '<div class="empty-block">Пусто</div>'; })
+        .catch(() => { cache[fid] = '<div class="empty-block">Не удалось отрисовать таблицу</div>'; })
+        .finally(() => { delete cache['_loading_' + fid]; _renderOpAliasPickerList(); });
       return;
     }
-    const lines = state._opAliasPickerFileLines;
-    if (lines === null) {
-      box.innerHTML = toggle + '<div class="loading-block">Открываем прайс…</div>';
-      return;
-    }
-    const q = ((document.getElementById('op-ap-search') || {}).value || '').toLowerCase().trim();
-    const list = q ? lines.filter(n => n.toLowerCase().includes(q)) : lines;
-    if (!list.length) {
-      box.innerHTML = toggle + '<div class="empty-block" style="padding:24px 10px;color:var(--text-light);">' +
-        (q ? 'Ничего не нашлось по «' + escapeHtml(q) + '»' : 'В этом прайсе позиций не нашлось') + '</div>';
-      return;
-    }
-    box.innerHTML = toggle +
-      '<div style="font-size:11.5px;color:var(--text-light);padding:2px 0 6px;">Нажми на позицию — она подставится в заявку</div>' +
-      list.slice(0, 400).map(n =>
-        '<div onclick="_opPriceLineChoose(this)" data-name="' + escapeHtml(n) + '" ' +
-          'style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;" ' +
-          'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
-          escapeHtml(n) +
-        '</div>'
-      ).join('') + (list.length > 400 ? '<div style="padding:8px 10px;color:var(--text-light);font-size:12px;">…показаны первые 400, уточни поиск</div>' : '');
+    box.innerHTML =
+      '<div style="font-size:11.5px;color:var(--text-light);padding:0 0 6px;">Нажми на строку товара — он подставится в заявку. Таблицу можно листать вбок</div>' +
+      '<div class="xls-wrap" onclick="_opXlsRowClick(event)">' + cache[fid] + '</div>';
     return;
   }
   const detailed = state._opAliasPickerDetailed || (state._opAliasPickerItems || []).map(n => ({ name: n, source: null }));
@@ -9685,6 +9662,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.252',
+    date: '11.06.2026',
+    title: 'Каталог — управление прайсами',
+    features: [
+      'У каждого прайса появилась <b>корзинка</b>: удаляет файл и его позиции из каталога. Новый прайс — кнопкой «Прайс из Excel»',
+      'Прайс открывается сразу <b>«как в Excel»</b> — переключатель «Список» убран',
+    ],
+  },
   {
     version: 'v2.45.251',
     date: '11.06.2026',
