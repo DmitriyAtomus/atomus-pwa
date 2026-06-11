@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.270-name-dups";
+const APP_VERSION = "v2.45.271-pay-block";
 const APP_VERSION_DATE = "10.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1573,6 +1573,9 @@ function renderDashboard(d) {
   const container = document.getElementById('dashboard-content');
   let html = '';
 
+  // v2.45.271: блок «На оплате» для бухгалтера/директора — заполняется отдельно
+  html += '<div id="pay-due-block"></div>';
+
   // v2.42.2: блок «Сейчас в работе» — заполняется отдельным запросом
   html += '<div id="active-works-block" class="active-works-section"></div>';
 
@@ -1719,6 +1722,67 @@ function renderDashboard(d) {
   // v2.42.2: подтягиваем активные работы (status='in_progress')
   if (typeof loadActiveWorksBlock === 'function') {
     try { loadActiveWorksBlock(); } catch (_) {}
+  }
+  // v2.45.271: «На оплате» — бухгалтеру и директору
+  try { _fillPayDueBlock(); } catch (_) {}
+}
+
+// v2.45.271: блок «На оплате» на главной — заказы в статусе to_pay с кнопкой «Оплатил»
+async function _fillPayDueBlock() {
+  const box = document.getElementById('pay-due-block');
+  if (!box) return;
+  const roles = (state.user && state.user.roles) || [];
+  if (!(roles.includes('director') || roles.includes('accountant') || roles.includes('zam'))) return;
+  try {
+    const d = await apiGet('/api/supply-orders?status=to_pay');
+    const list = d.orders || d.items || [];
+    if (!list.length) { box.innerHTML = ''; return; }
+    let h = '<div class="section" style="margin-bottom:16px;">' +
+      '<h3 class="section-title" style="color:#9A3412;"><i class="ti ti-wallet"></i> На оплате (' + list.length + ') ' +
+        '<a style="cursor:pointer;color:var(--brand);font-size:13px;" onclick="selectSidebarItem(\'supply-orders\')">все заказы →</a></h3>' +
+      '<div class="card" style="padding:4px 12px;">';
+    list.forEach(o => {
+      const sum = o.invoice_total
+        ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽'
+        : (o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '');
+      const inv = o.invoice_number ? 'Счёт № ' + o.invoice_number : (o.invoice_filename || '');
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);">' +
+        '<div style="flex:1;min-width:0;cursor:pointer;" onclick="state.currentSupplyOrderId=' + o.id + ';selectSidebarItem(\'supply-order-detail\');" title="Открыть заказ">' +
+          '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+            escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+          '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(inv) +
+            (sum ? (inv ? ' · ' : '') + '<b style="color:#9A3412;">' + sum + '</b>' : '') + '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payDueMarkPaid(' + o.id + ', this)">' +
+          '<i class="ti ti-cash"></i> Оплатил</button>' +
+      '</div>';
+    });
+    h += '</div></div>';
+    box.innerHTML = h;
+  } catch (e) { box.innerHTML = ''; }
+}
+
+async function payDueMarkPaid(orderId, btn) {
+  if (!confirm('Отметить заказ оплаченным?')) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
+  try {
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/transition', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: 'paid' }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось отметить оплату', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
+      return;
+    }
+    showToast('Оплачено ✓', 'success');
+    cache.supplyOrders = null;
+    _fillPayDueBlock();   // блок перерисуется (оплаченный уйдёт)
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
   }
 }
 
