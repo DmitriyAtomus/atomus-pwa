@@ -16945,7 +16945,9 @@
 }
 .xls-tbl {
   border-collapse: collapse;
-  font-size: 11.5px;
+  /* v2.45.251: плотнее — как Excel при обычном масштабе */
+  font-size: 10.5px;
+  line-height: 1.25;
   /* v2.45.246: натуральная ширина — колонки не ужимаются в столбик по букве,
      таблица скроллится вбок (мобильная версия) */
   width: max-content;
@@ -16953,18 +16955,18 @@
 }
 .xls-tbl td {
   border: 1px solid #e2e2e2;
-  padding: 3px 7px;
+  padding: 1px 5px;
   /* v2.45.249: как в Excel — контент по центру вертикали */
   vertical-align: middle;
-  min-width: 56px;
+  min-width: 40px;
   max-width: 340px;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
 }
 .xls-tbl img {
-  max-width: 130px;
-  max-height: 110px;
+  max-width: 110px;
+  max-height: 86px;
   display: block;
   object-fit: contain;
   margin: 0 auto;
@@ -16975,7 +16977,7 @@
 .xls-tbl .xls-imgs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
   justify-content: center;
 }
