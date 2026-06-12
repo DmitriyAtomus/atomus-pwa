@@ -6894,7 +6894,7 @@ function _search25UpdateChipCounts(counts) {
     if (!counts) return;
     const f = ch.getAttribute('data-search-filter');
     let n = 0;
-    if (f === 'all') n = (counts.contracts || 0) + (counts.tasks || 0) + (counts.defects || 0) + (counts.contractors || 0);
+    if (f === 'all') n = (counts.contracts || 0) + (counts.assemblies || 0) + (counts.tasks || 0) + (counts.defects || 0) + (counts.contractors || 0);
     else n = counts[f] || 0;
     if (n > 0) {
       const span = document.createElement('span');
@@ -6954,22 +6954,25 @@ async function runSearch25() {
 
   const filter = state.search25Filter;
   // v2.45.280: параллельные запросы — было последовательно через await в if'ах
+  // v2.45.283: + сборки (production works) — ищем по сборщику и соисполнителям
   const wantC  = (filter === 'all' || filter === 'contracts');
+  const wantA  = (filter === 'all' || filter === 'assemblies');
   const wantT  = (filter === 'all' || filter === 'tasks');
   const wantD  = (filter === 'all' || filter === 'defects');
   const wantCT = (filter === 'all' || filter === 'contractors');
-  const [rC, rT, rD, rCT] = await Promise.all([
-    wantC  ? apiGet('/api/contracts').catch(() => null)   : null,
-    wantT  ? apiGet('/api/tasks').catch(() => null)       : null,
-    wantD  ? apiGet('/api/defects').catch(() => null)     : null,
-    wantCT ? apiGet('/api/contractors').catch(() => null) : null,
+  const [rC, rA, rT, rD, rCT] = await Promise.all([
+    wantC  ? apiGet('/api/contracts').catch(() => null)         : null,
+    wantA  ? apiGet('/api/production/works').catch(() => null)  : null,
+    wantT  ? apiGet('/api/tasks').catch(() => null)             : null,
+    wantD  ? apiGet('/api/defects').catch(() => null)           : null,
+    wantCT ? apiGet('/api/contractors').catch(() => null)       : null,
   ]);
 
   // Перепроверяем что запрос ещё актуален (пользователь не стёр пока шёл fetch)
   if ((state.search25Query || '').toLowerCase().trim() !== q) return;
 
   const results = [];
-  const counts = { contracts: 0, tasks: 0, defects: 0, contractors: 0 };
+  const counts = { contracts: 0, assemblies: 0, tasks: 0, defects: 0, contractors: 0 };
 
   if (rC && Array.isArray(rC.contracts)) {
     rC.contracts.forEach(x => {
@@ -6993,6 +6996,36 @@ async function runSearch25() {
           title: (x.number || '—') + (x.contractor_name ? ' · ' + x.contractor_name : ''),
           sub: 'Договор · ' + (x.status_label || x.status || '—') + subRole,
           click: () => { switchMainTab('home'); selectSection('sales'); setTimeout(() => openContractDetail(x.id), 50); },
+        });
+      }
+    });
+  }
+  // v2.45.283: сборки (production works) — ищем по модели, договору, сборщику, соисполнителям
+  if (rA && Array.isArray(rA.works)) {
+    rA.works.forEach(w => {
+      const helperNames = (Array.isArray(w.active_helpers) ? w.active_helpers : [])
+        .map(h => (h && (h.short_name || h.full_name)) || '')
+        .filter(Boolean).join(' ');
+      const hay = (
+        (w.model_name || w.title || '') + ' ' +
+        (w.model_article || '') + ' ' +
+        (w.contract_number || '') + ' ' +
+        (w.contractor_name || '') + ' ' +
+        (w.assignee_short_name || '') + ' ' +
+        helperNames
+      ).toLowerCase();
+      if (hay.indexOf(q) >= 0) {
+        counts.assemblies++;
+        let subRole = '';
+        if ((w.assignee_short_name || '').toLowerCase().indexOf(q) >= 0) subRole = ' · сборщик ' + w.assignee_short_name;
+        else if (helperNames.toLowerCase().indexOf(q) >= 0) subRole = ' · соисполнитель';
+        const title = (w.model_name || w.title || ('Работа #' + w.id)) +
+                      (w.contract_number ? ' · ' + w.contract_number : '');
+        results.push({
+          type: 'assembly', cls: 'c-prod', icon: 'ti-tool',
+          title: title,
+          sub: 'Сборка · ' + (w.status_label || w.status || '—') + subRole,
+          click: () => { switchMainTab('home'); openProductionWorkDetail(w.id); },
         });
       }
     });
