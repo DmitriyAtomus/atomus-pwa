@@ -6973,13 +6973,25 @@ async function runSearch25() {
 
   if (rC && Array.isArray(rC.contracts)) {
     rC.contracts.forEach(x => {
-      const hay = ((x.number || '') + ' ' + (x.contractor_name || '') + ' ' + (x.comment || '')).toLowerCase();
+      // v2.45.282: ищем и по менеджеру + соменеджерам
+      const coNames = (Array.isArray(x.co_managers) ? x.co_managers : []).map(m => m && m.name).filter(Boolean).join(' ');
+      const hay = (
+        (x.number || '') + ' ' +
+        (x.contractor_name || '') + ' ' +
+        (x.comment || '') + ' ' +
+        (x.manager_name || '') + ' ' +
+        coNames
+      ).toLowerCase();
       if (hay.indexOf(q) >= 0) {
         counts.contracts++;
+        // Подпись подсказывает почему нашлось — менеджер, соменеджер или просто статус
+        let subRole = '';
+        if ((x.manager_name || '').toLowerCase().indexOf(q) >= 0) subRole = ' · менеджер ' + x.manager_name;
+        else if (coNames.toLowerCase().indexOf(q) >= 0) subRole = ' · соменеджер';
         results.push({
           type: 'contract', cls: 'c-sales', icon: 'ti-file-text',
           title: (x.number || '—') + (x.contractor_name ? ' · ' + x.contractor_name : ''),
-          sub: 'Договор · ' + (x.status_label || x.status || '—'),
+          sub: 'Договор · ' + (x.status_label || x.status || '—') + subRole,
           click: () => { switchMainTab('home'); selectSection('sales'); setTimeout(() => openContractDetail(x.id), 50); },
         });
       }
@@ -6987,13 +6999,20 @@ async function runSearch25() {
   }
   if (rT && Array.isArray(rT.tasks)) {
     rT.tasks.forEach(x => {
-      const hay = ((x.title || '') + ' ' + (x.description || '')).toLowerCase();
+      // v2.45.282: ищем и по исполнителю задачи
+      const hay = (
+        (x.title || '') + ' ' +
+        (x.description || '') + ' ' +
+        (x.assignee_name || '')
+      ).toLowerCase();
       if (hay.indexOf(q) >= 0) {
         counts.tasks++;
+        let subRole = '';
+        if ((x.assignee_name || '').toLowerCase().indexOf(q) >= 0) subRole = ' · исполнитель ' + x.assignee_name;
         results.push({
           type: 'task', cls: 'c-tasks', icon: 'ti-checklist',
           title: x.title || '—',
-          sub: 'Задача · ' + (x.status_label || x.status || '—'),
+          sub: 'Задача · ' + (x.status_label || x.status || '—') + subRole,
           click: () => { switchMainTab('home'); state.currentTaskId = x.id; selectSection('tasks'); setTimeout(() => selectSidebarItem('task-detail'), 50); },
         });
       }
