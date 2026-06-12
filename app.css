@@ -12949,6 +12949,243 @@
     font-size: 18px;
   }
 
+  /* v2.45.280: история поиска */
+  .search25-history {
+    margin: 0 14px 6px;
+  }
+  .search25-history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .search25-history-head .ti { font-size: 14px; margin-right: 4px; vertical-align: -1px; }
+  .search25-history-clear {
+    background: none;
+    border: none;
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 6px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .search25-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .search25-history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  }
+  .search25-history-item:active {
+    background: var(--bg);
+    transform: scale(0.99);
+  }
+  .search25-history-item .ti {
+    color: var(--text-light);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .search25-history-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* v2.45.280: скелет загрузки (поиск/уведомления) */
+  .search25-skeleton {
+    padding: 4px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .search25-skeleton .sk-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  .search25-skeleton .sk-icon {
+    width: 38px; height: 38px;
+    border-radius: 11px;
+    background: linear-gradient(90deg, #EEF2F7 0%, #F7FAFC 50%, #EEF2F7 100%);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.2s linear infinite;
+    flex-shrink: 0;
+  }
+  .search25-skeleton .sk-body {
+    flex: 1; min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .search25-skeleton .sk-line {
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(90deg, #EEF2F7 0%, #F7FAFC 50%, #EEF2F7 100%);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.2s linear infinite;
+  }
+  .search25-skeleton .sk-line.w40 { width: 40%; }
+  .search25-skeleton .sk-line.w70 { width: 70%; }
+  .search25-skeleton .sk-line.w90 { width: 90%; }
+  @keyframes sk-shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  /* v2.45.280: экран «Уведомления» (нижний таб) */
+  .notif25-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 14px 12px;
+  }
+  .notif25-count {
+    font-size: 12.5px;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+  .notif25-ack-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border: 1px solid var(--brand-bg-strong);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.1s;
+  }
+  .notif25-ack-all:active { transform: scale(0.96); background: var(--brand-bg-strong); }
+  .notif25-ack-all .ti { font-size: 14px; }
+  .notif25-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 14px 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .notif25-section-title .ti { color: var(--brand); font-size: 14px; }
+  .notif25-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin: 0 14px 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.12s, transform 0.1s, box-shadow 0.12s;
+  }
+  .notif25-item:active {
+    transform: scale(0.99);
+    background: var(--bg);
+  }
+  .notif25-item.notif-global { border-left: 3px solid #F59E0B; }
+  .notif25-item-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .notif25-item-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .notif25-item-title .ti { color: #4338CA; font-size: 16px; flex-shrink: 0; }
+  .notif25-item.notif-global .notif25-item-title .ti { color: #B45309; }
+  .notif25-item-sub {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .notif25-item-last {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-mid);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .notif25-author { font-weight: 600; color: var(--text); }
+  .notif25-item-time {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .notif25-ack-x {
+    background: none;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, color 0.12s;
+  }
+  .notif25-ack-x:active { background: var(--bg); color: var(--text); }
+  .notif25-ack-x .ti { font-size: 16px; }
+  .notif25-unread-badge {
+    background: linear-gradient(135deg, #EF4444, #B91C1C);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+    min-width: 22px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(220, 38, 38, 0.35);
+    flex-shrink: 0;
+  }
+
   /* ===== УВЕДОМЛЕНИЯ ===== */
   .notif25-row {
     display: flex;
