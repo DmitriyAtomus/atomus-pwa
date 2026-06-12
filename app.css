@@ -12965,6 +12965,30 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* v2.45.285: чипы поиска переносятся на следующую строку, без горизонтального скролла */
+  .search25-chips-wrap {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px 6px;
+    overflow: visible !important;
+    white-space: normal !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .search25-chips-wrap .filter-chip {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    font-size: 12px;
+    border-radius: 999px;
+    line-height: 1.2;
+  }
+  .search25-chips-wrap .filter-chip .chip-count {
+    margin-left: 5px;
+    padding: 0 5px;
+    font-size: 10.5px;
+    min-width: 16px;
+  }
+
   /* v2.45.284: сводка по сотруднику в поиске (часы за неделю + загрузка) */
   .search25-worker-card {
     margin: 0 14px 10px;
