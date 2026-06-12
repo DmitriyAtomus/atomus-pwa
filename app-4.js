@@ -1560,7 +1560,112 @@ function assistantAsk(text) {
   assistantSend();
 }
 
-function assistantSend() {
+// v2.45.291: режим ИИ. null — не проверяли; true — бэкенд /api/assistant
+// доступен; false — эндпоинта нет, работаем локальным поиском (Path A).
+let _assistantAiMode = null;
+const ASSISTANT_API_PATH = '/api/assistant';
+
+// Топ-N статей по релевантности — отдаём бэкенду как контекст (RAG на клиенте:
+// база знаний остаётся во фронте, бэкенд лишь передаёт её Claude вместе с вопросом)
+function _assistantTopArticles(query, n) {
+  const qTokens = _assistantTokens(query);
+  return (typeof HELP_ARTICLES !== 'undefined' ? HELP_ARTICLES : [])
+    .map(a => ({ a, s: _assistantScore(qTokens, a) }))
+    .sort((x, y) => y.s - x.s)
+    .slice(0, n)
+    .map(x => x.a);
+}
+
+function _assistantStripHtml(s) {
+  return String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Мини-markdown → HTML (жирный, списки, код, абзацы). Вход экранируется.
+function _assistantMdToHtml(md) {
+  const esc = escapeHtml(String(md || '').trim());
+  const lines = esc.split(/\r?\n/);
+  let html = '';
+  let listType = null; // 'ol' | 'ul' | null
+  const closeList = () => { if (listType) { html += '</' + listType + '>'; listType = null; } };
+  const inline = (s) => s
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  lines.forEach(raw => {
+    const line = raw.trim();
+    if (!line) { closeList(); return; }
+    const ol = line.match(/^(\d+)[.)]\s+(.*)$/);
+    const ul = line.match(/^[-•*]\s+(.*)$/);
+    if (ol) {
+      if (listType !== 'ol') { closeList(); html += '<ol class="help-ol">'; listType = 'ol'; }
+      html += '<li>' + inline(ol[2]) + '</li>';
+    } else if (ul) {
+      if (listType !== 'ul') { closeList(); html += '<ul class="help-ul">'; listType = 'ul'; }
+      html += '<li>' + inline(ul[1]) + '</li>';
+    } else {
+      closeList();
+      const h = line.match(/^#{1,4}\s+(.*)$/);
+      if (h) html += '<h4 class="help-h">' + inline(h[1]) + '</h4>';
+      else   html += '<p>' + inline(line) + '</p>';
+    }
+  });
+  closeList();
+  return html;
+}
+
+// Запрос к настоящему ИИ на бэкенде. Кидает исключение, если эндпоинта нет
+// или ответ пустой — тогда вызывающий код откатывается на локальный поиск.
+async function _assistantAskBackend(query) {
+  const token = localStorage.getItem(TOKEN_KEY) || '';
+  const context = _assistantTopArticles(query, 5).map(a => ({
+    id: a.id,
+    title: a.title,
+    text: _assistantArticleText(a).slice(0, 1600),
+  }));
+  const history = _assistantHistory.slice(-6).map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    text: m.role === 'user' ? m.text : _assistantStripHtml(m.html),
+  }));
+  const resp = await fetch(API_BASE + ASSISTANT_API_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ question: query, context, history }),
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+  const answer = data.answer || data.text || data.message || (data.data && data.data.answer);
+  if (!answer) throw new Error('empty');
+  return { answer: String(answer), sources: data.sources || [] };
+}
+
+function _assistantRelatedHtml(articles, label) {
+  if (!articles || !articles.length) return '';
+  return '<div class="asst-related-label">' + escapeHtml(label) + '</div><div class="asst-related">' +
+    articles.map(a => '<button class="asst-related-item" onclick="assistantOpenArticle(' + JSON.stringify(a.id).replace(/"/g, '&quot;') + ')"><i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.title) + '</span><i class="ti ti-chevron-right"></i></button>').join('') +
+  '</div>';
+}
+
+// Локальный ответ (Path A) — фолбэк, когда бэкенд-ИИ недоступен
+function _assistantLocalAnswerHtml(q) {
+  const ans = _assistantAnswer(q);
+  if (ans.type === 'fallback') {
+    let html = '<p>Не нашёл точного ответа на этот вопрос 🤔 Но вот что может подойти — или загляните в раздел <b>Помощь</b>:</p>';
+    if (ans.related.length) {
+      html += '<div class="asst-related">' +
+        ans.related.map(a => '<button class="asst-related-item" onclick="assistantOpenArticle(' + JSON.stringify(a.id).replace(/"/g, '&quot;') + ')"><i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.title) + '</span><i class="ti ti-chevron-right"></i></button>').join('') +
+      '</div>';
+    }
+    html += '<div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="closeAssistantChat();selectSidebarItem(\'help-knowledge\')"><i class="ti ti-book"></i> Открыть Помощь</button></div>';
+    return html;
+  }
+  let html = '<div class="asst-answer-title"><i class="ti ti-bulb"></i>' + escapeHtml(ans.title) + '</div>' + ans.html;
+  if (ans.type === 'article' && ans.article) {
+    html += '<div class="asst-answer-foot"><button class="btn btn-secondary btn-sm" onclick="assistantOpenArticle(' + JSON.stringify(ans.article.id).replace(/"/g, '&quot;') + ')"><i class="ti ti-external-link"></i> Открыть в Помощи</button></div>';
+  }
+  html += _assistantRelatedHtml(ans.related, 'Похожее:');
+  return html;
+}
+
+async function assistantSend() {
   const inp = document.getElementById('asst-input');
   if (!inp) return;
   const q = (inp.value || '').trim();
@@ -1568,37 +1673,37 @@ function assistantSend() {
   inp.value = '';
   _assistantPushUser(q);
 
-  // «думает» — короткая задержка для естественности
   const thinkingId = 'asst-think-' + Date.now();
-  _assistantPushBot('<span class="asst-thinking" id="' + thinkingId + '"><i class="ti ti-loader-2"></i> Ищу в инструкциях…</span>', false);
-
-  setTimeout(() => {
+  const thinkingLabel = (_assistantAiMode === false) ? 'Ищу в инструкциях…' : 'Думаю…';
+  _assistantPushBot('<span class="asst-thinking" id="' + thinkingId + '"><i class="ti ti-loader-2"></i> ' + thinkingLabel + '</span>', false);
+  const removeThinking = () => {
     const t = document.getElementById(thinkingId);
     if (t) { const b = t.closest('.asst-msg'); if (b) b.remove(); }
+  };
 
-    const ans = _assistantAnswer(q);
-    let html = '';
-    if (ans.type === 'fallback') {
-      html = '<p>Не нашёл точного ответа на этот вопрос 🤔 Но вот что может подойти — или загляните в раздел <b>Помощь</b>:</p>';
-      if (ans.related.length) {
-        html += '<div class="asst-related">' +
-          ans.related.map(a => '<button class="asst-related-item" onclick="assistantOpenArticle(' + JSON.stringify(a.id).replace(/"/g, '&quot;') + ')"><i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.title) + '</span><i class="ti ti-chevron-right"></i></button>').join('') +
-        '</div>';
-      }
-      html += '<div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="closeAssistantChat();selectSidebarItem(\'help-knowledge\')"><i class="ti ti-book"></i> Открыть Помощь</button></div>';
-    } else {
-      html = '<div class="asst-answer-title"><i class="ti ti-bulb"></i>' + escapeHtml(ans.title) + '</div>' + ans.html;
-      if (ans.type === 'article' && ans.article) {
-        html += '<div class="asst-answer-foot"><button class="btn btn-secondary btn-sm" onclick="assistantOpenArticle(' + JSON.stringify(ans.article.id).replace(/"/g, '&quot;') + ')"><i class="ti ti-external-link"></i> Открыть в Помощи</button></div>';
-      }
-      if (ans.related && ans.related.length) {
-        html += '<div class="asst-related-label">Похожее:</div><div class="asst-related">' +
-          ans.related.map(a => '<button class="asst-related-item" onclick="assistantOpenArticle(' + JSON.stringify(a.id).replace(/"/g, '&quot;') + ')"><i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.title) + '</span><i class="ti ti-chevron-right"></i></button>').join('') +
-        '</div>';
-      }
+  // 1) Настоящий ИИ на бэкенде (если эндпоинт ещё не признан отсутствующим)
+  if (_assistantAiMode !== false) {
+    try {
+      const res = await _assistantAskBackend(q);
+      _assistantAiMode = true;
+      removeThinking();
+      let html = '<div class="asst-answer-title"><i class="ti ti-sparkles"></i>Atom AI</div>' + _assistantMdToHtml(res.answer);
+      const srcArticles = (res.sources || [])
+        .map(s => (typeof HELP_ARTICLES !== 'undefined' ? HELP_ARTICLES : []).find(a => a.id === (s.id || s)))
+        .filter(Boolean);
+      html += _assistantRelatedHtml(srcArticles, 'Источники:');
+      _assistantPushBot(html);
+      return;
+    } catch (e) {
+      // Эндпоинта пока нет / сеть — переключаемся на локальный поиск (на эту сессию)
+      _assistantAiMode = false;
     }
-    _assistantPushBot(html);
-  }, 350);
+  }
+
+  // 2) Фолбэк — локальный поиск по базе знаний (Path A)
+  await new Promise(r => setTimeout(r, 250));
+  removeThinking();
+  _assistantPushBot(_assistantLocalAnswerHtml(q));
 }
 
 function assistantOpenArticle(articleId) {
