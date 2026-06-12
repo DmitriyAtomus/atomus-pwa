@@ -230,9 +230,6 @@
 
       <!-- Внешние сервисы -->
       <div class="nav-section-label">СЕРВИСЫ</div>
-      <a class="nav-item nav-assistant" onclick="openAssistantChat()" style="cursor:pointer;">
-        <i class="ti ti-sparkles"></i><span>Помощник</span>
-      </a>
       <a class="nav-item" onclick="openCalculatorModal()" style="cursor:pointer;">
         <i class="ti ti-calculator"></i><span>Калькулятор</span>
       </a>
@@ -533,6 +530,9 @@
         <i class="ti ti-help-circle"></i> Помощь
       </div>
       <div class="sidebar-nav">
+        <button class="nav-item nav-assistant" onclick="openAssistantChat()">
+          <i class="ti ti-sparkles"></i><span>Помощник</span>
+        </button>
         <button class="nav-item active" data-nav="help-knowledge" onclick="selectSidebarItem('help-knowledge')">
           <i class="ti ti-book"></i><span>База знаний</span>
         </button>
