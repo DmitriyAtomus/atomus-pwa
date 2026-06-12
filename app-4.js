@@ -6826,6 +6826,36 @@ function openDirectionKebabMenu(anchorEl, dirId) {
 state.search25Query = '';
 state.search25Filter = 'all';
 state.search25Timer = null;
+// v2.45.280: история поиска (максимум 8) — храним в localStorage
+const SEARCH25_HISTORY_KEY = 'atomus_search25_history';
+function _search25LoadHistory() {
+  try {
+    const raw = localStorage.getItem(SEARCH25_HISTORY_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter(x => typeof x === 'string' && x).slice(0, 8) : [];
+  } catch (e) { return []; }
+}
+function _search25SaveHistory(q) {
+  q = String(q || '').trim();
+  if (!q || q.length < 2) return;
+  try {
+    let arr = _search25LoadHistory();
+    arr = [q, ...arr.filter(x => x.toLowerCase() !== q.toLowerCase())].slice(0, 8);
+    localStorage.setItem(SEARCH25_HISTORY_KEY, JSON.stringify(arr));
+  } catch (e) {}
+}
+function _search25ClearHistory() {
+  try { localStorage.removeItem(SEARCH25_HISTORY_KEY); } catch (e) {}
+  renderSearch25Empty();
+}
+function search25RunFromHistory(q) {
+  const inp = document.getElementById('search25-input');
+  if (inp) { inp.value = q; inp.focus(); }
+  state.search25Query = q;
+  const clr = document.getElementById('search25-clear');
+  if (clr) clr.style.display = 'flex';
+  runSearch25();
+}
 
 function onSearch25Input() {
   const inp = document.getElementById('search25-input');
@@ -6843,6 +6873,8 @@ function clearSearch25() {
   state.search25Query = '';
   const clr = document.getElementById('search25-clear');
   if (clr) clr.style.display = 'none';
+  // v2.45.280: при очистке сбрасываем и счётчики в чипах
+  _search25UpdateChipCounts(null);
   renderSearch25Empty();
 }
 
@@ -6854,9 +6886,50 @@ function setSearch25Filter(f) {
   if (state.search25Query) runSearch25();
 }
 
+// v2.45.280: обновляет счётчики в чипах фильтров после поиска
+function _search25UpdateChipCounts(counts) {
+  document.querySelectorAll('#search25-chips .filter-chip').forEach(ch => {
+    const old = ch.querySelector('.chip-count');
+    if (old) old.remove();
+    if (!counts) return;
+    const f = ch.getAttribute('data-search-filter');
+    let n = 0;
+    if (f === 'all') n = (counts.contracts || 0) + (counts.tasks || 0) + (counts.defects || 0) + (counts.contractors || 0);
+    else n = counts[f] || 0;
+    if (n > 0) {
+      const span = document.createElement('span');
+      span.className = 'chip-count';
+      span.textContent = n > 99 ? '99+' : String(n);
+      ch.appendChild(span);
+    }
+  });
+}
+
 function renderSearch25Empty() {
   const c = document.getElementById('search25-results');
   if (!c) return;
+  // v2.45.280: если есть история — показываем её как «недавние», иначе подсказку
+  const history = _search25LoadHistory();
+  if (history.length) {
+    let html = '<div class="search25-history">' +
+      '<div class="search25-history-head">' +
+        '<span><i class="ti ti-history"></i> Недавние</span>' +
+        '<button class="search25-history-clear" onclick="_search25ClearHistory()">Очистить</button>' +
+      '</div>' +
+      '<div class="search25-history-list">';
+    history.forEach(q => {
+      html += '<button class="search25-history-item" onclick="search25RunFromHistory(' + JSON.stringify(q).replace(/"/g, '&quot;') + ')">' +
+        '<i class="ti ti-search"></i>' +
+        '<span>' + escapeHtml(q) + '</span>' +
+      '</button>';
+    });
+    html += '</div></div>';
+    html += '<div class="search25-empty" style="padding-top:24px;">' +
+      '<div class="hint">Или введите новый запрос:<br>номер договора, ФИО, контрагент, слово из задачи</div>' +
+    '</div>';
+    c.innerHTML = html;
+    return;
+  }
   c.innerHTML = '<div class="search25-empty">' +
     '<i class="ti ti-search big"></i>' +
     '<div class="title">Что ищем?</div>' +
@@ -6869,88 +6942,94 @@ async function runSearch25() {
   const c = document.getElementById('search25-results');
   if (!c) return;
   if (!q || q.length < 2) {
+    _search25UpdateChipCounts(null);
     renderSearch25Empty();
     return;
   }
-  c.innerHTML = '<div class="loading-block" style="margin: 0 14px;">Ищем…</div>';
+  // v2.45.280: скелет вместо «Ищем…»
+  c.innerHTML = '<div class="search25-skeleton">' +
+    Array.from({ length: 4 }).map(() =>
+      '<div class="sk-row"><div class="sk-icon"></div><div class="sk-body"><div class="sk-line w70"></div><div class="sk-line w40"></div></div></div>'
+    ).join('') +
+  '</div>';
 
   const filter = state.search25Filter;
-  const results = [];
+  // v2.45.280: параллельные запросы — было последовательно через await в if'ах
+  const wantC  = (filter === 'all' || filter === 'contracts');
+  const wantT  = (filter === 'all' || filter === 'tasks');
+  const wantD  = (filter === 'all' || filter === 'defects');
+  const wantCT = (filter === 'all' || filter === 'contractors');
+  const [rC, rT, rD, rCT] = await Promise.all([
+    wantC  ? apiGet('/api/contracts').catch(() => null)   : null,
+    wantT  ? apiGet('/api/tasks').catch(() => null)       : null,
+    wantD  ? apiGet('/api/defects').catch(() => null)     : null,
+    wantCT ? apiGet('/api/contractors').catch(() => null) : null,
+  ]);
 
-  try {
-    // Договоры
-    if (filter === 'all' || filter === 'contracts') {
-      try {
-        const r = await apiGet('/api/contracts');
-        const list = (r && r.contracts) || [];
-        list.forEach(x => {
-          const hay = ((x.number || '') + ' ' + (x.contractor_name || '') + ' ' + (x.comment || '')).toLowerCase();
-          if (hay.indexOf(q) >= 0) {
-            results.push({
-              type: 'contract', cls: 'c-sales', icon: 'ti-file-text',
-              title: (x.number || '—') + (x.contractor_name ? ' · ' + x.contractor_name : ''),
-              sub: 'Договор · ' + (x.status_label || x.status || '—'),
-              click: () => { switchMainTab('home'); selectSection('sales'); setTimeout(() => openContractDetail(x.id), 50); },
-            });
-          }
+  // Перепроверяем что запрос ещё актуален (пользователь не стёр пока шёл fetch)
+  if ((state.search25Query || '').toLowerCase().trim() !== q) return;
+
+  const results = [];
+  const counts = { contracts: 0, tasks: 0, defects: 0, contractors: 0 };
+
+  if (rC && Array.isArray(rC.contracts)) {
+    rC.contracts.forEach(x => {
+      const hay = ((x.number || '') + ' ' + (x.contractor_name || '') + ' ' + (x.comment || '')).toLowerCase();
+      if (hay.indexOf(q) >= 0) {
+        counts.contracts++;
+        results.push({
+          type: 'contract', cls: 'c-sales', icon: 'ti-file-text',
+          title: (x.number || '—') + (x.contractor_name ? ' · ' + x.contractor_name : ''),
+          sub: 'Договор · ' + (x.status_label || x.status || '—'),
+          click: () => { switchMainTab('home'); selectSection('sales'); setTimeout(() => openContractDetail(x.id), 50); },
         });
-      } catch (e) {}
-    }
-    // Задачи
-    if (filter === 'all' || filter === 'tasks') {
-      try {
-        const r = await apiGet('/api/tasks');
-        const list = (r && r.tasks) || [];
-        list.forEach(x => {
-          const hay = ((x.title || '') + ' ' + (x.description || '')).toLowerCase();
-          if (hay.indexOf(q) >= 0) {
-            results.push({
-              type: 'task', cls: 'c-tasks', icon: 'ti-checklist',
-              title: x.title || '—',
-              sub: 'Задача · ' + (x.status_label || x.status || '—'),
-              click: () => { switchMainTab('home'); state.currentTaskId = x.id; selectSection('tasks'); setTimeout(() => selectSidebarItem('task-detail'), 50); },
-            });
-          }
+      }
+    });
+  }
+  if (rT && Array.isArray(rT.tasks)) {
+    rT.tasks.forEach(x => {
+      const hay = ((x.title || '') + ' ' + (x.description || '')).toLowerCase();
+      if (hay.indexOf(q) >= 0) {
+        counts.tasks++;
+        results.push({
+          type: 'task', cls: 'c-tasks', icon: 'ti-checklist',
+          title: x.title || '—',
+          sub: 'Задача · ' + (x.status_label || x.status || '—'),
+          click: () => { switchMainTab('home'); state.currentTaskId = x.id; selectSection('tasks'); setTimeout(() => selectSidebarItem('task-detail'), 50); },
         });
-      } catch (e) {}
-    }
-    // Доработки
-    if (filter === 'all' || filter === 'defects') {
-      try {
-        const r = await apiGet('/api/defects');
-        const list = (r && r.defects) || [];
-        list.forEach(x => {
-          const hay = ((x.description || '') + ' ' + (x.author_name || '') + ' ' + (x.contractor_name || '')).toLowerCase();
-          if (hay.indexOf(q) >= 0) {
-            results.push({
-              type: 'defect', cls: 'c-defect', icon: 'ti-alert-triangle',
-              title: (x.description || '—').slice(0, 60),
-              sub: 'Доработка · ' + (x.status_label || x.status || '—'),
-              click: () => { switchMainTab('home'); state.currentDefectId = x.id; selectSection('defects'); setTimeout(() => selectSidebarItem('defect-detail'), 50); },
-            });
-          }
+      }
+    });
+  }
+  if (rD && Array.isArray(rD.defects)) {
+    rD.defects.forEach(x => {
+      const hay = ((x.description || '') + ' ' + (x.author_name || '') + ' ' + (x.contractor_name || '')).toLowerCase();
+      if (hay.indexOf(q) >= 0) {
+        counts.defects++;
+        results.push({
+          type: 'defect', cls: 'c-defect', icon: 'ti-alert-triangle',
+          title: (x.description || '—').slice(0, 60),
+          sub: 'Доработка · ' + (x.status_label || x.status || '—'),
+          click: () => { switchMainTab('home'); state.currentDefectId = x.id; selectSection('defects'); setTimeout(() => selectSidebarItem('defect-detail'), 50); },
         });
-      } catch (e) {}
-    }
-    // Контрагенты
-    if (filter === 'all' || filter === 'contractors') {
-      try {
-        const r = await apiGet('/api/contractors');
-        const list = (r && r.contractors) || [];
-        list.forEach(x => {
-          const hay = ((x.name || '') + ' ' + (x.inn || '') + ' ' + (x.contact_person || '')).toLowerCase();
-          if (hay.indexOf(q) >= 0) {
-            results.push({
-              type: 'contractor', cls: 'c-sales', icon: 'ti-briefcase',
-              title: x.name || '—',
-              sub: 'Контрагент' + (x.inn ? ' · ИНН ' + x.inn : ''),
-              click: () => { switchMainTab('home'); state.currentContractorId = x.id; selectSection('sales'); setTimeout(() => selectSidebarItem('sales-contractor-form'), 50); },
-            });
-          }
+      }
+    });
+  }
+  if (rCT && Array.isArray(rCT.contractors)) {
+    rCT.contractors.forEach(x => {
+      const hay = ((x.name || '') + ' ' + (x.inn || '') + ' ' + (x.contact_person || '')).toLowerCase();
+      if (hay.indexOf(q) >= 0) {
+        counts.contractors++;
+        results.push({
+          type: 'contractor', cls: 'c-sales', icon: 'ti-briefcase',
+          title: x.name || '—',
+          sub: 'Контрагент' + (x.inn ? ' · ИНН ' + x.inn : ''),
+          click: () => { switchMainTab('home'); state.currentContractorId = x.id; selectSection('sales'); setTimeout(() => selectSidebarItem('sales-contractor-form'), 50); },
         });
-      } catch (e) {}
-    }
-  } catch (e) {}
+      }
+    });
+  }
+
+  _search25UpdateChipCounts(counts);
 
   if (!results.length) {
     c.innerHTML = '<div class="search25-empty">' +
@@ -6960,6 +7039,9 @@ async function runSearch25() {
     '</div>';
     return;
   }
+
+  // v2.45.280: сохраняем удачный запрос в историю
+  _search25SaveHistory(state.search25Query);
 
   // Сохраняем коллбеки для клика
   window._search25Clicks = results.map(r => r.click);
@@ -6985,17 +7067,172 @@ function search25Click(idx) {
   if (typeof fn === 'function') fn();
 }
 
-// ============ УВЕДОМЛЕНИЯ (заглушка) ============
+// ============ УВЕДОМЛЕНИЯ (v2.45.280: полноценный экран) ============
+// Используем те же источники, что и панель колокольчика в шапке:
+// /api/contract-chats/unread (чаты) + /api/notifications/unread (уведомления).
+// Данные кэшируются в state._notifSummary, обновляются через refreshNotifBadge().
 
-function renderNotifications25() {
+async function renderNotifications25() {
   const c = document.getElementById('notif25-list');
   if (!c) return;
-  // Пока без бэка — заглушка. В следующих этапах подключим /api/notifications
-  c.innerHTML = '<div class="search25-empty">' +
-    '<i class="ti ti-bell-off big"></i>' +
-    '<div class="title">Пока тихо</div>' +
-    '<div class="hint">Раздел в разработке.<br>Здесь появятся уведомления о новых доработках,<br>просроченных задачах и приближающихся отгрузках.</div>' +
+  // Если данных ещё нет — показываем скелет и подтягиваем
+  if (!state._notifSummary) {
+    c.innerHTML = '<div class="search25-skeleton">' +
+      Array.from({ length: 3 }).map(() =>
+        '<div class="sk-row"><div class="sk-icon"></div><div class="sk-body"><div class="sk-line w70"></div><div class="sk-line w90"></div><div class="sk-line w40"></div></div></div>'
+      ).join('') +
+    '</div>';
+  } else {
+    _renderNotifications25(state._notifSummary);
+  }
+  // Всегда тянем свежее
+  try {
+    if (typeof refreshNotifBadge === 'function') await refreshNotifBadge();
+  } catch (e) {}
+  _renderNotifications25(state._notifSummary);
+}
+
+function _renderNotifications25(r) {
+  const c = document.getElementById('notif25-list');
+  if (!c) return;
+  const chats  = (r && r.contracts) || [];
+  const notifs = (r && r.items) || [];
+  const total = chats.length + notifs.length;
+
+  if (!total) {
+    c.innerHTML = '<div class="search25-empty">' +
+      '<i class="ti ti-check big" style="color: var(--success);"></i>' +
+      '<div class="title">Всё прочитано</div>' +
+      '<div class="hint">Новые уведомления — о доработках,<br>просроченных задачах и приближающихся отгрузках —<br>появятся здесь автоматически.</div>' +
+    '</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Шапка с кнопкой «Отметить все»
+  html += '<div class="notif25-actions">' +
+    '<div class="notif25-count">' +
+      (notifs.length ? notifs.length + ' уведомлен' + _pluralRu(notifs.length, 'ие', 'ия', 'ий') : '') +
+      (notifs.length && chats.length ? ' · ' : '') +
+      (chats.length ? chats.length + ' чат' + _pluralRu(chats.length, '', 'а', 'ов') : '') +
+    '</div>' +
+    (notifs.length ? '<button class="notif25-ack-all" onclick="ackAllFromTab25()"><i class="ti ti-checks"></i> Отметить все</button>' : '') +
   '</div>';
+
+  // Глобальные уведомления (дефекты, договоры, сборки)
+  if (notifs.length) {
+    html += '<div class="notif25-section-title"><i class="ti ti-bell-ringing"></i> Уведомления</div>';
+    notifs.forEach(n => {
+      const time = _chatPrettyTime(n.created_at);
+      let icon = 'ti-bell';
+      if (n.type === 'defect_created')        icon = 'ti-alert-triangle';
+      else if (n.type === 'defect_message_added') icon = 'ti-message-circle';
+      else if (n.type === 'contract_published')   icon = 'ti-file-text';
+      else if (n.type === 'assembly_created')     icon = 'ti-tool';
+      const onClick = n.entity_type === 'defect'
+        ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
+        : (n.entity_type === 'contract'
+            ? 'onNotif25GlobalClick(' + n.id + ',\'contract\',' + (n.entity_id || 0) + ')'
+            : 'onNotif25GlobalClick(' + n.id + ',\'\',\'\')');
+      html += '<div class="notif25-item notif-global" onclick="' + onClick + '">' +
+        '<div class="notif25-item-head">' +
+          '<div class="notif25-item-title"><i class="ti ' + icon + '"></i>' + escapeHtml(n.title || '') + '</div>' +
+          '<button class="notif25-ack-x" onclick="event.stopPropagation();ackOneNotif25(' + n.id + ')" title="Отметить как прочитанное"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        (n.message ? '<div class="notif25-item-last">' + escapeHtml(_truncate(n.message, 140)) + '</div>' : '') +
+        '<div class="notif25-item-time">' + escapeHtml(time) + '</div>' +
+      '</div>';
+    });
+  }
+
+  // Непрочитанные чаты по договорам
+  if (chats.length) {
+    html += '<div class="notif25-section-title"><i class="ti ti-messages"></i> Чаты по договорам</div>';
+    chats.forEach(ch => {
+      const lastTime = _chatPrettyTime(ch.last_at);
+      const lastText = ch.last_text || '';
+      const author   = ch.last_author ? (ch.last_author + ': ') : '';
+      html += '<div class="notif25-item" onclick="onNotif25ItemClick(' + ch.contract_id + ')">' +
+        '<div class="notif25-item-head">' +
+          '<div class="notif25-item-title"><i class="ti ti-message-circle"></i>Договор ' + escapeHtml(ch.contract_number || '#' + ch.contract_id) + '</div>' +
+          '<span class="notif25-unread-badge">' + (ch.unread > 99 ? '99+' : ch.unread) + '</span>' +
+        '</div>' +
+        (ch.contractor_name ? '<div class="notif25-item-sub">' + escapeHtml(ch.contractor_name) + '</div>' : '') +
+        '<div class="notif25-item-last">' +
+          '<span class="notif25-author">' + escapeHtml(author) + '</span>' +
+          escapeHtml(_truncate(lastText, 100)) +
+        '</div>' +
+        '<div class="notif25-item-time">' + escapeHtml(lastTime) + '</div>' +
+      '</div>';
+    });
+  }
+
+  c.innerHTML = html;
+}
+
+function _pluralRu(n, one, few, many) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+async function onNotif25GlobalClick(notifId, entityType, entityId) {
+  try { await apiPost('/api/notifications/' + notifId + '/ack', {}); } catch (e) {}
+  if (typeof refreshNotifBadge === 'function') refreshNotifBadge();
+  if (entityType === 'defect' && entityId) {
+    if (typeof openDefectDetail === 'function') openDefectDetail(entityId);
+    else if (typeof selectSidebarItem === 'function') {
+      switchMainTab('home');
+      setTimeout(() => selectSidebarItem('defects'), 50);
+    }
+  } else if (entityType === 'contract' && entityId) {
+    if (typeof openContractDetail === 'function') {
+      switchMainTab('home');
+      setTimeout(() => openContractDetail(entityId), 50);
+    }
+  }
+}
+
+async function ackOneNotif25(notifId) {
+  try {
+    await apiPost('/api/notifications/' + notifId + '/ack', {});
+    if (typeof refreshNotifBadge === 'function') {
+      await refreshNotifBadge();
+      _renderNotifications25(state._notifSummary);
+    }
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось отметить', 'error');
+  }
+}
+
+function onNotif25ItemClick(contractId) {
+  state.currentContractId = contractId;
+  switchMainTab('home');
+  if (typeof selectSection === 'function') selectSection('sales');
+  if (typeof selectSidebarItem === 'function') selectSidebarItem('sales-contract-detail');
+  setTimeout(() => {
+    if (typeof openContractChat === 'function') openContractChat();
+    if (typeof refreshNotifBadge === 'function') refreshNotifBadge();
+  }, 200);
+}
+
+async function ackAllFromTab25() {
+  const btn = document.querySelector('.notif25-ack-all');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiPost('/api/notifications/ack-all', {});
+    const cnt = (r && r.data && r.data.count) || 0;
+    if (state._notifSummary) state._notifSummary.items = [];
+    _renderNotifications25(state._notifSummary);
+    if (typeof refreshNotifBadge === 'function') refreshNotifBadge();
+    if (typeof showToast === 'function') showToast(cnt > 0 ? 'Подтверждено: ' + cnt : 'Нечего очищать', cnt > 0 ? 'success' : 'info');
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось очистить', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ============ НЕДЕЛЬНЫЙ КАЛЕНДАРЬ НА ГЛАВНОЙ ============
