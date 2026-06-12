@@ -1350,6 +1350,264 @@ function loadHelpChangelog() {
 }
 
 
+// ============ ПОМОЩНИК (v2.45.290) ============
+// Чат-помощник по базе знаний. Path A: ищет ответ среди HELP_ARTICLES +
+// HELP_FAQ прямо на устройстве (без внешнего ИИ, бесплатно, офлайн).
+// Точка расширения под настоящий ИИ — _assistantAnswer(): когда появится
+// бэкенд-эндпоинт, достаточно заменить локальный поиск на запрос к нему.
+
+const ASSISTANT_STOPWORDS = new Set([
+  'как','что','где','это','для','при','или','если','чтобы','можно','нужно','есть',
+  'мне','я','ты','он','она','они','мы','вы','а','и','в','во','на','с','со','к','по',
+  'от','до','за','из','о','об','же','ли','бы','не','ни','то','так','там','тут','уже',
+  'был','была','быть','мой','моя','твой','его','их','наш','ваш','кто','чем','чём',
+  'про','под','над','без','сделать','делать','хочу','надо'
+]);
+
+// Превращаем строку в набор значимых токенов (рус. леммы упрощённо — по корню)
+function _assistantTokens(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/gi, ' ')
+    .split(' ')
+    .map(t => t.trim())
+    .filter(t => t.length >= 3 && !ASSISTANT_STOPWORDS.has(t))
+    // грубая нормализация окончаний — «договоры/договора/договор» → «договор»
+    .map(t => t.length > 5 ? t.replace(/(ами|ями|ов|ам|ям|ах|ях|ыми|ими|ого|его|ую|ю|ы|и|а|е|у|о|й)$/,'') : t);
+}
+
+// Собираем весь поисковый текст статьи (заголовок, аннотация, тело — без HTML)
+function _assistantArticleText(a) {
+  let parts = [a.title || '', a.summary || '', a.cat_label || ''];
+  (a.body || []).forEach(b => {
+    if (b.p) parts.push(b.p);
+    if (b.h) parts.push(b.h);
+    if (b.note) parts.push(b.note);
+    if (b.ol) parts.push(b.ol.join(' '));
+    if (b.ul) parts.push(b.ul.join(' '));
+  });
+  return parts.join(' ').replace(/<[^>]+>/g, ' ');
+}
+
+// Скоринг релевантности по совпадению токенов (заголовок весит больше)
+function _assistantScore(queryTokens, a) {
+  if (!queryTokens.length) return 0;
+  const titleTokens = new Set(_assistantTokens(a.title));
+  const bodyTokens = new Set(_assistantTokens(_assistantArticleText(a)));
+  let score = 0;
+  queryTokens.forEach(qt => {
+    if (titleTokens.has(qt)) score += 5;
+    else if (bodyTokens.has(qt)) score += 2;
+    else {
+      // частичное совпадение по корню (вхождение)
+      for (const bt of bodyTokens) { if (bt.indexOf(qt) >= 0 || qt.indexOf(bt) >= 0) { score += 1; break; } }
+    }
+  });
+  return score;
+}
+
+// Тело статьи → HTML для вывода прямо в чат (как в openHelpArticle, но компактно)
+function _assistantArticleBodyHtml(a) {
+  let html = '';
+  (a.body || []).forEach(b => {
+    if (b.p)    html += '<p>' + b.p + '</p>';
+    if (b.h)    html += '<h4 class="help-h">' + escapeHtml(b.h) + '</h4>';
+    if (b.ol)   html += '<ol class="help-ol">' + b.ol.map(x => '<li>' + x + '</li>').join('') + '</ol>';
+    if (b.ul)   html += '<ul class="help-ul">' + b.ul.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+    if (b.note) html += '<div class="help-note"><i class="ti ti-info-circle"></i><div>' + b.note + '</div></div>';
+    if (b.tour) html += '<div style="margin:10px 0;"><button class="btn btn-primary btn-sm" onclick="closeAssistantChat();startTour(\'' + b.tour + '\')"><i class="ti ti-player-play"></i>' + escapeHtml(b.tour_label || 'Запустить гайд') + '</button></div>';
+  });
+  return html;
+}
+
+// Основной «мозг»: по тексту вопроса возвращает ответ-объект.
+// СЮДА позже подключается настоящий ИИ (Path B) — заменить тело на вызов
+// бэкенд-эндпоинта POST /api/assistant и оставить тот же формат результата.
+function _assistantAnswer(query) {
+  const qTokens = _assistantTokens(query);
+  // Статьи
+  const scored = (typeof HELP_ARTICLES !== 'undefined' ? HELP_ARTICLES : [])
+    .map(a => ({ a, s: _assistantScore(qTokens, a) }))
+    .filter(x => x.s > 0)
+    .sort((x, y) => y.s - x.s);
+  // FAQ
+  const faqScored = (typeof HELP_FAQ !== 'undefined' ? HELP_FAQ : [])
+    .map(f => {
+      const ft = new Set(_assistantTokens(f.q + ' ' + f.a));
+      let s = 0; qTokens.forEach(qt => { if (ft.has(qt)) s += 3; });
+      return { f, s };
+    })
+    .filter(x => x.s > 0)
+    .sort((x, y) => y.s - x.s);
+
+  const best = scored[0];
+  const bestFaq = faqScored[0];
+
+  // Если FAQ заметно релевантнее — отвечаем им
+  if (bestFaq && (!best || bestFaq.s >= best.s)) {
+    return {
+      type: 'faq',
+      title: bestFaq.f.q,
+      html: '<p>' + bestFaq.f.a + '</p>',
+      related: scored.slice(0, 3).map(x => x.a),
+    };
+  }
+  if (best && best.s >= 3) {
+    return {
+      type: 'article',
+      article: best.a,
+      title: best.a.title,
+      html: _assistantArticleBodyHtml(best.a),
+      related: scored.slice(1, 4).map(x => x.a),
+    };
+  }
+  // Ничего уверенного — мягкий фолбэк + подсказки
+  return {
+    type: 'fallback',
+    related: scored.slice(0, 4).map(x => x.a),
+  };
+}
+
+// Стартовые подсказки — что можно спросить
+const ASSISTANT_SUGGESTIONS = [
+  'Как создать договор',
+  'Как отметить брак или доработку',
+  'Как принять товар от поставщика',
+  'Как сделать отгрузку по QR',
+  'Как поставить задачу сотруднику',
+  'Что закупить — как это работает',
+];
+
+let _assistantHistory = []; // {role:'user'|'bot', html}
+
+function openAssistantChat() {
+  if (typeof closeSectionDrawer === 'function') { try { closeSectionDrawer(); } catch (e) {} }
+  let modal = document.getElementById('assistant-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'assistant-modal';
+  modal.className = 'modal-overlay visible';
+  modal.style.zIndex = '400';
+  modal.onclick = (e) => { if (e.target === modal) closeAssistantChat(); };
+  modal.innerHTML =
+    '<div class="modal asst-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header asst-header">' +
+        '<h3><i class="ti ti-sparkles"></i> Помощник Atom</h3>' +
+        '<button class="icon-btn" onclick="closeAssistantChat()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="asst-messages" id="asst-messages"></div>' +
+      '<div class="asst-input-bar">' +
+        '<input type="text" id="asst-input" placeholder="Спросите: как сделать…" ' +
+          'onkeydown="if(event.key===\'Enter\'){event.preventDefault();assistantSend();}" autocomplete="off">' +
+        '<button class="asst-send-btn" onclick="assistantSend()" title="Спросить"><i class="ti ti-send"></i></button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+
+  // Приветствие (один раз за сессию модалки)
+  const msgs = document.getElementById('asst-messages');
+  if (_assistantHistory.length === 0) {
+    let greet = '<p>Привет! Я помогу разобраться, как что устроено в Atom CRM. ' +
+      'Напишите вопрос своими словами — подскажу по шагам и объясню, зачем функция нужна.</p>' +
+      '<div class="asst-suggest-label">Например:</div>' +
+      '<div class="asst-suggest-chips">' +
+        ASSISTANT_SUGGESTIONS.map(s => '<button class="asst-chip" onclick="assistantAsk(' + JSON.stringify(s).replace(/"/g, '&quot;') + ')">' + escapeHtml(s) + '</button>').join('') +
+      '</div>';
+    _assistantPushBot(greet, false);
+  } else {
+    msgs.innerHTML = _assistantHistory.map(m => _assistantBubbleHtml(m)).join('');
+  }
+  _assistantScrollDown();
+  setTimeout(() => { const i = document.getElementById('asst-input'); if (i) i.focus(); }, 120);
+}
+
+function closeAssistantChat() {
+  const m = document.getElementById('assistant-modal');
+  if (m) m.remove();
+}
+
+function _assistantBubbleHtml(m) {
+  if (m.role === 'user') {
+    return '<div class="asst-msg asst-msg-user"><div class="asst-bubble">' + escapeHtml(m.text) + '</div></div>';
+  }
+  return '<div class="asst-msg asst-msg-bot">' +
+    '<div class="asst-avatar"><i class="ti ti-sparkles"></i></div>' +
+    '<div class="asst-bubble">' + m.html + '</div>' +
+  '</div>';
+}
+
+function _assistantPushUser(text) {
+  _assistantHistory.push({ role: 'user', text });
+  const msgs = document.getElementById('asst-messages');
+  if (msgs) msgs.insertAdjacentHTML('beforeend', _assistantBubbleHtml({ role: 'user', text }));
+  _assistantScrollDown();
+}
+function _assistantPushBot(html, store) {
+  if (store !== false) _assistantHistory.push({ role: 'bot', html });
+  const msgs = document.getElementById('asst-messages');
+  if (msgs) msgs.insertAdjacentHTML('beforeend', _assistantBubbleHtml({ role: 'bot', html }));
+  _assistantScrollDown();
+}
+function _assistantScrollDown() {
+  const msgs = document.getElementById('asst-messages');
+  if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
+}
+
+function assistantAsk(text) {
+  const inp = document.getElementById('asst-input');
+  if (inp) inp.value = text;
+  assistantSend();
+}
+
+function assistantSend() {
+  const inp = document.getElementById('asst-input');
+  if (!inp) return;
+  const q = (inp.value || '').trim();
+  if (!q) return;
+  inp.value = '';
+  _assistantPushUser(q);
+
+  // «думает» — короткая задержка для естественности
+  const thinkingId = 'asst-think-' + Date.now();
+  _assistantPushBot('<span class="asst-thinking" id="' + thinkingId + '"><i class="ti ti-loader-2"></i> Ищу в инструкциях…</span>', false);
+
+  setTimeout(() => {
+    const t = document.getElementById(thinkingId);
+    if (t) { const b = t.closest('.asst-msg'); if (b) b.remove(); }
+
+    const ans = _assistantAnswer(q);
+    let html = '';
+    if (ans.type === 'fallback') {
+      html = '<p>Не нашёл точного ответа на этот вопрос 🤔 Но вот что может подойти — или загляните в раздел <b>Помощь</b>:</p>';
+      if (ans.related.length) {
+        html += '<div class="asst-related">' +
+          ans.related.map(a => '<button class="asst-related-item" onclick="assistantOpenArticle(' + JSON.stringify(a.id).replace(/"/g, '&quot;') + ')"><i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.title) + '</span><i class="ti ti-chevron-right"></i></button>').join('') +
+        '</div>';
+      }
+      html += '<div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="closeAssistantChat();selectSidebarItem(\'help-knowledge\')"><i class="ti ti-book"></i> Открыть Помощь</button></div>';
+    } else {
+      html = '<div class="asst-answer-title"><i class="ti ti-bulb"></i>' + escapeHtml(ans.title) + '</div>' + ans.html;
+      if (ans.type === 'article' && ans.article) {
+        html += '<div class="asst-answer-foot"><button class="btn btn-secondary btn-sm" onclick="assistantOpenArticle(' + JSON.stringify(ans.article.id).replace(/"/g, '&quot;') + ')"><i class="ti ti-external-link"></i> Открыть в Помощи</button></div>';
+      }
+      if (ans.related && ans.related.length) {
+        html += '<div class="asst-related-label">Похожее:</div><div class="asst-related">' +
+          ans.related.map(a => '<button class="asst-related-item" onclick="assistantOpenArticle(' + JSON.stringify(a.id).replace(/"/g, '&quot;') + ')"><i class="ti ' + a.icon + '"></i><span>' + escapeHtml(a.title) + '</span><i class="ti ti-chevron-right"></i></button>').join('') +
+        '</div>';
+      }
+    }
+    _assistantPushBot(html);
+  }, 350);
+}
+
+function assistantOpenArticle(articleId) {
+  closeAssistantChat();
+  // help-modal — постоянный элемент, открывается из любого экрана
+  if (typeof openHelpArticle === 'function') openHelpArticle(articleId);
+}
+
+
 // ============ ЭТАП 39 (v2.19.0): ПУБЛИКАЦИЯ ДОГОВОРА ============
 
 async function publishContract(contractId) {
