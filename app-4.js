@@ -6955,17 +6955,19 @@ async function runSearch25() {
   const filter = state.search25Filter;
   // v2.45.280: параллельные запросы — было последовательно через await в if'ах
   // v2.45.283: + сборки (production works) — ищем по сборщику и соисполнителям
+  // v2.45.284: + workload — сводка часов по сотруднику, если имя совпало
   const wantC  = (filter === 'all' || filter === 'contracts');
   const wantA  = (filter === 'all' || filter === 'assemblies');
   const wantT  = (filter === 'all' || filter === 'tasks');
   const wantD  = (filter === 'all' || filter === 'defects');
   const wantCT = (filter === 'all' || filter === 'contractors');
-  const [rC, rA, rT, rD, rCT] = await Promise.all([
+  const [rC, rA, rT, rD, rCT, rWL] = await Promise.all([
     wantC  ? apiGet('/api/contracts').catch(() => null)         : null,
     wantA  ? apiGet('/api/production/works').catch(() => null)  : null,
     wantT  ? apiGet('/api/tasks').catch(() => null)             : null,
     wantD  ? apiGet('/api/defects').catch(() => null)           : null,
     wantCT ? apiGet('/api/contractors').catch(() => null)       : null,
+    wantA  ? apiGet('/api/production/workload').catch(() => null) : null,
   ]);
 
   // Перепроверяем что запрос ещё актуален (пользователь не стёр пока шёл fetch)
@@ -6973,6 +6975,8 @@ async function runSearch25() {
 
   const results = [];
   const counts = { contracts: 0, assemblies: 0, tasks: 0, defects: 0, contractors: 0 };
+  // v2.45.284: сводка по сотруднику — заполняется ниже, если запрос совпал с workload
+  let workerSummaryHtml = '';
 
   if (rC && Array.isArray(rC.contracts)) {
     rC.contracts.forEach(x => {
@@ -7001,6 +7005,7 @@ async function runSearch25() {
     });
   }
   // v2.45.283: сборки (production works) — ищем по модели, договору, сборщику, соисполнителям
+  // v2.45.284: + показываем часы каждой сборки, если есть
   if (rA && Array.isArray(rA.works)) {
     rA.works.forEach(w => {
       const helperNames = (Array.isArray(w.active_helpers) ? w.active_helpers : [])
@@ -7019,16 +7024,62 @@ async function runSearch25() {
         let subRole = '';
         if ((w.assignee_short_name || '').toLowerCase().indexOf(q) >= 0) subRole = ' · сборщик ' + w.assignee_short_name;
         else if (helperNames.toLowerCase().indexOf(q) >= 0) subRole = ' · соисполнитель';
+        // Часы: предпочитаем факт, иначе оценку с тильдой
+        let hoursPart = '';
+        if (w.actual_hours != null && Number(w.actual_hours) > 0) hoursPart = ' · ' + w.actual_hours + 'ч';
+        else if (w.est_hours != null && Number(w.est_hours) > 0)  hoursPart = ' · ~' + w.est_hours + 'ч';
         const title = (w.model_name || w.title || ('Работа #' + w.id)) +
                       (w.contract_number ? ' · ' + w.contract_number : '');
         results.push({
           type: 'assembly', cls: 'c-prod', icon: 'ti-tool',
           title: title,
-          sub: 'Сборка · ' + (w.status_label || w.status || '—') + subRole,
+          sub: 'Сборка · ' + (w.status_label || w.status || '—') + subRole + hoursPart,
           click: () => { switchMainTab('home'); openProductionWorkDetail(w.id); },
         });
       }
     });
+  }
+
+  // v2.45.284: сводка по сотруднику из workload — если имя совпало с запросом.
+  // Показывает: имя, часы за неделю, кол-во работ (своих и как соисполнитель), статус загрузки.
+  if (rWL && Array.isArray(rWL.workers)) {
+    const matched = rWL.workers.filter(w => {
+      const hay = ((w.short_name || '') + ' ' + (w.full_name || '')).toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+    if (matched.length) {
+      const norm = (rWL.norm_hours) || 40;
+      workerSummaryHtml = matched.map(w => {
+        const name   = w.short_name || w.full_name || ('Сотрудник #' + w.employee_id);
+        const hours  = (w.est_hours != null) ? w.est_hours : (w.total_hours || 0);
+        const isEst  = !!w.is_estimated;
+        const main   = w.main_count || 0;
+        const help   = w.help_count || 0;
+        const works  = w.works_count || (main + help);
+        const status = w.status || (works === 0 ? 'undersized' : 'normal');
+        const statusLabel =
+          (status === 'overloaded') ? 'перегруз' :
+          (status === 'normal')     ? 'норма'    :
+          (works === 0)             ? 'свободен' : 'недогруз';
+        const pct = Math.max(0, Math.min(150, Math.round(w.pct || 0)));
+        const parts = [];
+        if (main) parts.push(main + ' ' + _pluralRu(main, 'сборка', 'сборки', 'сборок'));
+        if (help) parts.push(help + ' как соисполнитель');
+        if (!parts.length) parts.push('нет активных работ');
+        return '<div class="search25-worker-card s-' + status + '">' +
+          '<div class="search25-worker-head">' +
+            '<div class="search25-worker-name"><i class="ti ti-user"></i>' + escapeHtml(name) + '</div>' +
+            '<div class="search25-worker-status">' + escapeHtml(statusLabel) + '</div>' +
+          '</div>' +
+          '<div class="search25-worker-hours">' +
+            '<span class="hours-num">' + (isEst ? '~' : '') + hours + 'ч</span>' +
+            '<span class="hours-of">из ' + norm + 'ч/нед · ' + pct + '%</span>' +
+          '</div>' +
+          '<div class="search25-worker-bar"><div class="search25-worker-bar-fill" style="width:' + Math.min(100, pct) + '%"></div></div>' +
+          '<div class="search25-worker-meta">' + escapeHtml(parts.join(' · ')) + '</div>' +
+        '</div>';
+      }).join('');
+    }
   }
   if (rT && Array.isArray(rT.tasks)) {
     rT.tasks.forEach(x => {
@@ -7082,7 +7133,7 @@ async function runSearch25() {
 
   _search25UpdateChipCounts(counts);
 
-  if (!results.length) {
+  if (!results.length && !workerSummaryHtml) {
     c.innerHTML = '<div class="search25-empty">' +
       '<i class="ti ti-mood-empty big"></i>' +
       '<div class="title">Ничего не нашлось</div>' +
@@ -7096,7 +7147,8 @@ async function runSearch25() {
 
   // Сохраняем коллбеки для клика
   window._search25Clicks = results.map(r => r.click);
-  let html = '';
+  // v2.45.284: наверху — сводка по сотруднику, если запрос совпал с workload
+  let html = workerSummaryHtml || '';
   results.slice(0, 50).forEach((r, i) => {
     html += '<div class="result25-row" onclick="search25Click(' + i + ')">' +
       '<div class="result25-icon ' + r.cls + '"><i class="ti ' + r.icon + '"></i></div>' +

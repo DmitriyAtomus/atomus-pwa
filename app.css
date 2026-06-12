@@ -12965,6 +12965,88 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* v2.45.284: сводка по сотруднику в поиске (часы за неделю + загрузка) */
+  .search25-worker-card {
+    margin: 0 14px 10px;
+    padding: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--brand);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(20, 33, 61, 0.04);
+  }
+  .search25-worker-card.s-overloaded { border-left-color: #DC2626; }
+  .search25-worker-card.s-normal     { border-left-color: #16A34A; }
+  .search25-worker-card.s-undersized { border-left-color: #94A3B8; }
+  .search25-worker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .search25-worker-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .search25-worker-name .ti { color: var(--brand); font-size: 16px; }
+  .search25-worker-status {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--brand-bg);
+    color: var(--brand);
+  }
+  .s-overloaded .search25-worker-status { background: #FEE2E2; color: #B91C1C; }
+  .s-normal     .search25-worker-status { background: #DCFCE7; color: #15803D; }
+  .s-undersized .search25-worker-status { background: #F1F5F9; color: #64748B; }
+  .search25-worker-hours {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .search25-worker-hours .hours-num {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .search25-worker-hours .hours-of {
+    font-size: 12.5px;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+  }
+  .search25-worker-bar {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .search25-worker-bar-fill {
+    height: 100%;
+    background: var(--brand);
+    border-radius: 999px;
+    transition: width 0.3s;
+  }
+  .s-overloaded .search25-worker-bar-fill { background: #DC2626; }
+  .s-normal     .search25-worker-bar-fill { background: #16A34A; }
+  .s-undersized .search25-worker-bar-fill { background: #94A3B8; }
+  .search25-worker-meta {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    line-height: 1.4;
+  }
+
   /* v2.45.280/281: история поиска — компактные чипы */
   .search25-history {
     margin: 0 14px 14px;
