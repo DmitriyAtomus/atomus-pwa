@@ -12949,67 +12949,98 @@
     font-size: 18px;
   }
 
-  /* v2.45.280: история поиска */
+  /* v2.45.281: overlay-экраны нижнего таб-бара (Поиск/Уведомления) —
+     перекрывают весь экран от шапки до низа, контент главной не просвечивает.
+     Скролл внутри, низ с запасом под таб-бар и safe-area. */
+  .tab25-overlay {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg);
+    z-index: 25;
+    overflow-y: auto;
+    padding: 16px 0 calc(96px + env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* v2.45.280/281: история поиска — компактные чипы */
   .search25-history {
-    margin: 0 14px 6px;
+    margin: 0 14px 14px;
   }
   .search25-history-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 12px;
-    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 11.5px;
+    font-weight: 700;
     color: var(--text-light);
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.5px;
   }
   .search25-history-head .ti { font-size: 14px; margin-right: 4px; vertical-align: -1px; }
   .search25-history-clear {
     background: none;
     border: none;
     color: var(--brand);
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     cursor: pointer;
     padding: 4px 6px;
     text-transform: none;
     letter-spacing: 0;
+    border-radius: 8px;
+    transition: background 0.12s;
   }
+  .search25-history-clear:active { background: var(--brand-bg); }
   .search25-history-list {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .search25-history-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
+    gap: 6px;
     background: white;
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 14px;
+    border-radius: 999px;
+    padding: 7px 14px 7px 11px;
+    font-size: 13.5px;
+    font-weight: 500;
     color: var(--text);
     text-align: left;
     cursor: pointer;
+    max-width: 100%;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.04);
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
   .search25-history-item:active {
-    background: var(--bg);
-    transform: scale(0.99);
+    background: var(--brand-bg);
+    border-color: var(--brand-bg-strong);
+    transform: scale(0.96);
   }
   .search25-history-item .ti {
-    color: var(--text-light);
-    font-size: 16px;
+    color: var(--brand);
+    font-size: 14px;
     flex-shrink: 0;
   }
   .search25-history-item span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 200px;
   }
+  .search25-history-hint {
+    margin-top: 12px;
+    padding: 0 4px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-light);
+  }
+  .search25-history-hint b { color: var(--text-mid); font-weight: 600; }
 
   /* v2.45.280: скелет загрузки (поиск/уведомления) */
   .search25-skeleton {
