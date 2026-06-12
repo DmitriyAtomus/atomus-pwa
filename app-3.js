@@ -7061,13 +7061,17 @@ function renderSupplyOrders() {
     }
     html += '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
       '<div class="sup-row-body">' +
-        '<div class="sup-row-title">Заказ ' + escapeHtml(label) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+        // v2.45.288: ORD-N — компактным чипом слева, имя поставщика — основным заголовком
+        '<div class="sup-row-title">' +
+          '<span class="sup-ord-label">' + escapeHtml(label) + '</span>' +
+          '<span class="sup-ord-supplier">' + escapeHtml(o.supplier_name || '—') + '</span>' +
+        '</div>' +
         '<div class="sup-row-meta">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
-          '<span><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
-          (total ? '<span><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
-          (o.expected_date ? '<span><i class="ti ti-calendar"></i>ожидаем ' + escapeHtml(o.expected_date) + '</span>' : '') +
+          '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
+          (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
+          (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
         '</div>' +
       '</div>' +
       (canDelete
@@ -10184,6 +10188,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.288',
+    date: '12.06.2026',
+    title: 'Заказы поставщикам — компактные карточки',
+    features: [
+      'Карточка заказа стала <b>заметно компактнее</b>: больше заказов помещается на экран',
+      '<b>«Заказ»</b> в заголовке убрано (раздел и так «Заказы»). Номер <b>ORD-61</b> — отдельным мини-чипом, имя поставщика — основным текстом и обрезается «…» если не влезает',
+      'Иконка, корзина и пилы статусов уменьшены и приведены к общему ритму отступов',
+    ],
+  },
   {
     version: 'v2.45.287',
     date: '12.06.2026',
