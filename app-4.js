@@ -6908,7 +6908,7 @@ function _search25UpdateChipCounts(counts) {
 function renderSearch25Empty() {
   const c = document.getElementById('search25-results');
   if (!c) return;
-  // v2.45.280: если есть история — показываем её как «недавние», иначе подсказку
+  // v2.45.281: если есть история — компактные чипы + краткий хинт; иначе крупный empty
   const history = _search25LoadHistory();
   if (history.length) {
     let html = '<div class="search25-history">' +
@@ -6923,9 +6923,8 @@ function renderSearch25Empty() {
         '<span>' + escapeHtml(q) + '</span>' +
       '</button>';
     });
-    html += '</div></div>';
-    html += '<div class="search25-empty" style="padding-top:24px;">' +
-      '<div class="hint">Или введите новый запрос:<br>номер договора, ФИО, контрагент, слово из задачи</div>' +
+    html += '</div>' +
+      '<div class="search25-history-hint">Тап по чипу — повторить запрос. Или введите новый: <b>номер договора, ФИО, контрагент, слово из задачи</b></div>' +
     '</div>';
     c.innerHTML = html;
     return;
