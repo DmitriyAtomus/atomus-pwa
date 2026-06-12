@@ -5395,32 +5395,115 @@ async function assignCpSupplier(supplierId) {
   } catch (e) { showToast('Ошибка', 'error'); }
 }
 
+// v2.45.286: локальное состояние пользователя по «Что закупить» —
+// скрытые позиции и переопределение количества. Хранится в localStorage
+// и применяется и в рендере, и при создании заказа / скачивании DOCX.
+const SHOP_HIDDEN_KEY = 'atomus_shop_hidden_ids';
+const SHOP_QTY_KEY    = 'atomus_shop_qty_overrides';
+function _shopGetHidden() {
+  try { return new Set(JSON.parse(localStorage.getItem(SHOP_HIDDEN_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+function _shopSaveHidden(set) {
+  try { localStorage.setItem(SHOP_HIDDEN_KEY, JSON.stringify([...set])); } catch (e) {}
+}
+function _shopGetQtyMap() {
+  try { return JSON.parse(localStorage.getItem(SHOP_QTY_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function _shopSaveQtyMap(map) {
+  try { localStorage.setItem(SHOP_QTY_KEY, JSON.stringify(map)); } catch (e) {}
+}
+async function shopHideItem(componentId, name) {
+  if (!confirm('Убрать «' + (name || '') + '» из «Что закупить»?\n\nПозиция перестанет показываться и не попадёт в новый заказ. Это локально (только на этом устройстве). Можно вернуть кнопкой «Показать скрытые».')) return;
+  const set = _shopGetHidden();
+  set.add(componentId);
+  _shopSaveHidden(set);
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+function shopUnhideAll() {
+  _shopSaveHidden(new Set());
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+function shopEditQty(componentId, currentQty, unit) {
+  const v = prompt('Сколько ' + (unit || 'шт.') + ' заказать?\n\nПусто — вернуть рекомендованное количество.', String(currentQty));
+  if (v === null) return;
+  const map = _shopGetQtyMap();
+  const trimmed = String(v).trim();
+  if (!trimmed) {
+    delete map[componentId];
+  } else {
+    const n = Number(trimmed.replace(',', '.'));
+    if (!isFinite(n) || n < 0) {
+      showToast('Введите неотрицательное число', 'error');
+      return;
+    }
+    map[componentId] = n;
+  }
+  _shopSaveQtyMap(map);
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+// Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount}
+function _shopApplyLocal(items) {
+  const hidden = _shopGetHidden();
+  const qtyMap = _shopGetQtyMap();
+  let hiddenCount = 0;
+  const out = (items || []).filter(it => {
+    if (hidden.has(it.component_id)) { hiddenCount++; return false; }
+    return true;
+  }).map(it => {
+    if (qtyMap[it.component_id] != null) {
+      return Object.assign({}, it, { recommended_qty: qtyMap[it.component_id], _qty_overridden: true });
+    }
+    return it;
+  });
+  return { items: out, hiddenCount };
+}
+
 function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
   const groups = (d && d.groups) || [];
   const cpBlock = _contractPurchasesBlockHtml(d && d._contract_purchases);
-  if (!groups.length) {
-    container.innerHTML = cpBlock + '<div class="empty-block" style="padding: 32px 16px;">' +
+  // v2.45.286: применяем локальные скрытие/переопределения к каждой группе
+  let totalHidden = 0;
+  groups.forEach(g => {
+    const r = _shopApplyLocal(g.items);
+    g.items = r.items;
+    g.items_count = r.items.length;
+    totalHidden += r.hiddenCount;
+  });
+  // Группы, в которых не осталось позиций после фильтра — выкидываем
+  const visibleGroups = groups.filter(g => (g.items || []).length > 0);
+  // v2.45.286: тулбар с кол-вом скрытых + кнопкой «Показать»
+  const hiddenToolbar = totalHidden > 0
+    ? '<div class="sup-shop-hidden-bar">' +
+        '<i class="ti ti-eye-off"></i>' +
+        '<span>Скрыто ' + totalHidden + ' ' + _plural(totalHidden, ['позиция', 'позиции', 'позиций']) + ' (только на этом устройстве)</span>' +
+        '<button class="btn btn-secondary btn-sm" onclick="shopUnhideAll()"><i class="ti ti-eye"></i>Показать все</button>' +
+      '</div>'
+    : '';
+  if (!visibleGroups.length) {
+    container.innerHTML = cpBlock + hiddenToolbar + '<div class="empty-block" style="padding: 32px 16px;">' +
       '<i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
       '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">' +
-        'Всё в норме — низкого остатка и дефицита не обнаружено.' +
+        (totalHidden > 0 ? 'Все оставшиеся позиции скрыты вами вручную.' : 'Всё в норме — низкого остатка и дефицита не обнаружено.') +
       '</div></div>';
     return;
   }
-  let html = cpBlock;
+  let html = cpBlock + hiddenToolbar;
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
   const allNoSupIds = new Set();
-  groups.forEach(g => {
+  visibleGroups.forEach(g => {
     if (!g.supplier_id) (g.items || []).forEach(it => allNoSupIds.add(it.component_id));
   });
   Array.from(window._noSupSelected).forEach(id => {
     if (!allNoSupIds.has(id)) window._noSupSelected.delete(id);
   });
 
-  groups.forEach((g, idx) => {
+  visibleGroups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
     const itemRows = (g.items || []).map(it => {
@@ -5456,6 +5539,24 @@ function renderSupplyShopping(d) {
         ? '<td class="ssp-action"><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
             '<i class="ti ti-truck"></i>Поставщик</button></td>'
         : '';
+      // v2.45.286: qty можно менять кликом, рядом — крестик «скрыть позицию»
+      const safeName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
+      const qtyOverridden = !!it._qty_overridden;
+      const qtyCell =
+        '<td class="ssp-qty ssp-qty-edit' + (qtyOverridden ? ' is-overridden' : '') + '" ' +
+            'onclick="shopEditQty(' + it.component_id + ', ' + Number(it.recommended_qty) + ', ' + JSON.stringify(it.unit || 'шт.').replace(/"/g, '&quot;') + ')" ' +
+            'title="' + (qtyOverridden ? 'Изменено вручную · ' : '') + 'Тап чтобы изменить количество">' +
+          escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
+          ' <i class="ti ti-pencil ssp-qty-pencil"></i>' +
+        '</td>';
+      const removeCell =
+        '<td class="ssp-remove-cell">' +
+          '<button type="button" class="ssp-remove-btn" ' +
+            'title="Убрать из «Что закупить» (локально)" ' +
+            'onclick="event.stopPropagation();shopHideItem(' + it.component_id + ', ' + safeName + ')">' +
+            '<i class="ti ti-x"></i>' +
+          '</button>' +
+        '</td>';
       return '<tr>' + checkCell +
         // v2.45.256: клик по названию — открыть карточку комплектующего
         '<td class="ssp-name">' + critBadge +
@@ -5471,11 +5572,10 @@ function renderSupplyShopping(d) {
           '<span class="ssp-meta-label">остаток/мин: </span>' +
           escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
         '</td>' +
-        '<td class="ssp-qty" style="text-align:right;font-weight:700;color:#2563EB;">' +
-          escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
-        '</td>' +
+        qtyCell +
         '<td class="ssp-reason-cell">' + reasonBadge + orderBadge + '</td>' +
         assignCell +
+        removeCell +
       '</tr>';
     }).join('');
     html += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
@@ -5543,6 +5643,7 @@ function renderSupplyShopping(d) {
           '<th style="text-align:right;width:140px;">Заказать</th>' +
           '<th style="width:160px;">Причина</th>' +
           (noSupplier ? '<th style="width:150px;">Действие</th>' : '') +
+          '<th style="width:40px;"></th>' +
         '</tr></thead>' +
         '<tbody>' + itemRows + '</tbody>' +
       '</table>' +
@@ -5558,7 +5659,9 @@ function renderSupplyShopping(d) {
 async function downloadShoppingGroupDocx(supplierId) {
   const d = await apiGet('/api/supply/shopping-list');
   const group = (d.groups || []).find(g => g.supplier_id === supplierId);
-  if (!group || !group.items || !group.items.length) {
+  // v2.45.286: проверяем после применения локального скрытия
+  const visible = group ? _shopApplyLocal(group.items).items : [];
+  if (!group || !visible.length) {
     showToast('Нет позиций для экспорта', 'warning');
     return;
   }
@@ -5571,7 +5674,8 @@ async function downloadShoppingGroupDocx(supplierId) {
       },
       body: JSON.stringify({
         supplier_id: supplierId,
-        items: group.items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
+        // v2.45.286: убираем локально скрытые и применяем переопределённые qty
+        items: _shopApplyLocal(group.items).items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
       }),
     });
     if (!resp.ok) {
@@ -5607,7 +5711,9 @@ async function downloadShoppingGroupDocx(supplierId) {
 async function openCreateOrderPreview(supplierId) {
   const d = await apiGet('/api/supply/shopping-list');
   const group = (d.groups || []).find(g => g.supplier_id === supplierId);
-  if (!group || !group.items || !group.items.length) {
+  // v2.45.286: проверяем после применения локального скрытия
+  const visible = group ? _shopApplyLocal(group.items).items : [];
+  if (!group || !visible.length) {
     showToast('Нет позиций для экспорта', 'warning');
     return;
   }
@@ -5626,7 +5732,8 @@ async function openCreateOrderPreview(supplierId) {
       },
       body: JSON.stringify({
         supplier_id: supplierId,
-        items: group.items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
+        // v2.45.286: убираем локально скрытые и применяем переопределённые qty
+        items: _shopApplyLocal(group.items).items.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
       }),
     });
     if (!resp.ok) {
@@ -10076,6 +10183,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.286',
+    date: '12.06.2026',
+    title: '«Что закупить» — убрать позицию и изменить количество',
+    features: [
+      'Можно <b>убрать ненужную позицию</b> из «Что закупить» крестиком справа. Скрытая позиция не показывается и не попадает в новый заказ',
+      'Можно <b>изменить количество</b>: тап по «3 шт.» — ввёл нужное число — сохранилось. Изменённое значение подсвечивается оранжевой плашкой',
+      'Сверху появляется тулбар <b>«Скрыто N · Показать все»</b> — одной кнопкой возвращаются все вручную убранные',
+      'При создании заказа (<b>«Сформировать заказ»</b> и <b>«Скачать DOCX»</b>) подставляется изменённое количество, а скрытые позиции пропускаются',
+      '<b>Важно:</b> и скрытие, и переопределение хранятся <b>локально</b>, только на этом устройстве. На сервере данные не меняются — это «мой взгляд», а не редактирование плана производства',
+    ],
+  },
   {
     version: 'v2.45.285',
     date: '12.06.2026',
