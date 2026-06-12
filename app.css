@@ -5512,6 +5512,54 @@
     transform: rotate(45deg);
   }
 
+  /* v2.45.287: карточка заказа поставщику — ровная, выровненная по центру.
+     Раньше на мобильной .sup-row уходил в column-режим (для inbox-кнопок),
+     из-за чего чекбокс «всплывал» по центру, а иконка/корзина разъезжались. */
+  .sup-ord-card {
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+  }
+  /* Перебиваем общий мобильный column-режим — у заказа одна кнопка, тесниться нечему */
+  .app.mobile-layout .sup-row.sup-ord-card {
+    flex-direction: row;
+    align-items: center;
+  }
+  .sup-ord-card .sup-row-body { align-self: center; }
+  .sup-ord-card .sup-row-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 6px;
+    /* длинное имя поставщика переносится, но не ломает сетку */
+    overflow-wrap: anywhere;
+  }
+  .sup-ord-card .sup-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    font-size: 12px;
+  }
+  .sup-ord-card .sup-row-meta > span:not(.sup-status-pill) {
+    color: var(--text-light);
+    white-space: nowrap;
+  }
+  .sup-ord-card .sup-row-delete { align-self: center; }
+
+  /* v2.45.287: шапка «Отметь заказы…» — ровный ряд, не sup-row */
+  .sup-ord-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 6px 10px;
+  }
+  .sup-ord-head-hint {
+    font-size: 12.5px;
+    color: var(--text-light);
+    line-height: 1.35;
+  }
+
   /* Pill статуса заявки */
   .sup-status-pill {
     padding: 2px 9px;

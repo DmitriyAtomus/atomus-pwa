@@ -7022,13 +7022,13 @@ function renderSupplyOrders() {
   // Шапка-выделить-всё
   if (canDelete) {
     const allChecked = list.length > 0 && state.supplyOrdersSelected.size === list.length;
-    html += '<div class="sup-row" style="background:transparent;border:none;padding:6px 14px;cursor:default;align-items:center;">' +
+    html += '<div class="sup-ord-head">' +
       '<label class="sup-check-wrap" title="Выделить все" onclick="event.stopPropagation();">' +
         '<input type="checkbox" id="sup-ord-check-all" ' + (allChecked ? 'checked' : '') +
           ' onchange="toggleAllSupplyOrders(this.checked)">' +
         '<span class="sup-check-box"></span>' +
       '</label>' +
-      '<div style="font-size:12.5px;color:var(--text-light);margin-left:8px;">Отметь заказы — кнопка «Удалить выбранные» появится снизу</div>' +
+      '<span class="sup-ord-head-hint">Отметь заказы — кнопка «Удалить выбранные» появится снизу</span>' +
     '</div>';
   }
 
@@ -7050,7 +7050,8 @@ function renderSupplyOrders() {
           ? '<span class="sup-status-pill" style="background:#E0E7FF;color:#3730A3;"><i class="ti ti-file-check"></i> счёт привязан</span>'
           : '');
 
-    html += '<div class="sup-row" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
+    const itemsWord = (typeof _plural === 'function') ? _plural(o.items_count, ['позиция', 'позиции', 'позиций']) : 'позиций';
+    html += '<div class="sup-row sup-ord-card" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
     if (canDelete) {
       html += '<label class="sup-check-wrap" onclick="event.stopPropagation();">' +
         '<input type="checkbox" ' + (isSel ? 'checked' : '') +
@@ -7061,10 +7062,10 @@ function renderSupplyOrders() {
     html += '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
       '<div class="sup-row-body">' +
         '<div class="sup-row-title">Заказ ' + escapeHtml(label) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
-        '<div class="sup-row-meta" style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;">' +
+        '<div class="sup-row-meta">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
-          '<span><i class="ti ti-list"></i>' + o.items_count + ' позиций</span>' +
+          '<span><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
           (total ? '<span><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span><i class="ti ti-calendar"></i>ожидаем ' + escapeHtml(o.expected_date) + '</span>' : '') +
         '</div>' +
@@ -10183,6 +10184,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.287',
+    date: '12.06.2026',
+    title: 'Заказы поставщикам — ровные карточки',
+    features: [
+      'Карточка заказа в «Заказах» теперь <b>выровнена</b>: чекбокс, иконка, текст и корзина — в один ровный ряд, по центру. Раньше на телефоне всё «разъезжалось» — чекбокс висел посередине, корзина уезжала вниз',
+      'Аккуратные отступы и переносы: длинное имя поставщика больше не ломает сетку',
+      'Мелочь: «1 позиция» вместо «1 позиций» — правильное склонение по числу',
+    ],
+  },
   {
     version: 'v2.45.286',
     date: '12.06.2026',
