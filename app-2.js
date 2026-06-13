@@ -7748,6 +7748,13 @@ async function loadContracts() {
   }
 }
 
+// v2.45.293: единая подпись типа договора (3 значения)
+function _contractTypeLabel(t) {
+  if (t === 'supply_install') return 'поставка с монтажом';
+  if (t === 'install_only')   return 'только монтаж';
+  return 'поставка';
+}
+
 function renderContractsList() {
   const container = document.getElementById('sc-content');
   const counts = cache.contractsCounts || {};
@@ -7805,8 +7812,7 @@ function renderContractsList() {
       '</div>';
     list.forEach(c => {
       const desc = [];
-      if (c.contract_type === 'supply_install') desc.push('поставка с монтажом');
-      else desc.push('поставка');
+      desc.push(_contractTypeLabel(c.contract_type));
       desc.push(legalEntityShortName(c.legal_entity));
       const statusCls = c.status ? ('s-' + c.status) : '';
       // v2.45.13: подсветка по сроку отгрузки
@@ -7848,7 +7854,7 @@ function renderContractsList() {
         '</div>' +
         '<div class="cc-name">' + escapeHtml(c.contractor_name || '—') + '</div>' +
         '<div class="cc-meta">' +
-          '<span>' + escapeHtml(c.contract_type === 'supply_install' ? 'поставка с монтажом' : 'поставка') + '</span>' +
+          '<span>' + escapeHtml(_contractTypeLabel(c.contract_type)) + '</span>' +
           (c.delivery_date ? '<span><b>срок</b> ' + formatDate(c.delivery_date) + '</span>' : '') +
           (canSeeMoney() && c.sum_amount ? '<span><b>сумма</b> ' + formatMoney(c.sum_amount) + '</span>' : '') +
         '</div>' +
@@ -7903,7 +7909,7 @@ function renderContractDetail(c) {
   document.getElementById('scd-mobile-title').textContent = c.number || 'Договор';
   document.getElementById('scd-subtitle').textContent =
     (c.sign_date ? 'от ' + formatDateLong(c.sign_date) : '') + ' · ' +
-    (c.contract_type === 'supply_install' ? 'поставка с монтажом' : 'поставка');
+    _contractTypeLabel(c.contract_type);
 
   const container = document.getElementById('scd-content');
   const canEdit = canManageSales();

@@ -2323,6 +2323,9 @@ function renderContractForm() {
           '<i class="ti ti-package"></i> Только поставка</button>';
   html += '<button type="button" class="' + (f.contract_type === 'supply_install' ? 'selected' : '') + '" onclick="setContractType(\'supply_install\')">' +
           '<i class="ti ti-tools"></i> Поставка + монтаж</button>';
+  // v2.45.293: иногда заказывают только монтаж (без поставки оборудования)
+  html += '<button type="button" class="' + (f.contract_type === 'install_only' ? 'selected' : '') + '" onclick="setContractType(\'install_only\')">' +
+          '<i class="ti ti-tool"></i> Только монтаж</button>';
   html += '</div></div></div>';
 
   // Юрлицо
