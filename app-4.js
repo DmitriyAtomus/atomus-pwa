@@ -10910,6 +10910,233 @@ async function deleteSurvey(id) {
   } catch (e) { showToast('Не удалось удалить', 'error'); }
 }
 
+// ============ ОТЧЁТЫ МЕНЕДЖЕРОВ (ежедневный KPI) ============
+// Менеджер раз в день вносит свои показатели; «итого» за месяц считает сервер
+// (нарастающим итогом). Менеджер видит свои отчёты, директор/зам — всех.
+
+var _srState = { month: null, data: null };
+
+// Поля отчёта: ключ, подпись в форме, короткая подпись в таблице, иконка
+var _SR_FIELDS = [
+  { key: 'calls',     label: 'Звонков',       short: 'звонков', icon: 'ti-phone' },
+  { key: 'connects',  label: 'Дозвоны',       short: 'дозвоны', icon: 'ti-checks' },
+  { key: 'new_leads', label: 'Новых заявок',  short: 'заявок',  icon: 'ti-inbox' },
+  { key: 'offers',    label: 'КП выставлено', short: 'КП',      icon: 'ti-file-invoice' },
+  { key: 'deals',     label: 'Сделок',        short: 'сделок',  icon: 'ti-circle-check' },
+  { key: 'revenue',   label: 'Выручка, ₽',    short: 'выручка', icon: 'ti-coin', money: true },
+];
+
+function _srTodayIso() {
+  const d = new Date();
+  const p = n => (n < 10 ? '0' + n : '' + n);
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function _srCurMonth() { return _srState.month || _srTodayIso().slice(0, 7); }
+function _srFmtNum(n) { return (Number(n) || 0).toLocaleString('ru-RU'); }
+function _srMonthLabel(ym) {
+  const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const parts = (ym || '').split('-');
+  return (months[parseInt(parts[1], 10) - 1] || '') + ' ' + (parts[0] || '');
+}
+function _srFmtDateRu(iso) {
+  const p = (iso || '').split('-');
+  return p.length === 3 ? (p[2] + '.' + p[1] + '.' + p[0].slice(2)) : (iso || '');
+}
+function _srShiftMonth(ym, delta) {
+  const p = (ym || _srCurMonth()).split('-');
+  let y = parseInt(p[0], 10), m = parseInt(p[1], 10) - 1 + delta;
+  y += Math.floor(m / 12);
+  m = ((m % 12) + 12) % 12;
+  return y + '-' + (m + 1 < 10 ? '0' : '') + (m + 1);
+}
+
+async function loadSalesReports() {
+  const box = document.getElementById('sales-reports-body');
+  if (!box) return;
+  const month = _srCurMonth();
+  box.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/sales/reports?month=' + encodeURIComponent(month));
+    _srState.month = d.month || month;
+    _srState.data = d;
+    _srRender(box, d);
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить отчёты</div>';
+  }
+}
+
+function _srNavMonth(delta) {
+  _srState.month = _srShiftMonth(_srCurMonth(), delta);
+  loadSalesReports();
+}
+
+function _srRender(box, d) {
+  let html = '<div class="sr-toolbar">' +
+      '<button class="btn btn-secondary btn-small" onclick="_srNavMonth(-1)" title="Предыдущий месяц"><i class="ti ti-chevron-left"></i></button>' +
+      '<div class="sr-month">' + escapeHtml(_srMonthLabel(d.month)) + '</div>' +
+      '<button class="btn btn-secondary btn-small" onclick="_srNavMonth(1)" title="Следующий месяц"><i class="ti ti-chevron-right"></i></button>' +
+    '</div>';
+  if (d.can_edit) html += _srFormHtml(d);
+  html += _srManagersHtml(d);
+  box.innerHTML = html;
+  const dateInput = document.getElementById('sr-date');
+  if (dateInput) {
+    dateInput.addEventListener('change', _srPrefillFromDate);
+    _srPrefillFromDate();
+  }
+}
+
+function _srFormHtml(d) {
+  const today = d.today || _srTodayIso();
+  let inputs = '';
+  _SR_FIELDS.forEach(f => {
+    inputs += '<div class="sr-field">' +
+        '<label class="form-label" for="sr-' + f.key + '"><i class="ti ' + f.icon + '"></i> ' + escapeHtml(f.label) + '</label>' +
+        '<input type="number" inputmode="numeric" min="0" step="1" class="form-input" id="sr-' + f.key + '" value="0" onfocus="this.select()">' +
+      '</div>';
+  });
+  return '<div class="sr-card sr-form-card">' +
+      '<div class="sr-card-title"><i class="ti ti-pencil-plus"></i> Мой отчёт за день</div>' +
+      '<div class="sr-field sr-date-field">' +
+        '<label class="form-label" for="sr-date">Дата</label>' +
+        '<input type="date" class="form-input" id="sr-date" value="' + today + '" max="' + today + '">' +
+      '</div>' +
+      '<div class="sr-grid">' + inputs + '</div>' +
+      '<div class="sr-form-actions">' +
+        '<button class="btn btn-primary" id="sr-save-btn" onclick="saveSalesReport()"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+        '<span class="sr-form-hint" id="sr-form-hint"></span>' +
+      '</div>' +
+    '</div>';
+}
+
+function _srPrefillFromDate() {
+  const d = _srState.data;
+  const dateInput = document.getElementById('sr-date');
+  if (!d || !dateInput) return;
+  const my = (d.my_reports || {})[dateInput.value];
+  _SR_FIELDS.forEach(f => {
+    const el = document.getElementById('sr-' + f.key);
+    if (el) el.value = my ? (my[f.key] || 0) : 0;
+  });
+  const hint = document.getElementById('sr-form-hint');
+  const btn = document.getElementById('sr-save-btn');
+  if (my) {
+    if (hint) hint.textContent = 'Отчёт за эту дату уже есть — сохранение обновит цифры.';
+    if (btn) btn.innerHTML = '<i class="ti ti-refresh"></i> Обновить';
+  } else {
+    if (hint) hint.textContent = '';
+    if (btn) btn.innerHTML = '<i class="ti ti-device-floppy"></i> Сохранить';
+  }
+}
+
+async function saveSalesReport() {
+  const dateInput = document.getElementById('sr-date');
+  const rdate = dateInput ? dateInput.value : _srTodayIso();
+  if (!rdate) { showToast('Укажите дату', 'error'); return; }
+  const body = { date: rdate };
+  _SR_FIELDS.forEach(f => {
+    let v = parseInt((document.getElementById('sr-' + f.key) || {}).value, 10);
+    body[f.key] = (isNaN(v) || v < 0) ? 0 : v;
+  });
+  const btn = document.getElementById('sr-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Сохраняю…'; }
+  try {
+    const res = await apiPost('/api/sales/reports', body);
+    if (!res.ok) throw new Error((res.data && res.data.message) || 'HTTP ' + res.status);
+    showToast('Отчёт сохранён', 'success');
+    _srState.month = rdate.slice(0, 7);  // показать месяц сохранённого отчёта
+    await loadSalesReports();
+  } catch (e) {
+    showToast('Не удалось сохранить: ' + (e.message || ''), 'error');
+    if (btn) { btn.disabled = false; _srPrefillFromDate(); }
+  }
+}
+
+function _srManagersHtml(d) {
+  const mgrs = d.managers || [];
+  if (!mgrs.length) {
+    return '<div class="empty-block"><i class="ti ti-chart-bar"></i>За ' + escapeHtml(_srMonthLabel(d.month).toLowerCase()) + ' отчётов пока нет.' +
+      (d.can_edit ? '<br><span style="font-size:13px;color:var(--text-light);">Заполни форму выше и нажми «Сохранить».</span>' : '') +
+      '</div>';
+  }
+  return mgrs.map((m, idx) => _srManagerCardHtml(m, idx, d)).join('');
+}
+
+function _srManagerCardHtml(m, idx, d) {
+  const t = m.totals || {};
+  const totalsTiles = _SR_FIELDS.map(f =>
+    '<div class="sr-tot-tile">' +
+      '<div class="sr-tot-val">' + (f.money ? _srFmtNum(t[f.key]) : (t[f.key] || 0)) + '</div>' +
+      '<div class="sr-tot-lbl">' + escapeHtml(f.short) + '</div>' +
+    '</div>').join('');
+
+  const head = '<tr><th>Дата</th>' + _SR_FIELDS.map(f => '<th>' + escapeHtml(f.short) + '</th>').join('') + '<th></th></tr>';
+  const rowsHtml = (m.reports || []).map(r => {
+    const cum = r.cum || {};
+    const cells = _SR_FIELDS.map(f =>
+      '<td>' + (f.money ? _srFmtNum(r[f.key]) : (r[f.key] || 0)) +
+        '<span class="sr-cum" title="нарастающий итог с начала месяца">' +
+          (f.money ? _srFmtNum(cum[f.key]) : (cum[f.key] || 0)) + '</span></td>').join('');
+    const act = '<button class="icon-btn icon-btn-sm" title="Скопировать для Telegram" onclick="_srCopyReport(' + idx + ',\'' + r.report_date + '\')"><i class="ti ti-copy"></i></button>' +
+      (d.can_edit ? '<button class="icon-btn icon-btn-sm" title="Удалить" onclick="deleteSalesReport(' + r.id + ')"><i class="ti ti-trash"></i></button>' : '');
+    return '<tr><td class="sr-d">' + escapeHtml(_srFmtDateRu(r.report_date)) + '</td>' + cells +
+      '<td class="sr-row-act">' + act + '</td></tr>';
+  }).join('');
+
+  return '<div class="sr-card">' +
+      '<div class="sr-mgr-head">' +
+        '<div class="sr-mgr-name"><i class="ti ti-user"></i> ' + escapeHtml(m.name || '—') +
+          (m.position ? ' <span class="sr-mgr-pos">' + escapeHtml(m.position) + '</span>' : '') + '</div>' +
+        '<div class="sr-mgr-sub">Итого за ' + escapeHtml(_srMonthLabel(d.month).toLowerCase()) + '</div>' +
+      '</div>' +
+      '<div class="sr-tot-row">' + totalsTiles + '</div>' +
+      '<div class="sr-table-wrap"><table class="sr-table">' +
+        '<thead>' + head + '</thead><tbody>' + rowsHtml + '</tbody></table>' +
+        '<div class="sr-table-note">маленькое число справа — нарастающий итог с начала месяца</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// Текст в формате привычного сообщения для Telegram-группы «Отчёты Атомус»
+function _srReportToText(name, position, r) {
+  const c = r.cum || {};
+  let s = (name || 'Менеджер') + '\n' +
+    'Дата ' + _srFmtDateRu(r.report_date) + '\n';
+  if (position) s += 'Должность: ' + position + '\n';
+  s += 'Звонков: ' + (r.calls || 0) + '\n' +
+    'Дозвоны: ' + (r.connects || 0) + '\n' +
+    'Новых заявок: ' + (r.new_leads || 0) + '\n' +
+    'КП выставлено: ' + (r.offers || 0) + '\n' +
+    'Сделок заключено: ' + (r.deals || 0) + '\n' +
+    'Выручка: ' + (r.revenue || 0) + '\n' +
+    '*итого: звонков = ' + (c.calls || 0) + '\n' +
+    '*итого: дозвоны = ' + (c.connects || 0) + '\n' +
+    '*итого: КП = ' + (c.offers || 0) + '\n' +
+    '*итого: сделок = ' + (c.deals || 0) + '\n' +
+    '*итого: выручка = ' + (c.revenue || 0);
+  return s;
+}
+
+function _srCopyReport(idx, rdate) {
+  const d = _srState.data;
+  const m = d && (d.managers || [])[idx];
+  const r = m && (m.reports || []).find(x => x.report_date === rdate);
+  if (!r) return;
+  const text = _srReportToText(m.name, m.position, r);
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => {
+    showToast('Скопировано — можно вставить в Telegram', 'success');
+  }).catch(() => { prompt('Скопируйте текст:', text); });
+}
+
+async function deleteSalesReport(id) {
+  if (!confirm('Удалить этот отчёт?')) return;
+  try {
+    await apiDelete('/api/sales/reports/' + id);
+    showToast('Удалено', 'success');
+    loadSalesReports();
+  } catch (e) { showToast('Не удалось удалить: ' + (e.message || ''), 'error'); }
+}
+
 // ============ INIT ============
 
 // v2.45.222: приём файла из системного «Поделиться» (Web Share Target).
