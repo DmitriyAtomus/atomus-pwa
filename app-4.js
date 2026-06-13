@@ -10997,6 +10997,7 @@ function _srFormHtml(d) {
   });
   return '<div class="sr-card sr-form-card">' +
       '<div class="sr-card-title"><i class="ti ti-pencil-plus"></i> Мой отчёт за день</div>' +
+      '<div class="sr-card-sub">Внеси цифры за день — «итого» за месяц посчитается само</div>' +
       '<div class="sr-field sr-date-field">' +
         '<label class="form-label" for="sr-date">Дата</label>' +
         '<input type="date" class="form-input" id="sr-date" value="' + today + '" max="' + today + '">' +

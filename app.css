@@ -17781,15 +17781,35 @@
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
   padding: 16px 16px 14px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(27,32,48,0.04);
 }
-.sr-form-card { border-color: var(--brand-light); background: var(--brand-bg); }
-.sr-card-title { font-size: 15px; font-weight: 700; color: var(--text-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+.sr-form-card { border-color: var(--brand-light); background: var(--brand-bg); padding: 18px; box-shadow: 0 2px 10px rgba(45,95,139,0.06); }
+.sr-card-title { font-size: 16px; font-weight: 700; color: var(--text-dark); margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
 .sr-card-title i { color: var(--brand); }
-.sr-date-field { max-width: 220px; margin-bottom: 12px; }
-.sr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sr-card-sub { font-size: 12.5px; color: var(--text-mid); margin: 0 0 16px 28px; line-height: 1.35; }
+.sr-date-field { max-width: 240px; margin-bottom: 16px; }
+.sr-date-field .form-input { font-weight: 600; }
+.sr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .sr-field label { display: flex; align-items: center; gap: 5px; }
-.sr-field label i { color: var(--text-light); font-size: 14px; }
+.sr-field label i { color: var(--brand); font-size: 14px; opacity: 0.85; }
 .sr-form-card .form-input { background: #fff; }
-.sr-form-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+/* поля-цифры как аккуратные «карточки-счётчики» с крупным центрированным числом */
+.sr-grid .sr-field {
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  padding: 9px 12px 8px; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.sr-grid .sr-field:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(45,95,139,0.12); }
+.sr-grid .sr-field label { margin-bottom: 3px; }
+.sr-grid .sr-field .form-input {
+  border: none; background: transparent; padding: 0; height: auto;
+  font-size: 22px; font-weight: 700; text-align: center; color: var(--text-dark);
+  letter-spacing: -0.3px;
+}
+.sr-grid .sr-field .form-input:focus { outline: none; box-shadow: none; }
+/* убираем стрелки-спиннеры у number-инпутов — чище */
+.sr-grid .sr-field input[type=number]::-webkit-outer-spin-button,
+.sr-grid .sr-field input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.sr-grid .sr-field input[type=number] { -moz-appearance: textfield; }
+.sr-form-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.sr-form-actions .btn-primary { padding: 11px 22px; font-size: 14.5px; }
 .sr-form-hint { font-size: 12px; color: var(--text-mid); }
 .sr-mgr-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .sr-mgr-name { font-size: 16px; font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 7px; }
@@ -17812,6 +17832,11 @@
 .sr-table-note { font-size: 11px; color: var(--text-light); margin-top: 8px; }
 .icon-btn-sm { width: 28px; height: 28px; padding: 0; }
 @media (max-width: 720px) {
-  .sr-grid { grid-template-columns: repeat(2, 1fr); }
+  .sr-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .sr-tot-row { grid-template-columns: repeat(3, 1fr); }
+  .sr-date-field { max-width: none; }
+  .sr-grid .sr-field .form-input { font-size: 20px; }
+  .sr-form-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+  .sr-form-actions .btn-primary { width: 100%; justify-content: center; padding: 13px; font-size: 15px; }
+  .sr-form-hint { text-align: center; order: 2; }
 }
