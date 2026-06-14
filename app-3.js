@@ -4236,6 +4236,7 @@ function showAssemblyStockModal(d) {
           (a.contract_id
             ? '<div><span class="as-lbl">Договор:</span> <a href="#" onclick="event.preventDefault(); closeAssemblyStockModal(); openContractFromWarehouse(' + a.contract_id + ')" class="contract-link">' + escapeHtml(a.contract_number) + (a.contractor_name ? ' · ' + escapeHtml(a.contractor_name) : '') + '</a></div>'
             : (a.work_type === 'assembly' || !a.work_type ? '<div><span class="as-lbl">Договор:</span> <em>не привязан</em></div>' : '')) +
+          (a.contract_item_name ? '<div><span class="as-lbl">Изделие:</span> <strong>' + escapeHtml(a.contract_item_name) + '</strong></div>' : '') +
         '</div>' +
         // v2.33.8: блок «Кто собирал»
         (a.workers && a.workers.length

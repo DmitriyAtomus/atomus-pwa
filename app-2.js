@@ -153,14 +153,73 @@ function openReserveAssemblyPicker(assemblyId) {
   _showContractPickerModal();
 }
 
+// Шаг 1: выбрали договор → подтягиваем его изделия (позиции) и даём выбрать
 async function reserveAssemblyToContract(contractId) {
-  const aid = state.reserveAssemblyId;
+  if (!state.reserveAssemblyId) return;
   closeContractPickerModal();
+  state.reserveContractId = contractId;
+  let items = [];
+  try {
+    const d = await apiGet('/api/contracts/' + contractId + '/items-list');
+    items = (d && d.items) || [];
+  } catch (e) { items = []; }
+  if (!items.length) {
+    doReserveAssembly(contractId, null);   // нет позиций — под договор целиком
+    return;
+  }
+  openReserveItemPicker(contractId, items);
+}
+
+function _fmtItemQty(it) {
+  const q = (it.qty != null && it.qty !== '') ? it.qty : '';
+  return q !== '' ? (q + ' ' + (it.unit || 'шт.')) : '';
+}
+
+// Шаг 2: выбор конкретного изделия (позиции) договора
+function openReserveItemPicker(contractId, items) {
+  let modal = document.getElementById('reserve-item-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'reserve-item-modal';
+  modal.className = 'modal-overlay visible';
+  modal.style.zIndex = '270';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  const rows = items.map(it =>
+    '<div class="modal-item" onclick="doReserveAssembly(' + contractId + ',' + it.id + ')">' +
+      '<div class="mi-icon"><i class="ti ti-package"></i></div>' +
+      '<div class="mi-text">' +
+        '<div class="mi-title">' + escapeHtml(it.name) + '</div>' +
+        '<div class="mi-meta">' + escapeHtml(_fmtItemQty(it)) +
+          (it.model_name ? ' · ' + escapeHtml(it.model_name) : '') + '</div>' +
+      '</div></div>'
+  ).join('');
+  modal.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-package"></i> Выберите изделие</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'reserve-item-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="max-height:62vh;overflow-y:auto;">' +
+        rows +
+        '<div class="modal-item" onclick="doReserveAssembly(' + contractId + ',0)" style="border-top:1px solid var(--border);margin-top:6px;">' +
+          '<div class="mi-icon"><i class="ti ti-file-text"></i></div>' +
+          '<div class="mi-text"><div class="mi-title">Весь заказ (без конкретного изделия)</div></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+}
+
+async function doReserveAssembly(contractId, itemId) {
+  const aid = state.reserveAssemblyId;
+  const m = document.getElementById('reserve-item-modal');
+  if (m) m.remove();
   if (!aid) return;
   try {
-    const res = await apiPost('/api/assemblies/' + aid + '/reserve', { contract_id: contractId });
+    const body = { contract_id: contractId };
+    if (itemId) body.contract_item_id = itemId;
+    const res = await apiPost('/api/assemblies/' + aid + '/reserve', body);
     if (!res.ok) throw new Error((res.data && res.data.message) || ('HTTP ' + res.status));
-    showToast('Назначено в изделие — теперь в резерве', 'success');
+    showToast('Назначено — теперь в резерве', 'success');
     cache.warehouseStock = null;
     if (typeof openAssemblyStock === 'function') openAssemblyStock(aid);
     try { if (typeof loadWarehouseStock === 'function') loadWarehouseStock(); } catch (_) {}
