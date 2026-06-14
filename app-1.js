@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.300-install-only";
+const APP_VERSION = "v2.45.301-install-only";
 const APP_VERSION_DATE = "14.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -283,6 +283,60 @@ async function apiCall(method, path, body) {
   if (method === 'DELETE') return apiDelete(path, body);
   throw new Error('Неподдерживаемый метод: ' + method);
 }
+
+// ===== Универсальные авто-черновики форм (localStorage) =====
+// Пока заполняешь форму — данные сохраняются; вышел/нажал «назад» — при
+// возврате восстанавливаются. Чистятся при сохранении или кнопкой «Очистить».
+const CONTRACT_DRAFT_KEY = 'atomus_contract_draft';
+const OFFER_DRAFT_KEY = 'atomus_offer_draft';
+
+function _draftSave(key, dataObj, hasContent) {
+  try {
+    if (typeof hasContent === 'function' && !hasContent(dataObj)) { localStorage.removeItem(key); return; }
+    localStorage.setItem(key, JSON.stringify({ data: dataObj, _ts: Date.now() }));
+  } catch (_) {}
+}
+function _draftLoad(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    return (o && o.data) ? o.data : null;
+  } catch (_) { return null; }
+}
+function _draftClear(key) { try { localStorage.removeItem(key); } catch (_) {} }
+
+function _contractDraftHasContent(f) {
+  if (!f) return false;
+  return !!((f.number && String(f.number).trim()) || f.contractor_id ||
+    (f.sum_amount && String(f.sum_amount).trim()) ||
+    (f.delivery_address && f.delivery_address.trim()) ||
+    (f.comment && f.comment.trim()) || f.manager_id);
+}
+function _offerDraftHasContent(f) {
+  if (!f) return false;
+  return !!(f.contractor_id || (Array.isArray(f.items) && f.items.length) ||
+    (f.comment_client && f.comment_client.trim()) ||
+    (f.comment_internal && f.comment_internal.trim()) ||
+    (f.delivery_terms && f.delivery_terms.trim()));
+}
+
+// Один глобальный слушатель: по текущему экрану-форме сохраняет нужный черновик.
+// Срабатывает после inline-обработчиков (фаза всплытия) — state уже обновлён.
+function _formDraftAutosave() {
+  try {
+    const s = state.currentScreen;
+    if (s === 'sales-contract-form' && state.contractFormMode !== 'edit') {
+      _draftSave(CONTRACT_DRAFT_KEY, state.contractForm, _contractDraftHasContent);
+    } else if (s === 'sales-offer-form' && state.offerFormMode !== 'edit') {
+      _draftSave(OFFER_DRAFT_KEY, state.offerForm, _offerDraftHasContent);
+    }
+  } catch (_) {}
+}
+try {
+  document.addEventListener('input', _formDraftAutosave);
+  document.addEventListener('change', _formDraftAutosave);
+} catch (_) {}
 
 // ============ ЛОГИН ============
 
@@ -9708,7 +9762,22 @@ function openNewOffer() {
     comment_client: '',
     items: [],
   };
+  // Авто-черновик: восстановим незаконченное новое КП, если оно есть
+  state.offerDraftRestored = false;
+  const _od = (typeof _draftLoad === 'function') ? _draftLoad(OFFER_DRAFT_KEY) : null;
+  if (_od) {
+    state.offerForm = Object.assign(state.offerForm, _od);
+    if (!Array.isArray(state.offerForm.items)) state.offerForm.items = [];
+    state.offerDraftRestored = true;
+  }
   selectSidebarItem('sales-offer-form');
+}
+
+function discardOfferDraft() {
+  if (typeof _draftClear === 'function') _draftClear(OFFER_DRAFT_KEY);
+  state.offerDraftRestored = false;
+  openNewOffer();   // пере-открываем чистую форму (черновик уже удалён)
+  showToast('Черновик очищен', 'info');
 }
 
 async function openEditOffer() {
@@ -9777,6 +9846,12 @@ function renderOfferForm() {
   const isEdit = state.offerFormMode === 'edit';
 
   let html = '';
+
+  if (!isEdit && state.offerDraftRestored) {
+    html += '<div class="task-draft-banner"><i class="ti ti-history"></i>' +
+      '<span>Восстановлен черновик незаконченного КП.</span>' +
+      '<button type="button" class="btn-link" onclick="discardOfferDraft()">Очистить</button></div>';
+  }
 
   // Менеджер
   html += '<div class="sales-form-section">';
@@ -10019,6 +10094,7 @@ async function submitOfferForm() {
       btn.innerHTML = '<i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать КП');
       return;
     }
+    if (!isEdit && typeof _draftClear === 'function') _draftClear(OFFER_DRAFT_KEY);
     showToast(isEdit ? 'КП обновлено' : 'КП ' + data.number + ' создано', 'success');
     cache.offers = null;
     cache.offersCounts = null;
