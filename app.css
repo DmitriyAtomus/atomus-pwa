@@ -7580,6 +7580,22 @@
   .bom-qty-lbl { font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; }
   .bom-actions { display: flex; gap: 4px; }
 
+  /* На телефоне: имя на всю ширину сверху, кол-во/наличие/действия — строкой ниже,
+     иначе колонка имени становится ~40px и текст рвётся по буквам в столбик. */
+  @media (max-width: 760px) {
+    .bom-row {
+      grid-template-columns: auto auto 1fr;
+      grid-template-areas:
+        "name name name"
+        "qty stock actions";
+      gap: 8px 16px;
+    }
+    .bom-row-main { grid-area: name; }
+    .bom-qty   { grid-area: qty;   text-align: left; }
+    .bom-stock { grid-area: stock; text-align: left; }
+    .bom-actions { grid-area: actions; justify-content: flex-end; align-self: center; }
+  }
+
   /* ============ ЭТАП 33.1: Picker комплектующих (поиск + сворачиваемые категории) ============ */
   .bom-picker-group {
     margin-bottom: 8px;
