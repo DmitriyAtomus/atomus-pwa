@@ -1494,6 +1494,8 @@ function openAssistantChat() {
     '<div class="modal asst-modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header asst-header">' +
         '<h3><i class="ti ti-sparkles"></i> Помощник Atom</h3>' +
+        (_assistantIsDev() ? '<button class="asst-mode-btn' + (_assistantCodeMode ? ' active' : '') + '" id="asst-mode-btn" onclick="_assistantToggleCode()" title="Режим разработчика: читать код">' +
+          '<i class="ti ti-code"></i><span>Код</span></button>' : '') +
         '<button class="icon-btn" onclick="closeAssistantChat()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="asst-messages" id="asst-messages"></div>' +
@@ -1665,6 +1667,55 @@ function _assistantLocalAnswerHtml(q) {
   return html;
 }
 
+// ===== Режим кода (для директора): помощник читает живой код бэкенда =====
+var _assistantCodeMode = false;
+
+function _assistantIsDev() {
+  try { return !!(state && state.user && (state.user.roles || []).indexOf('director') >= 0); }
+  catch (e) { return false; }
+}
+
+function _assistantToggleCode() {
+  _assistantCodeMode = !_assistantCodeMode;
+  const btn = document.getElementById('asst-mode-btn');
+  if (btn) btn.classList.toggle('active', _assistantCodeMode);
+  const inp = document.getElementById('asst-input');
+  if (inp) inp.placeholder = _assistantCodeMode ? 'Спросите про логику кода…' : 'Спросите: как сделать…';
+  _assistantPushBot(_assistantCodeMode
+    ? '<p><b>Режим кода включён.</b> Спросите про логику бэкенда — найду и прочитаю нужные места в коде и объясню. Это медленнее и дороже обычных вопросов.</p>'
+    : '<p>Режим кода выключен — снова отвечаю по базе знаний.</p>');
+}
+
+async function _assistantSendCode(q) {
+  const thinkingId = 'asst-think-' + Date.now();
+  _assistantPushBot('<span class="asst-thinking" id="' + thinkingId + '"><i class="ti ti-loader-2"></i> Читаю код…</span>', false);
+  const removeThinking = () => { const t = document.getElementById(thinkingId); if (t) { const b = t.closest('.asst-msg'); if (b) b.remove(); } };
+  const history = _assistantHistory.slice(-6).map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    text: m.role === 'user' ? m.text : _assistantStripHtml(m.html),
+  }));
+  try {
+    const res = await apiPost('/api/assistant/code', { question: q, history });
+    removeThinking();
+    if (!res.ok) {
+      const msg = res.status === 403 ? 'Режим кода доступен только директору.'
+        : ((res.data && res.data.message) || ('HTTP ' + res.status));
+      _assistantPushBot('<p>' + escapeHtml(msg) + '</p>');
+      return;
+    }
+    const d = res.data || {};
+    let html = '<div class="asst-answer-title"><i class="ti ti-code"></i>Atom AI · код</div>' + _assistantMdToHtml(d.answer || '');
+    if (d.files && d.files.length) {
+      html += '<div class="asst-related-label">Прочитано в коде:</div><div class="asst-files">' +
+        d.files.map(f => '<span class="asst-file"><i class="ti ti-file-text"></i>' + escapeHtml(f) + '</span>').join('') + '</div>';
+    }
+    _assistantPushBot(html);
+  } catch (e) {
+    removeThinking();
+    _assistantPushBot('<p>' + escapeHtml('Не удалось: ' + (e.message || '')) + '</p>');
+  }
+}
+
 async function assistantSend() {
   const inp = document.getElementById('asst-input');
   if (!inp) return;
@@ -1672,6 +1723,8 @@ async function assistantSend() {
   if (!q) return;
   inp.value = '';
   _assistantPushUser(q);
+
+  if (_assistantCodeMode) { await _assistantSendCode(q); return; }
 
   const thinkingId = 'asst-think-' + Date.now();
   const thinkingLabel = (_assistantAiMode === false) ? 'Ищу в инструкциях…' : 'Думаю…';
