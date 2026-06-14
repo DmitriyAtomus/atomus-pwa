@@ -167,6 +167,7 @@ function pickTaskContract(contractId) {
   state.taskForm.contract_id = contractId;
   state.taskForm.contract_label =
     c.number + (c.contractor_name ? ' · ' + c.contractor_name : '');
+  if (typeof _saveTaskDraft === 'function') _saveTaskDraft();
   closeContractPickerModal();
   // Перерисуем форму, чтобы показать новое значение
   if (state.currentScreen === 'task-form') renderTaskForm();
@@ -176,6 +177,7 @@ function pickTaskContract(contractId) {
 function clearTaskContract() {
   state.taskForm.contract_id = null;
   state.taskForm.contract_label = '';
+  if (typeof _saveTaskDraft === 'function') _saveTaskDraft();
   if (state.currentScreen === 'task-form') renderTaskForm();
 }
 
@@ -2680,6 +2682,54 @@ async function deleteCurrentTask() {
 
 // ---- Форма задачи ----
 
+// ===== Авто-черновик формы «Новая задача» =====
+// Пока заполняешь форму, данные сохраняются в localStorage. Если случайно вышел
+// или нажал «назад» — при следующем открытии «Новой задачи» черновик
+// восстановится. Чистится при создании задачи или по кнопке «Очистить».
+var TASK_DRAFT_KEY = 'atomus_task_draft';
+
+function _saveTaskDraft() {
+  try {
+    if (state.taskFormMode === 'edit') return;  // черновики только для новой задачи
+    const f = state.taskForm || {};
+    const hasContent = (f.title && f.title.trim()) || (f.description && f.description.trim()) ||
+      f.assignee_id || f.deadline || (f.source && f.source.trim()) || f.contract_id;
+    if (!hasContent) { localStorage.removeItem(TASK_DRAFT_KEY); return; }
+    localStorage.setItem(TASK_DRAFT_KEY, JSON.stringify({
+      title: f.title || '', description: f.description || '',
+      assignee_id: f.assignee_id || null, assignee_name: f.assignee_name || '',
+      deadline: f.deadline || '', priority: f.priority || 'normal',
+      source: f.source || '', contract_id: f.contract_id || null,
+      contract_label: f.contract_label || '', _ts: Date.now(),
+    }));
+  } catch (_) {}
+}
+
+function _loadTaskDraft() {
+  try {
+    const raw = localStorage.getItem(TASK_DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return (d && typeof d === 'object') ? d : null;
+  } catch (_) { return null; }
+}
+
+function clearTaskDraft() {
+  try { localStorage.removeItem(TASK_DRAFT_KEY); } catch (_) {}
+  state.taskDraftRestored = false;
+}
+
+function discardTaskDraft() {
+  clearTaskDraft();
+  state.taskForm = {
+    title: '', description: '', assignee_id: null, assignee_name: '',
+    deadline: '', priority: 'normal', source: '',
+    contract_id: null, contract_label: '',
+  };
+  if (state.currentScreen === 'task-form') renderTaskForm();
+  showToast('Черновик очищен', 'info');
+}
+
 function openNewTask() {
   if (!canManageTasks()) {
     showToast('Создавать задачи может директор, зам или менеджер', 'error');
@@ -2697,6 +2747,21 @@ function openNewTask() {
     deadline: '', priority: 'normal', source: '',
     contract_id: preContractId, contract_label: preContractLabel,
   };
+  // Восстановление черновика — только для «чистой» новой задачи (не из договора)
+  state.taskDraftRestored = false;
+  if (!preContractId) {
+    const draft = _loadTaskDraft();
+    if (draft) {
+      state.taskForm = {
+        title: draft.title || '', description: draft.description || '',
+        assignee_id: draft.assignee_id || null, assignee_name: draft.assignee_name || '',
+        deadline: draft.deadline || '', priority: draft.priority || 'normal',
+        source: draft.source || '',
+        contract_id: draft.contract_id || null, contract_label: draft.contract_label || '',
+      };
+      state.taskDraftRestored = true;
+    }
+  }
   selectSidebarItem('task-form');
 }
 
@@ -2767,6 +2832,15 @@ function renderTaskForm() {
   const f = state.taskForm;
   const container = document.getElementById('task-form-content');
   let html = '<div class="sales-form">';
+
+  // Восстановленный черновик — показываем плашку с возможностью очистить
+  if (state.taskFormMode === 'new' && state.taskDraftRestored) {
+    html += '<div class="task-draft-banner">' +
+            '<i class="ti ti-history"></i>' +
+            '<span>Восстановлен черновик незаконченной задачи.</span>' +
+            '<button type="button" class="btn-link" onclick="discardTaskDraft()">Очистить</button>' +
+            '</div>';
+  }
 
   // Название
   html += '<div class="sales-form-section">';
@@ -2849,10 +2923,10 @@ function renderTaskForm() {
   container.innerHTML = html;
 
   // Подвязка
-  document.getElementById('tf-title').addEventListener('input', e => { state.taskForm.title = e.target.value; });
-  document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; });
-  document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; });
-  document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; });
+  document.getElementById('tf-title').addEventListener('input', e => { state.taskForm.title = e.target.value; _saveTaskDraft(); });
+  document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; _saveTaskDraft(); });
+  document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; _saveTaskDraft(); });
+  document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; _saveTaskDraft(); });
   const assigneeSel = document.getElementById('tf-assignee');
   if (assigneeSel) {
     assigneeSel.addEventListener('change', e => {
@@ -2860,6 +2934,7 @@ function renderTaskForm() {
       state.taskForm.assignee_id = v ? parseInt(v) : null;
       const opt = assigneeSel.selectedOptions[0];
       state.taskForm.assignee_name = opt ? opt.textContent : '';
+      _saveTaskDraft();
     });
   }
 }
@@ -2909,7 +2984,7 @@ function _voiceToField(fieldId, stateKey) {
     const sep = (rec._baseText && !/\s$/.test(rec._baseText)) ? ' ' : '';
     const newText = rec._baseText + sep + phrase;
     fld.value = newText;
-    if (state.taskForm && stateKey) state.taskForm[stateKey] = newText;
+    if (state.taskForm && stateKey) { state.taskForm[stateKey] = newText; _saveTaskDraft(); }
   };
   rec.onerror = (e) => {
     if (e.error === 'not-allowed') showToast('Дай разрешение на микрофон в браузере', 'error');
@@ -2943,6 +3018,7 @@ function renderAssigneeSelect(currentId) {
 
 function setTaskPriority(p) {
   state.taskForm.priority = p;
+  _saveTaskDraft();
   // Обновим только кнопки приоритета — без полной перерисовки
   document.querySelectorAll('.priority-row .priority-btn').forEach(b => {
     b.className = 'priority-btn';
@@ -2996,6 +3072,7 @@ async function submitTaskForm() {
       return;
     }
     const created = await r.json();
+    if (!isEdit) clearTaskDraft();   // задача создана — черновик больше не нужен
     showToast(isEdit ? 'Задача обновлена' : 'Задача создана', 'success');
     cache.tasks = {};
     cache.myTasks = null;
