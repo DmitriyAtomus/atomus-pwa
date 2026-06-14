@@ -1734,29 +1734,27 @@ async function assistantSend() {
     if (t) { const b = t.closest('.asst-msg'); if (b) b.remove(); }
   };
 
-  // 1) Настоящий ИИ на бэкенде (если эндпоинт ещё не признан отсутствующим)
-  if (_assistantAiMode !== false) {
-    try {
-      const res = await _assistantAskBackend(q);
-      _assistantAiMode = true;
-      removeThinking();
-      let html = '<div class="asst-answer-title"><i class="ti ti-sparkles"></i>Atom AI</div>' + _assistantMdToHtml(res.answer);
-      const srcArticles = (res.sources || [])
-        .map(s => (typeof HELP_ARTICLES !== 'undefined' ? HELP_ARTICLES : []).find(a => a.id === (s.id || s)))
-        .filter(Boolean);
-      html += _assistantRelatedHtml(srcArticles, 'Источники:');
-      _assistantPushBot(html);
-      return;
-    } catch (e) {
-      // Эндпоинта пока нет / сеть — переключаемся на локальный поиск (на эту сессию)
-      _assistantAiMode = false;
-    }
+  // 1) Настоящий ИИ на бэкенде — пробуем на КАЖДЫЙ вопрос (самовосстановление:
+  //    если ИИ был недоступен и снова поднялся, помощник «поумнеет» без перезагрузки).
+  try {
+    const res = await _assistantAskBackend(q);
+    removeThinking();
+    let html = '<div class="asst-answer-title"><i class="ti ti-sparkles"></i>Atom AI</div>' + _assistantMdToHtml(res.answer);
+    const srcArticles = (res.sources || [])
+      .map(s => (typeof HELP_ARTICLES !== 'undefined' ? HELP_ARTICLES : []).find(a => a.id === (s.id || s)))
+      .filter(Boolean);
+    html += _assistantRelatedHtml(srcArticles, 'Источники:');
+    _assistantPushBot(html);
+    return;
+  } catch (e) {
+    // ИИ сейчас недоступен — честный разовый откат на локальный поиск (без залипания)
+    removeThinking();
+    _assistantPushBot(
+      '<div class="asst-ai-down"><i class="ti ti-alert-triangle"></i> Умный помощник сейчас недоступен — показываю из инструкций (может быть неточно):</div>' +
+      _assistantLocalAnswerHtml(q)
+    );
+    return;
   }
-
-  // 2) Фолбэк — локальный поиск по базе знаний (Path A)
-  await new Promise(r => setTimeout(r, 250));
-  removeThinking();
-  _assistantPushBot(_assistantLocalAnswerHtml(q));
 }
 
 function assistantOpenArticle(articleId) {
