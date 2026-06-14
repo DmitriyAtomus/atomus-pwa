@@ -2244,7 +2244,21 @@ function openNewContract() {
     days_type: 'working',  // v2.43.67: 'working' (рабочие) | 'calendar' (календарные)
     co_managers: [],  // v2.45.188: доп. менеджеры [{id, name}]
   };
+  // Авто-черновик: восстановим незаконченный новый договор, если он есть
+  state.contractDraftRestored = false;
+  const _cd = (typeof _draftLoad === 'function') ? _draftLoad(CONTRACT_DRAFT_KEY) : null;
+  if (_cd) {
+    state.contractForm = Object.assign(state.contractForm, _cd);
+    state.contractDraftRestored = true;
+  }
   selectSidebarItem('sales-contract-form');
+}
+
+function discardContractDraft() {
+  if (typeof _draftClear === 'function') _draftClear(CONTRACT_DRAFT_KEY);
+  state.contractDraftRestored = false;
+  openNewContract();   // пере-открываем чистую форму (черновик уже удалён)
+  showToast('Черновик очищен', 'info');
 }
 
 // ЭТАП 21: QR из карточки договора (вызывается из шапки sales-contract-detail)
@@ -2337,6 +2351,12 @@ function renderContractForm() {
   const f = state.contractForm;
 
   let html = '';
+
+  if (state.contractFormMode === 'new' && state.contractDraftRestored) {
+    html += '<div class="task-draft-banner"><i class="ti ti-history"></i>' +
+      '<span>Восстановлен черновик незаконченного договора.</span>' +
+      '<button type="button" class="btn-link" onclick="discardContractDraft()">Очистить</button></div>';
+  }
 
   // Контрагент
   html += '<div class="sales-form-section">';
@@ -2640,6 +2660,7 @@ async function submitContractForm() {
       btn.innerHTML = '<i class="ti ti-check"></i> ' + (state.contractFormMode === 'edit' ? 'Сохранить' : 'Создать договор');
       return;
     }
+    if (state.contractFormMode !== 'edit' && typeof _draftClear === 'function') _draftClear(CONTRACT_DRAFT_KEY);
     showToast(state.contractFormMode === 'edit' ? 'Договор обновлён' : 'Договор создан', 'success');
     cache.contracts = null;
     cache.contractsCounts = null;
