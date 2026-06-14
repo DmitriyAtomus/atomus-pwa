@@ -8165,10 +8165,15 @@
     text-align: left;
     color: var(--text-dark);
   }
-  /* Аккуратные заголовки каталога: имя ужимается/переносится, счётчик и кнопки — справа в одну строку */
-  .models-group-name, .models-subgroup-toggle .sg-name { min-width: 0; overflow-wrap: anywhere; }
+  /* Аккуратные заголовки каталога: имя переносится по словам, счётчик и кнопки — справа */
+  .models-group-name, .models-subgroup-toggle .sg-name { min-width: 0; overflow-wrap: break-word; }
   .models-group-count, .models-subgroup-count,
   .dir-kebab-btn, .dev-link-btn, .models-add-cat-btn { flex-shrink: 0; }
+  /* На телефоне «Категория» — компактной иконкой, чтобы названию хватало места */
+  @media (max-width: 760px) {
+    .models-add-cat-btn .acb-label { display: none; }
+    .models-add-cat-btn { padding: 6px 8px; }
+  }
   .models-group-count {
     background: var(--bg);
     color: var(--text-mid);

@@ -3599,7 +3599,7 @@ function renderModels(d) {
       const addCatBtn = canEdit
         ? '<button class="models-add-cat-btn" title="Создать категорию внутри подгруппы" ' +
             'onclick="event.stopPropagation();openCreateCategoryPrompt(' + dirId + ',' + sg.id + ',\'' + escapeHtml(sg.name).replace(/'/g, "\\'") + '\')">' +
-            '<i class="ti ti-folder-plus"></i> Категория' +
+            '<i class="ti ti-folder-plus"></i><span class="acb-label">Категория</span>' +
           '</button>'
         : '';
       // v2.45.196: удалить подгруппу (модели переезжают в «Без подгруппы», не удаляются)
