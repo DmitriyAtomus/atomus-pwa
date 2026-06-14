@@ -2892,18 +2892,23 @@ function _voiceToField(fieldId, stateKey) {
   rec.interimResults = true;
   rec._fieldId = fieldId;
   rec._baseText = fld.value || '';     // что было в поле до записи
-  rec._finalText = '';                 // окончательно распознанное за текущую сессию
   rec.onresult = (ev) => {
+    // Фикс дублей: ПЕРЕСТРАИВАЕМ распознанный текст из всего списка результатов
+    // заново (replace), а не накапливаем. На мобильных Web Speech присылает
+    // results кумулятивно и не двигает resultIndex — из-за накопления текст
+    // дублировался («говоритьговоритьговорить»). Перебор с 0 + сборка заново
+    // даёт корректный текст и на десктопе, и на телефоне.
+    let finalAll = '';
     let interim = '';
-    let final = '';
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const t = ev.results[i][0].transcript;
-      if (ev.results[i].isFinal) final += t;
+    for (let i = 0; i < ev.results.length; i++) {
+      const r = ev.results[i];
+      const t = (r[0] && r[0].transcript) || '';
+      if (r.isFinal) finalAll += t;
       else interim += t;
     }
-    if (final) rec._finalText += final;
-    const sep = rec._baseText && !/\s$/.test(rec._baseText) ? ' ' : '';
-    const newText = rec._baseText + sep + rec._finalText + (interim ? (rec._finalText ? ' ' : sep) + interim : '');
+    const spoken = (finalAll + ' ' + interim).replace(/\s+/g, ' ').trim();
+    const sep = (rec._baseText && !/\s$/.test(rec._baseText) && spoken) ? ' ' : '';
+    const newText = rec._baseText + sep + spoken;
     fld.value = newText;
     if (state.taskForm && stateKey) state.taskForm[stateKey] = newText;
   };
