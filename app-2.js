@@ -76,7 +76,8 @@ function _showContractPickerModal() {
   document.getElementById('contract-picker-search').value = '';
   // Скрываем кнопку "Без договора (на склад)" для режима task
   const wasteBtn = document.getElementById('contract-picker-skip');
-  if (wasteBtn) wasteBtn.style.display = (state.contractPickerMode === 'task') ? 'none' : '';
+  // «Без договора (на склад)» — только в режиме выбора назначения новой сборки
+  if (wasteBtn) wasteBtn.style.display = (state.contractPickerMode === 'assembly') ? '' : 'none';
   loadContractsForPicker('');
   setTimeout(() => {
     const s = document.getElementById('contract-picker-search');
@@ -138,8 +139,47 @@ async function loadContractsForPicker(query) {
 function pickContract(contractId) {
   if (state.contractPickerMode === 'task') {
     pickTaskContract(contractId);
+  } else if (state.contractPickerMode === 'assembly-reserve') {
+    reserveAssemblyToContract(contractId);
   } else {
     pickAssemblyContract(contractId);
+  }
+}
+
+// Назначить свободную сборку со склада в изделие (договор) → резерв
+function openReserveAssemblyPicker(assemblyId) {
+  state.reserveAssemblyId = assemblyId;
+  state.contractPickerMode = 'assembly-reserve';
+  _showContractPickerModal();
+}
+
+async function reserveAssemblyToContract(contractId) {
+  const aid = state.reserveAssemblyId;
+  closeContractPickerModal();
+  if (!aid) return;
+  try {
+    const res = await apiPost('/api/assemblies/' + aid + '/reserve', { contract_id: contractId });
+    if (!res.ok) throw new Error((res.data && res.data.message) || ('HTTP ' + res.status));
+    showToast('Назначено в изделие — теперь в резерве', 'success');
+    cache.warehouseStock = null;
+    if (typeof openAssemblyStock === 'function') openAssemblyStock(aid);
+    try { if (typeof loadWarehouseStock === 'function') loadWarehouseStock(); } catch (_) {}
+  } catch (e) {
+    showToast('Не удалось назначить: ' + (e.message || ''), 'error');
+  }
+}
+
+async function unreserveAssembly(aid) {
+  if (!confirm('Снять резерв и вернуть деталь в свободный остаток?')) return;
+  try {
+    const res = await apiPost('/api/assemblies/' + aid + '/unreserve', {});
+    if (!res.ok) throw new Error((res.data && res.data.message) || ('HTTP ' + res.status));
+    showToast('Резерв снят — деталь свободна', 'success');
+    cache.warehouseStock = null;
+    if (typeof openAssemblyStock === 'function') openAssemblyStock(aid);
+    try { if (typeof loadWarehouseStock === 'function') loadWarehouseStock(); } catch (_) {}
+  } catch (e) {
+    showToast('Не удалось: ' + (e.message || ''), 'error');
   }
 }
 
