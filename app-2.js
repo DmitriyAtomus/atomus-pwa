@@ -2888,27 +2888,26 @@ function _voiceToField(fieldId, stateKey) {
 
   const rec = new SR();
   rec.lang = 'ru-RU';
-  rec.continuous = true;
-  rec.interimResults = true;
+  // Одна фраза за нажатие — самый стабильный режим на мобильных. Continuous +
+  // interim плодили дубли: некоторые мобильные движки кладут в КАЖДЫЙ результат
+  // всю накопленную фразу, и их сумма давала «в общемв общем надо…».
+  rec.continuous = false;
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
   rec._fieldId = fieldId;
-  rec._baseText = fld.value || '';     // что было в поле до записи
+  rec._baseText = fld.value || '';     // содержимое поля до этой диктовки (фиксируем 1 раз)
   rec.onresult = (ev) => {
-    // Фикс дублей: ПЕРЕСТРАИВАЕМ распознанный текст из всего списка результатов
-    // заново (replace), а не накапливаем. На мобильных Web Speech присылает
-    // results кумулятивно и не двигает resultIndex — из-за накопления текст
-    // дублировался («говоритьговоритьговорить»). Перебор с 0 + сборка заново
-    // даёт корректный текст и на десктопе, и на телефоне.
-    let finalAll = '';
-    let interim = '';
-    for (let i = 0; i < ev.results.length; i++) {
-      const r = ev.results[i];
-      const t = (r[0] && r[0].transcript) || '';
-      if (r.isFinal) finalAll += t;
-      else interim += t;
-    }
-    const spoken = (finalAll + ' ' + interim).replace(/\s+/g, ' ').trim();
-    const sep = (rec._baseText && !/\s$/.test(rec._baseText) && spoken) ? ' ' : '';
-    const newText = rec._baseText + sep + spoken;
+    // Берём ТОЛЬКО последний результат — он содержит самую полную распознанную
+    // фразу. И ПОДСТАВЛЯЕМ (base + фраза), а не дописываем — чтобы повторные
+    // события одной сессии не плодили дубли.
+    let phrase = '';
+    try {
+      const last = ev.results[ev.results.length - 1];
+      phrase = ((last && last[0] && last[0].transcript) || '').replace(/\s+/g, ' ').trim();
+    } catch (_) {}
+    if (!phrase) return;
+    const sep = (rec._baseText && !/\s$/.test(rec._baseText)) ? ' ' : '';
+    const newText = rec._baseText + sep + phrase;
     fld.value = newText;
     if (state.taskForm && stateKey) state.taskForm[stateKey] = newText;
   };
@@ -2925,7 +2924,7 @@ function _voiceToField(fieldId, stateKey) {
     rec.start();
     _voiceRec = rec;
     if (btn) btn.classList.add('recording');
-    showToast('Говорите… (повторное нажатие — стоп)', 'info');
+    showToast('Говорите фразу… (для длинного текста — по фразе за нажатие)', 'info');
   } catch (e) {
     showToast('Не удалось запустить запись', 'error');
   }
