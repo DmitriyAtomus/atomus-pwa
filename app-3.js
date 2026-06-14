@@ -4172,6 +4172,15 @@ function showAssemblyStockModal(d) {
     if (a.status === 'in_progress') {
       actionsHtml += '<button class="btn btn-primary" onclick="changeAssemblyStatus(' + a.id + ', \'ready\')"><i class="ti ti-check"></i> Перевести в «Готово» (на склад)</button>';
     }
+    const _isAsm = (a.work_type === 'assembly' || !a.work_type);
+    // Назначить свободную сборку в изделие (договор) → уйдёт в резерв
+    if (_isAsm && !a.contract_id && a.stock_qty > 0) {
+      actionsHtml += '<button class="btn btn-secondary" onclick="openReserveAssemblyPicker(' + a.id + ')"><i class="ti ti-link"></i> Назначить в изделие</button>';
+    }
+    // Снять резерв (вернуть в свободный остаток)
+    if (_isAsm && a.contract_id && a.status !== 'shipped') {
+      actionsHtml += '<button class="btn btn-secondary" onclick="unreserveAssembly(' + a.id + ')"><i class="ti ti-unlink"></i> Снять резерв</button>';
+    }
     if (a.stock_qty > 0) {
       actionsHtml += '<button class="btn btn-danger btn-secondary" onclick="promptWriteOff(' + a.id + ', ' + a.stock_qty + ')"><i class="ti ti-trash"></i> Списать</button>';
     }
