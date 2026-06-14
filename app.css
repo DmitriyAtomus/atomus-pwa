@@ -8165,6 +8165,10 @@
     text-align: left;
     color: var(--text-dark);
   }
+  /* Аккуратные заголовки каталога: имя ужимается/переносится, счётчик и кнопки — справа в одну строку */
+  .models-group-name, .models-subgroup-toggle .sg-name { min-width: 0; overflow-wrap: anywhere; }
+  .models-group-count, .models-subgroup-count,
+  .dir-kebab-btn, .dev-link-btn, .models-add-cat-btn { flex-shrink: 0; }
   .models-group-count {
     background: var(--bg);
     color: var(--text-mid);
