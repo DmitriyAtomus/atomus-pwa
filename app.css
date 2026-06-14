@@ -2404,6 +2404,8 @@
   @media (min-width: 700px) { .modal-overlay { align-items: center; } }
   /* v2.43.74: QR-модалка всегда поверх остальных модалок (открывается изнутри карточек работ). */
   #qr-modal { z-index: 250; }
+  /* Пикер договоров может открываться поверх карточки остатка («Назначить в изделие») — держим выше. */
+  #contract-picker-modal { z-index: 260; }
   .modal {
     background: white;
     width: 100%; max-width: 540px;
