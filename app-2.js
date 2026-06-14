@@ -3520,7 +3520,7 @@ function renderModels(d) {
 
     html +=
       '<div class="models-group">' +
-        '<button class="models-group-toggle ' + palCls + '" onclick="toggleModelsGroup(\'' + dirId + '\')">' +
+        '<div class="models-group-toggle ' + palCls + '" role="button" tabindex="0" onclick="toggleModelsGroup(\'' + dirId + '\')">' +
           '<i class="ti ti-chevron-right models-group-chevron' + (isOpen ? ' open' : '') + '"></i>' +
           '<span class="nv-group-icon"><i class="ti ' + iconCls + '"></i></span>' +
           '<span class="models-group-name">' + escapeHtml(dirNamePretty) + '</span>' +
@@ -3533,7 +3533,7 @@ function renderModels(d) {
             '</span>' +
             '<button class="dir-kebab-btn" title="Действия" onclick="event.stopPropagation();openDirectionKebabMenu(this, ' + dir.id + ')"><i class="ti ti-dots-vertical"></i></button>'
             : '') +
-        '</button>' +
+        '</div>' +
         '<div class="models-group-body" data-dirid="' + dirId + '" style="' + (isOpen ? '' : 'display:none;') + '">';
 
     // Сначала модели «без подгруппы»
@@ -3643,13 +3643,13 @@ function renderModels(d) {
             '</button>'
           : '';
         html += '<div class="models-category models-subgroup ' + catTheme.cls + '" style="margin:6px 0 0 14px;">' +
-          '<button class="models-subgroup-toggle" data-subkey="' + catKey + '" onclick="toggleModelsSubgroup(\'' + catKey + '\')" style="padding-left:10px;' + catRowBg + '">' +
+          '<div class="models-subgroup-toggle" role="button" tabindex="0" data-subkey="' + catKey + '" onclick="toggleModelsSubgroup(\'' + catKey + '\')" style="padding-left:10px;' + catRowBg + '">' +
             '<i class="ti ti-chevron-right models-subgroup-chevron' + (catOpen ? ' open' : '') + '"></i>' +
             '<i class="ti ' + catTheme.icon + ' sg-icon"' + (isThemed ? '' : ' style="opacity:0.7;"') + '></i>' +
             '<span class="sg-name" style="font-size:13.5px;">' + escapeHtml(cat.name) + '</span>' +
             '<span class="models-subgroup-count">' + cat.items.length + '</span>' +
             renameBtn +
-          '</button>' +
+          '</div>' +
           '<div class="models-subgroup-body" data-subkey="' + catKey + '" style="' + (catOpen ? '' : 'display:none;') + '">' +
             '<div class="card">';
         cat.items.forEach(m => { html += _renderModelRow(m); });
