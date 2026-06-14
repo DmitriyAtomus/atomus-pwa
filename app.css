@@ -6464,6 +6464,24 @@
   .asst-header h3 { color: white; display: flex; align-items: center; gap: 8px; }
   .asst-header h3 i { color: #DDD6FE; }
   .asst-header .icon-btn { color: white; }
+  .asst-mode-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-left: auto; margin-right: 8px;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    background: rgba(255,255,255,0.15); color: #fff;
+    border: 1px solid rgba(255,255,255,0.4);
+    font-size: 12px; font-weight: 600; font-family: inherit;
+  }
+  .asst-mode-btn i { font-size: 14px; }
+  .asst-mode-btn.active { background: #fff; color: #4F46E5; border-color: #fff; }
+  .asst-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .asst-file {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #4F46E5; background: #EEF2FF; border: 1px solid #E0E7FF;
+    padding: 2px 8px; border-radius: 6px;
+  }
+  .asst-file i { font-size: 13px; opacity: 0.85; }
   .asst-messages {
     flex: 1;
     overflow-y: auto;
