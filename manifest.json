@@ -20,7 +20,16 @@
       "files": [
         {
           "name": "file",
-          "accept": ["application/pdf", "image/*", ".xls", ".xlsx", ".heic"]
+          "accept": [
+            "application/pdf",
+            "image/*",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/octet-stream",
+            ".pdf", ".xls", ".xlsx", ".doc", ".docx", ".heic"
+          ]
         }
       ]
     }
