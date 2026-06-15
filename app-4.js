@@ -9696,7 +9696,11 @@ async function submitManualSupplyInvoice() {
   }
 }
 
-function openSupplyInvoiceUpload() {
+// v2.45.312: forPayment=true — режим «Загрузить счёт на оплату»:
+// распознавание не запускаем автоматически и не открываем экран приёмки УПД.
+let siUploadForPayment = false;
+function openSupplyInvoiceUpload(forPayment) {
+  siUploadForPayment = !!forPayment;
   const existing = document.getElementById('si-upload-modal');
   if (existing) existing.remove();
 
@@ -9707,7 +9711,7 @@ function openSupplyInvoiceUpload() {
   overlay.innerHTML =
     '<div class="modal" style="max-width:480px;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-cloud-upload"></i>Загрузить накладную</h3>' +
+        '<h3><i class="ti ti-cloud-upload"></i>' + (forPayment ? 'Загрузить счёт' : 'Загрузить накладную') + '</h3>' +
         '<button class="icon-btn" onclick="document.getElementById(\'si-upload-modal\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-body">' +
@@ -9758,6 +9762,11 @@ function openSupplyInvoiceUpload() {
     const cb = document.getElementById('si-defer-recognize');
     if (cb) cb.checked = true;
   }
+  // Режим «счёт на оплату»: распознавание не запускаем, тумблер прячем
+  if (forPayment) {
+    const cb = document.getElementById('si-defer-recognize');
+    if (cb) { cb.checked = true; const lbl = cb.closest('label'); if (lbl) lbl.style.display = 'none'; }
+  }
   _siPopulateContractSelect();
 }
 
@@ -9796,8 +9805,10 @@ async function uploadSupplyInvoiceFiles(files) {
   const statusEl = document.getElementById('si-upload-status');
   const zone = document.getElementById('si-drop-zone');
   if (!files || !files.length) return;
+  const forPayment = !!siUploadForPayment;
   const deferEl = document.getElementById('si-defer-recognize');
-  const defer = !!(deferEl && deferEl.checked);
+  // В режиме «счёт на оплату» распознавание УПД не запускаем автоматически
+  const defer = forPayment ? true : !!(deferEl && deferEl.checked);
   const label = files.length === 1
     ? (defer ? 'Загружаем файл (без распознавания)...' : 'Загружаем файл...')
     : ('Загружаем ' + files.length + ' файла(ов)...');
@@ -9832,9 +9843,16 @@ async function uploadSupplyInvoiceFiles(files) {
     }
     const data = await res.json();
     const invId = data.id;
-    showToast(defer ? 'Файл загружен · ожидает распознавания' : 'Файл загружен · распознаём', 'success');
     const modal = document.getElementById('si-upload-modal');
     if (modal) modal.remove();
+    if (forPayment) {
+      // Счёт на оплату: тихо кладём во «Входящие счета», НЕ открываем приёмку УПД
+      siUploadForPayment = false;
+      showToast('Счёт загружен во «Входящие счета» · отдел оплаты уведомлён', 'success');
+      try { if (state.currentScreen === 'supply-invoice-intake') loadSupplyInvoicesList(); } catch (_) {}
+      return;
+    }
+    showToast(defer ? 'Файл загружен · ожидает распознавания' : 'Файл загружен · распознаём', 'success');
     // Если загружали не с экрана приёмки (например, с «Заказы») — перейдём туда
     if (state && state.currentScreen === 'supply-invoice-intake') {
       loadSupplyInvoiceDetail(invId);

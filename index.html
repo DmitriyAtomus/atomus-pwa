@@ -1960,7 +1960,7 @@
               <span class="page-counter" id="sup-ord-counter">0</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-secondary" id="sup-ord-upload-invoice-btn" onclick="openSupplyInvoiceUpload()">
+              <button class="btn btn-secondary" id="sup-ord-upload-invoice-btn" onclick="openSupplyInvoiceUpload(true)">
                 <i class="ti ti-cloud-upload"></i> Загрузить счёт
               </button>
               <button class="btn btn-primary" id="sup-ord-new-btn" onclick="openNewSupplyOrder()">
@@ -1988,7 +1988,7 @@
             <div class="loading-block">Загружаем заказы…</div>
           </div>
         </div>
-        <button class="fab" onclick="openNewSupplyOrder()" aria-label="Новый заказ">
+        <button class="fab" onclick="openSupplyOrderAddMenu()" aria-label="Добавить">
           <i class="ti ti-plus"></i>
         </button>
       </div>
