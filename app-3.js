@@ -8290,7 +8290,32 @@ function renderSupplyOrderDetail(o) {
     '</div>';
 
   const items = o.items || [];
-  if (!items.length) {
+  const invItems = o.invoice_items || [];
+  if (!items.length && invItems.length) {
+    // v2.45.321: позиции из распознанного счёта (наименования) — только показ
+    html += '<div style="font-size:12px;color:var(--text-light);padding:2px 2px 8px;display:flex;align-items:center;gap:6px;"><i class="ti ti-sparkles" style="color:var(--brand);"></i> Наименования из счёта (распознано)</div>';
+    html += '<div class="oi-list">';
+    invItems.forEach((it, idx) => {
+      const nm = (it && it.name) ? String(it.name) : '—';
+      const q = (it && it.qty !== null && it.qty !== undefined && it.qty !== '') ? it.qty : '';
+      const unit = (it && it.unit) ? String(it.unit) : '';
+      const priceNum = (it && it.price !== null && it.price !== undefined && it.price !== '') ? Number(it.price) : null;
+      const priceStr = priceNum != null && !isNaN(priceNum) ? priceNum.toLocaleString('ru-RU') + ' ₽' : '';
+      const sumStr = (q !== '' && priceNum != null && !isNaN(priceNum)) ? Math.round(Number(q) * priceNum).toLocaleString('ru-RU') + ' ₽' : '';
+      html += '<div class="oi-row">' +
+        '<div class="oi-body">' +
+          '<div class="oi-title">' + (idx + 1) + '. ' + escapeHtml(nm) + '</div>' +
+          '<div class="oi-meta">' +
+            (q !== '' ? '<span>' + escapeHtml(String(q)) + (unit ? ' ' + escapeHtml(unit) : '') + '</span>' : '') +
+            (priceStr ? '<span>' + priceStr + '/шт</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="oi-total">' + sumStr + '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+    html += '<div style="font-size:11.5px;color:var(--text-light);padding:8px 2px;">Это позиции из счёта на оплату (не приходуются на склад). Чтобы обновить — нажми «Распознать заново».</div>';
+  } else if (!items.length) {
     html += '<div class="empty-block" style="padding: 24px;"><i class="ti ti-package-off"></i>В заказе пока нет позиций' +
       (canEdit ? '<br><br><button class="btn btn-primary btn-small" onclick="openAddOrderItem(' + o.id + ')"><i class="ti ti-plus"></i> Добавить первую</button>' : '') +
       '</div>';
@@ -10356,6 +10381,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.321',
+    date: '15.06.2026',
+    title: 'Заказ: наименования из счёта в «Позициях»',
+    features: [
+      'После распознавания счёта его <b>наименования</b> (что в счёте) показываются в блоке <b>«Позиции»</b> заказа — с количеством, ценой и суммой',
+      'Это позиции из счёта на оплату (только для просмотра, на склад не приходуются). Обновить — кнопкой «Распознать заново»',
+    ],
+  },
   {
     version: 'v2.45.320',
     date: '15.06.2026',
