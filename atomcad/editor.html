@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27><rect width=%2724%27 height=%2724%27 rx=%275%27 fill=%27%230E1217%27/><circle cx=%2712%27 cy=%2712%27 r=%272.4%27 fill=%27%2316B7DB%27/><ellipse cx=%2712%27 cy=%2712%27 rx=%279%27 ry=%274%27 fill=%27none%27 stroke=%27%2316B7DB%27 stroke-width=%271.4%27 transform=%27rotate(-28 12 12)%27/><ellipse cx=%2712%27 cy=%2712%27 rx=%279%27 ry=%274%27 fill=%27none%27 stroke=%27%23FFC400%27 stroke-width=%271.1%27 transform=%27rotate(56 12 12)%27/></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AtomCAD · интерактивный прототип</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --graphite:#15191F;--panel:#1C222B;--panel2:#212935;--line:#2A323E;--desk:#10141A;
+  --paper:#F6F8FA;--ink:#1C2B38;--cyan:#16B7DB;--cyandim:rgba(22,183,219,.14);
+  --amber:#FFC400;--txt:#C9D4DF;--dim:#6B7785;--ok:#5BD6A2;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:var(--desk);color:var(--txt);font-family:'IBM Plex Sans',system-ui,sans-serif;
+  user-select:none;-webkit-user-select:none}
+.mono{font-family:'IBM Plex Mono',monospace}
+#app{height:100%;display:flex;flex-direction:column}
+
+/* верхняя панель */
+.topbar{height:50px;flex:0 0 50px;display:flex;align-items:center;gap:14px;padding:0 12px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.brand b{color:var(--cyan)}
+.doc{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--dim);display:flex;gap:6px;align-items:center}
+.doc .dot{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.doc .dot.dirty{background:var(--amber)}
+#erc{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;cursor:default;
+  background:var(--graphite);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+#erc .w{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+#erc.bad .w{background:var(--amber);box-shadow:0 0 0 3px rgba(255,196,0,.18)}
+.tb-btn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+  padding:6px 11px;font-size:11.5px;font-family:inherit;cursor:pointer}
+.tb-btn:hover{color:var(--txt);border-color:#3A4450}
+.mob{display:none}
+
+/* раскладка */
+.work{flex:1;display:flex;min-height:0;position:relative}
+aside{background:var(--panel);display:flex;flex-direction:column;z-index:5}
+.lib{width:218px;flex:0 0 218px;border-right:1px solid var(--line)}
+.props{width:262px;flex:0 0 262px;border-left:1px solid var(--line);overflow-y:auto}
+aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);padding:13px 14px 7px}
+.lib-list{flex:1;overflow-y:auto;padding:0 8px 10px}
+.grp{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  padding:10px 8px 4px}
+.it{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;cursor:pointer;
+  font-size:12px;color:var(--txt)}
+.it:hover{background:var(--cyandim)}
+.it.on{background:var(--cyan);color:#06262E}
+.it .sym{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--line);border-radius:6px;
+  background:var(--graphite);display:flex;align-items:center;justify-content:center;color:#AFC4D2}
+.it.on .sym{background:rgba(255,255,255,.15);border-color:transparent;color:#06262E}
+.lib-foot{padding:9px 14px;border-top:1px solid var(--line);font-size:10px;color:var(--dim)}
+
+/* канвас */
+.cv{flex:1;position:relative;min-width:0;background:var(--desk)}
+#svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:default}
+#svg.t-hand{cursor:grab}#svg.t-wire{cursor:crosshair}#svg.t-place{cursor:copy}
+
+/* палитра инструментов */
+.tools{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:6;
+  background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:5px;
+  display:flex;flex-direction:column;gap:2px;box-shadow:0 8px 22px rgba(0,0,0,.45)}
+.tool{width:36px;height:36px;border:none;background:none;color:var(--dim);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+.tool:hover{color:var(--txt);background:var(--panel)}
+.tool.on{background:var(--cyan);color:#06262E}
+.tsep{height:1px;background:var(--line);margin:4px 6px}
+
+.zoom{position:absolute;right:14px;bottom:14px;z-index:6;display:flex;align-items:center;gap:2px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px;
+  box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.zoom button{width:28px;height:28px;border:none;background:none;color:var(--dim);font-size:15px;
+  cursor:pointer;border-radius:6px;font-family:inherit}
+.zoom button:hover{background:var(--panel);color:var(--txt)}
+.zoom .v{font-family:'IBM Plex Mono';font-size:11px;padding:0 7px;min-width:46px;text-align:center}
+
+#wireChip{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;z-index:6;display:none;
+  gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:5px;
+  box-shadow:0 6px 16px rgba(0,0,0,.4)}
+#wireChip.show{display:flex}
+#wireChip button{border:none;border-radius:7px;padding:6px 12px;font-size:11.5px;font-weight:600;
+  font-family:inherit;cursor:pointer}
+#wcOk{background:var(--cyan);color:#06262E}
+#wcNo{background:none;color:var(--dim)}
+
+#toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:7;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;
+  font-size:11.5px;color:var(--txt);box-shadow:0 8px 22px rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;transition:opacity .3s}
+#toast.show{opacity:1}
+
+/* свойства */
+.sel-chip{margin:4px 14px 8px;display:flex;align-items:center;gap:9px;background:var(--graphite);
+  border:1px solid rgba(22,183,219,.45);border-radius:9px;padding:8px 10px}
+.sel-chip b{font-family:'IBM Plex Mono';font-size:13px;font-weight:500;color:var(--cyan)}
+.sel-chip span{font-size:11px;color:var(--dim)}
+.fields{padding:0 14px}
+.f{display:flex;align-items:center;gap:8px;padding:4px 0}
+.f label{font-size:11px;color:var(--dim);flex:0 0 88px}
+.f input{flex:1;min-width:0;background:var(--graphite);border:1px solid var(--line);border-radius:7px;
+  padding:6px 8px;font-size:11.5px;color:var(--txt);font-family:'IBM Plex Mono';outline:none}
+.f input:focus{border-color:rgba(22,183,219,.55)}
+.pbtns{display:flex;gap:6px;padding:10px 14px;flex-wrap:wrap}
+.pb{flex:1;background:var(--graphite);border:1px solid var(--line);color:var(--txt);border-radius:8px;
+  padding:7px 6px;font-size:11px;font-family:inherit;cursor:pointer;white-space:nowrap}
+.pb:hover{border-color:#3A4450}
+.pb.danger{color:#FF8A8A;border-color:rgba(255,120,120,.3)}
+.empty{padding:6px 14px;font-size:11.5px;color:var(--dim);line-height:1.5}
+
+/* статус */
+.status{height:26px;flex:0 0 26px;background:var(--panel);border-top:1px solid var(--line);
+  display:flex;align-items:center;gap:16px;padding:0 12px;font-family:'IBM Plex Mono';
+  font-size:10px;color:var(--dim)}
+.status .hl{color:var(--txt)}
+.status .r{margin-left:auto;display:flex;gap:16px}
+
+/* подсказки */
+#help{position:absolute;inset:0;z-index:20;background:rgba(10,14,19,.7);display:none;
+  align-items:center;justify-content:center}
+#help.show{display:flex}
+#help .card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+  padding:20px 24px;max-width:430px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#help h3{font-size:13px;margin-bottom:12px}
+#help table{width:100%;border-collapse:collapse;font-size:11.5px}
+#help td{padding:4px 0;color:var(--dim)}
+#help td:first-child{color:var(--txt);font-family:'IBM Plex Mono';width:150px}
+#help .close{margin-top:14px;width:100%}
+
+/* анимации */
+.ants{animation:ants 1.1s linear infinite}
+@keyframes ants{to{stroke-dashoffset:-120}}
+
+/* мобильные панели */
+@media (max-width:860px){
+  .lib,.props{position:absolute;top:0;bottom:0;transition:transform .22s ease}
+  .lib{left:0;transform:translateX(-100%);box-shadow:8px 0 24px rgba(0,0,0,.4)}
+  .props{right:0;transform:translateX(100%);box-shadow:-8px 0 24px rgba(0,0,0,.4)}
+  body.lib-open .lib{transform:none}
+  body.props-open .props{transform:none}
+  .mob{display:inline-flex}
+  .tools{left:8px}
+}
+/* каталог / спецификация */
+.modal{position:absolute;inset:0;z-index:30;background:rgba(8,12,17,.74);display:none;align-items:center;justify-content:center}
+.modal.show{display:flex}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(940px,94%);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+.mhead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.mhead h3{font-size:14px;font-weight:600}.mhead h3 b{color:var(--cyan);font-weight:600}
+.mhead .pick{font-size:11px;color:var(--amber);background:rgba(255,196,0,.1);border:1px solid rgba(255,196,0,.32);border-radius:8px;padding:4px 10px;font-family:'IBM Plex Mono'}
+.mhead .x{margin-left:auto;background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px}
+.mhead .x:hover{color:var(--txt)}
+.msearch{padding:11px 18px 9px}
+.msearch input{width:100%;background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:9px 12px;color:var(--txt);font-size:12.5px;font-family:inherit;outline:none}
+.msearch input:focus{border-color:rgba(22,183,219,.5)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:0 18px 11px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.chip{flex:0 0 auto;font-size:11px;color:var(--dim);background:var(--graphite);border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+.chip:hover{color:var(--txt)}.chip.on{background:var(--cyan);color:#06262E;border-color:transparent;font-weight:600}
+.mbody{overflow-y:auto;padding:6px 10px 14px}
+.catgrp{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:13px 10px 5px;border-top:1px solid var(--line);margin-top:4px}
+.catgrp:first-child{border-top:none;margin-top:0}
+.row{display:flex;align-items:flex-start;gap:12px;padding:9px 10px;border-radius:9px}
+.row:hover{background:var(--cyandim)}
+.row.pickable{cursor:pointer}
+.row .bdg{flex:0 0 auto;font-family:'IBM Plex Mono';font-size:10px;font-weight:500;color:#06262E;background:var(--cyan);border-radius:6px;padding:3px 0;margin-top:2px;width:42px;text-align:center}
+.row .bdg.ph{background:var(--line);color:var(--dim)}
+.row .main{flex:1;min-width:0}
+.row .ser{font-family:'IBM Plex Mono';font-size:12.5px;font-weight:500;color:var(--txt)}
+.row .nm{font-size:12px;color:var(--txt);margin-left:8px}
+.row .sp{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--cyan);margin-top:3px}
+.row .ds{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45}
+.row .go{flex:0 0 auto;align-self:center;font-size:11px;font-weight:600;color:#06262E;background:var(--cyan);border-radius:7px;padding:6px 12px;opacity:0;transition:opacity .15s}
+.row.pickable:hover .go{opacity:1}
+.mempty{padding:30px 20px;text-align:center;color:var(--dim);font-size:12.5px;line-height:1.6}
+.mempty button{margin-top:12px;background:var(--graphite);border:1px solid rgba(22,183,219,.4);color:var(--cyan);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:12px;cursor:pointer}
+.pb.cat{color:var(--cyan);border-color:rgba(22,183,219,.4);flex-basis:100%}
+.pb.cat:hover{border-color:var(--cyan)}
+.spec{width:100%;border-collapse:collapse;font-size:11.5px}
+.spec th{position:sticky;top:0;background:var(--panel2);color:var(--dim);font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase}
+.spec th.c,.spec td.c{text-align:center}
+.spec td{padding:8px 12px;border-bottom:1px solid var(--line);color:var(--txt);vertical-align:top}
+.spec td.d{font-family:'IBM Plex Mono';color:var(--cyan);white-space:nowrap;font-weight:500}
+.spec td.m{font-family:'IBM Plex Mono';font-size:11px}
+.spec tr:hover td{background:var(--cyandim)}
+.spec .miss{color:var(--amber)}
+.specfoot{padding:11px 18px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.specfoot b{color:var(--txt);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <button class="tb-btn mob" id="btnLib">☰</button>
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="2.4" fill="#16B7DB"/>
+        <ellipse cx="12" cy="12" rx="9.5" ry="4.2" stroke="#16B7DB" stroke-width="1.4" transform="rotate(-28 12 12)"/>
+        <ellipse cx="12" cy="12" rx="9.5" ry="4.2" stroke="#FFC400" stroke-width="1.1" opacity=".85" transform="rotate(56 12 12)"/>
+      </svg>
+      Atom<b>CAD</b>
+    </div>
+    <div class="doc"><span class="dot" id="saveDot"></span>ЩУ-003.001.1 · АГ.ЩУ-003/26</div>
+    <div id="erc"><span class="w"></span><span id="ercTxt">ERC: всё подключено</span></div>
+    <button class="tb-btn" id="btnCatalog">▦ Каталог CHINT</button>
+    <button class="tb-btn" id="btnSpec">▤ Спецификация</button>
+    <button class="tb-btn" id="btnReset">↺ Демо</button>
+    <button class="tb-btn" id="btnHelp">?</button>
+    <button class="tb-btn mob" id="btnProps">⚙</button>
+  </header>
+
+  <div class="work">
+
+    <aside class="lib">
+      <h2>Библиотека · ГОСТ</h2>
+      <div class="lib-list" id="libList"></div>
+      <div class="lib-foot">Клик по элементу → клик на лист.<br>Esc — отмена.</div>
+    </aside>
+
+    <main class="cv" id="cv">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="gpat" width="25" height="25" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r="2" fill="#1C2B38" opacity=".12"/>
+          </pattern>
+          <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#000" flood-opacity=".55"/>
+          </filter>
+        </defs>
+        <g id="view">
+          <g id="sheetL"></g>
+          <g id="wiresL"></g>
+          <g id="jL"></g>
+          <g id="compsL"></g>
+          <g id="pinsL"></g>
+          <g id="ercL"></g>
+          <g id="selL"></g>
+          <g id="draftL"></g>
+          <g id="ghostL"></g>
+        </g>
+      </svg>
+
+      <div class="tools" id="tools">
+        <button class="tool on" data-tool="select" title="Выбор (V)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6.5 1.5L9 19z" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="tool" data-tool="wire" title="Провод (W)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18h7V6h9"/><circle cx="4" cy="18" r="1.6" fill="currentColor"/><circle cx="20" cy="6" r="1.6" fill="currentColor"/></svg>
+        </button>
+        <button class="tool" data-tool="hand" title="Рука (H / Space)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 11V5a1.5 1.5 0 013 0v5m0-4a1.5 1.5 0 013 0v4m0-2.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-1a6 6 0 01-5.2-3L4 13.5A1.6 1.6 0 016.4 12l1.6 1.4" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="tsep"></div>
+        <button class="tool" id="btnUndo" title="Отменить (Ctrl+Z)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tool" id="btnFit" title="Вписать лист (0)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+      </div>
+
+      <div class="zoom">
+        <button id="zOut">−</button><span class="v" id="zVal">100%</span><button id="zIn">+</button>
+      </div>
+
+      <div id="wireChip"><button id="wcOk">✓ Завершить провод</button><button id="wcNo">✕</button></div>
+      <div id="toast"></div>
+
+      <div id="help">
+        <div class="card">
+          <h3>Как лазить по прототипу</h3>
+          <table>
+            <tr><td>drag по пустому</td><td>двигать лист · колесо / пинч — зум</td></tr>
+            <tr><td>клик по элементу</td><td>выбор → свойства справа, drag — перенос (провода тянутся)</td></tr>
+            <tr><td>W → клики</td><td>провод по орто-сетке, цепляется к выводам</td></tr>
+            <tr><td>2×клик / ПКМ / ✓</td><td>закончить провод</td></tr>
+            <tr><td>R · M</td><td>поворот · зеркало (выбранного или «призрака»)</td></tr>
+            <tr><td>Del · Ctrl+Z</td><td>удалить · отменить</td></tr>
+            <tr><td>ERC сверху</td><td>живой: оторви провод — увидишь жёлтые метки</td></tr>
+          </table>
+          <button class="tb-btn close" id="helpClose">Понятно</button>
+        </div>
+      </div>
+
+      <div id="catalog" class="modal">
+        <div class="box">
+          <div class="mhead">
+            <h3>Каталог <b>CHINT</b></h3>
+            <span class="pick" id="catPick" style="display:none"></span>
+            <button class="x" id="catX">✕</button>
+          </div>
+          <div class="msearch"><input id="catSearch" placeholder="Поиск: серия, тип, характеристика…"></div>
+          <div class="chips" id="catChips"></div>
+          <div class="mbody" id="catBody"></div>
+        </div>
+      </div>
+
+      <div id="spec" class="modal">
+        <div class="box">
+          <div class="mhead"><h3>Спецификация <b>· перечень элементов</b></h3><button class="x" id="specX">✕</button></div>
+          <div class="mbody" style="padding:0"><table class="spec" id="specTbl"></table></div>
+          <div class="specfoot" id="specFoot"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="props">
+      <h2>Свойства</h2>
+      <div id="propsBody"></div>
+    </aside>
+  </div>
+
+  <footer class="status">
+    <span>X <span class="hl" id="cx">—</span>  Y <span class="hl" id="cy">—</span> мм</span>
+    <span>Сетка 2,5</span>
+    <span id="toolName" class="hl">Выбор</span>
+    <span class="r"><span>Лист 1/1 · A3 альбомная</span></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ============ константы ============ */
+var GRID=25, SW=4200, SH=2970;
+var INK='#1C2B38', SOFT='#5E6E7C', CY='#16B7DB', AM='#FFC400', PAPER='#F6F8FA';
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function snap(v){return Math.round(v/GRID)*GRID}
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+var _i=1; function uid(p){return (p||'e')+(_i++)}
+
+/* ============ символы ============ */
+function L(x1,y1,x2,y2){return {t:'l',x1:x1,y1:y1,x2:x2,y2:y2}}
+function DL(x1,y1,x2,y2){return {t:'dl',x1:x1,y1:y1,x2:x2,y2:y2}}
+function C(x,y,r,f){return {t:'c',x:x,y:y,r:r,f:f}}
+function R(x,y,w,h,f){return {t:'r',x:x,y:y,w:w,h:h,f:f}}
+function T(x,y,s,tx){return {t:'t',x:x,y:y,s:s,tx:tx}}
+function p3(f){var a=[];[-100,0,100].forEach(function(dx){a=a.concat(f(dx))});return a}
+
+var SYM={
+  qf3:{name:'Автомат 3ф',pre:'QF',bb:[-170,-10,135,310],lbl:[-200,160,'end'],
+    pins:[[-100,0],[0,0],[100,0],[-100,300],[0,300],[100,300]],
+    pr:p3(function(dx){return [L(dx,0,dx,90),L(dx,240,dx-45,95),
+      L(dx-57,83,dx-33,107),L(dx-33,83,dx-57,107),L(dx,240,dx,300)]})
+      .concat([DL(-160,167,112,167)])},
+  fu:{name:'Предохранитель',pre:'FU',bb:[-25,-5,25,155],lbl:[40,88,'start'],
+    pins:[[0,0],[0,150]],pr:[L(0,0,0,150),R(-20,45,40,60)]},
+  km3:{name:'Контакты КМ 3ф',pre:'KM',bb:[-160,-10,135,310],lbl:[-200,160,'end'],
+    pins:[[-100,0],[0,0],[100,0],[-100,300],[0,300],[100,300]],
+    pr:p3(function(dx){return [L(dx,0,dx,90),L(dx,240,dx-45,95),L(dx,240,dx,300)]})
+      .concat([DL(-160,167,112,167)])},
+  kk3:{name:'Тепловое реле 3ф',pre:'KK',bb:[-160,-10,135,210],lbl:[-200,108,'end'],
+    pins:[[-100,0],[0,0],[100,0],[-100,200],[0,200],[100,200]],
+    pr:p3(function(dx){return [L(dx,0,dx,200),R(dx-25,60,50,80,1)]})
+      .concat([DL(-150,100,150,100)])},
+  coil:{name:'Катушка',pre:'KM',bb:[-45,-5,45,155],lbl:[-58,88,'end'],
+    pins:[[0,0],[0,150]],pr:[L(0,0,0,45),L(0,105,0,150),R(-40,45,80,60)]},
+  c_no:{name:'Контакт НО',pre:'K',bb:[-48,-5,10,155],lbl:[42,88,'start'],
+    pins:[[0,0],[0,150]],pr:[L(0,0,0,55),L(0,150,-40,50)]},
+  c_nc:{name:'Контакт НЗ',pre:'K',bb:[-48,-5,12,155],lbl:[42,88,'start'],
+    pins:[[0,0],[0,150]],pr:[L(0,0,0,55),L(-30,55,8,55),L(0,150,-40,50)]},
+  sb_nc:{name:'Кнопка НЗ «Стоп»',pre:'SB',bb:[-82,-5,12,155],lbl:[-94,88,'end'],
+    pins:[[0,0],[0,150]],pr:[L(0,0,0,55),L(-30,55,8,55),L(0,150,-40,50),
+      DL(-20,100,-72,100),L(-72,76,-72,124)]},
+  sb_no:{name:'Кнопка НО «Пуск»',pre:'SB',bb:[-82,-5,10,155],lbl:[-94,88,'end'],
+    pins:[[0,0],[0,150]],pr:[L(0,0,0,55),L(0,150,-40,50),
+      DL(-20,100,-72,100),L(-72,76,-72,124)]},
+  m3:{name:'Двигатель 3~',pre:'M',bb:[-115,-10,115,290],lbl:[150,178,'start'],
+    pins:[[-100,0],[0,0],[100,0]],
+    pr:[L(-100,0,-100,40),L(-100,40,-52,88),L(100,0,100,40),L(100,40,52,88),L(0,0,0,62),
+      C(0,170,110,1),T(0,192,72,'M'),T(0,242,40,'3~')]},
+  hl:{name:'Лампа',pre:'HL',bb:[-45,-5,45,155],lbl:[55,88,'start'],
+    pins:[[0,0],[0,150]],
+    pr:[L(0,0,0,35),L(0,115,0,150),C(0,75,40,1),L(-28,47,28,103),L(28,47,-28,103)]},
+  term:{name:'Вывод / клемма',pre:'X',bb:[-22,-44,22,4],lbl:[0,-58,'middle'],
+    pins:[[0,0]],pr:[C(0,-20,20)]},
+  qf1:{name:'Автомат 1п',pre:'QF',bb:[-62,-10,30,310],lbl:[-74,160,'end'],
+    pins:[[0,0],[0,300]],
+    pr:[L(0,0,0,90),L(0,240,-45,95),L(-57,83,-33,107),L(-33,83,-57,107),L(0,240,0,300)]},
+  box:{name:'Прибор / блок',pre:'A',bb:[-110,-10,150,310],lbl:[150,150,'start'],
+    pins:[[0,0],[0,300]],
+    pr:[L(0,0,0,40),R(-100,40,200,220,1),L(0,260,0,300)]},
+  ntc:{name:'Датчик NTC',pre:'BT',bb:[-42,-5,55,165],lbl:[55,95,'start'],
+    pins:[[0,0],[0,150]],
+    pr:[L(0,0,0,45),L(0,105,0,150),R(-22,45,44,60),L(-42,118,30,40)]}
+};
+var PALETTE=[
+  ['Защита',['qf3','qf1','fu']],
+  ['Коммутация',['km3','coil','c_no','c_nc','sb_no','sb_nc']],
+  ['Машины и реле',['m3','kk3','hl']],
+  ['Приборы и датчики',['box','ntc']],
+  ['Клеммы',['term']]
+];
+
+/* ============ состояние ============ */
+var S={comps:[],wires:[],texts:[],sel:null};
+var view={tx:0,ty:0,s:0.2};
+var tool='select', ghost=null, draft=[], curW={x:0,y:0};
+var U=[],Rd=[];
+var svg=$('svg');
+
+function demo(){
+  _i=1;
+  S.texts=[
+    {x:1320,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'},
+    {x:3150,y:235,s:38,tx:'СИГНАЛИЗАЦИЯ · ДАТЧИКИ'},
+    {x:1850,y:1735,s:28,tx:'вентиляторы ВО1·ВО2'},
+    {x:450,y:735,s:26,tx:'шины L1·L2·L3·N'}
+  ];
+  function K(des,sym,x,y,model,manu,note,nm){
+    var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;
+    return {id:uid('c'),sym:sym,x:x,y:y,rot:0,mirror:false,des:des,attrs:a};
+  }
+  S.comps=[
+    K('X1','term',450,360,'ЗНИ 6 мм², 5 кл.','','ввод 5×6'),
+    K('QF1','qf1',450,460,'NB1-63 3P, C32','CHINT','ввод'),
+    K('QF2','qf1',800,950,'NB1-63 3P, C20','CHINT','наружный блок ES-E 60HX'),
+    K('QF3','qf1',1150,950,'NB1-63 1P, C16','CHINT','ТЭН ВО1 (L2)'),
+    K('QF4','qf1',1500,950,'NB1-63 1P, C16','CHINT','ТЭН ВО2 (L3)'),
+    K('QF5','qf1',1850,950,'NB1-63 1P, C6','CHINT','вентиляторы (L1)'),
+    K('QD1','box',2200,950,'NL1-63 2P, 25 А, 30 мА','CHINT','группа ВО 230 В (реком.)'),
+    K('QF6','qf1',2200,1350,'NB1-63 1P, C4','CHINT','цепи управления'),
+    K('KM1','c_no',1150,1400,'NC1-0910, 230 В, AC-1 до 25 А','CHINT','ТЭН ВО1'),
+    K('KM2','c_no',1500,1400,'NC1-0910, 230 В, AC-1 до 25 А','CHINT','ТЭН ВО2'),
+    K('KM3','c_no',1850,1400,'NCH8-25/20, 230 В','CHINT','вентиляторы ВО','Контактор модульный'),
+    K('A1','box',2200,1750,'EV3223N7, 230 В, 2×NTC','EVCO','дверца щита','Контроллер'),
+    K('KV1','box',2620,1750,'ОРМ-1, 1CO 16 А, 230 В','IEK','пуск ККБ','Реле промежуточное'),
+    K('BT1','ntc',3050,1050,'NTC (ß3435)','EVCO','камера'),
+    K('BT2','ntc',3300,1050,'NTC (ß3435)','EVCO','испаритель ВО1'),
+    K('X5','term',3300,1450,'ЗНИ 2,5 мм², 4 кл.','','датчики NTC, экранир.'),
+    K('X2','term',800,1500,'ЗНИ 4 мм², 7 кл.','','наружный блок'),
+    K('X3','term',1150,1800,'ЗНИ 2,5 мм², 5 кл.','','ВО1'),
+    K('X4','term',1500,1800,'ЗНИ 2,5 мм², 5 кл.','','ВО2'),
+    K('HL1','hl',2900,420,'ND16-22DS, 230 В','CHINT','сеть'),
+    K('HL2','hl',3150,420,'ND16-22DS, 230 В','CHINT','холод'),
+    K('HL3','hl',3400,420,'ND16-22DS, 230 В','CHINT','оттайка')
+  ];
+  function W(){var pts=[].slice.call(arguments);return {id:uid('w'),pts:pts.map(function(p){return {x:p[0],y:p[1]}})}}
+  S.wires=[
+    W([450,360],[450,460]),
+    W([450,760],[450,800]),
+    W([450,800],[2200,800]),
+    W([800,800],[800,950]),
+    W([1150,800],[1150,950]),
+    W([1500,800],[1500,950]),
+    W([1850,800],[1850,950]),
+    W([2200,800],[2200,950]),
+    W([800,1250],[800,1500]),
+    W([1150,1250],[1150,1400]),
+    W([1150,1550],[1150,1800]),
+    W([1500,1250],[1500,1400]),
+    W([1500,1550],[1500,1800]),
+    W([1850,1250],[1850,1400]),
+    W([1850,1550],[1850,1700]),
+    W([2200,1250],[2200,1350]),
+    W([2200,1650],[2200,1750]),
+    W([450,2050],[3400,2050]),
+    W([2200,1700],[2620,1700],[2620,1750]),
+    W([2900,420],[3400,420]),
+    W([2900,570],[3400,570]),
+    W([3400,570],[3400,2050]),
+    W([3050,1050],[3300,1050]),
+    W([3050,1200],[3050,1380],[3300,1380],[3300,1450]),
+    W([3300,1200],[3300,1450])
+  ];
+  S.sel=null;
+}
+
+/* ============ геометрия ============ */
+function rotP(x,y,r){
+  if(r===90)return [-y,x];
+  if(r===180)return [-x,-y];
+  if(r===270)return [y,-x];
+  return [x,y];
+}
+function pinW(c,i){
+  var p=SYM[c.sym].pins[i], x=c.mirror?-p[0]:p[0];
+  var q=rotP(x,p[1],c.rot);
+  return {x:c.x+q[0],y:c.y+q[1]};
+}
+function lblW(c){
+  var s=SYM[c.sym], x=c.mirror?-s.lbl[0]:s.lbl[0];
+  var q=rotP(x,s.lbl[1],c.rot);
+  return {x:c.x+q[0],y:c.y+q[1]};
+}
+function bbW(c){
+  var b=SYM[c.sym].bb, cs=[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]];
+  var xs=[],ys=[];
+  cs.forEach(function(p){
+    var x=c.mirror?-p[0]:p[0], q=rotP(x,p[1],c.rot);
+    xs.push(c.x+q[0]);ys.push(c.y+q[1]);
+  });
+  return [Math.min.apply(null,xs),Math.min.apply(null,ys),Math.max.apply(null,xs),Math.max.apply(null,ys)];
+}
+function eq(a,b){return Math.abs(a.x-b.x)<=1&&Math.abs(a.y-b.y)<=1}
+function onSeg(p,a,b){
+  if(Math.abs(a.x-b.x)<=1) return Math.abs(p.x-a.x)<=1 && p.y>=Math.min(a.y,b.y)-1 && p.y<=Math.max(a.y,b.y)+1;
+  if(Math.abs(a.y-b.y)<=1) return Math.abs(p.y-a.y)<=1 && p.x>=Math.min(a.x,b.x)-1 && p.x<=Math.max(a.x,b.x)+1;
+  return false;
+}
+function compById(id){for(var i=0;i<S.comps.length;i++)if(S.comps[i].id===id)return S.comps[i];return null}
+function wireById(id){for(var i=0;i<S.wires.length;i++)if(S.wires[i].id===id)return S.wires[i];return null}
+
+function junctions(){
+  var out=[];
+  S.wires.forEach(function(w){
+    [w.pts[0],w.pts[w.pts.length-1]].forEach(function(e){
+      var interior=false,hits=0;
+      S.wires.forEach(function(o){
+        if(o===w)return;
+        for(var i=0;i<o.pts.length-1;i++){
+          if(onSeg(e,o.pts[i],o.pts[i+1])){
+            hits++;
+            if(!eq(e,o.pts[i])&&!eq(e,o.pts[i+1]))interior=true;
+            break;
+          }
+        }
+      });
+      if(interior||hits>=2){
+        for(var k=0;k<out.length;k++)if(eq(out[k],e))return;
+        out.push({x:e.x,y:e.y});
+      }
+    });
+  });
+  return out;
+}
+function pinConnected(pt){
+  for(var i=0;i<S.wires.length;i++){
+    var ps=S.wires[i].pts;
+    for(var j=0;j<ps.length;j++)if(eq(ps[j],pt))return true;
+    for(j=0;j<ps.length-1;j++)if(onSeg(pt,ps[j],ps[j+1]))return true;
+  }
+  return false;
+}
+function ercList(){
+  var bad=[];
+  S.comps.forEach(function(c){
+    for(var i=0;i<SYM[c.sym].pins.length;i++){
+      var p=pinW(c,i);
+      if(!pinConnected(p))bad.push(p);
+    }
+  });
+  return bad;
+}
+
+/* ============ undo ============ */
+function snapState(){return JSON.stringify({c:S.comps,w:S.wires})}
+function pushUndo(pre){
+  U.push(pre||snapState());
+  if(U.length>80)U.shift();
+  Rd.length=0;
+  $('saveDot').classList.add('dirty');
+}
+function loadState(j){
+  var o=JSON.parse(j);
+  S.comps=o.c;S.wires=o.w;S.sel=null;
+  renderAll();
+}
+function undo(){if(!U.length)return;Rd.push(snapState());loadState(U.pop())}
+function redo(){if(!Rd.length)return;U.push(snapState());loadState(Rd.pop())}
+
+/* ============ вид ============ */
+function applyView(){
+  $('view').setAttribute('transform','translate('+view.tx+' '+view.ty+') scale('+view.s+')');
+  $('zVal').textContent=Math.round(view.s/fitScale()*100)+'%';
+}
+var _fs=null;
+function fitScale(){
+  if(_fs)return _fs;
+  var r=svg.getBoundingClientRect();
+  _fs=Math.min((r.width-70)/SW,(r.height-70)/SH);
+  return _fs;
+}
+function fit(){
+  _fs=null;
+  var r=svg.getBoundingClientRect(), s=fitScale();
+  view.s=s;view.tx=(r.width-SW*s)/2;view.ty=(r.height-SH*s)/2;
+  applyView();
+}
+function toWorld(e){
+  var r=svg.getBoundingClientRect();
+  return {x:(e.clientX-r.left-view.tx)/view.s,y:(e.clientY-r.top-view.ty)/view.s};
+}
+function zoomAt(px,py,f){
+  var wx=(px-view.tx)/view.s, wy=(py-view.ty)/view.s;
+  view.s=clamp(view.s*f,fitScale()*0.35,fitScale()*22);
+  view.tx=px-wx*view.s;view.ty=py-wy*view.s;
+  applyView();
+}
+
+/* ============ рендер ============ */
+function prim(p){
+  if(p.t==='l')return '<line x1="'+p.x1+'" y1="'+p.y1+'" x2="'+p.x2+'" y2="'+p.y2+'"/>';
+  if(p.t==='dl')return '<line x1="'+p.x1+'" y1="'+p.y1+'" x2="'+p.x2+'" y2="'+p.y2+'" stroke-width="4" stroke-dasharray="16 16"/>';
+  if(p.t==='c')return '<circle cx="'+p.x+'" cy="'+p.y+'" r="'+p.r+'"'+(p.f?' fill="'+PAPER+'"':'')+'/>';
+  if(p.t==='r')return '<rect x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'"'+(p.f?' fill="'+PAPER+'"':'')+'/>';
+  if(p.t==='t')return '<text x="'+p.x+'" y="'+p.y+'" font-size="'+p.s+'" text-anchor="middle" stroke="none" fill="currentColor" font-family="\'IBM Plex Sans\'" font-weight="600">'+esc(p.tx)+'</text>';
+  return '';
+}
+function compSvg(c,col,extraOp){
+  var sx=c.mirror?-1:1, h='';
+  h+='<g data-c="'+c.id+'" color="'+col+'" stroke="'+col+'" fill="none" stroke-width="6" stroke-linecap="round"'+
+     (extraOp?' opacity="'+extraOp+'"':'')+
+     ' transform="translate('+c.x+' '+c.y+') rotate('+c.rot+') scale('+sx+' 1)">';
+  var _bb=SYM[c.sym].bb; h+='<rect x="'+_bb[0]+'" y="'+_bb[1]+'" width="'+(_bb[2]-_bb[0])+'" height="'+(_bb[3]-_bb[1])+'" fill="transparent" stroke="none" pointer-events="all"/>';
+  SYM[c.sym].pr.forEach(function(p){h+=prim(p)});
+  h+='</g>';
+  var lp=lblW(c), an=SYM[c.sym].lbl[2];
+  h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+lp.y+'" font-size="44" font-weight="500" fill="'+col+'" stroke="none" text-anchor="'+an+'"'+
+     (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Mono\'">'+esc(c.des)+'</text>';
+  if(c.attrs&&c.attrs.note)
+    h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+(lp.y+40)+'" font-size="30" fill="'+SOFT+'" stroke="none" text-anchor="'+an+'"'+
+       (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Sans\'">'+esc(c.attrs.note)+'</text>';
+  return h;
+}
+function renderCanvas(){
+  /* провода */
+  var h='';
+  S.wires.forEach(function(w){
+    var sel=S.sel&&S.sel.t==='w'&&S.sel.id===w.id;
+    var d=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' ');
+    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+(sel?CY:INK)+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
+    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>';
+    if(sel)w.pts.forEach(function(p){
+      h+='<rect x="'+(p.x-13)+'" y="'+(p.y-13)+'" width="26" height="26" fill="#fff" stroke="'+CY+'" stroke-width="5"/>';
+    });
+  });
+  $('wiresL').innerHTML=h;
+  /* точки соединений */
+  h='';
+  junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="11" fill="'+INK+'"/>'});
+  $('jL').innerHTML=h;
+  /* компоненты + свободные тексты */
+  h='';
+  S.texts.forEach(function(t){
+    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="middle" letter-spacing="6" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
+  });
+  S.comps.forEach(function(c){
+    var col=(S.sel&&S.sel.t==='c'&&S.sel.id===c.id)?CY:INK;
+    h+=compSvg(c,col);
+  });
+  $('compsL').innerHTML=h;
+  /* выводы (в режиме провода/размещения) */
+  h='';
+  if(tool==='wire'||tool==='place'){
+    S.comps.forEach(function(c){
+      for(var i=0;i<SYM[c.sym].pins.length;i++){
+        var p=pinW(c,i);
+        h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="12" fill="'+CY+'" opacity=".3"/>';
+      }
+    });
+  }
+  $('pinsL').innerHTML=h;
+  /* ERC */
+  var bad=ercList();h='';
+  bad.forEach(function(p){
+    h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="17" fill="'+AM+'"/>'+
+       '<text x="'+p.x+'" y="'+(p.y+8)+'" font-size="24" font-weight="700" fill="#3A2E00" text-anchor="middle">!</text>';
+  });
+  $('ercL').innerHTML=h;
+  var ercEl=$('erc');
+  if(bad.length){ercEl.classList.add('bad');$('ercTxt').textContent='ERC: не подключено выводов — '+bad.length}
+  else{ercEl.classList.remove('bad');$('ercTxt').textContent='ERC: всё подключено'}
+  /* выделение */
+  h='';
+  if(S.sel&&S.sel.t==='c'){
+    var c=compById(S.sel.id);
+    if(c){
+      var b=bbW(c),pad=26;
+      var x=b[0]-pad,y=b[1]-pad,w2=b[2]-b[0]+pad*2,h2=b[3]-b[1]+pad*2;
+      h+='<rect class="ants" x="'+x+'" y="'+y+'" width="'+w2+'" height="'+h2+'" fill="rgba(22,183,219,.06)" stroke="'+CY+'" stroke-width="5" stroke-dasharray="38 26"/>';
+      [[x,y],[x+w2/2,y],[x+w2,y],[x,y+h2/2],[x+w2,y+h2/2],[x,y+h2],[x+w2/2,y+h2],[x+w2,y+h2]].forEach(function(p){
+        h+='<rect x="'+(p[0]-13)+'" y="'+(p[1]-13)+'" width="26" height="26" fill="#fff" stroke="'+CY+'" stroke-width="5"/>';
+      });
+    }
+  }
+  $('selL').innerHTML=h;
+  renderDraft();renderGhost();
+}
+function renderDraft(){
+  var h='';
+  if(draft.length){
+    var d=draft.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' ');
+    h+='<path d="'+d+'" stroke="'+CY+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
+    var l=draft[draft.length-1], p=snapPoint(curW.x,curW.y);
+    var seg='M'+l.x+' '+l.y;
+    if(p.x!==l.x&&p.y!==l.y){
+      var c=Math.abs(p.x-l.x)>=Math.abs(p.y-l.y)?{x:p.x,y:l.y}:{x:l.x,y:p.y};
+      seg+=' L'+c.x+' '+c.y;
+    }
+    seg+=' L'+p.x+' '+p.y;
+    h+='<path d="'+seg+'" stroke="'+CY+'" stroke-width="5" stroke-dasharray="22 18" fill="none" opacity=".75"/>';
+    draft.forEach(function(p2){h+='<circle cx="'+p2.x+'" cy="'+p2.y+'" r="10" fill="'+CY+'"/>'});
+  }
+  $('draftL').innerHTML=h;
+  $('wireChip').classList.toggle('show',draft.length>0);
+}
+function renderGhost(){
+  var h='';
+  if(tool==='place'&&ghost){
+    var g={id:'ghost',sym:ghost.sym,x:ghost.x,y:ghost.y,rot:ghost.rot,mirror:ghost.mirror,
+           des:nextDes(SYM[ghost.sym].pre),attrs:{}};
+    h=compSvg(g,CY,'0.5');
+  }
+  $('ghostL').innerHTML=h;
+}
+
+/* ============ свойства ============ */
+var lastSelKey='';
+function renderProps(force){
+  var key=S.sel?(S.sel.t+S.sel.id):'none';
+  if(!force&&key===lastSelKey)return;
+  lastSelKey=key;
+  var el=$('propsBody'),h='';
+  if(!S.sel){
+    el.innerHTML='<div class="empty">Ничего не выбрано.<br><br>Кликни элемент или провод на листе — здесь появятся его свойства.</div>';
+    return;
+  }
+  if(S.sel.t==='w'){
+    var w=wireById(S.sel.id);
+    if(!w){S.sel=null;renderProps(true);return}
+    var len=0;
+    for(var i=0;i<w.pts.length-1;i++)
+      len+=Math.abs(w.pts[i+1].x-w.pts[i].x)+Math.abs(w.pts[i+1].y-w.pts[i].y);
+    h+='<div class="sel-chip"><b>Провод</b><span>· '+w.pts.length+' точ. · '+(len/10).toFixed(0)+' мм</span></div>';
+    h+='<div class="pbtns"><button class="pb danger" id="pDel">Удалить (Del)</button></div>';
+    el.innerHTML=h;
+    $('pDel').onclick=delSel;
+    return;
+  }
+  var c=compById(S.sel.id);
+  if(!c){S.sel=null;renderProps(true);return}
+  h+='<div class="sel-chip"><b>'+esc(c.des)+'</b><span>· '+esc(SYM[c.sym].name)+'</span></div>';
+  h+='<div class="fields">';
+  h+='<div class="f"><label>Обозначение</label><input id="fDes" value="'+esc(c.des)+'"></div>';
+  h+='<div class="f"><label>Модель</label><input id="fMod" value="'+esc(c.attrs.model||'')+'"></div>';
+  h+='<div class="f"><label>Производитель</label><input id="fMan" value="'+esc(c.attrs.manu||'')+'"></div>';
+  h+='<div class="f"><label>Примечание</label><input id="fNote" value="'+esc(c.attrs.note||'')+'"></div>';
+  h+='</div>';
+  h+='<div class="pbtns"><button class="pb cat" id="pCat">⊕ Подобрать из каталога CHINT</button></div>';
+  h+='<div class="pbtns"><button class="pb" id="pRot">⟳ 90° (R)</button>'+
+     '<button class="pb" id="pMir">⇋ Зеркало (M)</button>'+
+     '<button class="pb danger" id="pDel">Удалить</button></div>';
+  el.innerHTML=h;
+  var snapOnce=null;
+  function before(){if(!snapOnce){snapOnce=1;pushUndo()}}
+  function bind(id,fn){
+    var inp=$(id);
+    inp.addEventListener('focus',function(){snapOnce=null});
+    inp.addEventListener('input',function(){before();fn(inp.value);renderCanvas();
+      if(id==='fDes'){var chip=el.querySelector('.sel-chip b');if(chip)chip.textContent=inp.value}});
+  }
+  bind('fDes',function(v){c.des=v});
+  bind('fMod',function(v){c.attrs.model=v});
+  bind('fMan',function(v){c.attrs.manu=v});
+  bind('fNote',function(v){c.attrs.note=v});
+  $('pRot').onclick=function(){pushUndo();c.rot=(c.rot+90)%360;renderCanvas()};
+  $('pMir').onclick=function(){pushUndo();c.mirror=!c.mirror;renderCanvas()};
+  $('pDel').onclick=delSel;
+  $('pCat').onclick=function(){openCatalog(catKeyFor(c),c)};
+}
+function renderAll(){renderCanvas();renderProps()}
+function delSel(){
+  if(!S.sel)return;
+  pushUndo();
+  if(S.sel.t==='c')S.comps=S.comps.filter(function(c){return c.id!==S.sel.id});
+  else S.wires=S.wires.filter(function(w){return w.id!==S.sel.id});
+  S.sel=null;renderProps(true);renderCanvas();
+}
+function nextDes(pre){
+  var mx=0,re=new RegExp('^'+pre+'(\\d+)$');
+  S.comps.forEach(function(c){var m=re.exec(c.des);if(m)mx=Math.max(mx,parseInt(m[1],10))});
+  return pre+(mx+1);
+}
+
+/* ============ привязка ============ */
+function snapPoint(wx,wy){
+  var tol=Math.max(26,18/view.s),best=null,bd=tol;
+  S.comps.forEach(function(c){
+    for(var i=0;i<SYM[c.sym].pins.length;i++){
+      var p=pinW(c,i),d=Math.max(Math.abs(p.x-wx),Math.abs(p.y-wy));
+      if(d<bd){bd=d;best=p}
+    }
+  });
+  if(best)return {x:best.x,y:best.y};
+  return {x:snap(wx),y:snap(wy)};
+}
+
+/* ============ провод ============ */
+function addPt(p){
+  var d=draft,l=d[d.length-1];
+  if(l&&l.x===p.x&&l.y===p.y)return;
+  if(d.length>=2){
+    var a=d[d.length-2];
+    if((a.x===l.x&&l.x===p.x)||(a.y===l.y&&l.y===p.y)){d[d.length-1]=p;return}
+  }
+  d.push(p);
+}
+function wireClick(wx,wy){
+  var p=snapPoint(wx,wy);
+  if(!draft.length){draft.push(p);renderDraft();return}
+  var l=draft[draft.length-1];
+  if(l.x===p.x&&l.y===p.y){finishWire();return}
+  if(p.x!==l.x&&p.y!==l.y){
+    var c=Math.abs(p.x-l.x)>=Math.abs(p.y-l.y)?{x:p.x,y:l.y}:{x:l.x,y:p.y};
+    addPt(c);
+  }
+  addPt(p);
+  renderDraft();
+}
+function finishWire(){
+  if(draft.length>=2){
+    pushUndo();
+    S.wires.push({id:uid('w'),pts:draft.map(function(p){return {x:p.x,y:p.y}})});
+  }
+  draft=[];renderCanvas();
+}
+function cancelWire(){draft=[];renderDraft()}
+
+/* ============ drag компонента + подтяжка проводов ============ */
+var mode=null;
+function collectAtt(c){
+  var att=[],per={};
+  for(var i=0;i<SYM[c.sym].pins.length;i++){
+    var p=pinW(c,i);
+    S.wires.forEach(function(w){
+      [[0,false],[w.pts.length-1,true]].forEach(function(e){
+        if(eq(w.pts[e[0]],p)){
+          var ai=e[1]?w.pts.length-2:1;
+          att.push({w:w,last:e[1],pin:i,
+            oe:{x:w.pts[e[0]].x,y:w.pts[e[0]].y},
+            oa:{x:w.pts[ai].x,y:w.pts[ai].y}});
+          per[w.id]=(per[w.id]||0)+1;
+        }
+      });
+    });
+  }
+  att.forEach(function(a){a.both=per[a.w.id]>=2});
+  return att;
+}
+function applyAtt(c,att){
+  att.forEach(function(a){
+    var np=pinW(c,a.pin),w=a.w,pts=w.pts;
+    var ei=a.last?pts.length-1:0;
+    if(pts.length===2&&!a.both){
+      var oi=a.last?0:1,other=pts[oi];
+      if(np.x===other.x||np.y===other.y){
+        pts[ei]={x:np.x,y:np.y};
+      }else{
+        var vert=Math.abs(np.y-other.y)>=Math.abs(np.x-other.x);
+        var A=a.last?other:np,B=a.last?np:other,m;
+        if(vert){m=snap((np.y+other.y)/2);
+          w.pts=[{x:A.x,y:A.y},{x:A.x,y:m},{x:B.x,y:m},{x:B.x,y:B.y}];
+        }else{m=snap((np.x+other.x)/2);
+          w.pts=[{x:A.x,y:A.y},{x:m,y:A.y},{x:m,y:B.y},{x:B.x,y:B.y}];
+        }
+      }
+    }else{
+      pts=w.pts;ei=a.last?pts.length-1:0;
+      pts[ei]={x:np.x,y:np.y};
+      if(pts.length>2){
+        var ai=a.last?pts.length-2:1,ad=pts[ai];
+        if(Math.abs(a.oa.x-a.oe.x)<=1)ad.x=np.x;else ad.y=np.y;
+        a.oa={x:ad.x,y:ad.y};
+      }
+    }
+    a.oe={x:np.x,y:np.y};
+  });
+}
+function startDrag(e,wp){
+  var c=compById(S.sel.id);if(!c)return;
+  mode={k:'drag',c:c,sx:wp.x,sy:wp.y,ox:c.x,oy:c.y,att:collectAtt(c),moved:false,snap:snapState()};
+}
+function dragMove(wp){
+  var m=mode,nx=snap(m.ox+wp.x-m.sx),ny=snap(m.oy+wp.y-m.sy);
+  if(nx===m.c.x&&ny===m.c.y)return;
+  if(!m.moved){pushUndo(m.snap);m.moved=true}
+  m.c.x=nx;m.c.y=ny;
+  applyAtt(m.c,m.att);
+  renderCanvas();
+}
+
+/* ============ лист ============ */
+function buildSheet(){
+  var h='';
+  h+='<rect x="0" y="0" width="'+SW+'" height="'+SH+'" fill="'+PAPER+'" filter="url(#sh)"/>';
+  h+='<rect x="200" y="50" width="'+(SW-250)+'" height="'+(SH-100)+'" fill="url(#gpat)"/>';
+  h+='<rect x="4" y="4" width="'+(SW-8)+'" height="'+(SH-8)+'" fill="none" stroke="#9AA8B4" stroke-width="3"/>';
+  h+='<rect x="200" y="50" width="'+(SW-250)+'" height="'+(SH-100)+'" fill="none" stroke="'+INK+'" stroke-width="7"/>';
+  /* основная надпись */
+  var x0=2300,y0=2370,x1=4150,y1=2920;
+  h+='<rect x="'+x0+'" y="'+y0+'" width="'+(x1-x0)+'" height="'+(y1-y0)+'" fill="'+PAPER+'" stroke="'+INK+'" stroke-width="7"/>';
+  h+='<g stroke="'+INK+'" stroke-width="3.5">';
+  h+='<line x1="2944" y1="'+y0+'" x2="2944" y2="'+y1+'"/>';
+  h+='<line x1="2529" y1="'+y0+'" x2="2529" y2="'+y1+'"/>';
+  [2507.5,2645,2782.5].forEach(function(y){h+='<line x1="'+x0+'" y1="'+y+'" x2="2944" y2="'+y+'"/>'});
+  h+='<line x1="2944" y1="2535" x2="'+x1+'" y2="2535"/>';
+  h+='<line x1="2944" y1="2755" x2="'+x1+'" y2="2755"/>';
+  [3134,3420,3730].forEach(function(x){h+='<line x1="'+x+'" y1="2755" x2="'+x+'" y2="'+y1+'"/>'});
+  h+='</g>';
+  h+='<g fill="'+INK+'" font-family="\'IBM Plex Sans\'">';
+  var rows=['Разраб.','Пров.','Н.контр.','Утв.'];
+  rows.forEach(function(t,i){h+='<text x="2316" y="'+(2455+i*137.5)+'" font-size="30" fill="'+SOFT+'">'+t+'</text>'});
+  h+='<text x="2545" y="2455" font-size="30">Д.В.</text>';
+  h+='<text x="3547" y="2480" font-size="52" font-weight="600" text-anchor="middle" font-family="\'IBM Plex Mono\'">АГ.ЩУ-003/26</text>';
+  h+='<text x="3547" y="2630" font-size="36" text-anchor="middle">Щит управления ЩУ-003.001.1</text>';
+  h+='<text x="3547" y="2685" font-size="34" text-anchor="middle">холодильной камеры · схема электрическая</text>';
+  h+='<text x="3039" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Лит.</text>';
+  h+='<text x="3277" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Лист</text>';
+  h+='<text x="3575" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Листов</text>';
+  h+='<text x="3277" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">1</text>';
+  h+='<text x="3575" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">1</text>';
+  h+='<text x="3940" y="2815" font-size="32" font-weight="600" text-anchor="middle">ООО «Атомус</text>';
+  h+='<text x="3940" y="2858" font-size="32" font-weight="600" text-anchor="middle">Групп»</text>';
+  h+='</g>';
+  $('sheetL').innerHTML=h;
+}
+
+/* ============ палитра ============ */
+function symbolIcon(id){
+  var s=SYM[id],b=s.bb,pad=18;
+  var vb=(b[0]-pad)+' '+(b[1]-pad)+' '+(b[2]-b[0]+pad*2)+' '+(b[3]-b[1]+pad*2);
+  var swd=Math.max(b[2]-b[0],b[3]-b[1])/13;
+  var h='<svg width="24" height="24" viewBox="'+vb+'" fill="none" stroke="currentColor" color="currentColor" stroke-width="'+swd+'" stroke-linecap="round">';
+  s.pr.forEach(function(p){
+    if(p.t==='t')return;
+    if(p.t==='c'){h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+p.r+'"/>';return}
+    h+=prim(p).replace(' fill="'+PAPER+'"','');
+  });
+  h+='</svg>';
+  return h;
+}
+function buildPalette(){
+  var h='';
+  PALETTE.forEach(function(g){
+    h+='<div class="grp">'+g[0]+'</div>';
+    g[1].forEach(function(id){
+      h+='<div class="it" data-sym="'+id+'"><span class="sym">'+symbolIcon(id)+'</span>'+SYM[id].name+'</div>';
+    });
+  });
+  $('libList').innerHTML=h;
+  Array.prototype.forEach.call(document.querySelectorAll('.it'),function(el){
+    el.addEventListener('click',function(){
+      startPlace(el.getAttribute('data-sym'));
+      document.body.classList.remove('lib-open');
+    });
+  });
+}
+function startPlace(sym){
+  cancelWire();
+  ghost={sym:sym,rot:0,mirror:false,x:curW.x?snap(curW.x):1000,y:curW.y?snap(curW.y):1000};
+  setTool('place');
+  markPalette(sym);
+}
+function markPalette(sym){
+  Array.prototype.forEach.call(document.querySelectorAll('.it'),function(el){
+    el.classList.toggle('on',!!sym&&el.getAttribute('data-sym')===sym);
+  });
+}
+
+/* ============ инструменты ============ */
+var TOOLN={select:'Выбор',wire:'Провод',hand:'Рука',place:'Размещение'};
+function setTool(t){
+  if(t!=='wire')cancelWire();
+  if(t!=='place'){ghost=null;markPalette(null)}
+  tool=t;
+  svg.className.baseVal='';
+  svg.classList.add('t-'+t);
+  Array.prototype.forEach.call(document.querySelectorAll('.tool[data-tool]'),function(b){
+    b.classList.toggle('on',b.getAttribute('data-tool')===t);
+  });
+  $('toolName').textContent=TOOLN[t]||t;
+  renderCanvas();
+}
+
+/* ============ события указателя ============ */
+var ptrs=new Map(),pinch=null;
+function pdist(a,b){var dx=a.clientX-b.clientX,dy=a.clientY-b.clientY;return Math.sqrt(dx*dx+dy*dy)}
+svg.addEventListener('pointerdown',function(e){
+  svg.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,e);
+  if(ptrs.size===2){
+    var a=Array.from(ptrs.values());
+    pinch={d:pdist(a[0],a[1]),mx:(a[0].clientX+a[1].clientX)/2,my:(a[0].clientY+a[1].clientY)/2,
+           v:{tx:view.tx,ty:view.ty,s:view.s}};
+    mode=null;
+    return;
+  }
+  if(e.button===1){mode={k:'pan',sx:e.clientX,sy:e.clientY,tx:view.tx,ty:view.ty};return}
+  var wp=toWorld(e);
+  if(tool==='hand'){mode={k:'pan',sx:e.clientX,sy:e.clientY,tx:view.tx,ty:view.ty};return}
+  if(tool==='place'){
+    if(!ghost)return;
+    pushUndo();
+    S.comps.push({id:uid('c'),sym:ghost.sym,x:snap(wp.x),y:snap(wp.y),rot:ghost.rot,
+      mirror:ghost.mirror,des:nextDes(SYM[ghost.sym].pre),attrs:{}});
+    renderCanvas();
+    return;
+  }
+  if(tool==='wire'){wireClick(wp.x,wp.y);return}
+  var tc=e.target.closest&&e.target.closest('[data-c]');
+  if(tc){
+    var id=tc.getAttribute('data-c');
+    S.sel={t:'c',id:id};
+    renderAll();
+    if(window.matchMedia('(max-width:860px)').matches)document.body.classList.add('props-open');
+    startDrag(e,wp);
+    return;
+  }
+  var tw=e.target.closest&&e.target.closest('[data-w]');
+  if(tw){S.sel={t:'w',id:tw.getAttribute('data-w')};renderAll();return}
+  S.sel=null;renderAll();
+  mode={k:'pan',sx:e.clientX,sy:e.clientY,tx:view.tx,ty:view.ty};
+});
+svg.addEventListener('pointermove',function(e){
+  if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,e);
+  if(pinch&&ptrs.size===2){
+    var a=Array.from(ptrs.values()),r=svg.getBoundingClientRect();
+    var d=pdist(a[0],a[1]);
+    var mx=(a[0].clientX+a[1].clientX)/2-r.left,my=(a[0].clientY+a[1].clientY)/2-r.top;
+    var m0x=pinch.mx-r.left,m0y=pinch.my-r.top;
+    var s=clamp(pinch.v.s*d/pinch.d,fitScale()*0.35,fitScale()*22);
+    var wx=(m0x-pinch.v.tx)/pinch.v.s,wy=(m0y-pinch.v.ty)/pinch.v.s;
+    view.s=s;view.tx=mx-wx*s;view.ty=my-wy*s;applyView();
+    return;
+  }
+  var wp=toWorld(e);curW=wp;
+  $('cx').textContent=(wp.x/10).toFixed(1);
+  $('cy').textContent=(wp.y/10).toFixed(1);
+  if(mode&&mode.k==='pan'){
+    view.tx=mode.tx+(e.clientX-mode.sx);view.ty=mode.ty+(e.clientY-mode.sy);applyView();return;
+  }
+  if(mode&&mode.k==='drag'){dragMove(wp);return}
+  if(tool==='place'&&ghost){ghost.x=snap(wp.x);ghost.y=snap(wp.y);renderGhost()}
+  if(tool==='wire'&&draft.length)renderDraft();
+});
+function up(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size<2)pinch=null;
+  if(mode){mode=null}
+}
+svg.addEventListener('pointerup',up);
+svg.addEventListener('pointercancel',up);
+svg.addEventListener('dblclick',function(e){
+  if(tool==='wire')finishWire();
+  e.preventDefault();
+});
+svg.addEventListener('contextmenu',function(e){
+  e.preventDefault();
+  if(tool==='wire'&&draft.length)finishWire();
+  else if(tool==='place')setTool('select');
+});
+svg.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var r=svg.getBoundingClientRect();
+  zoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.15:1/1.15);
+},{passive:false});
+
+/* ============ клавиатура ============ */
+var spaceHeld=false,prevTool=null;
+window.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT')return;
+  if(document.querySelector('.modal.show')){if(e.key==='Escape')closeModal();return;}
+  var k=e.key;
+  if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='z'){
+    e.preventDefault();
+    if(e.shiftKey)redo();else undo();
+    return;
+  }
+  if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='y'){e.preventDefault();redo();return}
+  if(k===' '&&!spaceHeld){spaceHeld=true;prevTool=tool;setTool('hand');e.preventDefault();return}
+  if(k==='Escape'){
+    if(draft.length)cancelWire();
+    else if(tool==='place')setTool('select');
+    else{S.sel=null;renderAll()}
+    return;
+  }
+  if(k==='Delete'||k==='Backspace'){delSel();return}
+  var kl=k.toLowerCase();
+  if(kl==='v'||kl==='м'&&0)setTool('select');
+  if(kl==='v')setTool('select');
+  if(kl==='w')setTool('wire');
+  if(kl==='h')setTool('hand');
+  if(kl==='0')fit();
+  if(kl==='r'){
+    if(tool==='place'&&ghost){ghost.rot=(ghost.rot+90)%360;renderGhost()}
+    else if(S.sel&&S.sel.t==='c'){var c=compById(S.sel.id);if(c){pushUndo();c.rot=(c.rot+90)%360;renderCanvas()}}
+  }
+  if(kl==='m'){
+    if(tool==='place'&&ghost){ghost.mirror=!ghost.mirror;renderGhost()}
+    else if(S.sel&&S.sel.t==='c'){var c2=compById(S.sel.id);if(c2){pushUndo();c2.mirror=!c2.mirror;renderCanvas()}}
+  }
+});
+window.addEventListener('keyup',function(e){
+  if(e.key===' '&&spaceHeld){spaceHeld=false;setTool(prevTool||'select')}
+});
+
+/* ============ кнопки ============ */
+Array.prototype.forEach.call(document.querySelectorAll('.tool[data-tool]'),function(b){
+  b.addEventListener('click',function(){setTool(b.getAttribute('data-tool'))});
+});
+$('btnUndo').addEventListener('click',undo);
+$('btnFit').addEventListener('click',fit);
+$('zIn').addEventListener('click',function(){var r=svg.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1.25)});
+$('zOut').addEventListener('click',function(){var r=svg.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/1.25)});
+$('wcOk').addEventListener('click',finishWire);
+$('wcNo').addEventListener('click',cancelWire);
+$('btnReset').addEventListener('click',function(){demo();U=[];Rd=[];renderProps(true);renderAll();fit();toast('Демо восстановлено')});
+$('btnHelp').addEventListener('click',function(){$('help').classList.add('show')});
+$('helpClose').addEventListener('click',function(){$('help').classList.remove('show')});
+$('help').addEventListener('click',function(e){if(e.target===$('help'))$('help').classList.remove('show')});
+$('btnLib').addEventListener('click',function(){document.body.classList.toggle('lib-open');document.body.classList.remove('props-open')});
+$('btnProps').addEventListener('click',function(){document.body.classList.toggle('props-open');document.body.classList.remove('lib-open')});
+window.addEventListener('resize',function(){_fs=null;applyView()});
+
+function toast(t){
+  var el=$('toast');el.textContent=t;el.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(function(){el.classList.remove('show')},5000);
+}
+
+/* ============ каталог CHINT ============ */
+var CAT=[
+ ['Модульные автоматы','QF',[
+  ['NXB-63','Авт. выключатель модульный, 6 кА','qf3','1–4P · 1…63 А · B/C/D · 6 кА','Основная серия: защита групповых и распределит. цепей.'],
+  ['NXB-63 (S)','Модульный авт., 4,5 кА','qf3','1–4P · 1…63 А · 4,5 кА','Эконом-исполнение для бытовых сетей.'],
+  ['NXB-63 (H)','Модульный авт., 10 кА','qf3','1–4P · 1…63 А · 10 кА','Повышенная откл. способность — ближе к вводу.'],
+  ['NB1-63','Модульный авт. (эконом)','qf3','1–4P · 1…63 А · 6 кА (H — 10 кА)','Бюджетная массовая серия.'],
+  ['NB1-63DC','Авт. постоянного тока','qf3','1–4P · до 63 А · DC','Цепи PV, АКБ, приводы DC.'],
+  ['NB8-125R','Модульный авт., 25 кА','qf3','1–4P · 80…125 А · C/D · 25 кА','Вводной/групповой автомат повышенного номинала.'],
+ ]],
+ ['Автоматы в литом корпусе','QF',[
+  ['NXM','ВЛК, термомагнитный расцепитель','qf3','3P/4P · 16…1600 А · до 70 кА','Ввод и распределение ГРЩ/РЩ.'],
+  ['NM8 / NM8N','ВЛК, базовая серия','qf3','3P/4P · 16…800 А','Распределение средней мощности.'],
+  ['NXMS / NM8S','ВЛК, электронный расцепитель','qf3','3P/4P · до 800 А · до 70 кА','Регулируемые уставки, селективность.'],
+ ]],
+ ['Воздушные автоматы','QF',[
+  ['NA8','Воздушный авт. выключатель','qf3','3P/4P · до 6300 А · стац./выкатной','Главный распределит. щит, большие вводы.'],
+ ]],
+ ['Защита двигателя','QF',[
+  ['NS2-25','Авт. защиты двигателя','qf3','рег. 0,1…25 А + эл.магн. расцеп.','Защита и пуск АД; замена «автомат+реле».'],
+  ['NS2-80','Авт. защиты двигателя','qf3','до 80 А','Двигатели большей мощности.'],
+ ]],
+ ['УЗО','QFD',[
+  ['NL1-63','УЗО','','2P/4P · 16…63 А · тип AC · 30/100/300 мА','Защита от утечки и поражения током.'],
+  ['NL1-100','УЗО','','2P/4P · до 100 А','Вводное УЗО повышенного номинала.'],
+  ['NXL-63','УЗО (альт. серия)','','2P/4P · 16…63 А','Альтернативная линейка.'],
+ ]],
+ ['Дифавтоматы (АВДТ)','QFD',[
+  ['NB1L','Дифавтомат (АВДТ)','','1P+N · тип AC/A · 30 мА · C · 6–10 кА','Автомат + УЗО в одном корпусе.'],
+  ['NXBLE-63','Дифавтомат','','1P+N…4P · тип AC · 30/100 мА','Комбинированная защита линий.'],
+ ]],
+ ['УЗИП / ОПН','FV',[
+  ['NU6','УЗИП класс II (T2)','','Uc · In/Imax · сменный модуль','Защита от импульсных перенапряжений.'],
+ ]],
+ ['Рубильники / выкл. нагрузки','QS',[
+  ['NH40','Рубильник перекидной I-0-II','','3P/4P · 63…1000 А','Ручной АВР: сеть-0-генератор.'],
+  ['NHR / NHRT40','Предохр.-выкл.-разъединитель','','до 630 А · пофазное откл.','Коммутация с защитой вставками.'],
+  ['NH2','Рубильник-разъединитель','','от 100 А','Видимый разрыв, обслуживание.'],
+ ]],
+ ['Контакторы','KM',[
+  ['NXC (09…630)','Контактор силовой AC-3','km3 + coil','3P · 9…630 А · кат. AC/DC · доп. 1НО+1НЗ','Коммутация двигателей и нагрузок.'],
+  ['NXC-M (мини)','Мини-контактор','km3 + coil','9…38 А · встроенный доп. контакт','Цепи управления, малые двигатели.'],
+  ['NCH8','Контактор модульный (DIN)','km3 + coil','2/3/4P · 16…63 А · AC-7a · есть ..M','Освещение, ТЭНы, бытовые цепи.'],
+  ['CJX2 / NC1','Контактор (совм. серия)','km3 + coil','3P · 9…95 А · AC-3','Классическая линейка-аналог.'],
+ ]],
+ ['Тепловые реле','KK',[
+  ['NXR-25','Реле тепловое (под NXC)','kk3 + c_nc','0,1…25 А · сброс авто/ручн. · 95-96','Защита двигателя от перегрузки.'],
+  ['NXR-100 / 200 / 630','Реле тепловое (больш. токи)','kk3 + c_nc','до 630 А','Защита мощных приводов.'],
+  ['NR2','Реле тепловое (совм. серия)','kk3 + c_nc','0,1…630 А','Классическая линейка.'],
+ ]],
+ ['Плавный пуск (УПП)','UZ',[
+  ['NJR2','Устройство плавного пуска','','5,5…320 кВт','Плавный разгон/торможение АД.'],
+ ]],
+ ['Преобразователи частоты','UZ',[
+  ['NVF5','Преобразователь частоты','','0,4…400 кВт · вектор / U-f','Регулирование скорости АД.'],
+  ['NVF2G','ЧРП (насос/вентилятор)','','серия для HVAC','Под насосы и вентиляторы.'],
+ ]],
+ ['Промежуточные реле','KA',[
+  ['JZX-22F / NXJ','Реле промежуточное с колодкой','','2/3/4 группы · 12/24/220 В','Размножение и развязка сигналов.'],
+ ]],
+ ['Реле времени','KT',[
+  ['NKG / JSZ','Реле времени','','задержка вкл/выкл · DIN/розетка','Тайминги в цепях автоматики.'],
+ ]],
+ ['Реле контроля','KV',[
+  ['Реле контроля фаз','Контроль 3ф сети','','наличие/чередование/перекос фаз','Защита 3ф нагрузок от аварий сети.'],
+  ['Реле контроля уровня','Контроль уровня жидкости','','электроды','Насосы, защита от сухого хода.'],
+ ]],
+ ['Кнопки и посты','SB',[
+  ['NP2 (B…)','Кнопки/арматура Ø22 мм','sb_no / sb_nc','без/с фикс. · «грибок» NP2-BS · ключ','Органы управления, аварийный стоп.'],
+  ['NP4 / NP8','Кнопки Ø22 мм (доп.)','sb_no / sb_nc','усиленные / в сборе','Расширенный ряд кнопок.'],
+  ['NPH1 / NP3','Кнопочные посты в корпусе','sb_no / sb_nc','1/2/3-местные · IP54+','Готовые пульты «Пуск/Стоп».'],
+  ['ND16','Сигнализация Ø16 мм','hl','LED · 24/230 В','Компактная индикация.','HL'],
+ ]],
+ ['Переключатели','SA',[
+  ['LW32','Переключатель кулачковый','','10…63 А · 1-0-2 · многопозиц.','Выбор режимов Ручной-0-Авто.'],
+ ]],
+ ['Путевые выключатели','SQ',[
+  ['Путевые выключатели','Концевой выключатель','','рычаг/ролик/шток · NO/NC','Позиционный контроль механизмов.'],
+ ]],
+ ['Индикаторы (лампы)','HL',[
+  ['ND16','Индикатор/лампа Ø16','hl','LED · 24/230 В · цвета','Индикация Сеть/Работа/Авария.'],
+  ['NP2-EW','Светосигнальная арматура Ø22','hl','LED · кнопка-лампа','Подсветка/индикация в NP2.'],
+ ]],
+ ['Блоки питания','G',[
+  ['NDR','Блок питания на DIN','','24 В DC · 75/120/240/480 Вт','Питание контроллеров, реле, HMI.'],
+  ['DR','Блок питания компактный','','5/12/24 В · 15/30/60 Вт','Малые нагрузки.'],
+ ]],
+ ['Трансформаторы тока','TA',[
+  ['BH-0.66','Трансформатор тока измерит.','','0,66 кВ · …/5 А · кл. 0,5/0,5S','Подключение амперметров и счётчиков.'],
+ ]],
+ ['Счётчики энергии','PI',[
+  ['DDS','Счётчик однофазный (DIN)','','активная энергия','Учёт по однофазным линиям.'],
+  ['DTS / DTSU','Счётчик трёхфазный','','прям./трансф. · Modbus (DTSU666)','Учёт 3ф, интеграция в АСКУЭ.'],
+ ]],
+ ['Измер. приборы','PA / PV',[
+  ['Амперметры / вольтметры','Щитовые приборы','','аналог/цифра','Контроль тока и напряжения.'],
+ ]],
+ ['Корпуса и щиты','—',[
+  ['NEX5','Корпус пластиковый','','навесной/встр. · IP30/IP65 · 4…96 мод.','Размещение модульной аппаратуры.'],
+  ['Металлокорпуса','Щиты металлические','','IP31…IP65','Промышленные/уличные щиты.'],
+ ]],
+ ['Шины и аксессуары','—',[
+  ['Шина PIN / FORK','Шина соединительная (гребёнка)','','1P/3P/1P+N · шаг 18/36 мм','Разводка ряда автоматов.'],
+ ]],
+ ['Клеммы','XT',[
+  ['Клеммы на DIN','Клеммники наборные','term','проходные / с предохр. / земля','Подключение проводников в щите.'],
+ ]],
+];
+var FLAT=[];
+CAT.forEach(function(g){
+  g[2].forEach(function(it){
+    FLAT.push({g:g[0],de:it[5]||g[1],ser:it[0],nm:it[1],sym:it[2]||'',sp:it[3],ds:it[4]});
+  });
+});
+var GROUPS=CAT.map(function(g){return g[0]});
+
+var pickKey=null, pickComp=null, activeChip='*';
+function desPrefix(d){var m=/^[A-Za-zА-Яа-я]+/.exec(d||'');return m?m[0].toUpperCase():''}
+function catKeyFor(c){
+  if(c.sym==='term')return 'XT';
+  if(c.sym==='m3')return 'M';
+  var p=desPrefix(c.des)||(SYM[c.sym].pre||'').toUpperCase();
+  if(p==='QD')p='QFD';
+  return p;
+}
+function rowMatchesKey(row,key){
+  if(!key)return true;
+  var toks=row.de.split(/[\s\/]+/).map(function(t){return t.toUpperCase()});
+  return toks.indexOf(key)>=0;
+}
+function closeModal(){var m=document.querySelector('.modal.show');if(m)m.classList.remove('show')}
+
+function openCatalog(key,comp){
+  pickKey=key||null; pickComp=comp||null; activeChip='*';
+  $('catSearch').value='';
+  var pe=$('catPick');
+  if(pickComp){pe.style.display='';pe.textContent='Подбор для '+pickComp.des+' · '+SYM[pickComp.sym].name;}
+  else pe.style.display='none';
+  $('catChips').style.display=pickKey?'none':'flex';
+  renderChips();
+  renderCatalog();
+  $('catalog').classList.add('show');
+  if(!('ontouchstart' in window))setTimeout(function(){$('catSearch').focus()},50);
+}
+function renderChips(){
+  if(pickKey)return;
+  var h='<span class="chip'+(activeChip==='*'?' on':'')+'" data-g="*">Все</span>';
+  GROUPS.forEach(function(g){h+='<span class="chip'+(activeChip===g?' on':'')+'" data-g="'+esc(g)+'">'+esc(g)+'</span>'});
+  $('catChips').innerHTML=h;
+  Array.prototype.forEach.call($('catChips').querySelectorAll('.chip'),function(el){
+    el.onclick=function(){activeChip=el.getAttribute('data-g');renderChips();renderCatalog()};
+  });
+}
+function catTarget(){return pickComp||(S.sel&&S.sel.t==='c'?compById(S.sel.id):null)}
+function renderCatalog(){
+  var q=$('catSearch').value.trim().toLowerCase();
+  var canPick=!!catTarget();
+  var list=FLAT.filter(function(r){
+    if(!rowMatchesKey(r,pickKey))return false;
+    if(!pickKey&&activeChip!=='*'&&r.g!==activeChip)return false;
+    if(q){var hay=(r.ser+' '+r.nm+' '+r.sp+' '+r.ds+' '+r.de+' '+r.g).toLowerCase();if(hay.indexOf(q)<0)return false;}
+    return true;
+  });
+  var body=$('catBody');
+  if(!list.length){
+    body.innerHTML='<div class="mempty">Ничего не найдено'+(pickKey?(' для обозначения «'+pickKey+'».<br>В каталоге пока нет позиций этого типа.'):'.')+
+      (pickKey?'<br><button id="catAll">Показать весь каталог</button>':'')+'</div>';
+    var ca=$('catAll');if(ca)ca.onclick=function(){pickKey=null;$('catChips').style.display='flex';renderChips();renderCatalog()};
+    return;
+  }
+  var h='',lastG=null;
+  list.forEach(function(r){
+    if(r.g!==lastG){h+='<div class="catgrp">'+esc(r.g)+'</div>';lastG=r.g;}
+    var ph=!r.sym||r.sym.indexOf('—')>=0;
+    h+='<div class="row'+(canPick?' pickable':'')+'" data-ser="'+esc(r.ser)+'">'+
+       '<span class="bdg'+(r.de==='—'?' ph':'')+'">'+esc(r.de)+'</span>'+
+       '<span class="main"><span class="ser">'+esc(r.ser)+'</span><span class="nm">'+esc(r.nm)+'</span>'+
+       '<div class="sp">'+esc(r.sp)+'</div><div class="ds">'+esc(r.ds)+'</div></span>'+
+       (canPick?'<span class="go">Выбрать</span>':'')+'</div>';
+  });
+  body.innerHTML=h;
+  if(canPick)Array.prototype.forEach.call(body.querySelectorAll('.row'),function(el){
+    el.onclick=function(){assignModel(el.getAttribute('data-ser'))};
+  });
+}
+function assignModel(ser){
+  var c=catTarget();if(!c)return;
+  pushUndo();
+  var d=c.des,k=0;
+  S.comps.forEach(function(o){if(o.des===d){o.attrs.model=ser;o.attrs.manu='CHINT';k++}});
+  closeModal();renderAll();
+  toast(d+' ← '+ser+' · CHINT'+(k>1?(' · '+k+' симв.'):''));
+}
+
+/* ============ спецификация ============ */
+function natKey(d){var m=/^([A-Za-zА-Яа-я]+)(\d*)/.exec(d)||[];return (m[1]||'')+(m[2]?('00000'+m[2]).slice(-5):'')}
+var DESNAME={QF:'Выключатель автоматический',QD:'Выключатель диф. тока',QS:'Выключатель-разъединитель',
+ KM:'Контактор',KK:'Реле тепловое',KV:'Реле промежуточное',K:'Реле',KT:'Реле времени',
+ SB:'Кнопка',SA:'Переключатель',SQ:'Выключатель путевой',HL:'Лампа сигнальная',
+ A:'Контроллер',BT:'Датчик температуры',M:'Электродвигатель',X:'Клеммник',XT:'Клеммник',
+ FU:'Предохранитель',FV:'УЗИП',T:'Трансформатор',TA:'Трансформатор тока',G:'Блок питания'};
+function devName(c){return c.attrs.nm||DESNAME[desPrefix(c.des)]||SYM[c.sym].name}
+function compressDes(list){
+  if(list.length>=3){
+    var p=desPrefix(list[0]),nums=[],ok=true;
+    list.forEach(function(d){var m=/^([A-Za-zА-Яа-я]+)(\d+)$/.exec(d);if(!m||m[1].toUpperCase()!==p){ok=false}else nums.push(parseInt(m[2],10))});
+    if(ok){var cons=true;for(var i=1;i<nums.length;i++)if(nums[i]!==nums[i-1]+1)cons=false;if(cons)return list[0]+'…'+list[list.length-1];}
+  }
+  return list.join(', ');
+}
+function buildSpec(){
+  var groups={},order=[];
+  S.comps.forEach(function(c){
+    var nm=devName(c),model=c.attrs.model||'',manu=c.attrs.manu||'';
+    var key=nm+'|'+manu+'|'+model;
+    if(!groups[key]){groups[key]={nm:nm,manu:manu,model:model,des:[c.des],notes:c.attrs.note?[c.attrs.note]:[]};order.push(key);}
+    else{var g=groups[key];g.des.push(c.des);if(c.attrs.note&&g.notes.indexOf(c.attrs.note)<0)g.notes.push(c.attrs.note);}
+  });
+  var arr=order.map(function(k){return groups[k]});
+  arr.forEach(function(g){g.des.sort(function(a,b){return natKey(a)<natKey(b)?-1:1});g.desStr=compressDes(g.des);g.qty=g.des.length;});
+  arr.sort(function(a,b){return natKey(a.des[0])<natKey(b.des[0])?-1:natKey(a.des[0])>natKey(b.des[0])?1:0});
+  return arr;
+}
+function openSpec(){
+  var arr=buildSpec();
+  var h='<thead><tr><th>Поз. обозн.</th><th>Наименование</th><th class="c">Кол.</th><th>Примечание</th></tr></thead><tbody>';
+  var units=0;
+  arr.forEach(function(g){
+    var full=g.nm+(g.manu?' '+g.manu:'')+(g.model?' '+g.model:'');
+    units+=g.qty;
+    h+='<tr><td class="d">'+esc(g.desStr)+'</td><td>'+esc(full)+'</td><td class="c">'+g.qty+'</td><td>'+esc(g.notes.join(' / '))+'</td></tr>';
+  });
+  h+='</tbody>';
+  $('specTbl').innerHTML=h;
+  $('specFoot').innerHTML='Позиций: <b>'+arr.length+'</b>'+'<span>Изделий: <b>'+units+'</b></span>'+
+    '<span>Корпус: <b>IEK ЩРн-48з-1</b> · IP54 · 48 мод.</span>';
+  $('spec').classList.add('show');
+}
+
+/* ---- кнопки модалок ---- */
+$('btnCatalog').addEventListener('click',function(){openCatalog(null,null)});
+$('btnSpec').addEventListener('click',openSpec);
+$('catX').addEventListener('click',closeModal);
+$('specX').addEventListener('click',closeModal);
+$('catSearch').addEventListener('input',renderCatalog);
+['catalog','spec'].forEach(function(id){
+  $(id).addEventListener('click',function(e){if(e.target===$(id))closeModal()});
+});
+
+/* ============ приём схемы из мастера ============ */
+function loadExternal(d){
+  if(!d)return;
+  S.comps=(d.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}});
+  S.wires=(d.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}})}});
+  S.texts=d.texts||[]; S.sel=null;
+  renderProps(true); renderAll(); fit();
+  toast('Схема построена из мастера — '+(S.comps.length)+' аппаратов');
+}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.atomcad==='load-schematic'){
+    loadExternal(e.data.data);
+    if(e.data.code){var dc=document.querySelector('.doc');if(dc)dc.innerHTML='<span class="dot" id="saveDot"></span>'+e.data.code;}
+  }
+});
+window.AtomEditorLoad=loadExternal;
+
+/* ============ старт ============ */
+buildSheet();
+buildPalette();
+demo();
+renderProps(true);
+renderAll();
+fit();
+toast('Загружен щит ЩУ-003.001.1. Жми «Спецификация» — перечень соберётся из аппаратов.');
+})();
+</script>
+</body>
+</html>

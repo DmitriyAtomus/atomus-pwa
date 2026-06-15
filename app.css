@@ -17915,3 +17915,8 @@
 .task-draft-banner i { font-size: 16px; flex-shrink: 0; }
 .task-draft-banner span { flex: 1; }
 .task-draft-banner .btn-link { color: var(--warning); font-weight: 700; white-space: nowrap; }
+
+/* v2.45.325: Атом Электрика (AtomCAD) — полноэкранный встроенный инструмент проектирования щитов */
+.atomcad-screen { padding: 0 !important; }
+.atomcad-frame { display: block; width: 100%; border: 0; background: #0E1217; height: calc(100vh - 60px); }
+.app.mobile-layout .atomcad-frame { height: calc(100vh - 200px); min-height: 360px; }

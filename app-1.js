@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.323";
+const APP_VERSION = "v2.45.325";
 const APP_VERSION_DATE = "15.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1494,6 +1494,11 @@ function selectSidebarItem(screenName) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   // Загрузка данных под экран
+  // v2.45.325: AtomCAD «Атом Электрика» — ленивая загрузка iframe при первом открытии
+  if (screenName === 'atom-electrica') {
+    const _acf = document.getElementById('atomcad-frame');
+    if (_acf && !_acf.getAttribute('src') && _acf.dataset.src) _acf.setAttribute('src', _acf.dataset.src);
+  }
   if (screenName === 'home-dashboard') loadHomeDashboard();  // ЭТАП 16Б
   if (screenName === 'dashboard') loadDashboard();
   // ЭТАП 16В: задачи

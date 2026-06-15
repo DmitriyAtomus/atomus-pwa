@@ -284,6 +284,9 @@
         <button class="nav-item" data-nav="schemas-3d" onclick="selectSidebarItem('schemas-3d')">
           <i class="ti ti-3d-cube-sphere"></i><span>3D-схемы</span>
         </button>
+        <button class="nav-item" data-nav="atom-electrica" onclick="selectSidebarItem('atom-electrica')">
+          <i class="ti ti-bolt"></i><span>Атом Электрика</span>
+        </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
           <button class="nav-item" data-nav="models" onclick="selectSidebarItem('models')">
@@ -957,6 +960,15 @@
             </a>
           </div>
         </div>
+      </div>
+
+      <!-- ============ АТОМ ЭЛЕКТРИКА (AtomCAD) ============ -->
+      <div class="screen atomcad-screen" data-screen="atom-electrica" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Атом Электрика</h2>
+        </div>
+        <iframe id="atomcad-frame" class="atomcad-frame" title="Атом Электрика — проектирование щитов" data-src="/atomcad/index.html"></iframe>
       </div>
 
       <!-- ============ МОДЕЛИ ============ -->

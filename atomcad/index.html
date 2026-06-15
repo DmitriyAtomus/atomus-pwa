@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27><rect width=%2724%27 height=%2724%27 rx=%275%27 fill=%27%230E1217%27/><circle cx=%2712%27 cy=%2712%27 r=%272.4%27 fill=%27%2316B7DB%27/><ellipse cx=%2712%27 cy=%2712%27 rx=%279%27 ry=%274%27 fill=%27none%27 stroke=%27%2316B7DB%27 stroke-width=%271.4%27 transform=%27rotate(-28 12 12)%27/><ellipse cx=%2712%27 cy=%2712%27 rx=%279%27 ry=%274%27 fill=%27none%27 stroke=%27%23FFC400%27 stroke-width=%271.1%27 transform=%27rotate(56 12 12)%27/></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Атом Электрика · AtomCAD</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}
+body{display:flex;flex-direction:column;background:#0E1217;font-family:'IBM Plex Sans',system-ui,sans-serif;overflow:hidden}
+.shell{height:46px;flex:0 0 46px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#0E1217;border-bottom:1px solid #2A323E;z-index:10}
+.shell .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;color:#C9D4DF}.shell .brand b{color:#16B7DB}
+.seg{display:flex;background:#1C222B;border:1px solid #2A323E;border-radius:10px;padding:3px}
+.seg button{border:none;background:none;color:#6B7785;font-family:inherit;font-size:13px;padding:6px 16px;border-radius:8px;cursor:pointer}
+.seg button.on{background:#16B7DB;color:#06262E;font-weight:600}
+.tagv{margin-left:auto;font-size:11px;color:#6B7785}
+.stage{flex:1;position:relative}.frame{position:absolute;inset:0;width:100%;height:100%;border:none;opacity:0;pointer-events:none;transition:opacity .15s}.frame.active{opacity:1;pointer-events:auto}
+</style></head><body>
+<header class="shell"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="2.4" fill="#16B7DB"/><ellipse cx="12" cy="12" rx="9.5" ry="4.2" stroke="#16B7DB" stroke-width="1.4" transform="rotate(-28 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="4.2" stroke="#FFC400" stroke-width="1.1" opacity=".85" transform="rotate(56 12 12)"/></svg>Атом<b>Электрика</b></div>
+<div class="seg"><button id="tw" class="on" onclick="show('w')">Мастер</button><button id="te" onclick="show('e')">Редактор</button></div>
+<span class="tagv">проектирование щитов · AtomCAD</span></header>
+<div class="stage">
+  <iframe id="fw" class="frame active" src="wizard.html" title="Мастер"></iframe>
+  <iframe id="fe" class="frame" src="editor.html" title="Редактор"></iframe>
+</div>
+<script>
+function show(which){
+  var w=document.getElementById('fw'), e=document.getElementById('fe');
+  var bw=document.getElementById('tw'), be=document.getElementById('te');
+  var wOn=which==='w';
+  w.classList.toggle('active',wOn); e.classList.toggle('active',!wOn);
+  bw.classList.toggle('on',wOn);    be.classList.toggle('on',!wOn);
+}
+// Мост: мастер строит схему → переключаемся на редактор и передаём ему данные.
+window.addEventListener('message',function(ev){
+  var d=ev.data; if(!d||!d.atomcad) return;
+  if(d.atomcad==='build-open'){
+    var fe=document.getElementById('fe');
+    var send=function(){ try{ fe.contentWindow.postMessage({atomcad:'load-schematic',data:d.schematic,code:d.code},'*'); }catch(_){} };
+    show('e');
+    // редактор уже загружен (iframe src выставлен сразу), но на всякий случай ждём load
+    if(fe.contentWindow && fe.contentWindow.AtomEditorLoad){ send(); }
+    else { fe.addEventListener('load',send,{once:true}); send(); }
+  }
+});
+</script>
+</body></html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27><rect width=%2724%27 height=%2724%27 rx=%275%27 fill=%27%230E1217%27/><circle cx=%2712%27 cy=%2712%27 r=%272.4%27 fill=%27%2316B7DB%27/><ellipse cx=%2712%27 cy=%2712%27 rx=%279%27 ry=%274%27 fill=%27none%27 stroke=%27%2316B7DB%27 stroke-width=%271.4%27 transform=%27rotate(-28 12 12)%27/><ellipse cx=%2712%27 cy=%2712%27 rx=%279%27 ry=%274%27 fill=%27none%27 stroke=%27%23FFC400%27 stroke-width=%271.1%27 transform=%27rotate(56 12 12)%27/></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AtomCAD · Мастер</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--graphite:#15191F;--panel:#1C222B;--panel2:#212935;--line:#2A323E;--desk:#10141A;--paper:#F6F8FA;--ink:#1C2B38;--cyan:#16B7DB;--cyandim:rgba(22,183,219,.12);--amber:#FFC400;--txt:#C9D4DF;--dim:#6B7785;--ok:#5BD6A2;--red:#FF7A7A;--teal:#36C5D6;--violet:#B98AF0}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--desk);color:var(--txt);font-family:'IBM Plex Sans',system-ui,sans-serif;display:flex;flex-direction:column;height:100%;overflow:hidden}
+.mono{font-family:'IBM Plex Mono',monospace}
+.top{height:50px;flex:0 0 50px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.proj{font-family:'IBM Plex Mono';font-size:12px;color:var(--dim);padding:5px 10px;background:var(--graphite);border:1px solid var(--line);border-radius:8px}.proj b{color:var(--txt)}
+.tr{margin-left:auto;display:flex;gap:7px}
+.tb{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:7px 12px;font-size:12px;font-family:inherit;cursor:pointer}.tb:hover{color:var(--txt);border-color:#3A4450}.tb.cy{background:var(--cyan);border-color:transparent;color:#06262E;font-weight:600}
+.steps{display:flex;gap:3px;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;flex:0 0 auto;scrollbar-width:thin}
+.step{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:9px;cursor:pointer;border:1px solid transparent;white-space:nowrap}
+.step.on{background:var(--cyandim);border-color:rgba(22,183,219,.4)}.step:hover{background:var(--graphite)}
+.step .num{width:20px;height:20px;border-radius:50%;background:var(--graphite);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--dim)}
+.step.on .num{background:var(--cyan);color:#06262E;border-color:transparent}.step.done .num{background:rgba(91,214,162,.18);color:var(--ok);border-color:transparent}
+.step .lbl{font-size:12px;color:var(--dim)}.step.on .lbl{color:var(--txt);font-weight:600}.step.done .lbl{color:var(--txt)}
+.wrap{flex:1;overflow-y:auto;padding:20px 14px 86px}.sheet{max-width:1000px;margin:0 auto}
+.h{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}.h h2{font-size:19px;font-weight:600;color:#E7EEF4}.h .c{font-size:12px;color:var(--cyan);font-family:'IBM Plex Mono'}
+.sub{font-size:13px;color:var(--dim);margin-bottom:18px;line-height:1.5}
+.grid{display:grid;gap:11px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px}
+.card.sel{border-color:var(--amber);background:linear-gradient(180deg,rgba(255,196,0,.06),transparent)}.card.sel2{border-color:rgba(22,183,219,.5)}
+.cardpick{cursor:pointer}.cardpick:hover{border-color:#3A4450}
+.ctitle{display:flex;align-items:center;gap:10px}.cname{font-size:14px;font-weight:600;color:#E7EEF4}.ccode{display:block;font-family:'IBM Plex Mono';font-size:11px;color:var(--dim);margin-top:3px}.cname{display:block}
+.cnt{margin-left:auto;background:var(--graphite);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:12px;color:var(--dim);font-family:'IBM Plex Mono'}
+.chk{margin-left:auto;width:21px;height:21px;border-radius:50%;background:var(--amber);color:#3A2E00;display:flex;align-items:center;justify-content:center;font-size:12px}.chk.cy{background:var(--cyan);color:#06262E}
+.form{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:14px}
+.fld{display:flex;flex-direction:column;gap:4px}.fld.gr{flex:1;min-width:130px}
+.fld label{font-size:10.5px;color:var(--dim)}
+.fld input,.fld select{background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--txt);font-size:13px;font-family:inherit;outline:none}
+.fld input:focus,.fld select:focus{border-color:rgba(22,183,219,.5)}
+.fld input.w70{width:74px}.fld input.w90{width:92px}
+.addbtn{background:var(--cyan);border:none;color:#06262E;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;height:36px}
+.row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:9px}
+.row .body{flex:1;min-width:0}.row .nm{display:block;font-size:13.5px;font-weight:500;color:#E7EEF4}.row .meta{display:block;font-size:11.5px;color:var(--dim);margin-top:3px;font-family:'IBM Plex Mono'}
+.pill{display:inline-flex;gap:4px;background:var(--graphite);border:1px solid var(--line);border-radius:18px;padding:2px 9px;font-size:11px;color:var(--txt);font-family:'IBM Plex Mono';margin-left:6px}
+.pill.cy{color:var(--cyan)}.pill.gr{color:var(--ok)}
+.del{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:none;color:var(--dim);cursor:pointer}
+.empty{font-size:12.5px;color:#566370;padding:8px 2px}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:12px 0}@media(max-width:640px){.counts{grid-template-columns:repeat(2,1fr)}}
+.cc{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px}.cc .t{font-size:10px;color:var(--dim);text-transform:uppercase;display:flex;gap:6px;align-items:center}.cc .t .d{width:8px;height:8px;border-radius:2px}
+.cc .big{font-family:'IBM Plex Mono';font-size:20px;font-weight:600;margin-top:3px;color:#E7EEF4}.cc .big small{font-size:11px;color:var(--dim)}.cc .bar{height:5px;border-radius:3px;background:var(--graphite);margin-top:6px;overflow:hidden}.cc .bar i{display:block;height:100%}.cc.warn .big{color:var(--red)}
+.pins{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}@media(max-width:640px){.pins{grid-template-columns:1fr}}
+.pin{display:flex;align-items:center;gap:8px;background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:7px 9px;cursor:pointer;font-size:12px}
+.pin .id{font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:var(--dim);width:32px;text-align:center;border-radius:5px;padding:2px 0;background:var(--panel2)}
+.pin .lab{flex:1;min-width:0;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pin.used .lab{color:var(--txt)}.pin.free{border-style:dashed}
+.pin.AI.used .id{background:var(--cyan);color:#06262E}.pin.DI.used .id{background:var(--teal);color:#06262E}.pin.AO.used .id{background:var(--violet);color:#1E0E33}.pin.DO.used .id{background:var(--amber);color:#3A2E00}
+.pbtn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:var(--graphite);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:7px;cursor:pointer;font-family:inherit;font-size:12.5px;color:var(--txt)}.pbtn:hover{border-color:#3A4450}
+.tag{margin-left:auto;font-family:'IBM Plex Mono';font-size:10px;border-radius:5px;padding:2px 6px}.tag.AI{background:rgba(22,183,219,.16);color:var(--cyan)}.tag.DI{background:rgba(54,197,214,.16);color:var(--teal)}.tag.AO{background:rgba(185,138,240,.18);color:var(--violet)}.tag.DO{background:rgba(255,196,0,.16);color:var(--amber)}
+.brow{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:9px}
+.brow .t2{display:flex;align-items:center;gap:10px}.brow .qf{font-family:'IBM Plex Mono';font-size:13px;font-weight:600;color:var(--cyan);width:42px}
+.brow .rate{font-family:'IBM Plex Mono';font-size:12px;color:var(--dim);display:flex;align-items:center;gap:5px}
+.brow .rate button{width:20px;height:20px;border-radius:5px;border:1px solid var(--line);background:none;color:var(--dim);cursor:pointer;font-size:12px;line-height:1}
+.brow .sum{margin-left:auto;font-family:'IBM Plex Mono';font-size:13px;font-weight:600}.brow .sum.ok{color:var(--ok)}.brow .sum.warn{color:var(--amber)}.brow .sum.over{color:var(--red)}
+.brow .bar{height:6px;border-radius:4px;background:var(--graphite);margin:8px 0;overflow:hidden}.brow .bar i{display:block;height:100%}
+.lchips{display:flex;gap:6px;flex-wrap:wrap}.lchip{display:inline-flex;align-items:center;gap:6px;background:var(--graphite);border:1px solid var(--line);border-radius:16px;padding:2px 6px 2px 9px;font-size:11px}.lchip .a{font-family:'IBM Plex Mono';color:var(--dim)}.lchip .rm{width:15px;height:15px;border-radius:50%;border:none;background:rgba(255,122,122,.15);color:var(--red);cursor:pointer;font-size:9px;line-height:1}
+.over{color:var(--red);font-size:12px;margin-top:6px}
+.phase{display:flex;gap:9px;margin-bottom:12px}.phbox{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px;text-align:center}.phbox .l{font-size:11px;color:var(--dim);font-family:'IBM Plex Mono'}.phbox .v{font-family:'IBM Plex Mono';font-size:17px;font-weight:600;color:#E7EEF4;margin-top:3px}
+.svgcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:13px}.svgcard svg{width:100%;height:auto;display:block;background:var(--graphite);border-radius:9px}
+table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{background:var(--panel2);color:var(--dim);text-align:left;padding:8px 9px;font-size:9.5px;text-transform:uppercase;border-bottom:1px solid var(--line)}table.spec td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--txt)}table.spec td.d{font-family:'IBM Plex Mono';color:var(--cyan);white-space:nowrap}table.spec td.c{text-align:center;color:var(--dim)}
+.note{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.45}
+.foot{position:fixed;left:0;right:0;bottom:0;padding:11px 14px;background:linear-gradient(180deg,rgba(16,20,26,0),var(--desk) 30%)}.foot .inner{max-width:1000px;margin:0 auto;display:flex;gap:9px;align-items:center}
+.nav{border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:11px;padding:11px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer}.nav.cy{background:var(--cyan);border-color:transparent;color:#06262E}.nav:disabled{opacity:.4;cursor:default}.spacer{flex:1}.savechip{font-size:11.5px;color:var(--dim);display:flex;gap:6px;align-items:center}.savechip .d{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.mask{position:fixed;inset:0;background:rgba(8,12,17,.7);display:none;align-items:center;justify-content:center;z-index:40}.mask.show{display:flex}
+.confirm{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px;max-width:360px;width:92%}.confirm h4{font-size:15px;margin-bottom:8px;color:#E7EEF4}.confirm p{font-size:13px;color:var(--dim);margin-bottom:15px;line-height:1.5}.confirm .r{display:flex;gap:9px}.confirm button{flex:1;border-radius:10px;padding:11px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--line)}.confirm .ok{background:var(--cyan);border-color:transparent;color:#06262E}.confirm .no{background:none;color:var(--dim)}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#10212F;color:#fff;font-size:12px;padding:9px 14px;border-radius:10px;opacity:0;transition:opacity .25s;z-index:45;border:1px solid var(--line);white-space:nowrap}.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="proj" id="projTag">ЩУ-003.009 · <b>Холодильная камера</b></span>
+  <div class="tr">
+    <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
+    <button class="tb" onclick="document.getElementById('fileIn').click()">⭳ Загрузить</button>
+    <button class="tb" onclick="saveProject()">⭱ Сохранить</button>
+    <button class="tb cy" onclick="openEditor()">Открыть редактор →</button>
+  </div>
+</header>
+<nav class="steps" id="steps"></nav>
+<div class="wrap"><div class="sheet" id="panel"></div></div>
+<footer class="foot"><div class="inner"><button class="nav" id="prev">← Назад</button><div class="spacer"></div><span class="savechip"><span class="d"></span><span id="saveState">черновик</span></span><button class="nav cy" id="next">Далее →</button></div></footer>
+<div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
+<div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="core.js"></script>
+<script>
+/* === ядро логики (window.AtomCore) подключается выше отдельным скриптом === */
+var C=window.AtomCore;
+var $=function(id){return document.getElementById(id)};
+function uid(p){return (p||'x')+Math.random().toString(36).slice(2,8)}
+
+/* ---- модель проекта (реальное состояние) ---- */
+function ctrlIO(model){
+  if(/c-pro 3 OEM/.test(model)) return {pins:{AI:[{id:'AI1',tr:1},{id:'AI2',tr:1},{id:'AI3',tr:1},{id:'AI4'},{id:'AI5'},{id:'AI6'},{id:'AI7'}],DI:[{id:'DI1',hv:1},{id:'DI2',hv:1},{id:'DI3',dry:1},{id:'DI4',dry:1}],AO:[{id:'AO1'},{id:'AO2'},{id:'AO3'},{id:'AO4'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'},{id:'K5'},{id:'K6'}]},asg:{}};
+  if(/EV3223/.test(model)) return {pins:{AI:[{id:'Pb1'},{id:'Pb2'}],DI:[{id:'D.I.',dry:1}],AO:[],DO:[{id:'K1'},{id:'K2'},{id:'K3'}]},asg:{K1:'Компрессор',K2:'Оттайка',K3:'Вентиляторы'}};
+  return {pins:{AI:[{id:'AI1'},{id:'AI2'}],DI:[{id:'DI1',dry:1}],AO:[{id:'AO1'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'}]},asg:{}};
+}
+function newProject(){
+  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:'Холодильная камера созревания',
+    controller:{model:'EVCO c-pro 3 OEM (EPB9OR)', io:ctrlIO('EVCO c-pro 3 OEM (EPB9OR)')},
+    consumers:[{id:uid('c'),name:'ККБ Royal Clima ES-E 60HX',phases:3,kw:7,needs:'motor',qty:1},
+               {id:uid('c'),name:'ТЭН воздухоохладителя',phases:1,kw:2.43,needs:'heater',qty:2},
+               {id:uid('c'),name:'Вентилятор воздухоохладителя',phases:1,kw:0.28,needs:'fan',qty:2}],
+    sensors:[{id:uid('s'),name:'Датчик температуры камеры',sig:'NTC',qty:1},{id:uid('s'),name:'Датчик температуры испарителя',sig:'NTC',qty:1}],
+    aux:[{id:uid('a'),name:'Лампа сигнальная ND16',kind:'lamp',manu:'CHINT',model:'ND16',qty:3,a:0.05},
+         {id:uid('a'),name:'Блок питания 24 В',kind:'psu',manu:'Faraday',model:'24В',qty:1,a:0.3}],
+    breakers:null, enclosure:null, big:false };
+}
+var P=newProject();
+function dirty(){$('saveState').textContent='не сохранено'}
+
+/* ---- шаги ---- */
+var STEPS=[{l:'Раздел'},{l:'Контроллер'},{l:'Потребители'},{l:'Датчики'},{l:'Вспомогат.'},{l:'Автоматы'},{l:'Клеммы'},{l:'Компоновка'},{l:'Спецификация'}];
+var cur=0;
+function steps(){var h='';STEPS.forEach(function(s,i){h+='<div class="step '+(i===cur?'on':i<cur?'done':'')+'" data-i="'+i+'"><span class="num">'+(i<cur?'✓':(i+1))+'</span><span class="lbl">'+s.l+'</span></div>'});$('steps').innerHTML=h;Array.prototype.forEach.call($('steps').children,function(el){el.onclick=function(){go(+el.dataset.i)}})}
+function H(c,t,s){return '<div class="h"><span class="c">'+c+'</span><h2>'+t+'</h2></div><div class="sub">'+s+'</div>'}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&quot;')}
+
+/* confirm */
+var cfCb=null;
+function ask(t,x,cb){$('cfT').textContent=t;$('cfX').textContent=x;cfCb=cb;$('mask').classList.add('show')}
+$('cfOk').onclick=function(){$('mask').classList.remove('show');if(cfCb)cfCb()};$('cfNo').onclick=function(){$('mask').classList.remove('show');cfCb=null};
+function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0">'+esc(it.label)+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
+$('chNo').onclick=function(){$('chMask').classList.remove('show')};
+function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},2400)}
+
+/* 1 раздел */
+var SECTIONS=[['ЩУ-001','Камеры созревания',18],['ЩУ-002','Чиллера',13],['ЩУ-003','Холодильное оборудование',8],['ЩУ-004','Приточно-вытяжная вентиляция',7],['ЩУ-005','АСУ',2]];
+function pSection(){var h=H('Шаг 1','Раздел номенклатуры','Схема создаётся в существующем разделе. Номер и шифр подхватятся автоматически.');h+='<div class="grid g2">';SECTIONS.forEach(function(s,i){var on=P.section===s[0];h+='<div class="card cardpick'+(on?' sel':'')+'" onclick="pickSection(\''+s[0]+'\',\''+esc(s[1])+'\')"><div class="ctitle"><span><span class="cname">'+esc(s[1])+'</span><span class="ccode">'+s[0]+'.000</span></span>'+(on?'<span class="chk">✓</span>':'<span class="cnt">'+s[2]+'</span>')+(s[3]?'<button class="del" style="margin-left:8px" onclick="event.stopPropagation();rmSection('+i+')">✕</button>':'')+'</div></div>'});h+='</div>';h+='<div style="margin:12px 0"><button class="tb" onclick="addSection()">+ Добавить раздел</button></div>';h+='<div class="note">Обозначение изделия: <span class="mono" style="color:var(--cyan)">'+P.section+'.'+('00'+P.num).slice(-3)+'.'+P.variant+'</span> · шифр: <span class="mono">АГ.'+P.section+'.'+('00'+P.num).slice(-3)+'/26</span></div>';return h}
+function addSection(){var name=prompt('Название нового раздела:');if(!name)return;var max=0;SECTIONS.forEach(function(s){var m=/ЩУ-(\d+)/.exec(s[0]);if(m)max=Math.max(max,+m[1])});var code='ЩУ-'+('00'+(max+1)).slice(-3);SECTIONS.push([code,name,0,true]);dirty();draw();toast('Добавлен раздел '+code)}
+function rmSection(i){if(!SECTIONS[i]||!SECTIONS[i][3])return;var s=SECTIONS[i];ask('Удалить раздел?','Удалить «'+s[1]+'» ('+s[0]+')?',function(){SECTIONS.splice(i,1);draw()})}
+function pickSection(code,name){P.section=code;P.sectionName=name;dirty();draw();updTag()}
+function updTag(){$('projTag').innerHTML=P.section+'.'+('00'+P.num).slice(-3)+' · <b>'+esc(P.name)+'</b>'}
+
+/* 2 контроллер + IO */
+var CTRLS=['EVCO c-pro 3 OEM (EPB9OR)','EVCO EV3223N7','ОВЕН ТРМ (типовой)'];
+var COL={AI:'#16B7DB',DI:'#36C5D6',AO:'#B98AF0',DO:'#FFC400'};
+var IOPAL=[{lbl:'Датчик NTC',g:'AI',need:'any',tag:'AI'},{lbl:'Влажность 4–20 мА',g:'AI',need:'tr',tag:'AI1–3'},{lbl:'Управление 0–10 В',g:'AO',tag:'AO'},{lbl:'Дискр. вход',g:'DI',need:'dry',tag:'DI'},{lbl:'Реле нагрузки',g:'DO',tag:'DO'}];
+function fits(p,n){return n==='tr'?!!p.tr:n==='dry'?!!p.dry:true}
+function nextFree(g,n){var io=P.controller.io,a=io.pins[g]||[];for(var i=0;i<a.length;i++)if(!io.asg[a[i].id]&&fits(a[i],n))return a[i].id;return null}
+function ioAdd(it){var s=nextFree(it.g,it.need);if(!s){toast('Нет свободных '+it.g);return}ask('Занять вход/выход?','Посадить «'+it.lbl+'» на '+s+'?',function(){P.controller.io.asg[s]=it.lbl;dirty();draw();toast(it.lbl+' → '+s)})}
+function ioFree(id){var io=P.controller.io;if(!io.asg[id])return;var l=io.asg[id];ask('Снять назначение?','Освободить '+id+' («'+l+'»)?',function(){delete io.asg[id];dirty();draw();toast('Освобождён '+id)})}
+function ioClick(id,g){var io=P.controller.io;if(io.asg[id])return ioFree(id);var pin=(io.pins[g]||[]).filter(function(p){return p.id===id})[0]||{};openChooser('Что подключить на '+id,ioCandidates(g,pin),function(v){if(v==='__manual__'){var nm=prompt('Что подключаем на '+id+'?');if(!nm)return;io.asg[id]=nm;}else io.asg[id]=v;dirty();draw();toast(io.asg[id]+' → '+id)})}
+function ioCandidates(g,pin){var L=[];
+  if(g==='DO'){P.consumers.forEach(function(c){L.push({label:c.name,value:c.name,tag:'DO'})});P.aux.filter(function(a){return a.kind==='ssr'||a.kind==='fan'}).forEach(function(a){L.push({label:a.name,value:a.name,tag:'DO'})});}
+  else if(g==='AI'){P.sensors.forEach(function(s){var tr=/4–20|0–10/.test(s.sig);if(tr&&!pin.tr)return;L.push({label:s.name+' · '+s.sig,value:s.name,tag:'AI'})});}
+  else if(g==='AO'){P.sensors.filter(function(s){return /0–10/.test(s.sig)}).forEach(function(s){L.push({label:s.name,value:s.name,tag:'AO'})});}
+  else if(g==='DI'){P.sensors.filter(function(s){return /дискрет/.test(s.sig)}).forEach(function(s){L.push({label:s.name,value:s.name,tag:'DI'})});}
+  L.push({label:'Другое (вручную)…',value:'__manual__'});return L;}
+function pController(){
+  var io=P.controller.io;
+  var h=H('Шаг 2','Контроллер щита','Выбор контроллера и распределение сигналов по входам/выходам. Занять/снять — с подтверждением.');
+  h+='<div class="form"><div class="fld gr"><label>Модель контроллера</label><select id="ctrlSel" onchange="setCtrl(this.value)">';
+  CTRLS.forEach(function(m){h+='<option'+(P.controller.model===m?' selected':'')+'>'+m+'</option>'});
+  h+='</select></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="toast(\'Загрузи PDF или фото даташита — контроллер распознается и добавится в библиотеку\')">Нет в списке? Загрузить даташит</button></div></div>';
+  h+='<div class="counts">';['DO','AI','AO','DI'].forEach(function(g){var fr=C.ioFree(io,g),t=C.ioTotal(io,g),pct=t?Math.round((t-fr)/t*100):0;h+='<div class="cc'+(t&&fr===0?' warn':'')+'"><div class="t"><span class="d" style="background:'+COL[g]+'"></span>'+(g==='DO'?'Реле':g==='AI'?'Входы AI':g==='AO'?'Вых. AO':'Входы DI')+'</div><div class="big">'+fr+'<small> / '+t+'</small></div><div class="bar"><i style="width:'+pct+'%;background:'+COL[g]+'"></i></div></div>'});h+='</div>';
+  h+='<div class="grid g2"><div>';['DO','AI'].forEach(function(g){h+=ioGroup(g)});h+='</div><div>';['AO','DI'].forEach(function(g){h+=ioGroup(g)});
+  h+='<div class="card"><div class="cname" style="margin-bottom:8px">Добавить на контроллер</div>';IOPAL.forEach(function(it,i){h+='<button class="pbtn" onclick="ioAdd(IOPAL['+i+'])"><span>'+it.lbl+'</span><span class="tag '+it.g+'">'+it.tag+'</span></button>'});h+='</div></div></div>';
+  return h;
+}
+function ioGroup(g){var io=P.controller.io,a=io.pins[g]||[],fr=C.ioFree(io,g),t=a.length;if(!t)return '';var h='<div class="card" style="margin-bottom:11px"><div style="display:flex;margin-bottom:8px"><span class="cname" style="font-size:13px">'+(g==='AI'?'Аналог. входы':g==='DI'?'Дискр. входы':g==='AO'?'Аналог. выходы':'Реле-выходы')+'</span><span class="cnt" style="margin-left:auto">своб. '+fr+'/'+t+'</span></div><div class="pins">';a.forEach(function(p){var u=io.asg[p.id];h+='<div class="pin '+g+' '+(u?'used':'free')+'" onclick="ioClick(\''+p.id+'\',\''+g+'\')"><span class="id">'+p.id+'</span><span class="lab">'+(u||'свободно')+'</span></div>'});h+='</div></div>';return h}
+function setCtrl(m){P.controller.model=m;P.controller.io=ctrlIO(m);dirty();draw()}
+
+/* 3 потребители */
+function pConsumers(){
+  var h=H('Шаг 3','Потребители','Что питает щит. Указываешь марку, фазы, мощность — ток считается, дальше из него собираются автоматы.');
+  h+='<div class="form">'+
+     '<div class="fld gr"><label>Наименование</label><input id="cN" placeholder="напр. насос дренажный"></div>'+
+     '<div class="fld"><label>Фазы</label><select id="cP"><option value="3">3ф</option><option value="1">1ф</option></select></div>'+
+     '<div class="fld"><label>Мощн., кВт</label><input id="cKw" class="w90" inputmode="decimal" placeholder="0.0"></div>'+
+     '<div class="fld"><label>Кол-во</label><input id="cQ" class="w70" value="1" inputmode="numeric"></div>'+
+     '<div class="fld"><label>Тип</label><select id="cT"><option value="motor">двигатель</option><option value="heater">ТЭН</option><option value="fan">вентилятор</option><option value="direct">без контактора</option></select></div>'+
+     '<div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addConsumer()">+ Добавить</button></div></div>';
+  if(!P.consumers.length)h+='<div class="empty">Пока пусто — добавь потребителей.</div>';
+  P.consumers.forEach(function(c){var I=C.consumerCurrent(c);h+='<div class="row"><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+c.phases+'ф · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+'</span></span><span class="pill cy">'+I+' А</span><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>'});
+  return h;
+}
+function addConsumer(){var n=$('cN').value.trim();if(!n){toast('Введи наименование');return}P.consumers.push({id:uid('c'),name:n,phases:+$('cP').value,kw:parseFloat($('cKw').value)||0,qty:Math.max(1,parseInt($('cQ').value,10)||1),needs:$('cT').value});P.breakers=null;dirty();draw()}
+function rmConsumer(id){P.consumers=P.consumers.filter(function(c){return c.id!==id});P.breakers=null;dirty();draw()}
+
+/* 4 датчики */
+function pSensors(){var h=H('Шаг 4','Датчики и сигналы','Тип сигнала и количество. Лягут на входы контроллера и в сигнальный клеммник.');
+  h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="sN" placeholder="напр. датчик влажности"></div><div class="fld"><label>Сигнал</label><select id="sS"><option>NTC</option><option>Pt1000</option><option>4–20 мА</option><option>0–10 В</option><option>дискретный</option></select></div><div class="fld"><label>Кол-во</label><input id="sQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addSensor()">+ Добавить</button></div></div>';
+  if(!P.sensors.length)h+='<div class="empty">Пусто.</div>';
+  P.sensors.forEach(function(s){h+='<div class="row"><span class="body"><span class="nm">'+esc(s.name)+'</span><span class="meta">'+esc(s.sig)+(s.qty>1?(' · ×'+s.qty):'')+'</span></span><span class="pill gr">'+esc(s.sig)+'</span><button class="del" onclick="rmSensor(\''+s.id+'\')">✕</button></div>'});
+  return h;}
+function addSensor(){var n=$('sN').value.trim();if(!n){toast('Введи наименование');return}P.sensors.push({id:uid('s'),name:n,sig:$('sS').value,qty:Math.max(1,parseInt($('sQ').value,10)||1)});dirty();draw()}
+function rmSensor(id){P.sensors=P.sensors.filter(function(s){return s.id!==id});dirty();draw()}
+
+/* 5 вспомогательное */
+function pAux(){var h=H('Шаг 5','Вспомогательное оборудование','Внутрищитовое: лампы, реле, вентилятор шкафа, блок питания. Идёт в спецификацию и расчёт управления.');
+  h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="aN" placeholder="напр. вентилятор шкафа"></div><div class="fld"><label>Тип</label><select id="aT"><option value="lamp">лампа</option><option value="ssr">тв. реле SSR</option><option value="fan">вентилятор шкафа</option><option value="psu">блок питания</option><option value="other">прочее</option></select></div><div class="fld"><label>Ток, А</label><input id="aA" class="w70" inputmode="decimal" placeholder="0"></div><div class="fld"><label>Кол-во</label><input id="aQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addAux()">+ Добавить</button></div></div>';
+  if(!P.aux.length)h+='<div class="empty">Пусто.</div>';
+  P.aux.forEach(function(a){h+='<div class="row"><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(a.kind)+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>'});
+  return h;}
+function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наименование');return}P.aux.push({id:uid('a'),name:n,kind:$('aT').value,a:parseFloat($('aA').value)||0,qty:Math.max(1,parseInt($('aQ').value,10)||1)});dirty();draw()}
+function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});dirty();draw()}
+
+/* 6 автоматы */
+function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
+function pBreakers(){
+  ensureBreakers();
+  var h=H('Шаг 6','Автоматы · распределение','Собраны из состава: ток на каждом считается, проверяется по номиналу. Меняй номинал ±, добавляй нагрузки, перегруз подсветит.');
+  h+='<div style="display:flex;gap:8px;margin-bottom:14px"><button class="tb" onclick="regenBreakers()">↻ Пересобрать из состава</button></div>';
+  var ph=C.phaseBalance(P);
+  h+='<div class="phase"><div class="phbox"><div class="l">L1</div><div class="v">'+ph.L1+' А</div></div><div class="phbox"><div class="l">L2</div><div class="v">'+ph.L2+' А</div></div><div class="phbox"><div class="l">L3</div><div class="v">'+ph.L3+' А</div></div></div>';
+  P.breakers.forEach(function(b,bi){
+    var s=C.breakerSum(b),st=C.breakerStatus(b),pct=Math.min(100,Math.round(s/b.rate*100));
+    var col=st==='over'?'var(--red)':st==='warn'?'var(--amber)':'var(--ok)';
+    h+='<div class="brow"><div class="t2"><span class="qf">'+b.code+'</span><span class="rate"><button onclick="bRate('+bi+',-1)">−</button>C'+b.rate+' · '+b.poles+'P<button onclick="bRate('+bi+',1)">+</button></span><span class="sum '+st+'">'+s+' А</span></div>'+
+       '<div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div><div class="lchips">';
+    (b.loads||[]).forEach(function(l,li){h+='<span class="lchip">'+esc(l.name)+' <span class="a">'+l.a+' А</span>'+(b.fixed?'':'<button class="rm" onclick="bRm('+bi+','+li+')">✕</button>')+'</span>'});
+    h+='<button class="lchip" style="cursor:pointer;color:var(--cyan)" onclick="bAddLoad('+bi+')">+ нагрузка</button>';
+    h+='</div>'+(st==='over'?'<div class="over">⚠ перегруз: '+s+' А &gt; '+b.rate+' А — увеличь номинал или раздели линию</div>':'')+'<div class="note" style="margin-top:6px">'+esc(b.role)+' · кабель '+C.sectionFor(s)+' мм²</div></div>';
+  });
+  return h;
+}
+function regenBreakers(){P.breakers=C.buildBreakers(P);dirty();draw();toast('Автоматы пересобраны из состава')}
+function bRate(i,d){var b=P.breakers[i],idx=C.STD.indexOf(b.rate);idx=Math.max(0,Math.min(C.STD.length-1,idx+d));b.rate=C.STD[idx];dirty();draw()}
+function bRm(i,li){P.breakers[i].loads.splice(li,1);dirty();draw()}
+function bAddLoad(i){var nm=prompt('Название нагрузки:');if(!nm)return;var a=parseFloat(prompt('Ток, А:','1'))||0;P.breakers[i].loads.push({name:nm,a:a});dirty();draw()}
+
+/* 7 клеммы (из состава) */
+function pTerminals(){
+  ensureBreakers();
+  var h=H('Шаг 7','Клеммы','Внешний интерфейс щита — формируется из ввода, отходящих линий и сигналов.');
+  var cl=[];cl.push(['1','L1',''],['2','L2',''],['3','L3',''],['N','N',''],['PE','PE','pe']);
+  var branches=P.breakers.filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
+  var n=4;branches.forEach(function(b){cl.push([''+n,b.code,''])});
+  P.sensors.forEach(function(s){for(var k=0;k<(s.qty||1);k++)cl.push(['s','+'+s.sig,'sig'])});
+  h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th>Клемма</th><th>Назначение</th><th>Линия</th></tr></thead><tbody>';
+  var i=1;
+  h+='<tr><td class="d">X1:1–3</td><td>Ввод L1/L2/L3</td><td>5×6</td></tr><tr><td class="d">X1:4–5</td><td>N · PE</td><td>—</td></tr>';
+  branches.forEach(function(b){h+='<tr><td class="d">X2:'+(i++)+'</td><td>'+esc(b.role)+'</td><td class="c">'+esc(b.code)+'</td></tr>'});
+  P.sensors.forEach(function(s){h+='<tr><td class="d">X5</td><td>'+esc(s.name)+'</td><td class="c">'+esc(s.sig)+'</td></tr>'});
+  h+='</tbody></table></div><div class="note">Силовые и сигнальные клеммники разделены; сигнальные — экранированные.</div>';
+  return h;
+}
+
+/* 8 компоновка */
+function pCabinet(){
+  ensureBreakers();
+  if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
+  if(!P.cab)P.cab={w:'',ht:'',d:'',name:'',drawn:false};
+  var mods=C.moduleCount(P), enc=P.enclosure, fits=enc.modules>=mods, free=enc.modules-mods;
+  var h=H('Шаг 8','Компоновка щита','Подбор корпуса из номенклатуры — или задай габариты вручную. Кнопка «Нарисовать» строит раскладку.');
+  // ручной ввод габаритов + наименование
+  h+='<div class="form"><div class="fld gr"><label>Наименование щита</label><input id="cabName" value="'+esc(P.cab.name)+'" placeholder="напр. ЩУ холодильной камеры" oninput="cabSet()"></div>'+
+     '<div class="fld"><label>Ширина, мм</label><input id="cabW" class="w90" inputmode="numeric" value="'+esc(P.cab.w)+'" oninput="cabSet()"></div>'+
+     '<div class="fld"><label>Высота, мм</label><input id="cabH" class="w90" inputmode="numeric" value="'+esc(P.cab.ht)+'" oninput="cabSet()"></div>'+
+     '<div class="fld"><label>Глубина, мм</label><input id="cabD" class="w90" inputmode="numeric" value="'+esc(P.cab.d)+'" oninput="cabSet()"></div>'+
+     '<div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="cabDraw()">▦ Нарисовать</button></div></div>';
+  h+='<div class="grid g2"><div class="card"><div class="cname" style="margin-bottom:6px">Расчёт</div><div class="meta" style="font-family:inherit;color:var(--txt)">Требуется модулей (с запасом): <b class="mono" style="color:var(--cyan)">'+mods+'</b></div>';
+  h+='<div class="phase" style="margin-top:12px;margin-bottom:0;flex-wrap:wrap">';C.ENCL.forEach(function(e){var on=enc.model===e.model;h+='<div class="phbox" style="cursor:pointer;min-width:64px;'+(on?'border-color:var(--cyan)':'')+'" onclick="setEncl(\''+e.model+'\')"><div class="l">'+e.model.replace('IEK ','')+'</div><div class="v" style="font-size:14px">'+e.modules+'</div></div>'});h+='</div></div>';
+  h+='<div class="card sel2"><div class="cname">'+(P.cab.name||enc.model)+'</div><div class="ccode">'+enc.modules+' мод. · IP54'+(P.cab.w&&P.cab.ht?(' · '+P.cab.w+'×'+P.cab.ht+(P.cab.d?'×'+P.cab.d:'')+' мм'):'')+'</div>';
+  // проверка вместимости — по модулям и (если заданы) по размерам (та же логика, что и рисунок)
+  var cap=capByDims(P);
+  var capByDim = cap? cap.cap : null;
+  var okDim = capByDim==null? fits : (capByDim>=mods);
+  h+='<div class="note" style="color:'+(okDim?'var(--ok)':'var(--red)')+'">'+(okDim?('✓ помещается'+(capByDim!=null?(' · '+cap.perRow+' мод./ряд × '+cap.maxRows+' ряд = ~'+capByDim+' мод. (резерв '+(capByDim-mods)+')'):(' · резерв '+free+' мод.'))):('✗ не помещается'+(capByDim!=null?(' — вмещает ~'+capByDim+' мод. ('+cap.perRow+'×'+cap.maxRows+'), нужно '+mods):(' — нужно ещё '+(mods-enc.modules)+' мод.'))))+'</div>';
+  h+='<div class="note">Перфорированный кабель-канал заложен и учтён в спецификации.</div></div></div>';
+  // визуальная раскладка по кнопке
+  if(P.cab.drawn){
+    h+='<div class="svgcard" style="margin-top:14px">'+cabinetSVG()+'</div>';
+  }
+  return h;
+}
+function cabSet(){if(!P.cab)P.cab={};P.cab.name=$('cabName').value;P.cab.w=$('cabW').value;P.cab.ht=$('cabH').value;P.cab.d=$('cabD').value;dirty()}
+function cabDraw(){cabSet();P.cab.drawn=true;draw();toast('Раскладка построена')}
+// ёмкость корпуса по реальным габаритам (мм)
+function capByDims(P){
+  var W=+((P.cab&&P.cab.w)||0), H=+((P.cab&&P.cab.ht)||0);
+  if(!W||!H)return null;
+  var wall=12,duct=38,gap=8,moduleMm=17.5,topZone=52,botZone=84,pitch=120;
+  var railUsable=W-2*(wall+duct+gap);
+  var perRow=Math.max(1,Math.floor(railUsable/moduleMm));
+  var maxRows=Math.max(1,Math.floor((H-topZone-botZone)/pitch));
+  return {perRow:perRow,maxRows:maxRows,cap:perRow*maxRows,W:W,H:H,
+          wall:wall,duct:duct,gap:gap,moduleMm:moduleMm,topZone:topZone,botZone:botZone,pitch:pitch};
+}
+function cabinetSVG(){
+  ensureBreakers(); if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
+  // габариты: введённые или дефолт под подобранный корпус
+  var dim=capByDims(P) || (function(){P.cab=P.cab||{};return {W:500,H:650,perRow:12,maxRows:4,cap:48,wall:12,duct:38,gap:8,moduleMm:17.5,topZone:52,botZone:84,pitch:120}})();
+  var W=dim.W,H=dim.H, perRow=dim.perRow, maxRows=dim.maxRows;
+  // аппараты
+  var items=[];
+  if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:Math.min(perRow,5),k:'ctrl'});
+  P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf'})});
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?2:1,k:'km'});kmN++;}}});
+  P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++)items.push({t:a.kind==='psu'?'БП':a.kind==='ssr'?'SSR':a.kind==='lamp'?'HL':'F',w:a.kind==='psu'?2:1,k:'aux'})});
+  // раскладка по рядам исходя из perRow (от ширины)
+  var rows=[],curR=[],used=0;
+  items.forEach(function(it){var w=Math.min(it.w,perRow);if(used+w>perRow){rows.push(curR);curR=[];used=0;}curR.push({t:it.t,w:w,k:it.k});used+=w;});
+  if(curR.length)rows.push(curR);
+  rows.push([{t:'Клеммники X1…X'+(P.breakers.length),w:perRow,k:'term'}]);
+  var neededRows=rows.length, overflow=neededRows>maxRows;
+  var drawnRows=Math.min(neededRows,maxRows);
+  // масштаб мм→px (форма повторяет щит)
+  var ppm=Math.min(740/W,640/H,1.5), pad=12;
+  function mm(v){return v*ppm;}
+  var boxW=W*ppm, boxH=H*ppm, Wv=boxW+pad*2, Hv=boxH+pad*2+18;
+  var railX=pad+mm(dim.wall+dim.duct+dim.gap), railWpx=mm(W-2*(dim.wall+dim.duct+dim.gap)), modPx=railWpx/perRow;
+  var railsTop=pad+mm(dim.topZone), rowsRegionPx=mm(H-dim.topZone-dim.botZone);
+  var appHpx=mm(78), pitchPx=mm(dim.pitch);
+  function duct(x,y,w,hh){var s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+hh+'" rx="3" fill="rgba(120,140,160,.05)" stroke="#3A4654" stroke-width="1"/>';
+    if(w>hh){for(var xx=x+6;xx<x+w-4;xx+=11)s+='<line x1="'+xx.toFixed(1)+'" y1="'+(y+3)+'" x2="'+xx.toFixed(1)+'" y2="'+(y+hh-3)+'" stroke="#3A4654" stroke-width="1"/>';}
+    else{for(var yy=y+6;yy<y+hh-4;yy+=11)s+='<line x1="'+(x+3)+'" y1="'+yy.toFixed(1)+'" x2="'+(x+w-3)+'" y2="'+yy.toFixed(1)+'" stroke="#3A4654" stroke-width="1"/>';}
+    return s;}
+  var COLS={ctrl:['rgba(22,183,219,.12)','#16B7DB'],qf:['rgba(22,183,219,.13)','#16B7DB'],km:['rgba(255,196,0,.14)','#FFC400'],term:['rgba(91,214,162,.12)','#5BD6A2'],aux:['rgba(200,210,220,.05)','#5A6573']};
+  var s='<svg viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
+  // корпус (двойная рамка-дверь), форма = щит
+  s+='<rect x="'+pad+'" y="'+pad+'" width="'+boxW.toFixed(0)+'" height="'+boxH.toFixed(0)+'" rx="10" fill="#13171D" stroke="#39434F" stroke-width="2.5"/>';
+  s+='<rect x="'+(pad+6)+'" y="'+(pad+6)+'" width="'+(boxW-12).toFixed(0)+'" height="'+(boxH-12).toFixed(0)+'" rx="7" fill="none" stroke="#2A323E" stroke-width="1.2"/>';
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(pad+18)+'" font-size="10.5" fill="#8593A0" text-anchor="middle" font-family="IBM Plex Sans">'+(P.cab&&P.cab.name?P.cab.name:P.enclosure.model)+' · '+W+'×'+H+(P.cab&&P.cab.d?'×'+P.cab.d:'')+' мм</text>';
+  // вертикальные кабель-каналы по бокам (на высоту рядов)
+  s+=duct(pad+mm(dim.wall),railsTop,mm(dim.duct),rowsRegionPx);
+  s+=duct(pad+boxW-mm(dim.wall+dim.duct)-pad+pad,railsTop,mm(dim.duct),rowsRegionPx);
+  // ряды
+  for(var r=0;r<drawnRows;r++){
+    var row=rows[r], y=railsTop+r*pitchPx;
+    // DIN-рейка
+    s+='<rect x="'+railX.toFixed(0)+'" y="'+(y+appHpx-mm(9)).toFixed(0)+'" width="'+railWpx.toFixed(0)+'" height="'+mm(7).toFixed(1)+'" rx="2" fill="#39434F"/>';
+    var x=railX+2;
+    row.forEach(function(it){
+      var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
+      s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
+      var fs=Math.max(7,Math.min(11,modPx*0.7));
+      if(ww>14)s+='<text x="'+(x+ww/2).toFixed(1)+'" y="'+(y+mm(3)+hpx/2+fs*0.35).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+it.t+'</text>';
+      x+=ww+4;
+    });
+    if(r<drawnRows-1)s+=duct(railX,y+appHpx,railWpx,Math.max(6,pitchPx-appHpx-mm(4)));
+  }
+  // шины N/PE + вводы снизу
+  var by=railsTop+rowsRegionPx+mm(12);
+  s+='<rect x="'+railX.toFixed(0)+'" y="'+by.toFixed(0)+'" width="'+railWpx.toFixed(0)+'" height="'+mm(6).toFixed(1)+'" rx="2" fill="#2E8B57" opacity=".55"/><text x="'+(railX-5).toFixed(0)+'" y="'+(by+mm(6)).toFixed(0)+'" font-size="8.5" fill="#5BD6A2" text-anchor="end" font-family="IBM Plex Mono">PE</text>';
+  s+='<rect x="'+railX.toFixed(0)+'" y="'+(by+mm(12)).toFixed(0)+'" width="'+railWpx.toFixed(0)+'" height="'+mm(6).toFixed(1)+'" rx="2" fill="#3A6B96" opacity=".6"/><text x="'+(railX-5).toFixed(0)+'" y="'+(by+mm(12)+mm(6)).toFixed(0)+'" font-size="8.5" fill="#7FB3DD" text-anchor="end" font-family="IBM Plex Mono">N</text>';
+  var gy=by+mm(34); for(var gx=railX+mm(25);gx<railX+railWpx-mm(15);gx+=mm(60))s+='<circle cx="'+gx.toFixed(0)+'" cy="'+gy.toFixed(0)+'" r="'+mm(6).toFixed(1)+'" fill="none" stroke="#3A4654" stroke-width="1.3"/>';
+  // подпись/предупреждение
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
+     (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
+     (perRow+' мод./ряд · '+maxRows+' ряд(ов) макс · перфор. кабель-канал по периметру'))+'</text>';
+  s+='</svg>';return s;
+}
+function setEncl(m){P.enclosure=C.ENCL.filter(function(e){return e.model===m})[0];dirty();draw()}
+
+/* 9 спецификация */
+function pSpec(){
+  ensureBreakers();if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
+  var arr=C.buildSpec(P);
+  var h=H('Шаг 9','Спецификация','Перечень элементов собран из всего состава с группировкой. Сохрани проект или открой редактор — схема построится из этих данных.');
+  var units=0;arr.forEach(function(g){units+=g.qty});
+  h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th>Поз.</th><th>Наименование</th><th class="c">Кол.</th><th>Примечание</th></tr></thead><tbody>';
+  arr.forEach(function(g){h+='<tr><td class="d">'+esc(g.desStr)+'</td><td>'+esc(g.name+(g.manu?' '+g.manu:'')+(g.model?' '+g.model:''))+'</td><td class="c">'+g.qty+'</td><td>'+esc(g.notes.join(' / '))+'</td></tr>'});
+  h+='</tbody></table></div><div class="note">Позиций: <b style="color:var(--txt)">'+arr.length+'</b> · изделий: <b style="color:var(--txt)">'+units+'</b> · корпус '+P.enclosure.model+'</div>';
+  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект (.json)</button><button class="tb" onclick="document.getElementById(\'fileIn\').click()">⭳ Загрузить</button></div>';
+  return h;
+}
+
+/* ---- save / load (реальное) ---- */
+function saveProject(){
+  var blob=new Blob([JSON.stringify(P,null,2)],{type:'application/json'});
+  var u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download=(P.section+'.'+('00'+P.num).slice(-3)+'_'+P.name).replace(/[^\wа-яА-Я.-]+/g,'_')+'.json';
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
+  $('saveState').textContent='сохранено';toast('Проект сохранён в файл');
+}
+$('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);P=o;if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);go(0);updTag();$('saveState').textContent='загружено';toast('Проект загружен');}catch(err){toast('Ошибка чтения файла')}};r.readAsText(f);e.target.value=''};
+
+/* ---- передача схемы в редактор ---- */
+function openEditor(){
+  ensureBreakers();
+  var sch=C.buildSchematic(P);
+  try{parent.postMessage({atomcad:'build-open', name:P.name, code:'АГ.'+P.section+'.'+('00'+P.num).slice(-3)+'/26', schematic:sch},'*');}catch(_){}
+  toast('Схема построена — открываю редактор');
+}
+
+/* ---- навигация ---- */
+var PANELS=[pSection,pController,pConsumers,pSensors,pAux,pBreakers,pTerminals,pCabinet,pSpec];
+function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0}
+function go(i){cur=Math.max(0,Math.min(STEPS.length-1,i));$('prev').disabled=cur===0;$('next').textContent=cur===STEPS.length-1?'Готово ✓':'Далее →';steps();draw()}
+$('prev').onclick=function(){go(cur-1)};$('next').onclick=function(){go(cur+1)};
+updTag();steps();go(0);
+</script>
+</body>
+</html>
