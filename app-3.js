@@ -7918,9 +7918,34 @@ async function downloadInboxAttachmentDirect(inboxId, idx, suggestedName) {
   }
 }
 
+// v2.45.312: меню кнопки «+» на экране «Заказы» (мобильная и десктоп) —
+// выбор: новый заказ поставщику или загрузить счёт на оплату.
+function openSupplyOrderAddMenu() {
+  const existing = document.getElementById('sup-ord-add-menu');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'sup-ord-add-menu';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  const close = "document.getElementById('sup-ord-add-menu').remove();";
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:360px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-plus"></i>Добавить</h3>' +
+        '<button class="icon-btn" onclick="' + close + '"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openNewSupplyOrder();">' +
+          '<i class="ti ti-file-plus"></i> Новый заказ поставщику</button>' +
+        '<button class="btn btn-secondary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openSupplyInvoiceUpload(true);">' +
+          '<i class="ti ti-cloud-upload"></i> Загрузить счёт</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
 async function openNewSupplyOrder() {
   if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
-  // Подгружаем поставщиков
   if (!cache.suppliers) {
     try {
       const d = await apiGet('/api/suppliers');
@@ -10210,6 +10235,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.315',
+    date: '15.06.2026',
+    title: 'Счёт на оплату: кнопка на «+» и без лишней приёмки',
+    features: [
+      'На экране <b>«Заказы»</b> кнопка <b>«+»</b> (в т.ч. на телефоне) теперь спрашивает: <b>«Новый заказ»</b> или <b>«Загрузить счёт»</b>',
+      'При загрузке счёта на оплату <b>больше не запускается приёмка/распознавание УПД</b> — счёт просто кладётся во «Входящие счета» и отдел оплаты получает уведомление',
+      'Приложение не перекидывает на экран приёмки — остаётесь там, где были',
+    ],
+  },
   {
     version: 'v2.45.314',
     date: '15.06.2026',
