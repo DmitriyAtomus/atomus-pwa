@@ -507,25 +507,24 @@ function compById(id){for(var i=0;i<S.comps.length;i++)if(S.comps[i].id===id)ret
 function wireById(id){for(var i=0;i<S.wires.length;i++)if(S.wires[i].id===id)return S.wires[i];return null}
 
 function junctions(){
+  // Электрическая точка (по ЕСКД) — там, где сходятся ≥3 проводника.
+  // Проводник = конец/проход провода ИЛИ вывод аппарата. Кандидаты-точки:
+  // концы проводов + выводы аппаратов.
+  var cand=[];
+  function add(p){for(var i=0;i<cand.length;i++)if(eq(cand[i].p,p))return cand[i];var o={p:{x:p.x,y:p.y},pin:false};cand.push(o);return o;}
+  S.wires.forEach(function(w){add(w.pts[0]);add(w.pts[w.pts.length-1]);});
+  S.comps.forEach(function(c){for(var i=0;i<SYM[c.sym].pins.length;i++){add(pinW(c,i)).pin=true;}});
   var out=[];
-  S.wires.forEach(function(w){
-    [w.pts[0],w.pts[w.pts.length-1]].forEach(function(e){
-      var interior=false,hits=0;
-      S.wires.forEach(function(o){
-        if(o===w)return;
-        for(var i=0;i<o.pts.length-1;i++){
-          if(onSeg(e,o.pts[i],o.pts[i+1])){
-            hits++;
-            if(!eq(e,o.pts[i])&&!eq(e,o.pts[i+1]))interior=true;
-            break;
-          }
-        }
-      });
-      if(interior||hits>=2){
-        for(var k=0;k<out.length;k++)if(eq(out[k],e))return;
-        out.push({x:e.x,y:e.y});
-      }
+  cand.forEach(function(o){
+    var P=o.p, ends=0, through=0;
+    S.wires.forEach(function(w){
+      var e0=eq(w.pts[0],P), e1=eq(w.pts[w.pts.length-1],P);
+      if(e0||e1){ ends+=(e0?1:0)+(e1?1:0); return; }
+      for(var j=0;j<w.pts.length-1;j++){ if(onSeg(P,w.pts[j],w.pts[j+1])){ through++; break; } }
     });
+    // проход провода = 2 проводника; вывод аппарата = 1; конец провода = 1
+    var total=ends+2*through+(o.pin?1:0);
+    if(total>=3) out.push({x:P.x,y:P.y});
   });
   return out;
 }
@@ -620,6 +619,47 @@ function compSvg(c,col,extraOp){
        (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Sans\'">'+esc(c.attrs.note)+'</text>';
   return h;
 }
+// === сечение кабеля по току линии (ПУЭ-упрощённо, медь) ===
+function _secFor(I){var t=[[10,1.0],[16,1.5],[25,2.5],[32,4],[40,6],[50,10],[80,16],[100,25]];for(var i=0;i<t.length;i++)if(I<=t[i][0])return t[i][1];return 35;}
+// аппараты, подключённые к проводу (по совпадению вывода с концом/сегментом)
+function wireConnComps(w){
+  var e=[w.pts[0],w.pts[w.pts.length-1]],res=[];
+  S.comps.forEach(function(c){
+    var conn=false;
+    for(var i=0;i<SYM[c.sym].pins.length&&!conn;i++){var p=pinW(c,i);
+      if(eq(e[0],p)||eq(e[1],p)){conn=true;break;}
+      for(var j=0;j<w.pts.length-1;j++)if(onSeg(p,w.pts[j],w.pts[j+1])){conn=true;break;}
+    }
+    if(conn)res.push(c);
+  });
+  return res;
+}
+// ток линии = макс. номинал автомата (C16, C32…) среди подключённых аппаратов
+function wireCurrent(w){
+  var amax=0;
+  wireConnComps(w).forEach(function(c){
+    var m=/[CС]\s*(\d+)/.exec((c.attrs&&c.attrs.model)||'');
+    if(m){var a=+m[1];if(a>amax)amax=a;}
+  });
+  return amax;
+}
+// сечение: ручное (w.section) или авто по току
+function wireSection(w){
+  if(w.section!=null&&w.section!=='') return String(w.section);
+  var I=wireCurrent(w);
+  if(!I)return null;
+  return String(_secFor(I)).replace('.',',');
+}
+// середина самого длинного сегмента (для подписи сечения)
+function wireSegMid(w){
+  var best=null,bl=-1;
+  for(var i=0;i<w.pts.length-1;i++){
+    var a=w.pts[i],b=w.pts[i+1],L=Math.abs(b.x-a.x)+Math.abs(b.y-a.y);
+    if(L>bl){bl=L;best={a:a,b:b};}
+  }
+  if(!best)return null;
+  return {x:(best.a.x+best.b.x)/2,y:(best.a.y+best.b.y)/2,horiz:Math.abs(best.b.x-best.a.x)>=Math.abs(best.b.y-best.a.y),len:bl};
+}
 function renderCanvas(){
   /* провода */
   var h='';
@@ -628,6 +668,15 @@ function renderCanvas(){
     var d=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' ');
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+(sel?CY:INK)+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>';
+    // подпись сечения кабеля (мм²) у середины длинного сегмента
+    var _sec=wireSection(w);
+    if(_sec){
+      var _lp=wireSegMid(w);
+      if(_lp&&_lp.len>=130){
+        var _tx=_lp.horiz?_lp.x:(_lp.x+22), _ty=_lp.horiz?(_lp.y-14):_lp.y;
+        h+='<text x="'+_tx+'" y="'+_ty+'" font-size="26" fill="'+SOFT+'" stroke="none" text-anchor="'+(_lp.horiz?'middle':'start')+'" font-family="\'IBM Plex Mono\'">'+_sec+'</text>';
+      }
+    }
     if(sel)w.pts.forEach(function(p){
       h+='<rect x="'+(p.x-13)+'" y="'+(p.y-13)+'" width="26" height="26" fill="#fff" stroke="'+CY+'" stroke-width="5"/>';
     });
@@ -729,9 +778,16 @@ function renderProps(force){
     var len=0;
     for(var i=0;i<w.pts.length-1;i++)
       len+=Math.abs(w.pts[i+1].x-w.pts[i].x)+Math.abs(w.pts[i+1].y-w.pts[i].y);
+    var _I=wireCurrent(w), _auto=wireSection(w);
     h+='<div class="sel-chip"><b>Провод</b><span>· '+w.pts.length+' точ. · '+(len/10).toFixed(0)+' мм</span></div>';
+    h+='<div class="fields"><div class="f"><label>Сечение, мм²</label><input id="fSec" value="'+esc(w.section!=null?w.section:'')+'" placeholder="'+(_auto?('авто '+_auto):'—')+'"></div></div>';
+    if(_I) h+='<div class="empty" style="padding:4px 14px">Линия под защитой C'+_I+' А · авто-сечение '+_auto+' мм². Поле выше — ручное переопределение.</div>';
     h+='<div class="pbtns"><button class="pb danger" id="pDel">Удалить (Del)</button></div>';
     el.innerHTML=h;
+    (function(){var inp=$('fSec'),snapped=false;
+      inp.addEventListener('focus',function(){snapped=false});
+      inp.addEventListener('input',function(){if(!snapped){snapped=true;pushUndo();}w.section=inp.value.trim();renderCanvas();});
+    })();
     $('pDel').onclick=delSel;
     return;
   }
