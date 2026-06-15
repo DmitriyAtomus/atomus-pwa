@@ -647,7 +647,9 @@ function renderContractAssembliesBlock(c) {
       //   in_progress     — кнопка ✓ «Готово» (переводит ready)
       //   ready (не shipped) — кнопка ↩ «Вернуть в работу» (для случая ошибки)
       // v2.43.17: парная кнопка + жёсткая перезагрузка спецификации
-      let workersCellHtml = escapeHtml(workers);
+      // v2.45.313: имя сборщика усекается, кнопки управления НЕ сжимаются
+      // (раньше 🗑 уезжала за край узкой колонки — нельзя было удалить сборку)
+      let workersCellHtml = '<span class="cal-workers-name">' + escapeHtml(workers) + '</span>';
       if (canShip) {
         if (a.status === 'in_progress') {
           workersCellHtml +=
@@ -8979,11 +8981,18 @@ function renderContractItemsBlock(contractId) {
           }
           _altLine = '<div class="spec-item-meta" style="color:#B45309;margin-top:2px;">Отгрузка сразу на объекте' + (_apHtml ? ' · ' + _apHtml : '') + '</div>';
         }
+        // v2.45.312: позиция упакована в коробку — бейдж «в Коробке N» (клик открывает коробку)
+        let _boxChip = '';
+        if (it.box_id && it.box_name) {
+          _boxChip = ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#15803D;background:rgba(21,128,61,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;cursor:pointer;" ' +
+            'title="Открыть коробку" onclick="event.stopPropagation();openBoxDetail(' + it.box_id + ')">' +
+            '<i class="ti ti-package" style="font-size:11px;vertical-align:-1px;"></i> в ' + escapeHtml(it.box_name) + '</span>';
+        }
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
             '<div class="spec-item-name' + nameLinkClass + '"' + nameClickHandler + '>' + escapeHtml(displayName) + sourceTag + '</div>' +
-            ((typeChip || _sysChip || _altBadge) ? '<div class="spec-item-chips">' + typeChip + _sysChip + _altBadge + '</div>' : '') +
+            ((typeChip || _sysChip || _altBadge || _boxChip) ? '<div class="spec-item-chips">' + typeChip + _sysChip + _altBadge + _boxChip + '</div>' : '') +
             ((_reservedBadge || _quickAction) ? '<div class="spec-item-status">' + _reservedBadge + _quickAction + '</div>' : '') +
             '<div class="spec-item-meta">' + meta + '</div>' +
             _altLine +
@@ -10251,6 +10260,49 @@ async function loadContractShipmentBlock(contractId) {
       html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Открыть отгрузку</button>';
     }
     html += '</div>';
+
+    // v2.45.312: раздел «К отгрузке» — развёрнутый список единиц отгрузки
+    // (коробки + отдельные узлы/сборки), как просил директор.
+    const units = s.items || [];
+    if (units.length) {
+      const boxes = units.filter(u => u.type === 'box');
+      const asms = units.filter(u => u.type !== 'box');
+      html += '<div class="ship-units-card" style="margin-top:14px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 14px;">';
+      html += '<div style="font-size:13px;font-weight:700;color:var(--text-dark);margin-bottom:8px;display:flex;align-items:center;gap:6px;">' +
+        '<i class="ti ti-list-check" style="color:var(--brand);"></i> К отгрузке <span style="color:var(--text-light);font-weight:400;">(' + units.length + ' ед.)</span></div>';
+      const _unitRow = (u) => {
+        const done = !!u.shipped;
+        const icon = u.type === 'box' ? 'ti-package' : 'ti-tool';
+        const qtyLabel = u.type === 'box'
+          ? ((u.asm_count || u.qty || 0) + ' ' + (typeof pluralAssemblies === 'function' ? pluralAssemblies(u.asm_count || u.qty || 0) : 'шт.'))
+          : ((u.qty || 1) + ' шт.');
+        const badge = done
+          ? '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> отгружено</span>'
+          : '<span style="font-size:11px;font-weight:700;color:#9A3412;background:#FFEDD5;padding:1px 8px;border-radius:6px;white-space:nowrap;">готово к отгрузке</span>';
+        const clickAttr = u.type === 'box'
+          ? ' style="cursor:pointer;" onclick="openBoxDetail(' + u.id + ')" title="Открыть коробку"'
+          : ' style="cursor:default;"';
+        return '<div' + clickAttr + ' style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border);">' +
+          '<div style="width:30px;height:30px;border-radius:8px;background:' + (done ? '#E8F5E9' : 'var(--brand-bg)') + ';color:' + (done ? '#15803D' : 'var(--brand)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+            '<i class="ti ' + icon + '"></i></div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(u.name || '') + '</div>' +
+            '<div style="font-size:11.5px;color:var(--text-light);">' + (u.type === 'box' ? 'Коробка · ' : 'Узел / сборка · ') + qtyLabel + '</div>' +
+          '</div>' +
+          badge +
+        '</div>';
+      };
+      if (boxes.length) {
+        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:6px 0 2px;">Коробки</div>';
+        boxes.forEach(u => { html += _unitRow(u); });
+      }
+      if (asms.length) {
+        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:10px 0 2px;">Узлы и сборки (отдельно)</div>';
+        asms.forEach(u => { html += _unitRow(u); });
+      }
+      html += '</div>';
+    }
+
     container.innerHTML = html;
     container.style.display = '';
   } catch (e) {
