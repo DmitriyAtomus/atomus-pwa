@@ -9228,10 +9228,12 @@ function renderSpecForm(contractId, existing) {
   // v2.45.325: отгружать крупное покупное отдельной позицией (свой QR в «К отгрузке»)
   const shipStandaloneOn = !!e.ship_standalone;
   html += '<div style="grid-column: 1 / -1; margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 10px;">';
-  html += '<label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--text-dark);">' +
-    '<input type="checkbox" id="spec-form-ship-standalone"' + (shipStandaloneOn ? ' checked' : '') + ' style="width:auto;flex-shrink:0;">' +
+  // v2.45.329: клик по всей строке надёжно ставит/снимает галочку (тап по тексту тоже)
+  html += '<div onclick="if(event.target.tagName!==\'INPUT\'){var _cb=document.getElementById(\'spec-form-ship-standalone\');_cb.checked=!_cb.checked;}" ' +
+    'style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--text-dark); user-select:none; -webkit-user-select:none;">' +
+    '<input type="checkbox" id="spec-form-ship-standalone"' + (shipStandaloneOn ? ' checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--brand);">' +
     '<span><i class="ti ti-shopping-cart" style="vertical-align:-2px;color:var(--brand);"></i> Отгружать отдельной позицией</span>' +
-    '</label>';
+    '</div>';
   html += '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;line-height:1.45;">' +
     'Для крупного покупного (приточки, чиллеры-моноблоки): встанет в «К отгрузке» отдельной единицей со своим QR и учётом в прогрессе — без упаковки в коробку.</div>';
   html += '</div>';
@@ -9602,6 +9604,9 @@ async function submitSpecForm(contractId, itemId) {
     state._specByContract[contractId].addingMode = false;
     state._specByContract[contractId].editingId = null;
     loadContractItemsBlock(contractId);
+    // v2.45.329: сразу обновляем блок «К отгрузке» — чтобы покупное «отдельной
+    // позицией» появилось/исчезло без перезагрузки страницы.
+    if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
