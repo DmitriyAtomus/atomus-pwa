@@ -8837,6 +8837,10 @@ function renderContractItemsBlock(contractId) {
       '<button class="spec-export-btn" onclick="downloadContractSpecPdf(' + contractId + ')" title="Открыть PDF">' +
         '<i class="ti ti-file-type-pdf"></i><span>PDF</span>' +
       '</button>' +
+      // v2.45.323: QR договора прямо на вкладке спецификации — модалка с печатью/скачиванием PNG
+      '<button class="spec-export-btn" onclick="showContractQrFromDetail()" title="QR-код договора — печать / скачать">' +
+        '<i class="ti ti-qrcode"></i><span>QR</span>' +
+      '</button>' +
     '</div>';
   }
   html += '</div>';
