@@ -238,7 +238,7 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
           <g id="compsL"></g>
           <g id="pinsL"></g>
           <g id="ercL"></g>
-          <g id="selL"></g>
+          <g id="selL" pointer-events="none"></g>
           <g id="draftL"></g>
           <g id="ghostL"></g>
         </g>
@@ -607,7 +607,9 @@ function compSvg(c,col,extraOp){
   h+='<g data-c="'+c.id+'" color="'+col+'" stroke="'+col+'" fill="none" stroke-width="6" stroke-linecap="round"'+
      (extraOp?' opacity="'+extraOp+'"':'')+
      ' transform="translate('+c.x+' '+c.y+') rotate('+c.rot+') scale('+sx+' 1)">';
-  var _bb=SYM[c.sym].bb; h+='<rect x="'+_bb[0]+'" y="'+_bb[1]+'" width="'+(_bb[2]-_bb[0])+'" height="'+(_bb[3]-_bb[1])+'" fill="transparent" stroke="none" pointer-events="all"/>';
+  // Прозрачная зона захвата с запасом (_m), чтобы аппарат брался за всю площадь,
+  // а не только за тонкие линии — клик в любом месте этой области тащит элемент.
+  var _bb=SYM[c.sym].bb, _m=30; h+='<rect x="'+(_bb[0]-_m)+'" y="'+(_bb[1]-_m)+'" width="'+(_bb[2]-_bb[0]+_m*2)+'" height="'+(_bb[3]-_bb[1]+_m*2)+'" fill="transparent" stroke="none" pointer-events="all"/>';
   SYM[c.sym].pr.forEach(function(p){h+=prim(p)});
   h+='</g>';
   var lp=lblW(c), an=SYM[c.sym].lbl[2];
@@ -743,6 +745,7 @@ function renderProps(force){
   h+='<div class="f"><label>Примечание</label><input id="fNote" value="'+esc(c.attrs.note||'')+'"></div>';
   h+='</div>';
   h+='<div class="pbtns"><button class="pb cat" id="pCat">⊕ Подобрать из каталога CHINT</button></div>';
+  h+='<div class="pbtns"><button class="pb" id="pBreak" title="Удалить все провода, подключённые к этому аппарату">✂ Разорвать связи</button></div>';
   h+='<div class="pbtns"><button class="pb" id="pRot">⟳ 90° (R)</button>'+
      '<button class="pb" id="pMir">⇋ Зеркало (M)</button>'+
      '<button class="pb danger" id="pDel">Удалить</button></div>';
@@ -762,9 +765,32 @@ function renderProps(force){
   $('pRot').onclick=function(){pushUndo();c.rot=(c.rot+90)%360;renderCanvas()};
   $('pMir').onclick=function(){pushUndo();c.mirror=!c.mirror;renderCanvas()};
   $('pDel').onclick=delSel;
+  $('pBreak').onclick=breakLinks;
   $('pCat').onclick=function(){openCatalog(catKeyFor(c),c)};
 }
 function renderAll(){renderCanvas();renderProps()}
+// Разорвать связи: удалить все провода, подключённые к выводам выбранного аппарата.
+function breakLinks(){
+  if(!S.sel||S.sel.t!=='c')return;
+  var c=compById(S.sel.id);if(!c)return;
+  var pins=[];
+  for(var i=0;i<SYM[c.sym].pins.length;i++)pins.push(pinW(c,i));
+  var touches=function(w){
+    for(var k=0;k<pins.length;k++){
+      var p=pins[k];
+      if(eq(w.pts[0],p)||eq(w.pts[w.pts.length-1],p))return true;
+      for(var j=0;j<w.pts.length-1;j++)if(onSeg(p,w.pts[j],w.pts[j+1]))return true;
+    }
+    return false;
+  };
+  var removed=0;
+  var keep=S.wires.filter(function(w){var t=touches(w);if(t)removed++;return !t;});
+  if(!removed){toast('У аппарата нет подключённых проводов');return;}
+  pushUndo();
+  S.wires=keep;
+  renderAll();
+  toast('Связи разорваны — удалено проводов: '+removed);
+}
 function delSel(){
   if(!S.sel)return;
   pushUndo();
