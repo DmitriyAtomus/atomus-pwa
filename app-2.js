@@ -9025,38 +9025,45 @@ function renderContractItemsBlock(contractId) {
             _deliveredCtl +
           '</div>' +
           '<div class="spec-item-act-col">' +
-            (canEdit ? '<div class="spec-item-actions">' +
-              // v2.43.13: конвертация sale_product → model, если найдена одноимённая активная модель
-              (it.convertible_to_model_id ? (
-                '<button class="spec-item-act-btn" style="color:#1E40AF;" ' +
-                  'title="Превратить в сборку: ' + escapeHtml(it.convertible_to_model_name || '') + '" ' +
-                  'onclick="convertSpecItemToModel(' + contractId + ',' + it.id + ',' + it.convertible_to_model_id + ')">' +
-                  '<i class="ti ti-arrow-up-right"></i>' +
-                '</button>'
+            // v2.45.325: QR-этикетку на позицию можно печатать всем, у кого есть
+            // право canPrintLabels (в т.ч. роль «Мастер»), даже без прав на
+            // редактирование продаж. Поэтому столбец действий рендерим, если
+            // можно либо редактировать, либо печатать этикетки.
+            ((canEdit || (typeof canPrintLabels === 'function' && canPrintLabels())) ? '<div class="spec-item-actions">' +
+              // Конвертация / привязка к складу / редактирование — только для
+              // тех, кто управляет продажами (canEdit).
+              (canEdit ? (
+                // v2.43.13: конвертация sale_product → model, если найдена одноимённая активная модель
+                (it.convertible_to_model_id ? (
+                  '<button class="spec-item-act-btn" style="color:#1E40AF;" ' +
+                    'title="Превратить в сборку: ' + escapeHtml(it.convertible_to_model_name || '') + '" ' +
+                    'onclick="convertSpecItemToModel(' + contractId + ',' + it.id + ',' + it.convertible_to_model_id + ')">' +
+                    '<i class="ti ti-arrow-up-right"></i>' +
+                  '</button>'
+                ) : '') +
+                // v2.43.24: конвертация в комплектующее склада (для свободного ввода / sale_product)
+                (it.convertible_to_component_id ? (
+                  '<button class="spec-item-act-btn" style="color:#15803D;" ' +
+                    'title="Связать со складом: ' + escapeHtml(it.convertible_to_component_name || '') +
+                      (it.convertible_to_component_on_stock != null
+                        ? ' (на складе: ' + _fmtQty(it.convertible_to_component_on_stock) + ')'
+                        : '') + '" ' +
+                    'onclick="convertSpecItemToComponent(' + contractId + ',' + it.id + ',' + it.convertible_to_component_id + ')">' +
+                    '<i class="ti ti-package-import"></i>' +
+                  '</button>'
+                ) : '') +
+                // v2.45.16: ручное сопоставление со складом — для sale_product/свободного
+                // ввода, когда автомат не нашёл совпадения. Открывает picker с поиском.
+                ((!it.model_id && !it.component_id && (it.sale_product_id || !it.model_id)) ? (
+                  '<button class="spec-item-act-btn" style="color:#2563EB;" ' +
+                    'title="Сопоставить со складом вручную" ' +
+                    'onclick="openManualComponentPicker(' + contractId + ',' + it.id + ',' + JSON.stringify(it.sale_product_name || it.name || '').replace(/"/g,'&quot;') + ')">' +
+                    '<i class="ti ti-link"></i>' +
+                  '</button>'
+                ) : '')
               ) : '') +
-              // v2.43.24: конвертация в комплектующее склада (для свободного ввода / sale_product)
-              (it.convertible_to_component_id ? (
-                '<button class="spec-item-act-btn" style="color:#15803D;" ' +
-                  'title="Связать со складом: ' + escapeHtml(it.convertible_to_component_name || '') +
-                    (it.convertible_to_component_on_stock != null
-                      ? ' (на складе: ' + _fmtQty(it.convertible_to_component_on_stock) + ')'
-                      : '') + '" ' +
-                  'onclick="convertSpecItemToComponent(' + contractId + ',' + it.id + ',' + it.convertible_to_component_id + ')">' +
-                  '<i class="ti ti-package-import"></i>' +
-                '</button>'
-              ) : '') +
-              // v2.45.16: ручное сопоставление со складом — для sale_product/свободного
-              // ввода, когда автомат не нашёл совпадения. Открывает picker с поиском.
-              ((!it.model_id && !it.component_id && (it.sale_product_id || !it.model_id)) ? (
-                '<button class="spec-item-act-btn" style="color:#2563EB;" ' +
-                  'title="Сопоставить со складом вручную" ' +
-                  'onclick="openManualComponentPicker(' + contractId + ',' + it.id + ',' + JSON.stringify(it.sale_product_name || it.name || '').replace(/"/g,'&quot;') + ')">' +
-                  '<i class="ti ti-link"></i>' +
-                '</button>'
-              ) : '') +
-              // v2.45.208: QR у КАЖДОГО изделия (раньше — только у позиций в
-              // резерве). Печать этикетки; скан QR открывает карточку позиции
-              // (/c/{token}?item=ID). qty этикеток по кол-ву.
+              // v2.45.208: QR у КАЖДОГО изделия. Печать этикетки; скан QR открывает
+              // карточку позиции (/c/{token}?item=ID). qty этикеток по кол-ву.
               ((typeof canPrintLabels === 'function' && canPrintLabels()) ? (
                 '<button class="spec-item-act-btn" style="color:#0C4A6E;" ' +
                   'title="Печать QR-этикетки изделия (скан → карточка позиции)" ' +
@@ -9064,8 +9071,10 @@ function renderContractItemsBlock(contractId) {
                   '<i class="ti ti-qrcode"></i>' +
                 '</button>'
               ) : '') +
-              '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
-              '<button class="spec-item-act-btn danger" title="Удалить" onclick="deleteSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-trash"></i></button>' +
+              (canEdit ? (
+                '<button class="spec-item-act-btn" title="Редактировать" onclick="startEditSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-pencil"></i></button>' +
+                '<button class="spec-item-act-btn danger" title="Удалить" onclick="deleteSpecItem(' + contractId + ',' + it.id + ')"><i class="ti ti-trash"></i></button>'
+              ) : '') +
             '</div>' : '') +
           '</div>' +
         '</div>';
