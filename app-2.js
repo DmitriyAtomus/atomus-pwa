@@ -647,7 +647,9 @@ function renderContractAssembliesBlock(c) {
       //   in_progress     — кнопка ✓ «Готово» (переводит ready)
       //   ready (не shipped) — кнопка ↩ «Вернуть в работу» (для случая ошибки)
       // v2.43.17: парная кнопка + жёсткая перезагрузка спецификации
-      let workersCellHtml = escapeHtml(workers);
+      // v2.45.313: имя сборщика усекается, кнопки управления НЕ сжимаются
+      // (раньше 🗑 уезжала за край узкой колонки — нельзя было удалить сборку)
+      let workersCellHtml = '<span class="cal-workers-name">' + escapeHtml(workers) + '</span>';
       if (canShip) {
         if (a.status === 'in_progress') {
           workersCellHtml +=
