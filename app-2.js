@@ -8996,6 +8996,20 @@ function renderContractItemsBlock(contractId) {
             'title="Открыть коробку" onclick="event.stopPropagation();openBoxDetail(' + it.box_id + ')">' +
             '<i class="ti ti-package" style="font-size:11px;vertical-align:-1px;"></i> в ' + escapeHtml(it.box_name) + '</span>';
         }
+        // v2.45.322: доставка на объект — только для позиций «отгрузка на объект» (alt_supply)
+        let _deliveredCtl = '';
+        if (it.alt_supply) {
+          if (it.delivered_at) {
+            _deliveredCtl = '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+              '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#15803D;background:rgba(21,128,61,0.12);padding:2px 9px;border-radius:7px;"><i class="ti ti-circle-check" style="font-size:12px;"></i> Доставлено на объект</span>' +
+              (canEdit ? '<button class="spec-quick-act" title="Снять отметку доставки" onclick="markSpecItemDelivered(' + contractId + ',' + it.id + ',false)"><i class="ti ti-arrow-back-up"></i></button>' : '') +
+            '</div>';
+          } else if (canEdit) {
+            _deliveredCtl = '<div style="margin-top:6px;">' +
+              '<button class="btn btn-secondary btn-small" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" onclick="markSpecItemDelivered(' + contractId + ',' + it.id + ',true)"><i class="ti ti-truck-delivery"></i> Доставлено на объект</button>' +
+            '</div>';
+          }
+        }
         html += '<div class="spec-item">' +
           '<div class="spec-item-no">' + (it.position_no || (idx + 1)) + '</div>' +
           '<div class="spec-item-body">' +
@@ -9004,6 +9018,7 @@ function renderContractItemsBlock(contractId) {
             ((_reservedBadge || _quickAction) ? '<div class="spec-item-status">' + _reservedBadge + _quickAction + '</div>' : '') +
             '<div class="spec-item-meta">' + meta + '</div>' +
             _altLine +
+            _deliveredCtl +
           '</div>' +
           '<div class="spec-item-act-col">' +
             (canEdit ? '<div class="spec-item-actions">' +
@@ -9575,6 +9590,24 @@ async function _openSpecAltFile(itemId) {
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) { showToast('Ошибка открытия файла', 'error'); }
+}
+
+// v2.45.322: отметить/снять «Доставлено на объект» (позиция alt_supply)
+async function markSpecItemDelivered(contractId, itemId, delivered) {
+  if (delivered && !confirm('Отметить позицию доставленной на объект?')) return;
+  if (!delivered && !confirm('Снять отметку «Доставлено»?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/items/' + itemId + '/delivered', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delivered: delivered }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не удалось', 'error'); return; }
+    showToast(delivered ? 'Доставлено на объект ✓' : 'Отметка снята', 'success');
+    if (typeof loadContractItemsBlock === 'function') loadContractItemsBlock(contractId);
+  } catch (e) { showToast('Сеть: ' + (e.message || e), 'error'); }
 }
 
 async function deleteSpecItem(contractId, itemId) {
