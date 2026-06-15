@@ -607,6 +607,20 @@ function prim(p){
   if(p.t==='t')return '<text x="'+p.x+'" y="'+p.y+'" font-size="'+p.s+'" text-anchor="middle" stroke="none" fill="currentColor" font-family="\'IBM Plex Sans\'" font-weight="600">'+esc(p.tx)+'</text>';
   return '';
 }
+// перенос подписи аппарата на несколько строк (полностью, без обрезки «…»)
+function _wrapNote(s,max,maxLines){
+  s=String(s||'').trim(); if(!s)return [];
+  var words=s.split(/\s+/),lines=[],cur='';
+  for(var i=0;i<words.length;i++){var w=words[i];
+    if(!cur)cur=w;
+    else if((cur+' '+w).length<=max)cur+=' '+w;
+    else {lines.push(cur);cur=w;}
+  }
+  if(cur)lines.push(cur);
+  lines=lines.map(function(l){return l.length>max?l.slice(0,max-1)+'…':l;});
+  if(lines.length>maxLines){lines=lines.slice(0,maxLines);lines[maxLines-1]=lines[maxLines-1].replace(/.$/,'…');}
+  return lines;
+}
 function compSvg(c,col,extraOp){
   var sx=c.mirror?-1:1, h='';
   h+='<g data-c="'+c.id+'" color="'+col+'" stroke="'+col+'" fill="none" stroke-width="6" stroke-linecap="round"'+
@@ -620,9 +634,12 @@ function compSvg(c,col,extraOp){
   var lp=lblW(c), an=SYM[c.sym].lbl[2];
   h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+lp.y+'" font-size="44" font-weight="500" fill="'+col+'" stroke="none" text-anchor="'+an+'"'+
      (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Mono\'">'+esc(c.des)+'</text>';
-  if(c.attrs&&c.attrs.note)
-    h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+(lp.y+40)+'" font-size="30" fill="'+SOFT+'" stroke="none" text-anchor="'+an+'"'+
-       (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Sans\'">'+esc(c.attrs.note)+'</text>';
+  if(c.attrs&&c.attrs.note){
+    _wrapNote(c.attrs.note,14,3).forEach(function(_ln,_li){
+      h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+(lp.y+40+_li*30)+'" font-size="30" fill="'+SOFT+'" stroke="none" text-anchor="'+an+'"'+
+         (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Sans\'">'+esc(_ln)+'</text>';
+    });
+  }
   return h;
 }
 // === сечение кабеля по току линии (ПУЭ-упрощённо, медь) ===
