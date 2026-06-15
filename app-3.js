@@ -8257,6 +8257,11 @@ function renderSupplyOrderDetail(o) {
         (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
         (o.invoice_org ? chip(escapeHtml(o.invoice_org), o.invoice_org, false) : '') +
       '</div>';
+      // v2.45.319: повторное распознавание (например, после «Заменить»)
+      html += '<div style="width:100%;padding-top:8px;">' +
+        '<button class="btn btn-secondary btn-small" id="sup-inv-parse-btn-' + o.id + '" onclick="parseSupplyOrderInvoice(' + o.id + ')">' +
+          '<i class="ti ti-sparkles"></i> Распознать заново</button>' +
+      '</div>';
     } else {
       html += '<div style="width:100%;padding-top:8px;">' +
         '<button class="btn btn-secondary btn-small" id="sup-inv-parse-btn-' + o.id + '" onclick="parseSupplyOrderInvoice(' + o.id + ')">' +
@@ -8656,7 +8661,19 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
       return;
     }
     if (isPdf) {
-      cont.innerHTML = '<iframe data-blob-url="' + url + '" src="' + url + '#view=FitH" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
+      // На компьютере PDF показываем встроенно (iframe). На телефоне браузеры
+      // (особенно Huawei) PDF в iframe не рендерят — даём кнопку «Открыть PDF».
+      if (state && state.isDesktop) {
+        cont.innerHTML = '<iframe data-blob-url="' + url + '" src="' + url + '#view=FitH" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
+      } else {
+        cont.innerHTML =
+          '<div data-blob-url="' + url + '" style="padding:18px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;">' +
+            '<i class="ti ti-file-type-pdf" style="font-size:42px;color:#C0392B;"></i>' +
+            '<div style="margin:8px 0 14px;font-size:13px;color:var(--text-mid);word-break:break-word;">' + escapeHtml(filename || 'Счёт.pdf') + '</div>' +
+            '<button class="btn btn-primary" onclick="window.open(\'' + url + '\',\'_blank\')"><i class="ti ti-external-link"></i> Открыть PDF</button>' +
+            '<div style="margin-top:8px;font-size:11.5px;color:var(--text-light);">или кнопка «Скачать» выше</div>' +
+          '</div>';
+      }
     } else if (isImg) {
       cont.innerHTML = '<img data-blob-url="' + url + '" src="' + url + '" alt="Счёт" style="max-width:100%;max-height:80vh;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;" />';
     } else {
@@ -10339,6 +10356,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.320',
+    date: '15.06.2026',
+    title: 'Счёт в заказе: «Распознать заново» и просмотр PDF на телефоне',
+    features: [
+      'После кнопки <b>«Заменить»</b> счёт теперь можно <b>распознать заново</b> — старые реквизиты сбрасываются, появляется кнопка распознавания (и отдельная «Распознать заново» рядом с реквизитами)',
+      'На телефоне PDF-счёт открывается кнопкой <b>«Открыть PDF»</b> (Huawei и др. не показывают PDF встроенно) — на компьютере остаётся встроенный просмотр',
+    ],
+  },
   {
     version: 'v2.45.319',
     date: '15.06.2026',
