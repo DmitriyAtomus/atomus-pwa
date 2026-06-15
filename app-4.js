@@ -8625,9 +8625,13 @@ function _renderShipItemsGrouped(items) {
       const groupId = 'shipgrp-' + Math.random().toString(36).slice(2, 8);
       const iconCls = g.type === 'box' ? 'ti-package' : 'ti-tool';
       const typeLabel = g.type === 'box' ? 'Коробки' : 'Сборки';
+      // v2.45.334: цветная плитка по типу + спейсер, чтобы шапка группы вставала
+      // по той же сетке, что и обычные ряды (у которых слева кружок-галочка).
+      const typeMod = g.type === 'box' ? ' t-box' : (g.type === 'contract_item' ? ' t-buy' : ' t-asm');
       html += '<div class="ship-group" data-grp-id="' + groupId + '">' +
         '<div class="ship-group-head" onclick="_toggleShipGroup(\'' + groupId + '\')">' +
-          '<div class="ship-item-type-icon"><i class="ti ' + iconCls + '"></i></div>' +
+          '<div class="ship-group-spacer"></div>' +
+          '<div class="ship-item-type-icon' + typeMod + '"><i class="ti ' + iconCls + '"></i></div>' +
           '<div class="ship-item-body">' +
             '<div class="ship-item-name">' + escapeHtml(g.name || '—') + '</div>' +
             '<div class="ship-item-sub">' + typeLabel + ' · ' + g.items.length + ' шт.</div>' +
@@ -8676,7 +8680,7 @@ function renderShipItem(it) {
   const clickAttr = ' onclick="openShipmentItemDetail(\'' + it.type + '\',' + it.id + ')"';
   return '<div class="ship-item ' + (it.shipped ? 'shipped' : '') + '"' + clickAttr + ' style="cursor:pointer;">' +
     '<div class="ship-item-check"></div>' +
-    '<div class="ship-item-type-icon"><i class="ti ' + iconCls + '"></i></div>' +
+    '<div class="ship-item-type-icon' + (it.type === 'box' ? ' t-box' : (it.type === 'contract_item' ? ' t-buy' : ' t-asm')) + '"><i class="ti ' + iconCls + '"></i></div>' +
     '<div class="ship-item-body">' +
       '<div class="ship-item-name">' + escapeHtml(it.name || '—') + '</div>' +
       '<div class="ship-item-sub">' + escapeHtml(sub) + '</div>' +

@@ -14294,6 +14294,12 @@
     background: rgba(22, 163, 74, 0.15);
     color: var(--success);
   }
+  /* v2.45.334: цвет плитки-иконки по типу единицы (как в блоке «К отгрузке») */
+  .ship-item-type-icon.t-box { background: var(--brand-bg); color: var(--brand); }
+  .ship-item-type-icon.t-asm { background: #EEF0FB; color: #4F46E5; }
+  .ship-item-type-icon.t-buy { background: #E3F4F1; color: #0E8C7F; }
+  /* спейсер под кружок-галочку, чтобы шапка группы вставала по сетке рядов */
+  .ship-group-spacer { width: 24px; flex-shrink: 0; }
   .ship-item-body { flex: 1; min-width: 0; }
   .ship-item-name {
     font-size: 14px;
@@ -14325,6 +14331,65 @@
     border: 1px dashed var(--border-strong);
     border-radius: 14px;
   }
+
+  /* ============ v2.45.333: блок «К отгрузке» — аккуратные ряды единиц ============ */
+  .ku-head {
+    font-size: 14px; font-weight: 700; color: var(--text-dark);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .ku-head i { color: var(--brand); font-size: 18px; }
+  .ku-head-count { color: var(--text-light); font-weight: 500; font-size: 12.5px; }
+  .ku-desc {
+    font-size: 12px; color: var(--text-light);
+    margin: 5px 0 4px; line-height: 1.35;
+  }
+  .ku-sec {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-light); font-weight: 700; margin: 14px 0 4px; padding: 0 4px;
+  }
+  .ku-row {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 8px; margin: 2px -4px;
+    border-radius: 12px; border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .ku-row.is-clickable { cursor: pointer; }
+  .ku-row.is-clickable:hover { background: var(--brand-bg); border-color: #D4E3F3; }
+  .ku-row.is-clickable:active { background: #DBE8F5; }
+  .ku-row.is-done { background: #F3FAF5; }
+  .ku-ic {
+    width: 38px; height: 38px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 19px;
+  }
+  .ku-ic-box { background: var(--brand-bg); color: var(--brand); }
+  .ku-ic-asm { background: #EEF0FB; color: #4F46E5; }
+  .ku-ic-buy { background: #E3F4F1; color: #0E8C7F; }
+  .ku-ic-done { background: #DCFCE7; color: #15803D; }
+  .ku-main { flex: 1; min-width: 0; }
+  .ku-line1 { display: flex; align-items: center; gap: 8px; }
+  .ku-name {
+    flex: 1; min-width: 0;
+    font-size: 14px; font-weight: 600; color: var(--text-dark);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ku-sub {
+    font-size: 12px; color: var(--text-light); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ku-badge {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+    padding: 3px 9px; border-radius: 999px;
+  }
+  .ku-badge-pending { color: #B45309; background: #FEF3C7; }
+  .ku-badge-pending::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor; flex-shrink: 0;
+  }
+  .ku-badge-done { color: #15803D; background: #DCFCE7; }
+  .ku-badge-done i { font-size: 12px; }
+  .ku-chev { color: #B6BECC; font-size: 19px; flex-shrink: 0; }
 
   /* ============ v2.43.10 (Этап 35): расширения экрана отгрузки ============ */
   /* (B) Шапка с адресом и сроком */
