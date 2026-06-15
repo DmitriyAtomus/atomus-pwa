@@ -10363,14 +10363,14 @@ async function loadContractShipmentBlock(contractId) {
       const boxes = units.filter(u => u.type === 'box');
       const asms = units.filter(u => u.type === 'assembly');
       const citems = units.filter(u => u.type === 'contract_item');  // v2.45.325
-      html += '<div class="ship-units-card" style="margin-top:14px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 14px;">';
-      html += '<div style="font-size:13px;font-weight:700;color:var(--text-dark);margin-bottom:8px;display:flex;align-items:center;gap:6px;">' +
-        '<i class="ti ti-list-check" style="color:var(--brand);"></i> К отгрузке <span style="color:var(--text-light);font-weight:400;">(' + units.length + ' ед.)</span></div>';
-      html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">' +
-        'Что физически уезжает с производства: коробки (в них упаковано покупное и мелочь) и отдельные узлы/сборки.</div>';
+      html += '<div class="ship-units-card" style="margin-top:14px;background:white;border:1px solid var(--border);border-radius:14px;padding:12px 12px 8px;">';
+      html += '<div class="ku-head"><i class="ti ti-list-check"></i> К отгрузке <span class="ku-head-count">' + units.length + ' ед.</span></div>';
+      html += '<div class="ku-desc">Что физически уезжает с производства: коробки (в них упаковано покупное и мелочь) и отдельные узлы/сборки.</div>';
       const _unitRow = (u) => {
         const done = !!u.shipped;
         const icon = u.type === 'box' ? 'ti-package' : (u.type === 'contract_item' ? 'ti-shopping-cart' : 'ti-tool');
+        // v2.45.333: плитка-иконка кодируется цветом по типу (короб/узел/покупное), отгруженное — зелёным
+        const icCls = done ? 'ku-ic-done' : (u.type === 'box' ? 'ku-ic-box' : (u.type === 'contract_item' ? 'ku-ic-buy' : 'ku-ic-asm'));
         // v2.45.330: у коробки показываем и сборки, и покупные позиции — чтобы
         // вместо «0 сборок» было «N покупных позиций» (коробка не пустая).
         let qtyLabel;
@@ -10387,31 +10387,32 @@ async function loadContractShipmentBlock(contractId) {
         }
         const kindLabel = u.type === 'box' ? 'Коробка · ' : (u.type === 'contract_item' ? 'Покупное (отдельно) · ' : 'Узел / сборка · ');
         const badge = done
-          ? '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> отгружено</span>'
-          : '<span style="font-size:11px;font-weight:700;color:#9A3412;background:#FFEDD5;padding:1px 8px;border-radius:6px;white-space:nowrap;">готово к отгрузке</span>';
-        const clickAttr = u.type === 'box'
-          ? ' style="cursor:pointer;" onclick="openBoxDetail(' + u.id + ')" title="Открыть коробку"'
-          : ' style="cursor:default;"';
-        return '<div' + clickAttr + ' style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border);">' +
-          '<div style="width:30px;height:30px;border-radius:8px;background:' + (done ? '#E8F5E9' : 'var(--brand-bg)') + ';color:' + (done ? '#15803D' : 'var(--brand)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-            '<i class="ti ' + icon + '"></i></div>' +
-          '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(u.name || '') + '</div>' +
-            '<div style="font-size:11.5px;color:var(--text-light);">' + kindLabel + qtyLabel + '</div>' +
+          ? '<span class="ku-badge ku-badge-done"><i class="ti ti-check"></i> отгружено</span>'
+          : '<span class="ku-badge ku-badge-pending">готово к отгрузке</span>';
+        // v2.45.333: коробку можно открыть по тапу (стрелка + подсветка), узлы/покупное — нет.
+        // ВАЖНО: один атрибут style на ряд (раньше было два — из-за этого flex молча отваливался).
+        const clickable = u.type === 'box';
+        const clickAttr = clickable ? ' onclick="openBoxDetail(' + u.id + ')" title="Открыть коробку"' : '';
+        const chev = clickable ? '<i class="ti ti-chevron-right ku-chev"></i>' : '';
+        return '<div class="ku-row' + (done ? ' is-done' : '') + (clickable ? ' is-clickable' : '') + '"' + clickAttr + '>' +
+          '<div class="ku-ic ' + icCls + '"><i class="ti ' + icon + '"></i></div>' +
+          '<div class="ku-main">' +
+            '<div class="ku-line1"><span class="ku-name">' + escapeHtml(u.name || '') + '</span>' + badge + '</div>' +
+            '<div class="ku-sub">' + kindLabel + qtyLabel + '</div>' +
           '</div>' +
-          badge +
+          chev +
         '</div>';
       };
       if (boxes.length) {
-        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:6px 0 2px;">Коробки</div>';
+        html += '<div class="ku-sec">Коробки</div>';
         boxes.forEach(u => { html += _unitRow(u); });
       }
       if (asms.length) {
-        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:10px 0 2px;">Узлы и сборки (отдельно)</div>';
+        html += '<div class="ku-sec">Узлы и сборки (отдельно)</div>';
         asms.forEach(u => { html += _unitRow(u); });
       }
       if (citems.length) {  // v2.45.325: крупное покупное отдельной позицией
-        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:10px 0 2px;">Покупное (отдельной позицией)</div>';
+        html += '<div class="ku-sec">Покупное (отдельной позицией)</div>';
         citems.forEach(u => { html += _unitRow(u); });
       }
       html += '</div>';
