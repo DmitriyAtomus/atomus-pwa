@@ -131,15 +131,21 @@ function buildSchematic(P){
   wires.push(W([gx,760],[gx,800]));
   // отходящие — единые уровни: QF y=950, KM y=1450, клеммы y=1950; шаг увеличен под подписи
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
+  // динамический шаг колонок — чтобы все отходящие линии помещались в ширину
+  // листа (рабочее поле ~ до x=3950). Иначе при многих линиях схема вылезает за лист.
+  var nB=branches.length, maxX=3950;
+  if(nB>0){ var fit=(maxX-gx)/nB; if(fit<step) step=Math.max(300, Math.floor(fit)); }
+  // при тесных колонках подписи короче, чтобы не наезжали друг на друга
+  var lblLen=step<520?11:(step<640?14:18);
   var bx=gx+step, lastX=gx, kmN=1;
   branches.forEach(function(b,i){
     var x=bx+i*step;
     var cons=(P.consumers||[]).filter(function(c){return c.id===b.consumer})[0];
-    var role=shortLbl(cons?cons.name:b.role, 18);
+    var role=shortLbl(cons?cons.name:b.role, lblLen);
     comps.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
     wires.push(W([x,800],[x,950]));
     if(cons&&needsContactor(cons)){
-      comps.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',shortLbl(cons.name,18)));
+      comps.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',shortLbl(cons.name,lblLen)));
       wires.push(W([x,1250],[x,1450]));
       wires.push(W([x,1600],[x,1950]));
       kmN++;
