@@ -558,6 +558,8 @@ function renderContractAssembliesBlock(c) {
 
   let html = '';
   html += '<div class="section-label" style="margin-top: 20px;">Готовность по сборкам</div>';
+  html += '<div style="padding: 0 18px;font-size:12px;color:var(--text-light);margin-bottom:6px;">' +
+    'Что собираем на производстве по этому договору — сборки и узлы (ЩУ, узлы регулирования и т.п.) и их готовность.</div>';
   html += '<div style="padding: 0 18px 16px;">';
 
   // v2.43.13: контейнер прогресс-бара (заполняется renderContractProgressBar
@@ -8835,6 +8837,9 @@ function renderContractItemsBlock(contractId) {
     '</div>';
   }
   html += '</div>';
+  // v2.45.316: пояснение — что такое спецификация
+  html += '<div style="font-size:12px;color:var(--text-light);padding:0 0 8px;">' +
+    'Всё, что поставляется клиенту по договору: и наши сборки, и покупное, и материалы.</div>';
 
   // Список позиций
   if (items.length) {
@@ -10270,6 +10275,8 @@ async function loadContractShipmentBlock(contractId) {
       html += '<div class="ship-units-card" style="margin-top:14px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 14px;">';
       html += '<div style="font-size:13px;font-weight:700;color:var(--text-dark);margin-bottom:8px;display:flex;align-items:center;gap:6px;">' +
         '<i class="ti ti-list-check" style="color:var(--brand);"></i> К отгрузке <span style="color:var(--text-light);font-weight:400;">(' + units.length + ' ед.)</span></div>';
+      html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">' +
+        'Что физически уезжает с производства: коробки (в них упаковано покупное и мелочь) и отдельные узлы/сборки.</div>';
       const _unitRow = (u) => {
         const done = !!u.shipped;
         const icon = u.type === 'box' ? 'ti-package' : 'ti-tool';
