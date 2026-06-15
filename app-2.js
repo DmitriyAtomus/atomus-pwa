@@ -9225,6 +9225,16 @@ function renderSpecForm(contractId, existing) {
   }
   html += '</div>';
   html += '</div>';
+  // v2.45.325: отгружать крупное покупное отдельной позицией (свой QR в «К отгрузке»)
+  const shipStandaloneOn = !!e.ship_standalone;
+  html += '<div style="grid-column: 1 / -1; margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 10px;">';
+  html += '<label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--text-dark);">' +
+    '<input type="checkbox" id="spec-form-ship-standalone"' + (shipStandaloneOn ? ' checked' : '') + ' style="width:auto;flex-shrink:0;">' +
+    '<span><i class="ti ti-shopping-cart" style="vertical-align:-2px;color:var(--brand);"></i> Отгружать отдельной позицией</span>' +
+    '</label>';
+  html += '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;line-height:1.45;">' +
+    'Для крупного покупного (приточки, чиллеры-моноблоки): встанет в «К отгрузке» отдельной единицей со своим QR и учётом в прогрессе — без упаковки в коробку.</div>';
+  html += '</div>';
   html += '</div>';
   // Кнопки
   html += '<div class="spec-form-row-2">';
@@ -9537,6 +9547,8 @@ async function submitSpecForm(contractId, itemId) {
   payload.alt_supply_comment = altOn ? ((document.getElementById('spec-form-alt-comment') || {}).value || '').trim() : '';
   // v2.45.199: система/объект
   payload.system_tag = ((document.getElementById('spec-form-system-tag') || {}).value || '').trim();
+  // v2.45.325: отгружать крупное покупное отдельной позицией
+  payload.ship_standalone = (document.getElementById('spec-form-ship-standalone') || {}).checked ? 1 : 0;
 
   // v2.45.199: редактирование спецификации — под личным паролём
   const _pwd = await _promptPasswordForAction(
@@ -10344,7 +10356,8 @@ async function loadContractShipmentBlock(contractId) {
     const units = s.items || [];
     if (units.length) {
       const boxes = units.filter(u => u.type === 'box');
-      const asms = units.filter(u => u.type !== 'box');
+      const asms = units.filter(u => u.type === 'assembly');
+      const citems = units.filter(u => u.type === 'contract_item');  // v2.45.325
       html += '<div class="ship-units-card" style="margin-top:14px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 14px;">';
       html += '<div style="font-size:13px;font-weight:700;color:var(--text-dark);margin-bottom:8px;display:flex;align-items:center;gap:6px;">' +
         '<i class="ti ti-list-check" style="color:var(--brand);"></i> К отгрузке <span style="color:var(--text-light);font-weight:400;">(' + units.length + ' ед.)</span></div>';
@@ -10352,10 +10365,11 @@ async function loadContractShipmentBlock(contractId) {
         'Что физически уезжает с производства: коробки (в них упаковано покупное и мелочь) и отдельные узлы/сборки.</div>';
       const _unitRow = (u) => {
         const done = !!u.shipped;
-        const icon = u.type === 'box' ? 'ti-package' : 'ti-tool';
+        const icon = u.type === 'box' ? 'ti-package' : (u.type === 'contract_item' ? 'ti-shopping-cart' : 'ti-tool');
         const qtyLabel = u.type === 'box'
           ? ((u.asm_count || u.qty || 0) + ' ' + (typeof pluralAssemblies === 'function' ? pluralAssemblies(u.asm_count || u.qty || 0) : 'шт.'))
           : ((u.qty || 1) + ' шт.');
+        const kindLabel = u.type === 'box' ? 'Коробка · ' : (u.type === 'contract_item' ? 'Покупное (отдельно) · ' : 'Узел / сборка · ');
         const badge = done
           ? '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> отгружено</span>'
           : '<span style="font-size:11px;font-weight:700;color:#9A3412;background:#FFEDD5;padding:1px 8px;border-radius:6px;white-space:nowrap;">готово к отгрузке</span>';
@@ -10367,7 +10381,7 @@ async function loadContractShipmentBlock(contractId) {
             '<i class="ti ' + icon + '"></i></div>' +
           '<div style="flex:1;min-width:0;">' +
             '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(u.name || '') + '</div>' +
-            '<div style="font-size:11.5px;color:var(--text-light);">' + (u.type === 'box' ? 'Коробка · ' : 'Узел / сборка · ') + qtyLabel + '</div>' +
+            '<div style="font-size:11.5px;color:var(--text-light);">' + kindLabel + qtyLabel + '</div>' +
           '</div>' +
           badge +
         '</div>';
@@ -10379,6 +10393,10 @@ async function loadContractShipmentBlock(contractId) {
       if (asms.length) {
         html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:10px 0 2px;">Узлы и сборки (отдельно)</div>';
         asms.forEach(u => { html += _unitRow(u); });
+      }
+      if (citems.length) {  // v2.45.325: крупное покупное отдельной позицией
+        html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:10px 0 2px;">Покупное (отдельной позицией)</div>';
+        citems.forEach(u => { html += _unitRow(u); });
       }
       html += '</div>';
     }

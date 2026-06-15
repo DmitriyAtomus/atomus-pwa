@@ -8563,8 +8563,8 @@ function _toggleShipGroup(groupId) {
 }
 
 function renderShipItem(it) {
-  const iconCls = it.type === 'box' ? 'ti-package' : 'ti-tool';
-  const typeLabel = it.type === 'box' ? 'Коробка' : 'Сборка';
+  const iconCls = it.type === 'box' ? 'ti-package' : (it.type === 'contract_item' ? 'ti-shopping-cart' : 'ti-tool');
+  const typeLabel = it.type === 'box' ? 'Коробка' : (it.type === 'contract_item' ? 'Покупное (отдельно)' : 'Сборка');
   let sub = typeLabel;
   // v2.45.139: у короба показываем сколько сборок внутри (скан короба отгрузит их все)
   if (it.type === 'box') {
@@ -8629,9 +8629,10 @@ function _renderShipmentItemModal(card) {
     document.body.appendChild(m);
   }
   const isBox = card.type === 'box';
+  const isCItem = card.type === 'contract_item';  // v2.45.325: покупное отдельной позицией
   const isShipped = !!card.shipped;
-  const typeLabel = isBox ? 'Коробка' : 'Сборка';
-  const heroIcon = isBox ? 'ti-package' : 'ti-tool';
+  const typeLabel = isBox ? 'Коробка' : (isCItem ? 'Покупное (отдельно)' : 'Сборка');
+  const heroIcon = isBox ? 'ti-package' : (isCItem ? 'ti-shopping-cart' : 'ti-tool');
 
   // v2.43.12: чистим ведущий № в номере договора (он часто уже есть в данных)
   const cleanContractNum = (card.contract_number || '').replace(/^№\s*/, '');
