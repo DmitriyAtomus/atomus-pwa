@@ -8167,11 +8167,22 @@ function renderSupplyOrderDetail(o) {
       const receivedTag = oi.received_qty > 0
         ? '<span class="oi-received">принято ' + oi.received_qty + ' из ' + oi.qty + '</span>'
         : '';
+      // v2.45.314: сверка «запрошено vs в счёте» (кол-во из распознанного счёта)
+      let _invQtyTag = '';
+      if (oi.invoice_qty !== null && oi.invoice_qty !== undefined) {
+        const diff = Number(oi.invoice_qty) - Number(oi.qty);
+        if (Math.abs(diff) < 0.001) {
+          _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> в счёте ' + _fmtQty(oi.invoice_qty) + '</span>';
+        } else {
+          _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#9A3412;background:#FEE2E2;padding:1px 8px;border-radius:6px;white-space:nowrap;" title="Расхождение с запрошенным">⚠ в счёте ' + _fmtQty(oi.invoice_qty) + ' (' + (diff > 0 ? '+' : '') + _fmtQty(diff) + ')</span>';
+        }
+      }
       html += '<div class="oi-row">' +
         '<div class="oi-body">' +
           '<div class="oi-title">' + escapeHtml(oi.item_name) + '</div>' +
           '<div class="oi-meta">' +
-            '<span>' + oi.qty + ' ' + escapeHtml(oi.item_unit) + '</span>' +
+            '<span>запрошено ' + oi.qty + ' ' + escapeHtml(oi.item_unit) + '</span>' +
+            _invQtyTag +
             (oi.price !== null && oi.price !== undefined ? '<span>' + oi.price + ' ₽/шт</span>' : '') +
             (oi.contract_number ? '<span class="sup-contract-badge" onclick="openContractFromSupply(' + oi.request_contract_id + ')"><i class="ti ti-link"></i>' + escapeHtml(oi.contract_number) + '</span>' : '') +
             receivedTag +
@@ -10199,6 +10210,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.314',
+    date: '15.06.2026',
+    title: 'Заказ: сверка «запрошено / в счёте»',
+    features: [
+      'В позициях заказа теперь видно <b>«запрошено N»</b> и рядом <b>«в счёте M»</b> — количество, которое поставщик выставил в распознанном счёте',
+      'Если кол-во в счёте отличается от запрошенного — строка подсвечивается красным с разницей (⚠ +/-), совпало — зелёным',
+      'Кол-во из счёта подтягивается автоматически при распознавании (кнопка «Распознать номер и сумму» или авто с почты)',
+    ],
+  },
   {
     version: 'v2.45.313',
     date: '15.06.2026',
