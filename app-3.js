@@ -7937,11 +7937,114 @@ function openSupplyOrderAddMenu() {
       '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">' +
         '<button class="btn btn-primary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openNewSupplyOrder();">' +
           '<i class="ti ti-file-plus"></i> Новый заказ поставщику</button>' +
-        '<button class="btn btn-secondary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openSupplyInvoiceUpload(true);">' +
+        '<button class="btn btn-secondary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openUploadInvoiceToPay();">' +
           '<i class="ti ti-cloud-upload"></i> Загрузить счёт</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
+}
+
+// v2.45.318: «Загрузить счёт» → создаёт заказ сразу «в оплату» (виден в «К оплате»).
+// Файл стажируется, выбираешь договор/сумму/кому, жмёшь «Отправить» — окно не
+// закрывается раньше времени, распознавание не запускается.
+let _payInvoiceFile = null;
+function openUploadInvoiceToPay() {
+  const existing = document.getElementById('pay-inv-modal');
+  if (existing) existing.remove();
+  _payInvoiceFile = null;
+  const inp = 'width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;color:var(--text-dark);box-sizing:border-box;';
+  const lbl = 'display:block;font-size:12.5px;color:var(--text-mid);margin-bottom:4px;';
+  const overlay = document.createElement('div');
+  overlay.id = 'pay-inv-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:460px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-cloud-upload"></i>Счёт на оплату</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pay-inv-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div id="pay-inv-drop" onclick="document.getElementById(\'pay-inv-file\').click()" style="border:1.5px dashed var(--border);border-radius:10px;padding:18px;text-align:center;cursor:pointer;">' +
+          '<i class="ti ti-file-upload" style="font-size:30px;color:var(--brand);"></i>' +
+          '<div id="pay-inv-fname" style="margin-top:6px;font-size:13.5px;color:var(--text-mid);">Выбрать файл счёта (PDF, фото, Excel)</div>' +
+        '</div>' +
+        '<input type="file" id="pay-inv-file" accept="image/*,application/pdf,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="_payInvOnFile(event)">' +
+        '<div style="margin-top:14px;">' +
+          '<label style="' + lbl + '"><i class="ti ti-file-text" style="font-size:13px;"></i> Договор клиента</label>' +
+          '<select id="pay-inv-contract" style="' + inp + '"><option value="">— Без договора —</option></select>' +
+        '</div>' +
+        '<div style="margin-top:10px;">' +
+          '<label style="' + lbl + '">Кому платим (необязательно)</label>' +
+          '<input type="text" id="pay-inv-supplier" placeholder="напр. Лизинг ВТБ" style="' + inp + '">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;">' +
+          '<div style="flex:1;"><label style="' + lbl + '">Номер счёта</label><input type="text" id="pay-inv-number" style="' + inp + '"></div>' +
+          '<div style="flex:1;"><label style="' + lbl + '">Сумма, ₽</label><input type="number" inputmode="decimal" id="pay-inv-amount" style="' + inp + '"></div>' +
+        '</div>' +
+        '<div id="pay-inv-status" style="margin-top:10px;font-size:12.5px;text-align:center;color:var(--text-light);"></div>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:14px;justify-content:center;" onclick="_payInvSubmit()"><i class="ti ti-send"></i> Отправить в оплату</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  _payInvPopulateContracts();
+}
+
+function _payInvOnFile(e) {
+  const f = e.target.files && e.target.files[0];
+  _payInvoiceFile = f || null;
+  const el = document.getElementById('pay-inv-fname');
+  if (el) el.textContent = f ? ('✓ ' + f.name) : 'Выбрать файл счёта (PDF, фото, Excel)';
+}
+
+async function _payInvPopulateContracts() {
+  const sel = document.getElementById('pay-inv-contract');
+  if (!sel) return;
+  try {
+    let contracts = (typeof cache !== 'undefined' && cache.contracts) || null;
+    if (!contracts) {
+      const d = await apiGet('/api/contracts?limit=500');
+      contracts = d.contracts || [];
+      if (typeof cache !== 'undefined') cache.contracts = contracts;
+    }
+    contracts.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = (c.number || ('#' + c.id)) + (c.contractor_name ? (' · ' + c.contractor_name) : '');
+      sel.appendChild(o);
+    });
+  } catch (e) { /* без договора можно */ }
+}
+
+async function _payInvSubmit() {
+  if (!_payInvoiceFile) { showToast('Сначала выберите файл счёта', 'error'); return; }
+  const statusEl = document.getElementById('pay-inv-status');
+  const fd = new FormData();
+  fd.append('file', _payInvoiceFile, _payInvoiceFile.name);
+  const c = document.getElementById('pay-inv-contract');   if (c && c.value) fd.append('contract_id', c.value);
+  const sup = document.getElementById('pay-inv-supplier');  if (sup && sup.value.trim()) fd.append('supplier_name', sup.value.trim());
+  const num = document.getElementById('pay-inv-number');    if (num && num.value.trim()) fd.append('invoice_number', num.value.trim());
+  const amt = document.getElementById('pay-inv-amount');    if (amt && amt.value.trim()) fd.append('amount', amt.value.trim());
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Отправляем…';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const res = await fetch(API_BASE + '/api/supply-orders/from-invoice', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:#8C2A2A;">' + escapeHtml(d.message || ('Ошибка ' + res.status)) + '</span>';
+      return;
+    }
+    showToast('Счёт отправлен в оплату ✓', 'success');
+    const m = document.getElementById('pay-inv-modal'); if (m) m.remove();
+    cache.supplyOrders = null;
+    try { selectSidebarItem('supply-orders'); } catch (_) {}
+    try { setSupplyOrdFilter('to_pay'); } catch (_) {}
+    try { _fillPayDueBlock(); } catch (_) {}
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:#8C2A2A;">Сеть: ' + escapeHtml(String(e.message || e)) + '</span>';
+  }
 }
 
 async function openNewSupplyOrder() {
@@ -8083,6 +8186,7 @@ function renderSupplyOrderDetail(o) {
       (o.supplier_email ? '<div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">' + escapeHtml(o.supplier_email) + '</div></div>' : '') +
       (o.expected_date ? '<div class="detail-item"><div class="detail-label">Ожидаем</div><div class="detail-value">' + escapeHtml(o.expected_date) + '</div></div>' : '') +
       (o.order_label ? '<div class="detail-item"><div class="detail-label">Метка</div><div class="detail-value" style="font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(o.order_label) + '</div></div>' : '') +
+      (o.contract_number ? '<div class="detail-item"><div class="detail-label">Договор</div><div class="detail-value">№' + escapeHtml(o.contract_number) + '</div></div>' : '') +
     '</div>' +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
@@ -10235,6 +10339,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.318',
+    date: '15.06.2026',
+    title: 'Загрузить счёт → сразу в «К оплате»',
+    features: [
+      'Кнопка <b>«Загрузить счёт»</b> (на «+» и в шапке «Заказов») теперь открывает форму: выбираешь <b>файл</b>, <b>договор</b> (или без), по желанию <b>кому платим</b>, <b>номер</b> и <b>сумму</b>, и жмёшь <b>«Отправить в оплату»</b> — окно не закрывается само',
+      'Счёт сразу попадает в <b>«К оплате»</b> — бухгалтер видит его рядом с заказами, открывает файл и оплачивает (с подтверждением паролём)',
+      'Отделу оплаты (бухгалтер + директор) приходит уведомление «Новый счёт на оплату»',
+    ],
+  },
   {
     version: 'v2.45.317',
     date: '15.06.2026',

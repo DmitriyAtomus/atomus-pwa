@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.317";
+const APP_VERSION = "v2.45.318";
 const APP_VERSION_DATE = "15.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1851,12 +1851,14 @@ function _payBlockHtml(list, title, color, icon, btnFactory) {
       ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽'
       : (o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '');
     const inv = o.invoice_number ? 'Счёт № ' + o.invoice_number : (o.invoice_filename || '');
+    const dog = o.contract_number ? ('дог. №' + o.contract_number) : '';
+    const meta2 = [inv, dog].filter(Boolean).join(' · ');
     h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);">' +
       '<div style="flex:1;min-width:0;cursor:pointer;" onclick="state.currentSupplyOrderId=' + o.id + ';selectSidebarItem(\'supply-order-detail\');" title="Открыть заказ">' +
         '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
           escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
-        '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(inv) +
-          (sum ? (inv ? ' · ' : '') + '<b style="color:' + color + ';">' + sum + '</b>' : '') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(meta2) +
+          (sum ? (meta2 ? ' · ' : '') + '<b style="color:' + color + ';">' + sum + '</b>' : '') + '</div>' +
       '</div>' +
       btnFactory(o) +
     '</div>';
