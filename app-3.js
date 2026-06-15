@@ -8028,8 +8028,12 @@ function renderSupplyOrderDetail(o) {
     ? ['sent', 'awaiting_invoice', 'invoice_received', 'to_pay', 'paid', 'partial']
     : ['sent', 'awaiting_invoice', 'invoice_received'];
   const canUploadInvoice = canManage && _canUploadStatuses.includes(o.status);
-  const canToPay         = canManage && o.status === 'invoice_received';
-  const canMarkPaid      = canManage && o.status === 'to_pay';
+  // v2.45.310: оплатные переходы (На оплату / Оплачен) доступны и бухгалтеру —
+  // бэкенд это разрешает (accountant → to_pay/paid).
+  const _isAcc = state.user && (state.user.roles || []).includes('accountant');
+  const _canPayFlow = canManage || _isAcc;
+  const canToPay         = _canPayFlow && o.status === 'invoice_received';
+  const canMarkPaid      = _canPayFlow && o.status === 'to_pay';
   const canMarkReceived  = canManage && ['paid', 'partial'].includes(o.status);
   const canCancel        = canManage && !['received', 'cancelled', 'draft'].includes(o.status);
 
@@ -8345,15 +8349,12 @@ async function sendOrder(orderId) {
 async function transitionSupplyOrder(orderId, newStatus, confirmText) {
   if (confirmText && !confirm(confirmText)) return;
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/transition', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: newStatus }),
-    });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      showToast(d.message || ('Не удалось (HTTP ' + r.status + ')'), 'error');
+    // v2.45.309: для 'paid' бэкенд требует подтверждение личным паролём —
+    // общий помощник (из app-1.js) спросит пароль и повторит при необходимости.
+    const res = await supplyOrderTransitionConfirmed(orderId, newStatus);
+    if (res.cancelled) return;
+    if (!res.ok) {
+      showToast(res.message || ('Не удалось (HTTP ' + res.status + ')'), 'error');
       return;
     }
     showToast('Статус обновлён', 'success');
@@ -10198,6 +10199,26 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.310',
+    date: '15.06.2026',
+    title: 'Бухгалтер: кнопка «На оплату»',
+    features: [
+      'У <b>бухгалтера</b> на главном экране появился блок <b>«Счёт получен — на оплату»</b> с кнопкой <b>«На оплату»</b>: можно передать пришедший счёт в очередь на оплату, не дожидаясь директора',
+      'Те же кнопки «На оплату» и «Оплачен» теперь видны бухгалтеру и в карточке заказа поставщику',
+      'Дальше по цепочке — кнопка «Оплатил» (с подтверждением паролём) и уведомление директору, как и раньше',
+    ],
+  },
+  {
+    version: 'v2.45.309',
+    date: '15.06.2026',
+    title: 'Оплата счёта — подтверждение паролём и уведомление директору',
+    features: [
+      'Отметка <b>«Оплачено»</b> теперь требует подтверждения — кто отмечает оплату, вводит <b>свой пароль от Atom</b>. Защита от случайной и чужой отметки (если пароль у сотрудника не задан — подтверждение пропускается)',
+      'Как только счёт отмечен оплаченным — <b>директору</b> приходит уведомление (пуш на телефон + запись в колокольчике): поставщик, сумма и кто отметил',
+      'Работает и на главном экране (блок «На оплате»), и в карточке заказа поставщику',
+    ],
+  },
   {
     version: 'v2.45.308',
     date: '15.06.2026',
