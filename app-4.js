@@ -9318,6 +9318,9 @@ function renderSupplyInvoicesList(items) {
           'onclick="event.stopPropagation();' + handler + '(' + inv.id + ')">' +
           '<i class="ti ti-trash"></i></button>'
       : '';
+    const contractChip = inv.contract_number
+      ? ('<span style="display:inline-block;background:#E0E7FF;color:#3730A3;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;">Дог. №' + escapeHtml(inv.contract_number) + '</span>')
+      : '';
     html +=
       '<div class="si-list-card" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
         '<div class="si-list-card-row">' +
@@ -9326,6 +9329,7 @@ function renderSupplyInvoicesList(items) {
         '</div>' +
         '<div class="si-list-card-bottom">' +
           '<span class="si-status-chip ' + chipCls + '">' + escapeHtml(chipTxt) + '</span>' +
+          contractChip +
           '<span class="si-list-card-meta">' +
             escapeHtml(supplier) + (pagesLine ? (' · ' + pagesLine) : '') + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
           '</span>' +
@@ -9730,6 +9734,13 @@ function openSupplyInvoiceUpload() {
         '</div>' +
         '<input type="file" id="si-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleFileSelect(event)">' +
         '<input type="file" id="si-file-input" multiple accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.xlsx,.xls" style="display:none;" onchange="siHandleFileSelect(event)">' +
+        '<div style="margin-top:14px;">' +
+          '<label style="display:block;font-size:12.5px;color:var(--text-mid);margin-bottom:5px;"><i class="ti ti-file-text" style="font-size:13px;"></i> Договор клиента (необязательно)</label>' +
+          '<select id="si-contract-select" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;color:var(--text-dark);">' +
+            '<option value="">— Без договора —</option>' +
+          '</select>' +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">Чтобы видеть, по какому договору/клиенту этот расход. Можно оставить «Без договора».</div>' +
+        '</div>' +
         '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:12.5px;line-height:1.4;color:var(--text-mid);">' +
           '<input type="checkbox" id="si-defer-recognize" style="margin-top:2px;flex-shrink:0;">' +
           '<span>' +
@@ -9747,6 +9758,27 @@ function openSupplyInvoiceUpload() {
     const cb = document.getElementById('si-defer-recognize');
     if (cb) cb.checked = true;
   }
+  _siPopulateContractSelect();
+}
+
+// v2.45.311: список договоров клиентов в селектор «Договор» при загрузке счёта
+async function _siPopulateContractSelect() {
+  const sel = document.getElementById('si-contract-select');
+  if (!sel) return;
+  try {
+    let contracts = (typeof cache !== 'undefined' && cache.contracts) || null;
+    if (!contracts) {
+      const d = await apiGet('/api/contracts?limit=500');
+      contracts = d.contracts || [];
+      if (typeof cache !== 'undefined') cache.contracts = contracts;
+    }
+    contracts.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = (c.number || ('#' + c.id)) + (c.contractor_name ? ' · ' + c.contractor_name : '');
+      sel.appendChild(opt);
+    });
+  } catch (e) { /* без договора всё равно можно загрузить */ }
 }
 
 function siHandleDrop(e) {
@@ -9775,6 +9807,9 @@ async function uploadSupplyInvoiceFiles(files) {
   const fd = new FormData();
   files.forEach(f => fd.append('file', f, f.name));
   if (defer) fd.append('defer_recognition', '1');
+  // v2.45.311: договор клиента (если выбран в селекторе)
+  const contractSel = document.getElementById('si-contract-select');
+  if (contractSel && contractSel.value) fd.append('contract_id', contractSel.value);
 
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -9798,8 +9833,15 @@ async function uploadSupplyInvoiceFiles(files) {
     const data = await res.json();
     const invId = data.id;
     showToast(defer ? 'Файл загружен · ожидает распознавания' : 'Файл загружен · распознаём', 'success');
-    document.getElementById('si-upload-modal').remove();
-    loadSupplyInvoiceDetail(invId);
+    const modal = document.getElementById('si-upload-modal');
+    if (modal) modal.remove();
+    // Если загружали не с экрана приёмки (например, с «Заказы») — перейдём туда
+    if (state && state.currentScreen === 'supply-invoice-intake') {
+      loadSupplyInvoiceDetail(invId);
+    } else {
+      try { selectSidebarItem('supply-invoice-intake'); } catch (_) {}
+      setTimeout(() => { try { loadSupplyInvoiceDetail(invId); } catch (_) {} }, 350);
+    }
   } catch (e) {
     if (statusEl) statusEl.innerHTML = '<span style="color:#8C2A2A;">Ошибка соединения: ' + escapeHtml(String(e.message || e)) + '</span>';
     if (zone) zone.style.pointerEvents = '';
