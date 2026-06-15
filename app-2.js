@@ -629,7 +629,7 @@ function renderContractAssembliesBlock(c) {
         '<div>Дата</div><div>Модель</div><div style="text-align: right;">Кол-во</div><div style="text-align: right;">Сборщики</div>' +
         '</div>';
     }
-    assemblies.forEach(a => {
+    assemblies.forEach((a, idx) => {
       const workers = (a.workers || []).map(w => w.short_name).filter(Boolean).join(', ') || '—';
       const modelFull = (a.model_name || '') + (a.model_extra ? ' · ' + a.model_extra : '');
       const ipExec = [];
@@ -679,7 +679,10 @@ function renderContractAssembliesBlock(c) {
       }
       html += '<div class="cal-row">' +
         '<div class="cal-date">' + formatDateShort(a.assembly_date) + '</div>' +
-        '<div class="cal-name">' + escapeHtml(modelFull) +
+        '<div class="cal-name">' +
+          // v2.45.319: нумерация сборок
+          '<span style="color:var(--text-light);font-weight:700;margin-right:5px;">' + (idx + 1) + '.</span>' +
+          escapeHtml(modelFull) +
           ' ' + statusBadge +
           (ipExec.length ? '<small>' + escapeHtml(ipExec.join(' · ')) + '</small>' : '') +
         '</div>' +
