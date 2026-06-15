@@ -241,6 +241,7 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
           <g id="selL" pointer-events="none"></g>
           <g id="draftL"></g>
           <g id="ghostL"></g>
+          <g id="handlesL"></g>
         </g>
       </svg>
 
@@ -700,9 +701,6 @@ function renderCanvas(){
         h+='<text x="'+_tx+'" y="'+_ty+'" font-size="25" fill="'+(sel?CY:SOFT)+'" stroke="none" text-anchor="'+(_lp.horiz?'middle':'start')+'" font-family="\'IBM Plex Mono\'">'+_sec+' мм²</text>';
       }
     }
-    if(sel)w.pts.forEach(function(p){
-      h+='<rect x="'+(p.x-13)+'" y="'+(p.y-13)+'" width="26" height="26" fill="#fff" stroke="'+CY+'" stroke-width="5"/>';
-    });
   });
   $('wiresL').innerHTML=h;
   /* точки соединений */
@@ -754,6 +752,17 @@ function renderCanvas(){
     }
   }
   $('selL').innerHTML=h;
+  /* ручки выбранного провода: концевые квадраты — кликни и веди линию дальше */
+  h='';
+  if(S.sel&&S.sel.t==='w'){
+    var sw=wireById(S.sel.id);
+    if(sw) sw.pts.forEach(function(p,pi){
+      var isEnd=(pi===0||pi===sw.pts.length-1);
+      if(isEnd) h+='<rect data-we="'+sw.id+':'+pi+'" x="'+(p.x-16)+'" y="'+(p.y-16)+'" width="32" height="32" rx="5" fill="'+CY+'" stroke="#06262E" stroke-width="3" style="cursor:crosshair"/>';
+      else h+='<rect x="'+(p.x-12)+'" y="'+(p.y-12)+'" width="24" height="24" fill="#fff" stroke="'+CY+'" stroke-width="4" pointer-events="none"/>';
+    });
+  }
+  $('handlesL').innerHTML=h;
   renderDraft();renderGhost();
 }
 function renderDraft(){
@@ -921,11 +930,22 @@ function wireClick(wx,wy){
 function finishWire(){
   if(draft.length>=2){
     pushUndo();
-    S.wires.push({id:uid('w'),pts:draft.map(function(p){return {x:p.x,y:p.y}})});
+    if(S._extend){
+      // продолжение существующего провода: дорисовываем новые точки к его концу
+      var ww=wireById(S._extend.id);
+      if(ww){
+        var add=draft.slice(1).map(function(p){return {x:p.x,y:p.y}});
+        ww.pts=S._extend.atStart ? add.reverse().concat(ww.pts) : ww.pts.concat(add);
+      } else {
+        S.wires.push({id:uid('w'),pts:draft.map(function(p){return {x:p.x,y:p.y}})});
+      }
+    } else {
+      S.wires.push({id:uid('w'),pts:draft.map(function(p){return {x:p.x,y:p.y}})});
+    }
   }
-  draft=[];renderCanvas();
+  draft=[];S._extend=null;renderCanvas();
 }
-function cancelWire(){draft=[];renderDraft()}
+function cancelWire(){draft=[];S._extend=null;renderDraft()}
 
 /* ============ drag компонента + подтяжка проводов ============ */
 var mode=null;
@@ -1108,6 +1128,21 @@ svg.addEventListener('pointerdown',function(e){
     return;
   }
   if(tool==='wire'){wireClick(wp.x,wp.y);return}
+  // клик по концевой ручке выбранного провода → продолжаем вести от неё линию
+  var th=e.target.closest&&e.target.closest('[data-we]');
+  if(th){
+    var pr=th.getAttribute('data-we').split(':'), ww=wireById(pr[0]), idx=+pr[1];
+    if(ww){
+      var ep=ww.pts[idx];
+      S._extend={id:ww.id, atStart:(idx===0)};
+      draft=[{x:ep.x,y:ep.y}];
+      setTool('wire');
+      draft=[{x:ep.x,y:ep.y}];
+      renderDraft();
+      toast('Веди линию от конца провода · 2×клик/✓ — готово, Esc — отмена');
+      return;
+    }
+  }
   var tc=e.target.closest&&e.target.closest('[data-c]');
   if(tc){
     var id=tc.getAttribute('data-c');
