@@ -4003,6 +4003,57 @@ async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate)
 // v2.45.93: пакетная печать QR-наклеек для всех готовых сборок договора.
 // Один клик → шлёт N заданий в очередь шлюза термопринтера. По одной
 // странице с QR на каждую готовую сборку.
+// v2.45.331: окно-предпросмотр перед пакетной печатью — список того, что
+// распечатается (сборки по именам + покупное с количеством). Возвращает
+// Promise<bool>: true — печатать, false — отмена.
+function _confirmBatchPrintModal(total, readyList, compList) {
+  return new Promise((resolve) => {
+    let m = document.getElementById('batch-print-modal');
+    if (m) m.remove();
+    m = document.createElement('div');
+    m.id = 'batch-print-modal';
+    m.className = 'modal-overlay visible';
+    let listHtml = '';
+    if (readyList && readyList.length) {
+      listHtml += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:12px 0 4px;">Сборки (' + readyList.length + ')</div>';
+      readyList.forEach((a) => {
+        const nm = [a.model_article, a.model_name].filter(Boolean).join(' · ') || ('Сборка #' + a.id);
+        listHtml += '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);">' + escapeHtml(nm) + '</div>';
+      });
+    }
+    if (compList && compList.length) {
+      const compQty = compList.reduce((acc, it) => acc + Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1))), 0);
+      listHtml += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:14px 0 4px;">Покупное / комплектующие (' + compQty + ' шт · ' + compList.length + ' поз.)</div>';
+      compList.forEach((it) => {
+        const q = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
+        listHtml += '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;">' +
+          '<span>' + escapeHtml(it.name || ('Позиция #' + it.id)) + '</span>' +
+          '<span style="color:var(--text-light);white-space:nowrap;">' + q + ' шт</span></div>';
+      });
+    }
+    m.innerHTML =
+      '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+        '<div class="modal-header"><h3><i class="ti ti-printer"></i> Печать QR-наклеек</h3>' +
+          '<button class="modal-close" id="bp-close"><i class="ti ti-x"></i></button></div>' +
+        '<div style="padding:14px 18px;max-height:55vh;overflow-y:auto;">' +
+          '<div style="font-size:14px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">Будет отправлено ' + total + ' наклеек на термопринтер</div>' +
+          '<div style="font-size:12px;color:var(--text-light);line-height:1.5;">Проверь список ниже. Если шлюз сейчас оффлайн — задания подождут в очереди и напечатаются, как только он вернётся.</div>' +
+          listHtml +
+        '</div>' +
+        '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
+          '<button class="btn btn-secondary" id="bp-cancel">Отмена</button>' +
+          '<button class="btn btn-primary" id="bp-ok"><i class="ti ti-printer"></i> Печать (' + total + ')</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(m);
+    const cleanup = (val) => { m.remove(); resolve(val); };
+    m.querySelector('#bp-close').onclick = () => cleanup(false);
+    m.querySelector('#bp-cancel').onclick = () => cleanup(false);
+    m.querySelector('#bp-ok').onclick = () => cleanup(true);
+    m.onclick = (e) => { if (e.target === m) cleanup(false); };
+  });
+}
+
 async function batchPrintContractQrs(contractId) {
   // Берём договор из текущего экрана — assemblies уже подгружены при рендере карточки
   const c = state.lastLoadedContract || {};
@@ -4040,12 +4091,9 @@ async function batchPrintContractQrs(contractId) {
     showToast('Нет готовых сборок и компонентов в резерве для печати', 'error');
     return;
   }
-  const partsMsg = [];
-  if (ready.length) partsMsg.push(ready.length + ' сбор.');
-  if (compQtySum) partsMsg.push(compQtySum + ' компл. (' + compItems.length + ' поз.)');
-  if (!confirm('Отправить на термопринтер ' + total + ' QR-наклеек?\n\n' +
-               '· ' + partsMsg.join(' · ') + '\n\n' +
-               'Если шлюз сейчас оффлайн — задания подождут в очереди и напечатаются как только он вернётся.')) return;
+  // v2.45.331: вместо нативного confirm — окно со списком того, что распечатается
+  const _go = await _confirmBatchPrintModal(total, ready, compItems);
+  if (!_go) return;
 
   showToast('Отправляем ' + total + ' заданий…', 'info');
   let ok = 0;
