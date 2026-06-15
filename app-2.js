@@ -10371,9 +10371,20 @@ async function loadContractShipmentBlock(contractId) {
       const _unitRow = (u) => {
         const done = !!u.shipped;
         const icon = u.type === 'box' ? 'ti-package' : (u.type === 'contract_item' ? 'ti-shopping-cart' : 'ti-tool');
-        const qtyLabel = u.type === 'box'
-          ? ((u.asm_count || u.qty || 0) + ' ' + (typeof pluralAssemblies === 'function' ? pluralAssemblies(u.asm_count || u.qty || 0) : 'шт.'))
-          : ((u.qty || 1) + ' шт.');
+        // v2.45.330: у коробки показываем и сборки, и покупные позиции — чтобы
+        // вместо «0 сборок» было «N покупных позиций» (коробка не пустая).
+        let qtyLabel;
+        if (u.type === 'box') {
+          const asmN = Number(u.asm_count || 0);
+          const purN = Number(u.purchased_count || 0);
+          const asmTxt = asmN + ' ' + (typeof pluralAssemblies === 'function' ? pluralAssemblies(asmN) : 'сборок');
+          const purTxt = purN + ' ' + (typeof _plural === 'function' ? _plural(purN, ['покупная позиция', 'покупные позиции', 'покупных позиций']) : 'покупных позиций');
+          if (asmN > 0 && purN > 0) qtyLabel = asmTxt + ' + ' + purTxt;
+          else if (purN > 0) qtyLabel = purTxt;
+          else qtyLabel = asmTxt;  // только сборки или пустая (0 сборок)
+        } else {
+          qtyLabel = (u.qty || 1) + ' шт.';
+        }
         const kindLabel = u.type === 'box' ? 'Коробка · ' : (u.type === 'contract_item' ? 'Покупное (отдельно) · ' : 'Узел / сборка · ');
         const badge = done
           ? '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> отгружено</span>'

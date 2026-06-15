@@ -8567,9 +8567,14 @@ function renderShipItem(it) {
   const typeLabel = it.type === 'box' ? 'Коробка' : (it.type === 'contract_item' ? 'Покупное (отдельно)' : 'Сборка');
   let sub = typeLabel;
   // v2.45.139: у короба показываем сколько сборок внутри (скан короба отгрузит их все)
+  // v2.45.330: + покупные позиции, чтобы вместо «0 сборок» было «N покупных позиций»
   if (it.type === 'box') {
-    const n = Number(it.asm_count != null ? it.asm_count : it.qty) || 0;
-    sub += ' · ' + n + ' ' + _plural(n, ['сборка', 'сборки', 'сборок']);
+    const asmN = Number(it.asm_count || 0);
+    const purN = Number(it.purchased_count || 0);
+    const parts = [];
+    if (asmN > 0) parts.push(asmN + ' ' + _plural(asmN, ['сборка', 'сборки', 'сборок']));
+    if (purN > 0) parts.push(purN + ' ' + _plural(purN, ['покупная позиция', 'покупные позиции', 'покупных позиций']));
+    sub += ' · ' + (parts.length ? parts.join(' + ') : '0 сборок');
   }
   if (it.shipped && it.shipped_at) {
     sub += ' · отгружено ' + (String(it.shipped_at).slice(0, 16).replace('T', ' '));
