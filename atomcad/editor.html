@@ -522,9 +522,14 @@ function junctions(){
       if(e0||e1){ ends+=(e0?1:0)+(e1?1:0); return; }
       for(var j=0;j<w.pts.length-1;j++){ if(onSeg(P,w.pts[j],w.pts[j+1])){ through++; break; } }
     });
-    // проход провода = 2 проводника; вывод аппарата = 1; конец провода = 1
-    var total=ends+2*through+(o.pin?1:0);
-    if(total>=3) out.push({x:P.x,y:P.y});
+    var wireC=ends+2*through; // сколько проводников-проводов сходится в точке
+    if(o.pin){
+      // вывод аппарата: точка-соединение, если к нему подключён хотя бы один провод
+      if(ends+through>=1) out.push({x:P.x,y:P.y});
+    } else if(wireC>=3){
+      // узел только из проводов (T-образный / крест)
+      out.push({x:P.x,y:P.y});
+    }
   });
   return out;
 }
@@ -660,21 +665,39 @@ function wireSegMid(w){
   if(!best)return null;
   return {x:(best.a.x+best.b.x)/2,y:(best.a.y+best.b.y)/2,horiz:Math.abs(best.b.x-best.a.x)>=Math.abs(best.b.y-best.a.y),len:bl};
 }
+// главная шина = самый длинный горизонтальный сегмент (L1/общая)
+function _mainBus(){
+  var best=null,bl=600;
+  S.wires.forEach(function(w){
+    for(var i=0;i<w.pts.length-1;i++){var a=w.pts[i],b=w.pts[i+1];
+      if(Math.abs(a.y-b.y)<=1){var L=Math.abs(b.x-a.x);if(L>bl){bl=L;best={y:a.y,x1:Math.min(a.x,b.x),x2:Math.max(a.x,b.x),id:w.id};}}}
+  });
+  return best;
+}
+// отвод от шины: один из концов провода лежит на шине (чтобы подписывать сечение один раз)
+function _isFeeder(w,bus){
+  if(!bus||w.id===bus.id)return false;
+  return [w.pts[0],w.pts[w.pts.length-1]].some(function(p){
+    return Math.abs(p.y-bus.y)<=1 && p.x>=bus.x1-1 && p.x<=bus.x2+1;
+  });
+}
 function renderCanvas(){
   /* провода */
   var h='';
+  var _bus=_mainBus();
   S.wires.forEach(function(w){
     var sel=S.sel&&S.sel.t==='w'&&S.sel.id===w.id;
     var d=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' ');
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+(sel?CY:INK)+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>';
-    // подпись сечения кабеля (мм²) у середины длинного сегмента
+    // подпись сечения кабеля (мм²) — один раз на отводе от шины (или у выбранного провода),
+    // чтобы не засорять схему повторами на каждом сегменте.
     var _sec=wireSection(w);
-    if(_sec){
+    if(_sec && (sel || _isFeeder(w,_bus))){
       var _lp=wireSegMid(w);
       if(_lp&&_lp.len>=130){
-        var _tx=_lp.horiz?_lp.x:(_lp.x+22), _ty=_lp.horiz?(_lp.y-14):_lp.y;
-        h+='<text x="'+_tx+'" y="'+_ty+'" font-size="26" fill="'+SOFT+'" stroke="none" text-anchor="'+(_lp.horiz?'middle':'start')+'" font-family="\'IBM Plex Mono\'">'+_sec+'</text>';
+        var _tx=_lp.horiz?_lp.x:(_lp.x+24), _ty=_lp.horiz?(_lp.y-16):_lp.y;
+        h+='<text x="'+_tx+'" y="'+_ty+'" font-size="25" fill="'+(sel?CY:SOFT)+'" stroke="none" text-anchor="'+(_lp.horiz?'middle':'start')+'" font-family="\'IBM Plex Mono\'">'+_sec+' мм²</text>';
       }
     }
     if(sel)w.pts.forEach(function(p){
