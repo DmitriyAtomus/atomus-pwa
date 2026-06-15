@@ -9536,6 +9536,14 @@ async function submitSpecForm(contractId, itemId) {
   // v2.45.199: система/объект
   payload.system_tag = ((document.getElementById('spec-form-system-tag') || {}).value || '').trim();
 
+  // v2.45.199: редактирование спецификации — под личным паролём
+  const _pwd = await _promptPasswordForAction(
+    itemId ? 'Сохранить изменения позиции?' : 'Добавить позицию в спецификацию?',
+    'Подтверди личным паролём — редактирование договора защищено.'
+  );
+  if (_pwd === null) return;   // отменили
+  payload.password = _pwd;
+
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     let r;
@@ -9556,6 +9564,9 @@ async function submitSpecForm(contractId, itemId) {
     }
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
+      if ((r.status === 401 || r.status === 403) && typeof _clearCachedPassword === 'function') {
+        _clearCachedPassword();
+      }
       showToast(d.message || 'Не удалось сохранить', 'error');
       return;
     }
@@ -9625,14 +9636,25 @@ async function markSpecItemDelivered(contractId, itemId, delivered) {
 
 async function deleteSpecItem(contractId, itemId) {
   if (!confirm('Удалить позицию из спецификации?')) return;
+  // v2.45.199: удаление позиции спецификации — под личным паролём
+  const _pwd = await _promptPasswordForAction(
+    'Удалить позицию из спецификации?',
+    'Подтверди личным паролём — редактирование договора защищено.'
+  );
+  if (_pwd === null) return;   // отменили
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/contracts/items/' + itemId, {
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ password: _pwd }),
     });
     if (!r.ok) {
-      showToast('Не удалось удалить', 'error');
+      const d = await r.json().catch(() => ({}));
+      if ((r.status === 401 || r.status === 403) && typeof _clearCachedPassword === 'function') {
+        _clearCachedPassword();
+      }
+      showToast(d.message || 'Не удалось удалить', 'error');
       return;
     }
     showToast('Удалено', 'success');

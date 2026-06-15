@@ -2201,6 +2201,13 @@ async function doShippingAction(contractId, mode) {
     ? 'Перевести договор в «Отгружен частично»?'
     : 'Отгрузить договор несмотря на блокеры?';
   if (!confirm(confirmMsg)) return;
+  // v2.45.199: смена статуса договора — под личным паролём
+  const _pwd = await _promptPasswordForAction(
+    confirmMsg,
+    'Подтверди личным паролём — изменение договора защищено.'
+  );
+  if (_pwd === null) return;   // отменили
+  body.password = _pwd;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/contracts/' + contractId, {
@@ -2213,6 +2220,9 @@ async function doShippingAction(contractId, mode) {
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
+      if ((r.status === 401 || r.status === 403) && typeof _clearCachedPassword === 'function') {
+        _clearCachedPassword();
+      }
       showToast(d.message || 'Не удалось изменить статус', 'error');
       return;
     }
@@ -2634,6 +2644,17 @@ async function submitContractForm() {
   }
   // В режиме edit статус не отправляем (меняется через переключатель отдельно)
 
+  // v2.45.199: редактирование существующего договора — под личным паролём.
+  // (создание нового договора паролем не закрываем — только изменение.)
+  if (state.contractFormMode === 'edit' && state.currentContractId) {
+    const _pwd = await _promptPasswordForAction(
+      'Сохранить изменения договора?',
+      'Подтверди личным паролём — редактирование договора защищено.'
+    );
+    if (_pwd === null) return;   // отменили — форму не трогаем
+    payload.password = _pwd;
+  }
+
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
 
@@ -2655,6 +2676,10 @@ async function submitContractForm() {
     }
     const data = await r.json();
     if (!r.ok) {
+      // v2.45.199: неверный/непереданный пароль — сбросим кеш, чтобы переспросить
+      if ((r.status === 401 || r.status === 403) && typeof _clearCachedPassword === 'function') {
+        _clearCachedPassword();
+      }
       errEl.innerHTML = '<div class="sales-error">' + escapeHtml(data.message || data.error || 'Ошибка') + '</div>';
       btn.disabled = false;
       btn.innerHTML = '<i class="ti ti-check"></i> ' + (state.contractFormMode === 'edit' ? 'Сохранить' : 'Создать договор');
@@ -2676,14 +2701,24 @@ async function submitContractForm() {
 async function deleteCurrentContract() {
   if (!state.currentContractId) return;
   if (!confirm('Удалить договор? Действие можно отменить только восстановлением через бота.')) return;
+  // v2.45.199: удаление договора — под личным паролём
+  const _pwd = await _promptPasswordForAction(
+    'Удалить договор?',
+    'Подтверди личным паролём — удаление договора защищено.'
+  );
+  if (_pwd === null) return;   // отменили
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/contracts/' + state.currentContractId, {
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ password: _pwd }),
     });
     if (!r.ok) {
-      const d = await r.json();
+      const d = await r.json().catch(() => ({}));
+      if ((r.status === 401 || r.status === 403) && typeof _clearCachedPassword === 'function') {
+        _clearCachedPassword();
+      }
       showToast(d.message || 'Не удалось удалить', 'error');
       return;
     }
