@@ -9321,11 +9321,12 @@ function renderSupplyInvoicesList(items) {
     const contractChip = inv.contract_number
       ? ('<span style="display:inline-block;background:#E0E7FF;color:#3730A3;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;">Дог. №' + escapeHtml(inv.contract_number) + '</span>')
       : '';
+    const openBtn = '<button class="icon-btn" title="Открыть счёт" onclick="event.stopPropagation();openSupplyInvoiceFile(' + inv.id + ')"><i class="ti ti-eye"></i></button>';
     html +=
       '<div class="si-list-card" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
         '<div class="si-list-card-row">' +
           '<div class="si-list-card-title">' + escapeHtml(docTitle) + '</div>' +
-          delBtn +
+          openBtn + delBtn +
         '</div>' +
         '<div class="si-list-card-bottom">' +
           '<span class="si-status-chip ' + chipCls + '">' + escapeHtml(chipTxt) + '</span>' +
@@ -9868,6 +9869,31 @@ async function uploadSupplyInvoiceFiles(files) {
 
 // ---------- Detail-экран приёмки ----------
 
+// v2.45.316: открыть исходный файл счёта (PDF/фото/Excel) в новой вкладке —
+// бухгалтер открывает счёт, копирует номер, видит наименование.
+async function openSupplyInvoiceFile(invId, page) {
+  // окно открываем сразу в жесте пользователя (иначе блокирует попапы на телефоне)
+  const w = window.open('', '_blank');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = API_BASE + '/api/supply/invoices/' + invId + '/file' + (page ? ('?page=' + page) : '');
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) {
+      if (w) w.close();
+      const d = await res.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось открыть файл', 'error');
+      return;
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    if (w) w.location = blobUrl; else window.location = blobUrl;
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch (e) {
+    if (w) w.close();
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 async function loadSupplyInvoiceDetail(invoiceId) {
   siState.currentInvoiceId = invoiceId;
   siStopPolling();
@@ -9932,6 +9958,7 @@ function renderSupplyInvoiceDetail(data) {
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
   html +=   '<button class="pkb-btn" onclick="loadSupplyInvoicesList()"><i class="ti ti-arrow-left"></i>К списку</button>';
   html +=   '<div style="flex:1;"></div>';
+  html +=   '<button class="pkb-btn primary" onclick="openSupplyInvoiceFile(' + inv.id + ')"><i class="ti ti-eye"></i>Открыть счёт</button>';
   if (inv.status === 'draft') {
     html += '<button class="pkb-btn" onclick="deleteSupplyInvoice(' + inv.id + ')"><i class="ti ti-trash"></i>Удалить</button>';
   } else if (inv.status === 'confirmed' || inv.status === 'partially_refused') {
