@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.308";
+const APP_VERSION = "v2.45.309";
 const APP_VERSION_DATE = "15.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -767,6 +767,7 @@ function renderNotifModal() {
                    : n.type === 'assembly_created' ? 't-assembly'
                    : n.type === 'supply_invoice_received' ? 't-contract'
                    : n.type === 'supply_invoice_uploaded' ? 't-contract'
+                   : n.type === 'supply_order_paid' ? 't-assembly'
                    : n.type === 'edo_upd_received' ? 't-contract'
                    : (n.type === 'dev_guest_message' || n.type === 'dev_guest_file') ? 't-development'
                    : '';
@@ -774,6 +775,7 @@ function renderNotifModal() {
                 : n.type === 'assembly_created' ? 'ti-tool'
                 : n.type === 'supply_invoice_received' ? 'ti-receipt'
                 : n.type === 'supply_invoice_uploaded' ? 'ti-receipt'
+                : n.type === 'supply_order_paid' ? 'ti-cash'
                 : n.type === 'edo_upd_received' ? 'ti-cloud-download'
                 : n.type === 'dev_guest_message' ? 'ti-message-circle'
                 : n.type === 'dev_guest_file' ? 'ti-paperclip'
@@ -1848,18 +1850,55 @@ async function _fillPayDueBlock() {
   } catch (e) { box.innerHTML = ''; }
 }
 
+// v2.45.309: один запрос на смену статуса заказа поставщику.
+async function _supplyOrderTransitionReq(orderId, newStatus, password) {
+  const body = { to: newStatus };
+  if (password != null) body.password = password;
+  const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/transition', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, error: j.error, message: j.message, data: j };
+}
+
+// v2.45.309: смена статуса с подтверждением личным паролём для «Оплачено».
+// Сначала пробуем без пароля; если бэкенд просит пароль (401) или он неверный (403) —
+// спрашиваем и повторяем. Возвращает {ok, cancelled?, message?}.
+async function supplyOrderTransitionConfirmed(orderId, newStatus) {
+  let password = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await _supplyOrderTransitionReq(orderId, newStatus, password);
+    if (res.ok) return res;
+    if (res.status === 401 && res.error === 'password_required') {
+      const pw = prompt('Подтвердите оплату — введите ваш пароль от Atom:');
+      if (pw === null) return { ok: false, cancelled: true };
+      password = (pw || '').trim();
+      continue;
+    }
+    if (res.status === 403 && res.error === 'wrong_password') {
+      const pw = prompt('Неверный пароль. Введите ещё раз:');
+      if (pw === null) return { ok: false, cancelled: true };
+      password = (pw || '').trim();
+      continue;
+    }
+    return res; // прочая ошибка
+  }
+  return { ok: false, message: 'Слишком много попыток ввода пароля' };
+}
+
 async function payDueMarkPaid(orderId, btn) {
   if (!confirm('Отметить заказ оплаченным?')) return;
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
   try {
-    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/transition', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: 'paid' }),
-    });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      showToast(j.message || 'Не удалось отметить оплату', 'error');
+    const res = await supplyOrderTransitionConfirmed(orderId, 'paid');
+    if (res.cancelled) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
+      return;
+    }
+    if (!res.ok) {
+      showToast(res.message || 'Не удалось отметить оплату', 'error');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
       return;
     }
