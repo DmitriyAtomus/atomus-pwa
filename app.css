@@ -14294,6 +14294,12 @@
     background: rgba(22, 163, 74, 0.15);
     color: var(--success);
   }
+  /* v2.45.334: цвет плитки-иконки по типу единицы (как в блоке «К отгрузке») */
+  .ship-item-type-icon.t-box { background: var(--brand-bg); color: var(--brand); }
+  .ship-item-type-icon.t-asm { background: #EEF0FB; color: #4F46E5; }
+  .ship-item-type-icon.t-buy { background: #E3F4F1; color: #0E8C7F; }
+  /* спейсер под кружок-галочку, чтобы шапка группы вставала по сетке рядов */
+  .ship-group-spacer { width: 24px; flex-shrink: 0; }
   .ship-item-body { flex: 1; min-width: 0; }
   .ship-item-name {
     font-size: 14px;
