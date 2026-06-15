@@ -9009,8 +9009,10 @@ function renderContractItemsBlock(contractId) {
               (canEdit ? '<button class="spec-quick-act" title="Снять отметку доставки" onclick="markSpecItemDelivered(' + contractId + ',' + it.id + ',false)"><i class="ti ti-arrow-back-up"></i></button>' : '') +
             '</div>';
           } else if (canEdit) {
+            // v2.45.326: жёлтая плашка — это текущий статус «ещё не доставлено» + действие.
+            // Раньше надпись «Доставлено на объект» путала (выглядела как уже доставлено).
             _deliveredCtl = '<div style="margin-top:6px;">' +
-              '<button class="btn btn-secondary btn-small" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" onclick="markSpecItemDelivered(' + contractId + ',' + it.id + ',true)"><i class="ti ti-truck-delivery"></i> Доставлено на объект</button>' +
+              '<button class="btn btn-secondary btn-small" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" title="Нажмите, когда груз доставят на объект — позиция перейдёт в «Доставлено»" onclick="markSpecItemDelivered(' + contractId + ',' + it.id + ',true)"><i class="ti ti-truck-delivery"></i> Пока не доставлено на объект <span style="font-weight:400;opacity:.85;">(как доставят — нажмите)</span></button>' +
             '</div>';
           }
         }
