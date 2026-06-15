@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.307-install-only";
-const APP_VERSION_DATE = "14.06.2026";
+const APP_VERSION = "v2.45.308";
+const APP_VERSION_DATE = "15.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -766,12 +766,14 @@ function renderNotifModal() {
     const iconCls = n.type === 'contract_published' ? 't-contract'
                    : n.type === 'assembly_created' ? 't-assembly'
                    : n.type === 'supply_invoice_received' ? 't-contract'
+                   : n.type === 'supply_invoice_uploaded' ? 't-contract'
                    : n.type === 'edo_upd_received' ? 't-contract'
                    : (n.type === 'dev_guest_message' || n.type === 'dev_guest_file') ? 't-development'
                    : '';
     const icon = n.type === 'contract_published' ? 'ti-file-text'
                 : n.type === 'assembly_created' ? 'ti-tool'
                 : n.type === 'supply_invoice_received' ? 'ti-receipt'
+                : n.type === 'supply_invoice_uploaded' ? 'ti-receipt'
                 : n.type === 'edo_upd_received' ? 'ti-cloud-download'
                 : n.type === 'dev_guest_message' ? 'ti-message-circle'
                 : n.type === 'dev_guest_file' ? 'ti-paperclip'

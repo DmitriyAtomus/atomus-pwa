@@ -11235,6 +11235,8 @@ async function _processSharedInvoiceFiles() {
     showToast('Файл из «Поделиться» — загружаем счёт…', 'success');
     const fd = new FormData();
     files.forEach(f => fd.append('file', f, f.name));
+    // помечаем источник — пришло из системного «Поделиться» (а не Фото УПД)
+    fd.append('source', 'share');
     // как и в ручной загрузке: на телефоне распознавание откладываем
     if (state && !state.isDesktop) fd.append('defer_recognition', '1');
     const token = localStorage.getItem(TOKEN_KEY);
