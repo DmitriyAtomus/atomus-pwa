@@ -8028,8 +8028,12 @@ function renderSupplyOrderDetail(o) {
     ? ['sent', 'awaiting_invoice', 'invoice_received', 'to_pay', 'paid', 'partial']
     : ['sent', 'awaiting_invoice', 'invoice_received'];
   const canUploadInvoice = canManage && _canUploadStatuses.includes(o.status);
-  const canToPay         = canManage && o.status === 'invoice_received';
-  const canMarkPaid      = canManage && o.status === 'to_pay';
+  // v2.45.310: оплатные переходы (На оплату / Оплачен) доступны и бухгалтеру —
+  // бэкенд это разрешает (accountant → to_pay/paid).
+  const _isAcc = state.user && (state.user.roles || []).includes('accountant');
+  const _canPayFlow = canManage || _isAcc;
+  const canToPay         = _canPayFlow && o.status === 'invoice_received';
+  const canMarkPaid      = _canPayFlow && o.status === 'to_pay';
   const canMarkReceived  = canManage && ['paid', 'partial'].includes(o.status);
   const canCancel        = canManage && !['received', 'cancelled', 'draft'].includes(o.status);
 
@@ -10195,6 +10199,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.310',
+    date: '15.06.2026',
+    title: 'Бухгалтер: кнопка «На оплату»',
+    features: [
+      'У <b>бухгалтера</b> на главном экране появился блок <b>«Счёт получен — на оплату»</b> с кнопкой <b>«На оплату»</b>: можно передать пришедший счёт в очередь на оплату, не дожидаясь директора',
+      'Те же кнопки «На оплату» и «Оплачен» теперь видны бухгалтеру и в карточке заказа поставщику',
+      'Дальше по цепочке — кнопка «Оплатил» (с подтверждением паролём) и уведомление директору, как и раньше',
+    ],
+  },
   {
     version: 'v2.45.309',
     date: '15.06.2026',

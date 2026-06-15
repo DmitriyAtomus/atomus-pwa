@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.309";
+const APP_VERSION = "v2.45.310";
 const APP_VERSION_DATE = "15.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1814,40 +1814,76 @@ async function _fillPayDueBlock() {
   const roles = (state.user && state.user.roles) || [];
   if (!(roles.includes('director') || roles.includes('accountant') || roles.includes('zam'))) return;
   try {
-    const d = await apiGet('/api/supply-orders?status=to_pay');
-    const list = d.orders || d.items || [];
-    // v2.45.272/273: заодно обновляем бейджи на пунктах меню «На оплате»
+    // v2.45.310: два этапа для бухгалтера —
+    //  «Счёт получен» → кнопка «На оплату»; «На оплате» → кнопка «Оплатил».
+    const [dRecv, dPay] = await Promise.all([
+      apiGet('/api/supply-orders?status=invoice_received').catch(() => ({})),
+      apiGet('/api/supply-orders?status=to_pay').catch(() => ({})),
+    ]);
+    const recvList = dRecv.orders || dRecv.items || [];
+    const payList  = dPay.orders  || dPay.items  || [];
+    // бейджи «На оплате» в меню — по числу заказов to_pay
     ['supply-pay-badge', 'home-pay-badge'].forEach(id => {
       const badge = document.getElementById(id);
       if (badge) {
-        badge.textContent = list.length;
-        badge.style.display = list.length ? '' : 'none';
+        badge.textContent = payList.length;
+        badge.style.display = payList.length ? '' : 'none';
       }
     });
-    if (!list.length) { box.innerHTML = ''; return; }
-    let h = '<div class="section" style="margin-bottom:16px;">' +
-      '<h3 class="section-title" style="color:#9A3412;"><i class="ti ti-wallet"></i> На оплате (' + list.length + ') ' +
-        '<a style="cursor:pointer;color:var(--brand);font-size:13px;" onclick="selectSidebarItem(\'supply-orders\')">все заказы →</a></h3>' +
-      '<div class="card" style="padding:4px 12px;">';
-    list.forEach(o => {
-      const sum = o.invoice_total
-        ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽'
-        : (o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '');
-      const inv = o.invoice_number ? 'Счёт № ' + o.invoice_number : (o.invoice_filename || '');
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);">' +
-        '<div style="flex:1;min-width:0;cursor:pointer;" onclick="state.currentSupplyOrderId=' + o.id + ';selectSidebarItem(\'supply-order-detail\');" title="Открыть заказ">' +
-          '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-            escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
-          '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(inv) +
-            (sum ? (inv ? ' · ' : '') + '<b style="color:#9A3412;">' + sum + '</b>' : '') + '</div>' +
-        '</div>' +
-        '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payDueMarkPaid(' + o.id + ', this)">' +
-          '<i class="ti ti-cash"></i> Оплатил</button>' +
-      '</div>';
-    });
-    h += '</div></div>';
+    let h = '';
+    h += _payBlockHtml(recvList, 'Счёт получен — на оплату', '#3730A3', 'ti-file-invoice',
+      o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payQueueToPay(' + o.id + ', this)"><i class="ti ti-wallet"></i> На оплату</button>');
+    h += _payBlockHtml(payList, 'На оплате', '#9A3412', 'ti-wallet',
+      o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payDueMarkPaid(' + o.id + ', this)"><i class="ti ti-cash"></i> Оплатил</button>');
     box.innerHTML = h;
   } catch (e) { box.innerHTML = ''; }
+}
+
+// v2.45.310: HTML одного блока главного экрана «список заказов + кнопка действия».
+function _payBlockHtml(list, title, color, icon, btnFactory) {
+  if (!list || !list.length) return '';
+  let h = '<div class="section" style="margin-bottom:16px;">' +
+    '<h3 class="section-title" style="color:' + color + ';"><i class="ti ' + icon + '"></i> ' + escapeHtml(title) + ' (' + list.length + ') ' +
+      '<a style="cursor:pointer;color:var(--brand);font-size:13px;" onclick="selectSidebarItem(\'supply-orders\')">все заказы →</a></h3>' +
+    '<div class="card" style="padding:4px 12px;">';
+  list.forEach(o => {
+    const sum = o.invoice_total
+      ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽'
+      : (o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '');
+    const inv = o.invoice_number ? 'Счёт № ' + o.invoice_number : (o.invoice_filename || '');
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);">' +
+      '<div style="flex:1;min-width:0;cursor:pointer;" onclick="state.currentSupplyOrderId=' + o.id + ';selectSidebarItem(\'supply-order-detail\');" title="Открыть заказ">' +
+        '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+          escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(inv) +
+          (sum ? (inv ? ' · ' : '') + '<b style="color:' + color + ';">' + sum + '</b>' : '') + '</div>' +
+      '</div>' +
+      btnFactory(o) +
+    '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
+// v2.45.310: бухгалтер передаёт «счёт получен» → «на оплате»
+async function payQueueToPay(orderId, btn) {
+  if (!confirm('Передать на оплату?')) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
+  try {
+    const res = await supplyOrderTransitionConfirmed(orderId, 'to_pay');
+    if (res.cancelled) { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-wallet"></i> На оплату'; } return; }
+    if (!res.ok) {
+      showToast(res.message || 'Не удалось', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-wallet"></i> На оплату'; }
+      return;
+    }
+    showToast('Передано на оплату ✓', 'success');
+    cache.supplyOrders = null;
+    _fillPayDueBlock();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-wallet"></i> На оплату'; }
+  }
 }
 
 // v2.45.309: один запрос на смену статуса заказа поставщику.
