@@ -9,11 +9,14 @@ body{display:flex;flex-direction:column;background:#0E1217;font-family:'IBM Plex
 .seg{display:flex;background:#1C222B;border:1px solid #2A323E;border-radius:10px;padding:3px}
 .seg button{border:none;background:none;color:#6B7785;font-family:inherit;font-size:13px;padding:6px 16px;border-radius:8px;cursor:pointer}
 .seg button.on{background:#16B7DB;color:#06262E;font-weight:600}
-.tagv{margin-left:auto;font-size:11px;color:#6B7785}
+.fsbtn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:#1C222B;border:1px solid #2A323E;color:#C9D4DF;font-family:inherit;font-size:12.5px;padding:6px 12px;border-radius:9px;cursor:pointer}
+.fsbtn:hover{border-color:#16B7DB;color:#fff}
+.tagv{font-size:11px;color:#6B7785}
 .stage{flex:1;position:relative}.frame{position:absolute;inset:0;width:100%;height:100%;border:none;opacity:0;pointer-events:none;transition:opacity .15s}.frame.active{opacity:1;pointer-events:auto}
 </style></head><body>
 <header class="shell"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="2.4" fill="#16B7DB"/><ellipse cx="12" cy="12" rx="9.5" ry="4.2" stroke="#16B7DB" stroke-width="1.4" transform="rotate(-28 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="4.2" stroke="#FFC400" stroke-width="1.1" opacity=".85" transform="rotate(56 12 12)"/></svg>Атом<b>Электрика</b></div>
 <div class="seg"><button id="tw" class="on" onclick="show('w')">Мастер</button><button id="te" onclick="show('e')">Редактор</button></div>
+<button id="fsBtn" class="fsbtn" onclick="toggleFS()" title="Развернуть схему на весь экран (Esc — выйти)"><span id="fsIco">⛶</span> <span id="fsTxt">Во весь экран</span></button>
 <span class="tagv">проектирование щитов · AtomCAD</span></header>
 <div class="stage">
   <iframe id="fw" class="frame active" src="wizard.html" title="Мастер"></iframe>
@@ -27,6 +30,21 @@ function show(which){
   w.classList.toggle('active',wOn); e.classList.toggle('active',!wOn);
   bw.classList.toggle('on',wOn);    be.classList.toggle('on',!wOn);
 }
+// Во весь экран: разворачиваем весь модуль (шапка + активный iframe). Требует
+// allow="fullscreen" на родительском iframe в PWA.
+function toggleFS(){
+  try{
+    if(document.fullscreenElement){ document.exitFullscreen(); return; }
+    var p=document.documentElement.requestFullscreen();
+    if(p&&p.catch) p.catch(function(){});
+  }catch(_){}
+}
+document.addEventListener('fullscreenchange',function(){
+  var on=!!document.fullscreenElement;
+  var t=document.getElementById('fsTxt'), i=document.getElementById('fsIco');
+  if(t) t.textContent=on?'Свернуть':'Во весь экран';
+  if(i) i.textContent=on?'✕':'⛶';
+});
 // Мост: мастер строит схему → переключаемся на редактор и передаём ему данные.
 window.addEventListener('message',function(ev){
   var d=ev.data; if(!d||!d.atomcad) return;
