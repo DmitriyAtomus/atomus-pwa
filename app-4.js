@@ -4003,32 +4003,42 @@ async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate)
 // v2.45.93: пакетная печать QR-наклеек для всех готовых сборок договора.
 // Один клик → шлёт N заданий в очередь шлюза термопринтера. По одной
 // странице с QR на каждую готовую сборку.
-// v2.45.331: окно-предпросмотр перед пакетной печатью — список того, что
-// распечатается (сборки по именам + покупное с количеством). Возвращает
-// Promise<bool>: true — печатать, false — отмена.
-function _confirmBatchPrintModal(total, readyList, compList) {
+// v2.45.331/332: окно-предпросмотр перед пакетной печатью — список того, что
+// распечатается (сборки + покупное), у каждой строки кнопка «убрать из печати».
+// Возвращает Promise<{ready:[...], comp:[...]}> (что печатать) или null (отмена).
+function _confirmBatchPrintModal(readyList, compList) {
+  readyList = readyList || [];
+  compList = compList || [];
   return new Promise((resolve) => {
     let m = document.getElementById('batch-print-modal');
     if (m) m.remove();
     m = document.createElement('div');
     m.id = 'batch-print-modal';
     m.className = 'modal-overlay visible';
+    const removedAsm = new Set();
+    const removedComp = new Set();
+    const qtyOf = (it) => Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
+    const headStyle = 'font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:12px 0 4px;';
+    const delBtn = '<button class="bp-del" title="Убрать из печати" style="background:none;border:none;color:#B91C1C;cursor:pointer;padding:2px 4px;flex-shrink:0;font-size:15px;"><i class="ti ti-trash"></i></button>';
+    const rowHtml = (kind, id, label, right) =>
+      '<div class="bp-row" data-kind="' + kind + '" data-id="' + id + '" ' +
+        'style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">' +
+        '<span style="flex:1;min-width:0;">' + label + '</span>' +
+        (right ? '<span style="color:var(--text-light);white-space:nowrap;">' + right + '</span>' : '') +
+        delBtn +
+      '</div>';
     let listHtml = '';
-    if (readyList && readyList.length) {
-      listHtml += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:12px 0 4px;">Сборки (' + readyList.length + ')</div>';
+    if (readyList.length) {
+      listHtml += '<div style="' + headStyle + '">Сборки</div>';
       readyList.forEach((a) => {
         const nm = [a.model_article, a.model_name].filter(Boolean).join(' · ') || ('Сборка #' + a.id);
-        listHtml += '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);">' + escapeHtml(nm) + '</div>';
+        listHtml += rowHtml('asm', a.id, escapeHtml(nm), '');
       });
     }
-    if (compList && compList.length) {
-      const compQty = compList.reduce((acc, it) => acc + Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1))), 0);
-      listHtml += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:14px 0 4px;">Покупное / комплектующие (' + compQty + ' шт · ' + compList.length + ' поз.)</div>';
+    if (compList.length) {
+      listHtml += '<div style="' + headStyle + '">Покупное / комплектующие</div>';
       compList.forEach((it) => {
-        const q = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
-        listHtml += '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;">' +
-          '<span>' + escapeHtml(it.name || ('Позиция #' + it.id)) + '</span>' +
-          '<span style="color:var(--text-light);white-space:nowrap;">' + q + ' шт</span></div>';
+        listHtml += rowHtml('comp', it.id, escapeHtml(it.name || ('Позиция #' + it.id)), qtyOf(it) + ' шт');
       });
     }
     m.innerHTML =
@@ -4036,21 +4046,52 @@ function _confirmBatchPrintModal(total, readyList, compList) {
         '<div class="modal-header"><h3><i class="ti ti-printer"></i> Печать QR-наклеек</h3>' +
           '<button class="modal-close" id="bp-close"><i class="ti ti-x"></i></button></div>' +
         '<div style="padding:14px 18px;max-height:55vh;overflow-y:auto;">' +
-          '<div style="font-size:14px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">Будет отправлено ' + total + ' наклеек на термопринтер</div>' +
-          '<div style="font-size:12px;color:var(--text-light);line-height:1.5;">Проверь список ниже. Если шлюз сейчас оффлайн — задания подождут в очереди и напечатаются, как только он вернётся.</div>' +
+          '<div id="bp-total-txt" style="font-size:14px;font-weight:600;color:var(--text-dark);margin-bottom:4px;"></div>' +
+          '<div style="font-size:12px;color:var(--text-light);line-height:1.5;">Можно убрать лишние наклейки кнопкой 🗑. Если шлюз сейчас оффлайн — задания подождут в очереди и напечатаются, как только он вернётся.</div>' +
           listHtml +
         '</div>' +
         '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
           '<button class="btn btn-secondary" id="bp-cancel">Отмена</button>' +
-          '<button class="btn btn-primary" id="bp-ok"><i class="ti ti-printer"></i> Печать (' + total + ')</button>' +
+          '<button class="btn btn-primary" id="bp-ok"></button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(m);
+    const calcTotal = () =>
+      readyList.filter(x => !removedAsm.has(x.id)).length +
+      compList.filter(x => !removedComp.has(x.id)).reduce((acc, it) => acc + qtyOf(it), 0);
+    const refresh = () => {
+      const t = calcTotal();
+      const tt = m.querySelector('#bp-total-txt');
+      if (tt) tt.textContent = 'Будет отправлено ' + t + ' наклеек на термопринтер';
+      const okb = m.querySelector('#bp-ok');
+      if (okb) {
+        okb.innerHTML = '<i class="ti ti-printer"></i> Печать (' + t + ')';
+        okb.disabled = (t === 0);
+        okb.style.opacity = (t === 0) ? '0.5' : '';
+      }
+    };
+    m.querySelectorAll('.bp-del').forEach((btn) => {
+      btn.onclick = () => {
+        const row = btn.closest('.bp-row');
+        if (!row) return;
+        const id = Number(row.getAttribute('data-id'));
+        if (row.getAttribute('data-kind') === 'asm') removedAsm.add(id);
+        else removedComp.add(id);
+        row.remove();
+        refresh();
+      };
+    });
     const cleanup = (val) => { m.remove(); resolve(val); };
-    m.querySelector('#bp-close').onclick = () => cleanup(false);
-    m.querySelector('#bp-cancel').onclick = () => cleanup(false);
-    m.querySelector('#bp-ok').onclick = () => cleanup(true);
-    m.onclick = (e) => { if (e.target === m) cleanup(false); };
+    m.querySelector('#bp-close').onclick = () => cleanup(null);
+    m.querySelector('#bp-cancel').onclick = () => cleanup(null);
+    m.querySelector('#bp-ok').onclick = () => {
+      const selReady = readyList.filter(x => !removedAsm.has(x.id));
+      const selComp = compList.filter(x => !removedComp.has(x.id));
+      if (!selReady.length && !selComp.length) { cleanup(null); return; }
+      cleanup({ ready: selReady, comp: selComp });
+    };
+    m.onclick = (e) => { if (e.target === m) cleanup(null); };
+    refresh();
   });
 }
 
@@ -4091,14 +4132,18 @@ async function batchPrintContractQrs(contractId) {
     showToast('Нет готовых сборок и компонентов в резерве для печати', 'error');
     return;
   }
-  // v2.45.331: вместо нативного confirm — окно со списком того, что распечатается
-  const _go = await _confirmBatchPrintModal(total, ready, compItems);
-  if (!_go) return;
+  // v2.45.331/332: окно со списком + возможность убрать отдельные наклейки
+  const _sel = await _confirmBatchPrintModal(ready, compItems);
+  if (!_sel) return;
+  const selReady = _sel.ready;
+  const selComp = _sel.comp;
+  const selTotal = selReady.length + selComp.reduce((acc, it) => acc + Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1))), 0);
+  if (selTotal === 0) return;
 
-  showToast('Отправляем ' + total + ' заданий…', 'info');
+  showToast('Отправляем ' + selTotal + ' заданий…', 'info');
   let ok = 0;
   const failed = [];
-  for (const a of ready) {
+  for (const a of selReady) {
     try {
       // 1) получаем public-token для assembly
       const tok = await apiGet('/api/assemblies/' + a.id + '/public-token');
@@ -4136,12 +4181,12 @@ async function batchPrintContractQrs(contractId) {
   // v2.45.95/100: компонент-позиции в резерве → QR договора + кастомный caption.
   // По одной этикетке на каждую единицу qty (если qty=2 → 2 этикетки),
   // на каждой подпись «… · 1 шт» / «1 комплект».
-  if (compItems.length) {
+  if (selComp.length) {
     try {
       const ct = await apiGet('/api/contracts/' + contractId + '/public-token');
       const contractUrl = window.location.origin + '/c/' + ct.public_token;
       const contractNum = c.contract_number || ('#' + c.id);
-      for (const it of compItems) {
+      for (const it of selComp) {
         const itName = it.component_name || it.name || ('Поз. #' + it.id);
         const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
         const unit = _ccUnitLabel(it);
@@ -4163,7 +4208,7 @@ async function batchPrintContractQrs(contractId) {
       }
     } catch (e) {
       // Если не получили токен договора — все компоненты считаем неуспешными
-      compItems.forEach(it => failed.push({
+      selComp.forEach(it => failed.push({
         id: it.id, name: it.component_name || it.name, err: 'нет токена договора',
       }));
     }
@@ -4174,7 +4219,7 @@ async function batchPrintContractQrs(contractId) {
   } else if (ok === 0) {
     showToast('Не удалось отправить (ошибок: ' + failed.length + ')', 'error');
   } else {
-    showToast('📤 Отправлено ' + ok + '/' + total + '. Ошибки: ' + failed.length, 'info');
+    showToast('📤 Отправлено ' + ok + '/' + selTotal + '. Ошибки: ' + failed.length, 'info');
   }
 }
 
