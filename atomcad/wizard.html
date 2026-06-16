@@ -140,6 +140,32 @@ function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clear
 /* 1 раздел */
 var SECTIONS=[['ЩУ-001','Камеры созревания',18],['ЩУ-002','Чиллера',13],['ЩУ-003','Холодильное оборудование',8],['ЩУ-004','Приточно-вытяжная вентиляция',7],['ЩУ-005','АСУ',2]];
 function pad3(n){return ('00'+(n||0)).slice(-3)}
+/* справочник разделов: грузится с сервера (общий), имена редактируемы */
+var DEFAULT_CODES={'ЩУ-001':1,'ЩУ-002':1,'ЩУ-003':1,'ЩУ-004':1,'ЩУ-005':1};
+var secCat=null, secCatLoading=false, editSection=null;
+function secOverrides(){try{return JSON.parse(localStorage.getItem('atomcad_sec_names')||'{}')||{}}catch(_){return {}}}
+function setSecOverride(code,name){try{var o=secOverrides();o[code]=name;localStorage.setItem('atomcad_sec_names',JSON.stringify(o))}catch(_){}}
+function applyOverrides(){var o=secOverrides();SECTIONS.forEach(function(s){if(o[s[0]])s[1]=o[s[0]]})}
+function ensureSections(){
+  if(secCat!==null||secCatLoading)return;
+  secCatLoading=true;
+  if(!srvOn()){applyOverrides();secCat=true;secCatLoading=false;return;}
+  apiReq('GET','/api/atomcad/sections').then(function(d){
+    var arr=d.sections||[];
+    if(arr.length)SECTIONS=arr.map(function(s){return [s.code,s.name,s.item_count||0,!DEFAULT_CODES[s.code]]});
+    applyOverrides();secCat=true;secCatLoading=false;if(cur===0)draw();
+  }).catch(function(){applyOverrides();secCat=true;secCatLoading=false});
+}
+function startEditSection(code){editSection=code;draw()}
+function secEditKey(e,code){if(e.key==='Enter'){e.target.blur()}else if(e.key==='Escape'){editSection=null;draw()}}
+function commitEditSection(code,val){editSection=null;val=(val||'').trim();var sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec&&val&&val!==sec[1]){renameSection(code,val)}else{draw()}}
+function renameSection(code,val){
+  var sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec)sec[1]=val;
+  if(P.section===code)P.sectionName=val;
+  setSecOverride(code,val);draw();updTag();
+  if(srvOn())apiReq('PATCH','/api/atomcad/sections/'+encodeURIComponent(code),{name:val}).then(function(){toast('Раздел переименован')}).catch(function(err){toast('Не сохранилось на сервере: '+err.message)});
+  else toast('Раздел переименован');
+}
 var secLib=null, secLibLoading=false, expandedSection=null;
 function ensureSecLib(){
   if(secLib!==null||secLibLoading)return;
@@ -149,20 +175,24 @@ function ensureSecLib(){
 }
 function nextNum(code){var base=0,sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec)base=+sec[2]||0;(secLib||[]).forEach(function(p){if(p.section===code){var n=+p.num||0;if(n>base)base=n;}});return base+1;}
 function pSection(){
+  ensureSections();
   ensureSecLib();
   if(expandedSection===null)expandedSection=P.section;
-  var h=H('Шаг 1','Раздел номенклатуры','Назови изделие и выбери раздел. Клик по разделу раскрывает сохранённые чертежи — любой можно открыть и редактировать. Номер подставляется автоматически.');
+  var h=H('Шаг 1','Раздел номенклатуры','Назови изделие и выбери раздел. Клик по разделу раскрывает сохранённые чертежи; ✎ у названия — переименовать раздел (сохранится для всех). Номер подставляется автоматически.');
   h+='<div class="form"><div class="fld gr"><label>Наименование изделия</label><input id="prjName" value="'+esc(P.name)+'" placeholder="напр. Приточная установка П-1" oninput="setProjName()"></div>'+
      '<div class="fld"><label>Номер в разделе</label><input id="prjNum" class="w70" inputmode="numeric" value="'+(+P.num||0)+'" oninput="setProjNum()"></div>'+
      '<div class="fld"><label>Вариант</label><input id="prjVar" class="w70" value="'+esc(P.variant)+'" oninput="setProjVar()"></div></div>';
   h+='<div class="grid g2">';SECTIONS.forEach(function(s,i){
     var code=s[0],on=P.section===code,exp=expandedSection===code;
     var cnt=(secLib||[]).filter(function(p){return p.section===code}).length;
-    h+='<div class="card cardpick'+(on?' sel':'')+(exp?' sel2':'')+'" onclick="selectSectionStep(\''+code+'\',\''+esc(s[1])+'\')"><div class="ctitle"><span><span class="cname">'+esc(s[1])+'</span><span class="ccode">'+code+'.000</span></span>'+
+    var nameHtml=(editSection===code)
+      ? '<input id="secEditInput" value="'+esc(s[1])+'" onclick="event.stopPropagation()" onkeydown="secEditKey(event,\''+code+'\')" onblur="commitEditSection(\''+code+'\',this.value)" style="background:var(--graphite);border:1px solid rgba(22,183,219,.55);border-radius:7px;padding:4px 7px;color:var(--txt);font-size:13.5px;font-weight:600;font-family:inherit;width:170px;outline:none">'
+      : '<span class="cname">'+esc(s[1])+' <span onclick="event.stopPropagation();startEditSection(\''+code+'\')" title="Переименовать раздел" style="cursor:pointer;color:var(--dim);font-size:11px;margin-left:3px">✎</span></span>';
+    h+='<div class="card cardpick'+(on?' sel':'')+(exp?' sel2':'')+'" onclick="selectSectionStep(\''+code+'\')"><div class="ctitle"><span>'+nameHtml+'<span class="ccode">'+code+'.000</span></span>'+
       (cnt?'<span class="cnt" style="color:var(--cyan);border-color:rgba(22,183,219,.4)">▤ '+cnt+'</span>':'')+
       (on?'<span class="chk">✓</span>':'<span class="cnt">'+s[2]+'</span>')+
       '<span class="cnt" style="margin-left:6px;min-width:0;padding:2px 6px">'+(exp?'▴':'▾')+'</span>'+
-      (s[3]?'<button class="del" style="margin-left:6px" onclick="event.stopPropagation();rmSection('+i+')">✕</button>':'')+'</div></div>'});
+      (s[3]?'<button class="del" style="margin-left:6px" onclick="event.stopPropagation();rmSection(\''+code+'\')">✕</button>':'')+'</div></div>'});
   h+='</div>';
   h+='<div style="margin:12px 0"><button class="tb" onclick="addSection()">+ Добавить раздел</button></div>';
   h+=pSectionDrawings(expandedSection);
@@ -196,9 +226,23 @@ function refreshDes(){var des=$('prjDes'),code=$('prjCode');if(des)des.textConte
 function setProjName(){P.name=$('prjName').value;dirty();updTag()}
 function setProjNum(){var v=parseInt($('prjNum').value,10);P.num=isNaN(v)?0:Math.max(0,v);dirty();updTag();refreshDes()}
 function setProjVar(){P.variant=$('prjVar').value||'1';dirty();updTag();refreshDes()}
-function addSection(){var name=prompt('Название нового раздела:');if(!name)return;var max=0;SECTIONS.forEach(function(s){var m=/ЩУ-(\d+)/.exec(s[0]);if(m)max=Math.max(max,+m[1])});var code='ЩУ-'+('00'+(max+1)).slice(-3);SECTIONS.push([code,name,0,true]);dirty();draw();toast('Добавлен раздел '+code)}
-function rmSection(i){if(!SECTIONS[i]||!SECTIONS[i][3])return;var s=SECTIONS[i];ask('Удалить раздел?','Удалить «'+s[1]+'» ('+s[0]+')?',function(){SECTIONS.splice(i,1);draw()})}
-function selectSectionStep(code,name){var same=(P.section===code);P.section=code;P.sectionName=name;if(!same)P.num=nextNum(code);expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
+function addSection(){
+  var name=prompt('Название нового раздела:');if(!name)return;name=name.trim();if(!name)return;
+  if(srvOn()){
+    apiReq('POST','/api/atomcad/sections',{name:name}).then(function(d){var s=d.section;if(s){SECTIONS.push([s.code,s.name,s.item_count||0,true]);draw();toast('Добавлен раздел '+s.code);}}).catch(function(err){toast('Не удалось добавить: '+err.message)});
+  }else{
+    var max=0;SECTIONS.forEach(function(s){var m=/ЩУ-(\d+)/.exec(s[0]);if(m)max=Math.max(max,+m[1])});var code='ЩУ-'+('00'+(max+1)).slice(-3);SECTIONS.push([code,name,0,true]);setSecOverride(code,name);draw();toast('Добавлен раздел '+code);
+  }
+}
+function rmSection(code){
+  var s=SECTIONS.filter(function(x){return x[0]===code})[0];if(!s||!s[3])return;
+  ask('Удалить раздел?','Удалить «'+s[1]+'» ('+code+')?',function(){
+    function gone(){SECTIONS=SECTIONS.filter(function(x){return x[0]!==code});if(expandedSection===code)expandedSection=null;draw();}
+    if(srvOn())apiReq('DELETE','/api/atomcad/sections/'+encodeURIComponent(code)).then(gone).catch(function(err){toast('Не удалось: '+err.message)});
+    else gone();
+  });
+}
+function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same)P.num=nextNum(code);expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
 function updTag(){$('projTag').innerHTML=P.section+'.'+pad3(P.num)+' · <b>'+esc(P.name)+'</b>'}
 
 /* 2 контроллер + IO */
@@ -655,7 +699,7 @@ function openEditor(){
 
 /* ---- навигация ---- */
 var PANELS=[pSection,pController,pConsumers,pSensors,pAux,pBreakers,pTerminals,pCabinet,pSpec];
-function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0}
+function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0;var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}}
 function go(i){cur=Math.max(0,Math.min(STEPS.length-1,i));$('prev').disabled=cur===0;$('next').textContent=cur===STEPS.length-1?'Готово ✓':'Далее →';steps();draw()}
 $('prev').onclick=function(){go(cur-1)};$('next').onclick=function(){go(cur+1)};
 updTag();steps();go(0);
