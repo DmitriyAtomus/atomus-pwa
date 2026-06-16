@@ -20,22 +20,54 @@ function ratingFor(I){ return stdRating(I*1.25); } // запас 25%
 // нужен ли потребителю контактор (коммутация)
 function needsContactor(c){ return c.needs!=='direct'; }
 
+// низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
+function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
+var PSU_W=[15,30,60,100,120,150,240,350,480,720,960];
+// группировка НН-потребителей по напряжению → требуемые блоки питания (авто-мощность)
+function lvSupplies(P){
+  var byV={};
+  (P.consumers||[]).forEach(function(c){
+    if(!isLV(c))return;
+    var v=c.volt||24, q=c.qty||1, w=(c.kw||0)*1000*q;
+    if(!byV[v])byV[v]={volt:v,sumW:0,count:0};
+    byV[v].sumW+=w; byV[v].count+=q;
+  });
+  var out=[];
+  Object.keys(byV).forEach(function(k){
+    var g=byV[k], need=g.sumW*1.3, rw=PSU_W[PSU_W.length-1];
+    for(var i=0;i<PSU_W.length;i++){ if(PSU_W[i]>=need){ rw=PSU_W[i]; break; } }
+    var primA=+(rw/(230*0.85)).toFixed(2);   // первичный ток БП (230В, КПД≈0.85)
+    out.push({volt:g.volt, sumW:Math.round(g.sumW), count:g.count, ratingW:rw, primaryA:primA});
+  });
+  out.sort(function(a,b){return b.volt-a.volt});
+  return out;
+}
+
 // автоматы из состава: ввод + по группам потребителей + управление
 function buildBreakers(P){
   var b=[], n=1;
-  // ввод
-  var tot=0,maxScenario=0;
-  P.consumers.forEach(function(c){tot+=consumerCurrent(c)*(c.qty||1)});
+  var psus=lvSupplies(P);
+  // ввод: сетевые потребители + первичка блоков питания (НН-потребители напрямую НЕ грузят ввод)
+  var tot=0;
+  P.consumers.forEach(function(c){ if(isLV(c))return; tot+=consumerCurrent(c)*(c.qty||1); });
+  psus.forEach(function(p){ tot+=p.primaryA; });
   var introRate = ratingFor(tot);
   b.push({id:'QF'+n, code:'QF'+n, poles:3, rate: Math.max(introRate,16), role:'ввод', loads:[{name:'Σ нагрузка щита', a:+tot.toFixed(1)}], fixed:true}); n++;
-  // по потребителям
+  // по сетевым потребителям (НН пропускаем — они на БП)
   P.consumers.forEach(function(c){
+    if(isLV(c))return;
     var I=consumerCurrent(c), q=c.qty||1;
     for(var k=0;k<q;k++){
       var nm=c.name+(q>1?(' #'+(k+1)):'');
       b.push({id:'QF'+n, code:'QF'+n, poles:c.phases===3?3:1, rate:ratingFor(I), role:nm, loads:[{name:nm, a:I}], consumer:c.id});
       n++;
     }
+  });
+  // блоки питания низковольтных цепей (24/12 В) — отдельные линии, первичка от ввода
+  psus.forEach(function(p){
+    b.push({id:'QF'+n, code:'QF'+n, poles:1, rate:stdRating(p.primaryA*1.25)||6,
+            role:'питание '+p.volt+'В (БП '+p.ratingW+'Вт)',
+            loads:[{name:'БП '+p.volt+'В · нагрузка '+p.sumW+' Вт', a:p.primaryA}], psu:p.volt}); n++;
   });
   // управление
   var ctrlA = 0.8 + P.aux.reduce(function(s,a){return s+(a.a||0)},0);
@@ -49,10 +81,13 @@ function breakerStatus(b){ var s=breakerSum(b),r=b.rate; return s>r?'over':s>r*0
 function phaseBalance(P){
   var ph={L1:0,L2:0,L3:0}, ks=['L1','L2','L3'], idx=0;
   P.consumers.forEach(function(c){
+    if(isLV(c))return;               // НН-потребители висят на БП, не на фазах напрямую
     var I=consumerCurrent(c), q=c.qty||1;
     if(c.phases===3){ ph.L1+=I*q; ph.L2+=I*q; ph.L3+=I*q; }
     else { for(var k=0;k<q;k++){ ph[ks[idx%3]]+=I; idx++; } }
   });
+  // блоки питания — однофазная нагрузка (первичка), раскидываем по фазам
+  lvSupplies(P).forEach(function(p){ ph[ks[idx%3]]+=p.primaryA; idx++; });
   return {L1:+ph.L1.toFixed(1), L2:+ph.L2.toFixed(1), L3:+ph.L3.toFixed(1)};
 }
 
@@ -93,6 +128,10 @@ function buildSpec(P){
   // вспомогательное
   var hlN=1;
   (P.aux||[]).forEach(function(a){ var q=a.qty||1; for(var k=0;k<q;k++){ var base=a.tag||(a.kind==='lamp'?('HL'+hlN):a.kind==='psu'?'G1':a.kind==='ssr'?'KA1':'E'+hlN); var des=q>1?(base+'.'+(k+1)):base; if(!a.tag&&a.kind==='lamp')hlN++; items.push({des:des, name:a.name, manu:a.manu||'', model:a.model||'', note:a.note||''}); } });
+  // блоки питания низковольтных цепей (авто — по НН-потребителям)
+  var psuBase=(P.aux||[]).filter(function(a){return a.kind==='psu'}).reduce(function(s,a){return s+(a.qty||1)},0);
+  var gN=1;
+  lvSupplies(P).forEach(function(p){ items.push({des:'G'+(psuBase+gN), name:'Блок питания', manu:'', model:p.volt+'В '+p.ratingW+'Вт', note:'питание '+p.volt+'В · нагрузка '+p.sumW+' Вт ('+p.count+' шт)'}); gN++; });
   // корпус
   if(P.enclosure&&P.enclosure.model) items.push({des:'—', name:'Корпус щита', manu:'', model:P.enclosure.model, note:P.enclosure.modules+' мод.'});
 
@@ -115,6 +154,7 @@ function moduleCount(P){
   (P.breakers||[]).forEach(function(b){ m+= b.poles===3?3:1; });
   (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; m+= q*(c.phases===3?2:1); } });
   (P.aux||[]).forEach(function(a){ m+= (a.kind==='psu')?2:1; });
+  lvSupplies(P).forEach(function(){ m+=2; }); // авто-БП низковольтных цепей
   m+=4; // клеммы/резерв базовый
   return m;
 }
@@ -165,6 +205,7 @@ g.AtomCore={
   buildBreakers:buildBreakers, breakerSum:breakerSum, breakerStatus:breakerStatus,
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
-  buildSchematic:buildSchematic, needsContactor:needsContactor
+  buildSchematic:buildSchematic, needsContactor:needsContactor,
+  isLV:isLV, lvSupplies:lvSupplies
 };
 })(typeof window!=='undefined'?window:global);
