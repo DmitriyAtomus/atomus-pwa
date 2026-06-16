@@ -5235,12 +5235,12 @@ function _cpRowHtml(it) {
     const label = st ? st[0] : 'Заказано';
     const fg = st ? st[1] : '#78350F';
     const bg = st ? st[2] : '#FEF3C7';
-    stBadge = '<span style="font-size:11px;font-weight:700;color:' + fg + ';background:' + bg + ';padding:1px 8px;border-radius:6px;white-space:nowrap;" ' +
+    stBadge = '<span class="ssp-badge" style="color:' + fg + ';background:' + bg + ';" ' +
       'title="' + escapeHtml((it.order_label ? 'Заказ ' + it.order_label + ' · ' : '') + 'статус обновляется по заказу в «Заказах»') + '">' +
       escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') +
     '</span>';
   } else {
-    stBadge = '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
+    stBadge = '<span class="ssp-badge" style="color:#7F1D1D;background:#FEE2E2;">К заказу</span>';
   }
   return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
     '<input type="checkbox" class="cp-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
@@ -5293,9 +5293,9 @@ function _contractPurchasesBlockHtml(items) {
     if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
     bySup[k].items.push(it);
   });
-  let h = '<div class="sup-shop-group" style="border-left:3px solid #B45309;">' +
+  let h = '<div class="sup-shop-group cp-block">' +
     '<div class="sup-shop-group-head">' +
-      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart" style="color:#B45309;"></i> Покупные позиции по договорам' +
+      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart"></i> Покупные позиции по договорам' +
         '<span class="sup-shop-group-count">' + items.length + ' ' + (items.length === 1 ? 'позиция' : (items.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
       '</div>' +
       '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
@@ -5520,7 +5520,7 @@ function renderSupplyShopping(d) {
       // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
       const planContracts = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
       let reasonBadge = it.reason
-        ? '<span class="sup-shop-reason">' + escapeHtml(it.reason) + '</span>'
+        ? '<span class="sup-shop-reason' + (it.reason.indexOf('низкий остаток') !== -1 ? ' is-warn' : '') + '">' + escapeHtml(it.reason) + '</span>'
         : '';
       if (planContracts.length) {
         const shown = planContracts.slice(0, 3).map(n => '№' + n).join(', ');
@@ -5536,8 +5536,7 @@ function renderSupplyShopping(d) {
       if (it.order_status && typeof _CP_ORDER_STATUS_RU !== 'undefined') {
         const s = _CP_ORDER_STATUS_RU[it.order_status];
         if (s) {
-          orderBadge = '<span style="font-size:11px;font-weight:700;color:' + s[1] + ';background:' + s[2] + ';' +
-            'padding:1px 8px;border-radius:6px;white-space:nowrap;margin-left:6px;" ' +
+          orderBadge = '<span class="ssp-badge" style="color:' + s[1] + ';background:' + s[2] + ';" ' +
             'title="Статус обновляется по заказу в «Заказах»">' +
             escapeHtml(s[0]) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') +
           '</span>';
@@ -5567,8 +5566,10 @@ function renderSupplyShopping(d) {
         '<td class="ssp-qty ssp-qty-edit' + (qtyOverridden ? ' is-overridden' : '') + '" ' +
             'onclick="shopEditQty(' + it.component_id + ', ' + Number(it.recommended_qty) + ', ' + JSON.stringify(it.unit || 'шт.').replace(/"/g, '&quot;') + ')" ' +
             'title="' + (qtyOverridden ? 'Изменено вручную · ' : '') + 'Тап чтобы изменить количество">' +
-          escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
-          ' <i class="ti ti-pencil ssp-qty-pencil"></i>' +
+          '<span class="ssp-qty-chip">' +
+            escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
+            ' <i class="ti ti-pencil ssp-qty-pencil"></i>' +
+          '</span>' +
         '</td>';
       const removeCell =
         '<td class="ssp-remove-cell">' +
