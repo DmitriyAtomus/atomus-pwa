@@ -664,11 +664,19 @@ function _wrapNote(s,max,maxLines){
   if(lines.length>maxLines){lines=lines.slice(0,maxLines);lines[maxLines-1]=lines[maxLines-1].replace(/.$/,'…');}
   return lines;
 }
+function _tipText(c){
+  var parts=[c.des];
+  var nm=(c.attrs&&c.attrs.nm)||''; if(nm)parts.push(nm);
+  var note=(c.attrs&&c.attrs.note)||''; if(note&&note!==nm)parts.push(note);
+  var model=(c.attrs&&c.attrs.model)||''; if(model)parts.push(model);
+  return parts.join(' · ');
+}
 function compSvg(c,col,extraOp){
   var sx=c.mirror?-1:1, h='';
   h+='<g data-c="'+c.id+'" color="'+col+'" stroke="'+col+'" fill="none" stroke-width="6" stroke-linecap="round"'+
      (extraOp?' opacity="'+extraOp+'"':'')+
      ' transform="translate('+c.x+' '+c.y+') rotate('+c.rot+') scale('+sx+' 1)">';
+  h+='<title>'+esc(_tipText(c))+'</title>';   // подсказка по наведению мыши
   // Прозрачная зона захвата с запасом (_m), чтобы аппарат брался за всю площадь,
   // а не только за тонкие линии — клик в любом месте этой области тащит элемент.
   var _bb=symFor(c).bb, _m=30; h+='<rect x="'+(_bb[0]-_m)+'" y="'+(_bb[1]-_m)+'" width="'+(_bb[2]-_bb[0]+_m*2)+'" height="'+(_bb[3]-_bb[1]+_m*2)+'" fill="transparent" stroke="none" pointer-events="all"/>';
@@ -676,8 +684,9 @@ function compSvg(c,col,extraOp){
   h+='</g>';
   var lp=lblW(c), an=symFor(c).lbl[2];
   h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+lp.y+'" font-size="44" font-weight="500" fill="'+col+'" stroke="none" text-anchor="'+an+'"'+
-     (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Mono\'">'+esc(c.des)+'</text>';
-  if(c.attrs&&c.attrs.note){
+     (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Mono\'"><title>'+esc(_tipText(c))+'</title>'+esc(c.des)+'</text>';
+  // «short» — на схеме только обозначение (что это — по наведению мыши); иначе подпись в 3 строки
+  if(c.attrs&&c.attrs.note&&!c.attrs.short){
     _wrapNote(c.attrs.note,14,3).forEach(function(_ln,_li){
       h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+(lp.y+40+_li*30)+'" font-size="30" fill="'+SOFT+'" stroke="none" text-anchor="'+an+'"'+
          (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Sans\'">'+esc(_ln)+'</text>';

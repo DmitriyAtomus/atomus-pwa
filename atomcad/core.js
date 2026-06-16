@@ -228,27 +228,33 @@ function buildSchematic(P){
     var cspec=P.controller.spec||{};
     ac.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
       attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:io,supply:cspec.voltage||'',wired:true}});
-    var lpx=cz-G.hx-G.stub, rpx=cz+G.hx+G.stub, comX=lpx-560, nX=rpx+560;
-    var usedL=[], usedR=[], btN=1;
-    G.left.forEach(function(p,i){
-      if(!p.lab)return;
-      var py=ctrlY+G.pinY(i), sx=lpx-320, isT=(p.g==='AI');
-      ac.push(C('BT'+btN, isT?'ntc':'term', sx, py, isT?'NTC':'', '', p.lab));
-      aw.push(W([lpx,py],[sx,py]));
-      if(isT){ aw.push(W([sx,py+150],[comX,py+150])); usedL.push(py+150); }
-      else   { aw.push(W([sx,py],[comX,py]));           usedL.push(py); }
-      btN++;
+    var lpx=cz-G.hx-G.stub, rpx=cz+G.hx+G.stub;
+    var SP=210, baseY=ctrlY+40;                 // крупный шаг устройств — чтобы не наезжали
+    function shortC(des,sym,xx,yy,model,manu,note,nm){var cc=C(des,sym,xx,yy,model,manu,note,nm);cc.attrs.short=true;return cc;}
+    // только назначенные выводы
+    var inA=[], outA=[];
+    G.left.forEach(function(p,i){ if(p.lab) inA.push({p:p,i:i}); });
+    G.right.forEach(function(p,i){ if(p.lab) outA.push({p:p,i:i}); });
+    var inX=lpx-560, comX=inX-220, outX=rpx+560, nX=outX+220;
+    var usedL=[], usedR=[];
+    // ВХОДЫ слева: датчик/клемма на своём уровне, провод подведён зигзагом
+    inA.forEach(function(o,k){
+      var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, isT=(p.g==='AI'), chx=lpx-130-k*40;
+      ac.push(shortC('BT'+(k+1), isT?'ntc':'term', inX, devY, isT?'NTC':'', '', p.lab));
+      aw.push(W([lpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[inX,devY]));
+      if(isT){ aw.push(W([inX,devY+150],[comX,devY+150])); usedL.push(devY+150); }
+      else   { aw.push(W([inX,devY],[comX,devY]));         usedL.push(devY); }
     });
-    G.right.forEach(function(p,i){
-      if(!p.lab)return;
-      var py=ctrlY+G.pinY(i), ox=rpx+320, km=kmByName[p.lab];
+    // ВЫХОДЫ справа: катушка контактора / клемма
+    outA.forEach(function(o,k){
+      var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, km=kmByName[p.lab], chx=rpx+130+k*40;
       if(p.g==='DO' && km){
-        ac.push(C(km,'coil',ox,py,'катушка контактора','',p.lab));
-        aw.push(W([rpx,py],[ox,py])); aw.push(W([ox,py+150],[nX,py+150]));
-        usedR.push(py+150);
+        ac.push(shortC(km,'coil',outX,devY,'катушка контактора','',p.lab));
+        aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
+        aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);
       } else {
-        ac.push(C('XO'+(i+1),'term',ox,py,'','',p.lab));
-        aw.push(W([rpx,py],[ox,py]));
+        ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
+        aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
       }
     });
     if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); aw.push(W([comX,l0],[comX,l1])); at.push({x:comX-30,y:l0-26,s:24,tx:'общий / 0В'}); }
