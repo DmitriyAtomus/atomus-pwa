@@ -11901,7 +11901,12 @@ function _renderInstallationDetail(d) {
   // отчёты
   var reportsHtml = (d.reports || []).map(function (r) {
     var photos = (r.photos || []).map(function (p) {
-      return '<a href="' + API_BASE + p.url + '" target="_blank" style="display:inline-block;"><img src="' + API_BASE + p.url + '" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border,#E2E8F0);"></a>';
+      var url = API_BASE + p.url;
+      if ((p.content_type || '').indexOf('image/') === 0) {
+        return '<a href="' + url + '" target="_blank" class="ir-thumb"><img src="' + url + '" loading="lazy"></a>';
+      }
+      var ic = ((p.content_type || '').indexOf('video/') === 0) ? 'ti-video' : 'ti-file';
+      return '<a href="' + url + '" target="_blank" class="ir-fileatt"><i class="ti ' + ic + '"></i><span>' + escapeHtml(p.name || 'Файл') + '</span></a>';
     }).join('');
     return '<div style="border-top:1px solid var(--border,#E2E8F0);padding:10px 0;">' +
       '<div style="font-size:12px;color:var(--text-light,#94A3B8);">' +
@@ -11919,16 +11924,18 @@ function _renderInstallationDetail(d) {
   }).join('');
 
   var reportForm = canReport ?
-    '<div style="border-top:2px solid var(--border,#E2E8F0);margin-top:12px;padding-top:12px;">' +
-      '<div style="font-weight:600;margin-bottom:8px;"><i class="ti ti-send"></i> Новый отчёт с поля</div>' +
-      '<textarea id="install-report-text" rows="3" placeholder="Что сделано на объекте…" style="width:100%;box-sizing:border-box;"></textarea>' +
-      '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">' +
-        '<select id="install-report-status" style="flex:1;min-width:180px;">' + statusOptions + '</select>' +
-        '<label class="btn btn-secondary btn-small" style="cursor:pointer;"><i class="ti ti-camera"></i> Фото' +
-          '<input type="file" accept="image/*" multiple capture="environment" style="display:none;" onchange="onInstallReportFiles(this)"></label>' +
+    '<div class="ir-form">' +
+      '<div class="ir-form-title"><i class="ti ti-send"></i> Новый отчёт с поля</div>' +
+      '<textarea id="install-report-text" class="ir-textarea" rows="3" placeholder="Что сделано на объекте…"></textarea>' +
+      '<select id="install-report-status" class="ir-select">' + statusOptions + '</select>' +
+      '<div class="ir-attach-row">' +
+        '<label class="ir-attach-btn"><i class="ti ti-camera"></i> Фото' +
+          '<input type="file" accept="image/*" capture="environment" multiple style="display:none;" onchange="onInstallReportFiles(this)"></label>' +
+        '<label class="ir-attach-btn"><i class="ti ti-paperclip"></i> Файл' +
+          '<input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" multiple style="display:none;" onchange="onInstallReportFiles(this)"></label>' +
       '</div>' +
-      '<div id="install-report-files" style="margin-top:6px;font-size:12px;color:var(--text-light,#94A3B8);"></div>' +
-      '<button class="btn btn-primary" style="margin-top:10px;width:100%;" onclick="submitInstallationReport(' + d.id + ')"><i class="ti ti-check"></i> Отправить отчёт</button>' +
+      '<div id="install-report-files" class="ir-files"></div>' +
+      '<button class="btn btn-primary ir-send" onclick="submitInstallationReport(' + d.id + ')"><i class="ti ti-check"></i> Отправить отчёт</button>' +
     '</div>' : '';
 
   var manageBtns = canManage ?
@@ -11959,16 +11966,34 @@ function _renderInstallationDetail(d) {
 }
 
 function onInstallReportFiles(input) {
-  _installReportFiles = Array.prototype.slice.call(input.files || []).slice(0, 5);
+  Array.prototype.slice.call(input.files || []).forEach(function (f) {
+    if (_installReportFiles.length < 5) _installReportFiles.push(f);
+  });
+  input.value = '';
+  renderInstallReportFiles();
+}
+
+function renderInstallReportFiles() {
   var box = document.getElementById('install-report-files');
-  if (box) box.textContent = _installReportFiles.length ? ('Выбрано фото: ' + _installReportFiles.length) : '';
+  if (!box) return;
+  box.innerHTML = _installReportFiles.map(function (f, i) {
+    var isImg = (f.type || '').indexOf('image/') === 0;
+    return '<span class="ir-chip"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i>' +
+      '<span class="ir-chip-name">' + escapeHtml(f.name) + '</span>' +
+      '<button onclick="removeInstallReportFile(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button></span>';
+  }).join('');
+}
+
+function removeInstallReportFile(i) {
+  _installReportFiles.splice(i, 1);
+  renderInstallReportFiles();
 }
 
 async function submitInstallationReport(id) {
   var text = (document.getElementById('install-report-text') || {}).value || '';
   var status = (document.getElementById('install-report-status') || {}).value || '';
   if (!text.trim() && !_installReportFiles.length && !status) {
-    showToast('Добавьте комментарий, фото или смену статуса', 'error');
+    showToast('Добавьте комментарий, файл или смену статуса', 'error');
     return;
   }
   var fd = new FormData();

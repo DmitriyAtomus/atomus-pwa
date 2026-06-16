@@ -18173,3 +18173,26 @@
 .ci-st-cancelled { background: #FEE2E2; color: #991B1B; }
 .ci-hint { font-size: 12px; color: var(--text-light, #6B7280); margin-top: 8px; display: flex; gap: 5px; align-items: flex-start; }
 .ci-hint i { font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+
+/* v2.45.382: форма отчёта монтажника (раздел «Монтаж») */
+.ir-form { border-top: 2px solid var(--border, #E2E8F0); margin-top: 14px; padding-top: 14px; }
+.ir-form-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; color: var(--text, #111827); }
+.ir-form-title i { color: var(--brand); }
+.ir-textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--border, #D1D5DB); border-radius: 12px; padding: 12px 14px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 76px; line-height: 1.4; }
+.ir-textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(37,99,235,.08); }
+.ir-select { width: 100%; box-sizing: border-box; margin-top: 9px; border: 1px solid var(--border, #D1D5DB); border-radius: 10px; padding: 11px 12px; font-size: 13.5px; background: #fff; }
+.ir-attach-row { display: flex; gap: 8px; margin-top: 10px; }
+.ir-attach-btn { flex: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--border, #D1D5DB); border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; color: var(--text-mid, #475569); background: var(--bg, #F9FAFB); transition: all .12s; }
+.ir-attach-btn:hover { border-color: var(--brand); color: var(--brand); }
+.ir-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ir-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 8px; padding: 5px 6px 5px 9px; font-size: 12px; max-width: 220px; }
+.ir-chip > i { color: var(--brand); flex-shrink: 0; }
+.ir-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ir-chip button { background: none; border: none; cursor: pointer; color: var(--text-light, #94A3B8); padding: 2px; display: inline-flex; flex-shrink: 0; }
+.ir-chip button:hover { color: #DC2626; }
+.ir-send { margin-top: 12px; width: 100%; }
+.ir-thumb { display: inline-block; }
+.ir-thumb img { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border, #E2E8F0); display: block; }
+.ir-fileatt { display: inline-flex; align-items: center; gap: 6px; background: var(--bg, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 8px; padding: 8px 11px; font-size: 12.5px; color: var(--text, #1F2937); text-decoration: none; max-width: 220px; }
+.ir-fileatt i { color: var(--brand); font-size: 17px; flex-shrink: 0; }
+.ir-fileatt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
