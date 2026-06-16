@@ -140,18 +140,65 @@ function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clear
 /* 1 раздел */
 var SECTIONS=[['ЩУ-001','Камеры созревания',18],['ЩУ-002','Чиллера',13],['ЩУ-003','Холодильное оборудование',8],['ЩУ-004','Приточно-вытяжная вентиляция',7],['ЩУ-005','АСУ',2]];
 function pad3(n){return ('00'+(n||0)).slice(-3)}
-function pSection(){var h=H('Шаг 1','Раздел номенклатуры','Назови изделие и выбери раздел. Номер в разделе подставится автоматически (следующий свободный), шифр — тоже.');
+var secLib=null, secLibLoading=false, expandedSection=null;
+function ensureSecLib(){
+  if(secLib!==null||secLibLoading)return;
+  secLibLoading=true;
+  storeList().then(function(items){secLib=items||[];secLibLoading=false;if(cur===0)draw();})
+             .catch(function(){secLib=[];secLibLoading=false;if(cur===0)draw();});
+}
+function nextNum(code){var base=0,sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec)base=+sec[2]||0;(secLib||[]).forEach(function(p){if(p.section===code){var n=+p.num||0;if(n>base)base=n;}});return base+1;}
+function pSection(){
+  ensureSecLib();
+  if(expandedSection===null)expandedSection=P.section;
+  var h=H('Шаг 1','Раздел номенклатуры','Назови изделие и выбери раздел. Клик по разделу раскрывает сохранённые чертежи — любой можно открыть и редактировать. Номер подставляется автоматически.');
   h+='<div class="form"><div class="fld gr"><label>Наименование изделия</label><input id="prjName" value="'+esc(P.name)+'" placeholder="напр. Приточная установка П-1" oninput="setProjName()"></div>'+
      '<div class="fld"><label>Номер в разделе</label><input id="prjNum" class="w70" inputmode="numeric" value="'+(+P.num||0)+'" oninput="setProjNum()"></div>'+
      '<div class="fld"><label>Вариант</label><input id="prjVar" class="w70" value="'+esc(P.variant)+'" oninput="setProjVar()"></div></div>';
-  h+='<div class="grid g2">';SECTIONS.forEach(function(s,i){var on=P.section===s[0];h+='<div class="card cardpick'+(on?' sel':'')+'" onclick="pickSection(\''+s[0]+'\',\''+esc(s[1])+'\')"><div class="ctitle"><span><span class="cname">'+esc(s[1])+'</span><span class="ccode">'+s[0]+'.000</span></span>'+(on?'<span class="chk">✓</span>':'<span class="cnt">'+s[2]+'</span>')+(s[3]?'<button class="del" style="margin-left:8px" onclick="event.stopPropagation();rmSection('+i+')">✕</button>':'')+'</div></div>'});h+='</div>';h+='<div style="margin:12px 0"><button class="tb" onclick="addSection()">+ Добавить раздел</button></div>';h+='<div class="note">Раздел: <b style="color:var(--txt)">'+esc(P.sectionName||'')+'</b> · обозначение изделия: <span class="mono" id="prjDes" style="color:var(--cyan)">'+P.section+'.'+pad3(P.num)+'.'+esc(P.variant)+'</span> · шифр: <span class="mono" id="prjCode">АГ.'+P.section+'.'+pad3(P.num)+'/26</span></div>';return h}
+  h+='<div class="grid g2">';SECTIONS.forEach(function(s,i){
+    var code=s[0],on=P.section===code,exp=expandedSection===code;
+    var cnt=(secLib||[]).filter(function(p){return p.section===code}).length;
+    h+='<div class="card cardpick'+(on?' sel':'')+(exp?' sel2':'')+'" onclick="selectSectionStep(\''+code+'\',\''+esc(s[1])+'\')"><div class="ctitle"><span><span class="cname">'+esc(s[1])+'</span><span class="ccode">'+code+'.000</span></span>'+
+      (cnt?'<span class="cnt" style="color:var(--cyan);border-color:rgba(22,183,219,.4)">▤ '+cnt+'</span>':'')+
+      (on?'<span class="chk">✓</span>':'<span class="cnt">'+s[2]+'</span>')+
+      '<span class="cnt" style="margin-left:6px;min-width:0;padding:2px 6px">'+(exp?'▴':'▾')+'</span>'+
+      (s[3]?'<button class="del" style="margin-left:6px" onclick="event.stopPropagation();rmSection('+i+')">✕</button>':'')+'</div></div>'});
+  h+='</div>';
+  h+='<div style="margin:12px 0"><button class="tb" onclick="addSection()">+ Добавить раздел</button></div>';
+  h+=pSectionDrawings(expandedSection);
+  h+='<div class="note">Раздел: <b style="color:var(--txt)">'+esc(P.sectionName||'')+'</b> · обозначение изделия: <span class="mono" id="prjDes" style="color:var(--cyan)">'+P.section+'.'+pad3(P.num)+'.'+esc(P.variant)+'</span> · шифр: <span class="mono" id="prjCode">АГ.'+P.section+'.'+pad3(P.num)+'/26</span></div>';return h}
+function pSectionDrawings(code){
+  var sec=SECTIONS.filter(function(s){return s[0]===code})[0],nm=sec?sec[1]:'';
+  var items=(secLib||[]).filter(function(p){return p.section===code});
+  var h='<div class="card sel2" style="margin-bottom:12px"><div class="ctitle" style="margin-bottom:'+(items.length||secLib===null?'8px':'0')+'"><span class="cname">📂 Чертежи раздела «'+esc(nm)+'»</span><span class="cnt" style="margin-left:auto">'+(secLib===null?'…':items.length)+'</span></div>';
+  if(secLib===null){h+='<div class="empty">Загрузка…</div>';}
+  else if(!items.length){h+='<div class="empty">В этом разделе пока нет сохранённых чертежей. Заполни мастер и нажми «⭱ Сохранить».</div>';}
+  else{items.forEach(function(p){
+    h+='<button class="pbtn" style="margin:0 0 7px;align-items:flex-start;gap:11px" onclick="openDrawing(\''+esc(p.id)+'\')">'+
+         '<span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left">'+
+           '<span style="color:#E7EEF4;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name||'Без названия')+'</span>'+
+           '<span class="mono" style="font-size:10.5px;color:var(--dim)">'+esc(p.section+'.'+pad3(p.num))+' · '+fmtWhen(p.when)+(p.owner?' · '+esc(p.owner):'')+'</span>'+
+         '</span>'+
+         '<span class="tag AI" style="flex:0 0 auto">открыть ✎</span>'+
+         '<span class="del" title="Удалить" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center" onclick="event.stopPropagation();delDrawing(\''+esc(p.id)+'\')">✕</span>'+
+       '</button>';
+  });}
+  h+='</div>';return h;
+}
+function openDrawing(id){openLibProject(id)}
+function delDrawing(id){
+  var p=(secLib||[]).filter(function(x){return String(x.id)===String(id)})[0],nm=p?p.name:'';
+  ask('Удалить чертёж?','Удалить «'+(nm||'')+'» из раздела? Действие необратимо.',function(){
+    storeDel(id).then(function(){secLib=null;ensureSecLib();toast('Чертёж удалён');}).catch(function(err){toast('Не удалось удалить: '+err.message)});
+  });
+}
 function refreshDes(){var des=$('prjDes'),code=$('prjCode');if(des)des.textContent=P.section+'.'+pad3(P.num)+'.'+P.variant;if(code)code.textContent='АГ.'+P.section+'.'+pad3(P.num)+'/26';}
 function setProjName(){P.name=$('prjName').value;dirty();updTag()}
 function setProjNum(){var v=parseInt($('prjNum').value,10);P.num=isNaN(v)?0:Math.max(0,v);dirty();updTag();refreshDes()}
 function setProjVar(){P.variant=$('prjVar').value||'1';dirty();updTag();refreshDes()}
 function addSection(){var name=prompt('Название нового раздела:');if(!name)return;var max=0;SECTIONS.forEach(function(s){var m=/ЩУ-(\d+)/.exec(s[0]);if(m)max=Math.max(max,+m[1])});var code='ЩУ-'+('00'+(max+1)).slice(-3);SECTIONS.push([code,name,0,true]);dirty();draw();toast('Добавлен раздел '+code)}
 function rmSection(i){if(!SECTIONS[i]||!SECTIONS[i][3])return;var s=SECTIONS[i];ask('Удалить раздел?','Удалить «'+s[1]+'» ('+s[0]+')?',function(){SECTIONS.splice(i,1);draw()})}
-function pickSection(code,name){P.section=code;P.sectionName=name;var sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec)P.num=(+sec[2]||0)+1;dirty();draw();updTag()}
+function selectSectionStep(code,name){var same=(P.section===code);P.section=code;P.sectionName=name;if(!same)P.num=nextNum(code);expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
 function updTag(){$('projTag').innerHTML=P.section+'.'+pad3(P.num)+' · <b>'+esc(P.name)+'</b>'}
 
 /* 2 контроллер + IO */
@@ -432,14 +479,14 @@ async function saveProject(){
   if(srvOn()){
     try{
       var d=await apiReq('POST','/api/atomcad/projects',{id:P.serverId||null,name:P.name,section:P.section,num:P.num,data:P});
-      P.serverId=d.id;$('saveState').textContent='сохранено';toast('Проект сохранён на сервере');
+      P.serverId=d.id;$('saveState').textContent='сохранено';secLib=null;toast('Проект сохранён на сервере');
       return;
     }catch(err){
-      saveLocal();$('saveState').textContent='сохранено локально';
+      saveLocal();$('saveState').textContent='сохранено локально';secLib=null;
       toast('Сервер недоступен — сохранено локально');return;
     }
   }
-  if(saveLocal()){$('saveState').textContent='сохранено';toast('Проект сохранён');}
+  if(saveLocal()){$('saveState').textContent='сохранено';secLib=null;toast('Проект сохранён');}
   else toast('Не удалось сохранить');
 }
 
