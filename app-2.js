@@ -8224,6 +8224,8 @@ function renderContractDetail(c) {
   const isInstallOnly = (c.contract_type === 'install_only');
   if (isInstallOnly) {
     html += '<div id="scd-install-block"><div class="loading-block" style="padding:14px;">Загружаем монтаж…</div></div>';
+    html += '<div id="scd-install-files-block" style="margin-top:14px;"></div>';
+    html += '<div id="scd-install-chat-block" style="margin-top:14px;"></div>';
   } else {
     html += '<div id="scd-assemblies-block">' + renderContractAssembliesBlock(c) + '</div>';
 
@@ -8250,6 +8252,8 @@ function renderContractDetail(c) {
   if (isInstallOnly) {
     // v2.45.371: монтажные разделы вместо отгрузки/коробок/спецификации
     loadContractInstallBlock(c.id);
+    // v2.45.376: разделы «Файлы» и «Чат» (на чат-инфраструктуре договора)
+    loadInstallExtras(c.id);
   } else {
     // ЭТАП 26: загружаем прогресс отгрузки
     loadContractShipmentBlock(c.id);
@@ -8415,6 +8419,101 @@ async function deleteInstallItem(itemId) {
     renderInstallSections();
     if (typeof showToast === 'function') showToast('Удалено', 'success');
   } catch (e) { if (typeof showToast === 'function') showToast('Не удалось удалить', 'error'); }
+}
+
+// v2.45.376: разделы «Файлы» и «Чат» монтажного договора (на чат-инфраструктуре договора)
+async function loadInstallExtras(contractId) {
+  state._installExtrasCid = contractId;
+  let r = {};
+  try { r = (await apiGet('/api/contracts/' + contractId + '/chat')) || {}; } catch (e) { r = {}; }
+  state._installChat = r;
+  renderInstallFilesSection();
+  renderInstallChatSection();
+}
+
+function _installAllFiles() {
+  const msgs = (state._installChat && state._installChat.messages) || [];
+  const out = [];
+  msgs.forEach(m => { (m.files || []).forEach(f => { out.push({ f: f, author: m.author_name || '', date: m.created_at || '' }); }); });
+  return out.reverse(); // новые сверху
+}
+
+function renderInstallFilesSection() {
+  const host = document.getElementById('scd-install-files-block');
+  if (!host) return;
+  const files = _installAllFiles();
+  const canEdit = _installCanEdit();
+  let html = '<div class="install-section">';
+  html += '<div class="install-sec-head"><i class="ti ti-folder"></i><span>Документы и файлы</span><span class="install-count">' + files.length + '</span></div>';
+  if (!files.length) {
+    html += '<div class="install-empty">Пока нет файлов. Прикрепите схемы, фото объекта, акты.</div>';
+  } else {
+    html += '<div class="install-files-grid">';
+    files.forEach(x => {
+      const f = x.f;
+      const url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      const name = f.original_name || (f.kind === 'photo' ? 'Фото' : f.kind === 'video' ? 'Видео' : 'Файл #' + f.id);
+      const sub = (f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '') + (x.author ? ' · ' + x.author : '');
+      if (f.kind === 'photo') {
+        html += '<a href="' + url + '" target="_blank" class="install-file install-file-img" title="' + escapeHtml(name) + '"><img src="' + url + '" alt="" loading="lazy"></a>';
+      } else {
+        const ic = (f.kind === 'video') ? 'ti-video' : 'ti-file';
+        html += '<a href="' + url + '" target="_blank" class="install-file install-file-doc"><i class="ti ' + ic + '"></i>' +
+          '<div class="install-file-meta"><div class="install-file-name">' + escapeHtml(name) + '</div>' +
+          '<div class="install-file-sub">' + escapeHtml(sub) + '</div></div></a>';
+      }
+    });
+    html += '</div>';
+  }
+  if (canEdit) {
+    html += '<input type="file" id="install-file-input" multiple style="display:none" onchange="uploadInstallFiles(this.files)">';
+    html += '<button class="install-add-btn" onclick="document.getElementById(\'install-file-input\').click()"><i class="ti ti-upload"></i> Загрузить файл</button>';
+  }
+  html += '</div>';
+  host.innerHTML = html;
+}
+
+async function uploadInstallFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const cid = state._installExtrasCid;
+  const fd = new FormData();
+  let n = 0;
+  for (let i = 0; i < fileList.length && n < 5; i++) { fd.append('file_' + (n + 1), fileList[i], fileList[i].name); n++; }
+  fd.append('text', '📎 Документ по договору');
+  if (typeof showToast === 'function') showToast('Загружаем…', 'info');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    if (!resp.ok) throw new Error('upload');
+    await loadInstallExtras(cid);
+    if (typeof showToast === 'function') showToast('Файл добавлен', 'success');
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось загрузить', 'error'); }
+}
+
+function renderInstallChatSection() {
+  const host = document.getElementById('scd-install-chat-block');
+  if (!host) return;
+  const msgs = (state._installChat && state._installChat.messages) || [];
+  const last = msgs.slice(-4);
+  let html = '<div class="install-section">';
+  html += '<div class="install-sec-head"><i class="ti ti-message-circle"></i><span>Чат по договору</span><span class="install-count">' + msgs.length + '</span></div>';
+  if (!last.length) {
+    html += '<div class="install-empty">Сообщений пока нет — напишите бригаде или менеджеру.</div>';
+  } else {
+    html += '<div class="install-chat-preview">';
+    last.forEach(m => {
+      if (m.is_system) { html += '<div class="install-chat-sys">' + escapeHtml(m.text || '') + '</div>'; return; }
+      const who = escapeHtml(m.author_name || 'Сотрудник');
+      const txt = m.text ? _escapeChatText(m.text) : ((m.files && m.files.length) ? '📎 файл' : '');
+      html += '<div class="install-chat-msg"><b>' + who + ':</b> ' + txt + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '<button class="install-add-btn" onclick="openContractChat()"><i class="ti ti-message-circle"></i> Открыть чат</button>';
+  html += '</div>';
+  host.innerHTML = html;
 }
 
 // v2.45.106: журнал действий по договору
