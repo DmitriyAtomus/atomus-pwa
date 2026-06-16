@@ -315,9 +315,10 @@ function supplyOptions(sel){return SUPPLY.map(function(s){return '<option value=
 function supplyLabel(c){var v=c.volt||(c.phases===3?400:230);if(c.phases===3)return '3ф·400В';if(v<110)return '='+v+'В';return '1ф·230В';}
 function applySupply(c,val){var s=SUPPLY.filter(function(x){return x[0]===String(val)})[0]||SUPPLY[0];c.phases=s[2];c.volt=s[3];}
 function pConsumers(){
+  ensureLoads();
   /* проставим обозначения тем, у кого их ещё нет */
   (P.consumers||[]).forEach(function(c){if(!c.tag)c.tag=tagFor(c.name,c.id);});
-  var h=H('Шаг 3','Потребители','Что питает щит. Указываешь марку, фазы, мощность — ток считается, дальше из него собираются автоматы. Тип можно вписать свой; строку можно отредактировать (✎).');
+  var h=H('Шаг 3','Потребители','Что питает щит. Внеси вручную или по марке (ИИ определит питание, мощность, управление). Ток считается, дальше из него собираются автоматы. Строку можно отредактировать (✎).');
   var IST='background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:8px 9px;color:var(--txt);font-size:13px;font-family:inherit;outline:none';
   h+=ctypeDatalist();
   h+='<div class="form">'+
@@ -328,6 +329,13 @@ function pConsumers(){
      '<div class="fld"><label>Кол-во</label><input id="cQ" class="w70" value="1" inputmode="numeric"></div>'+
      '<div class="fld"><label>Тип</label><input id="cT" list="ctypeList" value="двигатель" placeholder="двигатель" style="width:130px"></div>'+
      '<div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addConsumer()">+ Добавить</button></div></div>';
+  h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке <span style="color:var(--dim);font-weight:400">(ИИ определит питание, мощность и управление; сохранится в библиотеку)</span></div>';
+  h+='<div class="form"><div class="fld gr"><label>Марка / модель</label><input id="cMark" placeholder="напр. Royal Clima ES-E 60HX, Belimo LM24A, ТЭН 2 кВт" onkeydown="if(event.key===\'Enter\')identifyConsumer()"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" id="cMarkBtn" onclick="identifyConsumer()">🔎 Найти по марке</button></div></div>';
+  if(LOAD_LIB.length){
+    h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">📚 Библиотека потребителей <span style="color:var(--dim);font-weight:400">(клик добавляет)</span></div><div class="grid g3" style="margin-bottom:14px">';
+    LOAD_LIB.forEach(function(it,idx){var phases=it.phases===3?3:1,volt=[400,230,24,12].indexOf(+it.voltage)>=0?+it.voltage:(phases===3?400:230);var sup=phases===3?'3ф·400В':(volt<110?('='+volt+'В'):'1ф·230В');h+='<div class="card cardpick sel2" style="padding:9px;display:flex;align-items:center;gap:8px" onclick="addConsumerFromSaved('+idx+')"><span style="min-width:0;flex:1"><span class="cname" style="font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.label)+'</span><span class="ccode">'+esc((it.power_kw?it.power_kw+' кВт · ':'')+sup)+'</span></span><span class="del" title="Убрать из библиотеки" onclick="event.stopPropagation();delLoad('+it.id+')" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span></div>';});
+    h+='</div>';
+  }
   if(!P.consumers.length)h+='<div class="empty">Пока пусто — добавь потребителей.</div>';
   P.consumers.forEach(function(c){var I=C.consumerCurrent(c);
     if(editConsumer===c.id){
@@ -349,6 +357,54 @@ function pConsumers(){
 }
 function addConsumer(){var n=$('cN').value.trim();if(!n){toast('Введи наименование');return}var tl=($('cT').value||'').trim()||'двигатель';addCtypeCustom(tl);var tag=($('cTag').value||'').trim()||tagFor(n);var sup=SUPPLY.filter(function(x){return x[0]===$('cP').value})[0]||SUPPLY[0];P.consumers.push({id:uid('c'),name:n,tag:tag,phases:sup[2],volt:sup[3],kw:parseFloat($('cKw').value)||0,qty:Math.max(1,parseInt($('cQ').value,10)||1),needs:typeNeeds(tl),typeLabel:tl});P.breakers=null;cTagManual=false;dirty();draw()}
 function rmConsumer(id){P.consumers=P.consumers.filter(function(c){return c.id!==id});if(editConsumer===id)editConsumer=null;P.breakers=null;dirty();draw()}
+/* библиотека потребителей + определение по марке (ИИ) */
+var LT2LABEL={motor:'двигатель',heater:'ТЭН',fan:'вентилятор',compressor:'компрессор',pump:'насос',valve:'привод заслонки',actuator:'электропривод',other:'прочее'};
+var LOAD_LIB=[], loadCat=null, loadCatLoading=false;
+function ensureLoads(){
+  if(loadCat!==null||loadCatLoading)return;
+  loadCatLoading=true;
+  if(!srvOn()){loadCat=true;loadCatLoading=false;return;}
+  apiReq('GET','/api/atomcad/loads').then(function(r){LOAD_LIB=r.loads||[];loadCat=true;loadCatLoading=false;if(cur===2)draw();}).catch(function(){loadCat=true;loadCatLoading=false;});
+}
+function consumerFromFields(o){
+  var phases=(+o.phases===3)?3:1;
+  var volt=[400,230,24,12].indexOf(+o.voltage)>=0?+o.voltage:(phases===3?400:230);
+  var tl=LT2LABEL[o.load_type||'other']||'двигатель';
+  var needs=(o.control==='direct')?'direct':'load';
+  var name=o.name||o.label||o.model||'Потребитель';
+  return {id:uid('c'),name:name,tag:tagFor(name),phases:phases,volt:volt,kw:(+o.power_kw||0),qty:1,needs:needs,typeLabel:tl,control:o.control||''};
+}
+function saveLoad(data,name){
+  if(!srvOn()||!name)return;
+  apiReq('POST','/api/atomcad/loads',{label:name,manufacturer:data.manufacturer||'',model:data.model||'',phases:data.phases,voltage:data.voltage,power_kw:data.power_kw,current_a:data.current_a,load_type:data.load_type,control:data.control,data:data}).then(function(res){
+    var item={id:res.id,label:name,manufacturer:data.manufacturer||'',model:data.model||'',phases:data.phases,voltage:data.voltage,power_kw:data.power_kw,current_a:data.current_a,load_type:data.load_type,control:data.control};
+    var f=-1;for(var i=0;i<LOAD_LIB.length;i++)if((LOAD_LIB[i].label||'')===name){f=i;break;}
+    if(f>=0)LOAD_LIB[f]=item; else LOAD_LIB.unshift(item);
+    if(cur===2)draw();
+  }).catch(function(){});
+}
+async function identifyConsumer(){
+  if(!srvOn()){toast('Поиск по марке работает в CRM (нужна авторизация)');return;}
+  var m=($('cMark').value||'').trim();if(!m){toast('Введи марку');return;}
+  var btn=$('cMarkBtn');if(btn){btn.disabled=true;btn.textContent='🔎 Ищу…';}
+  try{
+    var d=await apiReq('POST','/api/atomcad/identify-consumer',{model:m});
+    var data=d.data||{}, c=consumerFromFields(data);
+    P.consumers.push(c);P.breakers=null;dirty();draw();
+    toast('Определено: '+c.name+' · '+supplyLabel(c)+' · '+labelForNeeds(c.needs,c.typeLabel)+(data.confidence==='low'?' (проверь)':''));
+    saveLoad(data,c.name);
+  }catch(err){
+    if($('cMarkBtn')){$('cMarkBtn').disabled=false;$('cMarkBtn').textContent='🔎 Найти по марке';}
+    toast('Не удалось определить: '+err.message);
+  }
+}
+function addConsumerFromSaved(idx){var it=LOAD_LIB[idx];if(!it)return;P.consumers.push(consumerFromFields(it));P.breakers=null;dirty();draw();toast(it.label+' добавлен');}
+function delLoad(id){
+  ask('Убрать из библиотеки?','Удалить потребителя из сохранённых? (текущий проект не изменится)',function(){
+    if(srvOn())apiReq('DELETE','/api/atomcad/loads/'+id).then(function(){LOAD_LIB=LOAD_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}).catch(function(err){toast('Не удалось: '+err.message)});
+    else{LOAD_LIB=LOAD_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}
+  });
+}
 function startEditConsumer(id){editConsumer=id;draw()}
 function doneEditConsumer(){editConsumer=null;draw()}
 function editConsField(id,field,val){var c=P.consumers.filter(function(x){return x.id===id})[0];if(!c)return;
