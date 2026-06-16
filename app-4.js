@@ -12083,7 +12083,8 @@ function _mpSaveStore(o) { try { localStorage.setItem(MORNING_PROGRESS_KEY, JSON
 async function _maybeMorningProgress() {
   try {
     const roles = (state.user && state.user.roles) || [];
-    if (!roles.includes('master')) return;                 // только мастер
+    // v2.45.359: только мастеру (и НЕ директору) — у директора роль master тоже есть
+    if (!roles.includes('master') || roles.includes('director')) return;
     if (document.getElementById('morning-progress-overlay')) return;
     let contracts = cache.contracts;
     if (!contracts) {
@@ -12103,8 +12104,11 @@ function _renderMorningProgress(active) {
   state._mp = { active: active, filled: {} };
   active.forEach(c => { if (rec[c.id] != null) state._mp.filled[c.id] = rec[c.id]; });
 
-  const nm = (state.user && (state.user.name || state.user.full_name) || '').trim();
-  const greet = nm ? (', ' + escapeHtml(nm.split(' ')[0])) : '';
+  // v2.45.359: приветствие по имени-отчеству (ФИО = «Фамилия Имя Отчество» → «Имя Отчество»)
+  const nm = (state.user && (state.user.full_name || state.user.name) || '').trim();
+  const _np = nm.split(/\s+/).filter(Boolean);
+  const _io = _np.length >= 2 ? _np.slice(1).join(' ') : nm;
+  const greet = _io ? (', ' + escapeHtml(_io)) : '';
   const dt = new Date();
   const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
   const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
