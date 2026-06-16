@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.384';
+const CACHE_VERSION = 'atomus-v1.8.386';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -192,18 +192,22 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Клик по уведомлению — открыть/сфокусировать приложение
+// Клик по уведомлению — открыть/сфокусировать приложение и провалиться в карточку
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || '/';
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const c of clients) {
-        if ('focus' in c) { c.focus(); return; }
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clients) {
+      if ('focus' in c) {
+        await c.focus();
+        // v2.45.335: сообщаем открытому окну, куда провалиться (deep-link в сборку)
+        c.postMessage({ type: 'NOTIFICATION_CLICK', url });
+        return;
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
-  );
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  })());
 });
 
 async function networkFirst(req) {

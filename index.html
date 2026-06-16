@@ -38,7 +38,7 @@
   <div class="labels-preview-header">
     <div>
       <h2 style="margin: 0; font-size: 17px;">Печать наклеек 58×60мм</h2>
-      <div style="color: var(--text-light); font-size: 12.5px; margin-top: 3px;" id="labels-count-info">—</div>
+      <div style="color: var(--text-light); font-size: 13px; margin-top: 3px;" id="labels-count-info">—</div>
     </div>
     <div style="display: flex; gap: 8px;">
       <button class="btn btn-secondary" onclick="closeLabelsView()"><i class="ti ti-arrow-left"></i> Назад</button>
@@ -2052,7 +2052,7 @@
             </div>
             <button class="btn btn-secondary" onclick="loadEdoUpd()"><i class="ti ti-refresh"></i> Обновить</button>
           </div>
-          <div style="font-size:12.5px;color:var(--text-light);margin:0 0 12px;">Сюда автоматически прилетают УПД из 1С-ЭДО. Привязанные к заказу помечены меткой ORD-N, остальные привяжи вручную из карточки.</div>
+          <div style="font-size: 13px;color:var(--text-light);margin:0 0 12px;">Сюда автоматически прилетают УПД из 1С-ЭДО. Привязанные к заказу помечены меткой ORD-N, остальные привяжи вручную из карточки.</div>
           <div id="edo-upd-list"><div class="loading-block">Загружаем…</div></div>
         </div>
       </div>
@@ -2816,11 +2816,11 @@
       <i class="ti ti-scan"></i> Сканирование QR-кода
     </div>
     <div style="display: flex; gap: 8px; align-items: center;">
-      <label class="qr-scanner-close" title="Открыть фото с QR" style="width: auto; padding: 0 12px; border-radius: 18px; cursor: pointer;">
+      <label class="qr-scanner-close" title="Открыть фото с QR" style="width: auto; padding: 0 12px; border-radius: 16px; cursor: pointer;">
         <i class="ti ti-photo"></i>
         <input type="file" accept="image/*" style="display: none;" onchange="scanQrFromFile(this)">
       </label>
-      <button class="qr-scanner-close" onclick="openQrManualEntry()" title="Ввести вручную" style="width: auto; padding: 0 12px; font-size: 13px; border-radius: 18px;">
+      <button class="qr-scanner-close" onclick="openQrManualEntry()" title="Ввести вручную" style="width: auto; padding: 0 12px; font-size: 13px; border-radius: 16px;">
         <i class="ti ti-keyboard"></i>
       </button>
       <button class="qr-scanner-close" onclick="closeQrScanner()" title="Закрыть"><i class="ti ti-x"></i></button>
@@ -3052,7 +3052,7 @@
     gap: 16px;
   }
   .le-side {
-    background: white; border: 1px solid var(--border); border-radius: 10px;
+    background: white; border: 1px solid var(--border); border-radius: 12px;
     padding: 14px; display: flex; flex-direction: column; gap: 10px;
     min-height: 0;
   }
@@ -3061,12 +3061,12 @@
     font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
     padding-bottom: 6px; border-bottom: 1px solid #E2E8F0;
   }
-  .le-side .form-label { font-size: 11.5px; color: var(--text-mid); margin-bottom: 3px; }
+  .le-side .form-label { font-size: 12px; color: var(--text-mid); margin-bottom: 3px; }
   .le-side .form-input { font-size: 13px; padding: 6px 10px; margin-bottom: 0; }
 
   .le-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .le-preview-wrap {
-    background: white; border: 1px solid var(--border); border-radius: 10px;
+    background: white; border: 1px solid var(--border); border-radius: 12px;
     padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px;
   }
   .le-canvas {
@@ -3075,14 +3075,14 @@
     box-shadow: 0 1px 0 rgba(0,0,0,0.04);
   }
   .le-elements {
-    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 0;
+    background: white; border: 1px solid var(--border); border-radius: 12px; padding: 0;
     overflow: hidden;
   }
   .le-elements .le-el-head {
     display: grid;
     grid-template-columns: 100px 1fr 60px 60px 60px 36px;
     padding: 8px 12px; background: #F1F5F9;
-    font-size: 10.5px; color: var(--text-light);
+    font-size: 11px; color: var(--text-light);
     text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
   }
   .le-elements .le-el-row {
@@ -3092,7 +3092,7 @@
     padding: 6px 12px; border-top: 1px solid #E2E8F0;
   }
   .le-elements .le-el-row > * { font-size: 13px; }
-  .le-elements .form-input { padding: 5px 8px; font-size: 12.5px; margin: 0; height: 30px; }
+  .le-elements .form-input { padding: 4px 8px; font-size: 13px; margin: 0; height: 30px; }
   .le-elements .le-el-add { padding: 10px 12px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; gap: 6px; }
   .le-zpl-block textarea {
     width: 100%; min-height: 160px;
@@ -3107,13 +3107,13 @@
   }
   .le-footer .le-spacer { flex: 1; }
   .le-presets {
-    background: white; border: 1px solid var(--border); border-radius: 10px;
+    background: white; border: 1px solid var(--border); border-radius: 12px;
     padding: 10px 12px;
   }
   .le-presets .lep-row {
     display: flex; align-items: center; gap: 8px;
     padding: 6px 0; border-bottom: 1px dashed #E2E8F0;
-    font-size: 12.5px;
+    font-size: 13px;
   }
   .le-presets .lep-row:last-child { border-bottom: none; }
   .le-presets .lep-row > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3238,7 +3238,7 @@ function _leRenderSide() {
     '</div>' +
     '<h4 style="margin-top:6px;">Шаблоны</h4>' +
     '<div class="le-presets">' + presetsHtml + '</div>' +
-    '<div style="font-size:11.5px;color:var(--text-light);line-height:1.45;margin-top:6px;">' +
+    '<div style="font-size: 12px;color:var(--text-light);line-height:1.45;margin-top:6px;">' +
       '<i class="ti ti-info-circle"></i> Координаты в мм от левого-верхнего угла этикетки. ZPL — для Zebra TLP/GK/ZD.' +
     '</div>' +
   '</div>';
@@ -3249,7 +3249,7 @@ function _leRenderMain() {
   return '<div class="le-main">' +
     '<div class="le-preview-wrap">' +
       '<canvas id="le-canvas" class="le-canvas"></canvas>' +
-      '<div style="font-size:11.5px;color:var(--text-light);">Превью 1:3 (для прикидки). Финальный размер — в ZPL.</div>' +
+      '<div style="font-size: 12px;color:var(--text-light);">Превью 1:3 (для прикидки). Финальный размер — в ZPL.</div>' +
     '</div>' +
     '<div class="le-elements">' +
       '<div class="le-el-head">' +
@@ -3275,7 +3275,7 @@ function _leRenderElementRow(el, i) {
         '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'le-img-' + i + '\').click()">' +
           '<i class="ti ti-upload"></i> ' + (has ? 'Заменить' : 'Загрузить') +
         '</button>' +
-        (has ? '<span style="font-size:11.5px;color:var(--text-light);">' + ((el.dataUrl.length / 1024) | 0) + ' КБ</span>' : '') +
+        (has ? '<span style="font-size: 12px;color:var(--text-light);">' + ((el.dataUrl.length / 1024) | 0) + ' КБ</span>' : '') +
       '</div>';
   } else {
     content = '<input type="text" class="form-input" value="' + escapeHtml(el.text || '') + '" oninput="_leSetField(' + i + ',\'text\',this.value)" />';
@@ -3570,7 +3570,7 @@ function _leShowZpl() {
           '<button class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById(\'le-zpl-text\').value).then(()=>showToast(\'ZPL скопирован\',\'success\'))"><i class="ti ti-copy"></i> Скопировать</button>' +
           '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Готово</button>' +
         '</div>' +
-        '<div style="margin-top:10px;font-size:11.5px;color:var(--text-light);line-height:1.5;">' +
+        '<div style="margin-top:10px;font-size: 12px;color:var(--text-light);line-height:1.5;">' +
           '<i class="ti ti-info-circle"></i> Скопируй и отправь на принтер через шлюз / ZebraDesigner / прямо в порт. Картинки в ZPL вставляются как ^GFA — это нужно конвертировать отдельно (например, через labelary.com).' +
         '</div>' +
       '</div>' +
@@ -3684,8 +3684,8 @@ function _leDeletePreset(id) {
 <style>
   .bba-modal { max-width: 720px; width: 96vw; max-height: 92vh; display: flex; flex-direction: column; }
   .bba-body { flex: 1; overflow-y: auto; padding: 18px 20px; }
-  .bba-section { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
-  .bba-section h4 { margin: 0 0 10px; font-size: 12px; color: #0C4A6E; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+  .bba-section { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .bba-section h4 { margin: 0 0 10px; font-size: 12px; color: var(--brand); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
   .bba-add-row { display: grid; grid-template-columns: 1fr 80px 110px 32px; gap: 8px; margin-bottom: 8px; align-items: center; }
   .bba-add-row select, .bba-add-row input[type="number"], .bba-add-row input[type="text"] { font-size: 13px; padding: 6px 10px; margin: 0; height: 34px; border: 1px solid var(--border); border-radius: 8px; }
   /* v2.45.50: явный браузерный чекбокс с фиксированным размером */
@@ -3701,11 +3701,11 @@ function _leDeletePreset(id) {
     width: 18px; height: 18px;
     margin: 0; padding: 0;
     flex-shrink: 0;
-    accent-color: var(--brand, #0C4A6E);
+    accent-color: var(--brand, var(--brand));
     cursor: pointer;
   }
-  .bba-results { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; max-height: 280px; overflow-y: auto; }
-  .bba-results .bba-stats { font-weight: 600; margin-bottom: 8px; color: #0C4A6E; }
+  .bba-results { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 13px; max-height: 280px; overflow-y: auto; }
+  .bba-results .bba-stats { font-weight: 600; margin-bottom: 8px; color: var(--brand); }
   .bba-results .bba-model { padding: 4px 0; border-bottom: 1px dashed #E2E8F0; }
   .bba-results .bba-model:last-child { border-bottom: none; }
   .bba-results .bba-model b { color: var(--text-dark); }
@@ -3755,7 +3755,7 @@ function _bbaRender() {
         (c
           ? '<span style="color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
               escapeHtml(c.name || '—') +
-              (c.sku ? ' <span style="color:var(--text-light);font-family:monospace;font-size:11.5px;">' + escapeHtml(c.sku) + '</span>' : '') +
+              (c.sku ? ' <span style="color:var(--text-light);font-family:monospace;font-size: 12px;">' + escapeHtml(c.sku) + '</span>' : '') +
             '</span>'
           : '<span style="color:var(--text-light);">— выбрать комплектующее —</span>') +
         '<i class="ti ti-chevron-down" style="color:var(--text-light);flex-shrink:0;"></i>' +
@@ -3788,7 +3788,7 @@ function _bbaRender() {
               '<i class="ti ti-search"></i> Из каталога' +
             '</button>' +
           '</div>' +
-          '<div style="font-size:11.5px;color:var(--text-light);margin-top:6px;">Ищем все модели, в чьём BOM есть компонент с этим фрагментом в имени. Регистр не важен.</div>' +
+          '<div style="font-size: 12px;color:var(--text-light);margin-top:6px;">Ищем все модели, в чьём BOM есть компонент с этим фрагментом в имени. Регистр не важен.</div>' +
         '</div>' +
         '<div class="bba-section">' +
           '<h4>Что добавить (qty / критичность)</h4>' +
@@ -3806,7 +3806,7 @@ function _bbaRender() {
       '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
         // v2.45.49: индикатор загрузки слева
         (_bbaState._loading
-          ? '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);display:flex;align-items:center;gap:6px;">' +
+          ? '<div style="margin-right:auto;font-size: 13px;color:var(--text-mid);display:flex;align-items:center;gap:6px;">' +
               '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> ' +
               (_bbaState._loading === 'preview' ? 'Считаем предпросмотр…' : 'Применяем изменения…') +
             '</div>'
@@ -4059,19 +4059,19 @@ async function _bbaRun(dryRun) {
   .mrn-modal { max-width: 1100px; width: 96vw; max-height: 92vh; display: flex; flex-direction: column; }
   .mrn-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
   .mrn-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
-  .mrn-controls input[type="text"] { font-size: 13px; padding: 7px 10px; height: 34px; border: 1px solid var(--border); border-radius: 8px; min-width: 200px; }
-  .mrn-stats { font-size: 12.5px; color: var(--text-mid); display: flex; gap: 16px; flex-wrap: wrap; }
+  .mrn-controls input[type="text"] { font-size: 13px; padding: 8px 10px; height: 34px; border: 1px solid var(--border); border-radius: 8px; min-width: 200px; }
+  .mrn-stats { font-size: 13px; color: var(--text-mid); display: flex; gap: 16px; flex-wrap: wrap; }
   .mrn-stats b { color: var(--text-dark); }
   .mrn-stats .mrn-bad { color: var(--danger); }
   .mrn-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: white; }
-  .mrn-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .mrn-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .mrn-table th, .mrn-table td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; text-align: left; }
-  .mrn-table th { background: #F1F5F9; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-light); font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+  .mrn-table th { background: #F1F5F9; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-light); font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
   .mrn-table tr.mrn-conflict { background: #FEF2F2; }
   .mrn-table tr.mrn-unchanged { opacity: 0.55; }
-  .mrn-table input { font-size: 12.5px; padding: 4px 6px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: white; width: 100%; box-sizing: border-box; }
-  .mrn-table input.mrn-changed { border-color: #0C4A6E; background: #F0F9FF; }
-  .mrn-exec-pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; }
+  .mrn-table input { font-size: 13px; padding: 4px 6px; height: 28px; border: 1px solid var(--border); border-radius: 8px; background: white; width: 100%; box-sizing: border-box; }
+  .mrn-table input.mrn-changed { border-color: var(--brand); background: var(--brand-bg); }
+  .mrn-exec-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
   .mrn-exec-standard  { background: #DCFCE7; color: #0A5B41; }
   .mrn-exec-stainless { background: #FEE2E2; color: #8C2A2A; }
   .mrn-exec-waterproof { background: #DBEAFE; color: #1E3A8A; }
@@ -4154,15 +4154,15 @@ function _mrnRender() {
             : '') +
         '</div>' +
         (s.error
-          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius:6px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
+          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius: 8px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
           : '') +
         tableHtml +
-        '<div style="font-size:11.5px;color:var(--text-light);margin-top:10px;line-height:1.55;">' +
+        '<div style="font-size: 12px;color:var(--text-light);margin-top:10px;line-height:1.55;">' +
           '<i class="ti ti-info-circle"></i> Префикс <code>-N</code> в артикуле — нерж, <code>-V</code> — влагозащита, без префикса — стандарт. Имя не содержит префикса исполнения. Поля можно редактировать руками — изменённые подсвечены синим. Конфликтные строки выделены красным; их надо поправить руками или они будут пропущены при применении.' +
         '</div>' +
       '</div>' +
       '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
-        '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);">' +
+        '<div style="margin-right:auto;font-size: 13px;color:var(--text-mid);">' +
           (total > 0 ? 'Применить можно после устранения конфликтов.' : '') +
         '</div>' +
         '<button class="btn btn-primary" onclick="_mrnApply()" ' + ((!total || conflicts > 0 || s.loading) ? 'disabled' : '') + '>' +
@@ -4269,8 +4269,8 @@ async function _mrnApply() {
   .ssd-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
   .ssd-row { display: grid; grid-template-columns: 80px 1fr 32px; gap: 8px; align-items: center; margin-bottom: 6px; }
   .ssd-row input { font-size: 13px; padding: 6px 10px; height: 34px; border: 1px solid var(--border); border-radius: 8px; margin: 0; }
-  .ssd-results { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; max-height: 260px; overflow-y: auto; margin-top: 12px; }
-  .ssd-stat-line { padding: 3px 0; }
+  .ssd-results { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 13px; max-height: 260px; overflow-y: auto; margin-top: 12px; }
+  .ssd-stat-line { padding: 4px 0; }
 </style>
 <script>
 let _ssdState = null;
@@ -4360,7 +4360,7 @@ function _ssdRender() {
           ? '<div class="ssd-stat-line" style="color:var(--danger);">Не распознано/без подгруппы: <b>' + result.unmatched_count + '</b></div>'
           : '') +
         ((result.unmatched || []).length > 0
-          ? '<div style="margin-top:8px;color:var(--text-light);font-size:11.5px;">' +
+          ? '<div style="margin-top:8px;color:var(--text-light);font-size: 12px;">' +
               result.unmatched.slice(0, 30).map(u =>
                 '<div>• <code>' + escapeHtml(u.article) + '</code> — ' + escapeHtml(u.reason) + '</div>'
               ).join('') +
@@ -4378,19 +4378,19 @@ function _ssdRender() {
       '<div class="ssd-body">' +
         '<div style="display:grid;grid-template-columns:1fr 100px;gap:10px;margin-bottom:12px;">' +
           '<div>' +
-            '<label class="form-label" style="font-size:11.5px;">Направление</label>' +
-            '<select id="ssd-dir" onchange="_ssdSetDir(this.value)" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;">' + dirOpts + '</select>' +
+            '<label class="form-label" style="font-size: 12px;">Направление</label>' +
+            '<select id="ssd-dir" onchange="_ssdSetDir(this.value)" style="font-size:13px;padding:8px 10px;height:36px;border:1px solid var(--border);border-radius: 8px;width:100%;">' + dirOpts + '</select>' +
           '</div>' +
           '<div>' +
-            '<label class="form-label" style="font-size:11.5px;">Префикс</label>' +
-            '<input type="text" id="ssd-prefix" value="' + escapeHtml(s.prefix) + '" oninput="_ssdSetPrefix(this.value)" placeholder="ST" maxlength="6" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;text-align:center;text-transform:uppercase;font-weight:600;" />' +
+            '<label class="form-label" style="font-size: 12px;">Префикс</label>' +
+            '<input type="text" id="ssd-prefix" value="' + escapeHtml(s.prefix) + '" oninput="_ssdSetPrefix(this.value)" placeholder="ST" maxlength="6" style="font-size:13px;padding:8px 10px;height:36px;border:1px solid var(--border);border-radius: 8px;width:100%;text-align:center;text-transform:uppercase;font-weight:600;" />' +
           '</div>' +
         '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-light);margin:-6px 0 12px;line-height:1.5;">' +
+        '<div style="font-size: 12px;color:var(--text-light);margin:-6px 0 12px;line-height:1.5;">' +
           '<i class="ti ti-info-circle"></i> Префикс подставляется автоматически из имени направления: <b>Стандарт</b> → ST, <b>Нерж AISI</b> → N, <b>Влагозащита</b> → IP. Можно переопределить вручную.' +
         '</div>' +
         '<div style="margin-bottom:12px;">' +
-          '<label class="form-label" style="font-size:11.5px;">Подгруппы</label>' +
+          '<label class="form-label" style="font-size: 12px;">Подгруппы</label>' +
           '<div class="ssd-row" style="font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;">' +
             '<div>Код (3 цифры)</div><div>Название</div><div></div>' +
           '</div>' +
@@ -4399,21 +4399,21 @@ function _ssdRender() {
         '</div>' +
         '<div style="margin-bottom:12px;">' +
           '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">' +
-            '<input type="checkbox"' + (s.auto_bind ? ' checked' : '') + ' onchange="_ssdState.auto_bind=this.checked;_ssdRender()" style="width:18px;height:18px;appearance:auto;accent-color:#0C4A6E;" />' +
+            '<input type="checkbox"' + (s.auto_bind ? ' checked' : '') + ' onchange="_ssdState.auto_bind=this.checked;_ssdRender()" style="width:18px;height:18px;appearance:auto;accent-color:var(--brand);" />' +
             '<span>Автоматически привязать модели к подгруппам по первой цифре артикула</span>' +
           '</label>' +
-          '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">' +
+          '<div style="font-size: 12px;color:var(--text-light);margin-top:4px;">' +
             'ЩУ-001-XXX → код 001, ЩУ-002-XXX → код 002 и так далее. Если у модели нет подходящей подгруппы — она останется как есть.' +
           '</div>' +
         '</div>' +
         (s.error
-          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius:6px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
+          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius: 8px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
           : '') +
         resultsHtml +
       '</div>' +
       '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
         (s.loading
-          ? '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);display:flex;align-items:center;gap:6px;">' +
+          ? '<div style="margin-right:auto;font-size: 13px;color:var(--text-mid);display:flex;align-items:center;gap:6px;">' +
               '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…' +
             '</div>'
           : '') +
@@ -4542,15 +4542,15 @@ async function _ssdRun(dryRun) {
     gap: 8px;
   }
   .sat-card:hover {
-    border-color: #0C4A6E;
-    background: #F0F9FF;
+    border-color: var(--brand);
+    background: var(--brand-bg);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(12,74,110,0.08);
   }
   .sat-card-icon {
     width: 40px; height: 40px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #0C4A6E, #0369A1);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--brand), var(--brand));
     color: white;
     display: flex; align-items: center; justify-content: center;
     font-size: 20px;
@@ -4591,8 +4591,8 @@ function _satPromptPassword() {
         '<div style="padding:18px 20px;">' +
           '<div style="font-size:13px;color:var(--text-mid);margin-bottom:12px;line-height:1.5;">Глубокие настройки каталога защищены повторным вводом пароля. Введи свой пароль входа в CRM.</div>' +
           '<input type="password" id="sat-pwd-input" autocomplete="current-password" placeholder="Пароль" autofocus ' +
-            'style="width:100%;font-size:14px;padding:9px 12px;height:40px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;" />' +
-          '<div id="sat-pwd-error" style="display:none;color:var(--danger);font-size:12.5px;margin-top:6px;"></div>' +
+            'style="width:100%;font-size:14px;padding:8px 12px;height:40px;border:1px solid var(--border);border-radius: 8px;box-sizing:border-box;" />' +
+          '<div id="sat-pwd-error" style="display:none;color:var(--danger);font-size: 13px;margin-top:6px;"></div>' +
         '</div>' +
         '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
           '<button class="btn btn-secondary" id="sat-pwd-cancel-btn"><i class="ti ti-x"></i> Отмена</button>' +
@@ -4666,7 +4666,7 @@ async function openSupplyAdminTools() {
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="padding:18px 20px;overflow-y:auto;">' +
-        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:14px;line-height:1.5;">' +
+        '<div style="font-size: 13px;color:var(--text-light);margin-bottom:14px;line-height:1.5;">' +
           '<i class="ti ti-info-circle"></i> Массовые операции над каталогом и BOM. Каждый инструмент сначала показывает <b>предпросмотр</b>, изменения применяются только после подтверждения.' +
         '</div>' +
         '<div class="sat-grid">' +
@@ -4725,10 +4725,10 @@ async function openFinishedInventory() {
       '<div class="modal-header"><h3><i class="ti ti-clipboard-check"></i> Инвентаризация готовой продукции</h3>' +
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:16px 20px;">' +
-        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:12px;line-height:1.5;">' +
+        '<div style="font-size: 13px;color:var(--text-light);margin-bottom:12px;line-height:1.5;">' +
           'Поправка склада по факту инвентаризации. <b>Излишек</b> добавляет изделия <b>без списания комплектующих</b>. <b>Недостача</b> убирает со <b>свободного</b> остатка (резерв под договоры не трогается).' +
         '</div>' +
-        '<input id="fi-search" type="text" placeholder="Модель: название или артикул…" oninput="_fiSearch(this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;font-size:14px;">' +
+        '<input id="fi-search" type="text" placeholder="Модель: название или артикул…" oninput="_fiSearch(this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius: 8px;box-sizing:border-box;font-size:14px;">' +
         '<div id="fi-results" style="max-height:30vh;overflow:auto;margin-top:8px;"></div>' +
         '<div id="fi-adjust" style="display:none;margin-top:12px;"></div>' +
       '</div>' +
@@ -4761,7 +4761,7 @@ function _fiRenderList(q) {
   if (!shown.length) { box.innerHTML = '<div style="padding:10px;color:var(--text-light);">Ничего не найдено по запросу</div>'; return; }
   box.innerHTML = shown.map(mm =>
     '<div class="bom-relink-row" onclick="_fiPick(' + mm.id + ', ' + JSON.stringify(mm.name || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(mm.article || '').replace(/"/g, '&quot;') + ')" ' +
-    'style="display:flex;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;">' +
+    'style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius: 8px;margin-bottom:5px;cursor:pointer;">' +
     '<span style="font-weight:600;">' + escapeHtml(mm.name || '') + '</span>' +
     '<span style="color:var(--text-light);font-size:12px;">' + escapeHtml(mm.article || '') + '</span></div>').join('') +
     (list.length > shown.length ? '<div style="padding:8px;text-align:center;color:var(--text-light);font-size:12px;">…ещё ' + (list.length - shown.length) + '. Уточните поиск.</div>' : '');
@@ -4780,7 +4780,7 @@ async function _fiRenderAdjust() {
   let stock = { total: 0, free: 0, reserved: 0 };
   try { const r = await apiGet('/api/models/' + sel.id + '/finished-stock'); stock = r.stock || stock; } catch (e) {}
   box.innerHTML =
-    '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">' +
+    '<div style="background:var(--bg);border:1px solid var(--border);border-radius: 12px;padding:12px 14px;">' +
       '<div style="font-weight:700;margin-bottom:6px;">' + escapeHtml(sel.name) +
         (sel.article ? ' <span style="color:var(--text-light);font-weight:400;font-size:12px;">' + escapeHtml(sel.article) + '</span>' : '') + '</div>' +
       '<div style="display:flex;gap:14px;font-size:13px;margin-bottom:12px;">' +
@@ -4790,10 +4790,10 @@ async function _fiRenderAdjust() {
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">' +
         '<span style="font-size:13px;color:var(--text-light);">Кол-во:</span>' +
-        '<input id="fi-qty" type="number" min="1" value="1" style="width:80px;padding:8px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-size:15px;">' +
+        '<input id="fi-qty" type="number" min="1" value="1" style="width:80px;padding:8px;border:1.5px solid var(--border);border-radius: 8px;text-align:center;font-size:15px;">' +
         '<span style="font-size:13px;">шт.</span>' +
       '</div>' +
-      '<input id="fi-comment" type="text" placeholder="Комментарий (необязательно)" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;margin-bottom:12px;font-size:13px;">' +
+      '<input id="fi-comment" type="text" placeholder="Комментарий (необязательно)" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius: 8px;box-sizing:border-box;margin-bottom:12px;font-size:13px;">' +
       '<div style="display:flex;gap:8px;">' +
         '<button class="btn btn-secondary" style="flex:1;" onclick="_fiApply(1)"><i class="ti ti-plus"></i> Добавить (излишек)</button>' +
         '<button class="btn btn-secondary" style="flex:1;color:var(--danger);border-color:#FCD0D0;" onclick="_fiApply(-1)"><i class="ti ti-minus"></i> Убрать (недостача)</button>' +
@@ -4832,8 +4832,8 @@ async function _fiApply(sign) {
   .cmv-modal { max-width: 880px; width: 96vw; max-height: 92vh; display: flex; flex-direction: column; }
   .cmv-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
   .cmv-controls { display: grid; grid-template-columns: 1fr 1fr 140px; gap: 10px; margin-bottom: 14px; align-items: end; }
-  .cmv-controls label { font-size: 11.5px; color: var(--text-mid); display: block; margin-bottom: 4px; }
-  .cmv-controls select, .cmv-controls input { font-size: 13px; padding: 7px 10px; height: 36px; border: 1px solid var(--border); border-radius: 8px; width: 100%; box-sizing: border-box; }
+  .cmv-controls label { font-size: 12px; color: var(--text-mid); display: block; margin-bottom: 4px; }
+  .cmv-controls select, .cmv-controls input { font-size: 13px; padding: 8px 10px; height: 36px; border: 1px solid var(--border); border-radius: 8px; width: 100%; box-sizing: border-box; }
   .cmv-list {
     border: 1px solid var(--border); border-radius: 8px;
     max-height: 360px; overflow-y: auto; background: white;
@@ -4842,16 +4842,16 @@ async function _fiApply(sign) {
     display: grid;
     grid-template-columns: 36px 1fr 160px 140px;
     align-items: center; gap: 10px;
-    padding: 7px 12px;
+    padding: 8px 12px;
     border-bottom: 1px solid #E2E8F0;
     font-size: 13px;
   }
   .cmv-row:last-child { border-bottom: none; }
   .cmv-row:hover { background: #F8FAFC; }
-  .cmv-row input[type="checkbox"] { width: 18px; height: 18px; appearance: auto; accent-color: #0C4A6E; cursor: pointer; }
+  .cmv-row input[type="checkbox"] { width: 18px; height: 18px; appearance: auto; accent-color: var(--brand); cursor: pointer; }
   .cmv-row .cmv-name { font-weight: 500; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cmv-row .cmv-sku { font-family: monospace; font-size: 11.5px; color: var(--text-mid); }
-  .cmv-row .cmv-preview-sku { font-family: monospace; font-size: 11.5px; color: #0C4A6E; font-weight: 600; }
+  .cmv-row .cmv-sku { font-family: monospace; font-size: 12px; color: var(--text-mid); }
+  .cmv-row .cmv-preview-sku { font-family: monospace; font-size: 12px; color: var(--brand); font-weight: 600; }
   .cmv-controls-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
 </style>
 <script>
@@ -4957,7 +4957,7 @@ function _cmvRender() {
         (s.source_id ? 'В этой категории нет компонентов (или ничего не нашлось по фильтру)' : 'Выбери исходную категорию слева') +
       '</div>';
   const resultsHtml = s.lastResult
-    ? '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:10px 14px;font-size:12.5px;margin-top:12px;color:#0C4A6E;">' +
+    ? '<div style="background:var(--brand-bg);border:1px solid var(--brand-bg-strong);border-radius: 8px;padding:10px 14px;font-size: 13px;margin-top:12px;color:var(--brand);">' +
         (s.target_kind === 'models'
           ? 'Создано моделей: <b>' + (s.lastResult.created_count || 0) + '</b> · '
           : (s.lastResult.mode === 'copy'
@@ -4968,7 +4968,7 @@ function _cmvRender() {
           : '') +
         'пропущено: <b>' + s.lastResult.skipped_count + '</b>' +
         ((s.lastResult.skipped || []).length > 0
-          ? '<div style="margin-top:6px;font-size:11.5px;">Пропущенные:</div><ul style="margin:4px 0 0 18px;padding:0;font-size:11.5px;">' +
+          ? '<div style="margin-top:6px;font-size: 12px;">Пропущенные:</div><ul style="margin:4px 0 0 18px;padding:0;font-size: 12px;">' +
               s.lastResult.skipped.slice(0, 10).map(x => '<li>id=' + x.id + ': ' + escapeHtml(x.reason) + '</li>').join('') +
             '</ul>'
           : '') +
@@ -4988,7 +4988,7 @@ function _cmvRender() {
             'onclick="_cmvSetTargetKind(\'components\')"><i class="ti ti-package"></i> Комплектующие</button>' +
           '<button type="button" class="btn btn-small ' + (s.target_kind === 'models' ? 'btn-primary' : 'btn-secondary') + '" ' +
             'onclick="_cmvSetTargetKind(\'models\')"><i class="ti ti-cube"></i> Номенклатура производства</button>' +
-          '<span style="font-size:11.5px;color:var(--text-light);margin-left:8px;">' +
+          '<span style="font-size: 12px;color:var(--text-light);margin-left:8px;">' +
             (s.target_kind === 'models'
               ? 'Создаст модели в каталоге производства. Оригинальный компонент остаётся на складе'
               : 'Перенесёт/скопирует компоненты между категориями склада комплектующих') +
@@ -5001,7 +5001,7 @@ function _cmvRender() {
             ? '<div>' +
                 '<label>Категория комплектующих' +
                   ' <button type="button" onclick="_cmvCreateNewCat()" title="Создать новую категорию компонентов" ' +
-                    'style="margin-left:6px;background:none;border:none;color:var(--brand);font-size:11.5px;cursor:pointer;font-weight:600;padding:0;">' +
+                    'style="margin-left:6px;background:none;border:none;color:var(--brand);font-size: 12px;cursor:pointer;font-weight:600;padding:0;">' +
                     '+ Новая</button>' +
                 '</label>' +
                 '<select onchange="_cmvSetTarget(this.value)">' + catOpts(s.target_id) + '</select>' +
@@ -5046,28 +5046,28 @@ function _cmvRender() {
                 'onclick="_cmvSetMode(\'move\')"><i class="ti ti-transfer"></i> Перенести</button>' +
               '<button type="button" class="btn btn-small ' + (s.mode === 'copy' ? 'btn-primary' : 'btn-secondary') + '" ' +
                 'onclick="_cmvSetMode(\'copy\')"><i class="ti ti-copy"></i> Скопировать</button>' +
-              '<span style="font-size:11.5px;color:var(--text-light);margin-left:8px;">' +
+              '<span style="font-size: 12px;color:var(--text-light);margin-left:8px;">' +
                 (s.mode === 'copy'
                   ? 'Создаст копии в целевой категории, оригиналы останутся на месте'
                   : 'Переместит компоненты, оригиналы пропадут из источника') +
               '</span>' +
             '</div>'
           : '<div class="cmv-mode-row" style="display:flex;gap:6px;margin:8px 0 4px;align-items:center;">' +
-              '<label style="font-size:12.5px;color:var(--text-mid);display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+              '<label style="font-size: 13px;color:var(--text-mid);display:flex;align-items:center;gap:6px;cursor:pointer;">' +
                 '<input type="checkbox" ' + (s.add_to_bom ? 'checked' : '') + ' onchange="_cmvToggleAddBom(this.checked)" />' +
                 'Добавить исходный компонент первой строкой в BOM новой модели' +
               '</label>' +
             '</div>') +
         '<div class="cmv-controls-row">' +
-          '<input type="text" placeholder="Поиск по имени или артикулу…" value="' + escapeHtml(s.search) + '" oninput="_cmvSetSearch(this.value)" style="flex:1;font-size:13px;padding:7px 10px;height:34px;border:1px solid var(--border);border-radius:8px;" />' +
+          '<input type="text" placeholder="Поиск по имени или артикулу…" value="' + escapeHtml(s.search) + '" oninput="_cmvSetSearch(this.value)" style="flex:1;font-size:13px;padding:8px 10px;height:34px;border:1px solid var(--border);border-radius: 8px;" />' +
           '<button class="btn btn-secondary btn-small" onclick="_cmvSelectAll(true)">Выбрать все видимые</button>' +
           '<button class="btn btn-secondary btn-small" onclick="_cmvSelectAll(false)">Снять</button>' +
-          '<span style="font-size:12.5px;color:var(--text-mid);margin-left:auto;">' +
+          '<span style="font-size: 13px;color:var(--text-mid);margin-left:auto;">' +
             'Выбрано: <b>' + s.selected.size + '</b>' +
           '</span>' +
         '</div>' +
         '<div class="cmv-list">' + rowsHtml + '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-light);margin-top:8px;line-height:1.5;">' +
+        '<div style="font-size: 12px;color:var(--text-light);margin-top:8px;line-height:1.5;">' +
           '<i class="ti ti-info-circle"></i> Сначала снимается «снять» (если совпадает с концом sku), затем дописывается «добавить» (если ещё не стоит). В режиме «Скопировать» новый sku обязан отличаться от исходного — иначе компонент будет пропущен.' +
         '</div>' +
         resultsHtml +
@@ -5287,7 +5287,7 @@ function _trbRender() {
     const checked = s.selectedScopes.has(sc.key) ? 'checked' : '';
     return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text-dark);padding:6px 0;cursor:pointer;">' +
       '<input type="checkbox" ' + checked +
-        ' style="appearance:auto;-webkit-appearance:auto;width:16px;height:16px;margin:0;accent-color:#0C4A6E;cursor:pointer;flex-shrink:0;"' +
+        ' style="appearance:auto;-webkit-appearance:auto;width:16px;height:16px;margin:0;accent-color:var(--brand);cursor:pointer;flex-shrink:0;"' +
         ' onchange="_trbToggleScope(\'' + sc.key + '\', this.checked)" /> ' +
       escapeHtml(sc.label) +
     '</label>';
@@ -5301,18 +5301,18 @@ function _trbRender() {
       '</div>' +
       '<div style="padding:16px 20px;overflow-y:auto;flex:1;">' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">' +
-          '<div><label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">Найти</label>' +
+          '<div><label style="font-size: 12px;color:var(--text-mid);display:block;margin-bottom:4px;">Найти</label>' +
             '<input type="text" id="trb-find-input" value="' + escapeHtml(s.find) + '" placeholder="НПВ" oninput="_trbSetFind(this.value)" ' +
-              'style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;" /></div>' +
-          '<div><label style="font-size:11.5px;color:var(--text-mid);display:block;margin-bottom:4px;">Заменить на</label>' +
+              'style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius: 8px;" /></div>' +
+          '<div><label style="font-size: 12px;color:var(--text-mid);display:block;margin-bottom:4px;">Заменить на</label>' +
             '<input type="text" id="trb-replace-input" value="' + escapeHtml(s.replace) + '" placeholder="НВП" oninput="_trbSetReplace(this.value)" ' +
-              'style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;" /></div>' +
+              'style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius: 8px;" /></div>' +
         '</div>' +
         '<div style="font-size:12px;color:var(--text-mid);text-transform:uppercase;font-weight:600;margin-bottom:6px;">Где искать</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;border:1px solid var(--border);border-radius: 8px;padding:8px 12px;">' +
           scopesHtml +
         '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-light);margin-top:8px;line-height:1.5;">' +
+        '<div style="font-size: 12px;color:var(--text-light);margin-top:8px;line-height:1.5;">' +
           '<i class="ti ti-info-circle"></i> Замена — обычный <code>str.replace</code> по подстроке (регистр учитывается). Артикулы моделей с UNIQUE-коллизией попадают в «пропущенные».' +
         '</div>' +
         '<div id="trb-results"></div>' +
@@ -5341,17 +5341,17 @@ function _trbRenderResults() {
     const sum = s.preview.summary[scKey];
     const changes = (s.preview.changes && s.preview.changes[scKey]) || [];
     const samples = changes.slice(0, 8).map(c =>
-      '<li style="font-size:11.5px;color:var(--text-mid);"><code>' + escapeHtml(c.old) + '</code> → <b>' + escapeHtml(c.new) + '</b></li>'
+      '<li style="font-size: 12px;color:var(--text-mid);"><code>' + escapeHtml(c.old) + '</code> → <b>' + escapeHtml(c.new) + '</b></li>'
     ).join('');
-    const more = changes.length > 8 ? '<li style="font-size:11.5px;color:var(--text-light);">…ещё ' + (changes.length - 8) + '</li>' : '';
+    const more = changes.length > 8 ? '<li style="font-size: 12px;color:var(--text-light);">…ещё ' + (changes.length - 8) + '</li>' : '';
     const skipped = (s.preview.skipped && s.preview.skipped[scKey]) || [];
     const skippedHtml = skipped.length
-      ? '<div style="margin-top:6px;color:#B91C1C;font-size:11.5px;">Пропущено (коллизия): ' +
+      ? '<div style="margin-top:6px;color:#B91C1C;font-size: 12px;">Пропущено (коллизия): ' +
           skipped.slice(0, 5).map(sk => escapeHtml(sk.old) + '→' + escapeHtml(sk.new)).join(', ') +
         '</div>'
       : '';
     return '<div style="margin-bottom:10px;">' +
-      '<div style="font-size:12.5px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">' +
+      '<div style="font-size: 13px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">' +
         escapeHtml(scKey) + ': изменено <b>' + sum.changed + '</b>' +
         (sum.skipped ? ' · пропущено <b>' + sum.skipped + '</b>' : '') +
       '</div>' +
@@ -5359,7 +5359,7 @@ function _trbRenderResults() {
       skippedHtml +
     '</div>';
   }).join('');
-  block.innerHTML = '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:10px 14px;margin-top:12px;">' +
+  block.innerHTML = '<div style="background:var(--brand-bg);border:1px solid var(--brand-bg-strong);border-radius: 8px;padding:10px 14px;margin-top:12px;">' +
     (blocks || '<div style="color:var(--text-light);font-size:13px;">Ничего не найдено</div>') +
   '</div>';
   // Активируем кнопку «Заменить»
@@ -5495,9 +5495,9 @@ function _tlhRender() {
     dirs.map(d => '<option value="' + d.id + '"' + (s.direction_id === d.id ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>').join('');
   const l1Rows = s.level1.map((sg, i) =>
     '<div style="display:grid;grid-template-columns:90px 1fr 1.2fr 32px;gap:8px;margin-bottom:6px;align-items:center;">' +
-      '<input type="text" value="' + escapeHtml(sg.code) + '" placeholder="код" oninput="_tlhEditL1(' + i + ',\'code\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
-      '<input type="text" value="' + escapeHtml(sg.name) + '" placeholder="имя подгруппы" oninput="_tlhEditL1(' + i + ',\'name\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
-      '<input type="text" value="' + escapeHtml((sg.match || []).join(', ')) + '" placeholder="маркеры через запятую: Нерж, AISI" oninput="_tlhEditL1Match(' + i + ',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" title="Слова, по которым модель попадает в эту подгруппу. Ищется в exec_fixed и имени модели." />' +
+      '<input type="text" value="' + escapeHtml(sg.code) + '" placeholder="код" oninput="_tlhEditL1(' + i + ',\'code\',this.value)" style="font-size: 13px;padding:4px 8px;height:30px;border:1px solid var(--border);border-radius: 8px;" />' +
+      '<input type="text" value="' + escapeHtml(sg.name) + '" placeholder="имя подгруппы" oninput="_tlhEditL1(' + i + ',\'name\',this.value)" style="font-size: 13px;padding:4px 8px;height:30px;border:1px solid var(--border);border-radius: 8px;" />' +
+      '<input type="text" value="' + escapeHtml((sg.match || []).join(', ')) + '" placeholder="маркеры через запятую: Нерж, AISI" oninput="_tlhEditL1Match(' + i + ',this.value)" style="font-size: 13px;padding:4px 8px;height:30px;border:1px solid var(--border);border-radius: 8px;" title="Слова, по которым модель попадает в эту подгруппу. Ищется в exec_fixed и имени модели." />' +
       (i > 0
         ? '<button class="btn btn-secondary btn-small" onclick="_tlhRemoveL1(' + i + ')" style="color:var(--danger);"><i class="ti ti-x"></i></button>'
         : '<span></span>') +
@@ -5505,8 +5505,8 @@ function _tlhRender() {
   ).join('');
   const l2Rows = s.level2.map((cat, i) =>
     '<div style="display:grid;grid-template-columns:90px 1fr 32px;gap:8px;margin-bottom:6px;align-items:center;">' +
-      '<input type="text" value="' + escapeHtml(cat.code) + '" placeholder="001" oninput="_tlhEditL2(' + i + ',\'code\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
-      '<input type="text" value="' + escapeHtml(cat.name) + '" placeholder="ЩУ-001.000 Камеры созревания" oninput="_tlhEditL2(' + i + ',\'name\',this.value)" style="font-size:12.5px;padding:5px 8px;height:30px;border:1px solid var(--border);border-radius:6px;" />' +
+      '<input type="text" value="' + escapeHtml(cat.code) + '" placeholder="001" oninput="_tlhEditL2(' + i + ',\'code\',this.value)" style="font-size: 13px;padding:4px 8px;height:30px;border:1px solid var(--border);border-radius: 8px;" />' +
+      '<input type="text" value="' + escapeHtml(cat.name) + '" placeholder="ЩУ-001.000 Камеры созревания" oninput="_tlhEditL2(' + i + ',\'name\',this.value)" style="font-size: 13px;padding:4px 8px;height:30px;border:1px solid var(--border);border-radius: 8px;" />' +
       (i > 0
         ? '<button class="btn btn-secondary btn-small" onclick="_tlhRemoveL2(' + i + ')" style="color:var(--danger);"><i class="ti ti-x"></i></button>'
         : '<span></span>') +
@@ -5514,8 +5514,8 @@ function _tlhRender() {
   ).join('');
   const result = s.lastResult;
   const resultsHtml = result
-    ? '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;font-size:12.5px;margin-top:12px;">' +
-        '<div style="font-weight:600;color:#0C4A6E;margin-bottom:6px;">' + (result.dry_run ? 'Предпросмотр' : 'Применено') + ':</div>' +
+    ? '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius: 8px;padding:12px 14px;font-size: 13px;margin-top:12px;">' +
+        '<div style="font-weight:600;color:var(--brand);margin-bottom:6px;">' + (result.dry_run ? 'Предпросмотр' : 'Применено') + ':</div>' +
         '<div>Создано подгрупп: <b>' + (result.created_subgroups || []).length + '</b></div>' +
         '<div>Создано категорий: <b>' + (result.created_categories || []).length + '</b></div>' +
         '<div>Привязано моделей: <b>' + result.bound_count + '</b></div>' +
@@ -5541,36 +5541,36 @@ function _tlhRender() {
       '</div>' +
       '<div style="flex:1;overflow-y:auto;padding:16px 20px;">' +
         '<div style="margin-bottom:14px;">' +
-          '<label class="form-label" style="font-size:11.5px;">Направление</label>' +
-          '<select onchange="_tlhSetDir(this.value)" style="font-size:13px;padding:7px 10px;height:36px;border:1px solid var(--border);border-radius:8px;width:100%;">' + dirOpts + '</select>' +
+          '<label class="form-label" style="font-size: 12px;">Направление</label>' +
+          '<select onchange="_tlhSetDir(this.value)" style="font-size:13px;padding:8px 10px;height:36px;border:1px solid var(--border);border-radius: 8px;width:100%;">' + dirOpts + '</select>' +
         '</div>' +
-        '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">' +
-          '<div style="font-weight:700;color:#0C4A6E;text-transform:uppercase;font-size:11.5px;letter-spacing:0.4px;margin-bottom:10px;">Level 1: Подгруппы (исполнения)</div>' +
-          '<div style="display:grid;grid-template-columns:90px 1fr 1.2fr 32px;gap:8px;font-size:10.5px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">' +
+        '<div style="background:white;border:1px solid var(--border);border-radius: 12px;padding:14px 16px;margin-bottom:14px;">' +
+          '<div style="font-weight:700;color:var(--brand);text-transform:uppercase;font-size: 12px;letter-spacing:0.4px;margin-bottom:10px;">Level 1: Подгруппы (исполнения)</div>' +
+          '<div style="display:grid;grid-template-columns:90px 1fr 1.2fr 32px;gap:8px;font-size: 11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">' +
             '<div>Код</div><div>Имя</div><div>Маркеры (через запятую)</div><div></div>' +
           '</div>' +
           l1Rows +
           '<button class="btn btn-secondary btn-small" onclick="_tlhAddL1()" style="margin-top:6px;"><i class="ti ti-plus"></i> Подгруппу</button>' +
         '</div>' +
-        '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">' +
-          '<div style="font-weight:700;color:#0C4A6E;text-transform:uppercase;font-size:11.5px;letter-spacing:0.4px;margin-bottom:10px;">Level 2: Категории (по первой цифре артикула)</div>' +
-          '<div style="display:grid;grid-template-columns:90px 1fr 32px;gap:8px;font-size:10.5px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">' +
+        '<div style="background:white;border:1px solid var(--border);border-radius: 12px;padding:14px 16px;margin-bottom:14px;">' +
+          '<div style="font-weight:700;color:var(--brand);text-transform:uppercase;font-size: 12px;letter-spacing:0.4px;margin-bottom:10px;">Level 2: Категории (по первой цифре артикула)</div>' +
+          '<div style="display:grid;grid-template-columns:90px 1fr 32px;gap:8px;font-size: 11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">' +
             '<div>Код</div><div>Имя</div><div></div>' +
           '</div>' +
           l2Rows +
           '<button class="btn btn-secondary btn-small" onclick="_tlhAddL2()" style="margin-top:6px;"><i class="ti ti-plus"></i> Категорию</button>' +
         '</div>' +
         '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:8px;">' +
-          '<input type="checkbox"' + (s.deactivate_old ? ' checked' : '') + ' onchange="_tlhState.deactivate_old=this.checked" style="width:18px;height:18px;appearance:auto;accent-color:#0C4A6E;" />' +
+          '<input type="checkbox"' + (s.deactivate_old ? ' checked' : '') + ' onchange="_tlhState.deactivate_old=this.checked" style="width:18px;height:18px;appearance:auto;accent-color:var(--brand);" />' +
           '<span>Деактивировать старые подгруппы (с другими кодами)</span>' +
         '</label>' +
         (s.error
-          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius:6px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
+          ? '<div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #EF4444;color:#991B1B;border-radius: 8px;margin-bottom:12px;font-size:13px;">' + escapeHtml(s.error) + '</div>'
           : '') +
         resultsHtml +
       '</div>' +
       '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end;background:white;border-radius:0 0 12px 12px;">' +
-        (s.loading ? '<div style="margin-right:auto;font-size:12.5px;color:var(--text-mid);"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…</div>' : '') +
+        (s.loading ? '<div style="margin-right:auto;font-size: 13px;color:var(--text-mid);"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite;"></i> Считаем…</div>' : '') +
         '<button class="btn btn-secondary" onclick="_tlhRun(true)" ' + (s.loading ? 'disabled' : '') + '><i class="ti ti-eye"></i> Предпросмотр</button>' +
         '<button class="btn btn-primary" onclick="_tlhRun(false)" ' + ((s.loading || !s.lastResult) ? 'disabled' : '') + '><i class="ti ti-check"></i> Применить</button>' +
       '</div>' +
@@ -5636,8 +5636,8 @@ async function _tlhRun(dryRun) {
 <style>
   .cold-calc-widget {
     padding: 14px;
-    background: linear-gradient(135deg, #E0F2FE, #F0F9FF);
-    border: 1px solid #BAE6FD;
+    background: linear-gradient(135deg, var(--brand-bg), var(--brand-bg));
+    border: 1px solid var(--brand-bg-strong);
     border-radius: 12px;
     display: flex;
     gap: 12px;
@@ -5648,7 +5648,7 @@ async function _tlhRun(dryRun) {
     flex: 1;
     min-width: 200px;
     font-size: 13px;
-    color: #0C4A6E;
+    color: var(--brand);
     line-height: 1.45;
   }
   /* Полноэкранная модалка калькулятора */
@@ -5661,13 +5661,13 @@ async function _tlhRun(dryRun) {
     padding: 0;
   }
   .cc-modal .modal-header {
-    background: linear-gradient(135deg, #0C4A6E, #0369A1);
+    background: linear-gradient(135deg, var(--brand), var(--brand));
     color: white;
     padding: 14px 18px;
     border-radius: 12px 12px 0 0;
   }
   .cc-modal .modal-header h3 { color: white; margin: 0; font-size: 16px; }
-  .cc-modal .modal-header h3 i { color: #BAE6FD; margin-right: 6px; }
+  .cc-modal .modal-header h3 i { color: var(--brand-bg-strong); margin-right: 6px; }
   .cc-modal .modal-close { color: white; opacity: 0.85; }
   .cc-modal .modal-close:hover { opacity: 1; }
 
@@ -5698,13 +5698,13 @@ async function _tlhRun(dryRun) {
   .cc-tab i { font-size: 15px; }
   .cc-tab:hover { background: #F8FAFC; color: var(--text-dark); border-color: #CBD5E1; }
   .cc-tab.active {
-    background: #0C4A6E;
+    background: var(--brand);
     color: white;
-    border-color: #0C4A6E;
+    border-color: var(--brand);
     font-weight: 600;
     box-shadow: 0 1px 3px rgba(12,74,110,0.3);
   }
-  .cc-tab.active i { color: #BAE6FD; }
+  .cc-tab.active i { color: var(--brand-bg-strong); }
 
   .cc-body {
     flex: 1;
@@ -5724,21 +5724,21 @@ async function _tlhRun(dryRun) {
   .cc-section {
     background: white;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 16px 18px;
     margin-bottom: 14px;
   }
   .cc-section h4 {
     margin: 0 0 12px;
     font-size: 13px;
-    color: #0C4A6E;
+    color: var(--brand);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding-bottom: 8px;
     border-bottom: 1px solid #E2E8F0;
   }
-  .cc-section h4 i { color: #0369A1; margin-right: 4px; }
+  .cc-section h4 i { color: var(--brand); margin-right: 4px; }
   .cc-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -5749,7 +5749,7 @@ async function _tlhRun(dryRun) {
   /* v2.45.123: одинаковая высота для всех label независимо от текста */
   .cc-grid .form-label {
     margin-bottom: 4px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--text-mid);
     text-transform: none;
     font-weight: 500;
@@ -5762,7 +5762,7 @@ async function _tlhRun(dryRun) {
   .cc-grid select.form-input,
   .cc-grid input.form-input {
     margin-bottom: 0;
-    font-size: 13.5px;
+    font-size: 14px;
     padding: 8px 10px;
     height: 38px;        /* v2.45.123: одна высота для всех полей */
     box-sizing: border-box;
@@ -5783,7 +5783,7 @@ async function _tlhRun(dryRun) {
     align-items: center;
   }
   .cc-walls-table .hdr {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--text-light);
     text-transform: uppercase;
     letter-spacing: 0.4px;
@@ -5809,16 +5809,16 @@ async function _tlhRun(dryRun) {
   }
 
   .cc-hint {
-    background: #F0F9FF;
-    border-left: 3px solid #0369A1;
-    border-radius: 6px;
+    background: var(--brand-bg);
+    border-left: 3px solid var(--brand);
+    border-radius: 8px;
     padding: 10px 12px;
     font-size: 12px;
-    color: #0C4A6E;
+    color: var(--brand);
     line-height: 1.5;
     margin-top: 12px;
   }
-  .cc-hint i { color: #0369A1; margin-right: 4px; }
+  .cc-hint i { color: var(--brand); margin-right: 4px; }
 
   .cc-footer {
     padding: 12px 18px;
@@ -5835,22 +5835,22 @@ async function _tlhRun(dryRun) {
     font-size: 13px;
     color: var(--text-mid);
   }
-  .cc-footer-total b { font-size: 22px; color: #0C4A6E; font-variant-numeric: tabular-nums; }
-  .cc-footer .btn-primary { background: #0C4A6E; border-color: #0C4A6E; }
-  .cc-footer .btn-primary:hover { background: #0369A1; border-color: #0369A1; }
+  .cc-footer-total b { font-size: 22px; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .cc-footer .btn-primary { background: var(--brand); border-color: var(--brand); }
+  .cc-footer .btn-primary:hover { background: var(--brand); border-color: var(--brand); }
 
   .cc-result {
     background: white;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 16px;
   }
   .cc-result-row {
     display: flex;
     justify-content: space-between;
-    padding: 7px 0;
+    padding: 8px 0;
     border-bottom: 1px dashed var(--border);
-    font-size: 13.5px;
+    font-size: 14px;
   }
   .cc-result-row:last-child { border-bottom: none; font-weight: 700; padding-top: 12px; }
   .cc-result-row .v { font-variant-numeric: tabular-nums; color: var(--text-dark); }
@@ -5866,12 +5866,12 @@ async function _tlhRun(dryRun) {
     border: 1px solid #E2E8F0;
     border-radius: 8px;
   }
-  .cc-hist-row:hover { background: #F0F9FF; }
+  .cc-hist-row:hover { background: var(--brand-bg); }
   .cc-hist-main { flex: 1; min-width: 0; }
-  .cc-hist-title { font-weight: 600; color: var(--text-dark); font-size: 13.5px; }
-  .cc-hist-meta { font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+  .cc-hist-title { font-weight: 600; color: var(--text-dark); font-size: 14px; }
+  .cc-hist-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
   .cc-hist-kw {
-    font-size: 16px; font-weight: 700; color: #0C4A6E;
+    font-size: 16px; font-weight: 700; color: var(--brand);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
@@ -5906,7 +5906,7 @@ async function _tlhRun(dryRun) {
     .cc-walls-table { grid-template-columns: 1fr; gap: 4px; }
     .cc-walls-table .hdr { display: none; }
     .cc-walls-table .lbl {
-      background: #F1F5F9; padding: 6px 10px; border-radius: 6px;
+      background: #F1F5F9; padding: 6px 10px; border-radius: 8px;
       margin-top: 6px;
     }
     .cc-walls-table .row-sep { display: none; }
@@ -5916,7 +5916,7 @@ async function _tlhRun(dryRun) {
     .cc-walls-table > div:not(.lbl):not(.hdr):not(.row-sep)::before {
       content: attr(data-mob-lbl);
       display: block;
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--text-light);
       text-transform: uppercase;
       letter-spacing: 0.4px;
@@ -6277,7 +6277,7 @@ function _ccTabHistory() {
       '<h4><i class="ti ti-history"></i> Сохранённые расчёты</h4>' +
       '<div class="empty-block" style="padding:30px 0;">' +
         '<i class="ti ti-archive"></i>Сохранённых расчётов пока нет.<br/>' +
-        '<span style="font-size:12.5px;color:var(--text-light);">Заполни параметры, нажми «Рассчитать», затем «Сохранить расчёт» на вкладке «Результат».</span>' +
+        '<span style="font-size: 13px;color:var(--text-light);">Заполни параметры, нажми «Рассчитать», затем «Сохранить расчёт» на вкладке «Результат».</span>' +
       '</div></div>';
   }
   let rows = '';
@@ -6408,7 +6408,7 @@ function _ccRenderSchema() {
       7: '#6B7280',  // Инсиблок
       8: '#94A3B8',  // Без стены
     };
-    return map[matIdx] || '#0C4A6E';
+    return map[matIdx] || '#2D5F8B';
   };
 
   const w0 = ws[0] || {len: 0}, w1 = ws[1] || {len: 0};
@@ -6526,7 +6526,7 @@ function _ccRenderSchema() {
         '</linearGradient>' +
       '</defs>' +
 
-      '<text x="' + (SVG_W/2) + '" y="26" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#0C4A6E">КАМЕРА · ' +
+      '<text x="' + (SVG_W/2) + '" y="26" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#2D5F8B">КАМЕРА · ' +
         aLen.toFixed(1) + ' × ' + bLen.toFixed(1) + ' × ' + h.toFixed(1) + ' м · ' +
         (aLen * bLen).toFixed(1) + ' м² · ' + (aLen * bLen * h).toFixed(1) + ' м³' +
       '</text>' +
@@ -6545,10 +6545,10 @@ function _ccRenderSchema() {
 
       // ПРАВАЯ СТЕНА Б-2 (видимая)
       '<polygon points="' + poly(P.bfr, P.bbr, P.tbr, P.tfr) + '" ' +
-        'fill="' + RIGHT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+        'fill="' + RIGHT_FILL + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
       // ПЕРЕДНЯЯ СТЕНА А-1 (видимая)
       '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" ' +
-        'fill="' + FRONT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+        'fill="' + FRONT_FILL + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
       // v2.45.116: дверь на передней грани (А-1) — по центру стены у пола
       (() => {
         const door = _ccState.door || {};
@@ -6579,7 +6579,7 @@ function _ccRenderSchema() {
       })() +
       // ПОТОЛОК (видимый)
       '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" ' +
-        'fill="#F0F9FF" stroke="#0C4A6E" stroke-width="1.5" opacity="0.85"/>' +
+        'fill="#EAF2FA" stroke="#2D5F8B" stroke-width="1.5" opacity="0.85"/>' +
 
       // === v2.45.128: ВЫНОСКИ — линии от центра граней к разноцветным плашкам ===
       (() => {
@@ -6646,11 +6646,11 @@ function _ccRenderSchema() {
         return s;
       })() +
       // Высота H — вертикальная линия слева от передней-левой грани (оставлена, отдельный размер)
-      '<line x1="' + (P.bfl.x - 20) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 20) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.bfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.tfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.tfl.y + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<line x1="' + (P.bfl.x - 20) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 20) + '" y2="' + P.tfl.y + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
+      '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.bfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.bfl.y + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
+      '<line x1="' + (P.bfl.x - 24) + '" y1="' + P.tfl.y + '" x2="' + (P.bfl.x - 16) + '" y2="' + P.tfl.y + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
       '<text x="' + (P.bfl.x - 28) + '" y="' + ((P.bfl.y + P.tfl.y) / 2 + 4) +
-        '" text-anchor="end" font-family="Arial" font-size="12" font-weight="700" fill="#0C4A6E">H = ' + h.toFixed(1) + ' м</text>' +
+        '" text-anchor="end" font-family="Arial" font-size="12" font-weight="700" fill="#2D5F8B">H = ' + h.toFixed(1) + ' м</text>' +
     '</svg>';
 
   // === ЛЕГЕНДА МАТЕРИАЛОВ ===
@@ -6660,12 +6660,12 @@ function _ccRenderSchema() {
     { label: 'А-3 · ' + aLen.toFixed(1) + ' м · t° снаружи ' + (w2.tOut != null ? w2.tOut + '°C' : '—'), mat: matName(w2.wallMat || 0), iso: isoName(w2.isoCode), thick: w2.isoMm, color: matPattern(w2.wallMat || 0) },
     { label: 'Б-4 · ' + bLen.toFixed(1) + ' м · t° снаружи ' + (w3.tOut != null ? w3.tOut + '°C' : '—'), mat: matName(w3.wallMat || 0), iso: isoName(w3.isoCode), thick: w3.isoMm, color: matPattern(w3.wallMat || 0) },
     { label: 'Пол · t° снизу ' + (g.floor && g.floor.tOut != null ? g.floor.tOut + '°C' : '—'),    mat: '—',                            iso: isoName(g.floor && g.floor.isoCode),    thick: g.floor && g.floor.isoMm,    color: 'url(#cc-floor-grad)' },
-    { label: 'Потолок · t° сверху ' + (g.ceiling && g.ceiling.tOut != null ? g.ceiling.tOut + '°C' : '—'), mat: '—',                       iso: isoName(g.ceiling && g.ceiling.isoCode), thick: g.ceiling && g.ceiling.isoMm, color: '#F0F9FF' },
+    { label: 'Потолок · t° сверху ' + (g.ceiling && g.ceiling.tOut != null ? g.ceiling.tOut + '°C' : '—'), mat: '—',                       iso: isoName(g.ceiling && g.ceiling.isoCode), thick: g.ceiling && g.ceiling.isoMm, color: '#EAF2FA' },
   ];
   const legendHtml =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:14px;font-size:12px;">' +
       legendItems.map(it =>
-        '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:#FAFBFC;">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius: 8px;background:#FAFBFC;">' +
           '<svg width="18" height="18" viewBox="0 0 18 18" style="flex-shrink:0;">' +
             '<rect width="18" height="18" fill="' + it.color + '" stroke="#475569" stroke-width="0.7"/>' +
           '</svg>' +
@@ -6680,7 +6680,7 @@ function _ccRenderSchema() {
       ).join('') +
     '</div>';
 
-  return '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+  return '<div style="background:white;border:1px solid var(--border);border-radius: 12px;padding:14px;">' +
     '<div style="display:flex;justify-content:center;align-items:center;">' +
       '<div style="max-width:100%;width:100%;text-align:center;">' + planSvg + '</div>' +
     '</div>' +
@@ -6762,26 +6762,26 @@ function _ccRenderSchemaOld_unused() {
       '</defs>' +
       // Сама камера
       '<rect x="' + x0 + '" y="' + y0 + '" width="' + rectW + '" height="' + rectH +
-        '" fill="#F0F9FF" stroke="#0C4A6E" stroke-width="2"/>' +
+        '" fill="#EAF2FA" stroke="#2D5F8B" stroke-width="2"/>' +
       // 4 стены — толстые цветные полоски снаружи
       _ccWallStripe(x0, y0 - 14, rectW, 12, w0.wallMat || 0) +  // верх — Сторона А-1
       _ccWallStripe(x1 + 2, y0, 12, rectH, w1.wallMat || 0) +    // право — Сторона Б-2
       _ccWallStripe(x0, y1 + 2, rectW, 12, w2.wallMat || 0) +    // низ — Сторона А-3
       _ccWallStripe(x0 - 14, y0, 12, rectH, w3.wallMat || 0) +   // лево — Сторона Б-4
       // Подписи сторон
-      '<text x="' + (x0 + rectW/2) + '" y="' + (y0 - 22) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0C4A6E">А-1 · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
-      '<text x="' + (x1 + 22)     + '" y="' + (cy)        + '" text-anchor="start" font-size="13" font-weight="700" fill="#0C4A6E" transform="rotate(90,' + (x1 + 22) + ',' + cy + ')">Б-2 · ' + (bLen ? bLen.toFixed(1) + ' м' : '—') + '</text>' +
-      '<text x="' + (x0 + rectW/2) + '" y="' + (y1 + 28) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0C4A6E">А-3 · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
-      '<text x="' + (x0 - 22)     + '" y="' + (cy)        + '" text-anchor="start" font-size="13" font-weight="700" fill="#0C4A6E" transform="rotate(-90,' + (x0 - 22) + ',' + cy + ')">Б-4 · ' + (bLen ? bLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x0 + rectW/2) + '" y="' + (y0 - 22) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#2D5F8B">А-1 · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x1 + 22)     + '" y="' + (cy)        + '" text-anchor="start" font-size="13" font-weight="700" fill="#2D5F8B" transform="rotate(90,' + (x1 + 22) + ',' + cy + ')">Б-2 · ' + (bLen ? bLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x0 + rectW/2) + '" y="' + (y1 + 28) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#2D5F8B">А-3 · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (x0 - 22)     + '" y="' + (cy)        + '" text-anchor="start" font-size="13" font-weight="700" fill="#2D5F8B" transform="rotate(-90,' + (x0 - 22) + ',' + cy + ')">Б-4 · ' + (bLen ? bLen.toFixed(1) + ' м' : '—') + '</text>' +
       // Материалы стен — мелким шрифтом ниже подписей
       '<text x="' + (x0 + rectW/2) + '" y="' + (y0 - 8) + '" text-anchor="middle" font-size="10.5" fill="#475569">' + lblMat(w0) + '</text>' +
       '<text x="' + (x0 + rectW/2) + '" y="' + (y1 + 44) + '" text-anchor="middle" font-size="10.5" fill="#475569">' + lblMat(w2) + '</text>' +
       '<text x="' + (x1 + 36)     + '" y="' + (cy + 16)  + '" text-anchor="start" font-size="10.5" fill="#475569" transform="rotate(90,' + (x1 + 36) + ',' + (cy + 16) + ')">' + lblMat(w1) + '</text>' +
       '<text x="' + (x0 - 36)     + '" y="' + (cy + 16)  + '" text-anchor="start" font-size="10.5" fill="#475569" transform="rotate(-90,' + (x0 - 36) + ',' + (cy + 16) + ')">' + lblMat(w3) + '</text>' +
       // Подпись «План (вид сверху)»
-      '<text x="320" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">ПЛАН (вид сверху)</text>' +
+      '<text x="320" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#2D5F8B">ПЛАН (вид сверху)</text>' +
       // Площадь и объём в центре
-      '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="13" fill="#0C4A6E" font-weight="600">' + (aLen * bLen).toFixed(1) + ' м²</text>' +
+      '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="13" fill="#2D5F8B" font-weight="600">' + (aLen * bLen).toFixed(1) + ' м²</text>' +
       '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="11" fill="#475569">пол</text>' +
     '</svg>';
 
@@ -6800,29 +6800,29 @@ function _ccRenderSchemaOld_unused() {
   const ceilMatIdx  = (g.ceiling && g.ceiling.isoCode) || '';
   const sectionSvg =
     '<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto;" preserveAspectRatio="xMidYMid meet">' +
-      '<text x="320" y="15" text-anchor="middle" font-size="12" font-weight="700" fill="#0C4A6E">РАЗРЕЗ (сбоку)</text>' +
+      '<text x="320" y="15" text-anchor="middle" font-size="12" font-weight="700" fill="#2D5F8B">РАЗРЕЗ (сбоку)</text>' +
       // Потолок (толстая верхняя полоса)
       '<rect x="' + (sx0 - 4) + '" y="' + (sy0 - 14) + '" width="' + (sW + 8) + '" height="12" fill="#E2E8F0" stroke="#64748B" stroke-width="0.8"/>' +
       '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 - 18) + '" text-anchor="middle" font-size="10.5" fill="#475569">Потолок · ' + short(isoName(g.ceiling && g.ceiling.isoCode)) + '</text>' +
       // Сама камера
       '<rect x="' + sx0 + '" y="' + sy0 + '" width="' + sW + '" height="' + sH +
-        '" fill="#F0F9FF" stroke="#0C4A6E" stroke-width="2"/>' +
+        '" fill="#EAF2FA" stroke="#2D5F8B" stroke-width="2"/>' +
       // Пол (толстая нижняя полоса)
       '<rect x="' + (sx0 - 4) + '" y="' + (sy1 + 2) + '" width="' + (sW + 8) + '" height="14" fill="url(#cc-pat-concrete)" stroke="#64748B" stroke-width="0.8"/>' +
       '<text x="' + (sx0 + sW/2) + '" y="' + (sy1 + 30) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">ПОЛ · ' + short(isoName(g.floor && g.floor.isoCode)) + '</text>' +
       // Подпись высоты слева
-      '<line x1="' + (sx0 - 26) + '" y1="' + sy0 + '" x2="' + (sx0 - 26) + '" y2="' + sy1 + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      '<line x1="' + (sx0 - 30) + '" y1="' + sy0 + '" x2="' + (sx0 - 22) + '" y2="' + sy0 + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      '<line x1="' + (sx0 - 30) + '" y1="' + sy1 + '" x2="' + (sx0 - 22) + '" y2="' + sy1 + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      '<text x="' + (sx0 - 32) + '" y="' + (sy0 + sH/2) + '" text-anchor="end" font-size="13" font-weight="700" fill="#0C4A6E">H = ' + (h ? h.toFixed(1) + ' м' : '—') + '</text>' +
+      '<line x1="' + (sx0 - 26) + '" y1="' + sy0 + '" x2="' + (sx0 - 26) + '" y2="' + sy1 + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
+      '<line x1="' + (sx0 - 30) + '" y1="' + sy0 + '" x2="' + (sx0 - 22) + '" y2="' + sy0 + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
+      '<line x1="' + (sx0 - 30) + '" y1="' + sy1 + '" x2="' + (sx0 - 22) + '" y2="' + sy1 + '" stroke="#2D5F8B" stroke-width="1.5"/>' +
+      '<text x="' + (sx0 - 32) + '" y="' + (sy0 + sH/2) + '" text-anchor="end" font-size="13" font-weight="700" fill="#2D5F8B">H = ' + (h ? h.toFixed(1) + ' м' : '—') + '</text>' +
       // Подпись стороны А внизу
-      '<text x="' + (sx0 + sW/2) + '" y="' + (sy1 + 50) + '" text-anchor="middle" font-size="12" fill="#0C4A6E">↔ Сторона А · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
+      '<text x="' + (sx0 + sW/2) + '" y="' + (sy1 + 50) + '" text-anchor="middle" font-size="12" fill="#2D5F8B">↔ Сторона А · ' + (aLen ? aLen.toFixed(1) + ' м' : '—') + '</text>' +
       // Внутри — объём
-      '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 + sH/2 + 4) + '" text-anchor="middle" font-size="14" font-weight="600" fill="#0C4A6E">' + (aLen * bLen * h).toFixed(1) + ' м³</text>' +
+      '<text x="' + (sx0 + sW/2) + '" y="' + (sy0 + sH/2 + 4) + '" text-anchor="middle" font-size="14" font-weight="600" fill="#2D5F8B">' + (aLen * bLen * h).toFixed(1) + ' м³</text>' +
     '</svg>';
 
   // v2.45.110: центрирование SVG через display:block + margin:auto
-  return '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+  return '<div style="background:white;border:1px solid var(--border);border-radius: 12px;padding:14px;">' +
     '<div style="display:flex;justify-content:center;align-items:center;">' +
       '<div style="max-width:100%;width:100%;text-align:center;">' + planSvg + '</div>' +
     '</div>' +
@@ -6972,19 +6972,19 @@ function _ccTabProduct() {
     '</div>' +
     // v2.45.110: «дышащий» продукт — выделяет тепло при хранении
     // v2.45.123: чище вёрстка — чекбокс отдельно сверху, поле + подсказка в строку
-    '<div style="margin-top:14px;padding:12px 16px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;">' +
-      '<label style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--text-dark);cursor:pointer;margin-bottom:10px;">' +
+    '<div style="margin-top:14px;padding:12px 16px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius: 12px;">' +
+      '<label style="display:flex;align-items:center;gap:10px;font-size: 14px;color:var(--text-dark);cursor:pointer;margin-bottom:10px;">' +
         '<input type="checkbox" id="cc-prod-breathing" ' + (p.isBreathing ? 'checked' : '') + ' style="appearance:auto;-webkit-appearance:auto;width:18px;height:18px;accent-color:#15803D;flex-shrink:0;" />' +
-        '<span><b>Дышащий продукт</b> <span style="color:var(--text-light);font-weight:400;font-size:12.5px;">(овощи, фрукты, цветы — выделяют тепло при хранении)</span></span>' +
+        '<span><b>Дышащий продукт</b> <span style="color:var(--text-light);font-weight:400;font-size: 13px;">(овощи, фрукты, цветы — выделяют тепло при хранении)</span></span>' +
       '</label>' +
       '<div style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:flex-end;">' +
         '<div>' +
-          '<label style="display:block;margin-bottom:4px;font-size:11.5px;color:var(--text-mid);font-weight:500;">Тепло дыхания, Вт/тонна</label>' +
+          '<label style="display:block;margin-bottom:4px;font-size: 12px;color:var(--text-mid);font-weight:500;">Тепло дыхания, Вт/тонна</label>' +
           '<input type="number" id="cc-prod-breath-w" value="' + p.breathingHeatWPerTon + '" min="0" step="5" ' +
             (p.isBreathing ? '' : 'disabled') + ' ' +
-            'style="width:100%;height:38px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;color:#15803D;box-sizing:border-box;background:white;" />' +
+            'style="width:100%;height:38px;padding:8px 10px;border:1px solid var(--border);border-radius: 8px;font-size:14px;font-weight:600;color:#15803D;box-sizing:border-box;background:white;" />' +
         '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-mid);line-height:1.5;padding-bottom:9px;">' +
+        '<div style="font-size: 12px;color:var(--text-mid);line-height:1.5;padding-bottom:8px;">' +
           'Типовые значения: <b>яблоки</b> 15–40, <b>картофель</b> 10–25, ' +
           '<b>листовые овощи</b> 50–120, <b>цветы</b> 30–60, <b>грибы</b> 70–250 Вт/т' +
         '</div>' +
@@ -7111,108 +7111,108 @@ function _ccFormulaHtml(key, det, qW) {
   }
   if (key === 'q1') {
     const planes = (det.q1 && det.q1.planes) || [];
-    let html = '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₁ — теплоприток через ограждения</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    let html = '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q₁ — теплоприток через ограждения</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q₁ = Σ k · A · ΔT, &nbsp; k = 1 / (1/α_внутр + δ_изол/λ_изол + δ_стены/λ_стены + 1/α_внешн)' +
       '</div>' +
-      '<div style="font-size:11.5px;color:var(--text-mid);margin-bottom:6px;">α_внутр = 9, α_внешн = 23 Вт/(м²·К) — коэффициенты теплоотдачи</div>';
+      '<div style="font-size: 12px;color:var(--text-mid);margin-bottom:6px;">α_внутр = 9, α_внешн = 23 Вт/(м²·К) — коэффициенты теплоотдачи</div>';
     if (planes.length) {
-      html += '<table style="width:100%;border-collapse:collapse;font-size:11.5px;">' +
+      html += '<table style="width:100%;border-collapse:collapse;font-size: 12px;">' +
         '<tr style="background:#E2E8F0;"><th style="padding:4px 6px;text-align:left;">Плоскость</th><th>Площадь, м²</th><th>Конструкция</th><th>k, Вт/(м²·К)</th><th>ΔT, °C</th><th style="text-align:right;">Q, Вт</th></tr>' +
         planes.map(p =>
           '<tr><td style="padding:4px 6px;">' + p.label + '</td>' +
           '<td style="text-align:center;">' + p.area + '</td>' +
-          '<td style="font-size:10.5px;">' + p.wmNm + ' + ' + p.isoNm + ' (' + p.isoMm + ' мм)</td>' +
+          '<td style="font-size: 11px;">' + p.wmNm + ' + ' + p.isoNm + ' (' + p.isoMm + ' мм)</td>' +
           '<td style="text-align:center;">' + p.k + '</td>' +
           '<td style="text-align:center;">' + p.dT + '</td>' +
           '<td style="text-align:right;font-weight:600;">' + p.q + '</td></tr>'
         ).join('') +
       '</table>';
     }
-    html += '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₁ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+    html += '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q₁ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
     return html;
   }
   if (key === 'q2') {
     const d = det.q2 || {};
     const modeLabel = ({storage_mid:'хранение охл.',storage_low:'хранение зам.',freeze:'заморозка',cool:'охлаждение'})[d.mode] || d.mode;
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₂ — охлаждение/заморозка продукта</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q₂ — охлаждение/заморозка продукта</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q₂ = (m × cₚ × ΔT' + (d.mode === 'freeze' ? ' + m × L (кристаллизация)' : '') + ' + энергия_упаковки) / (τ × 3600)' +
       '</div>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:11.5px;">' +
-        '<tr><td style="padding:3px 6px;">Продукт</td><td><b>' + (d.productName || '—') + '</b></td></tr>' +
-        '<tr><td style="padding:3px 6px;">Режим</td><td>' + modeLabel + '</td></tr>' +
-        '<tr><td style="padding:3px 6px;">Масса загрузки m</td><td>' + d.massKg + ' кг</td></tr>' +
-        '<tr><td style="padding:3px 6px;">Температуры</td><td>' + d.tStart + ' → ' + d.tEnd + ' °C</td></tr>' +
-        '<tr><td style="padding:3px 6px;">Время τ</td><td>' + d.tauHours + ' ч</td></tr>' +
-        '<tr><td style="padding:3px 6px;">cₚ до зам. / после</td><td>' + d.cp1 + ' / ' + d.cp2 + ' кДж/(кг·К)</td></tr>' +
-        (d.mode === 'freeze' ? '<tr><td style="padding:3px 6px;">L кристаллизации</td><td>' + d.L + ' кДж/кг</td></tr>' : '') +
-        '<tr><td style="padding:3px 6px;">Энергия продукта</td><td>' + d.energy + ' кДж</td></tr>' +
-        (Number(d.pkgMass) > 0 ? '<tr><td style="padding:3px 6px;">Упаковка</td><td>' + d.pkgName + ' (' + d.pkgMass + ' кг × ' + d.pkgCp + ' кДж/(кг·К) → ' + d.energyPkg + ' кДж)</td></tr>' : '') +
+      '<table style="width:100%;border-collapse:collapse;font-size: 12px;">' +
+        '<tr><td style="padding:4px 6px;">Продукт</td><td><b>' + (d.productName || '—') + '</b></td></tr>' +
+        '<tr><td style="padding:4px 6px;">Режим</td><td>' + modeLabel + '</td></tr>' +
+        '<tr><td style="padding:4px 6px;">Масса загрузки m</td><td>' + d.massKg + ' кг</td></tr>' +
+        '<tr><td style="padding:4px 6px;">Температуры</td><td>' + d.tStart + ' → ' + d.tEnd + ' °C</td></tr>' +
+        '<tr><td style="padding:4px 6px;">Время τ</td><td>' + d.tauHours + ' ч</td></tr>' +
+        '<tr><td style="padding:4px 6px;">cₚ до зам. / после</td><td>' + d.cp1 + ' / ' + d.cp2 + ' кДж/(кг·К)</td></tr>' +
+        (d.mode === 'freeze' ? '<tr><td style="padding:4px 6px;">L кристаллизации</td><td>' + d.L + ' кДж/кг</td></tr>' : '') +
+        '<tr><td style="padding:4px 6px;">Энергия продукта</td><td>' + d.energy + ' кДж</td></tr>' +
+        (Number(d.pkgMass) > 0 ? '<tr><td style="padding:4px 6px;">Упаковка</td><td>' + d.pkgName + ' (' + d.pkgMass + ' кг × ' + d.pkgCp + ' кДж/(кг·К) → ' + d.energyPkg + ' кДж)</td></tr>' : '') +
       '</table>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₂ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q₂ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'q3') {
     const d = det.q3 || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₃ — тепло от людей</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q₃ — тепло от людей</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q₃ = N × q_человека(t°)' +
       '</div>' +
       '<div>N = <b>' + d.people + '</b> чел; t° в камере = <b>' + d.ti + ' °C</b><br/>' +
         'q_человека ≈ <b>' + d.perPerson + ' Вт</b> (280 при +10°C, до 470 при −20°C)</div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₃ = ' + d.people + ' × ' + d.perPerson + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q₃ = ' + d.people + ' × ' + d.perPerson + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'q4') {
     const d = det.q4 || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₄ — освещение</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q₄ — освещение</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q₄ = W_лампы × (часов_в_сутки / 24)' +
       '</div>' +
       '<div>W_лампы = <b>' + d.lightW + ' Вт</b>; часов работает = <b>' + d.lightHrs + ' ч/сут</b></div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₄ = ' + d.lightW + ' × ' + d.lightHrs + '/24 = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q₄ = ' + d.lightW + ' × ' + d.lightHrs + '/24 = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'q5') {
     const d = det.q5 || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₅ — электродвигатели + погрузчики</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q₅ — электродвигатели + погрузчики</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q₅ = W_двигат × 0.5 + N_погрузчик × кВт × 1000 × (ч/24)' +
       '</div>' +
       '<div>Электродвигатели: <b>' + d.motorsW + ' Вт</b> × 50% = ' + d.q5motors + ' Вт</div>' +
       (Number(d.forklifts) > 0
         ? '<div>Погрузчики: <b>' + d.forklifts + ' шт</b> × ' + d.forkliftKw + ' кВт × ' + d.forkliftHrs + '/24 = ' + d.q5fork + ' Вт</div>'
         : '<div style="color:var(--text-light);">Погрузчиков нет</div>') +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₅ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q₅ = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'q6') {
     const d = det.q6 || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₆ — инфильтрация через дверь</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q₆ — инфильтрация через дверь</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q₆ = 8 × ΔT × A_двери × (минут/1440) × K_тамбура' +
       '</div>' +
       '<div>Дверь: <b>' + d.doorH + '×' + d.doorW + ' мм</b>, площадь A = ' + d.doorArea + ' м²<br/>' +
         'Открытие: <b>' + d.doorMin + ' мин/сут</b> · ΔT за дверью: ' + d.dTdoor + ' °C · ' +
         'K_тамбура = <b>' + d.tambK + '</b> ' + (d.tambour ? '(тамбур есть, ÷2)' : '(без тамбура)') +
       '</div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₆ = 8 × ' + d.dTdoor + ' × ' + d.doorArea + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q₆ = 8 × ' + d.dTdoor + ' × ' + d.doorArea + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'qVent') {
     const d = det.qVent || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q-вент. — воздухообмен</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q-вент. — воздухообмен</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q = V × N × ρ × cₚ × ΔT / 86400, &nbsp; ρ_воздуха = 1.293 кг/м³, cₚ = 1005 Дж/(кг·К)' +
       '</div>' +
       '<div>Объём камеры V = <b>' + d.volume + ' м³</b>; обменов N = <b>' + d.airChanges + ' раз/сут</b>; ΔT = ' + d.dTdoor + ' °C</div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q-вент = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q-вент = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'qResp') {
     const d = det.qResp || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q-дыхания — тепловыделение продукта</div>' +
-      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
+    return '<div style="font-weight:700;color:var(--brand);margin-bottom:6px;">Q-дыхания — тепловыделение продукта</div>' +
+      '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius: 4px;">' +
         'Q_дых = (масса_хранения, т) × Вт/тонна' +
       '</div>' +
       '<div>Масса в камере = <b>' + d.mass + ' кг</b> = ' + (d.mass/1000).toFixed(3) + ' т; ' +
         'тепловыделение = <b>' + d.wpt + ' Вт/тонна</b></div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q-дых = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:var(--brand);">Итого Q-дых = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   return '<div style="color:var(--text-light);">Подробная формула не реализована для этой статьи.</div>';
 }
@@ -7244,7 +7244,7 @@ function _ccTabResult() {
   const cli = _ccState.client || {};
   const clientBlock = (cli.title || cli.company || cli.contactName)
     ? '<div class="cc-section"><h4><i class="ti ti-user"></i> На кого</h4>' +
-        '<div style="font-size:13.5px;color:var(--text-dark);line-height:1.6;">' +
+        '<div style="font-size: 14px;color:var(--text-dark);line-height:1.6;">' +
           (cli.title ? '<b>' + escapeHtml(cli.title) + '</b><br/>' : '') +
           (cli.company ? escapeHtml(cli.company) + '<br/>' : '') +
           (cli.contactName ? escapeHtml(cli.contactName) + (cli.note ? ' · ' + escapeHtml(cli.note) : '') + '<br/>' : '') +
@@ -7260,7 +7260,7 @@ function _ccTabResult() {
   return clientBlock +
     '<div class="cc-section">' +
     '<h4><i class="ti ti-chart-bar"></i> Теплопритоки по составляющим</h4>' +
-    '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">' +
+    '<div style="font-size: 12px;color:var(--text-light);margin-bottom:8px;">' +
       '<i class="ti ti-cursor-text"></i> Кликни на строку — раскроется формула и пошаговый расчёт' +
     '</div>' +
     '<div class="cc-result">' +
@@ -7277,7 +7277,7 @@ function _ccTabResult() {
               '<span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + pct + '%)</span>' +
             '</span>' +
           '</div>' +
-          '<div class="cc-formula" style="display:none;background:#F8FAFC;border-left:3px solid #0C4A6E;padding:10px 12px;margin-top:8px;border-radius:4px;font-size:12.5px;line-height:1.6;color:var(--text-dark);">' +
+          '<div class="cc-formula" style="display:none;background:#F8FAFC;border-left:3px solid var(--brand);padding:10px 12px;margin-top:8px;border-radius: 4px;font-size: 13px;line-height:1.6;color:var(--text-dark);">' +
             formula +
           '</div>' +
         '</div>';
@@ -7287,10 +7287,10 @@ function _ccTabResult() {
       '<div class="cc-result-row" style="font-weight:600;"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
         '<span class="v">' + totalWithSafetyKw.toFixed(2) + ' кВт</span></div>' +
     '</div>' +
-    '<div style="background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:10px;padding:16px;margin-top:16px;text-align:center;">' +
-      '<div style="font-size:13px;color:#0C4A6E;margin-bottom:4px;">Рекомендуемая мощность холода</div>' +
-      '<div style="font-size:36px;font-weight:700;color:#0C4A6E;line-height:1;">' + totalWithSafetyKw.toFixed(2) + ' кВт</div>' +
-      '<div style="font-size:12px;color:#0C4A6E;opacity:0.8;margin-top:6px;">с учётом работы оборудования ' + r.workHours + ' ч/сут</div>' +
+    '<div style="background:linear-gradient(135deg,var(--brand-bg),var(--brand-bg));border:1px solid var(--brand-bg-strong);border-radius: 12px;padding:16px;margin-top:16px;text-align:center;">' +
+      '<div style="font-size:13px;color:var(--brand);margin-bottom:4px;">Рекомендуемая мощность холода</div>' +
+      '<div style="font-size:36px;font-weight:700;color:var(--brand);line-height:1;">' + totalWithSafetyKw.toFixed(2) + ' кВт</div>' +
+      '<div style="font-size:12px;color:var(--brand);opacity:0.8;margin-top:6px;">с учётом работы оборудования ' + r.workHours + ' ч/сут</div>' +
     '</div>' +
     // v2.45.31: кнопка сохранения расчёта
     // v2.45.96: + печать / сохранение в PDF
@@ -7378,21 +7378,21 @@ function _ccPrintReport() {
 '<style>' +
 '  *,*::before,*::after{box-sizing:border-box}' +
 '  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1B2030;background:#fff;margin:24px;font-size:13px;line-height:1.45;}' +
-'  h1{margin:0 0 4px;font-size:20px;color:#0C4A6E}' +
-'  h2{margin:18px 0 8px;font-size:14px;color:#0C4A6E;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #CBD5E1;padding-bottom:4px}' +
-'  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0C4A6E;padding-bottom:8px;margin-bottom:12px}' +
+'  h1{margin:0 0 4px;font-size:20px;color:var(--brand)}' +
+'  h2{margin:18px 0 8px;font-size:14px;color:var(--brand);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #CBD5E1;padding-bottom:4px}' +
+'  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--brand);padding-bottom:8px;margin-bottom:12px}' +
 '  .head .brand{font-size:13px;color:#475569}' +
-'  .head .brand b{color:#0C4A6E;font-size:15px}' +
+'  .head .brand b{color:var(--brand);font-size:15px}' +
 '  table{width:100%;border-collapse:collapse;margin:6px 0 0;}' +
-'  th,td{padding:5px 8px;border-bottom:1px solid #E2E8F0;text-align:left;vertical-align:top;}' +
+'  th,td{padding:4px 8px;border-bottom:1px solid #E2E8F0;text-align:left;vertical-align:top;}' +
 '  th{font-size:11px;text-transform:uppercase;color:#64748B;letter-spacing:0.3px;}' +
 '  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}' +
-'  .total{background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:8px;padding:14px;text-align:center;margin-top:10px;}' +
-'  .total .v{font-size:30px;font-weight:700;color:#0C4A6E;line-height:1;}' +
-'  .total .lbl{font-size:12px;color:#0C4A6E;}' +
+'  .total{background:linear-gradient(135deg,var(--brand-bg),var(--brand-bg));border:1px solid var(--brand-bg-strong);border-radius: 8px;padding:14px;text-align:center;margin-top:10px;}' +
+'  .total .v{font-size:30px;font-weight:700;color:var(--brand);line-height:1;}' +
+'  .total .lbl{font-size:12px;color:var(--brand);}' +
 '  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;}' +
-'  .grid div{padding:2px 0;font-size:12.5px;}' +
-'  .grid b{color:#0C4A6E;}' +
+'  .grid div{padding:2px 0;font-size: 13px;}' +
+'  .grid b{color:var(--brand);}' +
 '  .foot{margin-top:24px;font-size:11px;color:#64748B;border-top:1px solid #CBD5E1;padding-top:6px;}' +
 '  @media print{@page{margin:14mm;} body{margin:0;}}' +
 '</style></head><body>' +
@@ -7461,7 +7461,7 @@ function _ccPrintReport() {
 '  </div>' +
 // v2.45.105: визуальная схема камеры в PDF — рендерим текущую схему
 '  <h2>Схема камеры</h2>' +
-'  <div style="text-align:center;border:1px solid #CBD5E1;border-radius:6px;padding:8px;margin:4px 0;">' +
+'  <div style="text-align:center;border:1px solid #CBD5E1;border-radius: 8px;padding:8px;margin:4px 0;">' +
     _ccRenderSchemaForPrint() +
 '  </div>' +
 '  <h2>Теплопритоки по составляющим</h2>' +
@@ -7605,7 +7605,7 @@ function _odbRenderOutdoor() {
   const brandColor = { 'Хигма': '#3B82F6', 'General Climate': '#15803D' };
   let cardsHtml = '';
   Object.keys(byBrand).forEach(brand => {
-    const color = brandColor[brand] || '#0C4A6E';
+    const color = brandColor[brand] || '#2D5F8B';
     cardsHtml += '<div style="margin-bottom:12px;">' +
       '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-left:2px;">' +
         '<i class="ti ti-tag"></i> ' + escapeHtml(brand) +
@@ -7620,7 +7620,7 @@ function _odbRenderOutdoor() {
         return '<button type="button" onclick="_odbSetOutdoor(' + idx + ')" ' +
           'style="text-align:center;padding:14px 12px;border:2px solid ' +
           (isActive ? color : 'var(--border)') + ';background:' +
-          (isActive ? color + '12' : 'white') + ';border-radius:10px;cursor:pointer;' +
+          (isActive ? color + '12' : 'white') + ';border-radius: 12px;cursor:pointer;' +
           'transition:all 0.15s;font-family:inherit;' +
           (isActive ? 'box-shadow:0 2px 6px ' + color + '40;' : '') + '">' +
           '<div style="font-size:13px;color:' + color + ';font-weight:700;text-transform:uppercase;letter-spacing:0.4px;">' + escapeHtml(blockLabel) + '</div>' +
@@ -7631,34 +7631,34 @@ function _odbRenderOutdoor() {
   });
 
   const rows = _odbOutdoorRows(nominal, roomDelta);
-  const activeColor = brandColor[u[1]] || '#0C4A6E';
+  const activeColor = brandColor[u[1]] || '#2D5F8B';
   return '' +
     // Сетка карточек выбора
-    '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">' +
+    '<div style="background:white;border:1px solid var(--border);border-radius: 12px;padding:14px;margin-bottom:14px;">' +
       cardsHtml +
     '</div>' +
     // Большая карточка-сводка выбранной модели + ΔT
-    '<div style="background:linear-gradient(135deg,' + activeColor + '08,' + activeColor + '15);border:1px solid ' + activeColor + '40;border-radius:12px;padding:16px 18px;margin-bottom:14px;">' +
+    '<div style="background:linear-gradient(135deg,' + activeColor + '08,' + activeColor + '15);border:1px solid ' + activeColor + '40;border-radius: 12px;padding:16px 18px;margin-bottom:14px;">' +
       '<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:end;">' +
         '<div>' +
           '<div style="font-size:11px;color:' + activeColor + ';font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Выбран блок</div>' +
           '<div style="font-size:18px;font-weight:700;color:var(--text-dark);margin-top:2px;">' + escapeHtml(u[0]) + '</div>' +
-          '<div style="font-size:12.5px;color:var(--text-mid);margin-top:2px;">' + escapeHtml(u[1]) + ' · номинал при +7 °C — <b style="color:' + activeColor + ';">' + nominal + ' кВт</b></div>' +
+          '<div style="font-size: 13px;color:var(--text-mid);margin-top:2px;">' + escapeHtml(u[1]) + ' · номинал при +7 °C — <b style="color:' + activeColor + ';">' + nominal + ' кВт</b></div>' +
         '</div>' +
         '<div>' +
           '<label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px;text-transform:uppercase;font-weight:600;" ' +
             'title="Разница между температурой кипения хладагента и температурой в камере">ΔT (камера − кипение)</label>' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
             '<input type="number" min="0" max="20" step="1" value="' + roomDelta + '" oninput="_odbSetDelta(this.value)" ' +
-              'style="width:100%;font-size:16px;font-weight:700;padding:8px 10px;border:1px solid var(--border);border-radius:8px;text-align:center;color:' + activeColor + ';" />' +
+              'style="width:100%;font-size:16px;font-weight:700;padding:8px 10px;border:1px solid var(--border);border-radius: 8px;text-align:center;color:' + activeColor + ';" />' +
             '<span style="font-size:13px;color:var(--text-mid);">°C</span>' +
           '</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
     // Таблица холодопроизводительности
-    '<div style="background:white;border:1px solid var(--border);border-radius:12px;overflow:hidden;">' +
-      '<div style="background:' + activeColor + ';color:white;padding:10px 14px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;">' +
+    '<div style="background:white;border:1px solid var(--border);border-radius: 12px;overflow:hidden;">' +
+      '<div style="background:' + activeColor + ';color:white;padding:10px 14px;font-size: 13px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;">' +
         '<i class="ti ti-chart-bar"></i> Холодопроизводительность по температурам кипения' +
       '</div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
@@ -7671,7 +7671,7 @@ function _odbRenderOutdoor() {
         '</tr></thead><tbody id="odb-outdoor-tbody">' + rows + '</tbody>' +
       '</table>' +
     '</div>' +
-    '<div style="margin-top:10px;font-size:11.5px;color:var(--text-light);line-height:1.5;padding:0 4px;">' +
+    '<div style="margin-top:10px;font-size: 12px;color:var(--text-light);line-height:1.5;padding:0 4px;">' +
       '<i class="ti ti-info-circle"></i> Холодопроизводительность падает на 4% за каждый градус ' +
       'снижения температуры кипения хладагента ниже +5 °C. Формула: <code>kW(T) = nominal × (1 − потери%)</code>.' +
       '<br/>«T в камере» — приближённая температура в холодильной камере при заданной T кипения (T кип + ΔT).' +
@@ -7688,12 +7688,12 @@ function _odbOutdoorRows(nominal, roomDelta) {
     const bg = i % 2 === 0 ? '#FAFBFC' : 'white';
     rows +=
       '<tr style="background:' + bg + ';border-bottom:1px solid #F1F5F9;">' +
-        '<td style="padding:8px 10px;text-align:center;font-weight:700;color:#0C4A6E;">' +
+        '<td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--brand);">' +
           (r.evapT > 0 ? '+' : '') + r.evapT + ' °C</td>' +
         '<td style="padding:8px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">' + kw + '</td>' +
         '<td style="padding:8px 10px;text-align:right;color:#B91C1C;font-variant-numeric:tabular-nums;">−' + lost + '</td>' +
         '<td style="padding:8px 10px;text-align:right;color:var(--text-mid);font-variant-numeric:tabular-nums;">' + r.lossPct + '%</td>' +
-        '<td style="padding:8px 10px;text-align:center;color:#0C4A6E;font-weight:600;">' + roomT + ' °C</td>' +
+        '<td style="padding:8px 10px;text-align:center;color:var(--brand);font-weight:600;">' + roomT + ' °C</td>' +
       '</tr>';
   });
   return rows;
@@ -7721,7 +7721,7 @@ function _odbRenderEvap() {
     cardsHtml += '<div style="margin-bottom:12px;">' +
       '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-left:2px;display:flex;align-items:baseline;gap:8px;">' +
         '<i class="ti ti-snowflake"></i> Семейство ' + fam +
-        '<span style="font-weight:400;color:var(--text-light);font-size:10.5px;text-transform:none;letter-spacing:0;">' + famDesc[fam] + '</span>' +
+        '<span style="font-weight:400;color:var(--text-light);font-size: 11px;text-transform:none;letter-spacing:0;">' + famDesc[fam] + '</span>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">' +
       list.map(({ ev, idx }) => {
@@ -7732,12 +7732,12 @@ function _odbRenderEvap() {
         return '<button type="button" onclick="_odbSetEvap(' + idx + ')" ' +
           'style="text-align:left;padding:10px 12px;border:2px solid ' +
           (isActive ? color : 'var(--border)') + ';background:' +
-          (isActive ? color + '12' : 'white') + ';border-radius:10px;cursor:pointer;' +
+          (isActive ? color + '12' : 'white') + ';border-radius: 12px;cursor:pointer;' +
           'transition:all 0.15s;font-family:inherit;' +
           (isActive ? 'box-shadow:0 2px 6px ' + color + '40;' : '') + '">' +
           '<div style="font-size:11px;color:' + color + ';font-weight:600;">' + fam + ' ' + escapeHtml(num) + 'M ED</div>' +
           '<div style="font-size:20px;font-weight:700;color:' + color + ';margin-top:4px;line-height:1;">' + kw7 + ' <span style="font-size:11px;font-weight:500;">кВт</span></div>' +
-          '<div style="font-size:10.5px;color:var(--text-mid);margin-top:4px;">струя ' + ev.jet + ' м · ' + ev.airflow + ' м³/ч</div>' +
+          '<div style="font-size: 11px;color:var(--text-mid);margin-top:4px;">струя ' + ev.jet + ' м · ' + ev.airflow + ' м³/ч</div>' +
         '</button>';
       }).join('') +
       '</div></div>';
@@ -7758,33 +7758,33 @@ function _odbRenderEvap() {
   });
   return '' +
     // Сетка карточек выбора
-    '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">' +
+    '<div style="background:white;border:1px solid var(--border);border-radius: 12px;padding:14px;margin-bottom:14px;">' +
       cardsHtml +
     '</div>' +
     // Большая карточка-сводка выбранной модели
-    '<div style="background:linear-gradient(135deg,' + activeColor + '08,' + activeColor + '15);border:1px solid ' + activeColor + '40;border-radius:12px;padding:16px 18px;margin-bottom:14px;">' +
+    '<div style="background:linear-gradient(135deg,' + activeColor + '08,' + activeColor + '15);border:1px solid ' + activeColor + '40;border-radius: 12px;padding:16px 18px;margin-bottom:14px;">' +
       '<div style="font-size:11px;color:' + activeColor + ';font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Выбран воздухоохладитель</div>' +
       '<div style="font-size:18px;font-weight:700;color:var(--text-dark);margin-top:2px;">' + escapeHtml(e.model) + '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">' +
-        '<div style="background:white;border:1px solid #BAE6FD;border-radius:8px;padding:12px;">' +
-          '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#0C4A6E;text-transform:uppercase;font-weight:600;">' +
+        '<div style="background:white;border:1px solid var(--brand-bg-strong);border-radius: 8px;padding:12px;">' +
+          '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--brand);text-transform:uppercase;font-weight:600;">' +
             '<i class="ti ti-arrow-right-rhombus"></i> Длина струи' +
           '</div>' +
-          '<div style="font-size:24px;font-weight:700;color:#0C4A6E;margin-top:4px;line-height:1;">' + e.jet + ' <span style="font-size:13px;font-weight:500;">м</span></div>' +
-          '<div style="font-size:10.5px;color:var(--text-light);margin-top:4px;">насколько далеко выдувает холодный воздух</div>' +
+          '<div style="font-size:24px;font-weight:700;color:var(--brand);margin-top:4px;line-height:1;">' + e.jet + ' <span style="font-size:13px;font-weight:500;">м</span></div>' +
+          '<div style="font-size: 11px;color:var(--text-light);margin-top:4px;">насколько далеко выдувает холодный воздух</div>' +
         '</div>' +
-        '<div style="background:white;border:1px solid #BBF7D0;border-radius:8px;padding:12px;">' +
+        '<div style="background:white;border:1px solid #BBF7D0;border-radius: 8px;padding:12px;">' +
           '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#15803D;text-transform:uppercase;font-weight:600;">' +
             '<i class="ti ti-wind"></i> Воздушный поток' +
           '</div>' +
           '<div style="font-size:24px;font-weight:700;color:#15803D;margin-top:4px;line-height:1;">' + e.airflow + ' <span style="font-size:13px;font-weight:500;">м³/ч</span></div>' +
-          '<div style="font-size:10.5px;color:var(--text-light);margin-top:4px;">объём прокачиваемого воздуха</div>' +
+          '<div style="font-size: 11px;color:var(--text-light);margin-top:4px;">объём прокачиваемого воздуха</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
     // Таблица холодопроизводительности
-    '<div style="background:white;border:1px solid var(--border);border-radius:12px;overflow:hidden;">' +
-      '<div style="background:' + activeColor + ';color:white;padding:10px 14px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;">' +
+    '<div style="background:white;border:1px solid var(--border);border-radius: 12px;overflow:hidden;">' +
+      '<div style="background:' + activeColor + ';color:white;padding:10px 14px;font-size: 13px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;">' +
         '<i class="ti ti-temperature"></i> Холодопроизводительность по температурам кипения' +
       '</div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
@@ -7794,7 +7794,7 @@ function _odbRenderEvap() {
         '</tr></thead><tbody>' + rows + '</tbody>' +
       '</table>' +
     '</div>' +
-    '<div style="margin-top:10px;font-size:11.5px;color:var(--text-light);line-height:1.5;padding:0 4px;">' +
+    '<div style="margin-top:10px;font-size: 12px;color:var(--text-light);line-height:1.5;padding:0 4px;">' +
       '<i class="ti ti-info-circle"></i> Значения из паспорта производителя. ' +
       'Длина струи — на сколько метров воздухоохладитель «выдувает» холодный воздух (важно при размещении в камере).' +
     '</div>';

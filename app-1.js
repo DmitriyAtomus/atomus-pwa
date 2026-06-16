@@ -876,7 +876,9 @@ function onNotifClick(notifId, entityType, entityId, notifType) {
     openContractDetail(entityId);
   } else if (entityType === 'assembly' && entityId) {
     closeNotifModalForced();
-    selectSidebarItem('history');
+    // v2.45.335: проваливаемся прямо в карточку сборки
+    if (typeof openAssemblyStock === 'function') openAssemblyStock(entityId);
+    else selectSidebarItem('history');
   } else if (entityType === 'supply_invoice') {
     // v2.45.140: Фото УПД → Приёмка УПД
     closeNotifModalForced();
@@ -1113,6 +1115,36 @@ function manuallyOpenNotifModal() {
 
 // ============ КОНЕЦ ЭТАПА 39 (v2.19.0) — УВЕДОМЛЕНИЯ ============
 
+// v2.45.335: deep-link в карточку сборки (из push-уведомления директору)
+function _openAssemblyFromUrl(url) {
+  try {
+    const u = new URL(url, location.origin);
+    const aid = u.searchParams.get('assembly');
+    if (aid && typeof openAssemblyStock === 'function') {
+      openAssemblyStock(aid);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+function _handleStartupDeepLink() {
+  // Если приложение открыто по ссылке вида /?assembly=123 — провалиться в карточку
+  if (_openAssemblyFromUrl(location.href)) {
+    // Убираем параметр, чтобы при F5 карточка не открывалась снова
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  }
+}
+let _swMsgBound = false;
+function _setupSwMessages() {
+  if (_swMsgBound || !('serviceWorker' in navigator)) return;
+  _swMsgBound = true;
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    const d = ev.data || {};
+    // Клик по уведомлению, когда окно уже открыто — провалиться в сборку
+    if (d.type === 'NOTIFICATION_CLICK' && d.url) _openAssemblyFromUrl(d.url);
+  });
+}
+
 
 function showApp() {
   document.getElementById('login-page').style.display = 'none';
@@ -1126,6 +1158,8 @@ function showApp() {
       _restoreLastView();
       _showWelcomeIfFresh();
       startNotifPolling();  // v2.19.0
+      _setupSwMessages();                          // v2.45.335
+      setTimeout(_handleStartupDeepLink, 300);     // v2.45.335
     })
       .catch(() => logout());
   } else {
@@ -1134,6 +1168,8 @@ function showApp() {
     _restoreLastView();
     _showWelcomeIfFresh();
     startNotifPolling();  // v2.19.0
+    _setupSwMessages();                            // v2.45.335
+    setTimeout(_handleStartupDeepLink, 300);       // v2.45.335
   }
 }
 

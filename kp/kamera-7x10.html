@@ -22,10 +22,10 @@
   .view{display:none;padding-top:20px}.view.active{display:block}
   .layout{display:grid;grid-template-columns:1fr 300px;gap:20px}
   @media(max-width:880px){.layout{grid-template-columns:1fr}}
-  .stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;overflow:hidden}
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius: 16px;padding:14px;overflow:hidden}
   .stage svg{width:100%;height:auto;display:block}
   .side{display:flex;flex-direction:column;gap:14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius: 16px;padding:16px}
   .card h3{font-size:13px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
   .row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line)}
   .row:last-child{border-bottom:none}.row span:first-child{color:var(--muted)}.row span:last-child{font-weight:600}
@@ -33,7 +33,7 @@
   .ctrl{font-size:13px;color:var(--muted);margin:10px 0 4px}
   input[type=range]{width:100%;accent-color:var(--cyan)}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:12px}
-  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius: 4px;margin-right:5px;vertical-align:-1px}
   .note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6}
 </style>
 </head>
@@ -375,7 +375,7 @@ function render2d(L,arr,doorCenterY){
   s.push(dim(parseFloat(px(PANEL)),M+W+42,parseFloat(px(PANEL+L.endGap)),M+W+42,`стена ${Math.round(L.endGap)}`,false));
   s.push(dim(parseFloat(px(PANEL+L.endGap+L.lineLen)),M+W+42,parseFloat(px(PANEL+INNER_L)),M+W+42,`стена ${Math.round(L.endGap)}`,false));
   document.getElementById('stage2d').innerHTML=
-    `<svg viewBox="0 0 ${vw.toFixed(0)} ${vh.toFixed(0)}" style="background:#0a1622;border-radius:10px">${s.join('')}</svg>`;
+    `<svg viewBox="0 0 ${vw.toFixed(0)} ${vh.toFixed(0)}" style="background:#0a1622;border-radius: 12px">${s.join('')}</svg>`;
   document.getElementById('note2d').innerHTML=
     `План сверху, камера 7×10 м. Размеры справа — глубины блоков (<b style="color:#F5C518">жёлтое</b>, 1200 = двойной «спина к спине», 2×600 по полке), боковые проходы (<b style="color:#8ba6c2">серое</b>), центральный проход и пристенные отступы (<b style="color:#9fb0bd">«стена»</b>). Снизу — торцевые отступы от стен. <b style="color:#cfd6dc">Серая обводка</b> — сэндвич 80 мм.`;
 }
