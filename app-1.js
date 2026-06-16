@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.348-atomcad-section-drawings";
+const APP_VERSION = "v2.45.349-installation-section";
 const APP_VERSION_DATE = "16.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -55,6 +55,7 @@ const SECTION_CONFIG = {
   logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
   supply:     { sidebar: 'sidebar-supply',     defaultScreen: 'supply-shopping' },    // ЭТАП 19; v2.45.339: открывать сразу «Что закупить»
   defects:    { sidebar: 'sidebar-defects',    defaultScreen: 'defects-list' },       // ЭТАП 22
+  installation: { sidebar: 'sidebar-installation', defaultScreen: 'installation-list' }, // v2.45.346 Монтаж
   hr:         { sidebar: 'sidebar-hr',         defaultScreen: 'hr-vacations-timeline' }, // ЭТАП 20
   help:       { sidebar: 'sidebar-help',       defaultScreen: 'help-knowledge' },
 };
@@ -1466,6 +1467,10 @@ function selectSidebarItem(screenName) {
     'defects-list-progress': 'defects-list',
     'defects-list-resolved': 'defects-list',
     'defects-list-rejected': 'defects-list',
+    // v2.45.346: фильтры монтажа → один экран
+    'installation-list-active':  'installation-list',
+    'installation-list-planned': 'installation-list',
+    'installation-list-done':    'installation-list',
     // ЭТАП 28.1: старые экраны склада → новый единый дашборд с табами
     'warehouse-stock':       'warehouse-dashboard',
     'warehouse-components':  'warehouse-dashboard',
@@ -1578,6 +1583,11 @@ function selectSidebarItem(screenName) {
   if (screenName === 'defects-list-progress') { state.defectsFilter = 'in_progress'; loadDefectsList(); }
   if (screenName === 'defects-list-resolved') { state.defectsFilter = 'resolved';    loadDefectsList(); }
   if (screenName === 'defects-list-rejected') { state.defectsFilter = 'rejected';    loadDefectsList(); }
+  // v2.45.346: Монтаж
+  if (screenName === 'installation-list')         { state.installFilter = 'all';     loadInstallationList(); }
+  if (screenName === 'installation-list-active')  { state.installFilter = 'active';  loadInstallationList(); }
+  if (screenName === 'installation-list-planned') { state.installFilter = 'planned'; loadInstallationList(); }
+  if (screenName === 'installation-list-done')    { state.installFilter = 'done';    loadInstallationList(); }
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
   if (screenName === 'sales-more') renderSalesMore();
@@ -7040,6 +7050,16 @@ function applyPermissionsToUI() {
     const isDir = state.user && (state.user.roles || []).includes('director');
     adminTools.style.display = isDir ? '' : 'none';
   }
+
+  // v2.45.346: Монтаж — вкладка видна при installation.view; создание — при installation.manage
+  const instTabs = document.querySelectorAll('.section-tab[data-section="installation"], .m-section-tabs button[data-section="installation"]');
+  const canSeeInstall = hasPermission('installation.view');
+  instTabs.forEach(t => { t.style.display = canSeeInstall ? '' : 'none'; });
+  const canManageInstall = hasPermission('installation.manage');
+  ['nav-install-new', 'install-new-btn', 'install-new-mobile', 'install-fab'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = canManageInstall ? '' : 'none';
+  });
 }
 
 // ============================================================================

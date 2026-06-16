@@ -140,6 +140,9 @@
         <button class="section-tab" data-section="defects" title="Открыть сервис и доработки">
           <i class="ti ti-alert-circle"></i>Сервис
         </button>
+        <button class="section-tab" data-section="installation" title="Открыть монтаж на объектах">
+          <i class="ti ti-tools"></i>Монтаж
+        </button>
         <button class="section-tab" data-section="hr" title="Открыть кадровый раздел">
           <i class="ti ti-id-badge"></i>Кадры
         </button>
@@ -191,6 +194,7 @@
       <button data-section="logistics"><i class="ti ti-truck"></i>Логистика</button>
       <button data-section="supply"><i class="ti ti-shopping-cart"></i>Снабжение</button>
       <button data-section="defects"><i class="ti ti-alert-circle"></i>Сервис</button>
+      <button data-section="installation"><i class="ti ti-tools"></i>Монтаж</button>
       <button data-section="hr"><i class="ti ti-id-badge"></i>Кадры</button>
       <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
     </nav>
@@ -474,6 +478,43 @@
         <div class="user-info-block">
           <div class="un" id="sb-username-defects">—</div>
           <div class="ur" id="sb-userrole-defects">—</div>
+        </div>
+        <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
+      </div>
+      <div class="sidebar-version">
+        Atom CRM<br>
+        <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- SIDEBAR МОНТАЖ (v2.45.346) -->
+    <aside class="sidebar" id="sidebar-installation" data-section="installation" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-tools"></i> Монтаж
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item new-btn" id="nav-install-new" onclick="openNewInstallation()" style="display:none;">
+          <i class="ti ti-circle-plus"></i><span>Новый монтаж</span>
+        </button>
+        <div class="nav-section-label">ОБЪЕКТЫ</div>
+        <button class="nav-item active" data-nav="installation-list" onclick="selectSidebarItem('installation-list')">
+          <i class="ti ti-list"></i><span>Все</span>
+        </button>
+        <button class="nav-item" data-nav="installation-list-active" onclick="selectSidebarItem('installation-list-active')">
+          <i class="ti ti-progress"></i><span>В работе</span>
+        </button>
+        <button class="nav-item" data-nav="installation-list-planned" onclick="selectSidebarItem('installation-list-planned')">
+          <i class="ti ti-calendar"></i><span>Запланированы</span>
+        </button>
+        <button class="nav-item" data-nav="installation-list-done" onclick="selectSidebarItem('installation-list-done')">
+          <i class="ti ti-check"></i><span>Сданы</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="small-avatar" id="sb-avatar-installation">—</div>
+        <div class="user-info-block">
+          <div class="un" id="sb-username-installation">—</div>
+          <div class="ur" id="sb-userrole-installation">—</div>
         </div>
         <button class="icon-btn" onclick="logout()" title="Выйти"><i class="ti ti-logout"></i></button>
       </div>
@@ -2317,6 +2358,44 @@
         </div>
         <!-- Floating Action Button (только на мобильной) — Новая доработка -->
         <button class="fab fab-defects" onclick="openNewDefectFromCRM()" aria-label="Новая доработка">
+          <i class="ti ti-plus"></i>
+        </button>
+      </div>
+
+      <!-- МОНТАЖ — список (v2.45.346) -->
+      <div class="screen" data-screen="installation-list" data-section="installation">
+        <div class="screen-header">
+          <h2>Монтаж</h2>
+          <div style="display:flex; gap:6px;">
+            <button class="icon-btn" id="install-new-mobile" onclick="openNewInstallation()" title="Новый монтаж" style="display:none;">
+              <i class="ti ti-plus"></i>
+            </button>
+          </div>
+        </div>
+        <div class="m-filter-chips" id="m-install-filter-chips">
+          <button class="m-filter-chip active" data-filter="all"     onclick="setMobileInstallFilter('all', this)">Все</button>
+          <button class="m-filter-chip"        data-filter="active"  onclick="setMobileInstallFilter('active', this)">В работе</button>
+          <button class="m-filter-chip"        data-filter="planned" onclick="setMobileInstallFilter('planned', this)">Запланированы</button>
+          <button class="m-filter-chip"        data-filter="done"    onclick="setMobileInstallFilter('done', this)">Сданы</button>
+        </div>
+        <div class="content-inner" style="max-width:100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-tools"></i>
+              <h1 id="installation-list-title">Монтаж на объектах</h1>
+              <span class="page-counter" id="installation-counter">0</span>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" id="install-new-btn" onclick="openNewInstallation()" style="display:none;">
+                <i class="ti ti-plus"></i> Новый монтаж
+              </button>
+            </div>
+          </div>
+          <div id="installation-list-content">
+            <div class="loading-block">Загружаем…</div>
+          </div>
+        </div>
+        <button class="fab" id="install-fab" onclick="openNewInstallation()" aria-label="Новый монтаж" style="display:none;">
           <i class="ti ti-plus"></i>
         </button>
       </div>

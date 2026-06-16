@@ -11740,3 +11740,327 @@ window.addEventListener('beforeunload', (e) => {
   e.returnValue = '';
   return '';
 });
+
+// ============================================================================
+// МОНТАЖ (v2.45.346) — раздел для выездных монтажников
+// ============================================================================
+var _installCanManage = false;
+var _installStatusLabels = { planned:'Запланирован', en_route:'Выехали', on_site:'На объекте', mounted:'Смонтировано', handed_over:'Сдан клиенту', cancelled:'Отменён' };
+var _installStatusFlow = ['planned','en_route','on_site','mounted','handed_over'];
+var _installCache = [];
+var _installReportFiles = [];
+
+function _installStatusColor(s) {
+  return ({
+    planned:     '#64748B',
+    en_route:    '#D97706',
+    on_site:     '#2563EB',
+    mounted:     '#7C3AED',
+    handed_over: '#15803D',
+    cancelled:   '#B91C1C',
+  })[s] || '#64748B';
+}
+
+function _installFmtDate(d) {
+  if (!d) return '';
+  var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : String(d);
+}
+
+function setMobileInstallFilter(f, el) {
+  try {
+    document.querySelectorAll('#m-install-filter-chips .m-filter-chip').forEach(function (c) { c.classList.remove('active'); });
+    if (el) el.classList.add('active');
+  } catch (_) {}
+  state.installFilter = f;
+  loadInstallationList();
+}
+
+async function loadInstallationList() {
+  var box = document.getElementById('installation-list-content');
+  if (!box) return;
+  state.installFilter = state.installFilter || 'all';
+  box.innerHTML = '<div class="loading-block">Загружаем…</div>';
+
+  var titles = { all:'Монтаж на объектах', active:'В работе', planned:'Запланированы', done:'Сданы' };
+  var t = document.getElementById('installation-list-title');
+  if (t) t.textContent = titles[state.installFilter] || 'Монтаж';
+
+  // подсветка пункта сайдбара
+  try {
+    document.querySelectorAll('#sidebar-installation .nav-item[data-nav]').forEach(function (n) { n.classList.remove('active'); });
+    var navKey = state.installFilter === 'all' ? 'installation-list' : 'installation-list-' + state.installFilter;
+    var navEl = document.querySelector('#sidebar-installation .nav-item[data-nav="' + navKey + '"]');
+    if (navEl) navEl.classList.add('active');
+  } catch (_) {}
+
+  try {
+    var q = '/api/installations';
+    if (state.installFilter === 'done')      q += '?status=handed_over';
+    else if (state.installFilter === 'planned') q += '?status=planned';
+    else if (state.installFilter === 'active')  q += '?include_done=0';
+    var d = await apiGet(q);
+    _installCanManage = !!d.can_manage;
+    if (d.status_labels) _installStatusLabels = d.status_labels;
+    if (d.status_flow)   _installStatusFlow = d.status_flow;
+    _installCache = d.installations || [];
+    var rows = _installCache;
+    if (state.installFilter === 'active') rows = rows.filter(function (r) { return ['en_route','on_site','mounted'].indexOf(r.status) >= 0; });
+    var c = document.getElementById('installation-counter');
+    if (c) c.textContent = rows.length;
+    renderInstallationList(rows);
+    if (typeof applyPermissionsToUI === 'function') applyPermissionsToUI();
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i> ' + escapeHtml(String(e.message || e)) + '</div>';
+  }
+}
+
+function renderInstallationList(rows) {
+  var box = document.getElementById('installation-list-content');
+  if (!box) return;
+  if (!rows.length) {
+    box.innerHTML =
+      '<div class="empty-block"><i class="ti ti-tools"></i>' +
+      (state.installFilter === 'all' ? 'Монтажей пока нет. Они появятся из договоров «Поставка с монтажом» или создайте вручную.' : 'В этой группе пусто.') +
+      '</div>';
+    return;
+  }
+  var html = '<div class="install-cards" style="display:flex;flex-direction:column;gap:10px;">';
+  rows.forEach(function (r) {
+    var color = _installStatusColor(r.status);
+    var meta = [];
+    if (r.scheduled_date) meta.push('<i class="ti ti-calendar"></i> ' + _installFmtDate(r.scheduled_date));
+    if (r.object_address) meta.push('<i class="ti ti-map-pin"></i> ' + escapeHtml(r.object_address));
+    if (r.assignee_name)  meta.push('<i class="ti ti-user"></i> ' + escapeHtml(r.assignee_name));
+    if (r.contract_number) meta.push('<i class="ti ti-file-text"></i> ' + escapeHtml(r.contract_number) + (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : ''));
+    html +=
+      '<div class="card" onclick="openInstallationDetail(' + r.id + ')" style="cursor:pointer;border:1px solid var(--border,#E2E8F0);border-radius:12px;padding:14px 16px;background:#fff;">' +
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">' +
+          '<div style="font-weight:600;font-size:15px;">' + escapeHtml(r.title || 'Монтаж') + '</div>' +
+          '<span style="flex:none;font-size:12px;font-weight:600;color:#fff;background:' + color + ';padding:3px 9px;border-radius:999px;">' +
+            escapeHtml(_installStatusLabels[r.status] || r.status) + '</span>' +
+        '</div>' +
+        (meta.length ? '<div style="margin-top:8px;color:var(--text-mid,#64748B);font-size:13px;display:flex;flex-wrap:wrap;gap:12px;">' +
+          meta.map(function (m) { return '<span>' + m + '</span>'; }).join('') + '</div>' : '') +
+        (r.reports_count ? '<div style="margin-top:8px;color:var(--text-light,#94A3B8);font-size:12px;"><i class="ti ti-camera"></i> отчётов: ' + r.reports_count + '</div>' : '') +
+      '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function _installModalEl() {
+  var m = document.getElementById('installation-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'installation-modal';
+    m.className = 'modal-overlay';
+    m.onclick = function (e) { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  return m;
+}
+
+async function openInstallationDetail(id) {
+  var m = _installModalEl();
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;"><div style="padding:32px;text-align:center;color:var(--text-light);">Загружаем…</div></div>';
+  m.classList.add('visible');
+  try {
+    var d = await apiGet('/api/installations/' + id);
+    _renderInstallationDetail(d);
+  } catch (e) {
+    m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;"><div class="empty-block">' + escapeHtml(String(e.message || e)) + '</div></div>';
+  }
+}
+
+function _renderInstallationDetail(d) {
+  var m = _installModalEl();
+  _installReportFiles = [];
+  var color = _installStatusColor(d.status);
+  var canManage = !!d.can_manage;
+  var canReport = !!d.can_report;
+
+  // лента статусов (быстрая смена)
+  var flowHtml = _installStatusFlow.map(function (s) {
+    var active = s === d.status;
+    return '<button class="btn btn-small" onclick="changeInstallationStatus(' + d.id + ',\'' + s + '\')" ' +
+      'style="border:1px solid ' + _installStatusColor(s) + ';' +
+      (active ? 'background:' + _installStatusColor(s) + ';color:#fff;' : 'background:#fff;color:' + _installStatusColor(s) + ';') +
+      'border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;margin:2px;">' +
+      escapeHtml(_installStatusLabels[s]) + '</button>';
+  }).join('');
+
+  var meta = [];
+  if (d.scheduled_date)  meta.push('<div><i class="ti ti-calendar"></i> ' + _installFmtDate(d.scheduled_date) + '</div>');
+  if (d.object_address)  meta.push('<div><i class="ti ti-map-pin"></i> ' + escapeHtml(d.object_address) + '</div>');
+  if (d.assignee_name)   meta.push('<div><i class="ti ti-user"></i> ' + escapeHtml(d.assignee_name) + '</div>');
+  if (d.contract_number) meta.push('<div><i class="ti ti-file-text"></i> Договор ' + escapeHtml(d.contract_number) + (d.contractor_name ? ' · ' + escapeHtml(d.contractor_name) : '') + '</div>');
+  if (d.contractor_phone) meta.push('<div><i class="ti ti-phone"></i> ' + escapeHtml(d.contractor_phone) + '</div>');
+
+  // отчёты
+  var reportsHtml = (d.reports || []).map(function (r) {
+    var photos = (r.photos || []).map(function (p) {
+      return '<a href="' + API_BASE + p.url + '" target="_blank" style="display:inline-block;"><img src="' + API_BASE + p.url + '" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border,#E2E8F0);"></a>';
+    }).join('');
+    return '<div style="border-top:1px solid var(--border,#E2E8F0);padding:10px 0;">' +
+      '<div style="font-size:12px;color:var(--text-light,#94A3B8);">' +
+        escapeHtml(r.author_name || 'Монтажник') + ' · ' + escapeHtml(r.created_at || '') +
+        (r.status_to_label ? ' · <b style="color:' + _installStatusColor(r.status_to) + '">→ ' + escapeHtml(r.status_to_label) + '</b>' : '') +
+      '</div>' +
+      (r.text ? '<div style="margin-top:4px;white-space:pre-wrap;">' + escapeHtml(r.text) + '</div>' : '') +
+      (photos ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + photos + '</div>' : '') +
+    '</div>';
+  }).join('') || '<div style="color:var(--text-light,#94A3B8);font-size:13px;padding:8px 0;">Отчётов пока нет.</div>';
+
+  // статусы для select в форме отчёта
+  var statusOptions = '<option value="">— не менять статус —</option>' + _installStatusFlow.map(function (s) {
+    return '<option value="' + s + '">' + escapeHtml(_installStatusLabels[s]) + '</option>';
+  }).join('');
+
+  var reportForm = canReport ?
+    '<div style="border-top:2px solid var(--border,#E2E8F0);margin-top:12px;padding-top:12px;">' +
+      '<div style="font-weight:600;margin-bottom:8px;"><i class="ti ti-send"></i> Новый отчёт с поля</div>' +
+      '<textarea id="install-report-text" rows="3" placeholder="Что сделано на объекте…" style="width:100%;box-sizing:border-box;"></textarea>' +
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">' +
+        '<select id="install-report-status" style="flex:1;min-width:180px;">' + statusOptions + '</select>' +
+        '<label class="btn btn-secondary btn-small" style="cursor:pointer;"><i class="ti ti-camera"></i> Фото' +
+          '<input type="file" accept="image/*" multiple capture="environment" style="display:none;" onchange="onInstallReportFiles(this)"></label>' +
+      '</div>' +
+      '<div id="install-report-files" style="margin-top:6px;font-size:12px;color:var(--text-light,#94A3B8);"></div>' +
+      '<button class="btn btn-primary" style="margin-top:10px;width:100%;" onclick="submitInstallationReport(' + d.id + ')"><i class="ti ti-check"></i> Отправить отчёт</button>' +
+    '</div>' : '';
+
+  var manageBtns = canManage ?
+    '<button class="btn btn-secondary btn-small" onclick="openEditInstallation(' + d.id + ')"><i class="ti ti-edit"></i> Изменить</button>' +
+    '<button class="btn btn-secondary btn-small" onclick="deleteInstallation(' + d.id + ')" style="color:var(--danger,#B91C1C);"><i class="ti ti-trash"></i></button>' : '';
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-tools"></i> ' + escapeHtml(d.title || 'Монтаж') + '</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;max-height:74vh;overflow:auto;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">' +
+          '<span style="font-size:13px;font-weight:600;color:#fff;background:' + color + ';padding:4px 12px;border-radius:999px;">' + escapeHtml(_installStatusLabels[d.status] || d.status) + '</span>' +
+          '<div style="display:flex;gap:6px;">' + manageBtns + '</div>' +
+        '</div>' +
+        (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
+        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Что монтировать:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
+        '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
+        '<div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">' + flowHtml + '</div>' +
+        '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
+        reportsHtml +
+        reportForm +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function onInstallReportFiles(input) {
+  _installReportFiles = Array.prototype.slice.call(input.files || []).slice(0, 5);
+  var box = document.getElementById('install-report-files');
+  if (box) box.textContent = _installReportFiles.length ? ('Выбрано фото: ' + _installReportFiles.length) : '';
+}
+
+async function submitInstallationReport(id) {
+  var text = (document.getElementById('install-report-text') || {}).value || '';
+  var status = (document.getElementById('install-report-status') || {}).value || '';
+  if (!text.trim() && !_installReportFiles.length && !status) {
+    showToast('Добавьте комментарий, фото или смену статуса', 'error');
+    return;
+  }
+  var fd = new FormData();
+  fd.append('text', text);
+  if (status) fd.append('status', status);
+  _installReportFiles.forEach(function (f, i) { fd.append('file_' + (i + 1), f, f.name); });
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var r = await fetch(API_BASE + '/api/installations/' + id + '/reports', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    if (!r.ok) { var e = await r.json().catch(function () { return {}; }); showToast(e.message || 'Не удалось отправить', 'error'); return; }
+    showToast('Отчёт отправлен', 'success');
+    _installReportFiles = [];
+    await openInstallationDetail(id);
+    loadInstallationList();
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function changeInstallationStatus(id, status) {
+  try {
+    await apiPatch('/api/installations/' + id, { status: status });
+    showToast('Статус: ' + (_installStatusLabels[status] || status), 'success');
+    await openInstallationDetail(id);
+    loadInstallationList();
+  } catch (e) { showToast(String(e.message || e), 'error'); }
+}
+
+async function deleteInstallation(id) {
+  if (!confirm('Удалить карточку монтажа? Она скроется из списка.')) return;
+  try {
+    await apiDelete('/api/installations/' + id);
+    document.getElementById('installation-modal').classList.remove('visible');
+    showToast('Удалено', 'success');
+    loadInstallationList();
+  } catch (e) { showToast(String(e.message || e), 'error'); }
+}
+
+async function openNewInstallation() { _openInstallationForm(null); }
+async function openEditInstallation(id) {
+  var inst = (_installCache || []).find(function (r) { return r.id === id; });
+  if (!inst) { try { inst = await apiGet('/api/installations/' + id); } catch (e) {} }
+  _openInstallationForm(inst);
+}
+
+async function _openInstallationForm(inst) {
+  var m = _installModalEl();
+  var isEdit = !!inst;
+  // подгрузим монтажников для назначения
+  var installers = [];
+  try { var di = await apiGet('/api/installations/installers'); installers = di.installers || []; } catch (e) {}
+  var optHtml = '<option value="">— не назначен —</option>' + installers.map(function (p) {
+    return '<option value="' + p.id + '"' + (inst && inst.assigned_employee_id === p.id ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
+  }).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-tools"></i> ' + (isEdit ? 'Изменить монтаж' : 'Новый монтаж') + '</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:10px;">' +
+        '<label>Что монтировать <span style="color:var(--danger,#B91C1C)">*</span><input type="text" id="if-title" value="' + escapeHtml(inst && inst.title || '') + '" placeholder="Например: монтаж щита ЩУ-003 на объекте"></label>' +
+        '<label>Адрес / объект<input type="text" id="if-address" value="' + escapeHtml(inst && inst.object_address || '') + '" placeholder="г. Челябинск, ул. …"></label>' +
+        '<label>Дата монтажа<input type="date" id="if-date" value="' + escapeHtml(inst && inst.scheduled_date || '') + '"></label>' +
+        '<label>Монтажник<select id="if-assignee">' + optHtml + '</select></label>' +
+        '<label>Детали для монтажника<textarea id="if-notes" rows="3" placeholder="Состав, нюансы, контакты на объекте…">' + escapeHtml(inst && inst.notes || '') + '</textarea></label>' +
+      '</div>' +
+      '<div class="modal-footer" style="padding:14px 18px;display:flex;justify-content:flex-end;gap:8px;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="submitInstallationForm(' + (isEdit ? inst.id : 'null') + ')"><i class="ti ti-check"></i> ' + (isEdit ? 'Сохранить' : 'Создать') + '</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function submitInstallationForm(id) {
+  var title = (document.getElementById('if-title') || {}).value || '';
+  if (!title.trim()) { showToast('Укажите что монтировать', 'error'); return; }
+  var body = {
+    title: title.trim(),
+    object_address: (document.getElementById('if-address') || {}).value || '',
+    scheduled_date: (document.getElementById('if-date') || {}).value || '',
+    assigned_employee_id: parseInt((document.getElementById('if-assignee') || {}).value, 10) || null,
+    notes: (document.getElementById('if-notes') || {}).value || '',
+  };
+  try {
+    if (id) { await apiPatch('/api/installations/' + id, body); showToast('Сохранено', 'success'); }
+    else {
+      var r = await apiPost('/api/installations', body);
+      if (!r.ok) { showToast((r.data && (r.data.message || r.data.error)) || 'Ошибка', 'error'); return; }
+      showToast('Монтаж создан', 'success');
+    }
+    document.getElementById('installation-modal').classList.remove('visible');
+    loadInstallationList();
+  } catch (e) { showToast(String(e.message || e), 'error'); }
+}
