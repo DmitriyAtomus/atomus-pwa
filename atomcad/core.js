@@ -163,6 +163,16 @@ function pickEnclosure(P){ var need=Math.ceil(moduleCount(P)*1.3); for(var i=0;i
 
 // генерация однолинейной схемы (компоненты+провода) для редактора
 function shortLbl(s,n){s=String(s||'');n=n||16;return s.length>n?s.slice(0,n-1)+'…':s;}
+// геометрия выводов контроллера — ДОЛЖНА совпадать с ctrlSym() в editor.html
+function _ctrlGeom(io){
+  var pn=(io&&io.pins)||{}, asg=(io&&io.asg)||{}, left=[], right=[];
+  ['AI','DI'].forEach(function(g){(pn[g]||[]).forEach(function(p){left.push({id:p.id,lab:asg[p.id]||'',g:g});});});
+  ['AO','DO'].forEach(function(g){(pn[g]||[]).forEach(function(p){right.push({id:p.id,lab:asg[p.id]||'',g:g});});});
+  var rows=Math.max(left.length,right.length,1), pitch=rows>14?50:rows>8?66:84;
+  var hx=230, stub=70, header=110, padB=40, bodyH=header+rows*pitch+padB;
+  return {left:left,right:right,rows:rows,pitch:pitch,hx:hx,stub:stub,header:header,padB:padB,bodyH:bodyH,
+    pinY:function(i){return header+padB/2+i*pitch+pitch/2;}};
+}
 function buildSchematic(P){
   var comps=[], wires=[], texts=[], gx=600, busY=800, step=720;
   var hasCtrl = !!(P.controller && P.controller.model);
@@ -200,39 +210,61 @@ function buildSchematic(P){
   wires.push(W([gx,800],[Math.max(lastX,bx),800]));
   texts.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
 
-  // ---- зона автоматики: контроллер, датчики, сигнализация ----
+  // ---- зона автоматики: контроллер + авто-разводка по назначениям I/O ----
   if(hasCtrl){
-    var cz=2780;
-    texts.push({x:cz,y:235,s:38,tx:'АВТОМАТИКА · ДАТЧИКИ'});
-    // автомат цепей управления → контроллер
+    var io=P.controller.io||{}, G=_ctrlGeom(io), ctrlY=1400;
+    var cz=Math.max(lastX + G.hx + 820, 3000);
+    texts.push({x:cz-220,y:235,s:38,tx:'АВТОМАТИКА · КОНТРОЛЛЕР'});
+    // карта «потребитель → KMx» (как в силовой части)
+    var kmByName={}, kmc=1;
+    (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; if(!(c.name in kmByName)) kmByName[c.name]='KM'+kmc; kmc+=q; } });
+    // автомат цепей управления + питание контроллера
     var cq=(P.breakers||[]).filter(function(bb){return bb.role==='цепи управления'})[0];
-    wires.push(W([Math.max(lastX,bx),800],[cz,800]));   // продлеваем верхнюю шину до зоны
+    wires.push(W([Math.max(lastX,bx),800],[cz,800]));
     if(cq){
       comps.push(C(cq.code,'qf1',cz,950,'NB1-63 1P, C'+cq.rate,'CHINT','цепи управления'));
       wires.push(W([cz,800],[cz,950]));
-      // питание контроллера: от автомата управления к выводам питания (слева сверху)
       wires.push(W([cz,1250],[cz,1200]));
       wires.push(W([cz-150,1200],[cz,1200]));
-      wires.push(W([cz-150,1200],[cz-150,1330]));
-      wires.push(W([cz-90,1200],[cz-90,1330]));
-    } else { wires.push(W([cz,800],[cz,1330])); }
-    // сам контроллер — параметрический блок: выводы AI/DI слева, AO/DO справа,
-    // питание сверху-слева, связь RS-485 с сенсорной панелью сверху-справа
+      wires.push(W([cz-150,1200],[cz-150,ctrlY-G.stub]));
+      wires.push(W([cz-90,1200],[cz-90,ctrlY-G.stub]));
+    } else { wires.push(W([cz,800],[cz,ctrlY-G.stub])); }
+    // контроллер (wired=true → подписи назначений показывают подключённые элементы)
     var cspec=P.controller.spec||{};
-    comps.push({sym:'ctrl',x:cz,y:1400,rot:0,mirror:false,des:'A1',
-      attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:P.controller.io||{},supply:cspec.voltage||''}});
-    // датчики над зоной + сигнальная шина
-    var sN=1, sxs=[];
-    (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ var x=cz+440+(sN-1)*300; comps.push(C('BT'+sN,'ntc',x,820,s.sig,'',s.name)); wires.push(W([x,970],[x,1180])); sxs.push(x); sN++; } });
-    if(sxs.length){
-      var b0=cz+440, b1=sxs[sxs.length-1];
-      wires.push(W([b0,1180],[b1,1180]));
-      comps.push(C('X'+(branches.length+2),'term',b0,1480,'сигнальные','','датчики NTC, экран'));
-      wires.push(W([b0,1180],[b0,1480]));
-    }
+    comps.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
+      attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:io,supply:cspec.voltage||'',wired:true}});
+    var lpx=cz-G.hx-G.stub, rpx=cz+G.hx+G.stub, comX=lpx-560, nX=rpx+560;
+    var usedL=[], usedR=[], btN=1;
+    // ВХОДЫ (AI/DI) → датчики слева
+    G.left.forEach(function(p,i){
+      if(!p.lab)return;
+      var py=ctrlY+G.pinY(i), sx=lpx-320, isT=(p.g==='AI');
+      comps.push(C('BT'+btN, isT?'ntc':'term', sx, py, isT?'NTC':'', '', p.lab));
+      wires.push(W([lpx,py],[sx,py]));                       // вывод контроллера ↔ датчик
+      if(isT){ wires.push(W([sx,py+150],[comX,py+150])); usedL.push(py+150); }
+      else   { wires.push(W([sx,py],[comX,py]));           usedL.push(py); }
+      btN++;
+    });
+    // ВЫХОДЫ (DO) → катушки контакторов справа; прочие → клемма
+    G.right.forEach(function(p,i){
+      if(!p.lab)return;
+      var py=ctrlY+G.pinY(i), ox=rpx+320, km=kmByName[p.lab];
+      if(p.g==='DO' && km){
+        comps.push(C(km,'coil',ox,py,'катушка контактора','',p.lab));
+        wires.push(W([rpx,py],[ox,py]));                    // вывод ↔ верх катушки
+        wires.push(W([ox,py+150],[nX,py+150]));             // низ катушки → N
+        usedR.push(py+150);
+      } else {
+        comps.push(C('XO'+(i+1),'term',ox,py,'','',p.lab));
+        wires.push(W([rpx,py],[ox,py]));
+      }
+    });
+    // вертикальные шины: общий/0В (слева, к датчикам) и N (справа, к катушкам)
+    if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); wires.push(W([comX,l0],[comX,l1])); texts.push({x:comX-30,y:l0-26,s:24,tx:'общий / 0В'}); }
+    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); wires.push(W([nX,r0],[nX,r1])); texts.push({x:nX+24,y:r0-26,s:24,tx:'N'}); }
     // сигнальные лампы (из аппаратов в шкафу, тип «лампа»)
     var hlN=1;
-    (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz+440+(hlN-1)*280; comps.push(C(a.tag||('HL'+hlN),'hl',x,420,a.model||'230 В','',a.name)); hlN++; } } });
+    (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; comps.push(C(a.tag||('HL'+hlN),'hl',x,420,a.model||'230 В','',a.name)); hlN++; } } });
   }
   return {comps:comps, wires:wires, texts:texts};
 }

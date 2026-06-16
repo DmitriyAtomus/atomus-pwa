@@ -405,12 +405,13 @@ function ctrlSym(c){
   var bodyH=header+rows*pitch+padB;
   var pr=[R(-hx,0,bodyW,bodyH), L(-hx,header,hx,header), T(0,header-48,40,'КОНТРОЛЛЕР')];
   var model=(c.attrs&&c.attrs.model)||''; if(model)pr.push(T(0,header-10,32,model.length>30?model.slice(0,29)+'…':model));
+  var wired=!!(c.attrs&&c.attrs.wired);  // при авторазводке назначения показывают подключённые элементы
   var pinsArr=[];
   function place(arr,side){arr.forEach(function(p,i){
     var y=header+padB/2+i*pitch+pitch/2, inX=side<0?-hx:hx, ex=side<0?(-hx-stub):(hx+stub);
     pr.push(L(inX,y,ex,y));
     pr.push(T(side<0?(-hx+58):(hx-58), y+fid*0.34, fid, p.id));
-    if(p.lab){var t=p.lab.length>18?p.lab.slice(0,17)+'…':p.lab; pr.push(T(ex+(side<0?-150:150), y+flab*0.34, flab, t));}
+    if(p.lab&&!wired){var t=p.lab.length>18?p.lab.slice(0,17)+'…':p.lab; pr.push(T(ex+(side<0?-150:150), y+flab*0.34, flab, t));}
     pinsArr.push([ex,y]);
   });}
   place(left,-1); place(right,1);
