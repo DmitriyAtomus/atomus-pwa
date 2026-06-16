@@ -3123,7 +3123,7 @@ function renderAssigneeSelect(currentId) {
   let html = '<select id="tf-assignee"><option value="">— не назначен —</option>';
   list.forEach(e => {
     const sel = (e.id === currentId) ? ' selected' : '';
-    html += '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.full_name || e.short_name || '—') + '</option>';
+    html += '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.short_name || e.full_name || '—') + '</option>';
   });
   html += '</select>';
   return html;
