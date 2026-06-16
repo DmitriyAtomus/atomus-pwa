@@ -2924,7 +2924,7 @@
   .contracts-table .ct-row.s-partially_shipped .ct-strip { background: #F97316; }
   .contracts-table .ct-row.s-closed .ct-strip { background: #6B7280; }
   .contracts-table .ct-row.s-draft .ct-strip { background: #9CA3AF; }
-  .contracts-table .ct-row:hover { background: var(--bg); }
+  .contracts-table .ct-row:hover { background: var(--brand-bg); }
 
   /* v2.45.13: подсветка строки по сроку отгрузки.
      urg-* приоритетнее s-* потому что цвет статуса всё равно остаётся в bage,
@@ -3003,7 +3003,7 @@
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
     background: var(--brand-bg);
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 8px;
     text-align: center;
   }
   .contracts-table .ct-name {
@@ -3014,7 +3014,9 @@
     display: block; color: var(--text-light); font-size: 12px; font-weight: 400; margin-top: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .contracts-table .ct-status { display: flex; align-items: center; }
+  /* v2.45.342: статус-ячейка переносит плашку срочности под бейдж — не наезжает на дату */
+  .contracts-table .ct-status { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+  .contracts-table .ct-status .ct-urg-pill { margin-left: 0; }
   .contracts-table .ct-date { font-size: 13px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
   .contracts-table .ct-sum { font-weight: 700; font-size: 14px; text-align: right; color: var(--text-dark); font-variant-numeric: tabular-nums; }
   .contracts-table .ct-manager { font-size: 13px; color: var(--text-mid); }
