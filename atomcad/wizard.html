@@ -122,7 +122,7 @@ function newProject(){
     breakers:null, enclosure:null, big:false };
 }
 var P=newProject();
-function dirty(){$('saveState').textContent='не сохранено'}
+function dirty(){$('saveState').textContent='не сохранено';if(typeof persistSession==='function')persistSession()}
 
 /* ---- шаги ---- */
 var STEPS=[{l:'Раздел'},{l:'Контроллер'},{l:'Потребители'},{l:'Датчики'},{l:'Вспомогат.'},{l:'Автоматы'},{l:'Клеммы'},{l:'Компоновка'},{l:'Спецификация'}];
@@ -753,10 +753,24 @@ function openEditor(){
 
 /* ---- навигация ---- */
 var PANELS=[pSection,pController,pConsumers,pSensors,pAux,pBreakers,pTerminals,pCabinet,pSpec];
-function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0;var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}}
+/* автосохранение рабочего состояния в браузер: проект + текущий шаг */
+var SESS_KEY='atomcad_session';
+function persistSession(){try{localStorage.setItem(SESS_KEY,JSON.stringify({P:P,cur:cur,v:1}));}catch(_){}}
+function restoreSession(){
+  try{var s=JSON.parse(localStorage.getItem(SESS_KEY)||'null');
+    if(s&&s.P&&typeof s.P==='object'){
+      P=s.P;
+      if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};
+      if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);
+      return (typeof s.cur==='number')?s.cur:0;
+    }
+  }catch(_){}
+  return 0;
+}
+function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0;var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}persistSession();}
 function go(i){cur=Math.max(0,Math.min(STEPS.length-1,i));$('prev').disabled=cur===0;$('next').textContent=cur===STEPS.length-1?'Готово ✓':'Далее →';steps();draw()}
 $('prev').onclick=function(){go(cur-1)};$('next').onclick=function(){go(cur+1)};
-updTag();steps();go(0);
+var _startStep=restoreSession();updTag();steps();go(_startStep);
 </script>
 </body>
 </html>
