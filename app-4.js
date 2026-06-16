@@ -12086,15 +12086,13 @@ async function _maybeMorningProgress() {
     // v2.45.359: только мастеру (и НЕ директору) — у директора роль master тоже есть
     if (!roles.includes('master') || roles.includes('director')) return;
     if (document.getElementById('morning-progress-overlay')) return;
-    let contracts = cache.contracts;
-    if (!contracts) {
-      try { const d = await apiGet('/api/contracts?limit=500'); contracts = (d && d.contracts) || []; cache.contracts = contracts; }
-      catch (e) { return; }
-    }
-    const active = (contracts || []).filter(c => c.status === 'production');
-    if (!active.length) return;                            // нечего отмечать — не мешаем работе
+    // v2.45.361: отмечаем по СБОРКАМ в работе (а не по договорам) — /api/active-works
+    let active = [];
+    try { const d = await apiGet('/api/active-works'); active = (d && d.works) || []; }
+    catch (e) { return; }
+    if (!active.length) return;                            // нет сборок в работе — не мешаем
     const rec = (_mpLoadStore()[_mpToday()]) || {};
-    if (active.every(c => rec[c.id] != null)) return;      // на сегодня всё уже проставлено
+    if (active.every(w => rec[w.id] != null)) return;      // на сегодня всё уже проставлено
     _renderMorningProgress(active);
   } catch (e) { /* окно не должно ломать вход в приложение */ }
 }
@@ -12115,25 +12113,31 @@ function _renderMorningProgress(active) {
   const dateStr = days[dt.getDay()] + ', ' + dt.getDate() + ' ' + months[dt.getMonth()];
 
   let items = '';
-  active.forEach(c => {
-    const has = state._mp.filled[c.id] != null;
-    const val = has ? state._mp.filled[c.id] : 0;
-    const urg = (typeof getContractUrgencyClass === 'function') ? getContractUrgencyClass(c) : '';
-    const hot = urg === 'urg-overdue' || urg === 'urg-urgent';
-    const deadline = c.delivery_date ? ((typeof formatDate === 'function') ? formatDate(c.delivery_date) : c.delivery_date) : '';
+  active.forEach(w => {
+    const has = state._mp.filled[w.id] != null;
+    const val = has ? state._mp.filled[w.id] : 0;
+    // срок берём с договора сборки; «горит», если осталось ≤3 дней или просрочено
+    let hot = false, deadline = '';
+    if (w.delivery_date) {
+      deadline = (typeof formatDate === 'function') ? formatDate(w.delivery_date) : w.delivery_date;
+      const dd = new Date(w.delivery_date + 'T00:00:00');
+      if (!isNaN(dd)) hot = Math.ceil((dd.getTime() - Date.now()) / 86400000) <= 3;
+    }
+    const model = w.model_name || 'Сборка';
+    const sub = [w.contract_number ? escapeHtml(w.contract_number) : '', w.contractor_name ? escapeHtml(w.contractor_name) : ''].filter(Boolean).join(' · ');
     items +=
-      '<div class="mp-item' + (has ? ' is-set' : ' is-todo') + '" data-cid="' + c.id + '">' +
+      '<div class="mp-item' + (has ? ' is-set' : ' is-todo') + '" data-cid="' + w.id + '">' +
         '<div class="mp-itop">' +
           '<div class="mp-ic"><i class="ti ti-tool"></i></div>' +
           '<div class="mp-imain">' +
-            '<div class="mp-iname">' + escapeHtml(c.number || '') + ' · ' + escapeHtml(c.contractor_name || '—') + '</div>' +
-            '<div class="mp-isub">' + (deadline ? 'срок ' + escapeHtml(deadline) : 'без срока') + (hot ? ' · <span class="mp-hot">ГОРИТ</span>' : '') + '</div>' +
+            '<div class="mp-iname">' + escapeHtml(model) + '</div>' +
+            '<div class="mp-isub">' + (sub || 'без договора') + (deadline ? ' · срок ' + escapeHtml(deadline) : '') + (hot ? ' · <span class="mp-hot">ГОРИТ</span>' : '') + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="mp-prog">' +
           '<input type="range" class="mp-range" min="0" max="100" step="5" value="' + val + '" ' +
-            'oninput="_mpOnInput(' + c.id + ', this.value)" onclick="_mpOnInput(' + c.id + ', this.value)">' +
-          '<span class="mp-pct" id="mp-pct-' + c.id + '">' + (has ? (val + '%') : '— укажи') + '</span>' +
+            'oninput="_mpOnInput(' + w.id + ', this.value)" onclick="_mpOnInput(' + w.id + ', this.value)">' +
+          '<span class="mp-pct" id="mp-pct-' + w.id + '">' + (has ? (val + '%') : '— укажи') + '</span>' +
         '</div>' +
       '</div>';
   });
@@ -12149,7 +12153,7 @@ function _renderMorningProgress(active) {
         '<div class="mp-h1">Доброе утро' + greet + ' 👋</div>' +
         '<div class="mp-date">' + dateStr + ' · смена началась</div>' +
       '</div>' +
-      '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Отметьте, сколько сделано по каждой работе. Окно закроется, когда проставите все %.</span></div>' +
+      '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Отметьте, сколько сделано по каждой сборке. Окно закроется, когда проставите все %.</span></div>' +
       '<div class="mp-counter"><span id="mp-counter-txt"></span><div class="mp-cbar"><div id="mp-cbar-fill"></div></div></div>' +
       '<div class="mp-list">' + items + '</div>' +
       '<div class="mp-foot">' +
@@ -12205,7 +12209,7 @@ function _mpSubmit() {
   // v2.45.345: отправляем на сервер — чтобы прогресс был общим (виден директору),
   // а не только локально. localStorage остаётся как офлайн-фолбэк.
   try {
-    const items = state._mp.active.map(c => ({ contract_id: c.id, pct: state._mp.filled[c.id] }));
+    const items = state._mp.active.map(c => ({ assembly_id: c.id, pct: state._mp.filled[c.id] }));
     if (typeof apiPost === 'function') apiPost('/api/morning-progress', { items }).catch(function () {});
   } catch (e) {}
   const ov = document.getElementById('morning-progress-overlay');
