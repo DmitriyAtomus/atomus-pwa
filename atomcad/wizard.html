@@ -80,7 +80,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
   <span class="proj" id="projTag">ЩУ-003.009 · <b>Холодильная камера</b></span>
   <div class="tr">
     <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
-    <button class="tb" onclick="document.getElementById('fileIn').click()">⭳ Загрузить</button>
+    <button class="tb" onclick="openLibrary()">📂 Мои проекты</button>
     <button class="tb" onclick="saveProject()">⭱ Сохранить</button>
     <button class="tb cy" onclick="openEditor()">Открыть редактор →</button>
   </div>
@@ -90,6 +90,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <footer class="foot"><div class="inner"><button class="nav" id="prev">← Назад</button><div class="spacer"></div><span class="savechip"><span class="d"></span><span id="saveState">черновик</span></span><button class="nav cy" id="next">Далее →</button></div></footer>
 <div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
 <div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
+<div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются внутри приложения и доступны для повторного открытия с этого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="core.js"></script>
@@ -127,9 +128,9 @@ function H(c,t,s){return '<div class="h"><span class="c">'+c+'</span><h2>'+t+'</
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&quot;')}
 
 /* confirm */
-var cfCb=null;
-function ask(t,x,cb){$('cfT').textContent=t;$('cfX').textContent=x;cfCb=cb;$('mask').classList.add('show')}
-$('cfOk').onclick=function(){$('mask').classList.remove('show');if(cfCb)cfCb()};$('cfNo').onclick=function(){$('mask').classList.remove('show');cfCb=null};
+var cfCb=null,cfNoCb=null;
+function ask(t,x,cb,noCb){$('cfT').textContent=t;$('cfX').textContent=x;cfCb=cb;cfNoCb=noCb||null;$('mask').classList.add('show')}
+$('cfOk').onclick=function(){$('mask').classList.remove('show');var f=cfCb;cfCb=null;cfNoCb=null;if(f)f()};$('cfNo').onclick=function(){$('mask').classList.remove('show');var f=cfNoCb;cfCb=null;cfNoCb=null;if(f)f()};
 function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0">'+esc(it.label)+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
 $('chNo').onclick=function(){$('chMask').classList.remove('show')};
 function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},2400)}
@@ -363,19 +364,82 @@ function pSpec(){
   h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th>Поз.</th><th>Наименование</th><th class="c">Кол.</th><th>Примечание</th></tr></thead><tbody>';
   arr.forEach(function(g){h+='<tr><td class="d">'+esc(g.desStr)+'</td><td>'+esc(g.name+(g.manu?' '+g.manu:'')+(g.model?' '+g.model:''))+'</td><td class="c">'+g.qty+'</td><td>'+esc(g.notes.join(' / '))+'</td></tr>'});
   h+='</tbody></table></div><div class="note">Позиций: <b style="color:var(--txt)">'+arr.length+'</b> · изделий: <b style="color:var(--txt)">'+units+'</b> · корпус '+P.enclosure.model+'</div>';
-  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект (.json)</button><button class="tb" onclick="document.getElementById(\'fileIn\').click()">⭳ Загрузить</button></div>';
+  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект</button><button class="tb" onclick="openLibrary()">📂 Мои проекты</button><button class="tb" onclick="exportFile()">⭳ Экспорт .json</button></div>';
   return h;
 }
 
-/* ---- save / load (реальное) ---- */
+/* ---- сохранение внутри приложения (библиотека проектов в localStorage) ---- */
+var LS_KEY='atomcad_projects';
+function loadLib(){try{var a=JSON.parse(localStorage.getItem(LS_KEY)||'[]');return Array.isArray(a)?a:[]}catch(_){return []}}
+function saveLib(a){try{localStorage.setItem(LS_KEY,JSON.stringify(a));return true}catch(_){toast('Не удалось сохранить — хранилище переполнено');return false}}
+function fmtDate(ts){var d=new Date(ts||Date.now());function z(n){return ('0'+n).slice(-2)}return z(d.getDate())+'.'+z(d.getMonth()+1)+'.'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes())}
+
+/* «Сохранить» — кладёт проект в библиотеку приложения (и обновляет, если уже есть) */
 function saveProject(){
+  if(!P.id)P.id=uid('prj');
+  var lib=loadLib();
+  var rec={id:P.id,name:P.name,section:P.section,num:P.num,savedAt:Date.now(),data:P};
+  var found=-1;for(var i=0;i<lib.length;i++)if(lib[i].id===P.id){found=i;break;}
+  if(found>=0)lib[found]=rec; else lib.unshift(rec);
+  if(saveLib(lib)){$('saveState').textContent='сохранено';toast('Проект сохранён в приложении');}
+}
+
+/* библиотека: список, открытие, удаление */
+function openLibrary(){
+  var lib=loadLib(),h='';
+  if(!lib.length){
+    h='<div class="empty" style="padding:10px 2px">Сохранённых проектов пока нет.<br>Нажми «⭱ Сохранить» в шапке, чтобы добавить текущий.</div>';
+  }else{
+    lib.forEach(function(r,i){
+      var cur=P.id&&r.id===P.id;
+      h+='<button class="pbtn" data-open="'+i+'" style="margin:0;align-items:flex-start;gap:11px">'+
+           '<span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left">'+
+             '<span style="color:#E7EEF4;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'Без названия')+(cur?' <span class="tag AI" style="margin-left:4px">открыт</span>':'')+'</span>'+
+             '<span class="mono" style="font-size:10.5px;color:var(--dim)">'+esc((r.section||'')+'.'+('00'+(r.num||0)).slice(-3))+' · '+fmtDate(r.savedAt)+'</span>'+
+           '</span>'+
+           '<span class="del" data-del="'+i+'" title="Удалить" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span>'+
+         '</button>';
+    });
+  }
+  $('libList').innerHTML=h;
+  Array.prototype.forEach.call($('libList').querySelectorAll('[data-open]'),function(el){
+    el.onclick=function(ev){
+      var d=ev.target.closest?ev.target.closest('[data-del]'):null;
+      if(d){ev.stopPropagation();delLibrary(+d.getAttribute('data-del'));return;}
+      openLibProject(+el.getAttribute('data-open'));
+    };
+  });
+  $('libMask').classList.add('show');
+}
+function openLibProject(i){
+  var lib=loadLib(),r=lib[i];if(!r||!r.data)return;
+  P=r.data;
+  if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};
+  if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);
+  if(!P.id)P.id=r.id;
+  $('libMask').classList.remove('show');
+  go(0);updTag();$('saveState').textContent='сохранено';
+  toast('Проект открыт: '+(r.name||''));
+}
+function delLibrary(i){
+  var lib=loadLib(),r=lib[i];if(!r)return;
+  $('libMask').classList.remove('show');
+  ask('Удалить проект?','Удалить «'+(r.name||'')+'» из сохранённых? Действие необратимо.',
+    function(){var l=loadLib();l.splice(i,1);saveLib(l);toast('Проект удалён');openLibrary();},
+    function(){openLibrary();});
+}
+$('libClose').onclick=function(){$('libMask').classList.remove('show')};
+$('libImport').onclick=function(){$('fileIn').click()};
+
+/* ---- файловый экспорт/импорт (запасной вариант) ---- */
+function exportFile(){
   var blob=new Blob([JSON.stringify(P,null,2)],{type:'application/json'});
   var u=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=u;a.download=(P.section+'.'+('00'+P.num).slice(-3)+'_'+P.name).replace(/[^\wа-яА-Я.-]+/g,'_')+'.json';
   document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
-  $('saveState').textContent='сохранено';toast('Проект сохранён в файл');
+  toast('Проект выгружен в файл');
 }
-$('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);P=o;if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);go(0);updTag();$('saveState').textContent='загружено';toast('Проект загружен');}catch(err){toast('Ошибка чтения файла')}};r.readAsText(f);e.target.value=''};
+$('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);P=o;if(!P.id)P.id=uid('prj');if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);$('libMask').classList.remove('show');go(0);updTag();$('saveState').textContent='загружено';toast('Проект загружен из файла');}catch(err){toast('Ошибка чтения файла')}};r.readAsText(f);e.target.value=''};
 
 /* ---- передача схемы в редактор ---- */
 function openEditor(){
