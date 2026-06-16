@@ -205,6 +205,7 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
       Atom<b>CAD</b>
     </div>
     <div class="doc"><span class="dot" id="saveDot"></span>ЩУ-003.001.1 · АГ.ЩУ-003/26</div>
+    <div id="sheetTabs" style="display:flex;gap:6px;align-items:center"></div>
     <div id="erc"><span class="w"></span><span id="ercTxt">ERC: всё подключено</span></div>
     <button class="tb-btn" id="btnCatalog">▦ Каталог CHINT</button>
     <button class="tb-btn" id="btnSpec">▤ Спецификация</button>
@@ -1582,9 +1583,23 @@ function _mkSheet(s){
   };
 }
 function updateSheetNav(){
-  var el=$('sheetNav'); if(!el)return;
-  var n=S.sheets.length||1, sub=(S.sheets[S.cur]&&S.sheets[S.cur].subtitle)||'';
-  el.textContent='◀ Лист '+((S.cur||0)+1)+'/'+n+(sub?(' · '+sub):'')+' ▶ · A3';
+  var el=$('sheetNav');
+  if(el){
+    var n=S.sheets.length||1, sub=(S.sheets[S.cur]&&S.sheets[S.cur].subtitle)||'';
+    el.textContent='◀ Лист '+((S.cur||0)+1)+'/'+n+(sub?(' · '+sub):'')+' ▶ · A3';
+  }
+  renderSheetTabs();
+}
+function renderSheetTabs(){
+  var el=$('sheetTabs'); if(!el)return;
+  if(!S.sheets||S.sheets.length<2){ el.innerHTML=''; return; }
+  var h='';
+  S.sheets.forEach(function(sh,i){
+    var on=i===S.cur;
+    h+='<button class="tb-btn" data-sheet="'+i+'" title="'+esc(sh.subtitle||'')+'" style="'+(on?'background:#16B7DB;color:#06262E;border-color:transparent;font-weight:600;':'')+'">Лист '+(i+1)+(sh.subtitle?(' · '+esc(sh.subtitle)):'')+'</button>';
+  });
+  el.innerHTML=h;
+  Array.prototype.forEach.call(el.querySelectorAll('[data-sheet]'),function(b){ b.onclick=function(){ gotoSheet(+b.getAttribute('data-sheet')); }; });
 }
 function gotoSheet(i,noFit){
   if(!S.sheets.length)return;
