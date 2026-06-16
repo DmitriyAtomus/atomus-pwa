@@ -643,7 +643,9 @@ function renderContractAssembliesBlock(c) {
       // v2.43.16: цветной бейдж статуса assembly
       let statusBadge = '';
       if (a.status === 'in_progress') {
-        statusBadge = '<span class="a-status-badge a-st-inprog"><i class="ti ti-tool"></i>В работе</span>';
+        // v2.45.361: % готовности по сборке (утренняя отметка мастера)
+        const _pp = (a.progress_pct != null) ? (' · <b class="a-pct">' + a.progress_pct + '%</b>') : '';
+        statusBadge = '<span class="a-status-badge a-st-inprog"><i class="ti ti-tool"></i>В работе' + _pp + '</span>';
       } else if (a.status === 'ready') {
         statusBadge = '<span class="a-status-badge a-st-ready"><i class="ti ti-circle-check"></i>Готово</span>';
       } else if (a.status === 'shipped') {
