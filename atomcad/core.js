@@ -188,22 +188,27 @@ function buildSchematic(P){
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
   var step=720, nB=branches.length, maxX=3850;
   if(nB>0){ var fit=(maxX-gx)/nB; if(fit<step) step=Math.max(300, Math.floor(fit)); }
-  var bx=gx+step, lastX=gx, kmN=1;
+  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1;
   branches.forEach(function(b,i){
     var x=bx+i*step;
     var cons=(P.consumers||[]).filter(function(c){return c.id===b.consumer})[0];
     var role=(cons?cons.name:b.role);
+    var ph3=(cons&&cons.phases===3);
+    var phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
     pc.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
     pw.push(W([x,800],[x,950]));
+    pt.push({x:x+44,y:885,s:24,tx:phase});                 // фаза линии
     if(cons&&needsContactor(cons)){
       pc.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',cons.name));
       pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
       kmN++;
     } else { pw.push(W([x,1250],[x,1950])); }
+    pt.push({x:x+44,y:1730,s:22,tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода линии
     pc.push(C('X'+(i+2),'term',x,2000,'ЗНИ 2,5 мм²','',role));
     lastX=x;
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
+  pt.push({x:gx-10,y:780,s:24,tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины
   pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
   var sheets=[{title:'силовые цепи', comps:pc, wires:pw, texts:pt}];
 
@@ -242,12 +247,14 @@ function buildSchematic(P){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, isT=(p.g==='AI'), chx=lpx-130-k*40;
       ac.push(shortC('BT'+(k+1), isT?'ntc':'term', inX, devY, isT?'NTC':'', '', p.lab));
       aw.push(W([lpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[inX,devY]));
+      at.push({x:chx+22,y:py-14,s:22,tx:''+(11+k)});        // номер цепи входа
       if(isT){ aw.push(W([inX,devY+150],[comX,devY+150])); usedL.push(devY+150); }
       else   { aw.push(W([inX,devY],[comX,devY]));         usedL.push(devY); }
     });
     // ВЫХОДЫ справа: катушка контактора / клемма
     outA.forEach(function(o,k){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, km=kmByName[p.lab], chx=rpx+130+k*40;
+      at.push({x:chx-22,y:py-14,s:22,tx:''+(21+k)});        // номер цепи выхода
       if(p.g==='DO' && km){
         ac.push(shortC(km,'coil',outX,devY,'катушка контактора','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
