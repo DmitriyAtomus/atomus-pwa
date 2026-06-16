@@ -12086,13 +12086,15 @@ async function _maybeMorningProgress() {
     // v2.45.359: только мастеру (и НЕ директору) — у директора роль master тоже есть
     if (!roles.includes('master') || roles.includes('director')) return;
     if (document.getElementById('morning-progress-overlay')) return;
-    // v2.45.361: отмечаем по СБОРКАМ в работе (а не по договорам) — /api/active-works
+    // v2.45.364: только то, что «В работе» в производстве (production works status=in_progress),
+    // и сразу подставляем текущий % готовности с карточки канбана
     let active = [];
-    try { const d = await apiGet('/api/active-works'); active = (d && d.works) || []; }
+    try { const d = await apiGet('/api/production/works?status=in_progress'); active = (d && d.works) || []; }
     catch (e) { return; }
-    if (!active.length) return;                            // нет сборок в работе — не мешаем
+    active = active.filter(w => w && w.status === 'in_progress');
+    if (!active.length) return;                            // нет работ в работе — не мешаем
     const rec = (_mpLoadStore()[_mpToday()]) || {};
-    if (active.every(w => rec[w.id] != null)) return;      // на сегодня всё уже проставлено
+    if (active.every(w => rec[w.id] != null)) return;      // на сегодня уже отмечено
     _renderMorningProgress(active);
   } catch (e) { /* окно не должно ломать вход в приложение */ }
 }
@@ -12100,7 +12102,11 @@ async function _maybeMorningProgress() {
 function _renderMorningProgress(active) {
   const rec = (_mpLoadStore()[_mpToday()]) || {};
   state._mp = { active: active, filled: {} };
-  active.forEach(c => { if (rec[c.id] != null) state._mp.filled[c.id] = rec[c.id]; });
+  // v2.45.364: пред-заполняем текущим % (rec за сегодня, иначе серверный progress с карточки)
+  active.forEach(w => {
+    const cur = (rec[w.id] != null) ? rec[w.id] : (w.progress != null ? Math.max(0, Math.min(100, parseInt(w.progress, 10) || 0)) : 0);
+    state._mp.filled[w.id] = cur;
+  });
 
   // v2.45.359: приветствие по имени-отчеству (ФИО = «Фамилия Имя Отчество» → «Имя Отчество»)
   const nm = (state.user && (state.user.full_name || state.user.name) || '').trim();
@@ -12114,30 +12120,30 @@ function _renderMorningProgress(active) {
 
   let items = '';
   active.forEach(w => {
-    const has = state._mp.filled[w.id] != null;
-    const val = has ? state._mp.filled[w.id] : 0;
-    // срок берём с договора сборки; «горит», если осталось ≤3 дней или просрочено
-    let hot = false, deadline = '';
-    if (w.delivery_date) {
-      deadline = (typeof formatDate === 'function') ? formatDate(w.delivery_date) : w.delivery_date;
-      const dd = new Date(w.delivery_date + 'T00:00:00');
-      if (!isNaN(dd)) hot = Math.ceil((dd.getTime() - Date.now()) / 86400000) <= 3;
+    const val = state._mp.filled[w.id];                    // уже пред-заполнено
+    // срок — дедлайн работы либо срок договора; «горит» при просрочке или ≤3 днях
+    const dlRaw = w.deadline_at || w.contract_delivery_date || '';
+    let hot = !!w.is_overdue, deadline = '';
+    if (dlRaw) {
+      const dd = new Date((String(dlRaw).length <= 10 ? dlRaw + 'T00:00:00' : dlRaw));
+      deadline = (typeof formatDate === 'function') ? formatDate(dlRaw) : String(dlRaw).slice(0, 10);
+      if (!isNaN(dd) && Math.ceil((dd.getTime() - Date.now()) / 86400000) <= 3) hot = true;
     }
-    const model = w.model_name || 'Сборка';
+    const model = w.model_name || 'Работа';
     const sub = [w.contract_number ? escapeHtml(w.contract_number) : '', w.contractor_name ? escapeHtml(w.contractor_name) : ''].filter(Boolean).join(' · ');
     items +=
-      '<div class="mp-item' + (has ? ' is-set' : ' is-todo') + '" data-cid="' + w.id + '">' +
+      '<div class="mp-item is-set" data-cid="' + w.id + '">' +
         '<div class="mp-itop">' +
           '<div class="mp-ic"><i class="ti ti-tool"></i></div>' +
           '<div class="mp-imain">' +
             '<div class="mp-iname">' + escapeHtml(model) + '</div>' +
-            '<div class="mp-isub">' + (sub || 'без договора') + (deadline ? ' · срок ' + escapeHtml(deadline) : '') + (hot ? ' · <span class="mp-hot">ГОРИТ</span>' : '') + '</div>' +
+            '<div class="mp-isub">' + (sub || 'без договора') + (deadline ? ' · до ' + escapeHtml(deadline) : '') + (hot ? ' · <span class="mp-hot">ГОРИТ</span>' : '') + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="mp-prog">' +
           '<input type="range" class="mp-range" min="0" max="100" step="5" value="' + val + '" ' +
             'oninput="_mpOnInput(' + w.id + ', this.value)" onclick="_mpOnInput(' + w.id + ', this.value)">' +
-          '<span class="mp-pct" id="mp-pct-' + w.id + '">' + (has ? (val + '%') : '— укажи') + '</span>' +
+          '<span class="mp-pct" id="mp-pct-' + w.id + '">' + val + '%</span>' +
         '</div>' +
       '</div>';
   });
@@ -12153,7 +12159,7 @@ function _renderMorningProgress(active) {
         '<div class="mp-h1">Доброе утро' + greet + ' 👋</div>' +
         '<div class="mp-date">' + dateStr + ' · смена началась</div>' +
       '</div>' +
-      '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Отметьте, сколько сделано по каждой сборке. Окно закроется, когда проставите все %.</span></div>' +
+      '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Проверьте % готовности по каждой работе в производстве — текущие значения подставлены, поправьте, если изменилось.</span></div>' +
       '<div class="mp-counter"><span id="mp-counter-txt"></span><div class="mp-cbar"><div id="mp-cbar-fill"></div></div></div>' +
       '<div class="mp-list">' + items + '</div>' +
       '<div class="mp-foot">' +
@@ -12206,11 +12212,14 @@ function _mpSubmit() {
   store[today] = store[today] || {};
   state._mp.active.forEach(c => { store[today][c.id] = state._mp.filled[c.id]; });
   _mpSaveStore(store);
-  // v2.45.345: отправляем на сервер — чтобы прогресс был общим (виден директору),
-  // а не только локально. localStorage остаётся как офлайн-фолбэк.
+  // v2.45.364: сохраняем % прямо в production work — тот же прогресс, что на карточке канбана
+  // (PATCH /api/production/works/{id}/progress). Виден всем, включая директора на доске.
   try {
-    const items = state._mp.active.map(c => ({ assembly_id: c.id, pct: state._mp.filled[c.id] }));
-    if (typeof apiPost === 'function') apiPost('/api/morning-progress', { items }).catch(function () {});
+    if (typeof apiPatch === 'function') {
+      state._mp.active.forEach(function (w) {
+        apiPatch('/api/production/works/' + w.id + '/progress', { progress: state._mp.filled[w.id] }).catch(function () {});
+      });
+    }
   } catch (e) {}
   const ov = document.getElementById('morning-progress-overlay');
   if (ov) ov.remove();
