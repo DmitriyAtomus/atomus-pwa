@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.379-task-assignee-short-names";
+const APP_VERSION = "v2.45.380-role-names-ru";
 const APP_VERSION_DATE = "16.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -132,6 +132,18 @@ window.addEventListener('resize', detectLayout);
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// v2.45.380: русские названия ролей (legacy-коды приходят на английском:
+// master/accountant/…). Используется в выпадашках, чтобы не показывать англ. слова.
+var ROLE_NAMES_RU = {
+  director: 'Директор', zam: 'Зам директора', manager: 'Менеджер',
+  engineer: 'Инженер', master: 'Мастер', accountant: 'Бухгалтер',
+  assembler: 'Сборщик', installer: 'Монтажник',
+};
+function roleNameRu(r) { return ROLE_NAMES_RU[r] || ''; }
+function roleNamesRu(roles) {
+  return (roles || []).map(roleNameRu).filter(Boolean).join(', ');
 }
 
 // v2.43.54: формирует «№XXX» с защитой от двойного № (если в БД уже есть префикс).

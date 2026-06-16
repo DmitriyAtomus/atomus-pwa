@@ -2885,11 +2885,12 @@ async function loadManagersForModal(query) {
       const name = e.short_name || e.full_name || '—';
       const picked = coMode && coIds.indexOf(e.id) >= 0;
       const click = coMode ? ('toggleCoManager(' + e.id + ')') : ('selectManager(' + e.id + ')');
+      const roleMeta = (typeof roleNamesRu === 'function') ? roleNamesRu(e.roles) : '';
       html += '<div class="modal-item" onclick="' + click + '"' + (picked ? ' style="background:var(--brand-bg);"' : '') + '>' +
         '<div class="mi-icon">' + (picked ? '<i class="ti ti-check" style="color:var(--brand);"></i>' : '<i class="ti ti-user"></i>') + '</div>' +
         '<div class="mi-text">' +
           '<div class="mi-title">' + escapeHtml(name) + '</div>' +
-          '<div class="mi-meta">' + escapeHtml((e.roles || []).join(', ')) + '</div>' +
+          (roleMeta ? '<div class="mi-meta">' + escapeHtml(roleMeta) + '</div>' : '') +
         '</div></div>';
     });
     container.innerHTML = html;
