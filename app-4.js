@@ -12064,3 +12064,148 @@ async function submitInstallationForm(id) {
     loadInstallationList();
   } catch (e) { showToast(String(e.message || e), 'error'); }
 }
+// ============ v2.45.344: Утреннее окно мастеру — отметка % готовности ============
+// Раз в день мастеру (роль 'master') показываем ОБЯЗАТЕЛЬНОЕ окно: проставить
+// процент готовности по каждому договору «в производстве». Окно нельзя закрыть,
+// пока не проставлены все позиции.
+// ВНИМАНИЕ: хранение пока ЛОКАЛЬНОЕ (localStorage этого устройства). Чтобы прогресс
+// видели все (директор и пр.), нужен бэкенд-эндпоинт: POST {date, contract_id, pct, user}.
+const MORNING_PROGRESS_KEY = 'atomus_morning_progress_v1';
+
+function _mpToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _mpLoadStore() { try { return JSON.parse(localStorage.getItem(MORNING_PROGRESS_KEY) || '{}'); } catch (e) { return {}; } }
+function _mpSaveStore(o) { try { localStorage.setItem(MORNING_PROGRESS_KEY, JSON.stringify(o)); } catch (e) {} }
+
+// Триггер — вызывается из showApp() после логина. Никогда не валит приложение.
+async function _maybeMorningProgress() {
+  try {
+    const roles = (state.user && state.user.roles) || [];
+    if (!roles.includes('master')) return;                 // только мастер
+    if (document.getElementById('morning-progress-overlay')) return;
+    let contracts = cache.contracts;
+    if (!contracts) {
+      try { const d = await apiGet('/api/contracts?limit=500'); contracts = (d && d.contracts) || []; cache.contracts = contracts; }
+      catch (e) { return; }
+    }
+    const active = (contracts || []).filter(c => c.status === 'production');
+    if (!active.length) return;                            // нечего отмечать — не мешаем работе
+    const rec = (_mpLoadStore()[_mpToday()]) || {};
+    if (active.every(c => rec[c.id] != null)) return;      // на сегодня всё уже проставлено
+    _renderMorningProgress(active);
+  } catch (e) { /* окно не должно ломать вход в приложение */ }
+}
+
+function _renderMorningProgress(active) {
+  const rec = (_mpLoadStore()[_mpToday()]) || {};
+  state._mp = { active: active, filled: {} };
+  active.forEach(c => { if (rec[c.id] != null) state._mp.filled[c.id] = rec[c.id]; });
+
+  const nm = (state.user && (state.user.name || state.user.full_name) || '').trim();
+  const greet = nm ? (', ' + escapeHtml(nm.split(' ')[0])) : '';
+  const dt = new Date();
+  const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const dateStr = days[dt.getDay()] + ', ' + dt.getDate() + ' ' + months[dt.getMonth()];
+
+  let items = '';
+  active.forEach(c => {
+    const has = state._mp.filled[c.id] != null;
+    const val = has ? state._mp.filled[c.id] : 0;
+    const urg = (typeof getContractUrgencyClass === 'function') ? getContractUrgencyClass(c) : '';
+    const hot = urg === 'urg-overdue' || urg === 'urg-urgent';
+    const deadline = c.delivery_date ? ((typeof formatDate === 'function') ? formatDate(c.delivery_date) : c.delivery_date) : '';
+    items +=
+      '<div class="mp-item' + (has ? ' is-set' : ' is-todo') + '" data-cid="' + c.id + '">' +
+        '<div class="mp-itop">' +
+          '<div class="mp-ic"><i class="ti ti-tool"></i></div>' +
+          '<div class="mp-imain">' +
+            '<div class="mp-iname">' + escapeHtml(c.number || '') + ' · ' + escapeHtml(c.contractor_name || '—') + '</div>' +
+            '<div class="mp-isub">' + (deadline ? 'срок ' + escapeHtml(deadline) : 'без срока') + (hot ? ' · <span class="mp-hot">ГОРИТ</span>' : '') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mp-prog">' +
+          '<input type="range" class="mp-range" min="0" max="100" step="5" value="' + val + '" ' +
+            'oninput="_mpOnInput(' + c.id + ', this.value)" onclick="_mpOnInput(' + c.id + ', this.value)">' +
+          '<span class="mp-pct" id="mp-pct-' + c.id + '">' + (has ? (val + '%') : '— укажи') + '</span>' +
+        '</div>' +
+      '</div>';
+  });
+
+  const ov = document.createElement('div');
+  ov.id = 'morning-progress-overlay';
+  ov.className = 'mp-overlay';
+  ov.innerHTML =
+    '<div class="mp-modal">' +
+      '<div class="mp-head">' +
+        '<span class="mp-lock"><i class="ti ti-lock"></i> обязательно</span>' +
+        '<div class="mp-sun"><i class="ti ti-sunrise"></i></div>' +
+        '<div class="mp-h1">Доброе утро' + greet + ' 👋</div>' +
+        '<div class="mp-date">' + dateStr + ' · смена началась</div>' +
+      '</div>' +
+      '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Отметьте, сколько сделано по каждой работе. Окно закроется, когда проставите все %.</span></div>' +
+      '<div class="mp-counter"><span id="mp-counter-txt"></span><div class="mp-cbar"><div id="mp-cbar-fill"></div></div></div>' +
+      '<div class="mp-list">' + items + '</div>' +
+      '<div class="mp-foot">' +
+        '<button class="mp-cta" id="mp-cta" disabled onclick="_mpSubmit()"><i class="ti ti-lock"></i> Начать смену</button>' +
+        '<div class="mp-hint" id="mp-hint"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  _mpUpdateState();
+}
+
+function _mpOnInput(cid, value) {
+  if (!state._mp) return;
+  const v = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+  state._mp.filled[cid] = v;
+  const el = document.getElementById('mp-pct-' + cid);
+  if (el) el.textContent = v + '%';
+  const item = document.querySelector('.mp-item[data-cid="' + cid + '"]');
+  if (item) { item.classList.remove('is-todo'); item.classList.add('is-set'); }
+  _mpUpdateState();
+}
+
+function _mpUpdateState() {
+  if (!state._mp) return;
+  const total = state._mp.active.length;
+  const done = state._mp.active.filter(c => state._mp.filled[c.id] != null).length;
+  const txt = document.getElementById('mp-counter-txt');
+  if (txt) txt.textContent = 'Заполнено ' + done + ' из ' + total;
+  const fill = document.getElementById('mp-cbar-fill');
+  if (fill) fill.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  const left = total - done;
+  const cta = document.getElementById('mp-cta');
+  const hint = document.getElementById('mp-hint');
+  if (cta) {
+    cta.disabled = left !== 0;
+    cta.classList.toggle('ready', left === 0);
+    cta.innerHTML = left === 0 ? 'Начать смену <i class="ti ti-arrow-right"></i>' : '<i class="ti ti-lock"></i> Начать смену';
+  }
+  if (hint) hint.innerHTML = left === 0 ? 'Готово — хорошей смены!' : ('Заполните все позиции — осталось <b>' + left + '</b>');
+}
+
+function _mpSubmit() {
+  if (!state._mp) return;
+  const total = state._mp.active.length;
+  const done = state._mp.active.filter(c => state._mp.filled[c.id] != null).length;
+  if (done < total) return; // защита: не закрываем, пока не всё
+  const store = _mpLoadStore();
+  const today = _mpToday();
+  store[today] = store[today] || {};
+  state._mp.active.forEach(c => { store[today][c.id] = state._mp.filled[c.id]; });
+  _mpSaveStore(store);
+  // v2.45.345: отправляем на сервер — чтобы прогресс был общим (виден директору),
+  // а не только локально. localStorage остаётся как офлайн-фолбэк.
+  try {
+    const items = state._mp.active.map(c => ({ contract_id: c.id, pct: state._mp.filled[c.id] }));
+    if (typeof apiPost === 'function') apiPost('/api/morning-progress', { items }).catch(function () {});
+  } catch (e) {}
+  const ov = document.getElementById('morning-progress-overlay');
+  if (ov) ov.remove();
+  document.body.style.overflow = '';
+  if (typeof showToast === 'function') showToast('Прогресс отмечен. Хорошей смены!', 'success');
+}
