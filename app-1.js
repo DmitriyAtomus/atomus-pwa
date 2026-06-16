@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.352-atomcad-controller-library";
+const APP_VERSION = "v2.45.353-installer-only-tabs";
 const APP_VERSION_DATE = "16.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7060,6 +7060,29 @@ function applyPermissionsToUI() {
     const el = document.getElementById(id);
     if (el) el.style.display = canManageInstall ? '' : 'none';
   });
+
+  // v2.45.350: «чистый» монтажник — есть installation.view и нет ни одного
+  // «офисного» права. Ему показываем ТОЛЬКО раздел «Монтаж»: прячем остальные
+  // вкладки, кнопку «Фото УПД» и сразу открываем монтаж.
+  const OFFICE_PERMS = [
+    'home.view_activity', 'home.view_finance_kpi',
+    'production.view', 'sales.view', 'warehouse.view', 'logistics.view',
+    'supply.view', 'defects.view', 'tasks.view_all',
+    'hr.view_vacations', 'hr.create_vacations', 'hr.manage_employees',
+    'hr.manage_positions', 'hr.manage_access',
+  ];
+  const installerOnly = canSeeInstall && !OFFICE_PERMS.some(p => hasPermission(p));
+  if (installerOnly) {
+    document.querySelectorAll('.section-tab, .m-section-tabs button').forEach(t => {
+      t.style.display = (t.dataset.section === 'installation') ? '' : 'none';
+    });
+    const cam = document.getElementById('si-camera-top-btn');
+    if (cam) cam.style.display = 'none';
+    // при входе монтажник попадает сразу в «Монтаж», а не на «Главную»
+    if (state.currentSection !== 'installation') {
+      try { selectSection('installation'); } catch (_) {}
+    }
+  }
 }
 
 // ============================================================================
