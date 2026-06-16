@@ -1206,9 +1206,11 @@
             <div class="form-section" id="quantity-section">
               <label class="form-label">Количество <span class="required">*</span></label>
               <div class="qty-stepper">
-                <button class="qty-btn" onclick="changeQty(-1)" id="qty-minus">−</button>
-                <input type="number" class="qty-input" id="qty-input" value="1" min="1" max="1000" oninput="refreshBomPreview()">
-                <button class="qty-btn" onclick="changeQty(1)">+</button>
+                <div class="qty-control">
+                  <button class="qty-btn" onclick="changeQty(-1)" id="qty-minus">−</button>
+                  <input type="number" class="qty-input" id="qty-input" value="1" min="1" max="1000" oninput="refreshBomPreview()">
+                  <button class="qty-btn" onclick="changeQty(1)">+</button>
+                </div>
                 <span class="qty-suffix">шт.</span>
               </div>
             </div>

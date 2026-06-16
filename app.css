@@ -2233,24 +2233,35 @@
 
   .qty-stepper {
     display: flex; align-items: center; justify-content: center;
-    gap: 16px; padding: 8px 0;
+    gap: 12px; padding: 8px 0;
+  }
+  /* v2.45.335: единый сегментированный контрол − [N] + вместо трёх отдельных кнопок */
+  .qty-control {
+    display: inline-flex; align-items: stretch;
+    border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; background: white;
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.05);
   }
   .qty-btn {
-    width: 44px; height: 44px;
-    background: white; border: 1px solid var(--border);
-    border-radius: 10px; font-size: 22px; font-weight: 600;
+    width: 48px; height: 48px;
+    background: white; border: none;
+    font-size: 22px; font-weight: 600;
     color: var(--brand); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s;
   }
+  .qty-btn:first-child { border-right: 1px solid var(--border); }
+  .qty-btn:last-child { border-left: 1px solid var(--border); }
   .qty-btn:hover { background: var(--brand-bg); }
-  .qty-btn:disabled { color: var(--text-faint); cursor: not-allowed; }
+  .qty-btn:active { background: var(--brand-bg-strong); }
+  .qty-btn:disabled { color: var(--text-faint); cursor: not-allowed; background: white; }
   .qty-input {
-    width: 80px; height: 44px;
+    width: 70px; height: 48px;
     text-align: center; font-size: 22px; font-weight: 600;
-    border: 1px solid var(--border); border-radius: 10px;
+    border: none; border-radius: 0;
     color: var(--text-dark); background: white; outline: none;
   }
-  .qty-input:focus { border-color: var(--brand); }
+  .qty-input:focus { box-shadow: inset 0 -2px 0 var(--brand); }
   .qty-suffix { font-size: 14px; color: var(--text-light); }
 
   .worker-row {
@@ -7220,20 +7231,25 @@
   }
   .dest-option {
     background: white; border: 1.5px solid var(--border);
-    border-radius: 10px; padding: 12px 14px;
+    border-radius: 12px; padding: 13px 14px;
     cursor: pointer;
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 12px;
     text-align: left;
-    transition: all 0.1s;
+    transition: all 0.12s;
     min-width: 0;   /* v2.45.172: даём grid-колонкам сжиматься, иначе вторая плашка уезжала за край */
   }
+  .dest-option:active { transform: scale(0.99); }
   /* v2.45.172: на телефоне «На склад / Под договор» — в столбик, на всю ширину
      (раньше вторая плашка обрезалась справа) */
   .app.mobile-layout .dest-choice { grid-template-columns: 1fr; }
   .dest-option:hover { background: var(--bg); }
+  /* v2.45.335: иконка в аккуратной плитке */
   .dest-option > i:first-child {
-    font-size: 22px; color: var(--text-mid);
-    flex-shrink: 0;
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--bg); color: var(--text-mid);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+    transition: background 0.12s, color 0.12s;
   }
   .dest-option .do-body { flex: 1; min-width: 0; }
   .dest-option .do-title {
@@ -7243,9 +7259,11 @@
     font-size: 11.5px; color: var(--text-light); margin-top: 2px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  /* v2.45.335: галочка выбора — залитый кружок */
   .dest-option .do-check {
-    color: var(--brand); font-size: 18px;
-    display: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--brand); color: #fff; font-size: 14px;
+    display: none; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
   .dest-option.selected {
@@ -7254,6 +7272,7 @@
   }
   .dest-option.selected > i:first-child,
   .dest-option.selected .do-title { color: var(--brand); font-weight: 600; }
+  .dest-option.selected > i:first-child { background: #fff; }
   .dest-option.selected .do-check { display: inline-flex; }
 
   /* Выбранный договор показывается под кнопками */
@@ -7587,7 +7606,7 @@
     font-size: 14px; font-weight: 600; color: var(--text);
     margin-bottom: 4px;
   }
-  .bom-critical { color: #F57C00; margin-left: 4px; font-size: 13px; }
+  .bom-critical { color: #E0A020; margin-left: 5px; font-size: 11px; }
   .bom-meta { font-size: 12px; color: var(--text-light); }
   .bom-qty, .bom-stock { text-align: center; line-height: 1.2; }
   .bom-qty-num { font-size: 16px; font-weight: 700; color: var(--text); }
@@ -8099,32 +8118,35 @@
   }
 
   /* Предпросмотр автосписания в форме сборки */
+  /* v2.45.335: белая карточка со строками-разделителями вместо плотного серого блока */
   .bom-preview-block {
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 10px; padding: 10px 14px;
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; padding: 0; overflow: hidden;
   }
   .bom-preview-alert {
     background: #FFEDED; color: #C62828;
     border-left: 3px solid #C62828;
     padding: 10px 12px; border-radius: 6px;
-    margin-bottom: 10px; font-size: 13px; font-weight: 500;
+    margin: 10px; font-size: 13px; font-weight: 500;
   }
   .bom-preview-warn {
     background: #FFF8E1; color: #B26A00;
     border-left: 3px solid #F57C00;
     padding: 10px 12px; border-radius: 6px;
-    margin-bottom: 10px; font-size: 13px;
+    margin: 10px; font-size: 13px;
   }
   .bom-preview-row {
-    display: flex; justify-content: space-between;
-    padding: 6px 8px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 14px;
     font-size: 13px;
+    border-left: 3px solid transparent;
   }
-  .bom-preview-row.shortage-critical { background: #FFE5E5; color: #C62828; }
-  .bom-preview-row.shortage-warn { background: #FFF4E5; color: #B26A00; }
-  .bom-preview-name { flex: 1; }
-  .bom-preview-qty { font-variant-numeric: tabular-nums; }
-  .bom-preview-stock { color: var(--text-light); font-size: 11px; }
+  .bom-preview-row + .bom-preview-row { border-top: 1px solid var(--border); }
+  .bom-preview-row.shortage-critical { background: #FDF1F1; border-left-color: #D64545; color: var(--text-dark); }
+  .bom-preview-row.shortage-warn { background: #FFF8EE; border-left-color: #E69A1F; color: var(--text-dark); }
+  .bom-preview-name { flex: 1; min-width: 0; color: var(--text-dark); }
+  .bom-preview-qty { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--text-dark); }
+  .bom-preview-stock { color: var(--text-light); font-size: 11.5px; }
   .bom-relink-btn {
     display: inline-flex; align-items: center; gap: 4px;
     margin-top: 4px; padding: 3px 8px;
@@ -10104,30 +10126,36 @@
   .work-type-pill {
     border: 1.5px solid var(--border);
     background: white;
-    padding: 10px 12px;
-    border-radius: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-mid);
     text-align: center;
-    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.1s;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 7px;
   }
   .work-type-pill:hover {
-    border-color: var(--brand);
+    border-color: var(--brand-light);
+    background: var(--bg);
     color: var(--brand);
   }
+  .work-type-pill:hover i { color: var(--brand); }
+  .work-type-pill:active { transform: scale(0.97); }
   .work-type-pill.active {
     background: var(--brand-bg);
     border-color: var(--brand);
     color: var(--brand);
-    box-shadow: 0 1px 3px rgba(44, 82, 130, 0.1);
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(44, 82, 130, 0.12);
   }
-  .work-type-pill i { font-size: 16px; }
+  /* v2.45.335: неактивные иконки приглушены — активная выделяется заметнее */
+  .work-type-pill i { font-size: 16px; color: var(--text-light); transition: color 0.15s; }
+  .work-type-pill.active i { color: var(--brand); }
 
   /* Бейдж типа работы в карточке/списке */
   .work-type-badge {
