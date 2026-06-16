@@ -755,11 +755,30 @@ function renderCanvas(){
   /* провода */
   var h='';
   var _bus=_mainBus();
+  // мостики на пересечениях: горизонтальный провод перескакивает дугой вертикальный
+  var _verts=[];
+  S.wires.forEach(function(w){ for(var i=0;i<w.pts.length-1;i++){ var a=w.pts[i],b=w.pts[i+1]; if(a.x===b.x&&a.y!==b.y)_verts.push({x:a.x,y0:Math.min(a.y,b.y),y1:Math.max(a.y,b.y),wid:w.id}); } });
+  var _jset={}; junctions().forEach(function(j){_jset[Math.round(j.x)+'_'+Math.round(j.y)]=1;});
+  function _hopD(w){
+    var pts=w.pts, d='M'+pts[0].x+' '+pts[0].y, r=20;
+    for(var i=1;i<pts.length;i++){
+      var a=pts[i-1], b=pts[i];
+      if(a.y===b.y && a.x!==b.x){
+        var y=a.y, x0=Math.min(a.x,b.x), x1=Math.max(a.x,b.x), dir=(b.x>a.x)?1:-1, sweep=dir>0?0:1, xs=[];
+        _verts.forEach(function(v){ if(v.wid===w.id)return; if(v.x>x0+2&&v.x<x1-2&&y>v.y0+2&&y<v.y1-2&&!_jset[Math.round(v.x)+'_'+Math.round(y)])xs.push(v.x); });
+        xs.sort(function(p,q){return dir*(p-q);});
+        xs.forEach(function(cx){ d+=' L'+(cx-dir*r)+' '+y+' A'+r+' '+r+' 0 0 '+sweep+' '+(cx+dir*r)+' '+y; });
+        d+=' L'+b.x+' '+b.y;
+      } else { d+=' L'+b.x+' '+b.y; }
+    }
+    return d;
+  }
   S.wires.forEach(function(w){
     var sel=S.sel&&S.sel.t==='w'&&S.sel.id===w.id;
-    var d=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' ');
+    var dHit=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' ');
+    var d=_hopD(w);
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+(sel?CY:INK)+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
-    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>';
+    h+='<path data-w="'+w.id+'" d="'+dHit+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>';
     // подпись сечения кабеля (мм²) — один раз на отводе от шины (или у выбранного провода),
     // чтобы не засорять схему повторами на каждом сегменте.
     var _sec=wireSection(w);
