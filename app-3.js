@@ -5517,9 +5517,20 @@ function renderSupplyShopping(d) {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
     const itemRows = (g.items || []).map(it => {
-      const reasonBadge = it.reason
+      // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
+      const planContracts = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
+      let reasonBadge = it.reason
         ? '<span class="sup-shop-reason">' + escapeHtml(it.reason) + '</span>'
         : '';
+      if (planContracts.length) {
+        const shown = planContracts.slice(0, 3).map(n => '№' + n).join(', ');
+        const more = planContracts.length > 3 ? ' +' + (planContracts.length - 3) : '';
+        reasonBadge += '<div style="font-size:11px;color:#0C4A6E;margin-top:3px;font-weight:600;" title="Нужно для этих договоров">' +
+          '<i class="ti ti-briefcase" style="font-size:11px;vertical-align:-1px;"></i> под проект: ' + escapeHtml(shown) + more + '</div>';
+      } else if (it.reason && it.reason.indexOf('низкий остаток') !== -1) {
+        reasonBadge += '<div style="font-size:11px;color:var(--text-light);margin-top:3px;" title="Пополнение склада до минимума">' +
+          '<i class="ti ti-building-warehouse" style="font-size:11px;vertical-align:-1px;"></i> на склад</div>';
+      }
       // v2.45.274: живой статус заказа по этой позиции (счёт запрошен / оплачен …)
       let orderBadge = '';
       if (it.order_status && typeof _CP_ORDER_STATUS_RU !== 'undefined') {
