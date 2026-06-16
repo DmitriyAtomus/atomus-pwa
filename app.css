@@ -12126,6 +12126,41 @@
   }
   .ns-hint i { color: var(--brand); font-size: 14px; }
 
+  /* ============ v2.45.340: «Что закупить» — единые бейджи, светлые шапки групп, аккуратные строки ============ */
+  .ssp-reason-wrap { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .sup-shop-reason { background: #EEF2F7; color: var(--text-mid); padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .ssp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .ssp-badge i { font-size: 12px; }
+  .ssp-badge-proj { color: #0C4A6E; background: #E0F2FE; }
+  .ssp-badge-stock { color: var(--text-light); background: var(--bg); font-weight: 500; }
+  .sup-shop-group { border-radius: 14px; margin-bottom: 16px; }
+  .sup-shop-group-head { background: #F4F8FE; border-bottom-color: var(--border); padding: 13px 16px; }
+  .sup-shop-group.no-supplier .sup-shop-group-head { background: #FFF6EA; border-bottom-color: #F6D9A8; }
+  .sup-shop-group-name { font-size: 15px; color: var(--text-dark); gap: 10px; }
+  .sup-shop-group-name > i:first-child { width: 30px; height: 30px; border-radius: 9px; background: var(--brand-bg); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 17px; }
+  .sup-shop-group.no-supplier .sup-shop-group-name { color: #92400E; }
+  .sup-shop-group.no-supplier .sup-shop-group-name > i:first-child { background: #FCEBD2; color: #B45309; }
+  .sup-shop-group-count { background: var(--brand-bg); color: var(--brand); box-shadow: none; border: 1px solid #D4E3F3; }
+  .sup-shop-group.no-supplier .sup-shop-group-count { background: #FCEBD2; color: #B45309; border-color: #F6D9A8; }
+  .sup-shop-group-contact { padding: 8px 16px; gap: 16px; }
+  .sup-shop-table th { padding: 9px 16px; }
+  .sup-shop-table td { padding: 11px 16px; }
+  .sup-shop-table tbody tr:hover { background: var(--brand-bg); }
+  .ssp-name { font-weight: 500; color: var(--text-dark); }
+  .ns-hint { background: #FFF6EA; color: #92400E; border-bottom-color: #F6D9A8; }
+  .ns-hint i { color: #D97706; }
+
+  /* v2.45.341: «Что закупить» — статусы-пилюли, чип «заказать», низкий остаток янтарём, блок договорных закупок */
+  .ssp-qty-chip { display: inline-flex; align-items: center; gap: 3px; padding: 4px 9px; border: 1px solid var(--border); background: #fff; border-radius: 8px; font-weight: 600; transition: border-color 0.12s; }
+  .ssp-qty-edit:hover .ssp-qty-chip { border-color: var(--brand); }
+  .ssp-qty-edit.is-overridden { background: transparent; box-shadow: none; }
+  .ssp-qty-edit.is-overridden .ssp-qty-chip { border-color: #F59E0B; background: #FFF7ED; color: #B45309; }
+  .sup-shop-reason.is-warn { background: #FEF3C7; color: #92400E; }
+  .cp-block { border-left: 3px solid #B45309; }
+  .cp-block .sup-shop-group-head { background: #FFF6EA; border-bottom-color: #F6D9A8; }
+  .cp-block .sup-shop-group-name { color: #92400E; }
+  .cp-block .sup-shop-group-name > i:first-child { background: #FCEBD2; color: #B45309; }
+
   /* v2.44.31: чипы выбранных целевых моделей для ТЭНа */
   .cf-tm-chip {
     display: inline-flex; align-items: center; gap: 6px;

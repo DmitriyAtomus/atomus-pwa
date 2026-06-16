@@ -5235,12 +5235,12 @@ function _cpRowHtml(it) {
     const label = st ? st[0] : 'Заказано';
     const fg = st ? st[1] : '#78350F';
     const bg = st ? st[2] : '#FEF3C7';
-    stBadge = '<span style="font-size:11px;font-weight:700;color:' + fg + ';background:' + bg + ';padding:1px 8px;border-radius:6px;white-space:nowrap;" ' +
+    stBadge = '<span class="ssp-badge" style="color:' + fg + ';background:' + bg + ';" ' +
       'title="' + escapeHtml((it.order_label ? 'Заказ ' + it.order_label + ' · ' : '') + 'статус обновляется по заказу в «Заказах»') + '">' +
       escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') +
     '</span>';
   } else {
-    stBadge = '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">К заказу</span>';
+    stBadge = '<span class="ssp-badge" style="color:#7F1D1D;background:#FEE2E2;">К заказу</span>';
   }
   return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
     '<input type="checkbox" class="cp-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
@@ -5293,9 +5293,9 @@ function _contractPurchasesBlockHtml(items) {
     if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
     bySup[k].items.push(it);
   });
-  let h = '<div class="sup-shop-group" style="border-left:3px solid #B45309;">' +
+  let h = '<div class="sup-shop-group cp-block">' +
     '<div class="sup-shop-group-head">' +
-      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart" style="color:#B45309;"></i> Покупные позиции по договорам' +
+      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart"></i> Покупные позиции по договорам' +
         '<span class="sup-shop-group-count">' + items.length + ' ' + (items.length === 1 ? 'позиция' : (items.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
       '</div>' +
       '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
@@ -5520,24 +5520,23 @@ function renderSupplyShopping(d) {
       // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
       const planContracts = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
       let reasonBadge = it.reason
-        ? '<span class="sup-shop-reason">' + escapeHtml(it.reason) + '</span>'
+        ? '<span class="sup-shop-reason' + (it.reason.indexOf('низкий остаток') !== -1 ? ' is-warn' : '') + '">' + escapeHtml(it.reason) + '</span>'
         : '';
       if (planContracts.length) {
         const shown = planContracts.slice(0, 3).map(n => '№' + n).join(', ');
         const more = planContracts.length > 3 ? ' +' + (planContracts.length - 3) : '';
-        reasonBadge += '<div style="font-size:11px;color:#0C4A6E;margin-top:3px;font-weight:600;" title="Нужно для этих договоров">' +
-          '<i class="ti ti-briefcase" style="font-size:11px;vertical-align:-1px;"></i> под проект: ' + escapeHtml(shown) + more + '</div>';
+        reasonBadge += '<span class="ssp-badge ssp-badge-proj" title="Нужно для этих договоров">' +
+          '<i class="ti ti-briefcase"></i> под проект: ' + escapeHtml(shown) + more + '</span>';
       } else if (it.reason && it.reason.indexOf('низкий остаток') !== -1) {
-        reasonBadge += '<div style="font-size:11px;color:var(--text-light);margin-top:3px;" title="Пополнение склада до минимума">' +
-          '<i class="ti ti-building-warehouse" style="font-size:11px;vertical-align:-1px;"></i> на склад</div>';
+        reasonBadge += '<span class="ssp-badge ssp-badge-stock" title="Пополнение склада до минимума">' +
+          '<i class="ti ti-building-warehouse"></i> на склад</span>';
       }
       // v2.45.274: живой статус заказа по этой позиции (счёт запрошен / оплачен …)
       let orderBadge = '';
       if (it.order_status && typeof _CP_ORDER_STATUS_RU !== 'undefined') {
         const s = _CP_ORDER_STATUS_RU[it.order_status];
         if (s) {
-          orderBadge = '<span style="font-size:11px;font-weight:700;color:' + s[1] + ';background:' + s[2] + ';' +
-            'padding:1px 8px;border-radius:6px;white-space:nowrap;margin-left:6px;" ' +
+          orderBadge = '<span class="ssp-badge" style="color:' + s[1] + ';background:' + s[2] + ';" ' +
             'title="Статус обновляется по заказу в «Заказах»">' +
             escapeHtml(s[0]) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') +
           '</span>';
@@ -5567,8 +5566,10 @@ function renderSupplyShopping(d) {
         '<td class="ssp-qty ssp-qty-edit' + (qtyOverridden ? ' is-overridden' : '') + '" ' +
             'onclick="shopEditQty(' + it.component_id + ', ' + Number(it.recommended_qty) + ', ' + JSON.stringify(it.unit || 'шт.').replace(/"/g, '&quot;') + ')" ' +
             'title="' + (qtyOverridden ? 'Изменено вручную · ' : '') + 'Тап чтобы изменить количество">' +
-          escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
-          ' <i class="ti ti-pencil ssp-qty-pencil"></i>' +
+          '<span class="ssp-qty-chip">' +
+            escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') +
+            ' <i class="ti ti-pencil ssp-qty-pencil"></i>' +
+          '</span>' +
         '</td>';
       const removeCell =
         '<td class="ssp-remove-cell">' +
@@ -5594,7 +5595,7 @@ function renderSupplyShopping(d) {
           escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
         '</td>' +
         qtyCell +
-        '<td class="ssp-reason-cell">' + reasonBadge + orderBadge + '</td>' +
+        '<td class="ssp-reason-cell"><div class="ssp-reason-wrap">' + reasonBadge + orderBadge + '</div></td>' +
         assignCell +
         removeCell +
       '</tr>';
@@ -10477,13 +10478,22 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.45.340',
+    version: 'v2.45.342',
     date: '16.06.2026',
     title: 'Атом Электрика — сохранение проектов',
     features: [
       'В мастере «Атом Электрика» проект теперь сохраняется на сервере по кнопке «⭱ Сохранить»',
       'Новая кнопка «📂 Мои проекты» — общая библиотека щитов, доступная всем сотрудникам с любого устройства: любой проект можно открыть заново или удалить',
       'Если нет связи — проект сохранится локально, чтобы работа не потерялась; есть импорт/экспорт через файл (.json)',
+    ],
+  },
+  {
+    version: 'v2.45.341',
+    date: '16.06.2026',
+    title: 'Что закупить — статусы заказа едиными пилюлями',
+    features: [
+      'Статусы заказа в «Что закупить» показаны едиными пилюлями, добавлен чип «заказать»',
+      'Блок договорных закупок приведён к единому стилю',
     ],
   },
   {
