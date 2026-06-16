@@ -91,7 +91,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
 <div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
 <div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются на сервере — общая библиотека, доступна всем сотрудникам с любого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
-<input type="file" id="dsFile" accept=".pdf,image/*" style="display:none">
+<input type="file" id="dsFile" accept=".pdf,image/*" multiple style="display:none">
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 
@@ -486,34 +486,47 @@ function delLibrary(id,name){
 $('libClose').onclick=function(){$('libMask').classList.remove('show')};
 $('libImport').onclick=function(){$('fileIn').click()};
 
-/* ---- распознавание даташита контроллера (ИИ читает PDF/фото) ---- */
-var dsLast=null;
+/* ---- распознавание даташита контроллера (ИИ читает PDF/фото, можно несколько страниц) ---- */
+var dsLast=null, dsFiles=[];
+function dsIdle(){
+  $('dsBody').innerHTML='<div class="empty" style="padding:6px 2px">Поддерживаются PDF и фото (JPG/PNG). Можно выбрать сразу несколько страниц. До 16 МБ на файл.</div>';
+  $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать файл(ы)';
+  $('dsPickBtn').onclick=function(){$('dsFile').click()};
+}
 function openDatasheet(){
-  dsLast=null;
+  dsLast=null;dsFiles=[];
   if(!srvOn()){
     $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px">Распознавание работает внутри CRM (нужна авторизация). Открой мастер через приложение Atomus.</div>';
     $('dsPickBtn').style.display='none';
   }else{
-    $('dsBody').innerHTML='<div class="empty" style="padding:6px 2px">Поддерживаются PDF и фото (JPG/PNG), до 16 МБ.</div>';
-    $('dsPickBtn').style.display='';$('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать файл';
-    $('dsPickBtn').onclick=function(){$('dsFile').click()};
+    $('dsPickBtn').style.display='';dsIdle();
   }
   $('dsMask').classList.add('show');
 }
 $('dsClose').onclick=function(){$('dsMask').classList.remove('show')};
-$('dsFile').onchange=function(e){var f=e.target.files[0];e.target.value='';if(f)recognizeDatasheet(f)};
-async function recognizeDatasheet(f){
-  $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px">⏳ Распознаю «'+esc(f.name)+'»… 10–30 сек.</div>';
+/* выбор файлов: докидываем к уже выбранным и перераспознаём весь набор */
+$('dsFile').onchange=function(e){
+  var fs=Array.prototype.slice.call(e.target.files||[]);e.target.value='';
+  if(!fs.length)return;
+  fs.forEach(function(f){dsFiles.push(f)});
+  if(dsFiles.length>8)dsFiles=dsFiles.slice(-8);
+  recognizeDatasheet();
+};
+function dsAddPage(){$('dsFile').click()}
+async function recognizeDatasheet(){
+  if(!dsFiles.length)return;
+  $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px">⏳ Распознаю '+dsFiles.length+(dsFiles.length>1?' стр.':' файл')+'… 10–30 сек.</div>';
   $('dsPickBtn').disabled=true;
   try{
-    var fd=new FormData();fd.append('file',f,f.name);
+    var fd=new FormData();dsFiles.forEach(function(f){fd.append('file',f,f.name)});
     var r=await fetch(ATOMCAD_API+'/api/atomcad/recognize-datasheet',{method:'POST',headers:{'Authorization':'Bearer '+tok()},body:fd});
     var d=null;try{d=await r.json();}catch(_){}
     if(!r.ok||!d||!d.ok)throw new Error((d&&(d.message||d.error))||('HTTP '+r.status));
     dsLast=d.data||{};renderDatasheet(dsLast);
   }catch(err){
     $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px;color:var(--red)">Не удалось распознать: '+esc(err.message)+'</div>';
-    $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать другой файл';
+    $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать заново';
+    $('dsPickBtn').onclick=function(){dsFiles=[];$('dsFile').click()};
   }
 }
 function renderDatasheet(d){
@@ -521,15 +534,25 @@ function renderDatasheet(d){
   function row(l,v){return (v==null||v==='')?'':'<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--dim);min-width:120px;font-size:12px">'+l+'</span><span style="color:#E7EEF4;font-size:12.5px">'+esc(v)+'</span></div>';}
   var dimStr=(dim.width_mm||'?')+'×'+(dim.height_mm||'?')+(dim.depth_mm?'×'+dim.depth_mm:'')+' мм';
   var ioArr=[];if(io.relays)ioArr.push(io.relays+' реле');if(io.analog_inputs)ioArr.push(io.analog_inputs+' AI');if(io.digital_inputs)ioArr.push(io.digital_inputs+' DI');if(io.analog_outputs)ioArr.push(io.analog_outputs+' AO');
+  var ioComplete=(d.io_complete!==false);
   var h='<div class="card" style="margin-bottom:10px">';
   h+=row('Модель',d.model)+row('Производитель',d.manufacturer);
   h+='<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--dim);min-width:120px;font-size:12px">Габариты</span><span class="mono" style="color:var(--cyan);font-size:13px;font-weight:600">'+esc(dimStr)+'</span></div>';
-  h+=row('Монтаж',d.mounting)+row('Модулей DIN',d.din_modules)+row('Степень защиты',d.ip_rating)+row('Питание',d.supply_voltage)+row('Входы/выходы',ioArr.join(' · '));
+  h+=row('Монтаж',d.mounting)+row('Модулей DIN',d.din_modules)+row('Степень защиты',d.ip_rating)+row('Питание',d.supply_voltage)+row('Входы/выходы',ioArr.join(' · ')+(ioComplete?'':' <span style="color:var(--amber)">(частично)</span>'));
   if(d.notes)h+='<div class="note" style="margin-top:8px">'+esc(d.notes)+'</div>';
   if(d.confidence==='low')h+='<div class="note" style="color:var(--amber);margin-top:6px">⚠ Низкая уверенность — проверь размеры по даташиту.</div>';
-  h+='</div><button class="tb cy" style="width:100%" onclick="applyDatasheet()">✓ Применить — добавить контроллер</button>';
+  h+='</div>';
+  // источники
+  if(dsFiles.length)h+='<div class="note" style="margin:-2px 0 8px">Страниц(ы): '+esc(dsFiles.map(function(f){return f.name}).join(', '))+'</div>';
+  // подсказка о неполном I/O + дозагрузка
+  if(!ioComplete){
+    h+='<div class="card" style="border-color:rgba(255,196,0,.5);background:linear-gradient(180deg,rgba(255,196,0,.06),transparent);margin-bottom:10px"><div style="color:var(--amber);font-size:12.5px">⚠ Входы/выходы прочитаны частично. Добавь страницу «Технические характеристики» (там обычно число AI/DI/AO/реле) — ИИ перечитает весь набор и дополнит состав. Габариты сохранятся.</div>'+
+       '<button class="tb cy" style="width:100%;margin-top:9px" onclick="dsAddPage()">➕ Добавить страницу характеристик</button></div>';
+  }
+  h+='<button class="tb cy" style="width:100%" onclick="applyDatasheet()">✓ Применить — добавить контроллер</button>';
   $('dsBody').innerHTML=h;
-  $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Другой файл';
+  $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='➕ Добавить страницу';
+  $('dsPickBtn').onclick=function(){$('dsFile').click()};
 }
 function ioFromCounts(c){
   var io={pins:{AI:[],DI:[],AO:[],DO:[]},asg:{}},i;
