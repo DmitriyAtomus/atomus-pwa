@@ -18050,3 +18050,64 @@
 .atomcad-screen { padding: 0 !important; }
 .atomcad-frame { display: block; width: 100%; border: 0; background: #0E1217; height: calc(100vh - 60px); }
 .app.mobile-layout .atomcad-frame { height: calc(100vh - 200px); min-height: 360px; }
+/* ============ v2.45.344: утреннее окно мастеру — отметка % готовности ============ */
+.mp-overlay {
+  position: fixed; inset: 0; z-index: 200000;
+  background: linear-gradient(180deg, rgba(14,27,51,.55), rgba(14,27,51,.8));
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 28px 16px; overflow-y: auto;
+}
+.mp-modal {
+  width: 100%; max-width: 380px; background: #fff;
+  border-radius: 22px; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+}
+.mp-head {
+  position: relative; padding: 18px 18px 15px;
+  background: linear-gradient(135deg, #FFE6B8 0%, #FFD08A 45%, #E9A23B 100%);
+}
+.mp-sun {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(255,255,255,.55); display: flex; align-items: center; justify-content: center;
+  color: #B5670C; font-size: 22px; margin-bottom: 9px;
+}
+.mp-h1 { font-size: 19px; font-weight: 800; color: #5C3A04; }
+.mp-date { font-size: 12px; color: #7A5212; margin-top: 2px; font-weight: 600; }
+.mp-lock {
+  position: absolute; top: 16px; right: 14px;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.55); color: #7A5212;
+  font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
+}
+.mp-note {
+  display: flex; gap: 8px; align-items: flex-start; margin: 13px 16px 0;
+  padding: 10px 12px; background: #FFF6EA; border: 1px solid #F6D9A8;
+  border-radius: 12px; font-size: 12px; color: #92400E; line-height: 1.35;
+}
+.mp-note i { color: #D97706; font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+.mp-counter { display: flex; align-items: center; gap: 8px; margin: 12px 16px 2px; font-size: 12px; color: var(--text-light); font-weight: 600; }
+.mp-cbar { flex: 1; height: 6px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.mp-cbar > div { height: 100%; width: 0; background: #15803D; border-radius: 99px; transition: width .2s; }
+.mp-list { max-height: 52vh; overflow-y: auto; }
+.mp-item { padding: 11px 16px 13px; }
+.mp-item + .mp-item { border-top: 1px solid var(--border); }
+.mp-item.is-todo { background: #FFFCF6; }
+.mp-itop { display: flex; align-items: center; gap: 10px; }
+.mp-ic { width: 34px; height: 34px; border-radius: 10px; background: #EEF0FB; color: #4F46E5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; }
+.mp-imain { flex: 1; min-width: 0; }
+.mp-iname { font-size: 13.5px; font-weight: 600; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-isub { font-size: 11.5px; color: var(--text-light); margin-top: 1px; }
+.mp-isub .mp-hot { color: #C2410C; font-weight: 700; }
+.mp-prog { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-left: 44px; }
+.mp-pct { font-size: 15px; font-weight: 800; min-width: 66px; text-align: right; color: var(--text-dark); }
+.mp-item.is-todo .mp-pct { color: #C2410C; }
+.mp-range { flex: 1; -webkit-appearance: none; appearance: none; height: 9px; border-radius: 99px; background: var(--border); outline: none; cursor: pointer; }
+.mp-item.is-todo .mp-range { background: #FCE8C8; box-shadow: inset 0 0 0 1.5px #F0B85A; }
+.mp-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 2.5px solid var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; }
+.mp-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 2.5px solid var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; }
+.mp-foot { padding: 13px 16px 16px; border-top: 1px solid var(--border); }
+.mp-cta { width: 100%; background: #C9CFDA; color: #fff; border: none; border-radius: 13px; padding: 13px; font-size: 14.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: not-allowed; }
+.mp-cta.ready { background: var(--brand); cursor: pointer; }
+.mp-cta.ready:active { transform: scale(.99); }
+.mp-hint { text-align: center; margin-top: 8px; font-size: 11.5px; color: var(--text-light); }
+.mp-hint b { color: #C2410C; }

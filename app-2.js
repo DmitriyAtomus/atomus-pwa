@@ -339,11 +339,16 @@ function renderContractProgressCard(c) {
   // показываем просто прогресс по факту: 0 / есть.
   // Когда добавим расшифровку договора по позициям — посчитаем реальный %.
   const hasAssemblies = qty > 0;
+  // v2.45.358: реальный % из утренней отметки мастера (если есть), иначе условный
+  const realPct = (c.progress_pct != null) ? Math.max(0, Math.min(100, c.progress_pct)) : null;
   let fillCls = 'empty';
   let widthPct = 0;
-  if (hasAssemblies) {
+  if (realPct != null) {
     fillCls = '';
-    widthPct = 50; // условно «в процессе» — без знания плана точнее не показать
+    widthPct = realPct;
+  } else if (hasAssemblies) {
+    fillCls = '';
+    widthPct = 50; // условно «в процессе» — пока мастер не отметил %
   }
 
   const deadlineHtml = c.delivery_date ? formatContractDeadline(c.delivery_date) : '';
@@ -368,7 +373,7 @@ function renderContractProgressCard(c) {
       '<div class="cpc-contractor">' + escapeHtml(c.contractor_name || '—') + '</div>' +
       '<div class="cpc-progress">' +
         '<div class="cpc-bar"><div class="cpc-bar-fill ' + fillCls + '" style="width: ' + widthPct + '%;"></div></div>' +
-        '<span class="cpc-count">' + (hasAssemblies ? '<b>' + qty + '</b> ' + pluralAssemblies(qty) : 'нет сборок') + '</span>' +
+        '<span class="cpc-count">' + (realPct != null ? '<b>' + realPct + '%</b> готово' : (hasAssemblies ? '<b>' + qty + '</b> ' + pluralAssemblies(qty) : 'нет сборок')) + '</span>' +
       '</div>' +
     '</div></div>';
 }

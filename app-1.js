@@ -1127,6 +1127,7 @@ function showApp() {
       _restoreLastView();
       _showWelcomeIfFresh();
       startNotifPolling();  // v2.19.0
+      setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
     })
       .catch(() => logout());
   } else {
@@ -1135,6 +1136,7 @@ function showApp() {
     _restoreLastView();
     _showWelcomeIfFresh();
     startNotifPolling();  // v2.19.0
+    setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
   }
 }
 
