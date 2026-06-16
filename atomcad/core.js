@@ -212,10 +212,9 @@ function buildSchematic(P){
       wires.push(W([cz,800],[cz,950]));
       wires.push(W([cz,1250],[cz,1400]));
     } else { wires.push(W([cz,800],[cz,1400])); }
-    // сам контроллер
-    comps.push(C('A1','box',cz,1400,P.controller.model,'','автоматика щита','Контроллер'));
-    wires.push(W([cz,1700],[cz,1950]));
-    comps.push(C('XA','term',cz,2000,'питание/линии','','контроллер'));
+    // сам контроллер — параметрический блок с выводами (AI/DI слева, AO/DO справа)
+    comps.push({sym:'ctrl',x:cz,y:1400,rot:0,mirror:false,des:'A1',
+      attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:P.controller.io||{}}});
     // датчики над зоной + сигнальная шина
     var sN=1, sxs=[];
     (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ var x=cz+440+(sN-1)*300; comps.push(C('BT'+sN,'ntc',x,820,s.sig,'',s.name)); wires.push(W([x,970],[x,1180])); sxs.push(x); sN++; } });
