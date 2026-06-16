@@ -5525,11 +5525,11 @@ function renderSupplyShopping(d) {
       if (planContracts.length) {
         const shown = planContracts.slice(0, 3).map(n => '№' + n).join(', ');
         const more = planContracts.length > 3 ? ' +' + (planContracts.length - 3) : '';
-        reasonBadge += '<div style="font-size:11px;color:#0C4A6E;margin-top:3px;font-weight:600;" title="Нужно для этих договоров">' +
-          '<i class="ti ti-briefcase" style="font-size:11px;vertical-align:-1px;"></i> под проект: ' + escapeHtml(shown) + more + '</div>';
+        reasonBadge += '<span class="ssp-badge ssp-badge-proj" title="Нужно для этих договоров">' +
+          '<i class="ti ti-briefcase"></i> под проект: ' + escapeHtml(shown) + more + '</span>';
       } else if (it.reason && it.reason.indexOf('низкий остаток') !== -1) {
-        reasonBadge += '<div style="font-size:11px;color:var(--text-light);margin-top:3px;" title="Пополнение склада до минимума">' +
-          '<i class="ti ti-building-warehouse" style="font-size:11px;vertical-align:-1px;"></i> на склад</div>';
+        reasonBadge += '<span class="ssp-badge ssp-badge-stock" title="Пополнение склада до минимума">' +
+          '<i class="ti ti-building-warehouse"></i> на склад</span>';
       }
       // v2.45.274: живой статус заказа по этой позиции (счёт запрошен / оплачен …)
       let orderBadge = '';
@@ -5594,7 +5594,7 @@ function renderSupplyShopping(d) {
           escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
         '</td>' +
         qtyCell +
-        '<td class="ssp-reason-cell">' + reasonBadge + orderBadge + '</td>' +
+        '<td class="ssp-reason-cell"><div class="ssp-reason-wrap">' + reasonBadge + orderBadge + '</div></td>' +
         assignCell +
         removeCell +
       '</tr>';
