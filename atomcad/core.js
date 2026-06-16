@@ -263,6 +263,8 @@ function buildSchematic(P){
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
   }
+  // на схеме — только обозначение; полное название элемента видно по наведению мыши
+  sheets.forEach(function(sh){ sh.comps.forEach(function(c){ c.attrs.short=true; }); });
   return {sheets:sheets, comps:pc, wires:pw, texts:pt};
 }
 
