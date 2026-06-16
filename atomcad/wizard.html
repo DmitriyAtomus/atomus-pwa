@@ -483,6 +483,8 @@ function pAux(){
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Каталог аппаратов — клик добавляет</div><div class="grid g3" style="margin-bottom:14px">';
   AUX_CATALOG.forEach(function(c){h+='<div class="card cardpick" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromCatalog(\''+c.kind+'\')">'+auxSym(c.kind)+'<span style="min-width:0"><span class="cname" style="font-size:12.5px;display:block">'+esc(c.label)+'</span><span class="ccode">'+esc(c.prefix)+'· '+esc(c.model||'вручную')+'</span></span></div>';});
   h+='</div>';
+  h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке <span style="color:var(--dim);font-weight:400">(ИИ определит тип и нарисует УГО)</span></div>';
+  h+='<div class="form"><div class="fld gr"><label>Марка / модель</label><input id="aMark" placeholder="напр. LA167-BDF41, HD-4022.10U, РЭК77/3" onkeydown="if(event.key===\'Enter\')identifyAux()"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" id="aMarkBtn" onclick="identifyAux()">🔎 Найти по марке</button></div></div>';
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Внести вручную</div>';
   h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="aN" placeholder="напр. реле контроля фаз"></div><div class="fld"><label>Тип</label><select id="aT">'+auxKindOptions('other')+'</select></div><div class="fld"><label>Ток, А</label><input id="aA" class="w70" inputmode="decimal" placeholder="0"></div><div class="fld"><label>Кол-во</label><input id="aQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addAux()">+ Добавить</button></div></div>';
   if(!P.aux.length)h+='<div class="empty">Пусто — выбери аппарат из каталога выше.</div>';
@@ -502,6 +504,21 @@ function pAux(){
   });
   return h;}
 function addAuxFromCatalog(kind){var c=auxCat(kind);P.aux.push({id:uid('a'),name:c.label,kind:kind,manu:c.manu||'',model:c.model||'',tag:auxTagFor(kind),a:0,qty:1});P.breakers=null;dirty();draw();toast(c.label+' добавлен');}
+async function identifyAux(){
+  if(!srvOn()){toast('Поиск по марке работает в CRM (нужна авторизация)');return;}
+  var m=($('aMark').value||'').trim();if(!m){toast('Введи марку');return;}
+  var btn=$('aMarkBtn');if(btn){btn.disabled=true;btn.textContent='🔎 Ищу…';}
+  try{
+    var d=await apiReq('POST','/api/atomcad/identify-component',{model:m});
+    var data=d.data||{},kind=data.kind||'other',c=auxCat(kind);
+    P.aux.push({id:uid('a'),name:data.name||m,kind:kind,manu:data.manufacturer||'',model:data.model||m,tag:auxTagFor(kind),a:(+data.current_a||0),qty:1,note:data.notes||''});
+    P.breakers=null;dirty();draw();
+    toast('Определено: '+c.label+(data.confidence==='low'?' (предположительно — проверь)':'')+' → '+P.aux[P.aux.length-1].tag);
+  }catch(err){
+    if($('aMarkBtn')){$('aMarkBtn').disabled=false;$('aMarkBtn').textContent='🔎 Найти по марке';}
+    toast('Не удалось определить: '+err.message);
+  }
+}
 function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наименование');return}var kind=$('aT').value;P.aux.push({id:uid('a'),name:n,kind:kind,a:parseFloat($('aA').value)||0,qty:Math.max(1,parseInt($('aQ').value,10)||1),tag:auxTagFor(kind)});P.breakers=null;dirty();draw()}
 function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});if(editAux===id)editAux=null;dirty();draw()}
 function startEditAux(id){editAux=id;draw()}
