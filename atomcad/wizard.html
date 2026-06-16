@@ -139,11 +139,20 @@ function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clear
 
 /* 1 раздел */
 var SECTIONS=[['ЩУ-001','Камеры созревания',18],['ЩУ-002','Чиллера',13],['ЩУ-003','Холодильное оборудование',8],['ЩУ-004','Приточно-вытяжная вентиляция',7],['ЩУ-005','АСУ',2]];
-function pSection(){var h=H('Шаг 1','Раздел номенклатуры','Схема создаётся в существующем разделе. Номер и шифр подхватятся автоматически.');h+='<div class="grid g2">';SECTIONS.forEach(function(s,i){var on=P.section===s[0];h+='<div class="card cardpick'+(on?' sel':'')+'" onclick="pickSection(\''+s[0]+'\',\''+esc(s[1])+'\')"><div class="ctitle"><span><span class="cname">'+esc(s[1])+'</span><span class="ccode">'+s[0]+'.000</span></span>'+(on?'<span class="chk">✓</span>':'<span class="cnt">'+s[2]+'</span>')+(s[3]?'<button class="del" style="margin-left:8px" onclick="event.stopPropagation();rmSection('+i+')">✕</button>':'')+'</div></div>'});h+='</div>';h+='<div style="margin:12px 0"><button class="tb" onclick="addSection()">+ Добавить раздел</button></div>';h+='<div class="note">Обозначение изделия: <span class="mono" style="color:var(--cyan)">'+P.section+'.'+('00'+P.num).slice(-3)+'.'+P.variant+'</span> · шифр: <span class="mono">АГ.'+P.section+'.'+('00'+P.num).slice(-3)+'/26</span></div>';return h}
+function pad3(n){return ('00'+(n||0)).slice(-3)}
+function pSection(){var h=H('Шаг 1','Раздел номенклатуры','Назови изделие и выбери раздел. Номер в разделе подставится автоматически (следующий свободный), шифр — тоже.');
+  h+='<div class="form"><div class="fld gr"><label>Наименование изделия</label><input id="prjName" value="'+esc(P.name)+'" placeholder="напр. Приточная установка П-1" oninput="setProjName()"></div>'+
+     '<div class="fld"><label>Номер в разделе</label><input id="prjNum" class="w70" inputmode="numeric" value="'+(+P.num||0)+'" oninput="setProjNum()"></div>'+
+     '<div class="fld"><label>Вариант</label><input id="prjVar" class="w70" value="'+esc(P.variant)+'" oninput="setProjVar()"></div></div>';
+  h+='<div class="grid g2">';SECTIONS.forEach(function(s,i){var on=P.section===s[0];h+='<div class="card cardpick'+(on?' sel':'')+'" onclick="pickSection(\''+s[0]+'\',\''+esc(s[1])+'\')"><div class="ctitle"><span><span class="cname">'+esc(s[1])+'</span><span class="ccode">'+s[0]+'.000</span></span>'+(on?'<span class="chk">✓</span>':'<span class="cnt">'+s[2]+'</span>')+(s[3]?'<button class="del" style="margin-left:8px" onclick="event.stopPropagation();rmSection('+i+')">✕</button>':'')+'</div></div>'});h+='</div>';h+='<div style="margin:12px 0"><button class="tb" onclick="addSection()">+ Добавить раздел</button></div>';h+='<div class="note">Раздел: <b style="color:var(--txt)">'+esc(P.sectionName||'')+'</b> · обозначение изделия: <span class="mono" id="prjDes" style="color:var(--cyan)">'+P.section+'.'+pad3(P.num)+'.'+esc(P.variant)+'</span> · шифр: <span class="mono" id="prjCode">АГ.'+P.section+'.'+pad3(P.num)+'/26</span></div>';return h}
+function refreshDes(){var des=$('prjDes'),code=$('prjCode');if(des)des.textContent=P.section+'.'+pad3(P.num)+'.'+P.variant;if(code)code.textContent='АГ.'+P.section+'.'+pad3(P.num)+'/26';}
+function setProjName(){P.name=$('prjName').value;dirty();updTag()}
+function setProjNum(){var v=parseInt($('prjNum').value,10);P.num=isNaN(v)?0:Math.max(0,v);dirty();updTag();refreshDes()}
+function setProjVar(){P.variant=$('prjVar').value||'1';dirty();updTag();refreshDes()}
 function addSection(){var name=prompt('Название нового раздела:');if(!name)return;var max=0;SECTIONS.forEach(function(s){var m=/ЩУ-(\d+)/.exec(s[0]);if(m)max=Math.max(max,+m[1])});var code='ЩУ-'+('00'+(max+1)).slice(-3);SECTIONS.push([code,name,0,true]);dirty();draw();toast('Добавлен раздел '+code)}
 function rmSection(i){if(!SECTIONS[i]||!SECTIONS[i][3])return;var s=SECTIONS[i];ask('Удалить раздел?','Удалить «'+s[1]+'» ('+s[0]+')?',function(){SECTIONS.splice(i,1);draw()})}
-function pickSection(code,name){P.section=code;P.sectionName=name;dirty();draw();updTag()}
-function updTag(){$('projTag').innerHTML=P.section+'.'+('00'+P.num).slice(-3)+' · <b>'+esc(P.name)+'</b>'}
+function pickSection(code,name){P.section=code;P.sectionName=name;var sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec)P.num=(+sec[2]||0)+1;dirty();draw();updTag()}
+function updTag(){$('projTag').innerHTML=P.section+'.'+pad3(P.num)+' · <b>'+esc(P.name)+'</b>'}
 
 /* 2 контроллер + IO */
 var CTRLS=['EVCO c-pro 3 OEM (EPB9OR)','EVCO EV3223N7','ОВЕН ТРМ (типовой)'];
