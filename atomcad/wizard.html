@@ -109,7 +109,7 @@ function ctrlIO(model){
   return {pins:{AI:[{id:'AI1'},{id:'AI2'}],DI:[{id:'DI1',dry:1}],AO:[{id:'AO1'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'}]},asg:{}};
 }
 function newProject(){
-  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:'Холодильная камера созревания',
+  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:'Холодильная камера созревания',nameAuto:true,
     controller:{model:'EVCO c-pro 3 OEM (EPB9OR)', io:ctrlIO('EVCO c-pro 3 OEM (EPB9OR)')},
     consumers:[{id:uid('c'),name:'ККБ Royal Clima ES-E 60HX',phases:3,kw:7,needs:'motor',qty:1},
                {id:uid('c'),name:'ТЭН воздухоохладителя',phases:1,kw:2.43,needs:'heater',qty:2},
@@ -161,7 +161,7 @@ function secEditKey(e,code){if(e.key==='Enter'){e.target.blur()}else if(e.key===
 function commitEditSection(code,val){editSection=null;val=(val||'').trim();var sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec&&val&&val!==sec[1]){renameSection(code,val)}else{draw()}}
 function renameSection(code,val){
   var sec=SECTIONS.filter(function(s){return s[0]===code})[0];if(sec)sec[1]=val;
-  if(P.section===code)P.sectionName=val;
+  if(P.section===code){P.sectionName=val;if(P.nameAuto)P.name=val;}
   setSecOverride(code,val);draw();updTag();
   if(srvOn())apiReq('PATCH','/api/atomcad/sections/'+encodeURIComponent(code),{name:val}).then(function(){toast('Раздел переименован')}).catch(function(err){toast('Не сохранилось на сервере: '+err.message)});
   else toast('Раздел переименован');
@@ -223,7 +223,7 @@ function delDrawing(id){
   });
 }
 function refreshDes(){var des=$('prjDes'),code=$('prjCode');if(des)des.textContent=P.section+'.'+pad3(P.num)+'.'+P.variant;if(code)code.textContent='АГ.'+P.section+'.'+pad3(P.num)+'/26';}
-function setProjName(){P.name=$('prjName').value;dirty();updTag()}
+function setProjName(){P.name=$('prjName').value;P.nameAuto=false;dirty();updTag()}
 function setProjNum(){var v=parseInt($('prjNum').value,10);P.num=isNaN(v)?0:Math.max(0,v);dirty();updTag();refreshDes()}
 function setProjVar(){P.variant=$('prjVar').value||'1';dirty();updTag();refreshDes()}
 function addSection(){
@@ -242,7 +242,7 @@ function rmSection(code){
     else gone();
   });
 }
-function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same)P.num=nextNum(code);expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
+function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same){P.num=nextNum(code);if(P.nameAuto&&s)P.name=s[1];}expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
 function updTag(){$('projTag').innerHTML=P.section+'.'+pad3(P.num)+' · <b>'+esc(P.name)+'</b>'}
 
 /* 2 контроллер + IO */
@@ -569,7 +569,7 @@ async function openLibProject(id){
   var data;
   try{data=await storeGet(id);}catch(err){toast('Не удалось открыть: '+err.message);return;}
   if(!data){toast('Проект не найден');return;}
-  P=data;
+  P=data;P.nameAuto=false;
   if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};
   if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);
   if(srvOn())P.serverId=(+id||id); else if(!P.id)P.id=id;
@@ -687,7 +687,7 @@ function exportFile(){
   document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
   toast('Проект выгружен в файл');
 }
-$('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);P=o;if(!P.id)P.id=uid('prj');if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);$('libMask').classList.remove('show');go(0);updTag();$('saveState').textContent='загружено';toast('Проект загружен из файла');}catch(err){toast('Ошибка чтения файла')}};r.readAsText(f);e.target.value=''};
+$('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);P=o;P.nameAuto=false;if(!P.id)P.id=uid('prj');if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);$('libMask').classList.remove('show');go(0);updTag();$('saveState').textContent='загружено';toast('Проект загружен из файла');}catch(err){toast('Ошибка чтения файла')}};r.readAsText(f);e.target.value=''};
 
 /* ---- передача схемы в редактор ---- */
 function openEditor(){
