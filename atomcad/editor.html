@@ -390,9 +390,12 @@ var SYM={
     pins:[[0,0],[0,150]],
     pr:[L(0,0,0,45),L(0,105,0,150),R(-22,45,44,60),L(-42,118,30,40)]}
 };
-/* параметрический контроллер: выводы AI/DI слева, AO/DO справа, из I/O-карты */
+/* параметрический контроллер: выводы AI/DI слева, AO/DO справа, питание сверху,
+   связь RS-485 (A/B) с сенсорной панелью */
 function ctrlSym(c){
   var io=(c.attrs&&c.attrs.io)||{}, pn=io.pins||{}, asg=io.asg||{};
+  var sv=(c.attrs&&c.attrs.supply)||'';
+  var pl=/24/.test(sv)?['+24V','0V']:/12/.test(sv)?['+12V','0V']:['L','N'];
   var left=[], right=[];
   ['AI','DI'].forEach(function(g){(pn[g]||[]).forEach(function(p){left.push({id:p.id,lab:asg[p.id]||''});});});
   ['AO','DO'].forEach(function(g){(pn[g]||[]).forEach(function(p){right.push({id:p.id,lab:asg[p.id]||''});});});
@@ -411,8 +414,21 @@ function ctrlSym(c){
     pinsArr.push([ex,y]);
   });}
   place(left,-1); place(right,1);
-  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300,-10,hx+stub+300,bodyH+10],
-          lbl:[-hx,-30,'start'], pins:pinsArr, pr:pr};
+  // питание (сверху-слева) — реальные выводы, подключаются от автомата управления
+  var px1=-150, px2=-90;
+  pr.push(L(px1,0,px1,-stub), L(px2,0,px2,-stub));
+  pr.push(T(px1,-stub-14,28,pl[0]), T(px2,-stub-14,28,pl[1]), T(-120,-stub-44,24,'питание'));
+  pinsArr.push([px1,-stub]); pinsArr.push([px2,-stub]);
+  // связь RS-485 (A/B) → сенсорная панель (сверху-справа)
+  var ax=90, bx=150, hy=-stub-210, hh=120, hxl=40, hw=270;
+  pr.push(L(ax,0,ax,-stub), L(bx,0,bx,-stub));
+  pr.push(T(ax,-stub-14,28,'A'), T(bx,-stub-14,28,'B'));
+  pr.push(R(hxl,hy,hw,hh));
+  pr.push(T(hxl+hw/2,hy+46,26,'СЕНСОРНАЯ'), T(hxl+hw/2,hy+82,26,'ПАНЕЛЬ (HMI)'));
+  pr.push(L(ax,-stub,ax,hy+hh), L(bx,-stub,bx,hy+hh));
+  pr.push(T(hxl+hw+62,-stub-96,24,'RS-485'));
+  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, hy-20, hx+stub+360, bodyH+10],
+          lbl:[-hx, bodyH+54, 'start'], pins:pinsArr, pr:pr};
 }
 function symFor(c){ return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
 var PALETTE=[
