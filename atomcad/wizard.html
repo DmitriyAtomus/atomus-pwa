@@ -356,22 +356,59 @@ function editConsField(id,field,val){var c=P.consumers.filter(function(x){return
 }
 
 /* 4 датчики */
-function pSensors(){var h=H('Шаг 4','Датчики и сигналы','Тип сигнала и количество. Лягут на входы контроллера и в сигнальный клеммник.');
-  h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="sN" placeholder="напр. датчик влажности"></div><div class="fld"><label>Сигнал</label><select id="sS"><option>NTC</option><option>Pt1000</option><option>4–20 мА</option><option>0–10 В</option><option>дискретный</option></select></div><div class="fld"><label>Кол-во</label><input id="sQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addSensor()">+ Добавить</button></div></div>';
+var FLDST='background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:8px 9px;color:var(--txt);font-size:13px;font-family:inherit;outline:none';
+var editSensor=null;
+var SENS_SIGS=['NTC','Pt1000','4–20 мА','0–10 В','дискретный'];
+function sigOptions(sel){return SENS_SIGS.map(function(s){return '<option'+(s===sel?' selected':'')+'>'+esc(s)+'</option>'}).join('')}
+function pSensors(){var h=H('Шаг 4','Датчики и сигналы','Тип сигнала и количество. Лягут на входы контроллера и в сигнальный клеммник. Строку можно отредактировать (✎).');
+  h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="sN" placeholder="напр. датчик влажности"></div><div class="fld"><label>Сигнал</label><select id="sS">'+sigOptions('NTC')+'</select></div><div class="fld"><label>Кол-во</label><input id="sQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addSensor()">+ Добавить</button></div></div>';
   if(!P.sensors.length)h+='<div class="empty">Пусто.</div>';
-  P.sensors.forEach(function(s){h+='<div class="row"><span class="body"><span class="nm">'+esc(s.name)+'</span><span class="meta">'+esc(s.sig)+(s.qty>1?(' · ×'+s.qty):'')+'</span></span><span class="pill gr">'+esc(s.sig)+'</span><button class="del" onclick="rmSensor(\''+s.id+'\')">✕</button></div>'});
+  P.sensors.forEach(function(s){
+    if(editSensor===s.id){
+      h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+
+         '<input style="flex:1;min-width:150px;'+FLDST+'" value="'+esc(s.name)+'" onchange="editSensField(\''+s.id+'\',\'name\',this.value)">'+
+         '<select style="'+FLDST+'" onchange="editSensField(\''+s.id+'\',\'sig\',this.value)">'+sigOptions(s.sig)+'</select>'+
+         '<input inputmode="numeric" style="width:56px;'+FLDST+'" value="'+(s.qty||1)+'" title="кол-во" onchange="editSensField(\''+s.id+'\',\'qty\',this.value)">'+
+         '<button class="addbtn" onclick="doneEditSensor()">✓ Готово</button>'+
+         '<button class="del" onclick="rmSensor(\''+s.id+'\')">✕</button></div>';
+    }else{
+      h+='<div class="row"><span class="body"><span class="nm">'+esc(s.name)+'</span><span class="meta">'+esc(s.sig)+(s.qty>1?(' · ×'+s.qty):'')+'</span></span><span class="pill gr">'+esc(s.sig)+'</span><button class="del" title="Изменить" onclick="startEditSensor(\''+s.id+'\')">✎</button><button class="del" onclick="rmSensor(\''+s.id+'\')">✕</button></div>';
+    }
+  });
   return h;}
 function addSensor(){var n=$('sN').value.trim();if(!n){toast('Введи наименование');return}P.sensors.push({id:uid('s'),name:n,sig:$('sS').value,qty:Math.max(1,parseInt($('sQ').value,10)||1)});dirty();draw()}
-function rmSensor(id){P.sensors=P.sensors.filter(function(s){return s.id!==id});dirty();draw()}
+function rmSensor(id){P.sensors=P.sensors.filter(function(s){return s.id!==id});if(editSensor===id)editSensor=null;dirty();draw()}
+function startEditSensor(id){editSensor=id;draw()}
+function doneEditSensor(){editSensor=null;draw()}
+function editSensField(id,f,v){var s=P.sensors.filter(function(x){return x.id===id})[0];if(!s)return;if(f==='name')s.name=v;else if(f==='sig')s.sig=v;else if(f==='qty')s.qty=Math.max(1,parseInt(v,10)||1);dirty();}
 
 /* 5 вспомогательное */
-function pAux(){var h=H('Шаг 5','Вспомогательное оборудование','Внутрищитовое: лампы, реле, вентилятор шкафа, блок питания. Идёт в спецификацию и расчёт управления.');
-  h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="aN" placeholder="напр. вентилятор шкафа"></div><div class="fld"><label>Тип</label><select id="aT"><option value="lamp">лампа</option><option value="ssr">тв. реле SSR</option><option value="fan">вентилятор шкафа</option><option value="psu">блок питания</option><option value="other">прочее</option></select></div><div class="fld"><label>Ток, А</label><input id="aA" class="w70" inputmode="decimal" placeholder="0"></div><div class="fld"><label>Кол-во</label><input id="aQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addAux()">+ Добавить</button></div></div>';
+var editAux=null;
+var AUX_KINDS=[['lamp','лампа'],['ssr','тв. реле SSR'],['fan','вентилятор шкафа'],['psu','блок питания'],['other','прочее']];
+function auxKindLabel(k){var p=AUX_KINDS.filter(function(x){return x[0]===k})[0];return p?p[1]:(k||'')}
+function auxKindOptions(sel){return AUX_KINDS.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===sel?' selected':'')+'>'+esc(x[1])+'</option>'}).join('')}
+function pAux(){var h=H('Шаг 5','Вспомогательное оборудование','Внутрищитовое: лампы, реле, вентилятор шкафа, блок питания. Идёт в спецификацию и расчёт управления. Строку можно отредактировать (✎).');
+  h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="aN" placeholder="напр. вентилятор шкафа"></div><div class="fld"><label>Тип</label><select id="aT">'+auxKindOptions('lamp')+'</select></div><div class="fld"><label>Ток, А</label><input id="aA" class="w70" inputmode="decimal" placeholder="0"></div><div class="fld"><label>Кол-во</label><input id="aQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addAux()">+ Добавить</button></div></div>';
   if(!P.aux.length)h+='<div class="empty">Пусто.</div>';
-  P.aux.forEach(function(a){h+='<div class="row"><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(a.kind)+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>'});
+  P.aux.forEach(function(a){
+    if(editAux===a.id){
+      h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+
+         '<input style="flex:1;min-width:150px;'+FLDST+'" value="'+esc(a.name)+'" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
+         '<select style="'+FLDST+'" onchange="editAuxField(\''+a.id+'\',\'kind\',this.value)">'+auxKindOptions(a.kind)+'</select>'+
+         '<input inputmode="decimal" style="width:64px;'+FLDST+'" value="'+(a.a||'')+'" placeholder="А" title="ток" onchange="editAuxField(\''+a.id+'\',\'a\',this.value)">'+
+         '<input inputmode="numeric" style="width:56px;'+FLDST+'" value="'+(a.qty||1)+'" title="кол-во" onchange="editAuxField(\''+a.id+'\',\'qty\',this.value)">'+
+         '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
+         '<button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+    }else{
+      h+='<div class="row"><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+    }
+  });
   return h;}
 function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наименование');return}P.aux.push({id:uid('a'),name:n,kind:$('aT').value,a:parseFloat($('aA').value)||0,qty:Math.max(1,parseInt($('aQ').value,10)||1)});dirty();draw()}
-function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});dirty();draw()}
+function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});if(editAux===id)editAux=null;dirty();draw()}
+function startEditAux(id){editAux=id;draw()}
+function doneEditAux(){editAux=null;draw()}
+function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='kind')a.kind=v;else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);dirty();}
 
 /* 6 автоматы */
 function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
