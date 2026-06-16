@@ -173,100 +173,91 @@ function _ctrlGeom(io){
   return {left:left,right:right,rows:rows,pitch:pitch,hx:hx,stub:stub,header:header,padB:padB,bodyH:bodyH,
     pinY:function(i){return header+padB/2+i*pitch+pitch/2;}};
 }
+function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
+function _W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
 function buildSchematic(P){
-  var comps=[], wires=[], texts=[], gx=600, busY=800, step=720;
+  var W=_W;
   var hasCtrl = !!(P.controller && P.controller.model);
-  function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
-  function W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
-  // ввод + шина
+
+  // ===================== ЛИСТ 1 · СИЛОВЫЕ ЦЕПИ =====================
+  var pc=[], pw=[], pt=[], gx=600;
   var intro=(P.breakers||[]).filter(function(b){return b.role==='ввод'})[0];
-  comps.push(C('X1','term',gx,360,'ЗНИ 6 мм²','','ввод'));
-  if(intro){ comps.push(C(intro.code,'qf1',gx,460,'NB1-63 '+intro.poles+'P, C'+intro.rate,'CHINT','ввод')); }
-  wires.push(W([gx,360],[gx,460]));
-  wires.push(W([gx,760],[gx,800]));
-  // отходящие — единые уровни: QF y=950, KM y=1450, клеммы y=1950; шаг увеличен под подписи
+  pc.push(C('X1','term',gx,360,'ЗНИ 6 мм²','','ввод'));
+  if(intro){ pc.push(C(intro.code,'qf1',gx,460,'NB1-63 '+intro.poles+'P, C'+intro.rate,'CHINT','ввод')); }
+  pw.push(W([gx,360],[gx,460])); pw.push(W([gx,760],[gx,800]));
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
-  // динамический шаг колонок — чтобы все отходящие линии помещались в ширину
-  // листа (рабочее поле ~ до x=3950). Иначе при многих линиях схема вылезает за лист.
-  var nB=branches.length, maxX=hasCtrl?2500:3850;  // при контроллере правую треть отдаём под автоматику
+  var step=720, nB=branches.length, maxX=3850;
   if(nB>0){ var fit=(maxX-gx)/nB; if(fit<step) step=Math.max(300, Math.floor(fit)); }
   var bx=gx+step, lastX=gx, kmN=1;
   branches.forEach(function(b,i){
     var x=bx+i*step;
     var cons=(P.consumers||[]).filter(function(c){return c.id===b.consumer})[0];
-    // полные имена — редактор сам перенесёт подпись на несколько строк
     var role=(cons?cons.name:b.role);
-    comps.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
-    wires.push(W([x,800],[x,950]));
+    pc.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
+    pw.push(W([x,800],[x,950]));
     if(cons&&needsContactor(cons)){
-      comps.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',cons.name));
-      wires.push(W([x,1250],[x,1450]));
-      wires.push(W([x,1600],[x,1950]));
+      pc.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',cons.name));
+      pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
       kmN++;
-    } else { wires.push(W([x,1250],[x,1950])); }
-    comps.push(C('X'+(i+2),'term',x,2000,'ЗНИ 2,5 мм²','',role));
+    } else { pw.push(W([x,1250],[x,1950])); }
+    pc.push(C('X'+(i+2),'term',x,2000,'ЗНИ 2,5 мм²','',role));
     lastX=x;
   });
-  wires.push(W([gx,800],[Math.max(lastX,bx),800]));
-  texts.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
+  pw.push(W([gx,800],[Math.max(lastX,bx),800]));
+  pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
+  var sheets=[{title:'силовые цепи', comps:pc, wires:pw, texts:pt}];
 
-  // ---- зона автоматики: контроллер + авто-разводка по назначениям I/O ----
+  // ===================== ЛИСТ 2 · ЦЕПИ УПРАВЛЕНИЯ =====================
   if(hasCtrl){
-    var io=P.controller.io||{}, G=_ctrlGeom(io), ctrlY=1400;
-    var cz=Math.max(lastX + G.hx + 820, 3000);
-    texts.push({x:cz-220,y:235,s:38,tx:'АВТОМАТИКА · КОНТРОЛЛЕР'});
-    // карта «потребитель → KMx» (как в силовой части)
+    var ac=[], aw=[], at=[];
+    var io=P.controller.io||{}, G=_ctrlGeom(io), cz=1900, ctrlY=900;
+    at.push({x:300,y:235,s:38,tx:'ЦЕПИ УПРАВЛЕНИЯ · АВТОМАТИКА'});
     var kmByName={}, kmc=1;
     (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; if(!(c.name in kmByName)) kmByName[c.name]='KM'+kmc; kmc+=q; } });
-    // автомат цепей управления + питание контроллера
+    // питание управления (приходит с силового листа) + автомат управления
+    ac.push(C('X0','term',cz,250,'L · N','','питание ← лист 1 (силовая)'));
     var cq=(P.breakers||[]).filter(function(bb){return bb.role==='цепи управления'})[0];
-    wires.push(W([Math.max(lastX,bx),800],[cz,800]));
     if(cq){
-      comps.push(C(cq.code,'qf1',cz,950,'NB1-63 1P, C'+cq.rate,'CHINT','цепи управления'));
-      wires.push(W([cz,800],[cz,950]));
-      wires.push(W([cz,1250],[cz,1200]));
-      wires.push(W([cz-150,1200],[cz,1200]));
-      wires.push(W([cz-150,1200],[cz-150,ctrlY-G.stub]));
-      wires.push(W([cz-90,1200],[cz-90,ctrlY-G.stub]));
-    } else { wires.push(W([cz,800],[cz,ctrlY-G.stub])); }
-    // контроллер (wired=true → подписи назначений показывают подключённые элементы)
+      ac.push(C(cq.code,'qf1',cz,320,'NB1-63 1P, C'+cq.rate,'CHINT','цепи управления'));
+      aw.push(W([cz,250],[cz,320]));
+      aw.push(W([cz,620],[cz,720]));
+      aw.push(W([cz-150,720],[cz,720]));
+      aw.push(W([cz-150,720],[cz-150,ctrlY-G.stub]));
+      aw.push(W([cz-90,720],[cz-90,ctrlY-G.stub]));
+    } else { aw.push(W([cz,250],[cz,ctrlY-G.stub])); }
     var cspec=P.controller.spec||{};
-    comps.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
+    ac.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
       attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:io,supply:cspec.voltage||'',wired:true}});
     var lpx=cz-G.hx-G.stub, rpx=cz+G.hx+G.stub, comX=lpx-560, nX=rpx+560;
     var usedL=[], usedR=[], btN=1;
-    // ВХОДЫ (AI/DI) → датчики слева
     G.left.forEach(function(p,i){
       if(!p.lab)return;
       var py=ctrlY+G.pinY(i), sx=lpx-320, isT=(p.g==='AI');
-      comps.push(C('BT'+btN, isT?'ntc':'term', sx, py, isT?'NTC':'', '', p.lab));
-      wires.push(W([lpx,py],[sx,py]));                       // вывод контроллера ↔ датчик
-      if(isT){ wires.push(W([sx,py+150],[comX,py+150])); usedL.push(py+150); }
-      else   { wires.push(W([sx,py],[comX,py]));           usedL.push(py); }
+      ac.push(C('BT'+btN, isT?'ntc':'term', sx, py, isT?'NTC':'', '', p.lab));
+      aw.push(W([lpx,py],[sx,py]));
+      if(isT){ aw.push(W([sx,py+150],[comX,py+150])); usedL.push(py+150); }
+      else   { aw.push(W([sx,py],[comX,py]));           usedL.push(py); }
       btN++;
     });
-    // ВЫХОДЫ (DO) → катушки контакторов справа; прочие → клемма
     G.right.forEach(function(p,i){
       if(!p.lab)return;
       var py=ctrlY+G.pinY(i), ox=rpx+320, km=kmByName[p.lab];
       if(p.g==='DO' && km){
-        comps.push(C(km,'coil',ox,py,'катушка контактора','',p.lab));
-        wires.push(W([rpx,py],[ox,py]));                    // вывод ↔ верх катушки
-        wires.push(W([ox,py+150],[nX,py+150]));             // низ катушки → N
+        ac.push(C(km,'coil',ox,py,'катушка контактора','',p.lab));
+        aw.push(W([rpx,py],[ox,py])); aw.push(W([ox,py+150],[nX,py+150]));
         usedR.push(py+150);
       } else {
-        comps.push(C('XO'+(i+1),'term',ox,py,'','',p.lab));
-        wires.push(W([rpx,py],[ox,py]));
+        ac.push(C('XO'+(i+1),'term',ox,py,'','',p.lab));
+        aw.push(W([rpx,py],[ox,py]));
       }
     });
-    // вертикальные шины: общий/0В (слева, к датчикам) и N (справа, к катушкам)
-    if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); wires.push(W([comX,l0],[comX,l1])); texts.push({x:comX-30,y:l0-26,s:24,tx:'общий / 0В'}); }
-    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); wires.push(W([nX,r0],[nX,r1])); texts.push({x:nX+24,y:r0-26,s:24,tx:'N'}); }
-    // сигнальные лампы (из аппаратов в шкафу, тип «лампа»)
+    if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); aw.push(W([comX,l0],[comX,l1])); at.push({x:comX-30,y:l0-26,s:24,tx:'общий / 0В'}); }
+    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,tx:'N'}); }
     var hlN=1;
-    (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; comps.push(C(a.tag||('HL'+hlN),'hl',x,420,a.model||'230 В','',a.name)); hlN++; } } });
+    (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
+    sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
   }
-  return {comps:comps, wires:wires, texts:texts};
+  return {sheets:sheets, comps:pc, wires:pw, texts:pt};
 }
 
 g.AtomCore={

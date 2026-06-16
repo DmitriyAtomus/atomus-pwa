@@ -319,7 +319,7 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
     <span>X <span class="hl" id="cx">—</span>  Y <span class="hl" id="cy">—</span> мм</span>
     <span>Сетка 2,5</span>
     <span id="toolName" class="hl">Выбор</span>
-    <span class="r"><span>Лист 1/1 · A3 альбомная</span></span>
+    <span class="r"><span id="sheetNav" style="cursor:pointer;user-select:none">Лист 1/1 · A3 альбомная</span></span>
   </footer>
 </div>
 
@@ -441,7 +441,7 @@ var PALETTE=[
 ];
 
 /* ============ состояние ============ */
-var S={comps:[],wires:[],texts:[],sel:null};
+var S={comps:[],wires:[],texts:[],sel:null,sheets:[],cur:0};
 var view={tx:0,ty:0,s:0.2};
 var tool='select', ghost=null, draft=[], curW={x:0,y:0};
 var U=[],Rd=[];
@@ -1093,12 +1093,13 @@ function buildSheet(){
   h+='<text x="2545" y="2455" font-size="30">Д.В.</text>';
   h+='<text x="3547" y="2480" font-size="52" font-weight="600" text-anchor="middle" font-family="\'IBM Plex Mono\'">АГ.ЩУ-003/26</text>';
   h+='<text x="3547" y="2630" font-size="36" text-anchor="middle">Щит управления ЩУ-003.001.1</text>';
-  h+='<text x="3547" y="2685" font-size="34" text-anchor="middle">холодильной камеры · схема электрическая</text>';
+  var _sub=(S.sheets[S.cur]&&S.sheets[S.cur].subtitle)||'схема электрическая';
+  h+='<text x="3547" y="2685" font-size="34" text-anchor="middle">холодильной камеры · '+esc(_sub)+'</text>';
   h+='<text x="3039" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Лит.</text>';
   h+='<text x="3277" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Лист</text>';
   h+='<text x="3575" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Листов</text>';
-  h+='<text x="3277" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">1</text>';
-  h+='<text x="3575" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">1</text>';
+  h+='<text x="3277" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+((S.cur||0)+1)+'</text>';
+  h+='<text x="3575" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+(S.sheets.length||1)+'</text>';
   h+='<text x="3940" y="2815" font-size="32" font-weight="600" text-anchor="middle">ООО «Атомус</text>';
   h+='<text x="3940" y="2858" font-size="32" font-weight="600" text-anchor="middle">Групп»</text>';
   h+='</g>';
@@ -1571,14 +1572,40 @@ $('catSearch').addEventListener('input',renderCatalog);
   $(id).addEventListener('click',function(e){if(e.target===$(id))closeModal()});
 });
 
+/* ============ листы ============ */
+function _mkSheet(s){
+  return {
+    comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
+    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}})}}),
+    texts:(s.texts||[]).slice(),
+    subtitle:s.subtitle||s.title||''
+  };
+}
+function updateSheetNav(){
+  var el=$('sheetNav'); if(!el)return;
+  var n=S.sheets.length||1, sub=(S.sheets[S.cur]&&S.sheets[S.cur].subtitle)||'';
+  el.textContent='◀ Лист '+((S.cur||0)+1)+'/'+n+(sub?(' · '+sub):'')+' ▶ · A3';
+}
+function gotoSheet(i,noFit){
+  if(!S.sheets.length)return;
+  i=(i+S.sheets.length)%S.sheets.length;
+  S.cur=i; var sh=S.sheets[i];
+  S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.sel=null;
+  U.length=0; Rd.length=0;
+  buildSheet(); updateSheetNav(); renderProps(true); renderAll();
+  if(!noFit)fit();
+}
+
 /* ============ приём схемы из мастера ============ */
 function loadExternal(d){
   if(!d)return;
-  S.comps=(d.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}});
-  S.wires=(d.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}})}});
-  S.texts=d.texts||[]; S.sel=null;
-  renderProps(true); renderAll(); fit();
-  toast('Схема построена из мастера — '+(S.comps.length)+' аппаратов');
+  if(d.sheets&&d.sheets.length){ S.sheets=d.sheets.map(_mkSheet); }
+  else { S.sheets=[_mkSheet(d)]; }
+  S.cur=0;
+  var sh=S.sheets[0]; S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.sel=null;
+  buildSheet(); updateSheetNav(); renderProps(true); renderAll(); fit();
+  var n=S.sheets.reduce(function(a,s){return a+s.comps.length},0);
+  toast('Схема из мастера: '+S.sheets.length+' лист(а), '+n+' аппаратов');
 }
 window.addEventListener('message',function(e){
   if(!e.data)return;
@@ -1590,9 +1617,13 @@ window.addEventListener('message',function(e){
 window.AtomEditorLoad=loadExternal;
 
 /* ============ старт ============ */
-buildSheet();
 buildPalette();
 demo();
+/* demo заполнил S.comps/wires/texts → оборачиваем в единственный лист */
+S.sheets=[{comps:S.comps,wires:S.wires,texts:S.texts,subtitle:'схема электрическая'}]; S.cur=0;
+var _sn=$('sheetNav'); if(_sn)_sn.addEventListener('click',function(){ if(S.sheets.length>1)gotoSheet(S.cur+1); });
+buildSheet();
+updateSheetNav();
 renderProps(true);
 renderAll();
 fit();
