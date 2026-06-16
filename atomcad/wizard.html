@@ -91,6 +91,8 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
 <div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
 <div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются на сервере — общая библиотека, доступна всем сотрудникам с любого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
+<input type="file" id="dsFile" accept=".pdf,image/*" style="display:none">
+<div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="core.js"></script>
@@ -163,7 +165,8 @@ function pController(){
   var h=H('Шаг 2','Контроллер щита','Выбор контроллера и распределение сигналов по входам/выходам. Занять/снять — с подтверждением.');
   h+='<div class="form"><div class="fld gr"><label>Модель контроллера</label><select id="ctrlSel" onchange="setCtrl(this.value)">';
   CTRLS.forEach(function(m){h+='<option'+(P.controller.model===m?' selected':'')+'>'+m+'</option>'});
-  h+='</select></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="toast(\'Загрузи PDF или фото даташита — контроллер распознается и добавится в библиотеку\')">Нет в списке? Загрузить даташит</button></div></div>';
+  h+='</select></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="openDatasheet()">Нет в списке? Загрузить даташит</button></div></div>';
+  if(P.controller.dims&&(P.controller.dims.w||P.controller.dims.h||P.controller.dims.d)){var dm=P.controller.dims;h+='<div class="note" style="margin:-6px 0 12px">📐 Габариты из даташита: <span class="mono" style="color:var(--cyan)">'+(dm.w||'?')+'×'+(dm.h||'?')+(dm.d?'×'+dm.d:'')+' мм</span>'+(P.controller.spec&&P.controller.spec.ip?(' · '+esc(P.controller.spec.ip)):'')+(P.controller.spec&&P.controller.spec.voltage?(' · '+esc(P.controller.spec.voltage)):'')+'</div>';}
   h+='<div class="counts">';['DO','AI','AO','DI'].forEach(function(g){var fr=C.ioFree(io,g),t=C.ioTotal(io,g),pct=t?Math.round((t-fr)/t*100):0;h+='<div class="cc'+(t&&fr===0?' warn':'')+'"><div class="t"><span class="d" style="background:'+COL[g]+'"></span>'+(g==='DO'?'Реле':g==='AI'?'Входы AI':g==='AO'?'Вых. AO':'Входы DI')+'</div><div class="big">'+fr+'<small> / '+t+'</small></div><div class="bar"><i style="width:'+pct+'%;background:'+COL[g]+'"></i></div></div>'});h+='</div>';
   h+='<div class="grid g2"><div>';['DO','AI'].forEach(function(g){h+=ioGroup(g)});h+='</div><div>';['AO','DI'].forEach(function(g){h+=ioGroup(g)});
   h+='<div class="card"><div class="cname" style="margin-bottom:8px">Добавить на контроллер</div>';IOPAL.forEach(function(it,i){h+='<button class="pbtn" onclick="ioAdd(IOPAL['+i+'])"><span>'+it.lbl+'</span><span class="tag '+it.g+'">'+it.tag+'</span></button>'});h+='</div></div></div>';
@@ -482,6 +485,76 @@ function delLibrary(id,name){
 }
 $('libClose').onclick=function(){$('libMask').classList.remove('show')};
 $('libImport').onclick=function(){$('fileIn').click()};
+
+/* ---- распознавание даташита контроллера (ИИ читает PDF/фото) ---- */
+var dsLast=null;
+function openDatasheet(){
+  dsLast=null;
+  if(!srvOn()){
+    $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px">Распознавание работает внутри CRM (нужна авторизация). Открой мастер через приложение Atomus.</div>';
+    $('dsPickBtn').style.display='none';
+  }else{
+    $('dsBody').innerHTML='<div class="empty" style="padding:6px 2px">Поддерживаются PDF и фото (JPG/PNG), до 16 МБ.</div>';
+    $('dsPickBtn').style.display='';$('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать файл';
+    $('dsPickBtn').onclick=function(){$('dsFile').click()};
+  }
+  $('dsMask').classList.add('show');
+}
+$('dsClose').onclick=function(){$('dsMask').classList.remove('show')};
+$('dsFile').onchange=function(e){var f=e.target.files[0];e.target.value='';if(f)recognizeDatasheet(f)};
+async function recognizeDatasheet(f){
+  $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px">⏳ Распознаю «'+esc(f.name)+'»… 10–30 сек.</div>';
+  $('dsPickBtn').disabled=true;
+  try{
+    var fd=new FormData();fd.append('file',f,f.name);
+    var r=await fetch(ATOMCAD_API+'/api/atomcad/recognize-datasheet',{method:'POST',headers:{'Authorization':'Bearer '+tok()},body:fd});
+    var d=null;try{d=await r.json();}catch(_){}
+    if(!r.ok||!d||!d.ok)throw new Error((d&&(d.message||d.error))||('HTTP '+r.status));
+    dsLast=d.data||{};renderDatasheet(dsLast);
+  }catch(err){
+    $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px;color:var(--red)">Не удалось распознать: '+esc(err.message)+'</div>';
+    $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать другой файл';
+  }
+}
+function renderDatasheet(d){
+  var dim=d.dimensions||{},io=d.io||{};
+  function row(l,v){return (v==null||v==='')?'':'<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--dim);min-width:120px;font-size:12px">'+l+'</span><span style="color:#E7EEF4;font-size:12.5px">'+esc(v)+'</span></div>';}
+  var dimStr=(dim.width_mm||'?')+'×'+(dim.height_mm||'?')+(dim.depth_mm?'×'+dim.depth_mm:'')+' мм';
+  var ioArr=[];if(io.relays)ioArr.push(io.relays+' реле');if(io.analog_inputs)ioArr.push(io.analog_inputs+' AI');if(io.digital_inputs)ioArr.push(io.digital_inputs+' DI');if(io.analog_outputs)ioArr.push(io.analog_outputs+' AO');
+  var h='<div class="card" style="margin-bottom:10px">';
+  h+=row('Модель',d.model)+row('Производитель',d.manufacturer);
+  h+='<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--dim);min-width:120px;font-size:12px">Габариты</span><span class="mono" style="color:var(--cyan);font-size:13px;font-weight:600">'+esc(dimStr)+'</span></div>';
+  h+=row('Монтаж',d.mounting)+row('Модулей DIN',d.din_modules)+row('Степень защиты',d.ip_rating)+row('Питание',d.supply_voltage)+row('Входы/выходы',ioArr.join(' · '));
+  if(d.notes)h+='<div class="note" style="margin-top:8px">'+esc(d.notes)+'</div>';
+  if(d.confidence==='low')h+='<div class="note" style="color:var(--amber);margin-top:6px">⚠ Низкая уверенность — проверь размеры по даташиту.</div>';
+  h+='</div><button class="tb cy" style="width:100%" onclick="applyDatasheet()">✓ Применить — добавить контроллер</button>';
+  $('dsBody').innerHTML=h;
+  $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Другой файл';
+}
+function ioFromCounts(c){
+  var io={pins:{AI:[],DI:[],AO:[],DO:[]},asg:{}},i;
+  for(i=1;i<=(+c.analog_inputs||0);i++)io.pins.AI.push({id:'AI'+i});
+  for(i=1;i<=(+c.digital_inputs||0);i++)io.pins.DI.push({id:'DI'+i,dry:1});
+  for(i=1;i<=(+c.analog_outputs||0);i++)io.pins.AO.push({id:'AO'+i});
+  for(i=1;i<=(+c.relays||0);i++)io.pins.DO.push({id:'K'+i});
+  return io;
+}
+function applyDatasheet(){
+  var d=dsLast;if(!d)return;
+  var model=(d.model||'').trim();if(!model){toast('Модель не распознана');return;}
+  var label=((d.manufacturer?d.manufacturer+' ':'')+model).trim();
+  if(CTRLS.indexOf(label)<0)CTRLS.unshift(label);
+  P.controller.model=label;
+  var io=d.io||{};
+  P.controller.io=(io.relays||io.analog_inputs||io.digital_inputs||io.analog_outputs)?ioFromCounts(io):ctrlIO(label);
+  var dim=d.dimensions||{};
+  P.controller.dims={w:dim.width_mm||'',h:dim.height_mm||'',d:dim.depth_mm||''};
+  P.controller.spec={manufacturer:d.manufacturer||'',mounting:d.mounting||'',modules:d.din_modules||null,ip:d.ip_rating||'',voltage:d.supply_voltage||'',notes:d.notes||''};
+  P.breakers=null;
+  $('dsMask').classList.remove('show');
+  dirty();draw();
+  toast('Контроллер «'+label+'» добавлен');
+}
 
 /* ---- файловый экспорт/импорт (запасной вариант) ---- */
 function exportFile(){
