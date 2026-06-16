@@ -7,7 +7,11 @@ var STD=[1,2,3,4,6,10,13,16,20,25,32,40,50,63,80,100,125]; // ряд номин�
 function consumerCurrent(c){
   if(c.a)return +c.a;
   if(!c.kw)return 0;
-  var p=c.phases===3?(Math.sqrt(3)*400*0.85):(230*0.9);
+  var U=c.volt||(c.phases===3?400:230);
+  var p;
+  if(c.phases===3) p=Math.sqrt(3)*U*0.85;        // 3ф AC, cosφ=0.85
+  else if(U>=110)  p=U*0.9;                        // 1ф сетевое AC, cosφ=0.9
+  else             p=U;                            // низковольтное (24/12 В), пост. ток / cosφ≈1
   return +(c.kw*1000/p).toFixed(1);
 }
 function stdRating(I){ for(var i=0;i<STD.length;i++) if(STD[i]>=I) return STD[i]; return STD[STD.length-1]; }

@@ -308,6 +308,12 @@ function tagPrefix(name){var m=(name||'').match(/[A-Za-zА-Яа-яЁё]/);return
 function nextTagNum(pref,exceptId){var max=0;(P.consumers||[]).forEach(function(c){if(exceptId&&c.id===exceptId)return;if(c.tag){var mm=String(c.tag).match(/^(.+?)(\d+)$/);if(mm&&mm[1].toUpperCase()===pref.toUpperCase())max=Math.max(max,+mm[2]);}});return max+1;}
 function tagFor(name,exceptId){var p=tagPrefix(name);return p+nextTagNum(p,exceptId);}
 function suggestTag(){if(cTagManual)return;var t=$('cTag');if(t)t.value=tagFor($('cN').value);}
+/* варианты питания потребителя: код, подпись, фазность, напряжение */
+var SUPPLY=[['400','3ф · 400В',3,400],['230','1ф · 230В',1,230],['24','= 24В',1,24],['12','= 12В',1,12]];
+function supplyVal(c){return String(c.volt||(c.phases===3?400:230));}
+function supplyOptions(sel){return SUPPLY.map(function(s){return '<option value="'+s[0]+'"'+(s[0]===String(sel)?' selected':'')+'>'+s[1]+'</option>'}).join('');}
+function supplyLabel(c){var v=c.volt||(c.phases===3?400:230);if(c.phases===3)return '3ф·400В';if(v<110)return '='+v+'В';return '1ф·230В';}
+function applySupply(c,val){var s=SUPPLY.filter(function(x){return x[0]===String(val)})[0]||SUPPLY[0];c.phases=s[2];c.volt=s[3];}
 function pConsumers(){
   /* проставим обозначения тем, у кого их ещё нет */
   (P.consumers||[]).forEach(function(c){if(!c.tag)c.tag=tagFor(c.name,c.id);});
@@ -317,7 +323,7 @@ function pConsumers(){
   h+='<div class="form">'+
      '<div class="fld gr"><label>Наименование</label><input id="cN" placeholder="напр. насос дренажный" oninput="suggestTag()"></div>'+
      '<div class="fld"><label>Обозн. в схеме</label><input id="cTag" class="w70" placeholder="П1" oninput="cTagManual=true" title="Позиционное обозначение — подставляется по наименованию, можно изменить"></div>'+
-     '<div class="fld"><label>Фазы</label><select id="cP"><option value="3">3ф</option><option value="1">1ф</option></select></div>'+
+     '<div class="fld"><label>Питание</label><select id="cP">'+supplyOptions('400')+'</select></div>'+
      '<div class="fld"><label>Мощн., кВт</label><input id="cKw" class="w90" inputmode="decimal" placeholder="0.0"></div>'+
      '<div class="fld"><label>Кол-во</label><input id="cQ" class="w70" value="1" inputmode="numeric"></div>'+
      '<div class="fld"><label>Тип</label><input id="cT" list="ctypeList" value="двигатель" placeholder="двигатель" style="width:130px"></div>'+
@@ -328,7 +334,7 @@ function pConsumers(){
       h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+
          '<input style="width:62px;'+IST+';font-family:\'IBM Plex Mono\';color:var(--cyan)" value="'+esc(c.tag||'')+'" title="обозначение в схеме" onchange="editConsField(\''+c.id+'\',\'tag\',this.value)">'+
          '<input style="flex:1;min-width:140px;'+IST+'" value="'+esc(c.name)+'" onchange="editConsField(\''+c.id+'\',\'name\',this.value)">'+
-         '<select style="'+IST+'" onchange="editConsField(\''+c.id+'\',\'phases\',this.value)"><option value="3"'+(c.phases===3?' selected':'')+'>3ф</option><option value="1"'+(c.phases===1?' selected':'')+'>1ф</option></select>'+
+         '<select style="'+IST+'" onchange="editConsField(\''+c.id+'\',\'supply\',this.value)">'+supplyOptions(supplyVal(c))+'</select>'+
          '<input inputmode="decimal" style="width:74px;'+IST+'" value="'+(c.kw||'')+'" placeholder="кВт" onchange="editConsField(\''+c.id+'\',\'kw\',this.value)">'+
          '<input inputmode="numeric" style="width:56px;'+IST+'" value="'+(c.qty||1)+'" title="кол-во" onchange="editConsField(\''+c.id+'\',\'qty\',this.value)">'+
          '<input list="ctypeList" style="width:130px;'+IST+'" value="'+esc(labelForNeeds(c.needs,c.typeLabel))+'" onchange="editConsField(\''+c.id+'\',\'type\',this.value)">'+
@@ -336,18 +342,19 @@ function pConsumers(){
          '<button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button>'+
          '</div>';
     }else{
-      h+='<div class="row"><span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:38px;justify-content:center">'+esc(c.tag||'')+'</span><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+c.phases+'ф · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+' · '+esc(labelForNeeds(c.needs,c.typeLabel))+'</span></span><span class="pill cy">'+I+' А</span><button class="del" title="Изменить" onclick="startEditConsumer(\''+c.id+'\')">✎</button><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>';
+      h+='<div class="row"><span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:38px;justify-content:center">'+esc(c.tag||'')+'</span><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+esc(supplyLabel(c))+' · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+' · '+esc(labelForNeeds(c.needs,c.typeLabel))+'</span></span><span class="pill cy">'+I+' А</span><button class="del" title="Изменить" onclick="startEditConsumer(\''+c.id+'\')">✎</button><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>';
     }
   });
   return h;
 }
-function addConsumer(){var n=$('cN').value.trim();if(!n){toast('Введи наименование');return}var tl=($('cT').value||'').trim()||'двигатель';addCtypeCustom(tl);var tag=($('cTag').value||'').trim()||tagFor(n);P.consumers.push({id:uid('c'),name:n,tag:tag,phases:+$('cP').value,kw:parseFloat($('cKw').value)||0,qty:Math.max(1,parseInt($('cQ').value,10)||1),needs:typeNeeds(tl),typeLabel:tl});P.breakers=null;cTagManual=false;dirty();draw()}
+function addConsumer(){var n=$('cN').value.trim();if(!n){toast('Введи наименование');return}var tl=($('cT').value||'').trim()||'двигатель';addCtypeCustom(tl);var tag=($('cTag').value||'').trim()||tagFor(n);var sup=SUPPLY.filter(function(x){return x[0]===$('cP').value})[0]||SUPPLY[0];P.consumers.push({id:uid('c'),name:n,tag:tag,phases:sup[2],volt:sup[3],kw:parseFloat($('cKw').value)||0,qty:Math.max(1,parseInt($('cQ').value,10)||1),needs:typeNeeds(tl),typeLabel:tl});P.breakers=null;cTagManual=false;dirty();draw()}
 function rmConsumer(id){P.consumers=P.consumers.filter(function(c){return c.id!==id});if(editConsumer===id)editConsumer=null;P.breakers=null;dirty();draw()}
 function startEditConsumer(id){editConsumer=id;draw()}
 function doneEditConsumer(){editConsumer=null;draw()}
 function editConsField(id,field,val){var c=P.consumers.filter(function(x){return x.id===id})[0];if(!c)return;
   if(field==='name')c.name=val;
   else if(field==='tag')c.tag=(val||'').trim();
+  else if(field==='supply')applySupply(c,val);
   else if(field==='phases')c.phases=+val;
   else if(field==='kw')c.kw=parseFloat(val)||0;
   else if(field==='qty')c.qty=Math.max(1,parseInt(val,10)||1);
