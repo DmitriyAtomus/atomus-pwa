@@ -295,21 +295,54 @@ function ensureControllers(){
 }
 
 /* 3 потребители */
+var editConsumer=null;
+var CTYPE_PRESETS=[['motor','двигатель'],['heater','ТЭН'],['fan','вентилятор'],['compressor','компрессор'],['pump','насос'],['direct','без контактора']];
+function ctypeCustom(){try{var a=JSON.parse(localStorage.getItem('atomcad_ctypes')||'[]');return Array.isArray(a)?a:[]}catch(_){return []}}
+function addCtypeCustom(label){label=(label||'').trim();if(!label)return;if(CTYPE_PRESETS.some(function(x){return x[1].toLowerCase()===label.toLowerCase()}))return;var a=ctypeCustom();if(a.map(function(s){return s.toLowerCase()}).indexOf(label.toLowerCase())<0){a.push(label);try{localStorage.setItem('atomcad_ctypes',JSON.stringify(a))}catch(_){}}}
+function labelForNeeds(needs,typeLabel){if(typeLabel)return typeLabel;var p=CTYPE_PRESETS.filter(function(x){return x[0]===needs})[0];return p?p[1]:(needs||'');}
+function typeNeeds(label){label=(label||'').trim();var p=CTYPE_PRESETS.filter(function(x){return x[1].toLowerCase()===label.toLowerCase()})[0];if(p)return p[0];if(/без\s*контактор|direct/i.test(label))return 'direct';return 'load';}
+function ctypeDatalist(){var labels=CTYPE_PRESETS.map(function(x){return x[1]});ctypeCustom().forEach(function(l){if(labels.map(function(s){return s.toLowerCase()}).indexOf(l.toLowerCase())<0)labels.push(l)});return '<datalist id="ctypeList">'+labels.map(function(l){return '<option value="'+esc(l)+'">'}).join('')+'</datalist>';}
 function pConsumers(){
-  var h=H('Шаг 3','Потребители','Что питает щит. Указываешь марку, фазы, мощность — ток считается, дальше из него собираются автоматы.');
+  var h=H('Шаг 3','Потребители','Что питает щит. Указываешь марку, фазы, мощность — ток считается, дальше из него собираются автоматы. Тип можно вписать свой; строку можно отредактировать (✎).');
+  var IST='background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:8px 9px;color:var(--txt);font-size:13px;font-family:inherit;outline:none';
+  h+=ctypeDatalist();
   h+='<div class="form">'+
      '<div class="fld gr"><label>Наименование</label><input id="cN" placeholder="напр. насос дренажный"></div>'+
      '<div class="fld"><label>Фазы</label><select id="cP"><option value="3">3ф</option><option value="1">1ф</option></select></div>'+
      '<div class="fld"><label>Мощн., кВт</label><input id="cKw" class="w90" inputmode="decimal" placeholder="0.0"></div>'+
      '<div class="fld"><label>Кол-во</label><input id="cQ" class="w70" value="1" inputmode="numeric"></div>'+
-     '<div class="fld"><label>Тип</label><select id="cT"><option value="motor">двигатель</option><option value="heater">ТЭН</option><option value="fan">вентилятор</option><option value="direct">без контактора</option></select></div>'+
+     '<div class="fld"><label>Тип</label><input id="cT" list="ctypeList" value="двигатель" placeholder="двигатель" style="width:130px"></div>'+
      '<div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addConsumer()">+ Добавить</button></div></div>';
   if(!P.consumers.length)h+='<div class="empty">Пока пусто — добавь потребителей.</div>';
-  P.consumers.forEach(function(c){var I=C.consumerCurrent(c);h+='<div class="row"><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+c.phases+'ф · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+'</span></span><span class="pill cy">'+I+' А</span><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>'});
+  P.consumers.forEach(function(c){var I=C.consumerCurrent(c);
+    if(editConsumer===c.id){
+      h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+
+         '<input style="flex:1;min-width:150px;'+IST+'" value="'+esc(c.name)+'" onchange="editConsField(\''+c.id+'\',\'name\',this.value)">'+
+         '<select style="'+IST+'" onchange="editConsField(\''+c.id+'\',\'phases\',this.value)"><option value="3"'+(c.phases===3?' selected':'')+'>3ф</option><option value="1"'+(c.phases===1?' selected':'')+'>1ф</option></select>'+
+         '<input inputmode="decimal" style="width:74px;'+IST+'" value="'+(c.kw||'')+'" placeholder="кВт" onchange="editConsField(\''+c.id+'\',\'kw\',this.value)">'+
+         '<input inputmode="numeric" style="width:56px;'+IST+'" value="'+(c.qty||1)+'" title="кол-во" onchange="editConsField(\''+c.id+'\',\'qty\',this.value)">'+
+         '<input list="ctypeList" style="width:130px;'+IST+'" value="'+esc(labelForNeeds(c.needs,c.typeLabel))+'" onchange="editConsField(\''+c.id+'\',\'type\',this.value)">'+
+         '<button class="addbtn" onclick="doneEditConsumer()">✓ Готово</button>'+
+         '<button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button>'+
+         '</div>';
+    }else{
+      h+='<div class="row"><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+c.phases+'ф · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+' · '+esc(labelForNeeds(c.needs,c.typeLabel))+'</span></span><span class="pill cy">'+I+' А</span><button class="del" title="Изменить" onclick="startEditConsumer(\''+c.id+'\')">✎</button><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>';
+    }
+  });
   return h;
 }
-function addConsumer(){var n=$('cN').value.trim();if(!n){toast('Введи наименование');return}P.consumers.push({id:uid('c'),name:n,phases:+$('cP').value,kw:parseFloat($('cKw').value)||0,qty:Math.max(1,parseInt($('cQ').value,10)||1),needs:$('cT').value});P.breakers=null;dirty();draw()}
-function rmConsumer(id){P.consumers=P.consumers.filter(function(c){return c.id!==id});P.breakers=null;dirty();draw()}
+function addConsumer(){var n=$('cN').value.trim();if(!n){toast('Введи наименование');return}var tl=($('cT').value||'').trim()||'двигатель';addCtypeCustom(tl);P.consumers.push({id:uid('c'),name:n,phases:+$('cP').value,kw:parseFloat($('cKw').value)||0,qty:Math.max(1,parseInt($('cQ').value,10)||1),needs:typeNeeds(tl),typeLabel:tl});P.breakers=null;dirty();draw()}
+function rmConsumer(id){P.consumers=P.consumers.filter(function(c){return c.id!==id});if(editConsumer===id)editConsumer=null;P.breakers=null;dirty();draw()}
+function startEditConsumer(id){editConsumer=id;draw()}
+function doneEditConsumer(){editConsumer=null;draw()}
+function editConsField(id,field,val){var c=P.consumers.filter(function(x){return x.id===id})[0];if(!c)return;
+  if(field==='name')c.name=val;
+  else if(field==='phases')c.phases=+val;
+  else if(field==='kw')c.kw=parseFloat(val)||0;
+  else if(field==='qty')c.qty=Math.max(1,parseInt(val,10)||1);
+  else if(field==='type'){var tl=(val||'').trim()||'двигатель';c.typeLabel=tl;c.needs=typeNeeds(tl);addCtypeCustom(tl);}
+  P.breakers=null;dirty();
+}
 
 /* 4 датчики */
 function pSensors(){var h=H('Шаг 4','Датчики и сигналы','Тип сигнала и количество. Лягут на входы контроллера и в сигнальный клеммник.');
