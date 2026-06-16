@@ -478,12 +478,18 @@ function auxSym(kind){
   return '<svg viewBox="0 0 104 52" style="width:94px;height:47px;flex:0 0 auto;background:var(--graphite);border:1px solid var(--line);border-radius:7px">'+s+'</svg>';
 }
 function pAux(){
+  ensureApparatus();
   (P.aux||[]).forEach(function(a){if(!a.tag)a.tag=auxTagFor(a.kind||'other',a.id);});
   var h=H('Шаг 5','Аппараты в шкафу','Контакторы, реле, переключатели, лампы и т.д. — выбери из каталога (с обозначением и схемным символом) или внеси вручную. Строку можно отредактировать (✎).');
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Каталог аппаратов — клик добавляет</div><div class="grid g3" style="margin-bottom:14px">';
   AUX_CATALOG.forEach(function(c){h+='<div class="card cardpick" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromCatalog(\''+c.kind+'\')">'+auxSym(c.kind)+'<span style="min-width:0"><span class="cname" style="font-size:12.5px;display:block">'+esc(c.label)+'</span><span class="ccode">'+esc(c.prefix)+'· '+esc(c.model||'вручную')+'</span></span></div>';});
   h+='</div>';
-  h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке <span style="color:var(--dim);font-weight:400">(ИИ определит тип и нарисует УГО)</span></div>';
+  if(APP_LIB.length){
+    h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">📚 Библиотека аппаратов <span style="color:var(--dim);font-weight:400">(найденные/добавленные — клик добавляет)</span></div><div class="grid g3" style="margin-bottom:14px">';
+    APP_LIB.forEach(function(it,idx){h+='<div class="card cardpick sel2" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromSaved('+idx+')">'+auxSym(it.kind||'other')+'<span style="min-width:0;flex:1"><span class="cname" style="font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.label)+'</span><span class="ccode">'+esc(it.model||'')+(it.current_a?(' · '+it.current_a+' А'):'')+'</span></span><span class="del" title="Убрать из библиотеки" onclick="event.stopPropagation();delApparatus('+it.id+')" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span></div>';});
+    h+='</div>';
+  }
+  h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке <span style="color:var(--dim);font-weight:400">(ИИ определит тип и нарисует УГО, сохранится в библиотеку)</span></div>';
   h+='<div class="form"><div class="fld gr"><label>Марка / модель</label><input id="aMark" placeholder="напр. LA167-BDF41, HD-4022.10U, РЭК77/3" onkeydown="if(event.key===\'Enter\')identifyAux()"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" id="aMarkBtn" onclick="identifyAux()">🔎 Найти по марке</button></div></div>';
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Внести вручную</div>';
   h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="aN" placeholder="напр. реле контроля фаз"></div><div class="fld"><label>Тип</label><select id="aT">'+auxKindOptions('other')+'</select></div><div class="fld"><label>Ток, А</label><input id="aA" class="w70" inputmode="decimal" placeholder="0"></div><div class="fld"><label>Кол-во</label><input id="aQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addAux()">+ Добавить</button></div></div>';
@@ -504,6 +510,30 @@ function pAux(){
   });
   return h;}
 function addAuxFromCatalog(kind){var c=auxCat(kind);P.aux.push({id:uid('a'),name:c.label,kind:kind,manu:c.manu||'',model:c.model||'',tag:auxTagFor(kind),a:0,qty:1});P.breakers=null;dirty();draw();toast(c.label+' добавлен');}
+/* библиотека аппаратов в шкафу (общая, серверная) */
+var APP_LIB=[], appCat=null, appCatLoading=false;
+function ensureApparatus(){
+  if(appCat!==null||appCatLoading)return;
+  appCatLoading=true;
+  if(!srvOn()){appCat=true;appCatLoading=false;return;}
+  apiReq('GET','/api/atomcad/apparatus').then(function(r){APP_LIB=r.apparatus||[];appCat=true;appCatLoading=false;if(cur===4)draw();}).catch(function(){appCat=true;appCatLoading=false;});
+}
+function saveApparatus(label,kind,manu,model,a,data){
+  if(!srvOn()||!label)return;
+  apiReq('POST','/api/atomcad/apparatus',{label:label,kind:kind,manufacturer:manu||'',model:model||'',current_a:(a||null),data:data||null}).then(function(res){
+    var item={id:res.id,label:label,kind:kind,manufacturer:manu||'',model:model||'',current_a:a||null};
+    var f=-1;for(var i=0;i<APP_LIB.length;i++)if((APP_LIB[i].label||'')===label){f=i;break;}
+    if(f>=0)APP_LIB[f]=item; else APP_LIB.unshift(item);
+    if(cur===4)draw();
+  }).catch(function(){});
+}
+function addAuxFromSaved(idx){var it=APP_LIB[idx];if(!it)return;var kind=it.kind||'other';P.aux.push({id:uid('a'),name:it.label,kind:kind,manu:it.manufacturer||'',model:it.model||'',tag:auxTagFor(kind),a:(+it.current_a||0),qty:1});P.breakers=null;dirty();draw();toast(it.label+' добавлен');}
+function delApparatus(id){
+  ask('Убрать из библиотеки?','Удалить аппарат из сохранённых? (текущий проект не изменится)',function(){
+    if(srvOn())apiReq('DELETE','/api/atomcad/apparatus/'+id).then(function(){APP_LIB=APP_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}).catch(function(err){toast('Не удалось: '+err.message)});
+    else{APP_LIB=APP_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}
+  });
+}
 async function identifyAux(){
   if(!srvOn()){toast('Поиск по марке работает в CRM (нужна авторизация)');return;}
   var m=($('aMark').value||'').trim();if(!m){toast('Введи марку');return;}
@@ -511,9 +541,11 @@ async function identifyAux(){
   try{
     var d=await apiReq('POST','/api/atomcad/identify-component',{model:m});
     var data=d.data||{},kind=data.kind||'other',c=auxCat(kind);
-    P.aux.push({id:uid('a'),name:data.name||m,kind:kind,manu:data.manufacturer||'',model:data.model||m,tag:auxTagFor(kind),a:(+data.current_a||0),qty:1,note:data.notes||''});
+    var label=data.name||m, manu=data.manufacturer||'', model=data.model||m, a=(+data.current_a||0);
+    P.aux.push({id:uid('a'),name:label,kind:kind,manu:manu,model:model,tag:auxTagFor(kind),a:a,qty:1,note:data.notes||''});
     P.breakers=null;dirty();draw();
     toast('Определено: '+c.label+(data.confidence==='low'?' (предположительно — проверь)':'')+' → '+P.aux[P.aux.length-1].tag);
+    saveApparatus(label,kind,manu,model,a,data);  /* в библиотеку */
   }catch(err){
     if($('aMarkBtn')){$('aMarkBtn').disabled=false;$('aMarkBtn').textContent='🔎 Найти по марке';}
     toast('Не удалось определить: '+err.message);
