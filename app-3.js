@@ -5619,7 +5619,11 @@ function renderSupplyShopping(d) {
                     ? 'onclick="openCreateOrderPreview(' + g.supplier_id + ')" title="Создать заказ и отправить письмо поставщику"'
                     : 'disabled title="У поставщика не указан email — заполни его в карточке поставщика"'
                   ) + '>' +
-                  '<i class="ti ti-mail-send"></i>Сформировать заказ</button>'
+                  '<i class="ti ti-mail-send"></i>Сформировать заказ</button>' +
+                // v2.45.337: оформить вручную — заказ уже сделан/оплачен по телефону, без письма
+                ' <button class="btn btn-secondary btn-sm" onclick="openManualOrderDialog(' + g.supplier_id + ')" ' +
+                  'title="Уже заказал/оплатил по телефону — записать заказ без письма и сразу поставить статус">' +
+                  '<i class="ti ti-clipboard-check"></i>Оформить вручную</button>'
               )
             : '<span style="color:var(--text-light);font-size:12px;">Сначала назначь поставщика — без этого не отправить заказ</span>'
           ) +
@@ -5768,6 +5772,86 @@ async function openCreateOrderPreview(supplierId) {
     return;
   }
   _renderOrderPreviewModal(draft);
+}
+
+// v2.45.337: «Оформить вручную» — заказ оформлен по телефону (счёт запросили/
+// оплатили вне системы). Создаём заказ по позициям группы БЕЗ письма и сразу
+// ставим выбранный статус. Открываем диалог выбора статуса.
+async function openManualOrderDialog(supplierId) {
+  const d = await apiGet('/api/supply/shopping-list');
+  const group = (d.groups || []).find(g => g.supplier_id === supplierId);
+  const visible = group ? _shopApplyLocal(group.items).items : [];
+  if (!group || !visible.length) {
+    showToast('Нет позиций для заказа', 'warning');
+    return;
+  }
+  const opts = [
+    ['awaiting_invoice', 'Счёт запрошен', 'Запросили счёт у поставщика, ещё не оплатили'],
+    ['invoice_received', 'Счёт получен',  'Счёт от поставщика уже на руках'],
+    ['to_pay',           'На оплате',     'Счёт передан на оплату'],
+    ['paid',             'Оплачен',       'Уже оплатили — ждём поставку'],
+  ];
+  const itemsLine = visible.map(it =>
+    escapeHtml(it.component_name) + ' — ' + escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.')
+  ).join('<br>');
+  const m = document.getElementById('supply-modal');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-clipboard-check"></i> Оформить вручную</h3>' +
+        '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div style="font-size:13px;color:var(--text-mid);margin-bottom:6px;">Поставщик: <b>' + escapeHtml(group.supplier_name || '') + '</b></div>' +
+        '<div style="font-size:12px;color:var(--text-light);background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;max-height:120px;overflow:auto;">' + itemsLine + '</div>' +
+        '<div style="font-size:12px;color:var(--text-mid);margin-bottom:8px;">Создадим заказ <b>без письма поставщику</b> и поставим статус:</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;">' +
+          opts.map(o =>
+            '<button class="btn btn-secondary" style="justify-content:flex-start;text-align:left;padding:10px 12px;" ' +
+              'onclick="submitManualOrder(' + supplierId + ', \'' + o[0] + '\')">' +
+              '<span><b>' + escapeHtml(o[1]) + '</b><br>' +
+                '<span style="font-size:11.5px;color:var(--text-light);font-weight:400;">' + escapeHtml(o[2]) + '</span>' +
+              '</span>' +
+            '</button>'
+          ).join('') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+async function submitManualOrder(supplierId, status) {
+  const d = await apiGet('/api/supply/shopping-list');
+  const group = (d.groups || []).find(g => g.supplier_id === supplierId);
+  const visible = group ? _shopApplyLocal(group.items).items : [];
+  if (!group || !visible.length) {
+    showToast('Нет позиций для заказа', 'warning');
+    return;
+  }
+  try {
+    const resp = await fetch(API_BASE + '/api/supply-orders/manual-from-shopping', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        supplier_id: supplierId,
+        status: status,
+        items: visible.map(it => ({ component_id: it.component_id, qty: it.recommended_qty })),
+      }),
+    });
+    const j = await resp.json().catch(() => ({}));
+    if (!resp.ok || !j.ok) {
+      showToast(j.message || 'Не удалось оформить заказ', 'error');
+      return;
+    }
+    closeSupplyModal();
+    showToast('Заказ ' + (j.order_label || ('#' + j.id)) + ' оформлен: ' + (j.status_label || status), 'success');
+    loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 // v2.44.76: проверка DOCX из превью — fetch с авторизацией, открываем blob в новой вкладке
@@ -10392,6 +10476,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.337',
+    date: '16.06.2026',
+    title: '«Что закупить» — кнопка «Оформить вручную» (заказал по телефону)',
+    features: [
+      'На группе поставщика появилась кнопка <b>«Оформить вручную»</b> — для случая, когда счёт <b>запросили и/или оплатили по телефону</b>, минуя письмо из системы',
+      'Создаёт заказ по позициям группы <b>без отправки письма</b> поставщику и сразу ставит выбранный статус: <b>«Счёт запрошен» / «Счёт получен» / «На оплате» / «Оплачен»</b>',
+      'Промежуточные даты этапов проставляются автоматически — в истории заказа видно, что счёт был запрошен и оплачен',
+      'Статус сразу подсвечивается у позиции в «Что закупить» (как и у обычных заказов)',
+    ],
+  },
   {
     version: 'v2.45.336',
     date: '16.06.2026',
