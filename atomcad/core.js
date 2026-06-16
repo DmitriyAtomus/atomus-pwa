@@ -201,6 +201,7 @@ function buildSchematic(P){
     if(cons&&needsContactor(cons)){
       pc.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',cons.name));
       pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
+      pt.push({x:x+46,y:1490,s:20,tx:'катушка → л.2'});     // перекрёстная ссылка на катушку
       kmN++;
     } else { pw.push(W([x,1250],[x,1950])); }
     pt.push({x:x+44,y:1730,s:22,tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода линии
@@ -259,6 +260,7 @@ function buildSchematic(P){
         ac.push(shortC(km,'coil',outX,devY,'катушка контактора','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);
+        at.push({x:outX+58,y:devY+90,s:20,tx:'силовой контакт → л.1'});   // перекрёстная ссылка на контакт
       } else {
         ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
