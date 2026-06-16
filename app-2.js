@@ -8220,16 +8220,22 @@ function renderContractDetail(c) {
   // v2.45.134: в контейнере — после загрузки спецификации перерисуем его, чтобы
   // счётчик «покупных в резерве» (плашка + кнопка печати QR) стал корректным
   // (на момент первого рендера спецификация ещё не загружена).
-  html += '<div id="scd-assemblies-block">' + renderContractAssembliesBlock(c) + '</div>';
+  // v2.45.371: договор «только монтаж» — монтажные разделы вместо сборок/спеки/отгрузки
+  const isInstallOnly = (c.contract_type === 'install_only');
+  if (isInstallOnly) {
+    html += '<div id="scd-install-block"><div class="loading-block" style="padding:14px;">Загружаем монтаж…</div></div>';
+  } else {
+    html += '<div id="scd-assemblies-block">' + renderContractAssembliesBlock(c) + '</div>';
 
-  // ЭТАП 27: блок Спецификация
-  html += '<div id="scd-items-block"><div class="loading-block" style="padding:14px;">Загружаем спецификацию…</div></div>';
+    // ЭТАП 27: блок Спецификация
+    html += '<div id="scd-items-block"><div class="loading-block" style="padding:14px;">Загружаем спецификацию…</div></div>';
 
-  // ЭТАП 26: кнопка перехода в режим отгрузки + прогресс
-  html += '<div id="scd-shipment-block" style="margin-top: 16px;"><div class="loading-block" style="padding:14px;">Загружаем прогресс отгрузки…</div></div>';
+    // ЭТАП 26: кнопка перехода в режим отгрузки + прогресс
+    html += '<div id="scd-shipment-block" style="margin-top: 16px;"><div class="loading-block" style="padding:14px;">Загружаем прогресс отгрузки…</div></div>';
 
-  // ЭТАП 26: блок управления коробками договора
-  html += '<div id="scd-boxes-block" style="margin-top: 12px;"></div>';
+    // ЭТАП 26: блок управления коробками договора
+    html += '<div id="scd-boxes-block" style="margin-top: 12px;"></div>';
+  }
 
   // ЭТАП 16В-2: блок задач по договору (контейнер, заполняется асинхронно)
   html += '<div id="scd-tasks-block"><div class="loading-block">Загружаем задачи…</div></div>';
@@ -8241,14 +8247,174 @@ function renderContractDetail(c) {
 
   // Загрузим задачи по договору
   loadContractTasks(c.id);
-  // ЭТАП 26: загружаем прогресс отгрузки
-  loadContractShipmentBlock(c.id);
-  // ЭТАП 26: загружаем список коробок
-  loadContractBoxesBlock(c.id);
-  // ЭТАП 27: загружаем спецификацию
-  loadContractItemsBlock(c.id);
+  if (isInstallOnly) {
+    // v2.45.371: монтажные разделы вместо отгрузки/коробок/спецификации
+    loadContractInstallBlock(c.id);
+  } else {
+    // ЭТАП 26: загружаем прогресс отгрузки
+    loadContractShipmentBlock(c.id);
+    // ЭТАП 26: загружаем список коробок
+    loadContractBoxesBlock(c.id);
+    // ЭТАП 27: загружаем спецификацию
+    loadContractItemsBlock(c.id);
+  }
   // v2.45.106: журнал действий
   loadContractAuditBlock(c.id);
+}
+
+// ============ v2.45.371: МОНТАЖНЫЕ РАЗДЕЛЫ (договор «только монтаж») ============
+const INSTALL_KIND_CFG = {
+  install:   { title: 'Что установить',    icon: 'ti-tool',      empty: 'Пока пусто. Добавьте, что нужно установить.', showQty: true,  showLoc: true,  showUnit: false, statuses: [['pending','Не установлено'],['done','Установлено']] },
+  dismantle: { title: 'Что демонтировать', icon: 'ti-trash-x',   empty: 'Пока пусто. Добавьте, что нужно демонтировать.', showQty: true,  showLoc: true,  showUnit: false, statuses: [['pending','Не демонтировано'],['done','Демонтировано']] },
+  work:      { title: 'Монтажные работы',  icon: 'ti-checklist', empty: 'Пока пусто. Добавьте этапы/работы монтажа.', showQty: false, showLoc: false, showUnit: false, statuses: [['planned','Запланировано'],['in_progress','В работе'],['done','Готово']] },
+  material:  { title: 'Материалы для монтажа', icon: 'ti-packages', empty: 'Пока пусто. Добавьте расходники и материалы.', showQty: true,  showLoc: false, showUnit: true, statuses: null },
+};
+
+async function loadContractInstallBlock(contractId) {
+  const host = document.getElementById('scd-install-block');
+  if (!host) return;
+  try {
+    const d = await apiGet('/api/contracts/' + contractId + '/install-items');
+    state._installItems = (d && d.items) || [];
+    state._installContractId = contractId;
+    state._installAddKind = null;
+    renderInstallSections();
+  } catch (e) {
+    host.innerHTML = '<div class="loading-block" style="padding:14px;color:#b45309;">Не удалось загрузить монтажные позиции</div>';
+  }
+}
+
+function _installCanEdit() {
+  if (typeof canManageSales === 'function' && canManageSales()) return true;
+  const roles = (state.user && state.user.roles) || [];
+  return roles.includes('master');
+}
+
+function _fmtInstQty(q) { const n = parseFloat(q); return isNaN(n) ? '' : (Math.round(n * 100) / 100).toString(); }
+
+function renderInstallSections() {
+  const host = document.getElementById('scd-install-block');
+  if (!host) return;
+  const items = state._installItems || [];
+  const cid = state._installContractId;
+  const canEdit = _installCanEdit();
+  let html = '<div class="install-wrap">';
+  ['install', 'dismantle', 'work', 'material'].forEach(kind => {
+    const cfg = INSTALL_KIND_CFG[kind];
+    const list = items.filter(x => x.kind === kind);
+    html += '<div class="install-section">';
+    html += '<div class="install-sec-head"><i class="ti ' + cfg.icon + '"></i><span>' + cfg.title + '</span><span class="install-count">' + list.length + '</span></div>';
+    if (list.length) {
+      html += '<div class="install-list">';
+      list.forEach(it => { html += renderInstallRow(it, cfg, canEdit); });
+      html += '</div>';
+    } else {
+      html += '<div class="install-empty">' + cfg.empty + '</div>';
+    }
+    if (state._installAddKind === kind) {
+      html += '<div class="install-add-form">';
+      html += '<input id="iadd-name" class="install-inp" placeholder="' + (kind === 'work' ? 'Что за работа/этап' : 'Наименование') + '">';
+      if (cfg.showQty) html += '<input id="iadd-qty" class="install-inp install-inp-sm" type="number" step="any" value="1">';
+      if (cfg.showUnit) html += '<input id="iadd-unit" class="install-inp install-inp-sm" value="шт.">';
+      if (cfg.showLoc) html += '<input id="iadd-loc" class="install-inp" placeholder="Помещение / место">';
+      html += '<div class="install-add-actions">';
+      html += '<button class="install-save-btn" onclick="submitInstallAdd(' + cid + ',\'' + kind + '\')"><i class="ti ti-check"></i> Сохранить</button>';
+      html += '<button class="install-cancel-btn" onclick="cancelInstallAdd()">Отмена</button>';
+      html += '</div></div>';
+    } else if (canEdit) {
+      html += '<button class="install-add-btn" onclick="openInstallAdd(\'' + kind + '\')"><i class="ti ti-plus"></i> Добавить</button>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  host.innerHTML = html;
+}
+
+function renderInstallRow(it, cfg, canEdit) {
+  const done = (it.status === 'done');
+  let html = '<div class="install-row' + (done ? ' is-done' : '') + '">';
+  html += '<div class="install-row-main">';
+  html += '<div class="install-row-name">' + escapeHtml(it.name || '') + '</div>';
+  const meta = [];
+  if (cfg.showQty) meta.push(_fmtInstQty(it.qty) + ' ' + escapeHtml(it.unit || 'шт.'));
+  if (cfg.showLoc && it.location) meta.push('<i class="ti ti-map-pin"></i> ' + escapeHtml(it.location));
+  if (it.comment) meta.push(escapeHtml(it.comment));
+  if (meta.length) html += '<div class="install-row-meta">' + meta.join(' · ') + '</div>';
+  html += '</div><div class="install-row-actions">';
+  if (cfg.statuses) {
+    const cur = cfg.statuses.find(s => s[0] === it.status) || cfg.statuses[0];
+    html += '<button class="install-status install-st-' + it.status + '"' + (canEdit ? ' onclick="cycleInstallStatus(' + it.id + ')" title="Сменить статус"' : ' disabled') + '>' + escapeHtml(cur[1]) + '</button>';
+  }
+  if (canEdit) {
+    html += '<button class="install-icon-btn" title="Изменить" onclick="editInstallItem(' + it.id + ')"><i class="ti ti-pencil"></i></button>';
+    html += '<button class="install-icon-btn danger" title="Удалить" onclick="deleteInstallItem(' + it.id + ')"><i class="ti ti-trash"></i></button>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function openInstallAdd(kind) {
+  state._installAddKind = kind;
+  renderInstallSections();
+  setTimeout(function () { const el = document.getElementById('iadd-name'); if (el) el.focus(); }, 30);
+}
+function cancelInstallAdd() { state._installAddKind = null; renderInstallSections(); }
+
+async function submitInstallAdd(cid, kind) {
+  const cfg = INSTALL_KIND_CFG[kind];
+  const nameEl = document.getElementById('iadd-name');
+  const name = ((nameEl && nameEl.value) || '').trim();
+  if (!name) { if (nameEl) nameEl.focus(); return; }
+  const body = { kind: kind, name: name };
+  if (cfg.showQty) { const q = document.getElementById('iadd-qty'); body.qty = parseFloat((q && q.value) || '1') || 1; }
+  if (cfg.showUnit) { const u = document.getElementById('iadd-unit'); body.unit = ((u && u.value) || 'шт.').trim() || 'шт.'; }
+  if (cfg.showLoc) { const l = document.getElementById('iadd-loc'); body.location = ((l && l.value) || '').trim(); }
+  try {
+    await apiPost('/api/contracts/' + cid + '/install-items', body);
+    state._installAddKind = null;
+    await loadContractInstallBlock(cid);
+    if (typeof showToast === 'function') showToast('Добавлено', 'success');
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось добавить', 'error'); }
+}
+
+async function cycleInstallStatus(itemId) {
+  const it = (state._installItems || []).find(x => x.id === itemId);
+  if (!it) return;
+  const cfg = INSTALL_KIND_CFG[it.kind];
+  if (!cfg.statuses) return;
+  const idx = cfg.statuses.findIndex(s => s[0] === it.status);
+  const next = cfg.statuses[(idx + 1) % cfg.statuses.length][0];
+  try {
+    await apiPatch('/api/contracts/install-items/' + itemId, { status: next });
+    it.status = next;
+    renderInstallSections();
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось обновить статус', 'error'); }
+}
+
+async function editInstallItem(itemId) {
+  const it = (state._installItems || []).find(x => x.id === itemId);
+  if (!it) return;
+  const cfg = INSTALL_KIND_CFG[it.kind];
+  const name = (prompt('Наименование:', it.name) || '').trim();
+  if (!name) return;
+  const body = { name: name };
+  if (cfg.showQty) { const q = (prompt('Количество:', _fmtInstQty(it.qty)) || it.qty).toString().replace(',', '.'); body.qty = parseFloat(q) || it.qty; }
+  if (cfg.showUnit) { body.unit = (prompt('Ед. изм.:', it.unit || 'шт.') || it.unit || 'шт.').trim() || 'шт.'; }
+  if (cfg.showLoc) { body.location = (prompt('Помещение / место:', it.location || '') || '').trim(); }
+  try {
+    await apiPatch('/api/contracts/install-items/' + itemId, body);
+    await loadContractInstallBlock(state._installContractId);
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось сохранить', 'error'); }
+}
+
+async function deleteInstallItem(itemId) {
+  if (!confirm('Удалить позицию?')) return;
+  try {
+    await apiDelete('/api/contracts/install-items/' + itemId);
+    state._installItems = (state._installItems || []).filter(x => x.id !== itemId);
+    renderInstallSections();
+    if (typeof showToast === 'function') showToast('Удалено', 'success');
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось удалить', 'error'); }
 }
 
 // v2.45.106: журнал действий по договору

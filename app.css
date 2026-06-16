@@ -18111,3 +18111,34 @@
 .mp-cta.ready:active { transform: scale(.99); }
 .mp-hint { text-align: center; margin-top: 8px; font-size: 11.5px; color: var(--text-light); }
 .mp-hint b { color: #C2410C; }
+
+/* v2.45.371: монтажные разделы договора «только монтаж» */
+.install-wrap { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+.install-section { background: #fff; border: 1px solid var(--border, #E5E7EB); border-radius: 14px; padding: 14px 16px; }
+.install-sec-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--text, #111827); margin-bottom: 10px; }
+.install-sec-head i { color: var(--brand); font-size: 18px; }
+.install-count { margin-left: auto; background: var(--bg, #F3F4F6); color: var(--text-light, #6B7280); font-size: 12px; font-weight: 700; min-width: 22px; text-align: center; padding: 2px 7px; border-radius: 20px; }
+.install-empty { color: var(--text-light, #9CA3AF); font-size: 13px; padding: 6px 0 10px; }
+.install-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.install-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px; background: var(--bg, #F9FAFB); border: 1px solid #EEF0F3; border-radius: 10px; }
+.install-row.is-done { opacity: .6; }
+.install-row.is-done .install-row-name { text-decoration: line-through; }
+.install-row-main { flex: 1; min-width: 0; }
+.install-row-name { font-size: 13.5px; font-weight: 600; color: var(--text, #111827); word-break: break-word; }
+.install-row-meta { font-size: 12px; color: var(--text-light, #6B7280); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.install-row-meta i { font-size: 13px; vertical-align: -1px; }
+.install-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.install-status { border: none; border-radius: 8px; padding: 5px 9px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.install-st-pending, .install-st-planned { background: #FEF3C7; color: #92400E; }
+.install-st-in_progress { background: #DBEAFE; color: #1E40AF; }
+.install-st-done { background: #D1FAE5; color: #065F46; }
+.install-icon-btn { background: transparent; border: 1px solid var(--border, #E5E7EB); border-radius: 8px; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-light, #6B7280); cursor: pointer; flex-shrink: 0; }
+.install-icon-btn.danger:hover { color: #DC2626; border-color: #FCA5A5; }
+.install-add-btn { width: 100%; border: 1px dashed var(--border, #D1D5DB); background: transparent; color: var(--text-light, #6B7280); border-radius: 10px; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.install-add-btn:hover { border-color: var(--brand); color: var(--brand); }
+.install-add-form { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--bg, #F9FAFB); border: 1px solid var(--border, #E5E7EB); border-radius: 10px; }
+.install-inp { flex: 1; min-width: 140px; border: 1px solid var(--border, #D1D5DB); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.install-inp-sm { flex: 0 0 84px; min-width: 70px; }
+.install-add-actions { display: flex; gap: 8px; width: 100%; }
+.install-save-btn { background: var(--brand); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.install-cancel-btn { background: transparent; color: var(--text-light, #6B7280); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
