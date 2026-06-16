@@ -90,7 +90,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <footer class="foot"><div class="inner"><button class="nav" id="prev">← Назад</button><div class="spacer"></div><span class="savechip"><span class="d"></span><span id="saveState">черновик</span></span><button class="nav cy" id="next">Далее →</button></div></footer>
 <div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
 <div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
-<div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются внутри приложения и доступны для повторного открытия с этого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
+<div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются на сервере — общая библиотека, доступна всем сотрудникам с любого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="core.js"></script>
@@ -368,36 +368,88 @@ function pSpec(){
   return h;
 }
 
-/* ---- сохранение внутри приложения (библиотека проектов в localStorage) ---- */
+/* ---- сохранение проектов: сервер (общая библиотека) + localStorage-фолбэк ---- */
+var ATOMCAD_API='https://worker-production-9b70.up.railway.app';
+function tok(){try{return localStorage.getItem('atomus_token')||''}catch(_){return ''}}
+function srvOn(){return !!tok()}  /* внутри PWA есть токен → работаем с сервером */
+async function apiReq(method,path,body){
+  var opt={method:method,headers:{'Authorization':'Bearer '+tok()}};
+  if(body!==undefined){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(body);}
+  var r=await fetch(ATOMCAD_API+path,opt);
+  var d=null;try{d=await r.json();}catch(_){}
+  if(!r.ok)throw new Error((d&&(d.message||d.error))||('HTTP '+r.status));
+  return d||{};
+}
+/* localStorage-фолбэк (нет токена / нет сети) */
 var LS_KEY='atomcad_projects';
 function loadLib(){try{var a=JSON.parse(localStorage.getItem(LS_KEY)||'[]');return Array.isArray(a)?a:[]}catch(_){return []}}
-function saveLib(a){try{localStorage.setItem(LS_KEY,JSON.stringify(a));return true}catch(_){toast('Не удалось сохранить — хранилище переполнено');return false}}
-function fmtDate(ts){var d=new Date(ts||Date.now());function z(n){return ('0'+n).slice(-2)}return z(d.getDate())+'.'+z(d.getMonth()+1)+'.'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes())}
-
-/* «Сохранить» — кладёт проект в библиотеку приложения (и обновляет, если уже есть) */
-function saveProject(){
+function saveLib(a){try{localStorage.setItem(LS_KEY,JSON.stringify(a));return true}catch(_){return false}}
+function saveLocal(){
   if(!P.id)P.id=uid('prj');
-  var lib=loadLib();
-  var rec={id:P.id,name:P.name,section:P.section,num:P.num,savedAt:Date.now(),data:P};
-  var found=-1;for(var i=0;i<lib.length;i++)if(lib[i].id===P.id){found=i;break;}
-  if(found>=0)lib[found]=rec; else lib.unshift(rec);
-  if(saveLib(lib)){$('saveState').textContent='сохранено';toast('Проект сохранён в приложении');}
+  var lib=loadLib(),rec={id:P.id,name:P.name,section:P.section,num:P.num,savedAt:Date.now(),data:P};
+  var f=-1;for(var i=0;i<lib.length;i++)if(lib[i].id===P.id){f=i;break;}
+  if(f>=0)lib[f]=rec; else lib.unshift(rec);
+  return saveLib(lib);
+}
+function fmtWhen(v){var d;
+  if(typeof v==='number')d=new Date(v);
+  else if(typeof v==='string'){var s=v.indexOf('T')<0?v.replace(' ','T')+'Z':v;d=new Date(s);if(isNaN(d.getTime()))d=new Date(v);}
+  else d=new Date();
+  if(isNaN(d.getTime()))return '';
+  function z(n){return ('0'+n).slice(-2)}
+  return z(d.getDate())+'.'+z(d.getMonth()+1)+'.'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes());
+}
+function curId(){return srvOn()?P.serverId:P.id}
+
+/* единый стор: список / открыть / удалить — сервер или локально */
+async function storeList(){
+  if(srvOn()){var d=await apiReq('GET','/api/atomcad/projects');return (d.projects||[]).map(function(p){return {id:p.id,name:p.name,section:p.section,num:p.num,when:p.updated_at,owner:p.owner_name};});}
+  return loadLib().map(function(r){return {id:r.id,name:r.name,section:r.section,num:r.num,when:r.savedAt,owner:null};});
+}
+async function storeGet(id){
+  if(srvOn()){var d=await apiReq('GET','/api/atomcad/projects/'+id);return d.project&&d.project.data;}
+  var lib=loadLib();for(var i=0;i<lib.length;i++)if(lib[i].id===id)return lib[i].data;return null;
+}
+async function storeDel(id){
+  if(srvOn()){await apiReq('DELETE','/api/atomcad/projects/'+id);return;}
+  var lib=loadLib(),f=-1;for(var i=0;i<lib.length;i++)if(lib[i].id===id){f=i;break;}if(f>=0){lib.splice(f,1);saveLib(lib);}
+}
+
+/* «Сохранить» — на сервер (общая библиотека), при сбое — локально */
+async function saveProject(){
+  if(srvOn()){
+    try{
+      var d=await apiReq('POST','/api/atomcad/projects',{id:P.serverId||null,name:P.name,section:P.section,num:P.num,data:P});
+      P.serverId=d.id;$('saveState').textContent='сохранено';toast('Проект сохранён на сервере');
+      return;
+    }catch(err){
+      saveLocal();$('saveState').textContent='сохранено локально';
+      toast('Сервер недоступен — сохранено локально');return;
+    }
+  }
+  if(saveLocal()){$('saveState').textContent='сохранено';toast('Проект сохранён');}
+  else toast('Не удалось сохранить');
 }
 
 /* библиотека: список, открытие, удаление */
-function openLibrary(){
-  var lib=loadLib(),h='';
-  if(!lib.length){
+async function openLibrary(){
+  $('libList').innerHTML='<div class="empty" style="padding:10px 2px">Загрузка…</div>';
+  $('libMask').classList.add('show');
+  var items;
+  try{items=await storeList();}
+  catch(err){$('libList').innerHTML='<div class="empty" style="padding:10px 2px">Не удалось загрузить список: '+esc(err.message)+'</div>';return;}
+  var cid=curId(),h='';
+  if(!items.length){
     h='<div class="empty" style="padding:10px 2px">Сохранённых проектов пока нет.<br>Нажми «⭱ Сохранить» в шапке, чтобы добавить текущий.</div>';
   }else{
-    lib.forEach(function(r,i){
-      var cur=P.id&&r.id===P.id;
-      h+='<button class="pbtn" data-open="'+i+'" style="margin:0;align-items:flex-start;gap:11px">'+
+    items.forEach(function(r){
+      var open=cid!=null&&String(r.id)===String(cid);
+      h+='<button class="pbtn" data-open="'+esc(r.id)+'" style="margin:0;align-items:flex-start;gap:11px">'+
            '<span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left">'+
-             '<span style="color:#E7EEF4;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'Без названия')+(cur?' <span class="tag AI" style="margin-left:4px">открыт</span>':'')+'</span>'+
-             '<span class="mono" style="font-size:10.5px;color:var(--dim)">'+esc((r.section||'')+'.'+('00'+(r.num||0)).slice(-3))+' · '+fmtDate(r.savedAt)+'</span>'+
+             '<span style="color:#E7EEF4;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'Без названия')+(open?' <span class="tag AI" style="margin-left:4px">открыт</span>':'')+'</span>'+
+             '<span class="mono" style="font-size:10.5px;color:var(--dim)">'+esc((r.section||'')+'.'+('00'+(r.num||0)).slice(-3))+' · '+fmtWhen(r.when)+(r.owner?' · '+esc(r.owner):'')+'</span>'+
            '</span>'+
-           '<span class="del" data-del="'+i+'" title="Удалить" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span>'+
+           '<span class="del" data-del="'+esc(r.id)+'" data-name="'+esc(r.name||'')+'" title="Удалить" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span>'+
          '</button>';
     });
   }
@@ -405,27 +457,27 @@ function openLibrary(){
   Array.prototype.forEach.call($('libList').querySelectorAll('[data-open]'),function(el){
     el.onclick=function(ev){
       var d=ev.target.closest?ev.target.closest('[data-del]'):null;
-      if(d){ev.stopPropagation();delLibrary(+d.getAttribute('data-del'));return;}
-      openLibProject(+el.getAttribute('data-open'));
+      if(d){ev.stopPropagation();delLibrary(d.getAttribute('data-del'),d.getAttribute('data-name'));return;}
+      openLibProject(el.getAttribute('data-open'));
     };
   });
-  $('libMask').classList.add('show');
 }
-function openLibProject(i){
-  var lib=loadLib(),r=lib[i];if(!r||!r.data)return;
-  P=r.data;
+async function openLibProject(id){
+  var data;
+  try{data=await storeGet(id);}catch(err){toast('Не удалось открыть: '+err.message);return;}
+  if(!data){toast('Проект не найден');return;}
+  P=data;
   if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};
   if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);
-  if(!P.id)P.id=r.id;
+  if(srvOn())P.serverId=(+id||id); else if(!P.id)P.id=id;
   $('libMask').classList.remove('show');
   go(0);updTag();$('saveState').textContent='сохранено';
-  toast('Проект открыт: '+(r.name||''));
+  toast('Проект открыт: '+(P.name||''));
 }
-function delLibrary(i){
-  var lib=loadLib(),r=lib[i];if(!r)return;
+function delLibrary(id,name){
   $('libMask').classList.remove('show');
-  ask('Удалить проект?','Удалить «'+(r.name||'')+'» из сохранённых? Действие необратимо.',
-    function(){var l=loadLib();l.splice(i,1);saveLib(l);toast('Проект удалён');openLibrary();},
+  ask('Удалить проект?','Удалить «'+(name||'')+'» из сохранённых? Действие необратимо.',
+    function(){storeDel(id).then(function(){toast('Проект удалён');openLibrary();}).catch(function(err){toast('Не удалось удалить: '+err.message);openLibrary();});},
     function(){openLibrary();});
 }
 $('libClose').onclick=function(){$('libMask').classList.remove('show')};
