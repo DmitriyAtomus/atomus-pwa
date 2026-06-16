@@ -101,9 +101,11 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 var C=window.AtomCore;
 var $=function(id){return document.getElementById(id)};
 function uid(p){return (p||'x')+Math.random().toString(36).slice(2,8)}
+var CTRL_LIB={};  /* библиотека распознанных контроллеров: label → {ioPins,dims,spec,id} */
 
 /* ---- модель проекта (реальное состояние) ---- */
 function ctrlIO(model){
+  if(CTRL_LIB[model]&&CTRL_LIB[model].ioPins) return {pins:JSON.parse(JSON.stringify(CTRL_LIB[model].ioPins)),asg:{}};
   if(/c-pro 3 OEM/.test(model)) return {pins:{AI:[{id:'AI1',tr:1},{id:'AI2',tr:1},{id:'AI3',tr:1},{id:'AI4'},{id:'AI5'},{id:'AI6'},{id:'AI7'}],DI:[{id:'DI1',hv:1},{id:'DI2',hv:1},{id:'DI3',dry:1},{id:'DI4',dry:1}],AO:[{id:'AO1'},{id:'AO2'},{id:'AO3'},{id:'AO4'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'},{id:'K5'},{id:'K6'}]},asg:{}};
   if(/EV3223/.test(model)) return {pins:{AI:[{id:'Pb1'},{id:'Pb2'}],DI:[{id:'D.I.',dry:1}],AO:[],DO:[{id:'K1'},{id:'K2'},{id:'K3'}]},asg:{K1:'Компрессор',K2:'Оттайка',K3:'Вентиляторы'}};
   return {pins:{AI:[{id:'AI1'},{id:'AI2'}],DI:[{id:'DI1',dry:1}],AO:[{id:'AO1'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'}]},asg:{}};
@@ -261,6 +263,7 @@ function ioCandidates(g,pin){var L=[];
   else if(g==='DI'){P.sensors.filter(function(s){return /дискрет/.test(s.sig)}).forEach(function(s){L.push({label:s.name,value:s.name,tag:'DI'})});}
   L.push({label:'Другое (вручную)…',value:'__manual__'});return L;}
 function pController(){
+  ensureControllers();
   var io=P.controller.io;
   var h=H('Шаг 2','Контроллер щита','Выбор контроллера и распределение сигналов по входам/выходам. Занять/снять — с подтверждением.');
   h+='<div class="form"><div class="fld gr"><label>Модель контроллера</label><select id="ctrlSel" onchange="setCtrl(this.value)">';
@@ -273,7 +276,23 @@ function pController(){
   return h;
 }
 function ioGroup(g){var io=P.controller.io,a=io.pins[g]||[],fr=C.ioFree(io,g),t=a.length;if(!t)return '';var h='<div class="card" style="margin-bottom:11px"><div style="display:flex;margin-bottom:8px"><span class="cname" style="font-size:13px">'+(g==='AI'?'Аналог. входы':g==='DI'?'Дискр. входы':g==='AO'?'Аналог. выходы':'Реле-выходы')+'</span><span class="cnt" style="margin-left:auto">своб. '+fr+'/'+t+'</span></div><div class="pins">';a.forEach(function(p){var u=io.asg[p.id];h+='<div class="pin '+g+' '+(u?'used':'free')+'" onclick="ioClick(\''+p.id+'\',\''+g+'\')"><span class="id">'+p.id+'</span><span class="lab">'+(u||'свободно')+'</span></div>'});h+='</div></div>';return h}
-function setCtrl(m){P.controller.model=m;P.controller.io=ctrlIO(m);dirty();draw()}
+function setCtrl(m){P.controller.model=m;P.controller.io=ctrlIO(m);var lib=CTRL_LIB[m];if(lib){P.controller.dims=lib.dims;P.controller.spec=lib.spec;}else{P.controller.dims=null;P.controller.spec=null;}dirty();draw()}
+/* библиотека контроллеров: построение записи из распознанных данных + загрузка с сервера */
+function ctrlLibFromData(d){var io=d.io||{};var ioObj=(io.relays||io.analog_inputs||io.digital_inputs||io.analog_outputs)?ioFromCounts(io):null;var dim=d.dimensions||{};return {ioPins:ioObj?ioObj.pins:null,dims:{w:dim.width_mm||'',h:dim.height_mm||'',d:dim.depth_mm||''},spec:{manufacturer:d.manufacturer||'',mounting:d.mounting||'',modules:d.din_modules||null,ip:d.ip_rating||'',voltage:d.supply_voltage||'',notes:d.notes||''}};}
+var ctrlCat=null, ctrlCatLoading=false;
+function ensureControllers(){
+  if(ctrlCat!==null||ctrlCatLoading)return;
+  ctrlCatLoading=true;
+  if(!srvOn()){ctrlCat=true;ctrlCatLoading=false;return;}
+  apiReq('GET','/api/atomcad/controllers').then(function(r){
+    (r.controllers||[]).forEach(function(c){
+      var label=c.label;if(!label)return;
+      CTRL_LIB[label]=ctrlLibFromData(c.data||{});CTRL_LIB[label].id=c.id;
+      if(CTRLS.indexOf(label)<0)CTRLS.unshift(label);
+    });
+    ctrlCat=true;ctrlCatLoading=false;if(cur===1)draw();
+  }).catch(function(){ctrlCat=true;ctrlCatLoading=false});
+}
 
 /* 3 потребители */
 function pConsumers(){
@@ -666,17 +685,19 @@ function applyDatasheet(){
   var d=dsLast;if(!d)return;
   var model=(d.model||'').trim();if(!model){toast('Модель не распознана');return;}
   var label=((d.manufacturer?d.manufacturer+' ':'')+model).trim();
+  var lib=ctrlLibFromData(d);CTRL_LIB[label]=lib;
   if(CTRLS.indexOf(label)<0)CTRLS.unshift(label);
   P.controller.model=label;
-  var io=d.io||{};
-  P.controller.io=(io.relays||io.analog_inputs||io.digital_inputs||io.analog_outputs)?ioFromCounts(io):ctrlIO(label);
-  var dim=d.dimensions||{};
-  P.controller.dims={w:dim.width_mm||'',h:dim.height_mm||'',d:dim.depth_mm||''};
-  P.controller.spec={manufacturer:d.manufacturer||'',mounting:d.mounting||'',modules:d.din_modules||null,ip:d.ip_rating||'',voltage:d.supply_voltage||'',notes:d.notes||''};
+  P.controller.io=lib.ioPins?{pins:JSON.parse(JSON.stringify(lib.ioPins)),asg:{}}:ctrlIO(label);
+  P.controller.dims=lib.dims;P.controller.spec=lib.spec;
   P.breakers=null;
   $('dsMask').classList.remove('show');
   dirty();draw();
   toast('Контроллер «'+label+'» добавлен');
+  /* сохранить в общую библиотеку контроллеров (останется после перезагрузки) */
+  if(srvOn())apiReq('POST','/api/atomcad/controllers',{label:label,manufacturer:d.manufacturer||'',model:model,data:d})
+    .then(function(res){if(res&&res.id)CTRL_LIB[label].id=res.id;})
+    .catch(function(err){toast('В список добавлен, но не сохранился на сервере: '+err.message)});
 }
 
 /* ---- файловый экспорт/импорт (запасной вариант) ---- */
