@@ -164,7 +164,8 @@ function pickEnclosure(P){ var need=Math.ceil(moduleCount(P)*1.3); for(var i=0;i
 // генерация однолинейной схемы (компоненты+провода) для редактора
 function shortLbl(s,n){s=String(s||'');n=n||16;return s.length>n?s.slice(0,n-1)+'…':s;}
 function buildSchematic(P){
-  var comps=[], wires=[], gx=600, busY=800, step=720;
+  var comps=[], wires=[], texts=[], gx=600, busY=800, step=720;
+  var hasCtrl = !!(P.controller && P.controller.model);
   function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
   function W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
   // ввод + шина
@@ -177,7 +178,7 @@ function buildSchematic(P){
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
   // динамический шаг колонок — чтобы все отходящие линии помещались в ширину
   // листа (рабочее поле ~ до x=3950). Иначе при многих линиях схема вылезает за лист.
-  var nB=branches.length, maxX=3850;
+  var nB=branches.length, maxX=hasCtrl?2500:3850;  // при контроллере правую треть отдаём под автоматику
   if(nB>0){ var fit=(maxX-gx)/nB; if(fit<step) step=Math.max(300, Math.floor(fit)); }
   var bx=gx+step, lastX=gx, kmN=1;
   branches.forEach(function(b,i){
@@ -197,7 +198,38 @@ function buildSchematic(P){
     lastX=x;
   });
   wires.push(W([gx,800],[Math.max(lastX,bx),800]));
-  return {comps:comps, wires:wires};
+  texts.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
+
+  // ---- зона автоматики: контроллер, датчики, сигнализация ----
+  if(hasCtrl){
+    var cz=2780;
+    texts.push({x:cz,y:235,s:38,tx:'АВТОМАТИКА · ДАТЧИКИ'});
+    // автомат цепей управления → контроллер
+    var cq=(P.breakers||[]).filter(function(bb){return bb.role==='цепи управления'})[0];
+    wires.push(W([Math.max(lastX,bx),800],[cz,800]));   // продлеваем верхнюю шину до зоны
+    if(cq){
+      comps.push(C(cq.code,'qf1',cz,950,'NB1-63 1P, C'+cq.rate,'CHINT','цепи управления'));
+      wires.push(W([cz,800],[cz,950]));
+      wires.push(W([cz,1250],[cz,1400]));
+    } else { wires.push(W([cz,800],[cz,1400])); }
+    // сам контроллер
+    comps.push(C('A1','box',cz,1400,P.controller.model,'','автоматика щита','Контроллер'));
+    wires.push(W([cz,1700],[cz,1950]));
+    comps.push(C('XA','term',cz,2000,'питание/линии','','контроллер'));
+    // датчики над зоной + сигнальная шина
+    var sN=1, sxs=[];
+    (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ var x=cz+440+(sN-1)*300; comps.push(C('BT'+sN,'ntc',x,820,s.sig,'',s.name)); wires.push(W([x,970],[x,1180])); sxs.push(x); sN++; } });
+    if(sxs.length){
+      var b0=cz+440, b1=sxs[sxs.length-1];
+      wires.push(W([b0,1180],[b1,1180]));
+      comps.push(C('X'+(branches.length+2),'term',b0,1480,'сигнальные','','датчики NTC, экран'));
+      wires.push(W([b0,1180],[b0,1480]));
+    }
+    // сигнальные лампы (из аппаратов в шкафу, тип «лампа»)
+    var hlN=1;
+    (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz+440+(hlN-1)*280; comps.push(C(a.tag||('HL'+hlN),'hl',x,420,a.model||'230 В','',a.name)); hlN++; } } });
+  }
+  return {comps:comps, wires:wires, texts:texts};
 }
 
 g.AtomCore={
