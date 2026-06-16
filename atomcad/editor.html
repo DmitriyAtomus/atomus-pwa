@@ -390,6 +390,31 @@ var SYM={
     pins:[[0,0],[0,150]],
     pr:[L(0,0,0,45),L(0,105,0,150),R(-22,45,44,60),L(-42,118,30,40)]}
 };
+/* параметрический контроллер: выводы AI/DI слева, AO/DO справа, из I/O-карты */
+function ctrlSym(c){
+  var io=(c.attrs&&c.attrs.io)||{}, pn=io.pins||{}, asg=io.asg||{};
+  var left=[], right=[];
+  ['AI','DI'].forEach(function(g){(pn[g]||[]).forEach(function(p){left.push({id:p.id,lab:asg[p.id]||''});});});
+  ['AO','DO'].forEach(function(g){(pn[g]||[]).forEach(function(p){right.push({id:p.id,lab:asg[p.id]||''});});});
+  var rows=Math.max(left.length,right.length,1);
+  var pitch=rows>14?50:rows>8?66:84, fid=rows>14?24:28, flab=rows>14?22:26;
+  var bodyW=460, stub=70, header=110, padB=40, hx=bodyW/2;
+  var bodyH=header+rows*pitch+padB;
+  var pr=[R(-hx,0,bodyW,bodyH), L(-hx,header,hx,header), T(0,header-48,40,'КОНТРОЛЛЕР')];
+  var model=(c.attrs&&c.attrs.model)||''; if(model)pr.push(T(0,header-10,32,model.length>30?model.slice(0,29)+'…':model));
+  var pinsArr=[];
+  function place(arr,side){arr.forEach(function(p,i){
+    var y=header+padB/2+i*pitch+pitch/2, inX=side<0?-hx:hx, ex=side<0?(-hx-stub):(hx+stub);
+    pr.push(L(inX,y,ex,y));
+    pr.push(T(side<0?(-hx+58):(hx-58), y+fid*0.34, fid, p.id));
+    if(p.lab){var t=p.lab.length>18?p.lab.slice(0,17)+'…':p.lab; pr.push(T(ex+(side<0?-150:150), y+flab*0.34, flab, t));}
+    pinsArr.push([ex,y]);
+  });}
+  place(left,-1); place(right,1);
+  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300,-10,hx+stub+300,bodyH+10],
+          lbl:[-hx,-30,'start'], pins:pinsArr, pr:pr};
+}
+function symFor(c){ return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
 var PALETTE=[
   ['Защита',['qf3','qf1','fu']],
   ['Коммутация',['km3','coil','c_no','c_nc','sb_no','sb_nc']],
@@ -480,17 +505,17 @@ function rotP(x,y,r){
   return [x,y];
 }
 function pinW(c,i){
-  var p=SYM[c.sym].pins[i], x=c.mirror?-p[0]:p[0];
+  var p=symFor(c).pins[i], x=c.mirror?-p[0]:p[0];
   var q=rotP(x,p[1],c.rot);
   return {x:c.x+q[0],y:c.y+q[1]};
 }
 function lblW(c){
-  var s=SYM[c.sym], x=c.mirror?-s.lbl[0]:s.lbl[0];
+  var s=symFor(c), x=c.mirror?-s.lbl[0]:s.lbl[0];
   var q=rotP(x,s.lbl[1],c.rot);
   return {x:c.x+q[0],y:c.y+q[1]};
 }
 function bbW(c){
-  var b=SYM[c.sym].bb, cs=[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]];
+  var b=symFor(c).bb, cs=[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]];
   var xs=[],ys=[];
   cs.forEach(function(p){
     var x=c.mirror?-p[0]:p[0], q=rotP(x,p[1],c.rot);
@@ -514,7 +539,7 @@ function junctions(){
   var cand=[];
   function add(p){for(var i=0;i<cand.length;i++)if(eq(cand[i].p,p))return cand[i];var o={p:{x:p.x,y:p.y},pin:false};cand.push(o);return o;}
   S.wires.forEach(function(w){add(w.pts[0]);add(w.pts[w.pts.length-1]);});
-  S.comps.forEach(function(c){for(var i=0;i<SYM[c.sym].pins.length;i++){add(pinW(c,i)).pin=true;}});
+  S.comps.forEach(function(c){for(var i=0;i<symFor(c).pins.length;i++){add(pinW(c,i)).pin=true;}});
   var out=[];
   cand.forEach(function(o){
     var P=o.p, ends=0, through=0;
@@ -545,7 +570,7 @@ function pinConnected(pt){
 function ercList(){
   var bad=[];
   S.comps.forEach(function(c){
-    for(var i=0;i<SYM[c.sym].pins.length;i++){
+    for(var i=0;i<symFor(c).pins.length;i++){
       var p=pinW(c,i);
       if(!pinConnected(p))bad.push(p);
     }
@@ -628,10 +653,10 @@ function compSvg(c,col,extraOp){
      ' transform="translate('+c.x+' '+c.y+') rotate('+c.rot+') scale('+sx+' 1)">';
   // Прозрачная зона захвата с запасом (_m), чтобы аппарат брался за всю площадь,
   // а не только за тонкие линии — клик в любом месте этой области тащит элемент.
-  var _bb=SYM[c.sym].bb, _m=30; h+='<rect x="'+(_bb[0]-_m)+'" y="'+(_bb[1]-_m)+'" width="'+(_bb[2]-_bb[0]+_m*2)+'" height="'+(_bb[3]-_bb[1]+_m*2)+'" fill="transparent" stroke="none" pointer-events="all"/>';
-  SYM[c.sym].pr.forEach(function(p){h+=prim(p)});
+  var _bb=symFor(c).bb, _m=30; h+='<rect x="'+(_bb[0]-_m)+'" y="'+(_bb[1]-_m)+'" width="'+(_bb[2]-_bb[0]+_m*2)+'" height="'+(_bb[3]-_bb[1]+_m*2)+'" fill="transparent" stroke="none" pointer-events="all"/>';
+  symFor(c).pr.forEach(function(p){h+=prim(p)});
   h+='</g>';
-  var lp=lblW(c), an=SYM[c.sym].lbl[2];
+  var lp=lblW(c), an=symFor(c).lbl[2];
   h+='<text data-c="'+c.id+'" x="'+lp.x+'" y="'+lp.y+'" font-size="44" font-weight="500" fill="'+col+'" stroke="none" text-anchor="'+an+'"'+
      (extraOp?' opacity="'+extraOp+'"':'')+' font-family="\'IBM Plex Mono\'">'+esc(c.des)+'</text>';
   if(c.attrs&&c.attrs.note){
@@ -649,7 +674,7 @@ function wireConnComps(w){
   var e=[w.pts[0],w.pts[w.pts.length-1]],res=[];
   S.comps.forEach(function(c){
     var conn=false;
-    for(var i=0;i<SYM[c.sym].pins.length&&!conn;i++){var p=pinW(c,i);
+    for(var i=0;i<symFor(c).pins.length&&!conn;i++){var p=pinW(c,i);
       if(eq(e[0],p)||eq(e[1],p)){conn=true;break;}
       for(var j=0;j<w.pts.length-1;j++)if(onSeg(p,w.pts[j],w.pts[j+1])){conn=true;break;}
     }
@@ -738,7 +763,7 @@ function renderCanvas(){
   h='';
   if(tool==='wire'||tool==='place'){
     S.comps.forEach(function(c){
-      for(var i=0;i<SYM[c.sym].pins.length;i++){
+      for(var i=0;i<symFor(c).pins.length;i++){
         var p=pinW(c,i);
         h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="12" fill="'+CY+'" opacity=".3"/>';
       }
@@ -842,7 +867,7 @@ function renderProps(force){
   }
   var c=compById(S.sel.id);
   if(!c){S.sel=null;renderProps(true);return}
-  h+='<div class="sel-chip"><b>'+esc(c.des)+'</b><span>· '+esc(SYM[c.sym].name)+'</span></div>';
+  h+='<div class="sel-chip"><b>'+esc(c.des)+'</b><span>· '+esc(symFor(c).name)+'</span></div>';
   h+='<div class="fields">';
   h+='<div class="f"><label>Обозначение</label><input id="fDes" value="'+esc(c.des)+'"></div>';
   h+='<div class="f"><label>Модель</label><input id="fMod" value="'+esc(c.attrs.model||'')+'"></div>';
@@ -879,7 +904,7 @@ function breakLinks(){
   if(!S.sel||S.sel.t!=='c')return;
   var c=compById(S.sel.id);if(!c)return;
   var pins=[];
-  for(var i=0;i<SYM[c.sym].pins.length;i++)pins.push(pinW(c,i));
+  for(var i=0;i<symFor(c).pins.length;i++)pins.push(pinW(c,i));
   var touches=function(w){
     for(var k=0;k<pins.length;k++){
       var p=pins[k];
@@ -913,7 +938,7 @@ function nextDes(pre){
 function snapPoint(wx,wy){
   var tol=Math.max(26,18/view.s),best=null,bd=tol;
   S.comps.forEach(function(c){
-    for(var i=0;i<SYM[c.sym].pins.length;i++){
+    for(var i=0;i<symFor(c).pins.length;i++){
       var p=pinW(c,i),d=Math.max(Math.abs(p.x-wx),Math.abs(p.y-wy));
       if(d<bd){bd=d;best=p}
     }
@@ -968,7 +993,7 @@ function cancelWire(){draft=[];S._extend=null;renderDraft()}
 var mode=null;
 function collectAtt(c){
   var att=[],per={};
-  for(var i=0;i<SYM[c.sym].pins.length;i++){
+  for(var i=0;i<symFor(c).pins.length;i++){
     var p=pinW(c,i);
     S.wires.forEach(function(w){
       [[0,false],[w.pts.length-1,true]].forEach(function(e){
@@ -1401,7 +1426,7 @@ function desPrefix(d){var m=/^[A-Za-zА-Яа-я]+/.exec(d||'');return m?m[0].toU
 function catKeyFor(c){
   if(c.sym==='term')return 'XT';
   if(c.sym==='m3')return 'M';
-  var p=desPrefix(c.des)||(SYM[c.sym].pre||'').toUpperCase();
+  var p=desPrefix(c.des)||(symFor(c).pre||'').toUpperCase();
   if(p==='QD')p='QFD';
   return p;
 }
@@ -1416,7 +1441,7 @@ function openCatalog(key,comp){
   pickKey=key||null; pickComp=comp||null; activeChip='*';
   $('catSearch').value='';
   var pe=$('catPick');
-  if(pickComp){pe.style.display='';pe.textContent='Подбор для '+pickComp.des+' · '+SYM[pickComp.sym].name;}
+  if(pickComp){pe.style.display='';pe.textContent='Подбор для '+pickComp.des+' · '+symFor(pickComp).name;}
   else pe.style.display='none';
   $('catChips').style.display=pickKey?'none':'flex';
   renderChips();
@@ -1481,7 +1506,7 @@ var DESNAME={QF:'Выключатель автоматический',QD:'Вык
  SB:'Кнопка',SA:'Переключатель',SQ:'Выключатель путевой',HL:'Лампа сигнальная',
  A:'Контроллер',BT:'Датчик температуры',M:'Электродвигатель',X:'Клеммник',XT:'Клеммник',
  FU:'Предохранитель',FV:'УЗИП',T:'Трансформатор',TA:'Трансформатор тока',G:'Блок питания'};
-function devName(c){return c.attrs.nm||DESNAME[desPrefix(c.des)]||SYM[c.sym].name}
+function devName(c){return c.attrs.nm||DESNAME[desPrefix(c.des)]||symFor(c).name}
 function compressDes(list){
   if(list.length>=3){
     var p=desPrefix(list[0]),nums=[],ok=true;
