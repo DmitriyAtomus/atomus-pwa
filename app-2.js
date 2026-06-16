@@ -8107,6 +8107,8 @@ function renderContractDetail(c) {
 
   const container = document.getElementById('scd-content');
   const canEdit = canManageSales();
+  // v2.45.380: договор «только монтаж» — свой блок монтажа, без производственных статусов
+  const isInstallOnly = (c.contract_type === 'install_only');
 
   let html = '';
 
@@ -8137,8 +8139,9 @@ function renderContractDetail(c) {
     html += '</div>';
   }
 
-  // Переключатель статуса (если есть права и НЕ draft)
-  if (canEdit && !isDraft) {
+  // Переключатель статуса (если есть права и НЕ draft). Для монтажного договора
+  // производственные статусы не показываем — там статусы монтажа (блок «Монтаж»).
+  if (canEdit && !isDraft && !isInstallOnly) {
     html += '<div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 16px; margin-bottom: 4px;">ИЗМЕНИТЬ СТАТУС</div>';
     // ЭТАП 40 (v2.20.0): добавлен шаг partially_shipped между ready и shipped
     const steps = [
@@ -8221,8 +8224,8 @@ function renderContractDetail(c) {
   // счётчик «покупных в резерве» (плашка + кнопка печати QR) стал корректным
   // (на момент первого рендера спецификация ещё не загружена).
   // v2.45.371: договор «только монтаж» — монтажные разделы вместо сборок/спеки/отгрузки
-  const isInstallOnly = (c.contract_type === 'install_only');
   if (isInstallOnly) {
+    html += '<div id="scd-install-mount-block" style="margin-bottom:14px;"></div>';
     html += '<div id="scd-install-block"><div class="loading-block" style="padding:14px;">Загружаем монтаж…</div></div>';
     html += '<div id="scd-install-files-block" style="margin-top:14px;"></div>';
     html += '<div id="scd-install-chat-block" style="margin-top:14px;"></div>';
@@ -8250,6 +8253,8 @@ function renderContractDetail(c) {
   // Загрузим задачи по договору
   loadContractTasks(c.id);
   if (isInstallOnly) {
+    // v2.45.380: блок «Монтаж» — назначение монтажника + статусы монтажа
+    loadContractInstallation(c.id);
     // v2.45.371: монтажные разделы вместо отгрузки/коробок/спецификации
     loadContractInstallBlock(c.id);
     // v2.45.376: разделы «Файлы» и «Чат» (на чат-инфраструктуре договора)
@@ -8514,6 +8519,94 @@ function renderInstallChatSection() {
   html += '<button class="install-add-btn" onclick="openContractChat()"><i class="ti ti-message-circle"></i> Открыть чат</button>';
   html += '</div>';
   host.innerHTML = html;
+}
+
+// v2.45.380: блок «Монтаж» в монтажном договоре — назначение монтажника + статусы (модуль «Монтаж»)
+async function loadContractInstallation(contractId) {
+  const host = document.getElementById('scd-install-mount-block');
+  if (!host) return;
+  try {
+    const d = await apiGet('/api/contracts/' + contractId + '/installation');
+    state._ciData = d || {};
+    state._ciCid = contractId;
+    renderContractInstallation();
+  } catch (e) { host.innerHTML = ''; } // нет доступа к монтажу — блок не показываем
+}
+
+function renderContractInstallation() {
+  const host = document.getElementById('scd-install-mount-block');
+  if (!host) return;
+  const d = state._ciData || {};
+  const inst = d.installation;
+  const labels = d.status_labels || {};
+  const flow = d.status_flow || ['planned', 'en_route', 'on_site', 'mounted', 'handed_over'];
+  const installers = d.installers || [];
+  const canManage = !!d.can_manage;
+  let html = '<div class="install-section ci-section">';
+  html += '<div class="install-sec-head"><i class="ti ti-tools"></i><span>Монтаж</span>';
+  if (inst) { html += '<span class="ci-status ci-st-' + inst.status + '">' + escapeHtml(labels[inst.status] || inst.status || '') + '</span>'; }
+  html += '</div>';
+  // Монтажник
+  html += '<div class="ci-row"><span class="ci-label">Монтажник</span>';
+  if (canManage) {
+    html += '<select class="ci-select" onchange="setContractInstaller(this.value)"><option value="">— не назначен —</option>';
+    installers.forEach(e => {
+      const sel = (inst && String(inst.assigned_employee_id) === String(e.id)) ? ' selected' : '';
+      html += '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.name) + '</option>';
+    });
+    html += '</select>';
+  } else {
+    const who = inst && (inst.assignee_name || inst.assignee_full);
+    html += '<span class="ci-val">' + (who ? escapeHtml(who) : 'не назначен') + '</span>';
+  }
+  html += '</div>';
+  // Статус монтажа (когда монтаж создан)
+  if (inst) {
+    html += '<div class="ci-row"><span class="ci-label">Статус монтажа</span>';
+    if (canManage) {
+      html += '<select class="ci-select" onchange="setContractInstallStatus(this.value)">';
+      flow.forEach(s => { html += '<option value="' + s + '"' + (s === inst.status ? ' selected' : '') + '>' + escapeHtml(labels[s] || s) + '</option>'; });
+      html += '</select>';
+    } else {
+      html += '<span class="ci-val">' + escapeHtml(labels[inst.status] || inst.status) + '</span>';
+    }
+    html += '</div>';
+    html += '<div class="ci-hint"><i class="ti ti-info-circle"></i> Детали и фото-отчёты монтажника — в разделе «Монтаж».</div>';
+  } else if (canManage) {
+    html += '<div class="ci-hint"><i class="ti ti-info-circle"></i> Назначьте монтажника — он увидит этот монтаж в своём разделе «Монтаж» под своим логином.</div>';
+  } else {
+    html += '<div class="install-empty">Монтажник ещё не назначен.</div>';
+  }
+  html += '</div>';
+  host.innerHTML = html;
+}
+
+async function setContractInstaller(empId) {
+  const d = state._ciData || {};
+  const cid = state._ciCid;
+  const inst = d.installation;
+  try {
+    if (inst) {
+      await apiPatch('/api/installations/' + inst.id, { assigned_employee_id: empId ? parseInt(empId, 10) : null });
+    } else {
+      if (!empId) return;
+      const c = state.lastLoadedContract || {};
+      const title = 'Монтаж по договору ' + (c.number || ('#' + cid)) + (c.contractor_name ? ' · ' + c.contractor_name : '');
+      await apiPost('/api/installations', { contract_id: cid, title: title, assigned_employee_id: parseInt(empId, 10), object_address: c.delivery_address || '' });
+    }
+    await loadContractInstallation(cid);
+    if (typeof showToast === 'function') showToast(empId ? 'Монтажник назначен' : 'Назначение снято', 'success');
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось сохранить', 'error'); }
+}
+
+async function setContractInstallStatus(status) {
+  const d = state._ciData || {};
+  if (!d.installation) return;
+  try {
+    await apiPatch('/api/installations/' + d.installation.id, { status: status });
+    await loadContractInstallation(state._ciCid);
+    if (typeof showToast === 'function') showToast('Статус монтажа обновлён', 'success');
+  } catch (e) { if (typeof showToast === 'function') showToast('Не удалось обновить', 'error'); }
 }
 
 // v2.45.106: журнал действий по договору
