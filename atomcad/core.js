@@ -210,11 +210,17 @@ function buildSchematic(P){
     if(cq){
       comps.push(C(cq.code,'qf1',cz,950,'NB1-63 1P, C'+cq.rate,'CHINT','цепи управления'));
       wires.push(W([cz,800],[cz,950]));
-      wires.push(W([cz,1250],[cz,1400]));
-    } else { wires.push(W([cz,800],[cz,1400])); }
-    // сам контроллер — параметрический блок с выводами (AI/DI слева, AO/DO справа)
+      // питание контроллера: от автомата управления к выводам питания (слева сверху)
+      wires.push(W([cz,1250],[cz,1200]));
+      wires.push(W([cz-150,1200],[cz,1200]));
+      wires.push(W([cz-150,1200],[cz-150,1330]));
+      wires.push(W([cz-90,1200],[cz-90,1330]));
+    } else { wires.push(W([cz,800],[cz,1330])); }
+    // сам контроллер — параметрический блок: выводы AI/DI слева, AO/DO справа,
+    // питание сверху-слева, связь RS-485 с сенсорной панелью сверху-справа
+    var cspec=P.controller.spec||{};
     comps.push({sym:'ctrl',x:cz,y:1400,rot:0,mirror:false,des:'A1',
-      attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:P.controller.io||{}}});
+      attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:P.controller.io||{},supply:cspec.voltage||''}});
     // датчики над зоной + сигнальная шина
     var sN=1, sxs=[];
     (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ var x=cz+440+(sN-1)*300; comps.push(C('BT'+sN,'ntc',x,820,s.sig,'',s.name)); wires.push(W([x,970],[x,1180])); sxs.push(x); sN++; } });
