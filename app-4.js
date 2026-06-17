@@ -8482,9 +8482,15 @@ async function submitExternalShipment() {
   }
 }
 
-async function openShipmentMode(contractId) {
+// v2.45.405: режим экрана — 'ship' (отгрузка, списывает склад) | 'gather'
+// (сборка к отгрузке, только комплектация по QR, без списания).
+function _shipModeIsGather() { return state._shipMode === 'gather'; }
+function _shipItemDone(it) { return _shipModeIsGather() ? !!(it && it.gathered) : !!(it && it.shipped); }
+
+async function openShipmentMode(contractId, mode) {
   if (!contractId) return;
   state._shipContractId = contractId;
+  state._shipMode = (mode === 'gather') ? 'gather' : 'ship';
 
   // Загружаем статус отгрузки
   let status;
@@ -8521,10 +8527,15 @@ function renderShipmentScreen(status) {
   const cleanCNumber = (c.number || '').replace(/^№\s*/, '');
   const contractTitle = cleanCNumber ? ('№ ' + cleanCNumber) : ('Договор #' + state._shipContractId);
   const contractor = c.contractor_name || '';
+  // v2.45.405: в режиме сборки счётчик и done-флаг считаем по «собрано», не «отгружено»
+  const isGather = _shipModeIsGather();
   const total = status.total || 0;
-  const shipped = status.shipped || 0;
+  const shipped = isGather ? (status.gathered || 0) : (status.shipped || 0);
   const pct = total > 0 ? Math.round(shipped / total * 100) : 0;
-  const isComplete = status.is_complete;
+  const isComplete = isGather ? !!status.gather_complete : !!status.is_complete;
+  const screenTitle = isGather ? 'Сборка к отгрузке ' : 'Отгрузка ';
+  const progLabel = isGather ? 'Собрано' : 'Отгружено';
+  const doneAllLabel = isGather ? 'Всё собрано' : 'Всё отгружено';
 
   // v2.43.10: запоминаем последний статус в state, чтобы модалка тапа могла к нему обращаться
   state._shipLastStatus = status;
@@ -8534,7 +8545,7 @@ function renderShipmentScreen(status) {
   html += '<div style="position:sticky;top:0;z-index:5;background:var(--brand);color:white;padding:14px 16px;display:flex;align-items:center;gap:12px;">';
   html += '<button onclick="closeShipmentScreen()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>';
   html += '<div style="flex:1;min-width:0;">';
-  html += '<div style="font-size:15px;font-weight:700;">Отгрузка ' + escapeHtml(contractTitle) + '</div>';
+  html += '<div style="font-size:15px;font-weight:700;">' + screenTitle + escapeHtml(contractTitle) + '</div>';
   if (contractor) html += '<div style="font-size:12px;opacity:0.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(contractor) + '</div>';
   html += '</div>';
   html += '<button onclick="reloadShipmentStatus()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;" title="Обновить"><i class="ti ti-refresh" style="font-size:18px;"></i></button>';
@@ -8559,14 +8570,14 @@ function renderShipmentScreen(status) {
   // Прогресс
   html += '<div class="ship-progress-card">';
   html += '<div class="ship-progress-head">';
-  html += '<div class="ship-progress-title">Отгружено</div>';
+  html += '<div class="ship-progress-title">' + progLabel + '</div>';
   html += '<div class="ship-progress-num">' + shipped + ' <span class="total">/ ' + total + '</span></div>';
   html += '</div>';
   html += '<div class="ship-progress-bar"><div class="ship-progress-fill ' + (isComplete ? 'complete' : '') + '" style="width:' + pct + '%"></div></div>';
   if (total === 0) {
     html += '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:8px 0;">К договору не привязано ни одной сборки или коробки</div>';
   } else if (isComplete) {
-    html += '<button class="ship-start-btn complete" onclick="onShipmentAllDone()"><i class="ti ti-check-circle"></i> Всё отгружено</button>';
+    html += '<button class="ship-start-btn complete" onclick="onShipmentAllDone()"><i class="ti ti-check-circle"></i> ' + doneAllLabel + '</button>';
   } else {
     html += '<button class="ship-start-btn" onclick="startShipmentScan()"><i class="ti ti-scan"></i> Сканировать QR</button>';
   }
@@ -8575,29 +8586,33 @@ function renderShipmentScreen(status) {
   // Список позиций (с группировкой одинаковых сборок)
   if (total > 0) {
     const items = status.items || [];
-    const shippedItems = items.filter(x => x.shipped);
-    const pendingItems = items.filter(x => !x.shipped);
+    const doneItems = items.filter(x => _shipItemDone(x));
+    const pendingItems = items.filter(x => !_shipItemDone(x));
+    const pendingTitle = isGather ? 'Ожидают сборки' : 'Ожидают отгрузки';
+    const doneTitle = isGather ? 'Собрано' : 'Отгружено';
 
     if (pendingItems.length) {
-      html += '<div class="ship-items-title">Ожидают отгрузки (' + pendingItems.length + ')</div>';
+      html += '<div class="ship-items-title">' + pendingTitle + ' (' + pendingItems.length + ')</div>';
       // v2.43.10 (C): группируем одинаковые сборки по имени
       html += _renderShipItemsGrouped(pendingItems);
     }
-    if (shippedItems.length) {
-      html += '<div class="ship-items-title">Отгружено (' + shippedItems.length + ')</div>';
-      // У отгруженных не группируем — нужно видеть время каждой
-      shippedItems.forEach(it => { html += renderShipItem(it); });
+    if (doneItems.length) {
+      html += '<div class="ship-items-title">' + doneTitle + ' (' + doneItems.length + ')</div>';
+      // У готовых не группируем — нужно видеть время каждой
+      doneItems.forEach(it => { html += renderShipItem(it); });
     }
   }
 
-  // v2.43.10 (E): аккордеон «История отгрузки»
-  html += '<div class="ship-log-section">' +
-    '<button class="ship-log-toggle" onclick="toggleShipmentLog()" id="ship-log-toggle-btn">' +
-      '<i class="ti ti-history"></i><span>История отгрузки</span>' +
-      '<i class="ti ti-chevron-down ship-log-chevron"></i>' +
-    '</button>' +
-    '<div class="ship-log-content" id="ship-log-content" style="display:none;"></div>' +
-  '</div>';
+  // v2.43.10 (E): аккордеон «История отгрузки» — только в режиме отгрузки
+  if (!isGather) {
+    html += '<div class="ship-log-section">' +
+      '<button class="ship-log-toggle" onclick="toggleShipmentLog()" id="ship-log-toggle-btn">' +
+        '<i class="ti ti-history"></i><span>История отгрузки</span>' +
+        '<i class="ti ti-chevron-down ship-log-chevron"></i>' +
+      '</button>' +
+      '<div class="ship-log-content" id="ship-log-content" style="display:none;"></div>' +
+    '</div>';
+  }
 
   html += '</div>';
 
@@ -8674,12 +8689,17 @@ function renderShipItem(it) {
     if (purN > 0) parts.push(purN + ' ' + _plural(purN, ['покупная позиция', 'покупные позиции', 'покупных позиций']));
     sub += ' · ' + (parts.length ? parts.join(' + ') : '0 сборок');
   }
-  if (it.shipped && it.shipped_at) {
+  const _isGather = _shipModeIsGather();
+  const _done = _shipItemDone(it);
+  if (!_isGather && it.shipped && it.shipped_at) {
     sub += ' · отгружено ' + (String(it.shipped_at).slice(0, 16).replace('T', ' '));
+  } else if (_isGather && _done) {
+    sub += ' · собрано';
   }
-  // v2.43.10 (A): тап по карточке открывает модалку с деталями
-  const clickAttr = ' onclick="openShipmentItemDetail(\'' + it.type + '\',' + it.id + ')"';
-  return '<div class="ship-item ' + (it.shipped ? 'shipped' : '') + '"' + clickAttr + ' style="cursor:pointer;">' +
+  // v2.43.10 (A): тап по карточке открывает модалку с деталями (только в режиме отгрузки —
+  // карточка завязана на shipments). В режиме сборки тап не нужен.
+  const clickAttr = _isGather ? '' : ' onclick="openShipmentItemDetail(\'' + it.type + '\',' + it.id + ')"';
+  return '<div class="ship-item ' + (_done ? 'shipped' : '') + '"' + clickAttr + ' style="' + (_isGather ? '' : 'cursor:pointer;') + '">' +
     '<div class="ship-item-check"></div>' +
     '<div class="ship-item-type-icon' + (it.type === 'box' ? ' t-box' : (it.type === 'contract_item' ? ' t-buy' : ' t-asm')) + '"><i class="ti ' + iconCls + '"></i></div>' +
     '<div class="ship-item-body">' +
@@ -9074,9 +9094,9 @@ function _fmtDateRu(d) {
 // ============ конец Этапа 35 ============
 
 function onShipmentAllDone() {
-  // Просто моргнуть successом
-  if (typeof toast === 'function') toast('Всё уже отгружено по этому договору');
-  else alert('Всё уже отгружено по этому договору');
+  const msg = _shipModeIsGather() ? 'Всё уже собрано к отгрузке' : 'Всё уже отгружено по этому договору';
+  if (typeof toast === 'function') toast(msg);
+  else alert(msg);
 }
 
 // ===== Continuous-режим сканера =====
@@ -9086,33 +9106,37 @@ async function startShipmentScan() {
     alert('Не выбран договор для отгрузки');
     return;
   }
-  // v2.45.146: отгрузка по QR — под личным паролём (проверяем перед сканером)
-  const password = await _promptPasswordForAction(
-    'Начать отгрузку по QR?',
-    'Подтверди личным паролём — без него сканирование не запустится.'
-  );
-  if (password === null) return;   // отменили
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const vr = await fetch(API_BASE + '/api/auth/verify-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ password: password }),
-    });
-    if (!vr.ok) {
-      const d = await vr.json().catch(() => ({}));
-      if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
-      showToast(d.error === 'wrong_password' ? 'Неверный пароль' : 'Нужно подтвердить паролем', 'error');
+  const _isGather = _shipModeIsGather();
+  // v2.45.146: отгрузка по QR — под личным паролём (списывает склад). Сборка к
+  // отгрузке (комплектация) — без пароля: она обратима и ничего не списывает.
+  if (!_isGather) {
+    const password = await _promptPasswordForAction(
+      'Начать отгрузку по QR?',
+      'Подтверди личным паролём — без него сканирование не запустится.'
+    );
+    if (password === null) return;   // отменили
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const vr = await fetch(API_BASE + '/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ password: password }),
+      });
+      if (!vr.ok) {
+        const d = await vr.json().catch(() => ({}));
+        if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
+        showToast(d.error === 'wrong_password' ? 'Неверный пароль' : 'Нужно подтвердить паролем', 'error');
+        return;
+      }
+    } catch (e) {
+      showToast('Сеть: не удалось проверить пароль', 'error');
       return;
     }
-  } catch (e) {
-    showToast('Сеть: не удалось проверить пароль', 'error');
-    return;
   }
   // Загружаем актуальный прогресс для счётчика
   try {
     const status = await apiGet('/api/contracts/' + state._shipContractId + '/shipment-status');
-    updateShipCounter(status.shipped || 0, status.total || 0, '');
+    updateShipCounter((_isGather ? status.gathered : status.shipped) || 0, status.total || 0, '');
   } catch (e) {}
 
   // Включаем continuous-режим
@@ -9136,6 +9160,14 @@ const _SHIP_REASON_TEXT = {
   'wrong_contract':  'Объект из другого договора',
   'already_shipped': 'Уже отгружено',
 };
+// v2.45.405: в режиме сборки «already_shipped» означает «уже собрано»
+function _shipReasonText(reason) {
+  if (_shipModeIsGather() && reason === 'already_shipped') return 'Уже собрано';
+  return _SHIP_REASON_TEXT[reason] || 'Ошибка';
+}
+function _shipScanEndpoint() {
+  return _shipModeIsGather() ? '/api/gatherings/scan' : '/api/shipments/scan';
+}
 
 // v2.45.137: скан → ПРОВЕРКА (dry_run, без списания) → показываем «Совпадает
 // по договору» + кнопку «Отгрузить». Реальная отгрузка — только по нажатию.
@@ -9162,7 +9194,7 @@ async function handleContinuousShipmentScan(decodedText) {
 
   let resp;
   try {
-    resp = await apiPost('/api/shipments/scan', {
+    resp = await apiPost(_shipScanEndpoint(), {
       qr_token: token,
       contract_id: state._shipContractId,
       contract_item_id: itemId,
@@ -9202,7 +9234,7 @@ async function handleContinuousShipmentScan(decodedText) {
     flashScanner('error');
     playBeep('error');
     vibrate([100, 50, 100]);
-    const reasonText = _SHIP_REASON_TEXT[d.reason] || 'Ошибка';
+    const reasonText = _shipReasonText(d.reason);
     showShipLast('error', reasonText, (d.item && d.item.name) || '');
   }
 }
@@ -9218,6 +9250,13 @@ function _showShipConfirm(item) {
     label += ' · ' + n + ' ' + _plural(n, ['сборка', 'сборки', 'сборок']);
   }
   if (nm) nm.textContent = label;
+  // v2.45.405: в режиме сборки кнопка подтверждения — «Собрано», не «Отгрузить»
+  const okBtn = el.querySelector('.ship-confirm-ok');
+  if (okBtn) {
+    okBtn.innerHTML = _shipModeIsGather()
+      ? '<i class="ti ti-checkbox"></i> Собрано'
+      : '<i class="ti ti-check"></i> Отгрузить';
+  }
   const last = document.getElementById('ship-last');
   if (last) last.classList.remove('visible');   // чтобы тост не перекрывал
   el.classList.add('visible');
@@ -9242,7 +9281,7 @@ async function confirmShipCurrent() {
   const okBtn = document.querySelector('.ship-confirm-ok');
   if (okBtn) okBtn.disabled = true;
   try {
-    const resp = await apiPost('/api/shipments/scan', {
+    const resp = await apiPost(_shipScanEndpoint(), {
       qr_token: pending.token,
       contract_id: state._shipContractId,
       contract_item_id: pending.itemId || null,
@@ -9258,13 +9297,15 @@ async function confirmShipCurrent() {
       playBeep('success');
       vibrate(80);
       const item = d.item || pending.item || {};
-      showShipLast('success', '✓ ' + (item.name || 'Отгружено'),
+      const okWord = _shipModeIsGather() ? 'Собрано' : 'Отгружено';
+      showShipLast('success', '✓ ' + (item.name || okWord),
         (d.progress ? (d.progress.shipped + ' из ' + d.progress.total) : ''));
     } else {
       flashScanner('error');
       playBeep('error');
       vibrate([100, 50, 100]);
-      const reasonText = _SHIP_REASON_TEXT[d.reason] || (d.message || 'Ошибка');
+      const reasonText = (_shipModeIsGather() && d.reason === 'already_shipped')
+        ? 'Уже собрано' : (_SHIP_REASON_TEXT[d.reason] || (d.message || 'Ошибка'));
       showShipLast('error', reasonText, (d.item && d.item.name) || '');
     }
   } catch (e) {
@@ -12157,6 +12198,8 @@ async function _maybeMorningProgress() {
     const roles = (state.user && state.user.roles) || [];
     // v2.45.359: только мастеру (и НЕ директору) — у директора роль master тоже есть
     if (!roles.includes('master') || roles.includes('director')) return;
+    // v2.45.404: Михаил Шевелёв пока не заполняет утреннюю готовность — не показываем
+    if (typeof _isShevelevMaster === 'function' && _isShevelevMaster()) return;
     if (document.getElementById('morning-progress-overlay')) return;
     // v2.45.364: только то, что «В работе» в производстве (production works status=in_progress),
     // и сразу подставляем текущий % готовности с карточки канбана

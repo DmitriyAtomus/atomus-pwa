@@ -14454,6 +14454,9 @@
   }
   .ku-badge-done { color: #15803D; background: #DCFCE7; }
   .ku-badge-done i { font-size: 12px; }
+  /* v2.45.405: собрано к отгрузке (промежуточный статус до отгрузки) */
+  .ku-badge-gathered { color: #1D4ED8; background: #DBEAFE; }
+  .ku-badge-gathered i { font-size: 12px; }
   .ku-chev { color: #B6BECC; font-size: 19px; flex-shrink: 0; }
 
   /* ============ v2.43.10 (Этап 35): расширения экрана отгрузки ============ */
