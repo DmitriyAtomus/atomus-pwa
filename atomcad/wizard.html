@@ -720,24 +720,26 @@ function cabItems(){
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
   return items;
 }
-/* перетаскивание аппаратов в компоновке — перемещение (вставка рядом с целью) */
-var cabDrag=null;
+/* перетаскивание аппаратов в компоновке — перемещение в любое место (между / в свободное) */
+var cabDrag=null, cabHits=[], cabGeom=null;
 function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;}
 function cabUp(e){
   if(!cabDrag)return;
   var src=cabDrag; cabDrag=null;
-  var el=document.elementFromPoint(e.clientX,e.clientY);
-  var g=el&&el.closest?el.closest('[data-cabkey]'):null;
-  if(g){var dst=g.getAttribute('data-cabkey'); if(dst&&dst!==src){
-    var keys=cabItems().map(function(it){return it.key;});
-    var ia=keys.indexOf(src), ib=keys.indexOf(dst);
-    if(ia>=0&&ib>=0){
-      keys.splice(ia,1);
-      var nb=keys.indexOf(dst);
-      keys.splice(nb+(ia<ib?1:0),0,src);
-      P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Перемещено');
-    }
-  }}
+  var svg=document.getElementById('cabSvg'); if(!svg||!cabGeom)return;
+  // координаты броска в системе листа
+  var loc;
+  try{var pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;loc=pt.matrixTransform(svg.getScreenCTM().inverse());}catch(_){return;}
+  var dropRow=Math.max(0,Math.min(cabGeom.drawnRows-1,Math.round((loc.y-cabGeom.railsTop)/cabGeom.pitchPx)));
+  var dropKey=dropRow*1e6+loc.x;
+  // место вставки — перед первым аппаратом (в порядке чтения), что идёт после точки броска
+  var hits=cabHits.filter(function(h){return h.key!==src;});
+  var beforeKey=null;
+  for(var i=0;i<hits.length;i++){ if((hits[i].row*1e6+hits[i].cx)>=dropKey){beforeKey=hits[i].key;break;} }
+  var keys=cabItems().map(function(it){return it.key;});
+  var si=keys.indexOf(src); if(si<0)return; keys.splice(si,1);
+  if(beforeKey){ keys.splice(keys.indexOf(beforeKey),0,src); } else { keys.push(src); }
+  P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Перемещено');
 }
 document.addEventListener('pointerup',cabUp);
 function cabinetSVG(){
@@ -761,12 +763,13 @@ function cabinetSVG(){
   var railX=pad+mm(dim.wall+dim.duct+dim.gap), railWpx=mm(W-2*(dim.wall+dim.duct+dim.gap)), modPx=railWpx/perRow;
   var railsTop=pad+mm(dim.topZone), rowsRegionPx=mm(H-dim.topZone-dim.botZone);
   var appHpx=mm(78), pitchPx=mm(dim.pitch);
+  cabHits=[]; cabGeom={railsTop:railsTop,pitchPx:pitchPx,drawnRows:drawnRows};  // для перетаскивания «между» и «в свободное»
   function duct(x,y,w,hh){var s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+hh+'" rx="3" fill="rgba(120,140,160,.05)" stroke="#3A4654" stroke-width="1"/>';
     if(w>hh){for(var xx=x+6;xx<x+w-4;xx+=11)s+='<line x1="'+xx.toFixed(1)+'" y1="'+(y+3)+'" x2="'+xx.toFixed(1)+'" y2="'+(y+hh-3)+'" stroke="#3A4654" stroke-width="1"/>';}
     else{for(var yy=y+6;yy<y+hh-4;yy+=11)s+='<line x1="'+(x+3)+'" y1="'+yy.toFixed(1)+'" x2="'+(x+w-3)+'" y2="'+yy.toFixed(1)+'" stroke="#3A4654" stroke-width="1"/>';}
     return s;}
   var COLS={ctrl:['rgba(22,183,219,.12)','#16B7DB'],qf:['rgba(22,183,219,.13)','#16B7DB'],km:['rgba(255,196,0,.14)','#FFC400'],term:['rgba(91,214,162,.12)','#5BD6A2'],aux:['rgba(200,210,220,.05)','#5A6573']};
-  var s='<svg viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
+  var s='<svg id="cabSvg" viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
   // корпус (двойная рамка-дверь), форма = щит
   s+='<rect x="'+pad+'" y="'+pad+'" width="'+boxW.toFixed(0)+'" height="'+boxH.toFixed(0)+'" rx="10" fill="#13171D" stroke="#39434F" stroke-width="2.5"/>';
   s+='<rect x="'+(pad+6)+'" y="'+(pad+6)+'" width="'+(boxW-12).toFixed(0)+'" height="'+(boxH-12).toFixed(0)+'" rx="7" fill="none" stroke="#2A323E" stroke-width="1.2"/>';
@@ -785,6 +788,7 @@ function cabinetSVG(){
     row.forEach(function(it){
       var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
       var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:grab"'):'';
+      if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
       s+='<g'+drag+'>';
       if(it.tip)s+='<title>'+esc(it.tip)+'</title>';
       s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
