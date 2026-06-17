@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.405-atomcad-hmi-door-dnd";
+const APP_VERSION = "v2.45.407-atomcad-hmi-door-dnd";
 const APP_VERSION_DATE = "17.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7041,6 +7041,14 @@ async function ensureAccessLevelsLoaded() {
 }
 
 // Применяет права к UI: скрывает пункты меню, кнопки и т.д.
+// v2.45.404: Михаил Шевелёв (мастер) пока не заполняет утреннюю готовность и не
+// работает с оплатой — точечно прячем для него утреннее окно «Начать смену» и
+// пункт меню «На оплату». Определяем по ФИО (другого стабильного признака нет).
+function _isShevelevMaster() {
+  const nm = (state.user && (state.user.full_name || state.user.name) || '');
+  return /шевел[её]в/i.test(nm) && /михаил/i.test(nm);
+}
+
 function applyPermissionsToUI() {
   // Сотрудники в Кадрах — только если hr.manage_employees
   const navEmps = document.querySelector('#sidebar-hr .nav-item[data-nav="employees"]');
@@ -7059,6 +7067,22 @@ function applyPermissionsToUI() {
   const canSeeHR = hasAnyPermission('hr.view_vacations', 'hr.create_vacations',
     'hr.manage_employees', 'hr.manage_positions', 'hr.manage_access');
   hrTabs.forEach(t => { t.style.display = canSeeHR ? '' : 'none'; });
+
+  // v2.45.404: Михаилу Шевелёву пункт «На оплату» не нужен — он с оплатой не работает
+  if (_isShevelevMaster()) {
+    const _payNav = document.getElementById('sb-home-pay');
+    if (_payNav) _payNav.style.display = 'none';
+  }
+
+  // v2.45.406: Михаил Шевелёв (мастер-сборщик) работает только с производством и
+  // сборкой к отгрузке. Оставляем в верхней навигации лишь «Главную» (там его
+  // запросы «к отгрузке» с QR) и «Производство»; остальные разделы прячем.
+  if (_isShevelevMaster()) {
+    const ALLOWED = ['home', 'production'];
+    document.querySelectorAll('.section-tab, .m-section-tabs button').forEach(t => {
+      t.style.display = ALLOWED.includes(t.dataset.section) ? '' : 'none';
+    });
+  }
 
   // v2.45.56: Админ-инструменты в сайдбаре Снабжения — только директору
   const adminTools = document.getElementById('sb-supply-admin-tools');
