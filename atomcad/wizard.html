@@ -95,6 +95,15 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 <div id="cabTip" style="position:fixed;z-index:60;display:none;pointer-events:none;background:#10212F;color:#fff;font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);max-width:280px;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.4)"></div>
+<div id="cabCard" style="position:fixed;z-index:70;display:none;left:50%;top:90px;transform:translateX(-50%);min-width:280px;max-width:360px;background:#13202B;color:#E7EEF4;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55)">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)">
+    <span id="cabCardTag" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--cyan)"></span>
+    <span id="cabCardType" style="font-size:12px;color:#8FA0AE"></span>
+    <span style="flex:1"></span>
+    <button onclick="cabCardHide()" style="background:none;border:none;color:#8FA0AE;font-size:20px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+  </div>
+  <div id="cabCardBody" style="padding:12px 14px;font-size:13px;line-height:1.5"></div>
+</div>
 
 <script src="core.js"></script>
 <script>
@@ -719,14 +728,53 @@ function cabItems(){
   // сквозная нумерация по физическому порядку: QF1..QFn, KM1..KMn (key остаётся стабильным)
   var cnt={};
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
+  cabTipByKey={}; cabCardByKey={};
+  items.forEach(function(it){
+    if(!it.key)return;
+    cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+it.tip):it.tip;
+    var parts=String(it.tip||'').split(' · ');
+    cabCardByKey[it.key]={tag:it.t||'', type:parts[0]||'', specs:parts.slice(1)};
+  });
   return items;
 }
+var cabTipByKey={}, cabCardByKey={};
+function cabCardShow(key){
+  var info=cabCardByKey[key]; if(!info)return;
+  var card=document.getElementById('cabCard'); if(!card)return;
+  document.getElementById('cabCardTag').textContent=info.tag;
+  document.getElementById('cabCardType').textContent=info.type;
+  var body='';
+  if(info.specs&&info.specs.length){
+    body='<table style="width:100%;border-collapse:collapse">';
+    var labels=info.type==='Автомат'?['Марка','Полюса · номинал','Назначение']
+              :info.type==='Контактор'?['Марка','Нагрузка']
+              :info.type==='Контроллер'?['Модель']:[];
+    info.specs.forEach(function(sp,i){
+      var lab=labels[i]||'';
+      body+='<tr><td style="color:#8FA0AE;padding:3px 10px 3px 0;white-space:nowrap;vertical-align:top">'+(lab||'·')+'</td><td style="padding:3px 0">'+esc(sp)+'</td></tr>';
+    });
+    body+='</table>';
+  } else { body='<div style="color:#8FA0AE">Нет дополнительных данных</div>'; }
+  document.getElementById('cabCardBody').innerHTML=body;
+  card.style.display='block';
+}
+function cabCardHide(){var c=document.getElementById('cabCard');if(c)c.style.display='none';}
+function cabTipShow(e,key){
+  var tipEl=document.getElementById('cabTip'); if(!tipEl)return;
+  var tip=cabTipByKey[key]; if(!tip){tipEl.style.display='none';return;}
+  tipEl.textContent=tip; tipEl.style.display='block';
+  var w=tipEl.offsetWidth||200, x=Math.min(e.clientX+14,(window.innerWidth||1000)-w-12);
+  tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
+}
+function cabTipHide(){var t=document.getElementById('cabTip');if(t)t.style.display='none';}
 /* перетаскивание аппаратов в компоновке — перемещение в любое место (между / в свободное) */
-var cabDrag=null, cabHits=[], cabGeom=null;
-function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;}
+var cabDrag=null, cabHits=[], cabGeom=null, cabDownXY=null;
+function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;cabDownXY={x:e.clientX,y:e.clientY};}
 function cabUp(e){
   if(!cabDrag)return;
   var src=cabDrag; cabDrag=null;
+  // короткий клик без перемещения → открыть карточку аппарата, не двигать
+  if(cabDownXY){var dx=Math.abs(e.clientX-cabDownXY.x),dy=Math.abs(e.clientY-cabDownXY.y);cabDownXY=null;if(dx<5&&dy<5){cabCardShow(src);return;}}
   var svg=document.getElementById('cabSvg'); if(!svg||!cabGeom)return;
   // координаты броска в системе листа
   var loc;
@@ -743,15 +791,6 @@ function cabUp(e){
   P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Перемещено');
 }
 document.addEventListener('pointerup',cabUp);
-function cabTipMove(e){
-  var tipEl=document.getElementById('cabTip'); if(!tipEl)return;
-  var t=e.target&&e.target.closest?e.target.closest('[data-tip]'):null;
-  if(t){ tipEl.textContent=t.getAttribute('data-tip'); tipEl.style.display='block';
-    var w=tipEl.offsetWidth||200, x=Math.min(e.clientX+14,(window.innerWidth||1000)-w-12);
-    tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
-  } else if(tipEl.style.display!=='none'){ tipEl.style.display='none'; }
-}
-document.addEventListener('pointermove',cabTipMove);
 function cabinetSVG(){
   ensureBreakers(); if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
   // габариты: введённые или дефолт под подобранный корпус
@@ -797,11 +836,10 @@ function cabinetSVG(){
     var x=railX+2;
     row.forEach(function(it){
       var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
-      var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:grab"'):'';
-      var tipAttr=it.tip?(' data-tip="'+esc(it.tip).replace(/"/g,'&#34;')+'"'):'';
+      var hov=it.key?(' onmousemove="cabTipShow(event,\''+it.key+'\')" onmouseleave="cabTipHide()"'):'';
+      var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:pointer"'):'';
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
-      s+='<g'+drag+tipAttr+'>';
-      if(it.tip)s+='<title>'+esc(it.tip)+'</title>';
+      s+='<g'+drag+hov+'>';
       s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
       var fs=Math.max(7,Math.min(11,modPx*0.7));
       var lbl=String(it.t||''), cx=x+ww/2, cy=y+mm(3)+hpx/2, textW=lbl.length*fs*0.62;
