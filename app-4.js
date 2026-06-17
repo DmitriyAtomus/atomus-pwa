@@ -9145,11 +9145,17 @@ async function handleContinuousShipmentScan(decodedText) {
   if (state._shipPendingConfirm) return;
   // Извлекаем токен из URL если это полная ссылка
   let token = decodedText;
+  let itemId = null;
   try {
     const url = new URL(decodedText);
     // ЭТАП 26.3: /a/ (сборка), /b/ (коробка), /c/ (договор)
     const m = url.pathname.match(/\/[abc]\/([A-Za-z0-9_\-]+)/);
     if (m) token = m[1];
+    // v2.45.385: этикетка покупной позиции = /c/{токен договора}?item=ID.
+    // Токен в ней — договорный (для просмотра карточки), а отгружать надо саму
+    // позицию по её id. Достаём item и шлём его как contract_item_id.
+    const it = url.searchParams.get('item');
+    if (it && /^\d+$/.test(it)) itemId = Number(it);
   } catch (e) { /* не URL — оставляем как есть */ }
   token = String(token || '').trim();
   if (!token) return;
@@ -9159,6 +9165,7 @@ async function handleContinuousShipmentScan(decodedText) {
     resp = await apiPost('/api/shipments/scan', {
       qr_token: token,
       contract_id: state._shipContractId,
+      contract_item_id: itemId,
       dry_run: true,   // только проверка
     });
   } catch (e) {
@@ -9188,7 +9195,7 @@ async function handleContinuousShipmentScan(decodedText) {
     flashScanner('success');
     playBeep('success');
     vibrate(40);
-    state._shipPendingConfirm = { token: token, item: d.item || {} };
+    state._shipPendingConfirm = { token: token, itemId: itemId, item: d.item || {} };
     _showShipConfirm(d.item || {});
   } else {
     // already_shipped / wrong_contract / unknown — показываем тост-ошибку
@@ -9238,6 +9245,7 @@ async function confirmShipCurrent() {
     const resp = await apiPost('/api/shipments/scan', {
       qr_token: pending.token,
       contract_id: state._shipContractId,
+      contract_item_id: pending.itemId || null,
     });
     // v2.45.145: поля в resp.data, не в resp (см. apiPost)
     const d = (resp && resp.data) || {};
