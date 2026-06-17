@@ -573,12 +573,13 @@ function pAux(){
          '<input style="width:62px;'+FLDST+';font-family:\'IBM Plex Mono\';color:var(--cyan)" value="'+esc(a.tag||'')+'" title="обозначение" onchange="editAuxField(\''+a.id+'\',\'tag\',this.value)">'+
          '<input style="flex:1;min-width:140px;'+FLDST+'" value="'+esc(a.name)+'" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
          '<select style="'+FLDST+'" onchange="editAuxField(\''+a.id+'\',\'kind\',this.value)">'+auxKindOptions(a.kind)+'</select>'+
+         (a.kind==='contactor'?'<select style="'+FLDST+'" title="что коммутирует контактор" onchange="editAuxField(\''+a.id+'\',\'target\',this.value)">'+consumerOptions(a.target)+'</select>':'')+
          '<input inputmode="decimal" style="width:60px;'+FLDST+'" value="'+(a.a||'')+'" placeholder="А" onchange="editAuxField(\''+a.id+'\',\'a\',this.value)">'+
          '<input inputmode="numeric" style="width:54px;'+FLDST+'" value="'+(a.qty||1)+'" title="кол-во" onchange="editAuxField(\''+a.id+'\',\'qty\',this.value)">'+
          '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
          '<button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }else{
-      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(a.kind==='contactor'?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }
   });
   return h;}
@@ -628,7 +629,9 @@ function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наиме
 function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});if(editAux===id)editAux=null;dirty();draw()}
 function startEditAux(id){editAux=id;draw()}
 function doneEditAux(){editAux=null;draw()}
-function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag')a.tag=(v||'').trim();else if(f==='kind')a.kind=v;else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);dirty();}
+function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag')a.tag=(v||'').trim();else if(f==='kind')a.kind=v;else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();dirty();}
+// варианты «что коммутирует контактор» — список потребителей
+function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'';o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';});return o;}
 
 /* 6 автоматы */
 function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
@@ -733,7 +736,9 @@ function cabItems(){
       doorN++;
     } else if(a.kind==='contactor'){
       // контактор/пускатель = тот же KM (готовое изделие с катушкой в сборе): единая сквозная нумерация KM1..KMn
-      items.push({t:'KM',w:3,k:'km',key:'aux'+(auxN++),tip:'Контактор · '+tip});
+      var brand=((a.manu||'')+' '+(a.model||'')).replace(/\s+/g,' ').trim()||'CHINT NXC-09';
+      var dest=a.target||'назначение не указано';
+      items.push({t:'KM',w:3,k:'km',key:'aux'+(auxN++),tip:'Контактор · '+brand+' · '+dest});
     } else {
       var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
       var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
