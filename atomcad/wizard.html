@@ -729,6 +729,9 @@ function cabItems(){
     if(DOOR_KINDS[a.kind]){
       cabDoorList.push({kind:a.kind,t:(a.tag||auxPrefix(a.kind)+doorN),key:'door'+doorN,tip:tip});
       doorN++;
+    } else if(a.kind==='contactor'){
+      // контактор/пускатель — готовое изделие с катушкой в сборе: полноценный блок ~3 мод.
+      items.push({t:(a.tag||'KM'),w:3,k:'kma',key:'aux'+(auxN++),tip:tip});
     } else {
       var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
       var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
@@ -849,7 +852,7 @@ function cabinetSVG(){
     if(w>hh){for(var xx=x+6;xx<x+w-4;xx+=11)s+='<line x1="'+xx.toFixed(1)+'" y1="'+(y+3)+'" x2="'+xx.toFixed(1)+'" y2="'+(y+hh-3)+'" stroke="#3A4654" stroke-width="1"/>';}
     else{for(var yy=y+6;yy<y+hh-4;yy+=11)s+='<line x1="'+(x+3)+'" y1="'+yy.toFixed(1)+'" x2="'+(x+w-3)+'" y2="'+yy.toFixed(1)+'" stroke="#3A4654" stroke-width="1"/>';}
     return s;}
-  var COLS={ctrl:['rgba(22,183,219,.12)','#16B7DB'],qf:['rgba(22,183,219,.13)','#16B7DB'],km:['rgba(255,196,0,.14)','#FFC400'],term:['rgba(91,214,162,.12)','#5BD6A2'],aux:['rgba(200,210,220,.05)','#5A6573']};
+  var COLS={ctrl:['rgba(22,183,219,.12)','#16B7DB'],qf:['rgba(22,183,219,.13)','#16B7DB'],km:['rgba(255,196,0,.14)','#FFC400'],kma:['rgba(255,196,0,.14)','#FFC400'],term:['rgba(91,214,162,.12)','#5BD6A2'],aux:['rgba(200,210,220,.05)','#5A6573']};
   var s='<svg id="cabSvg" viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
   // корпус (двойная рамка-дверь), форма = щит
   s+='<rect x="'+pad+'" y="'+pad+'" width="'+boxW.toFixed(0)+'" height="'+boxH.toFixed(0)+'" rx="10" fill="#13171D" stroke="#39434F" stroke-width="2.5"/>';
