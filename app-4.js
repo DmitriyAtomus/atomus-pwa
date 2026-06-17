@@ -11776,6 +11776,13 @@ function _installFmtDate(d) {
   return m ? (m[3] + '.' + m[2] + '.' + m[1]) : String(d);
 }
 
+// v2.45.394: дата+время для отметки «монтажник заходил»
+function _installFmtDateTime(d) {
+  if (!d) return '';
+  var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1] + ' ' + m[4] + ':' + m[5]) : String(d);
+}
+
 function setMobileInstallFilter(f, el) {
   try {
     document.querySelectorAll('#m-install-filter-chips .m-filter-chip').forEach(function (c) { c.classList.remove('active'); });
@@ -11903,6 +11910,18 @@ function _renderInstallationDetail(d) {
   if (d.scheduled_date)  meta.push('<div><i class="ti ti-calendar"></i> ' + _installFmtDate(d.scheduled_date) + '</div>');
   if (d.object_address)  meta.push('<div><i class="ti ti-map-pin"></i> ' + escapeHtml(d.object_address) + '</div>');
   if (d.assignee_name)   meta.push('<div><i class="ti ti-user"></i> ' + escapeHtml(d.assignee_name) + '</div>');
+  // v2.45.394: «заходил ли монтажник» — открывал ли назначенный исполнитель свой
+  // монтаж сам (в отличие от смены статуса из офиса). Видно: был или нет.
+  if (d.assigned_employee_id) {
+    var _who = d.assignee_name ? escapeHtml(d.assignee_name) : 'Монтажник';
+    if (d.installer_first_opened_at) {
+      var _seen = _installFmtDateTime(d.installer_last_seen_at || d.installer_first_opened_at);
+      meta.push('<div style="color:#15803D;font-weight:600;"><i class="ti ti-circle-check"></i> ' + _who + ' заходил: ' + escapeHtml(_seen) +
+        ((d.installer_open_count || 0) > 1 ? ' <span style="color:var(--text-light,#94A3B8);font-weight:400;">· открывал ' + d.installer_open_count + ' р.</span>' : '') + '</div>');
+    } else {
+      meta.push('<div style="color:#B45309;"><i class="ti ti-eye-off"></i> ' + _who + ' ещё не открывал монтаж</div>');
+    }
+  }
   if (d.contract_number) meta.push('<div><i class="ti ti-file-text"></i> Договор ' + escapeHtml(d.contract_number) + (d.contractor_name ? ' · ' + escapeHtml(d.contractor_name) : '') + '</div>');
   if (d.contractor_phone) meta.push('<div><i class="ti ti-phone"></i> ' + escapeHtml(d.contractor_phone) + '</div>');
 
