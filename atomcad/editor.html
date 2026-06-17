@@ -794,7 +794,7 @@ function renderCanvas(){
   $('wiresL').innerHTML=wiresMarkup(false);
   /* точки соединений */
   h='';
-  junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="11" fill="'+INK+'"/>'});
+  junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="6.5" fill="'+INK+'"/>'});
   $('jL').innerHTML=h;
   /* компоненты + свободные тексты */
   h='';
@@ -1153,7 +1153,7 @@ function exportSheetSVG(sh, idx){
   S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.sel=null;
   var h=buildSheetMarkup(idx, S.sheets.length, sh.subtitle||'схема электрическая');
   h+=wiresMarkup(true);
-  junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="11" fill="'+INK+'"/>'});
+  junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="6.5" fill="'+INK+'"/>'});
   S.texts.forEach(function(t){h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>'});
   S.comps.forEach(function(c){h+=compSvg(c,INK)});
   S.comps=oc;S.wires=ow;S.texts=ot;S.sel=osel;
