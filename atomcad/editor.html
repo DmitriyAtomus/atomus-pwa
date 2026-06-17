@@ -1037,6 +1037,17 @@ function cancelWire(){draft=[];S._extend=null;renderDraft()}
 
 /* ============ drag компонента + подтяжка проводов ============ */
 var mode=null;
+// гарантия ортогональности (стиль sPlan): любой косой сегмент → Г-образный (гориз.+верт.)
+function orthoWire(w){
+  if(!w||!w.pts||w.pts.length<2)return;
+  var out=[{x:w.pts[0].x,y:w.pts[0].y}];
+  for(var i=1;i<w.pts.length;i++){
+    var a=out[out.length-1], b=w.pts[i];
+    if(a.x!==b.x && a.y!==b.y) out.push({x:b.x,y:a.y});
+    out.push({x:b.x,y:b.y});
+  }
+  w.pts=out;
+}
 function collectAtt(c){
   var att=[],per={};
   for(var i=0;i<symFor(c).pins.length;i++){
@@ -1271,7 +1282,10 @@ svg.addEventListener('pointermove',function(e){
 function up(e){
   ptrs.delete(e.pointerId);
   if(ptrs.size<2)pinch=null;
-  if(mode){mode=null}
+  if(mode){
+    if(mode.k==='drag'&&mode.moved&&mode.att){ mode.att.forEach(function(a){orthoWire(a.w)}); renderCanvas(); }  // спрямляем провода под 90°
+    mode=null;
+  }
 }
 svg.addEventListener('pointerup',up);
 svg.addEventListener('pointercancel',up);
@@ -1644,6 +1658,7 @@ function loadExternal(d){
   if(!d)return;
   if(d.sheets&&d.sheets.length){ S.sheets=d.sheets.map(_mkSheet); }
   else { S.sheets=[_mkSheet(d)]; }
+  S.sheets.forEach(function(sh){ sh.wires.forEach(orthoWire); });  // всё под прямым углом
   S.cur=0;
   var sh=S.sheets[0]; S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.sel=null;
   buildSheet(); updateSheetNav(); renderProps(true); renderAll(); fit();
