@@ -197,19 +197,19 @@ function buildSchematic(P){
     var phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
     pc.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
     pw.push(W([x,800],[x,950]));
-    pt.push({x:x+44,y:885,s:24,tx:phase});                 // фаза линии
+    pt.push({x:x+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                 // фаза линии
     if(cons&&needsContactor(cons)){
       pc.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',cons.name));
       pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
-      pt.push({x:x+46,y:1490,s:20,tx:'катушка → л.2'});     // перекрёстная ссылка на катушку
+      pt.push({x:x-66,y:1545,s:20,ls:0,anchor:'end',tx:'(л.2)'});     // ссылка на катушку
       kmN++;
     } else { pw.push(W([x,1250],[x,1950])); }
-    pt.push({x:x+44,y:1730,s:22,tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода линии
+    pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
     pc.push(C('X'+(i+2),'term',x,2000,'ЗНИ 2,5 мм²','',role));
     lastX=x;
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
-  pt.push({x:gx-10,y:780,s:24,tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины
+  pt.push({x:gx-10,y:780,s:24,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины
   pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
   var sheets=[{title:'силовые цепи', comps:pc, wires:pw, texts:pt}];
 
@@ -248,26 +248,26 @@ function buildSchematic(P){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, isT=(p.g==='AI'), chx=lpx-130-k*40;
       ac.push(shortC('BT'+(k+1), isT?'ntc':'term', inX, devY, isT?'NTC':'', '', p.lab));
       aw.push(W([lpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[inX,devY]));
-      at.push({x:chx+22,y:py-14,s:22,tx:''+(11+k)});        // номер цепи входа
+      at.push({x:chx+22,y:py-14,s:22,ls:0,anchor:'start',tx:''+(11+k)});        // номер цепи входа
       if(isT){ aw.push(W([inX,devY+150],[comX,devY+150])); usedL.push(devY+150); }
       else   { aw.push(W([inX,devY],[comX,devY]));         usedL.push(devY); }
     });
     // ВЫХОДЫ справа: катушка контактора / клемма
     outA.forEach(function(o,k){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, km=kmByName[p.lab], chx=rpx+130+k*40;
-      at.push({x:chx-22,y:py-14,s:22,tx:''+(21+k)});        // номер цепи выхода
+      at.push({x:chx-22,y:py-14,s:22,ls:0,anchor:'end',tx:''+(21+k)});        // номер цепи выхода
       if(p.g==='DO' && km){
         ac.push(shortC(km,'coil',outX,devY,'катушка контактора','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);
-        at.push({x:outX+58,y:devY+90,s:20,tx:'силовой контакт → л.1'});   // перекрёстная ссылка на контакт
+        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'(л.1)'});   // ссылка на контакт (компактно, слева)
       } else {
         ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
       }
     });
-    if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); aw.push(W([comX,l0],[comX,l1])); at.push({x:comX-30,y:l0-26,s:24,tx:'общий / 0В'}); }
-    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,tx:'N'}); }
+    if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); aw.push(W([comX,l0],[comX,l1])); at.push({x:comX-30,y:l0-26,s:24,ls:0,anchor:'end',tx:'общий / 0В'}); }
+    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,ls:0,anchor:'start',tx:'N'}); }
     var hlN=1;
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
