@@ -696,6 +696,8 @@ function pCabinet(){
   // визуальная раскладка по кнопке
   if(P.cab.drawn){
     h+='<div class="svgcard" style="margin-top:14px">'+cabinetSVG()+'</div>';
+    var dsvg=doorSVG();
+    if(dsvg)h+='<div class="svgcard" style="margin-top:14px">'+dsvg+'</div>';
   }
   return h;
 }
@@ -717,8 +719,22 @@ function cabItems(){
   var items=[];
   if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
   P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?2:1,k:'km',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-09':'NCH8-25/20')+' · '+c.name});kmN++;}}});
-  var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){items.push({t:a.kind==='psu'?'БП':a.kind==='ssr'?'SSR':a.kind==='lamp'?'HL':'F',w:a.kind==='psu'?2:1,k:'aux',key:'aux'+(auxN++),tip:(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'')});}});
+  // контакторы — реальные габариты: 3ф ~3 мод., 1ф ~2 мод.
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?3:2,k:'km',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name});kmN++;}}});
+  // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
+  var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
+  cabDoorList=[]; var doorN=1;
+  var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){
+    var tip=(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'');
+    if(DOOR_KINDS[a.kind]){
+      cabDoorList.push({kind:a.kind,t:(a.tag||auxPrefix(a.kind)+doorN),key:'door'+doorN,tip:tip});
+      doorN++;
+    } else {
+      var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
+      var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
+      items.push({t:lbl,w:w,k:'aux',key:'aux'+(auxN++),tip:tip});
+    }
+  }});
   if(P.cab&&P.cab.order&&P.cab.order.length){
     var byKey={}; items.forEach(function(it){byKey[it.key]=it;});
     var ordered=[]; P.cab.order.forEach(function(k){if(byKey[k]){ordered.push(byKey[k]);delete byKey[k];}});
@@ -729,7 +745,7 @@ function cabItems(){
   var cnt={};
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
   cabTipByKey={}; cabCardByKey={};
-  items.forEach(function(it){
+  items.concat(cabDoorList).forEach(function(it){
     if(!it.key)return;
     cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+it.tip):it.tip;
     var parts=String(it.tip||'').split(' · ');
@@ -737,7 +753,7 @@ function cabItems(){
   });
   return items;
 }
-var cabTipByKey={}, cabCardByKey={};
+var cabTipByKey={}, cabCardByKey={}, cabDoorList=[];
 function cabCardShow(key){
   var info=cabCardByKey[key]; if(!info)return;
   var card=document.getElementById('cabCard'); if(!card)return;
@@ -881,6 +897,55 @@ function cabinetSVG(){
   s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
      (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
      (perRow+' мод./ряд · '+maxRows+' ряд макс · кабель-канал '+ductMm+'×60 мм · перетащи аппарат на другой — поменяются местами'))+'</text>';
+  s+='</svg>';return s;
+}
+// Лицевая панель / дверь щита: грибок, переключатели, кнопки, сигнальные лампы
+function doorSVG(){
+  cabItems(); // заполнит cabDoorList
+  var list=cabDoorList||[];
+  if(!list.length)return '';
+  var dimc=capByDims(P)||{}; var W=dimc.W||+((P.cab&&P.cab.w)||500), H=dimc.H||+((P.cab&&P.cab.ht)||650);
+  var ppm=Math.min(740/W,640/H,1.5), pad=12;
+  function mm(v){return v*ppm;}
+  var boxW=W*ppm, boxH=H*ppm, Wv=boxW+pad*2, Hv=boxH+pad*2+18;
+  var s='<svg id="cabDoorSvg" viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
+  // дверь (рамка)
+  s+='<rect x="'+pad+'" y="'+pad+'" width="'+boxW.toFixed(0)+'" height="'+boxH.toFixed(0)+'" rx="10" fill="#13171D" stroke="#39434F" stroke-width="2.5"/>';
+  s+='<rect x="'+(pad+6)+'" y="'+(pad+6)+'" width="'+(boxW-12).toFixed(0)+'" height="'+(boxH-12).toFixed(0)+'" rx="7" fill="none" stroke="#2A323E" stroke-width="1.2"/>';
+  // петли слева
+  s+='<rect x="'+(pad-3)+'" y="'+(pad+boxH*0.16).toFixed(0)+'" width="6" height="'+mm(40).toFixed(0)+'" rx="2" fill="#39434F"/>';
+  s+='<rect x="'+(pad-3)+'" y="'+(pad+boxH*0.76).toFixed(0)+'" width="6" height="'+mm(40).toFixed(0)+'" rx="2" fill="#39434F"/>';
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(pad+18)+'" font-size="10.5" fill="#8593A0" text-anchor="middle" font-family="IBM Plex Sans">Дверь / лицевая панель · '+W+'×'+H+' мм</text>';
+  // сетка размещения
+  var marginX=mm(45), marginTop=mm(58), cellW=mm(85), cellH=mm(78);
+  var usable=boxW-marginX*2, cols=Math.max(1,Math.floor(usable/cellW)); cellW=usable/cols;
+  list.forEach(function(d,i){
+    var col=i%cols, rw=Math.floor(i/cols);
+    var cx=pad+marginX+cellW*(col+0.5), cy=pad+marginTop+cellH*(rw+0.5);
+    var hov=' onmousemove="cabTipShow(event,\''+d.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+d.key+'\')" style="cursor:pointer"';
+    s+='<g'+hov+'>';
+    if(d.kind==='estop'){
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(19).toFixed(1)+'" fill="#3a3406" stroke="#C9A800" stroke-width="1.6"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(15).toFixed(1)+'" fill="#C0392B" stroke="#E74C3C" stroke-width="2"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(9).toFixed(1)+'" fill="none" stroke="#7d1f17" stroke-width="2"/>';
+    } else if(d.kind==='switch'){
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="#222b33" stroke="#8FA0AE" stroke-width="2"/>';
+      var hx=cx+Math.cos(-0.78)*mm(11), hy=cy+Math.sin(-0.78)*mm(11);
+      s+='<line x1="'+cx.toFixed(1)+'" y1="'+cy.toFixed(1)+'" x2="'+hx.toFixed(1)+'" y2="'+hy.toFixed(1)+'" stroke="#C9D4DF" stroke-width="3.2" stroke-linecap="round"/>';
+      s+='<text x="'+(cx-mm(16)).toFixed(1)+'" y="'+(cy+mm(4)).toFixed(1)+'" font-size="7" fill="#7a8a98" text-anchor="middle">O</text>';
+      s+='<text x="'+(cx+mm(16)).toFixed(1)+'" y="'+(cy-mm(8)).toFixed(1)+'" font-size="7" fill="#7a8a98" text-anchor="middle">I</text>';
+    } else if(d.kind==='button'){
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="#1f6f3f" stroke="#2ecc71" stroke-width="2"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(8).toFixed(1)+'" fill="none" stroke="#1a5c34" stroke-width="2"/>';
+    } else { // lamp
+      var col2=['#2ecc71','#e74c3c','#f1c40f','#3498db'][i%4];
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="none" stroke="'+col2+'" stroke-width="1.4" opacity=".45"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(9).toFixed(1)+'" fill="'+col2+'" opacity=".85"/>';
+    }
+    s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(28)).toFixed(1)+'" font-size="9" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+esc(String(d.t||''))+'</text>';
+    s+='</g>';
+  });
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Аппараты управления на лицевой панели · наведи — марка, ПКМ — копировать</text>';
   s+='</svg>';return s;
 }
 function setEncl(m){P.enclosure=C.ENCL.filter(function(e){return e.model===m})[0];dirty();draw()}
