@@ -724,14 +724,16 @@ function cabItems(){
   // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
   var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
   cabDoorList=[]; var doorN=1;
+  // сенсорная панель (HMI) ставится на дверь, если есть контроллер
+  if(P.controller&&P.controller.model) cabDoorList.push({kind:'hmi',t:'HMI',key:'doorHMI',tip:'Сенсорная панель (HMI) · связь с '+P.controller.model+' по RS-485'});
   var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){
     var tip=(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'');
     if(DOOR_KINDS[a.kind]){
       cabDoorList.push({kind:a.kind,t:(a.tag||auxPrefix(a.kind)+doorN),key:'door'+doorN,tip:tip});
       doorN++;
     } else if(a.kind==='contactor'){
-      // контактор/пускатель — готовое изделие с катушкой в сборе: полноценный блок ~3 мод.
-      items.push({t:(a.tag||'KM'),w:3,k:'kma',key:'aux'+(auxN++),tip:tip});
+      // контактор/пускатель = тот же KM (готовое изделие с катушкой в сборе): единая сквозная нумерация KM1..KMn
+      items.push({t:'KM',w:3,k:'km',key:'aux'+(auxN++),tip:'Контактор · '+tip});
     } else {
       var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
       var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
@@ -927,7 +929,12 @@ function doorSVG(){
     var cx=pad+marginX+cellW*(col+0.5), cy=pad+marginTop+cellH*(rw+0.5);
     var hov=' onmousemove="cabTipShow(event,\''+d.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+d.key+'\')" style="cursor:pointer"';
     s+='<g'+hov+'>';
-    if(d.kind==='estop'){
+    if(d.kind==='hmi'){
+      var pw=Math.min(cellW*0.92,mm(100)), ph=mm(56);
+      s+='<rect x="'+(cx-pw/2).toFixed(1)+'" y="'+(cy-ph/2).toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+ph.toFixed(1)+'" rx="5" fill="#0E1A22" stroke="#16B7DB" stroke-width="2"/>';
+      s+='<rect x="'+(cx-pw/2+mm(5)).toFixed(1)+'" y="'+(cy-ph/2+mm(5)).toFixed(1)+'" width="'+(pw-mm(10)).toFixed(1)+'" height="'+(ph-mm(14)).toFixed(1)+'" rx="3" fill="rgba(22,183,219,.12)" stroke="#16B7DB" stroke-width="1"/>';
+      s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(1)).toFixed(1)+'" font-size="9" fill="#9FD9E8" text-anchor="middle" font-family="IBM Plex Sans">Сенсорная панель</text>';
+    } else if(d.kind==='estop'){
       s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(19).toFixed(1)+'" fill="#3a3406" stroke="#C9A800" stroke-width="1.6"/>';
       s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(15).toFixed(1)+'" fill="#C0392B" stroke="#E74C3C" stroke-width="2"/>';
       s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(9).toFixed(1)+'" fill="none" stroke="#7d1f17" stroke-width="2"/>';
@@ -945,7 +952,7 @@ function doorSVG(){
       s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="none" stroke="'+col2+'" stroke-width="1.4" opacity=".45"/>';
       s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(9).toFixed(1)+'" fill="'+col2+'" opacity=".85"/>';
     }
-    s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(28)).toFixed(1)+'" font-size="9" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+esc(String(d.t||''))+'</text>';
+    s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(d.kind==='hmi'?36:28)).toFixed(1)+'" font-size="9" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+esc(String(d.t||''))+'</text>';
     s+='</g>';
   });
   s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Аппараты управления на лицевой панели · наведи — марка, ПКМ — копировать</text>';
