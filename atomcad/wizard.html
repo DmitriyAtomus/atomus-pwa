@@ -767,6 +767,22 @@ function cabTipShow(e,key){
   tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
 }
 function cabTipHide(){var t=document.getElementById('cabTip');if(t)t.style.display='none';}
+function cabCopy(e,key){
+  try{e.preventDefault();e.stopPropagation();}catch(_){}
+  var txt=cabTipByKey[key]; if(!txt)return false;
+  function done(){toast('Скопировано: '+txt);}
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,function(){fallbackCopy(txt);done();}); }
+    else { fallbackCopy(txt); done(); }
+  }catch(_){ try{fallbackCopy(txt);done();}catch(__){} }
+  return false;
+}
+function fallbackCopy(txt){
+  var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{document.execCommand('copy');}catch(_){}
+  document.body.removeChild(ta);
+}
 /* перетаскивание аппаратов в компоновке — перемещение в любое место (между / в свободное) */
 var cabDrag=null, cabHits=[], cabGeom=null, cabDownXY=null;
 function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;cabDownXY={x:e.clientX,y:e.clientY};}
@@ -836,7 +852,7 @@ function cabinetSVG(){
     var x=railX+2;
     row.forEach(function(it){
       var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
-      var hov=it.key?(' onmousemove="cabTipShow(event,\''+it.key+'\')" onmouseleave="cabTipHide()"'):'';
+      var hov=it.key?(' onmousemove="cabTipShow(event,\''+it.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+it.key+'\')"'):'';
       var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:pointer"'):'';
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
       s+='<g'+drag+hov+'>';
