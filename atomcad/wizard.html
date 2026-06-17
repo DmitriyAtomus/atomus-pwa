@@ -705,10 +705,10 @@ function capByDims(P){
 function cabItems(){
   ensureBreakers();
   var items=[];
-  if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl'});
-  P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code})});
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?2:1,k:'km',key:'KM'+kmN});kmN++;}}});
-  var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){items.push({t:a.kind==='psu'?'БП':a.kind==='ssr'?'SSR':a.kind==='lamp'?'HL':'F',w:a.kind==='psu'?2:1,k:'aux',key:'aux'+(auxN++)});}});
+  if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
+  P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?2:1,k:'km',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-09':'NCH8-25/20')+' · '+c.name});kmN++;}}});
+  var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){items.push({t:a.kind==='psu'?'БП':a.kind==='ssr'?'SSR':a.kind==='lamp'?'HL':'F',w:a.kind==='psu'?2:1,k:'aux',key:'aux'+(auxN++),tip:(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'')});}});
   if(P.cab&&P.cab.order&&P.cab.order.length){
     var byKey={}; items.forEach(function(it){byKey[it.key]=it;});
     var ordered=[]; P.cab.order.forEach(function(k){if(byKey[k]){ordered.push(byKey[k]);delete byKey[k];}});
@@ -720,7 +720,7 @@ function cabItems(){
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
   return items;
 }
-/* перетаскивание аппаратов в компоновке — обмен местами */
+/* перетаскивание аппаратов в компоновке — перемещение (вставка рядом с целью) */
 var cabDrag=null;
 function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;}
 function cabUp(e){
@@ -731,7 +731,12 @@ function cabUp(e){
   if(g){var dst=g.getAttribute('data-cabkey'); if(dst&&dst!==src){
     var keys=cabItems().map(function(it){return it.key;});
     var ia=keys.indexOf(src), ib=keys.indexOf(dst);
-    if(ia>=0&&ib>=0){var t=keys[ia];keys[ia]=keys[ib];keys[ib]=t;P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Аппараты поменялись местами');}
+    if(ia>=0&&ib>=0){
+      keys.splice(ia,1);
+      var nb=keys.indexOf(dst);
+      keys.splice(nb+(ia<ib?1:0),0,src);
+      P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Перемещено');
+    }
   }}
 }
 document.addEventListener('pointerup',cabUp);
@@ -781,6 +786,7 @@ function cabinetSVG(){
       var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
       var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:grab"'):'';
       s+='<g'+drag+'>';
+      if(it.tip)s+='<title>'+esc(it.tip)+'</title>';
       s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
       var fs=Math.max(7,Math.min(11,modPx*0.7));
       var lbl=String(it.t||''), cx=x+ww/2, cy=y+mm(3)+hpx/2, textW=lbl.length*fs*0.62;
