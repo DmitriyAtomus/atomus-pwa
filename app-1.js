@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.380-role-names-ru";
+const APP_VERSION = "v2.45.384-delivery-term";
 const APP_VERSION_DATE = "16.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1888,6 +1888,8 @@ function _payBlockHtml(list, title, color, icon, btnFactory) {
           escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(meta2) +
           (sum ? (meta2 ? ' · ' : '') + '<b style="color:' + color + ';">' + sum + '</b>' : '') + '</div>' +
+        // v2.45.x: срок поставки — заметно, чтобы видеть ДО оплаты
+        (o.invoice_delivery_term ? '<div style="font-size:11.5px;font-weight:700;color:#9A3412;margin-top:2px;"><i class="ti ti-truck-delivery" style="font-size:12px;vertical-align:-1px;"></i> Срок поставки: ' + escapeHtml(o.invoice_delivery_term) + '</div>' : '') +
       '</div>' +
       btnFactory(o) +
     '</div>';

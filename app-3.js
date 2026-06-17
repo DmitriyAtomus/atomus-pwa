@@ -8329,7 +8329,7 @@ function renderSupplyOrderDetail(o) {
       html += '<button class="btn btn-secondary" onclick="uploadSupplyOrderInvoice(' + o.id + ')"><i class="ti ti-refresh"></i> Заменить</button>';
     }
     // v2.45.261: распознанные реквизиты счёта — с копированием в один клик
-    if (o.invoice_number || o.invoice_total) {
+    if (o.invoice_number || o.invoice_total || o.invoice_delivery_term) {
       // v2.45.264: заголовок дословно как в счёте — «Счет № 05-0223915 от 11 июня 2026 г.»
       const dm = String(o.invoice_date || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
       const ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -8352,6 +8352,8 @@ function renderSupplyOrderDetail(o) {
         (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
         (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
         (o.invoice_org ? chip(escapeHtml(o.invoice_org), o.invoice_org, false) : '') +
+        // v2.45.x: срок поставки/изготовления (заметным оранжевым)
+        (o.invoice_delivery_term ? '<span style="display:inline-flex;align-items:center;gap:6px;background:#FFEDD5;border:1px solid #FDBA74;color:#9A3412;border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:700;"><i class="ti ti-truck-delivery"></i> Срок поставки: ' + escapeHtml(o.invoice_delivery_term) + '</span>' : '') +
       '</div>';
       // v2.45.319: повторное распознавание (например, после «Заменить»)
       html += '<div style="width:100%;padding-top:8px;">' +
@@ -10477,6 +10479,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.384',
+    date: '17.06.2026',
+    title: 'Срок поставки от поставщика',
+    features: [
+      'В письме-заявке поставщику добавлена просьба <b>указать срок поставки/изготовления</b>',
+      'ИИ вытаскивает срок из <b>счёта</b> («Срок изготовления», «Условия поставки»…) и из <b>текста письма</b> («до 15.07», «10–15 рабочих дней»)',
+      'Срок показывается на карточке заказа и в блоке <b>«На оплате»</b> — чтобы видеть его <b>до</b> оплаты, а не после',
+    ],
+  },
   {
     version: 'v2.45.378',
     date: '16.06.2026',
