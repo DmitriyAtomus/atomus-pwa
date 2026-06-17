@@ -798,7 +798,7 @@ function renderCanvas(){
   /* компоненты + свободные тексты */
   h='';
   S.texts.forEach(function(t){
-    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="middle" letter-spacing="6" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
+    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
   });
   S.comps.forEach(function(c){
     var col=(S.sel&&S.sel.t==='c'&&S.sel.id===c.id)?CY:INK;
