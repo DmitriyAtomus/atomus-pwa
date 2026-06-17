@@ -10662,6 +10662,24 @@ async function rollbackContractShipment(contractId) {
   }
 }
 
+// v2.45.405: запросить сборку к отгрузке — помечает договор и шлёт уведомление
+// сборщику (мастер/слесарь видит его в «колокольчике» и комплектует по QR).
+async function requestShipmentAssembly(contractId) {
+  if (!contractId) return;
+  try {
+    const resp = await apiPost('/api/contracts/' + contractId + '/request-shipment-assembly', {});
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast('Запрошена сборка к отгрузке — сборщик получит уведомление', 'success');
+      if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
+    } else {
+      showToast((d && (d.message || d.error)) || 'Не удалось отправить запрос', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 // v2.45.144: обновить область отгрузки (счётчик + коробки + сборки) одной кнопкой
 function refreshContractShipmentArea(contractId) {
   if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
@@ -10721,6 +10739,43 @@ async function loadContractShipmentBlock(contractId) {
     }
     html += '</div>';
 
+    // v2.45.405: «Сборка к отгрузке» — отдельный шаг ПЕРЕД отгрузкой. Директор
+    // запрашивает сборку (уведомление сборщику), сборщик комплектует по QR.
+    const gTotal = s.total || 0;
+    const gDone = s.gathered || 0;
+    if (gTotal > 0) {
+      const gPct = gTotal > 0 ? Math.round(gDone / gTotal * 100) : 0;
+      const gComplete = !!s.gather_complete;
+      const req = s.assembly_request || {};
+      html += '<div class="ship-progress-card" style="margin-top:14px;">';
+      html += '<div class="ship-progress-head">';
+      html += '<div class="ship-progress-title" style="display:flex;align-items:center;gap:6px;">' +
+                '<i class="ti ti-packages" style="color: var(--c-prod-25);"></i> Сборка к отгрузке</div>';
+      html += '<div class="ship-progress-num">' + gDone + ' <span class="total">/ ' + gTotal + '</span></div>';
+      html += '</div>';
+      html += '<div class="ship-progress-bar"><div class="ship-progress-fill ' + (gComplete ? 'complete' : '') + '" style="width:' + gPct + '%"></div></div>';
+      // Запрос сборщику — директору/менеджеру продаж
+      if (typeof canManageSales === 'function' && canManageSales()) {
+        if (req.requested) {
+          const whenTxt = req.requested_at ? String(req.requested_at).slice(0, 16).replace('T', ' ') : '';
+          html += '<div style="font-size:12px;color:var(--text-light);text-align:center;padding:8px 0 2px;">' +
+                    '<i class="ti ti-check"></i> Сборка запрошена' + (whenTxt ? ' · ' + escapeHtml(whenTxt) : '') + '</div>';
+          html += '<button onclick="requestShipmentAssembly(' + contractId + ')" ' +
+            'style="width:100%;margin-top:4px;background:none;border:1px solid var(--border);color:var(--brand);' +
+            'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+            'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+            '<i class="ti ti-bell-ringing"></i> Запросить повторно</button>';
+        } else {
+          html += '<button class="ship-start-btn" onclick="requestShipmentAssembly(' + contractId + ')">' +
+            '<i class="ti ti-bell-ringing"></i> Запросить сборку к отгрузке</button>';
+        }
+      }
+      // «Собрать по QR» — сборщику (мастер/слесарь): комплектация по сканам
+      html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="openShipmentMode(' + contractId + ', \'gather\')">' +
+        '<i class="ti ti-scan"></i> ' + (gComplete ? 'Собрано · открыть' : 'Собрать по QR') + '</button>';
+      html += '</div>';
+    }
+
     // v2.45.312: раздел «К отгрузке» — развёрнутый список единиц отгрузки
     // (коробки + отдельные узлы/сборки), как просил директор.
     const units = s.items || [];
@@ -10751,9 +10806,12 @@ async function loadContractShipmentBlock(contractId) {
           qtyLabel = (u.qty || 1) + ' шт.';
         }
         const kindLabel = u.type === 'box' ? 'Коробка · ' : (u.type === 'contract_item' ? 'Покупное (отдельно) · ' : 'Узел / сборка · ');
+        // v2.45.405: до отгрузки показываем, собрана ли единица к отгрузке
         const badge = done
           ? '<span class="ku-badge ku-badge-done"><i class="ti ti-check"></i> отгружено</span>'
-          : '<span class="ku-badge ku-badge-pending">готово к отгрузке</span>';
+          : (u.gathered
+              ? '<span class="ku-badge ku-badge-gathered"><i class="ti ti-checkbox"></i> собрано</span>'
+              : '<span class="ku-badge ku-badge-pending">готово к отгрузке</span>');
         // v2.45.333: коробку можно открыть по тапу (стрелка + подсветка), узлы/покупное — нет.
         // ВАЖНО: один атрибут style на ряд (раньше было два — из-за этого flex молча отваливался).
         const clickable = u.type === 'box';
