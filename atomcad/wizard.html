@@ -95,6 +95,15 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 <div id="cabTip" style="position:fixed;z-index:60;display:none;pointer-events:none;background:#10212F;color:#fff;font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);max-width:280px;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.4)"></div>
+<div id="cabCard" style="position:fixed;z-index:70;display:none;left:50%;top:90px;transform:translateX(-50%);min-width:280px;max-width:360px;background:#13202B;color:#E7EEF4;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55)">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)">
+    <span id="cabCardTag" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--cyan)"></span>
+    <span id="cabCardType" style="font-size:12px;color:#8FA0AE"></span>
+    <span style="flex:1"></span>
+    <button onclick="cabCardHide()" style="background:none;border:none;color:#8FA0AE;font-size:20px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+  </div>
+  <div id="cabCardBody" style="padding:12px 14px;font-size:13px;line-height:1.5"></div>
+</div>
 
 <script src="core.js"></script>
 <script>
@@ -687,6 +696,8 @@ function pCabinet(){
   // визуальная раскладка по кнопке
   if(P.cab.drawn){
     h+='<div class="svgcard" style="margin-top:14px">'+cabinetSVG()+'</div>';
+    var dsvg=doorSVG();
+    if(dsvg)h+='<div class="svgcard" style="margin-top:14px">'+dsvg+'</div>';
   }
   return h;
 }
@@ -708,8 +719,25 @@ function cabItems(){
   var items=[];
   if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
   P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?2:1,k:'km',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-09':'NCH8-25/20')+' · '+c.name});kmN++;}}});
-  var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){items.push({t:a.kind==='psu'?'БП':a.kind==='ssr'?'SSR':a.kind==='lamp'?'HL':'F',w:a.kind==='psu'?2:1,k:'aux',key:'aux'+(auxN++),tip:(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'')});}});
+  // контакторы — реальные габариты: 3ф ~3 мод., 1ф ~2 мод.
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?3:2,k:'km',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name});kmN++;}}});
+  // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
+  var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
+  cabDoorList=[]; var doorN=1;
+  var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){
+    var tip=(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'');
+    if(DOOR_KINDS[a.kind]){
+      cabDoorList.push({kind:a.kind,t:(a.tag||auxPrefix(a.kind)+doorN),key:'door'+doorN,tip:tip});
+      doorN++;
+    } else if(a.kind==='contactor'){
+      // контактор/пускатель — готовое изделие с катушкой в сборе: полноценный блок ~3 мод.
+      items.push({t:(a.tag||'KM'),w:3,k:'kma',key:'aux'+(auxN++),tip:tip});
+    } else {
+      var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
+      var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
+      items.push({t:lbl,w:w,k:'aux',key:'aux'+(auxN++),tip:tip});
+    }
+  }});
   if(P.cab&&P.cab.order&&P.cab.order.length){
     var byKey={}; items.forEach(function(it){byKey[it.key]=it;});
     var ordered=[]; P.cab.order.forEach(function(k){if(byKey[k]){ordered.push(byKey[k]);delete byKey[k];}});
@@ -719,14 +747,69 @@ function cabItems(){
   // сквозная нумерация по физическому порядку: QF1..QFn, KM1..KMn (key остаётся стабильным)
   var cnt={};
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
+  cabTipByKey={}; cabCardByKey={};
+  items.concat(cabDoorList).forEach(function(it){
+    if(!it.key)return;
+    cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+it.tip):it.tip;
+    var parts=String(it.tip||'').split(' · ');
+    cabCardByKey[it.key]={tag:it.t||'', type:parts[0]||'', specs:parts.slice(1)};
+  });
   return items;
 }
+var cabTipByKey={}, cabCardByKey={}, cabDoorList=[];
+function cabCardShow(key){
+  var info=cabCardByKey[key]; if(!info)return;
+  var card=document.getElementById('cabCard'); if(!card)return;
+  document.getElementById('cabCardTag').textContent=info.tag;
+  document.getElementById('cabCardType').textContent=info.type;
+  var body='';
+  if(info.specs&&info.specs.length){
+    body='<table style="width:100%;border-collapse:collapse">';
+    var labels=info.type==='Автомат'?['Марка','Полюса · номинал','Назначение']
+              :info.type==='Контактор'?['Марка','Нагрузка']
+              :info.type==='Контроллер'?['Модель']:[];
+    info.specs.forEach(function(sp,i){
+      var lab=labels[i]||'';
+      body+='<tr><td style="color:#8FA0AE;padding:3px 10px 3px 0;white-space:nowrap;vertical-align:top">'+(lab||'·')+'</td><td style="padding:3px 0">'+esc(sp)+'</td></tr>';
+    });
+    body+='</table>';
+  } else { body='<div style="color:#8FA0AE">Нет дополнительных данных</div>'; }
+  document.getElementById('cabCardBody').innerHTML=body;
+  card.style.display='block';
+}
+function cabCardHide(){var c=document.getElementById('cabCard');if(c)c.style.display='none';}
+function cabTipShow(e,key){
+  var tipEl=document.getElementById('cabTip'); if(!tipEl)return;
+  var tip=cabTipByKey[key]; if(!tip){tipEl.style.display='none';return;}
+  tipEl.textContent=tip; tipEl.style.display='block';
+  var w=tipEl.offsetWidth||200, x=Math.min(e.clientX+14,(window.innerWidth||1000)-w-12);
+  tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
+}
+function cabTipHide(){var t=document.getElementById('cabTip');if(t)t.style.display='none';}
+function cabCopy(e,key){
+  try{e.preventDefault();e.stopPropagation();}catch(_){}
+  var txt=cabTipByKey[key]; if(!txt)return false;
+  function done(){toast('Скопировано: '+txt);}
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,function(){fallbackCopy(txt);done();}); }
+    else { fallbackCopy(txt); done(); }
+  }catch(_){ try{fallbackCopy(txt);done();}catch(__){} }
+  return false;
+}
+function fallbackCopy(txt){
+  var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{document.execCommand('copy');}catch(_){}
+  document.body.removeChild(ta);
+}
 /* перетаскивание аппаратов в компоновке — перемещение в любое место (между / в свободное) */
-var cabDrag=null, cabHits=[], cabGeom=null;
-function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;}
+var cabDrag=null, cabHits=[], cabGeom=null, cabDownXY=null;
+function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;cabDownXY={x:e.clientX,y:e.clientY};}
 function cabUp(e){
   if(!cabDrag)return;
   var src=cabDrag; cabDrag=null;
+  // короткий клик без перемещения → открыть карточку аппарата, не двигать
+  if(cabDownXY){var dx=Math.abs(e.clientX-cabDownXY.x),dy=Math.abs(e.clientY-cabDownXY.y);cabDownXY=null;if(dx<5&&dy<5){cabCardShow(src);return;}}
   var svg=document.getElementById('cabSvg'); if(!svg||!cabGeom)return;
   // координаты броска в системе листа
   var loc;
@@ -743,15 +826,6 @@ function cabUp(e){
   P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Перемещено');
 }
 document.addEventListener('pointerup',cabUp);
-function cabTipMove(e){
-  var tipEl=document.getElementById('cabTip'); if(!tipEl)return;
-  var t=e.target&&e.target.closest?e.target.closest('[data-tip]'):null;
-  if(t){ tipEl.textContent=t.getAttribute('data-tip'); tipEl.style.display='block';
-    var w=tipEl.offsetWidth||200, x=Math.min(e.clientX+14,(window.innerWidth||1000)-w-12);
-    tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
-  } else if(tipEl.style.display!=='none'){ tipEl.style.display='none'; }
-}
-document.addEventListener('pointermove',cabTipMove);
 function cabinetSVG(){
   ensureBreakers(); if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
   // габариты: введённые или дефолт под подобранный корпус
@@ -778,7 +852,7 @@ function cabinetSVG(){
     if(w>hh){for(var xx=x+6;xx<x+w-4;xx+=11)s+='<line x1="'+xx.toFixed(1)+'" y1="'+(y+3)+'" x2="'+xx.toFixed(1)+'" y2="'+(y+hh-3)+'" stroke="#3A4654" stroke-width="1"/>';}
     else{for(var yy=y+6;yy<y+hh-4;yy+=11)s+='<line x1="'+(x+3)+'" y1="'+yy.toFixed(1)+'" x2="'+(x+w-3)+'" y2="'+yy.toFixed(1)+'" stroke="#3A4654" stroke-width="1"/>';}
     return s;}
-  var COLS={ctrl:['rgba(22,183,219,.12)','#16B7DB'],qf:['rgba(22,183,219,.13)','#16B7DB'],km:['rgba(255,196,0,.14)','#FFC400'],term:['rgba(91,214,162,.12)','#5BD6A2'],aux:['rgba(200,210,220,.05)','#5A6573']};
+  var COLS={ctrl:['rgba(22,183,219,.12)','#16B7DB'],qf:['rgba(22,183,219,.13)','#16B7DB'],km:['rgba(255,196,0,.14)','#FFC400'],kma:['rgba(255,196,0,.14)','#FFC400'],term:['rgba(91,214,162,.12)','#5BD6A2'],aux:['rgba(200,210,220,.05)','#5A6573']};
   var s='<svg id="cabSvg" viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
   // корпус (двойная рамка-дверь), форма = щит
   s+='<rect x="'+pad+'" y="'+pad+'" width="'+boxW.toFixed(0)+'" height="'+boxH.toFixed(0)+'" rx="10" fill="#13171D" stroke="#39434F" stroke-width="2.5"/>';
@@ -797,11 +871,10 @@ function cabinetSVG(){
     var x=railX+2;
     row.forEach(function(it){
       var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
-      var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:grab"'):'';
-      var tipAttr=it.tip?(' data-tip="'+esc(it.tip).replace(/"/g,'&#34;')+'"'):'';
+      var hov=it.key?(' onmousemove="cabTipShow(event,\''+it.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+it.key+'\')"'):'';
+      var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:pointer"'):'';
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
-      s+='<g'+drag+tipAttr+'>';
-      if(it.tip)s+='<title>'+esc(it.tip)+'</title>';
+      s+='<g'+drag+hov+'>';
       s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
       var fs=Math.max(7,Math.min(11,modPx*0.7));
       var lbl=String(it.t||''), cx=x+ww/2, cy=y+mm(3)+hpx/2, textW=lbl.length*fs*0.62;
@@ -827,6 +900,55 @@ function cabinetSVG(){
   s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
      (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
      (perRow+' мод./ряд · '+maxRows+' ряд макс · кабель-канал '+ductMm+'×60 мм · перетащи аппарат на другой — поменяются местами'))+'</text>';
+  s+='</svg>';return s;
+}
+// Лицевая панель / дверь щита: грибок, переключатели, кнопки, сигнальные лампы
+function doorSVG(){
+  cabItems(); // заполнит cabDoorList
+  var list=cabDoorList||[];
+  if(!list.length)return '';
+  var dimc=capByDims(P)||{}; var W=dimc.W||+((P.cab&&P.cab.w)||500), H=dimc.H||+((P.cab&&P.cab.ht)||650);
+  var ppm=Math.min(740/W,640/H,1.5), pad=12;
+  function mm(v){return v*ppm;}
+  var boxW=W*ppm, boxH=H*ppm, Wv=boxW+pad*2, Hv=boxH+pad*2+18;
+  var s='<svg id="cabDoorSvg" viewBox="0 0 '+Wv.toFixed(0)+' '+Hv.toFixed(0)+'">';
+  // дверь (рамка)
+  s+='<rect x="'+pad+'" y="'+pad+'" width="'+boxW.toFixed(0)+'" height="'+boxH.toFixed(0)+'" rx="10" fill="#13171D" stroke="#39434F" stroke-width="2.5"/>';
+  s+='<rect x="'+(pad+6)+'" y="'+(pad+6)+'" width="'+(boxW-12).toFixed(0)+'" height="'+(boxH-12).toFixed(0)+'" rx="7" fill="none" stroke="#2A323E" stroke-width="1.2"/>';
+  // петли слева
+  s+='<rect x="'+(pad-3)+'" y="'+(pad+boxH*0.16).toFixed(0)+'" width="6" height="'+mm(40).toFixed(0)+'" rx="2" fill="#39434F"/>';
+  s+='<rect x="'+(pad-3)+'" y="'+(pad+boxH*0.76).toFixed(0)+'" width="6" height="'+mm(40).toFixed(0)+'" rx="2" fill="#39434F"/>';
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(pad+18)+'" font-size="10.5" fill="#8593A0" text-anchor="middle" font-family="IBM Plex Sans">Дверь / лицевая панель · '+W+'×'+H+' мм</text>';
+  // сетка размещения
+  var marginX=mm(45), marginTop=mm(58), cellW=mm(85), cellH=mm(78);
+  var usable=boxW-marginX*2, cols=Math.max(1,Math.floor(usable/cellW)); cellW=usable/cols;
+  list.forEach(function(d,i){
+    var col=i%cols, rw=Math.floor(i/cols);
+    var cx=pad+marginX+cellW*(col+0.5), cy=pad+marginTop+cellH*(rw+0.5);
+    var hov=' onmousemove="cabTipShow(event,\''+d.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+d.key+'\')" style="cursor:pointer"';
+    s+='<g'+hov+'>';
+    if(d.kind==='estop'){
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(19).toFixed(1)+'" fill="#3a3406" stroke="#C9A800" stroke-width="1.6"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(15).toFixed(1)+'" fill="#C0392B" stroke="#E74C3C" stroke-width="2"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(9).toFixed(1)+'" fill="none" stroke="#7d1f17" stroke-width="2"/>';
+    } else if(d.kind==='switch'){
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="#222b33" stroke="#8FA0AE" stroke-width="2"/>';
+      var hx=cx+Math.cos(-0.78)*mm(11), hy=cy+Math.sin(-0.78)*mm(11);
+      s+='<line x1="'+cx.toFixed(1)+'" y1="'+cy.toFixed(1)+'" x2="'+hx.toFixed(1)+'" y2="'+hy.toFixed(1)+'" stroke="#C9D4DF" stroke-width="3.2" stroke-linecap="round"/>';
+      s+='<text x="'+(cx-mm(16)).toFixed(1)+'" y="'+(cy+mm(4)).toFixed(1)+'" font-size="7" fill="#7a8a98" text-anchor="middle">O</text>';
+      s+='<text x="'+(cx+mm(16)).toFixed(1)+'" y="'+(cy-mm(8)).toFixed(1)+'" font-size="7" fill="#7a8a98" text-anchor="middle">I</text>';
+    } else if(d.kind==='button'){
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="#1f6f3f" stroke="#2ecc71" stroke-width="2"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(8).toFixed(1)+'" fill="none" stroke="#1a5c34" stroke-width="2"/>';
+    } else { // lamp
+      var col2=['#2ecc71','#e74c3c','#f1c40f','#3498db'][i%4];
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(13).toFixed(1)+'" fill="none" stroke="'+col2+'" stroke-width="1.4" opacity=".45"/>';
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+mm(9).toFixed(1)+'" fill="'+col2+'" opacity=".85"/>';
+    }
+    s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(28)).toFixed(1)+'" font-size="9" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+esc(String(d.t||''))+'</text>';
+    s+='</g>';
+  });
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Аппараты управления на лицевой панели · наведи — марка, ПКМ — копировать</text>';
   s+='</svg>';return s;
 }
 function setEncl(m){P.enclosure=C.ENCL.filter(function(e){return e.model===m})[0];dirty();draw()}
