@@ -1050,7 +1050,7 @@ function doorSVG(){
     }
   });
   doorGeom={ppm:ppm,pad:pad,W:W,H:H,centers:doorCenters};
-  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Перетащи элемент (сетка 5 мм, в габаритах) — покажет размеры от края щита · наведи — марка, ПКМ — копировать</text>';
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Перетащи элемент (сетка 5 мм) или двигай стрелками ←↑↓→ по 1 см · размеры от края щита · ПКМ — копировать</text>';
   s+='</svg>';return s;
 }
 /* перетаскивание элементов по двери: свободно + прилипание к сетке 5 мм + удержание в габаритах */
@@ -1088,6 +1088,22 @@ function doorUp(e){
 }
 document.addEventListener('pointermove',doorMoveH);
 document.addEventListener('pointerup',doorUp);
+/* перемещение выбранного элемента двери стрелками клавиатуры, шаг 1 см (10 мм) */
+document.addEventListener('keydown',function(e){
+  if(!doorSel)return;
+  if(!document.getElementById('doorCard'))return; // только когда видна дверь (шаг «Компоновка»)
+  var tag=(e.target&&e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='select'||tag==='textarea'||(e.target&&e.target.isContentEditable))return;
+  var d={'ArrowLeft':[-1,0],'ArrowRight':[1,0],'ArrowUp':[0,-1],'ArrowDown':[0,1]}[e.key];
+  if(!d)return;
+  e.preventDefault();
+  if(!doorGeom||!doorGeom.centers[doorSel])return;
+  var c=doorGeom.centers[doorSel], ext=c.ext, step=10; // 1 см
+  var nx=clampN(c.x+d[0]*step,ext.hx,doorGeom.W-ext.hx);
+  var ny=clampN(c.y+d[1]*step,ext.hyTop,doorGeom.H-ext.hyBot);
+  ensureHmi();P.door.pos[doorSel]={x:nx,y:ny};
+  dirty();refreshDoor();
+});
 function setEncl(m){P.enclosure=C.ENCL.filter(function(e){return e.model===m})[0];dirty();draw()}
 
 /* 9 спецификация */
