@@ -12157,6 +12157,8 @@ async function _maybeMorningProgress() {
     const roles = (state.user && state.user.roles) || [];
     // v2.45.359: только мастеру (и НЕ директору) — у директора роль master тоже есть
     if (!roles.includes('master') || roles.includes('director')) return;
+    // v2.45.404: Михаил Шевелёв пока не заполняет утреннюю готовность — не показываем
+    if (typeof _isShevelevMaster === 'function' && _isShevelevMaster()) return;
     if (document.getElementById('morning-progress-overlay')) return;
     // v2.45.364: только то, что «В работе» в производстве (production works status=in_progress),
     // и сразу подставляем текущий % готовности с карточки канбана

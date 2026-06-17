@@ -7041,6 +7041,14 @@ async function ensureAccessLevelsLoaded() {
 }
 
 // Применяет права к UI: скрывает пункты меню, кнопки и т.д.
+// v2.45.404: Михаил Шевелёв (мастер) пока не заполняет утреннюю готовность и не
+// работает с оплатой — точечно прячем для него утреннее окно «Начать смену» и
+// пункт меню «На оплату». Определяем по ФИО (другого стабильного признака нет).
+function _isShevelevMaster() {
+  const nm = (state.user && (state.user.full_name || state.user.name) || '');
+  return /шевел[её]в/i.test(nm) && /михаил/i.test(nm);
+}
+
 function applyPermissionsToUI() {
   // Сотрудники в Кадрах — только если hr.manage_employees
   const navEmps = document.querySelector('#sidebar-hr .nav-item[data-nav="employees"]');
@@ -7059,6 +7067,12 @@ function applyPermissionsToUI() {
   const canSeeHR = hasAnyPermission('hr.view_vacations', 'hr.create_vacations',
     'hr.manage_employees', 'hr.manage_positions', 'hr.manage_access');
   hrTabs.forEach(t => { t.style.display = canSeeHR ? '' : 'none'; });
+
+  // v2.45.404: Михаилу Шевелёву пункт «На оплату» не нужен — он с оплатой не работает
+  if (_isShevelevMaster()) {
+    const _payNav = document.getElementById('sb-home-pay');
+    if (_payNav) _payNav.style.display = 'none';
+  }
 
   // v2.45.56: Админ-инструменты в сайдбаре Снабжения — только директору
   const adminTools = document.getElementById('sb-supply-admin-tools');
