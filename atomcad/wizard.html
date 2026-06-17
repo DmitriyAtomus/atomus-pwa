@@ -723,7 +723,7 @@ function cabItems(){
   if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
   P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
   // контакторы — реальные габариты: 3ф ~3 мод., 1ф ~2 мод.
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?3:2,k:'km',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name});kmN++;}}});
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?3:2,k:'km',src:'cons',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name+' · из «Потребители»'});kmN++;}}});
   // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
   var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
   cabDoorList=[]; var doorN=1;
@@ -738,7 +738,7 @@ function cabItems(){
       // контактор/пускатель = тот же KM (готовое изделие с катушкой в сборе): единая сквозная нумерация KM1..KMn
       var brand=((a.manu||'')+' '+(a.model||'')).replace(/\s+/g,' ').trim()||'CHINT NXC-09';
       var dest=a.target||'назначение не указано';
-      items.push({t:'KM',w:3,k:'km',key:'aux'+(auxN++),tip:'Контактор · '+brand+' · '+dest});
+      items.push({t:'KM',w:3,k:'km',src:'aux',key:'aux'+(auxN++),tip:'Контактор · '+brand+' · '+dest+' · из «Вспомогат.»'});
     } else {
       var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
       var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
@@ -773,7 +773,7 @@ function cabCardShow(key){
   if(info.specs&&info.specs.length){
     body='<table style="width:100%;border-collapse:collapse">';
     var labels=info.type==='Автомат'?['Марка','Полюса · номинал','Назначение']
-              :info.type==='Контактор'?['Марка','Нагрузка']
+              :info.type==='Контактор'?['Марка','Нагрузка','Источник']
               :info.type==='Контроллер'?['Модель']:[];
     info.specs.forEach(function(sp,i){
       var lab=labels[i]||'';
@@ -893,6 +893,11 @@ function cabinetSVG(){
           s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+vfs*0.35).toFixed(1)+'" font-size="'+vfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none" transform="rotate(-90 '+cx.toFixed(1)+' '+cy.toFixed(1)+')">'+lbl+'</text>';
         }
       }
+      // бейдж источника контактора: П — из «Потребители», В — из «Вспомогат.»
+      if(it.k==='km'&&it.src){
+        var bl=it.src==='cons'?'П':'В';
+        s+='<text x="'+(x+ww-3).toFixed(1)+'" y="'+(y+mm(3)+9).toFixed(1)+'" font-size="7.5" fill="#FFC400" text-anchor="end" font-family="IBM Plex Sans" pointer-events="none" opacity=".8">'+bl+'</text>';
+      }
       s+='</g>';
       x+=ww+4;
     });
@@ -906,7 +911,7 @@ function cabinetSVG(){
   // подпись/предупреждение
   s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
      (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
-     (perRow+' мод./ряд · '+maxRows+' ряд макс · кабель-канал '+ductMm+'×60 мм · перетащи аппарат на другой — поменяются местами'))+'</text>';
+     (perRow+' мод./ряд · '+maxRows+' ряд макс · кабель-канал '+ductMm+'×60 мм · у KM: П — из «Потребители», В — из «Вспомогат.» · перетащи аппарат на другой — поменяются местами'))+'</text>';
   s+='</svg>';return s;
 }
 // Лицевая панель / дверь щита: грибок, переключатели, кнопки, сигнальные лампы
