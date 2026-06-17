@@ -7074,6 +7074,16 @@ function applyPermissionsToUI() {
     if (_payNav) _payNav.style.display = 'none';
   }
 
+  // v2.45.406: Михаил Шевелёв (мастер-сборщик) работает только с производством и
+  // сборкой к отгрузке. Оставляем в верхней навигации лишь «Главную» (там его
+  // запросы «к отгрузке» с QR) и «Производство»; остальные разделы прячем.
+  if (_isShevelevMaster()) {
+    const ALLOWED = ['home', 'production'];
+    document.querySelectorAll('.section-tab, .m-section-tabs button').forEach(t => {
+      t.style.display = ALLOWED.includes(t.dataset.section) ? '' : 'none';
+    });
+  }
+
   // v2.45.56: Админ-инструменты в сайдбаре Снабжения — только директору
   const adminTools = document.getElementById('sb-supply-admin-tools');
   if (adminTools) {

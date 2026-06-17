@@ -767,11 +767,55 @@ async function loadHomeDashboard() {
   loadHomeShipments();    // ЭТАП 16Г
   loadHomeContractsProgress(); // ЭТАП 31.4
   loadHomeDashboardExtras();   // v2.43.98: воронка / алерты / ТОП сборщиков
+  loadHomeGatherings();        // v2.45.406: «Собрать к отгрузке» (запросы сборщику)
   // v2.8.2: лента «Последние действия» — только для директора
   if (state.user && (state.user.roles || []).includes('director')) {
     loadHomeActivity();
   }
   // loadHomeVacations() — отключено в v25.0 (блок убран с Главной)
+}
+
+// v2.45.406: «Собрать к отгрузке» на Главной — список договоров с активным запросом
+// сборки. Для каждого: контрагент, прогресс «собрано X/Y» и кнопка «Собрать по QR».
+async function loadHomeGatherings() {
+  const wrap = document.getElementById('home-gatherings-wrap');
+  const block = document.getElementById('home-gatherings-block');
+  if (!wrap || !block) return;
+  let items = [];
+  try {
+    const d = await apiGet('/api/gatherings/pending');
+    items = (d && d.items) || [];
+  } catch (e) {
+    // бэк не задеплоен / нет доступа — просто не показываем блок
+    wrap.style.display = 'none';
+    return;
+  }
+  if (!items.length) { wrap.style.display = 'none'; return; }
+
+  let html = '<div class="card" style="padding:6px;">';
+  items.forEach((it, idx) => {
+    const total = it.total || 0;
+    const done = it.gathered || 0;
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    const complete = total > 0 && done >= total;
+    const num = escapeHtml(it.number || ('№' + it.contract_id));
+    const who = escapeHtml(it.contractor_name || '');
+    const sep = idx < items.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+    html += '<div class="home-gather-row" style="padding:10px 8px;' + sep + '">';
+    html += '<div onclick="openContract(' + it.contract_id + ')" style="cursor:pointer;">';
+    html += '<div style="font-weight:700;font-size:14px;">' + num + '</div>';
+    if (who) html += '<div style="font-size:12px;color:var(--text-light);margin-top:1px;">' + who + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">';
+    html += '<div class="ship-progress-bar" style="flex:1;"><div class="ship-progress-fill ' + (complete ? 'complete' : '') + '" style="width:' + pct + '%"></div></div>';
+    html += '<div style="font-size:12px;color:var(--text-light);white-space:nowrap;">собрано ' + done + '/' + total + '</div>';
+    html += '</div></div>';
+    html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="openShipmentMode(' + it.contract_id + ', \'gather\')">' +
+            '<i class="ti ti-scan"></i> ' + (complete ? 'Собрано · открыть' : 'Собрать по QR') + '</button>';
+    html += '</div>';
+  });
+  html += '</div>';
+  block.innerHTML = html;
+  wrap.style.display = '';
 }
 
 function renderHomeSkeleton() {
@@ -819,6 +863,14 @@ function renderHomeSkeleton() {
   html += '<div class="qa25-grid" id="home25-quick-actions"></div>';
   html += '</div>';
   // ============ КОНЕЦ ЭТАПА 25.0 ============
+
+  // v2.45.406: «Сборка к отгрузке» — что нужно собрать к отгрузке (запрос директора).
+  // Блок скрыт, пока loadHomeGatherings не найдёт активные запросы. Для сборщика
+  // (мастера/слесаря) это главное на Главной: список договоров + кнопка «Собрать по QR».
+  html += '<div id="home-gatherings-wrap" style="display:none;margin-bottom:4px;">';
+  html += '<div class="home-kpi-title"><i class="ti ti-packages" style="color:var(--brand);"></i>Собрать к отгрузке</div>';
+  html += '<div id="home-gatherings-block"></div>';
+  html += '</div>';
 
   // v2.43.98: KPI «Сегодня» — sticky-обёртка, цифры всегда перед глазами при скролле
   html += '<div class="home-kpi-sticky">';
