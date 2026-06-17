@@ -129,9 +129,13 @@ function newProject(){
     sensors:[{id:uid('s'),name:'Датчик температуры камеры',sig:'NTC',qty:1},{id:uid('s'),name:'Датчик температуры испарителя',sig:'NTC',qty:1}],
     aux:[{id:uid('a'),name:'Лампа сигнальная ND16',kind:'lamp',manu:'CHINT',model:'ND16',qty:3,a:0.05},
          {id:uid('a'),name:'Блок питания 24 В',kind:'psu',manu:'Faraday',model:'24В',qty:1,a:0.3}],
+    hmi:{model:'EVCO Vroad EPV4 7"',manu:'EVCO',dims:{w:197,h:142,d:38},supply:'=24В',terminals:['+24V','0V','485A','485B','GND']},
+    door:{pos:{}},
     breakers:null, enclosure:null, big:false };
 }
 var P=newProject();
+function ensureHmi(){if(!P.hmi)P.hmi={model:'',manu:'',dims:null,supply:'',terminals:null};if(!P.door)P.door={pos:{}};if(!P.door.pos)P.door.pos={};}
+function clampN(v,a,b){return Math.max(a,Math.min(b,v));}
 function dirty(){$('saveState').textContent='не сохранено';if(typeof persistSession==='function')persistSession()}
 
 /* ---- шаги ---- */
@@ -280,6 +284,7 @@ function pController(){
   CTRLS.forEach(function(m){h+='<option'+(P.controller.model===m?' selected':'')+'>'+m+'</option>'});
   h+='</select></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="openDatasheet()">Нет в списке? Загрузить даташит</button></div></div>';
   if(P.controller.dims&&(P.controller.dims.w||P.controller.dims.h||P.controller.dims.d)){var dm=P.controller.dims;h+='<div class="note" style="margin:-6px 0 12px">📐 Габариты из даташита: <span class="mono" style="color:var(--cyan)">'+(dm.w||'?')+'×'+(dm.h||'?')+(dm.d?'×'+dm.d:'')+' мм</span>'+(P.controller.spec&&P.controller.spec.ip?(' · '+esc(P.controller.spec.ip)):'')+(P.controller.spec&&P.controller.spec.voltage?(' · '+esc(P.controller.spec.voltage)):'')+'</div>';}
+  h+=hmiBlock();
   h+='<div class="counts">';['DO','AI','AO','DI'].forEach(function(g){var fr=C.ioFree(io,g),t=C.ioTotal(io,g),pct=t?Math.round((t-fr)/t*100):0;h+='<div class="cc'+(t&&fr===0?' warn':'')+'"><div class="t"><span class="d" style="background:'+COL[g]+'"></span>'+(g==='DO'?'Реле':g==='AI'?'Входы AI':g==='AO'?'Вых. AO':'Входы DI')+'</div><div class="big">'+fr+'<small> / '+t+'</small></div><div class="bar"><i style="width:'+pct+'%;background:'+COL[g]+'"></i></div></div>'});h+='</div>';
   h+='<div class="grid g2"><div>';['DO','AI'].forEach(function(g){h+=ioGroup(g)});h+='</div><div>';['AO','DI'].forEach(function(g){h+=ioGroup(g)});
   h+='<div class="card"><div class="cname" style="margin-bottom:8px">Добавить на контроллер</div>';IOPAL.forEach(function(it,i){h+='<button class="pbtn" onclick="ioAdd(IOPAL['+i+'])"><span>'+it.lbl+'</span><span class="tag '+it.g+'">'+it.tag+'</span></button>'});h+='</div></div></div>';
@@ -302,6 +307,45 @@ function ensureControllers(){
     });
     ctrlCat=true;ctrlCatLoading=false;if(cur===1)draw();
   }).catch(function(){ctrlCat=true;ctrlCatLoading=false});
+}
+
+/* ---- сенсорная панель оператора (HMI): задаётся в шаге «Контроллер», ИИ снимает габариты/питание/клеммы ---- */
+var HMI_LIB={
+  'Weintek cMT2078X':{manu:'Weintek',dims:{w:200,h:146,d:35},supply:'=24В',terminals:['+24V','0V','485A','485B','FG']},
+  'Delta DOP-107EV':{manu:'Delta',dims:{w:200,h:146,d:42},supply:'=24В',terminals:['+24V','0V','485+','485-','SG']},
+  'EVCO Vroad EPV4 7"':{manu:'EVCO',dims:{w:197,h:142,d:38},supply:'=24В',terminals:['+24V','0V','485A','485B','GND']}
+};
+var HMIS=Object.keys(HMI_LIB);
+function defaultHmiTerminals(supply){return [/12|24|=|пост/i.test(supply||'')?'+24V':'L','0V','485+','485-','PE'];}
+function setHmi(model){
+  ensureHmi();
+  if(!model){P.hmi={model:'',manu:'',dims:null,supply:'',terminals:null};dirty();draw();return;}
+  if(P.hmi&&P.hmi.model===model&&P.hmi.dims)return; // та же модель (в т.ч. распознанная) — не теряем габариты
+  var lib=HMI_LIB[model]||{};
+  P.hmi={model:model,manu:lib.manu||'',dims:lib.dims||null,supply:lib.supply||'=24В',terminals:(lib.terminals&&lib.terminals.length)?lib.terminals.slice():defaultHmiTerminals(lib.supply)};
+  dirty();draw();
+}
+function hmiBlock(){
+  ensureHmi();
+  var H_=P.hmi||{};
+  var opts='<option value=""'+(H_.model?'':' selected')+'>— без панели —</option>';
+  HMIS.forEach(function(m){opts+='<option'+(H_.model===m?' selected':'')+'>'+esc(m)+'</option>'});
+  if(H_.model&&HMIS.indexOf(H_.model)<0)opts+='<option selected>'+esc(H_.model)+'</option>'; // распознанная по даташиту
+  var h='<div class="card" style="margin:4px 0 16px">'+
+    '<div class="cname" style="margin-bottom:8px">Сенсорная панель / HMI на дверь <span style="color:var(--dim);font-weight:400">(опционально — ИИ снимет габариты, питание и клеммы из даташита)</span></div>'+
+    '<div class="form"><div class="fld gr"><label>Модель панели</label><select id="hmiSel" onchange="setHmi(this.value)">'+opts+'</select></div>'+
+    '<div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="openDatasheet(\'hmi\')">Своя — загрузить даташит</button></div></div>';
+  if(H_.model){
+    var dm=H_.dims||{};
+    var dimStr=(dm.w||'?')+'×'+(dm.h||'?')+(dm.d?'×'+dm.d:'')+' мм';
+    h+='<div class="note" style="margin-top:2px">📐 Габариты: <span class="mono" style="color:var(--cyan)">'+esc(dimStr)+'</span>'+(H_.supply?(' · питание '+esc(H_.supply)):'')+' · связь RS-485 с контроллером</div>';
+    if(H_.terminals&&H_.terminals.length){
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
+      H_.terminals.forEach(function(t){h+='<span class="tag" style="background:rgba(91,214,162,.12);border:1px solid #2E8B57;color:#9be6c4;padding:2px 7px;border-radius:6px;font-family:\'IBM Plex Mono\';font-size:11px">'+esc(t)+'</span>';});
+      h+='</div><div class="note" style="margin-top:6px;color:var(--dim)">Клеммы и габариты попадут в спецификацию.</div>';
+    }
+  }
+  return h+'</div>';
 }
 
 /* 3 потребители */
@@ -727,8 +771,12 @@ function cabItems(){
   // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
   var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
   cabDoorList=[]; var doorN=1;
-  // сенсорная панель (HMI) ставится на дверь, если есть контроллер
-  if(P.controller&&P.controller.model) cabDoorList.push({kind:'hmi',t:'HMI',key:'doorHMI',tip:'Сенсорная панель (HMI) · связь с '+P.controller.model+' по RS-485'});
+  // сенсорная панель (HMI) ставится на дверь, если задана в шаге «Контроллер»
+  ensureHmi();
+  if(P.hmi&&P.hmi.model){
+    var hd=P.hmi.dims||{}, hdimStr=(hd.w||'?')+'×'+(hd.h||'?')+(hd.d?'×'+hd.d:'')+' мм';
+    cabDoorList.push({kind:'hmi',t:'HMI',key:'doorHMI',tip:'Сенсорная панель · '+P.hmi.model+' · '+hdimStr+(P.hmi.supply?(' · '+P.hmi.supply):'')+' · RS-485 с '+((P.controller&&P.controller.model)||'контроллером')});
+  }
   var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){
     var tip=(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'');
     if(DOOR_KINDS[a.kind]){
@@ -934,13 +982,25 @@ function doorSVG(){
   // сетка размещения
   var marginX=mm(45), marginTop=mm(58), cellW=mm(85), cellH=mm(78);
   var usable=boxW-marginX*2, cols=Math.max(1,Math.floor(usable/cellW)); cellW=usable/cols;
+  ensureHmi();
+  var doorCenters={};
   list.forEach(function(d,i){
     var col=i%cols, rw=Math.floor(i/cols);
-    var cx=pad+marginX+cellW*(col+0.5), cy=pad+marginTop+cellH*(rw+0.5);
-    var hov=' onmousemove="cabTipShow(event,\''+d.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+d.key+'\')" style="cursor:pointer"';
-    s+='<g'+hov+'>';
+    var defcx=pad+marginX+cellW*(col+0.5), defcy=pad+marginTop+cellH*(rw+0.5);
+    // экстенты элемента в мм — для отрисовки HMI и для удержания в пределах двери
+    var ext;
+    if(d.kind==='hmi'){var hd=(P.hmi&&P.hmi.dims)||{};var pwmm=Math.min(W-30,Math.max(60,+hd.w||100)),phmm=Math.min(H-60,Math.max(40,+hd.h||56));ext={hx:pwmm/2+6,hyTop:phmm/2+6,hyBot:phmm/2+18,pwmm:pwmm,phmm:phmm};}
+    else if(d.kind==='estop'){ext={hx:21,hyTop:21,hyBot:30};}
+    else{ext={hx:16,hyTop:16,hyBot:28};}
+    var pos=P.door.pos[d.key];
+    var cxmm=pos?clampN(pos.x,ext.hx,W-ext.hx):(defcx-pad)/ppm;
+    var cymm=pos?clampN(pos.y,ext.hyTop,H-ext.hyBot):(defcy-pad)/ppm;
+    var cx=pad+mm(cxmm), cy=pad+mm(cymm);
+    doorCenters[d.key]={x:cxmm,y:cymm,ext:ext};
+    var hov=' onmousemove="cabTipShow(event,\''+d.key+'\')" onmouseleave="cabTipHide()" oncontextmenu="cabCopy(event,\''+d.key+'\')" onpointerdown="doorDown(event,\''+d.key+'\')" style="cursor:grab;touch-action:none"';
+    s+='<g id="doorG_'+d.key+'"'+hov+'>';
     if(d.kind==='hmi'){
-      var pw=Math.min(cellW*0.92,mm(100)), ph=mm(56);
+      var pw=mm(ext.pwmm), ph=mm(ext.phmm);
       s+='<rect x="'+(cx-pw/2).toFixed(1)+'" y="'+(cy-ph/2).toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+ph.toFixed(1)+'" rx="5" fill="#0E1A22" stroke="#16B7DB" stroke-width="2"/>';
       s+='<rect x="'+(cx-pw/2+mm(5)).toFixed(1)+'" y="'+(cy-ph/2+mm(5)).toFixed(1)+'" width="'+(pw-mm(10)).toFixed(1)+'" height="'+(ph-mm(14)).toFixed(1)+'" rx="3" fill="rgba(22,183,219,.12)" stroke="#16B7DB" stroke-width="1"/>';
       s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(1)).toFixed(1)+'" font-size="9" fill="#9FD9E8" text-anchor="middle" font-family="IBM Plex Sans">Сенсорная панель</text>';
@@ -965,9 +1025,42 @@ function doorSVG(){
     s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(d.kind==='hmi'?36:28)).toFixed(1)+'" font-size="9" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+esc(String(d.t||''))+'</text>';
     s+='</g>';
   });
-  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Аппараты управления на лицевой панели · наведи — марка, ПКМ — копировать</text>';
+  doorGeom={ppm:ppm,pad:pad,W:W,H:H,centers:doorCenters};
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Перетащи элементы по двери (прилипают к сетке 5 мм, держатся в габаритах) · наведи — марка, ПКМ — копировать</text>';
   s+='</svg>';return s;
 }
+/* перетаскивание элементов по двери: свободно + прилипание к сетке 5 мм + удержание в габаритах */
+var doorDrag=null, doorStart=null, doorEl=null, doorGeom=null, doorMoved=false, doorCTMa=1;
+function doorDown(e,key){
+  try{e.preventDefault();e.stopPropagation();}catch(_){}
+  doorDrag=key;doorStart={x:e.clientX,y:e.clientY};doorMoved=false;
+  doorEl=document.getElementById('doorG_'+key);
+  var svg=document.getElementById('cabDoorSvg');
+  try{doorCTMa=svg.getScreenCTM().a||1;}catch(_){doorCTMa=1;}
+  if(doorEl)doorEl.style.cursor='grabbing';
+}
+function doorMoveH(e){
+  if(!doorDrag||!doorEl)return;
+  var dx=(e.clientX-doorStart.x)/doorCTMa, dy=(e.clientY-doorStart.y)/doorCTMa;
+  if(Math.abs(dx)>2||Math.abs(dy)>2)doorMoved=true;
+  doorEl.setAttribute('transform','translate('+dx.toFixed(1)+','+dy.toFixed(1)+')');
+}
+function doorUp(e){
+  if(!doorDrag)return;
+  var key=doorDrag, el=doorEl; doorDrag=null; doorEl=null;
+  if(el)el.style.cursor='grab';
+  if(!doorMoved){return;} // клик без перемещения — ничего не двигаем
+  if(!doorGeom||!doorGeom.centers[key]){if(el)el.removeAttribute('transform');return;}
+  var c=doorGeom.centers[key], ext=c.ext, ppm=doorGeom.ppm;
+  var dx=(e.clientX-doorStart.x)/doorCTMa/ppm, dy=(e.clientY-doorStart.y)/doorCTMa/ppm; // смещение в мм
+  var nx=Math.round((c.x+dx)/5)*5, ny=Math.round((c.y+dy)/5)*5; // прилипание к сетке 5 мм
+  nx=clampN(nx,ext.hx,doorGeom.W-ext.hx);
+  ny=clampN(ny,ext.hyTop,doorGeom.H-ext.hyBot);
+  ensureHmi();P.door.pos[key]={x:nx,y:ny};
+  dirty();draw();
+}
+document.addEventListener('pointermove',doorMoveH);
+document.addEventListener('pointerup',doorUp);
 function setEncl(m){P.enclosure=C.ENCL.filter(function(e){return e.model===m})[0];dirty();draw()}
 
 /* 9 спецификация */
@@ -1099,14 +1192,14 @@ $('libClose').onclick=function(){$('libMask').classList.remove('show')};
 $('libImport').onclick=function(){$('fileIn').click()};
 
 /* ---- распознавание даташита контроллера (ИИ читает PDF/фото, можно несколько страниц) ---- */
-var dsLast=null, dsFiles=[];
+var dsLast=null, dsFiles=[], dsMode='ctrl';
 function dsIdle(){
   $('dsBody').innerHTML='<div class="empty" style="padding:6px 2px">Поддерживаются PDF и фото (JPG/PNG). Можно выбрать сразу несколько страниц. До 16 МБ на файл.</div>';
   $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='⭳ Выбрать файл(ы)';
   $('dsPickBtn').onclick=function(){$('dsFile').click()};
 }
-function openDatasheet(){
-  dsLast=null;dsFiles=[];
+function openDatasheet(mode){
+  dsMode=mode||'ctrl';dsLast=null;dsFiles=[];
   if(!srvOn()){
     $('dsBody').innerHTML='<div class="empty" style="padding:8px 2px">Распознавание работает внутри CRM (нужна авторизация). Открой мастер через приложение Atomus.</div>';
     $('dsPickBtn').style.display='none';
@@ -1161,7 +1254,7 @@ function renderDatasheet(d){
     h+='<div class="card" style="border-color:rgba(255,196,0,.5);background:linear-gradient(180deg,rgba(255,196,0,.06),transparent);margin-bottom:10px"><div style="color:var(--amber);font-size:12.5px">⚠ Входы/выходы прочитаны частично. Добавь страницу «Технические характеристики» (там обычно число AI/DI/AO/реле) — ИИ перечитает весь набор и дополнит состав. Габариты сохранятся.</div>'+
        '<button class="tb cy" style="width:100%;margin-top:9px" onclick="dsAddPage()">➕ Добавить страницу характеристик</button></div>';
   }
-  h+='<button class="tb cy" style="width:100%" onclick="applyDatasheet()">✓ Применить — добавить контроллер</button>';
+  h+='<button class="tb cy" style="width:100%" onclick="applyDatasheet()">'+(dsMode==='hmi'?'✓ Применить — добавить панель на дверь':'✓ Применить — добавить контроллер')+'</button>';
   $('dsBody').innerHTML=h;
   $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='➕ Добавить страницу';
   $('dsPickBtn').onclick=function(){$('dsFile').click()};
@@ -1178,6 +1271,16 @@ function applyDatasheet(){
   var d=dsLast;if(!d)return;
   var model=(d.model||'').trim();if(!model){toast('Модель не распознана');return;}
   var label=((d.manufacturer?d.manufacturer+' ':'')+model).trim();
+  if(dsMode==='hmi'){
+    var dim=d.dimensions||{};
+    var term=(Array.isArray(d.terminals)&&d.terminals.length)?d.terminals.map(function(t){return typeof t==='string'?t:(t.id||t.name||'')}).filter(Boolean):defaultHmiTerminals(d.supply_voltage);
+    var hlib={manu:d.manufacturer||'',dims:{w:dim.width_mm||'',h:dim.height_mm||'',d:dim.depth_mm||''},supply:d.supply_voltage||'=24В',terminals:term};
+    HMI_LIB[label]=hlib;if(HMIS.indexOf(label)<0)HMIS.unshift(label);
+    ensureHmi();P.hmi={model:label,manu:hlib.manu,dims:hlib.dims,supply:hlib.supply,terminals:term.slice()};
+    $('dsMask').classList.remove('show');dirty();draw();
+    toast('Панель «'+label+'» добавлена на дверь');
+    return;
+  }
   var lib=ctrlLibFromData(d);CTRL_LIB[label]=lib;
   if(CTRLS.indexOf(label)<0)CTRLS.unshift(label);
   P.controller.model=label;

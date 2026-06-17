@@ -117,6 +117,8 @@ function buildSpec(P){
   var items=[]; // {des, name, manu, model, note}
   // контроллер
   if(P.controller&&P.controller.model) items.push({des:'A1', name:'Контроллер', manu:'', model:P.controller.model, note:'ядро щита'});
+  // сенсорная панель (HMI) на двери
+  if(P.hmi&&P.hmi.model){ var hd=P.hmi.dims||{}; var hdim=(hd.w||'?')+'×'+(hd.h||'?')+(hd.d?'×'+hd.d:'')+' мм'; var hnote='на дверь · '+hdim+(P.hmi.terminals&&P.hmi.terminals.length?(' · клеммы '+P.hmi.terminals.join('/')):'')+' · RS-485'; items.push({des:'A2', name:'Панель оператора (HMI)', manu:P.hmi.manu||'', model:P.hmi.model, note:hnote}); }
   // автоматы
   (P.breakers||[]).forEach(function(b){ items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
