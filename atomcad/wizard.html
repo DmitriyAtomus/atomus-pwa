@@ -719,8 +719,18 @@ function cabItems(){
   // сквозная нумерация по физическому порядку: QF1..QFn, KM1..KMn (key остаётся стабильным)
   var cnt={};
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
+  cabTipByKey={}; items.forEach(function(it){ if(it.key)cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+it.tip):it.tip; });
   return items;
 }
+var cabTipByKey={};
+function cabTipShow(e,key){
+  var tipEl=document.getElementById('cabTip'); if(!tipEl)return;
+  var tip=cabTipByKey[key]; if(!tip){tipEl.style.display='none';return;}
+  tipEl.textContent=tip; tipEl.style.display='block';
+  var w=tipEl.offsetWidth||200, x=Math.min(e.clientX+14,(window.innerWidth||1000)-w-12);
+  tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
+}
+function cabTipHide(){var t=document.getElementById('cabTip');if(t)t.style.display='none';}
 /* перетаскивание аппаратов в компоновке — перемещение в любое место (между / в свободное) */
 var cabDrag=null, cabHits=[], cabGeom=null;
 function cabDown(e,key){try{e.preventDefault();}catch(_){}cabDrag=key;}
@@ -743,15 +753,6 @@ function cabUp(e){
   P.cab=P.cab||{};P.cab.order=keys;dirty();draw();toast('Перемещено');
 }
 document.addEventListener('pointerup',cabUp);
-function cabTipMove(e){
-  var tipEl=document.getElementById('cabTip'); if(!tipEl)return;
-  var t=e.target&&e.target.closest?e.target.closest('[data-tip]'):null;
-  if(t){ tipEl.textContent=t.getAttribute('data-tip'); tipEl.style.display='block';
-    var w=tipEl.offsetWidth||200, x=Math.min(e.clientX+14,(window.innerWidth||1000)-w-12);
-    tipEl.style.left=x+'px'; tipEl.style.top=(e.clientY+16)+'px';
-  } else if(tipEl.style.display!=='none'){ tipEl.style.display='none'; }
-}
-document.addEventListener('pointermove',cabTipMove);
 function cabinetSVG(){
   ensureBreakers(); if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
   // габариты: введённые или дефолт под подобранный корпус
@@ -797,11 +798,10 @@ function cabinetSVG(){
     var x=railX+2;
     row.forEach(function(it){
       var ww=it.w*modPx-4, c=COLS[it.k]||COLS.aux, hpx=appHpx-mm(16);
+      var hov=it.key?(' onmousemove="cabTipShow(event,\''+it.key+'\')" onmouseleave="cabTipHide()"'):'';
       var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:grab"'):'';
-      var tipAttr=it.tip?(' data-tip="'+esc(it.tip).replace(/"/g,'&#34;')+'"'):'';
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
-      s+='<g'+drag+tipAttr+'>';
-      if(it.tip)s+='<title>'+esc(it.tip)+'</title>';
+      s+='<g'+drag+hov+'>';
       s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
       var fs=Math.max(7,Math.min(11,modPx*0.7));
       var lbl=String(it.t||''), cx=x+ww/2, cy=y+mm(3)+hpx/2, textW=lbl.length*fs*0.62;
