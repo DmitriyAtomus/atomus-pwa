@@ -744,7 +744,7 @@ function pCabinet(){
   if(P.cab.drawn){
     h+='<div class="svgcard" style="margin-top:14px">'+cabinetSVG()+'</div>';
     var dsvg=doorSVG();
-    if(dsvg)h+='<div class="svgcard" style="margin-top:14px">'+dsvg+'</div>';
+    if(dsvg)h+='<div class="svgcard" id="doorCard" style="margin-top:14px">'+dsvg+'</div>';
   }
   return h;
 }
@@ -1024,13 +1024,39 @@ function doorSVG(){
     }
     s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+mm(d.kind==='hmi'?36:28)).toFixed(1)+'" font-size="9" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono">'+esc(String(d.t||''))+'</text>';
     s+='</g>';
+    // размеры со стрелками для выбранного/перенесённого элемента: ширина и высота от края щита
+    // круглые (кнопки/переключатели/грибок/лампы) — до центра; прямоугольные (HMI) — до верхнего левого угла
+    if(d.key===doorSel){
+      var isRect=(d.kind==='hmi');
+      var rpx=isRect?0:mm(d.kind==='estop'?19:13);
+      var refX=isRect?(cx-mm(ext.pwmm)/2):cx, refY=isRect?(cy-mm(ext.phmm)/2):cy;
+      var boxLx=isRect?refX:(cx-rpx), boxTy=isRect?refY:(cy-rpx);
+      var wMm=Math.round((refX-pad)/ppm), hMm=Math.round((refY-pad)/ppm);
+      var dcol='#16B7DB';
+      // горизонтальный размер (ширина от левого края до точки отсчёта)
+      var yL=Math.max(pad+10,boxTy-mm(9));
+      s+='<line x1="'+pad.toFixed(1)+'" y1="'+yL.toFixed(1)+'" x2="'+refX.toFixed(1)+'" y2="'+yL.toFixed(1)+'" stroke="'+dcol+'" stroke-width="1"/>';
+      s+='<path d="M'+pad.toFixed(1)+','+yL.toFixed(1)+' l6,-3 l0,6 z" fill="'+dcol+'"/>';
+      s+='<path d="M'+refX.toFixed(1)+','+yL.toFixed(1)+' l-6,-3 l0,6 z" fill="'+dcol+'"/>';
+      s+='<line x1="'+refX.toFixed(1)+'" y1="'+yL.toFixed(1)+'" x2="'+refX.toFixed(1)+'" y2="'+refY.toFixed(1)+'" stroke="'+dcol+'" stroke-width=".6" stroke-dasharray="2 2" opacity=".7"/>';
+      s+='<text x="'+((pad+refX)/2).toFixed(1)+'" y="'+(yL-3).toFixed(1)+'" font-size="9" fill="'+dcol+'" text-anchor="middle" font-family="IBM Plex Mono">'+wMm+'</text>';
+      // вертикальный размер (высота от верхнего края до точки отсчёта)
+      var xL=Math.max(pad+10,boxLx-mm(9));
+      s+='<line x1="'+xL.toFixed(1)+'" y1="'+pad.toFixed(1)+'" x2="'+xL.toFixed(1)+'" y2="'+refY.toFixed(1)+'" stroke="'+dcol+'" stroke-width="1"/>';
+      s+='<path d="M'+xL.toFixed(1)+','+pad.toFixed(1)+' l-3,6 l6,0 z" fill="'+dcol+'"/>';
+      s+='<path d="M'+xL.toFixed(1)+','+refY.toFixed(1)+' l-3,-6 l6,0 z" fill="'+dcol+'"/>';
+      s+='<line x1="'+xL.toFixed(1)+'" y1="'+refY.toFixed(1)+'" x2="'+refX.toFixed(1)+'" y2="'+refY.toFixed(1)+'" stroke="'+dcol+'" stroke-width=".6" stroke-dasharray="2 2" opacity=".7"/>';
+      s+='<text transform="translate('+(xL-4).toFixed(1)+','+((pad+refY)/2).toFixed(1)+') rotate(-90)" font-size="9" fill="'+dcol+'" text-anchor="middle" font-family="IBM Plex Mono">'+hMm+'</text>';
+    }
   });
   doorGeom={ppm:ppm,pad:pad,W:W,H:H,centers:doorCenters};
-  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Перетащи элементы по двери (прилипают к сетке 5 мм, держатся в габаритах) · наведи — марка, ПКМ — копировать</text>';
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="#566370" text-anchor="middle">Перетащи элемент (сетка 5 мм, в габаритах) — покажет размеры от края щита · наведи — марка, ПКМ — копировать</text>';
   s+='</svg>';return s;
 }
 /* перетаскивание элементов по двери: свободно + прилипание к сетке 5 мм + удержание в габаритах */
-var doorDrag=null, doorStart=null, doorEl=null, doorGeom=null, doorMoved=false, doorCTMa=1;
+var doorDrag=null, doorStart=null, doorEl=null, doorGeom=null, doorMoved=false, doorCTMa=1, doorSel=null;
+/* перерисовать ТОЛЬКО дверь (без полного draw) — иначе при пересборке экрана прокрутка прыгает вверх */
+function refreshDoor(){var dc=document.getElementById('doorCard');if(dc){dc.innerHTML=doorSVG();}else{draw();}}
 function doorDown(e,key){
   try{e.preventDefault();e.stopPropagation();}catch(_){}
   doorDrag=key;doorStart={x:e.clientX,y:e.clientY};doorMoved=false;
@@ -1049,15 +1075,16 @@ function doorUp(e){
   if(!doorDrag)return;
   var key=doorDrag, el=doorEl; doorDrag=null; doorEl=null;
   if(el)el.style.cursor='grab';
-  if(!doorMoved){return;} // клик без перемещения — ничего не двигаем
-  if(!doorGeom||!doorGeom.centers[key]){if(el)el.removeAttribute('transform');return;}
+  doorSel=key; // показать размеры для элемента, с которым работаем
+  if(!doorMoved){refreshDoor();return;} // клик без перемещения — только выделить (показать размеры)
+  if(!doorGeom||!doorGeom.centers[key]){if(el)el.removeAttribute('transform');refreshDoor();return;}
   var c=doorGeom.centers[key], ext=c.ext, ppm=doorGeom.ppm;
   var dx=(e.clientX-doorStart.x)/doorCTMa/ppm, dy=(e.clientY-doorStart.y)/doorCTMa/ppm; // смещение в мм
   var nx=Math.round((c.x+dx)/5)*5, ny=Math.round((c.y+dy)/5)*5; // прилипание к сетке 5 мм
   nx=clampN(nx,ext.hx,doorGeom.W-ext.hx);
   ny=clampN(ny,ext.hyTop,doorGeom.H-ext.hyBot);
   ensureHmi();P.door.pos[key]={x:nx,y:ny};
-  dirty();draw();
+  dirty();refreshDoor();
 }
 document.addEventListener('pointermove',doorMoveH);
 document.addEventListener('pointerup',doorUp);
