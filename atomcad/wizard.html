@@ -743,11 +743,18 @@ function pCabinet(){
   // визуальная раскладка по кнопке
   if(P.cab.drawn){
     h+='<div class="svgcard" style="margin-top:14px">'+cabinetSVG()+'</div>';
+    h+='<div class="note" style="margin-top:6px">Клик по аппарату — карточка с маркой и кнопкой «Удалить из щита».'+(cabRemCount()>0?(' Удалено: <b style="color:var(--txt)">'+cabRemCount()+'</b> · <a href="#" onclick="cabRestore();return false" style="color:var(--cyan)">вернуть все</a>'):'')+'</div>';
     var dsvg=doorSVG();
-    if(dsvg)h+='<div class="svgcard" id="doorCard" style="margin-top:14px">'+dsvg+'</div>';
+    if(dsvg){
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap"><span class="note" style="margin:0">Шаг стрелок ←↑↓→:</span>'+
+         [1,5,10].map(function(n){return '<button class="dstep" data-s="'+n+'" onclick="setDoorStep('+n+')" style="padding:4px 10px;border:1px solid '+(doorStep===n?'#16B7DB':'var(--line)')+';color:'+(doorStep===n?'#16B7DB':'var(--dim)')+';background:transparent;border-radius:6px;cursor:pointer;font-size:12px">'+(n>=10?(n/10+' см'):(n+' мм'))+'</button>';}).join('')+'</div>';
+      h+='<div class="svgcard" id="doorCard" style="margin-top:8px">'+dsvg+'</div>';
+    }
   }
   return h;
 }
+var doorStep=10; /* шаг перемещения элемента двери стрелками, мм */
+function setDoorStep(n){doorStep=n;Array.prototype.forEach.call(document.querySelectorAll('.dstep'),function(b){var on=(+b.dataset.s===n);b.style.borderColor=on?'#16B7DB':'';b.style.color=on?'#16B7DB':'var(--dim)';});}
 function cabSet(){if(!P.cab)P.cab={};P.cab.name=$('cabName').value;P.cab.w=$('cabW').value;P.cab.ht=$('cabH').value;P.cab.d=$('cabD').value;dirty()}
 function cabDraw(){cabSet();P.cab.drawn=true;draw();toast('Раскладка построена')}
 // ёмкость корпуса по реальным габаритам (мм)
@@ -765,9 +772,9 @@ function cabItems(){
   ensureBreakers();
   var items=[];
   if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
-  P.breakers.forEach(function(b){items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
+  P.breakers.forEach(function(b){var tok='qf|'+b.code;if(cabIsRem(tok))return;items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,del:tok,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
   // контакторы — реальные габариты: 3ф ~3 мод., 1ф ~2 мод.
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){items.push({t:'KM'+kmN,w:c.phases===3?3:2,k:'km',src:'cons',key:'KM'+kmN,tip:'Контактор · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name+' · из «Потребители»'});kmN++;}}});
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){var tok='km|'+c.id+'|'+i, kk='KM'+kmN;kmN++;if(cabIsRem(tok))continue;items.push({t:kk,w:c.phases===3?3:2,k:'km',src:'cons',key:kk,del:tok,tip:'Контактор · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name+' · из «Потребители»'});}}});
   // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
   var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
   cabDoorList=[]; var doorN=1;
@@ -779,18 +786,23 @@ function cabItems(){
   }
   var auxN=1; P.aux.forEach(function(a){var q=a.qty||1;for(var i=0;i<q;i++){
     var tip=(a.name||'Аппарат')+(a.manu?(' · '+a.manu):'')+(a.model?(' '+a.model):'');
+    var tok='aux|'+a.id+'|'+i;
     if(DOOR_KINDS[a.kind]){
-      cabDoorList.push({kind:a.kind,t:(a.tag||auxPrefix(a.kind)+doorN),key:'door'+doorN,tip:tip});
-      doorN++;
+      var dk='door'+doorN; doorN++;
+      if(!cabIsRem(tok))cabDoorList.push({kind:a.kind,t:(a.tag||auxPrefix(a.kind)+(doorN-1)),key:dk,del:tok,tip:tip});
     } else if(a.kind==='contactor'){
       // контактор/пускатель = тот же KM (готовое изделие с катушкой в сборе): единая сквозная нумерация KM1..KMn
+      var key='aux'+(auxN++);
+      if(cabIsRem(tok))continue;
       var brand=((a.manu||'')+' '+(a.model||'')).replace(/\s+/g,' ').trim()||'CHINT NXC-09';
       var dest=a.target||'назначение не указано';
-      items.push({t:'KM',w:3,k:'km',src:'aux',key:'aux'+(auxN++),tip:'Контактор · '+brand+' · '+dest+' · из «Вспомогат.»'});
+      items.push({t:'KM',w:3,k:'km',src:'aux',key:key,del:tok,tip:'Контактор · '+brand+' · '+dest+' · из «Вспомогат.»'});
     } else {
+      var key2='aux'+(auxN++);
+      if(cabIsRem(tok))continue;
       var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
       var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
-      items.push({t:lbl,w:w,k:'aux',key:'aux'+(auxN++),tip:tip});
+      items.push({t:lbl,w:w,k:'aux',key:key2,del:tok,tip:tip});
     }
   }});
   if(P.cab&&P.cab.order&&P.cab.order.length){
@@ -807,11 +819,15 @@ function cabItems(){
     if(!it.key)return;
     cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+it.tip):it.tip;
     var parts=String(it.tip||'').split(' · ');
-    cabCardByKey[it.key]={tag:it.t||'', type:parts[0]||'', specs:parts.slice(1)};
+    cabCardByKey[it.key]={tag:it.t||'', type:parts[0]||'', specs:parts.slice(1), del:it.del||''};
   });
   return items;
 }
 var cabTipByKey={}, cabCardByKey={}, cabDoorList=[];
+function cabIsRem(token){return !!(P.cab&&P.cab.removed&&P.cab.removed[token]);}
+function cabRemCount(){var r=(P.cab&&P.cab.removed)||{},n=0,k;for(k in r)if(r[k])n++;return n;}
+function cabDelete(token){if(!token)return;P.cab=P.cab||{};P.cab.removed=P.cab.removed||{};P.cab.removed[token]=true;cabCardHide();dirty();draw();toast('Аппарат удалён из щита — можно вернуть');}
+function cabRestore(){if(P.cab)P.cab.removed={};dirty();draw();toast('Удалённые аппараты возвращены');}
 function cabCardShow(key){
   var info=cabCardByKey[key]; if(!info)return;
   var card=document.getElementById('cabCard'); if(!card)return;
@@ -829,6 +845,9 @@ function cabCardShow(key){
     });
     body+='</table>';
   } else { body='<div style="color:#8FA0AE">Нет дополнительных данных</div>'; }
+  if(info.del){
+    body+='<button onclick="cabDelete(\''+info.del+'\')" style="margin-top:10px;width:100%;padding:7px 10px;border:1px solid #5a2630;background:rgba(231,76,60,.12);color:#ff8c7a;border-radius:7px;cursor:pointer;font-size:12.5px">🗑 Удалить из щита</button>';
+  }
   document.getElementById('cabCardBody').innerHTML=body;
   card.style.display='block';
 }
@@ -1098,7 +1117,7 @@ document.addEventListener('keydown',function(e){
   if(!d)return;
   e.preventDefault();
   if(!doorGeom||!doorGeom.centers[doorSel])return;
-  var c=doorGeom.centers[doorSel], ext=c.ext, step=10; // 1 см
+  var c=doorGeom.centers[doorSel], ext=c.ext, step=doorStep||10; // выбираемый шаг
   var nx=clampN(c.x+d[0]*step,ext.hx,doorGeom.W-ext.hx);
   var ny=clampN(c.y+d[1]*step,ext.hyTop,doorGeom.H-ext.hyBot);
   ensureHmi();P.door.pos[doorSel]={x:nx,y:ny};

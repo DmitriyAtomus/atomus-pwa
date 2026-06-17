@@ -113,6 +113,8 @@ function compressDes(list){
   return list.join(', ');
 }
 function natKey(d){var m=/^([A-Za-zА-Яа-я]+)(\d*)/.exec(d)||[];return (m[1]||'')+(m[2]?('00000'+m[2]).slice(-5):'')}
+// удалённые пользователем элементы щита (обратимо): набор стабильных токенов в P.cab.removed
+function isRemoved(P,token){return !!(P&&P.cab&&P.cab.removed&&P.cab.removed[token]);}
 function buildSpec(P){
   var items=[]; // {des, name, manu, model, note}
   // контроллер
@@ -120,16 +122,16 @@ function buildSpec(P){
   // сенсорная панель (HMI) на двери
   if(P.hmi&&P.hmi.model){ var hd=P.hmi.dims||{}; var hdim=(hd.w||'?')+'×'+(hd.h||'?')+(hd.d?'×'+hd.d:'')+' мм'; var hnote='на дверь · '+hdim+(P.hmi.terminals&&P.hmi.terminals.length?(' · клеммы '+P.hmi.terminals.join('/')):'')+' · RS-485'; items.push({des:'A2', name:'Панель оператора (HMI)', manu:P.hmi.manu||'', model:P.hmi.model, note:hnote}); }
   // автоматы
-  (P.breakers||[]).forEach(function(b){ items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
+  (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
   var kmN=1;
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ items.push({des:'KM'+kmN, name:'Контактор', manu:'CHINT', model:c.phases===3?'NXC-'+(consumerCurrent(c)<18?'09':'25'):'NCH8-25/20', note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор', manu:'CHINT', model:c.phases===3?'NXC-'+(consumerCurrent(c)<18?'09':'25'):'NCH8-25/20', note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
   // датчики
   var btN=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ items.push({des:'BT'+btN, name:'Датчик температуры', manu:'', model:s.sig, note:s.name}); btN++; } });
   // вспомогательное
   var hlN=1;
-  (P.aux||[]).forEach(function(a){ var q=a.qty||1; for(var k=0;k<q;k++){ var base=a.tag||(a.kind==='lamp'?('HL'+hlN):a.kind==='psu'?'G1':a.kind==='ssr'?'KA1':'E'+hlN); var des=q>1?(base+'.'+(k+1)):base; if(!a.tag&&a.kind==='lamp')hlN++; items.push({des:des, name:a.name, manu:a.manu||'', model:a.model||'', note:a.note||''}); } });
+  (P.aux||[]).forEach(function(a){ var q=a.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'aux|'+a.id+'|'+k))continue; var base=a.tag||(a.kind==='lamp'?('HL'+hlN):a.kind==='psu'?'G1':a.kind==='ssr'?'KA1':'E'+hlN); var des=q>1?(base+'.'+(k+1)):base; if(!a.tag&&a.kind==='lamp')hlN++; items.push({des:des, name:a.name, manu:a.manu||'', model:a.model||'', note:a.note||''}); } });
   // блоки питания низковольтных цепей (авто — по НН-потребителям)
   var psuBase=(P.aux||[]).filter(function(a){return a.kind==='psu'}).reduce(function(s,a){return s+(a.qty||1)},0);
   var gN=1;
@@ -153,8 +155,8 @@ function buildSpec(P){
 // число модулей и подбор корпуса
 function moduleCount(P){
   var m=0;
-  (P.breakers||[]).forEach(function(b){ m+= b.poles===3?3:1; });
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; m+= q*(c.phases===3?2:1); } });
+  (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; m+= b.poles===3?3:1; });
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
   (P.aux||[]).forEach(function(a){ m+= (a.kind==='psu')?2:1; });
   lvSupplies(P).forEach(function(){ m+=2; }); // авто-БП низковольтных цепей
   m+=4; // клеммы/резерв базовый
