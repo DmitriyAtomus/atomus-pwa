@@ -11942,6 +11942,24 @@ function _renderInstallationDetail(d) {
     '<button class="btn btn-secondary btn-small" onclick="openEditInstallation(' + d.id + ')"><i class="ti ti-edit"></i> Изменить</button>' +
     '<button class="btn btn-secondary btn-small" onclick="deleteInstallation(' + d.id + ')" style="color:var(--danger,#B91C1C);"><i class="ti ti-trash"></i></button>' : '';
 
+  // v2.45.383: что назначено по договору (установить/демонтировать/работы/материалы) — видит исполнитель
+  var _idiCfg = { install: ['Что установить', 'ti-tool'], dismantle: ['Что демонтировать', 'ti-trash-x'], work: ['Монтажные работы', 'ti-checklist'], material: ['Материалы', 'ti-packages'] };
+  var itemsHtml = '';
+  ['install', 'dismantle', 'work', 'material'].forEach(function (k) {
+    var list = (d.install_items || []).filter(function (x) { return x.kind === k; });
+    if (!list.length) return;
+    itemsHtml += '<div class="idi-sec"><div class="idi-sec-h"><i class="ti ' + _idiCfg[k][1] + '"></i> ' + _idiCfg[k][0] + ' <span class="idi-cnt">' + list.length + '</span></div>';
+    list.forEach(function (it) {
+      var mt = [];
+      if (k !== 'work') mt.push((parseFloat(it.qty) || 0) + ' ' + escapeHtml(it.unit || 'шт.'));
+      if (it.location) mt.push(escapeHtml(it.location));
+      itemsHtml += '<div class="idi-row' + (it.status === 'done' ? ' done' : '') + '"><span class="idi-name">' + escapeHtml(it.name || '') + '</span>' +
+        (mt.length ? '<span class="idi-meta">' + mt.join(' · ') + '</span>' : '') + '</div>';
+    });
+    itemsHtml += '</div>';
+  });
+  if (itemsHtml) itemsHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-clipboard-list"></i> Что нужно сделать по договору</div>' + itemsHtml + '</div>';
+
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
       '<div class="modal-header">' +
@@ -11955,6 +11973,7 @@ function _renderInstallationDetail(d) {
         '</div>' +
         (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
         (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Что монтировать:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
+        itemsHtml +
         '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
         '<div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">' + flowHtml + '</div>' +
         '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
