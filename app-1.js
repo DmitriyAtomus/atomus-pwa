@@ -7092,6 +7092,11 @@ function applyPermissionsToUI() {
     });
     const cam = document.getElementById('si-camera-top-btn');
     if (cam) cam.style.display = 'none';
+    // v2.45.383: монтажнику уведомления не нужны — он видит только свой монтаж по договору
+    const _bell = document.getElementById('notif-bell-btn');
+    if (_bell) _bell.style.display = 'none';
+    const _ntab = document.querySelector('.tab25[data-main-tab="notifications"]');
+    if (_ntab) _ntab.style.display = 'none';
     // при входе монтажник попадает сразу в «Монтаж», а не на «Главную»
     if (state.currentSection !== 'installation') {
       try { selectSection('installation'); } catch (_) {}

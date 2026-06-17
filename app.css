@@ -18196,3 +18196,17 @@
 .ir-fileatt { display: inline-flex; align-items: center; gap: 6px; background: var(--bg, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 8px; padding: 8px 11px; font-size: 12.5px; color: var(--text, #1F2937); text-decoration: none; max-width: 220px; }
 .ir-fileatt i { color: var(--brand); font-size: 17px; flex-shrink: 0; }
 .ir-fileatt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* v2.45.383: позиции монтажа в карточке монтажа (исполнитель видит, что назначено) */
+.idi-wrap { background: var(--bg-soft, #F1F5F9); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.idi-title { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--text, #111827); }
+.idi-title i { color: var(--brand); }
+.idi-sec { margin-bottom: 10px; }
+.idi-sec:last-child { margin-bottom: 0; }
+.idi-sec-h { font-size: 12px; font-weight: 700; color: var(--text-mid, #475569); display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+.idi-sec-h i { color: var(--brand); }
+.idi-cnt { color: var(--text-light, #94A3B8); font-weight: 600; }
+.idi-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 9px; background: #fff; border-radius: 7px; margin-bottom: 4px; font-size: 13px; }
+.idi-row.done .idi-name { text-decoration: line-through; color: var(--text-light, #94A3B8); }
+.idi-name { font-weight: 600; color: var(--text, #1F2937); }
+.idi-meta { color: var(--text-light, #6B7280); font-size: 12px; white-space: nowrap; }
