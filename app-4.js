@@ -3293,10 +3293,10 @@ async function fetchPublicObject(kind, token, itemId) {
   if (pw) _qs.push('pw=' + encodeURIComponent(pw));
   if (itemId) _qs.push('item=' + encodeURIComponent(itemId));  // v2.45.208: карточка позиции
   if (_qs.length) url += '?' + _qs.join('&');
-  // Если пользователь вошёл в CRM — шлём токен сессии (сотрудник без пароля)
-  const _t = localStorage.getItem(TOKEN_KEY);
+  // v2.45.420: публичная страница QR НЕ шлёт токен сессии — пароль спрашивается
+  // всегда (в т.ч. у залогиненного сотрудника). Внутренние сценарии открытия
+  // карточки (openAssemblyByPublicToken и т.п.) шлют токен отдельно.
   const opts = { cache: 'no-store' };
-  if (_t) opts.headers = { 'Authorization': 'Bearer ' + _t };
   const r = await fetch(url, opts);
   let data = null;
   try { data = await r.json(); } catch (e) {}
@@ -3994,6 +3994,9 @@ async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate)
       subtitle: modelArticle ? 'Артикул: ' + modelArticle : '',
       url: url,
       type: 'assembly',
+      // v2.45.420: пароль для получателя (договорный или глобальный для свободной сборки)
+      password: r.public_password || '',
+      contractId: r.contract_id || null,
       data: { assemblyId, modelName, modelArticle, assemblyDate, token: r.public_token },
     });
   } catch (e) {
