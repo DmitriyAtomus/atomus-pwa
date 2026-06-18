@@ -10714,6 +10714,25 @@ async function rollbackContractShipment(contractId) {
   }
 }
 
+// v2.45.425: откат сборки к отгрузке — снимает все отметки «собрано» по договору.
+// Без пароля (склад не затрагивается, в отличие от отгрузки).
+async function rollbackContractGathering(contractId) {
+  if (!contractId) return;
+  if (!confirm('Откатить сборку к отгрузке? Все отметки «собрано» снимутся (счётчик сборки вернётся к 0). Склад не затрагивается.')) return;
+  try {
+    const resp = await apiPost('/api/contracts/' + contractId + '/gatherings/reset', {});
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast('Сборка откачена' + (d.removed ? ' (' + d.removed + ')' : ''), 'success');
+      if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
+    } else {
+      showToast((d && (d.message || d.error)) || 'Не удалось откатить сборку', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 // v2.45.405: запросить сборку к отгрузке — помечает договор и шлёт уведомление
 // сборщику (мастер/слесарь видит его в «колокольчике» и комплектует по QR).
 async function requestShipmentAssembly(contractId) {
@@ -10825,6 +10844,14 @@ async function loadContractShipmentBlock(contractId) {
       // «Собрать по QR» — сборщику (мастер/слесарь): комплектация по сканам
       html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="openShipmentMode(' + contractId + ', \'gather\')">' +
         '<i class="ti ti-scan"></i> ' + (gComplete ? 'Собрано · открыть' : 'Собрать по QR') + '</button>';
+      // v2.45.425: откат сборки к отгрузке — снять все отметки «собрано» (склад не трогается)
+      if (gDone > 0) {
+        html += '<button onclick="rollbackContractGathering(' + contractId + ')" ' +
+          'style="width:100%;margin-top:8px;background:none;border:1px solid #FCA5A5;color:#B91C1C;' +
+          'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+          'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+          '<i class="ti ti-arrow-back-up"></i> Откатить сборку (' + gDone + ')</button>';
+      }
       html += '</div>';
     }
 
