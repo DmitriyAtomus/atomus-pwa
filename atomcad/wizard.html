@@ -515,7 +515,7 @@ function editSensField(id,f,v){var s=P.sensors.filter(function(x){return x.id===
 /* 5 вспомогательное — аппараты в шкафу: каталог с УГО (ГОСТ, с выводами) */
 var editAux=null;
 var AUX_CATALOG=[
- {kind:'contactor',label:'Контактор электромагнитный',prefix:'K',manu:'CHINT',model:'NXC-09'},
+ {kind:'contactor',label:'Контактор электромагнитный',prefix:'K',manu:'CHINT',model:'NC1-1210 12А 230В AC-3 1НО'},
  {kind:'ssr',label:'Твердотельное реле',prefix:'ТР',manu:'',model:'HD-4022.10U'},
  {kind:'relay',label:'Реле промежуточное',prefix:'KL',manu:'IEK',model:'РЭК77/3'},
  {kind:'switch',label:'Переключатель',prefix:'SA',manu:'IEK',model:'LA167-BDF41'},
@@ -786,7 +786,7 @@ function cabItems(){
   if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
   P.breakers.forEach(function(b){var tok='qf|'+b.code;if(cabIsRem(tok))return;items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,del:tok,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
   // контакторы — реальные габариты: 3ф ~3 мод., 1ф ~2 мод.
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){var tok='km|'+c.id+'|'+i, kk='KM'+kmN;kmN++;if(cabIsRem(tok))continue;items.push({t:kk,w:c.phases===3?3:2,k:'km',src:'cons',key:kk,del:tok,tip:'Контактор электромагнитный (с катушкой) · CHINT '+(c.phases===3?'NXC-12':'NCH8-25/20')+' · '+c.name+' · из «Потребители»'});}}});
+  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){var tok='km|'+c.id+'|'+i, kk='KM'+kmN;kmN++;if(cabIsRem(tok))continue;items.push({t:kk,w:c.phases===3?3:2,k:'km',src:'cons',key:kk,del:tok,gab:C.contactorDimStr(c),tip:'Контактор электромагнитный (с катушкой) · CHINT '+C.contactorModel(c)+' · '+c.name+' · из «Потребители»'});}}});
   // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
   var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
   cabDoorList=[]; var doorN=1;
@@ -806,9 +806,9 @@ function cabItems(){
       // контактор/пускатель = тот же KM (готовое изделие с катушкой в сборе): единая сквозная нумерация KM1..KMn
       var key='aux'+(auxN++);
       if(cabIsRem(tok))continue;
-      var brand=((a.manu||'')+' '+(a.model||'')).replace(/\s+/g,' ').trim()||'CHINT NXC-09';
+      var brand=((a.manu||'')+' '+(a.model||'')).replace(/\s+/g,' ').trim()||'CHINT NC1-1210 12А 230В AC-3 1НО';
       var dest=a.target||'назначение не указано';
-      items.push({t:'KM',w:3,k:'km',src:'aux',key:key,del:tok,tip:'Контактор электромагнитный (с катушкой) · '+brand+' · '+dest+' · из «Вспомогат.»'});
+      items.push({t:'KM',w:3,k:'km',src:'aux',key:key,del:tok,gab:'45×75×87 мм · 3-пол.',tip:'Контактор электромагнитный (с катушкой) · '+brand+' · '+dest+' · из «Вспомогат.»'});
     } else {
       var key2='aux'+(auxN++);
       if(cabIsRem(tok))continue;
@@ -829,6 +829,7 @@ function cabItems(){
   // реальный габарит аппарата — чтобы было понятно, какой размер показан (рейка: 1 модуль = 17,5 мм)
   var MM=17.5;
   function sizeOf(it){
+    if(it.gab)return it.gab;
     if(it.k==='ctrl'){var cd=P.controller&&P.controller.dims;return (cd&&cd.w)?((cd.w)+'×'+(cd.h||'?')+(cd.d?'×'+cd.d:'')+' мм'):('ширина ~'+Math.round(it.w*MM)+' мм ('+it.w+' мод.)');}
     if(it.kind==='hmi'){var hd=(P.hmi&&P.hmi.dims)||{};return (hd.w||'?')+'×'+(hd.h||'?')+(hd.d?'×'+hd.d:'')+' мм';}
     if(it.kind==='estop')return 'Ø ~40 мм · отверстие Ø22 мм';

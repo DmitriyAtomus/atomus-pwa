@@ -20,6 +20,14 @@ function ratingFor(I){ return stdRating(I*1.25); } // запас 25%
 // нужен ли потребителю контактор (коммутация)
 function needsContactor(c){ return c.needs!=='direct'; }
 
+// контактор серии CHINT NC1 — типоразмер по рабочему току (AC-3), катушка =230В, 50 Гц
+var NC1=[{a:9,m:'NC1-0910',aux:'1НО',w:45,h:75,d:87},{a:12,m:'NC1-1210',aux:'1НО',w:45,h:75,d:87},{a:18,m:'NC1-1810',aux:'1НО',w:45,h:75,d:87},{a:25,m:'NC1-2510',aux:'1НО',w:45,h:80,d:87},{a:32,m:'NC1-3210',aux:'1НО',w:45,h:80,d:87},{a:40,m:'NC1-4011',aux:'1НО+1НЗ',w:55,h:85,d:92},{a:50,m:'NC1-5011',aux:'1НО+1НЗ',w:55,h:85,d:92},{a:65,m:'NC1-6511',aux:'1НО+1НЗ',w:55,h:90,d:100},{a:80,m:'NC1-8011',aux:'1НО+1НЗ',w:70,h:95,d:112},{a:95,m:'NC1-9511',aux:'1НО+1НЗ',w:70,h:95,d:112}];
+function contactorPick(curA){ curA=+curA||0; for(var i=0;i<NC1.length;i++){ if(NC1[i].a>=curA) return NC1[i]; } return NC1[NC1.length-1]; }
+// строка модели для спецификации/подсказки: «NC1-1210 12А 230В AC-3 1НО»
+function contactorModel(c){ var n=contactorPick(consumerCurrent(c)); return n.m+' '+n.a+'А 230В AC-3 '+n.aux; }
+// реальный габарит контактора (Ш×В×Г) — для понимания размера
+function contactorDimStr(c){ var n=contactorPick(consumerCurrent(c)); return n.w+'×'+n.h+'×'+n.d+' мм · 3-пол.'; }
+
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
 var PSU_W=[15,30,60,100,120,150,240,350,480,720,960];
@@ -125,7 +133,7 @@ function buildSpec(P){
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
   var kmN=1;
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:c.phases===3?'NXC-'+(consumerCurrent(c)<18?'09':'25'):'NCH8-25/20', note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
   // датчики
   var btN=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ items.push({des:'BT'+btN, name:'Датчик температуры', manu:'', model:s.sig, note:s.name}); btN++; } });
@@ -203,7 +211,7 @@ function buildSchematic(P){
     pw.push(W([x,800],[x,950]));
     pt.push({x:x+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                 // фаза линии
     if(cons&&needsContactor(cons)){
-      pc.push(C('KM'+kmN,'c_no',x,1450,cons.phases===3?'NXC-09':'NCH8-25/20','CHINT',cons.name));
+      pc.push(C('KM'+kmN,'c_no',x,1450,contactorModel(cons),'CHINT',cons.name));
       pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
       pt.push({x:x-66,y:1545,s:20,ls:0,anchor:'end',tx:'(л.2)'});     // ссылка на катушку
       kmN++;
@@ -286,7 +294,7 @@ g.AtomCore={
   buildBreakers:buildBreakers, breakerSum:breakerSum, breakerStatus:breakerStatus,
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
-  buildSchematic:buildSchematic, needsContactor:needsContactor,
+  buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,
   isLV:isLV, lvSupplies:lvSupplies
 };
 })(typeof window!=='undefined'?window:global);
