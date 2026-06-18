@@ -5370,6 +5370,12 @@ async function routeScannedToken(token) {
     return;
   }
 
+  // v2.45.384: сборка/чиллер с производственной работой → проваливаемся в карточку работы
+  if (info.type === 'assembly' && info.work_id && typeof openProductionWorkDetail === 'function') {
+    openProductionWorkDetail(info.work_id);
+    return;
+  }
+
   // Сборка с привязанным договором, ещё не отгружена → предлагаем отгрузку
   if (info.type === 'assembly' && info.contract_id && !info.is_shipped) {
     const cNum = info.contract_number || ('#' + info.contract_id);
