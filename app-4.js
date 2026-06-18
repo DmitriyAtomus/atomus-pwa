@@ -8667,6 +8667,11 @@ function renderShipmentScreen(status) {
   } else {
     html += '<button class="ship-start-btn" onclick="startShipmentScan()"><i class="ti ti-scan"></i> Сканировать QR</button>';
   }
+  // v2.45.416: подсказка про ручную отметку в режиме сборки (на случай дубля/слетевшей метки)
+  if (isGather && total > 0 && !isComplete) {
+    html += '<div style="font-size:12px;color:var(--text-light);text-align:center;margin-top:8px;">' +
+      'Не сканируется? Тапните по строке в списке, чтобы отметить «собрано» вручную</div>';
+  }
   html += '</div>';
 
   // Список позиций (с группировкой одинаковых сборок)
@@ -8782,10 +8787,13 @@ function renderShipItem(it) {
   } else if (_isGather && _done) {
     sub += ' · собрано';
   }
-  // v2.43.10 (A): тап по карточке открывает модалку с деталями (только в режиме отгрузки —
-  // карточка завязана на shipments). В режиме сборки тап не нужен.
-  const clickAttr = _isGather ? '' : ' onclick="openShipmentItemDetail(\'' + it.type + '\',' + it.id + ')"';
-  return '<div class="ship-item ' + (_done ? 'shipped' : '') + '"' + clickAttr + ' style="' + (_isGather ? '' : 'cursor:pointer;') + '">' +
+  // v2.43.10 (A): тап по карточке открывает модалку с деталями (режим отгрузки).
+  // v2.45.416: в режиме сборки тап по строке отмечает/снимает «собрано» вручную —
+  // запасной путь, когда метку не отсканировать (дубликат токена, слетела наклейка).
+  const clickAttr = _isGather
+    ? ' onclick="toggleGatherItem(\'' + it.type + '\',' + it.id + ',' + (_done ? 1 : 0) + ')"'
+    : ' onclick="openShipmentItemDetail(\'' + it.type + '\',' + it.id + ')"';
+  return '<div class="ship-item ' + (_done ? 'shipped' : '') + '"' + clickAttr + ' style="cursor:pointer;">' +
     '<div class="ship-item-check"></div>' +
     '<div class="ship-item-type-icon' + (it.type === 'box' ? ' t-box' : (it.type === 'contract_item' ? ' t-buy' : ' t-asm')) + '"><i class="ti ' + iconCls + '"></i></div>' +
     '<div class="ship-item-body">' +
@@ -8802,6 +8810,30 @@ async function reloadShipmentStatus() {
     const status = await apiGet('/api/contracts/' + state._shipContractId + '/shipment-status');
     renderShipmentScreen(status);
   } catch (e) {}
+}
+
+// v2.45.416: ручная отметка «собрано» тапом по строке в режиме сборки. Нужна, когда
+// единицу не отсканировать (дубликат QR-токена у одинаковых единиц, слетевшая
+// наклейка). Склад не затрагивается, действие обратимо повторным тапом.
+async function toggleGatherItem(type, id, done) {
+  const cid = state._shipContractId;
+  if (!cid || !id) return;
+  const unmark = !!done;
+  if (unmark && !confirm('Снять отметку «собрано» с этой единицы?')) return;
+  try {
+    const resp = await apiPost('/api/gatherings/mark', {
+      contract_id: cid, type: type, id: id, unmark: unmark,
+    });
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast(unmark ? 'Отметка снята' : 'Отмечено собранным', 'success');
+      reloadShipmentStatus();
+    } else {
+      showToast((d && (d.error)) || 'Не удалось отметить', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 function closeShipmentScreen() {
