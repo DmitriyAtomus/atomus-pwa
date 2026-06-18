@@ -8160,6 +8160,86 @@ function updateShipCounter(shipped, total, lastName) {
   if (nm && lastName) nm.textContent = lastName;
 }
 
+// v2.45.407: тап по счётчику «X/Y» в режиме скана открывает список —
+// что уже собрано/отгружено и что ещё осталось. Тянем свежий статус, чтобы
+// показать актуальную картину сразу после сканов.
+function closeShipScanList() {
+  const m = document.getElementById('ship-scan-list-modal');
+  if (m) m.remove();
+}
+
+async function openShipScanList() {
+  if (!state._shipContractId) return;
+  const isGather = (typeof _shipModeIsGather === 'function') && _shipModeIsGather();
+  const doneKey = isGather ? 'gathered' : 'shipped';
+  const doneWord = isGather ? 'Собрано' : 'Отгружено';
+  const leftWord = isGather ? 'Осталось собрать' : 'Осталось отгрузить';
+
+  let modal = document.getElementById('ship-scan-list-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'ship-scan-list-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.55);' +
+      'display:flex;align-items:flex-end;justify-content:center;';
+    modal.onclick = (e) => { if (e.target === modal) closeShipScanList(); };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = '<div style="background:var(--bg,#fff);width:100%;max-width:560px;max-height:82vh;' +
+    'border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div style="padding:14px 16px;display:flex;align-items:center;justify-content:center;color:var(--text-light);">' +
+    'Загружаем…</div></div>';
+
+  let status;
+  try {
+    status = await apiGet('/api/contracts/' + state._shipContractId + '/shipment-status');
+  } catch (e) {
+    const inner = modal.firstChild;
+    if (inner) inner.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text-light);">' +
+      'Не удалось загрузить список</div>';
+    return;
+  }
+
+  const items = status.items || [];
+  const done = items.filter(it => it[doneKey]);
+  const left = items.filter(it => !it[doneKey]);
+
+  const rowHtml = (it, isDone) => {
+    const nm = escapeHtml(it.name || ('#' + it.id));
+    const qty = it.qty ? (' · ' + it.qty + ' шт') : '';
+    const icon = isDone
+      ? '<i class="ti ti-circle-check" style="color:#16A34A;font-size:20px;flex-shrink:0;"></i>'
+      : '<i class="ti ti-circle" style="color:var(--text-light);font-size:20px;flex-shrink:0;"></i>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:11px 8px;border-bottom:1px solid var(--border);">' +
+      icon +
+      '<div style="flex:1;min-width:0;font-size:14px;' + (isDone ? 'color:var(--text-light);text-decoration:line-through;' : 'font-weight:600;') + '">' +
+      nm + '<span style="color:var(--text-light);font-weight:400;text-decoration:none;">' + qty + '</span></div>' +
+      '</div>';
+  };
+
+  let body = '';
+  body += '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">';
+  body += '<div style="font-size:16px;font-weight:700;">' + (isGather ? 'Сборка к отгрузке' : 'Отгрузка') +
+          ' · ' + done.length + '/' + items.length + '</div>';
+  body += '<button onclick="closeShipScanList()" style="width:34px;height:34px;border-radius:50%;border:none;' +
+          'background:var(--border);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">' +
+          '<i class="ti ti-x"></i></button>';
+  body += '</div>';
+  body += '<div style="overflow-y:auto;padding:6px 12px 18px;">';
+  // Сначала — что осталось (это и нужно сборщику в работе)
+  body += '<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;padding:10px 4px 4px;">' +
+          leftWord + ' · ' + left.length + '</div>';
+  if (left.length) { left.forEach(it => body += rowHtml(it, false)); }
+  else { body += '<div style="padding:14px 4px;color:#16A34A;font-weight:600;"><i class="ti ti-check"></i> Всё ' +
+          (isGather ? 'собрано' : 'отгружено') + '</div>'; }
+  body += '<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;padding:16px 4px 4px;">' +
+          doneWord + ' · ' + done.length + '</div>';
+  if (done.length) { done.forEach(it => body += rowHtml(it, true)); }
+  else { body += '<div style="padding:10px 4px;color:var(--text-light);">Пока ничего</div>'; }
+  body += '</div>';
+
+  modal.firstChild.innerHTML = body;
+}
+
 // ===== Открытие экрана отгрузки по договору =====
 
 // ============ ЭТАП 30.2: ЭКРАН ВЫБОРА СЦЕНАРИЯ ОТГРУЗКИ ============

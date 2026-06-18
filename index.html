@@ -2913,10 +2913,11 @@
     <!-- ЭТАП 26: цветная вспышка после скана -->
     <div class="qr-flash" id="qr-flash"></div>
     <!-- ЭТАП 26: счётчик прогресса в continuous-режиме -->
-    <div class="ship-counter" id="ship-counter">
+    <div class="ship-counter" id="ship-counter" onclick="openShipScanList()" title="Показать список — что собрано и что осталось">
       <span class="ship-counter-num"><span id="ship-counter-shipped">0</span>/<span id="ship-counter-total">0</span></span>
       <div class="ship-counter-progress"><div class="ship-counter-fill" id="ship-counter-fill" style="width:0%"></div></div>
       <span class="ship-counter-name" id="ship-counter-name">—</span>
+      <i class="ti ti-list-details ship-counter-list-ic"></i>
     </div>
     <!-- ЭТАП 26: тост с результатом последнего скана -->
     <div class="ship-last" id="ship-last">

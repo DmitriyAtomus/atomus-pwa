@@ -14115,6 +14115,14 @@
     max-width: calc(100% - 32px);
   }
   .ship-counter.visible { display: flex; }
+  .ship-counter { cursor: pointer; }
+  .ship-counter .ship-counter-list-ic {
+    font-size: 18px;
+    opacity: 0.9;
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+  .ship-counter:active { background: rgba(0, 0, 0, 0.8); }
   .ship-counter .ship-counter-num {
     font-size: 18px;
     font-weight: 700;
