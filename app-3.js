@@ -5388,7 +5388,10 @@ function _cpTrackingBlockHtml(ordered) {
     const g = bySup[k];
     const contactBtns = [];
     if (g.email) contactBtns.push('<a href="mailto:' + escapeHtml(g.email) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;"><i class="ti ti-mail"></i> Написать</a>');
-    if (g.phone) contactBtns.push('<a href="tel:' + escapeHtml(String(g.phone).replace(/[^\d+]/g, '')) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;"><i class="ti ti-phone"></i> Позвонить</a>');
+    // v2.45.429: вместо tel: — показываем сам номер, тап открывает карточку поставщика
+    if (g.phone) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
+      (g.id ? 'onclick="openEditSupplier(' + g.id + ')" title="Открыть карточку поставщика"' : 'disabled') +
+      '><i class="ti ti-phone"></i> ' + escapeHtml(g.phone) + '</button>');
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
       '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
       escapeHtml(g.name || '(поставщик не назначен)') + '</span>' +
@@ -10615,6 +10618,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.429',
+    date: '18.06.2026',
+    title: 'Отзыв запроса сборки + телефон поставщика',
+    features: [
+      'В блоке <b>«Сборка к отгрузке»</b> появилась кнопка <b>«Отозвать сборку»</b> — снимает отметку «сборка запрошена» и возвращает кнопку «Запросить сборку к отгрузке». Уже собранное не трогается, у сборщика договор уходит из списка к сборке',
+      'В блоке <b>«Ждём поставку»</b> вместо кнопки «Позвонить» теперь сразу виден <b>номер телефона</b> поставщика, а тап по нему открывает <b>карточку поставщика</b>',
+    ],
+  },
   {
     version: 'v2.45.428',
     date: '18.06.2026',

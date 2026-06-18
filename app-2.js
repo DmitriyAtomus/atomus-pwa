@@ -10751,6 +10751,25 @@ async function requestShipmentAssembly(contractId) {
   }
 }
 
+// v2.45.429: отозвать запрос сборки к отгрузке — снять отметку «сборка запрошена».
+// Возвращает блок к состоянию с кнопкой «Запросить сборку к отгрузке».
+async function cancelShipmentAssembly(contractId) {
+  if (!contractId) return;
+  if (!confirm('Отозвать запрос сборки к отгрузке? Отметка «сборка запрошена» снимется, у сборщика договор уйдёт из списка к сборке. Уже собранное не трогаем.')) return;
+  try {
+    const resp = await apiPost('/api/contracts/' + contractId + '/cancel-shipment-assembly', {});
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast('Запрос сборки отозван', 'success');
+      if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
+    } else {
+      showToast((d && (d.message || d.error)) || 'Не удалось отозвать запрос', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 // v2.45.144: обновить область отгрузки (счётчик + коробки + сборки) одной кнопкой
 function refreshContractShipmentArea(contractId) {
   if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
@@ -10836,6 +10855,12 @@ async function loadContractShipmentBlock(contractId) {
             'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
             'display:flex;align-items:center;justify-content:center;gap:6px;">' +
             '<i class="ti ti-bell-ringing"></i> Запросить повторно</button>';
+          // v2.45.429: отозвать запрос — вернуться к состоянию с кнопкой «Запросить сборку»
+          html += '<button onclick="cancelShipmentAssembly(' + contractId + ')" ' +
+            'style="width:100%;margin-top:8px;background:none;border:1px solid #FCA5A5;color:#B91C1C;' +
+            'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+            'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+            '<i class="ti ti-bell-off"></i> Отозвать сборку</button>';
         } else {
           html += '<button class="ship-start-btn" onclick="requestShipmentAssembly(' + contractId + ')">' +
             '<i class="ti ti-bell-ringing"></i> Запросить сборку к отгрузке</button>';
