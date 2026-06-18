@@ -5332,8 +5332,37 @@ function _contractPurchasesBlockHtml(items) {
     out += h;
   }
 
-  out += _cpTrackingBlockHtml(ordered);
+  // Трекинг «Ждём поставку» рисуется централизованно в renderSupplyShopping
+  // (объединяет заказанное по договорам и заказанные комплектующие).
   return out;
+}
+
+// v2.45.428: общий блок «Ждём поставку» — заказанные/оплаченные покупные позиции
+// по договорам И комплектующие. Принимает уже нормализованные элементы (CP-формат).
+function _waitingDeliveryBlockHtml(orderedItems) {
+  return _cpTrackingBlockHtml(orderedItems);
+}
+
+// Нормализует заказанное комплектующее (из shopping-list) к формату трекинга.
+function _componentToTracking(it, group) {
+  const projects = Array.isArray(it.plan_contracts) && it.plan_contracts.length
+    ? it.plan_contracts.map(n => '№' + n).join(', ')
+    : (it.reason || '');
+  return {
+    item_name: it.component_name,
+    contract_number: projects,
+    contract_id: null,
+    qty: it.recommended_qty,
+    unit: it.unit,
+    order_status: it.order_status,
+    order_label: it.order_label,
+    ordered_at: it.ordered_at || null,
+    supplier_id: group ? group.supplier_id : null,
+    supplier_name: group ? group.supplier_name : '',
+    supplier_email: group ? group.supplier_email : '',
+    supplier_phone: group ? group.supplier_phone : '',
+    supplier_contact: group ? group.supplier_contact : '',
+  };
 }
 
 // v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
@@ -5385,13 +5414,24 @@ function _cpTrackingRowHtml(it) {
     ageBadge = '<span style="font-size:11px;white-space:nowrap;color:' + (old ? '#B91C1C' : 'var(--text-light)') + ';font-weight:' + (old ? '700' : '400') + ';">' +
       (days === 0 ? 'сегодня' : days + ' ' + _plural(days, ['день', 'дня', 'дней'])) + (old ? ' ⚠' : '') + '</span>';
   }
-  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
-    '<span style="flex:1;font-size:13px;color:var(--text-dark);cursor:pointer;" ' +
+  // У покупных по договору есть contract_id (тап → договор); у комплектующих —
+  // нет, показываем причину/проекты текстом без клика.
+  let nameCell;
+  if (it.contract_id) {
+    nameCell = '<span style="flex:1;font-size:13px;color:var(--text-dark);cursor:pointer;" ' +
       'onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" ' +
       'title="Открыть договор ' + escapeHtml(it.contract_number || '') + '">' +
       escapeHtml(it.item_name || '—') +
       ' <span style="font-size:11px;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
-    '</span>' +
+    '</span>';
+  } else {
+    nameCell = '<span style="flex:1;font-size:13px;color:var(--text-dark);">' +
+      escapeHtml(it.item_name || '—') +
+      (it.contract_number ? ' <span style="font-size:11px;color:var(--text-light);">· ' + escapeHtml(it.contract_number) + '</span>' : '') +
+    '</span>';
+  }
+  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
+    nameCell +
     '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
     ageBadge +
     stBadge +
@@ -5543,6 +5583,9 @@ function _shopApplyLocal(items) {
   const qtyMap = _shopGetQtyMap();
   let hiddenCount = 0;
   const out = (items || []).filter(it => {
+    // v2.45.428: уже заказанные/оплаченные — не «к закупке», а «ждём поставку».
+    // Исключаем из групп и из формирования заказа (чтобы не заказывать повторно).
+    if (it.order_status) return false;
     if (hidden.has(it.component_id)) { hiddenCount++; return false; }
     return true;
   }).map(it => {
@@ -5558,15 +5601,24 @@ function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
   const groups = (d && d.groups) || [];
-  const cpBlock = _contractPurchasesBlockHtml(d && d._contract_purchases);
+  const cpItems = (d && d._contract_purchases) || [];
+  const cpBlock = _contractPurchasesBlockHtml(cpItems);
+  // v2.45.428: «Ждём поставку» — заказанные покупные по договорам + заказанные
+  // комплектующие (их убираем из групп «к закупке», чтобы не предлагались снова).
+  const waitingItems = cpItems.filter(x => x.purchase_status === 'ordered');
   // v2.45.286: применяем локальные скрытие/переопределения к каждой группе
   let totalHidden = 0;
   groups.forEach(g => {
-    const r = _shopApplyLocal(g.items);
+    // заказанные комплектующие → в «Ждём поставку» (из исходных, до фильтра)
+    (g.items || []).forEach(it => {
+      if (it.order_status) waitingItems.push(_componentToTracking(it, g));
+    });
+    const r = _shopApplyLocal(g.items);   // исключает заказанные + скрытые
     g.items = r.items;
     g.items_count = r.items.length;
     totalHidden += r.hiddenCount;
   });
+  const waitingBlock = _waitingDeliveryBlockHtml(waitingItems);
   // Группы, в которых не осталось позиций после фильтра — выкидываем
   const visibleGroups = groups.filter(g => (g.items || []).length > 0);
   // v2.45.286: тулбар с кол-вом скрытых + кнопкой «Показать»
@@ -5578,14 +5630,14 @@ function renderSupplyShopping(d) {
       '</div>'
     : '';
   if (!visibleGroups.length) {
-    container.innerHTML = cpBlock + hiddenToolbar + '<div class="empty-block" style="padding: 32px 16px;">' +
+    container.innerHTML = cpBlock + waitingBlock + hiddenToolbar + '<div class="empty-block" style="padding: 32px 16px;">' +
       '<i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
       '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">' +
         (totalHidden > 0 ? 'Все оставшиеся позиции скрыты вами вручную.' : 'Всё в норме — низкого остатка и дефицита не обнаружено.') +
       '</div></div>';
     return;
   }
-  let html = cpBlock + hiddenToolbar;
+  let html = cpBlock + waitingBlock + hiddenToolbar;
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
@@ -10563,6 +10615,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.428',
+    date: '18.06.2026',
+    title: 'Снабжение — заказанные комплектующие тоже едут в «Ждём поставку»',
+    features: [
+      'Теперь и <b>комплектующие</b> (а не только покупные по договорам), по которым уже есть заказ, уходят из списка «к закупке» в общий блок <b>«Ждём поставку»</b> — со статусом, числом дней ожидания и связью с поставщиком',
+      'Уже заказанная позиция больше не предлагается к закупке и не попадёт в новый заказ (исключается и из «Сформировать заказ», и из «Скачать DOCX»)',
+      'Так список «к закупке» показывает только то, что реально надо купить, а всё оплаченное/в пути — в одной таблице-трекинге',
+    ],
+  },
   {
     version: 'v2.45.427',
     date: '18.06.2026',
