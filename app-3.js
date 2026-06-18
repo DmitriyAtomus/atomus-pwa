@@ -5362,6 +5362,10 @@ function _componentToTracking(it, group) {
     supplier_email: group ? group.supplier_email : '',
     supplier_phone: group ? group.supplier_phone : '',
     supplier_contact: group ? group.supplier_contact : '',
+    _is_component: true,
+    order_id: it.order_id || null,
+    order_item_id: it.order_item_id || null,
+    order_label_short: it.order_label,
   };
 }
 
@@ -5433,12 +5437,48 @@ function _cpTrackingRowHtml(it) {
       (it.contract_number ? ' <span style="font-size:11px;color:var(--text-light);">· ' + escapeHtml(it.contract_number) + '</span>' : '') +
     '</span>';
   }
+  // v2.45.430: «вернуть к закупке» — только для комплектующего в ЧЕРНОВИКЕ заказа
+  // (нельзя дёргать позицию из отправленного/оплаченного). Убирает строку из
+  // заказа → позиция снова попадает в «к закупке», можно собрать в другой заказ.
+  let returnBtn = '';
+  if (it._is_component && it.order_status === 'draft' && it.order_item_id) {
+    returnBtn = '<button type="button" onclick="shopReturnToBuy(' + it.order_item_id +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      'title="Убрать из черновика заказа и вернуть в список к закупке" ' +
+      'style="background:none;border:1px solid #FCA5A5;color:#B91C1C;border-radius:8px;' +
+      'padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-arrow-back-up"></i> вернуть к закупке</button>';
+  }
   return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
     '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
     ageBadge +
     stBadge +
+    returnBtn +
   '</div>';
+}
+
+// v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
+async function shopReturnToBuy(orderItemId, name) {
+  if (!orderItemId) return;
+  if (!confirm('Вернуть «' + (name || 'позицию') + '» в список к закупке?\n\nПозиция будет убрана из черновика заказа — потом сможешь собрать её в другой заказ. (Доступно только для черновика «Заказ создан».)')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + orderItemId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось вернуть позицию', 'error');
+      return;
+    }
+    showToast('Позиция возвращена в список к закупке', 'success');
+    if (typeof cache !== 'undefined') { cache.supplyOrders = null; cache.supplyRequests = null; }
+    if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 // Сколько дней прошло с даты (ISO/SQLite). null если нет даты.
@@ -10618,6 +10658,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.430',
+    date: '18.06.2026',
+    title: '«Вернуть к закупке» в блоке «Ждём поставку»',
+    features: [
+      'У позиции-комплектующего, попавшей в <b>«Ждём поставку»</b> из <b>черновика</b> заказа («Заказ создан»), появилась кнопка <b>«↩ вернуть к закупке»</b> — убирает её из заказа и возвращает в список к закупке (потом можно собрать в другой заказ)',
+      'Так можно разделить заказ: оставить в нём только реально заказанное/оплаченное, а лишние позиции вернуть и заказать отдельно — без захода в раздел «Заказы»',
+      'Кнопка доступна только для черновика — из отправленного/оплаченного заказа позицию так не выдернуть',
+    ],
+  },
   {
     version: 'v2.45.429',
     date: '18.06.2026',
