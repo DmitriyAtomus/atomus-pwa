@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.417-atomcad-ctrl-power";
+const APP_VERSION = "v2.45.418-atomcad-ctrl-labels";
 const APP_VERSION_DATE = "17.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============

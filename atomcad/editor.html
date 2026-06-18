@@ -419,21 +419,22 @@ function ctrlSym(c){
   place(left,-1); place(right,1);
   // питание (сверху-слева) — выводы питания контроллера, подключаются от автомата управления
   var isDC=/12|24|=|пост/.test(sv);
-  var sup=/24/.test(sv)?'=24 В':/12/.test(sv)?'=12 В':(isDC?'=24 В':'~230 В');
-  var px1=-190, px2=-60, pmid=-125;
+  var pcap=isDC?'ПИТАНИЕ':'ПИТАНИЕ ~230 В';
+  var px1=-195, px2=-55, pmid=-125;
   pr.push(L(px1,0,px1,-stub), L(px2,0,px2,-stub));
   pr.push(C(px1,-stub,9), C(px2,-stub,9));                       // клеммы питания — кружки на концах выводов
-  pr.push(T(px1,-stub-20,30,pl[0]), T(px2,-stub-20,30,pl[1]));   // полярность / фаза выводов
-  pr.push(T(pmid,-stub-58,28,'ПИТАНИЕ '+sup));                   // явный заголовок с напряжением
+  pr.push(T(px1,-stub-16,30,pl[0]), T(px2,-stub-16,30,pl[1]));   // подписи выводов питания (над клеммами)
+  pr.push(T(pmid,-stub-56,24,pcap));                            // заголовок «ПИТАНИЕ»
   pinsArr.push([px1,-stub]); pinsArr.push([px2,-stub]);
   // связь RS-485 (A/B) → сенсорная панель (сверху-справа)
-  var ax=90, bx=150, hy=-stub-210, hh=120, hxl=40, hw=270;
+  var ax=80, bx=170, rmid=125, hy=-stub-200, hh=110, hw=240, hxl=rmid-hw/2;
   pr.push(L(ax,0,ax,-stub), L(bx,0,bx,-stub));
-  pr.push(T(ax,-stub-14,28,'A'), T(bx,-stub-14,28,'B'));
+  pr.push(C(ax,-stub,9), C(bx,-stub,9));                         // клеммы RS-485
+  pr.push(T(ax-34,-stub-16,30,'A'), T(bx+34,-stub-16,30,'B'));   // буквы сбоку от выводов — не на проводе
+  pr.push(T(rmid,-stub-54,24,'RS-485'));
   pr.push(R(hxl,hy,hw,hh));
-  pr.push(T(hxl+hw/2,hy+46,26,'СЕНСОРНАЯ'), T(hxl+hw/2,hy+82,26,'ПАНЕЛЬ (HMI)'));
+  pr.push(T(rmid,hy+44,26,'СЕНСОРНАЯ'), T(rmid,hy+80,26,'ПАНЕЛЬ (HMI)'));
   pr.push(L(ax,-stub,ax,hy+hh), L(bx,-stub,bx,hy+hh));
-  pr.push(T(hxl+hw+62,-stub-96,24,'RS-485'));
   return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, hy-20, hx+stub+360, bodyH+10],
           lbl:[-hx, bodyH+54, 'start'], pins:pinsArr, pr:pr};
 }
