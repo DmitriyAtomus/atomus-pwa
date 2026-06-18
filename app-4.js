@@ -9082,17 +9082,23 @@ async function markShipmentManual(itemType, itemId) {
     showToast('Не удалось отметить: ' + (e.message || e), 'error');
     return;
   }
-  if (r && r.ok) {
+  // v2.45.421: apiPost возвращает {ok: HTTP-статус, data: тело}. Раньше тут
+  // проверялся r.ok (HTTP), из-за чего на «уже отгружено» (HTTP 200, body.ok=false)
+  // показывалось ложное «отмечено», а вставки не было. Читаем тело (r.data).
+  const d = (r && r.data) || {};
+  const m = document.getElementById('ship-detail-modal');
+  if (d.ok) {
     showToast('✓ Отгрузка отмечена', 'success');
-    _handleShipmentStatusChange(r);
-    // Закрываем модалку и обновляем список
-    const m = document.getElementById('ship-detail-modal');
+    _handleShipmentStatusChange(d);
     if (m) m.classList.remove('visible');
     reloadShipmentStatus();
-  } else if (r && r.reason === 'already_shipped') {
-    showToast('Уже отгружено', 'info');
+  } else if (d.reason === 'already_shipped') {
+    // По этому id уже есть отгрузка — обновим экран, чтобы показать реальную картину
+    showToast('Эта единица уже отгружена', 'info');
+    if (m) m.classList.remove('visible');
+    reloadShipmentStatus();
   } else {
-    showToast('Не удалось отметить (' + (r && r.reason || 'unknown') + ')', 'error');
+    showToast('Не удалось отметить (' + (d.reason || 'unknown') + ')', 'error');
   }
 }
 
