@@ -397,7 +397,7 @@ var SYM={
 function ctrlSym(c){
   var io=(c.attrs&&c.attrs.io)||{}, pn=io.pins||{}, asg=io.asg||{};
   var sv=(c.attrs&&c.attrs.supply)||'';
-  var pl=/24/.test(sv)?['+24V','0V']:/12/.test(sv)?['+12V','0V']:['L','N'];
+  var pl=/24/.test(sv)?['+24 В','0 В']:/12/.test(sv)?['+12 В','0 В']:['L','N'];
   var left=[], right=[];
   ['AI','DI'].forEach(function(g){(pn[g]||[]).forEach(function(p){left.push({id:p.id,lab:asg[p.id]||''});});});
   ['AO','DO'].forEach(function(g){(pn[g]||[]).forEach(function(p){right.push({id:p.id,lab:asg[p.id]||''});});});
@@ -417,10 +417,14 @@ function ctrlSym(c){
     pinsArr.push([ex,y]);
   });}
   place(left,-1); place(right,1);
-  // питание (сверху-слева) — реальные выводы, подключаются от автомата управления
-  var px1=-150, px2=-90;
+  // питание (сверху-слева) — выводы питания контроллера, подключаются от автомата управления
+  var isDC=/12|24|=|пост/.test(sv);
+  var sup=/24/.test(sv)?'=24 В':/12/.test(sv)?'=12 В':(isDC?'=24 В':'~230 В');
+  var px1=-190, px2=-60, pmid=-125;
   pr.push(L(px1,0,px1,-stub), L(px2,0,px2,-stub));
-  pr.push(T(px1,-stub-14,28,pl[0]), T(px2,-stub-14,28,pl[1]), T(-120,-stub-44,24,'питание'));
+  pr.push(C(px1,-stub,9), C(px2,-stub,9));                       // клеммы питания — кружки на концах выводов
+  pr.push(T(px1,-stub-20,30,pl[0]), T(px2,-stub-20,30,pl[1]));   // полярность / фаза выводов
+  pr.push(T(pmid,-stub-58,28,'ПИТАНИЕ '+sup));                   // явный заголовок с напряжением
   pinsArr.push([px1,-stub]); pinsArr.push([px2,-stub]);
   // связь RS-485 (A/B) → сенсорная панель (сверху-справа)
   var ax=90, bx=150, hy=-stub-210, hh=120, hxl=40, hw=270;
