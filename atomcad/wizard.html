@@ -755,7 +755,7 @@ function pCabinet(){
   // визуальная раскладка по кнопке
   if(P.cab.drawn){
     h+='<div class="svgcard" style="margin-top:14px">'+cabinetSVG()+'</div>';
-    h+='<div class="note" style="margin-top:6px">Клик по аппарату — карточка с маркой и кнопкой «Удалить из щита».'+(cabRemCount()>0?(' Удалено: <b style="color:var(--txt)">'+cabRemCount()+'</b> · <a href="#" onclick="cabRestore();return false" style="color:var(--cyan)">вернуть все</a>'):'')+'</div>';
+    h+='<div class="note" style="margin-top:6px">Клик по аппарату — карточка с маркой, <b style="color:var(--txt)">габаритом</b> и кнопкой «Удалить из щита». Размеры на чертеже в масштабе — внизу справа линейка 100 мм.'+(cabRemCount()>0?(' Удалено: <b style="color:var(--txt)">'+cabRemCount()+'</b> · <a href="#" onclick="cabRestore();return false" style="color:var(--cyan)">вернуть все</a>'):'')+'</div>';
     var dsvg=doorSVG();
     if(dsvg){
       h+='<div style="display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap"><span class="note" style="margin:0">Шаг стрелок ←↑↓→:</span>'+
@@ -826,12 +826,24 @@ function cabItems(){
   // сквозная нумерация по физическому порядку: QF1..QFn, KM1..KMn (key остаётся стабильным)
   var cnt={};
   items.forEach(function(it){ if(it.k==='qf'){cnt.qf=(cnt.qf||0)+1;it.t='QF'+cnt.qf;} else if(it.k==='km'){cnt.km=(cnt.km||0)+1;it.t='KM'+cnt.km;} });
+  // реальный габарит аппарата — чтобы было понятно, какой размер показан (рейка: 1 модуль = 17,5 мм)
+  var MM=17.5;
+  function sizeOf(it){
+    if(it.k==='ctrl'){var cd=P.controller&&P.controller.dims;return (cd&&cd.w)?((cd.w)+'×'+(cd.h||'?')+(cd.d?'×'+cd.d:'')+' мм'):('ширина ~'+Math.round(it.w*MM)+' мм ('+it.w+' мод.)');}
+    if(it.kind==='hmi'){var hd=(P.hmi&&P.hmi.dims)||{};return (hd.w||'?')+'×'+(hd.h||'?')+(hd.d?'×'+hd.d:'')+' мм';}
+    if(it.kind==='estop')return 'Ø ~40 мм · отверстие Ø22 мм';
+    if(it.kind==='switch'||it.kind==='button'||it.kind==='lamp')return 'отверстие Ø22 мм';
+    if(it.w)return 'ширина ~'+Math.round(it.w*MM)+' мм ('+it.w+' мод. × 17,5 мм)';
+    return '';
+  }
   cabTipByKey={}; cabCardByKey={};
   items.concat(cabDoorList).forEach(function(it){
     if(!it.key)return;
-    cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+it.tip):it.tip;
+    var sz=sizeOf(it);
+    var baseTip=it.tip+(sz?(' · габарит '+sz):'');
+    cabTipByKey[it.key]=(it.t&&it.t!==it.tip)?(it.t+' · '+baseTip):baseTip;
     var parts=String(it.tip||'').split(' · ');
-    cabCardByKey[it.key]={tag:it.t||'', type:parts[0]||'', specs:parts.slice(1), del:it.del||''};
+    cabCardByKey[it.key]={tag:it.t||'', type:parts[0]||'', specs:parts.slice(1), del:it.del||'', size:sz||''};
   });
   return items;
 }
@@ -846,17 +858,20 @@ function cabCardShow(key){
   document.getElementById('cabCardTag').textContent=info.tag;
   document.getElementById('cabCardType').textContent=info.type;
   var body='';
+  if(info.size){
+    body+='<div style="display:flex;gap:8px;align-items:baseline;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line)"><span style="color:#8FA0AE;min-width:64px">Габарит</span><span class="mono" style="color:var(--cyan);font-weight:600">'+esc(info.size)+'</span></div>';
+  }
   if(info.specs&&info.specs.length){
-    body='<table style="width:100%;border-collapse:collapse">';
-    var labels=info.type==='Автомат'?['Марка','Полюса · номинал','Назначение']
-              :info.type==='Контактор'?['Марка','Нагрузка','Источник']
-              :info.type==='Контроллер'?['Модель']:[];
+    body+='<table style="width:100%;border-collapse:collapse">';
+    var labels=info.type.indexOf('Автомат')===0?['Марка','Полюса · номинал','Назначение']
+              :info.type.indexOf('Контактор')===0?['Марка','Нагрузка','Источник']
+              :info.type.indexOf('Контроллер')===0?['Модель']:[];
     info.specs.forEach(function(sp,i){
       var lab=labels[i]||'';
       body+='<tr><td style="color:#8FA0AE;padding:3px 10px 3px 0;white-space:nowrap;vertical-align:top">'+(lab||'·')+'</td><td style="padding:3px 0">'+esc(sp)+'</td></tr>';
     });
     body+='</table>';
-  } else { body='<div style="color:#8FA0AE">Нет дополнительных данных</div>'; }
+  } else if(!info.size){ body='<div style="color:#8FA0AE">Нет дополнительных данных</div>'; }
   if(info.del){
     body+='<button onclick="cabDelete(\''+info.del+'\')" style="margin-top:10px;width:100%;padding:7px 10px;border:1px solid #5a2630;background:rgba(231,76,60,.12);color:#ff8c7a;border-radius:7px;cursor:pointer;font-size:12.5px">🗑 Удалить из щита</button>';
   }
@@ -1000,6 +1015,13 @@ function cabinetSVG(){
   s+='<rect x="'+railX.toFixed(0)+'" y="'+by.toFixed(0)+'" width="'+railWpx.toFixed(0)+'" height="'+mm(6).toFixed(1)+'" rx="2" fill="#2E8B57" opacity=".55"/><text x="'+(railX-5).toFixed(0)+'" y="'+(by+mm(6)).toFixed(0)+'" font-size="8.5" fill="#5BD6A2" text-anchor="end" font-family="IBM Plex Mono">PE</text>';
   s+='<rect x="'+railX.toFixed(0)+'" y="'+(by+mm(12)).toFixed(0)+'" width="'+railWpx.toFixed(0)+'" height="'+mm(6).toFixed(1)+'" rx="2" fill="#3A6B96" opacity=".6"/><text x="'+(railX-5).toFixed(0)+'" y="'+(by+mm(12)+mm(6)).toFixed(0)+'" font-size="8.5" fill="#7FB3DD" text-anchor="end" font-family="IBM Plex Mono">N</text>';
   var gy=by+mm(34); for(var gx=railX+mm(25);gx<railX+railWpx-mm(15);gx+=mm(60))s+='<circle cx="'+gx.toFixed(0)+'" cy="'+gy.toFixed(0)+'" r="'+mm(6).toFixed(1)+'" fill="none" stroke="#3A4654" stroke-width="1.3"/>';
+  // масштабная линейка 100 мм — чтобы на глаз понимать реальные размеры аппаратов
+  var scX2=pad+boxW-mm(dim.wall)-mm(6), scX1=scX2-mm(100), scY=pad+boxH-mm(11), scMid=(scX1+scX2)/2;
+  s+='<line x1="'+scX1.toFixed(1)+'" y1="'+scY.toFixed(1)+'" x2="'+scX2.toFixed(1)+'" y2="'+scY.toFixed(1)+'" stroke="#8FA0AE" stroke-width="1.4"/>';
+  s+='<line x1="'+scX1.toFixed(1)+'" y1="'+(scY-4).toFixed(1)+'" x2="'+scX1.toFixed(1)+'" y2="'+(scY+4).toFixed(1)+'" stroke="#8FA0AE" stroke-width="1.4"/>';
+  s+='<line x1="'+scX2.toFixed(1)+'" y1="'+(scY-4).toFixed(1)+'" x2="'+scX2.toFixed(1)+'" y2="'+(scY+4).toFixed(1)+'" stroke="#8FA0AE" stroke-width="1.4"/>';
+  s+='<line x1="'+scMid.toFixed(1)+'" y1="'+(scY-2.5).toFixed(1)+'" x2="'+scMid.toFixed(1)+'" y2="'+(scY+2.5).toFixed(1)+'" stroke="#8FA0AE" stroke-width="1"/>';
+  s+='<text x="'+scMid.toFixed(1)+'" y="'+(scY-5).toFixed(1)+'" font-size="8" fill="#8FA0AE" text-anchor="middle" font-family="IBM Plex Mono">100 мм</text>';
   // подпись/предупреждение
   s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
      (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
