@@ -5286,44 +5286,128 @@ async function _cpSkipItem(itemId, name) {
 function _contractPurchasesBlockHtml(items) {
   if (!items || !items.length) return '';
   state._cpItems = items;
-  // Группируем по поставщику (не назначен — первым, по нему и работаем)
+  // v2.45.427: «К заказу» (pending) и «Ждём поставку» (ordered) — раздельно.
+  // Уже заказанные/оплаченные больше не предлагаются к закупке, а уезжают в
+  // отдельную таблицу-трекинг (статус, сколько дней ждём, связь с поставщиком).
+  const pending = items.filter(x => x.purchase_status !== 'ordered');
+  const ordered = items.filter(x => x.purchase_status === 'ordered');
+  let out = '';
+
+  if (pending.length) {
+    // Группируем по поставщику (не назначен — первым, по нему и работаем)
+    const bySup = {};
+    pending.forEach(it => {
+      const k = it.supplier_id || 0;
+      if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
+      bySup[k].items.push(it);
+    });
+    let h = '<div class="sup-shop-group cp-block">' +
+      '<div class="sup-shop-group-head">' +
+        '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart"></i> Покупные позиции по договорам' +
+          '<span class="sup-shop-group-count">' + pending.length + ' ' + (pending.length === 1 ? 'позиция' : (pending.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
+        '</div>' +
+        '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
+          '<i class="ti ti-truck"></i> Назначить поставщика (<span id="cp-assign-count">0</span>)</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Отметь позиции галочками → «Назначить поставщика» — для запроса счёта. Клик по названию откроет договор.</div>';
+    const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? -1 : b === '0' ? 1 : 0));
+    keys.forEach(k => {
+      const g = bySup[k];
+      if (k === '0') {
+        h += '<div style="font-size:12.5px;font-weight:700;color:#7F1D1D;padding:6px 14px 2px;"><i class="ti ti-alert-triangle"></i> Поставщик не назначен</div>';
+      } else {
+        const contacts = [g.contact, g.email, g.phone].filter(Boolean).map(escapeHtml).join(' · ');
+        const pendingIds = g.items.map(x => x.id);
+        h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
+          '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+          escapeHtml(g.name || '—') +
+          (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</span>' +
+          (pendingIds.length ? '<button class="btn btn-primary btn-sm" onclick="createCpOrder(' + g.id + ')">' +
+            '<i class="ti ti-mail-send"></i> Сформировать заказ (' + pendingIds.length + ')</button>' : '') +
+        '</div>';
+      }
+      g.items.forEach(it => { h += _cpRowHtml(it); });
+    });
+    h += '</div>';
+    out += h;
+  }
+
+  out += _cpTrackingBlockHtml(ordered);
+  return out;
+}
+
+// v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
+// Показывает статус заказа, сколько дней ждём и кнопки связи с поставщиком.
+function _cpTrackingBlockHtml(ordered) {
+  if (!ordered || !ordered.length) return '';
+  // группируем по поставщику
   const bySup = {};
-  items.forEach(it => {
+  ordered.forEach(it => {
     const k = it.supplier_id || 0;
     if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
     bySup[k].items.push(it);
   });
-  let h = '<div class="sup-shop-group cp-block">' +
+  let h = '<div class="sup-shop-group cp-block" style="margin-top:14px;">' +
     '<div class="sup-shop-group-head">' +
-      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart"></i> Покупные позиции по договорам' +
-        '<span class="sup-shop-group-count">' + items.length + ' ' + (items.length === 1 ? 'позиция' : (items.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
+      '<div class="sup-shop-group-name"><i class="ti ti-truck-delivery"></i> Ждём поставку' +
+        '<span class="sup-shop-group-count">' + ordered.length + ' ' + (ordered.length === 1 ? 'позиция' : (ordered.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
       '</div>' +
-      '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
-        '<i class="ti ti-truck"></i> Назначить поставщика (<span id="cp-assign-count">0</span>)</button>' +
     '</div>' +
-    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Отметь позиции галочками → «Назначить поставщика» — для запроса счёта. Клик по названию откроет договор.</div>';
-  const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? -1 : b === '0' ? 1 : 0));
+    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Уже заказано/оплачено — едет. К закупке больше не предлагается. Долго нет поставки — свяжись с поставщиком.</div>';
+  const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? 1 : b === '0' ? -1 : 0));
   keys.forEach(k => {
     const g = bySup[k];
-    if (k === '0') {
-      h += '<div style="font-size:12.5px;font-weight:700;color:#7F1D1D;padding:6px 14px 2px;"><i class="ti ti-alert-triangle"></i> Поставщик не назначен</div>';
-    } else {
-      const contacts = [g.contact, g.email, g.phone].filter(Boolean).map(escapeHtml).join(' · ');
-      const pendingIds = g.items.filter(x => x.purchase_status !== 'ordered').map(x => x.id);
-      h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
-        '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
-        escapeHtml(g.name || '—') +
-        (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</span>' +
-        // v2.45.236: сформировать заказ снабжения из позиций «К заказу» этого поставщика
-        (pendingIds.length ? '<button class="btn btn-primary btn-sm" onclick="createCpOrder(' + g.id + ')">' +
-          '<i class="ti ti-mail-send"></i> Сформировать заказ (' + pendingIds.length + ')</button>' : '') +
-      '</div>';
-    }
-    g.items.forEach(it => { h += _cpRowHtml(it); });
+    const contactBtns = [];
+    if (g.email) contactBtns.push('<a href="mailto:' + escapeHtml(g.email) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;"><i class="ti ti-mail"></i> Написать</a>');
+    if (g.phone) contactBtns.push('<a href="tel:' + escapeHtml(String(g.phone).replace(/[^\d+]/g, '')) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;"><i class="ti ti-phone"></i> Позвонить</a>');
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
+      '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+      escapeHtml(g.name || '(поставщик не назначен)') + '</span>' +
+      contactBtns.join('') +
+    '</div>';
+    g.items.forEach(it => { h += _cpTrackingRowHtml(it); });
   });
   h += '</div>';
   return h;
 }
+
+function _cpTrackingRowHtml(it) {
+  const st = _CP_ORDER_STATUS_RU[it.order_status];
+  const label = st ? st[0] : 'Заказано';
+  const fg = st ? st[1] : '#78350F';
+  const bg = st ? st[2] : '#FEF3C7';
+  const stBadge = '<span class="ssp-badge" style="color:' + fg + ';background:' + bg + ';">' +
+    escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') + '</span>';
+  const days = _daysSince(it.ordered_at);
+  let ageBadge = '';
+  if (days !== null) {
+    const old = days >= 14;
+    ageBadge = '<span style="font-size:11px;white-space:nowrap;color:' + (old ? '#B91C1C' : 'var(--text-light)') + ';font-weight:' + (old ? '700' : '400') + ';">' +
+      (days === 0 ? 'сегодня' : days + ' ' + _plural(days, ['день', 'дня', 'дней'])) + (old ? ' ⚠' : '') + '</span>';
+  }
+  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
+    '<span style="flex:1;font-size:13px;color:var(--text-dark);cursor:pointer;" ' +
+      'onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" ' +
+      'title="Открыть договор ' + escapeHtml(it.contract_number || '') + '">' +
+      escapeHtml(it.item_name || '—') +
+      ' <span style="font-size:11px;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
+    '</span>' +
+    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+    ageBadge +
+    stBadge +
+  '</div>';
+}
+
+// Сколько дней прошло с даты (ISO/SQLite). null если нет даты.
+function _daysSince(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(String(dateStr).replace(' ', 'T') + (String(dateStr).includes('Z') ? '' : 'Z'));
+  if (isNaN(d.getTime())) return null;
+  const ms = Date.now() - d.getTime();
+  if (ms < 0) return 0;
+  return Math.floor(ms / 86400000);
+}
+
 
 function _cpBulkUpdate() {
   const n = document.querySelectorAll('.cp-check:checked').length;
@@ -10479,6 +10563,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.427',
+    date: '18.06.2026',
+    title: 'Снабжение — оплаченное не предлагается снова, едет в «Ждём поставку»',
+    features: [
+      'Покупная позиция по договору, по которой уже есть заказ (заказана/на оплате/оплачена/едет), <b>больше не предлагается к закупке</b> и не попадает в новую заявку',
+      'Такие позиции уезжают в отдельный блок <b>«Ждём поставку»</b>: статус заказа, <b>сколько дней ждём</b> (если долго — подсветка), и кнопки <b>«Написать» / «Позвонить»</b> поставщику',
+      'Защита от двойного заказа на бэкенде: при формировании заявки уже заказанные позиции пропускаются, ссылка на действующий заказ не перезаписывается',
+    ],
+  },
   {
     version: 'v2.45.426',
     date: '18.06.2026',
