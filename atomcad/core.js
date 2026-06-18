@@ -239,9 +239,9 @@ function buildSchematic(P){
       ac.push(C(cq.code,'qf1',cz,320,'NB1-63 1P, C'+cq.rate,'CHINT','цепи управления'));
       aw.push(W([cz,250],[cz,320]));
       aw.push(W([cz,620],[cz,720]));
-      aw.push(W([cz-150,720],[cz,720]));
-      aw.push(W([cz-150,720],[cz-150,ctrlY-G.stub]));
-      aw.push(W([cz-90,720],[cz-90,ctrlY-G.stub]));
+      aw.push(W([cz-195,720],[cz,720]));                       // шина питания к выводам контроллера
+      aw.push(W([cz-195,720],[cz-195,ctrlY-G.stub]));          // на «+24 В» (px1=-195 в ctrlSym)
+      aw.push(W([cz-55,720],[cz-55,ctrlY-G.stub]));            // на «0 В» (px2=-55 в ctrlSym)
     } else { aw.push(W([cz,250],[cz,ctrlY-G.stub])); }
     var cspec=P.controller.spec||{};
     ac.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
