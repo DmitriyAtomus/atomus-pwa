@@ -125,7 +125,7 @@ function buildSpec(P){
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
   var kmN=1;
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор', manu:'CHINT', model:c.phases===3?'NXC-'+(consumerCurrent(c)<18?'09':'25'):'NCH8-25/20', note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:c.phases===3?'NXC-'+(consumerCurrent(c)<18?'09':'25'):'NCH8-25/20', note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
   // датчики
   var btN=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ items.push({des:'BT'+btN, name:'Датчик температуры', manu:'', model:s.sig, note:s.name}); btN++; } });
