@@ -7806,6 +7806,7 @@ function _renderNotifications25(r) {
       else if (n.type === 'defect_message_added') icon = 'ti-message-circle';
       else if (n.type === 'contract_published')   icon = 'ti-file-text';
       else if (n.type === 'assembly_created')     icon = 'ti-tool';
+      else if (n.type === 'contract_shipped')     icon = 'ti-truck-delivery';
       const onClick = n.entity_type === 'defect'
         ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
         : (n.entity_type === 'contract'

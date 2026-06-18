@@ -2125,6 +2125,9 @@ function _renderNotifPanel(r) {
         icon = 'ti-file-text';
       } else if (n.type === 'assembly_created') {
         icon = 'ti-tool';
+      } else if (n.type === 'contract_shipped') {
+        icon = 'ti-truck-delivery';
+        actionTitle = 'Открыть договор';
       }
       const onClick = n.entity_type === 'defect'
         ? 'onNotifGlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
