@@ -5222,7 +5222,7 @@ const _CP_ORDER_STATUS_RU = {
   awaiting_invoice: ['Счёт запрошен',         '#92400E', '#FEF3C7'],
   invoice_received: ['Счёт получен',          '#3730A3', '#E0E7FF'],
   to_pay:           ['На оплате',             '#9A3412', '#FFEDD5'],
-  paid:             ['Оплачен · ждём поставку', '#065F46', '#D1FAE5'],
+  paid:             ['Оплачен',                '#065F46', '#D1FAE5'],
   partial:          ['Доставка частично',     '#065F46', '#D1FAE5'],
   received:         ['Получено',              '#15803D', '#DCFCE7'],
   cancelled:        ['Заказ отменён',         '#7F1D1D', '#FEE2E2'],
@@ -5421,22 +5421,27 @@ function _cpTrackingRowHtml(it) {
     ageBadge = '<span style="font-size:11px;white-space:nowrap;color:' + (old ? '#B91C1C' : 'var(--text-light)') + ';font-weight:' + (old ? '700' : '400') + ';">' +
       (days === 0 ? 'сегодня' : days + ' ' + _plural(days, ['день', 'дня', 'дней'])) + (old ? ' ⚠' : '') + '</span>';
   }
+  // v2.45.431: двухстрочная раскладка для мобилы — название отдельной строкой,
+  // под ним чипсы (кол-во · дни · статус · кнопка) с переносом, чтобы ничего не
+  // обрезалось за правый край экрана.
   // У покупных по договору есть contract_id (тап → договор); у комплектующих —
   // нет, показываем причину/проекты текстом без клика.
   let nameCell;
   if (it.contract_id) {
-    nameCell = '<span style="flex:1;font-size:13px;color:var(--text-dark);cursor:pointer;" ' +
+    nameCell = '<div style="font-size:13.5px;font-weight:600;line-height:1.3;color:var(--text-dark);cursor:pointer;word-break:break-word;" ' +
       'onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" ' +
       'title="Открыть договор ' + escapeHtml(it.contract_number || '') + '">' +
       escapeHtml(it.item_name || '—') +
-      ' <span style="font-size:11px;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
-    '</span>';
+      ' <span style="font-size:11px;font-weight:400;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
+    '</div>';
   } else {
-    nameCell = '<span style="flex:1;font-size:13px;color:var(--text-dark);">' +
+    nameCell = '<div style="font-size:13.5px;font-weight:600;line-height:1.3;color:var(--text-dark);word-break:break-word;">' +
       escapeHtml(it.item_name || '—') +
-      (it.contract_number ? ' <span style="font-size:11px;color:var(--text-light);">· ' + escapeHtml(it.contract_number) + '</span>' : '') +
-    '</span>';
+      (it.contract_number ? ' <span style="font-size:11px;font-weight:400;color:var(--text-light);">· ' + escapeHtml(it.contract_number) + '</span>' : '') +
+    '</div>';
   }
+  const qtyChip = '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' +
+    _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>';
   // v2.45.430: «вернуть к закупке» — только для комплектующего в ЧЕРНОВИКЕ заказа
   // (нельзя дёргать позицию из отправленного/оплаченного). Убирает строку из
   // заказа → позиция снова попадает в «к закупке», можно собрать в другой заказ.
@@ -5446,15 +5451,17 @@ function _cpTrackingRowHtml(it) {
       ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
       'title="Убрать из черновика заказа и вернуть в список к закупке" ' +
       'style="background:none;border:1px solid #FCA5A5;color:#B91C1C;border-radius:8px;' +
-      'padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
+      'padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
       '<i class="ti ti-arrow-back-up"></i> вернуть к закупке</button>';
   }
-  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px dashed var(--border);">' +
+  return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
-    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
-    ageBadge +
-    stBadge +
-    returnBtn +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+      qtyChip +
+      (ageBadge ? '<span style="color:var(--border);">·</span>' + ageBadge : '') +
+      stBadge +
+      returnBtn +
+    '</div>' +
   '</div>';
 }
 
@@ -10658,6 +10665,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.431',
+    date: '18.06.2026',
+    title: '«Ждём поставку» — нормальная вёрстка на телефоне',
+    features: [
+      'Позиции в блоке «Ждём поставку» больше не обрезаются за край экрана: название теперь отдельной строкой, а под ним — чипсы (кол-во · сколько дней ждём · статус заказа · «вернуть к закупке») с переносом',
+      'Длинная метка «Оплачен · ждём поставку» укорочена до «Оплачен» (блок и так называется «Ждём поставку») — статусы стали компактнее и читаемее',
+    ],
+  },
   {
     version: 'v2.45.430',
     date: '18.06.2026',
