@@ -738,6 +738,10 @@ async function openComponentForm(componentId) {
         '</div>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
+        // v2.45.436: «сколько заказывать» — фиксированное кол-во к заказу при низком
+        // остатке. Пусто = авто (заказываем дефицит до минимума).
+        '<label class="form-label">Сколько заказывать <span style="color:var(--text-light);font-weight:400;font-size:11px;">(фикс. кол-во при низком остатке; пусто = авто до минимума)</span></label>' +
+        '<input type="number" id="cf-reorder" class="form-input" value="' + ((c && c.reorder_qty) || '') + '" min="0" step="0.01" placeholder="напр. 2 (при остатке ≤ минимума заказать 2 шт)" style="margin-bottom:14px;" />' +
         // v2.45.217: кратность закупки (фасовка/бухта) — в «Что закупить» количество
         // округляется вверх до кратного (наконечники по 100, провод по 40/50 м).
         '<label class="form-label">Кратность закупки <span style="color:var(--text-light);font-weight:400;font-size:11px;">(фасовка/бухта — закупаем кратно; пусто = поштучно)</span></label>' +
@@ -1076,6 +1080,8 @@ async function submitComponentForm(componentId) {
     min_stock: parseFloat(document.getElementById('cf-min').value || 0),
     purchase_pack: ((document.getElementById('cf-pack') || {}).value || '').trim() === ''
       ? null : parseFloat(document.getElementById('cf-pack').value),
+    reorder_qty: ((document.getElementById('cf-reorder') || {}).value || '').trim() === ''
+      ? null : parseFloat(document.getElementById('cf-reorder').value),
     comment: (document.getElementById('cf-comment').value || '').trim(),
     default_supplier_id: supVal ? parseInt(supVal) : null,
     supply_item_id: siVal ? parseInt(siVal) : null,
@@ -10815,6 +10821,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.436',
+    date: '19.06.2026',
+    title: 'Карточка комплектующего: «Сколько заказывать»',
+    features: [
+      'В карточке комплектующего (Склад → Комплектующие → ✎) появилось поле <b>«Сколько заказывать»</b> — фиксированное кол-во к заказу при низком остатке',
+      'Пример: «Наружный блок 9» — мин. остаток 1, сколько заказывать 2. Как только на складе останется 1 (или меньше) — в «Что закупить» предложит заказать ровно <b>2 шт</b>',
+      'Если поле пустое — работает как раньше (заказываем дефицит до минимума автоматически)',
+    ],
+  },
   {
     version: 'v2.45.435',
     date: '19.06.2026',
