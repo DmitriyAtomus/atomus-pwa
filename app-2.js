@@ -604,9 +604,10 @@ function renderContractAssembliesBlock(c) {
   const canShip = canManageSales();
   if (readyCount > 0 && canShip) {
     html += '<div style="margin-bottom: 14px;">' +
-      '<button class="btn btn-primary" onclick="shipByContract(' + c.id + ')" style="width: 100%; justify-content: center;">' +
+      '<button class="btn ship-btn-fallback" onclick="shipByContract(' + c.id + ')">' +
         '<i class="ti ti-truck-delivery"></i> Отгрузить по договору (готово ' + readyCount + ')' +
       '</button>' +
+      '<div style="font-size:11.5px;color:var(--text-light);text-align:center;margin-top:5px;">Запасной вариант — если не получается по коду</div>' +
       '</div>';
   }
   // v2.45.93: пакетная печать QR-наклеек на все готовые сборки договора
@@ -10813,7 +10814,7 @@ async function loadContractShipmentBlock(contractId) {
       if (isComplete) {
         html += '<button class="ship-start-btn complete" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-check-circle"></i> Всё отгружено · открыть</button>';
       } else {
-        html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Начать отгрузку</button>';
+        html += '<button class="ship-start-btn code" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Отгрузить по коду (рекомендуется)</button>';
       }
       // v2.45.142: откат отгрузки (под паролем) — если что-то уже отгружено
       if (shipped > 0 && canManageSales()) {
@@ -10825,7 +10826,7 @@ async function loadContractShipmentBlock(contractId) {
       }
     } else {
       html += '<div style="font-size:13px;color:var(--text-light);padding:8px 0;text-align:center;">К договору не привязано ни одной сборки или коробки.<br>Добавьте сборки или создайте коробки.</div>';
-      html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Открыть отгрузку</button>';
+      html += '<button class="ship-start-btn code" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Отгрузить по коду</button>';
     }
     html += '</div>';
 
@@ -10862,7 +10863,7 @@ async function loadContractShipmentBlock(contractId) {
             'display:flex;align-items:center;justify-content:center;gap:6px;">' +
             '<i class="ti ti-bell-off"></i> Отозвать сборку</button>';
         } else {
-          html += '<button class="ship-start-btn" onclick="requestShipmentAssembly(' + contractId + ')">' +
+          html += '<button class="ship-start-btn request" onclick="requestShipmentAssembly(' + contractId + ')">' +
             '<i class="ti ti-bell-ringing"></i> Запросить сборку к отгрузке</button>';
         }
       }

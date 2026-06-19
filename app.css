@@ -14306,6 +14306,13 @@
   .ship-start-btn.complete::before {
     content: '✓ ';
   }
+  /* v2.45.426: цвета по приоритету — по коду (зелёная, приоритет), запросить (янтарная) */
+  .ship-start-btn.code { background: #16A34A; }
+  .ship-start-btn.request { background: #D97706; }
+  .ship-btn-fallback {
+    width: 100%; justify-content: center;
+    background: #fff; color: #475569; border: 1.5px solid #CBD5E1;
+  }
 
   .ship-items-title {
     font-size: 12px;
