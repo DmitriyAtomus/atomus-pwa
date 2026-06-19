@@ -6480,6 +6480,35 @@ async function _opPriceNameChoose(name) {
   showToast('Сопоставлено: ' + name, 'success');
 }
 
+// v2.45.435: грузим превью прайса с понятной причиной ошибки (файл потерян /
+// не открылся Excel), а не глухим «Не удалось отрисовать таблицу».
+async function _opLoadPriceView(sid, fid) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const resp = await fetch(API_BASE + '/api/suppliers/' + sid + '/price-files/' + fid + '/view', {
+      headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store',
+    });
+    if (resp.ok) {
+      const d = await resp.json();
+      return d.html || '<div class="empty-block">Пусто</div>';
+    }
+    const j = await resp.json().catch(() => ({}));
+    const msg = j.message || j.error || ('HTTP ' + resp.status);
+    const lost = resp.status === 404;
+    return '<div class="empty-block" style="padding:24px 12px;text-align:center;color:var(--text-light);">' +
+      '<i class="ti ti-' + (lost ? 'file-x' : 'alert-triangle') + '" style="font-size:30px;color:#B91C1C;"></i><br>' +
+      '<div style="margin-top:8px;font-weight:700;color:var(--text-dark);">' +
+        (lost ? 'Файл прайса не найден в хранилище' : 'Не удалось открыть прайс') + '</div>' +
+      '<div style="margin-top:4px;font-size:12px;">' + escapeHtml(msg) + '</div>' +
+      '<div style="margin-top:10px;font-size:12px;line-height:1.45;">Загрузи прайс заново кнопкой <b>«Прайс из Excel»</b> выше' +
+        (lost ? ', либо удали этот файл корзинкой 🗑 и добавь новый.' : '.') + '</div>' +
+    '</div>';
+  } catch (e) {
+    return '<div class="empty-block" style="padding:24px 12px;text-align:center;color:var(--text-light);">' +
+      'Сеть недоступна: ' + escapeHtml(e.message || String(e)) + '<br>Попробуй открыть ещё раз.</div>';
+  }
+}
+
 function _renderOpAliasPickerList() {
   _renderOpApTabs();   // v2.45.243
   const box = document.getElementById('op-ap-list');
@@ -6494,9 +6523,8 @@ function _renderOpAliasPickerList() {
       box.innerHTML = '<div class="loading-block">Рисуем таблицу с картинками…</div>';
       if (cache['_loading_' + fid]) return;
       cache['_loading_' + fid] = true;
-      apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fid + '/view')
-        .then(d => { cache[fid] = d.html || '<div class="empty-block">Пусто</div>'; })
-        .catch(() => { cache[fid] = '<div class="empty-block">Не удалось отрисовать таблицу</div>'; })
+      _opLoadPriceView(_opCurrentDraft.supplier_id, fid)
+        .then(html => { cache[fid] = html; })
         .finally(() => { delete cache['_loading_' + fid]; _renderOpAliasPickerList(); });
       return;
     }
@@ -10787,6 +10815,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.435',
+    date: '19.06.2026',
+    title: 'Каталог прайсов: понятная причина, если прайс не открылся',
+    features: [
+      'Если в окне «Каталог поставщика» прайс не открывается — теперь видно <b>почему</b>: «файл прайса не найден в хранилище» или «не открылся Excel» (с текстом ошибки), вместо глухого «Не удалось отрисовать таблицу»',
+      'Тут же подсказка, что делать: загрузить прайс заново кнопкой «Прайс из Excel» или удалить файл корзинкой и добавить новый',
+    ],
+  },
   {
     version: 'v2.45.434',
     date: '19.06.2026',
