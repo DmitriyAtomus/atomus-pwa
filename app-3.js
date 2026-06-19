@@ -4549,11 +4549,83 @@ function showSupplierModal(s) {
             '</div>' +
           '</div>'
         : '') +
+        // Переписка с поставщиком — входящие письма (из IMAP-инбокса)
+        (isEdit ?
+          '<div class="form-group">' +
+            '<label>Переписка <span style="text-transform:none;font-weight:400;color:var(--text-light);">— входящие письма от поставщика</span></label>' +
+            '<div id="sm-correspondence" style="margin-top:6px;">' +
+              '<div style="font-size:12px;color:var(--text-light);">Загружаем…</div>' +
+            '</div>' +
+          '</div>'
+        : '') +
         (canManage ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveSupplier(' + (isEdit ? s.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>' : '') +
       '</div>' +
     '</div>';
   m.classList.add('visible');
   if (isEdit && canManage) _refreshSupplierPriceCount(s.id);
+  if (isEdit) _loadSupplierCorrespondence(s.id);
+}
+
+async function _loadSupplierCorrespondence(supplierId) {
+  const el = document.getElementById('sm-correspondence');
+  if (!el) return;
+  let items = [];
+  let supEmail = '';
+  try {
+    const d = await apiGet('/api/suppliers/' + supplierId + '/correspondence');
+    items = (d && d.items) || [];
+    supEmail = (d && d.supplier_email) || '';
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-light);">Не удалось загрузить переписку</div>';
+    return;
+  }
+  if (!items.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-light);">' +
+      (supEmail ? 'Писем от ' + escapeHtml(supEmail) + ' пока нет.' : 'У поставщика не указан email — письма не сматчить. Заполни email выше.') +
+      '</div>';
+    return;
+  }
+  let html = '<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px;">';
+  items.forEach(m => {
+    const dt = _supCorrDate(m.received_at);
+    const who = escapeHtml(m.from_name || m.from_addr || 'Поставщик');
+    const subj = escapeHtml(m.subject || '(без темы)');
+    const ord = m.order_label ? ('<span style="font-size:11px;background:var(--brand-bg,#eef2ff);color:var(--brand,#2563eb);border-radius:6px;padding:1px 6px;margin-left:6px;">' + escapeHtml(m.order_label) + '</span>') : '';
+    const body = (m.body_text || '').trim();
+    const bodyShort = body.length > 320 ? (escapeHtml(body.slice(0, 320)) + '…') : escapeHtml(body);
+    let atts = '';
+    if (m.attachments && m.attachments.length) {
+      atts = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' +
+        m.attachments.map(a =>
+          '<button class="btn btn-secondary btn-small" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + a.idx + ',\'' + escapeHtml((a.name || '').replace(/'/g, "\\'")) + '\')" title="Скачать">' +
+            '<i class="ti ti-paperclip"></i> ' + escapeHtml(a.name || ('файл ' + (a.idx + 1))) +
+          '</button>'
+        ).join('') +
+      '</div>';
+    }
+    html += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
+        '<div style="font-weight:600;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + who + ord + '</div>' +
+        '<div style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(dt) + '</div>' +
+      '</div>' +
+      '<div style="font-size:13px;font-weight:500;margin-top:3px;">' + subj + '</div>' +
+      (bodyShort ? '<div style="font-size:12.5px;color:var(--text);margin-top:5px;white-space:pre-wrap;word-break:break-word;">' + bodyShort + '</div>' : '') +
+      atts +
+    '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function _supCorrDate(s) {
+  if (!s) return '';
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return String(s).slice(0, 16).replace('T', ' ');
+    const pad = (n) => String(n).padStart(2, '0');
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + String(d.getFullYear()).slice(2) +
+      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  } catch (e) { return String(s).slice(0, 16).replace('T', ' '); }
 }
 
 function closeSupplyModal() {
