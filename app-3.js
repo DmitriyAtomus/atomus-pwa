@@ -5366,6 +5366,7 @@ function _componentToTracking(it, group) {
     order_id: it.order_id || null,
     order_item_id: it.order_item_id || null,
     order_expected: it.order_expected || null,
+    order_place: it.order_place || null,
     order_label_short: it.order_label,
   };
 }
@@ -5467,23 +5468,26 @@ function _cpTrackingRowHtml(it) {
   }
   // v2.45.433: ожидаемая дата поставки («когда придёт»). Ставится на заказ (ORD),
   // показывается у каждой позиции этого заказа. Если просрочена — красным с ⚠.
+  // v2.45.434: + куда придёт — «к нам» / «к ним на склад».
   let etaChip = '';
   if (it.order_id) {
     const lbl = escapeHtml(String(it.order_label || '')).replace(/'/g, '&#39;');
+    const place = (it.order_place === 'us' || it.order_place === 'supplier') ? it.order_place : '';
+    const placeRu = place === 'us' ? ' · к нам' : (place === 'supplier' ? ' · к ним на склад' : '');
     if (it.order_expected) {
       const iso = String(it.order_expected).slice(0, 10);
       const overdue = iso < new Date().toISOString().slice(0, 10);
-      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'' + iso + '\')" ' +
-        'title="Ожидаемая дата поставки — нажми, чтобы изменить" ' +
+      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'' + iso + '\',\'' + place + '\')" ' +
+        'title="Ожидаемая дата и место поставки — нажми, чтобы изменить" ' +
         'style="display:inline-flex;align-items:center;gap:3px;border:none;cursor:pointer;font-size:11px;font-weight:700;' +
         'color:' + (overdue ? '#7F1D1D' : '#065F46') + ';background:' + (overdue ? '#FEE2E2' : '#D1FAE5') + ';padding:2px 8px;border-radius:999px;">' +
-        '<i class="ti ti-calendar-check" style="font-size:12px;"></i>придёт ' + _fmtDateRuShort(iso) + (overdue ? ' ⚠' : '') + '</button>';
+        '<i class="ti ti-calendar-check" style="font-size:12px;"></i>придёт ' + _fmtDateRuShort(iso) + placeRu + (overdue ? ' ⚠' : '') + '</button>';
     } else {
-      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'\')" ' +
-        'title="Указать ожидаемую дату поставки" ' +
+      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'\',\'' + place + '\')" ' +
+        'title="Указать ожидаемую дату и место поставки" ' +
         'style="display:inline-flex;align-items:center;gap:3px;border:1px dashed #94A3B8;cursor:pointer;font-size:11px;font-weight:600;' +
         'color:#475569;background:none;padding:2px 8px;border-radius:999px;">' +
-        '<i class="ti ti-calendar-plus" style="font-size:12px;"></i>когда придёт?</button>';
+        '<i class="ti ti-calendar-plus" style="font-size:12px;"></i>когда придёт?' + (placeRu ? placeRu.replace(' · ', ' ') : '') + '</button>';
     }
   }
   return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
@@ -5503,29 +5507,42 @@ function _fmtDateRuShort(iso) {
   if (!iso) return '';
   const p = String(iso).slice(0, 10).split('-');
   if (p.length < 3) return iso;
-  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const d = parseInt(p[2], 10), mo = parseInt(p[1], 10) - 1;
   if (isNaN(d) || mo < 0 || mo > 11) return iso;
   return d + ' ' + months[mo];
 }
 
 // v2.45.433: окошко «когда придёт» — ожидаемая дата поставки по заказу (ORD).
-function openEtaPicker(orderId, orderLabel, currentIso) {
+// v2.45.434: + куда придёт — «к нам» / «к ним на склад».
+function openEtaPicker(orderId, orderLabel, currentIso, currentPlace) {
   if (!orderId) return;
+  window._etaPlace = (currentPlace === 'us' || currentPlace === 'supplier') ? currentPlace : '';
   let m = document.getElementById('eta-picker-modal');
   if (m) m.remove();
   m = document.createElement('div');
   m.id = 'eta-picker-modal';
   m.className = 'modal-overlay visible';
   m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const placeBtn = (val, label, icon) =>
+    '<button type="button" id="eta-place-' + val + '" onclick="setEtaPlace(\'' + val + '\')" ' +
+      'style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 8px;font-size:12.5px;font-weight:600;cursor:pointer;' +
+      'border-radius:8px;border:1.5px solid ' + (window._etaPlace === val ? '#2563EB' : 'var(--border)') + ';' +
+      'background:' + (window._etaPlace === val ? '#EFF6FF' : '#fff') + ';color:' + (window._etaPlace === val ? '#1E40AF' : 'var(--text-mid)') + ';">' +
+      '<i class="ti ' + icon + '"></i>' + label + '</button>';
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:380px;">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:400px;">' +
       '<div class="modal-header"><h3><i class="ti ti-calendar-event"></i> Когда придёт' + (orderLabel ? ' · ' + escapeHtml(orderLabel) : '') + '</h3>' +
         '<button class="icon-btn" onclick="document.getElementById(\'eta-picker-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
       '<div class="modal-body" style="padding:16px;">' +
         '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">Ожидаемая дата поставки по заказу' + (orderLabel ? ' ' + escapeHtml(orderLabel) : '') + '. Менеджер назвал срок — поставь его здесь, будешь видеть в «Ждём поставку» у всех позиций этого заказа.</div>' +
         '<input type="date" id="eta-date-input" value="' + escapeHtml(currentIso || '') + '" style="width:100%;padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;">' +
-        '<div style="display:flex;gap:8px;margin-top:14px;">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--text-mid);margin:14px 0 6px;">Куда придёт?</div>' +
+        '<div style="display:flex;gap:8px;" id="eta-place-row">' +
+          placeBtn('us', 'К нам', 'ti-building-warehouse') +
+          placeBtn('supplier', 'К ним на склад', 'ti-truck') +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:16px;">' +
           '<button class="btn btn-primary" style="flex:1;" onclick="saveEta(' + orderId + ',false)"><i class="ti ti-check"></i> Сохранить</button>' +
           (currentIso ? '<button class="btn btn-secondary" onclick="saveEta(' + orderId + ',true)"><i class="ti ti-eraser"></i> Убрать</button>' : '') +
         '</div>' +
@@ -5535,16 +5552,30 @@ function openEtaPicker(orderId, orderLabel, currentIso) {
   setTimeout(() => { const f = document.getElementById('eta-date-input'); if (f) f.focus(); }, 80);
 }
 
+// Переключение «куда придёт» в окошке (toggle — повторный тап снимает выбор).
+function setEtaPlace(val) {
+  window._etaPlace = (window._etaPlace === val) ? '' : val;
+  ['us', 'supplier'].forEach(v => {
+    const b = document.getElementById('eta-place-' + v);
+    if (!b) return;
+    const on = window._etaPlace === v;
+    b.style.border = '1.5px solid ' + (on ? '#2563EB' : 'var(--border)');
+    b.style.background = on ? '#EFF6FF' : '#fff';
+    b.style.color = on ? '#1E40AF' : 'var(--text-mid)';
+  });
+}
+
 async function saveEta(orderId, clear) {
   const inp = document.getElementById('eta-date-input');
   const iso = clear ? '' : (inp ? inp.value : '');
+  const place = clear ? '' : (window._etaPlace || '');
   if (!clear && !iso) { showToast('Выбери дату', 'error'); return; }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders/' + orderId, {
       method: 'PATCH',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expected_date: iso || null }),
+      body: JSON.stringify({ expected_date: iso || null, expected_place: place || null }),
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); showToast(j.message || 'Не удалось сохранить', 'error'); return; }
     showToast(clear ? 'Дата убрана' : 'Дата поставки сохранена', 'success');
@@ -10756,6 +10787,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.434',
+    date: '19.06.2026',
+    title: 'Дата поставки «15 июля» + куда придёт',
+    features: [
+      'Дата поставки теперь пишется по-человечески — <b>«придёт 15 июля»</b> (а не «15 июл»)',
+      'В окошке «когда придёт» добавлен выбор <b>куда придёт: «К нам» или «К ним на склад»</b> — видно прямо в чипе рядом с датой',
+    ],
+  },
   {
     version: 'v2.45.433',
     date: '19.06.2026',
