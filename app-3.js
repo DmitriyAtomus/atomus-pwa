@@ -8189,25 +8189,28 @@ async function forcePollSupplyInbox() {
 }
 
 async function openAttachInboxToOrder(inboxId) {
-  // Подгружаем открытые заказы для выбора
+  // v2.45.438: берём ВСЕ заказы (не только open) — чтобы ничего не скрыть
   let orders = [];
   try {
-    const d = await apiGet('/api/supply-orders?status=open');
-    orders = d.items || d.orders || d || [];
+    const d = await apiGet('/api/supply-orders');
+    orders = d.items || d.orders || (Array.isArray(d) ? d : []) || [];
     if (!Array.isArray(orders)) orders = orders.items || [];
   } catch (_) { orders = []; }
-  if (!orders.length) {
-    // Расширим до всех — если открытых нет
-    try {
-      const d2 = await apiGet('/api/supply-orders');
-      orders = d2.items || d2.orders || d2 || [];
-      if (!Array.isArray(orders)) orders = orders.items || [];
-    } catch (_) {}
-  }
-  if (!orders.length) {
-    showToast('Заказов нет — некуда привязывать', 'error');
-    return;
-  }
+
+  // Поставщик счёта (из отправителя письма) — для сопоставления и подсказки
+  const inb = (cache.supplyInbox || []).find(x => x.id === inboxId) || {};
+  const senderName = (inb.from_name || inb.from_addr || '').trim();
+  const senderKey = ((inb.from_name || '') + (inb.from_addr || '')).toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+  const senderDom = ((inb.from_addr || '').split('@')[1] || '').toLowerCase();
+  const _ordMatch = (o) => {
+    const sk = (o.supplier_name || '').toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+    if (sk && sk.length >= 3 && senderKey && (senderKey.indexOf(sk) >= 0 || sk.indexOf(senderKey) >= 0)) return true;
+    const ed = ((o.supplier_email || '').split('@')[1] || '').toLowerCase();
+    return !!(senderDom && ed && senderDom === ed);
+  };
+  // Совпадающего поставщика — наверх
+  orders.sort((a, b) => (_ordMatch(b) ? 1 : 0) - (_ordMatch(a) ? 1 : 0));
+
   const overlayId = 'inbox-attach-modal';
   let m = document.getElementById(overlayId); if (m) m.remove();
   m = document.createElement('div');
@@ -8215,29 +8218,60 @@ async function openAttachInboxToOrder(inboxId) {
   m.className = 'modal-overlay';
   const opts = orders.map(o =>
     '<option value="' + o.id + '">' +
+      (_ordMatch(o) ? '✓ ' : '') +
       escapeHtml((o.order_label || ('#' + o.id))) + ' · ' +
       escapeHtml(o.supplier_name || '—') + ' · ' +
       escapeHtml(o.status_label || o.status || '—') +
     '</option>'
   ).join('');
+  const senderHtml = senderName
+    ? '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;">Счёт от: <b>' + escapeHtml(senderName) + '</b>' +
+        (inb.from_addr && inb.from_name ? ' <span style="color:var(--text-light);">&lt;' + escapeHtml(inb.from_addr) + '&gt;</span>' : '') +
+        '<div style="color:var(--text-light);font-size:12px;margin-top:3px;">Заказы этого поставщика отмечены ✓ и подняты вверх. Если его заказа нет — создайте новый из этого счёта.</div></div>'
+    : '';
+  const selectOrEmpty = orders.length
+    ? '<select id="inbox-attach-order-select" class="form-input" style="width:100%;">' + opts + '</select>' +
+      '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitAttachInboxToOrder(' + inboxId + ')"><i class="ti ti-check"></i> Привязать к выбранному</button>' +
+      '<div style="text-align:center;color:var(--text-light);font-size:12px;">— или —</div>'
+    : '<div style="color:var(--text-light);font-size:13px;">Подходящих заказов нет.</div>';
   m.innerHTML =
-    '<div class="modal" style="max-width:520px;">' +
+    '<div class="modal" style="max-width:540px;">' +
       '<div class="modal-header">' +
-        '<h2><i class="ti ti-link"></i> Привязать письмо к заказу</h2>' +
+        '<h2><i class="ti ti-link"></i> Привязать счёт к заказу</h2>' +
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="display:flex;flex-direction:column;gap:10px;">' +
-        '<div style="color:var(--text-light);font-size:13px;">Выбери заказ, к которому отнести этот счёт. Первое вложение письма станет файлом счёта для заказа, статус перейдёт в «Счёт получен».</div>' +
-        '<select id="inbox-attach-order-select" class="form-input" style="width:100%;">' + opts + '</select>' +
+        senderHtml +
+        '<div style="color:var(--text-light);font-size:13px;">Привяжите счёт к существующему заказу — вложение станет файлом счёта, статус перейдёт в «Счёт получен».</div>' +
+        selectOrEmpty +
+        '<button class="btn ' + (orders.length ? 'btn-secondary' : 'btn-primary') + '" style="width:100%;justify-content:center;" onclick="createOrderFromInbox(' + inboxId + ')"><i class="ti ti-plus"></i> Создать новый заказ из этого счёта</button>' +
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
-        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitAttachInboxToOrder(' + inboxId + ')"><i class="ti ti-check"></i> Привязать</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(m);
   m.classList.add('visible');
   m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+}
+
+async function createOrderFromInbox(inboxId) {
+  if (!confirm('Создать новый заказ поставщику из этого счёта? Поставщик определится по отправителю письма.')) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/create-order', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error'); return; }
+    showToast('Создан заказ ' + (j.order_label || ('#' + j.order_id)) + ' — счёт привязан', 'success');
+    document.getElementById('inbox-attach-modal')?.remove();
+    await loadSupplyInbox();
+    if (j.order_id && typeof openSupplyOrder === 'function') openSupplyOrder(j.order_id);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 async function submitAttachInboxToOrder(inboxId) {
