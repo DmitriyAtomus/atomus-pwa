@@ -10966,8 +10966,8 @@
     .sup-shop-table tr {
       display: grid;
       column-gap: 10px;
-      row-gap: 3px;
-      padding: 11px 13px;
+      row-gap: 2px;
+      padding: 9px 13px;
       border-bottom: 1px solid var(--border);
     }
     .sup-shop-table tr:last-child { border-bottom: none; }
@@ -12129,7 +12129,7 @@
   .ns-hint i { color: var(--brand); font-size: 14px; }
 
   /* ============ v2.45.340: «Что закупить» — единые бейджи, светлые шапки групп, аккуратные строки ============ */
-  .ssp-reason-wrap { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .ssp-reason-wrap { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; margin-top: 1px; }
   .sup-shop-reason { background: #EEF2F7; color: var(--text-mid); padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
   .ssp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
   .ssp-badge i { font-size: 12px; }
