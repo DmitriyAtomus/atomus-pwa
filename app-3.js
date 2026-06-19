@@ -16175,6 +16175,18 @@ function _invRenderHome() {
   const token = localStorage.getItem(TOKEN_KEY) || '';
 
   let html = '';
+  // Быстрая сверка по фото товара (стоя у полки)
+  html +=
+    '<div style="background:linear-gradient(135deg,rgba(16,185,129,0.10),rgba(5,150,105,0.06));' +
+    'border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:14px 16px;margin-bottom:16px;' +
+    'display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+      '<i class="ti ti-camera-plus" style="font-size:26px;color:#059669;"></i>' +
+      '<div style="flex:1;min-width:200px;">' +
+        '<div style="font-weight:700;color:var(--text-dark);font-size:15px;">Сверка по фото товара</div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);">Фоткай коробку у полки, пиши количество — система сверит с остатком (сходится / расхождение / нет позиции).</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="openBoxCheck()"><i class="ti ti-camera"></i> Начать сверку</button>' +
+    '</div>';
   // Баннер «у тебя есть незавершённый черновик ручной инвентаризации»
   const draft = _invLoadManualDraft();
   if (draft && draft.values && Object.keys(draft.values).length) {
