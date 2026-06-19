@@ -5365,6 +5365,7 @@ function _componentToTracking(it, group) {
     _is_component: true,
     order_id: it.order_id || null,
     order_item_id: it.order_item_id || null,
+    order_expected: it.order_expected || null,
     order_label_short: it.order_label,
   };
 }
@@ -5464,15 +5465,95 @@ function _cpTrackingRowHtml(it) {
       'padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
       '<i class="ti ti-arrow-back-up"></i> вернуть к закупке</button>';
   }
+  // v2.45.433: ожидаемая дата поставки («когда придёт»). Ставится на заказ (ORD),
+  // показывается у каждой позиции этого заказа. Если просрочена — красным с ⚠.
+  let etaChip = '';
+  if (it.order_id) {
+    const lbl = escapeHtml(String(it.order_label || '')).replace(/'/g, '&#39;');
+    if (it.order_expected) {
+      const iso = String(it.order_expected).slice(0, 10);
+      const overdue = iso < new Date().toISOString().slice(0, 10);
+      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'' + iso + '\')" ' +
+        'title="Ожидаемая дата поставки — нажми, чтобы изменить" ' +
+        'style="display:inline-flex;align-items:center;gap:3px;border:none;cursor:pointer;font-size:11px;font-weight:700;' +
+        'color:' + (overdue ? '#7F1D1D' : '#065F46') + ';background:' + (overdue ? '#FEE2E2' : '#D1FAE5') + ';padding:2px 8px;border-radius:999px;">' +
+        '<i class="ti ti-calendar-check" style="font-size:12px;"></i>придёт ' + _fmtDateRuShort(iso) + (overdue ? ' ⚠' : '') + '</button>';
+    } else {
+      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'\')" ' +
+        'title="Указать ожидаемую дату поставки" ' +
+        'style="display:inline-flex;align-items:center;gap:3px;border:1px dashed #94A3B8;cursor:pointer;font-size:11px;font-weight:600;' +
+        'color:#475569;background:none;padding:2px 8px;border-radius:999px;">' +
+        '<i class="ti ti-calendar-plus" style="font-size:12px;"></i>когда придёт?</button>';
+    }
+  }
   return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
       qtyChip +
       ageBadge +
       stBadge +
+      etaChip +
       returnBtn +
     '</div>' +
   '</div>';
+}
+
+// v2.45.433: «15 июл» из ISO YYYY-MM-DD (короткий русский формат для чипа).
+function _fmtDateRuShort(iso) {
+  if (!iso) return '';
+  const p = String(iso).slice(0, 10).split('-');
+  if (p.length < 3) return iso;
+  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  const d = parseInt(p[2], 10), mo = parseInt(p[1], 10) - 1;
+  if (isNaN(d) || mo < 0 || mo > 11) return iso;
+  return d + ' ' + months[mo];
+}
+
+// v2.45.433: окошко «когда придёт» — ожидаемая дата поставки по заказу (ORD).
+function openEtaPicker(orderId, orderLabel, currentIso) {
+  if (!orderId) return;
+  let m = document.getElementById('eta-picker-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'eta-picker-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:380px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-calendar-event"></i> Когда придёт' + (orderLabel ? ' · ' + escapeHtml(orderLabel) : '') + '</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'eta-picker-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="padding:16px;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">Ожидаемая дата поставки по заказу' + (orderLabel ? ' ' + escapeHtml(orderLabel) : '') + '. Менеджер назвал срок — поставь его здесь, будешь видеть в «Ждём поставку» у всех позиций этого заказа.</div>' +
+        '<input type="date" id="eta-date-input" value="' + escapeHtml(currentIso || '') + '" style="width:100%;padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;">' +
+        '<div style="display:flex;gap:8px;margin-top:14px;">' +
+          '<button class="btn btn-primary" style="flex:1;" onclick="saveEta(' + orderId + ',false)"><i class="ti ti-check"></i> Сохранить</button>' +
+          (currentIso ? '<button class="btn btn-secondary" onclick="saveEta(' + orderId + ',true)"><i class="ti ti-eraser"></i> Убрать</button>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  setTimeout(() => { const f = document.getElementById('eta-date-input'); if (f) f.focus(); }, 80);
+}
+
+async function saveEta(orderId, clear) {
+  const inp = document.getElementById('eta-date-input');
+  const iso = clear ? '' : (inp ? inp.value : '');
+  if (!clear && !iso) { showToast('Выбери дату', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expected_date: iso || null }),
+    });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); showToast(j.message || 'Не удалось сохранить', 'error'); return; }
+    showToast(clear ? 'Дата убрана' : 'Дата поставки сохранена', 'success');
+    const mm = document.getElementById('eta-picker-modal'); if (mm) mm.remove();
+    if (typeof cache !== 'undefined') { cache.supplyOrders = null; }
+    if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 // v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
@@ -10675,6 +10756,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.433',
+    date: '19.06.2026',
+    title: 'Ожидаемая дата поставки в «Ждём поставку»',
+    features: [
+      'У позиции в «Ждём поставку» появилась кнопка <b>«когда придёт?»</b> — открывается окошко с выбором даты. Менеджер поставщика назвал срок (например, 15 июля) — ставишь, и видишь его прямо в списке',
+      'Дата показывается зелёным чипом <b>«📅 придёт 15 июл»</b>; если срок уже прошёл, а поставки нет — чип становится <b>красным с ⚠</b>',
+      'Дата задаётся на заказ (ORD) и показывается у всех его позиций — можно поправить в любой момент или убрать',
+    ],
+  },
   {
     version: 'v2.45.432',
     date: '19.06.2026',
