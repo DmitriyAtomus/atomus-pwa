@@ -5415,11 +5415,21 @@ function _cpTrackingRowHtml(it) {
   const stBadge = '<span class="ssp-badge" style="color:' + fg + ';background:' + bg + ';">' +
     escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') + '</span>';
   const days = _daysSince(it.ordered_at);
+  // v2.45.432: «сколько ждём» — цветной чип-акцент, чтобы было видно сразу.
+  // Градация: сегодня — спокойный, 1-6 дней — синий, 7-13 — оранжевый (ждём
+  // уже неделю+), 14+ — красный с ⚠ (засиделось, пора теребить поставщика).
   let ageBadge = '';
   if (days !== null) {
-    const old = days >= 14;
-    ageBadge = '<span style="font-size:11px;white-space:nowrap;color:' + (old ? '#B91C1C' : 'var(--text-light)') + ';font-weight:' + (old ? '700' : '400') + ';">' +
-      (days === 0 ? 'сегодня' : days + ' ' + _plural(days, ['день', 'дня', 'дней'])) + (old ? ' ⚠' : '') + '</span>';
+    let fg, bg, bold = false;
+    let txt = (days === 0) ? 'сегодня' : (days + ' ' + _plural(days, ['день', 'дня', 'дней']));
+    if (days >= 14)      { fg = '#7F1D1D'; bg = '#FEE2E2'; bold = true; txt += ' ⚠'; }
+    else if (days >= 7)  { fg = '#9A3412'; bg = '#FFEDD5'; bold = true; }
+    else if (days >= 1)  { fg = '#1E40AF'; bg = '#DBEAFE'; }
+    else                 { fg = '#475569'; bg = '#F1F5F9'; }
+    ageBadge = '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;' +
+      'white-space:nowrap;font-weight:' + (bold ? '700' : '600') + ';color:' + fg +
+      ';background:' + bg + ';padding:2px 8px;border-radius:999px;">' +
+      '<i class="ti ti-clock-hour-4" style="font-size:12px;"></i>' + txt + '</span>';
   }
   // v2.45.431: двухстрочная раскладка для мобилы — название отдельной строкой,
   // под ним чипсы (кол-во · дни · статус · кнопка) с переносом, чтобы ничего не
@@ -5458,7 +5468,7 @@ function _cpTrackingRowHtml(it) {
     nameCell +
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
       qtyChip +
-      (ageBadge ? '<span style="color:var(--border);">·</span>' + ageBadge : '') +
+      ageBadge +
       stBadge +
       returnBtn +
     '</div>' +
@@ -10665,6 +10675,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.432',
+    date: '19.06.2026',
+    title: 'Акцент на «сколько ждём поставку»',
+    features: [
+      'В блоке «Ждём поставку» срок ожидания теперь цветной чип с часиками, а не серый текст — видно сразу',
+      'Градация по сроку: до недели — синий, <b>7–13 дней — оранжевый</b> (ждём уже долго), <b>14+ дней — красный с ⚠</b> (пора теребить поставщика)',
+    ],
+  },
   {
     version: 'v2.45.431',
     date: '18.06.2026',
