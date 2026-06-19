@@ -405,6 +405,303 @@ async function deleteInventorySession(id, statusKey) {
   }
 }
 
+// ============ СВЕРКА СКЛАДА ПО ФОТО ТОВАРА ============
+// Стоя у полки: фото коробки → Claude распознаёт артикул → сверяем с остатком
+// (сходится / расхождение / нет позиции → занести). Накопительный список,
+// применяется батчем через /api/inventory/sessions/manual (как ручная инвентаризация).
+
+let _boxCheck = { items: [], cats: null, current: null };
+
+function _bcN(n) { n = Number(n) || 0; return (Math.round(n * 100) / 100).toString(); }
+
+async function openBoxCheck() {
+  _boxCheck = { items: [], cats: _boxCheck.cats, current: null };
+  _renderBoxCheck();
+  if (!_boxCheck.cats) {
+    try { const j = await apiGet('/api/components/categories'); _boxCheck.cats = (j && j.categories) || []; }
+    catch (e) { _boxCheck.cats = []; }
+  }
+}
+
+function _renderBoxCheck() {
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  let html = '';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
+    '<button class="btn btn-secondary" onclick="loadInventory()"><i class="ti ti-arrow-left"></i> Назад</button>' +
+    '<div style="font-weight:700;font-size:16px;">Сверка склада по фото</div></div>';
+  html += '<div class="inv-drop" onclick="_boxCheckPick()" style="margin-bottom:14px;">' +
+    '<i class="ti ti-camera"></i>' +
+    '<div><b>Сфотографировать коробку</b></div>' +
+    '<div style="font-size:11.5px;margin-top:3px;">артикул на упаковке распознаётся автоматически</div>' +
+    '<input type="file" id="box-check-input" accept="image/*" capture="environment" style="display:none;" onchange="_boxCheckPhoto(this.files)">' +
+    '</div>';
+  html += '<div id="box-check-result"></div>';
+  html += '<div id="box-check-list">' + _boxCheckListHtml() + '</div>';
+  body.innerHTML = html;
+}
+
+function _boxCheckPick() {
+  const i = document.getElementById('box-check-input');
+  if (i) { i.value = ''; i.click(); }
+}
+
+async function _boxCheckPhoto(files) {
+  if (!files || !files.length) return;
+  const f = files[0];
+  const res = document.getElementById('box-check-result');
+  if (res) res.innerHTML = '<div class="loading-block">Распознаём коробку…</div>';
+  const fd = new FormData();
+  fd.append('photo_1', f);
+  try {
+    const r = await fetch(API_BASE + '/api/inventory/recognize-box', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      body: fd,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) {
+      if (res) res.innerHTML = '';
+      showToast((j && (j.error || j.message)) || 'Не удалось распознать', 'error');
+      return;
+    }
+    _boxCheck.current = j;
+    _renderBoxCheckResult(j);
+  } catch (e) {
+    if (res) res.innerHTML = '';
+    showToast('Сеть: не удалось отправить фото', 'error');
+  }
+}
+
+function _boxCheckChoose(i) {
+  if (!_boxCheck.current) return;
+  const s = (_boxCheck.current.suggestions || [])[i];
+  if (!s) return;
+  _boxCheck.current.chosen = s;
+  _renderBoxCheckResult(_boxCheck.current);
+}
+
+function _renderBoxCheckResult(j) {
+  const res = document.getElementById('box-check-result');
+  if (!res) return;
+  const rec = j.recognized || {};
+  const chosen = j.chosen || j.match || null;
+  let h = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;">';
+  const recLine = [rec.manufacturer, rec.model || rec.name].filter(Boolean).join(' · ') || 'не распознано';
+  h += '<div style="font-size:12px;color:var(--text-light);">Распознано на коробке</div>';
+  h += '<div style="font-weight:600;margin-bottom:8px;">' + escapeHtml(recLine) +
+    (rec.codes && rec.codes.length ? (' <span style="color:var(--text-light);font-weight:400;">(' + escapeHtml(rec.codes.join(', ')) + ')</span>') : '') + '</div>';
+  if (chosen) {
+    h += '<div style="background:var(--brand-bg,#eef2ff);border-radius:8px;padding:10px;margin-bottom:10px;">' +
+      '<div style="font-weight:600;">' + escapeHtml(chosen.name || '') + '</div>' +
+      '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(chosen.sku || '—') +
+      ' · на складе <b>' + _bcN(chosen.qty_on_stock) + '</b> ' + escapeHtml(chosen.unit || 'шт.') + '</div>' +
+      '</div>';
+    h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<label style="font-size:13px;">Фактически:</label>' +
+      '<input type="number" inputmode="decimal" id="box-check-qty" min="0" step="1" ' +
+      'style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:15px;" ' +
+      'oninput="_boxCheckQtyHint()"' + (rec.pack_qty ? (' placeholder="' + rec.pack_qty + '"') : '') + '>' +
+      '<span style="font-size:13px;">' + escapeHtml(chosen.unit || 'шт.') + '</span>' +
+      '<span id="box-check-hint" style="font-size:13px;font-weight:600;"></span>' +
+      '</div>';
+    h += '<div style="display:flex;gap:8px;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="_boxCheckAdd()"><i class="ti ti-plus"></i> В список</button>' +
+      '<button class="btn btn-secondary" onclick="_boxCheckClear()">Отмена</button>' +
+      '</div>';
+  } else {
+    h += '<div style="color:#b45309;font-weight:600;margin-bottom:8px;"><i class="ti ti-alert-triangle"></i> На складе не найдено</div>';
+    if (j.suggestions && j.suggestions.length) {
+      h += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Возможно, это:</div>';
+      j.suggestions.forEach((s, i) => {
+        h += '<div onclick="_boxCheckChoose(' + i + ')" style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">' +
+          '<div style="font-weight:600;font-size:13px;">' + escapeHtml(s.name || '') + '</div>' +
+          '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(s.sku || '—') +
+          ' · на складе ' + _bcN(s.qty_on_stock) + ' ' + escapeHtml(s.unit || 'шт.') + '</div>' +
+          '</div>';
+      });
+    }
+    h += '<div style="display:flex;gap:8px;margin-top:10px;">' +
+      '<button class="btn btn-primary" onclick="_boxCheckNewForm()"><i class="ti ti-plus"></i> Занести новую</button>' +
+      '<button class="btn btn-secondary" onclick="_boxCheckClear()">Отмена</button>' +
+      '</div>';
+  }
+  h += '</div>';
+  res.innerHTML = h;
+  const qi = document.getElementById('box-check-qty');
+  if (qi) { try { qi.focus(); } catch (e) {} }
+}
+
+function _boxCheckQtyHint() {
+  const j = _boxCheck.current; if (!j) return;
+  const chosen = j.chosen || j.match; if (!chosen) return;
+  const el = document.getElementById('box-check-hint');
+  const qi = document.getElementById('box-check-qty');
+  if (!el || !qi) return;
+  if (qi.value === '') { el.textContent = ''; return; }
+  const fact = Number(qi.value);
+  const cur = Number(chosen.qty_on_stock) || 0;
+  if (!isFinite(fact)) { el.textContent = ''; return; }
+  const d = fact - cur;
+  if (d === 0) { el.style.color = '#16a34a'; el.textContent = '✓ сходится'; }
+  else { el.style.color = '#dc2626'; el.textContent = 'расхождение: ' + (d > 0 ? '+' : '') + _bcN(d); }
+}
+
+function _boxCheckClear() {
+  _boxCheck.current = null;
+  const res = document.getElementById('box-check-result');
+  if (res) res.innerHTML = '';
+}
+
+function _boxCheckAdd() {
+  const j = _boxCheck.current; if (!j) return;
+  const chosen = j.chosen || j.match; if (!chosen) return;
+  const qi = document.getElementById('box-check-qty');
+  const fact = qi ? Number(qi.value) : NaN;
+  if (qi && qi.value === '' || !isFinite(fact) || fact < 0) {
+    showToast('Введите фактическое количество', 'error'); return;
+  }
+  const cur = Number(chosen.qty_on_stock) || 0;
+  const item = {
+    component_id: chosen.component_id,
+    name: chosen.name, sku: chosen.sku, unit: chosen.unit || 'шт.',
+    current: cur, fact: fact, delta: fact - cur,
+    isNew: !!chosen._isNew,
+  };
+  const ix = _boxCheck.items.findIndex(x => x.component_id === item.component_id);
+  if (ix >= 0) _boxCheck.items[ix] = item; else _boxCheck.items.push(item);
+  _boxCheckClear();
+  _renderBoxCheckList();
+  showToast('Добавлено: ' + (item.name || ''), 'success');
+}
+
+function _boxCheckRemove(idx) {
+  _boxCheck.items.splice(idx, 1);
+  _renderBoxCheckList();
+}
+
+function _renderBoxCheckList() {
+  const el = document.getElementById('box-check-list');
+  if (el) el.innerHTML = _boxCheckListHtml();
+}
+
+function _boxCheckListHtml() {
+  const items = _boxCheck.items;
+  if (!items.length) {
+    return '<div style="color:var(--text-light);font-size:13px;padding:16px;text-align:center;border:1px dashed var(--border);border-radius:10px;">Список пуст — сфотографируйте первую коробку</div>';
+  }
+  const diffs = items.filter(x => x.delta !== 0).length;
+  let h = '<div style="font-weight:700;margin:6px 0 8px;">Проверено: ' + items.length +
+    (diffs ? (' · <span style="color:#dc2626;">с расхождением ' + diffs + '</span>') : ' · всё сходится') + '</div>';
+  items.forEach((x, i) => {
+    let badge;
+    if (x.isNew) badge = '<span style="color:#7c3aed;font-weight:600;">новая · ' + _bcN(x.fact) + '</span>';
+    else if (x.delta === 0) badge = '<span style="color:#16a34a;font-weight:600;">✓ ' + _bcN(x.fact) + '</span>';
+    else badge = '<span style="color:#dc2626;font-weight:600;">' + _bcN(x.current) + ' → ' + _bcN(x.fact) + ' (' + (x.delta > 0 ? '+' : '') + _bcN(x.delta) + ')</span>';
+    h += '<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(x.name || '') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(x.sku || '—') + ' · ' + escapeHtml(x.unit || 'шт.') + '</div>' +
+      '</div>' +
+      '<div style="font-size:13px;white-space:nowrap;">' + badge + '</div>' +
+      '<button class="inv-delete-btn" title="Убрать" onclick="_boxCheckRemove(' + i + ')"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  h += '<button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="_boxCheckApply()">' +
+    '<i class="ti ti-checks"></i> Применить (' + items.length + ')</button>';
+  return h;
+}
+
+async function _boxCheckApply() {
+  const items = _boxCheck.items;
+  if (!items.length) return;
+  const diffs = items.filter(x => x.delta !== 0 && !x.isNew).length;
+  const news = items.filter(x => x.isNew).length;
+  let msg = 'Применить ' + items.length + ' позиций к складу?';
+  if (diffs) msg += '\nС расхождением: ' + diffs + ' (остаток будет приведён к факту).';
+  if (news) msg += '\nНовых позиций: ' + news + '.';
+  if (!confirm(msg)) return;
+  const payload = { items: items.map(x => ({ component_id: x.component_id, new_qty: x.fact })) };
+  try {
+    const r = await apiPost('/api/inventory/sessions/manual', payload);
+    if (!r.ok || !(r.data && (r.data.ok || r.data.id))) {
+      showToast((r.data && (r.data.message || r.data.error)) || 'Не удалось применить', 'error');
+      return;
+    }
+    showToast('Применено: ' + items.length + ' позиций', 'success');
+    _boxCheck.items = [];
+    await _invFetchSessions();
+    _invRenderHome();
+  } catch (e) {
+    showToast('Сеть: не удалось применить', 'error');
+  }
+}
+
+function _boxCheckNewForm() {
+  const j = _boxCheck.current; if (!j) return;
+  const rec = j.recognized || {};
+  const res = document.getElementById('box-check-result'); if (!res) return;
+  const cats = _boxCheck.cats || [];
+  let defCat = cats.find(c => /электр/i.test(c.name || ''));
+  if (!defCat && cats.length) defCat = cats[0];
+  const nameVal = rec.name || rec.model || '';
+  const skuVal = (rec.codes && rec.codes.length ? rec.codes[0] : '') || rec.model || '';
+  let opts = cats.map(c => '<option value="' + c.id + '"' + (defCat && c.id === defCat.id ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>').join('');
+  let h = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;">' +
+    '<div style="font-weight:700;margin-bottom:10px;">Занести новую позицию</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;">' +
+      '<label style="font-size:12px;color:var(--text-light);">Наименование' +
+        '<input id="bc-new-name" value="' + escapeHtml(nameVal) + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Артикул' +
+        '<input id="bc-new-sku" value="' + escapeHtml(skuVal) + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Раздел' +
+        '<select id="bc-new-cat" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;">' + opts + '</select></label>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<label style="font-size:12px;color:var(--text-light);flex:1;">Фактически (шт.)' +
+          '<input id="bc-new-qty" type="number" inputmode="decimal" min="0" step="1"' + (rec.pack_qty ? (' placeholder="' + rec.pack_qty + '"') : '') + ' style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+        '<label style="font-size:12px;color:var(--text-light);width:90px;">Ед.' +
+          '<input id="bc-new-unit" value="шт." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="_boxCheckCreate()"><i class="ti ti-check"></i> Создать и добавить</button>' +
+      '<button class="btn btn-secondary" onclick="_renderBoxCheckResult(_boxCheck.current)">Назад</button>' +
+    '</div>' +
+  '</div>';
+  res.innerHTML = h;
+}
+
+async function _boxCheckCreate() {
+  const name = (document.getElementById('bc-new-name') || {}).value || '';
+  const sku = (document.getElementById('bc-new-sku') || {}).value || '';
+  const catId = Number((document.getElementById('bc-new-cat') || {}).value);
+  const unit = (document.getElementById('bc-new-unit') || {}).value || 'шт.';
+  const qiv = (document.getElementById('bc-new-qty') || {}).value;
+  const fact = Number(qiv);
+  if (!name.trim()) { showToast('Укажите наименование', 'error'); return; }
+  if (!catId) { showToast('Выберите раздел', 'error'); return; }
+  if (qiv === '' || !isFinite(fact) || fact < 0) { showToast('Укажите фактическое количество', 'error'); return; }
+  try {
+    const r = await apiPost('/api/components', {
+      name: name.trim(), sku: sku.trim(), category_id: catId, unit: unit.trim() || 'шт.',
+    });
+    if (!r.ok || !(r.data && r.data.id)) {
+      showToast((r.data && (r.data.message || r.data.error)) || 'Не удалось создать позицию', 'error');
+      return;
+    }
+    const comp = r.data;
+    _boxCheck.items.push({
+      component_id: comp.id, name: comp.name, sku: comp.sku || sku, unit: comp.unit || unit,
+      current: 0, fact: fact, delta: fact, isNew: true,
+    });
+    _boxCheckClear();
+    _renderBoxCheckList();
+    showToast('Создано и добавлено: ' + comp.name, 'success');
+  } catch (e) {
+    showToast('Сеть: не удалось создать', 'error');
+  }
+}
+
 async function openInventorySession(sessionId) {
   _invState._selectedIds = new Set();
   _invState._overrides = {};
