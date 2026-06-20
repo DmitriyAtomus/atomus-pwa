@@ -5307,6 +5307,27 @@ const _CP_ORDER_STATUS_RU = {
 };
 
 function _cpRowHtml(it) {
+  // v2.45.443: новый вид (карточка buy-item с галочкой/«К заказу») — под переключателем
+  if (window.SUPPLY_SHOP_V2) {
+    let st2;
+    if (it.purchase_status === 'ordered') {
+      const s2 = _CP_ORDER_STATUS_RU[it.order_status];
+      st2 = '<span class="sv2-buy-status ordered">' + escapeHtml(s2 ? s2[0] : 'Заказано') + '</span>';
+    } else {
+      st2 = '<span class="sv2-buy-status todo">К заказу</span>';
+    }
+    const sName2 = JSON.stringify(it.item_name || '').replace(/"/g, '&quot;');
+    return '<div class="sv2-buy">' +
+      '<input type="checkbox" class="cp-check sv2-buy-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
+      '<div class="sv2-buy-body" onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" title="Открыть договор">' +
+        '<div class="sv2-buy-title">' + escapeHtml(it.item_name || '—') + '</div>' +
+        '<div class="sv2-buy-meta">договор ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</div>' +
+      '</div>' +
+      '<span class="sv2-buy-qty">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+      st2 +
+      '<button type="button" class="sv2-buy-x" title="Убрать из закупки (в договоре останется)" onclick="event.stopPropagation();_cpSkipItem(' + it.id + ',' + sName2 + ')"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  }
   let stBadge;
   if (it.purchase_status === 'ordered') {
     const st = _CP_ORDER_STATUS_RU[it.order_status];
@@ -5866,6 +5887,8 @@ function _shopApplyLocal(items) {
 function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
+  // v2.45.443: флаг нового вида ставим ДО сборки блоков (cpBlock использует его в _cpRowHtml)
+  window.SUPPLY_SHOP_V2 = localStorage.getItem('supplyShopV2') !== '0';
   const groups = (d && d.groups) || [];
   const cpItems = (d && d._contract_purchases) || [];
   const cpBlock = _contractPurchasesBlockHtml(cpItems);
@@ -5904,7 +5927,6 @@ function renderSupplyShopping(d) {
     return;
   }
   // v2.45.442: переключатель нового/старого вида «Что закупить» (для отката)
-  window.SUPPLY_SHOP_V2 = localStorage.getItem('supplyShopV2') !== '0';
   const v2Toggle = '<div class="sv2-toggle-bar">' +
       '<span><i class="ti ti-' + (window.SUPPLY_SHOP_V2 ? 'sparkles' : 'history') + '"></i> ' +
         (window.SUPPLY_SHOP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
