@@ -18255,3 +18255,15 @@
 .sv2-stepper button { width: 34px; height: 100%; background: #F8FAFC; border: none; display: flex; align-items: center; justify-content: center; color: var(--text-mid, #5A6275); font-size: 18px; cursor: pointer; }
 .sv2-stepper button:active { background: #EEF1F6; }
 .sv2-stepper .val { min-width: 38px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text, #1A2138); }
+/* v2.45.443: карточка «К заказу» (buy-item) — покупные позиции по договорам */
+.sv2-buy { display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-top: 1px solid var(--border, #EEF1F6); }
+.sv2-buy-check { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--brand); cursor: pointer; margin: 0; }
+.sv2-buy-body { flex: 1; min-width: 0; cursor: pointer; }
+.sv2-buy-title { font-size: 14px; font-weight: 600; color: var(--text, #1A2138); line-height: 1.3; }
+.sv2-buy-meta { font-size: 12px; color: var(--text-light, #8B92A3); margin-top: 2px; }
+.sv2-buy-qty { font-size: 13px; font-weight: 700; color: var(--brand); white-space: nowrap; flex-shrink: 0; }
+.sv2-buy-status { font-size: 11.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+.sv2-buy-status.todo { background: #FEE2E2; color: #B91C1C; }
+.sv2-buy-status.ordered { background: #FEF3C7; color: #92400E; }
+.sv2-buy-x { background: none; border: none; cursor: pointer; color: var(--text-faint, #B5BAC7); padding: 4px; display: inline-flex; flex-shrink: 0; }
+.sv2-buy-x:hover { color: #DC2626; }
