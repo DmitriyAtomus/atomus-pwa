@@ -6149,6 +6149,8 @@ function renderSupplyShopping(d) {
     '</div>';
   });
   container.innerHTML = html;
+  // v2.45.444: кардинальный новый вид — класс на контейнере перекрывает стили групп/шапок
+  container.classList.toggle('sv2-mode', !!window.SUPPLY_SHOP_V2);
 }
 
 /* ============ ЭТАП 52 (v2.44.73): заказ из shopping-list с превью ============ */
