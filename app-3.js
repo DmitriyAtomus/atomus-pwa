@@ -5827,6 +5827,22 @@ function shopEditQty(componentId, currentQty, unit) {
   _shopSaveQtyMap(map);
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
+// v2.45.442: степпер количества в новом виде — меняет число и сохраняет, без полной перезагрузки
+function sv2StepQty(componentId, delta) {
+  const span = document.getElementById('sv2-qty-' + componentId);
+  let n = (span ? (parseFloat(span.textContent) || 0) : 0) + delta;
+  if (n < 0) n = 0;
+  if (span) span.textContent = String(n);
+  const map = _shopGetQtyMap();
+  map[componentId] = n;
+  _shopSaveQtyMap(map);
+}
+// v2.45.442: переключение нового/старого вида «Что закупить» (для отката)
+function toggleSupplyShopV2() {
+  const cur = localStorage.getItem('supplyShopV2') !== '0';
+  localStorage.setItem('supplyShopV2', cur ? '0' : '1');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
 // Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
@@ -5887,7 +5903,16 @@ function renderSupplyShopping(d) {
       '</div></div>';
     return;
   }
-  let html = cpBlock + waitingBlock + hiddenToolbar;
+  // v2.45.442: переключатель нового/старого вида «Что закупить» (для отката)
+  window.SUPPLY_SHOP_V2 = localStorage.getItem('supplyShopV2') !== '0';
+  const v2Toggle = '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SUPPLY_SHOP_V2 ? 'sparkles' : 'history') + '"></i> ' +
+        (window.SUPPLY_SHOP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleSupplyShopV2()">' +
+        (window.SUPPLY_SHOP_V2 ? 'Вернуть старый' : 'Включить новый') +
+      '</button>' +
+    '</div>';
+  let html = v2Toggle + cpBlock + waitingBlock + hiddenToolbar;
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
@@ -5986,6 +6011,42 @@ function renderSupplyShopping(d) {
         removeCell +
       '</tr>';
     }).join('');
+
+    // v2.45.442 (редизайн Снабжения, под переключателем): позиции карточками sv2 + степпер
+    const itemCardsV2 = (g.items || []).map(it => {
+      const crit = it.is_critical ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>' : '';
+      const low = !!(it.reason && it.reason.indexOf('низкий остаток') !== -1);
+      const plan = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
+      let tags = '';
+      if (low) tags += '<span class="sv2-tag warn"><i class="ti ti-arrow-down"></i>низкий остаток</span>';
+      if (plan.length) {
+        const shown = plan.slice(0, 3).map(n => '№' + n).join(', ') + (plan.length > 3 ? ' +' + (plan.length - 3) : '');
+        tags += '<span class="sv2-tag proj"><i class="ti ti-briefcase"></i>' + escapeHtml(shown) + '</span>';
+      } else if (low) {
+        tags += '<span class="sv2-tag neutral"><i class="ti ti-building-warehouse"></i>на склад</span>';
+      }
+      const sName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
+      const q = Number(it.recommended_qty) || 0;
+      return '<div class="sv2-item">' +
+        '<div class="sv2-item-top">' +
+          '<div class="sv2-item-body" onclick="openComponentDetail(' + it.component_id + ')">' +
+            '<div class="sv2-item-name">' + crit + escapeHtml(it.component_name || '') +
+              (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
+            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b></div>' +
+          '</div>' +
+          '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div class="sv2-item-bottom">' +
+          '<div class="sv2-tags">' + tags + '</div>' +
+          '<div class="sv2-stepper">' +
+            '<button type="button" onclick="sv2StepQty(' + it.component_id + ',-1)">−</button>' +
+            '<span class="val" id="sv2-qty-' + it.component_id + '">' + escapeHtml(String(q)) + '</span>' +
+            '<button type="button" class="plus" onclick="sv2StepQty(' + it.component_id + ',1)">+</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
     html += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
       '<div class="sup-shop-group-head">' +
         '<div class="sup-shop-group-name">' +
@@ -6044,7 +6105,10 @@ function renderSupplyShopping(d) {
           '</div>'
         : ''
       ) +
-      '<table class="sup-shop-table">' +
+      // v2.45.442: новый вид (карточки sv2) для групп с поставщиком — под переключателем; старый (таблица) — для отката
+      ((window.SUPPLY_SHOP_V2 && !noSupplier)
+        ? ('<div class="sv2-list">' + itemCardsV2 + '</div>')
+        : ('<table class="sup-shop-table">' +
         '<thead><tr>' +
           (noSupplier
             ? '<th class="ns-check-cell"><label class="ns-check-label"><input type="checkbox" id="ns-check-all" onchange="onNoSupCheckAll(this)" title="Выбрать все"></label></th>'
@@ -6058,7 +6122,8 @@ function renderSupplyShopping(d) {
           '<th style="width:40px;"></th>' +
         '</tr></thead>' +
         '<tbody>' + itemRows + '</tbody>' +
-      '</table>' +
+      '</table>')
+      ) +
     '</div>';
   });
   container.innerHTML = html;
