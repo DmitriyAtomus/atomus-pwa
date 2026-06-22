@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.455";
+const APP_VERSION = "v2.45.456";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -11929,6 +11929,161 @@ function addCustomOfferItem() {
   });
   closeSaleProductPickModal();
   renderOfferForm();
+}
+
+// ============================================================================
+// v2.45.456: Excel-прайс при составлении КП — открыть и листать «как в Excel»
+// (с фото), кликнуть по строке → позиция добавляется в КП с ценой.
+// ============================================================================
+var _salePriceState = { fid: null, uploadFile: null, sheets: null, added: 0 };
+
+function _salePriceModalEl() {
+  var m = document.getElementById('sale-price-viewer-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sale-price-viewer-modal';
+    m.className = 'modal-overlay';
+    m.onclick = function (e) { if (e.target === m) closeSalePriceViewer(); };
+    document.body.appendChild(m);
+  }
+  return m;
+}
+
+async function openSalePriceViewer() {
+  var m = _salePriceModalEl();
+  _salePriceState.added = 0;
+  m.innerHTML =
+    '<div class="modal spv-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-spreadsheet"></i> Excel-прайс — выбрать позицию в КП</h3>' +
+        '<button class="icon-btn" onclick="closeSalePriceViewer()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="spv-bar">' +
+        '<label class="btn btn-secondary spv-upload"><i class="ti ti-upload"></i> Загрузить прайс' +
+          '<input type="file" accept=".xlsx" style="display:none" onchange="onSalePriceUpload(this)"></label>' +
+        '<div class="spv-files" id="spv-files"></div>' +
+      '</div>' +
+      '<div class="spv-hint" id="spv-hint">Загрузите Excel-прайс (.xlsx) или выберите ранее загруженный — он откроется таблицей, как в Excel (с фото). Кликните по строке с моделью, чтобы добавить её в КП с ценой.</div>' +
+      '<div class="modal-body spv-body" id="spv-body"></div>' +
+      '<div class="spv-foot">' +
+        '<span id="spv-added" class="spv-added"></span>' +
+        '<button class="btn btn-primary" onclick="closeSalePriceViewer()"><i class="ti ti-check"></i> Готово</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  await _salePriceLoadFiles();
+}
+
+function closeSalePriceViewer() {
+  var m = document.getElementById('sale-price-viewer-modal');
+  if (m) m.classList.remove('visible');
+  closeSaleProductPickModal();
+  if (state.offerForm) renderOfferForm();
+}
+
+async function _salePriceLoadFiles() {
+  var box = document.getElementById('spv-files');
+  if (!box) return;
+  try {
+    var r = await apiGet('/api/sale-price-files');
+    var files = (r && r.files) || [];
+    if (!files.length) { box.innerHTML = '<span class="spv-files-empty">Сохранённых прайсов пока нет</span>'; return; }
+    box.innerHTML = files.map(function (f) {
+      var lbl = f.label || f.file_name || ('Прайс #' + f.id);
+      return '<button class="spv-file-chip' + (_salePriceState.fid === f.id ? ' active' : '') + '" onclick="openSalePriceFileView(' + f.id + ')">' +
+        '<i class="ti ti-table"></i><span class="spv-file-name">' + escapeHtml(lbl) + '</span>' +
+        '<span class="spv-file-del" onclick="event.stopPropagation();deleteSalePriceFile(' + f.id + ')" title="Удалить"><i class="ti ti-x"></i></span>' +
+      '</button>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<span class="spv-files-empty">Не удалось загрузить список</span>'; }
+}
+
+async function onSalePriceUpload(input, sheetName) {
+  var file = sheetName ? _salePriceState.uploadFile : (input && input.files && input.files[0]);
+  if (!file) return;
+  _salePriceState.uploadFile = file;
+  var hint = document.getElementById('spv-hint');
+  if (hint) hint.innerHTML = '<div class="loading-block" style="margin:0;">Загружаем прайс…</div>';
+  var fd = new FormData();
+  fd.append('file', file, file.name);
+  if (sheetName) fd.append('sheet_name', sheetName);
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var resp = await fetch(API_BASE + '/api/sale-price-files', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+    var d = await resp.json().catch(function () { return {}; });
+    if (!resp.ok) { showToast(d.message || 'Не удалось загрузить', 'error'); if (hint) hint.textContent = ''; return; }
+    if (d.need_sheet && d.sheets && !sheetName) {
+      _salePriceState.sheets = d.sheets;
+      if (hint) hint.innerHTML = '<div class="spv-sheets"><span>В файле несколько листов — выберите нужный:</span>' +
+        d.sheets.map(function (s, i) { return '<button class="spv-sheet-btn" onclick="onSalePriceUploadSheet(' + i + ')">' + escapeHtml(s) + '</button>'; }).join('') +
+      '</div>';
+      return;
+    }
+    if (input) input.value = '';
+    await _salePriceLoadFiles();
+    if (d.price_file_id) openSalePriceFileView(d.price_file_id);
+  } catch (e) { showToast('Ошибка соединения', 'error'); if (hint) hint.textContent = ''; }
+}
+
+function onSalePriceUploadSheet(idx) {
+  var s = (_salePriceState.sheets || [])[idx];
+  if (s != null) onSalePriceUpload(null, s);
+}
+
+async function openSalePriceFileView(fid) {
+  _salePriceState.fid = fid;
+  var body = document.getElementById('spv-body');
+  var hint = document.getElementById('spv-hint');
+  if (hint) hint.textContent = 'Кликните по строке с моделью — она добавится в КП с ценой.';
+  if (body) body.innerHTML = '<div class="loading-block">Открываем прайс…</div>';
+  _salePriceLoadFiles();
+  try {
+    var r = await apiGet('/api/sale-price-files/' + fid + '/view');
+    if (body) body.innerHTML = '<div class="xls-wrap" onclick="_salePriceRowClick(event)">' + (r.html || '') + '</div>';
+  } catch (e) {
+    if (body) body.innerHTML = '<div class="empty-block">Не удалось открыть прайс. Возможно, файл утерян — загрузите заново.</div>';
+  }
+}
+
+function _salePriceRowClick(e) {
+  var tr = e.target.closest && e.target.closest('tr.xls-pick');
+  if (!tr) return;
+  var name = tr.getAttribute('data-pick') || '';
+  var price = parseFloat(tr.getAttribute('data-price') || '0') || 0;
+  if (!name) return;
+  addExcelRowToOffer(name, price);
+  tr.style.transition = 'background .2s';
+  tr.style.background = 'rgba(22,163,74,0.22)';
+  setTimeout(function () { tr.style.background = ''; }, 350);
+}
+
+function addExcelRowToOffer(name, price) {
+  if (!state.offerForm) { showToast('Откройте форму КП', 'error'); return; }
+  if (!Array.isArray(state.offerForm.items)) state.offerForm.items = [];
+  state.offerForm.items.push({
+    sale_product_id: null,
+    name: name,
+    description: '',
+    unit: 'шт.',
+    qty: 1,
+    price: Number(price) || 0,
+    discount_pct: 0,
+  });
+  _salePriceState.added = (_salePriceState.added || 0) + 1;
+  var addedEl = document.getElementById('spv-added');
+  if (addedEl) addedEl.textContent = 'Добавлено позиций: ' + _salePriceState.added;
+  showToast('В КП: ' + name + (price ? ' — ' + formatMoney(price) : ''), 'success');
+}
+
+async function deleteSalePriceFile(fid) {
+  if (!confirm('Удалить этот прайс-файл? Сами позиции в КП останутся.')) return;
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var r = await fetch(API_BASE + '/api/sale-price-files/' + fid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    if (_salePriceState.fid === fid) { _salePriceState.fid = null; var b = document.getElementById('spv-body'); if (b) b.innerHTML = ''; }
+    await _salePriceLoadFiles();
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 // --------- МЕНЮ «ЕЩЁ» ----------
