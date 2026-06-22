@@ -9747,8 +9747,11 @@ function renderOfferDetail(o) {
   html += '<button class="btn btn-secondary" onclick="downloadOfferDocx()" style="flex: 1; justify-content: center;">' +
           '<i class="ti ti-file-type-doc"></i> Word</button>';
   html += '</div>';
+  // «На печать» — отправляет КП на офисный принтер через шлюз документов
+  html += '<button class="btn btn-secondary" onclick="printOffer()" style="width: 100%; justify-content: center; margin-top: 8px;">' +
+          '<i class="ti ti-printer"></i> На печать</button>';
   html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; margin-top: 6px;">' +
-          'Предпросмотр — посмотреть, как выглядит КП · PDF — клиенту · Word — для правок' +
+          'Предпросмотр — посмотреть · PDF — клиенту · Word — править · «На печать» — на офисный принтер' +
           '</div>';
   html += '</div>';
 
@@ -9764,6 +9767,33 @@ function renderOfferDetail(o) {
   }
 
   container.innerHTML = html;
+}
+
+// Отправка КП на офисный принтер (печатает шлюз документов на сервере офиса).
+// Работает откуда угодно — задание встаёт в очередь, бумага выходит в офисе.
+async function printOffer() {
+  if (!state.currentOfferId) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  showToast('Отправляю на печать…', 'success');
+  try {
+    const r = await apiPost('/api/documents/print', {
+      doc_type: 'offer_pdf',
+      offer_id: state.currentOfferId,
+      copies: 1,
+    });
+    if (r.ok) {
+      showToast('Отправлено на офисный принтер', 'success');
+    } else {
+      const msg = (r.data && (r.data.message || r.data.error)) || 'Не удалось отправить на печать';
+      showToast(msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
 }
 
 async function downloadOfferPdf() {
