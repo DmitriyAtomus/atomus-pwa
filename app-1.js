@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.451";
+const APP_VERSION = "v2.45.452";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9405,6 +9405,8 @@ state.offerFormMode = 'new';                  // 'new' или 'edit'
 state.offerForm = {
   manager_id: null,
   manager_name: '',
+  calculated_by_id: null,
+  calculated_by_name: '',
   contractor_id: null,
   contractor_name: '',
   contractor_inn: '',
@@ -9639,6 +9641,10 @@ function renderOfferDetail(o) {
           '</div></div>';
   html += '<div class="detail-item"><div class="detail-label">Менеджер</div>' +
           '<div class="detail-value">' + escapeHtml(o.manager_name || '—') + '</div></div>';
+  if (o.calc_by_name || o.calc_by_full_name) {
+    html += '<div class="detail-item"><div class="detail-label">Рассчитал</div>' +
+            '<div class="detail-value">' + escapeHtml(o.calc_by_name || o.calc_by_full_name) + '</div></div>';
+  }
   // ЭТАП 16А: срок действия — приоритет у длительности
   let validText = 'не указан';
   let validHasValue = false;
@@ -9960,6 +9966,8 @@ function openNewOffer() {
   state.offerForm = {
     manager_id: defaultManagerId,
     manager_name: defaultManagerName,
+    calculated_by_id: null,
+    calculated_by_name: '',
     contractor_id: null, contractor_name: '', contractor_inn: '',
     legal_entity: 'ooo_atomus',
     valid_until: '',                       // ЭТАП 16А: считается на бэке
@@ -10002,6 +10010,8 @@ async function openEditOffer() {
     state.offerForm = {
       manager_id: o.manager_id,
       manager_name: o.manager_name || o.manager_full_name || '',
+      calculated_by_id: o.calculated_by_id || null,
+      calculated_by_name: o.calc_by_name || o.calc_by_full_name || '',
       contractor_id: o.contractor_id,
       contractor_name: o.contractor_name || '',
       contractor_inn: o.contractor_inn || '',
@@ -10075,6 +10085,22 @@ function renderOfferForm() {
   }
   html += '<i class="ti ti-chevron-right chev"></i>';
   html += '</div></div>';
+
+  // Рассчитал (необязательно)
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Рассчитал</div>';
+  html += '<div class="contractor-selector" onclick="openCalcModalForOffer()">';
+  if (f.calculated_by_id) {
+    html += '<div class="selected-text"><div class="selected-name">' + escapeHtml(f.calculated_by_name || '—') + '</div></div>';
+  } else {
+    html += '<div class="selected-text"><div class="placeholder">Кто рассчитал КП (необязательно)…</div></div>';
+  }
+  html += '<i class="ti ti-chevron-right chev"></i>';
+  html += '</div>';
+  if (f.calculated_by_id) {
+    html += '<div style="margin-top:6px;"><button type="button" class="btn-link" onclick="clearOfferCalc(event)">Убрать</button></div>';
+  }
+  html += '</div>';
 
   // Контрагент
   html += '<div class="sales-form-section">';
@@ -10274,6 +10300,7 @@ async function submitOfferForm() {
 
   const payload = {
     manager_id: f.manager_id,
+    calculated_by_id: f.calculated_by_id || null,
     contractor_id: f.contractor_id,
     legal_entity: f.legal_entity,
     // ЭТАП 16А: длительность вместо явной даты — valid_until посчитается на бэке
@@ -10341,6 +10368,19 @@ async function submitOfferForm() {
 function openManagerModalForOffer() {
   state._managerModalContext = 'offer';
   openManagerModal();
+}
+
+// «Рассчитал» для КП — тот же пикер сотрудников, отдельный контекст.
+function openCalcModalForOffer() {
+  state._managerModalContext = 'offer_calc';
+  openManagerModal();
+}
+
+function clearOfferCalc(e) {
+  if (e) e.stopPropagation();
+  state.offerForm.calculated_by_id = null;
+  state.offerForm.calculated_by_name = '';
+  renderOfferForm();
 }
 
 // selectManager живёт в app-4.js (там объявление function selectManager,

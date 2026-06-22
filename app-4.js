@@ -3232,6 +3232,22 @@ function selectManager(managerId) {
     if (typeof renderOfferForm === 'function') renderOfferForm();
     return;
   }
+  if (state._managerModalContext === 'offer_calc') {
+    // «Рассчитал» в КП — необязательный сотрудник
+    if (managerId === null) {
+      state.offerForm.calculated_by_id = null;
+      state.offerForm.calculated_by_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.calculated_by_id = managerId;
+        state.offerForm.calculated_by_name = m.short_name || m.full_name || '';
+      }
+    }
+    closeManagerModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   if (managerId === null) {
     state.contractForm.manager_id = null;
     state.contractForm._manager_name = '';
