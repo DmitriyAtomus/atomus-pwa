@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.460-kp-tracker";
+const APP_VERSION = "v2.45.461-kp-tracker";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9979,7 +9979,9 @@ function renderOfferTracker(el, d, offerId) {
   if (links.length) {
     h += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);margin:6px 0 6px;">Кому отправляли</div>';
     links.forEach(l => {
-      const safeUrl = escapeHtml((l.url || '').replace(/'/g, "\\'"));
+      // Ссылку строим от текущего домена приложения (как все публичные ссылки)
+      const url = window.location.origin + '/kp/' + l.token;
+      const safeUrl = escapeHtml(url.replace(/'/g, "\\'"));
       h += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;' + (l.is_active ? '' : 'opacity:.5;') + '">';
       h += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">';
       h += '<div style="font-weight:600;font-size:13.5px;">' + escapeHtml(l.recipient_name || 'Без имени') + (l.is_active ? '' : ' <span style="font-weight:400;color:var(--text-light);">(отозвана)</span>') + '</div>';
@@ -9987,7 +9989,7 @@ function renderOfferTracker(el, d, offerId) {
       h += '</div>';
       if (l.last_view_at) h += '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">последний просмотр ' + _kpEventTime(l.last_view_at) + '</div>';
       h += '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">';
-      h += '<input readonly value="' + escapeHtml(l.url || '') + '" onclick="this.select()" style="flex:1;min-width:140px;font-size:12px;font-family:monospace;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#fff;">';
+      h += '<input readonly value="' + escapeHtml(url) + '" onclick="this.select()" style="flex:1;min-width:140px;font-size:12px;font-family:monospace;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#fff;">';
       h += '<button class="btn btn-secondary btn-small" onclick="copyKpLink(\'' + safeUrl + '\')" title="Копировать"><i class="ti ti-copy"></i></button>';
       if (canEdit && l.is_active) h += '<button class="btn btn-secondary btn-small" onclick="deleteKpLink(' + l.id + ',' + offerId + ')" title="Отозвать"><i class="ti ti-trash"></i></button>';
       h += '</div></div>';
@@ -10038,7 +10040,7 @@ async function createKpLink(offerId) {
     if (!r.ok) throw new Error('http');
     const d = await r.json();
     await loadOfferTracker(offerId);
-    copyKpLink(d.url);
+    copyKpLink(window.location.origin + '/kp/' + d.token);
   } catch (e) {
     showToast('Не удалось создать ссылку', 'error');
   }
