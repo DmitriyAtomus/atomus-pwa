@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.450";
+const APP_VERSION = "v2.45.451";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9739,14 +9739,16 @@ function renderOfferDetail(o) {
 
   // Кнопка «Скачать PDF» + «Скачать Word» (для всех авторизованных) — ЭТАП 17
   html += '<div style="padding: 12px 18px 14px;">';
+  html += '<button class="btn btn-primary" onclick="previewOfferPdf()" style="width: 100%; justify-content: center; margin-bottom: 8px;">' +
+          '<i class="ti ti-eye"></i> Предпросмотр</button>';
   html += '<div style="display: flex; gap: 8px;">';
-  html += '<button class="btn btn-primary" onclick="downloadOfferPdf()" style="flex: 1; justify-content: center;">' +
+  html += '<button class="btn btn-secondary" onclick="downloadOfferPdf()" style="flex: 1; justify-content: center;">' +
           '<i class="ti ti-file-download"></i> PDF</button>';
   html += '<button class="btn btn-secondary" onclick="downloadOfferDocx()" style="flex: 1; justify-content: center;">' +
           '<i class="ti ti-file-type-doc"></i> Word</button>';
   html += '</div>';
   html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; margin-top: 6px;">' +
-          'PDF — для отправки клиенту, Word — для редактирования' +
+          'Предпросмотр — посмотреть, как выглядит КП · PDF — клиенту · Word — для правок' +
           '</div>';
   html += '</div>';
 
@@ -9790,6 +9792,40 @@ async function downloadOfferPdf() {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
+// Предпросмотр КП: открываем PDF во вкладке для быстрого просмотра «как выглядит».
+// Тот же PDF, что и «Скачать», но цель — посмотреть, а не сохранить.
+async function previewOfferPdf() {
+  if (!state.currentOfferId) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  // Вкладку открываем синхронно (в обработчике клика), иначе после await её
+  // заблокирует попап-блокировщик. Потом подменим адрес на готовый PDF.
+  const win = window.open('', '_blank');
+  showToast('Готовим предпросмотр…', 'success');
+  try {
+    const r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId + '/pdf', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось открыть предпросмотр';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      if (win) win.close();
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    if (win) { win.location = url; } else { window.open(url, '_blank'); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+    if (win) win.close();
   }
 }
 
