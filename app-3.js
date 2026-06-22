@@ -5307,6 +5307,27 @@ const _CP_ORDER_STATUS_RU = {
 };
 
 function _cpRowHtml(it) {
+  // v2.45.443: новый вид (карточка buy-item с галочкой/«К заказу») — под переключателем
+  if (window.SUPPLY_SHOP_V2) {
+    let st2;
+    if (it.purchase_status === 'ordered') {
+      const s2 = _CP_ORDER_STATUS_RU[it.order_status];
+      st2 = '<span class="sv2-buy-status ordered">' + escapeHtml(s2 ? s2[0] : 'Заказано') + '</span>';
+    } else {
+      st2 = '<span class="sv2-buy-status todo">К заказу</span>';
+    }
+    const sName2 = JSON.stringify(it.item_name || '').replace(/"/g, '&quot;');
+    return '<div class="sv2-buy">' +
+      '<input type="checkbox" class="cp-check sv2-buy-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
+      '<div class="sv2-buy-body" onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" title="Открыть договор">' +
+        '<div class="sv2-buy-title">' + escapeHtml(it.item_name || '—') + '</div>' +
+        '<div class="sv2-buy-meta">договор ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</div>' +
+      '</div>' +
+      '<span class="sv2-buy-qty">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+      st2 +
+      '<button type="button" class="sv2-buy-x" title="Убрать из закупки (в договоре останется)" onclick="event.stopPropagation();_cpSkipItem(' + it.id + ',' + sName2 + ')"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  }
   let stBadge;
   if (it.purchase_status === 'ordered') {
     const st = _CP_ORDER_STATUS_RU[it.order_status];
@@ -5827,6 +5848,22 @@ function shopEditQty(componentId, currentQty, unit) {
   _shopSaveQtyMap(map);
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
+// v2.45.442: степпер количества в новом виде — меняет число и сохраняет, без полной перезагрузки
+function sv2StepQty(componentId, delta) {
+  const span = document.getElementById('sv2-qty-' + componentId);
+  let n = (span ? (parseFloat(span.textContent) || 0) : 0) + delta;
+  if (n < 0) n = 0;
+  if (span) span.textContent = String(n);
+  const map = _shopGetQtyMap();
+  map[componentId] = n;
+  _shopSaveQtyMap(map);
+}
+// v2.45.442: переключение нового/старого вида «Что закупить» (для отката)
+function toggleSupplyShopV2() {
+  const cur = localStorage.getItem('supplyShopV2') !== '0';
+  localStorage.setItem('supplyShopV2', cur ? '0' : '1');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
 // Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
@@ -5850,6 +5887,8 @@ function _shopApplyLocal(items) {
 function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
+  // v2.45.443: флаг нового вида ставим ДО сборки блоков (cpBlock использует его в _cpRowHtml)
+  window.SUPPLY_SHOP_V2 = localStorage.getItem('supplyShopV2') !== '0';
   const groups = (d && d.groups) || [];
   const cpItems = (d && d._contract_purchases) || [];
   const cpBlock = _contractPurchasesBlockHtml(cpItems);
@@ -5887,7 +5926,15 @@ function renderSupplyShopping(d) {
       '</div></div>';
     return;
   }
-  let html = cpBlock + waitingBlock + hiddenToolbar;
+  // v2.45.442: переключатель нового/старого вида «Что закупить» (для отката)
+  const v2Toggle = '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SUPPLY_SHOP_V2 ? 'sparkles' : 'history') + '"></i> ' +
+        (window.SUPPLY_SHOP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleSupplyShopV2()">' +
+        (window.SUPPLY_SHOP_V2 ? 'Вернуть старый' : 'Включить новый') +
+      '</button>' +
+    '</div>';
+  let html = v2Toggle + cpBlock + waitingBlock + hiddenToolbar;
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
@@ -5986,6 +6033,42 @@ function renderSupplyShopping(d) {
         removeCell +
       '</tr>';
     }).join('');
+
+    // v2.45.442 (редизайн Снабжения, под переключателем): позиции карточками sv2 + степпер
+    const itemCardsV2 = (g.items || []).map(it => {
+      const crit = it.is_critical ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>' : '';
+      const low = !!(it.reason && it.reason.indexOf('низкий остаток') !== -1);
+      const plan = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
+      let tags = '';
+      if (low) tags += '<span class="sv2-tag warn"><i class="ti ti-arrow-down"></i>низкий остаток</span>';
+      if (plan.length) {
+        const shown = plan.slice(0, 3).map(n => '№' + n).join(', ') + (plan.length > 3 ? ' +' + (plan.length - 3) : '');
+        tags += '<span class="sv2-tag proj"><i class="ti ti-briefcase"></i>' + escapeHtml(shown) + '</span>';
+      } else if (low) {
+        tags += '<span class="sv2-tag neutral"><i class="ti ti-building-warehouse"></i>на склад</span>';
+      }
+      const sName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
+      const q = Number(it.recommended_qty) || 0;
+      return '<div class="sv2-item">' +
+        '<div class="sv2-item-top">' +
+          '<div class="sv2-item-body" onclick="openComponentDetail(' + it.component_id + ')">' +
+            '<div class="sv2-item-name">' + crit + escapeHtml(it.component_name || '') +
+              (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
+            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b></div>' +
+          '</div>' +
+          '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div class="sv2-item-bottom">' +
+          '<div class="sv2-tags">' + tags + '</div>' +
+          '<div class="sv2-stepper">' +
+            '<button type="button" onclick="sv2StepQty(' + it.component_id + ',-1)">−</button>' +
+            '<span class="val" id="sv2-qty-' + it.component_id + '">' + escapeHtml(String(q)) + '</span>' +
+            '<button type="button" class="plus" onclick="sv2StepQty(' + it.component_id + ',1)">+</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
     html += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
       '<div class="sup-shop-group-head">' +
         '<div class="sup-shop-group-name">' +
@@ -6044,7 +6127,10 @@ function renderSupplyShopping(d) {
           '</div>'
         : ''
       ) +
-      '<table class="sup-shop-table">' +
+      // v2.45.442: новый вид (карточки sv2) для групп с поставщиком — под переключателем; старый (таблица) — для отката
+      ((window.SUPPLY_SHOP_V2 && !noSupplier)
+        ? ('<div class="sv2-list">' + itemCardsV2 + '</div>')
+        : ('<table class="sup-shop-table">' +
         '<thead><tr>' +
           (noSupplier
             ? '<th class="ns-check-cell"><label class="ns-check-label"><input type="checkbox" id="ns-check-all" onchange="onNoSupCheckAll(this)" title="Выбрать все"></label></th>'
@@ -6058,10 +6144,13 @@ function renderSupplyShopping(d) {
           '<th style="width:40px;"></th>' +
         '</tr></thead>' +
         '<tbody>' + itemRows + '</tbody>' +
-      '</table>' +
+      '</table>')
+      ) +
     '</div>';
   });
   container.innerHTML = html;
+  // v2.45.444: кардинальный новый вид — класс на контейнере перекрывает стили групп/шапок
+  container.classList.toggle('sv2-mode', !!window.SUPPLY_SHOP_V2);
 }
 
 /* ============ ЭТАП 52 (v2.44.73): заказ из shopping-list с превью ============ */
@@ -10927,6 +11016,108 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.458',
+    date: '22.06.2026',
+    title: 'Excel-прайс в КП: во весь экран, крупнее фото, ровный текст',
+    features: [
+      'В просмотрщике Excel-прайса появилась кнопка <b>«Во весь экран»</b> — таблицу удобно листать целиком',
+      'Фотографии моделей стали <b>крупнее и чётче</b>',
+      'Текст в ячейках <b>больше не рвётся по буквам</b> — колонки подстраиваются под содержимое, надписи читаются нормально',
+    ],
+  },
+  {
+    version: 'v2.45.457',
+    date: '22.06.2026',
+    title: 'Excel-прайс для КП: открываются и старые форматы',
+    features: [
+      'При загрузке прайса в КП теперь видны и выбираются файлы <b>.xls</b> и <b>.xlsm</b>, а не только .xlsx — раньше старый прайс «не находился» в окне выбора',
+      'Старый формат .xls тоже открывается таблицей с кликабельными позициями (без фото — этот формат их не хранит)',
+    ],
+  },
+  {
+    version: 'v2.45.456',
+    date: '22.06.2026',
+    title: 'КП: добавляйте позиции прямо из Excel-прайса',
+    features: [
+      'При составлении КП в окне «Добавить позицию» появилась вкладка <b>«Excel-прайс»</b> — загрузите .xlsx, и он откроется <b>прямо в приложении как таблица, с фотографиями</b>, как в Excel',
+      'Кликните по строке с моделью — <b>позиция сразу добавится в КП с ценой</b>; можно набрать так всё КП, листая прайс',
+      'Загруженные прайсы сохраняются — их можно переоткрывать в любом КП, не загружая заново',
+    ],
+  },
+  {
+    version: 'v2.45.455',
+    date: '22.06.2026',
+    title: 'Список КП: видно, кто рассчитал',
+    features: [
+      'В списке КП рядом с <b>менеджером</b> теперь показывается, <b>кто рассчитал</b> КП (если указано) — раньше это было видно только в карточке и в PDF',
+    ],
+  },
+  {
+    version: 'v2.45.454',
+    date: '22.06.2026',
+    title: 'Продажная номенклатура: импорт прайса из Excel',
+    features: [
+      'На странице <b>«Продажная номенклатура»</b> появилась кнопка <b>«Прайс из Excel»</b> — загрузите .xlsx, и позиции с ценами зальются автоматически',
+      'Сервер сам находит колонки <b>«Наименование»</b> и <b>«Цена»</b> по заголовкам; каждый <b>лист</b> книги становится отдельной <b>группой</b> (папкой)',
+      'Позиция с тем же названием в выбранной категории <b>обновится ценой</b>, новые — добавятся; каталожные позиции (с артикулом) не затрагиваются',
+    ],
+  },
+  {
+    version: 'v2.45.453',
+    date: '22.06.2026',
+    title: 'Монтаж: чат и файлы прямо в карточке',
+    features: [
+      'В карточке монтажа теперь есть <b>чат и прикрепление файлов по договору</b> — встроены прямо в карточку (ниже отчётов), отдельное окно больше не открывается',
+      'Монтажник, менеджер и директор переписываются и обмениваются фото/документами по объекту в одном месте — сообщения общие с чатом договора',
+    ],
+  },
+  {
+    version: 'v2.45.452',
+    date: '22.06.2026',
+    title: 'КП: поле «Рассчитал» + аккуратнее шапка PDF',
+    features: [
+      'В форме КП появилось необязательное поле <b>«Рассчитал»</b> — можно указать сотрудника, который считал КП (если это не менеджер)',
+      'В PDF добавлен блок <b>«Менеджер / Рассчитал»</b>, а блок «Кому / От кого» сделан компактнее',
+    ],
+  },
+  {
+    version: 'v2.45.451',
+    date: '22.06.2026',
+    title: 'КП: предпросмотр + обновлённый PDF (Times New Roman 12)',
+    features: [
+      'В открытом КП появилась кнопка <b>«Предпросмотр»</b> — открывает PDF во вкладке, чтобы сразу посмотреть, как будет выглядеть документ, не скачивая',
+      'Сам PDF переоформлен: шрифт <b>Times New Roman 12</b>, уже боковые поля, а суммы в таблице больше не переносятся на две строки',
+    ],
+  },
+  {
+    version: 'v2.45.450',
+    date: '22.06.2026',
+    title: 'КП: цена и количество вводятся нормально',
+    features: [
+      'В позициях <b>«Новое КП»</b> поля <b>«Цена»</b>, <b>«Кол-во»</b> и <b>«Скидка»</b> больше не теряют фокус после каждой цифры — теперь сумму можно набрать одним заходом',
+      'Сумма позиции и общий итог по-прежнему пересчитываются на лету, прямо во время ввода',
+    ],
+  },
+  {
+    version: 'v2.45.449',
+    date: '22.06.2026',
+    title: 'Черновик КП не теряется при обновлении страницы',
+    features: [
+      'Начатое <b>«Новое КП»</b> теперь сохраняется автоматически — если случайно обновить страницу или закрыть вкладку, при возврате форма восстановится с баннером «Восстановлен черновик незаконченного КП»',
+      'Раньше сохранялось только то, что вводилось руками; выбор <b>менеджера, контрагента, юрлица и позиций</b> через окошки не попадал в черновик. Теперь попадает всё',
+      'Очистить черновик можно кнопкой «Очистить» в баннере или просто создав КП',
+    ],
+  },
+  {
+    version: 'v2.45.448',
+    date: '22.06.2026',
+    title: 'КП: менеджер и контрагент снова сохраняются',
+    features: [
+      'В форме <b>«Новое КП»</b> снова выбираются <b>менеджер</b> и <b>контрагент</b> — раньше выбор в окне не закреплялся и поле оставалось пустым',
+      'Причина была техническая: обработчик выбора в КП перекрывался обработчиком из формы договора. Теперь у КП и договора свои независимые обработчики',
+    ],
+  },
   {
     version: 'v2.45.436',
     date: '19.06.2026',

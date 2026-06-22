@@ -3039,6 +3039,9 @@ function openContractorModal() {
 
 function closeContractorModal() {
   document.getElementById('contractor-modal').classList.remove('visible');
+  // Сбрасываем контекст КП, чтобы он не «прилип» к форме договора, если
+  // модалку закрыли крестиком без выбора.
+  state._contractorModalContext = null;
 }
 
 async function loadContractorsForModal(query) {
@@ -3086,6 +3089,17 @@ async function loadContractorsForModal(query) {
 function selectContractor(contractorId) {
   const c = (cache.contractors || []).find(x => x.id === contractorId);
   if (!c) return;
+  // КП (offerForm) — отдельный контекст, см. openContractorModalForOffer.
+  // Эта функция — единственная (объявление в app-4 перекрывает прежний
+  // window.selectContractor из app-1), поэтому оба контекста живут здесь.
+  if (state._contractorModalContext === 'offer') {
+    state.offerForm.contractor_id = contractorId;
+    state.offerForm.contractor_name = c.name;
+    state.offerForm.contractor_inn = c.inn || '';
+    closeContractorModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   state.contractForm.contractor_id = contractorId;
   state.contractForm._contractor_name = c.name;
   state.contractForm._contractor_inn = c.inn || '';
@@ -3112,6 +3126,9 @@ function openManagerModal(mode) {
 
 function closeManagerModal() {
   document.getElementById('manager-modal').classList.remove('visible');
+  // Сбрасываем контекст КП, чтобы он не «прилип» к форме договора, если
+  // модалку закрыли крестиком без выбора.
+  state._managerModalContext = null;
   if (state._managerPickMode === 'co') {
     state._managerPickMode = 'main';
     if (typeof renderContractForm === 'function') renderContractForm();
@@ -3197,6 +3214,40 @@ async function loadManagersForModal(query) {
 }
 
 function selectManager(managerId) {
+  // КП (offerForm) — отдельный контекст, см. openManagerModalForOffer.
+  // Эта функция — единственная (объявление в app-4 перекрывает прежний
+  // window.selectManager из app-1), поэтому оба контекста живут здесь.
+  if (state._managerModalContext === 'offer') {
+    if (managerId === null) {
+      state.offerForm.manager_id = null;
+      state.offerForm.manager_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.manager_id = managerId;
+        state.offerForm.manager_name = m.short_name || m.full_name || '';
+      }
+    }
+    closeManagerModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
+  if (state._managerModalContext === 'offer_calc') {
+    // «Рассчитал» в КП — необязательный сотрудник
+    if (managerId === null) {
+      state.offerForm.calculated_by_id = null;
+      state.offerForm.calculated_by_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.calculated_by_id = managerId;
+        state.offerForm.calculated_by_name = m.short_name || m.full_name || '';
+      }
+    }
+    closeManagerModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   if (managerId === null) {
     state.contractForm.manager_id = null;
     state.contractForm._manager_name = '';
@@ -12349,6 +12400,11 @@ async function openInstallationDetail(id) {
   m.classList.add('visible');
   try {
     var d = await apiGet('/api/installations/' + id);
+    // v2.45.445: список монтажников для назначения прямо из карточки (только управляющим)
+    if (d && d.can_manage) {
+      try { var _ir = await apiGet('/api/installations/installers'); d._installers = (_ir && _ir.installers) || []; }
+      catch (_) { d._installers = []; }
+    }
     _renderInstallationDetail(d);
   } catch (e) {
     m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;"><div class="empty-block">' + escapeHtml(String(e.message || e)) + '</div></div>';
@@ -12358,6 +12414,7 @@ async function openInstallationDetail(id) {
 function _renderInstallationDetail(d) {
   var m = _installModalEl();
   _installReportFiles = [];
+  _montageChatFiles = [];
   var color = _installStatusColor(d.status);
   var canManage = !!d.can_manage;
   var canReport = !!d.can_report;
@@ -12453,6 +12510,45 @@ function _renderInstallationDetail(d) {
   });
   if (itemsHtml) itemsHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-clipboard-list"></i> Что нужно сделать по договору</div>' + itemsHtml + '</div>';
 
+  // v2.45.447: спецификация договора (что монтировать) — для исполнителя
+  var specHtml = '';
+  if (d.contract_spec && d.contract_spec.length) {
+    specHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-list-details"></i> Спецификация — что монтировать <span class="idi-cnt">' + d.contract_spec.length + '</span></div>';
+    d.contract_spec.forEach(function (s) {
+      specHtml += '<div class="idi-row"><span class="idi-name">' + escapeHtml(s.name || '—') + '</span>' +
+        '<span class="idi-meta">' + (parseFloat(s.qty) || 0) + ' ' + escapeHtml(s.unit || 'шт.') + '</span></div>';
+    });
+    specHtml += '</div>';
+  }
+  // v2.45.448: встроенный чат+файлы по договору прямо в карточке (не отдельное окно)
+  var chatBlock = d.contract_id ? (
+    '<div class="imc-chat">' +
+      '<div class="imc-chat-title"><i class="ti ti-message-circle"></i> Чат и файлы по договору</div>' +
+      '<div class="imc-chat-msgs" id="imc-chat-msgs"><div class="imc-empty">Загружаем…</div></div>' +
+      '<textarea id="imc-chat-input" class="imc-chat-ta" rows="2" placeholder="Написать сообщение / вопрос по объекту…"></textarea>' +
+      '<div class="imc-chat-actions">' +
+        '<label class="imc-chat-attach"><i class="ti ti-paperclip"></i> Файл' +
+          '<input type="file" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display:none" onchange="onMontageChatFiles(this)"></label>' +
+        '<span id="imc-chat-files" class="imc-chat-files"></span>' +
+        '<button class="btn btn-primary imc-chat-send" onclick="sendMontageChat(' + d.contract_id + ')"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>'
+  ) : '';
+
+  // v2.45.445: назначение монтажника прямо в карточке (управляющим)
+  var assigneeCtrl = '';
+  if (canManage) {
+    var _ins = d._installers || [];
+    var _opts = '<option value="">— не назначен —</option>' + _ins.map(function (e) {
+      return '<option value="' + e.id + '"' + (String(d.assigned_employee_id) === String(e.id) ? ' selected' : '') + '>' + escapeHtml(e.name) + '</option>';
+    }).join('');
+    assigneeCtrl = '<div class="idet-assignee">' +
+      '<span class="idet-assignee-label"><i class="ti ti-user-cog"></i> Монтажник</span>' +
+      '<select class="idet-assignee-select" onchange="assignInstallationInstaller(' + d.id + ', this.value)">' + _opts + '</select>' +
+      (_ins.length ? '' : '<div class="idet-assignee-hint">Нет монтажников — заведите сотрудника с правом «Монтаж»</div>') +
+    '</div>';
+  }
+
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
       '<div class="modal-header">' +
@@ -12465,16 +12561,33 @@ function _renderInstallationDetail(d) {
           '<div style="display:flex;gap:6px;">' + manageBtns + '</div>' +
         '</div>' +
         (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
-        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Что монтировать:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
+        assigneeCtrl +
+        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Детали для монтажника:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
         itemsHtml +
+        specHtml +
         '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
         '<div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">' + flowHtml + '</div>' +
         '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
         reportsHtml +
         reportForm +
+        chatBlock +
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  // v2.45.448: подгрузить встроенный чат по договору
+  if (d.contract_id) loadMontageChat(d.contract_id);
+}
+
+// v2.45.445: назначить/сменить монтажника прямо из карточки монтажа
+async function assignInstallationInstaller(installationId, empId) {
+  try {
+    await apiPatch('/api/installations/' + installationId, { assigned_employee_id: empId ? parseInt(empId, 10) : null });
+    if (typeof showToast === 'function') showToast(empId ? 'Монтажник назначен' : 'Назначение снято', 'success');
+    await openInstallationDetail(installationId);
+    if (typeof loadInstallationList === 'function') loadInstallationList();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось назначить монтажника', 'error');
+  }
 }
 
 function onInstallReportFiles(input) {
@@ -12499,6 +12612,112 @@ function renderInstallReportFiles() {
 function removeInstallReportFile(i) {
   _installReportFiles.splice(i, 1);
   renderInstallReportFiles();
+}
+
+// v2.45.448: встроенный чат+файлы по договору прямо в карточке монтажа
+// (переиспользуем backend контрактного чата /api/contracts/{id}/chat)
+var _montageChatFiles = [];
+
+async function loadMontageChat(cid) {
+  var box = document.getElementById('imc-chat-msgs');
+  if (!box) return;
+  try {
+    var r = await apiGet('/api/contracts/' + cid + '/chat');
+    _renderMontageChatMsgs(r);
+  } catch (e) {
+    box.innerHTML = '<div class="imc-empty">Не удалось загрузить чат</div>';
+  }
+}
+
+function _renderMontageChatMsgs(r) {
+  var box = document.getElementById('imc-chat-msgs');
+  if (!box) return;
+  var msgs = (r && r.messages) || [];
+  var myId = r && r.my_chat_id;
+  if (!msgs.length) {
+    box.innerHTML = '<div class="imc-empty">Сообщений пока нет. Напишите первое — все по договору увидят.</div>';
+    return;
+  }
+  var html = '';
+  msgs.forEach(function (m) {
+    var time = (m.created_at || '').slice(11, 16);
+    if (m.is_system) {
+      html += '<div class="imc-sys">' + escapeHtml(m.text || '') + (time ? ' · ' + escapeHtml(time) : '') + '</div>';
+      return;
+    }
+    var isMine = (m.author_chat_id === myId);
+    var author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
+    var filesHtml = '';
+    (m.files || []).forEach(function (f) {
+      var url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      if (f.kind === 'photo') {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-img"><img src="' + url + '" loading="lazy"></a>';
+      } else if (f.kind === 'video') {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-file"><i class="ti ti-video"></i><span>' + escapeHtml(f.original_name || 'Видео') + '</span></a>';
+      } else {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-file"><i class="ti ti-file"></i><span>' + escapeHtml(f.original_name || 'Файл') + '</span></a>';
+      }
+    });
+    html += '<div class="imc-msg' + (isMine ? ' mine' : '') + '">' +
+      '<div class="imc-author">' + escapeHtml(author) + (time ? ' · ' + escapeHtml(time) : '') + '</div>' +
+      (m.text ? '<div class="imc-text">' + escapeHtml(m.text).replace(/\n/g, '<br>') + '</div>' : '') +
+      (filesHtml ? '<div class="imc-files-row">' + filesHtml + '</div>' : '') +
+    '</div>';
+  });
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function onMontageChatFiles(input) {
+  Array.prototype.slice.call(input.files || []).forEach(function (f) {
+    if (_montageChatFiles.length < 5) _montageChatFiles.push(f);
+  });
+  input.value = '';
+  _renderMontageChatFiles();
+}
+
+function _renderMontageChatFiles() {
+  var box = document.getElementById('imc-chat-files');
+  if (!box) return;
+  box.innerHTML = _montageChatFiles.map(function (f, i) {
+    var isImg = (f.type || '').indexOf('image/') === 0;
+    return '<span class="imc-chip"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i>' +
+      '<span class="imc-chip-name">' + escapeHtml(f.name) + '</span>' +
+      '<button onclick="removeMontageChatFile(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button></span>';
+  }).join('');
+}
+
+function removeMontageChatFile(i) {
+  _montageChatFiles.splice(i, 1);
+  _renderMontageChatFiles();
+}
+
+async function sendMontageChat(cid) {
+  var inp = document.getElementById('imc-chat-input');
+  var text = (inp && inp.value || '').trim();
+  if (!text && !_montageChatFiles.length) { showToast('Напишите сообщение или прикрепите файл', 'error'); return; }
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var resp;
+    if (_montageChatFiles.length) {
+      var fd = new FormData();
+      if (text) fd.append('text', text);
+      _montageChatFiles.forEach(function (f, i) { fd.append('file_' + (i + 1), f, f.name); });
+      resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+      });
+    } else {
+      resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: text }),
+      });
+    }
+    if (!resp.ok) { var e = await resp.json().catch(function () { return {}; }); showToast(e.message || e.error || 'Не отправилось', 'error'); return; }
+    if (inp) inp.value = '';
+    _montageChatFiles = [];
+    _renderMontageChatFiles();
+    await loadMontageChat(cid);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 async function submitInstallationReport(id) {
@@ -12566,7 +12785,7 @@ async function _openInstallationForm(inst) {
         '<h3><i class="ti ti-tools"></i> ' + (isEdit ? 'Изменить монтаж' : 'Новый монтаж') + '</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:10px;">' +
+      '<div class="if-form" style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:14px;">' +
         '<label>Что монтировать <span style="color:var(--danger,#B91C1C)">*</span><input type="text" id="if-title" value="' + escapeHtml(inst && inst.title || '') + '" placeholder="Например: монтаж щита ЩУ-003 на объекте"></label>' +
         '<label>Адрес / объект<input type="text" id="if-address" value="' + escapeHtml(inst && inst.object_address || '') + '" placeholder="г. Челябинск, ул. …"></label>' +
         '<label>Дата монтажа<input type="date" id="if-date" value="' + escapeHtml(inst && inst.scheduled_date || '') + '"></label>' +

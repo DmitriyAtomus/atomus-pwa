@@ -10966,8 +10966,8 @@
     .sup-shop-table tr {
       display: grid;
       column-gap: 10px;
-      row-gap: 3px;
-      padding: 11px 13px;
+      row-gap: 2px;
+      padding: 9px 13px;
       border-bottom: 1px solid var(--border);
     }
     .sup-shop-table tr:last-child { border-bottom: none; }
@@ -12129,7 +12129,7 @@
   .ns-hint i { color: var(--brand); font-size: 14px; }
 
   /* ============ v2.45.340: «Что закупить» — единые бейджи, светлые шапки групп, аккуратные строки ============ */
-  .ssp-reason-wrap { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .ssp-reason-wrap { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; margin-top: 1px; }
   .sup-shop-reason { background: #EEF2F7; color: var(--text-mid); padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
   .ssp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
   .ssp-badge i { font-size: 12px; }
@@ -17986,6 +17986,36 @@
 }
 .xls-tbl .xls-imgs img { margin: 0; }
 
+/* v2.45.456: просмотрщик Excel-прайса при составлении КП */
+.spv-modal { max-width: 1400px; width: 97vw; height: 90vh; display: flex; flex-direction: column; transition: none; }
+.spv-modal.spv-full { max-width: none; width: 100vw; height: 100vh; border-radius: 0; }
+.spv-bar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--border, #E2E8F0); flex-wrap: wrap; }
+.spv-upload { flex: none; cursor: pointer; }
+.spv-files { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.spv-files-empty { font-size: 12.5px; color: var(--text-light, #94A3B8); align-self: center; }
+.spv-file-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 280px; background: var(--bg-soft, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 999px; padding: 6px 8px 6px 12px; font-size: 12.5px; color: var(--text-mid, #475569); cursor: pointer; }
+.spv-file-chip.active { background: #EAF2FB; border-color: #9CC2E6; color: #1E4E79; font-weight: 600; }
+.spv-file-chip i { color: var(--brand); flex: none; }
+.spv-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spv-file-del { display: inline-flex; padding: 2px; border-radius: 50%; color: var(--text-light, #94A3B8); }
+.spv-file-del:hover { background: rgba(0,0,0,.08); color: var(--danger, #B91C1C); }
+.spv-hint { padding: 10px 18px; font-size: 12.5px; color: var(--text-mid, #475569); background: #F8FAFC; border-bottom: 1px solid var(--border, #E2E8F0); line-height: 1.45; }
+.spv-sheets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.spv-sheets > span { font-weight: 600; }
+.spv-sheet-btn { border: 1px solid var(--brand); color: var(--brand); background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.spv-sheet-btn:hover { background: var(--brand); color: #fff; }
+.spv-body { flex: 1; overflow: auto; padding: 12px 14px; }
+.spv-foot { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--border, #E2E8F0); background: var(--bg, #fff); }
+.spv-added { flex: 1; font-size: 13px; font-weight: 600; color: #16A34A; }
+@media (max-width: 640px) { .spv-modal { width: 100vw; height: 92vh; max-width: none; border-radius: 0; } }
+/* v2.45.458: в КП-просмотрщике колонки по содержимому (текст не рвётся по буквам),
+   крупнее шрифт и фото. Затрагивает только этот просмотрщик (не прайсы поставщиков). */
+.spv-body .xls-tbl { table-layout: auto !important; width: auto !important; font-size: 12.5px; line-height: 1.35; }
+.spv-body .xls-tbl col { width: auto !important; }
+.spv-body .xls-tbl td { min-width: 0; max-width: 360px; padding: 4px 9px; word-break: normal; overflow-wrap: break-word; hyphens: none; }
+.spv-body .xls-tbl img { max-width: 240px; max-height: 180px; }
+.spv-body .xls-tbl .xls-imgs img { max-width: 240px; max-height: 180px; }
+
 /* ============ ОТЧЁТЫ МЕНЕДЖЕРОВ (ежедневный KPI) ============ */
 .sr-toolbar { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 2px 0 16px; }
 .sr-month { font-size: 16px; font-weight: 700; color: var(--text-dark); min-width: 150px; text-align: center; }
@@ -18228,3 +18258,115 @@
 .idi-row.done .idi-name { text-decoration: line-through; color: var(--text-light, #94A3B8); }
 .idi-name { font-weight: 600; color: var(--text, #1F2937); }
 .idi-meta { color: var(--text-light, #6B7280); font-size: 12px; white-space: nowrap; }
+
+/* v2.45.442: новый вид «Что закупить» (редизайн Снабжения, под переключателем для отката) */
+.sv2-toggle-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; margin-bottom: 12px; background: var(--bg, #F4F6FA); border: 1px solid var(--border, #EEF1F6); border-radius: 12px; font-size: 12.5px; color: var(--text-mid, #5A6275); }
+.sv2-toggle-bar > span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.sv2-toggle-btn { background: #fff; border: 1px solid var(--border-strong, #DDE2EC); border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 600; color: var(--brand); cursor: pointer; }
+.sv2-list { display: flex; flex-direction: column; }
+.sv2-item { padding: 14px 16px; border-top: 1px solid var(--border, #EEF1F6); }
+.sv2-item:first-child { border-top: none; }
+.sv2-item-top { display: flex; align-items: flex-start; gap: 12px; }
+.sv2-item-body { flex: 1; min-width: 0; cursor: pointer; }
+.sv2-item-name { font-size: 14.5px; font-weight: 600; color: var(--text, #1A2138); line-height: 1.3; }
+.sv2-sku { color: var(--text-light, #8B92A3); font-weight: 400; font-size: 12px; }
+.sv2-item-stock { font-size: 12px; color: var(--text-light, #8B92A3); margin-top: 4px; }
+.sv2-item-stock b { color: var(--text-mid, #5A6275); font-weight: 700; }
+.sv2-item-x { width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-faint, #B5BAC7); flex-shrink: 0; background: none; border: none; cursor: pointer; }
+.sv2-item-x:hover { background: #FEE2E2; color: #DC2626; }
+.sv2-item-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.sv2-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sv2-tag { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.sv2-tag.warn { background: #FFF4E6; color: #C18B00; }
+.sv2-tag.neutral { background: #F1F5F9; color: var(--text-mid, #5A6275); font-weight: 600; }
+.sv2-tag.proj { background: #E0F2FE; color: #0C4A6E; }
+.sv2-tag i { font-size: 12px; }
+.sv2-stepper { display: inline-flex; align-items: center; border: 1px solid var(--border-strong, #DDE2EC); border-radius: 10px; overflow: hidden; height: 36px; flex-shrink: 0; }
+.sv2-stepper button { width: 34px; height: 100%; background: #F8FAFC; border: none; display: flex; align-items: center; justify-content: center; color: var(--text-mid, #5A6275); font-size: 18px; cursor: pointer; }
+.sv2-stepper button:active { background: #EEF1F6; }
+.sv2-stepper .val { min-width: 38px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text, #1A2138); }
+/* v2.45.443: карточка «К заказу» (buy-item) — покупные позиции по договорам */
+.sv2-buy { display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-top: 1px solid var(--border, #EEF1F6); }
+.sv2-buy-check { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--brand); cursor: pointer; margin: 0; }
+.sv2-buy-body { flex: 1; min-width: 0; cursor: pointer; }
+.sv2-buy-title { font-size: 14px; font-weight: 600; color: var(--text, #1A2138); line-height: 1.3; }
+.sv2-buy-meta { font-size: 12px; color: var(--text-light, #8B92A3); margin-top: 2px; }
+.sv2-buy-qty { font-size: 13px; font-weight: 700; color: var(--brand); white-space: nowrap; flex-shrink: 0; }
+.sv2-buy-status { font-size: 11.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+.sv2-buy-status.todo { background: #FEE2E2; color: #B91C1C; }
+.sv2-buy-status.ordered { background: #FEF3C7; color: #92400E; }
+.sv2-buy-x { background: none; border: none; cursor: pointer; color: var(--text-faint, #B5BAC7); padding: 4px; display: inline-flex; flex-shrink: 0; }
+.sv2-buy-x:hover { color: #DC2626; }
+
+/* v2.45.444: КАРДИНАЛЬНЫЙ новый вид — перекрываем группы/шапки под прототип v26 */
+.sv2-mode .sup-shop-group,
+.sv2-mode .cp-block {
+  background: #fff; border: 1px solid #EEF1F6; border-radius: 18px;
+  box-shadow: 0 2px 12px rgba(20, 33, 61, 0.06); margin-bottom: 16px; overflow: hidden;
+}
+.sv2-mode .sup-shop-group.no-supplier { background: #fff; border-color: #EEF1F6; }
+.sv2-mode .sup-shop-group-head {
+  background: #fff !important; border-bottom: 1px solid #F1F5F9 !important;
+  padding: 15px 16px 13px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.sv2-mode .sup-shop-group-name {
+  font-size: 16px !important; font-weight: 700 !important; color: #1A2138 !important;
+  gap: 12px; align-items: center; flex: 1; min-width: 0;
+}
+.sv2-mode .sup-shop-group-name > i:first-child {
+  width: 38px; height: 38px; border-radius: 11px; background: #EAF2FA; color: #2D5F8B;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+}
+.sv2-mode .cp-block .sup-shop-group-name > i:first-child,
+.sv2-mode .sup-shop-group.no-supplier .sup-shop-group-name > i:first-child { background: #FFF4E6; color: #C18B00; }
+.sv2-mode .sup-shop-group-count {
+  background: #EAF2FA !important; color: #2D5F8B !important; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; flex-shrink: 0;
+}
+.sv2-mode .sup-shop-group-actions { gap: 8px; flex-wrap: wrap; }
+.sv2-mode .sup-shop-group-actions .btn { border-radius: 10px; height: 38px; }
+.sv2-mode .sup-shop-group-contact { padding: 4px 16px 12px; gap: 8px 16px; }
+/* «Сформировать заказ» внутри группы — на всю ширину, заметная */
+.sv2-mode .cp-block .btn-primary { border-radius: 10px; }
+
+/* v2.45.445: назначение монтажника прямо в карточке монтажа */
+.idet-assignee { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; background: var(--bg-soft, #F1F5F9); border-radius: 10px; }
+.idet-assignee-label { font-size: 13px; font-weight: 600; color: var(--text-mid, #475569); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.idet-assignee-label i { color: var(--brand); }
+.idet-assignee-select { flex: 1; min-width: 160px; border: 1px solid var(--border, #D1D5DB); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; background: #fff; }
+.idet-assignee-hint { width: 100%; font-size: 11.5px; color: var(--text-light, #94A3B8); }
+
+/* v2.45.446: форма «Изменить/Новый монтаж» — подпись сверху, поля во всю ширину */
+.if-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-mid, #475569); }
+.if-form input, .if-form select, .if-form textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--border, #D1D5DB); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--text, #111827); background: #fff; }
+.if-form input:focus, .if-form select:focus, .if-form textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(45, 95, 139, .08); }
+.if-form textarea { resize: vertical; min-height: 82px; line-height: 1.4; }
+
+/* v2.45.448: встроенный чат+файлы по договору прямо в карточке монтажа */
+.imc-chat { border-top: 2px solid var(--border, #E2E8F0); margin-top: 16px; padding-top: 14px; }
+.imc-chat-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; color: var(--text, #111827); }
+.imc-chat-title i { color: var(--brand); }
+.imc-chat-msgs { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; padding: 4px; background: var(--bg-soft, #F1F5F9); border-radius: 10px; margin-bottom: 10px; }
+.imc-empty { padding: 22px 14px; text-align: center; color: var(--text-light, #94A3B8); font-size: 13px; }
+.imc-sys { align-self: center; font-size: 11.5px; color: var(--text-light, #94A3B8); background: rgba(0, 0, 0, .04); padding: 3px 10px; border-radius: 999px; }
+.imc-msg { align-self: flex-start; max-width: 84%; background: #fff; border: 1px solid var(--border, #E2E8F0); border-radius: 12px; border-top-left-radius: 4px; padding: 8px 11px; }
+.imc-msg.mine { align-self: flex-end; background: #EAF2FB; border-color: #CFE0F3; border-top-left-radius: 12px; border-top-right-radius: 4px; }
+.imc-author { font-size: 11.5px; font-weight: 700; color: var(--brand); margin-bottom: 3px; }
+.imc-msg.mine .imc-author { color: #1E4E79; }
+.imc-text { font-size: 14px; color: var(--text, #111827); line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.imc-files-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.imc-img img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; display: block; }
+.imc-file { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-soft, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--text-mid, #475569); text-decoration: none; max-width: 200px; }
+.imc-file i { color: var(--brand); flex: none; }
+.imc-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imc-chat-ta { width: 100%; box-sizing: border-box; border: 1px solid var(--border, #D1D5DB); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 46px; line-height: 1.4; }
+.imc-chat-ta:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(45, 95, 139, .08); }
+.imc-chat-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.imc-chat-attach { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-mid, #475569); background: var(--bg-soft, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 8px; padding: 8px 12px; }
+.imc-chat-attach i { color: var(--brand); }
+.imc-chat-files { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.imc-chip { display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 1px solid var(--border, #E2E8F0); border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 12px; color: var(--text-mid, #475569); }
+.imc-chip i { color: var(--brand); }
+.imc-chip-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imc-chip button { border: none; background: none; cursor: pointer; color: var(--text-light, #94A3B8); padding: 2px; display: inline-flex; }
+.imc-chat-send { margin-left: auto; white-space: nowrap; }

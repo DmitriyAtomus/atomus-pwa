@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.441-kp-tracker";
-const APP_VERSION_DATE = "17.06.2026";
+const APP_VERSION = "v2.45.459-kp-tracker";
+const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -8079,6 +8079,156 @@ async function runSaleProductsImport(categoryId) {
   await loadSaleProducts();
 }
 
+// ============================================================================
+// v2.45.453: Импорт прайса из Excel в Продажную номенклатуру
+// (тот же механизм, что и в Каталоге: xlsx → сервер разбирает листы → upsert)
+// ============================================================================
+
+async function openSaleXlsxImport() {
+  if (!canManageSales()) {
+    showToast('Доступ только директору, заму и менеджеру', 'error');
+    return;
+  }
+  // Категории — чтобы выбрать, куда сложить позиции
+  if (!cache.saleCategories) {
+    try {
+      const r = await apiGet('/api/sale-categories');
+      cache.saleCategories = r.categories || [];
+    } catch (e) { cache.saleCategories = []; }
+  }
+  const catOpts = '<option value="">— без категории —</option>' +
+    (cache.saleCategories || []).map(c =>
+      '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>'
+    ).join('');
+
+  let m = document.getElementById('sp-xlsx-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sp-xlsx-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeSaleXlsxImport(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-spreadsheet"></i> Импорт прайса из Excel</h3>' +
+        '<button class="modal-close" onclick="closeSaleXlsxImport()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;display:flex;flex-direction:column;gap:14px;">' +
+        '<div style="font-size:13px;color:var(--text-mid);line-height:1.5;">' +
+          'Загрузите Excel-прайс (.xlsx). Сервер сам найдёт колонки <b>«Наименование»</b> и <b>«Цена»</b> ' +
+          'по заголовкам, а каждый <b>лист</b> книги станет отдельной <b>группой</b> (папкой) в номенклатуре.' +
+        '</div>' +
+        '<div style="font-size:12px;padding:10px 12px;background:#E0F2FE;border-left:3px solid #2563EB;border-radius:6px;line-height:1.5;color:#1E40AF;">' +
+          '<b><i class="ti ti-info-circle"></i> Логика:</b> позиция с таким же <b>названием</b> в выбранной категории ' +
+          '<b>обновится ценой</b>, новые — добавятся. Каталожные позиции (с артикулом) не затрагиваются.' +
+        '</div>' +
+        '<label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--text-mid);">' +
+          'Категория для позиций' +
+          '<select id="sp-xlsx-category" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;">' + catOpts + '</select>' +
+        '</label>' +
+        '<label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--text-mid);">' +
+          'XLSX файл (до 50 МБ)' +
+          '<input type="file" id="sp-xlsx-file" accept=".xlsx" style="font-size:13px;">' +
+        '</label>' +
+        '<button class="btn btn-primary" onclick="runSaleXlsxImport()"><i class="ti ti-upload"></i> Запустить импорт</button>' +
+        '<div id="sp-xlsx-result"></div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeSaleXlsxImport() {
+  const m = document.getElementById('sp-xlsx-modal');
+  if (m) m.classList.remove('visible');
+  if (window._saleXlsxPollTimer) { clearTimeout(window._saleXlsxPollTimer); window._saleXlsxPollTimer = null; }
+}
+
+async function runSaleXlsxImport() {
+  const fileInput = document.getElementById('sp-xlsx-file');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) { showToast('Выберите xlsx-файл', 'error'); return; }
+  const catSel = document.getElementById('sp-xlsx-category');
+  const categoryId = catSel ? (catSel.value || '') : '';
+  const resultEl = document.getElementById('sp-xlsx-result');
+  resultEl.innerHTML = '<div class="loading-block" style="margin:10px 0;">Загружаем прайс на сервер…</div>';
+  const form = new FormData();
+  form.append('file', file);
+  if (categoryId) form.append('category_id', categoryId);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-products/import-xlsx', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form,
+    });
+    if (!r.ok) {
+      let errMsg = 'HTTP ' + r.status;
+      try { const err = await r.json(); if (err && err.message) errMsg = err.message; } catch (_) {}
+      throw new Error(errMsg);
+    }
+    const d = await r.json();
+    pollSaleXlsxStatus(d.job_id, d.total_chunks);
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block" style="text-align:left;padding:14px;"><i class="ti ti-alert-triangle" style="color:#DC2626;"></i> ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
+async function pollSaleXlsxStatus(jobId, totalChunks) {
+  const resultEl = document.getElementById('sp-xlsx-result');
+  if (!resultEl) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-jobs/' + jobId, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const job = await r.json();
+    const pct = totalChunks > 0 ? Math.round((job.done_chunks || 0) / totalChunks * 100) : 0;
+    let html = '<div style="margin-top:10px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<span style="font-size:13px;color:var(--text-mid);">' +
+          (job.status === 'completed' ? '<i class="ti ti-check" style="color:#16A34A;"></i> Готово' :
+           job.status === 'failed'    ? '<i class="ti ti-x" style="color:#DC2626;"></i> Ошибка' :
+                                        '<i class="ti ti-loader"></i> Обрабатываем') +
+          ' · лист ' + (job.done_chunks || 0) + ' из ' + totalChunks +
+          ' · позиций: <b>' + (job.products_count || 0) + '</b>' +
+        '</span>' +
+        '<span style="font-size:13px;color:var(--text-light);">' + pct + '%</span>' +
+      '</div>' +
+      '<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;">' +
+        '<div style="height:100%;background:var(--brand);width:' + pct + '%;transition:width 0.3s;"></div>' +
+      '</div>';
+    if (job.status === 'failed') {
+      html += '<div style="margin-top:10px;color:#DC2626;font-size:12.5px;">' +
+        escapeText(job.error_message || 'Неизвестная ошибка') + '</div>';
+    }
+    if (job.status === 'completed') {
+      let summary = '';
+      try {
+        const mm = JSON.parse(job.error_message || '{}');
+        if (mm && (mm.added != null || mm.updated != null)) {
+          summary = ' · добавлено ' + (mm.added || 0) + ', обновлено ' + (mm.updated || 0);
+        }
+      } catch (_) {}
+      html += '<div style="margin-top:10px;padding:10px 12px;background:#E8F5E9;border-radius:8px;font-size:13px;color:#16A34A;">' +
+        '<i class="ti ti-check"></i> Прайс импортирован' + summary + '</div>';
+    }
+    html += '</div>';
+    resultEl.innerHTML = html;
+    if (job.status === 'pending' || job.status === 'running') {
+      window._saleXlsxPollTimer = setTimeout(() => pollSaleXlsxStatus(jobId, totalChunks), 3000);
+    } else if (job.status === 'completed') {
+      cache.saleProducts = null;
+      cache.saleCategories = null;
+      loadSaleProducts();
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block">Ошибка опроса: ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
 // --------- ЗАГРУЗКА ----------
 
 async function loadSaleProducts() {
@@ -9405,6 +9555,8 @@ state.offerFormMode = 'new';                  // 'new' или 'edit'
 state.offerForm = {
   manager_id: null,
   manager_name: '',
+  calculated_by_id: null,
+  calculated_by_name: '',
   contractor_id: null,
   contractor_name: '',
   contractor_inn: '',
@@ -9549,6 +9701,7 @@ function renderOffersList() {
         '<div class="oc-meta">' +
           '<span><b>сумма</b> ' + formatMoney(o.total_sum) + '</span>' +
           '<span><b>менеджер</b> ' + escapeHtml(o.manager_name || '—') + '</span>' +
+          ((o.calc_by_name || o.calc_by_full_name) ? '<span><b>рассчитал</b> ' + escapeHtml(o.calc_by_name || o.calc_by_full_name) + '</span>' : '') +
         '</div>' +
         '</div>';
     });
@@ -9639,6 +9792,10 @@ function renderOfferDetail(o) {
           '</div></div>';
   html += '<div class="detail-item"><div class="detail-label">Менеджер</div>' +
           '<div class="detail-value">' + escapeHtml(o.manager_name || '—') + '</div></div>';
+  if (o.calc_by_name || o.calc_by_full_name) {
+    html += '<div class="detail-item"><div class="detail-label">Рассчитал</div>' +
+            '<div class="detail-value">' + escapeHtml(o.calc_by_name || o.calc_by_full_name) + '</div></div>';
+  }
   // ЭТАП 16А: срок действия — приоритет у длительности
   let validText = 'не указан';
   let validHasValue = false;
@@ -9739,14 +9896,19 @@ function renderOfferDetail(o) {
 
   // Кнопка «Скачать PDF» + «Скачать Word» (для всех авторизованных) — ЭТАП 17
   html += '<div style="padding: 12px 18px 14px;">';
+  html += '<button class="btn btn-primary" onclick="previewOfferPdf()" style="width: 100%; justify-content: center; margin-bottom: 8px;">' +
+          '<i class="ti ti-eye"></i> Предпросмотр</button>';
   html += '<div style="display: flex; gap: 8px;">';
-  html += '<button class="btn btn-primary" onclick="downloadOfferPdf()" style="flex: 1; justify-content: center;">' +
+  html += '<button class="btn btn-secondary" onclick="downloadOfferPdf()" style="flex: 1; justify-content: center;">' +
           '<i class="ti ti-file-download"></i> PDF</button>';
   html += '<button class="btn btn-secondary" onclick="downloadOfferDocx()" style="flex: 1; justify-content: center;">' +
           '<i class="ti ti-file-type-doc"></i> Word</button>';
   html += '</div>';
+  // «На печать» — отправляет КП на офисный принтер через шлюз документов
+  html += '<button class="btn btn-secondary" onclick="printOffer()" style="width: 100%; justify-content: center; margin-top: 8px;">' +
+          '<i class="ti ti-printer"></i> На печать</button>';
   html += '<div style="font-size: 12px; color: var(--text-light); text-align: center; margin-top: 6px;">' +
-          'PDF — для отправки клиенту, Word — для редактирования' +
+          'Предпросмотр — посмотреть · PDF — клиенту · Word — править · «На печать» — на офисный принтер' +
           '</div>';
   html += '</div>';
 
@@ -9906,6 +10068,33 @@ async function deleteKpLink(linkId, offerId) {
   }
 }
 
+// Отправка КП на офисный принтер (печатает шлюз документов на сервере офиса).
+// Работает откуда угодно — задание встаёт в очередь, бумага выходит в офисе.
+async function printOffer() {
+  if (!state.currentOfferId) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  showToast('Отправляю на печать…', 'success');
+  try {
+    const r = await apiPost('/api/documents/print', {
+      doc_type: 'offer_pdf',
+      offer_id: state.currentOfferId,
+      copies: 1,
+    });
+    if (r.ok) {
+      showToast('Отправлено на офисный принтер', 'success');
+    } else {
+      const msg = (r.data && (r.data.message || r.data.error)) || 'Не удалось отправить на печать';
+      showToast(msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
 async function downloadOfferPdf() {
   if (!state.currentOfferId) return;
   const token = localStorage.getItem(TOKEN_KEY);
@@ -9932,6 +10121,40 @@ async function downloadOfferPdf() {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
+// Предпросмотр КП: открываем PDF во вкладке для быстрого просмотра «как выглядит».
+// Тот же PDF, что и «Скачать», но цель — посмотреть, а не сохранить.
+async function previewOfferPdf() {
+  if (!state.currentOfferId) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    showToast('Сессия истекла, войдите заново', 'error');
+    return;
+  }
+  // Вкладку открываем синхронно (в обработчике клика), иначе после await её
+  // заблокирует попап-блокировщик. Потом подменим адрес на готовый PDF.
+  const win = window.open('', '_blank');
+  showToast('Готовим предпросмотр…', 'success');
+  try {
+    const r = await fetch(API_BASE + '/api/sale-offers/' + state.currentOfferId + '/pdf', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось открыть предпросмотр';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      if (win) win.close();
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    if (win) { win.location = url; } else { window.open(url, '_blank'); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+    if (win) win.close();
   }
 }
 
@@ -10066,6 +10289,8 @@ function openNewOffer() {
   state.offerForm = {
     manager_id: defaultManagerId,
     manager_name: defaultManagerName,
+    calculated_by_id: null,
+    calculated_by_name: '',
     contractor_id: null, contractor_name: '', contractor_inn: '',
     legal_entity: 'ooo_atomus',
     valid_until: '',                       // ЭТАП 16А: считается на бэке
@@ -10108,6 +10333,8 @@ async function openEditOffer() {
     state.offerForm = {
       manager_id: o.manager_id,
       manager_name: o.manager_name || o.manager_full_name || '',
+      calculated_by_id: o.calculated_by_id || null,
+      calculated_by_name: o.calc_by_name || o.calc_by_full_name || '',
       contractor_id: o.contractor_id,
       contractor_name: o.contractor_name || '',
       contractor_inn: o.contractor_inn || '',
@@ -10181,6 +10408,22 @@ function renderOfferForm() {
   }
   html += '<i class="ti ti-chevron-right chev"></i>';
   html += '</div></div>';
+
+  // Рассчитал (необязательно)
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Рассчитал</div>';
+  html += '<div class="contractor-selector" onclick="openCalcModalForOffer()">';
+  if (f.calculated_by_id) {
+    html += '<div class="selected-text"><div class="selected-name">' + escapeHtml(f.calculated_by_name || '—') + '</div></div>';
+  } else {
+    html += '<div class="selected-text"><div class="placeholder">Кто рассчитал КП (необязательно)…</div></div>';
+  }
+  html += '<i class="ti ti-chevron-right chev"></i>';
+  html += '</div>';
+  if (f.calculated_by_id) {
+    html += '<div style="margin-top:6px;"><button type="button" class="btn-link" onclick="clearOfferCalc(event)">Убрать</button></div>';
+  }
+  html += '</div>';
 
   // Контрагент
   html += '<div class="sales-form-section">';
@@ -10261,7 +10504,7 @@ function renderOfferForm() {
       html += '<div><label class="ire-label">Скидка %</label>' +
               '<input type="number" step="1" min="0" max="100" value="' + (it.discount_pct || 0) + '" oninput="updateOfferItem(' + idx + ', \'discount_pct\', this.value)"></div>';
       html += '<div><label class="ire-label">Сумма</label>' +
-              '<div class="ire-line-total">' + formatMoney(lineTotal) + '</div></div>';
+              '<div class="ire-line-total" id="sof-item-total-' + idx + '">' + formatMoney(lineTotal) + '</div></div>';
       html += '</div></div>';
       html += '<button class="ire-remove" onclick="removeOfferItem(' + idx + ')" title="Убрать"><i class="ti ti-x"></i></button>';
       html += '</div>';
@@ -10270,7 +10513,7 @@ function renderOfferForm() {
     const total = calcOfferTotal(f.items);
     html += '<div style="background: var(--brand-bg); padding: 12px 14px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">' +
       '<span style="font-weight:600; color: var(--brand); text-transform: uppercase; letter-spacing: 0.4px; font-size: 12px;">Итого</span>' +
-      '<span style="font-weight:700; color: var(--brand); font-size: 18px;">' + formatMoney(total) + '</span>' +
+      '<span id="sof-grand-total" style="font-weight:700; color: var(--brand); font-size: 18px;">' + formatMoney(total) + '</span>' +
       '</div>';
   }
   html += '<button class="btn btn-secondary" onclick="openSaleProductPickModal()" style="width: 100%; justify-content: center; margin-top: 12px;">' +
@@ -10295,6 +10538,15 @@ function renderOfferForm() {
   html += '<div id="sof-error"></div>';
 
   container.innerHTML = html;
+
+  // Авто-черновик нового КП: менеджер, контрагент, юрлицо и позиции выбираются
+  // через модалки/кнопки и НЕ порождают input/change-событий, поэтому
+  // глобального слушателя _formDraftAutosave недостаточно. renderOfferForm
+  // вызывается после каждого такого изменения state.offerForm — сохраняем
+  // черновик здесь, чтобы начатое КП пережило обновление страницы.
+  if (!isEdit) {
+    try { _draftSave(OFFER_DRAFT_KEY, state.offerForm, _offerDraftHasContent); } catch (_) {}
+  }
 
   // Подвязка полей
   document.getElementById('sof-valid-duration-value').addEventListener('input', e => {
@@ -10328,16 +10580,25 @@ function setOfferLegalEntity(le) {
 }
 
 function updateOfferItem(idx, field, value) {
-  if (!state.offerForm.items[idx]) return;
+  const it = state.offerForm.items[idx];
+  if (!it) return;
   if (field === 'qty' || field === 'price' || field === 'discount_pct') {
-    state.offerForm.items[idx][field] = Number(value) || 0;
+    it[field] = Number(value) || 0;
   } else {
-    state.offerForm.items[idx][field] = value;
+    it[field] = value;
   }
-  // Не делаем полный renderOfferForm() при каждом keystroke — обновляем только сумму этой позиции и итог
+  // Пересчёт сумм БЕЗ полного renderOfferForm(): иначе input пересоздаётся и
+  // фокус слетает после каждой цифры. Точечно обновляем сумму этой позиции и
+  // общий итог по их id — поля ввода не трогаем.
   if (field === 'qty' || field === 'price' || field === 'discount_pct') {
-    // Перерисуем чтобы пересчитать
-    renderOfferForm();
+    const itEl = document.getElementById('sof-item-total-' + idx);
+    if (itEl) itEl.textContent = formatMoney(calcItemTotal(it));
+    const totEl = document.getElementById('sof-grand-total');
+    if (totEl) totEl.textContent = formatMoney(calcOfferTotal(state.offerForm.items));
+  }
+  // Черновик (раньше его сохранял renderOfferForm) — сохраняем явно.
+  if (state.offerFormMode !== 'edit') {
+    try { _draftSave(OFFER_DRAFT_KEY, state.offerForm, _offerDraftHasContent); } catch (_) {}
   }
 }
 
@@ -10362,6 +10623,7 @@ async function submitOfferForm() {
 
   const payload = {
     manager_id: f.manager_id,
+    calculated_by_id: f.calculated_by_id || null,
     contractor_id: f.contractor_id,
     legal_entity: f.legal_entity,
     // ЭТАП 16А: длительность вместо явной даты — valid_until посчитается на бэке
@@ -10431,38 +10693,22 @@ function openManagerModalForOffer() {
   openManagerModal();
 }
 
-// Переопределим selectManager чтобы он мог писать и в contractForm, и в offerForm
-const _origSelectManager = typeof selectManager === 'function' ? selectManager : null;
-window.selectManager = function(managerId) {
-  if (state._managerModalContext === 'offer') {
-    if (managerId === null) {
-      state.offerForm.manager_id = null;
-      state.offerForm.manager_name = '';
-    } else {
-      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
-      if (m) {
-        state.offerForm.manager_id = managerId;
-        state.offerForm.manager_name = m.short_name || m.full_name || '';
-      }
-    }
-    state._managerModalContext = null;
-    closeManagerModal();
-    renderOfferForm();
-    return;
-  }
-  // Для договоров — старая логика
-  if (managerId === null) {
-    state.contractForm.manager_id = null;
-    state.contractForm._manager_name = '';
-  } else {
-    const m = (cache.managersForPicker || []).find(x => x.id === managerId);
-    if (!m) return;
-    state.contractForm.manager_id = managerId;
-    state.contractForm._manager_name = m.short_name || m.full_name || '';
-  }
-  closeManagerModal();
-  renderContractForm();
-};
+// «Рассчитал» для КП — тот же пикер сотрудников, отдельный контекст.
+function openCalcModalForOffer() {
+  state._managerModalContext = 'offer_calc';
+  openManagerModal();
+}
+
+function clearOfferCalc(e) {
+  if (e) e.stopPropagation();
+  state.offerForm.calculated_by_id = null;
+  state.offerForm.calculated_by_name = '';
+  renderOfferForm();
+}
+
+// selectManager живёт в app-4.js (там объявление function selectManager,
+// которое грузится позже и перекрывает любой override отсюда). Контекст КП
+// (offerForm) обрабатывается прямо там по state._managerModalContext.
 
 // --------- МОДАЛКА КОНТРАГЕНТА ДЛЯ КП ----------
 
@@ -10471,26 +10717,8 @@ function openContractorModalForOffer() {
   openContractorModal();
 }
 
-// Переопределим selectContractor — поддержка двух контекстов
-window.selectContractor = function(contractorId) {
-  const c = (cache.contractors || []).find(x => x.id === contractorId);
-  if (!c) return;
-  if (state._contractorModalContext === 'offer') {
-    state.offerForm.contractor_id = contractorId;
-    state.offerForm.contractor_name = c.name;
-    state.offerForm.contractor_inn = c.inn || '';
-    state._contractorModalContext = null;
-    closeContractorModal();
-    renderOfferForm();
-    return;
-  }
-  // Для договоров — старая логика
-  state.contractForm.contractor_id = contractorId;
-  state.contractForm._contractor_name = c.name;
-  state.contractForm._contractor_inn = c.inn || '';
-  closeContractorModal();
-  renderContractForm();
-};
+// selectContractor живёт в app-4.js (объявление перекрывает override отсюда).
+// Контекст КП (offerForm) обрабатывается там по state._contractorModalContext.
 
 // --------- МОДАЛКА ВЫБОРА ПРОДАЖНОЙ ПОЗИЦИИ ----------
 
@@ -11843,6 +12071,172 @@ function addCustomOfferItem() {
   });
   closeSaleProductPickModal();
   renderOfferForm();
+}
+
+// ============================================================================
+// v2.45.456: Excel-прайс при составлении КП — открыть и листать «как в Excel»
+// (с фото), кликнуть по строке → позиция добавляется в КП с ценой.
+// ============================================================================
+var _salePriceState = { fid: null, uploadFile: null, sheets: null, added: 0 };
+
+function _salePriceModalEl() {
+  var m = document.getElementById('sale-price-viewer-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sale-price-viewer-modal';
+    m.className = 'modal-overlay';
+    m.onclick = function (e) { if (e.target === m) closeSalePriceViewer(); };
+    document.body.appendChild(m);
+  }
+  return m;
+}
+
+async function openSalePriceViewer() {
+  var m = _salePriceModalEl();
+  _salePriceState.added = 0;
+  m.innerHTML =
+    '<div class="modal spv-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-spreadsheet"></i> Excel-прайс — выбрать позицию в КП</h3>' +
+        '<div style="display:flex;gap:4px;align-items:center;">' +
+          '<button class="icon-btn" id="spv-full-btn" onclick="toggleSalePriceFullscreen()" title="Во весь экран"><i class="ti ti-arrows-maximize"></i></button>' +
+          '<button class="icon-btn" onclick="closeSalePriceViewer()"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="spv-bar">' +
+        '<label class="btn btn-secondary spv-upload"><i class="ti ti-upload"></i> Загрузить прайс' +
+          '<input type="file" accept=".xlsx,.xlsm,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="onSalePriceUpload(this)"></label>' +
+        '<div class="spv-files" id="spv-files"></div>' +
+      '</div>' +
+      '<div class="spv-hint" id="spv-hint">Загрузите Excel-прайс (.xlsx) или выберите ранее загруженный — он откроется таблицей, как в Excel (с фото). Кликните по строке с моделью, чтобы добавить её в КП с ценой.</div>' +
+      '<div class="modal-body spv-body" id="spv-body"></div>' +
+      '<div class="spv-foot">' +
+        '<span id="spv-added" class="spv-added"></span>' +
+        '<button class="btn btn-primary" onclick="closeSalePriceViewer()"><i class="ti ti-check"></i> Готово</button>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  await _salePriceLoadFiles();
+}
+
+function closeSalePriceViewer() {
+  var m = document.getElementById('sale-price-viewer-modal');
+  if (m) m.classList.remove('visible');
+  closeSaleProductPickModal();
+  if (state.offerForm) renderOfferForm();
+}
+
+function toggleSalePriceFullscreen() {
+  var mod = document.querySelector('#sale-price-viewer-modal .spv-modal');
+  if (!mod) return;
+  var full = mod.classList.toggle('spv-full');
+  var btn = document.getElementById('spv-full-btn');
+  if (btn) btn.innerHTML = '<i class="ti ' + (full ? 'ti-arrows-minimize' : 'ti-arrows-maximize') + '"></i>';
+}
+
+async function _salePriceLoadFiles() {
+  var box = document.getElementById('spv-files');
+  if (!box) return;
+  try {
+    var r = await apiGet('/api/sale-price-files');
+    var files = (r && r.files) || [];
+    if (!files.length) { box.innerHTML = '<span class="spv-files-empty">Сохранённых прайсов пока нет</span>'; return; }
+    box.innerHTML = files.map(function (f) {
+      var lbl = f.label || f.file_name || ('Прайс #' + f.id);
+      return '<button class="spv-file-chip' + (_salePriceState.fid === f.id ? ' active' : '') + '" onclick="openSalePriceFileView(' + f.id + ')">' +
+        '<i class="ti ti-table"></i><span class="spv-file-name">' + escapeHtml(lbl) + '</span>' +
+        '<span class="spv-file-del" onclick="event.stopPropagation();deleteSalePriceFile(' + f.id + ')" title="Удалить"><i class="ti ti-x"></i></span>' +
+      '</button>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<span class="spv-files-empty">Не удалось загрузить список</span>'; }
+}
+
+async function onSalePriceUpload(input, sheetName) {
+  var file = sheetName ? _salePriceState.uploadFile : (input && input.files && input.files[0]);
+  if (!file) return;
+  _salePriceState.uploadFile = file;
+  var hint = document.getElementById('spv-hint');
+  if (hint) hint.innerHTML = '<div class="loading-block" style="margin:0;">Загружаем прайс…</div>';
+  var fd = new FormData();
+  fd.append('file', file, file.name);
+  if (sheetName) fd.append('sheet_name', sheetName);
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var resp = await fetch(API_BASE + '/api/sale-price-files', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+    var d = await resp.json().catch(function () { return {}; });
+    if (!resp.ok) { showToast(d.message || 'Не удалось загрузить', 'error'); if (hint) hint.textContent = ''; return; }
+    if (d.need_sheet && d.sheets && !sheetName) {
+      _salePriceState.sheets = d.sheets;
+      if (hint) hint.innerHTML = '<div class="spv-sheets"><span>В файле несколько листов — выберите нужный:</span>' +
+        d.sheets.map(function (s, i) { return '<button class="spv-sheet-btn" onclick="onSalePriceUploadSheet(' + i + ')">' + escapeHtml(s) + '</button>'; }).join('') +
+      '</div>';
+      return;
+    }
+    if (input) input.value = '';
+    await _salePriceLoadFiles();
+    if (d.price_file_id) openSalePriceFileView(d.price_file_id);
+  } catch (e) { showToast('Ошибка соединения', 'error'); if (hint) hint.textContent = ''; }
+}
+
+function onSalePriceUploadSheet(idx) {
+  var s = (_salePriceState.sheets || [])[idx];
+  if (s != null) onSalePriceUpload(null, s);
+}
+
+async function openSalePriceFileView(fid) {
+  _salePriceState.fid = fid;
+  var body = document.getElementById('spv-body');
+  var hint = document.getElementById('spv-hint');
+  if (hint) hint.textContent = 'Кликните по строке с моделью — она добавится в КП с ценой.';
+  if (body) body.innerHTML = '<div class="loading-block">Открываем прайс…</div>';
+  _salePriceLoadFiles();
+  try {
+    var r = await apiGet('/api/sale-price-files/' + fid + '/view');
+    if (body) body.innerHTML = '<div class="xls-wrap" onclick="_salePriceRowClick(event)">' + (r.html || '') + '</div>';
+  } catch (e) {
+    if (body) body.innerHTML = '<div class="empty-block">Не удалось открыть прайс. Возможно, файл утерян — загрузите заново.</div>';
+  }
+}
+
+function _salePriceRowClick(e) {
+  var tr = e.target.closest && e.target.closest('tr.xls-pick');
+  if (!tr) return;
+  var name = tr.getAttribute('data-pick') || '';
+  var price = parseFloat(tr.getAttribute('data-price') || '0') || 0;
+  if (!name) return;
+  addExcelRowToOffer(name, price);
+  tr.style.transition = 'background .2s';
+  tr.style.background = 'rgba(22,163,74,0.22)';
+  setTimeout(function () { tr.style.background = ''; }, 350);
+}
+
+function addExcelRowToOffer(name, price) {
+  if (!state.offerForm) { showToast('Откройте форму КП', 'error'); return; }
+  if (!Array.isArray(state.offerForm.items)) state.offerForm.items = [];
+  state.offerForm.items.push({
+    sale_product_id: null,
+    name: name,
+    description: '',
+    unit: 'шт.',
+    qty: 1,
+    price: Number(price) || 0,
+    discount_pct: 0,
+  });
+  _salePriceState.added = (_salePriceState.added || 0) + 1;
+  var addedEl = document.getElementById('spv-added');
+  if (addedEl) addedEl.textContent = 'Добавлено позиций: ' + _salePriceState.added;
+  showToast('В КП: ' + name + (price ? ' — ' + formatMoney(price) : ''), 'success');
+}
+
+async function deleteSalePriceFile(fid) {
+  if (!confirm('Удалить этот прайс-файл? Сами позиции в КП останутся.')) return;
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var r = await fetch(API_BASE + '/api/sale-price-files/' + fid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    if (_salePriceState.fid === fid) { _salePriceState.fid = null; var b = document.getElementById('spv-body'); if (b) b.innerHTML = ''; }
+    await _salePriceLoadFiles();
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 // --------- МЕНЮ «ЕЩЁ» ----------

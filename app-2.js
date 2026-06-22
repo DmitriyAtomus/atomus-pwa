@@ -11302,6 +11302,8 @@ function renderBoxDetail(box) {
     '<div style="padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;background:var(--bg);border-top:1px solid var(--border);">' +
       (items.length ? '<button class="btn btn-primary btn-small" onclick="printPackingList(' + box.id + ')">' +
                       '<i class="ti ti-printer"></i> Упаковочный лист (A4)</button>' : '') +
+      (items.length ? '<button class="btn btn-secondary btn-small" onclick="printPackingListToOffice(' + box.id + ')">' +
+                      '<i class="ti ti-printer"></i> На печать</button>' : '') +
       '<button class="btn btn-secondary btn-small" onclick="showBoxQr(' + box.id + ', ' +
         JSON.stringify(box.name || ('Коробка #' + box.id)).replace(/"/g, '&quot;') + ', ' +
         JSON.stringify(box.qr_token || '').replace(/"/g, '&quot;') + ', ' +
@@ -11611,6 +11613,27 @@ async function printPackingList(boxId) {
     renderPackingListPrint(box);
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+  }
+}
+
+// Отправка упаковочного листа на офисный принтер через шлюз документов
+// (печатает сервер офиса; работает и удалённо).
+async function printPackingListToOffice(boxId) {
+  showToast('Отправляю на печать…', 'success');
+  try {
+    const r = await apiPost('/api/documents/print', {
+      doc_type: 'box_packing_list',
+      box_id: boxId,
+      copies: 1,
+    });
+    if (r.ok) {
+      showToast('Отправлено на офисный принтер', 'success');
+    } else {
+      const msg = (r.data && (r.data.message || r.data.error)) || 'Не удалось отправить на печать';
+      showToast(msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
   }
 }
 
