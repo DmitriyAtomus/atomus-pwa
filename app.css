@@ -17986,6 +17986,28 @@
 }
 .xls-tbl .xls-imgs img { margin: 0; }
 
+/* v2.45.456: просмотрщик Excel-прайса при составлении КП */
+.spv-modal { max-width: 980px; width: 96vw; height: 88vh; display: flex; flex-direction: column; }
+.spv-bar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--border, #E2E8F0); flex-wrap: wrap; }
+.spv-upload { flex: none; cursor: pointer; }
+.spv-files { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.spv-files-empty { font-size: 12.5px; color: var(--text-light, #94A3B8); align-self: center; }
+.spv-file-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 280px; background: var(--bg-soft, #F1F5F9); border: 1px solid var(--border, #E2E8F0); border-radius: 999px; padding: 6px 8px 6px 12px; font-size: 12.5px; color: var(--text-mid, #475569); cursor: pointer; }
+.spv-file-chip.active { background: #EAF2FB; border-color: #9CC2E6; color: #1E4E79; font-weight: 600; }
+.spv-file-chip i { color: var(--brand); flex: none; }
+.spv-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spv-file-del { display: inline-flex; padding: 2px; border-radius: 50%; color: var(--text-light, #94A3B8); }
+.spv-file-del:hover { background: rgba(0,0,0,.08); color: var(--danger, #B91C1C); }
+.spv-hint { padding: 10px 18px; font-size: 12.5px; color: var(--text-mid, #475569); background: #F8FAFC; border-bottom: 1px solid var(--border, #E2E8F0); line-height: 1.45; }
+.spv-sheets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.spv-sheets > span { font-weight: 600; }
+.spv-sheet-btn { border: 1px solid var(--brand); color: var(--brand); background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.spv-sheet-btn:hover { background: var(--brand); color: #fff; }
+.spv-body { flex: 1; overflow: auto; padding: 12px 14px; }
+.spv-foot { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--border, #E2E8F0); background: var(--bg, #fff); }
+.spv-added { flex: 1; font-size: 13px; font-weight: 600; color: #16A34A; }
+@media (max-width: 640px) { .spv-modal { width: 100vw; height: 92vh; max-width: none; border-radius: 0; } }
+
 /* ============ ОТЧЁТЫ МЕНЕДЖЕРОВ (ежедневный KPI) ============ */
 .sr-toolbar { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 2px 0 16px; }
 .sr-month { font-size: 16px; font-weight: 700; color: var(--text-dark); min-width: 150px; text-align: center; }
