@@ -9223,13 +9223,13 @@
     text-transform: uppercase; letter-spacing: 0.4px;
     font-weight: 600;
     display: grid;
-    grid-template-columns: 40px 1fr 70px 110px 70px 110px;
+    grid-template-columns: 40px 1fr 70px 110px 110px;
     gap: 8px; align-items: center;
   }
   .offer-items-table .oit-row {
     padding: 12px 14px;
     display: grid;
-    grid-template-columns: 40px 1fr 70px 110px 70px 110px;
+    grid-template-columns: 40px 1fr 70px 110px 110px;
     gap: 8px; align-items: center;
     border-top: 1px solid var(--border);
   }
@@ -9272,7 +9272,7 @@
     display: grid; grid-template-columns: 1fr; gap: 8px;
   }
   .desktop-layout .item-row-edit .ire-body {
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
   /* v2.45.460: расшифровка позиции — отдельной строкой во всю ширину, заметно */
   .item-row-edit .ire-desc { margin-bottom: 8px; }
