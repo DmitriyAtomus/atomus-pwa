@@ -3039,6 +3039,9 @@ function openContractorModal() {
 
 function closeContractorModal() {
   document.getElementById('contractor-modal').classList.remove('visible');
+  // Сбрасываем контекст КП, чтобы он не «прилип» к форме договора, если
+  // модалку закрыли крестиком без выбора.
+  state._contractorModalContext = null;
 }
 
 async function loadContractorsForModal(query) {
@@ -3086,6 +3089,17 @@ async function loadContractorsForModal(query) {
 function selectContractor(contractorId) {
   const c = (cache.contractors || []).find(x => x.id === contractorId);
   if (!c) return;
+  // КП (offerForm) — отдельный контекст, см. openContractorModalForOffer.
+  // Эта функция — единственная (объявление в app-4 перекрывает прежний
+  // window.selectContractor из app-1), поэтому оба контекста живут здесь.
+  if (state._contractorModalContext === 'offer') {
+    state.offerForm.contractor_id = contractorId;
+    state.offerForm.contractor_name = c.name;
+    state.offerForm.contractor_inn = c.inn || '';
+    closeContractorModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   state.contractForm.contractor_id = contractorId;
   state.contractForm._contractor_name = c.name;
   state.contractForm._contractor_inn = c.inn || '';
@@ -3112,6 +3126,9 @@ function openManagerModal(mode) {
 
 function closeManagerModal() {
   document.getElementById('manager-modal').classList.remove('visible');
+  // Сбрасываем контекст КП, чтобы он не «прилип» к форме договора, если
+  // модалку закрыли крестиком без выбора.
+  state._managerModalContext = null;
   if (state._managerPickMode === 'co') {
     state._managerPickMode = 'main';
     if (typeof renderContractForm === 'function') renderContractForm();
@@ -3197,6 +3214,24 @@ async function loadManagersForModal(query) {
 }
 
 function selectManager(managerId) {
+  // КП (offerForm) — отдельный контекст, см. openManagerModalForOffer.
+  // Эта функция — единственная (объявление в app-4 перекрывает прежний
+  // window.selectManager из app-1), поэтому оба контекста живут здесь.
+  if (state._managerModalContext === 'offer') {
+    if (managerId === null) {
+      state.offerForm.manager_id = null;
+      state.offerForm.manager_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.manager_id = managerId;
+        state.offerForm.manager_name = m.short_name || m.full_name || '';
+      }
+    }
+    closeManagerModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   if (managerId === null) {
     state.contractForm.manager_id = null;
     state.contractForm._manager_name = '';
