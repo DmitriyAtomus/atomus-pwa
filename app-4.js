@@ -12598,7 +12598,7 @@ async function _openInstallationForm(inst) {
         '<h3><i class="ti ti-tools"></i> ' + (isEdit ? 'Изменить монтаж' : 'Новый монтаж') + '</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:10px;">' +
+      '<div class="if-form" style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:14px;">' +
         '<label>Что монтировать <span style="color:var(--danger,#B91C1C)">*</span><input type="text" id="if-title" value="' + escapeHtml(inst && inst.title || '') + '" placeholder="Например: монтаж щита ЩУ-003 на объекте"></label>' +
         '<label>Адрес / объект<input type="text" id="if-address" value="' + escapeHtml(inst && inst.object_address || '') + '" placeholder="г. Челябинск, ул. …"></label>' +
         '<label>Дата монтажа<input type="date" id="if-date" value="' + escapeHtml(inst && inst.scheduled_date || '') + '"></label>' +
