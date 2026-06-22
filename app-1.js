@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.463-kp-docs";
+const APP_VERSION = "v2.45.464";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9851,7 +9851,6 @@ function renderOfferDetail(o) {
       '<div>№</div><div>Наименование</div>' +
       '<div style="text-align: right;">Кол-во</div>' +
       '<div style="text-align: right;">Цена</div>' +
-      '<div style="text-align: right;">Скидка</div>' +
       '<div style="text-align: right;">Сумма</div>' +
       '</div>';
     (o.items || []).forEach((it, idx) => {
@@ -9862,7 +9861,6 @@ function renderOfferDetail(o) {
         '</div>' +
         '<div class="oit-qty">' + formatNumberShort(it.qty) + ' ' + escapeHtml(it.unit) + '</div>' +
         '<div class="oit-price">' + formatMoney(it.price) + '</div>' +
-        '<div class="oit-discount">' + (it.discount_pct > 0 ? '−' + it.discount_pct + '%' : '—') + '</div>' +
         '<div class="oit-total">' + formatMoney(it.line_total) + '</div>' +
         '</div>';
     });
@@ -9880,7 +9878,6 @@ function renderOfferDetail(o) {
       if (it.description) html += '<div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">' + escapeHtml(it.description) + '</div>';
       html += '<div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: var(--text-mid);">' +
         '<span>' + formatNumberShort(it.qty) + ' ' + escapeHtml(it.unit) + ' × ' + formatMoney(it.price) +
-          (it.discount_pct > 0 ? ' <span style="color:var(--text-light);">−' + it.discount_pct + '%</span>' : '') +
         '</span>' +
         '<span style="font-weight: 600; color: var(--brand);">' + formatMoney(it.line_total) + '</span>' +
         '</div>';
@@ -10614,8 +10611,6 @@ function renderOfferForm() {
               '<input type="number" step="0.01" min="0" value="' + (it.qty || 1) + '" oninput="updateOfferItem(' + idx + ', \'qty\', this.value)"></div>';
       html += '<div><label class="ire-label">Цена ₽</label>' +
               '<input type="number" step="100" min="0" value="' + (it.price || 0) + '" oninput="updateOfferItem(' + idx + ', \'price\', this.value)"></div>';
-      html += '<div><label class="ire-label">Скидка %</label>' +
-              '<input type="number" step="1" min="0" max="100" value="' + (it.discount_pct || 0) + '" oninput="updateOfferItem(' + idx + ', \'discount_pct\', this.value)"></div>';
       html += '<div><label class="ire-label">Сумма</label>' +
               '<div class="ire-line-total" id="sof-item-total-' + idx + '">' + formatMoney(lineTotal) + '</div></div>';
       html += '</div></div>';
