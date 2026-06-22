@@ -12414,6 +12414,7 @@ async function openInstallationDetail(id) {
 function _renderInstallationDetail(d) {
   var m = _installModalEl();
   _installReportFiles = [];
+  _montageChatFiles = [];
   var color = _installStatusColor(d.status);
   var canManage = !!d.can_manage;
   var canReport = !!d.can_report;
@@ -12519,10 +12520,20 @@ function _renderInstallationDetail(d) {
     });
     specHtml += '</div>';
   }
-  // v2.45.447: чат и файлы по договору (комментарии + вложения — переиспользуем чат договора)
-  var chatBtn = d.contract_id
-    ? '<button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="state.currentContractId=' + d.contract_id + ';if(typeof openContractChat===\'function\')openContractChat();"><i class="ti ti-message-circle"></i> Чат и файлы по договору</button>'
-    : '';
+  // v2.45.448: встроенный чат+файлы по договору прямо в карточке (не отдельное окно)
+  var chatBlock = d.contract_id ? (
+    '<div class="imc-chat">' +
+      '<div class="imc-chat-title"><i class="ti ti-message-circle"></i> Чат и файлы по договору</div>' +
+      '<div class="imc-chat-msgs" id="imc-chat-msgs"><div class="imc-empty">Загружаем…</div></div>' +
+      '<textarea id="imc-chat-input" class="imc-chat-ta" rows="2" placeholder="Написать сообщение / вопрос по объекту…"></textarea>' +
+      '<div class="imc-chat-actions">' +
+        '<label class="imc-chat-attach"><i class="ti ti-paperclip"></i> Файл' +
+          '<input type="file" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display:none" onchange="onMontageChatFiles(this)"></label>' +
+        '<span id="imc-chat-files" class="imc-chat-files"></span>' +
+        '<button class="btn btn-primary imc-chat-send" onclick="sendMontageChat(' + d.contract_id + ')"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>'
+  ) : '';
 
   // v2.45.445: назначение монтажника прямо в карточке (управляющим)
   var assigneeCtrl = '';
@@ -12551,7 +12562,6 @@ function _renderInstallationDetail(d) {
         '</div>' +
         (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
         assigneeCtrl +
-        chatBtn +
         (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Детали для монтажника:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
         itemsHtml +
         specHtml +
@@ -12560,9 +12570,12 @@ function _renderInstallationDetail(d) {
         '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
         reportsHtml +
         reportForm +
+        chatBlock +
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  // v2.45.448: подгрузить встроенный чат по договору
+  if (d.contract_id) loadMontageChat(d.contract_id);
 }
 
 // v2.45.445: назначить/сменить монтажника прямо из карточки монтажа
@@ -12599,6 +12612,112 @@ function renderInstallReportFiles() {
 function removeInstallReportFile(i) {
   _installReportFiles.splice(i, 1);
   renderInstallReportFiles();
+}
+
+// v2.45.448: встроенный чат+файлы по договору прямо в карточке монтажа
+// (переиспользуем backend контрактного чата /api/contracts/{id}/chat)
+var _montageChatFiles = [];
+
+async function loadMontageChat(cid) {
+  var box = document.getElementById('imc-chat-msgs');
+  if (!box) return;
+  try {
+    var r = await apiGet('/api/contracts/' + cid + '/chat');
+    _renderMontageChatMsgs(r);
+  } catch (e) {
+    box.innerHTML = '<div class="imc-empty">Не удалось загрузить чат</div>';
+  }
+}
+
+function _renderMontageChatMsgs(r) {
+  var box = document.getElementById('imc-chat-msgs');
+  if (!box) return;
+  var msgs = (r && r.messages) || [];
+  var myId = r && r.my_chat_id;
+  if (!msgs.length) {
+    box.innerHTML = '<div class="imc-empty">Сообщений пока нет. Напишите первое — все по договору увидят.</div>';
+    return;
+  }
+  var html = '';
+  msgs.forEach(function (m) {
+    var time = (m.created_at || '').slice(11, 16);
+    if (m.is_system) {
+      html += '<div class="imc-sys">' + escapeHtml(m.text || '') + (time ? ' · ' + escapeHtml(time) : '') + '</div>';
+      return;
+    }
+    var isMine = (m.author_chat_id === myId);
+    var author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
+    var filesHtml = '';
+    (m.files || []).forEach(function (f) {
+      var url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      if (f.kind === 'photo') {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-img"><img src="' + url + '" loading="lazy"></a>';
+      } else if (f.kind === 'video') {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-file"><i class="ti ti-video"></i><span>' + escapeHtml(f.original_name || 'Видео') + '</span></a>';
+      } else {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-file"><i class="ti ti-file"></i><span>' + escapeHtml(f.original_name || 'Файл') + '</span></a>';
+      }
+    });
+    html += '<div class="imc-msg' + (isMine ? ' mine' : '') + '">' +
+      '<div class="imc-author">' + escapeHtml(author) + (time ? ' · ' + escapeHtml(time) : '') + '</div>' +
+      (m.text ? '<div class="imc-text">' + escapeHtml(m.text).replace(/\n/g, '<br>') + '</div>' : '') +
+      (filesHtml ? '<div class="imc-files-row">' + filesHtml + '</div>' : '') +
+    '</div>';
+  });
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function onMontageChatFiles(input) {
+  Array.prototype.slice.call(input.files || []).forEach(function (f) {
+    if (_montageChatFiles.length < 5) _montageChatFiles.push(f);
+  });
+  input.value = '';
+  _renderMontageChatFiles();
+}
+
+function _renderMontageChatFiles() {
+  var box = document.getElementById('imc-chat-files');
+  if (!box) return;
+  box.innerHTML = _montageChatFiles.map(function (f, i) {
+    var isImg = (f.type || '').indexOf('image/') === 0;
+    return '<span class="imc-chip"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i>' +
+      '<span class="imc-chip-name">' + escapeHtml(f.name) + '</span>' +
+      '<button onclick="removeMontageChatFile(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button></span>';
+  }).join('');
+}
+
+function removeMontageChatFile(i) {
+  _montageChatFiles.splice(i, 1);
+  _renderMontageChatFiles();
+}
+
+async function sendMontageChat(cid) {
+  var inp = document.getElementById('imc-chat-input');
+  var text = (inp && inp.value || '').trim();
+  if (!text && !_montageChatFiles.length) { showToast('Напишите сообщение или прикрепите файл', 'error'); return; }
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var resp;
+    if (_montageChatFiles.length) {
+      var fd = new FormData();
+      if (text) fd.append('text', text);
+      _montageChatFiles.forEach(function (f, i) { fd.append('file_' + (i + 1), f, f.name); });
+      resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+      });
+    } else {
+      resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: text }),
+      });
+    }
+    if (!resp.ok) { var e = await resp.json().catch(function () { return {}; }); showToast(e.message || e.error || 'Не отправилось', 'error'); return; }
+    if (inp) inp.value = '';
+    _montageChatFiles = [];
+    _renderMontageChatFiles();
+    await loadMontageChat(cid);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 async function submitInstallationReport(id) {
