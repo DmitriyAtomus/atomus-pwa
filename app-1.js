@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.452";
+const APP_VERSION = "v2.45.455";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -8079,6 +8079,156 @@ async function runSaleProductsImport(categoryId) {
   await loadSaleProducts();
 }
 
+// ============================================================================
+// v2.45.453: Импорт прайса из Excel в Продажную номенклатуру
+// (тот же механизм, что и в Каталоге: xlsx → сервер разбирает листы → upsert)
+// ============================================================================
+
+async function openSaleXlsxImport() {
+  if (!canManageSales()) {
+    showToast('Доступ только директору, заму и менеджеру', 'error');
+    return;
+  }
+  // Категории — чтобы выбрать, куда сложить позиции
+  if (!cache.saleCategories) {
+    try {
+      const r = await apiGet('/api/sale-categories');
+      cache.saleCategories = r.categories || [];
+    } catch (e) { cache.saleCategories = []; }
+  }
+  const catOpts = '<option value="">— без категории —</option>' +
+    (cache.saleCategories || []).map(c =>
+      '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>'
+    ).join('');
+
+  let m = document.getElementById('sp-xlsx-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sp-xlsx-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeSaleXlsxImport(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-file-spreadsheet"></i> Импорт прайса из Excel</h3>' +
+        '<button class="modal-close" onclick="closeSaleXlsxImport()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:18px;display:flex;flex-direction:column;gap:14px;">' +
+        '<div style="font-size:13px;color:var(--text-mid);line-height:1.5;">' +
+          'Загрузите Excel-прайс (.xlsx). Сервер сам найдёт колонки <b>«Наименование»</b> и <b>«Цена»</b> ' +
+          'по заголовкам, а каждый <b>лист</b> книги станет отдельной <b>группой</b> (папкой) в номенклатуре.' +
+        '</div>' +
+        '<div style="font-size:12px;padding:10px 12px;background:#E0F2FE;border-left:3px solid #2563EB;border-radius:6px;line-height:1.5;color:#1E40AF;">' +
+          '<b><i class="ti ti-info-circle"></i> Логика:</b> позиция с таким же <b>названием</b> в выбранной категории ' +
+          '<b>обновится ценой</b>, новые — добавятся. Каталожные позиции (с артикулом) не затрагиваются.' +
+        '</div>' +
+        '<label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--text-mid);">' +
+          'Категория для позиций' +
+          '<select id="sp-xlsx-category" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;">' + catOpts + '</select>' +
+        '</label>' +
+        '<label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--text-mid);">' +
+          'XLSX файл (до 50 МБ)' +
+          '<input type="file" id="sp-xlsx-file" accept=".xlsx" style="font-size:13px;">' +
+        '</label>' +
+        '<button class="btn btn-primary" onclick="runSaleXlsxImport()"><i class="ti ti-upload"></i> Запустить импорт</button>' +
+        '<div id="sp-xlsx-result"></div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeSaleXlsxImport() {
+  const m = document.getElementById('sp-xlsx-modal');
+  if (m) m.classList.remove('visible');
+  if (window._saleXlsxPollTimer) { clearTimeout(window._saleXlsxPollTimer); window._saleXlsxPollTimer = null; }
+}
+
+async function runSaleXlsxImport() {
+  const fileInput = document.getElementById('sp-xlsx-file');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) { showToast('Выберите xlsx-файл', 'error'); return; }
+  const catSel = document.getElementById('sp-xlsx-category');
+  const categoryId = catSel ? (catSel.value || '') : '';
+  const resultEl = document.getElementById('sp-xlsx-result');
+  resultEl.innerHTML = '<div class="loading-block" style="margin:10px 0;">Загружаем прайс на сервер…</div>';
+  const form = new FormData();
+  form.append('file', file);
+  if (categoryId) form.append('category_id', categoryId);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-products/import-xlsx', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form,
+    });
+    if (!r.ok) {
+      let errMsg = 'HTTP ' + r.status;
+      try { const err = await r.json(); if (err && err.message) errMsg = err.message; } catch (_) {}
+      throw new Error(errMsg);
+    }
+    const d = await r.json();
+    pollSaleXlsxStatus(d.job_id, d.total_chunks);
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block" style="text-align:left;padding:14px;"><i class="ti ti-alert-triangle" style="color:#DC2626;"></i> ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
+async function pollSaleXlsxStatus(jobId, totalChunks) {
+  const resultEl = document.getElementById('sp-xlsx-result');
+  if (!resultEl) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/catalog/import-jobs/' + jobId, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const job = await r.json();
+    const pct = totalChunks > 0 ? Math.round((job.done_chunks || 0) / totalChunks * 100) : 0;
+    let html = '<div style="margin-top:10px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<span style="font-size:13px;color:var(--text-mid);">' +
+          (job.status === 'completed' ? '<i class="ti ti-check" style="color:#16A34A;"></i> Готово' :
+           job.status === 'failed'    ? '<i class="ti ti-x" style="color:#DC2626;"></i> Ошибка' :
+                                        '<i class="ti ti-loader"></i> Обрабатываем') +
+          ' · лист ' + (job.done_chunks || 0) + ' из ' + totalChunks +
+          ' · позиций: <b>' + (job.products_count || 0) + '</b>' +
+        '</span>' +
+        '<span style="font-size:13px;color:var(--text-light);">' + pct + '%</span>' +
+      '</div>' +
+      '<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;">' +
+        '<div style="height:100%;background:var(--brand);width:' + pct + '%;transition:width 0.3s;"></div>' +
+      '</div>';
+    if (job.status === 'failed') {
+      html += '<div style="margin-top:10px;color:#DC2626;font-size:12.5px;">' +
+        escapeText(job.error_message || 'Неизвестная ошибка') + '</div>';
+    }
+    if (job.status === 'completed') {
+      let summary = '';
+      try {
+        const mm = JSON.parse(job.error_message || '{}');
+        if (mm && (mm.added != null || mm.updated != null)) {
+          summary = ' · добавлено ' + (mm.added || 0) + ', обновлено ' + (mm.updated || 0);
+        }
+      } catch (_) {}
+      html += '<div style="margin-top:10px;padding:10px 12px;background:#E8F5E9;border-radius:8px;font-size:13px;color:#16A34A;">' +
+        '<i class="ti ti-check"></i> Прайс импортирован' + summary + '</div>';
+    }
+    html += '</div>';
+    resultEl.innerHTML = html;
+    if (job.status === 'pending' || job.status === 'running') {
+      window._saleXlsxPollTimer = setTimeout(() => pollSaleXlsxStatus(jobId, totalChunks), 3000);
+    } else if (job.status === 'completed') {
+      cache.saleProducts = null;
+      cache.saleCategories = null;
+      loadSaleProducts();
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<div class="empty-block">Ошибка опроса: ' + escapeText(e.message || String(e)) + '</div>';
+  }
+}
+
 // --------- ЗАГРУЗКА ----------
 
 async function loadSaleProducts() {
@@ -9551,6 +9701,7 @@ function renderOffersList() {
         '<div class="oc-meta">' +
           '<span><b>сумма</b> ' + formatMoney(o.total_sum) + '</span>' +
           '<span><b>менеджер</b> ' + escapeHtml(o.manager_name || '—') + '</span>' +
+          ((o.calc_by_name || o.calc_by_full_name) ? '<span><b>рассчитал</b> ' + escapeHtml(o.calc_by_name || o.calc_by_full_name) + '</span>' : '') +
         '</div>' +
         '</div>';
     });
