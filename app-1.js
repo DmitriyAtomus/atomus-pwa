@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.449";
+const APP_VERSION = "v2.45.450";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10119,7 +10119,7 @@ function renderOfferForm() {
       html += '<div><label class="ire-label">Скидка %</label>' +
               '<input type="number" step="1" min="0" max="100" value="' + (it.discount_pct || 0) + '" oninput="updateOfferItem(' + idx + ', \'discount_pct\', this.value)"></div>';
       html += '<div><label class="ire-label">Сумма</label>' +
-              '<div class="ire-line-total">' + formatMoney(lineTotal) + '</div></div>';
+              '<div class="ire-line-total" id="sof-item-total-' + idx + '">' + formatMoney(lineTotal) + '</div></div>';
       html += '</div></div>';
       html += '<button class="ire-remove" onclick="removeOfferItem(' + idx + ')" title="Убрать"><i class="ti ti-x"></i></button>';
       html += '</div>';
@@ -10128,7 +10128,7 @@ function renderOfferForm() {
     const total = calcOfferTotal(f.items);
     html += '<div style="background: var(--brand-bg); padding: 12px 14px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">' +
       '<span style="font-weight:600; color: var(--brand); text-transform: uppercase; letter-spacing: 0.4px; font-size: 12px;">Итого</span>' +
-      '<span style="font-weight:700; color: var(--brand); font-size: 18px;">' + formatMoney(total) + '</span>' +
+      '<span id="sof-grand-total" style="font-weight:700; color: var(--brand); font-size: 18px;">' + formatMoney(total) + '</span>' +
       '</div>';
   }
   html += '<button class="btn btn-secondary" onclick="openSaleProductPickModal()" style="width: 100%; justify-content: center; margin-top: 12px;">' +
@@ -10195,16 +10195,25 @@ function setOfferLegalEntity(le) {
 }
 
 function updateOfferItem(idx, field, value) {
-  if (!state.offerForm.items[idx]) return;
+  const it = state.offerForm.items[idx];
+  if (!it) return;
   if (field === 'qty' || field === 'price' || field === 'discount_pct') {
-    state.offerForm.items[idx][field] = Number(value) || 0;
+    it[field] = Number(value) || 0;
   } else {
-    state.offerForm.items[idx][field] = value;
+    it[field] = value;
   }
-  // Не делаем полный renderOfferForm() при каждом keystroke — обновляем только сумму этой позиции и итог
+  // Пересчёт сумм БЕЗ полного renderOfferForm(): иначе input пересоздаётся и
+  // фокус слетает после каждой цифры. Точечно обновляем сумму этой позиции и
+  // общий итог по их id — поля ввода не трогаем.
   if (field === 'qty' || field === 'price' || field === 'discount_pct') {
-    // Перерисуем чтобы пересчитать
-    renderOfferForm();
+    const itEl = document.getElementById('sof-item-total-' + idx);
+    if (itEl) itEl.textContent = formatMoney(calcItemTotal(it));
+    const totEl = document.getElementById('sof-grand-total');
+    if (totEl) totEl.textContent = formatMoney(calcOfferTotal(state.offerForm.items));
+  }
+  // Черновик (раньше его сохранял renderOfferForm) — сохраняем явно.
+  if (state.offerFormMode !== 'edit') {
+    try { _draftSave(OFFER_DRAFT_KEY, state.offerForm, _offerDraftHasContent); } catch (_) {}
   }
 }
 
