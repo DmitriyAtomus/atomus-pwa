@@ -12349,6 +12349,11 @@ async function openInstallationDetail(id) {
   m.classList.add('visible');
   try {
     var d = await apiGet('/api/installations/' + id);
+    // v2.45.445: список монтажников для назначения прямо из карточки (только управляющим)
+    if (d && d.can_manage) {
+      try { var _ir = await apiGet('/api/installations/installers'); d._installers = (_ir && _ir.installers) || []; }
+      catch (_) { d._installers = []; }
+    }
     _renderInstallationDetail(d);
   } catch (e) {
     m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;"><div class="empty-block">' + escapeHtml(String(e.message || e)) + '</div></div>';
@@ -12453,6 +12458,20 @@ function _renderInstallationDetail(d) {
   });
   if (itemsHtml) itemsHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-clipboard-list"></i> Что нужно сделать по договору</div>' + itemsHtml + '</div>';
 
+  // v2.45.445: назначение монтажника прямо в карточке (управляющим)
+  var assigneeCtrl = '';
+  if (canManage) {
+    var _ins = d._installers || [];
+    var _opts = '<option value="">— не назначен —</option>' + _ins.map(function (e) {
+      return '<option value="' + e.id + '"' + (String(d.assigned_employee_id) === String(e.id) ? ' selected' : '') + '>' + escapeHtml(e.name) + '</option>';
+    }).join('');
+    assigneeCtrl = '<div class="idet-assignee">' +
+      '<span class="idet-assignee-label"><i class="ti ti-user-cog"></i> Монтажник</span>' +
+      '<select class="idet-assignee-select" onchange="assignInstallationInstaller(' + d.id + ', this.value)">' + _opts + '</select>' +
+      (_ins.length ? '' : '<div class="idet-assignee-hint">Нет монтажников — заведите сотрудника с правом «Монтаж»</div>') +
+    '</div>';
+  }
+
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
       '<div class="modal-header">' +
@@ -12465,6 +12484,7 @@ function _renderInstallationDetail(d) {
           '<div style="display:flex;gap:6px;">' + manageBtns + '</div>' +
         '</div>' +
         (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
+        assigneeCtrl +
         (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Что монтировать:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
         itemsHtml +
         '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
@@ -12475,6 +12495,18 @@ function _renderInstallationDetail(d) {
       '</div>' +
     '</div>';
   m.classList.add('visible');
+}
+
+// v2.45.445: назначить/сменить монтажника прямо из карточки монтажа
+async function assignInstallationInstaller(installationId, empId) {
+  try {
+    await apiPatch('/api/installations/' + installationId, { assigned_employee_id: empId ? parseInt(empId, 10) : null });
+    if (typeof showToast === 'function') showToast(empId ? 'Монтажник назначен' : 'Назначение снято', 'success');
+    await openInstallationDetail(installationId);
+    if (typeof loadInstallationList === 'function') loadInstallationList();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось назначить монтажника', 'error');
+  }
 }
 
 function onInstallReportFiles(input) {
