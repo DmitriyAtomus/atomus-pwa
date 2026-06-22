@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.459-kp-tracker";
+const APP_VERSION = "v2.45.460-kp-tracker";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12109,6 +12109,7 @@ async function openSalePriceViewer() {
         '<div class="spv-files" id="spv-files"></div>' +
       '</div>' +
       '<div class="spv-hint" id="spv-hint">Загрузите Excel-прайс (.xlsx) или выберите ранее загруженный — он откроется таблицей, как в Excel (с фото). Кликните по строке с моделью, чтобы добавить её в КП с ценой.</div>' +
+      '<div class="spv-sheettabs" id="spv-sheettabs" style="display:none;"></div>' +
       '<div class="modal-body spv-body" id="spv-body"></div>' +
       '<div class="spv-foot">' +
         '<span id="spv-added" class="spv-added"></span>' +
@@ -12183,19 +12184,38 @@ function onSalePriceUploadSheet(idx) {
   if (s != null) onSalePriceUpload(null, s);
 }
 
-async function openSalePriceFileView(fid) {
+async function openSalePriceFileView(fid, sheet) {
   _salePriceState.fid = fid;
   var body = document.getElementById('spv-body');
   var hint = document.getElementById('spv-hint');
-  if (hint) hint.textContent = 'Кликните по строке с моделью — она добавится в КП с ценой.';
+  if (hint) hint.textContent = 'Кликните по строке с моделью — она добавится в КП с ценой. Листы прайса — вкладками ниже.';
   if (body) body.innerHTML = '<div class="loading-block">Открываем прайс…</div>';
-  _salePriceLoadFiles();
+  if (!sheet) _salePriceLoadFiles();  // подсветить активный файл (при смене листа не дёргаем)
   try {
-    var r = await apiGet('/api/sale-price-files/' + fid + '/view');
-    if (body) body.innerHTML = '<div class="xls-wrap" onclick="_salePriceRowClick(event)">' + (r.html || '') + '</div>';
+    var url = '/api/sale-price-files/' + fid + '/view' + (sheet ? '?sheet=' + encodeURIComponent(sheet) : '');
+    var r = await apiGet(url);
+    _renderSheetTabs(r.sheets, r.current_sheet);
+    if (body) {
+      body.innerHTML = '<div class="xls-wrap" onclick="_salePriceRowClick(event)">' + (r.html || '') + '</div>';
+      body.scrollTop = 0;
+    }
   } catch (e) {
     if (body) body.innerHTML = '<div class="empty-block">Не удалось открыть прайс. Возможно, файл утерян — загрузите заново.</div>';
   }
+}
+
+function _renderSheetTabs(sheets, current) {
+  var bar = document.getElementById('spv-sheettabs');
+  if (!bar) return;
+  _salePriceState.curSheets = sheets || [];
+  if (!sheets || sheets.length < 2) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  bar.innerHTML = '<span class="spv-sheettabs-lbl"><i class="ti ti-layout-list"></i> Листы:</span>' +
+    sheets.map(function (s, i) {
+      return '<button class="spv-sheet-tab' + (s === current ? ' active' : '') + '" ' +
+        'onclick="openSalePriceFileView(_salePriceState.fid, _salePriceState.curSheets[' + i + '])">' +
+        escapeHtml(s) + '</button>';
+    }).join('');
 }
 
 function _salePriceRowClick(e) {
