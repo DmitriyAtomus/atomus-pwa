@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.462";
+const APP_VERSION = "v2.45.463-kp-docs";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9912,6 +9912,16 @@ function renderOfferDetail(o) {
           '</div>';
   html += '</div>';
 
+  // Документы к КП (чертежи/спецификации) — видны клиенту на странице
+  html += '<div style="padding: 12px 18px;">';
+  html += '<h3 style="font-size: 15px; margin-bottom: 8px; display:flex; align-items:center; gap:6px;"><i class="ti ti-paperclip"></i> Документы <span style="font-weight:400;font-size:12px;color:var(--text-light);">— видны клиенту на странице КП</span></h3>';
+  html += '<div id="sod-docs"><div style="font-size:13px;color:var(--text-light);">Загружаем…</div></div>';
+  if (canEdit) {
+    html += '<label class="btn btn-secondary" style="cursor:pointer;margin-top:8px;"><i class="ti ti-upload"></i> Прикрепить файл' +
+            '<input type="file" style="display:none;" onchange="uploadOfferAttachment(' + o.id + ', this)"></label>';
+  }
+  html += '</div>';
+
   // Трекер: отправка по ссылке + активность (кто открыл/распечатал/скачал)
   html += '<div style="padding: 12px 18px;">';
   html += '<h3 style="font-size: 15px; margin-bottom: 8px; display:flex; align-items:center; gap:6px;"><i class="ti ti-link"></i> Отправка по ссылке и активность</h3>';
@@ -9931,6 +9941,107 @@ function renderOfferDetail(o) {
 
   container.innerHTML = html;
   loadOfferTracker(o.id);
+  loadOfferAttachments(o.id);
+}
+
+// ============ Документы к КП ============
+
+async function loadOfferAttachments(offerId) {
+  const el = document.getElementById('sod-docs');
+  if (!el) return;
+  let list = [];
+  try {
+    const d = await apiGet('/api/sale-offers/' + offerId + '/attachments');
+    list = (d && d.attachments) || [];
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-light);">Не удалось загрузить</div>';
+    return;
+  }
+  const canEdit = canManageSales();
+  if (!list.length) {
+    el.innerHTML = '<div style="font-size:12.5px;color:var(--text-light);">Файлов нет. Прикрепи чертёж или спецификацию — клиент увидит их на странице КП.</div>';
+    return;
+  }
+  let h = '';
+  list.forEach(a => {
+    const name = escapeHtml(a.filename || 'файл');
+    const size = _kpFileSize(a.size);
+    h += '<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:9px 11px;margin-bottom:8px;">';
+    h += '<i class="ti ti-file-text" style="font-size:18px;color:var(--brand);"></i>';
+    h += '<div style="flex:1;min-width:0;cursor:pointer;" onclick="downloadKpAttachment(' + a.id + ',\'' + escapeHtml((a.filename || '').replace(/'/g, "\\'")) + '\')">' +
+         '<div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</div>' +
+         (size ? '<div style="font-size:11.5px;color:var(--text-light);">' + size + '</div>' : '') +
+         '</div>';
+    h += '<button class="btn btn-secondary btn-small" onclick="downloadKpAttachment(' + a.id + ',\'' + escapeHtml((a.filename || '').replace(/'/g, "\\'")) + '\')" title="Открыть"><i class="ti ti-eye"></i></button>';
+    if (canEdit) h += '<button class="btn btn-secondary btn-small" onclick="deleteKpAttachment(' + a.id + ',' + offerId + ')" title="Удалить"><i class="ti ti-trash"></i></button>';
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
+
+function _kpFileSize(n) {
+  n = parseInt(n || 0, 10);
+  if (!n || n <= 0) return '';
+  if (n < 1024) return n + ' Б';
+  if (n < 1048576) return Math.round(n / 1024) + ' КБ';
+  return (n / 1048576).toFixed(1) + ' МБ';
+}
+
+async function uploadOfferAttachment(offerId, input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-offers/' + offerId + '/attachments', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось загрузить';
+      try { const e = await r.json(); if (e.message) msg = e.message; } catch (x) {}
+      showToast(msg, 'error');
+    } else {
+      showToast('Файл прикреплён');
+      await loadOfferAttachments(offerId);
+    }
+  } catch (e) {
+    showToast('Не удалось загрузить', 'error');
+  }
+  input.value = '';
+}
+
+async function downloadKpAttachment(attachmentId, filename) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/kp-attachments/' + attachmentId + '/file', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('http');
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Не удалось открыть файл', 'error');
+  }
+}
+
+async function deleteKpAttachment(attachmentId, offerId) {
+  if (!confirm('Удалить документ? Он пропадёт со страницы КП.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/kp-attachments/' + attachmentId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('http');
+    await loadOfferAttachments(offerId);
+  } catch (e) {
+    showToast('Не удалось удалить', 'error');
+  }
 }
 
 // ============ Трекер просмотров КП ============
