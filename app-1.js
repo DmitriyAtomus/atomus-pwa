@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.457";
+const APP_VERSION = "v2.45.458";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -11956,7 +11956,10 @@ async function openSalePriceViewer() {
     '<div class="modal spv-modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-file-spreadsheet"></i> Excel-прайс — выбрать позицию в КП</h3>' +
-        '<button class="icon-btn" onclick="closeSalePriceViewer()"><i class="ti ti-x"></i></button>' +
+        '<div style="display:flex;gap:4px;align-items:center;">' +
+          '<button class="icon-btn" id="spv-full-btn" onclick="toggleSalePriceFullscreen()" title="Во весь экран"><i class="ti ti-arrows-maximize"></i></button>' +
+          '<button class="icon-btn" onclick="closeSalePriceViewer()"><i class="ti ti-x"></i></button>' +
+        '</div>' +
       '</div>' +
       '<div class="spv-bar">' +
         '<label class="btn btn-secondary spv-upload"><i class="ti ti-upload"></i> Загрузить прайс' +
@@ -11979,6 +11982,14 @@ function closeSalePriceViewer() {
   if (m) m.classList.remove('visible');
   closeSaleProductPickModal();
   if (state.offerForm) renderOfferForm();
+}
+
+function toggleSalePriceFullscreen() {
+  var mod = document.querySelector('#sale-price-viewer-modal .spv-modal');
+  if (!mod) return;
+  var full = mod.classList.toggle('spv-full');
+  var btn = document.getElementById('spv-full-btn');
+  if (btn) btn.innerHTML = '<i class="ti ' + (full ? 'ti-arrows-minimize' : 'ti-arrows-maximize') + '"></i>';
 }
 
 async function _salePriceLoadFiles() {
