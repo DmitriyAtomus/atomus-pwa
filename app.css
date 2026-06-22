@@ -17987,7 +17987,8 @@
 .xls-tbl .xls-imgs img { margin: 0; }
 
 /* v2.45.456: просмотрщик Excel-прайса при составлении КП */
-.spv-modal { max-width: 980px; width: 96vw; height: 88vh; display: flex; flex-direction: column; }
+.spv-modal { max-width: 1400px; width: 97vw; height: 90vh; display: flex; flex-direction: column; transition: none; }
+.spv-modal.spv-full { max-width: none; width: 100vw; height: 100vh; border-radius: 0; }
 .spv-bar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--border, #E2E8F0); flex-wrap: wrap; }
 .spv-upload { flex: none; cursor: pointer; }
 .spv-files { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
@@ -18007,6 +18008,13 @@
 .spv-foot { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--border, #E2E8F0); background: var(--bg, #fff); }
 .spv-added { flex: 1; font-size: 13px; font-weight: 600; color: #16A34A; }
 @media (max-width: 640px) { .spv-modal { width: 100vw; height: 92vh; max-width: none; border-radius: 0; } }
+/* v2.45.458: в КП-просмотрщике колонки по содержимому (текст не рвётся по буквам),
+   крупнее шрифт и фото. Затрагивает только этот просмотрщик (не прайсы поставщиков). */
+.spv-body .xls-tbl { table-layout: auto !important; width: auto !important; font-size: 12.5px; line-height: 1.35; }
+.spv-body .xls-tbl col { width: auto !important; }
+.spv-body .xls-tbl td { min-width: 0; max-width: 360px; padding: 4px 9px; word-break: normal; overflow-wrap: break-word; hyphens: none; }
+.spv-body .xls-tbl img { max-width: 240px; max-height: 180px; }
+.spv-body .xls-tbl .xls-imgs img { max-width: 240px; max-height: 180px; }
 
 /* ============ ОТЧЁТЫ МЕНЕДЖЕРОВ (ежедневный KPI) ============ */
 .sr-toolbar { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 2px 0 16px; }
