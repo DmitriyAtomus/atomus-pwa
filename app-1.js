@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.440-supplier-correspondence";
+const APP_VERSION = "v2.45.441-kp-tracker";
 const APP_VERSION_DATE = "17.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9750,6 +9750,12 @@ function renderOfferDetail(o) {
           '</div>';
   html += '</div>';
 
+  // Трекер: отправка по ссылке + активность (кто открыл/распечатал/скачал)
+  html += '<div style="padding: 12px 18px;">';
+  html += '<h3 style="font-size: 15px; margin-bottom: 8px; display:flex; align-items:center; gap:6px;"><i class="ti ti-link"></i> Отправка по ссылке и активность</h3>';
+  html += '<div id="sod-tracker"><div style="font-size:13px;color:var(--text-light);">Загружаем…</div></div>';
+  html += '</div>';
+
   // Версионирование — кнопка «Создать новую версию» (если canEdit)
   if (canEdit) {
     html += '<div style="padding: 12px 18px;">';
@@ -9762,6 +9768,142 @@ function renderOfferDetail(o) {
   }
 
   container.innerHTML = html;
+  loadOfferTracker(o.id);
+}
+
+// ============ Трекер просмотров КП ============
+
+async function loadOfferTracker(offerId) {
+  const el = document.getElementById('sod-tracker');
+  if (!el) return;
+  let d;
+  try {
+    d = await apiGet('/api/sale-offers/' + offerId + '/tracker');
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-light);">Не удалось загрузить активность</div>';
+    return;
+  }
+  renderOfferTracker(el, d, offerId);
+}
+
+function _kpEventTime(s) {
+  if (!s) return '';
+  // created_at из SQLite — UTC ("YYYY-MM-DD HH:MM:SS"); приводим к локальному времени
+  const iso = s.replace(' ', 'T') + (s.length <= 19 ? 'Z' : '');
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return s;
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getDate()) + '.' + p(d.getMonth() + 1) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+function renderOfferTracker(el, d, offerId) {
+  const canEdit = canManageSales();
+  let h = '';
+  // Счётчики
+  const stat = (v, l, icon, brand) =>
+    '<div style="background:var(--bg,#f1f5f9);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;">' +
+      '<div style="font-size:20px;font-weight:800;' + (brand ? 'color:var(--brand);' : '') + '">' + (v || 0) + '</div>' +
+      '<div style="font-size:11px;color:var(--text-light);margin-top:2px;"><i class="ti ' + icon + '"></i> ' + l + '</div></div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">';
+  h += stat(d.views, 'Просмотры', 'ti-eye', true);
+  h += stat(d.prints, 'Печати', 'ti-printer', false);
+  h += stat(d.downloads, 'Скачали', 'ti-download', false);
+  h += stat(d.devices, 'Устройств', 'ti-devices', false);
+  h += '</div>';
+
+  h += '<button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="createKpLink(' + offerId + ')"><i class="ti ti-plus"></i> Создать ссылку для клиента</button>';
+
+  const links = d.links || [];
+  if (links.length) {
+    h += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);margin:6px 0 6px;">Кому отправляли</div>';
+    links.forEach(l => {
+      const safeUrl = escapeHtml((l.url || '').replace(/'/g, "\\'"));
+      h += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;' + (l.is_active ? '' : 'opacity:.5;') + '">';
+      h += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">';
+      h += '<div style="font-weight:600;font-size:13.5px;">' + escapeHtml(l.recipient_name || 'Без имени') + (l.is_active ? '' : ' <span style="font-weight:400;color:var(--text-light);">(отозвана)</span>') + '</div>';
+      h += '<div style="font-size:12px;color:var(--text-light);white-space:nowrap;">' + (l.views || 0) + ' просм.</div>';
+      h += '</div>';
+      if (l.last_view_at) h += '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">последний просмотр ' + _kpEventTime(l.last_view_at) + '</div>';
+      h += '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">';
+      h += '<input readonly value="' + escapeHtml(l.url || '') + '" onclick="this.select()" style="flex:1;min-width:140px;font-size:12px;font-family:monospace;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#fff;">';
+      h += '<button class="btn btn-secondary btn-small" onclick="copyKpLink(\'' + safeUrl + '\')" title="Копировать"><i class="ti ti-copy"></i></button>';
+      if (canEdit && l.is_active) h += '<button class="btn btn-secondary btn-small" onclick="deleteKpLink(' + l.id + ',' + offerId + ')" title="Отозвать"><i class="ti ti-trash"></i></button>';
+      h += '</div></div>';
+    });
+  } else {
+    h += '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Ссылок пока нет. Создай ссылку и отправь клиенту — увидишь, когда её откроют.</div>';
+  }
+
+  const ev = d.events || [];
+  if (ev.length) {
+    h += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);margin:14px 0 6px;">Лента событий</div>';
+    h += '<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px;">';
+    ev.forEach(e => {
+      let icon = 'ti-eye', label = 'Просмотрено';
+      if (e.is_forward) { icon = 'ti-arrow-forward-up'; label = 'Открыто с нового устройства (возможно, переслали)'; }
+      else if (e.event_type === 'print') { icon = 'ti-printer'; label = 'Распечатано'; }
+      else if (e.event_type === 'download') { icon = 'ti-download'; label = 'Скачан PDF'; }
+      const geo = [e.city, e.country].filter(Boolean).join(', ');
+      const who = e.recipient_name ? (' · ' + e.recipient_name) : '';
+      const sub = [geo, e.device].filter(Boolean).join(' · ') + who;
+      h += '<div style="display:flex;gap:10px;align-items:flex-start;">';
+      h += '<div style="width:28px;height:28px;border-radius:50%;background:var(--brand-bg,#eef2ff);color:var(--brand);display:flex;align-items:center;justify-content:center;flex:none;"><i class="ti ' + icon + '"></i></div>';
+      h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;">' + escapeHtml(label) + '</div>';
+      if (sub.trim()) h += '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(sub) + '</div>';
+      h += '</div>';
+      h += '<div style="font-size:11.5px;color:var(--text-light);white-space:nowrap;">' + _kpEventTime(e.created_at) + '</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  // Подсказка про ограничения трекинга
+  h += '<div style="font-size:11.5px;color:var(--text-light);background:var(--bg,#f1f5f9);border-radius:8px;padding:9px 11px;margin-top:12px;">Открытие фиксируется надёжно. Печать и скачивание — когда клиент делает это на странице по ссылке. «Переслали» определяется по открытию с нового устройства.</div>';
+
+  el.innerHTML = h;
+}
+
+async function createKpLink(offerId) {
+  const name = prompt('Кому отправляете КП? (имя клиента / компании — для вашей статистики)');
+  if (name === null) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sale-offers/' + offerId + '/tracker-links', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipient_name: name }),
+    });
+    if (!r.ok) throw new Error('http');
+    const d = await r.json();
+    await loadOfferTracker(offerId);
+    copyKpLink(d.url);
+  } catch (e) {
+    showToast('Не удалось создать ссылку', 'error');
+  }
+}
+
+function copyKpLink(url) {
+  if (!url) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => showToast('Ссылка скопирована')).catch(() => showToast('Ссылка: ' + url));
+  } else {
+    showToast('Ссылка: ' + url);
+  }
+}
+
+async function deleteKpLink(linkId, offerId) {
+  if (!confirm('Отозвать ссылку? Клиент больше не сможет открыть КП по ней.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/kp-tracker-links/' + linkId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('http');
+    await loadOfferTracker(offerId);
+  } catch (e) {
+    showToast('Не удалось отозвать', 'error');
+  }
 }
 
 async function downloadOfferPdf() {
