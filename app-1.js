@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.448";
+const APP_VERSION = "v2.45.449";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10153,6 +10153,15 @@ function renderOfferForm() {
   html += '<div id="sof-error"></div>';
 
   container.innerHTML = html;
+
+  // Авто-черновик нового КП: менеджер, контрагент, юрлицо и позиции выбираются
+  // через модалки/кнопки и НЕ порождают input/change-событий, поэтому
+  // глобального слушателя _formDraftAutosave недостаточно. renderOfferForm
+  // вызывается после каждого такого изменения state.offerForm — сохраняем
+  // черновик здесь, чтобы начатое КП пережило обновление страницы.
+  if (!isEdit) {
+    try { _draftSave(OFFER_DRAFT_KEY, state.offerForm, _offerDraftHasContent); } catch (_) {}
+  }
 
   // Подвязка полей
   document.getElementById('sof-valid-duration-value').addEventListener('input', e => {
