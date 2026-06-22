@@ -18298,3 +18298,10 @@
 .sv2-mode .sup-shop-group-contact { padding: 4px 16px 12px; gap: 8px 16px; }
 /* «Сформировать заказ» внутри группы — на всю ширину, заметная */
 .sv2-mode .cp-block .btn-primary { border-radius: 10px; }
+
+/* v2.45.445: назначение монтажника прямо в карточке монтажа */
+.idet-assignee { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; background: var(--bg-soft, #F1F5F9); border-radius: 10px; }
+.idet-assignee-label { font-size: 13px; font-weight: 600; color: var(--text-mid, #475569); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.idet-assignee-label i { color: var(--brand); }
+.idet-assignee-select { flex: 1; min-width: 160px; border: 1px solid var(--border, #D1D5DB); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; background: #fff; }
+.idet-assignee-hint { width: 100%; font-size: 11.5px; color: var(--text-light, #94A3B8); }
