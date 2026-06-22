@@ -9272,8 +9272,16 @@
     display: grid; grid-template-columns: 1fr; gap: 8px;
   }
   .desktop-layout .item-row-edit .ire-body {
-    grid-template-columns: 2fr 80px 100px 70px 100px;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
   }
+  /* v2.45.460: расшифровка позиции — отдельной строкой во всю ширину, заметно */
+  .item-row-edit .ire-desc { margin-bottom: 8px; }
+  .item-row-edit .ire-desc input {
+    width: 100%; padding: 8px 10px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13.5px;
+  }
+  .item-row-edit .ire-desc input:focus { border-color: var(--brand); outline: none; }
   .item-row-edit .ire-body input,
   .item-row-edit .ire-body textarea {
     width: 100%; padding: 8px 10px;

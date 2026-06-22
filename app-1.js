@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.461-kp-tracker";
+const APP_VERSION = "v2.45.462";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10607,9 +10607,9 @@ function renderOfferForm() {
         html += ' <span class="ire-no-product" style="font-size:11px;">(не из каталога)</span>';
       }
       html += '</div>';
+      html += '<div class="ire-desc"><label class="ire-label">Расшифровка — что это, видит клиент</label>' +
+              '<input type="text" value="' + escapeHtml(it.description || '') + '" oninput="updateOfferItem(' + idx + ', \'description\', this.value)" placeholder="напр.: Щит управления, стандартное исполнение, IP54; автоматика Carel"></div>';
       html += '<div class="ire-body">';
-      html += '<div><label class="ire-label">Описание</label>' +
-              '<input type="text" value="' + escapeHtml(it.description || '') + '" oninput="updateOfferItem(' + idx + ', \'description\', this.value)" placeholder="доп. описание"></div>';
       html += '<div><label class="ire-label">Кол-во</label>' +
               '<input type="number" step="0.01" min="0" value="' + (it.qty || 1) + '" oninput="updateOfferItem(' + idx + ', \'qty\', this.value)"></div>';
       html += '<div><label class="ire-label">Цена ₽</label>' +
