@@ -18015,6 +18015,12 @@
 .spv-body .xls-tbl td { min-width: 0; max-width: 360px; padding: 4px 9px; word-break: normal; overflow-wrap: break-word; hyphens: none; }
 .spv-body .xls-tbl img { max-width: 240px; max-height: 180px; }
 .spv-body .xls-tbl .xls-imgs img { max-width: 240px; max-height: 180px; }
+/* v2.45.459: вкладки листов прайса (как в Excel снизу) */
+.spv-sheettabs { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--border, #E2E8F0); overflow-x: auto; white-space: nowrap; background: #fff; }
+.spv-sheettabs-lbl { font-size: 12px; font-weight: 600; color: var(--text-light, #94A3B8); flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.spv-sheet-tab { flex: none; border: 1px solid var(--border, #E2E8F0); background: var(--bg-soft, #F1F5F9); color: var(--text-mid, #475569); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.spv-sheet-tab:hover { background: #EAF2FB; }
+.spv-sheet-tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 
 /* ============ ОТЧЁТЫ МЕНЕДЖЕРОВ (ежедневный KPI) ============ */
 .sr-toolbar { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 2px 0 16px; }
