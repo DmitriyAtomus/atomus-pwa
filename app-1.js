@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.422-atomcad-power-mark";
-const APP_VERSION_DATE = "17.06.2026";
+const APP_VERSION = "v2.45.441";
+const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -10289,38 +10289,9 @@ function openManagerModalForOffer() {
   openManagerModal();
 }
 
-// Переопределим selectManager чтобы он мог писать и в contractForm, и в offerForm
-const _origSelectManager = typeof selectManager === 'function' ? selectManager : null;
-window.selectManager = function(managerId) {
-  if (state._managerModalContext === 'offer') {
-    if (managerId === null) {
-      state.offerForm.manager_id = null;
-      state.offerForm.manager_name = '';
-    } else {
-      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
-      if (m) {
-        state.offerForm.manager_id = managerId;
-        state.offerForm.manager_name = m.short_name || m.full_name || '';
-      }
-    }
-    state._managerModalContext = null;
-    closeManagerModal();
-    renderOfferForm();
-    return;
-  }
-  // Для договоров — старая логика
-  if (managerId === null) {
-    state.contractForm.manager_id = null;
-    state.contractForm._manager_name = '';
-  } else {
-    const m = (cache.managersForPicker || []).find(x => x.id === managerId);
-    if (!m) return;
-    state.contractForm.manager_id = managerId;
-    state.contractForm._manager_name = m.short_name || m.full_name || '';
-  }
-  closeManagerModal();
-  renderContractForm();
-};
+// selectManager живёт в app-4.js (там объявление function selectManager,
+// которое грузится позже и перекрывает любой override отсюда). Контекст КП
+// (offerForm) обрабатывается прямо там по state._managerModalContext.
 
 // --------- МОДАЛКА КОНТРАГЕНТА ДЛЯ КП ----------
 
@@ -10329,26 +10300,8 @@ function openContractorModalForOffer() {
   openContractorModal();
 }
 
-// Переопределим selectContractor — поддержка двух контекстов
-window.selectContractor = function(contractorId) {
-  const c = (cache.contractors || []).find(x => x.id === contractorId);
-  if (!c) return;
-  if (state._contractorModalContext === 'offer') {
-    state.offerForm.contractor_id = contractorId;
-    state.offerForm.contractor_name = c.name;
-    state.offerForm.contractor_inn = c.inn || '';
-    state._contractorModalContext = null;
-    closeContractorModal();
-    renderOfferForm();
-    return;
-  }
-  // Для договоров — старая логика
-  state.contractForm.contractor_id = contractorId;
-  state.contractForm._contractor_name = c.name;
-  state.contractForm._contractor_inn = c.inn || '';
-  closeContractorModal();
-  renderContractForm();
-};
+// selectContractor живёт в app-4.js (объявление перекрывает override отсюда).
+// Контекст КП (offerForm) обрабатывается там по state._contractorModalContext.
 
 // --------- МОДАЛКА ВЫБОРА ПРОДАЖНОЙ ПОЗИЦИИ ----------
 
