@@ -12458,6 +12458,21 @@ function _renderInstallationDetail(d) {
   });
   if (itemsHtml) itemsHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-clipboard-list"></i> Что нужно сделать по договору</div>' + itemsHtml + '</div>';
 
+  // v2.45.447: спецификация договора (что монтировать) — для исполнителя
+  var specHtml = '';
+  if (d.contract_spec && d.contract_spec.length) {
+    specHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-list-details"></i> Спецификация — что монтировать <span class="idi-cnt">' + d.contract_spec.length + '</span></div>';
+    d.contract_spec.forEach(function (s) {
+      specHtml += '<div class="idi-row"><span class="idi-name">' + escapeHtml(s.name || '—') + '</span>' +
+        '<span class="idi-meta">' + (parseFloat(s.qty) || 0) + ' ' + escapeHtml(s.unit || 'шт.') + '</span></div>';
+    });
+    specHtml += '</div>';
+  }
+  // v2.45.447: чат и файлы по договору (комментарии + вложения — переиспользуем чат договора)
+  var chatBtn = d.contract_id
+    ? '<button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="state.currentContractId=' + d.contract_id + ';if(typeof openContractChat===\'function\')openContractChat();"><i class="ti ti-message-circle"></i> Чат и файлы по договору</button>'
+    : '';
+
   // v2.45.445: назначение монтажника прямо в карточке (управляющим)
   var assigneeCtrl = '';
   if (canManage) {
@@ -12485,8 +12500,10 @@ function _renderInstallationDetail(d) {
         '</div>' +
         (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
         assigneeCtrl +
-        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Что монтировать:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
+        chatBtn +
+        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Детали для монтажника:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
         itemsHtml +
+        specHtml +
         '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
         '<div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">' + flowHtml + '</div>' +
         '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
