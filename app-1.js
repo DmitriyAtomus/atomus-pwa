@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.456";
+const APP_VERSION = "v2.45.457";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -11960,7 +11960,7 @@ async function openSalePriceViewer() {
       '</div>' +
       '<div class="spv-bar">' +
         '<label class="btn btn-secondary spv-upload"><i class="ti ti-upload"></i> Загрузить прайс' +
-          '<input type="file" accept=".xlsx" style="display:none" onchange="onSalePriceUpload(this)"></label>' +
+          '<input type="file" accept=".xlsx,.xlsm,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="onSalePriceUpload(this)"></label>' +
         '<div class="spv-files" id="spv-files"></div>' +
       '</div>' +
       '<div class="spv-hint" id="spv-hint">Загрузите Excel-прайс (.xlsx) или выберите ранее загруженный — он откроется таблицей, как в Excel (с фото). Кликните по строке с моделью, чтобы добавить её в КП с ценой.</div>' +
