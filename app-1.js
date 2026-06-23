@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.484-atomcad-psu-sym";
+const APP_VERSION = "v2.45.485-atomcad-psu-sym";
 const APP_VERSION_DATE = "23.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9226,16 +9226,20 @@ function _renderSpfSpecs() {
   if (!box) return;
   const specs = state.saleProductForm.specs || [];
   if (!specs.length) {
-    box.innerHTML = '<div class="linked-empty">Характеристик нет. Добавьте — они появятся в карточке и под позицией в КП.</div>';
+    box.innerHTML = '<div class="spf-specs-empty">Характеристик нет. Добавьте — они появятся в карточке и под позицией в КП.</div>';
     return;
   }
-  box.innerHTML = specs.map((row, i) =>
-    '<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">' +
-      '<input type="text" placeholder="Параметр (напр. Холодопроизводительность)" value="' + escapeHtml(row.key || '') + '" oninput="updateSpfSpec(' + i + ',\'key\',this.value)" style="flex:1; min-width:0;">' +
-      '<input type="text" placeholder="Значение (напр. 2,73 кВт)" value="' + escapeHtml(row.val || '') + '" oninput="updateSpfSpec(' + i + ',\'val\',this.value)" style="flex:1; min-width:0;">' +
-      '<button class="lm-remove" onclick="removeSpfSpec(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
-    '</div>'
-  ).join('');
+  let html = '<div class="spf-specs-table">';
+  html += '<div class="spf-specs-head"><span>Параметр</span><span>Значение</span><span></span></div>';
+  specs.forEach((row, i) => {
+    html += '<div class="spf-spec-row">' +
+      '<input class="spf-spec-k" type="text" placeholder="напр. Холодопроизводительность" value="' + escapeHtml(row.key || '') + '" oninput="updateSpfSpec(' + i + ',\'key\',this.value)">' +
+      '<input class="spf-spec-v" type="text" placeholder="напр. 2,73 кВт" value="' + escapeHtml(row.val || '') + '" oninput="updateSpfSpec(' + i + ',\'val\',this.value)">' +
+      '<button class="spf-spec-del" onclick="removeSpfSpec(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
 }
 
 function addSpfSpec() {
