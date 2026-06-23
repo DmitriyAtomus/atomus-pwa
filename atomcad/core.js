@@ -139,7 +139,8 @@ function buildSpec(P){
   // автоматы
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
-  var kmN=1, _cov=auxCoverSet(P);
+  var _auxKm=(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length;   // добавленные контакторы уже заняли KM1..KMn
+  var kmN=_auxKm+1, _cov=auxCoverSet(P);
   (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_cov,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:unm}); kmN++; } } });
   // датчики
   var btN=1;
@@ -240,7 +241,7 @@ function buildSchematic(P){
   });
   var nT=cols.length, step=720, maxX=3850;
   if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
-  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
+  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
     var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
