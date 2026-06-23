@@ -27,6 +27,8 @@ function contactorPick(curA){ curA=+curA||0; for(var i=0;i<NC1.length;i++){ if(N
 function contactorModel(c){ var n=contactorPick(consumerCurrent(c)); return n.m+' '+n.a+'А 230В AC-3 '+n.aux; }
 // реальный габарит контактора (Ш×В×Г) — для понимания размера
 function contactorDimStr(c){ var n=contactorPick(consumerCurrent(c)); return n.w+'×'+n.h+'×'+n.d+' мм · 3-пол.'; }
+// символ УГО для аппарата из «Вспомогат.» в редакторе (ключи совпадают с SYM в editor.html)
+function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'coil',ssr:'box',psu:'box',vfd:'box',fan:'m3',contactor:'km3',breaker:'qf1',other:'box'})[k]||'box';}
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
@@ -300,6 +302,20 @@ function buildSchematic(P){
     if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,ls:0,anchor:'start',tx:'N'}); }
     var hlN=1;
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
+    // остальные аппараты из «Вспомогат.» (кнопки, переключатели, грибок, реле, твердотельные реле и т.д.) — отдельным блоком
+    var auxApp=(P.aux||[]).filter(function(a){return a.kind!=='lamp';});
+    if(auxApp.length){
+      var maxDevY=(ctrlY+40)+Math.max(inA.length,outA.length,1)*SP+200;
+      var aTop=Math.max(ctrlY+G.bodyH, maxDevY)+460, per=7, ax0=380, axs=470, ays=470, ci=0;
+      at.push({x:ax0,y:aTop-170,s:36,tx:'АППАРАТЫ УПРАВЛЕНИЯ'});
+      auxApp.forEach(function(a){ var q=a.qty||1; for(var k=0;k<q;k++){
+        var col=ci%per, rw=Math.floor(ci/per), x=ax0+col*axs, y=aTop+rw*ays;
+        var des=(a.tag||'A')+(q>1?('.'+(k+1)):'');
+        var note=(a.name||'')+(a.target?(' · '+a.target):'');
+        ac.push(C(des, auxSym2(a.kind), x, y, a.model||'', a.manu||'', note));
+        ci++;
+      }});
+    }
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
   }
   // на схеме — только обозначение; полное название элемента видно по наведению мыши
