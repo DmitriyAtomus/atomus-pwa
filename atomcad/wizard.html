@@ -120,8 +120,9 @@ function ctrlIO(model){
   if(/EV3223/.test(model)) return {pins:{AI:[{id:'Pb1'},{id:'Pb2'}],DI:[{id:'D.I.',dry:1}],AO:[],DO:[{id:'K1'},{id:'K2'},{id:'K3'}]},asg:{K1:'Компрессор',K2:'Оттайка',K3:'Вентиляторы'}};
   return {pins:{AI:[{id:'AI1'},{id:'AI2'}],DI:[{id:'DI1',dry:1}],AO:[{id:'AO1'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'}]},asg:{}};
 }
+var DEMO_NAME='Холодильная камера созревания';   // демо-имя по умолчанию (считается «автоматическим»)
 function newProject(){
-  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:'Холодильная камера созревания',nameAuto:true,
+  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:DEMO_NAME,nameAuto:true,
     controller:{model:'EVCO c-pro 3 OEM (EPB9OR)', io:ctrlIO('EVCO c-pro 3 OEM (EPB9OR)')},
     consumers:[{id:uid('c'),name:'ККБ Royal Clima ES-E 60HX',phases:3,kw:7,needs:'motor',qty:1},
                {id:uid('c'),name:'ТЭН воздухоохладителя',phases:1,kw:2.43,needs:'heater',qty:2},
@@ -258,7 +259,17 @@ function rmSection(code){
     else gone();
   });
 }
-function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same){P.num=nextNum(code);if(P.nameAuto&&s)P.name=s[1];}expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
+/* имя «автоматическое» (не задано вручную) — можно подменять под раздел: пустое,
+   помечено nameAuto, совпадает с названием любого раздела, либо это демо-имя вне его
+   «родного» холодильного раздела (внутри ЩУ-003 «камера созревания» — осмысленное имя) */
+function nameLooksAuto(targetCode){
+  if(P.nameAuto)return true;
+  var nm=(P.name||'').trim();
+  if(!nm)return true;
+  if(nm===DEMO_NAME && targetCode!=='ЩУ-003')return true;
+  return SECTIONS.some(function(s){return s[1]===nm;});
+}
+function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same)P.num=nextNum(code);if(s&&nameLooksAuto(code)&&P.name!==s[1]){P.name=s[1];P.nameAuto=true;}expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
 function updTag(){$('projTag').innerHTML=P.section+'.'+pad3(P.num)+' · <b>'+esc(P.name)+'</b>'}
 
 /* 2 контроллер + IO */
