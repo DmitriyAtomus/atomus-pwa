@@ -604,9 +604,10 @@ function renderContractAssembliesBlock(c) {
   const canShip = canManageSales();
   if (readyCount > 0 && canShip) {
     html += '<div style="margin-bottom: 14px;">' +
-      '<button class="btn btn-primary" onclick="shipByContract(' + c.id + ')" style="width: 100%; justify-content: center;">' +
+      '<button class="btn ship-btn-fallback" onclick="shipByContract(' + c.id + ')">' +
         '<i class="ti ti-truck-delivery"></i> Отгрузить по договору (готово ' + readyCount + ')' +
       '</button>' +
+      '<div style="font-size:11.5px;color:var(--text-light);text-align:center;margin-top:5px;">Запасной вариант — если не получается по коду</div>' +
       '</div>';
   }
   // v2.45.93: пакетная печать QR-наклеек на все готовые сборки договора
@@ -10714,6 +10715,25 @@ async function rollbackContractShipment(contractId) {
   }
 }
 
+// v2.45.425: откат сборки к отгрузке — снимает все отметки «собрано» по договору.
+// Без пароля (склад не затрагивается, в отличие от отгрузки).
+async function rollbackContractGathering(contractId) {
+  if (!contractId) return;
+  if (!confirm('Откатить сборку к отгрузке? Все отметки «собрано» снимутся (счётчик сборки вернётся к 0). Склад не затрагивается.')) return;
+  try {
+    const resp = await apiPost('/api/contracts/' + contractId + '/gatherings/reset', {});
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast('Сборка откачена' + (d.removed ? ' (' + d.removed + ')' : ''), 'success');
+      if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
+    } else {
+      showToast((d && (d.message || d.error)) || 'Не удалось откатить сборку', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 // v2.45.405: запросить сборку к отгрузке — помечает договор и шлёт уведомление
 // сборщику (мастер/слесарь видит его в «колокольчике» и комплектует по QR).
 async function requestShipmentAssembly(contractId) {
@@ -10726,6 +10746,25 @@ async function requestShipmentAssembly(contractId) {
       if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
     } else {
       showToast((d && (d.message || d.error)) || 'Не удалось отправить запрос', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.45.429: отозвать запрос сборки к отгрузке — снять отметку «сборка запрошена».
+// Возвращает блок к состоянию с кнопкой «Запросить сборку к отгрузке».
+async function cancelShipmentAssembly(contractId) {
+  if (!contractId) return;
+  if (!confirm('Отозвать запрос сборки к отгрузке? Отметка «сборка запрошена» снимется, у сборщика договор уйдёт из списка к сборке. Уже собранное не трогаем.')) return;
+  try {
+    const resp = await apiPost('/api/contracts/' + contractId + '/cancel-shipment-assembly', {});
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast('Запрос сборки отозван', 'success');
+      if (typeof loadContractShipmentBlock === 'function') loadContractShipmentBlock(contractId);
+    } else {
+      showToast((d && (d.message || d.error)) || 'Не удалось отозвать запрос', 'error');
     }
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
@@ -10775,7 +10814,7 @@ async function loadContractShipmentBlock(contractId) {
       if (isComplete) {
         html += '<button class="ship-start-btn complete" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-check-circle"></i> Всё отгружено · открыть</button>';
       } else {
-        html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Начать отгрузку</button>';
+        html += '<button class="ship-start-btn code" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Отгрузить по коду (рекомендуется)</button>';
       }
       // v2.45.142: откат отгрузки (под паролем) — если что-то уже отгружено
       if (shipped > 0 && canManageSales()) {
@@ -10787,7 +10826,7 @@ async function loadContractShipmentBlock(contractId) {
       }
     } else {
       html += '<div style="font-size:13px;color:var(--text-light);padding:8px 0;text-align:center;">К договору не привязано ни одной сборки или коробки.<br>Добавьте сборки или создайте коробки.</div>';
-      html += '<button class="ship-start-btn" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Открыть отгрузку</button>';
+      html += '<button class="ship-start-btn code" onclick="openShipmentMode(' + contractId + ')"><i class="ti ti-scan"></i> Отгрузить по коду</button>';
     }
     html += '</div>';
 
@@ -10817,14 +10856,28 @@ async function loadContractShipmentBlock(contractId) {
             'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
             'display:flex;align-items:center;justify-content:center;gap:6px;">' +
             '<i class="ti ti-bell-ringing"></i> Запросить повторно</button>';
+          // v2.45.429: отозвать запрос — вернуться к состоянию с кнопкой «Запросить сборку»
+          html += '<button onclick="cancelShipmentAssembly(' + contractId + ')" ' +
+            'style="width:100%;margin-top:8px;background:none;border:1px solid #FCA5A5;color:#B91C1C;' +
+            'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+            'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+            '<i class="ti ti-bell-off"></i> Отозвать сборку</button>';
         } else {
-          html += '<button class="ship-start-btn" onclick="requestShipmentAssembly(' + contractId + ')">' +
+          html += '<button class="ship-start-btn request" onclick="requestShipmentAssembly(' + contractId + ')">' +
             '<i class="ti ti-bell-ringing"></i> Запросить сборку к отгрузке</button>';
         }
       }
       // «Собрать по QR» — сборщику (мастер/слесарь): комплектация по сканам
       html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="openShipmentMode(' + contractId + ', \'gather\')">' +
         '<i class="ti ti-scan"></i> ' + (gComplete ? 'Собрано · открыть' : 'Собрать по QR') + '</button>';
+      // v2.45.425: откат сборки к отгрузке — снять все отметки «собрано» (склад не трогается)
+      if (gDone > 0) {
+        html += '<button onclick="rollbackContractGathering(' + contractId + ')" ' +
+          'style="width:100%;margin-top:8px;background:none;border:1px solid #FCA5A5;color:#B91C1C;' +
+          'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+          'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+          '<i class="ti ti-arrow-back-up"></i> Откатить сборку (' + gDone + ')</button>';
+      }
       html += '</div>';
     }
 
@@ -11249,6 +11302,8 @@ function renderBoxDetail(box) {
     '<div style="padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;background:var(--bg);border-top:1px solid var(--border);">' +
       (items.length ? '<button class="btn btn-primary btn-small" onclick="printPackingList(' + box.id + ')">' +
                       '<i class="ti ti-printer"></i> Упаковочный лист (A4)</button>' : '') +
+      (items.length ? '<button class="btn btn-secondary btn-small" onclick="printPackingListToOffice(' + box.id + ')">' +
+                      '<i class="ti ti-printer"></i> На печать</button>' : '') +
       '<button class="btn btn-secondary btn-small" onclick="showBoxQr(' + box.id + ', ' +
         JSON.stringify(box.name || ('Коробка #' + box.id)).replace(/"/g, '&quot;') + ', ' +
         JSON.stringify(box.qr_token || '').replace(/"/g, '&quot;') + ', ' +
@@ -11558,6 +11613,27 @@ async function printPackingList(boxId) {
     renderPackingListPrint(box);
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+  }
+}
+
+// Отправка упаковочного листа на офисный принтер через шлюз документов
+// (печатает сервер офиса; работает и удалённо).
+async function printPackingListToOffice(boxId) {
+  showToast('Отправляю на печать…', 'success');
+  try {
+    const r = await apiPost('/api/documents/print', {
+      doc_type: 'box_packing_list',
+      box_id: boxId,
+      copies: 1,
+    });
+    if (r.ok) {
+      showToast('Отправлено на офисный принтер', 'success');
+    } else {
+      const msg = (r.data && (r.data.message || r.data.error)) || 'Не удалось отправить на печать';
+      showToast(msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
   }
 }
 

@@ -738,6 +738,10 @@ async function openComponentForm(componentId) {
         '</div>' +
         '<label class="form-label">Мин. остаток (для алертов)</label>' +
         '<input type="number" id="cf-min" class="form-input" value="' + ((c && c.min_stock) || 0) + '" min="0" step="0.01" style="margin-bottom:14px;" />' +
+        // v2.45.436: «сколько заказывать» — фиксированное кол-во к заказу при низком
+        // остатке. Пусто = авто (заказываем дефицит до минимума).
+        '<label class="form-label">Сколько заказывать <span style="color:var(--text-light);font-weight:400;font-size:11px;">(фикс. кол-во при низком остатке; пусто = авто до минимума)</span></label>' +
+        '<input type="number" id="cf-reorder" class="form-input" value="' + ((c && c.reorder_qty) || '') + '" min="0" step="0.01" placeholder="напр. 2 (при остатке ≤ минимума заказать 2 шт)" style="margin-bottom:14px;" />' +
         // v2.45.217: кратность закупки (фасовка/бухта) — в «Что закупить» количество
         // округляется вверх до кратного (наконечники по 100, провод по 40/50 м).
         '<label class="form-label">Кратность закупки <span style="color:var(--text-light);font-weight:400;font-size:11px;">(фасовка/бухта — закупаем кратно; пусто = поштучно)</span></label>' +
@@ -1076,6 +1080,8 @@ async function submitComponentForm(componentId) {
     min_stock: parseFloat(document.getElementById('cf-min').value || 0),
     purchase_pack: ((document.getElementById('cf-pack') || {}).value || '').trim() === ''
       ? null : parseFloat(document.getElementById('cf-pack').value),
+    reorder_qty: ((document.getElementById('cf-reorder') || {}).value || '').trim() === ''
+      ? null : parseFloat(document.getElementById('cf-reorder').value),
     comment: (document.getElementById('cf-comment').value || '').trim(),
     default_supplier_id: supVal ? parseInt(supVal) : null,
     supply_item_id: siVal ? parseInt(siVal) : null,
@@ -4543,11 +4549,83 @@ function showSupplierModal(s) {
             '</div>' +
           '</div>'
         : '') +
+        // Переписка с поставщиком — входящие письма (из IMAP-инбокса)
+        (isEdit ?
+          '<div class="form-group">' +
+            '<label>Переписка <span style="text-transform:none;font-weight:400;color:var(--text-light);">— входящие письма от поставщика</span></label>' +
+            '<div id="sm-correspondence" style="margin-top:6px;">' +
+              '<div style="font-size:12px;color:var(--text-light);">Загружаем…</div>' +
+            '</div>' +
+          '</div>'
+        : '') +
         (canManage ? '<div class="modal-actions"><button class="btn btn-primary" onclick="saveSupplier(' + (isEdit ? s.id : 'null') + ')"><i class="ti ti-check"></i> Сохранить</button></div>' : '') +
       '</div>' +
     '</div>';
   m.classList.add('visible');
   if (isEdit && canManage) _refreshSupplierPriceCount(s.id);
+  if (isEdit) _loadSupplierCorrespondence(s.id);
+}
+
+async function _loadSupplierCorrespondence(supplierId) {
+  const el = document.getElementById('sm-correspondence');
+  if (!el) return;
+  let items = [];
+  let supEmail = '';
+  try {
+    const d = await apiGet('/api/suppliers/' + supplierId + '/correspondence');
+    items = (d && d.items) || [];
+    supEmail = (d && d.supplier_email) || '';
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-light);">Не удалось загрузить переписку</div>';
+    return;
+  }
+  if (!items.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-light);">' +
+      (supEmail ? 'Писем от ' + escapeHtml(supEmail) + ' пока нет.' : 'У поставщика не указан email — письма не сматчить. Заполни email выше.') +
+      '</div>';
+    return;
+  }
+  let html = '<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px;">';
+  items.forEach(m => {
+    const dt = _supCorrDate(m.received_at);
+    const who = escapeHtml(m.from_name || m.from_addr || 'Поставщик');
+    const subj = escapeHtml(m.subject || '(без темы)');
+    const ord = m.order_label ? ('<span style="font-size:11px;background:var(--brand-bg,#eef2ff);color:var(--brand,#2563eb);border-radius:6px;padding:1px 6px;margin-left:6px;">' + escapeHtml(m.order_label) + '</span>') : '';
+    const body = (m.body_text || '').trim();
+    const bodyShort = body.length > 320 ? (escapeHtml(body.slice(0, 320)) + '…') : escapeHtml(body);
+    let atts = '';
+    if (m.attachments && m.attachments.length) {
+      atts = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' +
+        m.attachments.map(a =>
+          '<button class="btn btn-secondary btn-small" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + a.idx + ',\'' + escapeHtml((a.name || '').replace(/'/g, "\\'")) + '\')" title="Скачать">' +
+            '<i class="ti ti-paperclip"></i> ' + escapeHtml(a.name || ('файл ' + (a.idx + 1))) +
+          '</button>'
+        ).join('') +
+      '</div>';
+    }
+    html += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
+        '<div style="font-weight:600;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + who + ord + '</div>' +
+        '<div style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(dt) + '</div>' +
+      '</div>' +
+      '<div style="font-size:13px;font-weight:500;margin-top:3px;">' + subj + '</div>' +
+      (bodyShort ? '<div style="font-size:12.5px;color:var(--text);margin-top:5px;white-space:pre-wrap;word-break:break-word;">' + bodyShort + '</div>' : '') +
+      atts +
+    '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function _supCorrDate(s) {
+  if (!s) return '';
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return String(s).slice(0, 16).replace('T', ' ');
+    const pad = (n) => String(n).padStart(2, '0');
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + String(d.getFullYear()).slice(2) +
+      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  } catch (e) { return String(s).slice(0, 16).replace('T', ' '); }
 }
 
 function closeSupplyModal() {
@@ -5222,13 +5300,34 @@ const _CP_ORDER_STATUS_RU = {
   awaiting_invoice: ['Счёт запрошен',         '#92400E', '#FEF3C7'],
   invoice_received: ['Счёт получен',          '#3730A3', '#E0E7FF'],
   to_pay:           ['На оплате',             '#9A3412', '#FFEDD5'],
-  paid:             ['Оплачен · ждём поставку', '#065F46', '#D1FAE5'],
+  paid:             ['Оплачен',                '#065F46', '#D1FAE5'],
   partial:          ['Доставка частично',     '#065F46', '#D1FAE5'],
   received:         ['Получено',              '#15803D', '#DCFCE7'],
   cancelled:        ['Заказ отменён',         '#7F1D1D', '#FEE2E2'],
 };
 
 function _cpRowHtml(it) {
+  // v2.45.443: новый вид (карточка buy-item с галочкой/«К заказу») — под переключателем
+  if (window.SUPPLY_SHOP_V2) {
+    let st2;
+    if (it.purchase_status === 'ordered') {
+      const s2 = _CP_ORDER_STATUS_RU[it.order_status];
+      st2 = '<span class="sv2-buy-status ordered">' + escapeHtml(s2 ? s2[0] : 'Заказано') + '</span>';
+    } else {
+      st2 = '<span class="sv2-buy-status todo">К заказу</span>';
+    }
+    const sName2 = JSON.stringify(it.item_name || '').replace(/"/g, '&quot;');
+    return '<div class="sv2-buy">' +
+      '<input type="checkbox" class="cp-check sv2-buy-check" data-cpid="' + it.id + '" onchange="_cpBulkUpdate()" onclick="event.stopPropagation();">' +
+      '<div class="sv2-buy-body" onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" title="Открыть договор">' +
+        '<div class="sv2-buy-title">' + escapeHtml(it.item_name || '—') + '</div>' +
+        '<div class="sv2-buy-meta">договор ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</div>' +
+      '</div>' +
+      '<span class="sv2-buy-qty">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+      st2 +
+      '<button type="button" class="sv2-buy-x" title="Убрать из закупки (в договоре останется)" onclick="event.stopPropagation();_cpSkipItem(' + it.id + ',' + sName2 + ')"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  }
   let stBadge;
   if (it.purchase_status === 'ordered') {
     const st = _CP_ORDER_STATUS_RU[it.order_status];
@@ -5286,44 +5385,374 @@ async function _cpSkipItem(itemId, name) {
 function _contractPurchasesBlockHtml(items) {
   if (!items || !items.length) return '';
   state._cpItems = items;
-  // Группируем по поставщику (не назначен — первым, по нему и работаем)
+  // v2.45.427: «К заказу» (pending) и «Ждём поставку» (ordered) — раздельно.
+  // Уже заказанные/оплаченные больше не предлагаются к закупке, а уезжают в
+  // отдельную таблицу-трекинг (статус, сколько дней ждём, связь с поставщиком).
+  const pending = items.filter(x => x.purchase_status !== 'ordered');
+  const ordered = items.filter(x => x.purchase_status === 'ordered');
+  let out = '';
+
+  if (pending.length) {
+    // Группируем по поставщику (не назначен — первым, по нему и работаем)
+    const bySup = {};
+    pending.forEach(it => {
+      const k = it.supplier_id || 0;
+      if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
+      bySup[k].items.push(it);
+    });
+    let h = '<div class="sup-shop-group cp-block">' +
+      '<div class="sup-shop-group-head">' +
+        '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart"></i> Покупные позиции по договорам' +
+          '<span class="sup-shop-group-count">' + pending.length + ' ' + (pending.length === 1 ? 'позиция' : (pending.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
+        '</div>' +
+        '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
+          '<i class="ti ti-truck"></i> Назначить поставщика (<span id="cp-assign-count">0</span>)</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Отметь позиции галочками → «Назначить поставщика» — для запроса счёта. Клик по названию откроет договор.</div>';
+    const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? -1 : b === '0' ? 1 : 0));
+    keys.forEach(k => {
+      const g = bySup[k];
+      if (k === '0') {
+        h += '<div style="font-size:12.5px;font-weight:700;color:#7F1D1D;padding:6px 14px 2px;"><i class="ti ti-alert-triangle"></i> Поставщик не назначен</div>';
+      } else {
+        const contacts = [g.contact, g.email, g.phone].filter(Boolean).map(escapeHtml).join(' · ');
+        const pendingIds = g.items.map(x => x.id);
+        h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
+          '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+          escapeHtml(g.name || '—') +
+          (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</span>' +
+          (pendingIds.length ? '<button class="btn btn-primary btn-sm" onclick="createCpOrder(' + g.id + ')">' +
+            '<i class="ti ti-mail-send"></i> Сформировать заказ (' + pendingIds.length + ')</button>' : '') +
+        '</div>';
+      }
+      g.items.forEach(it => { h += _cpRowHtml(it); });
+    });
+    h += '</div>';
+    out += h;
+  }
+
+  // Трекинг «Ждём поставку» рисуется централизованно в renderSupplyShopping
+  // (объединяет заказанное по договорам и заказанные комплектующие).
+  return out;
+}
+
+// v2.45.428: общий блок «Ждём поставку» — заказанные/оплаченные покупные позиции
+// по договорам И комплектующие. Принимает уже нормализованные элементы (CP-формат).
+function _waitingDeliveryBlockHtml(orderedItems) {
+  return _cpTrackingBlockHtml(orderedItems);
+}
+
+// Нормализует заказанное комплектующее (из shopping-list) к формату трекинга.
+function _componentToTracking(it, group) {
+  const projects = Array.isArray(it.plan_contracts) && it.plan_contracts.length
+    ? it.plan_contracts.map(n => '№' + n).join(', ')
+    : (it.reason || '');
+  return {
+    item_name: it.component_name,
+    contract_number: projects,
+    contract_id: null,
+    qty: it.recommended_qty,
+    unit: it.unit,
+    order_status: it.order_status,
+    order_label: it.order_label,
+    ordered_at: it.ordered_at || null,
+    supplier_id: group ? group.supplier_id : null,
+    supplier_name: group ? group.supplier_name : '',
+    supplier_email: group ? group.supplier_email : '',
+    supplier_phone: group ? group.supplier_phone : '',
+    supplier_contact: group ? group.supplier_contact : '',
+    _is_component: true,
+    order_id: it.order_id || null,
+    order_item_id: it.order_item_id || null,
+    order_expected: it.order_expected || null,
+    order_place: it.order_place || null,
+    order_label_short: it.order_label,
+  };
+}
+
+// v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
+// Показывает статус заказа, сколько дней ждём и кнопки связи с поставщиком.
+function _cpTrackingBlockHtml(ordered) {
+  if (!ordered || !ordered.length) return '';
+  // группируем по поставщику
   const bySup = {};
-  items.forEach(it => {
+  ordered.forEach(it => {
     const k = it.supplier_id || 0;
     if (!bySup[k]) bySup[k] = { id: it.supplier_id, name: it.supplier_name, email: it.supplier_email, phone: it.supplier_phone, contact: it.supplier_contact, items: [] };
     bySup[k].items.push(it);
   });
-  let h = '<div class="sup-shop-group cp-block">' +
+  let h = '<div class="sup-shop-group cp-block" style="margin-top:14px;">' +
     '<div class="sup-shop-group-head">' +
-      '<div class="sup-shop-group-name"><i class="ti ti-shopping-cart"></i> Покупные позиции по договорам' +
-        '<span class="sup-shop-group-count">' + items.length + ' ' + (items.length === 1 ? 'позиция' : (items.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
+      '<div class="sup-shop-group-name"><i class="ti ti-truck-delivery"></i> Ждём поставку' +
+        '<span class="sup-shop-group-count">' + ordered.length + ' ' + (ordered.length === 1 ? 'позиция' : (ordered.length < 5 ? 'позиции' : 'позиций')) + '</span>' +
       '</div>' +
-      '<button class="btn btn-secondary btn-sm" id="cp-assign-btn" style="display:none;" onclick="openCpSupplierPicker()">' +
-        '<i class="ti ti-truck"></i> Назначить поставщика (<span id="cp-assign-count">0</span>)</button>' +
     '</div>' +
-    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Отметь позиции галочками → «Назначить поставщика» — для запроса счёта. Клик по названию откроет договор.</div>';
-  const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? -1 : b === '0' ? 1 : 0));
+    '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Уже заказано/оплачено — едет. К закупке больше не предлагается. Долго нет поставки — свяжись с поставщиком.</div>';
+  const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? 1 : b === '0' ? -1 : 0));
   keys.forEach(k => {
     const g = bySup[k];
-    if (k === '0') {
-      h += '<div style="font-size:12.5px;font-weight:700;color:#7F1D1D;padding:6px 14px 2px;"><i class="ti ti-alert-triangle"></i> Поставщик не назначен</div>';
-    } else {
-      const contacts = [g.contact, g.email, g.phone].filter(Boolean).map(escapeHtml).join(' · ');
-      const pendingIds = g.items.filter(x => x.purchase_status !== 'ordered').map(x => x.id);
-      h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
-        '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
-        escapeHtml(g.name || '—') +
-        (contacts ? ' <span style="font-weight:400;color:var(--text-light);">· ' + contacts + '</span>' : '') + '</span>' +
-        // v2.45.236: сформировать заказ снабжения из позиций «К заказу» этого поставщика
-        (pendingIds.length ? '<button class="btn btn-primary btn-sm" onclick="createCpOrder(' + g.id + ')">' +
-          '<i class="ti ti-mail-send"></i> Сформировать заказ (' + pendingIds.length + ')</button>' : '') +
-      '</div>';
-    }
-    g.items.forEach(it => { h += _cpRowHtml(it); });
+    const contactBtns = [];
+    if (g.email) contactBtns.push('<a href="mailto:' + escapeHtml(g.email) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;"><i class="ti ti-mail"></i> Написать</a>');
+    // v2.45.429: вместо tel: — показываем сам номер, тап открывает карточку поставщика
+    if (g.phone) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
+      (g.id ? 'onclick="openEditSupplier(' + g.id + ')" title="Открыть карточку поставщика"' : 'disabled') +
+      '><i class="ti ti-phone"></i> ' + escapeHtml(g.phone) + '</button>');
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
+      '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+      escapeHtml(g.name || '(поставщик не назначен)') + '</span>' +
+      contactBtns.join('') +
+    '</div>';
+    g.items.forEach(it => { h += _cpTrackingRowHtml(it); });
   });
   h += '</div>';
   return h;
 }
+
+function _cpTrackingRowHtml(it) {
+  const st = _CP_ORDER_STATUS_RU[it.order_status];
+  const label = st ? st[0] : 'Заказано';
+  const fg = st ? st[1] : '#78350F';
+  const bg = st ? st[2] : '#FEF3C7';
+  const stBadge = '<span class="ssp-badge" style="color:' + fg + ';background:' + bg + ';">' +
+    escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') + '</span>';
+  const days = _daysSince(it.ordered_at);
+  // v2.45.432: «сколько ждём» — цветной чип-акцент, чтобы было видно сразу.
+  // Градация: сегодня — спокойный, 1-6 дней — синий, 7-13 — оранжевый (ждём
+  // уже неделю+), 14+ — красный с ⚠ (засиделось, пора теребить поставщика).
+  let ageBadge = '';
+  if (days !== null) {
+    let fg, bg, bold = false;
+    let txt = (days === 0) ? 'сегодня' : (days + ' ' + _plural(days, ['день', 'дня', 'дней']));
+    if (days >= 14)      { fg = '#7F1D1D'; bg = '#FEE2E2'; bold = true; txt += ' ⚠'; }
+    else if (days >= 7)  { fg = '#9A3412'; bg = '#FFEDD5'; bold = true; }
+    else if (days >= 1)  { fg = '#1E40AF'; bg = '#DBEAFE'; }
+    else                 { fg = '#475569'; bg = '#F1F5F9'; }
+    ageBadge = '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;' +
+      'white-space:nowrap;font-weight:' + (bold ? '700' : '600') + ';color:' + fg +
+      ';background:' + bg + ';padding:2px 8px;border-radius:999px;">' +
+      '<i class="ti ti-clock-hour-4" style="font-size:12px;"></i>' + txt + '</span>';
+  }
+  // v2.45.431: двухстрочная раскладка для мобилы — название отдельной строкой,
+  // под ним чипсы (кол-во · дни · статус · кнопка) с переносом, чтобы ничего не
+  // обрезалось за правый край экрана.
+  // У покупных по договору есть contract_id (тап → договор); у комплектующих —
+  // нет, показываем причину/проекты текстом без клика.
+  let nameCell;
+  if (it.contract_id) {
+    nameCell = '<div style="font-size:13.5px;font-weight:600;line-height:1.3;color:var(--text-dark);cursor:pointer;word-break:break-word;" ' +
+      'onclick="state.currentContractId=' + it.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" ' +
+      'title="Открыть договор ' + escapeHtml(it.contract_number || '') + '">' +
+      escapeHtml(it.item_name || '—') +
+      ' <span style="font-size:11px;font-weight:400;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
+    '</div>';
+  } else {
+    nameCell = '<div style="font-size:13.5px;font-weight:600;line-height:1.3;color:var(--text-dark);word-break:break-word;">' +
+      escapeHtml(it.item_name || '—') +
+      (it.contract_number ? ' <span style="font-size:11px;font-weight:400;color:var(--text-light);">· ' + escapeHtml(it.contract_number) + '</span>' : '') +
+    '</div>';
+  }
+  const qtyChip = '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' +
+    _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>';
+  // v2.45.430: «вернуть к закупке» — только для комплектующего в ЧЕРНОВИКЕ заказа
+  // (нельзя дёргать позицию из отправленного/оплаченного). Убирает строку из
+  // заказа → позиция снова попадает в «к закупке», можно собрать в другой заказ.
+  let returnBtn = '';
+  if (it._is_component && it.order_status === 'draft' && it.order_item_id) {
+    returnBtn = '<button type="button" onclick="shopReturnToBuy(' + it.order_item_id +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      'title="Убрать из черновика заказа и вернуть в список к закупке" ' +
+      'style="background:none;border:1px solid #FCA5A5;color:#B91C1C;border-radius:8px;' +
+      'padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-arrow-back-up"></i> вернуть к закупке</button>';
+  }
+  // v2.45.433: ожидаемая дата поставки («когда придёт»). Ставится на заказ (ORD),
+  // показывается у каждой позиции этого заказа. Если просрочена — красным с ⚠.
+  // v2.45.434: + куда придёт — «к нам» / «к ним на склад».
+  let etaChip = '';
+  if (it.order_id) {
+    const lbl = escapeHtml(String(it.order_label || '')).replace(/'/g, '&#39;');
+    const place = (it.order_place === 'us' || it.order_place === 'supplier') ? it.order_place : '';
+    const placeRu = place === 'us' ? ' · к нам' : (place === 'supplier' ? ' · к ним на склад' : '');
+    if (it.order_expected) {
+      const iso = String(it.order_expected).slice(0, 10);
+      const overdue = iso < new Date().toISOString().slice(0, 10);
+      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'' + iso + '\',\'' + place + '\')" ' +
+        'title="Ожидаемая дата и место поставки — нажми, чтобы изменить" ' +
+        'style="display:inline-flex;align-items:center;gap:3px;border:none;cursor:pointer;font-size:11px;font-weight:700;' +
+        'color:' + (overdue ? '#7F1D1D' : '#065F46') + ';background:' + (overdue ? '#FEE2E2' : '#D1FAE5') + ';padding:2px 8px;border-radius:999px;">' +
+        '<i class="ti ti-calendar-check" style="font-size:12px;"></i>придёт ' + _fmtDateRuShort(iso) + placeRu + (overdue ? ' ⚠' : '') + '</button>';
+    } else {
+      etaChip = '<button type="button" onclick="openEtaPicker(' + it.order_id + ',\'' + lbl + '\',\'\',\'' + place + '\')" ' +
+        'title="Указать ожидаемую дату и место поставки" ' +
+        'style="display:inline-flex;align-items:center;gap:3px;border:1px dashed #94A3B8;cursor:pointer;font-size:11px;font-weight:600;' +
+        'color:#475569;background:none;padding:2px 8px;border-radius:999px;">' +
+        '<i class="ti ti-calendar-plus" style="font-size:12px;"></i>когда придёт?' + (placeRu ? placeRu.replace(' · ', ' ') : '') + '</button>';
+    }
+  }
+  // Кнопка «получено» — товар пришёл, закрываем позицию заказа (для уже
+  // отправленных/оплаченных, не черновик). Закрытый заказ уходит из «Ждём поставку».
+  let receivedBtn = '';
+  if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
+    receivedBtn = '<button type="button" onclick="shopMarkReceived(' + it.order_item_id +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      'title="Товар пришёл — отметить позицию полученной и закрыть заказ" ' +
+      'style="background:none;border:1px solid #6EE7B7;color:#047857;border-radius:8px;' +
+      'padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-checkbox"></i> получено</button>';
+  }
+  return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
+    nameCell +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+      qtyChip +
+      ageBadge +
+      stBadge +
+      etaChip +
+      receivedBtn +
+      returnBtn +
+    '</div>' +
+  '</div>';
+}
+
+// v2.45.433: «15 июл» из ISO YYYY-MM-DD (короткий русский формат для чипа).
+function _fmtDateRuShort(iso) {
+  if (!iso) return '';
+  const p = String(iso).slice(0, 10).split('-');
+  if (p.length < 3) return iso;
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const d = parseInt(p[2], 10), mo = parseInt(p[1], 10) - 1;
+  if (isNaN(d) || mo < 0 || mo > 11) return iso;
+  return d + ' ' + months[mo];
+}
+
+// v2.45.433: окошко «когда придёт» — ожидаемая дата поставки по заказу (ORD).
+// v2.45.434: + куда придёт — «к нам» / «к ним на склад».
+function openEtaPicker(orderId, orderLabel, currentIso, currentPlace) {
+  if (!orderId) return;
+  window._etaPlace = (currentPlace === 'us' || currentPlace === 'supplier') ? currentPlace : '';
+  let m = document.getElementById('eta-picker-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'eta-picker-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const placeBtn = (val, label, icon) =>
+    '<button type="button" id="eta-place-' + val + '" onclick="setEtaPlace(\'' + val + '\')" ' +
+      'style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 8px;font-size:12.5px;font-weight:600;cursor:pointer;' +
+      'border-radius:8px;border:1.5px solid ' + (window._etaPlace === val ? '#2563EB' : 'var(--border)') + ';' +
+      'background:' + (window._etaPlace === val ? '#EFF6FF' : '#fff') + ';color:' + (window._etaPlace === val ? '#1E40AF' : 'var(--text-mid)') + ';">' +
+      '<i class="ti ' + icon + '"></i>' + label + '</button>';
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:400px;">' +
+      '<div class="modal-header"><h3><i class="ti ti-calendar-event"></i> Когда придёт' + (orderLabel ? ' · ' + escapeHtml(orderLabel) : '') + '</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'eta-picker-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="padding:16px;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">Ожидаемая дата поставки по заказу' + (orderLabel ? ' ' + escapeHtml(orderLabel) : '') + '. Менеджер назвал срок — поставь его здесь, будешь видеть в «Ждём поставку» у всех позиций этого заказа.</div>' +
+        '<input type="date" id="eta-date-input" value="' + escapeHtml(currentIso || '') + '" style="width:100%;padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--text-mid);margin:14px 0 6px;">Куда придёт?</div>' +
+        '<div style="display:flex;gap:8px;" id="eta-place-row">' +
+          placeBtn('us', 'К нам', 'ti-building-warehouse') +
+          placeBtn('supplier', 'К ним на склад', 'ti-truck') +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:16px;">' +
+          '<button class="btn btn-primary" style="flex:1;" onclick="saveEta(' + orderId + ',false)"><i class="ti ti-check"></i> Сохранить</button>' +
+          (currentIso ? '<button class="btn btn-secondary" onclick="saveEta(' + orderId + ',true)"><i class="ti ti-eraser"></i> Убрать</button>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  setTimeout(() => { const f = document.getElementById('eta-date-input'); if (f) f.focus(); }, 80);
+}
+
+// Переключение «куда придёт» в окошке (toggle — повторный тап снимает выбор).
+function setEtaPlace(val) {
+  window._etaPlace = (window._etaPlace === val) ? '' : val;
+  ['us', 'supplier'].forEach(v => {
+    const b = document.getElementById('eta-place-' + v);
+    if (!b) return;
+    const on = window._etaPlace === v;
+    b.style.border = '1.5px solid ' + (on ? '#2563EB' : 'var(--border)');
+    b.style.background = on ? '#EFF6FF' : '#fff';
+    b.style.color = on ? '#1E40AF' : 'var(--text-mid)';
+  });
+}
+
+async function saveEta(orderId, clear) {
+  const inp = document.getElementById('eta-date-input');
+  const iso = clear ? '' : (inp ? inp.value : '');
+  const place = clear ? '' : (window._etaPlace || '');
+  if (!clear && !iso) { showToast('Выбери дату', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/' + orderId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expected_date: iso || null, expected_place: place || null }),
+    });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); showToast(j.message || 'Не удалось сохранить', 'error'); return; }
+    showToast(clear ? 'Дата убрана' : 'Дата поставки сохранена', 'success');
+    const mm = document.getElementById('eta-picker-modal'); if (mm) mm.remove();
+    if (typeof cache !== 'undefined') { cache.supplyOrders = null; }
+    if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
+async function shopMarkReceived(orderItemId, name) {
+  if (!orderItemId) return;
+  if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nЗаказ закроется (статус «получен»), позиция уйдёт из «Ждём поставку».')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + orderItemId + '/received', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось отметить полученным', 'error');
+      return;
+    }
+    showToast('Отмечено полученным', 'success');
+    if (typeof cache !== 'undefined') { cache.supplyOrders = null; cache.supplyRequests = null; }
+    if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+async function shopReturnToBuy(orderItemId, name) {
+  if (!orderItemId) return;
+  if (!confirm('Вернуть «' + (name || 'позицию') + '» в список к закупке?\n\nПозиция будет убрана из черновика заказа — потом сможешь собрать её в другой заказ. (Доступно только для черновика «Заказ создан».)')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + orderItemId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось вернуть позицию', 'error');
+      return;
+    }
+    showToast('Позиция возвращена в список к закупке', 'success');
+    if (typeof cache !== 'undefined') { cache.supplyOrders = null; cache.supplyRequests = null; }
+    if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// Сколько дней прошло с даты (ISO/SQLite). null если нет даты.
+function _daysSince(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(String(dateStr).replace(' ', 'T') + (String(dateStr).includes('Z') ? '' : 'Z'));
+  if (isNaN(d.getTime())) return null;
+  const ms = Date.now() - d.getTime();
+  if (ms < 0) return 0;
+  return Math.floor(ms / 86400000);
+}
+
 
 function _cpBulkUpdate() {
   const n = document.querySelectorAll('.cp-check:checked').length;
@@ -5453,12 +5882,31 @@ function shopEditQty(componentId, currentQty, unit) {
   _shopSaveQtyMap(map);
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
+// v2.45.442: степпер количества в новом виде — меняет число и сохраняет, без полной перезагрузки
+function sv2StepQty(componentId, delta) {
+  const span = document.getElementById('sv2-qty-' + componentId);
+  let n = (span ? (parseFloat(span.textContent) || 0) : 0) + delta;
+  if (n < 0) n = 0;
+  if (span) span.textContent = String(n);
+  const map = _shopGetQtyMap();
+  map[componentId] = n;
+  _shopSaveQtyMap(map);
+}
+// v2.45.442: переключение нового/старого вида «Что закупить» (для отката)
+function toggleSupplyShopV2() {
+  const cur = localStorage.getItem('supplyShopV2') !== '0';
+  localStorage.setItem('supplyShopV2', cur ? '0' : '1');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
 // Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
   const qtyMap = _shopGetQtyMap();
   let hiddenCount = 0;
   const out = (items || []).filter(it => {
+    // v2.45.428: уже заказанные/оплаченные — не «к закупке», а «ждём поставку».
+    // Исключаем из групп и из формирования заказа (чтобы не заказывать повторно).
+    if (it.order_status) return false;
     if (hidden.has(it.component_id)) { hiddenCount++; return false; }
     return true;
   }).map(it => {
@@ -5473,16 +5921,27 @@ function _shopApplyLocal(items) {
 function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
+  // v2.45.443: флаг нового вида ставим ДО сборки блоков (cpBlock использует его в _cpRowHtml)
+  window.SUPPLY_SHOP_V2 = localStorage.getItem('supplyShopV2') !== '0';
   const groups = (d && d.groups) || [];
-  const cpBlock = _contractPurchasesBlockHtml(d && d._contract_purchases);
+  const cpItems = (d && d._contract_purchases) || [];
+  const cpBlock = _contractPurchasesBlockHtml(cpItems);
+  // v2.45.428: «Ждём поставку» — заказанные покупные по договорам + заказанные
+  // комплектующие (их убираем из групп «к закупке», чтобы не предлагались снова).
+  const waitingItems = cpItems.filter(x => x.purchase_status === 'ordered');
   // v2.45.286: применяем локальные скрытие/переопределения к каждой группе
   let totalHidden = 0;
   groups.forEach(g => {
-    const r = _shopApplyLocal(g.items);
+    // заказанные комплектующие → в «Ждём поставку» (из исходных, до фильтра)
+    (g.items || []).forEach(it => {
+      if (it.order_status) waitingItems.push(_componentToTracking(it, g));
+    });
+    const r = _shopApplyLocal(g.items);   // исключает заказанные + скрытые
     g.items = r.items;
     g.items_count = r.items.length;
     totalHidden += r.hiddenCount;
   });
+  const waitingBlock = _waitingDeliveryBlockHtml(waitingItems);
   // Группы, в которых не осталось позиций после фильтра — выкидываем
   const visibleGroups = groups.filter(g => (g.items || []).length > 0);
   // v2.45.286: тулбар с кол-вом скрытых + кнопкой «Показать»
@@ -5494,14 +5953,22 @@ function renderSupplyShopping(d) {
       '</div>'
     : '';
   if (!visibleGroups.length) {
-    container.innerHTML = cpBlock + hiddenToolbar + '<div class="empty-block" style="padding: 32px 16px;">' +
+    container.innerHTML = cpBlock + waitingBlock + hiddenToolbar + '<div class="empty-block" style="padding: 32px 16px;">' +
       '<i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
       '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">' +
         (totalHidden > 0 ? 'Все оставшиеся позиции скрыты вами вручную.' : 'Всё в норме — низкого остатка и дефицита не обнаружено.') +
       '</div></div>';
     return;
   }
-  let html = cpBlock + hiddenToolbar;
+  // v2.45.442: переключатель нового/старого вида «Что закупить» (для отката)
+  const v2Toggle = '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SUPPLY_SHOP_V2 ? 'sparkles' : 'history') + '"></i> ' +
+        (window.SUPPLY_SHOP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleSupplyShopV2()">' +
+        (window.SUPPLY_SHOP_V2 ? 'Вернуть старый' : 'Включить новый') +
+      '</button>' +
+    '</div>';
+  let html = v2Toggle + cpBlock + waitingBlock + hiddenToolbar;
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
@@ -5600,6 +6067,42 @@ function renderSupplyShopping(d) {
         removeCell +
       '</tr>';
     }).join('');
+
+    // v2.45.442 (редизайн Снабжения, под переключателем): позиции карточками sv2 + степпер
+    const itemCardsV2 = (g.items || []).map(it => {
+      const crit = it.is_critical ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>' : '';
+      const low = !!(it.reason && it.reason.indexOf('низкий остаток') !== -1);
+      const plan = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
+      let tags = '';
+      if (low) tags += '<span class="sv2-tag warn"><i class="ti ti-arrow-down"></i>низкий остаток</span>';
+      if (plan.length) {
+        const shown = plan.slice(0, 3).map(n => '№' + n).join(', ') + (plan.length > 3 ? ' +' + (plan.length - 3) : '');
+        tags += '<span class="sv2-tag proj"><i class="ti ti-briefcase"></i>' + escapeHtml(shown) + '</span>';
+      } else if (low) {
+        tags += '<span class="sv2-tag neutral"><i class="ti ti-building-warehouse"></i>на склад</span>';
+      }
+      const sName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
+      const q = Number(it.recommended_qty) || 0;
+      return '<div class="sv2-item">' +
+        '<div class="sv2-item-top">' +
+          '<div class="sv2-item-body" onclick="openComponentDetail(' + it.component_id + ')">' +
+            '<div class="sv2-item-name">' + crit + escapeHtml(it.component_name || '') +
+              (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
+            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b></div>' +
+          '</div>' +
+          '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div class="sv2-item-bottom">' +
+          '<div class="sv2-tags">' + tags + '</div>' +
+          '<div class="sv2-stepper">' +
+            '<button type="button" onclick="sv2StepQty(' + it.component_id + ',-1)">−</button>' +
+            '<span class="val" id="sv2-qty-' + it.component_id + '">' + escapeHtml(String(q)) + '</span>' +
+            '<button type="button" class="plus" onclick="sv2StepQty(' + it.component_id + ',1)">+</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
     html += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
       '<div class="sup-shop-group-head">' +
         '<div class="sup-shop-group-name">' +
@@ -5658,7 +6161,10 @@ function renderSupplyShopping(d) {
           '</div>'
         : ''
       ) +
-      '<table class="sup-shop-table">' +
+      // v2.45.442: новый вид (карточки sv2) для групп с поставщиком — под переключателем; старый (таблица) — для отката
+      ((window.SUPPLY_SHOP_V2 && !noSupplier)
+        ? ('<div class="sv2-list">' + itemCardsV2 + '</div>')
+        : ('<table class="sup-shop-table">' +
         '<thead><tr>' +
           (noSupplier
             ? '<th class="ns-check-cell"><label class="ns-check-label"><input type="checkbox" id="ns-check-all" onchange="onNoSupCheckAll(this)" title="Выбрать все"></label></th>'
@@ -5672,10 +6178,13 @@ function renderSupplyShopping(d) {
           '<th style="width:40px;"></th>' +
         '</tr></thead>' +
         '<tbody>' + itemRows + '</tbody>' +
-      '</table>' +
+      '</table>')
+      ) +
     '</div>';
   });
   container.innerHTML = html;
+  // v2.45.444: кардинальный новый вид — класс на контейнере перекрывает стили групп/шапок
+  container.classList.toggle('sv2-mode', !!window.SUPPLY_SHOP_V2);
 }
 
 /* ============ ЭТАП 52 (v2.44.73): заказ из shopping-list с превью ============ */
@@ -6172,6 +6681,35 @@ async function _opPriceNameChoose(name) {
   showToast('Сопоставлено: ' + name, 'success');
 }
 
+// v2.45.435: грузим превью прайса с понятной причиной ошибки (файл потерян /
+// не открылся Excel), а не глухим «Не удалось отрисовать таблицу».
+async function _opLoadPriceView(sid, fid) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const resp = await fetch(API_BASE + '/api/suppliers/' + sid + '/price-files/' + fid + '/view', {
+      headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store',
+    });
+    if (resp.ok) {
+      const d = await resp.json();
+      return d.html || '<div class="empty-block">Пусто</div>';
+    }
+    const j = await resp.json().catch(() => ({}));
+    const msg = j.message || j.error || ('HTTP ' + resp.status);
+    const lost = resp.status === 404;
+    return '<div class="empty-block" style="padding:24px 12px;text-align:center;color:var(--text-light);">' +
+      '<i class="ti ti-' + (lost ? 'file-x' : 'alert-triangle') + '" style="font-size:30px;color:#B91C1C;"></i><br>' +
+      '<div style="margin-top:8px;font-weight:700;color:var(--text-dark);">' +
+        (lost ? 'Файл прайса не найден в хранилище' : 'Не удалось открыть прайс') + '</div>' +
+      '<div style="margin-top:4px;font-size:12px;">' + escapeHtml(msg) + '</div>' +
+      '<div style="margin-top:10px;font-size:12px;line-height:1.45;">Загрузи прайс заново кнопкой <b>«Прайс из Excel»</b> выше' +
+        (lost ? ', либо удали этот файл корзинкой 🗑 и добавь новый.' : '.') + '</div>' +
+    '</div>';
+  } catch (e) {
+    return '<div class="empty-block" style="padding:24px 12px;text-align:center;color:var(--text-light);">' +
+      'Сеть недоступна: ' + escapeHtml(e.message || String(e)) + '<br>Попробуй открыть ещё раз.</div>';
+  }
+}
+
 function _renderOpAliasPickerList() {
   _renderOpApTabs();   // v2.45.243
   const box = document.getElementById('op-ap-list');
@@ -6186,9 +6724,8 @@ function _renderOpAliasPickerList() {
       box.innerHTML = '<div class="loading-block">Рисуем таблицу с картинками…</div>';
       if (cache['_loading_' + fid]) return;
       cache['_loading_' + fid] = true;
-      apiGet('/api/suppliers/' + _opCurrentDraft.supplier_id + '/price-files/' + fid + '/view')
-        .then(d => { cache[fid] = d.html || '<div class="empty-block">Пусто</div>'; })
-        .catch(() => { cache[fid] = '<div class="empty-block">Не удалось отрисовать таблицу</div>'; })
+      _opLoadPriceView(_opCurrentDraft.supplier_id, fid)
+        .then(html => { cache[fid] = html; })
         .finally(() => { delete cache['_loading_' + fid]; _renderOpAliasPickerList(); });
       return;
     }
@@ -7847,25 +8384,28 @@ async function forcePollSupplyInbox() {
 }
 
 async function openAttachInboxToOrder(inboxId) {
-  // Подгружаем открытые заказы для выбора
+  // v2.45.438: берём ВСЕ заказы (не только open) — чтобы ничего не скрыть
   let orders = [];
   try {
-    const d = await apiGet('/api/supply-orders?status=open');
-    orders = d.items || d.orders || d || [];
+    const d = await apiGet('/api/supply-orders');
+    orders = d.items || d.orders || (Array.isArray(d) ? d : []) || [];
     if (!Array.isArray(orders)) orders = orders.items || [];
   } catch (_) { orders = []; }
-  if (!orders.length) {
-    // Расширим до всех — если открытых нет
-    try {
-      const d2 = await apiGet('/api/supply-orders');
-      orders = d2.items || d2.orders || d2 || [];
-      if (!Array.isArray(orders)) orders = orders.items || [];
-    } catch (_) {}
-  }
-  if (!orders.length) {
-    showToast('Заказов нет — некуда привязывать', 'error');
-    return;
-  }
+
+  // Поставщик счёта (из отправителя письма) — для сопоставления и подсказки
+  const inb = (cache.supplyInbox || []).find(x => x.id === inboxId) || {};
+  const senderName = (inb.from_name || inb.from_addr || '').trim();
+  const senderKey = ((inb.from_name || '') + (inb.from_addr || '')).toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+  const senderDom = ((inb.from_addr || '').split('@')[1] || '').toLowerCase();
+  const _ordMatch = (o) => {
+    const sk = (o.supplier_name || '').toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+    if (sk && sk.length >= 3 && senderKey && (senderKey.indexOf(sk) >= 0 || sk.indexOf(senderKey) >= 0)) return true;
+    const ed = ((o.supplier_email || '').split('@')[1] || '').toLowerCase();
+    return !!(senderDom && ed && senderDom === ed);
+  };
+  // Совпадающего поставщика — наверх
+  orders.sort((a, b) => (_ordMatch(b) ? 1 : 0) - (_ordMatch(a) ? 1 : 0));
+
   const overlayId = 'inbox-attach-modal';
   let m = document.getElementById(overlayId); if (m) m.remove();
   m = document.createElement('div');
@@ -7873,29 +8413,60 @@ async function openAttachInboxToOrder(inboxId) {
   m.className = 'modal-overlay';
   const opts = orders.map(o =>
     '<option value="' + o.id + '">' +
+      (_ordMatch(o) ? '✓ ' : '') +
       escapeHtml((o.order_label || ('#' + o.id))) + ' · ' +
       escapeHtml(o.supplier_name || '—') + ' · ' +
       escapeHtml(o.status_label || o.status || '—') +
     '</option>'
   ).join('');
+  const senderHtml = senderName
+    ? '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;">Счёт от: <b>' + escapeHtml(senderName) + '</b>' +
+        (inb.from_addr && inb.from_name ? ' <span style="color:var(--text-light);">&lt;' + escapeHtml(inb.from_addr) + '&gt;</span>' : '') +
+        '<div style="color:var(--text-light);font-size:12px;margin-top:3px;">Заказы этого поставщика отмечены ✓ и подняты вверх. Если его заказа нет — создайте новый из этого счёта.</div></div>'
+    : '';
+  const selectOrEmpty = orders.length
+    ? '<select id="inbox-attach-order-select" class="form-input" style="width:100%;">' + opts + '</select>' +
+      '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitAttachInboxToOrder(' + inboxId + ')"><i class="ti ti-check"></i> Привязать к выбранному</button>' +
+      '<div style="text-align:center;color:var(--text-light);font-size:12px;">— или —</div>'
+    : '<div style="color:var(--text-light);font-size:13px;">Подходящих заказов нет.</div>';
   m.innerHTML =
-    '<div class="modal" style="max-width:520px;">' +
+    '<div class="modal" style="max-width:540px;">' +
       '<div class="modal-header">' +
-        '<h2><i class="ti ti-link"></i> Привязать письмо к заказу</h2>' +
+        '<h2><i class="ti ti-link"></i> Привязать счёт к заказу</h2>' +
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="display:flex;flex-direction:column;gap:10px;">' +
-        '<div style="color:var(--text-light);font-size:13px;">Выбери заказ, к которому отнести этот счёт. Первое вложение письма станет файлом счёта для заказа, статус перейдёт в «Счёт получен».</div>' +
-        '<select id="inbox-attach-order-select" class="form-input" style="width:100%;">' + opts + '</select>' +
+        senderHtml +
+        '<div style="color:var(--text-light);font-size:13px;">Привяжите счёт к существующему заказу — вложение станет файлом счёта, статус перейдёт в «Счёт получен».</div>' +
+        selectOrEmpty +
+        '<button class="btn ' + (orders.length ? 'btn-secondary' : 'btn-primary') + '" style="width:100%;justify-content:center;" onclick="createOrderFromInbox(' + inboxId + ')"><i class="ti ti-plus"></i> Создать новый заказ из этого счёта</button>' +
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
-        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitAttachInboxToOrder(' + inboxId + ')"><i class="ti ti-check"></i> Привязать</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(m);
   m.classList.add('visible');
   m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+}
+
+async function createOrderFromInbox(inboxId) {
+  if (!confirm('Создать новый заказ поставщику из этого счёта? Поставщик определится по отправителю письма.')) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/create-order', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error'); return; }
+    showToast('Создан заказ ' + (j.order_label || ('#' + j.order_id)) + ' — счёт привязан', 'success');
+    document.getElementById('inbox-attach-modal')?.remove();
+    await loadSupplyInbox();
+    if (j.order_id && typeof openSupplyOrder === 'function') openSupplyOrder(j.order_id);
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
 }
 
 async function submitAttachInboxToOrder(inboxId) {
@@ -10480,13 +11051,286 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.45.423',
-    date: '18.06.2026',
+    version: 'v2.45.467',
+    date: '23.06.2026',
     title: 'Атом Электрика — несколько потребителей на один автомат',
     features: [
       'В шаге «Автоматы» можно объединять линии на один автомат: у автомата — «⤵ объединить с…» (выбор другого автомата той же полюсности). Номинал автоматически поднимается под суммарный ток',
       'Обратное действие: у линии в сгруппированном автомате — кнопка «⤴» выносит её обратно в отдельный автомат',
       'Подсказка показывает «N линии на одном автомате», перегруз по-прежнему подсвечивается; число модулей в корпусе пересчитывается',
+    ],
+  },
+  {
+    version: 'v2.45.466',
+    date: '23.06.2026',
+    title: 'Производство: удобный выбор компонента со склада',
+    features: [
+      'В окне <b>«Сопоставить со склада»</b> сверху показываются позиции, <b>похожие на нужную</b> (по названию), а не случайные — даже до ввода поиска',
+      'То, что <b>есть в наличии</b>, поднимается выше; «нет в наличии» помечается и притеняется',
+      'Поиск работает по <b>названию и артикулу</b>, видно категорию позиции и галочку у выбранной',
+    ],
+  },
+  {
+    version: 'v2.45.465',
+    date: '23.06.2026',
+    title: 'Снабжение: кнопка «Получено» в «Ждём поставку»',
+    features: [
+      'У позиций в <b>«Ждём поставку»</b> появилась кнопка <b>«получено»</b> — когда товар пришёл, жмёшь её, и заказ закрывается (статус «получен»), позиция уходит из ожидания',
+      'Удобно, если приёмка УПД не «схлопнула» заказ автоматически или товар пришёл вообще без УПД',
+    ],
+  },
+  {
+    version: 'v2.45.464',
+    date: '22.06.2026',
+    title: 'КП без колонки «Скидка»',
+    features: [
+      'Из КП убрана колонка <b>«Скидка»</b> — в форме составления, в карточке КП и в PDF. Состав стал чище: №, наименование, кол-во, цена, сумма',
+    ],
+  },
+  {
+    version: 'v2.45.462',
+    date: '22.06.2026',
+    title: 'КП: расшифровка позиции для клиента',
+    features: [
+      'У каждой позиции КП появилось заметное поле <b>«Расшифровка — что это, видит клиент»</b> (отдельной строкой во всю ширину)',
+      'Расшифровка показывается под названием позиции <b>в самом КП и в PDF</b> — клиенту понятно, что за «ЩУ-003-001»: напишите, например, «Щит управления, стандартное исполнение, IP54»',
+      'Если позиция добавлена из каталога и у неё уже есть описание — оно подставляется в расшифровку автоматически',
+    ],
+  },
+  {
+    version: 'v2.45.459',
+    date: '22.06.2026',
+    title: 'Excel-прайс в КП: листы-вкладки и округление цен',
+    features: [
+      'Если в прайсе несколько листов (Вентиляторы, Сетевые элементы, Решётки…), они теперь показываются <b>вкладками</b> — переключайтесь между ними прямо в просмотрщике',
+      'Цены больше не показываются «хвостами» вроде 5490.179999 — числа аккуратно округляются, а в КП цена встаёт <b>целым числом рублей</b>',
+    ],
+  },
+  {
+    version: 'v2.45.458',
+    date: '22.06.2026',
+    title: 'Excel-прайс в КП: во весь экран, крупнее фото, ровный текст',
+    features: [
+      'В просмотрщике Excel-прайса появилась кнопка <b>«Во весь экран»</b> — таблицу удобно листать целиком',
+      'Фотографии моделей стали <b>крупнее и чётче</b>',
+      'Текст в ячейках <b>больше не рвётся по буквам</b> — колонки подстраиваются под содержимое, надписи читаются нормально',
+    ],
+  },
+  {
+    version: 'v2.45.457',
+    date: '22.06.2026',
+    title: 'Excel-прайс для КП: открываются и старые форматы',
+    features: [
+      'При загрузке прайса в КП теперь видны и выбираются файлы <b>.xls</b> и <b>.xlsm</b>, а не только .xlsx — раньше старый прайс «не находился» в окне выбора',
+      'Старый формат .xls тоже открывается таблицей с кликабельными позициями (без фото — этот формат их не хранит)',
+    ],
+  },
+  {
+    version: 'v2.45.456',
+    date: '22.06.2026',
+    title: 'КП: добавляйте позиции прямо из Excel-прайса',
+    features: [
+      'При составлении КП в окне «Добавить позицию» появилась вкладка <b>«Excel-прайс»</b> — загрузите .xlsx, и он откроется <b>прямо в приложении как таблица, с фотографиями</b>, как в Excel',
+      'Кликните по строке с моделью — <b>позиция сразу добавится в КП с ценой</b>; можно набрать так всё КП, листая прайс',
+      'Загруженные прайсы сохраняются — их можно переоткрывать в любом КП, не загружая заново',
+    ],
+  },
+  {
+    version: 'v2.45.455',
+    date: '22.06.2026',
+    title: 'Список КП: видно, кто рассчитал',
+    features: [
+      'В списке КП рядом с <b>менеджером</b> теперь показывается, <b>кто рассчитал</b> КП (если указано) — раньше это было видно только в карточке и в PDF',
+    ],
+  },
+  {
+    version: 'v2.45.454',
+    date: '22.06.2026',
+    title: 'Продажная номенклатура: импорт прайса из Excel',
+    features: [
+      'На странице <b>«Продажная номенклатура»</b> появилась кнопка <b>«Прайс из Excel»</b> — загрузите .xlsx, и позиции с ценами зальются автоматически',
+      'Сервер сам находит колонки <b>«Наименование»</b> и <b>«Цена»</b> по заголовкам; каждый <b>лист</b> книги становится отдельной <b>группой</b> (папкой)',
+      'Позиция с тем же названием в выбранной категории <b>обновится ценой</b>, новые — добавятся; каталожные позиции (с артикулом) не затрагиваются',
+    ],
+  },
+  {
+    version: 'v2.45.453',
+    date: '22.06.2026',
+    title: 'Монтаж: чат и файлы прямо в карточке',
+    features: [
+      'В карточке монтажа теперь есть <b>чат и прикрепление файлов по договору</b> — встроены прямо в карточку (ниже отчётов), отдельное окно больше не открывается',
+      'Монтажник, менеджер и директор переписываются и обмениваются фото/документами по объекту в одном месте — сообщения общие с чатом договора',
+    ],
+  },
+  {
+    version: 'v2.45.452',
+    date: '22.06.2026',
+    title: 'КП: поле «Рассчитал» + аккуратнее шапка PDF',
+    features: [
+      'В форме КП появилось необязательное поле <b>«Рассчитал»</b> — можно указать сотрудника, который считал КП (если это не менеджер)',
+      'В PDF добавлен блок <b>«Менеджер / Рассчитал»</b>, а блок «Кому / От кого» сделан компактнее',
+    ],
+  },
+  {
+    version: 'v2.45.451',
+    date: '22.06.2026',
+    title: 'КП: предпросмотр + обновлённый PDF (Times New Roman 12)',
+    features: [
+      'В открытом КП появилась кнопка <b>«Предпросмотр»</b> — открывает PDF во вкладке, чтобы сразу посмотреть, как будет выглядеть документ, не скачивая',
+      'Сам PDF переоформлен: шрифт <b>Times New Roman 12</b>, уже боковые поля, а суммы в таблице больше не переносятся на две строки',
+    ],
+  },
+  {
+    version: 'v2.45.450',
+    date: '22.06.2026',
+    title: 'КП: цена и количество вводятся нормально',
+    features: [
+      'В позициях <b>«Новое КП»</b> поля <b>«Цена»</b>, <b>«Кол-во»</b> и <b>«Скидка»</b> больше не теряют фокус после каждой цифры — теперь сумму можно набрать одним заходом',
+      'Сумма позиции и общий итог по-прежнему пересчитываются на лету, прямо во время ввода',
+    ],
+  },
+  {
+    version: 'v2.45.449',
+    date: '22.06.2026',
+    title: 'Черновик КП не теряется при обновлении страницы',
+    features: [
+      'Начатое <b>«Новое КП»</b> теперь сохраняется автоматически — если случайно обновить страницу или закрыть вкладку, при возврате форма восстановится с баннером «Восстановлен черновик незаконченного КП»',
+      'Раньше сохранялось только то, что вводилось руками; выбор <b>менеджера, контрагента, юрлица и позиций</b> через окошки не попадал в черновик. Теперь попадает всё',
+      'Очистить черновик можно кнопкой «Очистить» в баннере или просто создав КП',
+    ],
+  },
+  {
+    version: 'v2.45.448',
+    date: '22.06.2026',
+    title: 'КП: менеджер и контрагент снова сохраняются',
+    features: [
+      'В форме <b>«Новое КП»</b> снова выбираются <b>менеджер</b> и <b>контрагент</b> — раньше выбор в окне не закреплялся и поле оставалось пустым',
+      'Причина была техническая: обработчик выбора в КП перекрывался обработчиком из формы договора. Теперь у КП и договора свои независимые обработчики',
+    ],
+  },
+  {
+    version: 'v2.45.436',
+    date: '19.06.2026',
+    title: 'Карточка комплектующего: «Сколько заказывать»',
+    features: [
+      'В карточке комплектующего (Склад → Комплектующие → ✎) появилось поле <b>«Сколько заказывать»</b> — фиксированное кол-во к заказу при низком остатке',
+      'Пример: «Наружный блок 9» — мин. остаток 1, сколько заказывать 2. Как только на складе останется 1 (или меньше) — в «Что закупить» предложит заказать ровно <b>2 шт</b>',
+      'Если поле пустое — работает как раньше (заказываем дефицит до минимума автоматически)',
+    ],
+  },
+  {
+    version: 'v2.45.435',
+    date: '19.06.2026',
+    title: 'Каталог прайсов: понятная причина, если прайс не открылся',
+    features: [
+      'Если в окне «Каталог поставщика» прайс не открывается — теперь видно <b>почему</b>: «файл прайса не найден в хранилище» или «не открылся Excel» (с текстом ошибки), вместо глухого «Не удалось отрисовать таблицу»',
+      'Тут же подсказка, что делать: загрузить прайс заново кнопкой «Прайс из Excel» или удалить файл корзинкой и добавить новый',
+    ],
+  },
+  {
+    version: 'v2.45.434',
+    date: '19.06.2026',
+    title: 'Дата поставки «15 июля» + куда придёт',
+    features: [
+      'Дата поставки теперь пишется по-человечески — <b>«придёт 15 июля»</b> (а не «15 июл»)',
+      'В окошке «когда придёт» добавлен выбор <b>куда придёт: «К нам» или «К ним на склад»</b> — видно прямо в чипе рядом с датой',
+    ],
+  },
+  {
+    version: 'v2.45.433',
+    date: '19.06.2026',
+    title: 'Ожидаемая дата поставки в «Ждём поставку»',
+    features: [
+      'У позиции в «Ждём поставку» появилась кнопка <b>«когда придёт?»</b> — открывается окошко с выбором даты. Менеджер поставщика назвал срок (например, 15 июля) — ставишь, и видишь его прямо в списке',
+      'Дата показывается зелёным чипом <b>«📅 придёт 15 июл»</b>; если срок уже прошёл, а поставки нет — чип становится <b>красным с ⚠</b>',
+      'Дата задаётся на заказ (ORD) и показывается у всех его позиций — можно поправить в любой момент или убрать',
+    ],
+  },
+  {
+    version: 'v2.45.432',
+    date: '19.06.2026',
+    title: 'Акцент на «сколько ждём поставку»',
+    features: [
+      'В блоке «Ждём поставку» срок ожидания теперь цветной чип с часиками, а не серый текст — видно сразу',
+      'Градация по сроку: до недели — синий, <b>7–13 дней — оранжевый</b> (ждём уже долго), <b>14+ дней — красный с ⚠</b> (пора теребить поставщика)',
+    ],
+  },
+  {
+    version: 'v2.45.431',
+    date: '18.06.2026',
+    title: '«Ждём поставку» — нормальная вёрстка на телефоне',
+    features: [
+      'Позиции в блоке «Ждём поставку» больше не обрезаются за край экрана: название теперь отдельной строкой, а под ним — чипсы (кол-во · сколько дней ждём · статус заказа · «вернуть к закупке») с переносом',
+      'Длинная метка «Оплачен · ждём поставку» укорочена до «Оплачен» (блок и так называется «Ждём поставку») — статусы стали компактнее и читаемее',
+    ],
+  },
+  {
+    version: 'v2.45.430',
+    date: '18.06.2026',
+    title: '«Вернуть к закупке» в блоке «Ждём поставку»',
+    features: [
+      'У позиции-комплектующего, попавшей в <b>«Ждём поставку»</b> из <b>черновика</b> заказа («Заказ создан»), появилась кнопка <b>«↩ вернуть к закупке»</b> — убирает её из заказа и возвращает в список к закупке (потом можно собрать в другой заказ)',
+      'Так можно разделить заказ: оставить в нём только реально заказанное/оплаченное, а лишние позиции вернуть и заказать отдельно — без захода в раздел «Заказы»',
+      'Кнопка доступна только для черновика — из отправленного/оплаченного заказа позицию так не выдернуть',
+    ],
+  },
+  {
+    version: 'v2.45.429',
+    date: '18.06.2026',
+    title: 'Отзыв запроса сборки + телефон поставщика',
+    features: [
+      'В блоке <b>«Сборка к отгрузке»</b> появилась кнопка <b>«Отозвать сборку»</b> — снимает отметку «сборка запрошена» и возвращает кнопку «Запросить сборку к отгрузке». Уже собранное не трогается, у сборщика договор уходит из списка к сборке',
+      'В блоке <b>«Ждём поставку»</b> вместо кнопки «Позвонить» теперь сразу виден <b>номер телефона</b> поставщика, а тап по нему открывает <b>карточку поставщика</b>',
+    ],
+  },
+  {
+    version: 'v2.45.428',
+    date: '18.06.2026',
+    title: 'Снабжение — заказанные комплектующие тоже едут в «Ждём поставку»',
+    features: [
+      'Теперь и <b>комплектующие</b> (а не только покупные по договорам), по которым уже есть заказ, уходят из списка «к закупке» в общий блок <b>«Ждём поставку»</b> — со статусом, числом дней ожидания и связью с поставщиком',
+      'Уже заказанная позиция больше не предлагается к закупке и не попадёт в новый заказ (исключается и из «Сформировать заказ», и из «Скачать DOCX»)',
+      'Так список «к закупке» показывает только то, что реально надо купить, а всё оплаченное/в пути — в одной таблице-трекинге',
+    ],
+  },
+  {
+    version: 'v2.45.427',
+    date: '18.06.2026',
+    title: 'Снабжение — оплаченное не предлагается снова, едет в «Ждём поставку»',
+    features: [
+      'Покупная позиция по договору, по которой уже есть заказ (заказана/на оплате/оплачена/едет), <b>больше не предлагается к закупке</b> и не попадает в новую заявку',
+      'Такие позиции уезжают в отдельный блок <b>«Ждём поставку»</b>: статус заказа, <b>сколько дней ждём</b> (если долго — подсветка), и кнопки <b>«Написать» / «Позвонить»</b> поставщику',
+      'Защита от двойного заказа на бэкенде: при формировании заявки уже заказанные позиции пропускаются, ссылка на действующий заказ не перезаписывается',
+    ],
+  },
+  {
+    version: 'v2.45.426',
+    date: '18.06.2026',
+    title: 'Сборка к отгрузке — можно откатить',
+    features: [
+      'В блоке <b>«Сборка к отгрузке»</b> появилась кнопка <b>«Откатить сборку (N)»</b> — снимает все отметки «собрано» и возвращает счётчик сборки к 0',
+      'Откат без пароля: сборка к отгрузке склад не затрагивала, поэтому откатывается свободно (в отличие от отгрузки, где нужен личный пароль)',
+      'Отдельные единицы по-прежнему можно снимать по одной — тапом по строке в экране «Собрать по QR»',
+    ],
+  },
+  {
+    version: 'v2.45.424',
+    date: '18.06.2026',
+    title: 'Уведомление «Договор отгружён»',
+    features: [
+      'Когда договор <b>полностью отгружён</b> (по QR или ручной отметкой) — в «колокольчик» приходит уведомление <b>«Договор отгружён»</b> (№ договора, контрагент, число единиц), директору ещё и push на телефон',
+      'Тап по уведомлению открывает сам договор',
+      'Раньше уведомление было только на <b>запрос</b> сборки к отгрузке — теперь и на сам факт отгрузки',
+    ],
+  },
+  {
+    version: 'v2.45.423',
+    date: '18.06.2026',
+    title: 'Отгрузка — кнопка «Отметить отгруженным» работает честно',
+    features: [
+      'Кнопка <b>«Отметить отгруженным»</b> (отметка отгрузки без QR) раньше показывала «отмечено», даже когда на деле ничего не отгружалось (единица уже отгружена) — теперь читает реальный ответ сервера и сразу обновляет экран',
+      'Если по единице уже есть отгрузка — честно пишет «уже отгружена» и перерисовывает список с актуальным прогрессом',
+      'Плюс на бэкенде: скан отгрузки при дублирующемся QR у одинаковых единиц сам отгружает ещё не отгруженную копию',
     ],
   },
   {
@@ -15684,6 +16528,18 @@ function _invRenderHome() {
   const token = localStorage.getItem(TOKEN_KEY) || '';
 
   let html = '';
+  // Быстрая сверка по фото товара (стоя у полки)
+  html +=
+    '<div style="background:linear-gradient(135deg,rgba(16,185,129,0.10),rgba(5,150,105,0.06));' +
+    'border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:14px 16px;margin-bottom:16px;' +
+    'display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+      '<i class="ti ti-camera-plus" style="font-size:26px;color:#059669;"></i>' +
+      '<div style="flex:1;min-width:200px;">' +
+        '<div style="font-weight:700;color:var(--text-dark);font-size:15px;">Сверка по фото товара</div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);">Фоткай коробку у полки, пиши количество — система сверит с остатком (сходится / расхождение / нет позиции).</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="openBoxCheck()"><i class="ti ti-camera"></i> Начать сверку</button>' +
+    '</div>';
   // Баннер «у тебя есть незавершённый черновик ручной инвентаризации»
   const draft = _invLoadManualDraft();
   if (draft && draft.values && Object.keys(draft.values).length) {

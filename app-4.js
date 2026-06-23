@@ -405,6 +405,303 @@ async function deleteInventorySession(id, statusKey) {
   }
 }
 
+// ============ СВЕРКА СКЛАДА ПО ФОТО ТОВАРА ============
+// Стоя у полки: фото коробки → Claude распознаёт артикул → сверяем с остатком
+// (сходится / расхождение / нет позиции → занести). Накопительный список,
+// применяется батчем через /api/inventory/sessions/manual (как ручная инвентаризация).
+
+let _boxCheck = { items: [], cats: null, current: null };
+
+function _bcN(n) { n = Number(n) || 0; return (Math.round(n * 100) / 100).toString(); }
+
+async function openBoxCheck() {
+  _boxCheck = { items: [], cats: _boxCheck.cats, current: null };
+  _renderBoxCheck();
+  if (!_boxCheck.cats) {
+    try { const j = await apiGet('/api/components/categories'); _boxCheck.cats = (j && j.categories) || []; }
+    catch (e) { _boxCheck.cats = []; }
+  }
+}
+
+function _renderBoxCheck() {
+  const body = document.getElementById('inventory-screen-body');
+  if (!body) return;
+  let html = '';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
+    '<button class="btn btn-secondary" onclick="loadInventory()"><i class="ti ti-arrow-left"></i> Назад</button>' +
+    '<div style="font-weight:700;font-size:16px;">Сверка склада по фото</div></div>';
+  html += '<div class="inv-drop" onclick="_boxCheckPick()" style="margin-bottom:14px;">' +
+    '<i class="ti ti-camera"></i>' +
+    '<div><b>Сфотографировать коробку</b></div>' +
+    '<div style="font-size:11.5px;margin-top:3px;">артикул на упаковке распознаётся автоматически</div>' +
+    '<input type="file" id="box-check-input" accept="image/*" capture="environment" style="display:none;" onchange="_boxCheckPhoto(this.files)">' +
+    '</div>';
+  html += '<div id="box-check-result"></div>';
+  html += '<div id="box-check-list">' + _boxCheckListHtml() + '</div>';
+  body.innerHTML = html;
+}
+
+function _boxCheckPick() {
+  const i = document.getElementById('box-check-input');
+  if (i) { i.value = ''; i.click(); }
+}
+
+async function _boxCheckPhoto(files) {
+  if (!files || !files.length) return;
+  const f = files[0];
+  const res = document.getElementById('box-check-result');
+  if (res) res.innerHTML = '<div class="loading-block">Распознаём коробку…</div>';
+  const fd = new FormData();
+  fd.append('photo_1', f);
+  try {
+    const r = await fetch(API_BASE + '/api/inventory/recognize-box', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      body: fd,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) {
+      if (res) res.innerHTML = '';
+      showToast((j && (j.error || j.message)) || 'Не удалось распознать', 'error');
+      return;
+    }
+    _boxCheck.current = j;
+    _renderBoxCheckResult(j);
+  } catch (e) {
+    if (res) res.innerHTML = '';
+    showToast('Сеть: не удалось отправить фото', 'error');
+  }
+}
+
+function _boxCheckChoose(i) {
+  if (!_boxCheck.current) return;
+  const s = (_boxCheck.current.suggestions || [])[i];
+  if (!s) return;
+  _boxCheck.current.chosen = s;
+  _renderBoxCheckResult(_boxCheck.current);
+}
+
+function _renderBoxCheckResult(j) {
+  const res = document.getElementById('box-check-result');
+  if (!res) return;
+  const rec = j.recognized || {};
+  const chosen = j.chosen || j.match || null;
+  let h = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;">';
+  const recLine = [rec.manufacturer, rec.model || rec.name].filter(Boolean).join(' · ') || 'не распознано';
+  h += '<div style="font-size:12px;color:var(--text-light);">Распознано на коробке</div>';
+  h += '<div style="font-weight:600;margin-bottom:8px;">' + escapeHtml(recLine) +
+    (rec.codes && rec.codes.length ? (' <span style="color:var(--text-light);font-weight:400;">(' + escapeHtml(rec.codes.join(', ')) + ')</span>') : '') + '</div>';
+  if (chosen) {
+    h += '<div style="background:var(--brand-bg,#eef2ff);border-radius:8px;padding:10px;margin-bottom:10px;">' +
+      '<div style="font-weight:600;">' + escapeHtml(chosen.name || '') + '</div>' +
+      '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(chosen.sku || '—') +
+      ' · на складе <b>' + _bcN(chosen.qty_on_stock) + '</b> ' + escapeHtml(chosen.unit || 'шт.') + '</div>' +
+      '</div>';
+    h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<label style="font-size:13px;">Фактически:</label>' +
+      '<input type="number" inputmode="decimal" id="box-check-qty" min="0" step="1" ' +
+      'style="width:110px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:15px;" ' +
+      'oninput="_boxCheckQtyHint()"' + (rec.pack_qty ? (' placeholder="' + rec.pack_qty + '"') : '') + '>' +
+      '<span style="font-size:13px;">' + escapeHtml(chosen.unit || 'шт.') + '</span>' +
+      '<span id="box-check-hint" style="font-size:13px;font-weight:600;"></span>' +
+      '</div>';
+    h += '<div style="display:flex;gap:8px;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="_boxCheckAdd()"><i class="ti ti-plus"></i> В список</button>' +
+      '<button class="btn btn-secondary" onclick="_boxCheckClear()">Отмена</button>' +
+      '</div>';
+  } else {
+    h += '<div style="color:#b45309;font-weight:600;margin-bottom:8px;"><i class="ti ti-alert-triangle"></i> На складе не найдено</div>';
+    if (j.suggestions && j.suggestions.length) {
+      h += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Возможно, это:</div>';
+      j.suggestions.forEach((s, i) => {
+        h += '<div onclick="_boxCheckChoose(' + i + ')" style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">' +
+          '<div style="font-weight:600;font-size:13px;">' + escapeHtml(s.name || '') + '</div>' +
+          '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(s.sku || '—') +
+          ' · на складе ' + _bcN(s.qty_on_stock) + ' ' + escapeHtml(s.unit || 'шт.') + '</div>' +
+          '</div>';
+      });
+    }
+    h += '<div style="display:flex;gap:8px;margin-top:10px;">' +
+      '<button class="btn btn-primary" onclick="_boxCheckNewForm()"><i class="ti ti-plus"></i> Занести новую</button>' +
+      '<button class="btn btn-secondary" onclick="_boxCheckClear()">Отмена</button>' +
+      '</div>';
+  }
+  h += '</div>';
+  res.innerHTML = h;
+  const qi = document.getElementById('box-check-qty');
+  if (qi) { try { qi.focus(); } catch (e) {} }
+}
+
+function _boxCheckQtyHint() {
+  const j = _boxCheck.current; if (!j) return;
+  const chosen = j.chosen || j.match; if (!chosen) return;
+  const el = document.getElementById('box-check-hint');
+  const qi = document.getElementById('box-check-qty');
+  if (!el || !qi) return;
+  if (qi.value === '') { el.textContent = ''; return; }
+  const fact = Number(qi.value);
+  const cur = Number(chosen.qty_on_stock) || 0;
+  if (!isFinite(fact)) { el.textContent = ''; return; }
+  const d = fact - cur;
+  if (d === 0) { el.style.color = '#16a34a'; el.textContent = '✓ сходится'; }
+  else { el.style.color = '#dc2626'; el.textContent = 'расхождение: ' + (d > 0 ? '+' : '') + _bcN(d); }
+}
+
+function _boxCheckClear() {
+  _boxCheck.current = null;
+  const res = document.getElementById('box-check-result');
+  if (res) res.innerHTML = '';
+}
+
+function _boxCheckAdd() {
+  const j = _boxCheck.current; if (!j) return;
+  const chosen = j.chosen || j.match; if (!chosen) return;
+  const qi = document.getElementById('box-check-qty');
+  const fact = qi ? Number(qi.value) : NaN;
+  if (qi && qi.value === '' || !isFinite(fact) || fact < 0) {
+    showToast('Введите фактическое количество', 'error'); return;
+  }
+  const cur = Number(chosen.qty_on_stock) || 0;
+  const item = {
+    component_id: chosen.component_id,
+    name: chosen.name, sku: chosen.sku, unit: chosen.unit || 'шт.',
+    current: cur, fact: fact, delta: fact - cur,
+    isNew: !!chosen._isNew,
+  };
+  const ix = _boxCheck.items.findIndex(x => x.component_id === item.component_id);
+  if (ix >= 0) _boxCheck.items[ix] = item; else _boxCheck.items.push(item);
+  _boxCheckClear();
+  _renderBoxCheckList();
+  showToast('Добавлено: ' + (item.name || ''), 'success');
+}
+
+function _boxCheckRemove(idx) {
+  _boxCheck.items.splice(idx, 1);
+  _renderBoxCheckList();
+}
+
+function _renderBoxCheckList() {
+  const el = document.getElementById('box-check-list');
+  if (el) el.innerHTML = _boxCheckListHtml();
+}
+
+function _boxCheckListHtml() {
+  const items = _boxCheck.items;
+  if (!items.length) {
+    return '<div style="color:var(--text-light);font-size:13px;padding:16px;text-align:center;border:1px dashed var(--border);border-radius:10px;">Список пуст — сфотографируйте первую коробку</div>';
+  }
+  const diffs = items.filter(x => x.delta !== 0).length;
+  let h = '<div style="font-weight:700;margin:6px 0 8px;">Проверено: ' + items.length +
+    (diffs ? (' · <span style="color:#dc2626;">с расхождением ' + diffs + '</span>') : ' · всё сходится') + '</div>';
+  items.forEach((x, i) => {
+    let badge;
+    if (x.isNew) badge = '<span style="color:#7c3aed;font-weight:600;">новая · ' + _bcN(x.fact) + '</span>';
+    else if (x.delta === 0) badge = '<span style="color:#16a34a;font-weight:600;">✓ ' + _bcN(x.fact) + '</span>';
+    else badge = '<span style="color:#dc2626;font-weight:600;">' + _bcN(x.current) + ' → ' + _bcN(x.fact) + ' (' + (x.delta > 0 ? '+' : '') + _bcN(x.delta) + ')</span>';
+    h += '<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(x.name || '') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(x.sku || '—') + ' · ' + escapeHtml(x.unit || 'шт.') + '</div>' +
+      '</div>' +
+      '<div style="font-size:13px;white-space:nowrap;">' + badge + '</div>' +
+      '<button class="inv-delete-btn" title="Убрать" onclick="_boxCheckRemove(' + i + ')"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  h += '<button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="_boxCheckApply()">' +
+    '<i class="ti ti-checks"></i> Применить (' + items.length + ')</button>';
+  return h;
+}
+
+async function _boxCheckApply() {
+  const items = _boxCheck.items;
+  if (!items.length) return;
+  const diffs = items.filter(x => x.delta !== 0 && !x.isNew).length;
+  const news = items.filter(x => x.isNew).length;
+  let msg = 'Применить ' + items.length + ' позиций к складу?';
+  if (diffs) msg += '\nС расхождением: ' + diffs + ' (остаток будет приведён к факту).';
+  if (news) msg += '\nНовых позиций: ' + news + '.';
+  if (!confirm(msg)) return;
+  const payload = { items: items.map(x => ({ component_id: x.component_id, new_qty: x.fact })) };
+  try {
+    const r = await apiPost('/api/inventory/sessions/manual', payload);
+    if (!r.ok || !(r.data && (r.data.ok || r.data.id))) {
+      showToast((r.data && (r.data.message || r.data.error)) || 'Не удалось применить', 'error');
+      return;
+    }
+    showToast('Применено: ' + items.length + ' позиций', 'success');
+    _boxCheck.items = [];
+    await _invFetchSessions();
+    _invRenderHome();
+  } catch (e) {
+    showToast('Сеть: не удалось применить', 'error');
+  }
+}
+
+function _boxCheckNewForm() {
+  const j = _boxCheck.current; if (!j) return;
+  const rec = j.recognized || {};
+  const res = document.getElementById('box-check-result'); if (!res) return;
+  const cats = _boxCheck.cats || [];
+  let defCat = cats.find(c => /электр/i.test(c.name || ''));
+  if (!defCat && cats.length) defCat = cats[0];
+  const nameVal = rec.name || rec.model || '';
+  const skuVal = (rec.codes && rec.codes.length ? rec.codes[0] : '') || rec.model || '';
+  let opts = cats.map(c => '<option value="' + c.id + '"' + (defCat && c.id === defCat.id ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>').join('');
+  let h = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;">' +
+    '<div style="font-weight:700;margin-bottom:10px;">Занести новую позицию</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;">' +
+      '<label style="font-size:12px;color:var(--text-light);">Наименование' +
+        '<input id="bc-new-name" value="' + escapeHtml(nameVal) + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Артикул' +
+        '<input id="bc-new-sku" value="' + escapeHtml(skuVal) + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Раздел' +
+        '<select id="bc-new-cat" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;">' + opts + '</select></label>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<label style="font-size:12px;color:var(--text-light);flex:1;">Фактически (шт.)' +
+          '<input id="bc-new-qty" type="number" inputmode="decimal" min="0" step="1"' + (rec.pack_qty ? (' placeholder="' + rec.pack_qty + '"') : '') + ' style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+        '<label style="font-size:12px;color:var(--text-light);width:90px;">Ед.' +
+          '<input id="bc-new-unit" value="шт." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:3px;"></label>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="_boxCheckCreate()"><i class="ti ti-check"></i> Создать и добавить</button>' +
+      '<button class="btn btn-secondary" onclick="_renderBoxCheckResult(_boxCheck.current)">Назад</button>' +
+    '</div>' +
+  '</div>';
+  res.innerHTML = h;
+}
+
+async function _boxCheckCreate() {
+  const name = (document.getElementById('bc-new-name') || {}).value || '';
+  const sku = (document.getElementById('bc-new-sku') || {}).value || '';
+  const catId = Number((document.getElementById('bc-new-cat') || {}).value);
+  const unit = (document.getElementById('bc-new-unit') || {}).value || 'шт.';
+  const qiv = (document.getElementById('bc-new-qty') || {}).value;
+  const fact = Number(qiv);
+  if (!name.trim()) { showToast('Укажите наименование', 'error'); return; }
+  if (!catId) { showToast('Выберите раздел', 'error'); return; }
+  if (qiv === '' || !isFinite(fact) || fact < 0) { showToast('Укажите фактическое количество', 'error'); return; }
+  try {
+    const r = await apiPost('/api/components', {
+      name: name.trim(), sku: sku.trim(), category_id: catId, unit: unit.trim() || 'шт.',
+    });
+    if (!r.ok || !(r.data && r.data.id)) {
+      showToast((r.data && (r.data.message || r.data.error)) || 'Не удалось создать позицию', 'error');
+      return;
+    }
+    const comp = r.data;
+    _boxCheck.items.push({
+      component_id: comp.id, name: comp.name, sku: comp.sku || sku, unit: comp.unit || unit,
+      current: 0, fact: fact, delta: fact, isNew: true,
+    });
+    _boxCheckClear();
+    _renderBoxCheckList();
+    showToast('Создано и добавлено: ' + comp.name, 'success');
+  } catch (e) {
+    showToast('Сеть: не удалось создать', 'error');
+  }
+}
+
 async function openInventorySession(sessionId) {
   _invState._selectedIds = new Set();
   _invState._overrides = {};
@@ -2742,6 +3039,9 @@ function openContractorModal() {
 
 function closeContractorModal() {
   document.getElementById('contractor-modal').classList.remove('visible');
+  // Сбрасываем контекст КП, чтобы он не «прилип» к форме договора, если
+  // модалку закрыли крестиком без выбора.
+  state._contractorModalContext = null;
 }
 
 async function loadContractorsForModal(query) {
@@ -2789,6 +3089,17 @@ async function loadContractorsForModal(query) {
 function selectContractor(contractorId) {
   const c = (cache.contractors || []).find(x => x.id === contractorId);
   if (!c) return;
+  // КП (offerForm) — отдельный контекст, см. openContractorModalForOffer.
+  // Эта функция — единственная (объявление в app-4 перекрывает прежний
+  // window.selectContractor из app-1), поэтому оба контекста живут здесь.
+  if (state._contractorModalContext === 'offer') {
+    state.offerForm.contractor_id = contractorId;
+    state.offerForm.contractor_name = c.name;
+    state.offerForm.contractor_inn = c.inn || '';
+    closeContractorModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   state.contractForm.contractor_id = contractorId;
   state.contractForm._contractor_name = c.name;
   state.contractForm._contractor_inn = c.inn || '';
@@ -2815,6 +3126,9 @@ function openManagerModal(mode) {
 
 function closeManagerModal() {
   document.getElementById('manager-modal').classList.remove('visible');
+  // Сбрасываем контекст КП, чтобы он не «прилип» к форме договора, если
+  // модалку закрыли крестиком без выбора.
+  state._managerModalContext = null;
   if (state._managerPickMode === 'co') {
     state._managerPickMode = 'main';
     if (typeof renderContractForm === 'function') renderContractForm();
@@ -2900,6 +3214,40 @@ async function loadManagersForModal(query) {
 }
 
 function selectManager(managerId) {
+  // КП (offerForm) — отдельный контекст, см. openManagerModalForOffer.
+  // Эта функция — единственная (объявление в app-4 перекрывает прежний
+  // window.selectManager из app-1), поэтому оба контекста живут здесь.
+  if (state._managerModalContext === 'offer') {
+    if (managerId === null) {
+      state.offerForm.manager_id = null;
+      state.offerForm.manager_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.manager_id = managerId;
+        state.offerForm.manager_name = m.short_name || m.full_name || '';
+      }
+    }
+    closeManagerModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
+  if (state._managerModalContext === 'offer_calc') {
+    // «Рассчитал» в КП — необязательный сотрудник
+    if (managerId === null) {
+      state.offerForm.calculated_by_id = null;
+      state.offerForm.calculated_by_name = '';
+    } else {
+      const m = (cache.managersForPicker || []).find(x => x.id === managerId);
+      if (m) {
+        state.offerForm.calculated_by_id = managerId;
+        state.offerForm.calculated_by_name = m.short_name || m.full_name || '';
+      }
+    }
+    closeManagerModal();
+    if (typeof renderOfferForm === 'function') renderOfferForm();
+    return;
+  }
   if (managerId === null) {
     state.contractForm.manager_id = null;
     state.contractForm._manager_name = '';
@@ -3293,10 +3641,10 @@ async function fetchPublicObject(kind, token, itemId) {
   if (pw) _qs.push('pw=' + encodeURIComponent(pw));
   if (itemId) _qs.push('item=' + encodeURIComponent(itemId));  // v2.45.208: карточка позиции
   if (_qs.length) url += '?' + _qs.join('&');
-  // Если пользователь вошёл в CRM — шлём токен сессии (сотрудник без пароля)
-  const _t = localStorage.getItem(TOKEN_KEY);
+  // v2.45.420: публичная страница QR НЕ шлёт токен сессии — пароль спрашивается
+  // всегда (в т.ч. у залогиненного сотрудника). Внутренние сценарии открытия
+  // карточки (openAssemblyByPublicToken и т.п.) шлют токен отдельно.
   const opts = { cache: 'no-store' };
-  if (_t) opts.headers = { 'Authorization': 'Bearer ' + _t };
   const r = await fetch(url, opts);
   let data = null;
   try { data = await r.json(); } catch (e) {}
@@ -3994,6 +4342,9 @@ async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate)
       subtitle: modelArticle ? 'Артикул: ' + modelArticle : '',
       url: url,
       type: 'assembly',
+      // v2.45.420: пароль для получателя (договорный или глобальный для свободной сборки)
+      password: r.public_password || '',
+      contractId: r.contract_id || null,
       data: { assemblyId, modelName, modelArticle, assemblyDate, token: r.public_token },
     });
   } catch (e) {
@@ -7806,6 +8157,7 @@ function _renderNotifications25(r) {
       else if (n.type === 'defect_message_added') icon = 'ti-message-circle';
       else if (n.type === 'contract_published')   icon = 'ti-file-text';
       else if (n.type === 'assembly_created')     icon = 'ti-tool';
+      else if (n.type === 'contract_shipped')     icon = 'ti-truck-delivery';
       const onClick = n.entity_type === 'defect'
         ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
         : (n.entity_type === 'contract'
@@ -9082,17 +9434,23 @@ async function markShipmentManual(itemType, itemId) {
     showToast('Не удалось отметить: ' + (e.message || e), 'error');
     return;
   }
-  if (r && r.ok) {
+  // v2.45.421: apiPost возвращает {ok: HTTP-статус, data: тело}. Раньше тут
+  // проверялся r.ok (HTTP), из-за чего на «уже отгружено» (HTTP 200, body.ok=false)
+  // показывалось ложное «отмечено», а вставки не было. Читаем тело (r.data).
+  const d = (r && r.data) || {};
+  const m = document.getElementById('ship-detail-modal');
+  if (d.ok) {
     showToast('✓ Отгрузка отмечена', 'success');
-    _handleShipmentStatusChange(r);
-    // Закрываем модалку и обновляем список
-    const m = document.getElementById('ship-detail-modal');
+    _handleShipmentStatusChange(d);
     if (m) m.classList.remove('visible');
     reloadShipmentStatus();
-  } else if (r && r.reason === 'already_shipped') {
-    showToast('Уже отгружено', 'info');
+  } else if (d.reason === 'already_shipped') {
+    // По этому id уже есть отгрузка — обновим экран, чтобы показать реальную картину
+    showToast('Эта единица уже отгружена', 'info');
+    if (m) m.classList.remove('visible');
+    reloadShipmentStatus();
   } else {
-    showToast('Не удалось отметить (' + (r && r.reason || 'unknown') + ')', 'error');
+    showToast('Не удалось отметить (' + (d.reason || 'unknown') + ')', 'error');
   }
 }
 
@@ -12042,6 +12400,11 @@ async function openInstallationDetail(id) {
   m.classList.add('visible');
   try {
     var d = await apiGet('/api/installations/' + id);
+    // v2.45.445: список монтажников для назначения прямо из карточки (только управляющим)
+    if (d && d.can_manage) {
+      try { var _ir = await apiGet('/api/installations/installers'); d._installers = (_ir && _ir.installers) || []; }
+      catch (_) { d._installers = []; }
+    }
     _renderInstallationDetail(d);
   } catch (e) {
     m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;"><div class="empty-block">' + escapeHtml(String(e.message || e)) + '</div></div>';
@@ -12051,6 +12414,7 @@ async function openInstallationDetail(id) {
 function _renderInstallationDetail(d) {
   var m = _installModalEl();
   _installReportFiles = [];
+  _montageChatFiles = [];
   var color = _installStatusColor(d.status);
   var canManage = !!d.can_manage;
   var canReport = !!d.can_report;
@@ -12146,6 +12510,45 @@ function _renderInstallationDetail(d) {
   });
   if (itemsHtml) itemsHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-clipboard-list"></i> Что нужно сделать по договору</div>' + itemsHtml + '</div>';
 
+  // v2.45.447: спецификация договора (что монтировать) — для исполнителя
+  var specHtml = '';
+  if (d.contract_spec && d.contract_spec.length) {
+    specHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-list-details"></i> Спецификация — что монтировать <span class="idi-cnt">' + d.contract_spec.length + '</span></div>';
+    d.contract_spec.forEach(function (s) {
+      specHtml += '<div class="idi-row"><span class="idi-name">' + escapeHtml(s.name || '—') + '</span>' +
+        '<span class="idi-meta">' + (parseFloat(s.qty) || 0) + ' ' + escapeHtml(s.unit || 'шт.') + '</span></div>';
+    });
+    specHtml += '</div>';
+  }
+  // v2.45.448: встроенный чат+файлы по договору прямо в карточке (не отдельное окно)
+  var chatBlock = d.contract_id ? (
+    '<div class="imc-chat">' +
+      '<div class="imc-chat-title"><i class="ti ti-message-circle"></i> Чат и файлы по договору</div>' +
+      '<div class="imc-chat-msgs" id="imc-chat-msgs"><div class="imc-empty">Загружаем…</div></div>' +
+      '<textarea id="imc-chat-input" class="imc-chat-ta" rows="2" placeholder="Написать сообщение / вопрос по объекту…"></textarea>' +
+      '<div class="imc-chat-actions">' +
+        '<label class="imc-chat-attach"><i class="ti ti-paperclip"></i> Файл' +
+          '<input type="file" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display:none" onchange="onMontageChatFiles(this)"></label>' +
+        '<span id="imc-chat-files" class="imc-chat-files"></span>' +
+        '<button class="btn btn-primary imc-chat-send" onclick="sendMontageChat(' + d.contract_id + ')"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>'
+  ) : '';
+
+  // v2.45.445: назначение монтажника прямо в карточке (управляющим)
+  var assigneeCtrl = '';
+  if (canManage) {
+    var _ins = d._installers || [];
+    var _opts = '<option value="">— не назначен —</option>' + _ins.map(function (e) {
+      return '<option value="' + e.id + '"' + (String(d.assigned_employee_id) === String(e.id) ? ' selected' : '') + '>' + escapeHtml(e.name) + '</option>';
+    }).join('');
+    assigneeCtrl = '<div class="idet-assignee">' +
+      '<span class="idet-assignee-label"><i class="ti ti-user-cog"></i> Монтажник</span>' +
+      '<select class="idet-assignee-select" onchange="assignInstallationInstaller(' + d.id + ', this.value)">' + _opts + '</select>' +
+      (_ins.length ? '' : '<div class="idet-assignee-hint">Нет монтажников — заведите сотрудника с правом «Монтаж»</div>') +
+    '</div>';
+  }
+
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
       '<div class="modal-header">' +
@@ -12158,16 +12561,33 @@ function _renderInstallationDetail(d) {
           '<div style="display:flex;gap:6px;">' + manageBtns + '</div>' +
         '</div>' +
         (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
-        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Что монтировать:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
+        assigneeCtrl +
+        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Детали для монтажника:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
         itemsHtml +
+        specHtml +
         '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
         '<div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">' + flowHtml + '</div>' +
         '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
         reportsHtml +
         reportForm +
+        chatBlock +
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  // v2.45.448: подгрузить встроенный чат по договору
+  if (d.contract_id) loadMontageChat(d.contract_id);
+}
+
+// v2.45.445: назначить/сменить монтажника прямо из карточки монтажа
+async function assignInstallationInstaller(installationId, empId) {
+  try {
+    await apiPatch('/api/installations/' + installationId, { assigned_employee_id: empId ? parseInt(empId, 10) : null });
+    if (typeof showToast === 'function') showToast(empId ? 'Монтажник назначен' : 'Назначение снято', 'success');
+    await openInstallationDetail(installationId);
+    if (typeof loadInstallationList === 'function') loadInstallationList();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось назначить монтажника', 'error');
+  }
 }
 
 function onInstallReportFiles(input) {
@@ -12192,6 +12612,112 @@ function renderInstallReportFiles() {
 function removeInstallReportFile(i) {
   _installReportFiles.splice(i, 1);
   renderInstallReportFiles();
+}
+
+// v2.45.448: встроенный чат+файлы по договору прямо в карточке монтажа
+// (переиспользуем backend контрактного чата /api/contracts/{id}/chat)
+var _montageChatFiles = [];
+
+async function loadMontageChat(cid) {
+  var box = document.getElementById('imc-chat-msgs');
+  if (!box) return;
+  try {
+    var r = await apiGet('/api/contracts/' + cid + '/chat');
+    _renderMontageChatMsgs(r);
+  } catch (e) {
+    box.innerHTML = '<div class="imc-empty">Не удалось загрузить чат</div>';
+  }
+}
+
+function _renderMontageChatMsgs(r) {
+  var box = document.getElementById('imc-chat-msgs');
+  if (!box) return;
+  var msgs = (r && r.messages) || [];
+  var myId = r && r.my_chat_id;
+  if (!msgs.length) {
+    box.innerHTML = '<div class="imc-empty">Сообщений пока нет. Напишите первое — все по договору увидят.</div>';
+    return;
+  }
+  var html = '';
+  msgs.forEach(function (m) {
+    var time = (m.created_at || '').slice(11, 16);
+    if (m.is_system) {
+      html += '<div class="imc-sys">' + escapeHtml(m.text || '') + (time ? ' · ' + escapeHtml(time) : '') + '</div>';
+      return;
+    }
+    var isMine = (m.author_chat_id === myId);
+    var author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
+    var filesHtml = '';
+    (m.files || []).forEach(function (f) {
+      var url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      if (f.kind === 'photo') {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-img"><img src="' + url + '" loading="lazy"></a>';
+      } else if (f.kind === 'video') {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-file"><i class="ti ti-video"></i><span>' + escapeHtml(f.original_name || 'Видео') + '</span></a>';
+      } else {
+        filesHtml += '<a href="' + url + '" target="_blank" class="imc-file"><i class="ti ti-file"></i><span>' + escapeHtml(f.original_name || 'Файл') + '</span></a>';
+      }
+    });
+    html += '<div class="imc-msg' + (isMine ? ' mine' : '') + '">' +
+      '<div class="imc-author">' + escapeHtml(author) + (time ? ' · ' + escapeHtml(time) : '') + '</div>' +
+      (m.text ? '<div class="imc-text">' + escapeHtml(m.text).replace(/\n/g, '<br>') + '</div>' : '') +
+      (filesHtml ? '<div class="imc-files-row">' + filesHtml + '</div>' : '') +
+    '</div>';
+  });
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function onMontageChatFiles(input) {
+  Array.prototype.slice.call(input.files || []).forEach(function (f) {
+    if (_montageChatFiles.length < 5) _montageChatFiles.push(f);
+  });
+  input.value = '';
+  _renderMontageChatFiles();
+}
+
+function _renderMontageChatFiles() {
+  var box = document.getElementById('imc-chat-files');
+  if (!box) return;
+  box.innerHTML = _montageChatFiles.map(function (f, i) {
+    var isImg = (f.type || '').indexOf('image/') === 0;
+    return '<span class="imc-chip"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i>' +
+      '<span class="imc-chip-name">' + escapeHtml(f.name) + '</span>' +
+      '<button onclick="removeMontageChatFile(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button></span>';
+  }).join('');
+}
+
+function removeMontageChatFile(i) {
+  _montageChatFiles.splice(i, 1);
+  _renderMontageChatFiles();
+}
+
+async function sendMontageChat(cid) {
+  var inp = document.getElementById('imc-chat-input');
+  var text = (inp && inp.value || '').trim();
+  if (!text && !_montageChatFiles.length) { showToast('Напишите сообщение или прикрепите файл', 'error'); return; }
+  try {
+    var token = localStorage.getItem(TOKEN_KEY);
+    var resp;
+    if (_montageChatFiles.length) {
+      var fd = new FormData();
+      if (text) fd.append('text', text);
+      _montageChatFiles.forEach(function (f, i) { fd.append('file_' + (i + 1), f, f.name); });
+      resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+      });
+    } else {
+      resp = await fetch(API_BASE + '/api/contracts/' + cid + '/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: text }),
+      });
+    }
+    if (!resp.ok) { var e = await resp.json().catch(function () { return {}; }); showToast(e.message || e.error || 'Не отправилось', 'error'); return; }
+    if (inp) inp.value = '';
+    _montageChatFiles = [];
+    _renderMontageChatFiles();
+    await loadMontageChat(cid);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 async function submitInstallationReport(id) {
@@ -12259,7 +12785,7 @@ async function _openInstallationForm(inst) {
         '<h3><i class="ti ti-tools"></i> ' + (isEdit ? 'Изменить монтаж' : 'Новый монтаж') + '</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:10px;">' +
+      '<div class="if-form" style="padding:18px;max-height:74vh;overflow:auto;display:flex;flex-direction:column;gap:14px;">' +
         '<label>Что монтировать <span style="color:var(--danger,#B91C1C)">*</span><input type="text" id="if-title" value="' + escapeHtml(inst && inst.title || '') + '" placeholder="Например: монтаж щита ЩУ-003 на объекте"></label>' +
         '<label>Адрес / объект<input type="text" id="if-address" value="' + escapeHtml(inst && inst.object_address || '') + '" placeholder="г. Челябинск, ул. …"></label>' +
         '<label>Дата монтажа<input type="date" id="if-date" value="' + escapeHtml(inst && inst.scheduled_date || '') + '"></label>' +
