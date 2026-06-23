@@ -9523,15 +9523,133 @@ function renderContractItemsBlock(contractId) {
     html += '<button class="spec-add-btn" onclick="startAddSpecItem(' + contractId + ')"><i class="ti ti-plus"></i> Добавить позицию</button>';
   }
 
+  // Документы (паспорта, декларации) — отдельный раздел спецификации
+  html += '<div id="spec-docs-' + contractId + '" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">' +
+            '<div style="font-size:12px;color:var(--text-light);">Документы…</div></div>';
+
   html += '</div>';
   container.innerHTML = html;
   container.style.display = '';
+  loadContractDocuments(contractId);
 
   // Фокус на поле name если форма открыта
   setTimeout(() => {
     const f = document.getElementById('spec-form-name');
     if (f) f.focus();
   }, 50);
+}
+
+// ============ Документы договора (паспорта, декларации) ============
+
+async function loadContractDocuments(contractId) {
+  const el = document.getElementById('spec-docs-' + contractId);
+  if (!el) return;
+  let docs = [];
+  let boxes = [];
+  try {
+    const d = await apiGet('/api/contracts/' + contractId + '/documents');
+    docs = (d && d.documents) || [];
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-light);">Не удалось загрузить документы</div>';
+    return;
+  }
+  try {
+    const bm = await apiGet('/api/contracts/' + contractId + '/box-map');
+    boxes = (bm && bm.boxes) || [];
+  } catch (e) { /* коробок может не быть */ }
+  state._docBoxes = state._docBoxes || {};
+  state._docBoxes[contractId] = boxes;
+  renderContractDocuments(el, contractId, docs, boxes);
+}
+
+function renderContractDocuments(el, contractId, docs, boxes) {
+  const canEdit = canManageSales();
+  let h = '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:8px;">' +
+          '<i class="ti ti-file-certificate" style="color:var(--brand);"></i> Документы ' +
+          (docs.length ? '(' + docs.length + ')' : '') +
+          ' <span style="font-weight:400;font-size:11px;color:var(--text-light);">— паспорта, декларации; попадают в спецификацию</span></div>';
+  if (docs.length) {
+    docs.forEach(d => {
+      const boxBadge = d.box_name
+        ? '<span style="font-size:11px;background:#F3E8FF;color:#7C3A8F;border-radius:6px;padding:1px 6px;margin-left:6px;"><i class="ti ti-package" style="font-size:11px;vertical-align:-1px;"></i> ' + escapeHtml(d.box_name) + '</span>'
+        : '';
+      h += '<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">';
+      h += '<div style="flex:1;min-width:0;font-size:13px;">' + escapeHtml(d.name || '') +
+           ' <span style="color:var(--text-light);">· ' + _docQty(d.qty) + ' ' + escapeHtml(d.unit || 'шт.') + '</span>' + boxBadge + '</div>';
+      if (canEdit) {
+        // выбор коробки
+        let opts = '<option value="">— не в коробке —</option>';
+        (boxes || []).forEach(b => {
+          opts += '<option value="' + b.id + '"' + (String(d.box_id) === String(b.id) ? ' selected' : '') + '>' + escapeHtml(b.name || ('Коробка #' + b.id)) + '</option>';
+        });
+        h += '<select onchange="assignDocumentBox(' + d.id + ',' + contractId + ',this.value)" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 6px;max-width:150px;">' + opts + '</select>';
+        h += '<button class="btn btn-secondary btn-small" onclick="deleteContractDocument(' + d.id + ',' + contractId + ')" title="Удалить"><i class="ti ti-trash"></i></button>';
+      }
+      h += '</div>';
+    });
+  } else {
+    h += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Документов нет.</div>';
+  }
+  if (canEdit) {
+    h += '<button class="spec-add-btn" onclick="addContractDocument(' + contractId + ')" style="margin-top:2px;"><i class="ti ti-plus"></i> Добавить документ</button>';
+  }
+  el.innerHTML = h;
+}
+
+function _docQty(q) {
+  const n = Number(q || 1);
+  return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
+}
+
+async function addContractDocument(contractId) {
+  const name = prompt('Название документа (например: Паспорт изделия, Декларация соответствия):');
+  if (name === null) return;
+  if (!name.trim()) { showToast('Укажите название', 'error'); return; }
+  const qtyStr = prompt('Количество:', '1');
+  if (qtyStr === null) return;
+  const qty = Math.max(1, Math.floor(Number(qtyStr) || 1));
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/documents', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), qty: qty }),
+    });
+    if (!r.ok) throw new Error('http');
+    await loadContractDocuments(contractId);
+  } catch (e) {
+    showToast('Не удалось добавить документ', 'error');
+  }
+}
+
+async function assignDocumentBox(docId, contractId, boxId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contract-documents/' + docId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ box_id: boxId ? Number(boxId) : null }),
+    });
+    if (!r.ok) throw new Error('http');
+    await loadContractDocuments(contractId);
+  } catch (e) {
+    showToast('Не удалось обновить', 'error');
+  }
+}
+
+async function deleteContractDocument(docId, contractId) {
+  if (!confirm('Удалить документ из спецификации?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contract-documents/' + docId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('http');
+    await loadContractDocuments(contractId);
+  } catch (e) {
+    showToast('Не удалось удалить', 'error');
+  }
 }
 
 function renderSpecForm(contractId, existing) {
