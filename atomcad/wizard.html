@@ -673,7 +673,7 @@ function pAux(){
          '<input style="flex:1;min-width:130px;'+FLDST+'" value="'+esc(a.name)+'" placeholder="наименование" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
          '<input style="width:140px;'+FLDST+';font-family:\'IBM Plex Mono\'" value="'+esc(a.model||'')+'" placeholder="марка / модель" onchange="editAuxField(\''+a.id+'\',\'model\',this.value)">'+
          '<select style="'+FLDST+'" onchange="editAuxField(\''+a.id+'\',\'kind\',this.value)">'+auxKindOptions(a.kind)+'</select>'+
-         (auxSwitches(a.kind)?'<select style="'+FLDST+'" title="что коммутирует" onchange="editAuxField(\''+a.id+'\',\'target\',this.value)">'+consumerOptions(a.target)+'</select>':'')+
+         (auxSwitches(a.kind)?auxTargetsEditor(a):'')+
          '<input inputmode="decimal" style="width:60px;'+FLDST+'" value="'+(a.a||'')+'" placeholder="А" onchange="editAuxField(\''+a.id+'\',\'a\',this.value)">'+
          '<input inputmode="numeric" style="width:54px;'+FLDST+'" value="'+(a.qty||1)+'" title="кол-во" onchange="editAuxField(\''+a.id+'\',\'qty\',this.value)">'+
          '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
@@ -729,6 +729,18 @@ function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наиме
 function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});if(editAux===id)editAux=null;dirty();draw()}
 function startEditAux(id){editAux=id;draw()}
 function doneEditAux(){editAux=null;draw()}
+/* «что коммутирует» — несколько нагрузок (приточный + вытяжной и т.д.) */
+function auxTargets(a){ if(Array.isArray(a.targets))return a.targets; a.targets=(a.target?String(a.target).split(/\s*,\s*/).filter(Boolean):[]); return a.targets; }
+function auxTargetsSync(a){ a.target=auxTargets(a).join(', '); }
+function editAuxAddTarget(id,name){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;name=(name||'').trim();if(!name)return;var tg=auxTargets(a);if(tg.indexOf(name)<0)tg.push(name);auxTargetsSync(a);dirty();draw();}
+function editAuxRmTarget(id,i){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;auxTargets(a).splice(i,1);auxTargetsSync(a);dirty();draw();}
+function auxTargetsEditor(a){
+  var tg=auxTargets(a),h='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 6px;background:var(--graphite);min-width:200px">';
+  if(tg.length)tg.forEach(function(t,i){h+='<span class="lchip" style="margin:0">'+esc(t)+'<button class="rm" title="убрать" onclick="editAuxRmTarget(\''+a.id+'\','+i+')">✕</button></span>';});
+  else h+='<span style="color:var(--amber);font-size:12px">что коммутирует?</span>';
+  h+='<select title="добавить нагрузку" style="background:transparent;border:none;color:var(--cyan);font-size:12px;outline:none;cursor:pointer" onchange="editAuxAddTarget(\''+a.id+'\',this.value);this.value=\'\'">'+consumerOptions('')+'</select></div>';
+  return h;
+}
 function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag'){v=(v||'').trim();if(v){a.tag=v;a.tagManual=true;}else{a.tag='';a.tagManual=false;}}else if(f==='kind'){a.kind=v;a.tagManual=false;}else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();else if(f==='model')a.model=(v||'').trim();else if(f==='manu')a.manu=(v||'').trim();dirty();}
 // варианты «что коммутирует контактор» — список потребителей
 function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'';o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';});return o;}
