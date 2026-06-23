@@ -28,7 +28,7 @@ function contactorModel(c){ var n=contactorPick(consumerCurrent(c)); return n.m+
 // реальный габарит контактора (Ш×В×Г) — для понимания размера
 function contactorDimStr(c){ var n=contactorPick(consumerCurrent(c)); return n.w+'×'+n.h+'×'+n.d+' мм · 3-пол.'; }
 // символ УГО для аппарата из «Вспомогат.» в редакторе (ключи совпадают с SYM в editor.html)
-function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'coil',ssr:'box',psu:'box',vfd:'box',fan:'m3',contactor:'km3',breaker:'qf1',other:'box'})[k]||'box';}
+function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'coil',ssr:'box',psu:'psu',vfd:'box',fan:'m3',contactor:'km3',breaker:'qf1',other:'box'})[k]||'box';}
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
