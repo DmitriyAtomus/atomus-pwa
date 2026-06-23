@@ -391,6 +391,12 @@ var SYM={
   ntc:{name:'Датчик NTC',pre:'BT',bb:[-42,-5,55,165],lbl:[55,95,'start'],
     pins:[[0,0],[0,150]],
     pr:[L(0,0,0,45),L(0,105,0,150),R(-22,45,44,60),L(-42,118,30,40)]},
+  // сенсорная панель (HMI): отдельный элемент, выводы RS-485 A/B снизу (под A/B контроллера, шаг 90)
+  hmi:{name:'Сенсорная панель (HMI)',pre:'A',bb:[-130,-12,130,230],lbl:[0,260,'middle'],
+    pins:[[-45,170],[45,170]],
+    pr:[R(-120,0,240,150,1),T(0,62,28,'СЕНСОРНАЯ'),T(0,100,28,'ПАНЕЛЬ (HMI)'),
+        L(-45,150,-45,170),L(45,150,45,170),C(-45,170,9),C(45,170,9),
+        T(-45,142,22,'A'),T(45,142,22,'B')]},
   // блок питания: вход L/N (~) сверху, выход +24В/0В (=) снизу
   psu:{name:'Блок питания',pre:'G',bb:[-130,-14,150,314],lbl:[150,150,'start'],
     pins:[[-55,0],[55,0],[-55,300],[55,300]],
@@ -430,16 +436,14 @@ function ctrlSym(c){
   pr.push(C(px1,-stub,9), C(px2,-stub,9));                       // клеммы питания — кружки на концах выводов
   pr.push(T(px1,-stub-16,30,pl[0]), T(px2,-stub-16,30,pl[1]));   // маркировка выводов питания
   pinsArr.push([px1,-stub]); pinsArr.push([px2,-stub]);
-  // связь RS-485 (A/B) → сенсорная панель (сверху-справа)
-  var ax=80, bx=170, rmid=125, hy=-stub-200, hh=110, hw=240, hxl=rmid-hw/2;
+  // выводы RS-485 (A/B) сверху-справа — сенсорная панель теперь отдельный элемент (см. SYM.hmi), подключается проводами
+  var ax=80, bx=170, rmid=125;
   pr.push(L(ax,0,ax,-stub), L(bx,0,bx,-stub));
   pr.push(C(ax,-stub,9), C(bx,-stub,9));                         // клеммы RS-485
-  pr.push(T(ax-34,-stub-16,30,'A'), T(bx+34,-stub-16,30,'B'));   // буквы сбоку от выводов — не на проводе
-  pr.push(T(rmid,-stub-54,24,'RS-485'));
-  pr.push(R(hxl,hy,hw,hh));
-  pr.push(T(rmid,hy+44,26,'СЕНСОРНАЯ'), T(rmid,hy+80,26,'ПАНЕЛЬ (HMI)'));
-  pr.push(L(ax,-stub,ax,hy+hh), L(bx,-stub,bx,hy+hh));
-  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, hy-20, hx+stub+360, bodyH+10],
+  pr.push(T(ax-34,-stub-16,30,'A'), T(bx+34,-stub-16,30,'B'));
+  pr.push(T(rmid,-stub-50,24,'RS-485'));
+  pinsArr.push([ax,-stub]); pinsArr.push([bx,-stub]);            // A/B — реальные выводы, к ним идёт провод к HMI
+  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, -stub-90, hx+stub+360, bodyH+10],
           lbl:[-hx, bodyH+54, 'start'], pins:pinsArr, pr:pr};
 }
 function symFor(c){ return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
@@ -447,7 +451,7 @@ var PALETTE=[
   ['Защита',['qf3','qf1','fu']],
   ['Коммутация',['km3','coil','c_no','c_nc','sb_no','sb_nc']],
   ['Машины и реле',['m3','kk3','hl']],
-  ['Питание и приборы',['psu','box','ntc']],
+  ['Питание и приборы',['psu','hmi','box','ntc']],
   ['Клеммы',['term']]
 ];
 

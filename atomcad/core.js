@@ -290,6 +290,13 @@ function buildSchematic(P){
     var cspec=P.controller.spec||{};
     ac.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
       attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:io,supply:cspec.voltage||'',wired:true}});
+    // сенсорная панель (HMI) — отдельный элемент над контроллером, RS-485 A/B заведены проводами на выводы A/B контроллера
+    if(P.hmi&&P.hmi.model){
+      var hmiY=ctrlY-G.stub-360;
+      ac.push(C('A2','hmi',cz+125,hmiY,P.hmi.model,P.hmi.manu||'','Сенсорная панель HMI'));
+      aw.push(W([cz+80, ctrlY-G.stub],[cz+80, hmiY+170]));    // A
+      aw.push(W([cz+170, ctrlY-G.stub],[cz+170, hmiY+170]));  // B
+    }
     var lpx=cz-G.hx-G.stub, rpx=cz+G.hx+G.stub;
     var SP=210, baseY=ctrlY+40;                 // крупный шаг устройств — чтобы не наезжали
     function shortC(des,sym,xx,yy,model,manu,note,nm){var cc=C(des,sym,xx,yy,model,manu,note,nm);cc.attrs.short=true;return cc;}
