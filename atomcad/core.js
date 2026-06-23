@@ -299,7 +299,7 @@ function buildSchematic(P){
     });
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
-  pt.push({x:gx-10,y:780,s:24,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины
+  pt.push({x:gx+40,y:770,s:22,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины — над линией шины (y=800) и правее ввода, чтобы линия не пересекала подпись
   pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
   var sheets=[{title:'силовые цепи', comps:pc, wires:pw, texts:pt}];
 
