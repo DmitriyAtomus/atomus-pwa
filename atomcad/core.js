@@ -32,6 +32,8 @@ function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'
 // нагрузки, закреплённые за общим контактором из «Вспомогат.» (через «что коммутирует»): имя → обозначение контактора
 function auxCoverSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='contactor')return; var tag=a.tag||'KM'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
 function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение общего контактора
+// твердотельные реле (рег. напряжения) из «Вспомогат.» по «что коммутирует»: имя нагрузки → обозначение ТР
+function ssrSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='ssr')return; var tag=a.tag||'ТР'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
@@ -238,7 +240,7 @@ function buildSchematic(P){
   });
   var nT=cols.length, step=720, maxX=3850;
   if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
-  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1, termN=2, _covS=auxCoverSet(P);
+  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
     var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
@@ -256,20 +258,31 @@ function buildSchematic(P){
       var role=cons?cons.name:(col.l.name||b.role);
       if(grouped) pw.push(W([x,1350],[x,1450]));                                        // от шины к отводу
       else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
+      // цепь отвода: автомат → контактор → (твердотельное реле) → клемма → нагрузка
       var covTag=coveredByAux(_covS,cons,col.l&&col.l.name);
+      var ssrTag=cons?(_ssr[col.l&&col.l.name]||_ssr[cons.name]||''):'';
+      var kmBot=1450;                                                                    // низ предыдущего аппарата (по умолчанию — сразу отвод)
       if(cons&&needsContactor(cons)&&covTag){
-        // общий контактор на несколько нагрузок: один контакт (полюс) на каждый отвод, общее обозначение
-        pc.push(C(covTag,'c_no',x,1450,'',' ',cons.name));
-        pw.push(W([x,1600],[x,1950]));
+        pc.push(C(covTag,'c_no',x,1450,'',' ',cons.name)); kmBot=1600;                    // общий контактор — контакт на отвод
       } else if(cons&&needsContactor(cons)){
-        pc.push(C('KM'+kmN,'kmp',x,1450,contactorModel(cons),'CHINT',cons.name));         // свой контактор NC1 (3-полюсный)
-        pw.push(W([x,1780],[x,1950]));
-        pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});                      // ссылка на катушку (лист 2)
+        pc.push(C('KM'+kmN,'kmp',x,1450,contactorModel(cons),'CHINT',cons.name)); kmBot=1780;  // свой контактор NC1
+        pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});
         if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;
         kmN++;
-      } else { pw.push(W([x,1450],[x,1950])); }
-      pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
-      pc.push(C('X'+termN,'term',x,2000,'ЗНИ 2,5 мм²','',role)); termN++;
+      }
+      var termY=2000, wnY=1730;
+      if(ssrTag){
+        var sy=kmBot+120;                                                                // твердотельное реле сразу под контактором
+        pw.push(W([x,kmBot],[x,sy]));
+        pc.push(C(ssrTag,'ssr',x,sy,'','','ТР рег. напряжения · 0-10В'));                 // вход L1 сверху, выход T1 снизу, управление 0-10В
+        pt.push({x:x-150,y:sy+170,s:18,ls:0,anchor:'end',tx:'0-10В ← AO'});               // подсказка по управлению
+        pw.push(W([x,sy+300],[x,sy+420]));                                               // выход ТР → клемма
+        termY=sy+470; wnY=sy+360;
+      } else {
+        pw.push(W([x,kmBot],[x,1950]));                                                   // контактор/отвод → клемма
+      }
+      pt.push({x:x+44,y:wnY,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
+      pc.push(C('X'+termN,'term',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;
       lastX=x;
     });
   });
