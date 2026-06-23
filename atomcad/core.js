@@ -28,10 +28,12 @@ function contactorModel(c){ var n=contactorPick(consumerCurrent(c)); return n.m+
 // реальный габарит контактора (Ш×В×Г) — для понимания размера
 function contactorDimStr(c){ var n=contactorPick(consumerCurrent(c)); return n.w+'×'+n.h+'×'+n.d+' мм · 3-пол.'; }
 // символ УГО для аппарата из «Вспомогат.» в редакторе (ключи совпадают с SYM в editor.html)
-function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'coil',ssr:'box',psu:'psu',vfd:'box',fan:'m3',contactor:'coil',breaker:'qf1',other:'box'})[k]||'box';}
+function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'coil',ssr:'ssr',psu:'psu',vfd:'box',fan:'m3',contactor:'coil',breaker:'qf1',other:'box'})[k]||'box';}
 // нагрузки, закреплённые за общим контактором из «Вспомогат.» (через «что коммутирует»): имя → обозначение контактора
-function auxCoverSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='contactor'&&a.kind!=='ssr')return; var tag=a.tag||'KM'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
+function auxCoverSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='contactor')return; var tag=a.tag||'KM'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
 function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение общего контактора
+// твердотельные реле (рег. напряжения) из «Вспомогат.» по «что коммутирует»: имя нагрузки → обозначение ТР
+function ssrSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='ssr')return; var tag=a.tag||'ТР'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
@@ -82,8 +84,15 @@ function buildBreakers(P){
             role:'питание '+p.volt+'В (БП '+p.ratingW+'Вт)',
             loads:[{name:'БП '+p.volt+'В · нагрузка '+p.sumW+' Вт', a:p.primaryA}], psu:p.volt}); n++;
   });
-  // управление
-  var ctrlA = 0.8 + P.aux.reduce(function(s,a){return s+(a.a||0)},0);
+  // управление — ток цепи управления: контроллер + катушки + сигнальные лампы/кнопки + вентилятор шкафа.
+  // НЕ нагружают цепь управления: коммутируемый ток контакторов/ТР/реле (это катушки ~0.05А),
+  // силовые БП (свой автомат), частотники/автоматы/прочее силовое — их ток идёт по силовым цепям, не сюда.
+  var CTRL_LOAD={lamp:1,button:1,switch:1,estop:1,fan:1};
+  var ctrlA = 0.8 + P.aux.reduce(function(s,a){
+    if(a.kind==='contactor'||a.kind==='ssr'||a.kind==='relay') return s+0.05*(a.qty||1);   // только ток катушки/управления
+    if(CTRL_LOAD[a.kind]) return s+(+a.a||0)*(a.qty||1);                                    // реальные потребители цепи управления — по своему току
+    return s;                                                                              // psu/vfd/breaker/other — силовые, на цепь управления не вешаем
+  },0);
   b.push({id:'QF'+n, code:'QF'+n, poles:1, rate:stdRating(ctrlA*1.25)||4, role:'цепи управления', loads:[{name:'Контроллер + вспом.', a:+ctrlA.toFixed(1)}]});
   return b;
 }
@@ -137,7 +146,8 @@ function buildSpec(P){
   // автоматы
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
-  var kmN=1, _cov=auxCoverSet(P);
+  var _auxKm=(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length;   // добавленные контакторы уже заняли KM1..KMn
+  var kmN=_auxKm+1, _cov=auxCoverSet(P);
   (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_cov,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:unm}); kmN++; } } });
   // датчики
   var btN=1;
@@ -222,7 +232,7 @@ function buildSchematic(P){
   var hasCtrl = !!(P.controller && P.controller.model);
 
   // ===================== ЛИСТ 1 · СИЛОВЫЕ ЦЕПИ =====================
-  var pc=[], pw=[], pt=[], gx=600, kmByName={};   // kmByName — общий для листов 1 и 2 (чтобы контакт KMn = катушка KMn)
+  var pc=[], pw=[], pt=[], gx=600, kmByName={}, covPole={};   // kmByName — общий для листов 1 и 2 (контакт KMn = катушка KMn); covPole — номер полюса общего контактора по нагрузкам
   var intro=(P.breakers||[]).filter(function(b){return b.role==='ввод'})[0];
   pc.push(C('X1','term',gx,360,'ЗНИ 6 мм²','','ввод'));
   if(intro){ pc.push(C(intro.code,'qf1',gx,460,'NB1-63 '+intro.poles+'P, C'+intro.rate,'CHINT','ввод')); }
@@ -238,7 +248,7 @@ function buildSchematic(P){
   });
   var nT=cols.length, step=720, maxX=3850;
   if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
-  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1, termN=2, _covS=auxCoverSet(P);
+  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
     var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
@@ -246,7 +256,7 @@ function buildSchematic(P){
     // автомат — один на группу, питание с шины ввода
     pc.push(C(b.code,'qf1',qfx,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT', grouped?('группа · '+gc.length+' лин.'):gc[0].l.name));
     pw.push(W([qfx,800],[qfx,950]));
-    pt.push({x:qfx+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                       // фаза(ы) линии
+    pt.push({x:qfx-40,y:892,s:24,ls:0,anchor:'end',tx:phase});                         // фаза(ы) линии — слева от отвода, чтобы не налезать на подпись сечения «N мм²» справа
     if(grouped){
       pw.push(W([qfx,1250],[qfx,1350]));                                               // отвод автомата на шину распределения
       pw.push(W([x0,1350],[x1,1350]));                                                 // шина распределения по отводам
@@ -256,20 +266,35 @@ function buildSchematic(P){
       var role=cons?cons.name:(col.l.name||b.role);
       if(grouped) pw.push(W([x,1350],[x,1450]));                                        // от шины к отводу
       else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
+      // цепь отвода: автомат → контактор → (твердотельное реле) → клемма → нагрузка
       var covTag=coveredByAux(_covS,cons,col.l&&col.l.name);
+      var ssrTag=cons?(_ssr[col.l&&col.l.name]||_ssr[cons.name]||''):'';
+      var kmBot=1450;                                                                    // низ предыдущего аппарата (по умолчанию — сразу отвод)
       if(cons&&needsContactor(cons)&&covTag){
-        // общий контактор на несколько нагрузок: один контакт (полюс) на каждый отвод, общее обозначение
-        pc.push(C(covTag,'c_no',x,1450,'',' ',cons.name));
-        pw.push(W([x,1600],[x,1950]));
+        var pole=(covPole[covTag]=(covPole[covTag]||0)+1);                                 // какой по счёту полюс общего контактора уходит на эту нагрузку
+        pc.push(C(covTag,'kmp1',x,1450,'',' ',cons.name)); kmBot=1780;                     // общий контактор — один полюс на нагрузку (тот же KM, разнесённо)
+        pt.push({x:x+24,y:1545,s:17,ls:0,anchor:'start',tx:(2*pole-1)+'/L'+pole});         // маркировка ввода полюса (1/L1, 3/L2, 5/L3…)
+        pt.push({x:x+24,y:1685,s:17,ls:0,anchor:'start',tx:(2*pole)+'/T'+pole});           // маркировка выхода полюса (2/T1, 4/T2, 6/T3…)
+        if(!(cons.name in kmByName)) kmByName[cons.name]=covTag;
       } else if(cons&&needsContactor(cons)){
-        pc.push(C('KM'+kmN,'kmp',x,1450,contactorModel(cons),'CHINT',cons.name));         // свой контактор NC1 (3-полюсный)
-        pw.push(W([x,1780],[x,1950]));
-        pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});                      // ссылка на катушку (лист 2)
+        pc.push(C('KM'+kmN,'kmp',x,1450,contactorModel(cons),'CHINT',cons.name)); kmBot=1780;  // свой контактор NC1
+        pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});
         if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;
         kmN++;
-      } else { pw.push(W([x,1450],[x,1950])); }
-      pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
-      pc.push(C('X'+termN,'term',x,2000,'ЗНИ 2,5 мм²','',role)); termN++;
+      }
+      var termY=2000, wnY=1730;
+      if(ssrTag){
+        var sy=kmBot+120;                                                                // твердотельное реле сразу под контактором
+        pw.push(W([x,kmBot],[x,sy]));
+        pc.push(C(ssrTag,'ssr',x,sy,'','','ТР рег. напряжения · 0-10В'));                 // вход L1 сверху, выход T1 снизу, управление 0-10В
+        pt.push({x:x-150,y:sy+170,s:18,ls:0,anchor:'end',tx:'0-10В ← AO'});               // подсказка по управлению
+        pw.push(W([x,sy+300],[x,sy+420]));                                               // выход ТР → клемма
+        termY=sy+470; wnY=sy+360;
+      } else {
+        pw.push(W([x,kmBot],[x,1950]));                                                   // контактор/отвод → клемма
+      }
+      pt.push({x:x+44,y:wnY,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
+      pc.push(C('X'+termN,'term',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;
       lastX=x;
     });
   });
