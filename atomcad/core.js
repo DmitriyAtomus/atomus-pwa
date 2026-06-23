@@ -84,8 +84,11 @@ function buildBreakers(P){
             role:'питание '+p.volt+'В (БП '+p.ratingW+'Вт)',
             loads:[{name:'БП '+p.volt+'В · нагрузка '+p.sumW+' Вт', a:p.primaryA}], psu:p.volt}); n++;
   });
-  // управление
-  var ctrlA = 0.8 + P.aux.reduce(function(s,a){return s+(a.a||0)},0);
+  // управление — ток цепи управления: контроллер + катушки/лампы (а НЕ коммутируемый ток контакторов/ТР/реле)
+  var ctrlA = 0.8 + P.aux.reduce(function(s,a){
+    if(a.kind==='contactor'||a.kind==='ssr'||a.kind==='relay') return s+0.05*(a.qty||1);   // катушка/управление — мало
+    return s+(+a.a||0)*(a.qty||1);                                                          // лампы/БП/прочее — по своему току
+  },0);
   b.push({id:'QF'+n, code:'QF'+n, poles:1, rate:stdRating(ctrlA*1.25)||4, role:'цепи управления', loads:[{name:'Контроллер + вспом.', a:+ctrlA.toFixed(1)}]});
   return b;
 }
