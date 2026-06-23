@@ -253,9 +253,10 @@ function buildSchematic(P){
       if(grouped) pw.push(W([x,1350],[x,1450]));                                        // от шины к отводу
       else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
       if(cons&&needsContactor(cons)){
-        pc.push(C('KM'+kmN,'c_no',x,1450,contactorModel(cons),'CHINT',cons.name));
-        pw.push(W([x,1600],[x,1950]));
-        pt.push({x:x-66,y:1545,s:20,ls:0,anchor:'end',tx:'(л.2)'});                     // ссылка на катушку (лист 2)
+        var kmSym=ph3?'kmp':'c_no', kmBot=ph3?1780:1600;                                 // 3ф — силовой контактор с 3 контактами (T1..T3)
+        pc.push(C('KM'+kmN,kmSym,x,1450,contactorModel(cons),'CHINT',cons.name));
+        pw.push(W([x,kmBot],[x,1950]));
+        pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});                      // ссылка на катушку (лист 2)
         if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;                       // тот же номер на листе 2 (катушка)
         kmN++;
       } else { pw.push(W([x,1450],[x,1950])); }
