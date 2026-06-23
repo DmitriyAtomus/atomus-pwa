@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.471";
+const APP_VERSION = "v2.45.472";
 const APP_VERSION_DATE = "23.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12204,14 +12204,28 @@ function pickModelForOffer(modelId) {
   renderOfferForm();
 }
 
+// v2.45.x: характеристики продажной позиции (p.specs — плоский ключ→значение)
+// в строку для расшифровки позиции КП
+function _saleSpecsLine(p) {
+  if (!p || !p.specs || typeof p.specs !== 'object') return '';
+  const parts = [];
+  Object.keys(p.specs).forEach(k => {
+    const v = (p.specs[k] == null ? '' : String(p.specs[k])).trim();
+    if (v) parts.push((k || '').trim() ? ((k || '').trim() + ' ' + v) : v);
+  });
+  return parts.join(' · ');
+}
+
 function pickSaleProductForOffer(productId) {
   const p = ((cache.saleProducts && cache.saleProducts.products) || []).find(x => x.id === productId);
   if (!p) return;
+  // v2.45.x: характеристики позиции подставляем в расшифровку (видно в КП и PDF)
+  const specLine = _saleSpecsLine(p);
   // Добавляем позицию в КП с базовой ценой
   state.offerForm.items.push({
     sale_product_id: p.id,
     name: p.name,
-    description: p.description || '',
+    description: specLine || p.description || '',
     unit: p.unit || 'шт.',
     qty: 1,
     price: Number(p.base_price) || 0,
