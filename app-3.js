@@ -5589,6 +5589,17 @@ function _cpTrackingRowHtml(it) {
         '<i class="ti ti-calendar-plus" style="font-size:12px;"></i>когда придёт?' + (placeRu ? placeRu.replace(' · ', ' ') : '') + '</button>';
     }
   }
+  // Кнопка «получено» — товар пришёл, закрываем позицию заказа (для уже
+  // отправленных/оплаченных, не черновик). Закрытый заказ уходит из «Ждём поставку».
+  let receivedBtn = '';
+  if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
+    receivedBtn = '<button type="button" onclick="shopMarkReceived(' + it.order_item_id +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      'title="Товар пришёл — отметить позицию полученной и закрыть заказ" ' +
+      'style="background:none;border:1px solid #6EE7B7;color:#047857;border-radius:8px;' +
+      'padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-checkbox"></i> получено</button>';
+  }
   return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
@@ -5596,6 +5607,7 @@ function _cpTrackingRowHtml(it) {
       ageBadge +
       stBadge +
       etaChip +
+      receivedBtn +
       returnBtn +
     '</div>' +
   '</div>';
@@ -5687,6 +5699,28 @@ async function saveEta(orderId, clear) {
 }
 
 // v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
+async function shopMarkReceived(orderItemId, name) {
+  if (!orderItemId) return;
+  if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nЗаказ закроется (статус «получен»), позиция уйдёт из «Ждём поставку».')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-orders/items/' + orderItemId + '/received', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось отметить полученным', 'error');
+      return;
+    }
+    showToast('Отмечено полученным', 'success');
+    if (typeof cache !== 'undefined') { cache.supplyOrders = null; cache.supplyRequests = null; }
+    if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 async function shopReturnToBuy(orderItemId, name) {
   if (!orderItemId) return;
   if (!confirm('Вернуть «' + (name || 'позицию') + '» в список к закупке?\n\nПозиция будет убрана из черновика заказа — потом сможешь собрать её в другой заказ. (Доступно только для черновика «Заказ создан».)')) return;
@@ -11016,6 +11050,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.465',
+    date: '23.06.2026',
+    title: 'Снабжение: кнопка «Получено» в «Ждём поставку»',
+    features: [
+      'У позиций в <b>«Ждём поставку»</b> появилась кнопка <b>«получено»</b> — когда товар пришёл, жмёшь её, и заказ закрывается (статус «получен»), позиция уходит из ожидания',
+      'Удобно, если приёмка УПД не «схлопнула» заказ автоматически или товар пришёл вообще без УПД',
+    ],
+  },
   {
     version: 'v2.45.464',
     date: '22.06.2026',
