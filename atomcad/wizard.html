@@ -825,7 +825,14 @@ function buildTerminals(P){
     var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
     loads.forEach(function(l){ t.push({term:'X2:'+(i++), name:l.name||b.role, line:b.code}); });
   });
-  (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++) t.push({term:'X5', name:s.name+(q>1?(' #'+(k+1)):''), line:s.sig}); });
+  // датчики: каждый полевой датчик двухпроводной (NTC/Pt1000 — пассивный, 4–20мА/0–10В/дискретный — 2 провода),
+  // поэтому на каждый датчик заводим ДВЕ клеммы (сигнал + общий), нумерация X5:1, X5:2, X5:3…
+  var si=1;
+  (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){
+    var nm=s.name+(q>1?(' #'+(k+1)):'');
+    t.push({term:'X5:'+(si++), name:nm, line:s.sig});
+    t.push({term:'X5:'+(si++), name:nm, line:s.sig});
+  } });
   return t;
 }
 function ensureTerminals(){ if(!P.terminals||!P.terminals.length) P.terminals=buildTerminals(P); }
