@@ -811,7 +811,11 @@ function buildTerminals(P){
   t.push({term:'X1:1–3', name:'Ввод L1/L2/L3', line:'5×6'});
   t.push({term:'X1:4–5', name:'N · PE', line:'—'});
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
-  var i=1; branches.forEach(function(b){ t.push({term:'X2:'+(i++), name:b.role, line:b.code}); });
+  var i=1; branches.forEach(function(b){
+    // объединённый автомат → отдельная клемма на каждую линию, но с одним и тем же QF в «Линии»
+    var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
+    loads.forEach(function(l){ t.push({term:'X2:'+(i++), name:l.name||b.role, line:b.code}); });
+  });
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++) t.push({term:'X5', name:s.name+(q>1?(' #'+(k+1)):''), line:s.sig}); });
   return t;
 }
@@ -857,7 +861,8 @@ function termEquip(){
   items.push({label:'Ввод L1/L2/L3', tag:'силовая', value:{name:'Ввод L1/L2/L3', line:'5×6'}});
   items.push({label:'N · PE', value:{name:'N · PE', line:'—'}});
   (P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления';}).forEach(function(b){
-    items.push({label:b.role+' · '+b.code, tag:'линия', value:{name:b.role, line:b.code}});
+    var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
+    loads.forEach(function(l){ items.push({label:(l.name||b.role)+' · '+b.code, tag:'линия', value:{name:l.name||b.role, line:b.code}}); });
   });
   (P.consumers||[]).forEach(function(c){var q=c.qty||1;for(var k=0;k<q;k++){var nm=c.name+(q>1?(' #'+(k+1)):'');items.push({label:nm, value:{name:nm, line:''}});}});
   (P.aux||[]).forEach(function(a){var q=a.qty||1;for(var k=0;k<q;k++){var nm=(a.tag?a.tag+' · ':'')+a.name+(q>1?(' #'+(k+1)):'');items.push({label:nm, value:{name:a.name+(q>1?(' #'+(k+1)):''), line:a.tag||''}});}});
