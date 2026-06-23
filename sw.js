@@ -5,11 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-<<<<<<< HEAD
-const CACHE_VERSION = 'atomus-v1.8.480';
-=======
-const CACHE_VERSION = 'atomus-v1.8.480';
->>>>>>> origin/main
+const CACHE_VERSION = 'atomus-v1.8.481';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
