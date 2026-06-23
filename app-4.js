@@ -9744,8 +9744,17 @@ async function handleContinuousShipmentScan(decodedText) {
     vibrate(40);
     state._shipPendingConfirm = { token: token, itemId: itemId, item: d.item || {} };
     _showShipConfirm(d.item || {});
+  } else if (d.reason === 'already_shipped' && d.shipment_id && !_shipModeIsGather()) {
+    // Позицию уже пометили отгруженной (напр. через «Отгрузить по договору»).
+    // Даём отгрузить её заново по скану: подтверждение снимет старую отметку и
+    // проведёт отгрузку по коду.
+    flashScanner('success');
+    playBeep('success');
+    vibrate(40);
+    state._shipPendingConfirm = { token: token, itemId: itemId, item: d.item || {}, reship: true, shipmentId: d.shipment_id };
+    _showShipConfirm(d.item || {}, true);
   } else {
-    // already_shipped / wrong_contract / unknown — показываем тост-ошибку
+    // wrong_contract / unknown / no_contract — показываем тост-ошибку
     flashScanner('error');
     playBeep('error');
     vibrate([100, 50, 100]);
@@ -9754,7 +9763,7 @@ async function handleContinuousShipmentScan(decodedText) {
   }
 }
 
-function _showShipConfirm(item) {
+function _showShipConfirm(item, reship) {
   const el = document.getElementById('ship-confirm');
   if (!el) return;
   const nm = document.getElementById('ship-confirm-name');
@@ -9764,13 +9773,16 @@ function _showShipConfirm(item) {
     const n = Number(item.qty) || 0;
     label += ' · ' + n + ' ' + _plural(n, ['сборка', 'сборки', 'сборок']);
   }
+  if (reship) label += ' · уже отгружена';
   if (nm) nm.textContent = label;
   // v2.45.405: в режиме сборки кнопка подтверждения — «Собрано», не «Отгрузить»
   const okBtn = el.querySelector('.ship-confirm-ok');
   if (okBtn) {
-    okBtn.innerHTML = _shipModeIsGather()
-      ? '<i class="ti ti-checkbox"></i> Собрано'
-      : '<i class="ti ti-check"></i> Отгрузить';
+    okBtn.innerHTML = reship
+      ? '<i class="ti ti-refresh"></i> Отгрузить заново'
+      : (_shipModeIsGather()
+          ? '<i class="ti ti-checkbox"></i> Собрано'
+          : '<i class="ti ti-check"></i> Отгрузить');
   }
   const last = document.getElementById('ship-last');
   if (last) last.classList.remove('visible');   // чтобы тост не перекрывал
@@ -9796,6 +9808,10 @@ async function confirmShipCurrent() {
   const okBtn = document.querySelector('.ship-confirm-ok');
   if (okBtn) okBtn.disabled = true;
   try {
+    // Повторная отгрузка: сперва снимаем прежнюю отметку, затем проводим по скану
+    if (pending.reship && pending.shipmentId) {
+      try { await apiDelete('/api/shipments/' + pending.shipmentId); } catch (e) { /* продолжаем */ }
+    }
     const resp = await apiPost(_shipScanEndpoint(), {
       qr_token: pending.token,
       contract_id: state._shipContractId,
