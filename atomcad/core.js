@@ -67,7 +67,7 @@ function buildBreakers(P){
     var I=consumerCurrent(c), q=c.qty||1;
     for(var k=0;k<q;k++){
       var nm=c.name+(q>1?(' #'+(k+1)):'');
-      b.push({id:'QF'+n, code:'QF'+n, poles:c.phases===3?3:1, rate:ratingFor(I), role:nm, loads:[{name:nm, a:I}], consumer:c.id});
+      b.push({id:'QF'+n, code:'QF'+n, poles:c.phases===3?3:1, rate:ratingFor(I), role:nm, loads:[{name:nm, a:I, cid:c.id}], consumer:c.id});
       n++;
     }
   });

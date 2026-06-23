@@ -693,25 +693,60 @@ function consumerOptions(sel){var o='<option value="">— назначение (
 function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
 function pBreakers(){
   ensureBreakers();
-  var h=H('Шаг 6','Автоматы · распределение','Собраны из состава: ток на каждом считается, проверяется по номиналу. Меняй номинал ±, добавляй нагрузки, перегруз подсветит.');
+  var h=H('Шаг 6','Автоматы · распределение','Собраны из состава: ток на каждом считается, проверяется по номиналу. Меняй номинал ±, объединяй несколько линий на один автомат или выноси обратно, добавляй нагрузки — перегруз подсветит.');
   h+='<div style="display:flex;gap:8px;margin-bottom:14px"><button class="tb" onclick="regenBreakers()">↻ Пересобрать из состава</button></div>';
   var ph=C.phaseBalance(P);
   h+='<div class="phase"><div class="phbox"><div class="l">L1</div><div class="v">'+ph.L1+' А</div></div><div class="phbox"><div class="l">L2</div><div class="v">'+ph.L2+' А</div></div><div class="phbox"><div class="l">L3</div><div class="v">'+ph.L3+' А</div></div></div>';
   P.breakers.forEach(function(b,bi){
     var s=C.breakerSum(b),st=C.breakerStatus(b),pct=Math.min(100,Math.round(s/b.rate*100));
     var col=st==='over'?'var(--red)':st==='warn'?'var(--amber)':'var(--ok)';
+    var nLoads=(b.loads||[]).length;
     h+='<div class="brow"><div class="t2"><span class="qf">'+b.code+'</span><span class="rate"><button onclick="bRate('+bi+',-1)">−</button>C'+b.rate+' · '+b.poles+'P<button onclick="bRate('+bi+',1)">+</button></span><span class="sum '+st+'">'+s+' А</span></div>'+
        '<div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div><div class="lchips">';
-    (b.loads||[]).forEach(function(l,li){h+='<span class="lchip">'+esc(l.name)+' <span class="a">'+l.a+' А</span>'+(b.fixed?'':'<button class="rm" onclick="bRm('+bi+','+li+')">✕</button>')+'</span>'});
+    (b.loads||[]).forEach(function(l,li){
+      h+='<span class="lchip">'+esc(l.name)+' <span class="a">'+l.a+' А</span>'+
+         (nLoads>1?'<button class="rm" title="вынести в отдельный автомат" style="color:var(--cyan)" onclick="bSplit('+bi+','+li+')">⤴</button>':'')+
+         (b.fixed?'':'<button class="rm" title="убрать линию" onclick="bRm('+bi+','+li+')">✕</button>')+'</span>';
+    });
     h+='<button class="lchip" style="cursor:pointer;color:var(--cyan)" onclick="bAddLoad('+bi+')">+ нагрузка</button>';
-    h+='</div>'+(st==='over'?'<div class="over">⚠ перегруз: '+s+' А &gt; '+b.rate+' А — увеличь номинал или раздели линию</div>':'')+'<div class="note" style="margin-top:6px">'+esc(b.role)+' · кабель '+C.sectionFor(s)+' мм²</div></div>';
+    // объединение нескольких линий на один автомат (одинаковая полюсность, кроме ввода/управления/БП)
+    if(!b.fixed && b.role!=='цепи управления' && !b.psu){
+      var tgts=[];
+      P.breakers.forEach(function(x,xi){ if(xi!==bi && !x.fixed && x.role!=='цепи управления' && !x.psu && x.poles===b.poles) tgts.push({xi:xi,code:x.code}); });
+      if(tgts.length){
+        h+='<select class="lchip" style="color:var(--cyan);background:transparent;border:1px dashed var(--cyan);cursor:pointer" onchange="bMerge('+bi+',this.value);this.value=\'\'">'+
+           '<option value="">⤵ объединить с…</option>'+
+           tgts.map(function(t){return '<option value="'+t.xi+'">→ '+esc(t.code)+'</option>';}).join('')+'</select>';
+      }
+    }
+    h+='</div>'+(st==='over'?'<div class="over">⚠ перегруз: '+s+' А &gt; '+b.rate+' А — увеличь номинал или раздели линию</div>':'')+'<div class="note" style="margin-top:6px">'+esc(b.role)+(nLoads>1?(' · '+nLoads+' линии на одном автомате'):'')+' · кабель '+C.sectionFor(s)+' мм²</div></div>';
   });
   return h;
 }
 function regenBreakers(){P.breakers=C.buildBreakers(P);dirty();draw();toast('Автоматы пересобраны из состава')}
 function bRate(i,d){var b=P.breakers[i],idx=C.STD.indexOf(b.rate);idx=Math.max(0,Math.min(C.STD.length-1,idx+d));b.rate=C.STD[idx];dirty();draw()}
-function bRm(i,li){P.breakers[i].loads.splice(li,1);dirty();draw()}
+function bRm(i,li){P.breakers[i].loads.splice(li,1);if(!P.breakers[i].loads.length)P.breakers.splice(i,1);bRenum();dirty();draw()}
 function bAddLoad(i){var nm=prompt('Название нагрузки:');if(!nm)return;var a=parseFloat(prompt('Ток, А:','1'))||0;P.breakers[i].loads.push({name:nm,a:a});dirty();draw()}
+/* сквозная перенумерация QF после объединения/выноса */
+function bRenum(){var n=1;P.breakers.forEach(function(b){b.code='QF'+n;b.id='QF'+n;n++;});}
+/* объединить линии автомата bi на автомат di (одинаковая полюсность) */
+function bMerge(bi,di){
+  bi=+bi;di=+di;var src=P.breakers[bi],dst=P.breakers[di];
+  if(!src||!dst||bi===di||src.poles!==dst.poles)return;
+  dst.loads=(dst.loads||[]).concat(src.loads||[]);
+  dst.role='группа линий';dst.consumer=undefined;
+  var need=C.ratingFor(C.breakerSum(dst));                  // авто-номинал под суммарный ток (с запасом 25%)
+  if(C.STD.indexOf(need)>C.STD.indexOf(dst.rate))dst.rate=need;
+  P.breakers.splice(bi,1);bRenum();dirty();draw();toast('Линии объединены на один автомат');
+}
+/* вынести линию li автомата bi обратно в отдельный автомат */
+function bSplit(bi,li){
+  var b=P.breakers[bi];if(!b||!b.loads||b.loads.length<2)return;
+  var ld=b.loads.splice(li,1)[0];
+  var nb={code:'',id:'',poles:b.poles,rate:C.ratingFor(+ld.a||0)||6,role:ld.name,loads:[ld],consumer:ld.cid};
+  if(b.loads.length===1){b.role=b.loads[0].name;b.consumer=b.loads[0].cid;}
+  P.breakers.splice(bi+1,0,nb);bRenum();dirty();draw();toast('Линия вынесена в отдельный автомат');
+}
 
 /* 7 клеммы (из состава) */
 function pTerminals(){
