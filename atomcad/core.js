@@ -189,6 +189,30 @@ function _ctrlGeom(io){
 }
 function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
 function _W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
+// рамка листа A3 (×10 мм) — ДОЛЖНА совпадать с editor.html (SW/SH и штамп)
+var SHEET_W=4200, SHEET_H=2970, TITLE_X=2300, TITLE_Y=2370;
+/* листы «аппараты управления»: сетка в пределах рамки, перенос на новый лист при нехватке места */
+function buildAuxSheets(P){
+  var units=[];
+  (P.aux||[]).forEach(function(a){ if(a.kind==='lamp')return; var q=a.qty||1; for(var k=0;k<q;k++){ units.push({a:a, des:(a.tag||'A')+(q>1?('.'+(k+1)):'')}); } });
+  if(!units.length)return [];
+  // рабочая зона: по ширине — вся рамка; по высоте — до верха штампа (полноширинные ряды)
+  var x0=380, xs=500, perRow=Math.max(1,Math.floor((SHEET_W-200-x0)/xs));   // отступ справа 200
+  var yTop=460, ys=560, yMax=TITLE_Y-120;                                    // не залезаем в штамп
+  var rowsPer=Math.max(1,Math.floor((yMax-yTop)/ys));
+  var perSheet=perRow*rowsPer, sheets=[], np=Math.ceil(units.length/perSheet);
+  for(var p=0;p<np;p++){
+    var ac=[], at=[], part=units.slice(p*perSheet,(p+1)*perSheet);
+    at.push({x:x0,y:yTop-150,s:36,tx:'АППАРАТЫ УПРАВЛЕНИЯ'+(np>1?(' · '+(p+1)+'/'+np):'')});
+    part.forEach(function(u,ci){
+      var col=ci%perRow, rw=Math.floor(ci/perRow), x=x0+col*xs, y=yTop+rw*ys;
+      var note=(u.a.name||'')+(u.a.target?(' · '+u.a.target):'');
+      ac.push(C(u.des, auxSym2(u.a.kind), x, y, u.a.model||'', u.a.manu||'', note));
+    });
+    sheets.push({title:'аппараты управления'+(np>1?(' '+(p+1)):''), subtitle:'аппараты управления', comps:ac, wires:[], texts:at});
+  }
+  return sheets;
+}
 function buildSchematic(P){
   var W=_W;
   var hasCtrl = !!(P.controller && P.controller.model);
@@ -302,22 +326,10 @@ function buildSchematic(P){
     if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,ls:0,anchor:'start',tx:'N'}); }
     var hlN=1;
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
-    // остальные аппараты из «Вспомогат.» (кнопки, переключатели, грибок, реле, твердотельные реле и т.д.) — отдельным блоком
-    var auxApp=(P.aux||[]).filter(function(a){return a.kind!=='lamp';});
-    if(auxApp.length){
-      var maxDevY=(ctrlY+40)+Math.max(inA.length,outA.length,1)*SP+200;
-      var aTop=Math.max(ctrlY+G.bodyH, maxDevY)+460, per=7, ax0=380, axs=470, ays=470, ci=0;
-      at.push({x:ax0,y:aTop-170,s:36,tx:'АППАРАТЫ УПРАВЛЕНИЯ'});
-      auxApp.forEach(function(a){ var q=a.qty||1; for(var k=0;k<q;k++){
-        var col=ci%per, rw=Math.floor(ci/per), x=ax0+col*axs, y=aTop+rw*ays;
-        var des=(a.tag||'A')+(q>1?('.'+(k+1)):'');
-        var note=(a.name||'')+(a.target?(' · '+a.target):'');
-        ac.push(C(des, auxSym2(a.kind), x, y, a.model||'', a.manu||'', note));
-        ci++;
-      }});
-    }
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
   }
+  // отдельные листы «аппараты управления» — кнопки/переключатели/реле/SSR и т.д., в пределах рамки A3, с переносом
+  buildAuxSheets(P).forEach(function(sh){ sheets.push(sh); });
   // на схеме — только обозначение; полное название элемента видно по наведению мыши
   sheets.forEach(function(sh){ sh.comps.forEach(function(c){ c.attrs.short=true; }); });
   return {sheets:sheets, comps:pc, wires:pw, texts:pt};
