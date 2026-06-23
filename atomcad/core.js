@@ -27,6 +27,11 @@ function contactorPick(curA){ curA=+curA||0; for(var i=0;i<NC1.length;i++){ if(N
 function contactorModel(c){ var n=contactorPick(consumerCurrent(c)); return n.m+' '+n.a+'А 230В AC-3 '+n.aux; }
 // реальный габарит контактора (Ш×В×Г) — для понимания размера
 function contactorDimStr(c){ var n=contactorPick(consumerCurrent(c)); return n.w+'×'+n.h+'×'+n.d+' мм · 3-пол.'; }
+// символ УГО для аппарата из «Вспомогат.» в редакторе (ключи совпадают с SYM в editor.html)
+function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'coil',ssr:'box',psu:'psu',vfd:'box',fan:'m3',contactor:'coil',breaker:'qf1',other:'box'})[k]||'box';}
+// нагрузки, уже закреплённые за контактором/SSR из «Вспомогат.» (через «что коммутирует») — им НЕ нужен авто-контактор
+function auxCoverSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='contactor'&&a.kind!=='ssr')return; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=1;}); }); return s; }
+function coveredByAux(set,c,unitName){ return !!(set&&(set[unitName]||set[c&&c.name])); }
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
@@ -67,7 +72,7 @@ function buildBreakers(P){
     var I=consumerCurrent(c), q=c.qty||1;
     for(var k=0;k<q;k++){
       var nm=c.name+(q>1?(' #'+(k+1)):'');
-      b.push({id:'QF'+n, code:'QF'+n, poles:c.phases===3?3:1, rate:ratingFor(I), role:nm, loads:[{name:nm, a:I}], consumer:c.id});
+      b.push({id:'QF'+n, code:'QF'+n, poles:c.phases===3?3:1, rate:ratingFor(I), role:nm, loads:[{name:nm, a:I, cid:c.id}], consumer:c.id});
       n++;
     }
   });
@@ -132,8 +137,8 @@ function buildSpec(P){
   // автоматы
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
-  var kmN=1;
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:c.name+(q>1?(' #'+(k+1)):'')}); kmN++; } } });
+  var kmN=1, _cov=auxCoverSet(P);
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_cov,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:unm}); kmN++; } } });
   // датчики
   var btN=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ items.push({des:'BT'+btN, name:'Датчик температуры', manu:'', model:s.sig, note:s.name}); btN++; } });
@@ -164,7 +169,8 @@ function buildSpec(P){
 function moduleCount(P){
   var m=0;
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; m+= b.poles===3?3:1; });
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
+  var _covM=auxCoverSet(P);
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_covM,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
   (P.aux||[]).forEach(function(a){ m+= (a.kind==='psu')?2:1; });
   lvSupplies(P).forEach(function(){ m+=2; }); // авто-БП низковольтных цепей
   m+=4; // клеммы/резерв базовый
@@ -187,38 +193,81 @@ function _ctrlGeom(io){
 }
 function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
 function _W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
+// рамка листа A3 (×10 мм) — ДОЛЖНА совпадать с editor.html (SW/SH и штамп)
+var SHEET_W=4200, SHEET_H=2970, TITLE_X=2300, TITLE_Y=2370;
+/* листы «аппараты управления»: сетка в пределах рамки, перенос на новый лист при нехватке места */
+function buildAuxSheets(P){
+  var units=[];
+  (P.aux||[]).forEach(function(a){ if(a.kind==='lamp')return; var q=a.qty||1; for(var k=0;k<q;k++){ units.push({a:a, des:(a.tag||'A')+(q>1?('.'+(k+1)):'')}); } });
+  if(!units.length)return [];
+  // рабочая зона: по ширине — вся рамка; по высоте — до верха штампа (полноширинные ряды)
+  var x0=380, xs=500, perRow=Math.max(1,Math.floor((SHEET_W-200-x0)/xs));   // отступ справа 200
+  var yTop=460, ys=560, yMax=TITLE_Y-120;                                    // не залезаем в штамп
+  var rowsPer=Math.max(1,Math.floor((yMax-yTop)/ys));
+  var perSheet=perRow*rowsPer, sheets=[], np=Math.ceil(units.length/perSheet);
+  for(var p=0;p<np;p++){
+    var ac=[], at=[], part=units.slice(p*perSheet,(p+1)*perSheet);
+    at.push({x:x0,y:yTop-150,s:36,tx:'АППАРАТЫ УПРАВЛЕНИЯ'+(np>1?(' · '+(p+1)+'/'+np):'')});
+    part.forEach(function(u,ci){
+      var col=ci%perRow, rw=Math.floor(ci/perRow), x=x0+col*xs, y=yTop+rw*ys;
+      var note=(u.a.name||'')+(u.a.target?(' · '+u.a.target):'');
+      ac.push(C(u.des, auxSym2(u.a.kind), x, y, u.a.model||'', u.a.manu||'', note));
+    });
+    sheets.push({title:'аппараты управления'+(np>1?(' '+(p+1)):''), subtitle:'аппараты управления', comps:ac, wires:[], texts:at});
+  }
+  return sheets;
+}
 function buildSchematic(P){
   var W=_W;
   var hasCtrl = !!(P.controller && P.controller.model);
 
   // ===================== ЛИСТ 1 · СИЛОВЫЕ ЦЕПИ =====================
-  var pc=[], pw=[], pt=[], gx=600;
+  var pc=[], pw=[], pt=[], gx=600, kmByName={};   // kmByName — общий для листов 1 и 2 (чтобы контакт KMn = катушка KMn)
   var intro=(P.breakers||[]).filter(function(b){return b.role==='ввод'})[0];
   pc.push(C('X1','term',gx,360,'ЗНИ 6 мм²','','ввод'));
   if(intro){ pc.push(C(intro.code,'qf1',gx,460,'NB1-63 '+intro.poles+'P, C'+intro.rate,'CHINT','ввод')); }
   pw.push(W([gx,360],[gx,460])); pw.push(W([gx,760],[gx,800]));
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
-  var step=720, nB=branches.length, maxX=3850;
-  if(nB>0){ var fit=(maxX-gx)/nB; if(fit<step) step=Math.max(300, Math.floor(fit)); }
-  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1;
-  branches.forEach(function(b,i){
-    var x=bx+i*step;
-    var cons=(P.consumers||[]).filter(function(c){return c.id===b.consumer})[0];
-    var role=(cons?cons.name:b.role);
-    var ph3=(cons&&cons.phases===3);
-    var phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
-    pc.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
-    pw.push(W([x,800],[x,950]));
-    pt.push({x:x+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                 // фаза линии
-    if(cons&&needsContactor(cons)){
-      pc.push(C('KM'+kmN,'c_no',x,1450,contactorModel(cons),'CHINT',cons.name));
-      pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
-      pt.push({x:x-66,y:1545,s:20,ls:0,anchor:'end',tx:'(л.2)'});     // ссылка на катушку
-      kmN++;
-    } else { pw.push(W([x,1250],[x,1950])); }
-    pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
-    pc.push(C('X'+(i+2),'term',x,2000,'ЗНИ 2,5 мм²','',role));
-    lastX=x;
+  // колонки-отводы: по одной на каждую линию автомата (сгруппированный автомат → несколько колонок)
+  var groups=[], cols=[];
+  branches.forEach(function(b){
+    var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role,cid:b.consumer}];
+    var g={b:b, cols:[]};
+    loads.forEach(function(l){ var col={b:b,l:l}; cols.push(col); g.cols.push(col); });
+    groups.push(g);
+  });
+  var nT=cols.length, step=720, maxX=3850;
+  if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
+  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1, termN=2, _covS=auxCoverSet(P);
+  cols.forEach(function(col,ci){ col.x=bx+ci*step; });
+  groups.forEach(function(g){
+    var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
+    var ph3=(b.poles===3), phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
+    // автомат — один на группу, питание с шины ввода
+    pc.push(C(b.code,'qf1',qfx,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT', grouped?('группа · '+gc.length+' лин.'):gc[0].l.name));
+    pw.push(W([qfx,800],[qfx,950]));
+    pt.push({x:qfx+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                       // фаза(ы) линии
+    if(grouped){
+      pw.push(W([qfx,1250],[qfx,1350]));                                               // отвод автомата на шину распределения
+      pw.push(W([x0,1350],[x1,1350]));                                                 // шина распределения по отводам
+    }
+    gc.forEach(function(col){
+      var x=col.x, cons=(P.consumers||[]).filter(function(c){return c.id===(col.l.cid||b.consumer)})[0];
+      var role=cons?cons.name:(col.l.name||b.role);
+      if(grouped) pw.push(W([x,1350],[x,1450]));                                        // от шины к отводу
+      else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
+      if(cons&&needsContactor(cons)&&!coveredByAux(_covS,cons,col.l.name)){
+        var kmSym='kmp', kmBot=1780;                                                     // контактор NC1 — 3-полюсный (выводы 1/3/5 → 2/4/6)
+        pc.push(C('KM'+kmN,kmSym,x,1450,contactorModel(cons),'CHINT',cons.name));
+        pw.push(W([x,kmBot],[x,1950]));
+        pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});                      // ссылка на катушку (лист 2)
+        if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;                       // тот же номер на листе 2 (катушка)
+        kmN++;
+      } else { pw.push(W([x,1450],[x,1950])); }
+      pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
+      pc.push(C('X'+termN,'term',x,2000,'ЗНИ 2,5 мм²','',role)); termN++;
+      lastX=x;
+    });
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
   pt.push({x:gx-10,y:780,s:24,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины
@@ -230,8 +279,8 @@ function buildSchematic(P){
     var ac=[], aw=[], at=[];
     var io=P.controller.io||{}, G=_ctrlGeom(io), cz=1900, ctrlY=900;
     at.push({x:300,y:235,s:38,tx:'ЦЕПИ УПРАВЛЕНИЯ · АВТОМАТИКА'});
-    var kmByName={}, kmc=1;
-    (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; if(!(c.name in kmByName)) kmByName[c.name]='KM'+kmc; kmc+=q; } });
+    // kmByName уже заполнен на листе 1 (контакт KMn ↔ катушка KMn). Подстраховка, если контакт не нарисован:
+    var kmc=kmN; (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; if(!(c.name in kmByName)) kmByName[c.name]='KM'+kmc; kmc+=q; } });
     // питание управления (приходит с силового листа) + автомат управления
     ac.push(C('X0','term',cz,250,'L · N','','питание ← лист 1 (силовая)'));
     var cq=(P.breakers||[]).filter(function(bb){return bb.role==='цепи управления'})[0];
@@ -246,6 +295,13 @@ function buildSchematic(P){
     var cspec=P.controller.spec||{};
     ac.push({sym:'ctrl',x:cz,y:ctrlY,rot:0,mirror:false,des:'A1',
       attrs:{model:P.controller.model,nm:'Контроллер',note:'',io:io,supply:cspec.voltage||'',wired:true}});
+    // сенсорная панель (HMI) — отдельный элемент над контроллером, RS-485 A/B заведены проводами на выводы A/B контроллера
+    if(P.hmi&&P.hmi.model){
+      var hmiY=ctrlY-G.stub-360;
+      ac.push(C('A2','hmi',cz+125,hmiY,P.hmi.model,P.hmi.manu||'','Сенсорная панель HMI'));
+      aw.push(W([cz+80, ctrlY-G.stub],[cz+80, hmiY+170]));    // A
+      aw.push(W([cz+170, ctrlY-G.stub],[cz+170, hmiY+170]));  // B
+    }
     var lpx=cz-G.hx-G.stub, rpx=cz+G.hx+G.stub;
     var SP=210, baseY=ctrlY+40;                 // крупный шаг устройств — чтобы не наезжали
     function shortC(des,sym,xx,yy,model,manu,note,nm){var cc=C(des,sym,xx,yy,model,manu,note,nm);cc.attrs.short=true;return cc;}
@@ -284,6 +340,8 @@ function buildSchematic(P){
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
   }
+  // отдельные листы «аппараты управления» — кнопки/переключатели/реле/SSR и т.д., в пределах рамки A3, с переносом
+  buildAuxSheets(P).forEach(function(sh){ sheets.push(sh); });
   // на схеме — только обозначение; полное название элемента видно по наведению мыши
   sheets.forEach(function(sh){ sh.comps.forEach(function(c){ c.attrs.short=true; }); });
   return {sheets:sheets, comps:pc, wires:pw, texts:pt};
@@ -295,6 +353,7 @@ g.AtomCore={
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
   buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,
+  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux,
   isLV:isLV, lvSupplies:lvSupplies
 };
 })(typeof window!=='undefined'?window:global);

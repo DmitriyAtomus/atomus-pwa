@@ -8691,6 +8691,14 @@ async function loadContractAuditBlock(contractId) {
       'remove_box_item':       'Убрано из коробки',
       'shipment_scan_ok':      'Отгрузка по QR',
       'remove_supply_order_item': 'Удалена позиция заказа',
+      // дополняем договорные действия, чтобы в истории не было англ. кодов
+      'shipment_assembly_requested': 'Запрошена сборка к отгрузке',
+      'shipment_assembly_cancelled': 'Отменена сборка к отгрузке',
+      'shipment_reset':        'Сброс отгрузки',
+      'gatherings_reset':      'Сброс отметок «собрано»',
+      'gathering_undo':        'Отмена отметки «собрано»',
+      'auto_link_stock':       'Авто-привязка к складу',
+      'contract_chat_post':    'Сообщение в чат договора',
     };
     // v2.45.138: перевод технического payload (и старых англоязычных записей)
     // v2.45.276: + перевод имён полей в «fields: a, b, c»
@@ -8752,7 +8760,10 @@ async function loadContractAuditBlock(contractId) {
         .replace(/\bclosed\b/g, 'закрыт')
         .replace(/\bassemblies=/g, 'сборок=')
         .replace(/\bcomponents=/g, 'комплектующих=')
-        .replace(/\bneed_buy=/g, 'к закупке=');
+        .replace(/\bneed_buy=/g, 'к закупке=')
+        .replace(/\bremoved=/g, 'снято=')
+        .replace(/\blinked=/g, 'привязано=')
+        .replace(/\bskipped=/g, 'пропущено=');
     };
     let html = '<div class="card" style="padding:14px 18px;">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text-dark);">' +

@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.463-kp-docs";
-const APP_VERSION_DATE = "22.06.2026";
+const APP_VERSION = "v2.45.495-atomcad-km-cover-relay";
+const APP_VERSION_DATE = "23.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -5136,6 +5136,7 @@ async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
     catch (e) { cache.components = []; }
   }
   state._bomFulfillSelectedId = null;
+  state._bomFulfillName = bomName || '';
   const overlay = document.createElement('div');
   overlay.id = 'bom-fulfill-modal';
   overlay.className = 'modal-overlay visible';
@@ -5153,7 +5154,8 @@ async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
           '<div style="font-weight:600;font-size:14px;margin-top:2px;">' + escapeHtml(bomName) + '</div>' +
           '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">Нужно ' + need + ' ' + escapeHtml(unit) + '</div>' +
         '</div>' +
-        '<input type="text" id="bf-search" class="form-input" placeholder="Поиск компонента…" oninput="_bomFulfillFilter()" style="margin-bottom:10px;" />' +
+        '<input type="text" id="bf-search" class="form-input" placeholder="Поиск по названию или артикулу…" oninput="_bomFulfillFilter()" style="margin-bottom:6px;" />' +
+        '<div style="font-size:11px;color:var(--text-light);margin-bottom:10px;">Сверху — подходящие по названию к нужной позиции и то, что есть в наличии.</div>' +
       '</div>' +
       '<div id="bf-list" style="flex:1;overflow-y:auto;padding:0 18px;"></div>' +
       '<div id="bf-qty-row" style="display:none;padding:14px 18px 0;border-top:1px solid var(--border);">' +
@@ -5168,38 +5170,74 @@ async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
   _bomFulfillFilter();
 }
 
+// v2.45.x: оценка релевантности компонента запросу/нужной позиции (больше — лучше)
+function _bomScore(c, tokens, rawNoSpace) {
+  const name = (c.name || '').toLowerCase();
+  const sku  = (c.sku  || '').toLowerCase();
+  const nameN = name.replace(/\s+/g, '');
+  const skuN  = sku.replace(/\s+/g, '');
+  let score = 0;
+  if (rawNoSpace) {
+    if (nameN === rawNoSpace || skuN === rawNoSpace) score += 1000;
+    else if (nameN.indexOf(rawNoSpace) === 0 || skuN.indexOf(rawNoSpace) === 0) score += 500;
+    else if (nameN.indexOf(rawNoSpace) >= 0 || skuN.indexOf(rawNoSpace) >= 0) score += 200;
+  }
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t && (name.indexOf(t) >= 0 || sku.indexOf(t) >= 0)) score += 50;
+  }
+  return score;
+}
+
 function _bomFulfillFilter() {
-  // v2.44.79: ищем по name+sku, игнорируя пробелы и регистр —
-  // чтобы «BS-TEF 027M» находил «BS-TEF027M ED» и наоборот.
+  // Релевантность: при пустом поиске ранжируем по похожести на нужную позицию,
+  // при вводе — по запросу. В наличии — выше. Поиск по названию и артикулу,
+  // игнорируя пробелы/регистр.
   const raw = ((document.getElementById('bf-search') || {}).value || '').trim().toLowerCase();
-  const q  = raw;
-  const qN = raw.replace(/\s+/g, '');  // без пробелов
+  const usingSearch = !!raw;
+  const basis = usingSearch ? raw : (state._bomFulfillName || '').toLowerCase();
+  const tokens = basis.split(/[\s,;·.\/]+/).filter(t => t.length >= 2);
+  const rawNoSpace = usingSearch ? raw.replace(/\s+/g, '') : '';
   const comps = cache.components || [];
-  const filtered = q
-    ? comps.filter(c => {
-        const name  = (c.name || '').toLowerCase();
-        const sku   = (c.sku  || '').toLowerCase();
-        const nameN = name.replace(/\s+/g, '');
-        const skuN  = sku.replace(/\s+/g, '');
-        return name.includes(q) || sku.includes(q) || nameN.includes(qN) || skuN.includes(qN);
-      })
-    : comps;
+
+  let arr = comps.map(c => ({ c: c, s: _bomScore(c, tokens, rawNoSpace) }));
+  if (usingSearch) arr = arr.filter(x => x.s > 0);
+  arr.sort((a, b) => {
+    if (b.s !== a.s) return b.s - a.s;                         // релевантность
+    const ia = parseFloat(a.c.qty_on_stock || 0) > 0 ? 1 : 0;
+    const ib = parseFloat(b.c.qty_on_stock || 0) > 0 ? 1 : 0;
+    if (ib !== ia) return ib - ia;                             // в наличии — выше
+    return (a.c.name || '').localeCompare(b.c.name || '', 'ru');
+  });
+  const filtered = arr.map(x => x.c);
+
   const list = document.getElementById('bf-list');
   if (!list) return;
   if (!filtered.length) {
-    list.innerHTML = '<div class="empty-block" style="padding:14px;"><i class="ti ti-info-circle"></i>Ничего не найдено</div>';
+    list.innerHTML = '<div class="empty-block" style="padding:14px;"><i class="ti ti-info-circle"></i>Ничего не найдено. Попробуйте другое слово или артикул.</div>';
     return;
   }
-  list.innerHTML = filtered.slice(0, 120).map(c => {
+  const shown = filtered.slice(0, 120);
+  list.innerHTML = shown.map(c => {
     const stock = parseFloat(c.qty_on_stock || 0);
-    const stockCls = stock > 0 ? '' : ' style="color:var(--danger);"';
-    const sel = state._bomFulfillSelectedId === c.id ? ' style="background:var(--brand-bg);"' : '';
-    return '<div class="modal-item" onclick="_bomFulfillSelect(' + c.id + ')"' + sel + '>' +
+    const inStock = stock > 0;
+    const sel = state._bomFulfillSelectedId === c.id;
+    const cat = c.category_name ? escapeHtml(c.category_name) + ' · ' : '';
+    const stockHtml = inStock
+      ? '<span style="color:#15803D;font-weight:600;">в наличии: ' + formatNumberShort(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</span>'
+      : '<span style="color:var(--danger);">нет в наличии</span>';
+    return '<div class="modal-item' + (sel ? ' bf-selected' : '') + '" onclick="_bomFulfillSelect(' + c.id + ')"' +
+             (inStock ? '' : ' style="opacity:.72;"') + '>' +
              '<div class="mi-text">' +
                '<div class="mi-title">' + escapeHtml(c.name || '?') + (c.sku ? ' · ' + escapeHtml(c.sku) : '') + '</div>' +
-               '<div class="mi-meta"' + stockCls + '>на складе: ' + stock + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
-             '</div></div>';
-  }).join('');
+               '<div class="mi-meta">' + cat + stockHtml + '</div>' +
+             '</div>' +
+             (sel ? '<i class="ti ti-circle-check" style="color:var(--brand);font-size:20px;"></i>' : '') +
+           '</div>';
+  }).join('') +
+    (filtered.length > shown.length
+      ? '<div style="padding:10px 4px;text-align:center;color:var(--text-light);font-size:12px;">…ещё ' + (filtered.length - shown.length) + ' — уточните поиск.</div>'
+      : '');
 }
 
 function _bomFulfillSelect(componentId) {
@@ -9005,6 +9043,7 @@ function openNewSaleProduct() {
     name: '', description: '', product_type: 'goods', base_price: '', unit: 'шт.',
     category_id: null,    // ЭТАП 17
     linkedModels: [],
+    specs: [],            // характеристики (key/val) → specs_json
   };
   selectSidebarItem('sale-product-form');
 }
@@ -9035,6 +9074,8 @@ async function openEditSaleProduct(productId, returnTo) {
         model_article: lm.model_article,
         direction_name: lm.direction_name,
       })),
+      // характеристики (specs_json) → редактируемые строки
+      specs: Object.keys(p.specs || {}).map(k => ({ key: k, val: String(p.specs[k] == null ? '' : p.specs[k]) })),
     };
     selectSidebarItem('sale-product-form');
   } catch (e) {
@@ -9120,6 +9161,14 @@ function renderSaleProductForm() {
   html += '</div></div>';
   html += '</div></div>';
 
+  // Блок 2.5: Характеристики (specs_json) — видны в карточке и в КП
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Характеристики <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(показываются в карточке и под позицией в КП)</span></div>';
+  html += '<div id="spf-specs-list"></div>';
+  html += '<button class="btn btn-secondary" onclick="addSpfSpec()" style="width: 100%; justify-content: center; margin-top: 10px;">' +
+          '<i class="ti ti-plus"></i> Добавить характеристику</button>';
+  html += '</div>';
+
   // Блок 3: Привязка к сборкам
   html += '<div class="sales-form-section">';
   html += '<div class="sales-form-title">Связанные сборочные позиции <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально, можно не привязывать — для услуг)</span></div>';
@@ -9168,6 +9217,45 @@ function renderSaleProductForm() {
       state.saleProductForm.category_id = v ? parseInt(v) : null;
     });
   }
+  _renderSpfSpecs();
+}
+
+// --- Характеристики позиции (specs_json) ---
+function _renderSpfSpecs() {
+  const box = document.getElementById('spf-specs-list');
+  if (!box) return;
+  const specs = state.saleProductForm.specs || [];
+  if (!specs.length) {
+    box.innerHTML = '<div class="spf-specs-empty">Характеристик нет. Добавьте — они появятся в карточке и под позицией в КП.</div>';
+    return;
+  }
+  let html = '<div class="spf-specs-table">';
+  html += '<div class="spf-specs-head"><span>Параметр</span><span>Значение</span><span></span></div>';
+  specs.forEach((row, i) => {
+    html += '<div class="spf-spec-row">' +
+      '<input class="spf-spec-k" type="text" placeholder="напр. Холодопроизводительность" value="' + escapeHtml(row.key || '') + '" oninput="updateSpfSpec(' + i + ',\'key\',this.value)">' +
+      '<input class="spf-spec-v" type="text" placeholder="напр. 2,73 кВт" value="' + escapeHtml(row.val || '') + '" oninput="updateSpfSpec(' + i + ',\'val\',this.value)">' +
+      '<button class="spf-spec-del" onclick="removeSpfSpec(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function addSpfSpec() {
+  if (!Array.isArray(state.saleProductForm.specs)) state.saleProductForm.specs = [];
+  state.saleProductForm.specs.push({ key: '', val: '' });
+  _renderSpfSpecs();
+}
+
+function updateSpfSpec(i, field, value) {
+  const s = state.saleProductForm.specs;
+  if (s && s[i]) s[i][field] = value;
+}
+
+function removeSpfSpec(i) {
+  const s = state.saleProductForm.specs;
+  if (s) { s.splice(i, 1); _renderSpfSpecs(); }
 }
 
 function setSaleProductType(t) {
@@ -9196,6 +9284,14 @@ async function submitSaleProductForm() {
     return;
   }
 
+  // характеристики (key/val строки) → плоский словарь specs
+  const specsObj = {};
+  (f.specs || []).forEach(row => {
+    const k = (row.key || '').trim();
+    const v = (row.val || '').trim();
+    if (k && v) specsObj[k] = v;
+  });
+
   const payload = {
     name: f.name.trim(),
     description: f.description.trim(),
@@ -9203,6 +9299,7 @@ async function submitSaleProductForm() {
     unit: f.unit,
     category_id: f.category_id || null,    // ЭТАП 17
     linked_model_ids: f.linkedModels.map(lm => lm.model_id),
+    specs: specsObj,                        // → specs_json
   };
 
   if (f.base_price !== '' && f.base_price !== null) {
@@ -9851,7 +9948,6 @@ function renderOfferDetail(o) {
       '<div>№</div><div>Наименование</div>' +
       '<div style="text-align: right;">Кол-во</div>' +
       '<div style="text-align: right;">Цена</div>' +
-      '<div style="text-align: right;">Скидка</div>' +
       '<div style="text-align: right;">Сумма</div>' +
       '</div>';
     (o.items || []).forEach((it, idx) => {
@@ -9862,7 +9958,6 @@ function renderOfferDetail(o) {
         '</div>' +
         '<div class="oit-qty">' + formatNumberShort(it.qty) + ' ' + escapeHtml(it.unit) + '</div>' +
         '<div class="oit-price">' + formatMoney(it.price) + '</div>' +
-        '<div class="oit-discount">' + (it.discount_pct > 0 ? '−' + it.discount_pct + '%' : '—') + '</div>' +
         '<div class="oit-total">' + formatMoney(it.line_total) + '</div>' +
         '</div>';
     });
@@ -9880,7 +9975,6 @@ function renderOfferDetail(o) {
       if (it.description) html += '<div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">' + escapeHtml(it.description) + '</div>';
       html += '<div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: var(--text-mid);">' +
         '<span>' + formatNumberShort(it.qty) + ' ' + escapeHtml(it.unit) + ' × ' + formatMoney(it.price) +
-          (it.discount_pct > 0 ? ' <span style="color:var(--text-light);">−' + it.discount_pct + '%</span>' : '') +
         '</span>' +
         '<span style="font-weight: 600; color: var(--brand);">' + formatMoney(it.line_total) + '</span>' +
         '</div>';
@@ -10614,8 +10708,6 @@ function renderOfferForm() {
               '<input type="number" step="0.01" min="0" value="' + (it.qty || 1) + '" oninput="updateOfferItem(' + idx + ', \'qty\', this.value)"></div>';
       html += '<div><label class="ire-label">Цена ₽</label>' +
               '<input type="number" step="100" min="0" value="' + (it.price || 0) + '" oninput="updateOfferItem(' + idx + ', \'price\', this.value)"></div>';
-      html += '<div><label class="ire-label">Скидка %</label>' +
-              '<input type="number" step="1" min="0" max="100" value="' + (it.discount_pct || 0) + '" oninput="updateOfferItem(' + idx + ', \'discount_pct\', this.value)"></div>';
       html += '<div><label class="ire-label">Сумма</label>' +
               '<div class="ire-line-total" id="sof-item-total-' + idx + '">' + formatMoney(lineTotal) + '</div></div>';
       html += '</div></div>';
@@ -12135,14 +12227,33 @@ function _offerProductionTreeHtml(st) {
   if ((byDir[0] || []).length) html += renderDir(0, 'Без направления', byDir[0]);
   return html + '</div>';
 }
+// v2.45.x: характеристики модели → строка для расшифровки позиции КП
+function _modelCharsLine(m) {
+  if (!m || !m.characteristics) return '';
+  let obj;
+  try { obj = (typeof m.characteristics === 'string') ? JSON.parse(m.characteristics) : m.characteristics; }
+  catch (e) { return ''; }
+  if (!obj || !Array.isArray(obj.sections)) return '';
+  const parts = [];
+  obj.sections.forEach(s => {
+    (s.items || []).forEach(it => {
+      const k = (it.key || '').trim(), v = (it.value || '').trim();
+      if (v) parts.push(k ? (k + ' ' + v) : v);
+    });
+  });
+  return parts.join(' · ');
+}
+
 function pickModelForOffer(modelId) {
   const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
   if (!m) return;
   const label = (m.article ? m.article + ' · ' : '') + (m.name || '');
+  // v2.45.x: подставляем характеристики модели в расшифровку (видно в КП и PDF)
+  const specLine = _modelCharsLine(m);
   state.offerForm.items.push({
     sale_product_id: null,
     name: label,
-    description: m.extra || m.description || '',
+    description: specLine || m.extra || m.description || '',
     unit: 'шт.',
     qty: 1,
     price: Number(m.base_price) || 0,
@@ -12152,14 +12263,28 @@ function pickModelForOffer(modelId) {
   renderOfferForm();
 }
 
+// v2.45.x: характеристики продажной позиции (p.specs — плоский ключ→значение)
+// в строку для расшифровки позиции КП
+function _saleSpecsLine(p) {
+  if (!p || !p.specs || typeof p.specs !== 'object') return '';
+  const parts = [];
+  Object.keys(p.specs).forEach(k => {
+    const v = (p.specs[k] == null ? '' : String(p.specs[k])).trim();
+    if (v) parts.push((k || '').trim() ? ((k || '').trim() + ' ' + v) : v);
+  });
+  return parts.join(' · ');
+}
+
 function pickSaleProductForOffer(productId) {
   const p = ((cache.saleProducts && cache.saleProducts.products) || []).find(x => x.id === productId);
   if (!p) return;
+  // v2.45.x: характеристики позиции подставляем в расшифровку (видно в КП и PDF)
+  const specLine = _saleSpecsLine(p);
   // Добавляем позицию в КП с базовой ценой
   state.offerForm.items.push({
     sale_product_id: p.id,
     name: p.name,
-    description: p.description || '',
+    description: specLine || p.description || '',
     unit: p.unit || 'шт.',
     qty: 1,
     price: Number(p.base_price) || 0,

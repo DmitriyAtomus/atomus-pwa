@@ -82,6 +82,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
     <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
     <button class="tb" onclick="openLibrary()">📂 Мои проекты</button>
     <button class="tb" onclick="saveProject()">⭱ Сохранить</button>
+    <button class="tb" onclick="openSaveAs()">⎘ Сохранить как…</button>
     <button class="tb cy" onclick="openEditor()">Открыть редактор →</button>
   </div>
 </header>
@@ -91,6 +92,12 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
 <div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
 <div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются на сервере — общая библиотека, доступна всем сотрудникам с любого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
+<div class="mask" id="saveAsMask"><div class="confirm" style="max-width:460px"><h4>Сохранить как…</h4><p style="margin-bottom:12px">Сохранить копию: выбери раздел и задай название. Номер в разделе подставится автоматически.</p>
+  <div class="form" style="margin-bottom:10px"><div class="fld gr"><label>Название</label><input id="saName" placeholder="напр. Приточная установка П-1"></div></div>
+  <div class="form" style="margin-bottom:6px"><div class="fld gr"><label>Раздел</label><select id="saSec" onchange="saSecChange()"></select></div>
+  <div class="fld"><label>Номер</label><input id="saNum" class="w70" inputmode="numeric"></div></div>
+  <div class="note" id="saDes" style="margin-bottom:12px"></div>
+  <div class="r" style="gap:9px"><button class="no" id="saCancel" style="flex:1">Отмена</button><button class="ok" id="saOk" style="flex:1">⭱ Сохранить копию</button></div></div></div>
 <input type="file" id="dsFile" accept=".pdf,image/*" multiple style="display:none">
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
@@ -120,8 +127,9 @@ function ctrlIO(model){
   if(/EV3223/.test(model)) return {pins:{AI:[{id:'Pb1'},{id:'Pb2'}],DI:[{id:'D.I.',dry:1}],AO:[],DO:[{id:'K1'},{id:'K2'},{id:'K3'}]},asg:{K1:'Компрессор',K2:'Оттайка',K3:'Вентиляторы'}};
   return {pins:{AI:[{id:'AI1'},{id:'AI2'}],DI:[{id:'DI1',dry:1}],AO:[{id:'AO1'}],DO:[{id:'K1'},{id:'K2'},{id:'K3'},{id:'K4'}]},asg:{}};
 }
+var DEMO_NAME='Холодильная камера созревания';   // демо-имя по умолчанию (считается «автоматическим»)
 function newProject(){
-  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:'Холодильная камера созревания',nameAuto:true,
+  return {section:'ЩУ-003',sectionName:'Холодильное оборудование',num:9,variant:'1',name:DEMO_NAME,nameAuto:true,
     controller:{model:'EVCO c-pro 3 OEM (EPB9OR)', io:ctrlIO('EVCO c-pro 3 OEM (EPB9OR)')},
     consumers:[{id:uid('c'),name:'ККБ Royal Clima ES-E 60HX',phases:3,kw:7,needs:'motor',qty:1},
                {id:uid('c'),name:'ТЭН воздухоохладителя',phases:1,kw:2.43,needs:'heater',qty:2},
@@ -149,7 +157,7 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 var cfCb=null,cfNoCb=null;
 function ask(t,x,cb,noCb){$('cfT').textContent=t;$('cfX').textContent=x;cfCb=cb;cfNoCb=noCb||null;$('mask').classList.add('show')}
 $('cfOk').onclick=function(){$('mask').classList.remove('show');var f=cfCb;cfCb=null;cfNoCb=null;if(f)f()};$('cfNo').onclick=function(){$('mask').classList.remove('show');var f=cfNoCb;cfCb=null;cfNoCb=null;if(f)f()};
-function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0">'+esc(it.label)+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
+function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0'+(it.used?';opacity:.6':'')+'">'+esc(it.label)+(it.note?'<span class="tag" style="background:rgba(22,183,219,.16);border:1px solid #16B7DB;color:#9be0f5">✓ '+esc(it.note)+'</span>':'')+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
 $('chNo').onclick=function(){$('chMask').classList.remove('show')};
 function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},2400)}
 
@@ -258,7 +266,17 @@ function rmSection(code){
     else gone();
   });
 }
-function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same){P.num=nextNum(code);if(P.nameAuto&&s)P.name=s[1];}expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
+/* имя «автоматическое» (не задано вручную) — можно подменять под раздел: пустое,
+   помечено nameAuto, совпадает с названием любого раздела, либо это демо-имя вне его
+   «родного» холодильного раздела (внутри ЩУ-003 «камера созревания» — осмысленное имя) */
+function nameLooksAuto(targetCode){
+  if(P.nameAuto)return true;
+  var nm=(P.name||'').trim();
+  if(!nm)return true;
+  if(nm===DEMO_NAME && targetCode!=='ЩУ-003')return true;
+  return SECTIONS.some(function(s){return s[1]===nm;});
+}
+function selectSectionStep(code){var same=(P.section===code);var s=SECTIONS.filter(function(x){return x[0]===code})[0];P.section=code;P.sectionName=s?s[1]:'';if(!same)P.num=nextNum(code);if(s&&nameLooksAuto(code)&&P.name!==s[1]){P.name=s[1];P.nameAuto=true;}expandedSection=(expandedSection===code)?null:code;dirty();draw();updTag()}
 function updTag(){$('projTag').innerHTML=P.section+'.'+pad3(P.num)+' · <b>'+esc(P.name)+'</b>'}
 
 /* 2 контроллер + IO */
@@ -532,8 +550,35 @@ function auxCat(kind){return AUX_CATALOG.filter(function(x){return x.kind===kind
 function auxKindLabel(k){return auxCat(k).label;}
 function auxKindOptions(sel){return AUX_CATALOG.map(function(x){return '<option value="'+x.kind+'"'+(x.kind===sel?' selected':'')+'>'+esc(x.label)+'</option>'}).join('');}
 function auxPrefix(kind){return auxCat(kind).prefix;}
+/* коммутирующие аппараты — у них указывается «что коммутирует» (нагрузка) */
+function auxSwitches(kind){return kind==='contactor'||kind==='relay'||kind==='ssr';}
+/* реальные габариты аппарата (Ш×В×Г) и ширина на рейке в модулях — где знаем точно */
+function auxRealDim(a){ if(a&&a.kind==='relay')return {gab:'27×80×66 мм · реле на колодке (РЭК77/3)', w:1.5}; return null; }
 function nextAuxNum(pref,exceptId){var max=0;(P.aux||[]).forEach(function(a){if(exceptId&&a.id===exceptId)return;if(a.tag){var m=String(a.tag).match(/^(.+?)(\d+)$/);if(m&&m[1].toUpperCase()===pref.toUpperCase())max=Math.max(max,+m[2]);}});return max+1;}
 function auxTagFor(kind,exceptId){var p=auxPrefix(kind);return p+nextAuxNum(p,exceptId);}
+/* группировка аппаратов «по роду»: одинаковые обозначения рядом (K1,K2,K3…), порядок групп — как в каталоге */
+function auxKindOrder(kind){for(var i=0;i<AUX_CATALOG.length;i++)if(AUX_CATALOG[i].kind===kind)return i;return 99;}
+function auxNumOf(tag){var m=String(tag||'').match(/(\d+)\s*$/);return m?+m[1]:0;}
+function auxPfxNum(tag){var m=String(tag||'').match(/^(.*?)(\d+)\s*$/);return m?[m[1],+m[2]]:[String(tag||''),0];}
+function sortAux(){
+  if(!P.aux)return;
+  P.aux.forEach(function(a){if(!a.tag)a.tag=auxTagFor(a.kind||'other',a.id);});
+  P.aux.sort(function(x,y){
+    var ox=auxKindOrder(x.kind), oy=auxKindOrder(y.kind);
+    if(ox!==oy)return ox-oy;                 // сначала по роду (каталожный порядок)
+    return auxNumOf(x.tag)-auxNumOf(y.tag);  // внутри рода — по номеру
+  });
+  // сквозная перенумерация внутри рода: K1,K2,K3… / ТР1,ТР2… (ручные обозначения не трогаем, их номера резервируем)
+  var used={};
+  P.aux.forEach(function(a){if(a.tagManual){var pr=auxPfxNum(a.tag);(used[pr[0]]||(used[pr[0]]={}))[pr[1]]=1;}});
+  var cnt={};
+  P.aux.forEach(function(a){
+    if(a.tagManual)return;
+    var p=auxPrefix(a.kind), n=(cnt[p]||0)+1;
+    while(used[p]&&used[p][n])n++;
+    cnt[p]=n; a.tag=p+n;
+  });
+}
 /* ---- УГО (условные графические обозначения) ---- */
 function _ut(x,y,s){return '<text x="'+x+'" y="'+y+'" font-size="6" fill="#7A8896" font-family="IBM Plex Mono" text-anchor="middle">'+s+'</text>';}
 function _noC(x,t,b){return '<line x1="'+x+'" y1="9" x2="'+x+'" y2="20"/><line x1="'+x+'" y1="20" x2="'+(x+8)+'" y2="27"/><line x1="'+x+'" y1="30" x2="'+x+'" y2="43"/>'+_ut(x,7,t)+_ut(x,50,b);}
@@ -608,7 +653,7 @@ function auxSym(kind){
 }
 function pAux(){
   ensureApparatus();
-  (P.aux||[]).forEach(function(a){if(!a.tag)a.tag=auxTagFor(a.kind||'other',a.id);});
+  sortAux();   // группируем по роду: K1,K2,K3… рядом
   var h=H('Шаг 5','Аппараты в шкафу','Контакторы, реле, переключатели, лампы и т.д. — выбери из каталога (с обозначением и схемным символом) или внеси вручную. Строку можно отредактировать (✎).');
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Каталог аппаратов — клик добавляет</div><div class="grid g3" style="margin-bottom:14px">';
   AUX_CATALOG.forEach(function(c){h+='<div class="card cardpick" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromCatalog(\''+c.kind+'\')">'+auxSym(c.kind)+'<span style="min-width:0"><span class="cname" style="font-size:12.5px;display:block">'+esc(c.label)+'</span><span class="ccode">'+esc(c.prefix)+'· '+esc(c.model||'вручную')+'</span></span></div>';});
@@ -627,15 +672,16 @@ function pAux(){
     if(editAux===a.id){
       h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+auxSym(a.kind)+
          '<input style="width:62px;'+FLDST+';font-family:\'IBM Plex Mono\';color:var(--cyan)" value="'+esc(a.tag||'')+'" title="обозначение" onchange="editAuxField(\''+a.id+'\',\'tag\',this.value)">'+
-         '<input style="flex:1;min-width:140px;'+FLDST+'" value="'+esc(a.name)+'" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
+         '<input style="flex:1;min-width:130px;'+FLDST+'" value="'+esc(a.name)+'" placeholder="наименование" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
+         '<input style="width:140px;'+FLDST+';font-family:\'IBM Plex Mono\'" value="'+esc(a.model||'')+'" placeholder="марка / модель" onchange="editAuxField(\''+a.id+'\',\'model\',this.value)">'+
          '<select style="'+FLDST+'" onchange="editAuxField(\''+a.id+'\',\'kind\',this.value)">'+auxKindOptions(a.kind)+'</select>'+
-         (a.kind==='contactor'?'<select style="'+FLDST+'" title="что коммутирует контактор" onchange="editAuxField(\''+a.id+'\',\'target\',this.value)">'+consumerOptions(a.target)+'</select>':'')+
+         (auxSwitches(a.kind)?auxTargetsEditor(a):'')+
          '<input inputmode="decimal" style="width:60px;'+FLDST+'" value="'+(a.a||'')+'" placeholder="А" onchange="editAuxField(\''+a.id+'\',\'a\',this.value)">'+
          '<input inputmode="numeric" style="width:54px;'+FLDST+'" value="'+(a.qty||1)+'" title="кол-во" onchange="editAuxField(\''+a.id+'\',\'qty\',this.value)">'+
          '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
          '<button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }else{
-      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(a.kind==='contactor'?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(auxSwitches(a.kind)?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }
   });
   return h;}
@@ -685,50 +731,161 @@ function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наиме
 function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});if(editAux===id)editAux=null;dirty();draw()}
 function startEditAux(id){editAux=id;draw()}
 function doneEditAux(){editAux=null;draw()}
-function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag')a.tag=(v||'').trim();else if(f==='kind')a.kind=v;else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();dirty();}
+/* «что коммутирует» — несколько нагрузок (приточный + вытяжной и т.д.) */
+function auxTargets(a){ if(Array.isArray(a.targets))return a.targets; a.targets=(a.target?String(a.target).split(/\s*,\s*/).filter(Boolean):[]); return a.targets; }
+function auxTargetsSync(a){ a.target=auxTargets(a).join(', '); }
+function editAuxAddTarget(id,name){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;name=(name||'').trim();if(!name)return;auxTargets(a).push(name);auxTargetsSync(a);dirty();draw();}
+function editAuxRmTarget(id,i){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;auxTargets(a).splice(i,1);auxTargetsSync(a);dirty();draw();}
+function auxTargetsEditor(a){
+  var tg=auxTargets(a),h='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 6px;background:var(--graphite);min-width:200px">';
+  if(tg.length)tg.forEach(function(t,i){h+='<span class="lchip" style="margin:0">'+esc(t)+'<button class="rm" title="убрать" onclick="editAuxRmTarget(\''+a.id+'\','+i+')">✕</button></span>';});
+  else h+='<span style="color:var(--amber);font-size:12px">что коммутирует?</span>';
+  h+='<select title="добавить нагрузку" style="background:transparent;border:none;color:var(--cyan);font-size:12px;outline:none;cursor:pointer" onchange="editAuxAddTarget(\''+a.id+'\',this.value);this.value=\'\'">'+consumerOptions('')+'</select></div>';
+  return h;
+}
+function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag'){v=(v||'').trim();if(v){a.tag=v;a.tagManual=true;}else{a.tag='';a.tagManual=false;}}else if(f==='kind'){a.kind=v;a.tagManual=false;}else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();else if(f==='model')a.model=(v||'').trim();else if(f==='manu')a.manu=(v||'').trim();dirty();}
 // варианты «что коммутирует контактор» — список потребителей
-function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'';o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';});return o;}
+function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'',q=c.qty||1;if(q>1){for(var k=0;k<q;k++){var n=nm+' #'+(k+1);o+='<option value="'+esc(n)+'"'+(sel===n?' selected':'')+'>'+esc(n)+'</option>';}}else{o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';}});return o;}
 
 /* 6 автоматы */
 function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
 function pBreakers(){
   ensureBreakers();
-  var h=H('Шаг 6','Автоматы · распределение','Собраны из состава: ток на каждом считается, проверяется по номиналу. Меняй номинал ±, добавляй нагрузки, перегруз подсветит.');
+  var h=H('Шаг 6','Автоматы · распределение','Собраны из состава: ток на каждом считается, проверяется по номиналу. Меняй номинал ±, объединяй несколько линий на один автомат или выноси обратно, добавляй нагрузки — перегруз подсветит.');
   h+='<div style="display:flex;gap:8px;margin-bottom:14px"><button class="tb" onclick="regenBreakers()">↻ Пересобрать из состава</button></div>';
   var ph=C.phaseBalance(P);
   h+='<div class="phase"><div class="phbox"><div class="l">L1</div><div class="v">'+ph.L1+' А</div></div><div class="phbox"><div class="l">L2</div><div class="v">'+ph.L2+' А</div></div><div class="phbox"><div class="l">L3</div><div class="v">'+ph.L3+' А</div></div></div>';
   P.breakers.forEach(function(b,bi){
     var s=C.breakerSum(b),st=C.breakerStatus(b),pct=Math.min(100,Math.round(s/b.rate*100));
     var col=st==='over'?'var(--red)':st==='warn'?'var(--amber)':'var(--ok)';
+    var nLoads=(b.loads||[]).length;
     h+='<div class="brow"><div class="t2"><span class="qf">'+b.code+'</span><span class="rate"><button onclick="bRate('+bi+',-1)">−</button>C'+b.rate+' · '+b.poles+'P<button onclick="bRate('+bi+',1)">+</button></span><span class="sum '+st+'">'+s+' А</span></div>'+
        '<div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div><div class="lchips">';
-    (b.loads||[]).forEach(function(l,li){h+='<span class="lchip">'+esc(l.name)+' <span class="a">'+l.a+' А</span>'+(b.fixed?'':'<button class="rm" onclick="bRm('+bi+','+li+')">✕</button>')+'</span>'});
+    (b.loads||[]).forEach(function(l,li){
+      h+='<span class="lchip">'+esc(l.name)+' <span class="a">'+l.a+' А</span>'+
+         (nLoads>1?'<button class="rm" title="вынести в отдельный автомат" style="color:var(--cyan)" onclick="bSplit('+bi+','+li+')">⤴</button>':'')+
+         (b.fixed?'':'<button class="rm" title="убрать линию" onclick="bRm('+bi+','+li+')">✕</button>')+'</span>';
+    });
     h+='<button class="lchip" style="cursor:pointer;color:var(--cyan)" onclick="bAddLoad('+bi+')">+ нагрузка</button>';
-    h+='</div>'+(st==='over'?'<div class="over">⚠ перегруз: '+s+' А &gt; '+b.rate+' А — увеличь номинал или раздели линию</div>':'')+'<div class="note" style="margin-top:6px">'+esc(b.role)+' · кабель '+C.sectionFor(s)+' мм²</div></div>';
+    // объединение нескольких линий на один автомат (одинаковая полюсность; нельзя только сам ввод)
+    if(!b.fixed){
+      var tgts=[];
+      P.breakers.forEach(function(x,xi){ if(xi!==bi && !x.fixed && x.poles===b.poles) tgts.push({xi:xi,code:x.code}); });
+      if(tgts.length){
+        h+='<select class="lchip" style="color:var(--cyan);background:transparent;border:1px dashed var(--cyan);cursor:pointer" onchange="bMerge('+bi+',this.value);this.value=\'\'">'+
+           '<option value="">⤵ объединить с…</option>'+
+           tgts.map(function(t){return '<option value="'+t.xi+'">→ '+esc(t.code)+'</option>';}).join('')+'</select>';
+      }
+    }
+    h+='</div>'+(st==='over'?'<div class="over">⚠ перегруз: '+s+' А &gt; '+b.rate+' А — увеличь номинал или раздели линию</div>':'')+'<div class="note" style="margin-top:6px">'+esc(b.role)+(nLoads>1?(' · '+nLoads+' линии на одном автомате'):'')+' · кабель '+C.sectionFor(s)+' мм²</div></div>';
   });
   return h;
 }
 function regenBreakers(){P.breakers=C.buildBreakers(P);dirty();draw();toast('Автоматы пересобраны из состава')}
 function bRate(i,d){var b=P.breakers[i],idx=C.STD.indexOf(b.rate);idx=Math.max(0,Math.min(C.STD.length-1,idx+d));b.rate=C.STD[idx];dirty();draw()}
-function bRm(i,li){P.breakers[i].loads.splice(li,1);dirty();draw()}
+function bRm(i,li){P.breakers[i].loads.splice(li,1);if(!P.breakers[i].loads.length)P.breakers.splice(i,1);bRenum();dirty();draw()}
 function bAddLoad(i){var nm=prompt('Название нагрузки:');if(!nm)return;var a=parseFloat(prompt('Ток, А:','1'))||0;P.breakers[i].loads.push({name:nm,a:a});dirty();draw()}
+/* сквозная перенумерация QF после объединения/выноса */
+function bRenum(){var n=1;P.breakers.forEach(function(b){b.code='QF'+n;b.id='QF'+n;n++;});}
+/* объединить линии автомата bi на автомат di (одинаковая полюсность) */
+function bMerge(bi,di){
+  bi=+bi;di=+di;var src=P.breakers[bi],dst=P.breakers[di];
+  if(!src||!dst||bi===di||src.poles!==dst.poles)return;
+  dst.loads=(dst.loads||[]).concat(src.loads||[]);
+  dst.role='группа линий';dst.consumer=undefined;
+  var need=C.ratingFor(C.breakerSum(dst));                  // авто-номинал под суммарный ток (с запасом 25%)
+  if(C.STD.indexOf(need)>C.STD.indexOf(dst.rate))dst.rate=need;
+  P.breakers.splice(bi,1);bRenum();dirty();draw();toast('Линии объединены на один автомат');
+}
+/* вынести линию li автомата bi обратно в отдельный автомат */
+function bSplit(bi,li){
+  var b=P.breakers[bi];if(!b||!b.loads||b.loads.length<2)return;
+  var ld=b.loads.splice(li,1)[0];
+  var nb={code:'',id:'',poles:b.poles,rate:C.ratingFor(+ld.a||0)||6,role:ld.name,loads:[ld],consumer:ld.cid};
+  if(b.loads.length===1){b.role=b.loads[0].name;b.consumer=b.loads[0].cid;}
+  P.breakers.splice(bi+1,0,nb);bRenum();dirty();draw();toast('Линия вынесена в отдельный автомат');
+}
 
-/* 7 клеммы (из состава) */
-function pTerminals(){
+/* 7 клеммы — редактируемый план клемм (хранится в P.terminals) */
+function buildTerminals(P){
   ensureBreakers();
-  var h=H('Шаг 7','Клеммы','Внешний интерфейс щита — формируется из ввода, отходящих линий и сигналов.');
-  var cl=[];cl.push(['1','L1',''],['2','L2',''],['3','L3',''],['N','N',''],['PE','PE','pe']);
-  var branches=P.breakers.filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
-  var n=4;branches.forEach(function(b){cl.push([''+n,b.code,''])});
-  P.sensors.forEach(function(s){for(var k=0;k<(s.qty||1);k++)cl.push(['s','+'+s.sig,'sig'])});
-  h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th>Клемма</th><th>Назначение</th><th>Линия</th></tr></thead><tbody>';
-  var i=1;
-  h+='<tr><td class="d">X1:1–3</td><td>Ввод L1/L2/L3</td><td>5×6</td></tr><tr><td class="d">X1:4–5</td><td>N · PE</td><td>—</td></tr>';
-  branches.forEach(function(b){h+='<tr><td class="d">X2:'+(i++)+'</td><td>'+esc(b.role)+'</td><td class="c">'+esc(b.code)+'</td></tr>'});
-  P.sensors.forEach(function(s){h+='<tr><td class="d">X5</td><td>'+esc(s.name)+'</td><td class="c">'+esc(s.sig)+'</td></tr>'});
-  h+='</tbody></table></div><div class="note">Силовые и сигнальные клеммники разделены; сигнальные — экранированные.</div>';
+  var t=[];
+  t.push({term:'X1:1–3', name:'Ввод L1/L2/L3', line:'5×6'});
+  t.push({term:'X1:4–5', name:'N · PE', line:'—'});
+  var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
+  var i=1; branches.forEach(function(b){
+    // объединённый автомат → отдельная клемма на каждую линию, но с одним и тем же QF в «Линии»
+    var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
+    loads.forEach(function(l){ t.push({term:'X2:'+(i++), name:l.name||b.role, line:b.code}); });
+  });
+  (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++) t.push({term:'X5', name:s.name+(q>1?(' #'+(k+1)):''), line:s.sig}); });
+  return t;
+}
+function ensureTerminals(){ if(!P.terminals||!P.terminals.length) P.terminals=buildTerminals(P); }
+function pTerminals(){
+  ensureTerminals();
+  var h=H('Шаг 7','Клеммы','Внешний интерфейс щита. Можно добавлять, редактировать и убирать клеммы. «Пересобрать из состава» вернёт авто-набор по вводу, линиям и датчикам.');
+  h+='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"><button class="tb" onclick="regenTerminals()">↻ Пересобрать из состава</button><button class="tb cy" onclick="termAdd()">+ Добавить клемму</button></div>';
+  var ist=FLDST+';width:100%;padding:6px 8px';
+  h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th style="width:120px">Клемма</th><th>Назначение</th><th style="width:120px">Линия</th><th style="width:128px;text-align:center">Порядок</th></tr></thead><tbody>';
+  var nT=P.terminals.length;
+  P.terminals.forEach(function(t,i){
+    h+='<tr>'+
+      '<td><div style="display:flex;gap:4px;align-items:center"><input value="'+esc(t.term||'')+'" oninput="termSet('+i+',\'term\',this.value)" style="'+ist+';font-family:\'IBM Plex Mono\';color:var(--cyan);flex:1;min-width:0"><button title="выбрать из оборудования" onclick="termPick('+i+')" style="flex:0 0 auto;background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:12px">▾</button></div></td>'+
+      '<td><input value="'+esc(t.name||'')+'" oninput="termSet('+i+',\'name\',this.value)" placeholder="назначение — или ▾ выбрать" style="'+ist+'"></td>'+
+      '<td><input value="'+esc(t.line||'')+'" oninput="termSet('+i+',\'line\',this.value)" placeholder="линия/сечение" style="'+ist+';font-family:\'IBM Plex Mono\'"></td>'+
+      '<td style="white-space:nowrap;text-align:center">'+
+        '<button class="del" title="вверх"'+(i===0?' disabled style="opacity:.3"':'')+' onclick="termMove('+i+',-1)">↑</button>'+
+        '<button class="del" title="вниз"'+(i===nT-1?' disabled style="opacity:.3"':'')+' onclick="termMove('+i+',1)">↓</button>'+
+        '<button class="del" title="вставить клемму ниже" style="color:var(--cyan)" onclick="termInsertAfter('+i+')">＋</button>'+
+        '<button class="del" title="убрать клемму" onclick="termRm('+i+')">✕</button>'+
+      '</td>'+
+    '</tr>';
+  });
+  h+='</tbody></table></div><div class="note">Позиций: <b style="color:var(--txt)">'+P.terminals.length+'</b> · ↑↓ — поменять местами, ＋ — вставить ниже (номера сдвинутся автоматически). Силовые и сигнальные клеммники разделены, сигнальные — экранированные.</div>';
   return h;
 }
+/* правка инлайн — без перерисовки, чтобы не слетал фокус */
+function termSet(i,f,v){ ensureTerminals(); if(P.terminals[i])P.terminals[i][f]=v; dirty(); }
+function termRm(i){ ensureTerminals(); P.terminals.splice(i,1); renumberTerminals(); dirty(); draw(); }
+function termAdd(){ ensureTerminals(); var prev=P.terminals[P.terminals.length-1]||{}, m=String(prev.term||'').match(/^(.*?:)\d+$/); P.terminals.push({term:(m?m[1]:'X2:')+'1', name:'', line:''}); renumberTerminals(); dirty(); draw(); }
+/* перенумерация обозначений вида «PREFIX:N» по порядку внутри каждого префикса (X2:1, X2:2…); диапазоны (X1:1–3) и «X5» не трогаем */
+function renumberTerminals(){ ensureTerminals(); var cnt={}; P.terminals.forEach(function(t){ var m=String(t.term||'').match(/^(.*?:)(\d+)$/); if(m){ var p=m[1]; cnt[p]=(cnt[p]||0)+1; t.term=p+cnt[p]; } }); }
+/* поменять местами с соседом */
+function termMove(i,dir){ ensureTerminals(); var a=P.terminals, j=i+dir; if(j<0||j>=a.length)return; var tmp=a[i]; a[i]=a[j]; a[j]=tmp; renumberTerminals(); dirty(); draw(); }
+/* вставить клемму ниже строки i (наследует префикс, номера сдвигаются) */
+function termInsertAfter(i){ ensureTerminals(); var prev=P.terminals[i]||{}, m=String(prev.term||'').match(/^(.*?:)\d+$/); P.terminals.splice(i+1,0,{term:(m?m[1]:'X2:')+'1', name:'', line:''}); renumberTerminals(); dirty(); draw(); }
+function regenTerminals(){ P.terminals=buildTerminals(P); dirty(); draw(); toast('Клеммы пересобраны из состава'); }
+/* список внесённого оборудования для назначения клеммы */
+function termEquip(){
+  ensureBreakers();
+  var items=[];
+  items.push({label:'Ввод L1/L2/L3', tag:'силовая', value:{name:'Ввод L1/L2/L3', line:'5×6'}});
+  items.push({label:'N · PE', value:{name:'N · PE', line:'—'}});
+  (P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления';}).forEach(function(b){
+    var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
+    loads.forEach(function(l){ items.push({label:(l.name||b.role)+' · '+b.code, tag:'линия', value:{name:l.name||b.role, line:b.code}}); });
+  });
+  (P.consumers||[]).forEach(function(c){var q=c.qty||1;for(var k=0;k<q;k++){var nm=c.name+(q>1?(' #'+(k+1)):'');items.push({label:nm, value:{name:nm, line:''}});}});
+  (P.aux||[]).forEach(function(a){var q=a.qty||1;for(var k=0;k<q;k++){var nm=(a.tag?a.tag+' · ':'')+a.name+(q>1?(' #'+(k+1)):'');items.push({label:nm, value:{name:a.name+(q>1?(' #'+(k+1)):''), line:a.tag||''}});}});
+  (P.sensors||[]).forEach(function(s){var q=s.qty||1;for(var k=0;k<q;k++){var nm=s.name+(q>1?(' #'+(k+1)):'');items.push({label:nm+' · '+s.sig, tag:'sig', value:{name:nm, line:s.sig}});}});
+  if(P.controller&&P.controller.model)items.push({label:'Контроллер · '+P.controller.model, value:{name:'Контроллер '+P.controller.model, line:''}});
+  if(P.hmi&&P.hmi.model)items.push({label:'Панель HMI · '+P.hmi.model, value:{name:'Панель HMI '+P.hmi.model, line:'RS-485'}});
+  // пометить уже назначенные на клеммы (показать, на какой клемме)
+  var byName={}; (P.terminals||[]).forEach(function(t){ if(t.name){(byName[t.name]=byName[t.name]||[]).push(t.term||'');} });
+  items.forEach(function(it){ var u=byName[it.value.name]; if(u&&u.length){ it.used=true; it.note='уже: '+u.filter(Boolean).join(', '); } });
+  return items;
+}
+function termPick(i){
+  ensureTerminals();
+  openChooser('Выбрать из оборудования', termEquip(), function(v){
+    if(!P.terminals[i])return;
+    P.terminals[i].name=v.name;
+    if(v.line)P.terminals[i].line=v.line;
+    dirty();draw();
+  });
+}
+
 
 /* 8 компоновка */
 function pCabinet(){
@@ -786,7 +943,7 @@ function cabItems(){
   if(P.controller&&P.controller.model) items.push({t:P.controller.model.replace(/\s*\(.*\)/,''),w:5,k:'ctrl',key:'ctrl',tip:'Контроллер · '+P.controller.model});
   P.breakers.forEach(function(b){var tok='qf|'+b.code;if(cabIsRem(tok))return;items.push({t:b.code,w:b.poles===3?3:1,k:'qf',key:b.code,del:tok,tip:'Автомат · CHINT NB1-63 '+b.poles+'P · C'+b.rate+(b.role?(' · '+b.role):'')})});
   // контакторы — реальные габариты: 3ф ~3 мод., 1ф ~2 мод.
-  var kmN=1; P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){var tok='km|'+c.id+'|'+i, kk='KM'+kmN;kmN++;if(cabIsRem(tok))continue;items.push({t:kk,w:c.phases===3?3:2,k:'km',src:'cons',key:kk,del:tok,gab:C.contactorDimStr(c),tip:'Контактор электромагнитный (с катушкой) · CHINT '+C.contactorModel(c)+' · '+c.name+' · из «Потребители»'});}}});
+  var kmN=1, _cov=C.auxCoverSet(P); P.consumers.forEach(function(c){if(C.needsContactor(c)){var q=c.qty||1;for(var i=0;i<q;i++){var unm=c.name+(q>1?(' #'+(i+1)):'');if(C.coveredByAux(_cov,c,unm))continue;var tok='km|'+c.id+'|'+i, kk='KM'+kmN;kmN++;if(cabIsRem(tok))continue;items.push({t:kk,w:c.phases===3?3:2,k:'km',src:'cons',key:kk,del:tok,gab:C.contactorDimStr(c),tip:'Контактор электромагнитный (с катушкой) · CHINT '+C.contactorModel(c)+' · '+c.name+' · из «Потребители»'});}}});
   // аппараты «на дверь» (лицевую панель): грибок, переключатель, кнопка, сигнальная лампа — на DIN-рейку не ставятся
   var DOOR_KINDS={estop:1,switch:1,button:1,lamp:1};
   cabDoorList=[]; var doorN=1;
@@ -812,9 +969,10 @@ function cabItems(){
     } else {
       var key2='aux'+(auxN++);
       if(cabIsRem(tok))continue;
-      var w=a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1;
+      var rd=auxRealDim(a);
+      var w=rd?rd.w:(a.kind==='vfd'?3:(a.kind==='psu'||a.kind==='ssr')?2:1);
       var lbl=a.tag||(a.kind==='psu'?'G':a.kind==='ssr'?'ТР':a.kind==='relay'?'KL':a.kind==='fan'?'M':'A');
-      items.push({t:lbl,w:w,k:'aux',key:key2,del:tok,tip:tip});
+      items.push({t:lbl,w:w,k:'aux',key:key2,del:tok,gab:rd?rd.gab:undefined,tip:tip});
     }
   }});
   if(P.cab&&P.cab.order&&P.cab.order.length){
@@ -1185,7 +1343,7 @@ function pSpec(){
   h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th>Поз.</th><th>Наименование</th><th class="c">Кол.</th><th>Примечание</th></tr></thead><tbody>';
   arr.forEach(function(g){h+='<tr><td class="d">'+esc(g.desStr)+'</td><td>'+esc(g.name+(g.manu?' '+g.manu:'')+(g.model?' '+g.model:''))+'</td><td class="c">'+g.qty+'</td><td>'+esc(g.notes.join(' / '))+'</td></tr>'});
   h+='</tbody></table></div><div class="note">Позиций: <b style="color:var(--txt)">'+arr.length+'</b> · изделий: <b style="color:var(--txt)">'+units+'</b> · корпус '+P.enclosure.model+'</div>';
-  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект</button><button class="tb" onclick="openLibrary()">📂 Мои проекты</button><button class="tb" onclick="exportFile()">⭳ Экспорт .json</button></div>';
+  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект</button><button class="tb" onclick="openSaveAs()">⎘ Сохранить как…</button><button class="tb" onclick="openLibrary()">📂 Мои проекты</button><button class="tb" onclick="exportFile()">⭳ Экспорт .json</button></div>';
   return h;
 }
 
@@ -1251,6 +1409,37 @@ async function saveProject(){
   if(saveLocal()){$('saveState').textContent='сохранено';secLib=null;toast('Проект сохранён');}
   else toast('Не удалось сохранить');
 }
+
+/* «Сохранить как…» — копия с выбором раздела и названия */
+function openSaveAs(){
+  ensureSections();ensureSecLib();
+  var sel=$('saSec');
+  sel.innerHTML=SECTIONS.map(function(s){return '<option value="'+esc(s[0])+'"'+(s[0]===P.section?' selected':'')+'>'+esc(s[1])+'</option>';}).join('');
+  $('saName').value=P.name||'';
+  $('saNum').value=nextNum(P.section);
+  saDesUpd();
+  $('saveAsMask').classList.add('show');
+  setTimeout(function(){try{$('saName').focus();$('saName').select();}catch(_){}}, 30);
+}
+function saSecChange(){ $('saNum').value=nextNum($('saSec').value); saDesUpd(); }
+function saDesUpd(){
+  var code=$('saSec').value, num=parseInt($('saNum').value,10)||0;
+  $('saDes').innerHTML='Обозначение: <span class="mono" style="color:var(--cyan)">'+esc(code)+'.'+pad3(num)+'.'+esc(P.variant||'1')+'</span> · шифр: <span class="mono">АГ.'+esc(code)+'.'+pad3(num)+'/26</span>';
+}
+document.getElementById('saNum').addEventListener('input',saDesUpd);
+document.getElementById('saCancel').onclick=function(){$('saveAsMask').classList.remove('show');};
+document.getElementById('saOk').onclick=async function(){
+  var name=($('saName').value||'').trim();
+  if(!name){toast('Введи название');return;}
+  var code=$('saSec').value, s=SECTIONS.filter(function(x){return x[0]===code})[0];
+  var num=Math.max(0,parseInt($('saNum').value,10)||nextNum(code));
+  P.name=name;P.nameAuto=false;
+  P.section=code;P.sectionName=s?s[1]:'';P.num=num;
+  P.serverId=null;P.id=uid('prj');          // новая копия — не перезаписываем исходник
+  $('saveAsMask').classList.remove('show');
+  await saveProject();
+  draw();updTag();
+};
 
 /* библиотека: список, открытие, удаление */
 async function openLibrary(){
@@ -1444,7 +1633,17 @@ function restoreSession(){
   }catch(_){}
   return 0;
 }
-function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0;var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}persistSession();}
+var lastDrawnCur=-1;
+function draw(){
+  var wrap=document.querySelector('.wrap');
+  var keep=(cur===lastDrawnCur);                         // тот же шаг → сохраняем прокрутку (без «прыжка»)
+  var st=(keep&&wrap)?wrap.scrollTop:0;
+  $('panel').innerHTML=PANELS[cur]();
+  if(wrap)wrap.scrollTop=st;                             // смена шага → 0 (наверх), внутри шага → как было
+  lastDrawnCur=cur;
+  var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}
+  persistSession();
+}
 function go(i){cur=Math.max(0,Math.min(STEPS.length-1,i));$('prev').disabled=cur===0;$('next').textContent=cur===STEPS.length-1?'Готово ✓':'Далее →';steps();draw()}
 $('prev').onclick=function(){go(cur-1)};$('next').onclick=function(){go(cur+1)};
 var _startStep=restoreSession();updTag();steps();go(_startStep);

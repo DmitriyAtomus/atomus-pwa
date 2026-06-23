@@ -2453,6 +2453,7 @@
   }
   .modal-item:last-child { border-bottom: none; margin-bottom: 0; }
   .modal-item:hover { background: var(--bg); }
+  .modal-item.bf-selected { background: var(--brand-bg); }
   .modal-item .mi-icon {
     width: 32px; height: 32px;
     background: var(--brand-bg); color: var(--brand);
@@ -9100,6 +9101,39 @@
     padding: 12px;
   }
 
+  /* v2.45.x: таблица характеристик в форме продажной позиции */
+  .spf-specs-empty {
+    text-align: center; color: var(--text-light); font-size: 13px; padding: 14px;
+    border: 1px dashed var(--border, #E2E8F0); border-radius: 10px;
+  }
+  .spf-specs-table {
+    border: 1px solid var(--border, #E2E8F0); border-radius: 10px;
+    overflow: hidden; background: #fff;
+  }
+  .spf-specs-head, .spf-spec-row {
+    display: grid; grid-template-columns: 1fr 1.3fr 38px; align-items: center;
+  }
+  .spf-specs-head {
+    background: var(--bg-soft, #F1F5F9); padding: 8px 12px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.3px; color: var(--text-light, #94A3B8);
+  }
+  .spf-spec-row { border-top: 1px solid var(--border, #EEF1F5); }
+  .spf-spec-row:nth-child(even) { background: #FAFBFD; }
+  .spf-spec-row input {
+    border: none; background: transparent; padding: 10px 12px;
+    font-size: 13.5px; width: 100%; box-sizing: border-box;
+    color: var(--text, #111827); font-family: inherit;
+  }
+  .spf-spec-row input:focus { outline: none; background: #EAF2FB; }
+  .spf-spec-row .spf-spec-k { border-right: 1px solid var(--border, #EEF1F5); font-weight: 500; }
+  .spf-spec-del {
+    border: none; background: none; cursor: pointer;
+    color: var(--text-light, #94A3B8); display: flex;
+    align-items: center; justify-content: center; height: 100%; padding: 6px;
+  }
+  .spf-spec-del:hover { color: var(--danger, #B91C1C); background: rgba(185,28,28,0.06); }
+
   /* Чекбокс в модалке выбора моделей */
   .modal-item.checkbox-item {
     cursor: pointer;
@@ -9223,13 +9257,13 @@
     text-transform: uppercase; letter-spacing: 0.4px;
     font-weight: 600;
     display: grid;
-    grid-template-columns: 40px 1fr 70px 110px 70px 110px;
+    grid-template-columns: 40px 1fr 70px 110px 110px;
     gap: 8px; align-items: center;
   }
   .offer-items-table .oit-row {
     padding: 12px 14px;
     display: grid;
-    grid-template-columns: 40px 1fr 70px 110px 70px 110px;
+    grid-template-columns: 40px 1fr 70px 110px 110px;
     gap: 8px; align-items: center;
     border-top: 1px solid var(--border);
   }
@@ -9272,7 +9306,7 @@
     display: grid; grid-template-columns: 1fr; gap: 8px;
   }
   .desktop-layout .item-row-edit .ire-body {
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
   /* v2.45.460: расшифровка позиции — отдельной строкой во всю ширину, заметно */
   .item-row-edit .ire-desc { margin-bottom: 8px; }
