@@ -2453,6 +2453,7 @@
   }
   .modal-item:last-child { border-bottom: none; margin-bottom: 0; }
   .modal-item:hover { background: var(--bg); }
+  .modal-item.bf-selected { background: var(--brand-bg); }
   .modal-item .mi-icon {
     width: 32px; height: 32px;
     background: var(--brand-bg); color: var(--brand);

@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.465";
+const APP_VERSION = "v2.45.466";
 const APP_VERSION_DATE = "22.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5136,6 +5136,7 @@ async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
     catch (e) { cache.components = []; }
   }
   state._bomFulfillSelectedId = null;
+  state._bomFulfillName = bomName || '';
   const overlay = document.createElement('div');
   overlay.id = 'bom-fulfill-modal';
   overlay.className = 'modal-overlay visible';
@@ -5153,7 +5154,8 @@ async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
           '<div style="font-weight:600;font-size:14px;margin-top:2px;">' + escapeHtml(bomName) + '</div>' +
           '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">Нужно ' + need + ' ' + escapeHtml(unit) + '</div>' +
         '</div>' +
-        '<input type="text" id="bf-search" class="form-input" placeholder="Поиск компонента…" oninput="_bomFulfillFilter()" style="margin-bottom:10px;" />' +
+        '<input type="text" id="bf-search" class="form-input" placeholder="Поиск по названию или артикулу…" oninput="_bomFulfillFilter()" style="margin-bottom:6px;" />' +
+        '<div style="font-size:11px;color:var(--text-light);margin-bottom:10px;">Сверху — подходящие по названию к нужной позиции и то, что есть в наличии.</div>' +
       '</div>' +
       '<div id="bf-list" style="flex:1;overflow-y:auto;padding:0 18px;"></div>' +
       '<div id="bf-qty-row" style="display:none;padding:14px 18px 0;border-top:1px solid var(--border);">' +
@@ -5168,38 +5170,74 @@ async function openBomFulfillModal(workId, bomId, bomName, need, unit) {
   _bomFulfillFilter();
 }
 
+// v2.45.x: оценка релевантности компонента запросу/нужной позиции (больше — лучше)
+function _bomScore(c, tokens, rawNoSpace) {
+  const name = (c.name || '').toLowerCase();
+  const sku  = (c.sku  || '').toLowerCase();
+  const nameN = name.replace(/\s+/g, '');
+  const skuN  = sku.replace(/\s+/g, '');
+  let score = 0;
+  if (rawNoSpace) {
+    if (nameN === rawNoSpace || skuN === rawNoSpace) score += 1000;
+    else if (nameN.indexOf(rawNoSpace) === 0 || skuN.indexOf(rawNoSpace) === 0) score += 500;
+    else if (nameN.indexOf(rawNoSpace) >= 0 || skuN.indexOf(rawNoSpace) >= 0) score += 200;
+  }
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t && (name.indexOf(t) >= 0 || sku.indexOf(t) >= 0)) score += 50;
+  }
+  return score;
+}
+
 function _bomFulfillFilter() {
-  // v2.44.79: ищем по name+sku, игнорируя пробелы и регистр —
-  // чтобы «BS-TEF 027M» находил «BS-TEF027M ED» и наоборот.
+  // Релевантность: при пустом поиске ранжируем по похожести на нужную позицию,
+  // при вводе — по запросу. В наличии — выше. Поиск по названию и артикулу,
+  // игнорируя пробелы/регистр.
   const raw = ((document.getElementById('bf-search') || {}).value || '').trim().toLowerCase();
-  const q  = raw;
-  const qN = raw.replace(/\s+/g, '');  // без пробелов
+  const usingSearch = !!raw;
+  const basis = usingSearch ? raw : (state._bomFulfillName || '').toLowerCase();
+  const tokens = basis.split(/[\s,;·.\/]+/).filter(t => t.length >= 2);
+  const rawNoSpace = usingSearch ? raw.replace(/\s+/g, '') : '';
   const comps = cache.components || [];
-  const filtered = q
-    ? comps.filter(c => {
-        const name  = (c.name || '').toLowerCase();
-        const sku   = (c.sku  || '').toLowerCase();
-        const nameN = name.replace(/\s+/g, '');
-        const skuN  = sku.replace(/\s+/g, '');
-        return name.includes(q) || sku.includes(q) || nameN.includes(qN) || skuN.includes(qN);
-      })
-    : comps;
+
+  let arr = comps.map(c => ({ c: c, s: _bomScore(c, tokens, rawNoSpace) }));
+  if (usingSearch) arr = arr.filter(x => x.s > 0);
+  arr.sort((a, b) => {
+    if (b.s !== a.s) return b.s - a.s;                         // релевантность
+    const ia = parseFloat(a.c.qty_on_stock || 0) > 0 ? 1 : 0;
+    const ib = parseFloat(b.c.qty_on_stock || 0) > 0 ? 1 : 0;
+    if (ib !== ia) return ib - ia;                             // в наличии — выше
+    return (a.c.name || '').localeCompare(b.c.name || '', 'ru');
+  });
+  const filtered = arr.map(x => x.c);
+
   const list = document.getElementById('bf-list');
   if (!list) return;
   if (!filtered.length) {
-    list.innerHTML = '<div class="empty-block" style="padding:14px;"><i class="ti ti-info-circle"></i>Ничего не найдено</div>';
+    list.innerHTML = '<div class="empty-block" style="padding:14px;"><i class="ti ti-info-circle"></i>Ничего не найдено. Попробуйте другое слово или артикул.</div>';
     return;
   }
-  list.innerHTML = filtered.slice(0, 120).map(c => {
+  const shown = filtered.slice(0, 120);
+  list.innerHTML = shown.map(c => {
     const stock = parseFloat(c.qty_on_stock || 0);
-    const stockCls = stock > 0 ? '' : ' style="color:var(--danger);"';
-    const sel = state._bomFulfillSelectedId === c.id ? ' style="background:var(--brand-bg);"' : '';
-    return '<div class="modal-item" onclick="_bomFulfillSelect(' + c.id + ')"' + sel + '>' +
+    const inStock = stock > 0;
+    const sel = state._bomFulfillSelectedId === c.id;
+    const cat = c.category_name ? escapeHtml(c.category_name) + ' · ' : '';
+    const stockHtml = inStock
+      ? '<span style="color:#15803D;font-weight:600;">в наличии: ' + formatNumberShort(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</span>'
+      : '<span style="color:var(--danger);">нет в наличии</span>';
+    return '<div class="modal-item' + (sel ? ' bf-selected' : '') + '" onclick="_bomFulfillSelect(' + c.id + ')"' +
+             (inStock ? '' : ' style="opacity:.72;"') + '>' +
              '<div class="mi-text">' +
                '<div class="mi-title">' + escapeHtml(c.name || '?') + (c.sku ? ' · ' + escapeHtml(c.sku) : '') + '</div>' +
-               '<div class="mi-meta"' + stockCls + '>на складе: ' + stock + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
-             '</div></div>';
-  }).join('');
+               '<div class="mi-meta">' + cat + stockHtml + '</div>' +
+             '</div>' +
+             (sel ? '<i class="ti ti-circle-check" style="color:var(--brand);font-size:20px;"></i>' : '') +
+           '</div>';
+  }).join('') +
+    (filtered.length > shown.length
+      ? '<div style="padding:10px 4px;text-align:center;color:var(--text-light);font-size:12px;">…ещё ' + (filtered.length - shown.length) + ' — уточните поиск.</div>'
+      : '');
 }
 
 function _bomFulfillSelect(componentId) {
