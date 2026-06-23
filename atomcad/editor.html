@@ -1056,8 +1056,35 @@ function wireClick(wx,wy){
   addPt(p);
   renderDraft();
 }
+/* два провода не должны идти по одной линии — детектор перекрытия коллинеарных сегментов */
+function _segOverlap(a,b,c,d){
+  var t=2;
+  if(Math.abs(a.y-b.y)<=t&&Math.abs(c.y-d.y)<=t&&Math.abs(a.y-c.y)<=t){      // оба горизонтальные на одной y
+    var lo=Math.max(Math.min(a.x,b.x),Math.min(c.x,d.x)), hi=Math.min(Math.max(a.x,b.x),Math.max(c.x,d.x));
+    return hi-lo>t;
+  }
+  if(Math.abs(a.x-b.x)<=t&&Math.abs(c.x-d.x)<=t&&Math.abs(a.x-c.x)<=t){      // оба вертикальные на одной x
+    var lo2=Math.max(Math.min(a.y,b.y),Math.min(c.y,d.y)), hi2=Math.min(Math.max(a.y,b.y),Math.max(c.y,d.y));
+    return hi2-lo2>t;
+  }
+  return false;
+}
+function wireOverlaps(pts,exceptId){
+  for(var i=0;i<pts.length-1;i++){var a=pts[i],b=pts[i+1];
+    for(var wi=0;wi<S.wires.length;wi++){var w=S.wires[wi]; if(exceptId&&w.id===exceptId)continue;
+      for(var j=0;j<w.pts.length-1;j++){ if(_segOverlap(a,b,w.pts[j],w.pts[j+1]))return true; }
+    }
+  }
+  return false;
+}
 function finishWire(){
   if(draft.length>=2){
+    // запрет: провод не должен идти по одной линии с уже проложенным
+    var fin=draft.map(function(p){return {x:p.x,y:p.y}});
+    if(wireOverlaps(fin, S._extend&&S._extend.id)){
+      toast('Провод пошёл бы по одной линии с другим — проложи в стороне (Esc — отменить)');
+      return;
+    }
     pushUndo();
     if(S._extend){
       // продолжение существующего провода: дорисовываем новые точки к его концу
