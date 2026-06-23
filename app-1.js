@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.483-atomcad-psu-sym";
+const APP_VERSION = "v2.45.484-atomcad-psu-sym";
 const APP_VERSION_DATE = "23.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9043,6 +9043,7 @@ function openNewSaleProduct() {
     name: '', description: '', product_type: 'goods', base_price: '', unit: 'шт.',
     category_id: null,    // ЭТАП 17
     linkedModels: [],
+    specs: [],            // характеристики (key/val) → specs_json
   };
   selectSidebarItem('sale-product-form');
 }
@@ -9073,6 +9074,8 @@ async function openEditSaleProduct(productId, returnTo) {
         model_article: lm.model_article,
         direction_name: lm.direction_name,
       })),
+      // характеристики (specs_json) → редактируемые строки
+      specs: Object.keys(p.specs || {}).map(k => ({ key: k, val: String(p.specs[k] == null ? '' : p.specs[k]) })),
     };
     selectSidebarItem('sale-product-form');
   } catch (e) {
@@ -9158,6 +9161,14 @@ function renderSaleProductForm() {
   html += '</div></div>';
   html += '</div></div>';
 
+  // Блок 2.5: Характеристики (specs_json) — видны в карточке и в КП
+  html += '<div class="sales-form-section">';
+  html += '<div class="sales-form-title">Характеристики <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(показываются в карточке и под позицией в КП)</span></div>';
+  html += '<div id="spf-specs-list"></div>';
+  html += '<button class="btn btn-secondary" onclick="addSpfSpec()" style="width: 100%; justify-content: center; margin-top: 10px;">' +
+          '<i class="ti ti-plus"></i> Добавить характеристику</button>';
+  html += '</div>';
+
   // Блок 3: Привязка к сборкам
   html += '<div class="sales-form-section">';
   html += '<div class="sales-form-title">Связанные сборочные позиции <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально, можно не привязывать — для услуг)</span></div>';
@@ -9206,6 +9217,41 @@ function renderSaleProductForm() {
       state.saleProductForm.category_id = v ? parseInt(v) : null;
     });
   }
+  _renderSpfSpecs();
+}
+
+// --- Характеристики позиции (specs_json) ---
+function _renderSpfSpecs() {
+  const box = document.getElementById('spf-specs-list');
+  if (!box) return;
+  const specs = state.saleProductForm.specs || [];
+  if (!specs.length) {
+    box.innerHTML = '<div class="linked-empty">Характеристик нет. Добавьте — они появятся в карточке и под позицией в КП.</div>';
+    return;
+  }
+  box.innerHTML = specs.map((row, i) =>
+    '<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">' +
+      '<input type="text" placeholder="Параметр (напр. Холодопроизводительность)" value="' + escapeHtml(row.key || '') + '" oninput="updateSpfSpec(' + i + ',\'key\',this.value)" style="flex:1; min-width:0;">' +
+      '<input type="text" placeholder="Значение (напр. 2,73 кВт)" value="' + escapeHtml(row.val || '') + '" oninput="updateSpfSpec(' + i + ',\'val\',this.value)" style="flex:1; min-width:0;">' +
+      '<button class="lm-remove" onclick="removeSpfSpec(' + i + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
+    '</div>'
+  ).join('');
+}
+
+function addSpfSpec() {
+  if (!Array.isArray(state.saleProductForm.specs)) state.saleProductForm.specs = [];
+  state.saleProductForm.specs.push({ key: '', val: '' });
+  _renderSpfSpecs();
+}
+
+function updateSpfSpec(i, field, value) {
+  const s = state.saleProductForm.specs;
+  if (s && s[i]) s[i][field] = value;
+}
+
+function removeSpfSpec(i) {
+  const s = state.saleProductForm.specs;
+  if (s) { s.splice(i, 1); _renderSpfSpecs(); }
 }
 
 function setSaleProductType(t) {
@@ -9234,6 +9280,14 @@ async function submitSaleProductForm() {
     return;
   }
 
+  // характеристики (key/val строки) → плоский словарь specs
+  const specsObj = {};
+  (f.specs || []).forEach(row => {
+    const k = (row.key || '').trim();
+    const v = (row.val || '').trim();
+    if (k && v) specsObj[k] = v;
+  });
+
   const payload = {
     name: f.name.trim(),
     description: f.description.trim(),
@@ -9241,6 +9295,7 @@ async function submitSaleProductForm() {
     unit: f.unit,
     category_id: f.category_id || null,    // ЭТАП 17
     linked_model_ids: f.linkedModels.map(lm => lm.model_id),
+    specs: specsObj,                        // → specs_json
   };
 
   if (f.base_price !== '' && f.base_price !== null) {
