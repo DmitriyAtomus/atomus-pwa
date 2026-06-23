@@ -157,7 +157,7 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 var cfCb=null,cfNoCb=null;
 function ask(t,x,cb,noCb){$('cfT').textContent=t;$('cfX').textContent=x;cfCb=cb;cfNoCb=noCb||null;$('mask').classList.add('show')}
 $('cfOk').onclick=function(){$('mask').classList.remove('show');var f=cfCb;cfCb=null;cfNoCb=null;if(f)f()};$('cfNo').onclick=function(){$('mask').classList.remove('show');var f=cfNoCb;cfCb=null;cfNoCb=null;if(f)f()};
-function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0">'+esc(it.label)+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
+function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0'+(it.used?';opacity:.6':'')+'">'+esc(it.label)+(it.note?'<span class="tag" style="background:rgba(22,183,219,.16);border:1px solid #16B7DB;color:#9be0f5">✓ '+esc(it.note)+'</span>':'')+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
 $('chNo').onclick=function(){$('chMask').classList.remove('show')};
 function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},2400)}
 
@@ -852,6 +852,9 @@ function termEquip(){
   (P.sensors||[]).forEach(function(s){var q=s.qty||1;for(var k=0;k<q;k++){var nm=s.name+(q>1?(' #'+(k+1)):'');items.push({label:nm+' · '+s.sig, tag:'sig', value:{name:nm, line:s.sig}});}});
   if(P.controller&&P.controller.model)items.push({label:'Контроллер · '+P.controller.model, value:{name:'Контроллер '+P.controller.model, line:''}});
   if(P.hmi&&P.hmi.model)items.push({label:'Панель HMI · '+P.hmi.model, value:{name:'Панель HMI '+P.hmi.model, line:'RS-485'}});
+  // пометить уже назначенные на клеммы (показать, на какой клемме)
+  var byName={}; (P.terminals||[]).forEach(function(t){ if(t.name){(byName[t.name]=byName[t.name]||[]).push(t.term||'');} });
+  items.forEach(function(it){ var u=byName[it.value.name]; if(u&&u.length){ it.used=true; it.note='уже: '+u.filter(Boolean).join(', '); } });
   return items;
 }
 function termPick(i){
