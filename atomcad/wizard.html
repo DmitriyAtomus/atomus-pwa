@@ -550,8 +550,22 @@ function auxCat(kind){return AUX_CATALOG.filter(function(x){return x.kind===kind
 function auxKindLabel(k){return auxCat(k).label;}
 function auxKindOptions(sel){return AUX_CATALOG.map(function(x){return '<option value="'+x.kind+'"'+(x.kind===sel?' selected':'')+'>'+esc(x.label)+'</option>'}).join('');}
 function auxPrefix(kind){return auxCat(kind).prefix;}
+/* коммутирующие аппараты — у них указывается «что коммутирует» (нагрузка) */
+function auxSwitches(kind){return kind==='contactor'||kind==='relay'||kind==='ssr';}
 function nextAuxNum(pref,exceptId){var max=0;(P.aux||[]).forEach(function(a){if(exceptId&&a.id===exceptId)return;if(a.tag){var m=String(a.tag).match(/^(.+?)(\d+)$/);if(m&&m[1].toUpperCase()===pref.toUpperCase())max=Math.max(max,+m[2]);}});return max+1;}
 function auxTagFor(kind,exceptId){var p=auxPrefix(kind);return p+nextAuxNum(p,exceptId);}
+/* группировка аппаратов «по роду»: одинаковые обозначения рядом (K1,K2,K3…), порядок групп — как в каталоге */
+function auxKindOrder(kind){for(var i=0;i<AUX_CATALOG.length;i++)if(AUX_CATALOG[i].kind===kind)return i;return 99;}
+function auxNumOf(tag){var m=String(tag||'').match(/(\d+)\s*$/);return m?+m[1]:0;}
+function sortAux(){
+  if(!P.aux)return;
+  P.aux.forEach(function(a){if(!a.tag)a.tag=auxTagFor(a.kind||'other',a.id);});
+  P.aux.sort(function(x,y){
+    var ox=auxKindOrder(x.kind), oy=auxKindOrder(y.kind);
+    if(ox!==oy)return ox-oy;                 // сначала по роду (каталожный порядок)
+    return auxNumOf(x.tag)-auxNumOf(y.tag);  // внутри рода — по номеру
+  });
+}
 /* ---- УГО (условные графические обозначения) ---- */
 function _ut(x,y,s){return '<text x="'+x+'" y="'+y+'" font-size="6" fill="#7A8896" font-family="IBM Plex Mono" text-anchor="middle">'+s+'</text>';}
 function _noC(x,t,b){return '<line x1="'+x+'" y1="9" x2="'+x+'" y2="20"/><line x1="'+x+'" y1="20" x2="'+(x+8)+'" y2="27"/><line x1="'+x+'" y1="30" x2="'+x+'" y2="43"/>'+_ut(x,7,t)+_ut(x,50,b);}
@@ -626,7 +640,7 @@ function auxSym(kind){
 }
 function pAux(){
   ensureApparatus();
-  (P.aux||[]).forEach(function(a){if(!a.tag)a.tag=auxTagFor(a.kind||'other',a.id);});
+  sortAux();   // группируем по роду: K1,K2,K3… рядом
   var h=H('Шаг 5','Аппараты в шкафу','Контакторы, реле, переключатели, лампы и т.д. — выбери из каталога (с обозначением и схемным символом) или внеси вручную. Строку можно отредактировать (✎).');
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Каталог аппаратов — клик добавляет</div><div class="grid g3" style="margin-bottom:14px">';
   AUX_CATALOG.forEach(function(c){h+='<div class="card cardpick" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromCatalog(\''+c.kind+'\')">'+auxSym(c.kind)+'<span style="min-width:0"><span class="cname" style="font-size:12.5px;display:block">'+esc(c.label)+'</span><span class="ccode">'+esc(c.prefix)+'· '+esc(c.model||'вручную')+'</span></span></div>';});
@@ -648,13 +662,13 @@ function pAux(){
          '<input style="flex:1;min-width:130px;'+FLDST+'" value="'+esc(a.name)+'" placeholder="наименование" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
          '<input style="width:140px;'+FLDST+';font-family:\'IBM Plex Mono\'" value="'+esc(a.model||'')+'" placeholder="марка / модель" onchange="editAuxField(\''+a.id+'\',\'model\',this.value)">'+
          '<select style="'+FLDST+'" onchange="editAuxField(\''+a.id+'\',\'kind\',this.value)">'+auxKindOptions(a.kind)+'</select>'+
-         (a.kind==='contactor'?'<select style="'+FLDST+'" title="что коммутирует контактор" onchange="editAuxField(\''+a.id+'\',\'target\',this.value)">'+consumerOptions(a.target)+'</select>':'')+
+         (auxSwitches(a.kind)?'<select style="'+FLDST+'" title="что коммутирует" onchange="editAuxField(\''+a.id+'\',\'target\',this.value)">'+consumerOptions(a.target)+'</select>':'')+
          '<input inputmode="decimal" style="width:60px;'+FLDST+'" value="'+(a.a||'')+'" placeholder="А" onchange="editAuxField(\''+a.id+'\',\'a\',this.value)">'+
          '<input inputmode="numeric" style="width:54px;'+FLDST+'" value="'+(a.qty||1)+'" title="кол-во" onchange="editAuxField(\''+a.id+'\',\'qty\',this.value)">'+
          '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
          '<button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }else{
-      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(a.kind==='contactor'?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(auxSwitches(a.kind)?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }
   });
   return h;}
