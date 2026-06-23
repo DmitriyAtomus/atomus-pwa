@@ -53,7 +53,11 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
   color:var(--dim);padding:13px 14px 7px}
 .lib-list{flex:1;overflow-y:auto;padding:0 8px 10px}
 .grp{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
-  padding:10px 8px 4px}
+  padding:10px 8px 4px;display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;user-select:none}
+.grp:hover{color:var(--txt)}
+.grpchev{font-size:9px;transition:transform .12s ease;flex:0 0 auto;margin-left:6px}
+.grp.collapsed .grpchev{transform:rotate(-90deg)}
 .it{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;cursor:pointer;
   font-size:12px;color:var(--txt)}
 .it:hover{background:var(--cyandim)}
@@ -1318,15 +1322,30 @@ function symbolIcon(id){
   h+='</svg>';
   return h;
 }
+function _grpColl(){try{return JSON.parse(localStorage.getItem('atomcad_grp_collapsed')||'{}')}catch(e){return {}}}
 function buildPalette(){
-  var h='';
-  PALETTE.forEach(function(g){
-    h+='<div class="grp">'+g[0]+'</div>';
+  var h='', coll=_grpColl();
+  PALETTE.forEach(function(g,gi){
+    var col=!!coll[gi];
+    h+='<div class="grp'+(col?' collapsed':'')+'" data-grp="'+gi+'"><span>'+g[0]+'</span><span class="grpchev">▾</span></div>';
+    h+='<div class="grpitems" data-gi="'+gi+'"'+(col?' style="display:none"':'')+'>';
     g[1].forEach(function(id){
       h+='<div class="it" data-sym="'+id+'"><span class="sym">'+symbolIcon(id)+'</span>'+SYM[id].name+'</div>';
     });
+    h+='</div>';
   });
   $('libList').innerHTML=h;
+  // сворачивание групп библиотеки (Коммутация, Защита и т.д.)
+  Array.prototype.forEach.call(document.querySelectorAll('.grp[data-grp]'),function(g){
+    g.addEventListener('click',function(){
+      var gi=g.getAttribute('data-grp');
+      var items=$('libList').querySelector('.grpitems[data-gi="'+gi+'"]');
+      var col=g.classList.toggle('collapsed');
+      if(items)items.style.display=col?'none':'';
+      var st=_grpColl(); st[gi]=col?1:0;
+      try{localStorage.setItem('atomcad_grp_collapsed',JSON.stringify(st))}catch(e){}
+    });
+  });
   Array.prototype.forEach.call(document.querySelectorAll('.it'),function(el){
     el.addEventListener('click',function(){
       startPlace(el.getAttribute('data-sym'));
