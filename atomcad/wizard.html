@@ -82,6 +82,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
     <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
     <button class="tb" onclick="openLibrary()">📂 Мои проекты</button>
     <button class="tb" onclick="saveProject()">⭱ Сохранить</button>
+    <button class="tb" onclick="openSaveAs()">⎘ Сохранить как…</button>
     <button class="tb cy" onclick="openEditor()">Открыть редактор →</button>
   </div>
 </header>
@@ -91,6 +92,12 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="mask"><div class="confirm"><h4 id="cfT">Подтверждение</h4><p id="cfX"></p><div class="r"><button class="no" id="cfNo">Отмена</button><button class="ok" id="cfOk">Подтвердить</button></div></div></div>
 <div class="mask" id="chMask"><div class="confirm" style="max-width:430px"><h4 id="chT">Что подключить</h4><div id="chList" style="display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow:auto;margin-bottom:12px"></div><div class="r"><button class="no" id="chNo" style="flex:1">Отмена</button></div></div></div>
 <div class="mask" id="libMask"><div class="confirm" style="max-width:470px"><h4>Мои проекты</h4><p style="margin-bottom:12px">Проекты сохраняются на сервере — общая библиотека, доступна всем сотрудникам с любого устройства.</p><div id="libList" style="display:flex;flex-direction:column;gap:7px;max-height:48vh;overflow:auto;margin-bottom:12px"></div><div class="r" style="gap:9px"><button class="no" id="libImport" style="flex:1">⭳ Импорт из файла</button><button class="no" id="libClose" style="flex:1">Закрыть</button></div></div></div>
+<div class="mask" id="saveAsMask"><div class="confirm" style="max-width:460px"><h4>Сохранить как…</h4><p style="margin-bottom:12px">Сохранить копию: выбери раздел и задай название. Номер в разделе подставится автоматически.</p>
+  <div class="form" style="margin-bottom:10px"><div class="fld gr"><label>Название</label><input id="saName" placeholder="напр. Приточная установка П-1"></div></div>
+  <div class="form" style="margin-bottom:6px"><div class="fld gr"><label>Раздел</label><select id="saSec" onchange="saSecChange()"></select></div>
+  <div class="fld"><label>Номер</label><input id="saNum" class="w70" inputmode="numeric"></div></div>
+  <div class="note" id="saDes" style="margin-bottom:12px"></div>
+  <div class="r" style="gap:9px"><button class="no" id="saCancel" style="flex:1">Отмена</button><button class="ok" id="saOk" style="flex:1">⭱ Сохранить копию</button></div></div></div>
 <input type="file" id="dsFile" accept=".pdf,image/*" multiple style="display:none">
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
@@ -1231,7 +1238,7 @@ function pSpec(){
   h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th>Поз.</th><th>Наименование</th><th class="c">Кол.</th><th>Примечание</th></tr></thead><tbody>';
   arr.forEach(function(g){h+='<tr><td class="d">'+esc(g.desStr)+'</td><td>'+esc(g.name+(g.manu?' '+g.manu:'')+(g.model?' '+g.model:''))+'</td><td class="c">'+g.qty+'</td><td>'+esc(g.notes.join(' / '))+'</td></tr>'});
   h+='</tbody></table></div><div class="note">Позиций: <b style="color:var(--txt)">'+arr.length+'</b> · изделий: <b style="color:var(--txt)">'+units+'</b> · корпус '+P.enclosure.model+'</div>';
-  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект</button><button class="tb" onclick="openLibrary()">📂 Мои проекты</button><button class="tb" onclick="exportFile()">⭳ Экспорт .json</button></div>';
+  h+='<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap"><button class="tb cy" onclick="openEditor()">Построить схему в редакторе →</button><button class="tb" onclick="saveProject()">⭱ Сохранить проект</button><button class="tb" onclick="openSaveAs()">⎘ Сохранить как…</button><button class="tb" onclick="openLibrary()">📂 Мои проекты</button><button class="tb" onclick="exportFile()">⭳ Экспорт .json</button></div>';
   return h;
 }
 
@@ -1297,6 +1304,37 @@ async function saveProject(){
   if(saveLocal()){$('saveState').textContent='сохранено';secLib=null;toast('Проект сохранён');}
   else toast('Не удалось сохранить');
 }
+
+/* «Сохранить как…» — копия с выбором раздела и названия */
+function openSaveAs(){
+  ensureSections();ensureSecLib();
+  var sel=$('saSec');
+  sel.innerHTML=SECTIONS.map(function(s){return '<option value="'+esc(s[0])+'"'+(s[0]===P.section?' selected':'')+'>'+esc(s[1])+'</option>';}).join('');
+  $('saName').value=P.name||'';
+  $('saNum').value=nextNum(P.section);
+  saDesUpd();
+  $('saveAsMask').classList.add('show');
+  setTimeout(function(){try{$('saName').focus();$('saName').select();}catch(_){}}, 30);
+}
+function saSecChange(){ $('saNum').value=nextNum($('saSec').value); saDesUpd(); }
+function saDesUpd(){
+  var code=$('saSec').value, num=parseInt($('saNum').value,10)||0;
+  $('saDes').innerHTML='Обозначение: <span class="mono" style="color:var(--cyan)">'+esc(code)+'.'+pad3(num)+'.'+esc(P.variant||'1')+'</span> · шифр: <span class="mono">АГ.'+esc(code)+'.'+pad3(num)+'/26</span>';
+}
+document.getElementById('saNum').addEventListener('input',saDesUpd);
+document.getElementById('saCancel').onclick=function(){$('saveAsMask').classList.remove('show');};
+document.getElementById('saOk').onclick=async function(){
+  var name=($('saName').value||'').trim();
+  if(!name){toast('Введи название');return;}
+  var code=$('saSec').value, s=SECTIONS.filter(function(x){return x[0]===code})[0];
+  var num=Math.max(0,parseInt($('saNum').value,10)||nextNum(code));
+  P.name=name;P.nameAuto=false;
+  P.section=code;P.sectionName=s?s[1]:'';P.num=num;
+  P.serverId=null;P.id=uid('prj');          // новая копия — не перезаписываем исходник
+  $('saveAsMask').classList.remove('show');
+  await saveProject();
+  draw();updTag();
+};
 
 /* библиотека: список, открытие, удаление */
 async function openLibrary(){
