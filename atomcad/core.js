@@ -192,33 +192,51 @@ function buildSchematic(P){
   var hasCtrl = !!(P.controller && P.controller.model);
 
   // ===================== ЛИСТ 1 · СИЛОВЫЕ ЦЕПИ =====================
-  var pc=[], pw=[], pt=[], gx=600;
+  var pc=[], pw=[], pt=[], gx=600, kmByName={};   // kmByName — общий для листов 1 и 2 (чтобы контакт KMn = катушка KMn)
   var intro=(P.breakers||[]).filter(function(b){return b.role==='ввод'})[0];
   pc.push(C('X1','term',gx,360,'ЗНИ 6 мм²','','ввод'));
   if(intro){ pc.push(C(intro.code,'qf1',gx,460,'NB1-63 '+intro.poles+'P, C'+intro.rate,'CHINT','ввод')); }
   pw.push(W([gx,360],[gx,460])); pw.push(W([gx,760],[gx,800]));
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
-  var step=720, nB=branches.length, maxX=3850;
-  if(nB>0){ var fit=(maxX-gx)/nB; if(fit<step) step=Math.max(300, Math.floor(fit)); }
-  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1;
-  branches.forEach(function(b,i){
-    var x=bx+i*step;
-    var cons=(P.consumers||[]).filter(function(c){return c.id===b.consumer})[0];
-    var role=(cons?cons.name:b.role);
-    var ph3=(cons&&cons.phases===3);
-    var phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
-    pc.push(C(b.code,'qf1',x,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT',role));
-    pw.push(W([x,800],[x,950]));
-    pt.push({x:x+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                 // фаза линии
-    if(cons&&needsContactor(cons)){
-      pc.push(C('KM'+kmN,'c_no',x,1450,contactorModel(cons),'CHINT',cons.name));
-      pw.push(W([x,1250],[x,1450])); pw.push(W([x,1600],[x,1950]));
-      pt.push({x:x-66,y:1545,s:20,ls:0,anchor:'end',tx:'(л.2)'});     // ссылка на катушку
-      kmN++;
-    } else { pw.push(W([x,1250],[x,1950])); }
-    pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
-    pc.push(C('X'+(i+2),'term',x,2000,'ЗНИ 2,5 мм²','',role));
-    lastX=x;
+  // колонки-отводы: по одной на каждую линию автомата (сгруппированный автомат → несколько колонок)
+  var groups=[], cols=[];
+  branches.forEach(function(b){
+    var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role,cid:b.consumer}];
+    var g={b:b, cols:[]};
+    loads.forEach(function(l){ var col={b:b,l:l}; cols.push(col); g.cols.push(col); });
+    groups.push(g);
+  });
+  var nT=cols.length, step=720, maxX=3850;
+  if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
+  var bx=gx+step, lastX=gx, kmN=1, phI=0, wN=1, termN=2;
+  cols.forEach(function(col,ci){ col.x=bx+ci*step; });
+  groups.forEach(function(g){
+    var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
+    var ph3=(b.poles===3), phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
+    // автомат — один на группу, питание с шины ввода
+    pc.push(C(b.code,'qf1',qfx,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT', grouped?('группа · '+gc.length+' лин.'):gc[0].l.name));
+    pw.push(W([qfx,800],[qfx,950]));
+    pt.push({x:qfx+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                       // фаза(ы) линии
+    if(grouped){
+      pw.push(W([qfx,1250],[qfx,1350]));                                               // отвод автомата на шину распределения
+      pw.push(W([x0,1350],[x1,1350]));                                                 // шина распределения по отводам
+    }
+    gc.forEach(function(col){
+      var x=col.x, cons=(P.consumers||[]).filter(function(c){return c.id===(col.l.cid||b.consumer)})[0];
+      var role=cons?cons.name:(col.l.name||b.role);
+      if(grouped) pw.push(W([x,1350],[x,1450]));                                        // от шины к отводу
+      else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
+      if(cons&&needsContactor(cons)){
+        pc.push(C('KM'+kmN,'c_no',x,1450,contactorModel(cons),'CHINT',cons.name));
+        pw.push(W([x,1600],[x,1950]));
+        pt.push({x:x-66,y:1545,s:20,ls:0,anchor:'end',tx:'(л.2)'});                     // ссылка на катушку (лист 2)
+        if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;                       // тот же номер на листе 2 (катушка)
+        kmN++;
+      } else { pw.push(W([x,1450],[x,1950])); }
+      pt.push({x:x+44,y:1730,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
+      pc.push(C('X'+termN,'term',x,2000,'ЗНИ 2,5 мм²','',role)); termN++;
+      lastX=x;
+    });
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
   pt.push({x:gx-10,y:780,s:24,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины
@@ -230,8 +248,8 @@ function buildSchematic(P){
     var ac=[], aw=[], at=[];
     var io=P.controller.io||{}, G=_ctrlGeom(io), cz=1900, ctrlY=900;
     at.push({x:300,y:235,s:38,tx:'ЦЕПИ УПРАВЛЕНИЯ · АВТОМАТИКА'});
-    var kmByName={}, kmc=1;
-    (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; if(!(c.name in kmByName)) kmByName[c.name]='KM'+kmc; kmc+=q; } });
+    // kmByName уже заполнен на листе 1 (контакт KMn ↔ катушка KMn). Подстраховка, если контакт не нарисован:
+    var kmc=kmN; (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; if(!(c.name in kmByName)) kmByName[c.name]='KM'+kmc; kmc+=q; } });
     // питание управления (приходит с силового листа) + автомат управления
     ac.push(C('X0','term',cz,250,'L · N','','питание ← лист 1 (силовая)'));
     var cq=(P.breakers||[]).filter(function(bb){return bb.role==='цепи управления'})[0];
