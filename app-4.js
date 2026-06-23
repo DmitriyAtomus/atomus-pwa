@@ -4358,9 +4358,10 @@ async function showAssemblyQr(assemblyId, modelName, modelArticle, assemblyDate)
 // v2.45.331/332: окно-предпросмотр перед пакетной печатью — список того, что
 // распечатается (сборки + покупное), у каждой строки кнопка «убрать из печати».
 // Возвращает Promise<{ready:[...], comp:[...]}> (что печатать) или null (отмена).
-function _confirmBatchPrintModal(readyList, compList) {
+function _confirmBatchPrintModal(readyList, compList, boxList) {
   readyList = readyList || [];
   compList = compList || [];
+  boxList = boxList || [];
   return new Promise((resolve) => {
     let m = document.getElementById('batch-print-modal');
     if (m) m.remove();
@@ -4369,6 +4370,7 @@ function _confirmBatchPrintModal(readyList, compList) {
     m.className = 'modal-overlay visible';
     const removedAsm = new Set();
     const removedComp = new Set();
+    const removedBox = new Set();
     const qtyOf = (it) => Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
     const headStyle = 'font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-light);font-weight:600;margin:12px 0 4px;';
     const delBtn = '<button class="bp-del" title="Убрать из печати" style="background:none;border:none;color:#B91C1C;cursor:pointer;padding:2px 4px;flex-shrink:0;font-size:15px;"><i class="ti ti-trash"></i></button>';
@@ -4393,6 +4395,12 @@ function _confirmBatchPrintModal(readyList, compList) {
         listHtml += rowHtml('comp', it.id, escapeHtml(it.name || ('Позиция #' + it.id)), qtyOf(it) + ' шт');
       });
     }
+    if (boxList.length) {
+      listHtml += '<div style="' + headStyle + '">Коробки (QR коробки вместо вложенных сборок)</div>';
+      boxList.forEach((b) => {
+        listHtml += rowHtml('box', b.id, escapeHtml(b.name || ('Коробка #' + b.id)), 'коробка');
+      });
+    }
     m.innerHTML =
       '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
         '<div class="modal-header"><h3><i class="ti ti-printer"></i> Печать QR-наклеек</h3>' +
@@ -4410,6 +4418,7 @@ function _confirmBatchPrintModal(readyList, compList) {
     document.body.appendChild(m);
     const calcTotal = () =>
       readyList.filter(x => !removedAsm.has(x.id)).length +
+      boxList.filter(x => !removedBox.has(x.id)).length +
       compList.filter(x => !removedComp.has(x.id)).reduce((acc, it) => acc + qtyOf(it), 0);
     const refresh = () => {
       const t = calcTotal();
@@ -4427,7 +4436,9 @@ function _confirmBatchPrintModal(readyList, compList) {
         const row = btn.closest('.bp-row');
         if (!row) return;
         const id = Number(row.getAttribute('data-id'));
-        if (row.getAttribute('data-kind') === 'asm') removedAsm.add(id);
+        const kind = row.getAttribute('data-kind');
+        if (kind === 'asm') removedAsm.add(id);
+        else if (kind === 'box') removedBox.add(id);
         else removedComp.add(id);
         row.remove();
         refresh();
@@ -4439,8 +4450,9 @@ function _confirmBatchPrintModal(readyList, compList) {
     m.querySelector('#bp-ok').onclick = () => {
       const selReady = readyList.filter(x => !removedAsm.has(x.id));
       const selComp = compList.filter(x => !removedComp.has(x.id));
-      if (!selReady.length && !selComp.length) { cleanup(null); return; }
-      cleanup({ ready: selReady, comp: selComp });
+      const selBoxes = boxList.filter(x => !removedBox.has(x.id));
+      if (!selReady.length && !selComp.length && !selBoxes.length) { cleanup(null); return; }
+      cleanup({ ready: selReady, comp: selComp, boxes: selBoxes });
     };
     m.onclick = (e) => { if (e.target === m) cleanup(null); };
     refresh();
@@ -4479,17 +4491,28 @@ async function batchPrintContractQrs(contractId) {
   );
   const compQtySum = compItems.reduce((acc, it) =>
     acc + Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1))), 0);
-  const total = ready.length + compQtySum;
+  // Коробки договора: сборки, уже упакованные в коробку, по отдельности не печатаем —
+  // вместо них печатаем QR самой коробки (он покрывает её содержимое).
+  let boxes = [];
+  let packed = new Set();
+  try {
+    const bm = await apiGet('/api/contracts/' + contractId + '/box-map');
+    boxes = (bm && bm.boxes) || [];
+    packed = new Set((bm && bm.packed_assembly_ids) || []);
+  } catch (e) { /* нет данных по коробкам — печатаем как раньше */ }
+  const readyUnpacked = ready.filter(a => !packed.has(a.id));
+  const total = readyUnpacked.length + compQtySum + boxes.length;
   if (total === 0) {
-    showToast('Нет готовых сборок и компонентов в резерве для печати', 'error');
+    showToast('Нет готовых сборок, коробок и компонентов в резерве для печати', 'error');
     return;
   }
   // v2.45.331/332: окно со списком + возможность убрать отдельные наклейки
-  const _sel = await _confirmBatchPrintModal(ready, compItems);
+  const _sel = await _confirmBatchPrintModal(readyUnpacked, compItems, boxes);
   if (!_sel) return;
   const selReady = _sel.ready;
   const selComp = _sel.comp;
-  const selTotal = selReady.length + selComp.reduce((acc, it) => acc + Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1))), 0);
+  const selBoxes = _sel.boxes || [];
+  const selTotal = selReady.length + selBoxes.length + selComp.reduce((acc, it) => acc + Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1))), 0);
   if (selTotal === 0) return;
 
   showToast('Отправляем ' + selTotal + ' заданий…', 'info');
@@ -4563,6 +4586,19 @@ async function batchPrintContractQrs(contractId) {
       selComp.forEach(it => failed.push({
         id: it.id, name: it.component_name || it.name, err: 'нет токена договора',
       }));
+    }
+  }
+
+  // Коробки → QR коробки (ссылка /b/{qr_token})
+  for (const b of selBoxes) {
+    try {
+      const url = window.location.origin + '/b/' + b.qr_token;
+      const caption = ('Дог.' + (c.contract_number || ('#' + c.id)) + ' · ' + (b.name || ('Коробка #' + b.id))).slice(0, 80);
+      const resp = await apiPost('/api/labels/print', { qr_url: url, caption: caption, copies: 1 });
+      if (resp && resp.ok) ok++;
+      else failed.push({ id: b.id, name: b.name });
+    } catch (e) {
+      failed.push({ id: b.id, name: b.name, err: e && e.message });
     }
   }
 
