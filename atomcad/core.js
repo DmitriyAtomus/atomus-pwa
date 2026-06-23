@@ -58,6 +58,19 @@ function lvSupplies(P){
   return out;
 }
 
+// ток цепи управления: контроллер (0.8А база) + катушки контакторов/ТР/реле (~0.05А)
+// + реальные потребители управления (лампы/кнопки/переключатели/грибок/вентилятор шкафа).
+// НЕ нагружают цепь управления силовые аппараты: БП (свой автомат), частотники, автоматы, прочее силовое.
+function controlCurrent(P){
+  var CTRL_LOAD={lamp:1,button:1,switch:1,estop:1,fan:1};
+  var a = 0.8 + (P&&P.aux||[]).reduce(function(s,x){
+    if(x.kind==='contactor'||x.kind==='ssr'||x.kind==='relay') return s+0.05*(x.qty||1);
+    if(CTRL_LOAD[x.kind]) return s+(+x.a||0)*(x.qty||1);
+    return s;
+  },0);
+  return +a.toFixed(1);
+}
+
 // автоматы из состава: ввод + по группам потребителей + управление
 function buildBreakers(P){
   var b=[], n=1;
@@ -84,16 +97,9 @@ function buildBreakers(P){
             role:'питание '+p.volt+'В (БП '+p.ratingW+'Вт)',
             loads:[{name:'БП '+p.volt+'В · нагрузка '+p.sumW+' Вт', a:p.primaryA}], psu:p.volt}); n++;
   });
-  // управление — ток цепи управления: контроллер + катушки + сигнальные лампы/кнопки + вентилятор шкафа.
-  // НЕ нагружают цепь управления: коммутируемый ток контакторов/ТР/реле (это катушки ~0.05А),
-  // силовые БП (свой автомат), частотники/автоматы/прочее силовое — их ток идёт по силовым цепям, не сюда.
-  var CTRL_LOAD={lamp:1,button:1,switch:1,estop:1,fan:1};
-  var ctrlA = 0.8 + P.aux.reduce(function(s,a){
-    if(a.kind==='contactor'||a.kind==='ssr'||a.kind==='relay') return s+0.05*(a.qty||1);   // только ток катушки/управления
-    if(CTRL_LOAD[a.kind]) return s+(+a.a||0)*(a.qty||1);                                    // реальные потребители цепи управления — по своему току
-    return s;                                                                              // psu/vfd/breaker/other — силовые, на цепь управления не вешаем
-  },0);
-  b.push({id:'QF'+n, code:'QF'+n, poles:1, rate:stdRating(ctrlA*1.25)||4, role:'цепи управления', loads:[{name:'Контроллер + вспом.', a:+ctrlA.toFixed(1)}]});
+  // управление — ток цепи управления (см. controlCurrent): контроллер + катушки + сигнальные лампы/кнопки + вентилятор шкафа
+  var ctrlA = controlCurrent(P);
+  b.push({id:'QF'+n, code:'QF'+n, poles:1, rate:stdRating(ctrlA*1.25)||4, role:'цепи управления', loads:[{name:'Контроллер + вспом.', a:ctrlA}]});
   return b;
 }
 function breakerSum(b){ return +(b.loads||[]).reduce(function(s,l){return s+(+l.a||0)},0).toFixed(1); }
@@ -378,7 +384,7 @@ function buildSchematic(P){
 
 g.AtomCore={
   STD:STD, consumerCurrent:consumerCurrent, stdRating:stdRating, ratingFor:ratingFor,
-  buildBreakers:buildBreakers, breakerSum:breakerSum, breakerStatus:breakerStatus,
+  buildBreakers:buildBreakers, controlCurrent:controlCurrent, breakerSum:breakerSum, breakerStatus:breakerStatus,
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
   buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,

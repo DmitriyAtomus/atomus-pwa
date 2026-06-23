@@ -748,7 +748,14 @@ function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[
 function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'',q=c.qty||1;if(q>1){for(var k=0;k<q;k++){var n=nm+' #'+(k+1);o+='<option value="'+esc(n)+'"'+(sel===n?' selected':'')+'>'+esc(n)+'</option>';}}else{o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';}});return o;}
 
 /* 6 автоматы */
-function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
+function ensureBreakers(){
+  if(!P.breakers)P.breakers=C.buildBreakers(P);
+  // подстраховка: пересчитать ток цепи управления у уже сохранённых щитов (старые проекты могли держать завышенное значение),
+  // не трогая ручные объединения/номиналы — обновляем только сам ток нагрузки «Контроллер + вспом.»
+  if(C.controlCurrent){var _ca=C.controlCurrent(P);
+    P.breakers.forEach(function(b){(b.loads||[]).forEach(function(l){ if(l.name&&l.name.indexOf('Контроллер')===0 && l.a!==_ca){ l.a=_ca; } });});
+  }
+}
 function pBreakers(){
   ensureBreakers();
   var h=H('Шаг 6','Автоматы · распределение','Собраны из состава: ток на каждом считается, проверяется по номиналу. Меняй номинал ±, объединяй несколько линий на один автомат или выноси обратно, добавляй нагрузки — перегруз подсветит.');
