@@ -1587,7 +1587,17 @@ function restoreSession(){
   }catch(_){}
   return 0;
 }
-function draw(){$('panel').innerHTML=PANELS[cur]();document.querySelector('.wrap').scrollTop=0;var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}persistSession();}
+var lastDrawnCur=-1;
+function draw(){
+  var wrap=document.querySelector('.wrap');
+  var keep=(cur===lastDrawnCur);                         // тот же шаг → сохраняем прокрутку (без «прыжка»)
+  var st=(keep&&wrap)?wrap.scrollTop:0;
+  $('panel').innerHTML=PANELS[cur]();
+  if(wrap)wrap.scrollTop=st;                             // смена шага → 0 (наверх), внутри шага → как было
+  lastDrawnCur=cur;
+  var ei=$('secEditInput');if(ei){ei.focus();try{ei.setSelectionRange(ei.value.length,ei.value.length)}catch(_){}}
+  persistSession();
+}
 function go(i){cur=Math.max(0,Math.min(STEPS.length-1,i));$('prev').disabled=cur===0;$('next').textContent=cur===STEPS.length-1?'Готово ✓':'Далее →';steps();draw()}
 $('prev').onclick=function(){go(cur-1)};$('next').onclick=function(){go(cur+1)};
 var _startStep=restoreSession();updTag();steps();go(_startStep);
