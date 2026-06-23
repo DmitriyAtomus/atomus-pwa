@@ -557,6 +557,7 @@ function auxTagFor(kind,exceptId){var p=auxPrefix(kind);return p+nextAuxNum(p,ex
 /* группировка аппаратов «по роду»: одинаковые обозначения рядом (K1,K2,K3…), порядок групп — как в каталоге */
 function auxKindOrder(kind){for(var i=0;i<AUX_CATALOG.length;i++)if(AUX_CATALOG[i].kind===kind)return i;return 99;}
 function auxNumOf(tag){var m=String(tag||'').match(/(\d+)\s*$/);return m?+m[1]:0;}
+function auxPfxNum(tag){var m=String(tag||'').match(/^(.*?)(\d+)\s*$/);return m?[m[1],+m[2]]:[String(tag||''),0];}
 function sortAux(){
   if(!P.aux)return;
   P.aux.forEach(function(a){if(!a.tag)a.tag=auxTagFor(a.kind||'other',a.id);});
@@ -564,6 +565,16 @@ function sortAux(){
     var ox=auxKindOrder(x.kind), oy=auxKindOrder(y.kind);
     if(ox!==oy)return ox-oy;                 // сначала по роду (каталожный порядок)
     return auxNumOf(x.tag)-auxNumOf(y.tag);  // внутри рода — по номеру
+  });
+  // сквозная перенумерация внутри рода: K1,K2,K3… / ТР1,ТР2… (ручные обозначения не трогаем, их номера резервируем)
+  var used={};
+  P.aux.forEach(function(a){if(a.tagManual){var pr=auxPfxNum(a.tag);(used[pr[0]]||(used[pr[0]]={}))[pr[1]]=1;}});
+  var cnt={};
+  P.aux.forEach(function(a){
+    if(a.tagManual)return;
+    var p=auxPrefix(a.kind), n=(cnt[p]||0)+1;
+    while(used[p]&&used[p][n])n++;
+    cnt[p]=n; a.tag=p+n;
   });
 }
 /* ---- УГО (условные графические обозначения) ---- */
@@ -718,7 +729,7 @@ function addAux(){var n=$('aN').value.trim();if(!n){toast('Введи наиме
 function rmAux(id){P.aux=P.aux.filter(function(a){return a.id!==id});if(editAux===id)editAux=null;dirty();draw()}
 function startEditAux(id){editAux=id;draw()}
 function doneEditAux(){editAux=null;draw()}
-function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag')a.tag=(v||'').trim();else if(f==='kind')a.kind=v;else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();else if(f==='model')a.model=(v||'').trim();else if(f==='manu')a.manu=(v||'').trim();dirty();}
+function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag'){v=(v||'').trim();if(v){a.tag=v;a.tagManual=true;}else{a.tag='';a.tagManual=false;}}else if(f==='kind'){a.kind=v;a.tagManual=false;}else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();else if(f==='model')a.model=(v||'').trim();else if(f==='manu')a.manu=(v||'').trim();dirty();}
 // варианты «что коммутирует контактор» — список потребителей
 function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'';o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';});return o;}
 
@@ -742,10 +753,10 @@ function pBreakers(){
          (b.fixed?'':'<button class="rm" title="убрать линию" onclick="bRm('+bi+','+li+')">✕</button>')+'</span>';
     });
     h+='<button class="lchip" style="cursor:pointer;color:var(--cyan)" onclick="bAddLoad('+bi+')">+ нагрузка</button>';
-    // объединение нескольких линий на один автомат (одинаковая полюсность, кроме ввода/управления/БП)
-    if(!b.fixed && b.role!=='цепи управления' && !b.psu){
+    // объединение нескольких линий на один автомат (одинаковая полюсность; нельзя только сам ввод)
+    if(!b.fixed){
       var tgts=[];
-      P.breakers.forEach(function(x,xi){ if(xi!==bi && !x.fixed && x.role!=='цепи управления' && !x.psu && x.poles===b.poles) tgts.push({xi:xi,code:x.code}); });
+      P.breakers.forEach(function(x,xi){ if(xi!==bi && !x.fixed && x.poles===b.poles) tgts.push({xi:xi,code:x.code}); });
       if(tgts.length){
         h+='<select class="lchip" style="color:var(--cyan);background:transparent;border:1px dashed var(--cyan);cursor:pointer" onchange="bMerge('+bi+',this.value);this.value=\'\'">'+
            '<option value="">⤵ объединить с…</option>'+
