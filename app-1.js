@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.470-atomcad-save-as";
+const APP_VERSION = "v2.45.471";
 const APP_VERSION_DATE = "23.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -12168,14 +12168,33 @@ function _offerProductionTreeHtml(st) {
   if ((byDir[0] || []).length) html += renderDir(0, 'Без направления', byDir[0]);
   return html + '</div>';
 }
+// v2.45.x: характеристики модели → строка для расшифровки позиции КП
+function _modelCharsLine(m) {
+  if (!m || !m.characteristics) return '';
+  let obj;
+  try { obj = (typeof m.characteristics === 'string') ? JSON.parse(m.characteristics) : m.characteristics; }
+  catch (e) { return ''; }
+  if (!obj || !Array.isArray(obj.sections)) return '';
+  const parts = [];
+  obj.sections.forEach(s => {
+    (s.items || []).forEach(it => {
+      const k = (it.key || '').trim(), v = (it.value || '').trim();
+      if (v) parts.push(k ? (k + ' ' + v) : v);
+    });
+  });
+  return parts.join(' · ');
+}
+
 function pickModelForOffer(modelId) {
   const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId);
   if (!m) return;
   const label = (m.article ? m.article + ' · ' : '') + (m.name || '');
+  // v2.45.x: подставляем характеристики модели в расшифровку (видно в КП и PDF)
+  const specLine = _modelCharsLine(m);
   state.offerForm.items.push({
     sale_product_id: null,
     name: label,
-    description: m.extra || m.description || '',
+    description: specLine || m.extra || m.description || '',
     unit: 'шт.',
     qty: 1,
     price: Number(m.base_price) || 0,
