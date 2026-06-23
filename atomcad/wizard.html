@@ -732,7 +732,7 @@ function doneEditAux(){editAux=null;draw()}
 /* «что коммутирует» — несколько нагрузок (приточный + вытяжной и т.д.) */
 function auxTargets(a){ if(Array.isArray(a.targets))return a.targets; a.targets=(a.target?String(a.target).split(/\s*,\s*/).filter(Boolean):[]); return a.targets; }
 function auxTargetsSync(a){ a.target=auxTargets(a).join(', '); }
-function editAuxAddTarget(id,name){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;name=(name||'').trim();if(!name)return;var tg=auxTargets(a);if(tg.indexOf(name)<0)tg.push(name);auxTargetsSync(a);dirty();draw();}
+function editAuxAddTarget(id,name){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;name=(name||'').trim();if(!name)return;auxTargets(a).push(name);auxTargetsSync(a);dirty();draw();}
 function editAuxRmTarget(id,i){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;auxTargets(a).splice(i,1);auxTargetsSync(a);dirty();draw();}
 function auxTargetsEditor(a){
   var tg=auxTargets(a),h='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 6px;background:var(--graphite);min-width:200px">';
@@ -743,7 +743,7 @@ function auxTargetsEditor(a){
 }
 function editAuxField(id,f,v){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;if(f==='name')a.name=v;else if(f==='tag'){v=(v||'').trim();if(v){a.tag=v;a.tagManual=true;}else{a.tag='';a.tagManual=false;}}else if(f==='kind'){a.kind=v;a.tagManual=false;}else if(f==='a')a.a=parseFloat(v)||0;else if(f==='qty')a.qty=Math.max(1,parseInt(v,10)||1);else if(f==='target')a.target=(v||'').trim();else if(f==='model')a.model=(v||'').trim();else if(f==='manu')a.manu=(v||'').trim();dirty();}
 // варианты «что коммутирует контактор» — список потребителей
-function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'';o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';});return o;}
+function consumerOptions(sel){var o='<option value="">— назначение (что коммутирует) —</option>';(P.consumers||[]).forEach(function(c){var nm=c.name||'',q=c.qty||1;if(q>1){for(var k=0;k<q;k++){var n=nm+' #'+(k+1);o+='<option value="'+esc(n)+'"'+(sel===n?' selected':'')+'>'+esc(n)+'</option>';}}else{o+='<option value="'+esc(nm)+'"'+(sel===nm?' selected':'')+'>'+esc(nm)+'</option>';}});return o;}
 
 /* 6 автоматы */
 function ensureBreakers(){if(!P.breakers)P.breakers=C.buildBreakers(P)}
