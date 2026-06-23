@@ -890,6 +890,7 @@ function termPick(i){
 /* 8 компоновка */
 function pCabinet(){
   ensureBreakers();
+  if(typeof sortAux==='function')sortAux();   // нормализуем обозначения аппаратов (K→KM)
   if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
   if(!P.cab)P.cab={w:'',ht:'',d:'',name:'',drawn:false};
   var mods=C.moduleCount(P), enc=P.enclosure, fits=enc.modules>=mods, free=enc.modules-mods;
@@ -1336,7 +1337,7 @@ function setEncl(m){P.enclosure=C.ENCL.filter(function(e){return e.model===m})[0
 
 /* 9 спецификация */
 function pSpec(){
-  ensureBreakers();if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
+  ensureBreakers();if(typeof sortAux==='function')sortAux();if(!P.enclosure)P.enclosure=C.pickEnclosure(P);
   var arr=C.buildSpec(P);
   var h=H('Шаг 9','Спецификация','Перечень элементов собран из всего состава с группировкой. Сохрани проект или открой редактор — схема построится из этих данных.');
   var units=0;arr.forEach(function(g){units+=g.qty});
@@ -1612,6 +1613,7 @@ $('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new 
 /* ---- передача схемы в редактор ---- */
 function openEditor(){
   ensureBreakers();
+  if(typeof sortAux==='function')sortAux();   // нормализуем обозначения аппаратов (K→KM и т.п.) перед построением схемы
   var sch=C.buildSchematic(P);
   try{parent.postMessage({atomcad:'build-open', name:P.name, code:'АГ.'+P.section+'.'+('00'+P.num).slice(-3)+'/26', schematic:sch},'*');}catch(_){}
   toast('Схема построена — открываю редактор');
