@@ -4566,9 +4566,12 @@ async function batchPrintContractQrs(contractId) {
         const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
         const unit = _ccUnitLabel(it);
         const caption = ('Дог.' + contractNum + ' · ' + itName + ' · 1 ' + unit).slice(0, 80);
+        // v2.45.x: QR покупной позиции = /c/{токен}?item=ID — скан отгружает
+        // именно эту позицию (а не «вообще договор»).
+        const itemUrl = contractUrl + '?item=' + it.id;
         try {
           const resp = await apiPost('/api/labels/print', {
-            qr_url: contractUrl,
+            qr_url: itemUrl,
             caption: caption,
             copies: qty,
           });
