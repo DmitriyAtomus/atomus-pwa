@@ -452,7 +452,11 @@ var PALETTE=[
 ];
 
 /* ============ состояние ============ */
-var S={comps:[],wires:[],texts:[],sel:null,sheets:[],cur:0};
+var S={comps:[],wires:[],texts:[],sel:null,selSet:[],sheets:[],cur:0};
+/* множественное выделение (рамкой) */
+function isSelC(id){return (S.sel&&S.sel.t==='c'&&S.sel.id===id)||(S.selSet&&S.selSet.indexOf(id)>=0);}
+function selIds(){return (S.selSet&&S.selSet.length)?S.selSet.slice():(S.sel&&S.sel.t==='c'?[S.sel.id]:[]);}
+function clearSel(){S.sel=null;S.selSet=[];}
 var view={tx:0,ty:0,s:0.2};
 var tool='select', ghost=null, draft=[], curW={x:0,y:0};
 var U=[],Rd=[];
@@ -798,6 +802,7 @@ function wiresMarkup(forExport){
   return h;
 }
 function renderCanvas(){
+  if(S.selSet&&S.selSet.length)S.selSet=S.selSet.filter(function(id){return !!compById(id);});  // убрать устаревшие id (смена листа и т.п.)
   /* провода */
   var h='';
   $('wiresL').innerHTML=wiresMarkup(false);
@@ -811,7 +816,7 @@ function renderCanvas(){
     h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
   });
   S.comps.forEach(function(c){
-    var col=(S.sel&&S.sel.t==='c'&&S.sel.id===c.id)?CY:INK;
+    var col=isSelC(c.id)?CY:INK;
     h+=compSvg(c,col);
   });
   $('compsL').innerHTML=h;
@@ -838,7 +843,13 @@ function renderCanvas(){
   else{ercEl.classList.remove('bad');$('ercTxt').textContent='ERC: всё подключено'}
   /* выделение */
   h='';
-  if(S.sel&&S.sel.t==='c'){
+  if(S.selSet&&S.selSet.length>1){
+    // несколько выбрано — общая рамка вокруг группы (без ручек) + лёгкая подсветка каждого
+    var gx0=1e9,gy0=1e9,gx1=-1e9,gy1=-1e9;
+    S.selSet.forEach(function(id){var c=compById(id);if(!c)return;var b=bbW(c);if(b[0]<gx0)gx0=b[0];if(b[1]<gy0)gy0=b[1];if(b[2]>gx1)gx1=b[2];if(b[3]>gy1)gy1=b[3];
+      h+='<rect x="'+(b[0]-12)+'" y="'+(b[1]-12)+'" width="'+(b[2]-b[0]+24)+'" height="'+(b[3]-b[1]+24)+'" fill="rgba(22,183,219,.07)" stroke="'+CY+'" stroke-width="3"/>';});
+    if(gx1>gx0){var gp=34;h+='<rect class="ants" x="'+(gx0-gp)+'" y="'+(gy0-gp)+'" width="'+(gx1-gx0+gp*2)+'" height="'+(gy1-gy0+gp*2)+'" fill="none" stroke="'+CY+'" stroke-width="5" stroke-dasharray="38 26"/>';}
+  } else if(S.sel&&S.sel.t==='c'){
     var c=compById(S.sel.id);
     if(c){
       var b=bbW(c),pad=26;
@@ -848,6 +859,11 @@ function renderCanvas(){
         h+='<rect x="'+(p[0]-13)+'" y="'+(p[1]-13)+'" width="26" height="26" fill="#fff" stroke="'+CY+'" stroke-width="5"/>';
       });
     }
+  }
+  // рамка-выбор (протяжка по пустому месту)
+  if(mode&&mode.k==='band'&&mode.cur){
+    var bx=Math.min(mode.sx,mode.cur.x),by=Math.min(mode.sy,mode.cur.y),bw=Math.abs(mode.cur.x-mode.sx),bh=Math.abs(mode.cur.y-mode.sy);
+    h+='<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" fill="rgba(22,183,219,.10)" stroke="'+CY+'" stroke-width="4" stroke-dasharray="20 14"/>';
   }
   $('selL').innerHTML=h;
   /* ручки выбранного провода: концевые квадраты — кликни и веди линию дальше */
@@ -894,10 +910,15 @@ function renderGhost(){
 /* ============ свойства ============ */
 var lastSelKey='';
 function renderProps(force){
-  var key=S.sel?(S.sel.t+S.sel.id):'none';
+  var grp=(S.selSet&&S.selSet.length>1);
+  var key=grp?('grp'+S.selSet.length):(S.sel?(S.sel.t+S.sel.id):'none');
   if(!force&&key===lastSelKey)return;
   lastSelKey=key;
   var el=$('propsBody'),h='';
+  if(grp){
+    el.innerHTML='<div class="empty" style="padding:12px 4px">Выбрано элементов: <b style="color:var(--cy,#16B7DB)">'+S.selSet.length+'</b><br><br>Тащи любой из них — перенесутся группой. Delete — удалить выбранные. Клик по пустому — снять выделение.</div>';
+    return;
+  }
   if(!S.sel){
     el.innerHTML='<div class="empty">Ничего не выбрано.<br><br>Кликни элемент или провод на листе — здесь появятся его свойства.</div>';
     return;
@@ -978,11 +999,17 @@ function breakLinks(){
   toast('Связи разорваны — удалено проводов: '+removed);
 }
 function delSel(){
+  if(S.selSet&&S.selSet.length>1){
+    pushUndo();
+    var set={};S.selSet.forEach(function(id){set[id]=1});
+    S.comps=S.comps.filter(function(c){return !set[c.id]});
+    clearSel();renderProps(true);renderCanvas();return;
+  }
   if(!S.sel)return;
   pushUndo();
   if(S.sel.t==='c')S.comps=S.comps.filter(function(c){return c.id!==S.sel.id});
   else S.wires=S.wires.filter(function(w){return w.id!==S.sel.id});
-  S.sel=null;renderProps(true);renderCanvas();
+  clearSel();renderProps(true);renderCanvas();
 }
 function nextDes(pre){
   var mx=0,re=new RegExp('^'+pre+'(\\d+)$');
@@ -1107,15 +1134,17 @@ function applyAtt(c,att){
   });
 }
 function startDrag(e,wp){
-  var c=compById(S.sel.id);if(!c)return;
-  mode={k:'drag',c:c,sx:wp.x,sy:wp.y,ox:c.x,oy:c.y,att:collectAtt(c),moved:false,snap:snapState()};
+  var ids=selIds(), comps=ids.map(compById).filter(Boolean);
+  if(!comps.length){var c0=S.sel&&compById(S.sel.id);if(c0)comps=[c0];}
+  if(!comps.length)return;
+  mode={k:'drag',orig:comps.map(function(c){return {c:c,ox:c.x,oy:c.y,att:collectAtt(c)};}),sx:wp.x,sy:wp.y,moved:false,snap:snapState()};
 }
 function dragMove(wp){
-  var m=mode,nx=snap(m.ox+wp.x-m.sx),ny=snap(m.oy+wp.y-m.sy);
-  if(nx===m.c.x&&ny===m.c.y)return;
+  var m=mode,dx=wp.x-m.sx,dy=wp.y-m.sy,changed=false;
+  m.orig.forEach(function(o){var nx=snap(o.ox+dx),ny=snap(o.oy+dy);if(nx!==o.c.x||ny!==o.c.y){o.c.x=nx;o.c.y=ny;changed=true;}});
+  if(!changed)return;
   if(!m.moved){pushUndo(m.snap);m.moved=true}
-  m.c.x=nx;m.c.y=ny;
-  applyAtt(m.c,m.att);
+  m.orig.forEach(function(o){applyAtt(o.c,o.att)});
   renderCanvas();
 }
 
@@ -1290,16 +1319,21 @@ svg.addEventListener('pointerdown',function(e){
   var tc=e.target.closest&&e.target.closest('[data-c]');
   if(tc){
     var id=tc.getAttribute('data-c');
-    S.sel={t:'c',id:id};
+    if(S.selSet&&S.selSet.length>1&&S.selSet.indexOf(id)>=0){
+      // клик по элементу группы — тащим всю группу, выделение не сбрасываем
+      S.sel={t:'c',id:id}; startDrag(e,wp); return;
+    }
+    S.selSet=[]; S.sel={t:'c',id:id};
     renderAll();
     if(window.matchMedia('(max-width:860px)').matches)document.body.classList.add('props-open');
     startDrag(e,wp);
     return;
   }
   var tw=e.target.closest&&e.target.closest('[data-w]');
-  if(tw){S.sel={t:'w',id:tw.getAttribute('data-w')};renderAll();return}
-  S.sel=null;renderAll();
-  mode={k:'pan',sx:e.clientX,sy:e.clientY,tx:view.tx,ty:view.ty};
+  if(tw){S.selSet=[];S.sel={t:'w',id:tw.getAttribute('data-w')};renderAll();return}
+  // пустое место + инструмент «выбор» → рамка-выделение (панорама — пробел/рука/средняя кнопка)
+  clearSel();renderAll();
+  mode={k:'band',sx:wp.x,sy:wp.y,cur:{x:wp.x,y:wp.y}};
 });
 svg.addEventListener('pointermove',function(e){
   if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,e);
@@ -1320,6 +1354,7 @@ svg.addEventListener('pointermove',function(e){
     view.tx=mode.tx+(e.clientX-mode.sx);view.ty=mode.ty+(e.clientY-mode.sy);applyView();return;
   }
   if(mode&&mode.k==='drag'){dragMove(wp);return}
+  if(mode&&mode.k==='band'){mode.cur={x:wp.x,y:wp.y};renderCanvas();return}
   if(tool==='place'&&ghost){ghost.x=snap(wp.x);ghost.y=snap(wp.y);renderGhost()}
   if(tool==='wire'&&draft.length)renderDraft();
 });
@@ -1327,7 +1362,15 @@ function up(e){
   ptrs.delete(e.pointerId);
   if(ptrs.size<2)pinch=null;
   if(mode){
-    if(mode.k==='drag'&&mode.moved&&mode.att){ mode.att.forEach(function(a){orthoWire(a.w)}); renderCanvas(); }  // спрямляем провода под 90°
+    if(mode.k==='drag'&&mode.moved&&mode.orig){ mode.orig.forEach(function(o){o.att.forEach(function(a){orthoWire(a.w)})}); renderCanvas(); }  // спрямляем провода под 90°
+    if(mode.k==='band'){
+      var bx0=Math.min(mode.sx,mode.cur.x),by0=Math.min(mode.sy,mode.cur.y),bx1=Math.max(mode.sx,mode.cur.x),by1=Math.max(mode.sy,mode.cur.y);
+      var ids=[];
+      if(bx1-bx0>30||by1-by0>30){ S.comps.forEach(function(c){var b=bbW(c); if(b[0]<=bx1&&b[2]>=bx0&&b[1]<=by1&&b[3]>=by0)ids.push(c.id);}); }
+      S.selSet=ids; S.sel=(ids.length===1?{t:'c',id:ids[0]}:null);
+      mode=null; renderAll(); if(ids.length)toast('Выбрано: '+ids.length+' — тащи любой, чтобы перенести группой');
+      return;
+    }
     mode=null;
   }
 }
@@ -1364,7 +1407,7 @@ window.addEventListener('keydown',function(e){
   if(k==='Escape'){
     if(draft.length)cancelWire();
     else if(tool==='place')setTool('select');
-    else{S.sel=null;renderAll()}
+    else{clearSel();renderAll()}
     return;
   }
   if(k==='Delete'||k==='Backspace'){delSel();return}
@@ -1376,11 +1419,11 @@ window.addEventListener('keydown',function(e){
   if(kl==='0')fit();
   if(kl==='r'){
     if(tool==='place'&&ghost){ghost.rot=(ghost.rot+90)%360;renderGhost()}
-    else if(S.sel&&S.sel.t==='c'){var c=compById(S.sel.id);if(c){pushUndo();c.rot=(c.rot+90)%360;renderCanvas()}}
+    else{var ri=selIds();if(ri.length){pushUndo();ri.forEach(function(id){var c=compById(id);if(c)c.rot=(c.rot+90)%360});renderCanvas()}}
   }
   if(kl==='m'){
     if(tool==='place'&&ghost){ghost.mirror=!ghost.mirror;renderGhost()}
-    else if(S.sel&&S.sel.t==='c'){var c2=compById(S.sel.id);if(c2){pushUndo();c2.mirror=!c2.mirror;renderCanvas()}}
+    else{var mi=selIds();if(mi.length){pushUndo();mi.forEach(function(id){var c=compById(id);if(c)c.mirror=!c.mirror});renderCanvas()}}
   }
 });
 window.addEventListener('keyup',function(e){
