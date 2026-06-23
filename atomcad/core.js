@@ -228,7 +228,7 @@ function buildSchematic(P){
   var hasCtrl = !!(P.controller && P.controller.model);
 
   // ===================== ЛИСТ 1 · СИЛОВЫЕ ЦЕПИ =====================
-  var pc=[], pw=[], pt=[], gx=600, kmByName={};   // kmByName — общий для листов 1 и 2 (чтобы контакт KMn = катушка KMn)
+  var pc=[], pw=[], pt=[], gx=600, kmByName={}, covPole={};   // kmByName — общий для листов 1 и 2 (контакт KMn = катушка KMn); covPole — номер полюса общего контактора по нагрузкам
   var intro=(P.breakers||[]).filter(function(b){return b.role==='ввод'})[0];
   pc.push(C('X1','term',gx,360,'ЗНИ 6 мм²','','ввод'));
   if(intro){ pc.push(C(intro.code,'qf1',gx,460,'NB1-63 '+intro.poles+'P, C'+intro.rate,'CHINT','ввод')); }
@@ -267,7 +267,11 @@ function buildSchematic(P){
       var ssrTag=cons?(_ssr[col.l&&col.l.name]||_ssr[cons.name]||''):'';
       var kmBot=1450;                                                                    // низ предыдущего аппарата (по умолчанию — сразу отвод)
       if(cons&&needsContactor(cons)&&covTag){
-        pc.push(C(covTag,'c_no',x,1450,'',' ',cons.name)); kmBot=1600;                    // общий контактор — контакт на отвод
+        var pole=(covPole[covTag]=(covPole[covTag]||0)+1);                                 // какой по счёту полюс общего контактора уходит на эту нагрузку
+        pc.push(C(covTag,'kmp1',x,1450,'',' ',cons.name)); kmBot=1780;                     // общий контактор — один полюс на нагрузку (тот же KM, разнесённо)
+        pt.push({x:x+24,y:1545,s:17,ls:0,anchor:'start',tx:(2*pole-1)+'/L'+pole});         // маркировка ввода полюса (1/L1, 3/L2, 5/L3…)
+        pt.push({x:x+24,y:1685,s:17,ls:0,anchor:'start',tx:(2*pole)+'/T'+pole});           // маркировка выхода полюса (2/T1, 4/T2, 6/T3…)
+        if(!(cons.name in kmByName)) kmByName[cons.name]=covTag;
       } else if(cons&&needsContactor(cons)){
         pc.push(C('KM'+kmN,'kmp',x,1450,contactorModel(cons),'CHINT',cons.name)); kmBot=1780;  // свой контактор NC1
         pt.push({x:x-86,y:1560,s:20,ls:0,anchor:'end',tx:'(л.2)'});
