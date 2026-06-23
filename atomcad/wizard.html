@@ -786,8 +786,8 @@ function pTerminals(){
   h+='<div class="card" style="padding:0;overflow:hidden"><table class="spec"><thead><tr><th style="width:120px">Клемма</th><th>Назначение</th><th style="width:120px">Линия</th><th style="width:42px"></th></tr></thead><tbody>';
   P.terminals.forEach(function(t,i){
     h+='<tr>'+
-      '<td><input value="'+esc(t.term||'')+'" oninput="termSet('+i+',\'term\',this.value)" style="'+ist+';font-family:\'IBM Plex Mono\';color:var(--cyan)"></td>'+
-      '<td><input value="'+esc(t.name||'')+'" oninput="termSet('+i+',\'name\',this.value)" placeholder="назначение" style="'+ist+'"></td>'+
+      '<td><div style="display:flex;gap:4px;align-items:center"><input value="'+esc(t.term||'')+'" oninput="termSet('+i+',\'term\',this.value)" style="'+ist+';font-family:\'IBM Plex Mono\';color:var(--cyan);flex:1;min-width:0"><button title="выбрать из оборудования" onclick="termPick('+i+')" style="flex:0 0 auto;background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:12px">▾</button></div></td>'+
+      '<td><input value="'+esc(t.name||'')+'" oninput="termSet('+i+',\'name\',this.value)" placeholder="назначение — или ▾ выбрать" style="'+ist+'"></td>'+
       '<td><input value="'+esc(t.line||'')+'" oninput="termSet('+i+',\'line\',this.value)" placeholder="линия/сечение" style="'+ist+';font-family:\'IBM Plex Mono\'"></td>'+
       '<td style="text-align:center"><button class="del" title="убрать клемму" onclick="termRm('+i+')">✕</button></td>'+
     '</tr>';
@@ -800,6 +800,31 @@ function termSet(i,f,v){ ensureTerminals(); if(P.terminals[i])P.terminals[i][f]=
 function termRm(i){ ensureTerminals(); P.terminals.splice(i,1); dirty(); draw(); }
 function termAdd(){ ensureTerminals(); P.terminals.push({term:'X', name:'', line:''}); dirty(); draw(); }
 function regenTerminals(){ P.terminals=buildTerminals(P); dirty(); draw(); toast('Клеммы пересобраны из состава'); }
+/* список внесённого оборудования для назначения клеммы */
+function termEquip(){
+  ensureBreakers();
+  var items=[];
+  items.push({label:'Ввод L1/L2/L3', tag:'силовая', value:{name:'Ввод L1/L2/L3', line:'5×6'}});
+  items.push({label:'N · PE', value:{name:'N · PE', line:'—'}});
+  (P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления';}).forEach(function(b){
+    items.push({label:b.role+' · '+b.code, tag:'линия', value:{name:b.role, line:b.code}});
+  });
+  (P.consumers||[]).forEach(function(c){var q=c.qty||1;for(var k=0;k<q;k++){var nm=c.name+(q>1?(' #'+(k+1)):'');items.push({label:nm, value:{name:nm, line:''}});}});
+  (P.aux||[]).forEach(function(a){var q=a.qty||1;for(var k=0;k<q;k++){var nm=(a.tag?a.tag+' · ':'')+a.name+(q>1?(' #'+(k+1)):'');items.push({label:nm, value:{name:a.name+(q>1?(' #'+(k+1)):''), line:a.tag||''}});}});
+  (P.sensors||[]).forEach(function(s){var q=s.qty||1;for(var k=0;k<q;k++){var nm=s.name+(q>1?(' #'+(k+1)):'');items.push({label:nm+' · '+s.sig, tag:'sig', value:{name:nm, line:s.sig}});}});
+  if(P.controller&&P.controller.model)items.push({label:'Контроллер · '+P.controller.model, value:{name:'Контроллер '+P.controller.model, line:''}});
+  if(P.hmi&&P.hmi.model)items.push({label:'Панель HMI · '+P.hmi.model, value:{name:'Панель HMI '+P.hmi.model, line:'RS-485'}});
+  return items;
+}
+function termPick(i){
+  ensureTerminals();
+  openChooser('Выбрать из оборудования', termEquip(), function(v){
+    if(!P.terminals[i])return;
+    P.terminals[i].name=v.name;
+    if(v.line)P.terminals[i].line=v.line;
+    dirty();draw();
+  });
+}
 
 
 /* 8 компоновка */
