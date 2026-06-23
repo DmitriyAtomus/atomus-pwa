@@ -84,10 +84,14 @@ function buildBreakers(P){
             role:'питание '+p.volt+'В (БП '+p.ratingW+'Вт)',
             loads:[{name:'БП '+p.volt+'В · нагрузка '+p.sumW+' Вт', a:p.primaryA}], psu:p.volt}); n++;
   });
-  // управление — ток цепи управления: контроллер + катушки/лампы (а НЕ коммутируемый ток контакторов/ТР/реле)
+  // управление — ток цепи управления: контроллер + катушки + сигнальные лампы/кнопки + вентилятор шкафа.
+  // НЕ нагружают цепь управления: коммутируемый ток контакторов/ТР/реле (это катушки ~0.05А),
+  // силовые БП (свой автомат), частотники/автоматы/прочее силовое — их ток идёт по силовым цепям, не сюда.
+  var CTRL_LOAD={lamp:1,button:1,switch:1,estop:1,fan:1};
   var ctrlA = 0.8 + P.aux.reduce(function(s,a){
-    if(a.kind==='contactor'||a.kind==='ssr'||a.kind==='relay') return s+0.05*(a.qty||1);   // катушка/управление — мало
-    return s+(+a.a||0)*(a.qty||1);                                                          // лампы/БП/прочее — по своему току
+    if(a.kind==='contactor'||a.kind==='ssr'||a.kind==='relay') return s+0.05*(a.qty||1);   // только ток катушки/управления
+    if(CTRL_LOAD[a.kind]) return s+(+a.a||0)*(a.qty||1);                                    // реальные потребители цепи управления — по своему току
+    return s;                                                                              // psu/vfd/breaker/other — силовые, на цепь управления не вешаем
   },0);
   b.push({id:'QF'+n, code:'QF'+n, poles:1, rate:stdRating(ctrlA*1.25)||4, role:'цепи управления', loads:[{name:'Контроллер + вспом.', a:+ctrlA.toFixed(1)}]});
   return b;
@@ -252,7 +256,7 @@ function buildSchematic(P){
     // автомат — один на группу, питание с шины ввода
     pc.push(C(b.code,'qf1',qfx,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT', grouped?('группа · '+gc.length+' лин.'):gc[0].l.name));
     pw.push(W([qfx,800],[qfx,950]));
-    pt.push({x:qfx+44,y:885,s:24,ls:0,anchor:'start',tx:phase});                       // фаза(ы) линии
+    pt.push({x:qfx-40,y:892,s:24,ls:0,anchor:'end',tx:phase});                         // фаза(ы) линии — слева от отвода, чтобы не налезать на подпись сечения «N мм²» справа
     if(grouped){
       pw.push(W([qfx,1250],[qfx,1350]));                                               // отвод автомата на шину распределения
       pw.push(W([x0,1350],[x1,1350]));                                                 // шина распределения по отводам
