@@ -13162,24 +13162,23 @@ function renderTeamChatList(chats) {
   box.innerHTML = html;
 }
 
-function _updateTeamChatsBadge(chats) {
-  const total = (chats || []).reduce((s, c) => s + (c.unread || 0), 0);
-  const b = document.getElementById('team-chats-nav-badge');
-  if (b) {
+// Бейдж «Чаты» есть и в Сервисе, и в Монтаже — обновляем все сразу (.team-chats-badge)
+function _setTeamChatsBadge(total) {
+  document.querySelectorAll('.team-chats-badge').forEach(b => {
     if (total > 0) { b.textContent = total > 99 ? '99+' : total; b.style.display = ''; }
     else b.style.display = 'none';
-  }
+  });
+}
+
+function _updateTeamChatsBadge(chats) {
+  const total = (chats || []).reduce((s, c) => s + (c.unread || 0), 0);
+  _setTeamChatsBadge(total);
 }
 
 async function refreshTeamChatsBadge() {
   try {
     const r = await apiGet('/api/team-chats/unread');
-    const b = document.getElementById('team-chats-nav-badge');
-    if (b) {
-      const total = r.total_unread || 0;
-      if (total > 0) { b.textContent = total > 99 ? '99+' : total; b.style.display = ''; }
-      else b.style.display = 'none';
-    }
+    _setTeamChatsBadge(r.total_unread || 0);
   } catch (_) {}
 }
 
