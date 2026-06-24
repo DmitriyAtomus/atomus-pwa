@@ -2648,10 +2648,10 @@ async function openComponentReceiveModal(preselectedId) {
       '<div style="padding:18px;">' +
         '<label class="form-label">Комплектующее *</label>' +
         '<select id="recv-component" class="form-input" style="margin-bottom:14px;">' + opts + '</select>' +
-        '<label class="form-label">Количество *</label>' +
-        '<input type="number" id="recv-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
-        '<label class="form-label">Марка / модель (что фактически пришло)</label>' +
-        '<input type="text" id="recv-brand" class="form-input" list="recv-brand-list" autocomplete="off" placeholder="Выбери из номенклатуры или впиши: Royal Clima ES-E 60HEX" style="margin-bottom:14px;" />' +
+        '<label class="form-label">Что пришло — марка и количество *</label>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Можно несколько марок сразу (напр. 3 Hisense + 2 Royal). Марку выбери из номенклатуры или впиши; оставь пустой — без марки.</div>' +
+        '<div id="recv-lines"></div>' +
+        '<button type="button" class="btn btn-secondary btn-small" onclick="recvAddBrandRow()" style="margin:2px 0 14px;"><i class="ti ti-plus"></i> Добавить марку</button>' +
         '<datalist id="recv-brand-list">' +
           components.map(c => '<option value="' + escapeHtml(c.name) + '">').join('') +
         '</datalist>' +
@@ -2669,6 +2669,7 @@ async function openComponentReceiveModal(preselectedId) {
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  recvAddBrandRow();  // одна строка по умолчанию
 
   // Подгружаем поставщиков если ещё нет
   if (!cache.suppliers) {
@@ -2689,33 +2690,53 @@ function closeComponentReceiveModal() {
   if (m) m.classList.remove('visible');
 }
 
+// Строка прихода «марка + количество» (можно несколько за один приход)
+function recvAddBrandRow(brand, qty) {
+  const box = document.getElementById('recv-lines');
+  if (!box) return;
+  const row = document.createElement('div');
+  row.className = 'recv-line';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+  row.innerHTML =
+    '<input type="text" class="form-input recv-line-brand" list="recv-brand-list" autocomplete="off" ' +
+      'placeholder="Марка / модель (или пусто)" style="flex:1;margin:0;" value="' + (brand ? escapeHtml(brand) : '') + '">' +
+    '<input type="number" class="form-input recv-line-qty" min="0" step="0.01" value="' + (qty != null ? qty : 1) + '" ' +
+      'style="width:84px;margin:0;" title="Количество">' +
+    '<button type="button" class="btn btn-secondary btn-small" title="Убрать строку" ' +
+      'onclick="this.closest(\'.recv-line\').remove()"><i class="ti ti-x"></i></button>';
+  box.appendChild(row);
+}
+
 async function submitComponentReceive() {
   const component_id = parseInt(document.getElementById('recv-component').value);
-  const qty = parseFloat(document.getElementById('recv-qty').value);
   const supplier_id = document.getElementById('recv-supplier').value || null;
   const reason = document.getElementById('recv-reason').value || '';
-  const brandEl = document.getElementById('recv-brand');
-  const brand = brandEl ? (brandEl.value || '').trim() : '';
-  if (!component_id || isNaN(qty) || qty <= 0) {
-    showToast('Заполни поля корректно', 'error'); return;
+  const rows = Array.from(document.querySelectorAll('#recv-lines .recv-line'));
+  const lines = rows.map(r => ({
+    brand: (r.querySelector('.recv-line-brand').value || '').trim(),
+    qty: parseFloat(r.querySelector('.recv-line-qty').value),
+  })).filter(l => l.qty > 0);
+  if (!component_id || !lines.length) {
+    showToast('Укажи хотя бы одну марку с количеством > 0', 'error'); return;
   }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/components/receive', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ component_id, qty, supplier_id, reason, brand }),
-    });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      showToast(d.message || 'Не удалось оприходовать', 'error');
-      return;
+    let ok = 0;
+    for (const l of lines) {
+      const r = await fetch(API_BASE + '/api/components/receive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ component_id, qty: l.qty, supplier_id, reason, brand: l.brand }),
+      });
+      if (r.ok) ok++;
     }
-    showToast('Приход +' + _fmtQty(qty), 'success');
+    if (!ok) { showToast('Не удалось оприходовать', 'error'); return; }
+    const total = lines.reduce((a, l) => a + l.qty, 0);
+    showToast('Приход +' + _fmtQty(total) + (lines.length > 1 ? ' (' + lines.length + ' марок)' : ''), 'success');
     closeComponentReceiveModal();
     cache.components = null;
     loadWarehouseComponents();
-    // v2.45.x: обновим «Что закупить» — оприходованный компонент уйдёт из списка
+    // обновим «Что закупить» — оприходованный компонент уйдёт из списка
     if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
