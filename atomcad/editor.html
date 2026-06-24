@@ -2004,7 +2004,7 @@ $('catSearch').addEventListener('input',renderCatalog);
 function _mkSheet(s){
   return {
     comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
-    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null,sec:(w.sec!=null?w.sec:null)}}),
+    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null,sec:(w.sec!=null?w.sec:null),bus:w.bus||null}}),
     texts:(s.texts||[]).slice(),
     nodes:(s.nodes||[]).map(function(n){return {x:n.x,y:n.y}}),
     subtitle:s.subtitle||s.title||''

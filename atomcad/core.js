@@ -329,6 +329,12 @@ function buildSchematic(P){
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
   pt.push({x:gx+40,y:770,s:22,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины — над линией шины (y=800) и правее ввода, чтобы линия не пересекала подпись
+  // шины N и PE внизу — для однофазных потребителей (вывод N/PE ведём авто-проводом до этих шин)
+  var _railR=Math.max(lastX,bx), _nY=2160, _peY=2240;
+  var _wN=W([gx,_nY],[_railR,_nY]); _wN.phase='N'; _wN.bus='N'; pw.push(_wN);
+  var _wPE=W([gx,_peY],[_railR,_peY]); _wPE.phase='PE'; _wPE.bus='PE'; pw.push(_wPE);
+  pt.push({x:gx-12,y:_nY+8,s:26,ls:0,anchor:'end',tx:'N',ph:'N'});
+  pt.push({x:gx-12,y:_peY+8,s:26,ls:0,anchor:'end',tx:'PE',ph:'PE'});
   pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
   // легенда цветов фаз
   pt.push({x:gx+1180,y:232,s:24,anchor:'start',tx:'L1',ph:'L1'});
