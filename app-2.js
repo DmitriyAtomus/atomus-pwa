@@ -11051,12 +11051,19 @@ async function loadContractShipmentBlock(contractId) {
         const clickable = u.type === 'box';
         const clickAttr = clickable ? ' onclick="openBoxDetail(' + u.id + ')" title="Открыть коробку"' : '';
         const chev = clickable ? '<i class="ti ti-chevron-right ku-chev"></i>' : '';
+        // Ручная отгрузка без QR — для ещё не отгруженных единиц (узел/покупное/коробка).
+        // Решает кейс, когда QR на наклейке битый/чужой и скан не отгружает позицию.
+        const canShip = (typeof canManageSales !== 'function') || canManageSales();
+        const shipBtn = (!done && canShip)
+          ? '<button onclick="event.stopPropagation(); markShipmentManual(\'' + u.type + '\',' + u.id + ')" title="Отгрузить без сканирования" style="flex:none;border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:600;cursor:pointer;color:var(--brand);"><i class="ti ti-truck-delivery"></i> Отгрузить</button>'
+          : '';
         return '<div class="ku-row' + (done ? ' is-done' : '') + (clickable ? ' is-clickable' : '') + '"' + clickAttr + '>' +
           '<div class="ku-ic ' + icCls + '"><i class="ti ' + icon + '"></i></div>' +
           '<div class="ku-main">' +
             '<div class="ku-line1"><span class="ku-name">' + escapeHtml(u.name || '') + '</span>' + badge + '</div>' +
             '<div class="ku-sub">' + kindLabel + qtyLabel + '</div>' +
           '</div>' +
+          shipBtn +
           chev +
         '</div>';
       };
