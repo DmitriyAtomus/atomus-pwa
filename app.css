@@ -18418,3 +18418,82 @@
 .imc-chip-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .imc-chip button { border: none; background: none; cursor: pointer; color: var(--text-light, #94A3B8); padding: 2px; display: inline-flex; }
 .imc-chat-send { margin-left: auto; white-space: nowrap; }
+
+/* ============ v2.45.523: КОМАНДНЫЕ ЧАТЫ (свободные группы) ============ */
+/* Список чатов */
+.tcl-list { display: flex; flex-direction: column; gap: 8px; }
+.tcl-card {
+  display: flex; gap: 12px; align-items: center; cursor: pointer;
+  background: var(--card-bg, #fff); border: 1px solid var(--border, #E2E8F0);
+  border-radius: 12px; padding: 12px 14px; transition: background .12s, border-color .12s;
+}
+.tcl-card:hover { background: var(--hover-bg, #F8FAFC); border-color: #C7D2FE; }
+.tcl-ava {
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.tcl-main { flex: 1; min-width: 0; }
+.tcl-row1 { display: flex; align-items: baseline; gap: 8px; }
+.tcl-title { font-weight: 700; color: var(--text, #1E293B); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.tcl-time { font-size: 12px; color: var(--text-light, #94A3B8); flex-shrink: 0; }
+.tcl-row2 { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.tcl-preview { font-size: 13px; color: var(--text-light, #64748B); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.tcl-preview.sys { font-style: italic; opacity: .8; }
+.tcl-unread {
+  flex-shrink: 0; background: #EF4444; color: #fff; border-radius: 11px;
+  min-width: 20px; height: 20px; line-height: 20px; text-align: center;
+  font-size: 12px; font-weight: 700; padding: 0 6px;
+}
+.tcl-meta { font-size: 11px; color: var(--text-light, #94A3B8); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+
+/* Панель участников внутри чата */
+.tcm-panel {
+  background: var(--hover-bg, #F8FAFC); border-bottom: 1px solid var(--border, #E2E8F0);
+  padding: 10px 14px; max-height: 46vh; overflow-y: auto;
+}
+.tcm-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: var(--text, #1E293B); margin-bottom: 8px; }
+.tcm-add-btn {
+  border: 1px solid #6366F1; background: #fff; color: #4F46E5; border-radius: 8px;
+  padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.tcm-add-btn:hover { background: #EEF2FF; }
+.tcm-list { display: flex; flex-direction: column; gap: 4px; }
+.tcm-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 8px; background: #fff; border: 1px solid var(--border, #E2E8F0); }
+.tcm-name { font-size: 13px; color: var(--text, #1E293B); display: flex; align-items: center; gap: 6px; }
+.tcm-you { font-size: 10px; background: #DBEAFE; color: #1D4ED8; border-radius: 5px; padding: 1px 5px; font-weight: 700; }
+.tcm-role { font-size: 10px; background: #FEF3C7; color: #B45309; border-radius: 5px; padding: 1px 5px; font-weight: 700; }
+.tcm-del { border: none; background: none; color: #DC2626; cursor: pointer; padding: 3px; display: inline-flex; border-radius: 6px; }
+.tcm-del:hover { background: #FEE2E2; }
+.tcm-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.tcm-act {
+  border: 1px solid var(--border, #E2E8F0); background: #fff; color: var(--text, #334155);
+  border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+}
+.tcm-act:hover { background: #F1F5F9; }
+.tcm-act.danger { color: #DC2626; border-color: #FCA5A5; }
+.tcm-act.danger:hover { background: #FEE2E2; }
+
+/* Выбор участников (создание/добавление) */
+.tcp-body { padding: 14px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.tcp-input {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--border, #CBD5E1);
+  border-radius: 9px; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--text, #1E293B);
+}
+.tcp-input:focus { outline: none; border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
+.tcp-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 120px; }
+.tcp-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
+  border: 1px solid var(--border, #E2E8F0); cursor: pointer; transition: background .1s;
+}
+.tcp-item:hover { background: var(--hover-bg, #F8FAFC); }
+.tcp-item.sel { background: #EEF2FF; border-color: #A5B4FC; }
+.tcp-check { color: #6366F1; font-size: 20px; display: flex; flex-shrink: 0; }
+.tcp-item:not(.sel) .tcp-check { color: var(--text-light, #CBD5E1); }
+.tcp-info { min-width: 0; }
+.tcp-name { font-size: 14px; font-weight: 600; color: var(--text, #1E293B); }
+.tcp-pos { font-size: 12px; color: var(--text-light, #94A3B8); }
+.tcp-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 18px; border-top: 1px solid var(--border, #E2E8F0); flex-shrink: 0;
+}
