@@ -223,7 +223,7 @@ function _ctrlGeom(io){
 function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
 function _W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
 // сечение жилы по току защиты (медь, мм²) — тот же ряд, что в редакторе
-function _secForA(I){var t=[[10,1.0],[16,1.5],[25,2.5],[32,4],[40,6],[50,10],[80,16],[100,25]];for(var i=0;i<t.length;i++)if(I<=t[i][0])return t[i][1];return 35;}
+function _secForA(I){var t=[[16,1.5],[25,2.5],[32,4],[40,6],[50,10],[80,16],[100,25]];for(var i=0;i<t.length;i++)if(I<=t[i][0])return t[i][1];return 35;}
 // рамка листа A3 (×10 мм) — ДОЛЖНА совпадать с editor.html (SW/SH и штамп)
 var SHEET_W=4200, SHEET_H=2970, TITLE_X=2300, TITLE_Y=2370;
 /* листы «аппараты управления»: сетка в пределах рамки, перенос на новый лист при нехватке места */
