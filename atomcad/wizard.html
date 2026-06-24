@@ -1195,14 +1195,16 @@ function cabinetSVG(){
         for(var ti=0;ti<it.n;ti++){ var kp=kpiTerm(termSecOf(tlist[ti])), cw=Math.max(mm(6.5),WPS*kp.S);
           if(cxp+cw>tw+0.5 && cxp>0){ ry++; cxp=0; }
           lay.push({x:tx0+cxp,row:ry,w:cw,tag:tlist[ti]?String(tlist[ti].term||''):''}); cxp+=cw; }
-        var nrows=ry+1, railH=Math.min(mm(40),Math.max(mm(15),availH/nrows));
-        var _termH=titleH+nrows*railH+mm(5);
+        var nrows=ry+1, ductGap=mm(50);                                        // ПРАВИЛО: между рейками клемм ≥5 см под кабель-канал
+        var railH=Math.min(mm(34),Math.max(mm(15),(availH-(nrows-1)*ductGap)/nrows));
+        var rowPitch=railH+ductGap, _termH=titleH+nrows*railH+(nrows-1)*ductGap+mm(5);
         s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+_termH.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
         var tfs=Math.max(7,Math.min(10,modPx*0.62));
         s+='<text x="'+(x+Math.max(6,ww)/2).toFixed(1)+'" y="'+(y+mm(3)+mm(7.5)).toFixed(1)+'" font-size="'+tfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+String(it.t||'')+'</text>';
         var ty0=y+mm(3)+titleH;
+        for(var rg=0;rg<nrows-1;rg++){ var dgy=ty0+rg*rowPitch+railH; s+=duct(tx0,dgy+mm(5),tw,ductGap-mm(10)); }  // кабель-канал между рейками
         lay.forEach(function(Lc){
-          var sy=ty0+Lc.row*railH, scx=Lc.x+Lc.w/2, scy=sy+railH/2;
+          var sy=ty0+Lc.row*rowPitch, scx=Lc.x+Lc.w/2, scy=sy+railH/2;
           s+='<rect x="'+Lc.x.toFixed(1)+'" y="'+(sy+1).toFixed(1)+'" width="'+Math.max(3,Lc.w-1).toFixed(1)+'" height="'+Math.max(4,railH-2).toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.6" opacity=".8"/>';
           var labFs=Math.max(5,Math.min(9,Math.min(Lc.w*0.62,railH/4.6)));
           if(Lc.tag) s+='<text x="'+scx.toFixed(1)+'" y="'+scy.toFixed(1)+'" font-size="'+labFs.toFixed(1)+'" fill="#9be6c4" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none" transform="rotate(-90 '+scx.toFixed(1)+' '+scy.toFixed(1)+')">'+Lc.tag+'</text>';
