@@ -9463,6 +9463,29 @@ function _reprintQrFromShipCard(card) {
   }
 }
 
+// Перепечатать QR: выдать позиции новый уникальный код и отправить на печать
+async function reprintUnitQr(type, id, name) {
+  if (!confirm('Сгенерировать НОВЫЙ QR для «' + (name || '') + '» и отправить на печать?\nСтарый код перестанет к ней относиться.')) return;
+  try {
+    const r = await apiPost('/api/shipments/regenerate-qr', { type: type, id: id });
+    const d = (r && r.data) || {};
+    if (!r.ok || !d.ok || !d.path) {
+      showToast('Не удалось обновить код', 'error');
+      return;
+    }
+    const url = window.location.origin + d.path;
+    const caption = String(name || '').slice(0, 80);
+    const pr = await apiPost('/api/labels/print', { qr_url: url, caption: caption, copies: 1 });
+    if (pr && pr.ok) {
+      showToast('📤 Новый QR отправлен на печать', 'success');
+    } else {
+      showToast('Код обновлён, но печать не ушла (проверь шлюз печати)', 'info');
+    }
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 // Отметка вручную
 async function markShipmentManual(itemType, itemId) {
   if (!confirm('Отметить как отгруженное вручную (без сканирования QR)?')) return;
