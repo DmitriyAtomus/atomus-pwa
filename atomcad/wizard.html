@@ -99,6 +99,21 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
   <div class="note" id="saDes" style="margin-bottom:12px"></div>
   <div class="r" style="gap:9px"><button class="no" id="saCancel" style="flex:1">Отмена</button><button class="ok" id="saOk" style="flex:1">⭱ Сохранить копию</button></div></div></div>
 <input type="file" id="dsFile" accept=".pdf,image/*" multiple style="display:none">
+<div class="mask" id="ugoMask"><div class="confirm" style="max-width:780px">
+  <h4>УГО: <span id="ugoName"></span></h4>
+  <div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
+    <button class="no ugt on" data-ugt="line" style="flex:0 0 auto">╱ Линия</button>
+    <button class="no ugt" data-ugt="dash" style="flex:0 0 auto">┄ Пунктир</button>
+    <button class="no ugt" data-ugt="pin" style="flex:0 0 auto">○ Вывод</button>
+    <button class="no ugt" data-ugt="text" style="flex:0 0 auto">T Текст</button>
+    <span style="flex:1"></span>
+    <button class="no" id="ugoUndo" style="flex:0 0 auto">↺ Стереть</button>
+    <button class="no" id="ugoClear" style="flex:0 0 auto">Очистить</button>
+  </div>
+  <svg id="ugoCanvas" width="100%" height="360" viewBox="-360 -240 720 480" style="background:#F6F8FA;border:1px solid var(--line);border-radius:8px;display:block;touch-action:none"></svg>
+  <div style="font-size:11px;color:var(--dim);margin:7px 0">Линия/Пунктир — кликай точки (двойной клик — закончить). «Вывод» — точка подключения. Сетка 20.</div>
+  <div class="r" style="gap:9px"><button class="ok" id="ugoSave" style="flex:1">✓ Сохранить УГО</button><button class="no" id="ugoClose" style="flex:1">Закрыть</button></div>
+</div></div>
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 <div id="cabTip" style="position:fixed;z-index:60;display:none;pointer-events:none;background:#10212F;color:#fff;font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);max-width:280px;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.4)"></div>
@@ -588,6 +603,60 @@ function sortAux(){
 /* ---- УГО (условные графические обозначения) ---- */
 function _ut(x,y,s){return '<text x="'+x+'" y="'+y+'" font-size="6" fill="#7A8896" font-family="IBM Plex Mono" text-anchor="middle">'+s+'</text>';}
 function _noC(x,t,b){return '<line x1="'+x+'" y1="9" x2="'+x+'" y2="20"/><line x1="'+x+'" y1="20" x2="'+(x+8)+'" y2="27"/><line x1="'+x+'" y1="30" x2="'+x+'" y2="43"/>'+_ut(x,7,t)+_ut(x,50,b);}
+/* ===== редактор своего УГО (в мастере) ===== */
+function ugoPrimSvg(p){
+  if(p.t==='l'||p.t==='dl')return '<line x1="'+p.x1+'" y1="'+p.y1+'" x2="'+p.x2+'" y2="'+p.y2+'"'+(p.t==='dl'?' stroke-dasharray="14 12"':'')+'/>';
+  if(p.t==='c')return '<circle cx="'+p.x+'" cy="'+p.y+'" r="'+p.r+'" fill="none"/>';
+  if(p.t==='t')return '<text x="'+p.x+'" y="'+p.y+'" font-size="'+p.s+'" text-anchor="middle" stroke="none" fill="currentColor" font-family="IBM Plex Sans">'+esc(p.tx)+'</text>';
+  return '';
+}
+function ugoSvg(ugo,w,h){
+  if(!ugo||!ugo.pr||!ugo.pr.length)return '';
+  var b=ugo.bb||[-100,-100,100,100],pad=10;
+  var vb=(b[0]-pad)+' '+(b[1]-pad)+' '+(b[2]-b[0]+pad*2)+' '+(b[3]-b[1]+pad*2);
+  var sw=Math.max(1.2,Math.max(b[2]-b[0],b[3]-b[1])/26);
+  var s='<svg width="'+w+'" height="'+h+'" viewBox="'+vb+'" fill="none" stroke="#9FB0BE" color="#9FB0BE" stroke-width="'+sw+'" stroke-linecap="round">';
+  ugo.pr.forEach(function(p){s+=ugoPrimSvg(p)}); return s+'</svg>';
+}
+var ugoTool='line', ugoDraw={pr:[],pins:[]}, ugoPend=null, ugoIdx=-1;
+function openUgoEd(idx){
+  ugoIdx=idx; var it=APP_LIB[idx];
+  ugoDraw=(it&&it.data&&it.data.ugo)?{pr:JSON.parse(JSON.stringify(it.data.ugo.pr||[])),pins:(it.data.ugo.pins||[]).map(function(p){return {x:p[0],y:p[1]}})}:{pr:[],pins:[]};
+  ugoPend=null; ugoSetTool('line'); $('ugoName').textContent=(it?it.label:'аппарат'); renderUgo(); $('ugoMask').classList.add('show');
+}
+function ugoSetTool(t){ugoTool=t;ugoPend=null;Array.prototype.forEach.call(document.querySelectorAll('.ugt'),function(b){b.classList.toggle('on',b.getAttribute('data-ugt')===t)});}
+function _ugoPt(e){var sv=$('ugoCanvas'),r=sv.getBoundingClientRect(),vb=sv.viewBox.baseVal;return {x:Math.round((vb.x+(e.clientX-r.left)/r.width*vb.width)/20)*20,y:Math.round((vb.y+(e.clientY-r.top)/r.height*vb.height)/20)*20};}
+function renderUgo(){
+  var h='';
+  for(var gx=-360;gx<=360;gx+=20)h+='<line x1="'+gx+'" y1="-240" x2="'+gx+'" y2="240" stroke="#E3E9EF" stroke-width="1"/>';
+  for(var gy=-240;gy<=240;gy+=20)h+='<line x1="-360" y1="'+gy+'" x2="360" y2="'+gy+'" stroke="#E3E9EF" stroke-width="1"/>';
+  h+='<line x1="-360" y1="0" x2="360" y2="0" stroke="#C7D0D8"/><line x1="0" y1="-240" x2="0" y2="240" stroke="#C7D0D8"/>';
+  h+='<g stroke="#1C2B38" stroke-width="4" fill="none" color="#1C2B38">';
+  ugoDraw.pr.forEach(function(p){h+=ugoPrimSvg(p)}); h+='</g>';
+  ugoDraw.pins.forEach(function(p){h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="6" fill="none" stroke="#16B7DB" stroke-width="3"/>';});
+  if(ugoPend)h+='<circle cx="'+ugoPend.x+'" cy="'+ugoPend.y+'" r="6" fill="#16B7DB"/>';
+  $('ugoCanvas').innerHTML=h;
+}
+function ugoClick(e){
+  var p=_ugoPt(e);
+  if(ugoTool==='line'||ugoTool==='dash'){ if(!ugoPend){ugoPend=p;} else { ugoDraw.pr.push({t:(ugoTool==='dash'?'dl':'l'),x1:ugoPend.x,y1:ugoPend.y,x2:p.x,y2:p.y}); ugoPend=p; } }
+  else if(ugoTool==='pin'){ var n=ugoDraw.pins.length+1; ugoDraw.pins.push({x:p.x,y:p.y}); ugoDraw.pr.push({t:'c',x:p.x,y:p.y,r:7}); ugoDraw.pr.push({t:'t',x:p.x+22,y:p.y+7,s:18,tx:String(n)}); }
+  else if(ugoTool==='text'){ var tx=prompt('Текст:'); if(tx){ugoDraw.pr.push({t:'t',x:p.x,y:p.y,s:22,tx:tx});} }
+  renderUgo();
+}
+function ugoSave(){
+  if(ugoIdx<0||!APP_LIB[ugoIdx]){$('ugoMask').classList.remove('show');return;}
+  if(!ugoDraw.pr.length){toast('Сначала нарисуй УГО');return;}
+  var xs=[0],ys=[0];
+  ugoDraw.pr.forEach(function(p){ if(p.t==='l'||p.t==='dl'){xs.push(p.x1,p.x2);ys.push(p.y1,p.y2);} else if(p.t==='c'){xs.push(p.x-p.r,p.x+p.r);ys.push(p.y-p.r,p.y+p.r);} else if(p.t==='t'){xs.push(p.x-40,p.x+40);ys.push(p.y-20,p.y+12);} });
+  ugoDraw.pins.forEach(function(p){xs.push(p.x);ys.push(p.y);});
+  var bb=[Math.min.apply(null,xs)-12,Math.min.apply(null,ys)-12,Math.max.apply(null,xs)+12,Math.max.apply(null,ys)+12];
+  var it=APP_LIB[ugoIdx];
+  it.data=it.data||{};
+  it.data.ugo={pr:ugoDraw.pr,pins:ugoDraw.pins.map(function(p){return [p.x,p.y]}),bb:bb,lbl:[0,bb[3]+30,'middle']};
+  saveApparatus(it.label,it.kind,it.manufacturer||'',it.model||'',it.current_a,it.data);
+  $('ugoMask').classList.remove('show'); draw(); toast('УГО сохранено для «'+it.label+'»');
+}
 function auxSym(kind){
   var s='<g stroke="#9FB0BE" stroke-width="1.2" fill="none" stroke-linecap="round">';
   if(kind==='contactor'){
@@ -666,7 +735,7 @@ function pAux(){
   h+='</div>';
   if(APP_LIB.length){
     h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">📚 Библиотека аппаратов <span style="color:var(--dim);font-weight:400">(найденные/добавленные — клик добавляет)</span></div><div class="grid g3" style="margin-bottom:14px">';
-    APP_LIB.forEach(function(it,idx){h+='<div class="card cardpick sel2" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromSaved('+idx+')">'+auxSym(it.kind||'other')+'<span style="min-width:0;flex:1"><span class="cname" style="font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.label)+'</span><span class="ccode">'+esc(it.model||'')+(it.current_a?(' · '+it.current_a+' А'):'')+'</span></span><span class="del" title="Убрать из библиотеки" onclick="event.stopPropagation();delApparatus('+it.id+')" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span></div>';});
+    APP_LIB.forEach(function(it,idx){h+='<div class="card cardpick sel2" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromSaved('+idx+')">'+((it.data&&it.data.ugo)?ugoSvg(it.data.ugo,46,46):auxSym(it.kind||'other'))+'<span style="min-width:0;flex:1"><span class="cname" style="font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.label)+'</span><span class="ccode">'+esc(it.model||'')+(it.current_a?(' · '+it.current_a+' А'):'')+'</span></span><span class="del" title="Редактировать УГО" onclick="event.stopPropagation();openUgoEd('+idx+')" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✎</span><span class="del" title="Убрать из библиотеки" onclick="event.stopPropagation();delApparatus('+it.id+')" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span></div>';});
     h+='</div>';
   }
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке или из PDF/фото <span style="color:var(--dim);font-weight:400">(ИИ определит тип и нарисует УГО, сохранится в библиотеку)</span></div>';
@@ -1613,6 +1682,14 @@ function openDatasheet(mode){
   $('dsMask').classList.add('show');
 }
 $('dsClose').onclick=function(){$('dsMask').classList.remove('show')};
+// редактор УГО (мастер)
+$('ugoClose').onclick=function(){$('ugoMask').classList.remove('show')};
+$('ugoSave').onclick=ugoSave;
+$('ugoCanvas').addEventListener('click',ugoClick);
+$('ugoCanvas').addEventListener('dblclick',function(e){e.preventDefault();ugoPend=null;renderUgo();});
+$('ugoUndo').onclick=function(){ if(ugoPend){ugoPend=null;} else { var n=ugoDraw.pr.length,l=ugoDraw.pr[n-1]; if(l&&l.t==='t'&&ugoDraw.pr[n-2]&&ugoDraw.pr[n-2].t==='c'&&ugoDraw.pins.length){ugoDraw.pr.pop();ugoDraw.pr.pop();ugoDraw.pins.pop();} else ugoDraw.pr.pop(); } renderUgo(); };
+$('ugoClear').onclick=function(){ugoDraw={pr:[],pins:[]};ugoPend=null;renderUgo();};
+Array.prototype.forEach.call(document.querySelectorAll('.ugt'),function(b){b.addEventListener('click',function(){ugoSetTool(b.getAttribute('data-ugt'))});});
 /* выбор файлов: докидываем к уже выбранным и перераспознаём весь набор */
 $('dsFile').onchange=function(e){
   var fs=Array.prototype.slice.call(e.target.files||[]);e.target.value='';
