@@ -5595,10 +5595,10 @@ function _cpTrackingRowHtml(it) {
   if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
     receivedBtn = '<button type="button" onclick="shopMarkReceived(' + it.order_item_id +
       ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
-      'title="Товар пришёл — отметить позицию полученной и закрыть заказ" ' +
-      'style="background:none;border:1px solid #6EE7B7;color:#047857;border-radius:8px;' +
-      'padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">' +
-      '<i class="ti ti-checkbox"></i> получено</button>';
+      'title="Товар пришёл — нажмите, чтобы отметить позицию полученной (заказ закроется)" ' +
+      'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #34D399;color:#047857;border-radius:8px;' +
+      'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-circle-check"></i> Отметить, что пришло</button>';
   }
   return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
@@ -11050,6 +11050,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.522',
+    date: '24.06.2026',
+    title: 'Снабжение: кнопка «получено» стала понятнее',
+    features: [
+      'В «Снабжение → Ждём поставку» кнопка <b>«получено»</b> сбивала с толку — было непонятно, это статус («уже получено») или действие. Переименовали в <b>«Отметить, что пришло»</b> и оформили явной кнопкой-действием. Жмёшь, когда товар пришёл — заказ закрывается, позиция уходит из ожидания',
+    ],
+  },
   {
     version: 'v2.45.506',
     date: '23.06.2026',
