@@ -2763,31 +2763,41 @@
 
 <!-- ============ v2.45.523: КОМАНДНЫЙ ЧАТ (свободная группа) ============ -->
 <div class="modal-overlay" id="team-chat-modal" onclick="if(event.target===this) closeTeamChat()">
-  <div class="modal contract-chat-modal" onclick="event.stopPropagation()">
+  <div class="modal team-chat-modal" id="tchat-modal-card" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <div style="min-width:0;">
-        <h3><i class="ti ti-messages"></i> <span id="tchat-title">Чат</span></h3>
+      <div style="min-width:0;flex:1;">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <h3 style="margin:0;display:flex;align-items:center;gap:7px;min-width:0;">
+            <i class="ti ti-messages"></i>
+            <span id="tchat-title" class="tchat-title-text">Чат</span>
+          </h3>
+          <button class="tchat-icon-act" id="tchat-rename-btn" onclick="renameTeamChat()" title="Переименовать чат"><i class="ti ti-pencil"></i></button>
+        </div>
         <div class="chat-subtitle" id="tchat-subtitle"></div>
       </div>
       <div style="display:flex;gap:2px;align-items:center;flex-shrink:0;">
-        <button class="icon-btn" onclick="toggleTeamMembers()" title="Участники"><i class="ti ti-users"></i></button>
+        <button class="icon-btn tchat-side-toggle" onclick="toggleTeamMembers()" title="Участники"><i class="ti ti-users"></i></button>
         <button class="modal-close" onclick="closeTeamChat()"><i class="ti ti-x"></i></button>
       </div>
     </div>
-    <div id="tchat-members-panel" class="tcm-panel" style="display:none;"></div>
-    <div class="cchat-messages" id="tchat-messages">
-      <div class="loading-block">Загружаем сообщения…</div>
-    </div>
-    <div class="cchat-attach-preview" id="tchat-attach-preview"></div>
-    <div class="cchat-input-bar">
-      <input type="file" id="tchat-file-input" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" style="display:none;" onchange="onTeamChatFilesSelected(this.files)">
-      <button class="cchat-attach-btn" type="button" onclick="document.getElementById('tchat-file-input').click()" title="Прикрепить файлы">
-        <i class="ti ti-paperclip"></i>
-      </button>
-      <textarea id="tchat-input" placeholder="Напишите сообщение… (Enter — отправить, Shift+Enter — перенос)" rows="1"></textarea>
-      <button class="btn btn-primary" id="tchat-send-btn" onclick="sendTeamChatMessage()">
-        <i class="ti ti-send"></i>
-      </button>
+    <div class="tchat-body">
+      <aside class="tchat-side" id="tchat-side"></aside>
+      <div class="tchat-main">
+        <div class="cchat-messages" id="tchat-messages">
+          <div class="loading-block">Загружаем сообщения…</div>
+        </div>
+        <div class="cchat-attach-preview" id="tchat-attach-preview"></div>
+        <div class="cchat-input-bar">
+          <input type="file" id="tchat-file-input" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" style="display:none;" onchange="onTeamChatFilesSelected(this.files)">
+          <button class="cchat-attach-btn" type="button" onclick="document.getElementById('tchat-file-input').click()" title="Прикрепить файлы">
+            <i class="ti ti-paperclip"></i>
+          </button>
+          <textarea id="tchat-input" placeholder="Напишите сообщение… (Enter — отправить, Shift+Enter — перенос)" rows="1"></textarea>
+          <button class="btn btn-primary" id="tchat-send-btn" onclick="sendTeamChatMessage()">
+            <i class="ti ti-send"></i>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
