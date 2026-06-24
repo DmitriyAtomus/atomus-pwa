@@ -661,6 +661,14 @@ function ugoSave(){
   saveApparatus(it.label,it.kind,it.manufacturer||'',it.model||'',it.current_a,it.data);
   $('ugoMask').classList.remove('show'); draw(); toast('УГО сохранено для «'+it.label+'»');
 }
+function ugoSvgBox(ugo){
+  if(!ugo||!ugo.pr||!ugo.pr.length)return '';
+  var b=ugo.bb||[-100,-100,100,100],pad=14;
+  var vb=(b[0]-pad)+' '+(b[1]-pad)+' '+(b[2]-b[0]+pad*2)+' '+(b[3]-b[1]+pad*2);
+  var sw=Math.max(2.5,Math.max(b[2]-b[0],b[3]-b[1])/24);
+  var s='<svg viewBox="'+vb+'" style="width:94px;height:47px;flex:0 0 auto;background:var(--graphite);border:1px solid var(--line);border-radius:7px" fill="none" stroke="#9FB0BE" color="#9FB0BE" stroke-width="'+sw+'" stroke-linecap="round">';
+  ugo.pr.forEach(function(p){s+=ugoPrimSvg(p)}); return s+'</svg>';
+}
 function auxSym(kind){
   var s='<g stroke="#9FB0BE" stroke-width="1.2" fill="none" stroke-linecap="round">';
   if(kind==='contactor'){
@@ -749,7 +757,7 @@ function pAux(){
   if(!P.aux.length)h+='<div class="empty">Пусто — выбери аппарат из каталога выше.</div>';
   P.aux.forEach(function(a){
     if(editAux===a.id){
-      h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+auxSym(a.kind)+
+      h+='<div class="row" style="flex-wrap:wrap;gap:8px">'+(a.ugo?ugoSvgBox(a.ugo):auxSym(a.kind))+
          '<input style="width:62px;'+FLDST+';font-family:\'IBM Plex Mono\';color:var(--cyan)" value="'+esc(a.tag||'')+'" title="обозначение" onchange="editAuxField(\''+a.id+'\',\'tag\',this.value)">'+
          '<input style="flex:1;min-width:130px;'+FLDST+'" value="'+esc(a.name)+'" placeholder="наименование" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
          '<input style="width:140px;'+FLDST+';font-family:\'IBM Plex Mono\'" value="'+esc(a.model||'')+'" placeholder="марка / модель" onchange="editAuxField(\''+a.id+'\',\'model\',this.value)">'+
@@ -760,7 +768,7 @@ function pAux(){
          '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
          '<button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }else{
-      h+='<div class="row">'+auxSym(a.kind)+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(auxSwitches(a.kind)?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+      h+='<div class="row">'+(a.ugo?ugoSvgBox(a.ugo):auxSym(a.kind))+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(auxSwitches(a.kind)?(' · '+(a.target?('→ '+esc(a.target)):'<span style="color:var(--amber)">назначение не указано</span>')):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }
   });
   return h;}
@@ -782,7 +790,7 @@ function saveApparatus(label,kind,manu,model,a,data){
     if(cur===4)draw();
   }).catch(function(){});
 }
-function addAuxFromSaved(idx){var it=APP_LIB[idx];if(!it)return;var kind=it.kind||'other';P.aux.push({id:uid('a'),name:it.label,kind:kind,manu:it.manufacturer||'',model:it.model||'',tag:auxTagFor(kind),a:(+it.current_a||0),qty:1});P.breakers=null;dirty();draw();toast(it.label+' добавлен');}
+function addAuxFromSaved(idx){var it=APP_LIB[idx];if(!it)return;var kind=it.kind||'other';P.aux.push({id:uid('a'),name:it.label,kind:kind,manu:it.manufacturer||'',model:it.model||'',tag:auxTagFor(kind),a:(+it.current_a||0),qty:1,ugo:(it.data&&it.data.ugo)||null});P.breakers=null;dirty();draw();toast(it.label+' добавлен');}
 function delApparatus(id){
   ask('Убрать из библиотеки?','Удалить аппарат из сохранённых? (текущий проект не изменится)',function(){
     if(srvOn())apiReq('DELETE','/api/atomcad/apparatus/'+id).then(function(){APP_LIB=APP_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}).catch(function(err){toast('Не удалось: '+err.message)});
