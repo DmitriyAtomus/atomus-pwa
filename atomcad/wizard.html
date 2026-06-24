@@ -669,8 +669,8 @@ function pAux(){
     APP_LIB.forEach(function(it,idx){h+='<div class="card cardpick sel2" style="padding:8px;display:flex;align-items:center;gap:9px" onclick="addAuxFromSaved('+idx+')">'+auxSym(it.kind||'other')+'<span style="min-width:0;flex:1"><span class="cname" style="font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.label)+'</span><span class="ccode">'+esc(it.model||'')+(it.current_a?(' · '+it.current_a+' А'):'')+'</span></span><span class="del" title="Убрать из библиотеки" onclick="event.stopPropagation();delApparatus('+it.id+')" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span></div>';});
     h+='</div>';
   }
-  h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке <span style="color:var(--dim);font-weight:400">(ИИ определит тип и нарисует УГО, сохранится в библиотеку)</span></div>';
-  h+='<div class="form"><div class="fld gr"><label>Марка / модель</label><input id="aMark" placeholder="напр. LA167-BDF41, HD-4022.10U, РЭК77/3" onkeydown="if(event.key===\'Enter\')identifyAux()"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" id="aMarkBtn" onclick="identifyAux()">🔎 Найти по марке</button></div></div>';
+  h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Своё — по марке или из PDF/фото <span style="color:var(--dim);font-weight:400">(ИИ определит тип и нарисует УГО, сохранится в библиотеку)</span></div>';
+  h+='<div class="form"><div class="fld gr"><label>Марка / модель</label><input id="aMark" placeholder="напр. LA167-BDF41, HD-4022.10U, РЭК77/3" onkeydown="if(event.key===\'Enter\')identifyAux()"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" id="aMarkBtn" onclick="identifyAux()">🔎 Найти по марке</button></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="openDatasheet(\'aux\')">📎 PDF / фото</button></div></div>';
   h+='<div class="cname" style="margin:2px 0 8px;font-size:13px">Внести вручную</div>';
   h+='<div class="form"><div class="fld gr"><label>Наименование</label><input id="aN" placeholder="напр. реле контроля фаз"></div><div class="fld"><label>Тип</label><select id="aT">'+auxKindOptions('other')+'</select></div><div class="fld"><label>Ток, А</label><input id="aA" class="w70" inputmode="decimal" placeholder="0"></div><div class="fld"><label>Кол-во</label><input id="aQ" class="w70" value="1" inputmode="numeric"></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="addAux()">+ Добавить</button></div></div>';
   if(!P.aux.length)h+='<div class="empty">Пусто — выбери аппарат из каталога выше.</div>';
@@ -715,6 +715,21 @@ function delApparatus(id){
     if(srvOn())apiReq('DELETE','/api/atomcad/apparatus/'+id).then(function(){APP_LIB=APP_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}).catch(function(err){toast('Не удалось: '+err.message)});
     else{APP_LIB=APP_LIB.filter(function(x){return String(x.id)!==String(id)});draw();}
   });
+}
+/* грубое определение типа аппарата по тексту распознавания (для PDF/фото) */
+function auxKindGuess(s){s=(s||'').toLowerCase();
+  if(/реле пром|промежуточн|рэк|\brek\b|rxm|finder|интерфейсн/.test(s))return 'relay';
+  if(/тверд|\bssr\b|hd-?40|симист/.test(s))return 'ssr';
+  if(/контактор|пускател|nc1|кми|\bкм\b/.test(s))return 'contactor';
+  if(/частот|чрп|\bvfd\b|inverter|преобразоват/.test(s))return 'vfd';
+  if(/блок питан|\bpsu\b|power supply|24\s?в/.test(s))return 'psu';
+  if(/перекл|\bswitch\b|\bsa\b/.test(s))return 'switch';
+  if(/гриб|аварийн|стоп|e-?stop/.test(s))return 'estop';
+  if(/кнопк|button|пуск/.test(s))return 'button';
+  if(/лампа|сигнальн|индикат|nd16/.test(s))return 'lamp';
+  if(/автомат|выключател|nb1|\bqf\b/.test(s))return 'breaker';
+  if(/вентилятор|\bfan\b|кулер/.test(s))return 'fan';
+  return 'other';
 }
 async function identifyAux(){
   if(!srvOn()){toast('Поиск по марке работает в CRM (нужна авторизация)');return;}
@@ -1643,7 +1658,7 @@ function renderDatasheet(d){
     h+='<div class="card" style="border-color:rgba(255,196,0,.5);background:linear-gradient(180deg,rgba(255,196,0,.06),transparent);margin-bottom:10px"><div style="color:var(--amber);font-size:12.5px">⚠ Входы/выходы прочитаны частично. Добавь страницу «Технические характеристики» (там обычно число AI/DI/AO/реле) — ИИ перечитает весь набор и дополнит состав. Габариты сохранятся.</div>'+
        '<button class="tb cy" style="width:100%;margin-top:9px" onclick="dsAddPage()">➕ Добавить страницу характеристик</button></div>';
   }
-  h+='<button class="tb cy" style="width:100%" onclick="applyDatasheet()">'+(dsMode==='hmi'?'✓ Применить — добавить панель на дверь':'✓ Применить — добавить контроллер')+'</button>';
+  h+='<button class="tb cy" style="width:100%" onclick="applyDatasheet()">'+(dsMode==='hmi'?'✓ Применить — добавить панель на дверь':dsMode==='aux'?'✓ Применить — добавить аппарат':'✓ Применить — добавить контроллер')+'</button>';
   $('dsBody').innerHTML=h;
   $('dsPickBtn').disabled=false;$('dsPickBtn').textContent='➕ Добавить страницу';
   $('dsPickBtn').onclick=function(){$('dsFile').click()};
@@ -1660,6 +1675,16 @@ function applyDatasheet(){
   var d=dsLast;if(!d)return;
   var model=(d.model||'').trim();if(!model){toast('Модель не распознана');return;}
   var label=((d.manufacturer?d.manufacturer+' ':'')+model).trim();
+  if(dsMode==='aux'){
+    var _vk={contactor:1,ssr:1,relay:1,switch:1,estop:1,button:1,lamp:1,psu:1,breaker:1,vfd:1,fan:1,other:1};
+    var kind=(d.kind&&_vk[d.kind])?d.kind:auxKindGuess((d.component_type||'')+' '+(d.notes||'')+' '+label);
+    var a=(+d.current_a||0);
+    P.aux.push({id:uid('a'),name:label,kind:kind,manu:d.manufacturer||'',model:model,tag:auxTagFor(kind),a:a,qty:1,note:d.notes||''});
+    P.breakers=null; $('dsMask').classList.remove('show'); dirty(); draw();
+    toast('Аппарат «'+label+'» добавлен ('+auxCat(kind).label+') → '+P.aux[P.aux.length-1].tag+(d.confidence==='low'?' — проверь тип':''));
+    saveApparatus(label,kind,d.manufacturer||'',model,a,d);
+    return;
+  }
   if(dsMode==='hmi'){
     var dim=d.dimensions||{};
     var term=(Array.isArray(d.terminals)&&d.terminals.length)?d.terminals.map(function(t){return typeof t==='string'?t:(t.id||t.name||'')}).filter(Boolean):defaultHmiTerminals(d.supply_voltage);
