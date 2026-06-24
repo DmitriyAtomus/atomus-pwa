@@ -877,7 +877,7 @@ function renderCanvas(){
   /* точки соединений */
   h='';
   junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="6.5" fill="'+INK+'"/>'});
-  (S.nodes||[]).forEach(function(n){h+='<circle cx="'+n.x+'" cy="'+n.y+'" r="8" fill="'+CY+'" stroke="#06262E" stroke-width="2"/>'});  // поставленные точки-отводы
+  (S.nodes||[]).forEach(function(n,i){var sn=S.sel&&S.sel.t==='n'&&S.sel.ni===i;h+='<circle cx="'+n.x+'" cy="'+n.y+'" r="'+(sn?11:8)+'" fill="'+CY+'" stroke="'+(sn?'#fff':'#06262E')+'" stroke-width="'+(sn?3:2)+'"/>'});  // поставленные точки-отводы (выбранная — крупнее, белый контур)
   $('jL').innerHTML=h;
   /* компоненты + свободные тексты */
   h='';
@@ -980,7 +980,7 @@ function renderGhost(){
 var lastSelKey='';
 function renderProps(force){
   var grp=(S.selSet&&S.selSet.length>1);
-  var key=grp?('grp'+S.selSet.length):(S.sel?(S.sel.t+S.sel.id):'none');
+  var key=grp?('grp'+S.selSet.length):(S.sel?(S.sel.t==='n'?('n'+S.sel.ni):(S.sel.t+S.sel.id)):'none');
   if(!force&&key===lastSelKey)return;
   lastSelKey=key;
   var el=$('propsBody'),h='';
@@ -991,6 +991,14 @@ function renderProps(force){
   if(!S.sel){
     el.innerHTML='<div class="empty">Ничего не выбрано.<br><br>Кликни элемент или провод на листе — здесь появятся его свойства.</div>';
     return;
+  }
+  if(S.sel.t==='n'){
+    var nd=S.nodes&&S.nodes[S.sel.ni];
+    if(!nd){S.sel=null;renderProps(true);return}
+    h+='<div class="sel-chip"><b>Точка-отвод</b><span>· '+(nd.x/10).toFixed(0)+' × '+(nd.y/10).toFixed(0)+' мм</span></div>';
+    h+='<div class="empty" style="padding:8px 4px 12px">Тащи — перенести. От неё можно вести «Авто-провод» (A). Клик по точке инструментом «Точка» (P) тоже удаляет.</div>';
+    h+='<div class="pbtns"><button class="pb danger" id="pDelN">Удалить точку (Del)</button></div>';
+    el.innerHTML=h; $('pDelN').onclick=delSel; return;
   }
   if(S.sel.t==='w'){
     var w=wireById(S.sel.id);
@@ -1077,6 +1085,7 @@ function delSel(){
   if(!S.sel)return;
   pushUndo();
   if(S.sel.t==='c')S.comps=S.comps.filter(function(c){return c.id!==S.sel.id});
+  else if(S.sel.t==='n'){ if(S.nodes&&S.nodes[S.sel.ni])S.nodes.splice(S.sel.ni,1); }
   else S.wires=S.wires.filter(function(w){return w.id!==S.sel.id});
   clearSel();renderProps(true);renderCanvas();
 }
@@ -1194,14 +1203,22 @@ function autoTarget(wx,wy){
   var wp=wireTapPoint(wx,wy); if(wp)return wp;
   return {x:snap(wx),y:snap(wy)};
 }
-// поставить точку самому: на линии → отвод-узел (со split провода), иначе свободная точка на сетке
+// индекс поставленной точки рядом с (wx,wy), иначе -1
+function hitNodeIdx(wx,wy){
+  var tol=Math.max(15,13/view.s);
+  for(var i=(S.nodes||[]).length-1;i>=0;i--){var n=S.nodes[i]; if(Math.max(Math.abs(n.x-wx),Math.abs(n.y-wy))<=tol)return i;}
+  return -1;
+}
+// поставить точку самому: клик по существующей точке — удалить; на линии → отвод-узел (split провода), иначе свободная точка на сетке
 function placePoint(wx,wy){
+  var hn=hitNodeIdx(wx,wy);
+  if(hn>=0){ pushUndo(); S.nodes.splice(hn,1); if(S.sel&&S.sel.t==='n')clearSel(); renderCanvas(); toast('Точка удалена'); return; }
   pushUndo();
   var tap=wireTapPoint(wx,wy), pt;
   if(tap){ splitWireAt(tap); pt={x:tap.x,y:tap.y}; }
   else { pt={x:snap(wx),y:snap(wy)}; }
   if(!(S.nodes||[]).some(function(n){return n.x===pt.x&&n.y===pt.y})) S.nodes.push(pt);
-  renderCanvas(); toast('Точка поставлена — теперь «Авто-провод» (A) от неё');
+  renderCanvas(); toast('Точка поставлена (клик по ней — удалить) · «Авто-провод» A — вести от неё');
 }
 function _dedupePts(pts){
   var o=[]; pts.forEach(function(p){var l=o[o.length-1]; if(!l||l.x!==p.x||l.y!==p.y)o.push({x:p.x,y:p.y});});
@@ -1498,6 +1515,9 @@ svg.addEventListener('pointerdown',function(e){
   if(tool==='wire'){wireClick(wp.x,wp.y);return}
   if(tool==='point'){placePoint(wp.x,wp.y);return}
   if(tool==='autowire'){autowireClick(wp.x,wp.y);return}
+  // выбор/перенос/удаление поставленной точки (в режиме «Выбор»)
+  var _hn=hitNodeIdx(wp.x,wp.y);
+  if(_hn>=0){ clearSel(); S.sel={t:'n',ni:_hn}; mode={k:'node',ni:_hn,sx:wp.x,sy:wp.y,ox:S.nodes[_hn].x,oy:S.nodes[_hn].y,moved:false}; renderCanvas(); renderProps(true); return; }
   // клик по концевой ручке выбранного провода → продолжаем вести от неё линию
   var th=e.target.closest&&e.target.closest('[data-we]');
   if(th){
@@ -1551,6 +1571,7 @@ svg.addEventListener('pointermove',function(e){
     view.tx=mode.tx+(e.clientX-mode.sx);view.ty=mode.ty+(e.clientY-mode.sy);applyView();return;
   }
   if(mode&&mode.k==='drag'){dragMove(wp);return}
+  if(mode&&mode.k==='node'){ var nn=S.nodes[mode.ni]; if(nn){ if(!mode.moved){mode.moved=true;pushUndo();} nn.x=snap(mode.ox+(wp.x-mode.sx)); nn.y=snap(mode.oy+(wp.y-mode.sy)); renderCanvas(); } return; }
   if(mode&&mode.k==='band'){mode.cur={x:wp.x,y:wp.y};renderCanvas();return}
   if(tool==='place'&&ghost){ghost.x=snap(wp.x);ghost.y=snap(wp.y);renderGhost()}
   if(tool==='wire'&&draft.length)renderDraft();
