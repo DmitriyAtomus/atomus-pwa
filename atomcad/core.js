@@ -266,7 +266,11 @@ function buildSchematic(P){
     groups.push(g);
   });
   var nT=cols.length, step=720, maxX=3850;
-  if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
+  if(nT>0){
+    var fitL=Math.floor((2240-gx)/nT);                                    // шаг, при котором последняя колонка остаётся левее штампа (x≈2300)
+    if(fitL>=380){ step=Math.min(720,fitL); maxX=2240; }                  // мало колонок — уводим их левее основной надписи, чтобы не заходили
+    else { var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(380,Math.floor(fit)); }  // много колонок — раскладываем шире (без наложения аппаратов)
+  }
   var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
