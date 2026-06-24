@@ -144,8 +144,11 @@ function natKey(d){var m=/^([A-Za-zА-Яа-я]+)(\d*)/.exec(d)||[];return (m[1]|
 // удалённые пользователем элементы щита (обратимо): набор стабильных токенов в P.cab.removed
 function isRemoved(P,token){return !!(P&&P.cab&&P.cab.removed&&P.cab.removed[token]);}
 // клеммы IEK КПИ 2в — модель по сечению; развёртка диапазонов и оценка сечения для спецификации
-var KPI_TERM_SPEC=[{sec:1.5,model:'КПИ 2в-1,5'},{sec:2.5,model:'КПИ 2в-2,5'},{sec:4,model:'КПИ 2в-4'},{sec:6,model:'КПИ 2в-6'},{sec:10,model:'КПИ 2в-10'}];
-function kpiTermModel(sec){sec=+sec||1.5;for(var i=0;i<KPI_TERM_SPEC.length;i++)if(sec<=KPI_TERM_SPEC[i].sec)return KPI_TERM_SPEC[i].model;return KPI_TERM_SPEC[KPI_TERM_SPEC.length-1].model;}
+var KPI_TERM_SPEC=[{sec:1.5,model:'КПИ 2в-1,5',S:4.2},{sec:2.5,model:'КПИ 2в-2,5',S:5.2},{sec:4,model:'КПИ 2в-4',S:6.2},{sec:6,model:'КПИ 2в-6',S:8.2},{sec:10,model:'КПИ 2в-10',S:10.3}];
+function kpiTermPick(sec){sec=+sec||1.5;for(var i=0;i<KPI_TERM_SPEC.length;i++)if(sec<=KPI_TERM_SPEC[i].sec)return KPI_TERM_SPEC[i];return KPI_TERM_SPEC[KPI_TERM_SPEC.length-1];}
+function kpiTermModel(sec){return kpiTermPick(sec).model;}
+// суммарная ширина клемм на рейке, мм (для оценки модулей корпуса)
+function terminalsWidthMM(P){var w=0;expandTerms(P&&P.terminals).forEach(function(t){w+=kpiTermPick(termSec(t)).S;});return w;}
 function expandTerms(list){var out=[];(list||[]).forEach(function(t){var m=String(t.term||'').match(/^(.*?:)(\d+)\s*[–\-]\s*(\d+)$/);if(m&&+m[3]>=+m[2]&&+m[3]-+m[2]<60){for(var n=+m[2];n<=+m[3];n++)out.push({term:m[1]+n,name:t.name,sec:t.sec});return;}out.push(t);});return out;}
 function termSec(t){if(t&&t.sec)return +t.sec;var g=String(t&&t.term||'');if(/^X1/.test(g))return 6;if(/^X5/.test(g))return 1.5;return 2.5;}
 
@@ -197,7 +200,8 @@ function moduleCount(P){
   (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_covM,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
   (P.aux||[]).forEach(function(a){ m+= (a.kind==='psu')?2:1; });
   lvSupplies(P).forEach(function(){ m+=2; }); // авто-БП низковольтных цепей
-  m+=4; // клеммы/резерв базовый
+  // клеммы: ширина по рейке (КПИ S) → эквивалент в модулях (1 мод = 17,5 мм) + резерв на упоры/перемычки
+  m += Math.max(4, Math.ceil(terminalsWidthMM(P)/17.5)+2);
   return m;
 }
 var ENCL=[{model:'IEK ЩРн-24',modules:24},{model:'IEK ЩРн-36з',modules:36},{model:'IEK ЩРн-48з-1',modules:48},{model:'IEK ЩРн-72з',modules:72},{model:'IEK ЩРн-96',modules:96}];
