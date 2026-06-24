@@ -34,6 +34,8 @@ function auxCoverSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind
 function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение общего контактора
 // твердотельные реле (рег. напряжения) из «Вспомогат.» по «что коммутирует»: имя нагрузки → обозначение ТР
 function ssrSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='ssr')return; var tag=a.tag||'ТР'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
+// промежуточные реле из «Вспомогат.» по «что коммутирует»: имя нагрузки → обозначение реле (KL)
+function relaySet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='relay')return; var tag=a.tag||'KL'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
@@ -163,8 +165,8 @@ function buildSpec(P){
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; items.push({des:b.code, name:'Выключатель автоматический', manu:'CHINT', model:'NB1-63 '+b.poles+'P, C'+b.rate, note:b.role}); });
   // контакторы под потребители
   var _auxKm=(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length;   // добавленные контакторы уже заняли KM1..KMn
-  var kmN=_auxKm+1, _cov=auxCoverSet(P);
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_cov,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:unm}); kmN++; } } });
+  var kmN=_auxKm+1, _cov=auxCoverSet(P), _covRel=relaySet(P);
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_cov,c,unm)||coveredByAux(_covRel,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; items.push({des:'KM'+kmN, name:'Контактор электромагнитный', manu:'CHINT', model:contactorModel(c), note:unm}); kmN++; } } });
   // датчики
   var btN=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){ items.push({des:'BT'+btN, name:'Датчик температуры', manu:'', model:s.sig, note:s.name}); btN++; } });
@@ -197,8 +199,8 @@ function buildSpec(P){
 function moduleCount(P){
   var m=0;
   (P.breakers||[]).forEach(function(b){ if(isRemoved(P,'qf|'+b.code))return; m+= b.poles===3?3:1; });
-  var _covM=auxCoverSet(P);
-  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_covM,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
+  var _covM=auxCoverSet(P), _covMR=relaySet(P);
+  (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_covM,c,unm)||coveredByAux(_covMR,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
   (P.aux||[]).forEach(function(a){ m+= (a.kind==='psu')?2:1; });
   lvSupplies(P).forEach(function(){ m+=2; }); // авто-БП низковольтных цепей
   // клеммы: ширина по рейке (КПИ S) → эквивалент в модулях (1 мод = 17,5 мм) + резерв на упоры/перемычки
@@ -276,7 +278,7 @@ function buildSchematic(P){
     if(fitL>=380){ step=Math.min(720,fitL); maxX=2240; }                  // мало колонок — уводим их левее основной надписи, чтобы не заходили
     else { var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(380,Math.floor(fit)); }  // много колонок — раскладываем шире (без наложения аппаратов)
   }
-  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
+  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
     var _w0=pw.length;                                                                  // запомним, какие провода добавит эта группа — потом раскрасим по фазе
@@ -298,9 +300,16 @@ function buildSchematic(P){
       else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
       // цепь отвода: автомат → контактор → (твердотельное реле) → клемма → нагрузка
       var covTag=coveredByAux(_covS,cons,col.l&&col.l.name);
+      var relTag=cons?(_rel[col.l&&col.l.name]||_rel[cons.name]||''):'';
       var ssrTag=cons?(_ssr[col.l&&col.l.name]||_ssr[cons.name]||''):'';
       var kmBot=1450;                                                                    // низ предыдущего аппарата (по умолчанию — сразу отвод)
-      if(cons&&needsContactor(cons)&&covTag){
+      if(cons&&needsContactor(cons)&&relTag){
+        var rpole=(covPole[relTag]=(covPole[relTag]||0)+1);                                // какой контакт реле уходит на эту нагрузку
+        pc.push(C(relTag,'c_no',x,1450,'','',cons.name)); kmBot=1600;                      // контакт промежуточного реле (вместо контактора)
+        pt.push({x:x+24,y:1500,s:17,ls:0,anchor:'start',tx:String(rpole)});                // общий контакт (1/2/3)
+        pt.push({x:x+24,y:1590,s:17,ls:0,anchor:'start',tx:String(rpole+6)});              // НО-контакт (7/8/9)
+        if(!(cons.name in kmByName)) kmByName[cons.name]=relTag;
+      } else if(cons&&needsContactor(cons)&&covTag){
         var pole=(covPole[covTag]=(covPole[covTag]||0)+1);                                 // какой по счёту полюс общего контактора уходит на эту нагрузку
         pc.push(C(covTag,'kmp1',x,1450,'',' ',cons.name)); kmBot=1780;                     // общий контактор — один полюс на нагрузку (тот же KM, разнесённо)
         pt.push({x:x+24,y:1545,s:17,ls:0,anchor:'start',tx:(2*pole-1)+'/L'+pole});         // маркировка ввода полюса (1/L1, 3/L2, 5/L3…)
@@ -424,7 +433,7 @@ g.AtomCore={
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
   buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,
-  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux,
+  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux, relaySet:relaySet,
   isLV:isLV, lvSupplies:lvSupplies
 };
 })(typeof window!=='undefined'?window:global);
