@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.544-comp-brands";
+const APP_VERSION = "v2.45.545";
 const APP_VERSION_DATE = "24.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1992,8 +1992,13 @@ let _notifRefreshTimer = null;
 
 function startNotifPolling() {
   refreshNotifBadge();
+  // v2.45.544: бейдж непрочитанных в чатах (Сервис + Монтаж)
+  try { if (typeof refreshTeamChatsBadge === 'function') refreshTeamChatsBadge(); } catch (_) {}
   if (_notifRefreshTimer) clearInterval(_notifRefreshTimer);
-  _notifRefreshTimer = setInterval(refreshNotifBadge, 30000);
+  _notifRefreshTimer = setInterval(() => {
+    refreshNotifBadge();
+    try { if (typeof refreshTeamChatsBadge === 'function') refreshTeamChatsBadge(); } catch (_) {}
+  }, 30000);
   // v2.45.159: пере-синхронизировать пуш-подписку, чтобы она не «слетала»
   // после обновления страницы / Service Worker (иконка гасла, пуш не приходил)
   try { syncPushSubscription(); } catch (_) {}
