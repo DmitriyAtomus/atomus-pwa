@@ -13061,3 +13061,542 @@ function _mpSubmit() {
   document.body.style.overflow = '';
   if (typeof showToast === 'function') showToast('Прогресс отмечен. Хорошей смены!', 'success');
 }
+
+
+// ============================================================================
+// v2.45.523: КОМАНДНЫЕ ЧАТЫ (свободные группы) — раздел «Сервис»
+// Менеджер создаёт чат, приглашает участников (сотрудников), общается.
+// Текст + файлы (фото/видео/документы). Поллинг как у чата по договору.
+// ============================================================================
+
+let _teamChatsPollTimer = null;
+let _tchatRefreshTimer  = null;
+let _tchatPendingFiles  = [];
+let _tchatCurrentId     = null;
+let _tchatLastSig       = '';
+
+function _stopTeamChatsPolling() {
+  if (_teamChatsPollTimer) { clearInterval(_teamChatsPollTimer); _teamChatsPollTimer = null; }
+}
+
+function _tcTrim(s, n) { s = s || ''; return s.length > n ? s.slice(0, n) + '…' : s; }
+
+function _tchatListTime(iso) {
+  if (!iso) return '';
+  const d = iso.slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const yest  = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (d === today) return iso.slice(11, 16) || '';
+  if (d === yest)  return 'вчера';
+  return d.split('-').reverse().slice(0, 2).join('.');
+}
+
+// ---------- Список чатов ----------
+async function loadTeamChats() {
+  const box = document.getElementById('team-chats-content');
+  if (!box) return;
+  try {
+    const r = await apiGet('/api/team-chats');
+    const chats = r.chats || [];
+    renderTeamChatList(chats);
+    _updateTeamChatsBadge(chats);
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Не удалось загрузить чаты</div>';
+  }
+  _stopTeamChatsPolling();
+  _teamChatsPollTimer = setInterval(() => {
+    const modal = document.getElementById('team-chat-modal');
+    if (state.currentScreen === 'defects-chats' && !(modal && modal.classList.contains('visible'))) {
+      _silentRefreshTeamChats();
+    }
+  }, 12000);
+}
+
+async function _silentRefreshTeamChats() {
+  try {
+    const r = await apiGet('/api/team-chats');
+    renderTeamChatList(r.chats || []);
+    _updateTeamChatsBadge(r.chats || []);
+  } catch (_) {}
+}
+
+function renderTeamChatList(chats) {
+  const box = document.getElementById('team-chats-content');
+  const counter = document.getElementById('team-chats-counter');
+  if (counter) counter.textContent = chats.length;
+  if (!box) return;
+  if (!chats.length) {
+    box.innerHTML = '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
+      + '<i class="ti ti-messages" style="font-size:42px;opacity:.4;"></i><br><br>'
+      + 'Пока нет ни одного чата.<br>Создайте чат, пригласите монтажников и коллег — и общайтесь.<br><br>'
+      + '<button class="btn btn-primary" onclick="openTeamPick(\'create\')"><i class="ti ti-plus"></i> Создать чат</button>'
+      + '</div>';
+    return;
+  }
+  let html = '<div class="tcl-list">';
+  chats.forEach(c => {
+    const lm = c.last_message;
+    let preview = 'Нет сообщений';
+    if (lm) {
+      if (lm.is_system) preview = lm.text;
+      else {
+        const who = lm.author_name ? (lm.author_name + ': ') : '';
+        const body = lm.text || (lm.has_files ? '📎 файл' : '');
+        preview = who + body;
+      }
+    }
+    const t = c.last_at ? _tchatListTime(c.last_at) : '';
+    const unread = c.unread > 0 ? '<span class="tcl-unread">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' : '';
+    html += '<div class="tcl-card" onclick="openTeamChat(' + c.id + ')">'
+      + '<div class="tcl-ava"><i class="ti ti-' + (c.role === 'owner' ? 'crown' : 'messages') + '"></i></div>'
+      + '<div class="tcl-main">'
+      + '<div class="tcl-row1"><span class="tcl-title">' + escapeHtml(c.title) + '</span>'
+      + '<span class="tcl-time">' + escapeHtml(t) + '</span></div>'
+      + '<div class="tcl-row2"><span class="tcl-preview' + (lm && lm.is_system ? ' sys' : '') + '">'
+      + escapeHtml(_tcTrim(preview, 72)) + '</span>' + unread + '</div>'
+      + '<div class="tcl-meta"><i class="ti ti-users"></i> ' + (c.members_count || 1)
+      + (c.role === 'owner' ? ' · вы владелец' : '') + '</div>'
+      + '</div></div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function _updateTeamChatsBadge(chats) {
+  const total = (chats || []).reduce((s, c) => s + (c.unread || 0), 0);
+  const b = document.getElementById('team-chats-nav-badge');
+  if (b) {
+    if (total > 0) { b.textContent = total > 99 ? '99+' : total; b.style.display = ''; }
+    else b.style.display = 'none';
+  }
+}
+
+async function refreshTeamChatsBadge() {
+  try {
+    const r = await apiGet('/api/team-chats/unread');
+    const b = document.getElementById('team-chats-nav-badge');
+    if (b) {
+      const total = r.total_unread || 0;
+      if (total > 0) { b.textContent = total > 99 ? '99+' : total; b.style.display = ''; }
+      else b.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
+// ---------- Открытие чата ----------
+async function openTeamChat(cid) {
+  _tchatCurrentId = cid;
+  _tchatPendingFiles = [];
+  _tchatLastSig = '';
+  _renderTeamAttachPreview();
+  const panel = document.getElementById('tchat-members-panel');
+  if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+  document.getElementById('tchat-messages').innerHTML = '<div class="loading-block">Загружаем…</div>';
+  document.getElementById('team-chat-modal').classList.add('visible');
+  await loadTeamChatMeta(cid);
+  await loadTeamChat(cid);
+  if (_tchatRefreshTimer) clearInterval(_tchatRefreshTimer);
+  _tchatRefreshTimer = setInterval(() => {
+    const modal = document.getElementById('team-chat-modal');
+    if (modal && modal.classList.contains('visible')) loadTeamChat(cid, true);
+    else { clearInterval(_tchatRefreshTimer); _tchatRefreshTimer = null; }
+  }, 6000);
+  setTimeout(() => { const i = document.getElementById('tchat-input'); if (i) i.focus(); }, 150);
+}
+
+function closeTeamChat() {
+  document.getElementById('team-chat-modal').classList.remove('visible');
+  if (_tchatRefreshTimer) { clearInterval(_tchatRefreshTimer); _tchatRefreshTimer = null; }
+  _tchatCurrentId = null;
+  _tchatPendingFiles = [];
+  _renderTeamAttachPreview();
+  if (state.currentScreen === 'defects-chats') _silentRefreshTeamChats();
+  else refreshTeamChatsBadge();
+}
+
+async function loadTeamChatMeta(cid) {
+  try {
+    const r = await apiGet('/api/team-chats/' + cid);
+    state._tchatMeta = r;
+    document.getElementById('tchat-title').textContent = r.title || 'Чат';
+    const names = (r.members || []).map(m => m.name).join(', ');
+    document.getElementById('tchat-subtitle').textContent =
+      (r.members || []).length + ' участ. · ' + _tcTrim(names, 56);
+  } catch (e) {}
+}
+
+async function loadTeamChat(cid, silent) {
+  const box = document.getElementById('tchat-messages');
+  try {
+    const r = await apiGet('/api/team-chats/' + cid + '/messages');
+    const arr = r.messages || [];
+    const sig = arr.length + ':' + ((arr.slice(-1)[0] || {}).id || 0);
+    if (silent && sig === _tchatLastSig) return;
+    _tchatLastSig = sig;
+    _renderTeamChatMessages(r);
+  } catch (e) {
+    if (!silent) box.innerHTML = '<div class="empty-block">Ошибка загрузки</div>';
+  }
+}
+
+function _renderTeamChatMessages(r) {
+  const box = document.getElementById('tchat-messages');
+  const msgs = r.messages || [];
+  const myChatId = r.my_chat_id;
+  const meta = state._tchatMeta || {};
+  const canModerate = !!meta.is_owner;
+  if (!msgs.length) {
+    box.innerHTML = '<div class="empty-block" style="padding:30px 18px;color:var(--text-light);">'
+      + '<i class="ti ti-message-circle"></i><br>Сообщений пока нет.<br>Напишите первое — все участники увидят.</div>';
+    return;
+  }
+  const wasAtBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 60;
+  let html = '';
+  let lastAuthor = null, lastDate = null;
+  msgs.forEach(m => {
+    const isMine = (m.author_chat_id === myChatId);
+    const dt = (m.created_at || '').slice(0, 10);
+    if (dt !== lastDate) {
+      html += '<div class="cchat-date-sep"><span>' + escapeHtml(_chatPrettyDate(dt)) + '</span></div>';
+      lastDate = dt; lastAuthor = null;
+    }
+    const time = (m.created_at || '').slice(11, 16);
+    if (m.is_system) {
+      html += '<div class="cchat-sys">' + escapeHtml(m.text) + ' · ' + escapeHtml(time) + '</div>';
+      lastAuthor = null;
+      return;
+    }
+    const showHead = (lastAuthor !== (m.author_chat_id || 0));
+    lastAuthor = m.author_chat_id || 0;
+    const author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
+    const cls = 'cchat-msg' + (isMine ? ' mine' : '');
+    html += '<div class="' + cls + '">';
+    if (showHead && !isMine) html += '<div class="cchat-msg-author">' + escapeHtml(author) + '</div>';
+    if (m.text) html += '<div class="cchat-msg-body">' + _escapeChatText(m.text) + '</div>';
+    if (m.files && m.files.length) html += _renderTeamMessageFiles(m.files);
+    html += '<div class="cchat-msg-meta">' + escapeHtml(time);
+    if (isMine || canModerate) {
+      html += ' · <button class="cchat-del-btn" onclick="deleteTeamChatMessage(' + m.id + ')" title="Удалить"><i class="ti ti-trash"></i></button>';
+    }
+    html += '</div></div>';
+  });
+  box.innerHTML = html;
+  if (wasAtBottom) box.scrollTop = box.scrollHeight;
+}
+
+function _renderTeamMessageFiles(files) {
+  if (!files || !files.length) return '';
+  let html = '<div class="cchat-msg-files">';
+  files.forEach(f => {
+    const url = API_BASE + '/api/team-chats/messages/files/' + f.id;
+    if (f.kind === 'photo') {
+      html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt=""></a>';
+    } else if (f.kind === 'video') {
+      html += '<video controls class="cchat-file-video"><source src="' + url + '" type="' + escapeHtml(f.content_type || '') + '"></video>';
+    } else {
+      const name = f.original_name || ('Файл #' + f.id);
+      const sz = f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '';
+      html += '<a href="' + url + '" target="_blank" class="cchat-file-doc"><i class="ti ti-file"></i>'
+        + '<div class="cchat-file-doc-meta"><div class="cchat-file-doc-name">' + escapeHtml(name) + '</div>'
+        + (sz ? '<div class="cchat-file-doc-size">' + sz + '</div>' : '') + '</div></a>';
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
+// ---------- Файлы к сообщению ----------
+function onTeamChatFilesSelected(files) {
+  if (!files || !files.length) return;
+  for (let i = 0; i < files.length; i++) {
+    if (_tchatPendingFiles.length >= 5) { showToast('Не больше 5 файлов на сообщение', 'info'); break; }
+    const f = files[i];
+    const isVid = (f.type || '').startsWith('video/');
+    const maxSize = isVid ? 100 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (f.size > maxSize) { showToast('Файл "' + f.name + '" слишком большой', 'error'); continue; }
+    _tchatPendingFiles.push(f);
+  }
+  _renderTeamAttachPreview();
+  document.getElementById('tchat-file-input').value = '';
+}
+
+function _renderTeamAttachPreview() {
+  const wrap = document.getElementById('tchat-attach-preview');
+  if (!wrap) return;
+  if (!_tchatPendingFiles.length) { wrap.innerHTML = ''; return; }
+  let html = '<div class="cchat-attach-row">';
+  _tchatPendingFiles.forEach((f, i) => {
+    const isImg = (f.type || '').startsWith('image/');
+    const isVid = (f.type || '').startsWith('video/');
+    let thumb;
+    if (isImg) thumb = '<img src="' + URL.createObjectURL(f) + '" alt="">';
+    else if (isVid) thumb = '<div class="cchat-thumb-icon"><i class="ti ti-video"></i></div>';
+    else thumb = '<div class="cchat-thumb-icon"><i class="ti ti-file"></i></div>';
+    html += '<div class="cchat-attach-item">' + thumb
+      + '<div class="cchat-attach-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>'
+      + '<button class="cchat-attach-remove" onclick="removeTeamAttachment(' + i + ')"><i class="ti ti-x"></i></button>'
+      + '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function removeTeamAttachment(idx) { _tchatPendingFiles.splice(idx, 1); _renderTeamAttachPreview(); }
+
+// ---------- Отправка / удаление ----------
+async function sendTeamChatMessage() {
+  const inp = document.getElementById('tchat-input');
+  const btn = document.getElementById('tchat-send-btn');
+  const text = (inp.value || '').trim();
+  const cid = _tchatCurrentId;
+  if (!cid) return;
+  if (!text && !_tchatPendingFiles.length) return;
+  btn.disabled = true;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    let response;
+    if (_tchatPendingFiles.length) {
+      const fd = new FormData();
+      if (text) fd.append('text', text);
+      _tchatPendingFiles.forEach((f, i) => fd.append('file_' + (i + 1), f, f.name));
+      response = await fetch(API_BASE + '/api/team-chats/' + cid + '/messages', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+    } else {
+      response = await fetch(API_BASE + '/api/team-chats/' + cid + '/messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: text }) });
+    }
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      showToast(e.message || e.error || 'Не отправилось', 'error');
+      return;
+    }
+    inp.value = ''; inp.style.height = '';
+    _tchatPendingFiles = []; _renderTeamAttachPreview();
+    _tchatLastSig = '';
+    await loadTeamChat(cid, false);
+    const box = document.getElementById('tchat-messages');
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally { btn.disabled = false; inp.focus(); }
+}
+
+async function deleteTeamChatMessage(mid) {
+  if (!confirm('Удалить сообщение?')) return;
+  const cid = _tchatCurrentId;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/team-chats/' + cid + '/messages/' + mid, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+    _tchatLastSig = '';
+    loadTeamChat(cid, false);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ---------- Панель участников ----------
+function toggleTeamMembers() {
+  const panel = document.getElementById('tchat-members-panel');
+  if (!panel) return;
+  if (panel.style.display === 'none' || !panel.style.display) {
+    renderTeamMembersPanel();
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function renderTeamMembersPanel() {
+  const panel = document.getElementById('tchat-members-panel');
+  if (!panel) return;
+  const meta = state._tchatMeta || {};
+  const members = meta.members || [];
+  const isOwner = !!meta.is_owner;
+  let html = '<div class="tcm-head"><span><i class="ti ti-users"></i> Участники (' + members.length + ')</span>'
+    + '<button class="tcm-add-btn" onclick="openTeamPick(\'add\')"><i class="ti ti-user-plus"></i> Добавить</button></div>';
+  html += '<div class="tcm-list">';
+  members.forEach(m => {
+    const roleTag = m.role === 'owner' ? '<span class="tcm-role">владелец</span>' : '';
+    let delBtn = '';
+    if (!m.is_me && isOwner && m.employee_id) {
+      delBtn = '<button class="tcm-del" onclick="removeTeamMember(' + m.employee_id + ')" title="Убрать из чата"><i class="ti ti-x"></i></button>';
+    }
+    html += '<div class="tcm-item"><span class="tcm-name">' + escapeHtml(m.name || '—')
+      + (m.is_me ? ' <span class="tcm-you">вы</span>' : '') + roleTag + '</span>' + delBtn + '</div>';
+  });
+  html += '</div><div class="tcm-actions">';
+  if (isOwner) html += '<button class="tcm-act" onclick="renameTeamChat()"><i class="ti ti-edit"></i> Переименовать</button>';
+  html += '<button class="tcm-act danger" onclick="leaveTeamChat()"><i class="ti ti-logout"></i> Выйти из чата</button>';
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+async function removeTeamMember(empId) {
+  const meta = state._tchatMeta || {};
+  const m = (meta.members || []).find(x => x.employee_id === empId);
+  const name = m ? m.name : 'участника';
+  if (!confirm('Убрать «' + name + '» из чата?')) return;
+  const cid = _tchatCurrentId;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/team-chats/' + cid + '/members/' + empId, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+    await loadTeamChatMeta(cid);
+    renderTeamMembersPanel();
+    _tchatLastSig = ''; loadTeamChat(cid, false);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function leaveTeamChat() {
+  if (!confirm('Выйти из этого чата? Вы перестанете получать сообщения.')) return;
+  const cid = _tchatCurrentId;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/team-chats/' + cid + '/leave', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Не удалось выйти', 'error'); return; }
+    showToast('Вы вышли из чата', 'success');
+    closeTeamChat();
+    if (state.currentScreen === 'defects-chats') loadTeamChats();
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function renameTeamChat() {
+  const meta = state._tchatMeta || {};
+  const title = prompt('Новое название чата:', meta.title || '');
+  if (title === null) return;
+  const t = (title || '').trim();
+  if (!t) return;
+  const cid = _tchatCurrentId;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/team-chats/' + cid, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ title: t }) });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+    await loadTeamChatMeta(cid);
+    renderTeamMembersPanel();
+    _tchatLastSig = ''; loadTeamChat(cid, false);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ---------- Выбор участников (создание / добавление) ----------
+async function openTeamPick(mode) {
+  state._teamPick = { mode: mode, cid: _tchatCurrentId, sel: new Set(), existing: new Set(), employees: [] };
+  const titleEl = document.getElementById('tcp-title');
+  const nameRow = document.getElementById('tcp-name-row');
+  const submit  = document.getElementById('tcp-submit');
+  if (mode === 'add') {
+    titleEl.textContent = 'Добавить участников';
+    nameRow.style.display = 'none';
+    submit.textContent = 'Добавить';
+    const meta = state._tchatMeta || {};
+    (meta.members || []).forEach(m => { if (m.employee_id) state._teamPick.existing.add(m.employee_id); });
+  } else {
+    titleEl.textContent = 'Новый чат';
+    nameRow.style.display = '';
+    submit.textContent = 'Создать чат';
+    document.getElementById('tcp-chat-title').value = '';
+  }
+  document.getElementById('tcp-search').value = '';
+  document.getElementById('tcp-list').innerHTML = '<div class="loading-block">Загружаем…</div>';
+  document.getElementById('team-pick-modal').classList.add('visible');
+  if (mode === 'create') setTimeout(() => { const t = document.getElementById('tcp-chat-title'); if (t) t.focus(); }, 120);
+  try {
+    const r = await apiGet('/api/employees/active');
+    state._teamPick.employees = (r.employees || []).filter(e => !state._teamPick.existing.has(e.id));
+    renderTeamPickList();
+  } catch (e) {
+    document.getElementById('tcp-list').innerHTML = '<div class="empty-block">Не удалось загрузить сотрудников</div>';
+  }
+  _updateTcpCount();
+}
+
+function closeTeamPick() {
+  document.getElementById('team-pick-modal').classList.remove('visible');
+  state._teamPick = null;
+}
+
+function renderTeamPickList() {
+  const tp = state._teamPick;
+  if (!tp) return;
+  const q = (document.getElementById('tcp-search').value || '').toLowerCase().trim();
+  const list = document.getElementById('tcp-list');
+  let emps = tp.employees;
+  if (q) emps = emps.filter(e => ((e.short_name || '') + ' ' + (e.full_name || '') + ' ' + (e.position || '')).toLowerCase().includes(q));
+  if (!emps.length) { list.innerHTML = '<div class="empty-block" style="padding:18px;">Никого не найдено</div>'; return; }
+  let html = '';
+  emps.forEach(e => {
+    const sel = tp.sel.has(e.id);
+    const nm = e.short_name || e.full_name || ('Сотрудник #' + e.id);
+    html += '<div class="tcp-item' + (sel ? ' sel' : '') + '" onclick="toggleTeamPick(' + e.id + ')">'
+      + '<div class="tcp-check"><i class="ti ti-' + (sel ? 'square-check-filled' : 'square') + '"></i></div>'
+      + '<div class="tcp-info"><div class="tcp-name">' + escapeHtml(nm) + '</div>'
+      + (e.position ? '<div class="tcp-pos">' + escapeHtml(e.position) + '</div>' : '') + '</div></div>';
+  });
+  list.innerHTML = html;
+}
+
+function toggleTeamPick(empId) {
+  const tp = state._teamPick;
+  if (!tp) return;
+  if (tp.sel.has(empId)) tp.sel.delete(empId); else tp.sel.add(empId);
+  renderTeamPickList();
+  _updateTcpCount();
+}
+
+function _updateTcpCount() {
+  const tp = state._teamPick;
+  const el = document.getElementById('tcp-count');
+  if (el && tp) el.textContent = 'Выбрано: ' + tp.sel.size;
+}
+
+async function submitTeamPick() {
+  const tp = state._teamPick;
+  if (!tp) return;
+  const ids = Array.from(tp.sel);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (tp.mode === 'create') {
+    const title = (document.getElementById('tcp-chat-title').value || '').trim();
+    if (!title) { showToast('Введите название чата', 'error'); document.getElementById('tcp-chat-title').focus(); return; }
+    try {
+      const r = await fetch(API_BASE + '/api/team-chats', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ title: title, member_ids: ids }) });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось создать', 'error'); return; }
+      const data = await r.json();
+      closeTeamPick();
+      if (state.currentScreen === 'defects-chats') await loadTeamChats();
+      if (data.id) openTeamChat(data.id);
+    } catch (e) { showToast('Ошибка соединения', 'error'); }
+  } else {
+    if (!ids.length) { showToast('Выберите хотя бы одного сотрудника', 'info'); return; }
+    const cid = tp.cid || _tchatCurrentId;
+    try {
+      const r = await fetch(API_BASE + '/api/team-chats/' + cid + '/members', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ employee_ids: ids }) });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+      closeTeamPick();
+      await loadTeamChatMeta(cid);
+      renderTeamMembersPanel();
+      _tchatLastSig = ''; loadTeamChat(cid, false);
+      showToast('Участники добавлены', 'success');
+    } catch (e) { showToast('Ошибка соединения', 'error'); }
+  }
+}
+
+// Enter — отправить, Shift+Enter — перенос; авто-рост поля ввода
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('tchat-input');
+  if (!inp) return;
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTeamChatMessage(); }
+  });
+  inp.addEventListener('input', () => {
+    inp.style.height = 'auto';
+    inp.style.height = Math.min(inp.scrollHeight, 140) + 'px';
+  });
+});

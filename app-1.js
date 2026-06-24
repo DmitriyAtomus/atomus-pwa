@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.539-cp-received";
+const APP_VERSION = "v2.45.540";
 const APP_VERSION_DATE = "24.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1439,6 +1439,10 @@ function selectSidebarItem(screenName) {
   if (screenName !== 'inventory') {
     try { _invStopPolling && _invStopPolling(); } catch (_) {}
   }
+  // v2.45.523: глушим poll списка чатов при уходе
+  if (screenName !== 'defects-chats') {
+    try { _stopTeamChatsPolling && _stopTeamChatsPolling(); } catch (_) {}
+  }
 
   // v2.8.2 / v2.43.28: сохраняем текущий раздел+экран+ID-контекст чтобы при F5
   // оказаться ровно там, где был. Не сохраняем для form-экранов (там полузаполненные данные).
@@ -1597,6 +1601,8 @@ function selectSidebarItem(screenName) {
   if (screenName === 'defects-list-progress') { state.defectsFilter = 'in_progress'; loadDefectsList(); }
   if (screenName === 'defects-list-resolved') { state.defectsFilter = 'resolved';    loadDefectsList(); }
   if (screenName === 'defects-list-rejected') { state.defectsFilter = 'rejected';    loadDefectsList(); }
+  // v2.45.523: командные чаты (свободные группы)
+  if (screenName === 'defects-chats') loadTeamChats();
   // v2.45.346: Монтаж
   if (screenName === 'installation-list')         { state.installFilter = 'all';     loadInstallationList(); }
   if (screenName === 'installation-list-active')  { state.installFilter = 'active';  loadInstallationList(); }
