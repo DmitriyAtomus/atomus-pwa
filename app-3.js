@@ -5325,6 +5325,7 @@ function _cpRowHtml(it) {
       '</div>' +
       '<span class="sv2-buy-qty">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
       st2 +
+      '<button type="button" class="sv2-buy-x" title="Отметить, что пришло (получено)" style="color:#15803D;" onclick="event.stopPropagation();_cpMarkReceived(' + it.id + ',' + sName2 + ')"><i class="ti ti-check"></i></button>' +
       '<button type="button" class="sv2-buy-x" title="Убрать из закупки (в договоре останется)" onclick="event.stopPropagation();_cpSkipItem(' + it.id + ',' + sName2 + ')"><i class="ti ti-x"></i></button>' +
     '</div>';
   }
@@ -5352,6 +5353,11 @@ function _cpRowHtml(it) {
     '</span>' +
     '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
     stBadge +
+    // Отметить, что пришло (получено) — уйдёт из «Что закупить»
+    '<button type="button" title="Отметить, что пришло (получено)" ' +
+      'onclick="event.stopPropagation();_cpMarkReceived(' + it.id + ', ' + JSON.stringify(it.item_name || '').replace(/"/g, '&quot;') + ')" ' +
+      'style="border:none;background:none;cursor:pointer;color:#15803D;padding:2px 4px;font-size:14px;display:flex;align-items:center;" title="Пришло">' +
+      '<i class="ti ti-check"></i></button>' +
     // v2.45.260: убрать из закупки (позиция в договоре остаётся)
     '<button type="button" title="Убрать из закупки (в договоре останется)" ' +
       'onclick="event.stopPropagation();_cpSkipItem(' + it.id + ', ' + JSON.stringify(it.item_name || '').replace(/"/g, '&quot;') + ')" ' +
@@ -5376,6 +5382,27 @@ async function _cpSkipItem(itemId, name) {
       return;
     }
     showToast('Позиция убрана из закупки', 'success');
+    loadSupplyShopping();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+async function _cpMarkReceived(itemId, name) {
+  if (!confirm('Отметить «' + (name || '') + '» как пришедшее (получено)?\nПозиция уйдёт из «Что закупить».')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/contracts/items/' + itemId + '/purchase-status', {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'received' }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось отметить', 'error');
+      return;
+    }
+    showToast('✓ Отмечено как пришедшее', 'success');
     loadSupplyShopping();
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
