@@ -439,9 +439,9 @@ var SYM={
     pr:[L(0,0,0,35),L(0,115,0,150),C(0,75,40,1),L(-28,47,28,103),L(28,47,-28,103)]},
   term:{name:'Вывод / клемма',pre:'X',bb:[-22,-44,22,4],lbl:[0,-58,'middle'],
     pins:[[0,0]],pr:[C(0,-20,20)]},
-  // клемма с подключением сверху (вывод вверху, обозначение снизу) — для нагрузочных клемм внизу схемы
-  termb:{name:'Клемма (подключение сверху)',pre:'X',bb:[-22,-4,22,72],lbl:[0,66,'middle'],
-    pins:[[0,0]],pr:[C(0,20,20)]},
+  // клемма с подключением сверху (вывод вверху, обозначение снизу) — для нагрузочных клемм внизу схемы; короткий вывод-отступ до кружка
+  termb:{name:'Клемма (подключение сверху)',pre:'X',bb:[-22,-4,22,84],lbl:[0,78,'middle'],
+    pins:[[0,0]],pr:[L(0,0,0,16),C(0,36,20)]},
   qf1:{name:'Автомат 1п',pre:'QF',bb:[-62,-10,30,310],lbl:[-74,160,'end'],
     pins:[[0,0],[0,300]],
     pr:[L(0,0,0,90),L(0,240,-45,95),L(-57,83,-33,107),L(-33,83,-57,107),L(0,240,0,300)]},
@@ -1401,29 +1401,30 @@ function buildSheetMarkup(cur,total,subtitle){
   g+='</g>';
   h+=g;
   var T='<g fill="'+INK+'" font-family="\'IBM Plex Sans\'">';
-  // обозначение документа (графа 2) — крупно сверху
-  T+='<text x="'+GX(125)+'" y="'+GY(7.5)+'" font-size="48" font-weight="600" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+esc(_docCode)+'</text>';
+  function fitFs(txt,wmm,maxFs){var n=(String(txt).length)||1; return Math.max(13,Math.min(maxFs,(wmm*U)/(n*0.56))).toFixed(1);}
+  // обозначение документа (графа 2) — крупно сверху, влезает по ширине средней+правой части
+  T+='<text x="'+GX(125)+'" y="'+GY(7.5)+'" font-size="'+fitFs(_docCode,112,48)+'" font-weight="600" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+esc(_docCode)+'</text>';
   // заголовок таблицы изменений
-  T+='<text x="'+GX(32.5)+'" y="'+GY(15)+'" font-size="20" text-anchor="middle" fill="'+SOFT+'">Изм. Лист № докум. Подп. Дата</text>';
+  T+='<text x="'+GX(32.5)+'" y="'+GY(15)+'" font-size="'+fitFs('Изм. Лист № докум. Подп. Дата',62,19)+'" text-anchor="middle" fill="'+SOFT+'">Изм. Лист № докум. Подп. Дата</text>';
   // графы разработки (роли + фамилия)
   [['Разраб.',27.5],['Пров.',32.5],['Т.контр.',37.5],['Н.контр.',47.5],['Утв.',52.5]].forEach(function(r){
-    T+='<text x="'+GX(2)+'" y="'+GY(r[1]+1.7)+'" font-size="21" fill="'+SOFT+'">'+r[0]+'</text>';
+    T+='<text x="'+GX(2)+'" y="'+GY(r[1]+1.7)+'" font-size="20" fill="'+SOFT+'">'+r[0]+'</text>';
   });
-  T+='<text x="'+GX(21)+'" y="'+GY(29.2)+'" font-size="21">Д.В.</text>';
-  // средняя графа — наименование изделия и документа
-  T+='<text x="'+GX(100)+'" y="'+GY(21)+'" font-size="36" font-weight="600" text-anchor="middle">Щит управления</text>';
-  T+='<text x="'+GX(100)+'" y="'+GY(36)+'" font-size="27" text-anchor="middle">схема электрическая</text>';
-  T+='<text x="'+GX(100)+'" y="'+GY(48)+'" font-size="24" text-anchor="middle" fill="'+SOFT+'">'+esc(subtitle||'')+'</text>';
+  T+='<text x="'+GX(21)+'" y="'+GY(29.2)+'" font-size="20">Д.В.</text>';
+  // средняя графа — наименование изделия и документа (вписываем в 68 мм)
+  T+='<text x="'+GX(100)+'" y="'+GY(21)+'" font-size="'+fitFs('Щит управления',66,36)+'" font-weight="600" text-anchor="middle">Щит управления</text>';
+  T+='<text x="'+GX(100)+'" y="'+GY(36)+'" font-size="'+fitFs('схема электрическая',66,26)+'" text-anchor="middle">схема электрическая</text>';
+  T+='<text x="'+GX(100)+'" y="'+GY(48)+'" font-size="'+fitFs(subtitle||' ',66,23)+'" text-anchor="middle" fill="'+SOFT+'">'+esc(subtitle||'')+'</text>';
   // правый блок — стадия / лист / листов
-  T+='<text x="'+GX(142.5)+'" y="'+GY(16.5)+'" font-size="20" text-anchor="middle" fill="'+SOFT+'">Стадия</text>';
-  T+='<text x="'+GX(157.5)+'" y="'+GY(16.5)+'" font-size="20" text-anchor="middle" fill="'+SOFT+'">Лист</text>';
-  T+='<text x="'+GX(175)+'" y="'+GY(16.5)+'" font-size="20" text-anchor="middle" fill="'+SOFT+'">Листов</text>';
-  T+='<text x="'+GX(142.5)+'" y="'+GY(27)+'" font-size="30" text-anchor="middle" font-family="\'IBM Plex Mono\'">Р</text>';
-  T+='<text x="'+GX(157.5)+'" y="'+GY(27)+'" font-size="30" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+((cur||0)+1)+'</text>';
-  T+='<text x="'+GX(175)+'" y="'+GY(27)+'" font-size="30" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+(total||1)+'</text>';
-  // организация (графа 9)
-  T+='<text x="'+GX(160)+'" y="'+GY(37.5)+'" font-size="27" font-weight="600" text-anchor="middle">ООО «Атомус Групп»</text>';
-  T+='<text x="'+GX(160)+'" y="'+GY(49)+'" font-size="22" text-anchor="middle" fill="'+SOFT+'">Атом Электрика · AtomCAD</text>';
+  T+='<text x="'+GX(142.5)+'" y="'+GY(16.5)+'" font-size="17" text-anchor="middle" fill="'+SOFT+'">Стадия</text>';
+  T+='<text x="'+GX(157.5)+'" y="'+GY(16.5)+'" font-size="17" text-anchor="middle" fill="'+SOFT+'">Лист</text>';
+  T+='<text x="'+GX(175)+'" y="'+GY(16.5)+'" font-size="17" text-anchor="middle" fill="'+SOFT+'">Листов</text>';
+  T+='<text x="'+GX(142.5)+'" y="'+GY(27)+'" font-size="28" text-anchor="middle" font-family="\'IBM Plex Mono\'">Р</text>';
+  T+='<text x="'+GX(157.5)+'" y="'+GY(27)+'" font-size="28" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+((cur||0)+1)+'</text>';
+  T+='<text x="'+GX(175)+'" y="'+GY(27)+'" font-size="28" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+(total||1)+'</text>';
+  // организация (графа 9) — вписываем в 50 мм
+  T+='<text x="'+GX(160)+'" y="'+GY(37.5)+'" font-size="'+fitFs('ООО «Атомус Групп»',47,26)+'" font-weight="600" text-anchor="middle">ООО «Атомус Групп»</text>';
+  T+='<text x="'+GX(160)+'" y="'+GY(49)+'" font-size="'+fitFs('Атом Электрика · AtomCAD',47,20)+'" text-anchor="middle" fill="'+SOFT+'">Атом Электрика · AtomCAD</text>';
   T+='</g>';
   h+=T;
   return h;
