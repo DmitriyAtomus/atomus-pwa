@@ -222,6 +222,8 @@ function _ctrlGeom(io){
 }
 function C(des,sym,xx,yy,model,manu,note,nm){var a={};if(model)a.model=model;if(manu)a.manu=manu;if(note)a.note=note;if(nm)a.nm=nm;return {sym:sym,x:xx,y:yy,rot:0,mirror:false,des:des,attrs:a};}
 function _W(){var pts=[].slice.call(arguments);return {pts:pts.map(function(p){return {x:p[0],y:p[1]}})};}
+// сечение жилы по току защиты (медь, мм²) — тот же ряд, что в редакторе
+function _secForA(I){var t=[[10,1.0],[16,1.5],[25,2.5],[32,4],[40,6],[50,10],[80,16],[100,25]];for(var i=0;i<t.length;i++)if(I<=t[i][0])return t[i][1];return 35;}
 // рамка листа A3 (×10 мм) — ДОЛЖНА совпадать с editor.html (SW/SH и штамп)
 var SHEET_W=4200, SHEET_H=2970, TITLE_X=2300, TITLE_Y=2370;
 /* листы «аппараты управления»: сетка в пределах рамки, перенос на новый лист при нехватке места */
@@ -308,15 +310,16 @@ function buildSchematic(P){
         kmN++;
       }
       var termY=1950, wnY=1730;                                                          // termY — конец отвода = верхний пин клеммы (подключение сверху)
+      var brSec=_secForA(+(b.rate)||0);                                                   // сечение жилы отвода по номиналу автомата
       if(ssrTag){
         var sy=kmBot+120;                                                                // твердотельное реле сразу под контактором
         pw.push(W([x,kmBot],[x,sy]));
         pc.push(C(ssrTag,'ssr',x,sy,'','','ТР рег. напряжения · 0-10В'));                 // вход L1 сверху, выход T1 снизу, управление 0-10В
         pt.push({x:x-150,y:sy+170,s:18,ls:0,anchor:'end',tx:'0-10В ← AO'});               // подсказка по управлению
         termY=sy+440; wnY=sy+360;
-        pw.push(W([x,sy+300],[x,termY]));                                               // выход ТР → клемма (до верхнего пина)
+        var _tw=W([x,sy+300],[x,termY]); _tw.sec=brSec; pw.push(_tw);                     // выход ТР → клемма (до верхнего пина)
       } else {
-        pw.push(W([x,kmBot],[x,termY]));                                                  // контактор/отвод → клемма (до верхнего пина)
+        var _tw2=W([x,kmBot],[x,termY]); _tw2.sec=brSec; pw.push(_tw2);                   // контактор/отвод → клемма (до верхнего пина)
       }
       pt.push({x:x+44,y:wnY,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
       pc.push(C('X'+termN,'termb',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;               // клемма: подключение сверху, обозначение снизу

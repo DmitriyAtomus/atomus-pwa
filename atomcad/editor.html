@@ -867,8 +867,8 @@ function wiresMarkup(forExport){
     var _wc=sel?CY:(w.phase&&PHASE_COL[w.phase]?PHASE_COL[w.phase]:INK);   // цвет по фазе L1/L2/L3
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+_wc+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
     if(!forExport){ var dHit=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' '); h+='<path data-w="'+w.id+'" d="'+dHit+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>'; }
-    var _sec=wireSection(w);
-    if(_sec && (sel || _isFeeder(w,_bus))){
+    var _sec=(w.sec!=null)?String(w.sec).replace('.',','):wireSection(w);
+    if(_sec && (sel || w.sec!=null || _isFeeder(w,_bus))){
       var _lp=wireSegMid(w);
       if(_lp&&_lp.len>=130){
         var _tx=_lp.horiz?_lp.x:(_lp.x+24), _ty=_lp.horiz?(_lp.y-16):_lp.y;
@@ -2004,7 +2004,7 @@ $('catSearch').addEventListener('input',renderCatalog);
 function _mkSheet(s){
   return {
     comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
-    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null}}),
+    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null,sec:(w.sec!=null?w.sec:null)}}),
     texts:(s.texts||[]).slice(),
     nodes:(s.nodes||[]).map(function(n){return {x:n.x,y:n.y}}),
     subtitle:s.subtitle||s.title||''
