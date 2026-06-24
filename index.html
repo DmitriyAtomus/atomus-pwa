@@ -160,6 +160,11 @@
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">QR-скан</span>
     </button>
+    <!-- v2.45.x: глобальная кнопка чатов — доступна во всех разделах и всем ролям -->
+    <button class="notif-btn" id="team-chats-top-btn" onclick="openTeamChatsScreen()" title="Чаты">
+      <i class="ti ti-messages"></i>
+      <span class="notif-badge team-chats-badge" id="team-chats-top-badge" style="display:none;">0</span>
+    </button>
     <!-- v2.42.5: уведомления -->
     <button class="notif-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Уведомления">
       <i class="ti ti-bell"></i>

@@ -13079,6 +13079,14 @@ function _stopTeamChatsPolling() {
   if (_teamChatsPollTimer) { clearInterval(_teamChatsPollTimer); _teamChatsPollTimer = null; }
 }
 
+// Глобальная точка входа в чаты (кнопка в шапке) — работает из любого раздела
+// и для любой роли, в т.ч. для «чистого» монтажника. Экран чатов не привязан
+// к разделу, поэтому просто показываем его поверх текущего.
+function openTeamChatsScreen() {
+  if (typeof selectSidebarItem === 'function') selectSidebarItem('defects-chats');
+  else if (typeof loadTeamChats === 'function') loadTeamChats();
+}
+
 function _tcTrim(s, n) { s = s || ''; return s.length > n ? s.slice(0, n) + '…' : s; }
 
 function _tchatListTime(iso) {
