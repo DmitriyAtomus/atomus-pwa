@@ -1580,6 +1580,9 @@ function _radioState() {
       playing: false,
       loading: false,
       volume: 0.7,
+      target: 'local',     // 'local' — играть здесь, 'tv' — на Око офиса (телевизор)
+      tvStationId: null,   // выбранная станция для ТВ
+      tvPlaying: false,    // считаем, что играет на ТВ
     };
     try {
       const saved = JSON.parse(localStorage.getItem(RADIO_STORAGE_KEY) || 'null');
@@ -1587,6 +1590,8 @@ function _radioState() {
       if (saved && typeof saved.volume === 'number') {
         window._radio.volume = Math.max(0, Math.min(1, saved.volume));
       }
+      if (saved && saved.target) window._radio.target = saved.target;
+      if (saved && saved.tvStationId) window._radio.tvStationId = saved.tvStationId;
     } catch (e) {}
   }
   return window._radio;
@@ -1603,6 +1608,8 @@ function _radioSave() {
       stationId:  s.stationId,
       volume:     s.volume,
       wasPlaying: !!s.playing, // v2.43.77: для автозапуска после F5
+      target:     s.target,
+      tvStationId: s.tvStationId,
     }));
   } catch (e) {}
 }
@@ -1612,29 +1619,43 @@ function renderSidebarRadio() {
   const btn = document.getElementById('sidebar-radio-btn');
   if (!btn) return;
   const s = _radioState();
-  const station = s.stationId ? _radioGetStation(s.stationId) : null;
-  btn.classList.toggle('playing', !!s.playing);
+  const isTv = s.target === 'tv';
+  const playing = isTv ? s.tvPlaying : s.playing;
+  const curId = isTv ? s.tvStationId : s.stationId;
+  const station = curId ? _radioGetStation(curId) : null;
+  btn.classList.toggle('playing', !!playing);
   const nameEl = document.getElementById('sidebar-radio-station');
-  if (nameEl) nameEl.textContent = (s.playing && station) ? station.name : '';
+  if (nameEl) nameEl.textContent = (playing && station) ? (station.name + (isTv ? ' · Око офиса' : '')) : '';
 }
 
 // Рендер тела модалки (тёмная панель с управлением + список станций).
 function _renderRadioModalBody() {
   const s = _radioState();
-  const station = s.stationId ? _radioGetStation(s.stationId) : null;
+  const isTv = s.target === 'tv';
+  const curId = isTv ? s.tvStationId : s.stationId;
+  const station = curId ? _radioGetStation(curId) : null;
   const stationName = station ? station.name : 'Выберите волну';
-  const isPlaying = s.playing;
-  const isLoading = s.loading;
+  const isPlaying = isTv ? s.tvPlaying : s.playing;
+  const isLoading = isTv ? false : s.loading;
   const playIcon = isLoading ? 'ti-loader-2' : (isPlaying ? 'ti-player-pause-filled' : 'ti-player-play-filled');
   const labelHtml = isPlaying
-    ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>В эфире'
+    ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>' + (isTv ? 'На Око офиса' : 'В эфире')
     : '<i class="ti ti-radio"></i>Радио';
   const volPct = Math.round((s.volume || 0) * 100);
   const volIcon = volPct === 0 ? 'ti-volume-off' : (volPct < 40 ? 'ti-volume-2' : 'ti-volume');
 
+  // Переключатель назначения: здесь (в браузере) / на телевизор «Око офиса»
+  const btnBase = 'flex:1;padding:9px 8px;border-radius:9px;border:1px solid #2a3550;background:#141d30;color:#cdd8ee;cursor:pointer;font-size:14px;font-weight:600;';
+  const btnAct  = 'background:#2D5F8B;color:#fff;border-color:#2D5F8B;';
+  const targetRow =
+    '<div class="radio-target" style="display:flex;gap:8px;padding:12px 14px 2px;">' +
+      '<button style="' + btnBase + (!isTv ? btnAct : '') + '" onclick="setRadioTarget(\'local\')"><i class="ti ti-device-speaker"></i> Здесь</button>' +
+      '<button style="' + btnBase + (isTv ? btnAct : '') + '" onclick="setRadioTarget(\'tv\')">👁️ Око офиса</button>' +
+    '</div>';
+
   let items = '';
   RADIO_STATIONS.forEach((st, i) => {
-    const active = st.id === s.stationId;
+    const active = st.id === curId;
     items += '<div class="radio-station-item' + (active ? ' active' : '') + '" onclick="selectRadioStation(\'' + st.id + '\')">' +
                '<div class="rsi-num">' + (i + 1) + '.</div>' +
                '<div class="rsi-name">' + escapeHtml(st.name) + '</div>' +
@@ -1643,10 +1664,19 @@ function _renderRadioModalBody() {
              '</div>';
   });
 
+  const volumeHtml = isTv
+    ? '<div class="hr-volume" style="opacity:.75;font-size:13px;"><i class="ti ti-volume"></i>&nbsp;Громкость на Око офиса — тихо (10%)</div>'
+    : '<div class="hr-volume">' +
+        '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
+        '<input type="range" min="0" max="100" value="' + volPct + '" oninput="setRadioVolume(this.value)">' +
+        '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
+      '</div>';
+
   return (
+    targetRow +
     '<div class="radio-modal-top' + (isLoading ? ' hr-loading' : '') + '">' +
       '<div class="hr-top">' +
-        '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Пауза' : 'Играть') + '">' +
+        '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Стоп' : 'Играть') + '">' +
           '<i class="ti ' + playIcon + '"></i>' +
         '</button>' +
         '<div class="hr-text">' +
@@ -1654,11 +1684,7 @@ function _renderRadioModalBody() {
           '<div class="hr-station">' + escapeHtml(stationName) + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="hr-volume">' +
-        '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
-        '<input type="range" min="0" max="100" value="' + volPct + '" oninput="setRadioVolume(this.value)">' +
-        '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
-      '</div>' +
+      volumeHtml +
     '</div>' +
     '<div class="modal-body"><div class="radio-station-list">' + items + '</div></div>'
   );
@@ -1711,6 +1737,17 @@ function setRadioVolume(v) {
 
 function toggleRadioPlay() {
   const s = _radioState();
+  if (s.target === 'tv') {
+    if (s.tvPlaying) {
+      s.tvPlaying = false; _radioSave(); _radioTvCommand('stop', null);
+      showToast('Радио на Око офиса остановлено', 'info');
+    } else if (s.tvStationId) {
+      const st = _radioGetStation(s.tvStationId);
+      if (st) { s.tvPlaying = true; _radioSave(); _radioTvCommand('play', st); }
+    }
+    _refreshRadioModal(); renderSidebarRadio();
+    return;
+  }
   const audio = _radioEnsureAudio();
   if (!s.stationId) {
     // Нет станции — просто откроем список (модалка уже открыта, но на случай прямого вызова)
@@ -1737,6 +1774,13 @@ function selectRadioStation(id) {
   const station = _radioGetStation(id);
   if (!station) return;
   const s = _radioState();
+  if (s.target === 'tv') {
+    s.tvStationId = id; s.tvPlaying = true; _radioSave();
+    _radioTvCommand('play', station);
+    showToast('Включаю «' + station.name + '» на Око офиса', 'success');
+    _refreshRadioModal(); renderSidebarRadio();
+    return;
+  }
   const audio = _radioEnsureAudio();
   s.stationId = id;
   _radioSave();
@@ -1748,6 +1792,32 @@ function selectRadioStation(id) {
     s.loading = false; s.playing = false; _refreshRadioModal(); renderSidebarRadio();
     showToast('Не удалось воспроизвести — проверьте интернет или выберите другую', 'error');
   });
+}
+
+// Переключить, куда играть радио: 'local' (здесь) или 'tv' (Око офиса).
+function setRadioTarget(t) {
+  const s = _radioState();
+  if (s.target === t) return;
+  s.target = t;
+  // При уходе на ТВ глушим локальный звук, чтобы не дублировать.
+  if (t === 'tv' && s.audio && s.playing) { try { s.audio.pause(); } catch (e) {} }
+  _radioSave();
+  _refreshRadioModal();
+  renderSidebarRadio();
+}
+
+// Отправить команду радио на телевизор «Око офиса» (читает локальный поллер на офисном ПК).
+async function _radioTvCommand(action, station) {
+  try {
+    await apiPost('/api/tv/radio', {
+      action:     action,
+      station_id: station ? station.id : null,
+      name:       station ? station.name : '',
+      url:        station ? station.url : '',
+    });
+  } catch (e) {
+    showToast('Не удалось отправить команду на Око офиса', 'error');
+  }
 }
 
 function openRadioModal() {
