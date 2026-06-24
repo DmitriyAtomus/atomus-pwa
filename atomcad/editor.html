@@ -348,6 +348,8 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
 /* ============ константы ============ */
 var GRID=25, SW=4200, SH=2970;
 var INK='#1C2B38', SOFT='#5E6E7C', CY='#16B7DB', AM='#FFC400', PAPER='#F6F8FA';
+// цвета фаз для наглядности (читаемы на белом листе): L1 — жёлто-коричневый, L2 — зелёный, L3 — красный
+var PHASE_COL={L1:'#C49000',L2:'#1E8E3E',L3:'#D23B3B',N:'#3A6B96',PE:'#2E8B57'};
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function snap(v){return Math.round(v/GRID)*GRID}
@@ -856,7 +858,8 @@ function wiresMarkup(forExport){
   S.wires.forEach(function(w){
     var sel=!forExport&&S.sel&&S.sel.t==='w'&&S.sel.id===w.id;
     var d=_hopD(w);
-    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+(sel?CY:INK)+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
+    var _wc=sel?CY:(w.phase&&PHASE_COL[w.phase]?PHASE_COL[w.phase]:INK);   // цвет по фазе L1/L2/L3
+    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+_wc+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
     if(!forExport){ var dHit=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' '); h+='<path data-w="'+w.id+'" d="'+dHit+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>'; }
     var _sec=wireSection(w);
     if(_sec && (sel || _isFeeder(w,_bus))){
@@ -882,7 +885,8 @@ function renderCanvas(){
   /* компоненты + свободные тексты */
   h='';
   S.texts.forEach(function(t){
-    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
+    var _tc=(t.ph&&PHASE_COL[t.ph])?PHASE_COL[t.ph]:SOFT;   // подпись фазы — цветом фазы
+    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+_tc+'" font-weight="'+(t.ph?'700':'400')+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
   });
   S.comps.forEach(function(c){
     var col=isSelC(c.id)?CY:INK;
@@ -1961,7 +1965,7 @@ $('catSearch').addEventListener('input',renderCatalog);
 function _mkSheet(s){
   return {
     comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
-    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}})}}),
+    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null}}),
     texts:(s.texts||[]).slice(),
     nodes:(s.nodes||[]).map(function(n){return {x:n.x,y:n.y}}),
     subtitle:s.subtitle||s.title||''

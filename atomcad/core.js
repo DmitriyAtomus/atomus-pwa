@@ -270,12 +270,14 @@ function buildSchematic(P){
   var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
+    var _w0=pw.length;                                                                  // запомним, какие провода добавит эта группа — потом раскрасим по фазе
     var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
     var ph3=(b.poles===3), phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
+    var phTag=(!ph3&&/^L[123]$/.test(phase))?phase:null;                                 // однофазный отвод → одна фаза, можно красить
     // автомат — один на группу, питание с шины ввода
     pc.push(C(b.code,'qf1',qfx,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT', grouped?('группа · '+gc.length+' лин.'):gc[0].l.name));
     pw.push(W([qfx,800],[qfx,950]));
-    pt.push({x:qfx-40,y:892,s:24,ls:0,anchor:'end',tx:phase});                         // фаза(ы) линии — слева от отвода, чтобы не налезать на подпись сечения «N мм²» справа
+    pt.push({x:qfx-40,y:892,s:24,ls:0,anchor:'end',tx:phase,ph:phTag});                  // фаза(ы) линии — слева от отвода; ph — цвет фазы
     if(grouped){
       pw.push(W([qfx,1250],[qfx,1350]));                                               // отвод автомата на шину распределения
       pw.push(W([x0,1350],[x1,1350]));                                                 // шина распределения по отводам
@@ -316,10 +318,15 @@ function buildSchematic(P){
       pc.push(C('X'+termN,'term',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;
       lastX=x;
     });
+    if(phTag){ for(var _wi=_w0;_wi<pw.length;_wi++) pw[_wi].phase=phTag; }                // раскрасить все провода однофазной группы по фазе
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
   pt.push({x:gx+40,y:770,s:22,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины — над линией шины (y=800) и правее ввода, чтобы линия не пересекала подпись
   pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
+  // легенда цветов фаз
+  pt.push({x:gx+1180,y:232,s:24,anchor:'start',tx:'L1',ph:'L1'});
+  pt.push({x:gx+1260,y:232,s:24,anchor:'start',tx:'L2',ph:'L2'});
+  pt.push({x:gx+1340,y:232,s:24,anchor:'start',tx:'L3',ph:'L3'});
   var sheets=[{title:'силовые цепи', comps:pc, wires:pw, texts:pt}];
 
   // ===================== ЛИСТ 2 · ЦЕПИ УПРАВЛЕНИЯ =====================
