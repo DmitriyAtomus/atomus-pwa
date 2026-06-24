@@ -1167,10 +1167,14 @@ function cabinetSVG(){
       if(it.k==='term'&&it.n){
         var tn=it.n, pad2=mm(2.5), tx0=x+pad2, tw=Math.max(6,ww)-pad2*2;
         var ty0=y+mm(3)+mm(11), ty1=y+mm(3)+hpx-mm(4), slotH=ty1-ty0;       // слоты ниже подписи
-        var sw=tw/tn;
+        var sw=tw/tn, tlist=(P.terminals||[]);
+        var tagFs=Math.max(4.5,Math.min(8,sw*0.62));                         // шрифт обозначения под ширину клеммы
         for(var ti=0;ti<tn;ti++){
-          var sx=tx0+ti*sw;
+          var sx=tx0+ti*sw, scx=sx+sw/2, scy=ty0+slotH/2;
           s+='<rect x="'+sx.toFixed(1)+'" y="'+ty0.toFixed(1)+'" width="'+Math.max(1.2,sw-1).toFixed(1)+'" height="'+slotH.toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.7" opacity=".75"/>';
+          // обозначение клеммы — вертикально внутри ножа (как на реальной маркировке)
+          var tag=tlist[ti]?String(tlist[ti].term||''):'';
+          if(tag) s+='<text x="'+scx.toFixed(1)+'" y="'+scy.toFixed(1)+'" font-size="'+tagFs.toFixed(1)+'" fill="#9be6c4" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none" transform="rotate(-90 '+scx.toFixed(1)+' '+scy.toFixed(1)+')">'+tag+'</text>';
         }
         // подпись клеммника — сверху блока, над слотами (не перекрывает их)
         var tfs=Math.max(7,Math.min(10,modPx*0.62));
