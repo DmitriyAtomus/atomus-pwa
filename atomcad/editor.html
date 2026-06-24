@@ -1217,10 +1217,16 @@ function _projOnSeg(px,py,a,b){
   var dx=b.x-a.x,dy=b.y-a.y,t=((px-a.x)*dx+(py-a.y)*dy)/(dx*dx+dy*dy||1); t=Math.max(0,Math.min(1,t)); return {x:a.x+t*dx,y:a.y+t*dy};
 }
 // ближайшая точка на каком-либо проводе (поставить отвод/точку на линии)
+function _clampSeg(v,p,q){return Math.max(Math.min(p,q),Math.min(Math.max(p,q),v));}
 function wireTapPoint(wx,wy){
   var tol=Math.max(16,13/view.s), best=null, bd=tol;
   S.wires.forEach(function(w){ for(var i=0;i<w.pts.length-1;i++){
-    var pt=_projOnSeg(wx,wy,w.pts[i],w.pts[i+1]), d=Math.max(Math.abs(pt.x-wx),Math.abs(pt.y-wy));
+    var a=w.pts[i],b=w.pts[i+1], pt=_projOnSeg(wx,wy,a,b);
+    // привязка к сетке вдоль линии (точка остаётся на проводе, но в узле сетки)
+    if(a.x===b.x) pt={x:a.x, y:_clampSeg(snap(pt.y),a.y,b.y)};
+    else if(a.y===b.y) pt={x:_clampSeg(snap(pt.x),a.x,b.x), y:a.y};
+    else pt={x:snap(pt.x), y:snap(pt.y)};
+    var d=Math.max(Math.abs(pt.x-wx),Math.abs(pt.y-wy));
     if(d<bd){bd=d;best={x:Math.round(pt.x),y:Math.round(pt.y),wire:w,seg:i};}
   }});
   return best;
