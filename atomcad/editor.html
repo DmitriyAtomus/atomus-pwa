@@ -1089,6 +1089,28 @@ function delSel(){
   else S.wires=S.wires.filter(function(w){return w.id!==S.sel.id});
   clearSel();renderProps(true);renderCanvas();
 }
+/* ============ копировать / вставить (с новой нумерацией) ============ */
+var clipboard=null;
+function _selCompIds(){ return (S.selSet&&S.selSet.length)?S.selSet.slice():(S.sel&&S.sel.t==='c'?[S.sel.id]:[]); }
+function copySel(){
+  var comps=_selCompIds().map(compById).filter(Boolean);
+  if(!comps.length){toast('Сначала выдели аппарат(ы)');return;}
+  clipboard=comps.map(function(c){return {sym:c.sym,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:JSON.parse(JSON.stringify(c.attrs||{})),x:c.x,y:c.y};});
+  toast('Скопировано: '+clipboard.length+' — Ctrl+V вставит с новой нумерацией');
+}
+function _preOf(s){ if(SYM[s.sym]&&SYM[s.sym].pre)return SYM[s.sym].pre; var m=String(s.des||'').match(/^([A-Za-zА-Яа-я]+)/); return m?m[1]:'A'; }
+function pasteClip(){
+  if(!clipboard||!clipboard.length){toast('Буфер пуст');return;}
+  pushUndo();
+  var off=80, ids=[];
+  clipboard.forEach(function(s){
+    var nc={id:uid('c'),sym:s.sym,x:snap(s.x+off),y:snap(s.y+off),rot:s.rot,mirror:s.mirror,des:nextDes(_preOf(s)),attrs:JSON.parse(JSON.stringify(s.attrs||{}))};
+    S.comps.push(nc); ids.push(nc.id);
+  });
+  S.selSet=ids; S.sel=(ids.length===1?{t:'c',id:ids[0]}:null);
+  renderCanvas(); renderProps(true);
+  toast('Вставлено: '+ids.length+' (новые обозначения) — тащи на место');
+}
 function nextDes(pre){
   var mx=0,re=new RegExp('^'+pre+'(\\d+)$');
   S.comps.forEach(function(c){var m=re.exec(c.des);if(m)mx=Math.max(mx,parseInt(m[1],10))});
@@ -1616,12 +1638,15 @@ window.addEventListener('keydown',function(e){
   if(e.target.tagName==='INPUT')return;
   if(document.querySelector('.modal.show')){if(e.key==='Escape')closeModal();return;}
   var k=e.key;
-  if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='z'){
+  if((e.ctrlKey||e.metaKey)&&(k.toLowerCase()==='z'||e.code==='KeyZ')){
     e.preventDefault();
     if(e.shiftKey)redo();else undo();
     return;
   }
-  if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='y'){e.preventDefault();redo();return}
+  if((e.ctrlKey||e.metaKey)&&(k.toLowerCase()==='y'||e.code==='KeyY')){e.preventDefault();redo();return}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'){e.preventDefault();copySel();return}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'){e.preventDefault();pasteClip();return}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyD'){e.preventDefault();copySel();pasteClip();return}
   if(k===' '&&!spaceHeld){spaceHeld=true;prevTool=tool;setTool('hand');e.preventDefault();return}
   if(k==='Escape'){
     if(draft.length)cancelWire();
