@@ -63,7 +63,8 @@ function lvSupplies(P){
 // НЕ нагружают цепь управления силовые аппараты: БП (свой автомат), частотники, автоматы, прочее силовое.
 function controlCurrent(P){
   var CTRL_LOAD={lamp:1,button:1,switch:1,estop:1,fan:1};
-  var a = 0.8 + (P&&P.aux||[]).reduce(function(s,x){
+  var base=(P&&P.controller&&P.controller.model)?0.8:0;   // без контроллера базового потребления нет
+  var a = base + (P&&P.aux||[]).reduce(function(s,x){
     if(x.kind==='contactor'||x.kind==='ssr'||x.kind==='relay') return s+0.05*(x.qty||1);
     if(CTRL_LOAD[x.kind]) return s+(+x.a||0)*(x.qty||1);
     return s;
