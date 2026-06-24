@@ -303,19 +303,19 @@ function buildSchematic(P){
         if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;
         kmN++;
       }
-      var termY=2000, wnY=1730;
+      var termY=1950, wnY=1730;                                                          // termY — конец отвода = верхний пин клеммы (подключение сверху)
       if(ssrTag){
         var sy=kmBot+120;                                                                // твердотельное реле сразу под контактором
         pw.push(W([x,kmBot],[x,sy]));
         pc.push(C(ssrTag,'ssr',x,sy,'','','ТР рег. напряжения · 0-10В'));                 // вход L1 сверху, выход T1 снизу, управление 0-10В
         pt.push({x:x-150,y:sy+170,s:18,ls:0,anchor:'end',tx:'0-10В ← AO'});               // подсказка по управлению
-        pw.push(W([x,sy+300],[x,sy+420]));                                               // выход ТР → клемма
-        termY=sy+470; wnY=sy+360;
+        termY=sy+440; wnY=sy+360;
+        pw.push(W([x,sy+300],[x,termY]));                                               // выход ТР → клемма (до верхнего пина)
       } else {
-        pw.push(W([x,kmBot],[x,1950]));                                                   // контактор/отвод → клемма
+        pw.push(W([x,kmBot],[x,termY]));                                                  // контактор/отвод → клемма (до верхнего пина)
       }
       pt.push({x:x+44,y:wnY,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
-      pc.push(C('X'+termN,'term',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;
+      pc.push(C('X'+termN,'termb',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;               // клемма: подключение сверху, обозначение снизу
       lastX=x;
     });
     if(phTag){ for(var _wi=_w0;_wi<pw.length;_wi++) pw[_wi].phase=phTag; }                // раскрасить все провода однофазной группы по фазе
