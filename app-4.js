@@ -9808,14 +9808,12 @@ async function confirmShipCurrent() {
   const okBtn = document.querySelector('.ship-confirm-ok');
   if (okBtn) okBtn.disabled = true;
   try {
-    // Повторная отгрузка: сперва снимаем прежнюю отметку, затем проводим по скану
-    if (pending.reship && pending.shipmentId) {
-      try { await apiDelete('/api/shipments/' + pending.shipmentId); } catch (e) { /* продолжаем */ }
-    }
     const resp = await apiPost(_shipScanEndpoint(), {
       qr_token: pending.token,
       contract_id: state._shipContractId,
       contract_item_id: pending.itemId || null,
+      // «Отгрузить заново»: бэкенд атомарно снимет прежнюю отметку и отгрузит снова
+      force: pending.reship ? true : undefined,
     });
     // v2.45.145: поля в resp.data, не в resp (см. apiPost)
     const d = (resp && resp.data) || {};
