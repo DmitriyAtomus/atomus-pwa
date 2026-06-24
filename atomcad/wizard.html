@@ -106,10 +106,12 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
     <button class="no ugt" data-ugt="dash" style="flex:0 0 auto">┄ Пунктир</button>
     <button class="no ugt" data-ugt="pin" style="flex:0 0 auto">○ Вывод</button>
     <button class="no ugt" data-ugt="text" style="flex:0 0 auto">T Текст</button>
+    <button class="no" id="ugoPhoto" style="flex:0 0 auto">📎 Фото</button>
     <span style="flex:1"></span>
     <button class="no" id="ugoUndo" style="flex:0 0 auto">↺ Стереть</button>
     <button class="no" id="ugoClear" style="flex:0 0 auto">Очистить</button>
   </div>
+  <input type="file" id="ugoFile" accept="image/*" style="display:none">
   <svg id="ugoCanvas" width="100%" height="360" viewBox="-360 -240 720 480" style="background:#F6F8FA;border:1px solid var(--line);border-radius:8px;display:block;touch-action:none"></svg>
   <div style="font-size:11px;color:var(--dim);margin:7px 0">Линия/Пунктир — кликай точки (двойной клик — закончить). «Вывод» — точка подключения. Сетка 20.</div>
   <div class="r" style="gap:9px"><button class="ok" id="ugoSave" style="flex:1">✓ Сохранить УГО</button><button class="no" id="ugoClose" style="flex:1">Закрыть</button></div>
@@ -618,9 +620,9 @@ function ugoSvg(ugo,w,h){
   var s='<svg width="'+w+'" height="'+h+'" viewBox="'+vb+'" fill="none" stroke="#9FB0BE" color="#9FB0BE" stroke-width="'+sw+'" stroke-linecap="round">';
   ugo.pr.forEach(function(p){s+=ugoPrimSvg(p)}); return s+'</svg>';
 }
-var ugoTool='line', ugoDraw={pr:[],pins:[]}, ugoPend=null, ugoIdx=-1;
+var ugoTool='line', ugoDraw={pr:[],pins:[]}, ugoPend=null, ugoIdx=-1, ugoBg=null;
 function openUgoEd(idx){
-  ugoIdx=idx; var it=APP_LIB[idx];
+  ugoIdx=idx; var it=APP_LIB[idx]; ugoBg=null; var pb=$('ugoPhoto'); if(pb)pb.textContent='📎 Фото';
   ugoDraw=(it&&it.data&&it.data.ugo)?{pr:JSON.parse(JSON.stringify(it.data.ugo.pr||[])),pins:(it.data.ugo.pins||[]).map(function(p){return {x:p[0],y:p[1]}})}:{pr:[],pins:[]};
   ugoPend=null; ugoSetTool('line'); $('ugoName').textContent=(it?it.label:'аппарат'); renderUgo(); $('ugoMask').classList.add('show');
 }
@@ -631,6 +633,7 @@ function renderUgo(){
   for(var gx=-360;gx<=360;gx+=20)h+='<line x1="'+gx+'" y1="-240" x2="'+gx+'" y2="240" stroke="#E3E9EF" stroke-width="1"/>';
   for(var gy=-240;gy<=240;gy+=20)h+='<line x1="-360" y1="'+gy+'" x2="360" y2="'+gy+'" stroke="#E3E9EF" stroke-width="1"/>';
   h+='<line x1="-360" y1="0" x2="360" y2="0" stroke="#C7D0D8"/><line x1="0" y1="-240" x2="0" y2="240" stroke="#C7D0D8"/>';
+  if(ugoBg)h+='<image x="-360" y="-240" width="720" height="480" href="'+ugoBg+'" preserveAspectRatio="xMidYMid meet" opacity="0.42"/>';
   h+='<g stroke="#1C2B38" stroke-width="4" fill="none" color="#1C2B38">';
   ugoDraw.pr.forEach(function(p){h+=ugoPrimSvg(p)}); h+='</g>';
   ugoDraw.pins.forEach(function(p){h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="6" fill="none" stroke="#16B7DB" stroke-width="3"/>';});
@@ -1689,6 +1692,8 @@ $('ugoCanvas').addEventListener('click',ugoClick);
 $('ugoCanvas').addEventListener('dblclick',function(e){e.preventDefault();ugoPend=null;renderUgo();});
 $('ugoUndo').onclick=function(){ if(ugoPend){ugoPend=null;} else { var n=ugoDraw.pr.length,l=ugoDraw.pr[n-1]; if(l&&l.t==='t'&&ugoDraw.pr[n-2]&&ugoDraw.pr[n-2].t==='c'&&ugoDraw.pins.length){ugoDraw.pr.pop();ugoDraw.pr.pop();ugoDraw.pins.pop();} else ugoDraw.pr.pop(); } renderUgo(); };
 $('ugoClear').onclick=function(){ugoDraw={pr:[],pins:[]};ugoPend=null;renderUgo();};
+$('ugoPhoto').onclick=function(){ if(ugoBg){ugoBg=null;$('ugoPhoto').textContent='📎 Фото';renderUgo();toast('Подложка убрана');} else $('ugoFile').click(); };
+$('ugoFile').onchange=function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;var r=new FileReader();r.onload=function(){ugoBg=r.result;$('ugoPhoto').textContent='✕ Убрать фото';renderUgo();toast('Фото подложено — обводи линиями/выводами поверх');};r.readAsDataURL(f);};
 Array.prototype.forEach.call(document.querySelectorAll('.ugt'),function(b){b.addEventListener('click',function(){ugoSetTool(b.getAttribute('data-ugt'))});});
 /* выбор файлов: докидываем к уже выбранным и перераспознаём весь набор */
 $('dsFile').onchange=function(e){
