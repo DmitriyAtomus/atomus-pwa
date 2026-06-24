@@ -143,6 +143,12 @@ function compressDes(list){
 function natKey(d){var m=/^([A-Za-zА-Яа-я]+)(\d*)/.exec(d)||[];return (m[1]||'')+(m[2]?('00000'+m[2]).slice(-5):'')}
 // удалённые пользователем элементы щита (обратимо): набор стабильных токенов в P.cab.removed
 function isRemoved(P,token){return !!(P&&P.cab&&P.cab.removed&&P.cab.removed[token]);}
+// клеммы IEK КПИ 2в — модель по сечению; развёртка диапазонов и оценка сечения для спецификации
+var KPI_TERM_SPEC=[{sec:1.5,model:'КПИ 2в-1,5'},{sec:2.5,model:'КПИ 2в-2,5'},{sec:4,model:'КПИ 2в-4'},{sec:6,model:'КПИ 2в-6'},{sec:10,model:'КПИ 2в-10'}];
+function kpiTermModel(sec){sec=+sec||1.5;for(var i=0;i<KPI_TERM_SPEC.length;i++)if(sec<=KPI_TERM_SPEC[i].sec)return KPI_TERM_SPEC[i].model;return KPI_TERM_SPEC[KPI_TERM_SPEC.length-1].model;}
+function expandTerms(list){var out=[];(list||[]).forEach(function(t){var m=String(t.term||'').match(/^(.*?:)(\d+)\s*[–\-]\s*(\d+)$/);if(m&&+m[3]>=+m[2]&&+m[3]-+m[2]<60){for(var n=+m[2];n<=+m[3];n++)out.push({term:m[1]+n,name:t.name,sec:t.sec});return;}out.push(t);});return out;}
+function termSec(t){if(t&&t.sec)return +t.sec;var g=String(t&&t.term||'');if(/^X1/.test(g))return 6;if(/^X5/.test(g))return 1.5;return 2.5;}
+
 function buildSpec(P){
   var items=[]; // {des, name, manu, model, note}
   // контроллер
@@ -165,6 +171,8 @@ function buildSpec(P){
   var psuBase=(P.aux||[]).filter(function(a){return a.kind==='psu'}).reduce(function(s,a){return s+(a.qty||1)},0);
   var gN=1;
   lvSupplies(P).forEach(function(p){ items.push({des:'G'+(psuBase+gN), name:'Блок питания', manu:'', model:p.volt+'В '+p.ratingW+'Вт', note:'питание '+p.volt+'В · нагрузка '+p.sumW+' Вт ('+p.count+' шт)'}); gN++; });
+  // клеммы (IEK КПИ 2в) — отдельной позицией по типоразмерам (модель по сечению)
+  expandTerms(P.terminals).forEach(function(t){ var sc=termSec(t); items.push({des:t.term||'X', name:'Клемма пружинная', manu:'IEK', model:kpiTermModel(sc), note:sc+' мм²'}); });
   // корпус
   if(P.enclosure&&P.enclosure.model) items.push({des:'—', name:'Корпус щита', manu:'', model:P.enclosure.model, note:P.enclosure.modules+' мод.'});
 
