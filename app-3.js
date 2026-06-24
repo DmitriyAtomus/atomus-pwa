@@ -767,6 +767,27 @@ async function openComponentForm(componentId) {
     '</div>';
   m.classList.add('visible');
   setTimeout(() => { const n = document.getElementById('cf-name'); if (n) n.focus(); }, 50);
+  // Разбивка остатка по маркам (обобщённый компонент → Hisense 3 / Royal 2)
+  if (componentId) {
+    (async () => {
+      try {
+        const d = await apiGet('/api/components/' + componentId + '/brands');
+        const brands = (d && d.brands) || [];
+        if (!brands.length) return;
+        const chips = brands.map(b =>
+          '<span style="display:inline-block;background:#EEF2FF;color:#3730A3;border-radius:8px;padding:2px 8px;margin:2px 4px 2px 0;font-size:12px;">' +
+          escapeHtml(b.brand) + ' — <b>' + _fmtQty(b.qty) + '</b></span>'
+        ).join('');
+        const box = document.createElement('div');
+        box.style.cssText = 'padding:10px 18px;border-bottom:1px solid var(--border);background:#FAFAFE;';
+        box.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);margin-bottom:4px;"><i class="ti ti-tags"></i> Марки на складе</div>' + chips;
+        const modalEl = m.querySelector('.modal');
+        const header = modalEl && modalEl.querySelector('.modal-header');
+        if (header && header.parentNode) header.parentNode.insertBefore(box, header.nextSibling);
+        else if (modalEl) modalEl.insertBefore(box, modalEl.firstChild);
+      } catch (e) { /* марок нет — не показываем */ }
+    })();
+  }
 }
 
 function closeComponentForm() {
@@ -2629,6 +2650,8 @@ async function openComponentReceiveModal(preselectedId) {
         '<select id="recv-component" class="form-input" style="margin-bottom:14px;">' + opts + '</select>' +
         '<label class="form-label">Количество *</label>' +
         '<input type="number" id="recv-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
+        '<label class="form-label">Марка / модель (что фактически пришло)</label>' +
+        '<input type="text" id="recv-brand" class="form-input" placeholder="Напр.: Royal Clima ES-E 60HEX / Hisense" style="margin-bottom:14px;" />' +
         '<label class="form-label">Поставщик (опционально)</label>' +
         '<select id="recv-supplier" class="form-input" style="margin-bottom:14px;">' +
           '<option value="">— Не указан —</option>' +
@@ -2668,6 +2691,8 @@ async function submitComponentReceive() {
   const qty = parseFloat(document.getElementById('recv-qty').value);
   const supplier_id = document.getElementById('recv-supplier').value || null;
   const reason = document.getElementById('recv-reason').value || '';
+  const brandEl = document.getElementById('recv-brand');
+  const brand = brandEl ? (brandEl.value || '').trim() : '';
   if (!component_id || isNaN(qty) || qty <= 0) {
     showToast('Заполни поля корректно', 'error'); return;
   }
@@ -2676,7 +2701,7 @@ async function submitComponentReceive() {
     const r = await fetch(API_BASE + '/api/components/receive', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ component_id, qty, supplier_id, reason }),
+      body: JSON.stringify({ component_id, qty, supplier_id, reason, brand }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
