@@ -2590,7 +2590,15 @@ async function openComponentDetail(componentId) {
 
 // ============ Приход ============
 
-function openComponentReceiveModal(preselectedId) {
+async function openComponentReceiveModal(preselectedId) {
+  // Каталог комплектующих мог быть не загружен (напр. открыли из «Что закупить») —
+  // подгружаем на лету, чтобы модалка прихода работала из любого раздела.
+  if (!cache.components || !cache.components.length) {
+    try {
+      const r = await apiGet('/api/components');
+      cache.components = (r && r.components) || [];
+    } catch (e) { /* ниже покажем ошибку, если пусто */ }
+  }
   const components = cache.components || [];
   if (!components.length) {
     showToast('Сначала добавь хотя бы одно комплектующее', 'error');
