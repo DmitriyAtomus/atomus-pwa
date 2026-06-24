@@ -2651,7 +2651,10 @@ async function openComponentReceiveModal(preselectedId) {
         '<label class="form-label">Количество *</label>' +
         '<input type="number" id="recv-qty" class="form-input" value="1" min="0.01" step="0.01" style="margin-bottom:14px;" />' +
         '<label class="form-label">Марка / модель (что фактически пришло)</label>' +
-        '<input type="text" id="recv-brand" class="form-input" placeholder="Напр.: Royal Clima ES-E 60HEX / Hisense" style="margin-bottom:14px;" />' +
+        '<input type="text" id="recv-brand" class="form-input" list="recv-brand-list" autocomplete="off" placeholder="Выбери из номенклатуры или впиши: Royal Clima ES-E 60HEX" style="margin-bottom:14px;" />' +
+        '<datalist id="recv-brand-list">' +
+          components.map(c => '<option value="' + escapeHtml(c.name) + '">').join('') +
+        '</datalist>' +
         '<label class="form-label">Поставщик (опционально)</label>' +
         '<select id="recv-supplier" class="form-input" style="margin-bottom:14px;">' +
           '<option value="">— Не указан —</option>' +
