@@ -1149,6 +1149,7 @@ function cabinetSVG(){
   var termLbl='Клеммники '+(termGroups.length?(termGroups[0]+'…'+termGroups[termGroups.length-1]):'')+' · '+termN+' кл.';
   rows.push([{t:termLbl,w:perRow,k:'term',n:termN,terms:termList}]);
   var neededRows=rows.length, overflow=neededRows>maxRows;
+  var termOverflow=false, termRows=1;   // клеммы не помещаются по высоте с зазорами под кабель-каналы → нужен корпус выше
   var drawnRows=Math.min(neededRows,maxRows);
   // масштаб мм→px (форма повторяет щит)
   var ppm=Math.min(740/W,640/H,1.5), pad=12;
@@ -1196,6 +1197,8 @@ function cabinetSVG(){
           if(cxp+cw>tw+0.5 && cxp>0){ ry++; cxp=0; }
           lay.push({x:tx0+cxp,row:ry,w:cw,tag:tlist[ti]?String(tlist[ti].term||''):''}); cxp+=cw; }
         var nrows=ry+1, ductGap=mm(50);                                        // ПРАВИЛО: между рейками клемм ≥5 см под кабель-канал
+        termRows=nrows;
+        if(nrows*mm(15)+(nrows-1)*ductGap>availH+0.5) termOverflow=true;        // не лезет даже при минимальной высоте клеммы + зазорах → корпус мал
         var railH=Math.min(mm(34),Math.max(mm(15),(availH-(nrows-1)*ductGap)/nrows));
         var rowPitch=railH+ductGap, _termH=titleH+nrows*railH+(nrows-1)*ductGap+mm(5);
         s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+_termH.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
@@ -1258,8 +1261,10 @@ function cabinetSVG(){
   s+='<line x1="'+scMid.toFixed(1)+'" y1="'+(scY-2.5).toFixed(1)+'" x2="'+scMid.toFixed(1)+'" y2="'+(scY+2.5).toFixed(1)+'" stroke="#8FA0AE" stroke-width="1"/>';
   s+='<text x="'+scMid.toFixed(1)+'" y="'+(scY-5).toFixed(1)+'" font-size="8" fill="#8FA0AE" text-anchor="middle" font-family="IBM Plex Mono">100 мм</text>';
   // подпись/предупреждение
-  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
+  var _warn=overflow||termOverflow;
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(_warn?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
      (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
+      termOverflow?('✗ клеммам не хватает высоты: '+termRows+' рейки с зазором 5 см под кабель-канал не помещаются в '+W+'×'+H+' мм — нужен корпус выше'):
      (perRow+' мод./ряд · '+maxRows+' ряд макс · кабель-канал '+ductMm+'×60 мм · у KM: П — из «Потребители», В — из «Вспомогат.» · перетащи аппарат на другой — поменяются местами'))+'</text>';
   s+='</svg>';return s;
 }
