@@ -2679,6 +2679,8 @@ async function submitComponentReceive() {
     closeComponentReceiveModal();
     cache.components = null;
     loadWarehouseComponents();
+    // v2.45.x: обновим «Что закупить» — оприходованный компонент уйдёт из списка
+    if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
   } catch (e) {
     showToast('Ошибка соединения', 'error');
   }
@@ -6067,6 +6069,11 @@ function renderSupplyShopping(d) {
         '</td>';
       const removeCell =
         '<td class="ssp-remove-cell">' +
+          '<button type="button" class="ssp-remove-btn" style="color:#15803D;" ' +
+            'title="Приход на склад (оприходовать)" ' +
+            'onclick="event.stopPropagation();openComponentReceiveModal(' + it.component_id + ')">' +
+            '<i class="ti ti-package-import"></i>' +
+          '</button>' +
           '<button type="button" class="ssp-remove-btn" ' +
             'title="Убрать из «Что закупить» (локально)" ' +
             'onclick="event.stopPropagation();shopHideItem(' + it.component_id + ', ' + safeName + ')">' +
@@ -6117,6 +6124,7 @@ function renderSupplyShopping(d) {
               (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
             '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b></div>' +
           '</div>' +
+          '<button class="sv2-item-x" title="Приход на склад (оприходовать)" style="color:#15803D;" onclick="event.stopPropagation();openComponentReceiveModal(' + it.component_id + ')"><i class="ti ti-package-import"></i></button>' +
           '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +
         '</div>' +
         '<div class="sv2-item-bottom">' +
