@@ -1173,27 +1173,29 @@ function cabinetSVG(){
       var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:pointer"'):'';
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
       s+='<g'+drag+hov+'>';
-      var _termH=(it.k==='term')?Math.max(hpx,(railsTop+rowsRegionPx+mm(12)-mm(6))-(y+mm(3))):hpx;  // клеммник тянем вниз до шины N/PE
-      s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+_termH.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
-      // клеммник — реальное число клемм, столбиком (вертикально) с переносом на колонки, обозначение горизонтально
+      // клеммник — физические клеммы-ножи в горизонтальный ряд (реальный размер), обозначение вертикально; перенос на доп. ряды если не влезает
       if(it.k==='term'&&it.n){
         var tn=it.n, pad2=mm(2.5), tx0=x+pad2, tw=Math.max(6,ww)-pad2*2;
-        var ty0=y+mm(3)+mm(11), ty1=y+mm(3)+_termH-mm(4), blockH=ty1-ty0;     // зона под клеммы (ниже подписи)
-        var tlist=it.terms||[];
-        var rowsPerCol=Math.max(1,Math.min(tn,Math.floor(blockH/mm(11))));     // ~11 мм на клемму по высоте → столбик; лишнее переносится в след. колонку
-        var cols=Math.ceil(tn/rowsPerCol); rowsPerCol=Math.ceil(tn/cols);      // выровнять колонки
-        var clampH=Math.min(blockH/rowsPerCol, mm(13)), colW=tw/cols;
-        var tagFs=Math.max(6,Math.min(11,Math.min(clampH*0.62,colW/4.4)));
-        for(var ti=0;ti<tn;ti++){
-          var col=Math.floor(ti/rowsPerCol), rin=ti%rowsPerCol;
-          var sx=tx0+col*colW, sy=ty0+rin*clampH;
-          s+='<rect x="'+sx.toFixed(1)+'" y="'+sy.toFixed(1)+'" width="'+Math.max(3,colW-1.5).toFixed(1)+'" height="'+Math.max(2,clampH-1).toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.6" opacity=".8"/>';
-          var tag=tlist[ti]?String(tlist[ti].term||''):'';
-          if(tag) s+='<text x="'+(sx+colW/2).toFixed(1)+'" y="'+(sy+clampH/2+tagFs*0.35).toFixed(1)+'" font-size="'+tagFs.toFixed(1)+'" fill="#9be6c4" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+tag+'</text>';
-        }
-        // подпись клеммника — сверху блока, над слотами (не перекрывает их)
+        var titleH=mm(10), busClear=railsTop+rowsRegionPx+mm(12)-mm(6);
+        var availH=Math.max(mm(20),busClear-(y+mm(3))-titleH-mm(5));           // высота под ножи (до шины N/PE)
+        var perRow=Math.max(1,Math.min(tn,Math.floor(tw/mm(6))));             // клемма ~6 мм
+        var nrows=Math.ceil(tn/perRow), railH=Math.min(mm(30),Math.max(mm(15),availH/nrows));
+        while(nrows*railH>availH && perRow<tn){ perRow++; nrows=Math.ceil(tn/perRow); railH=Math.min(mm(30),Math.max(mm(15),availH/nrows)); }
+        var clampW=tw/perRow, _termH=titleH+nrows*railH+mm(5);
+        s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+_termH.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
         var tfs=Math.max(7,Math.min(10,modPx*0.62));
-        s+='<text x="'+(x+Math.max(6,ww)/2).toFixed(1)+'" y="'+(y+mm(3)+mm(8)).toFixed(1)+'" font-size="'+tfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+String(it.t||'')+'</text>';
+        s+='<text x="'+(x+Math.max(6,ww)/2).toFixed(1)+'" y="'+(y+mm(3)+mm(7.5)).toFixed(1)+'" font-size="'+tfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+String(it.t||'')+'</text>';
+        var ty0=y+mm(3)+titleH, tlist=it.terms||[];
+        var labFs=Math.max(5,Math.min(9,Math.min(clampW*0.62,railH/4.6)));
+        for(var ti=0;ti<tn;ti++){
+          var col=ti%perRow, rin=Math.floor(ti/perRow);
+          var sx=tx0+col*clampW, sy=ty0+rin*railH, scx=sx+clampW/2, scy=sy+railH/2;
+          s+='<rect x="'+sx.toFixed(1)+'" y="'+(sy+1).toFixed(1)+'" width="'+Math.max(2,clampW-1).toFixed(1)+'" height="'+Math.max(4,railH-2).toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.6" opacity=".8"/>';
+          var tag=tlist[ti]?String(tlist[ti].term||''):'';
+          if(tag) s+='<text x="'+scx.toFixed(1)+'" y="'+scy.toFixed(1)+'" font-size="'+labFs.toFixed(1)+'" fill="#9be6c4" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none" transform="rotate(-90 '+scx.toFixed(1)+' '+scy.toFixed(1)+')">'+tag+'</text>';
+        }
+      } else {
+        s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
       }
       // электромагнитный контактор — рисуем символ катушки (A1—A2) внизу блока
       if(it.k==='km'){
