@@ -456,6 +456,11 @@
         <button class="nav-item" onclick="openShareForInstallerFromCRM()" style="background: rgba(34, 197, 94, 0.15); color: #BBF7D0; margin-top: 4px;">
           <i class="ti ti-send"></i><span>Отправить монтажнику</span>
         </button>
+        <div class="nav-section-label">ОБЩЕНИЕ</div>
+        <button class="nav-item" data-nav="defects-chats" onclick="selectSidebarItem('defects-chats')">
+          <i class="ti ti-messages"></i><span>Чаты</span>
+          <span id="team-chats-nav-badge" style="display:none;margin-left:auto;background:#EF4444;color:#fff;border-radius:10px;font-size:11px;font-weight:700;min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 5px;">0</span>
+        </button>
         <div class="nav-section-label">ЗАМЕЧАНИЯ</div>
         <button class="nav-item active" data-nav="defects-list" onclick="selectSidebarItem('defects-list')">
           <i class="ti ti-list"></i><span>Все</span>
@@ -2365,6 +2370,36 @@
         </button>
       </div>
 
+      <!-- v2.45.523: ЧАТЫ (свободные группы — создал, пригласил, общаешься) -->
+      <div class="screen" data-screen="defects-chats" data-section="defects">
+        <div class="screen-header">
+          <h2>Чаты</h2>
+          <button class="icon-btn" onclick="openTeamPick('create')" title="Новый чат" style="color:#2563EB;">
+            <i class="ti ti-plus"></i>
+          </button>
+        </div>
+        <div class="content-inner" style="max-width: 760px;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-messages"></i>
+              <h1>Чаты</h1>
+              <span class="page-counter" id="team-chats-counter">0</span>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" onclick="openTeamPick('create')">
+                <i class="ti ti-plus"></i> Новый чат
+              </button>
+            </div>
+          </div>
+          <div id="team-chats-content">
+            <div class="loading-block">Загружаем…</div>
+          </div>
+        </div>
+        <button class="fab fab-defects" onclick="openTeamPick('create')" aria-label="Новый чат">
+          <i class="ti ti-plus"></i>
+        </button>
+      </div>
+
       <!-- МОНТАЖ — список (v2.45.346) -->
       <div class="screen" data-screen="installation-list" data-section="installation">
         <div class="screen-header">
@@ -2725,6 +2760,63 @@
   </div>
 </div>
 <!-- ============ /МОДАЛКА ЧАТА ============ -->
+
+<!-- ============ v2.45.523: КОМАНДНЫЙ ЧАТ (свободная группа) ============ -->
+<div class="modal-overlay" id="team-chat-modal" onclick="if(event.target===this) closeTeamChat()">
+  <div class="modal contract-chat-modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div style="min-width:0;">
+        <h3><i class="ti ti-messages"></i> <span id="tchat-title">Чат</span></h3>
+        <div class="chat-subtitle" id="tchat-subtitle"></div>
+      </div>
+      <div style="display:flex;gap:2px;align-items:center;flex-shrink:0;">
+        <button class="icon-btn" onclick="toggleTeamMembers()" title="Участники"><i class="ti ti-users"></i></button>
+        <button class="modal-close" onclick="closeTeamChat()"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+    <div id="tchat-members-panel" class="tcm-panel" style="display:none;"></div>
+    <div class="cchat-messages" id="tchat-messages">
+      <div class="loading-block">Загружаем сообщения…</div>
+    </div>
+    <div class="cchat-attach-preview" id="tchat-attach-preview"></div>
+    <div class="cchat-input-bar">
+      <input type="file" id="tchat-file-input" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" style="display:none;" onchange="onTeamChatFilesSelected(this.files)">
+      <button class="cchat-attach-btn" type="button" onclick="document.getElementById('tchat-file-input').click()" title="Прикрепить файлы">
+        <i class="ti ti-paperclip"></i>
+      </button>
+      <textarea id="tchat-input" placeholder="Напишите сообщение… (Enter — отправить, Shift+Enter — перенос)" rows="1"></textarea>
+      <button class="btn btn-primary" id="tchat-send-btn" onclick="sendTeamChatMessage()">
+        <i class="ti ti-send"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- v2.45.523: ВЫБОР УЧАСТНИКОВ (создание чата / добавление) -->
+<div class="modal-overlay" id="team-pick-modal" onclick="if(event.target===this) closeTeamPick()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;display:flex;flex-direction:column;max-height:84vh;">
+    <div class="modal-header">
+      <h3><i class="ti ti-users-plus"></i> <span id="tcp-title">Новый чат</span></h3>
+      <button class="modal-close" onclick="closeTeamPick()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="tcp-body">
+      <div id="tcp-name-row">
+        <input id="tcp-chat-title" class="tcp-input" maxlength="120" placeholder="Название чата (например: Монтаж — объект на Ленина)">
+      </div>
+      <input id="tcp-search" class="tcp-input" placeholder="Поиск сотрудника…" oninput="renderTeamPickList()">
+      <div id="tcp-list" class="tcp-list"><div class="loading-block">Загружаем…</div></div>
+    </div>
+    <div class="tcp-footer">
+      <span id="tcp-count" class="muted small">Выбрано: 0</span>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="closeTeamPick()">Отмена</button>
+        <button class="btn btn-primary" id="tcp-submit" onclick="submitTeamPick()">Создать чат</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ============ /КОМАНДНЫЙ ЧАТ ============ -->
+
 <div class="modal-overlay" id="model-modal">
   <div class="modal">
     <div class="modal-header">
