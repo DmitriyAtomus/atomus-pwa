@@ -265,6 +265,9 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
         <button class="tool" data-tool="wire" title="Провод (W)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18h7V6h9"/><circle cx="4" cy="18" r="1.6" fill="currentColor"/><circle cx="20" cy="6" r="1.6" fill="currentColor"/></svg>
         </button>
+        <button class="tool" data-tool="autowire" title="Авто-провод: точка→точка прямыми углами (A)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19V11h7V5"/><circle cx="5" cy="19" r="2.3" fill="currentColor" stroke="none"/><circle cx="12" cy="11" r="2.1" fill="none"/><circle cx="19" cy="5" r="2.3" fill="currentColor" stroke="none"/></svg>
+        </button>
         <button class="tool" data-tool="hand" title="Рука (H / Space)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 11V5a1.5 1.5 0 013 0v5m0-4a1.5 1.5 0 013 0v4m0-2.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-1a6 6 0 01-5.2-3L4 13.5A1.6 1.6 0 016.4 12l1.6 1.4" stroke-linejoin="round"/></svg>
         </button>
@@ -1161,6 +1164,78 @@ function finishWire(){
 }
 function cancelWire(){draft=[];S._extend=null;renderDraft()}
 
+/* ============ авто-провод: точка→точка прямыми углами, с перехлёстом, без наложения ============ */
+var autoStart=null;   // {x,y, wire?, seg?} — первая выбранная точка (вывод или точка на линии)
+function _projOnSeg(px,py,a,b){
+  if(a.x===b.x){ var y=Math.max(Math.min(a.y,b.y),Math.min(Math.max(a.y,b.y),py)); return {x:a.x,y:y}; }
+  if(a.y===b.y){ var x=Math.max(Math.min(a.x,b.x),Math.min(Math.max(a.x,b.x),px)); return {x:x,y:a.y}; }
+  var dx=b.x-a.x,dy=b.y-a.y,t=((px-a.x)*dx+(py-a.y)*dy)/(dx*dx+dy*dy||1); t=Math.max(0,Math.min(1,t)); return {x:a.x+t*dx,y:a.y+t*dy};
+}
+// ближайшая точка на каком-либо проводе (поставить отвод/точку на линии)
+function wireTapPoint(wx,wy){
+  var tol=Math.max(16,13/view.s), best=null, bd=tol;
+  S.wires.forEach(function(w){ for(var i=0;i<w.pts.length-1;i++){
+    var pt=_projOnSeg(wx,wy,w.pts[i],w.pts[i+1]), d=Math.max(Math.abs(pt.x-wx),Math.abs(pt.y-wy));
+    if(d<bd){bd=d;best={x:Math.round(pt.x),y:Math.round(pt.y),wire:w,seg:i};}
+  }});
+  return best;
+}
+// цель клика: вывод аппарата → точка на проводе → узел сетки
+function autoTarget(wx,wy){
+  var tol=Math.max(26,18/view.s),best=null,bd=tol;
+  S.comps.forEach(function(c){for(var i=0;i<symFor(c).pins.length;i++){var p=pinW(c,i),d=Math.max(Math.abs(p.x-wx),Math.abs(p.y-wy));if(d<bd){bd=d;best={x:p.x,y:p.y};}}});
+  if(best)return best;
+  var wp=wireTapPoint(wx,wy); if(wp)return wp;
+  return {x:snap(wx),y:snap(wy)};
+}
+function _dedupePts(pts){
+  var o=[]; pts.forEach(function(p){var l=o[o.length-1]; if(!l||l.x!==p.x||l.y!==p.y)o.push({x:p.x,y:p.y});});
+  if(o.length<3)return o;
+  var r=[o[0]];
+  for(var i=1;i<o.length-1;i++){var a=r[r.length-1],b=o[i],c=o[i+1]; if((a.x===b.x&&b.x===c.x)||(a.y===b.y&&b.y===c.y))continue; r.push(b);}
+  r.push(o[o.length-1]); return r;
+}
+// ортогональный маршрут s→e: Г- и Z-варианты, выбираем первый без наложения на чужие провода
+function routeOrtho(s,e){
+  var cands=[];
+  if(s.x!==e.x&&s.y!==e.y){ cands.push([s,{x:e.x,y:s.y},e]); cands.push([s,{x:s.x,y:e.y},e]); }
+  else cands.push([s,e]);
+  var mx=snap((s.x+e.x)/2), my=snap((s.y+e.y)/2);
+  cands.push([s,{x:mx,y:s.y},{x:mx,y:e.y},e]);
+  cands.push([s,{x:s.x,y:my},{x:e.x,y:my},e]);
+  for(var i=0;i<cands.length;i++){var pts=_dedupePts(cands[i]); if(pts.length>=2&&!wireOverlaps(pts,null))return pts;}
+  return _dedupePts(cands[0]);
+}
+// вставить точку-вершину на провод (точка на линии становится узлом-отводом)
+function splitWireAt(info){
+  if(!info||!info.wire)return; var w=info.wire;
+  for(var i=0;i<w.pts.length;i++)if(w.pts[i].x===info.x&&w.pts[i].y===info.y)return;
+  w.pts.splice(info.seg+1,0,{x:info.x,y:info.y});
+}
+function autowireClick(wx,wy){
+  var t=autoTarget(wx,wy);
+  if(!autoStart){ autoStart=t; renderAutoDraft(); toast('Точка 1 — теперь укажи вторую (вывод аппарата или линию)'); return; }
+  if(autoStart.x===t.x&&autoStart.y===t.y){ autoStart=null; renderAutoDraft(); return; }
+  var route=routeOrtho({x:autoStart.x,y:autoStart.y},{x:t.x,y:t.y});
+  if(wireOverlaps(route,null)) toast('Местами идёт по чужой линии — но проложил ближайшим путём');
+  pushUndo();
+  splitWireAt(autoStart); splitWireAt(t);
+  S.wires.push({id:uid('w'),pts:route});
+  autoStart=null; renderAutoDraft(); renderCanvas(); toast('Провод проложен');
+}
+function renderAutoDraft(){
+  var h='';
+  if(autoStart){
+    var p=autoTarget(curW.x,curW.y), route=routeOrtho({x:autoStart.x,y:autoStart.y},{x:p.x,y:p.y});
+    var d=route.map(function(q,i){return (i?'L':'M')+q.x+' '+q.y}).join(' ');
+    h+='<path d="'+d+'" stroke="'+CY+'" stroke-width="5" stroke-dasharray="22 18" fill="none" opacity=".75"/>';
+    h+='<circle cx="'+autoStart.x+'" cy="'+autoStart.y+'" r="11" fill="none" stroke="'+CY+'" stroke-width="3"/>';
+    h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="8" fill="'+CY+'"/>';
+  }
+  $('draftL').innerHTML=h;
+}
+function cancelAuto(){autoStart=null;renderAutoDraft();}
+
 /* ============ drag компонента + подтяжка проводов ============ */
 var mode=null;
 // гарантия ортогональности (стиль sPlan): любой косой сегмент → Г-образный (гориз.+верт.)
@@ -1366,9 +1441,10 @@ function markPalette(sym){
 }
 
 /* ============ инструменты ============ */
-var TOOLN={select:'Выбор',wire:'Провод',hand:'Рука',place:'Размещение'};
+var TOOLN={select:'Выбор',wire:'Провод',autowire:'Авто-провод',hand:'Рука',place:'Размещение'};
 function setTool(t){
   if(t!=='wire')cancelWire();
+  if(t!=='autowire')cancelAuto();
   if(t!=='place'){ghost=null;markPalette(null)}
   tool=t;
   svg.className.baseVal='';
@@ -1405,6 +1481,7 @@ svg.addEventListener('pointerdown',function(e){
     return;
   }
   if(tool==='wire'){wireClick(wp.x,wp.y);return}
+  if(tool==='autowire'){autowireClick(wp.x,wp.y);return}
   // клик по концевой ручке выбранного провода → продолжаем вести от неё линию
   var th=e.target.closest&&e.target.closest('[data-we]');
   if(th){
@@ -1461,6 +1538,7 @@ svg.addEventListener('pointermove',function(e){
   if(mode&&mode.k==='band'){mode.cur={x:wp.x,y:wp.y};renderCanvas();return}
   if(tool==='place'&&ghost){ghost.x=snap(wp.x);ghost.y=snap(wp.y);renderGhost()}
   if(tool==='wire'&&draft.length)renderDraft();
+  if(tool==='autowire'&&autoStart)renderAutoDraft();
 });
 function up(e){
   ptrs.delete(e.pointerId);
@@ -1510,6 +1588,7 @@ window.addEventListener('keydown',function(e){
   if(k===' '&&!spaceHeld){spaceHeld=true;prevTool=tool;setTool('hand');e.preventDefault();return}
   if(k==='Escape'){
     if(draft.length)cancelWire();
+    else if(autoStart)cancelAuto();
     else if(tool==='place')setTool('select');
     else{clearSel();renderAll()}
     return;
@@ -1519,6 +1598,7 @@ window.addEventListener('keydown',function(e){
   if(kl==='v'||kl==='м'&&0)setTool('select');
   if(kl==='v')setTool('select');
   if(kl==='w')setTool('wire');
+  if(kl==='a')setTool('autowire');
   if(kl==='h')setTool('hand');
   if(kl==='0')fit();
   if(kl==='r'){
