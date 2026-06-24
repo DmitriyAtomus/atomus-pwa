@@ -218,6 +218,8 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
     <div class="doc"><span class="dot" id="saveDot"></span>ЩУ-003.001.1 · АГ.ЩУ-003/26</div>
     <div id="sheetTabs" style="display:flex;gap:6px;align-items:center"></div>
     <div id="erc"><span class="w"></span><span id="ercTxt">ERC: всё подключено</span></div>
+    <button class="tb-btn" id="btnSaveDoc" style="background:var(--cyan);color:#06262E;font-weight:600">💾 Сохранить</button>
+    <button class="tb-btn" id="btnLoadDoc">📂 Открыть</button>
     <button class="tb-btn" id="btnCatalog">▦ Каталог CHINT</button>
     <button class="tb-btn" id="btnSpec">▤ Спецификация</button>
     <button class="tb-btn" id="btnPdf">⎙ PDF</button>
@@ -2171,9 +2173,36 @@ window.addEventListener('message',function(e){
   if(e.data.atomcad==='load-schematic'){
     loadExternal(e.data.data);
     if(e.data.code){_docCode=e.data.code;buildSheet();var dc=document.querySelector('.doc');if(dc)dc.innerHTML='<span class="dot" id="saveDot"></span>'+e.data.code;}
+    try{ if(localStorage.getItem(_docKey())) setTimeout(function(){toast('Есть сохранённая версия этого щита — «📂 Открыть», чтобы загрузить');},900); }catch(_){}
   }
 });
 window.AtomEditorLoad=loadExternal;
+
+/* ============ сохранение схемы (локально по обозначению щита) ============ */
+function _docKey(){ return 'atomcad_doc_'+((_docCode||'default').replace(/[^\wА-Яа-я.\-\/]/g,'')); }
+function saveDoc(){
+  try{
+    var snap={code:_docCode,cur:S.cur,sheets:S.sheets.map(function(sh){return {subtitle:sh.subtitle||'',comps:sh.comps,wires:sh.wires,texts:sh.texts,nodes:sh.nodes||[]};})};
+    localStorage.setItem(_docKey(),JSON.stringify(snap));
+    var sd=$('saveDot'); if(sd)sd.style.background='#2E8B57';
+    try{parent.postMessage({atomcad:'save-schematic',code:_docCode,sheets:snap.sheets},'*');}catch(_){}
+    toast('Схема сохранена ('+S.sheets.length+' лист.)');
+  }catch(e){ toast('Не удалось сохранить: '+e.message); }
+}
+function loadDoc(){
+  var raw=null; try{raw=localStorage.getItem(_docKey());}catch(_){}
+  if(!raw){ toast('Нет сохранённой схемы для '+(_docCode||'этого щита')); return; }
+  try{
+    var snap=JSON.parse(raw); if(!snap||!snap.sheets||!snap.sheets.length){toast('Сохранение пустое');return;}
+    S.sheets=snap.sheets.map(_mkSheet); S.cur=Math.min(snap.cur||0,S.sheets.length-1);
+    var sh=S.sheets[S.cur]; if(!sh.nodes)sh.nodes=[]; S.comps=sh.comps;S.wires=sh.wires;S.texts=sh.texts;S.nodes=sh.nodes;S.sel=null;
+    U=[];Rd=[]; buildSheet(); updateSheetNav(); renderProps(true); renderAll(); fit();
+    toast('Загружена сохранённая схема');
+  }catch(e){ toast('Ошибка загрузки: '+e.message); }
+}
+$('btnSaveDoc').addEventListener('click',saveDoc);
+$('btnLoadDoc').addEventListener('click',loadDoc);
+window.addEventListener('keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.code==='KeyS'&&!document.querySelector('.modal.show')){e.preventDefault();saveDoc();} });
 
 /* ============ старт ============ */
 buildPalette();

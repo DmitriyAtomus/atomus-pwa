@@ -278,7 +278,7 @@ function buildSchematic(P){
     if(fitL>=380){ step=Math.min(720,fitL); maxX=2240; }                  // мало колонок — уводим их левее основной надписи, чтобы не заходили
     else { var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(380,Math.floor(fit)); }  // много колонок — раскладываем шире (без наложения аппаратов)
   }
-  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P);
+  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, psuN=1, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
     var _w0=pw.length;                                                                  // запомним, какие провода добавит эта группа — потом раскрасим по фазе
@@ -298,6 +298,20 @@ function buildSchematic(P){
       var role=cons?cons.name:(col.l.name||b.role);
       if(grouped) pw.push(W([x,1350],[x,1450]));                                        // от шины к отводу
       else        pw.push(W([qfx,1250],[x,1450]));                                      // одиночный отвод — прямо от автомата
+      // блок питания (G) — рисуем сам БП: вход L (от автомата) и N, выход +24В/0В → контроллер/датчики
+      if(b.psu){
+        var gd='G'+(psuN++);
+        pc.push(C(gd,'psu',x,1500,b.psu+'В','','питание управления'));                  // блок питания на силовом листе
+        pw.push(W([x,1450],[x,1480]),W([x,1480],[x-55,1480]),W([x-55,1480],[x-55,1500]));   // отвод → вход L
+        pw.push(W([x+55,1410],[x+55,1500]));                                            // вход N
+        pt.push({x:x+80,y:1445,s:18,ls:0,anchor:'start',tx:'N'});
+        pt.push({x:x-150,y:1505,s:18,ls:0,anchor:'end',tx:'L'});
+        pw.push(W([x-55,1800],[x-55,1880]),W([x+55,1800],[x+55,1880]));                 // выход +24В/0В вниз
+        pc.push(C('X'+termN,'termb',x-55,1880,'ЗНИ 1,5 мм²','','+24В')); termN++;
+        pc.push(C('X'+termN,'termb',x+55,1880,'ЗНИ 1,5 мм²','','0В · → контроллер, датчики')); termN++;
+        pt.push({x:x,y:1840,s:18,ls:0,anchor:'middle',tx:'+24В · 0В → контроллер'});
+        lastX=x; return;
+      }
       // цепь отвода: автомат → контактор → (твердотельное реле) → клемма → нагрузка
       var covTag=coveredByAux(_covS,cons,col.l&&col.l.name);
       var relTag=cons?(_rel[col.l&&col.l.name]||_rel[cons.name]||''):'';
