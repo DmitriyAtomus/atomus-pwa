@@ -813,6 +813,14 @@ function bSplit(bi,li){
   P.breakers.splice(bi+1,0,nb);bRenum();dirty();draw();toast('Линия вынесена в отдельный автомат');
 }
 
+/* подписи пары клемм по типу сигнала: [провод 1, провод 2] */
+function sensorPairLabels(sig){
+  sig=sig||'';
+  if(/4–20|4-20/.test(sig)) return [sig+' (+)', sig+' (−)'];        // токовая петля: + и −
+  if(/0–10|0-10/.test(sig)) return [sig+' сигнал', '0 В общий'];    // аналог по напряжению: сигнал и общий
+  if(/дискрет/i.test(sig))  return ['дискр. сигнал', 'дискр. общий']; // сухой контакт: вход и общий
+  return [sig+' сигнал', sig+' общий'];                            // NTC/Pt1000 — пассивный, оба провода
+}
 /* 7 клеммы — редактируемый план клемм (хранится в P.terminals) */
 function buildTerminals(P){
   ensureBreakers();
@@ -825,13 +833,13 @@ function buildTerminals(P){
     var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
     loads.forEach(function(l){ t.push({term:'X2:'+(i++), name:l.name||b.role, line:b.code}); });
   });
-  // датчики: каждый полевой датчик двухпроводной (NTC/Pt1000 — пассивный, 4–20мА/0–10В/дискретный — 2 провода),
-  // поэтому на каждый датчик заводим ДВЕ клеммы (сигнал + общий), нумерация X5:1, X5:2, X5:3…
+  // датчики и дискретные входы: каждый двухпроводной → ДВЕ клеммы (сигнал + общий/возврат),
+  // в столбце «Линия» подписываем назначение каждого провода по типу сигнала. Нумерация X5:1, X5:2…
   var si=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){
-    var nm=s.name+(q>1?(' #'+(k+1)):'');
-    t.push({term:'X5:'+(si++), name:nm, line:s.sig});
-    t.push({term:'X5:'+(si++), name:nm, line:s.sig});
+    var nm=s.name+(q>1?(' #'+(k+1)):''), lp=sensorPairLabels(s.sig);
+    t.push({term:'X5:'+(si++), name:nm, line:lp[0]});
+    t.push({term:'X5:'+(si++), name:nm, line:lp[1]});
   } });
   return t;
 }
