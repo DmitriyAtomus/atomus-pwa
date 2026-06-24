@@ -229,7 +229,7 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
   <div class="work">
 
     <aside class="lib" id="libAside">
-      <h2><span class="h2txt">Библиотека · ГОСТ</span><button class="libtog" id="libTog" title="Свернуть/развернуть библиотеку">‹</button></h2>
+      <h2><span class="h2txt">Библиотека · ГОСТ</span><button class="libtog" id="symEdBtn" title="Создать своё УГО">✎</button><button class="libtog" id="libTog" title="Свернуть/развернуть библиотеку">‹</button></h2>
       <div class="lib-list" id="libList"></div>
       <div class="lib-foot">Клик по элементу → клик на лист.<br>Esc — отмена.</div>
     </aside>
@@ -327,6 +327,28 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
           <div class="mhead"><h3>Спецификация <b>· перечень элементов</b></h3><button class="x" id="specX">✕</button></div>
           <div class="mbody" style="padding:0"><table class="spec" id="specTbl"></table></div>
           <div class="specfoot" id="specFoot"></div>
+        </div>
+      </div>
+      <div id="symEd" class="modal">
+        <div class="card" style="width:760px;max-width:95vw;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <input id="symName" placeholder="Название УГО (напр. Реле контроля фаз)" style="flex:1;background:var(--graphite);border:1px solid var(--line);border-radius:7px;color:var(--txt);padding:8px 10px;font-size:13px">
+            <button class="tb-btn" id="symClose">✕</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+            <button class="tb-btn syt on" data-syt="line">╱ Линия</button>
+            <button class="tb-btn syt" data-syt="dash">┄ Пунктир</button>
+            <button class="tb-btn syt" data-syt="pin">○ Вывод</button>
+            <button class="tb-btn syt" data-syt="text">T Текст</button>
+            <span style="flex:1"></span>
+            <button class="tb-btn" id="symUndo">↺ Стереть</button>
+            <button class="tb-btn" id="symClear">Очистить</button>
+          </div>
+          <svg id="symCanvas" width="100%" height="380" viewBox="-360 -240 720 480" style="background:#F6F8FA;border:1px solid var(--line);border-radius:8px;display:block;touch-action:none"></svg>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <div class="lib-foot" style="flex:1;padding:0;border:none">Линия/Пунктир — кликай точки (двойной клик — закончить). «Вывод» — точка подключения (нумеруется). Сетка 20.</div>
+            <button class="tb-btn" id="symSave" style="background:var(--cyan);color:#06262E;font-weight:600">✓ Сохранить УГО</button>
+          </div>
         </div>
       </div>
     </main>
@@ -1517,6 +1539,63 @@ function symbolIcon(id){
   h+='</svg>';
   return h;
 }
+/* ============ редактор своего УГО ============ */
+function _usyms(){try{return JSON.parse(localStorage.getItem('atomcad_usyms')||'{}')}catch(e){return {}}}
+function loadUserSyms(){
+  var store=_usyms(), ids=Object.keys(store);
+  ids.forEach(function(id){ SYM[id]=store[id]; });
+  var g=null; for(var i=0;i<PALETTE.length;i++)if(PALETTE[i][0]==='Свои УГО')g=PALETTE[i];
+  if(ids.length){ if(!g){g=['Свои УГО',[]];PALETTE.push(g);} g[1]=ids; }
+}
+var symTool='line', symDraw={pr:[],pins:[]}, symPend=null;
+function openSymEd(){ symDraw={pr:[],pins:[]}; symPend=null; var n=$('symName'); if(n)n.value=''; setSymTool('line'); renderSym(); $('symEd').classList.add('show'); }
+function setSymTool(t){ symTool=t; symPend=null; Array.prototype.forEach.call(document.querySelectorAll('.syt'),function(b){b.classList.toggle('on',b.getAttribute('data-syt')===t)}); renderSym(); }
+function _symSnap(v){return Math.round(v/20)*20;}
+function _symPt(e){ var sv=$('symCanvas'),r=sv.getBoundingClientRect(),vb=sv.viewBox.baseVal;
+  return {x:_symSnap(vb.x+(e.clientX-r.left)/r.width*vb.width), y:_symSnap(vb.y+(e.clientY-r.top)/r.height*vb.height)}; }
+function renderSym(){
+  var h='';
+  for(var gx=-360;gx<=360;gx+=20)h+='<line x1="'+gx+'" y1="-240" x2="'+gx+'" y2="240" stroke="#E3E9EF" stroke-width="1"/>';
+  for(var gy=-240;gy<=240;gy+=20)h+='<line x1="-360" y1="'+gy+'" x2="360" y2="'+gy+'" stroke="#E3E9EF" stroke-width="1"/>';
+  h+='<line x1="-360" y1="0" x2="360" y2="0" stroke="#C7D0D8" stroke-width="1.5"/><line x1="0" y1="-240" x2="0" y2="240" stroke="#C7D0D8" stroke-width="1.5"/>';
+  h+='<g stroke="#1C2B38" stroke-width="4" fill="none" color="#1C2B38">';
+  symDraw.pr.forEach(function(p){h+=prim(p)});
+  h+='</g>';
+  symDraw.pins.forEach(function(p){h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="6" fill="none" stroke="#16B7DB" stroke-width="3"/>';});
+  if(symPend)h+='<circle cx="'+symPend.x+'" cy="'+symPend.y+'" r="6" fill="#16B7DB"/>';
+  $('symCanvas').innerHTML=h;
+}
+function symClick(e){
+  var p=_symPt(e);
+  if(symTool==='line'||symTool==='dash'){
+    if(!symPend){symPend=p;} else { symDraw.pr.push(symTool==='dash'?DL(symPend.x,symPend.y,p.x,p.y):L(symPend.x,symPend.y,p.x,p.y)); symPend=p; }
+  } else if(symTool==='pin'){
+    var n=symDraw.pins.length+1; symDraw.pins.push({x:p.x,y:p.y}); symDraw.pr.push(C(p.x,p.y,7)); symDraw.pr.push(T(p.x+22,p.y+7,18,String(n)));
+  } else if(symTool==='text'){
+    var tx=prompt('Текст:'); if(tx){symDraw.pr.push(T(p.x,p.y,22,tx));}
+  }
+  renderSym();
+}
+function symSave(){
+  if(!symDraw.pr.length){toast('Сначала нарисуй УГО');return;}
+  var name=(($('symName')&&$('symName').value)||'').trim()||'Своё УГО';
+  var xs=[0],ys=[0];
+  symDraw.pr.forEach(function(p){
+    if(p.t==='l'||p.t==='dl'){xs.push(p.x1,p.x2);ys.push(p.y1,p.y2);}
+    else if(p.t==='c'){xs.push(p.x-p.r,p.x+p.r);ys.push(p.y-p.r,p.y+p.r);}
+    else if(p.t==='r'){xs.push(p.x,p.x+p.w);ys.push(p.y,p.y+p.h);}
+    else if(p.t==='t'){xs.push(p.x-40,p.x+40);ys.push(p.y-20,p.y+12);}
+  });
+  symDraw.pins.forEach(function(p){xs.push(p.x);ys.push(p.y);});
+  var bb=[Math.min.apply(null,xs)-12,Math.min.apply(null,ys)-12,Math.max.apply(null,xs)+12,Math.max.apply(null,ys)+12];
+  var id='u'+Date.now();
+  var def={name:name,pre:'A',bb:bb,lbl:[0,bb[3]+30,'middle'],pins:symDraw.pins.map(function(p){return [p.x,p.y]}),pr:symDraw.pr};
+  var store=_usyms(); store[id]=def; try{localStorage.setItem('atomcad_usyms',JSON.stringify(store))}catch(_){}
+  SYM[id]=def; loadUserSyms(); buildPalette();
+  $('symEd').classList.remove('show');
+  toast('УГО «'+name+'» сохранено — раздел «Свои УГО» в библиотеке');
+}
+loadUserSyms();
 function _grpColl(){try{return JSON.parse(localStorage.getItem('atomcad_grp_collapsed')||'{}')}catch(e){return {}}}
 function buildPalette(){
   var h='', coll=_grpColl();
@@ -1758,6 +1837,16 @@ $('btnReset').addEventListener('click',function(){demo();U=[];Rd=[];renderProps(
 $('btnHelp').addEventListener('click',function(){$('help').classList.add('show')});
 $('helpClose').addEventListener('click',function(){$('help').classList.remove('show')});
 $('help').addEventListener('click',function(e){if(e.target===$('help'))$('help').classList.remove('show')});
+// редактор своего УГО
+$('symEdBtn').addEventListener('click',openSymEd);
+$('symClose').addEventListener('click',function(){$('symEd').classList.remove('show')});
+$('symEd').addEventListener('click',function(e){if(e.target===$('symEd'))$('symEd').classList.remove('show')});
+$('symCanvas').addEventListener('click',symClick);
+$('symCanvas').addEventListener('dblclick',function(e){e.preventDefault();symPend=null;renderSym();});
+$('symSave').addEventListener('click',symSave);
+$('symUndo').addEventListener('click',function(){ if(symPend){symPend=null;} else { var last=symDraw.pr[symDraw.pr.length-1]; if(last&&last.t==='t'&&symDraw.pins.length&&symDraw.pr[symDraw.pr.length-2]&&symDraw.pr[symDraw.pr.length-2].t==='c'){ symDraw.pr.pop();symDraw.pr.pop();symDraw.pins.pop(); } else symDraw.pr.pop(); } renderSym(); });
+$('symClear').addEventListener('click',function(){ symDraw={pr:[],pins:[]}; symPend=null; renderSym(); });
+Array.prototype.forEach.call(document.querySelectorAll('.syt'),function(b){ b.addEventListener('click',function(){setSymTool(b.getAttribute('data-syt'))}); });
 $('btnLib').addEventListener('click',function(){document.body.classList.toggle('lib-open');document.body.classList.remove('props-open')});
 // сворачивание левой колонки (библиотека) на десктопе — больше места под лист
 $('libTog').addEventListener('click',function(){
