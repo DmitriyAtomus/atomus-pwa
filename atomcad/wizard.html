@@ -830,6 +830,8 @@ var KPI_TERM=[
   {sec:10, model:'КПИ 2в-10', S:10.3,H:72,L:50.3}
 ];
 function kpiTerm(sec){sec=+sec||1.5;for(var i=0;i<KPI_TERM.length;i++)if(sec<=KPI_TERM[i].sec)return KPI_TERM[i];return KPI_TERM[KPI_TERM.length-1];}
+/* сечение клеммы: из поля sec, иначе по типу (ввод X1 — 6 мм², датчики X5 — 1,5, прочее — 2,5) — чтобы ширина была верной и для старых проектов */
+function termSecOf(t){ if(t&&t.sec)return +t.sec; var g=String(t&&t.term||''); if(/^X1/.test(g))return 6; if(/^X5/.test(g))return 1.5; return 2.5; }
 function secByCurrent(a){a=+a||0;if(a<=16)return 1.5;if(a<=25)return 2.5;if(a<=32)return 4;if(a<=50)return 6;return 10;}
 /* развернуть диапазоны клемм (X1:1–3) в отдельные клеммы (X1:1, X1:2, X1:3) — для отрисовки/подсчёта */
 function expandTerminals(list){
@@ -1190,7 +1192,7 @@ function cabinetSVG(){
         var availH=Math.max(mm(20),busClear-(y+mm(3))-titleH-mm(5));            // высота под клеммы (до шины N/PE)
         var tlist=it.terms||[], WPS=mm(2.5);                                    // px на 1 мм ширины S (пропорция КПИ, читаемо)
         var lay=[], cxp=0, ry=0;                                               // пасс 1 — раскладка с переносом по реальной ширине
-        for(var ti=0;ti<it.n;ti++){ var kp=kpiTerm(tlist[ti]&&tlist[ti].sec), cw=Math.max(mm(6.5),WPS*kp.S);
+        for(var ti=0;ti<it.n;ti++){ var kp=kpiTerm(termSecOf(tlist[ti])), cw=Math.max(mm(6.5),WPS*kp.S);
           if(cxp+cw>tw+0.5 && cxp>0){ ry++; cxp=0; }
           lay.push({x:tx0+cxp,row:ry,w:cw,tag:tlist[ti]?String(tlist[ti].term||''):''}); cxp+=cw; }
         var nrows=ry+1, railH=Math.min(mm(40),Math.max(mm(15),availH/nrows));
