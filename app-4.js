@@ -13189,11 +13189,14 @@ async function openTeamChat(cid) {
   _tchatPendingFiles = [];
   _tchatLastSig = '';
   _renderTeamAttachPreview();
-  const panel = document.getElementById('tchat-members-panel');
-  if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+  const card = document.getElementById('tchat-modal-card');
+  if (card) card.classList.remove('show-side');
+  const side = document.getElementById('tchat-side');
+  if (side) side.innerHTML = '';
   document.getElementById('tchat-messages').innerHTML = '<div class="loading-block">Загружаем…</div>';
   document.getElementById('team-chat-modal').classList.add('visible');
   await loadTeamChatMeta(cid);
+  renderTeamSide();
   await loadTeamChat(cid);
   if (_tchatRefreshTimer) clearInterval(_tchatRefreshTimer);
   _tchatRefreshTimer = setInterval(() => {
@@ -13222,6 +13225,9 @@ async function loadTeamChatMeta(cid) {
     const names = (r.members || []).map(m => m.name).join(', ');
     document.getElementById('tchat-subtitle').textContent =
       (r.members || []).length + ' участ. · ' + _tcTrim(names, 56);
+    // карандаш-переименование — только владельцу
+    const rb = document.getElementById('tchat-rename-btn');
+    if (rb) rb.style.display = r.is_owner ? '' : 'none';
   } catch (e) {}
 }
 
@@ -13395,26 +13401,23 @@ async function deleteTeamChatMessage(mid) {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
-// ---------- Панель участников ----------
+// ---------- Боковая панель участников ----------
+// На широком экране видна всегда; на мобильном — выезжает по кнопке 👥.
 function toggleTeamMembers() {
-  const panel = document.getElementById('tchat-members-panel');
-  if (!panel) return;
-  if (panel.style.display === 'none' || !panel.style.display) {
-    renderTeamMembersPanel();
-    panel.style.display = 'block';
-  } else {
-    panel.style.display = 'none';
-  }
+  const card = document.getElementById('tchat-modal-card');
+  if (card) card.classList.toggle('show-side');
 }
 
-function renderTeamMembersPanel() {
-  const panel = document.getElementById('tchat-members-panel');
+function renderTeamSide() {
+  const panel = document.getElementById('tchat-side');
   if (!panel) return;
   const meta = state._tchatMeta || {};
   const members = meta.members || [];
   const isOwner = !!meta.is_owner;
-  let html = '<div class="tcm-head"><span><i class="ti ti-users"></i> Участники (' + members.length + ')</span>'
-    + '<button class="tcm-add-btn" onclick="openTeamPick(\'add\')"><i class="ti ti-user-plus"></i> Добавить</button></div>';
+  let html = '<div class="tchat-side-head"><span><i class="ti ti-users"></i> Участники · ' + members.length + '</span>'
+    + '<button class="tchat-side-close" onclick="toggleTeamMembers()" title="Свернуть"><i class="ti ti-x"></i></button></div>';
+  html += '<div class="tchat-side-scroll">';
+  html += '<button class="tcm-add-btn full" onclick="openTeamPick(\'add\')"><i class="ti ti-user-plus"></i> Добавить участников</button>';
   html += '<div class="tcm-list">';
   members.forEach(m => {
     const roleTag = m.role === 'owner' ? '<span class="tcm-role">владелец</span>' : '';
@@ -13422,11 +13425,14 @@ function renderTeamMembersPanel() {
     if (!m.is_me && isOwner && m.employee_id) {
       delBtn = '<button class="tcm-del" onclick="removeTeamMember(' + m.employee_id + ')" title="Убрать из чата"><i class="ti ti-x"></i></button>';
     }
-    html += '<div class="tcm-item"><span class="tcm-name">' + escapeHtml(m.name || '—')
+    const initial = escapeHtml((m.name || '?').trim().charAt(0).toUpperCase());
+    html += '<div class="tcm-item"><div class="tcm-ava">' + initial + '</div>'
+      + '<span class="tcm-name">' + escapeHtml(m.name || '—')
       + (m.is_me ? ' <span class="tcm-you">вы</span>' : '') + roleTag + '</span>' + delBtn + '</div>';
   });
-  html += '</div><div class="tcm-actions">';
-  if (isOwner) html += '<button class="tcm-act" onclick="renameTeamChat()"><i class="ti ti-edit"></i> Переименовать</button>';
+  html += '</div></div>';
+  html += '<div class="tchat-side-foot">';
+  if (isOwner) html += '<button class="tcm-act" onclick="renameTeamChat()"><i class="ti ti-edit"></i> Переименовать чат</button>';
   html += '<button class="tcm-act danger" onclick="leaveTeamChat()"><i class="ti ti-logout"></i> Выйти из чата</button>';
   html += '</div>';
   panel.innerHTML = html;
@@ -13444,7 +13450,7 @@ async function removeTeamMember(empId) {
       method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
     await loadTeamChatMeta(cid);
-    renderTeamMembersPanel();
+    renderTeamSide();
     _tchatLastSig = ''; loadTeamChat(cid, false);
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
@@ -13477,7 +13483,7 @@ async function renameTeamChat() {
       body: JSON.stringify({ title: t }) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
     await loadTeamChatMeta(cid);
-    renderTeamMembersPanel();
+    renderTeamSide();
     _tchatLastSig = ''; loadTeamChat(cid, false);
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
@@ -13581,7 +13587,7 @@ async function submitTeamPick() {
       if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
       closeTeamPick();
       await loadTeamChatMeta(cid);
-      renderTeamMembersPanel();
+      renderTeamSide();
       _tchatLastSig = ''; loadTeamChat(cid, false);
       showToast('Участники добавлены', 'success');
     } catch (e) { showToast('Ошибка соединения', 'error'); }
