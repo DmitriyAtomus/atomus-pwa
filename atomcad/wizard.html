@@ -107,6 +107,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
     <button class="no ugt" data-ugt="pin" style="flex:0 0 auto">○ Вывод</button>
     <button class="no ugt" data-ugt="text" style="flex:0 0 auto">T Текст</button>
     <button class="no" id="ugoPhoto" style="flex:0 0 auto">📎 Фото</button>
+    <button class="ok" id="ugoAi" style="flex:0 0 auto">✨ Нарисовать ИИ</button>
     <span style="flex:1"></span>
     <button class="no" id="ugoUndo" style="flex:0 0 auto">↺ Стереть</button>
     <button class="no" id="ugoClear" style="flex:0 0 auto">Очистить</button>
@@ -620,9 +621,9 @@ function ugoSvg(ugo,w,h){
   var s='<svg width="'+w+'" height="'+h+'" viewBox="'+vb+'" fill="none" stroke="#9FB0BE" color="#9FB0BE" stroke-width="'+sw+'" stroke-linecap="round">';
   ugo.pr.forEach(function(p){s+=ugoPrimSvg(p)}); return s+'</svg>';
 }
-var ugoTool='line', ugoDraw={pr:[],pins:[]}, ugoPend=null, ugoIdx=-1, ugoBg=null;
+var ugoTool='line', ugoDraw={pr:[],pins:[]}, ugoPend=null, ugoIdx=-1, ugoBg=null, ugoBgFile=null;
 function openUgoEd(idx){
-  ugoIdx=idx; var it=APP_LIB[idx]; ugoBg=null; var pb=$('ugoPhoto'); if(pb)pb.textContent='📎 Фото';
+  ugoIdx=idx; var it=APP_LIB[idx]; ugoBg=null; ugoBgFile=null; var pb=$('ugoPhoto'); if(pb)pb.textContent='📎 Фото';
   ugoDraw=(it&&it.data&&it.data.ugo)?{pr:JSON.parse(JSON.stringify(it.data.ugo.pr||[])),pins:(it.data.ugo.pins||[]).map(function(p){return {x:p[0],y:p[1]}})}:{pr:[],pins:[]};
   ugoPend=null; ugoSetTool('line'); $('ugoName').textContent=(it?it.label:'аппарат'); renderUgo(); $('ugoMask').classList.add('show');
 }
@@ -1692,8 +1693,24 @@ $('ugoCanvas').addEventListener('click',ugoClick);
 $('ugoCanvas').addEventListener('dblclick',function(e){e.preventDefault();ugoPend=null;renderUgo();});
 $('ugoUndo').onclick=function(){ if(ugoPend){ugoPend=null;} else { var n=ugoDraw.pr.length,l=ugoDraw.pr[n-1]; if(l&&l.t==='t'&&ugoDraw.pr[n-2]&&ugoDraw.pr[n-2].t==='c'&&ugoDraw.pins.length){ugoDraw.pr.pop();ugoDraw.pr.pop();ugoDraw.pins.pop();} else ugoDraw.pr.pop(); } renderUgo(); };
 $('ugoClear').onclick=function(){ugoDraw={pr:[],pins:[]};ugoPend=null;renderUgo();};
-$('ugoPhoto').onclick=function(){ if(ugoBg){ugoBg=null;$('ugoPhoto').textContent='📎 Фото';renderUgo();toast('Подложка убрана');} else $('ugoFile').click(); };
-$('ugoFile').onchange=function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;var r=new FileReader();r.onload=function(){ugoBg=r.result;$('ugoPhoto').textContent='✕ Убрать фото';renderUgo();toast('Фото подложено — обводи линиями/выводами поверх');};r.readAsDataURL(f);};
+$('ugoPhoto').onclick=function(){ if(ugoBg){ugoBg=null;ugoBgFile=null;$('ugoPhoto').textContent='📎 Фото';renderUgo();toast('Подложка убрана');} else $('ugoFile').click(); };
+$('ugoFile').onchange=function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;ugoBgFile=f;var r=new FileReader();r.onload=function(){ugoBg=r.result;$('ugoPhoto').textContent='✕ Убрать фото';renderUgo();toast('Фото подложено — обводи поверх или жми «✨ Нарисовать ИИ»');};r.readAsDataURL(f);};
+$('ugoAi').onclick=async function(){
+  if(!ugoBgFile){ $('ugoFile').click(); toast('Сначала выбери фото УГО'); return; }
+  if(!srvOn()){toast('ИИ-отрисовка работает в CRM (нужна авторизация)');return;}
+  var btn=$('ugoAi'); btn.disabled=true; var old=btn.textContent; btn.textContent='✨ Рисую… 10–30 сек';
+  try{
+    var fd=new FormData(); fd.append('file',ugoBgFile,ugoBgFile.name||'ugo.png');
+    var r=await fetch(ATOMCAD_API+'/api/atomcad/draw-ugo',{method:'POST',headers:{'Authorization':'Bearer '+tok()},body:fd});
+    var d=null;try{d=await r.json()}catch(_){}
+    if(!r.ok||!d||!d.ok)throw new Error((d&&(d.message||d.error))||('HTTP '+r.status));
+    var u=d.data||{};
+    ugoDraw={pr:(u.pr||[]),pins:(u.pins||[]).map(function(p){return {x:p[0],y:p[1]}})};
+    ugoPend=null; renderUgo();
+    toast('ИИ нарисовал УГО — проверь и поправь, потом «Сохранить»');
+  }catch(err){ toast('Не удалось нарисовать: '+err.message); }
+  btn.disabled=false; btn.textContent=old;
+};
 Array.prototype.forEach.call(document.querySelectorAll('.ugt'),function(b){b.addEventListener('click',function(){ugoSetTool(b.getAttribute('data-ugt'))});});
 /* выбор файлов: докидываем к уже выбранным и перераспознаём весь набор */
 $('dsFile').onchange=function(e){
