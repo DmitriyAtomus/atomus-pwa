@@ -564,7 +564,8 @@ function ctrlSym(c){
   return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, -stub-90, hx+stub+360, bodyH+10],
           lbl:[-hx, bodyH+54, 'start'], pins:pinsArr, pr:pr};
 }
-function symFor(c){ return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
+function _ugoSym(u){ var b=u.bb||[-100,-100,100,100]; return {name:'УГО',pre:'A',bb:b,lbl:u.lbl||[0,b[3]+30,'middle'],pins:u.pins||[],pr:u.pr}; }
+function symFor(c){ if(c.ugo&&c.ugo.pr&&c.ugo.pr.length) return _ugoSym(c.ugo); return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
 var PALETTE=[
   ['Защита',['qf3','qf1','fu']],
   ['Коммутация',['kmfull','kmp','kmp1','km3','coil','c_no','c_nc','sb_no','sb_nc']],
@@ -2116,7 +2117,7 @@ $('catSearch').addEventListener('input',renderCatalog);
 /* ============ листы ============ */
 function _mkSheet(s){
   return {
-    comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
+    comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{},ugo:(c.ugo&&c.ugo.pr?c.ugo:null)}}),
     wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null,sec:(w.sec!=null?w.sec:null),bus:w.bus||null}}),
     texts:(s.texts||[]).slice(),
     nodes:(s.nodes||[]).map(function(n){return {x:n.x,y:n.y}}),

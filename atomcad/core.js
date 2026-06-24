@@ -243,7 +243,9 @@ function buildAuxSheets(P){
     part.forEach(function(u,ci){
       var col=ci%perRow, rw=Math.floor(ci/perRow), x=x0+col*xs, y=yTop+rw*ys;
       var note=(u.a.name||'')+(u.a.target?(' · '+u.a.target):'');
-      ac.push(C(u.des, auxSym2(u.a.kind), x, y, u.a.model||'', u.a.manu||'', note));
+      var _ac=C(u.des, auxSym2(u.a.kind), x, y, u.a.model||'', u.a.manu||'', note);
+      if(u.a.ugo&&u.a.ugo.pr&&u.a.ugo.pr.length) _ac.ugo=u.a.ugo;   // своё УГО из библиотеки — рисуется вместо стандартного
+      ac.push(_ac);
     });
     sheets.push({title:'аппараты управления'+(np>1?(' '+(p+1)):''), subtitle:'аппараты управления', comps:ac, wires:[], texts:at});
   }
