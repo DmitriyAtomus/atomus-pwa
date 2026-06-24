@@ -63,7 +63,8 @@ function lvSupplies(P){
 // НЕ нагружают цепь управления силовые аппараты: БП (свой автомат), частотники, автоматы, прочее силовое.
 function controlCurrent(P){
   var CTRL_LOAD={lamp:1,button:1,switch:1,estop:1,fan:1};
-  var a = 0.8 + (P&&P.aux||[]).reduce(function(s,x){
+  var base=(P&&P.controller&&P.controller.model)?0.8:0;   // без контроллера базового потребления нет
+  var a = base + (P&&P.aux||[]).reduce(function(s,x){
     if(x.kind==='contactor'||x.kind==='ssr'||x.kind==='relay') return s+0.05*(x.qty||1);
     if(CTRL_LOAD[x.kind]) return s+(+x.a||0)*(x.qty||1);
     return s;
@@ -143,6 +144,15 @@ function compressDes(list){
 function natKey(d){var m=/^([A-Za-zА-Яа-я]+)(\d*)/.exec(d)||[];return (m[1]||'')+(m[2]?('00000'+m[2]).slice(-5):'')}
 // удалённые пользователем элементы щита (обратимо): набор стабильных токенов в P.cab.removed
 function isRemoved(P,token){return !!(P&&P.cab&&P.cab.removed&&P.cab.removed[token]);}
+// клеммы IEK КПИ 2в — модель по сечению; развёртка диапазонов и оценка сечения для спецификации
+var KPI_TERM_SPEC=[{sec:1.5,model:'КПИ 2в-1,5',S:4.2},{sec:2.5,model:'КПИ 2в-2,5',S:5.2},{sec:4,model:'КПИ 2в-4',S:6.2},{sec:6,model:'КПИ 2в-6',S:8.2},{sec:10,model:'КПИ 2в-10',S:10.3}];
+function kpiTermPick(sec){sec=+sec||1.5;for(var i=0;i<KPI_TERM_SPEC.length;i++)if(sec<=KPI_TERM_SPEC[i].sec)return KPI_TERM_SPEC[i];return KPI_TERM_SPEC[KPI_TERM_SPEC.length-1];}
+function kpiTermModel(sec){return kpiTermPick(sec).model;}
+// суммарная ширина клемм на рейке, мм (для оценки модулей корпуса)
+function terminalsWidthMM(P){var w=0;expandTerms(P&&P.terminals).forEach(function(t){w+=kpiTermPick(termSec(t)).S;});return w;}
+function expandTerms(list){var out=[];(list||[]).forEach(function(t){var m=String(t.term||'').match(/^(.*?:)(\d+)\s*[–\-]\s*(\d+)$/);if(m&&+m[3]>=+m[2]&&+m[3]-+m[2]<60){for(var n=+m[2];n<=+m[3];n++)out.push({term:m[1]+n,name:t.name,sec:t.sec});return;}out.push(t);});return out;}
+function termSec(t){if(t&&t.sec)return +t.sec;var g=String(t&&t.term||'');if(/^X1/.test(g))return 6;if(/^X5/.test(g))return 1.5;return 2.5;}
+
 function buildSpec(P){
   var items=[]; // {des, name, manu, model, note}
   // контроллер
@@ -165,6 +175,8 @@ function buildSpec(P){
   var psuBase=(P.aux||[]).filter(function(a){return a.kind==='psu'}).reduce(function(s,a){return s+(a.qty||1)},0);
   var gN=1;
   lvSupplies(P).forEach(function(p){ items.push({des:'G'+(psuBase+gN), name:'Блок питания', manu:'', model:p.volt+'В '+p.ratingW+'Вт', note:'питание '+p.volt+'В · нагрузка '+p.sumW+' Вт ('+p.count+' шт)'}); gN++; });
+  // клеммы (IEK КПИ 2в) — отдельной позицией по типоразмерам (модель по сечению)
+  expandTerms(P.terminals).forEach(function(t){ var sc=termSec(t); items.push({des:t.term||'X', name:'Клемма пружинная', manu:'IEK', model:kpiTermModel(sc), note:sc+' мм²'}); });
   // корпус
   if(P.enclosure&&P.enclosure.model) items.push({des:'—', name:'Корпус щита', manu:'', model:P.enclosure.model, note:P.enclosure.modules+' мод.'});
 
@@ -189,7 +201,8 @@ function moduleCount(P){
   (P.consumers||[]).forEach(function(c){ if(needsContactor(c)){ var q=c.qty||1; for(var k=0;k<q;k++){ var unm=c.name+(q>1?(' #'+(k+1)):''); if(coveredByAux(_covM,c,unm))continue; if(isRemoved(P,'km|'+c.id+'|'+k))continue; m+= c.phases===3?2:1; } } });
   (P.aux||[]).forEach(function(a){ m+= (a.kind==='psu')?2:1; });
   lvSupplies(P).forEach(function(){ m+=2; }); // авто-БП низковольтных цепей
-  m+=4; // клеммы/резерв базовый
+  // клеммы: ширина по рейке (КПИ S) → эквивалент в модулях (1 мод = 17,5 мм) + резерв на упоры/перемычки
+  m += Math.max(4, Math.ceil(terminalsWidthMM(P)/17.5)+2);
   return m;
 }
 var ENCL=[{model:'IEK ЩРн-24',modules:24},{model:'IEK ЩРн-36з',modules:36},{model:'IEK ЩРн-48з-1',modules:48},{model:'IEK ЩРн-72з',modules:72},{model:'IEK ЩРн-96',modules:96}];
@@ -253,16 +266,22 @@ function buildSchematic(P){
     groups.push(g);
   });
   var nT=cols.length, step=720, maxX=3850;
-  if(nT>0){ var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(300, Math.floor(fit)); }
+  if(nT>0){
+    var fitL=Math.floor((2240-gx)/nT);                                    // шаг, при котором последняя колонка остаётся левее штампа (x≈2300)
+    if(fitL>=380){ step=Math.min(720,fitL); maxX=2240; }                  // мало колонок — уводим их левее основной надписи, чтобы не заходили
+    else { var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(380,Math.floor(fit)); }  // много колонок — раскладываем шире (без наложения аппаратов)
+  }
   var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, _covS=auxCoverSet(P), _ssr=ssrSet(P);
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
+    var _w0=pw.length;                                                                  // запомним, какие провода добавит эта группа — потом раскрасим по фазе
     var gc=g.cols, b=g.b, x0=gc[0].x, x1=gc[gc.length-1].x, qfx=(x0+x1)/2, grouped=gc.length>1;
     var ph3=(b.poles===3), phase=ph3?'L1 L2 L3':['L1','L2','L3'][(phI++)%3];
+    var phTag=(!ph3&&/^L[123]$/.test(phase))?phase:null;                                 // однофазный отвод → одна фаза, можно красить
     // автомат — один на группу, питание с шины ввода
     pc.push(C(b.code,'qf1',qfx,950,'NB1-63 '+b.poles+'P, C'+b.rate,'CHINT', grouped?('группа · '+gc.length+' лин.'):gc[0].l.name));
     pw.push(W([qfx,800],[qfx,950]));
-    pt.push({x:qfx-40,y:892,s:24,ls:0,anchor:'end',tx:phase});                         // фаза(ы) линии — слева от отвода, чтобы не налезать на подпись сечения «N мм²» справа
+    pt.push({x:qfx-40,y:892,s:24,ls:0,anchor:'end',tx:phase,ph:phTag});                  // фаза(ы) линии — слева от отвода; ph — цвет фазы
     if(grouped){
       pw.push(W([qfx,1250],[qfx,1350]));                                               // отвод автомата на шину распределения
       pw.push(W([x0,1350],[x1,1350]));                                                 // шина распределения по отводам
@@ -288,25 +307,30 @@ function buildSchematic(P){
         if(!(cons.name in kmByName)) kmByName[cons.name]='KM'+kmN;
         kmN++;
       }
-      var termY=2000, wnY=1730;
+      var termY=1950, wnY=1730;                                                          // termY — конец отвода = верхний пин клеммы (подключение сверху)
       if(ssrTag){
         var sy=kmBot+120;                                                                // твердотельное реле сразу под контактором
         pw.push(W([x,kmBot],[x,sy]));
         pc.push(C(ssrTag,'ssr',x,sy,'','','ТР рег. напряжения · 0-10В'));                 // вход L1 сверху, выход T1 снизу, управление 0-10В
         pt.push({x:x-150,y:sy+170,s:18,ls:0,anchor:'end',tx:'0-10В ← AO'});               // подсказка по управлению
-        pw.push(W([x,sy+300],[x,sy+420]));                                               // выход ТР → клемма
-        termY=sy+470; wnY=sy+360;
+        termY=sy+440; wnY=sy+360;
+        pw.push(W([x,sy+300],[x,termY]));                                               // выход ТР → клемма (до верхнего пина)
       } else {
-        pw.push(W([x,kmBot],[x,1950]));                                                   // контактор/отвод → клемма
+        pw.push(W([x,kmBot],[x,termY]));                                                  // контактор/отвод → клемма (до верхнего пина)
       }
       pt.push({x:x+44,y:wnY,s:22,ls:0,anchor:'start',tx:(ph3?('W'+wN+'…'+(wN+2)):('W'+wN))}); wN+=ph3?3:1;  // номер(а) провода
-      pc.push(C('X'+termN,'term',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;
+      pc.push(C('X'+termN,'termb',x,termY,'ЗНИ 2,5 мм²','',role)); termN++;               // клемма: подключение сверху, обозначение снизу
       lastX=x;
     });
+    if(phTag){ for(var _wi=_w0;_wi<pw.length;_wi++) pw[_wi].phase=phTag; }                // раскрасить все провода однофазной группы по фазе
   });
   pw.push(W([gx,800],[Math.max(lastX,bx),800]));
   pt.push({x:gx+40,y:770,s:22,ls:0,anchor:'start',tx:'L1 · L2 · L3 · N · PE'});  // маркировка шины — над линией шины (y=800) и правее ввода, чтобы линия не пересекала подпись
   pt.push({x:gx+120,y:235,s:38,tx:'СИЛОВЫЕ ЦЕПИ · 3N~ 400 В'});
+  // легенда цветов фаз
+  pt.push({x:gx+1180,y:232,s:24,anchor:'start',tx:'L1',ph:'L1'});
+  pt.push({x:gx+1260,y:232,s:24,anchor:'start',tx:'L2',ph:'L2'});
+  pt.push({x:gx+1340,y:232,s:24,anchor:'start',tx:'L3',ph:'L3'});
   var sheets=[{title:'силовые цепи', comps:pc, wires:pw, texts:pt}];
 
   // ===================== ЛИСТ 2 · ЦЕПИ УПРАВЛЕНИЯ =====================

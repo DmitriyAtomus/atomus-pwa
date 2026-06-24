@@ -298,9 +298,12 @@ function pController(){
   ensureControllers();
   var io=P.controller.io;
   var h=H('Шаг 2','Контроллер щита','Выбор контроллера и распределение сигналов по входам/выходам. Занять/снять — с подтверждением.');
+  var noCtrl=!(P.controller&&P.controller.model);
   h+='<div class="form"><div class="fld gr"><label>Модель контроллера</label><select id="ctrlSel" onchange="setCtrl(this.value)">';
+  h+='<option value="Без контроллера"'+(noCtrl?' selected':'')+'>— Без контроллера —</option>';
   CTRLS.forEach(function(m){h+='<option'+(P.controller.model===m?' selected':'')+'>'+m+'</option>'});
   h+='</select></div><div class="fld"><label>&nbsp;</label><button class="addbtn" onclick="openDatasheet()">Нет в списке? Загрузить даташит</button></div></div>';
+  if(noCtrl){ h+='<div class="note" style="margin-top:2px">Щит <b>без контроллера</b> — управление на контакторах/реле (кнопки, датчики напрямую). Цепи управления контроллера и панель оператора не формируются; в спецификацию и схему контроллер не попадёт.</div>'; return h; }
   if(P.controller.dims&&(P.controller.dims.w||P.controller.dims.h||P.controller.dims.d)){var dm=P.controller.dims;h+='<div class="note" style="margin:-6px 0 12px">📐 Габариты из даташита: <span class="mono" style="color:var(--cyan)">'+(dm.w||'?')+'×'+(dm.h||'?')+(dm.d?'×'+dm.d:'')+' мм</span>'+(P.controller.spec&&P.controller.spec.ip?(' · '+esc(P.controller.spec.ip)):'')+(P.controller.spec&&P.controller.spec.voltage?(' · '+esc(P.controller.spec.voltage)):'')+'</div>';}
   h+=hmiBlock();
   h+='<div class="counts">';['DO','AI','AO','DI'].forEach(function(g){var fr=C.ioFree(io,g),t=C.ioTotal(io,g),pct=t?Math.round((t-fr)/t*100):0;h+='<div class="cc'+(t&&fr===0?' warn':'')+'"><div class="t"><span class="d" style="background:'+COL[g]+'"></span>'+(g==='DO'?'Реле':g==='AI'?'Входы AI':g==='AO'?'Вых. AO':'Входы DI')+'</div><div class="big">'+fr+'<small> / '+t+'</small></div><div class="bar"><i style="width:'+pct+'%;background:'+COL[g]+'"></i></div></div>'});h+='</div>';
@@ -309,7 +312,10 @@ function pController(){
   return h;
 }
 function ioGroup(g){var io=P.controller.io,a=io.pins[g]||[],fr=C.ioFree(io,g),t=a.length;if(!t)return '';var h='<div class="card" style="margin-bottom:11px"><div style="display:flex;margin-bottom:8px"><span class="cname" style="font-size:13px">'+(g==='AI'?'Аналог. входы':g==='DI'?'Дискр. входы':g==='AO'?'Аналог. выходы':'Реле-выходы')+'</span><span class="cnt" style="margin-left:auto">своб. '+fr+'/'+t+'</span></div><div class="pins">';a.forEach(function(p){var u=io.asg[p.id];h+='<div class="pin '+g+' '+(u?'used':'free')+'" onclick="ioClick(\''+p.id+'\',\''+g+'\')"><span class="id">'+p.id+'</span><span class="lab">'+(u||'свободно')+'</span></div>'});h+='</div></div>';return h}
-function setCtrl(m){P.controller.model=m;P.controller.io=ctrlIO(m);var lib=CTRL_LIB[m];if(lib){P.controller.dims=lib.dims;P.controller.spec=lib.spec;}else{P.controller.dims=null;P.controller.spec=null;}dirty();draw()}
+function setCtrl(m){
+  if(m==='Без контроллера'){ P.controller={model:'',io:{pins:{AI:[],DI:[],AO:[],DO:[]},asg:{}},dims:null,spec:null}; P.hmi=null; P.breakers=null; dirty(); draw(); return; }
+  if(!P.controller)P.controller={};
+  P.controller.model=m;P.controller.io=ctrlIO(m);var lib=CTRL_LIB[m];if(lib){P.controller.dims=lib.dims;P.controller.spec=lib.spec;}else{P.controller.dims=null;P.controller.spec=null;}P.breakers=null;dirty();draw()}
 /* библиотека контроллеров: построение записи из распознанных данных + загрузка с сервера */
 function ctrlLibFromData(d){var io=d.io||{};var ioObj=(io.relays||io.analog_inputs||io.digital_inputs||io.analog_outputs)?ioFromCounts(io):null;var dim=d.dimensions||{};return {ioPins:ioObj?ioObj.pins:null,dims:{w:dim.width_mm||'',h:dim.height_mm||'',d:dim.depth_mm||''},spec:{manufacturer:d.manufacturer||'',mounting:d.mounting||'',modules:d.din_modules||null,ip:d.ip_rating||'',voltage:d.supply_voltage||'',notes:d.notes||''}};}
 var ctrlCat=null, ctrlCatLoading=false;
@@ -821,25 +827,47 @@ function sensorPairLabels(sig){
   if(/дискрет/i.test(sig))  return ['дискр. сигнал', 'дискр. общий']; // сухой контакт: вход и общий
   return [sig+' сигнал', sig+' общий'];                            // NTC/Pt1000 — пассивный, оба провода
 }
+/* пружинные клеммы IEK КПИ 2в — габариты по сечению (S — ширина на рейке, H — высота, L — глубина, мм) */
+var KPI_TERM=[
+  {sec:1.5,model:'КПИ 2в-1,5',S:4.2,H:49.3,L:35.9},
+  {sec:2.5,model:'КПИ 2в-2,5',S:5.2,H:49.3,L:35.9},
+  {sec:4,  model:'КПИ 2в-4',  S:6.2,H:56.3,L:35.6},
+  {sec:6,  model:'КПИ 2в-6',  S:8.2,H:69.7,L:42.4},
+  {sec:10, model:'КПИ 2в-10', S:10.3,H:72,L:50.3}
+];
+function kpiTerm(sec){sec=+sec||1.5;for(var i=0;i<KPI_TERM.length;i++)if(sec<=KPI_TERM[i].sec)return KPI_TERM[i];return KPI_TERM[KPI_TERM.length-1];}
+/* сечение клеммы: из поля sec, иначе по типу (ввод X1 — 6 мм², датчики X5 — 1,5, прочее — 2,5) — чтобы ширина была верной и для старых проектов */
+function termSecOf(t){ if(t&&t.sec)return +t.sec; var g=String(t&&t.term||''); if(/^X1/.test(g))return 6; if(/^X5/.test(g))return 1.5; return 2.5; }
+function secByCurrent(a){a=+a||0;if(a<=16)return 1.5;if(a<=25)return 2.5;if(a<=32)return 4;if(a<=50)return 6;return 10;}
+/* развернуть диапазоны клемм (X1:1–3) в отдельные клеммы (X1:1, X1:2, X1:3) — для отрисовки/подсчёта */
+function expandTerminals(list){
+  var out=[];
+  (list||[]).forEach(function(t){
+    var m=String(t.term||'').match(/^(.*?:)(\d+)\s*[–\-]\s*(\d+)$/);
+    if(m){ var p=m[1],a=+m[2],b=+m[3]; if(b>=a&&b-a<60){ for(var n=a;n<=b;n++) out.push({term:p+n,name:t.name,line:t.line,sec:t.sec}); return; } }
+    out.push(t);
+  });
+  return out;
+}
 /* 7 клеммы — редактируемый план клемм (хранится в P.terminals) */
 function buildTerminals(P){
   ensureBreakers();
   var t=[];
-  t.push({term:'X1:1–3', name:'Ввод L1/L2/L3', line:'5×6'});
-  t.push({term:'X1:4–5', name:'N · PE', line:'—'});
+  t.push({term:'X1:1–3', name:'Ввод L1/L2/L3', line:'5×6', sec:6});
+  t.push({term:'X1:4–5', name:'N · PE', line:'—', sec:6});
   var branches=(P.breakers||[]).filter(function(b){return b.role!=='ввод'&&b.role!=='цепи управления'});
   var i=1; branches.forEach(function(b){
     // объединённый автомат → отдельная клемма на каждую линию, но с одним и тем же QF в «Линии»
     var loads=(b.loads&&b.loads.length)?b.loads:[{name:b.role}];
-    loads.forEach(function(l){ t.push({term:'X2:'+(i++), name:l.name||b.role, line:b.code}); });
+    loads.forEach(function(l){ t.push({term:'X2:'+(i++), name:l.name||b.role, line:b.code, sec:secByCurrent(l.a)}); });  // сечение по току линии
   });
   // датчики и дискретные входы: каждый двухпроводной → ДВЕ клеммы (сигнал + общий/возврат),
   // в столбце «Линия» подписываем назначение каждого провода по типу сигнала. Нумерация X5:1, X5:2…
   var si=1;
   (P.sensors||[]).forEach(function(s){ var q=s.qty||1; for(var k=0;k<q;k++){
     var nm=s.name+(q>1?(' #'+(k+1)):''), lp=sensorPairLabels(s.sig);
-    t.push({term:'X5:'+(si++), name:nm, line:lp[0]});
-    t.push({term:'X5:'+(si++), name:nm, line:lp[1]});
+    t.push({term:'X5:'+(si++), name:nm, line:lp[0], sec:1.5});                  // сигнальные провода — КПИ 2в-1,5
+    t.push({term:'X5:'+(si++), name:nm, line:lp[1], sec:1.5});
   } });
   return t;
 }
@@ -1121,11 +1149,13 @@ function cabinetSVG(){
   items.forEach(function(it){var w=Math.min(it.w,perRow);if(used+w>perRow){rows.push(curR);curR=[];used=0;}curR.push({t:it.t,w:w,k:it.k,key:it.key});used+=w;});
   if(curR.length)rows.push(curR);
   ensureTerminals();
-  var termN=(P.terminals||[]).length;                                   // реальное число клемм
-  var termGroups=(function(){var seen=[],set={};(P.terminals||[]).forEach(function(t){var p=String(t.term||'').split(':')[0];if(p&&!set[p]){set[p]=1;seen.push(p);}});return seen;})();
+  var termList=expandTerminals(P.terminals);                            // диапазоны X1:1–3 → отдельные клеммы X1:1, X1:2, X1:3
+  var termN=termList.length;                                            // реальное число отдельных клемм
+  var termGroups=(function(){var seen=[],set={};termList.forEach(function(t){var p=String(t.term||'').split(':')[0];if(p&&!set[p]){set[p]=1;seen.push(p);}});return seen;})();
   var termLbl='Клеммники '+(termGroups.length?(termGroups[0]+'…'+termGroups[termGroups.length-1]):'')+' · '+termN+' кл.';
-  rows.push([{t:termLbl,w:perRow,k:'term',n:termN}]);
+  rows.push([{t:termLbl,w:perRow,k:'term',n:termN,terms:termList}]);
   var neededRows=rows.length, overflow=neededRows>maxRows;
+  var termOverflow=false, termRows=1;   // клеммы не помещаются по высоте с зазорами под кабель-каналы → нужен корпус выше
   var drawnRows=Math.min(neededRows,maxRows);
   // масштаб мм→px (форма повторяет щит)
   var ppm=Math.min(740/W,640/H,1.5), pad=12;
@@ -1162,19 +1192,34 @@ function cabinetSVG(){
       var drag=it.key?(' data-cabkey="'+it.key+'" onpointerdown="cabDown(event,\''+it.key+'\')" style="cursor:pointer"'):'';
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
       s+='<g'+drag+hov+'>';
-      s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
-      // клеммник — рисуем реальное число клемм отдельными «ножами» на рейке
+      // клеммник — клеммы IEK КПИ 2в в горизонтальный ряд, ширина по сечению (S), обозначение вертикально; перенос на доп. ряд если не влезает
       if(it.k==='term'&&it.n){
-        var tn=it.n, pad2=mm(2.5), tx0=x+pad2, tw=Math.max(6,ww)-pad2*2;
-        var ty0=y+mm(3)+mm(11), ty1=y+mm(3)+hpx-mm(4), slotH=ty1-ty0;       // слоты ниже подписи
-        var sw=tw/tn;
-        for(var ti=0;ti<tn;ti++){
-          var sx=tx0+ti*sw;
-          s+='<rect x="'+sx.toFixed(1)+'" y="'+ty0.toFixed(1)+'" width="'+Math.max(1.2,sw-1).toFixed(1)+'" height="'+slotH.toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.7" opacity=".75"/>';
-        }
-        // подпись клеммника — сверху блока, над слотами (не перекрывает их)
+        var pad2=mm(2.5), tx0=x+pad2, tw=Math.max(6,ww)-pad2*2;
+        var titleH=mm(10), busClear=railsTop+rowsRegionPx+mm(12)-mm(6);
+        var availH=Math.max(mm(20),busClear-(y+mm(3))-titleH-mm(5));            // высота под клеммы (до шины N/PE)
+        var tlist=it.terms||[], WPS=mm(2.5);                                    // px на 1 мм ширины S (пропорция КПИ, читаемо)
+        var lay=[], cxp=0, ry=0;                                               // пасс 1 — раскладка с переносом по реальной ширине
+        for(var ti=0;ti<it.n;ti++){ var kp=kpiTerm(termSecOf(tlist[ti])), cw=Math.max(mm(6.5),WPS*kp.S);
+          if(cxp+cw>tw+0.5 && cxp>0){ ry++; cxp=0; }
+          lay.push({x:tx0+cxp,row:ry,w:cw,tag:tlist[ti]?String(tlist[ti].term||''):''}); cxp+=cw; }
+        var nrows=ry+1, ductGap=mm(50);                                        // ПРАВИЛО: между рейками клемм ≥5 см под кабель-канал
+        termRows=nrows;
+        if(nrows*mm(15)+(nrows-1)*ductGap>availH+0.5) termOverflow=true;        // не лезет даже при минимальной высоте клеммы + зазорах → корпус мал
+        var railH=Math.min(mm(34),Math.max(mm(15),(availH-(nrows-1)*ductGap)/nrows));
+        var rowPitch=railH+ductGap, _termH=titleH+nrows*railH+(nrows-1)*ductGap+mm(5);
+        s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+_termH.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
         var tfs=Math.max(7,Math.min(10,modPx*0.62));
-        s+='<text x="'+(x+Math.max(6,ww)/2).toFixed(1)+'" y="'+(y+mm(3)+mm(8)).toFixed(1)+'" font-size="'+tfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+String(it.t||'')+'</text>';
+        s+='<text x="'+(x+Math.max(6,ww)/2).toFixed(1)+'" y="'+(y+mm(3)+mm(7.5)).toFixed(1)+'" font-size="'+tfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+String(it.t||'')+'</text>';
+        var ty0=y+mm(3)+titleH;
+        for(var rg=0;rg<nrows-1;rg++){ var dgy=ty0+rg*rowPitch+railH; s+=duct(tx0,dgy+mm(5),tw,ductGap-mm(10)); }  // кабель-канал между рейками
+        lay.forEach(function(Lc){
+          var sy=ty0+Lc.row*rowPitch, scx=Lc.x+Lc.w/2, scy=sy+railH/2;
+          s+='<rect x="'+Lc.x.toFixed(1)+'" y="'+(sy+1).toFixed(1)+'" width="'+Math.max(3,Lc.w-1).toFixed(1)+'" height="'+Math.max(4,railH-2).toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.6" opacity=".8"/>';
+          var labFs=Math.max(5,Math.min(9,Math.min(Lc.w*0.62,railH/4.6)));
+          if(Lc.tag) s+='<text x="'+scx.toFixed(1)+'" y="'+scy.toFixed(1)+'" font-size="'+labFs.toFixed(1)+'" fill="#9be6c4" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none" transform="rotate(-90 '+scx.toFixed(1)+' '+scy.toFixed(1)+')">'+Lc.tag+'</text>';
+        });
+      } else {
+        s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
       }
       // электромагнитный контактор — рисуем символ катушки (A1—A2) внизу блока
       if(it.k==='km'){
@@ -1222,8 +1267,10 @@ function cabinetSVG(){
   s+='<line x1="'+scMid.toFixed(1)+'" y1="'+(scY-2.5).toFixed(1)+'" x2="'+scMid.toFixed(1)+'" y2="'+(scY+2.5).toFixed(1)+'" stroke="#8FA0AE" stroke-width="1"/>';
   s+='<text x="'+scMid.toFixed(1)+'" y="'+(scY-5).toFixed(1)+'" font-size="8" fill="#8FA0AE" text-anchor="middle" font-family="IBM Plex Mono">100 мм</text>';
   // подпись/предупреждение
-  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(overflow?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
+  var _warn=overflow||termOverflow;
+  s+='<text x="'+(Wv/2).toFixed(0)+'" y="'+(Hv-6).toFixed(0)+'" font-size="9" fill="'+(_warn?'#FF7A7A':'#566370')+'" text-anchor="middle">'+
      (overflow?('✗ в '+W+'×'+H+' мм помещается '+(maxRows)+' ряд(ов) ('+dim.cap+' мод.), нужно '+neededRows+' — увеличь высоту/ширину'):
+      termOverflow?('✗ клеммам не хватает высоты: '+termRows+' рейки с зазором 5 см под кабель-канал не помещаются в '+W+'×'+H+' мм — нужен корпус выше'):
      (perRow+' мод./ряд · '+maxRows+' ряд макс · кабель-канал '+ductMm+'×60 мм · у KM: П — из «Потребители», В — из «Вспомогат.» · перетащи аппарат на другой — поменяются местами'))+'</text>';
   s+='</svg>';return s;
 }

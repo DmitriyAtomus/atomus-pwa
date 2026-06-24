@@ -265,6 +265,12 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
         <button class="tool" data-tool="wire" title="Провод (W)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18h7V6h9"/><circle cx="4" cy="18" r="1.6" fill="currentColor"/><circle cx="20" cy="6" r="1.6" fill="currentColor"/></svg>
         </button>
+        <button class="tool" data-tool="point" title="Точка-отвод: поставь точку на линии или свободно (P)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="tool" data-tool="autowire" title="Авто-провод: точка→точка прямыми углами (A)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19V11h7V5"/><circle cx="5" cy="19" r="2.3" fill="currentColor" stroke="none"/><circle cx="12" cy="11" r="2.1" fill="none"/><circle cx="19" cy="5" r="2.3" fill="currentColor" stroke="none"/></svg>
+        </button>
         <button class="tool" data-tool="hand" title="Рука (H / Space)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 11V5a1.5 1.5 0 013 0v5m0-4a1.5 1.5 0 013 0v4m0-2.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-1a6 6 0 01-5.2-3L4 13.5A1.6 1.6 0 016.4 12l1.6 1.4" stroke-linejoin="round"/></svg>
         </button>
@@ -342,6 +348,8 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
 /* ============ константы ============ */
 var GRID=25, SW=4200, SH=2970;
 var INK='#1C2B38', SOFT='#5E6E7C', CY='#16B7DB', AM='#FFC400', PAPER='#F6F8FA';
+// цвета фаз для наглядности (читаемы на белом листе): L1 — жёлто-коричневый, L2 — зелёный, L3 — красный
+var PHASE_COL={L1:'#C49000',L2:'#1E8E3E',L3:'#D23B3B',N:'#3A6B96',PE:'#2E8B57'};
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function snap(v){return Math.round(v/GRID)*GRID}
@@ -431,6 +439,9 @@ var SYM={
     pr:[L(0,0,0,35),L(0,115,0,150),C(0,75,40,1),L(-28,47,28,103),L(28,47,-28,103)]},
   term:{name:'Вывод / клемма',pre:'X',bb:[-22,-44,22,4],lbl:[0,-58,'middle'],
     pins:[[0,0]],pr:[C(0,-20,20)]},
+  // клемма с подключением сверху (вывод вверху, обозначение снизу, с запасом от кружка чтобы не налезало)
+  termb:{name:'Клемма (подключение сверху)',pre:'X',bb:[-20,-4,20,104],lbl:[0,94,'middle'],
+    pins:[[0,0]],pr:[L(0,0,0,6),C(0,24,18)]},
   qf1:{name:'Автомат 1п',pre:'QF',bb:[-62,-10,30,310],lbl:[-74,160,'end'],
     pins:[[0,0],[0,300]],
     pr:[L(0,0,0,90),L(0,240,-45,95),L(-57,83,-33,107),L(-33,83,-57,107),L(0,240,0,300)]},
@@ -514,7 +525,7 @@ var PALETTE=[
 ];
 
 /* ============ состояние ============ */
-var S={comps:[],wires:[],texts:[],sel:null,selSet:[],sheets:[],cur:0};
+var S={comps:[],wires:[],texts:[],nodes:[],sel:null,selSet:[],sheets:[],cur:0};
 /* множественное выделение (рамкой) */
 function isSelC(id){return (S.sel&&S.sel.t==='c'&&S.sel.id===id)||(S.selSet&&S.selSet.indexOf(id)>=0);}
 function selIds(){return (S.selSet&&S.selSet.length)?S.selSet.slice():(S.sel&&S.sel.t==='c'?[S.sel.id]:[]);}
@@ -850,7 +861,8 @@ function wiresMarkup(forExport){
   S.wires.forEach(function(w){
     var sel=!forExport&&S.sel&&S.sel.t==='w'&&S.sel.id===w.id;
     var d=_hopD(w);
-    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+(sel?CY:INK)+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
+    var _wc=sel?CY:(w.phase&&PHASE_COL[w.phase]?PHASE_COL[w.phase]:INK);   // цвет по фазе L1/L2/L3
+    h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+_wc+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
     if(!forExport){ var dHit=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' '); h+='<path data-w="'+w.id+'" d="'+dHit+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>'; }
     var _sec=wireSection(w);
     if(_sec && (sel || _isFeeder(w,_bus))){
@@ -871,11 +883,13 @@ function renderCanvas(){
   /* точки соединений */
   h='';
   junctions().forEach(function(j){h+='<circle cx="'+j.x+'" cy="'+j.y+'" r="6.5" fill="'+INK+'"/>'});
+  (S.nodes||[]).forEach(function(n,i){var sn=S.sel&&S.sel.t==='n'&&S.sel.ni===i;h+='<circle cx="'+n.x+'" cy="'+n.y+'" r="'+(sn?11:8)+'" fill="'+CY+'" stroke="'+(sn?'#fff':'#06262E')+'" stroke-width="'+(sn?3:2)+'"/>'});  // поставленные точки-отводы (выбранная — крупнее, белый контур)
   $('jL').innerHTML=h;
   /* компоненты + свободные тексты */
   h='';
   S.texts.forEach(function(t){
-    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+SOFT+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
+    var _tc=(t.ph&&PHASE_COL[t.ph])?PHASE_COL[t.ph]:SOFT;   // подпись фазы — цветом фазы
+    h+='<text x="'+t.x+'" y="'+t.y+'" font-size="'+t.s+'" fill="'+_tc+'" font-weight="'+(t.ph?'700':'400')+'" text-anchor="'+(t.anchor||'middle')+'" letter-spacing="'+(t.ls!=null?t.ls:6)+'" font-family="\'IBM Plex Sans\'">'+esc(t.tx)+'</text>';
   });
   S.comps.forEach(function(c){
     var col=isSelC(c.id)?CY:INK;
@@ -884,7 +898,7 @@ function renderCanvas(){
   $('compsL').innerHTML=h;
   /* выводы (в режиме провода/размещения) */
   h='';
-  if(tool==='wire'||tool==='place'){
+  if(tool==='wire'||tool==='place'||tool==='autowire'||tool==='point'){
     S.comps.forEach(function(c){
       for(var i=0;i<symFor(c).pins.length;i++){
         var p=pinW(c,i);
@@ -973,7 +987,7 @@ function renderGhost(){
 var lastSelKey='';
 function renderProps(force){
   var grp=(S.selSet&&S.selSet.length>1);
-  var key=grp?('grp'+S.selSet.length):(S.sel?(S.sel.t+S.sel.id):'none');
+  var key=grp?('grp'+S.selSet.length):(S.sel?(S.sel.t==='n'?('n'+S.sel.ni):(S.sel.t+S.sel.id)):'none');
   if(!force&&key===lastSelKey)return;
   lastSelKey=key;
   var el=$('propsBody'),h='';
@@ -984,6 +998,14 @@ function renderProps(force){
   if(!S.sel){
     el.innerHTML='<div class="empty">Ничего не выбрано.<br><br>Кликни элемент или провод на листе — здесь появятся его свойства.</div>';
     return;
+  }
+  if(S.sel.t==='n'){
+    var nd=S.nodes&&S.nodes[S.sel.ni];
+    if(!nd){S.sel=null;renderProps(true);return}
+    h+='<div class="sel-chip"><b>Точка-отвод</b><span>· '+(nd.x/10).toFixed(0)+' × '+(nd.y/10).toFixed(0)+' мм</span></div>';
+    h+='<div class="empty" style="padding:8px 4px 12px">Тащи — перенести. От неё можно вести «Авто-провод» (A). Клик по точке инструментом «Точка» (P) тоже удаляет.</div>';
+    h+='<div class="pbtns"><button class="pb danger" id="pDelN">Удалить точку (Del)</button></div>';
+    el.innerHTML=h; $('pDelN').onclick=delSel; return;
   }
   if(S.sel.t==='w'){
     var w=wireById(S.sel.id);
@@ -1070,8 +1092,31 @@ function delSel(){
   if(!S.sel)return;
   pushUndo();
   if(S.sel.t==='c')S.comps=S.comps.filter(function(c){return c.id!==S.sel.id});
+  else if(S.sel.t==='n'){ if(S.nodes&&S.nodes[S.sel.ni])S.nodes.splice(S.sel.ni,1); }
   else S.wires=S.wires.filter(function(w){return w.id!==S.sel.id});
   clearSel();renderProps(true);renderCanvas();
+}
+/* ============ копировать / вставить (с новой нумерацией) ============ */
+var clipboard=null;
+function _selCompIds(){ return (S.selSet&&S.selSet.length)?S.selSet.slice():(S.sel&&S.sel.t==='c'?[S.sel.id]:[]); }
+function copySel(){
+  var comps=_selCompIds().map(compById).filter(Boolean);
+  if(!comps.length){toast('Сначала выдели аппарат(ы)');return;}
+  clipboard=comps.map(function(c){return {sym:c.sym,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:JSON.parse(JSON.stringify(c.attrs||{})),x:c.x,y:c.y};});
+  toast('Скопировано: '+clipboard.length+' — Ctrl+V вставит с новой нумерацией');
+}
+function _preOf(s){ if(SYM[s.sym]&&SYM[s.sym].pre)return SYM[s.sym].pre; var m=String(s.des||'').match(/^([A-Za-zА-Яа-я]+)/); return m?m[1]:'A'; }
+function pasteClip(){
+  if(!clipboard||!clipboard.length){toast('Буфер пуст');return;}
+  pushUndo();
+  var off=80, ids=[];
+  clipboard.forEach(function(s){
+    var nc={id:uid('c'),sym:s.sym,x:snap(s.x+off),y:snap(s.y+off),rot:s.rot,mirror:s.mirror,des:nextDes(_preOf(s)),attrs:JSON.parse(JSON.stringify(s.attrs||{}))};
+    S.comps.push(nc); ids.push(nc.id);
+  });
+  S.selSet=ids; S.sel=(ids.length===1?{t:'c',id:ids[0]}:null);
+  renderCanvas(); renderProps(true);
+  toast('Вставлено: '+ids.length+' (новые обозначения) — тащи на место');
 }
 function nextDes(pre){
   var mx=0,re=new RegExp('^'+pre+'(\\d+)$');
@@ -1161,6 +1206,97 @@ function finishWire(){
 }
 function cancelWire(){draft=[];S._extend=null;renderDraft()}
 
+/* ============ авто-провод: точка→точка прямыми углами, с перехлёстом, без наложения ============ */
+var autoStart=null;   // {x,y, wire?, seg?} — первая выбранная точка (вывод или точка на линии)
+function _projOnSeg(px,py,a,b){
+  if(a.x===b.x){ var y=Math.max(Math.min(a.y,b.y),Math.min(Math.max(a.y,b.y),py)); return {x:a.x,y:y}; }
+  if(a.y===b.y){ var x=Math.max(Math.min(a.x,b.x),Math.min(Math.max(a.x,b.x),px)); return {x:x,y:a.y}; }
+  var dx=b.x-a.x,dy=b.y-a.y,t=((px-a.x)*dx+(py-a.y)*dy)/(dx*dx+dy*dy||1); t=Math.max(0,Math.min(1,t)); return {x:a.x+t*dx,y:a.y+t*dy};
+}
+// ближайшая точка на каком-либо проводе (поставить отвод/точку на линии)
+function wireTapPoint(wx,wy){
+  var tol=Math.max(16,13/view.s), best=null, bd=tol;
+  S.wires.forEach(function(w){ for(var i=0;i<w.pts.length-1;i++){
+    var pt=_projOnSeg(wx,wy,w.pts[i],w.pts[i+1]), d=Math.max(Math.abs(pt.x-wx),Math.abs(pt.y-wy));
+    if(d<bd){bd=d;best={x:Math.round(pt.x),y:Math.round(pt.y),wire:w,seg:i};}
+  }});
+  return best;
+}
+// цель клика: поставленная точка → вывод аппарата → точка на проводе → узел сетки
+function autoTarget(wx,wy){
+  var tol=Math.max(26,18/view.s),best=null,bd=tol;
+  (S.nodes||[]).forEach(function(n){var d=Math.max(Math.abs(n.x-wx),Math.abs(n.y-wy));if(d<bd){bd=d;best={x:n.x,y:n.y};}});  // приоритет — поставленным точкам
+  if(best)return best;
+  S.comps.forEach(function(c){for(var i=0;i<symFor(c).pins.length;i++){var p=pinW(c,i),d=Math.max(Math.abs(p.x-wx),Math.abs(p.y-wy));if(d<bd){bd=d;best={x:p.x,y:p.y};}}});
+  if(best)return best;
+  var wp=wireTapPoint(wx,wy); if(wp)return wp;
+  return {x:snap(wx),y:snap(wy)};
+}
+// индекс поставленной точки рядом с (wx,wy), иначе -1
+function hitNodeIdx(wx,wy){
+  var tol=Math.max(15,13/view.s);
+  for(var i=(S.nodes||[]).length-1;i>=0;i--){var n=S.nodes[i]; if(Math.max(Math.abs(n.x-wx),Math.abs(n.y-wy))<=tol)return i;}
+  return -1;
+}
+// поставить точку самому: клик по существующей точке — удалить; на линии → отвод-узел (split провода), иначе свободная точка на сетке
+function placePoint(wx,wy){
+  var hn=hitNodeIdx(wx,wy);
+  if(hn>=0){ pushUndo(); S.nodes.splice(hn,1); if(S.sel&&S.sel.t==='n')clearSel(); renderCanvas(); toast('Точка удалена'); return; }
+  pushUndo();
+  var tap=wireTapPoint(wx,wy), pt;
+  if(tap){ splitWireAt(tap); pt={x:tap.x,y:tap.y}; }
+  else { pt={x:snap(wx),y:snap(wy)}; }
+  if(!(S.nodes||[]).some(function(n){return n.x===pt.x&&n.y===pt.y})) S.nodes.push(pt);
+  renderCanvas(); toast('Точка поставлена (клик по ней — удалить) · «Авто-провод» A — вести от неё');
+}
+function _dedupePts(pts){
+  var o=[]; pts.forEach(function(p){var l=o[o.length-1]; if(!l||l.x!==p.x||l.y!==p.y)o.push({x:p.x,y:p.y});});
+  if(o.length<3)return o;
+  var r=[o[0]];
+  for(var i=1;i<o.length-1;i++){var a=r[r.length-1],b=o[i],c=o[i+1]; if((a.x===b.x&&b.x===c.x)||(a.y===b.y&&b.y===c.y))continue; r.push(b);}
+  r.push(o[o.length-1]); return r;
+}
+// ортогональный маршрут s→e: Г- и Z-варианты, выбираем первый без наложения на чужие провода
+function routeOrtho(s,e){
+  var cands=[];
+  if(s.x!==e.x&&s.y!==e.y){ cands.push([s,{x:e.x,y:s.y},e]); cands.push([s,{x:s.x,y:e.y},e]); }
+  else cands.push([s,e]);
+  var mx=snap((s.x+e.x)/2), my=snap((s.y+e.y)/2);
+  cands.push([s,{x:mx,y:s.y},{x:mx,y:e.y},e]);
+  cands.push([s,{x:s.x,y:my},{x:e.x,y:my},e]);
+  for(var i=0;i<cands.length;i++){var pts=_dedupePts(cands[i]); if(pts.length>=2&&!wireOverlaps(pts,null))return pts;}
+  return _dedupePts(cands[0]);
+}
+// вставить точку-вершину на провод (точка на линии становится узлом-отводом)
+function splitWireAt(info){
+  if(!info||!info.wire)return; var w=info.wire;
+  for(var i=0;i<w.pts.length;i++)if(w.pts[i].x===info.x&&w.pts[i].y===info.y)return;
+  w.pts.splice(info.seg+1,0,{x:info.x,y:info.y});
+}
+function autowireClick(wx,wy){
+  var t=autoTarget(wx,wy);
+  if(!autoStart){ autoStart=t; renderAutoDraft(); toast('Точка 1 — теперь укажи вторую (вывод аппарата или линию)'); return; }
+  if(autoStart.x===t.x&&autoStart.y===t.y){ autoStart=null; renderAutoDraft(); return; }
+  var route=routeOrtho({x:autoStart.x,y:autoStart.y},{x:t.x,y:t.y});
+  if(wireOverlaps(route,null)) toast('Местами идёт по чужой линии — но проложил ближайшим путём');
+  pushUndo();
+  splitWireAt(autoStart); splitWireAt(t);
+  S.wires.push({id:uid('w'),pts:route});
+  autoStart=null; renderAutoDraft(); renderCanvas(); toast('Провод проложен');
+}
+function renderAutoDraft(){
+  var h='';
+  if(autoStart){
+    var p=autoTarget(curW.x,curW.y), route=routeOrtho({x:autoStart.x,y:autoStart.y},{x:p.x,y:p.y});
+    var d=route.map(function(q,i){return (i?'L':'M')+q.x+' '+q.y}).join(' ');
+    h+='<path d="'+d+'" stroke="'+CY+'" stroke-width="5" stroke-dasharray="22 18" fill="none" opacity=".75"/>';
+    h+='<circle cx="'+autoStart.x+'" cy="'+autoStart.y+'" r="11" fill="none" stroke="'+CY+'" stroke-width="3"/>';
+    h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="8" fill="'+CY+'"/>';
+  }
+  $('draftL').innerHTML=h;
+}
+function cancelAuto(){autoStart=null;renderAutoDraft();}
+
 /* ============ drag компонента + подтяжка проводов ============ */
 var mode=null;
 // гарантия ортогональности (стиль sPlan): любой косой сегмент → Г-образный (гориз.+верт.)
@@ -1245,32 +1381,58 @@ function buildSheetMarkup(cur,total,subtitle){
   h+='<rect x="200" y="50" width="'+(SW-250)+'" height="'+(SH-100)+'" fill="url(#gpat)"/>';
   h+='<rect x="4" y="4" width="'+(SW-8)+'" height="'+(SH-8)+'" fill="none" stroke="#9AA8B4" stroke-width="3"/>';
   h+='<rect x="200" y="50" width="'+(SW-250)+'" height="'+(SH-100)+'" fill="none" stroke="'+INK+'" stroke-width="7"/>';
-  /* основная надпись */
-  var x0=2300,y0=2370,x1=4150,y1=2920;
+  /* основная надпись — ГОСТ 2.104, форма 1 (185×55 мм; 10 ед = 1 мм) */
+  var x0=2300,y0=2370,x1=4150,y1=2920, U=10;
+  function GX(m){return (x0+m*U).toFixed(1);} function GY(m){return (y0+m*U).toFixed(1);}
   h+='<rect x="'+x0+'" y="'+y0+'" width="'+(x1-x0)+'" height="'+(y1-y0)+'" fill="'+PAPER+'" stroke="'+INK+'" stroke-width="7"/>';
-  h+='<g stroke="'+INK+'" stroke-width="3.5">';
-  h+='<line x1="2944" y1="'+y0+'" x2="2944" y2="'+y1+'"/>';
-  h+='<line x1="2529" y1="'+y0+'" x2="2529" y2="'+y1+'"/>';
-  [2507.5,2645,2782.5].forEach(function(y){h+='<line x1="'+x0+'" y1="'+y+'" x2="2944" y2="'+y+'"/>'});
-  h+='<line x1="2944" y1="2535" x2="'+x1+'" y2="2535"/>';
-  h+='<line x1="2944" y1="2755" x2="'+x1+'" y2="2755"/>';
-  [3134,3420,3730].forEach(function(x){h+='<line x1="'+x+'" y1="2755" x2="'+x+'" y2="'+y1+'"/>'});
-  h+='</g>';
-  h+='<g fill="'+INK+'" font-family="\'IBM Plex Sans\'">';
-  var rows=['Разраб.','Пров.','Н.контр.','Утв.'];
-  rows.forEach(function(t,i){h+='<text x="2316" y="'+(2455+i*137.5)+'" font-size="30" fill="'+SOFT+'">'+t+'</text>'});
-  h+='<text x="2545" y="2455" font-size="30">Д.В.</text>';
-  h+='<text x="3547" y="2480" font-size="52" font-weight="600" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+esc(_docCode)+'</text>';
-  h+='<text x="3547" y="2630" font-size="36" text-anchor="middle">Щит управления · схема электрическая</text>';
-  h+='<text x="3547" y="2685" font-size="34" text-anchor="middle">'+esc(subtitle||'схема электрическая')+'</text>';
-  h+='<text x="3039" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Лит.</text>';
-  h+='<text x="3277" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Лист</text>';
-  h+='<text x="3575" y="2800" font-size="26" text-anchor="middle" fill="'+SOFT+'">Листов</text>';
-  h+='<text x="3277" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+((cur||0)+1)+'</text>';
-  h+='<text x="3575" y="2880" font-size="42" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+(total||1)+'</text>';
-  h+='<text x="3940" y="2815" font-size="32" font-weight="600" text-anchor="middle">ООО «Атомус</text>';
-  h+='<text x="3940" y="2858" font-size="32" font-weight="600" text-anchor="middle">Групп»</text>';
-  h+='</g>';
+  var g='<g stroke="'+INK+'" fill="none" stroke-width="3">';
+  // левый блок — вертикали граф (17,40,55 мм) на всю высоту + правый край (65)
+  [17,40,55,65].forEach(function(m){ g+='<line x1="'+GX(m)+'" y1="'+y0+'" x2="'+GX(m)+'" y2="'+y1+'"/>'; });
+  // доп. вертикаль «Изм.|Лист» (7мм) — только в таблице изменений (верхняя часть)
+  g+='<line x1="'+GX(7)+'" y1="'+y0+'" x2="'+GX(7)+'" y2="'+GY(30)+'"/>';
+  // средняя|правая графа — только НИЖЕ строки обозначения (строка обозначения — единая, на всю ширину)
+  g+='<line x1="'+GX(135)+'" y1="'+GY(10)+'" x2="'+GX(135)+'" y2="'+y1+'"/>';
+  // горизонтали левого блока: таблица изменений (5..25) и графы разработки (30..50, строки по 5мм)
+  [5,10,15,20,25,30,35,40,45,50].forEach(function(m){ g+='<line x1="'+x0+'" y1="'+GY(m)+'" x2="'+GX(65)+'" y2="'+GY(m)+'"/>'; });
+  // верхняя графа обозначения (10мм) — на средней+правой части
+  g+='<line x1="'+GX(65)+'" y1="'+GY(10)+'" x2="'+x1+'" y2="'+GY(10)+'"/>';
+  // средняя графа (название): строки на 30 и 40 мм
+  [30,40].forEach(function(m){ g+='<line x1="'+GX(65)+'" y1="'+GY(m)+'" x2="'+GX(135)+'" y2="'+GY(m)+'"/>'; });
+  // правый блок: Стадия|Лист|Листов (10..30) + строки организации
+  g+='<line x1="'+GX(150)+'" y1="'+GY(10)+'" x2="'+GX(150)+'" y2="'+GY(30)+'"/>';
+  g+='<line x1="'+GX(165)+'" y1="'+GY(10)+'" x2="'+GX(165)+'" y2="'+GY(30)+'"/>';
+  [20,30,42].forEach(function(m){ g+='<line x1="'+GX(135)+'" y1="'+GY(m)+'" x2="'+x1+'" y2="'+GY(m)+'"/>'; });
+  g+='</g>';
+  h+=g;
+  var T='<g fill="'+INK+'" font-family="\'IBM Plex Sans\'">';
+  function fitFs(txt,wmm,maxFs){var n=(String(txt).length)||1; return Math.max(13,Math.min(maxFs,(wmm*U)/(n*0.56))).toFixed(1);}
+  // обозначение документа (графа 2) — крупно сверху, влезает по ширине средней+правой части
+  T+='<text x="'+GX(125)+'" y="'+GY(7.5)+'" font-size="'+fitFs(_docCode,112,48)+'" font-weight="600" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+esc(_docCode)+'</text>';
+  // заголовок таблицы изменений — каждое слово в своей графе (строка 25..30 мм)
+  [['Изм.',3.5],['Лист',12],['№ докум.',28.5],['Подп.',47.5],['Дата',60]].forEach(function(c){
+    T+='<text x="'+GX(c[0]==='№ докум.'?28.5:c[1])+'" y="'+GY(28.7)+'" font-size="14" text-anchor="middle" fill="'+SOFT+'">'+c[0]+'</text>';
+  });
+  // графы разработки: роль слева (0..17), фамилия в средней графе (17..40)
+  [['Разраб.',33.6],['Пров.',38.6],['Т.контр.',43.6],['Н.контр.',48.6],['Утв.',53.6]].forEach(function(r){
+    T+='<text x="'+GX(1.5)+'" y="'+GY(r[1])+'" font-size="15" fill="'+SOFT+'">'+r[0]+'</text>';
+  });
+  T+='<text x="'+GX(28.5)+'" y="'+GY(33.6)+'" font-size="17" text-anchor="middle">Д.В.</text>';
+  // средняя графа — наименование изделия и документа (вписываем в 68 мм)
+  T+='<text x="'+GX(100)+'" y="'+GY(21)+'" font-size="'+fitFs('Щит управления',66,36)+'" font-weight="600" text-anchor="middle">Щит управления</text>';
+  T+='<text x="'+GX(100)+'" y="'+GY(36)+'" font-size="'+fitFs('схема электрическая',66,26)+'" text-anchor="middle">схема электрическая</text>';
+  T+='<text x="'+GX(100)+'" y="'+GY(48)+'" font-size="'+fitFs(subtitle||' ',66,23)+'" text-anchor="middle" fill="'+SOFT+'">'+esc(subtitle||'')+'</text>';
+  // правый блок — стадия / лист / листов
+  T+='<text x="'+GX(142.5)+'" y="'+GY(16.5)+'" font-size="17" text-anchor="middle" fill="'+SOFT+'">Стадия</text>';
+  T+='<text x="'+GX(157.5)+'" y="'+GY(16.5)+'" font-size="17" text-anchor="middle" fill="'+SOFT+'">Лист</text>';
+  T+='<text x="'+GX(175)+'" y="'+GY(16.5)+'" font-size="17" text-anchor="middle" fill="'+SOFT+'">Листов</text>';
+  T+='<text x="'+GX(142.5)+'" y="'+GY(27)+'" font-size="28" text-anchor="middle" font-family="\'IBM Plex Mono\'">Р</text>';
+  T+='<text x="'+GX(157.5)+'" y="'+GY(27)+'" font-size="28" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+((cur||0)+1)+'</text>';
+  T+='<text x="'+GX(175)+'" y="'+GY(27)+'" font-size="28" text-anchor="middle" font-family="\'IBM Plex Mono\'">'+(total||1)+'</text>';
+  // организация (графа 9) — вписываем в 50 мм
+  T+='<text x="'+GX(160)+'" y="'+GY(37.5)+'" font-size="'+fitFs('ООО «Атомус Групп»',47,26)+'" font-weight="600" text-anchor="middle">ООО «Атомус Групп»</text>';
+  T+='<text x="'+GX(160)+'" y="'+GY(49)+'" font-size="'+fitFs('Атом Электрика · AtomCAD',47,20)+'" text-anchor="middle" fill="'+SOFT+'">Атом Электрика · AtomCAD</text>';
+  T+='</g>';
+  h+=T;
   return h;
 }
 function buildSheet(){ $('sheetL').innerHTML=buildSheetMarkup(S.cur, S.sheets.length||1, (S.sheets[S.cur]&&S.sheets[S.cur].subtitle)||'схема электрическая'); }
@@ -1366,9 +1528,10 @@ function markPalette(sym){
 }
 
 /* ============ инструменты ============ */
-var TOOLN={select:'Выбор',wire:'Провод',hand:'Рука',place:'Размещение'};
+var TOOLN={select:'Выбор',wire:'Провод',point:'Точка-отвод',autowire:'Авто-провод',hand:'Рука',place:'Размещение'};
 function setTool(t){
   if(t!=='wire')cancelWire();
+  if(t!=='autowire')cancelAuto();
   if(t!=='place'){ghost=null;markPalette(null)}
   tool=t;
   svg.className.baseVal='';
@@ -1405,6 +1568,11 @@ svg.addEventListener('pointerdown',function(e){
     return;
   }
   if(tool==='wire'){wireClick(wp.x,wp.y);return}
+  if(tool==='point'){placePoint(wp.x,wp.y);return}
+  if(tool==='autowire'){autowireClick(wp.x,wp.y);return}
+  // выбор/перенос/удаление поставленной точки (в режиме «Выбор»)
+  var _hn=hitNodeIdx(wp.x,wp.y);
+  if(_hn>=0){ clearSel(); S.sel={t:'n',ni:_hn}; mode={k:'node',ni:_hn,sx:wp.x,sy:wp.y,ox:S.nodes[_hn].x,oy:S.nodes[_hn].y,moved:false}; renderCanvas(); renderProps(true); return; }
   // клик по концевой ручке выбранного провода → продолжаем вести от неё линию
   var th=e.target.closest&&e.target.closest('[data-we]');
   if(th){
@@ -1458,9 +1626,11 @@ svg.addEventListener('pointermove',function(e){
     view.tx=mode.tx+(e.clientX-mode.sx);view.ty=mode.ty+(e.clientY-mode.sy);applyView();return;
   }
   if(mode&&mode.k==='drag'){dragMove(wp);return}
+  if(mode&&mode.k==='node'){ var nn=S.nodes[mode.ni]; if(nn){ if(!mode.moved){mode.moved=true;pushUndo();} nn.x=snap(mode.ox+(wp.x-mode.sx)); nn.y=snap(mode.oy+(wp.y-mode.sy)); renderCanvas(); } return; }
   if(mode&&mode.k==='band'){mode.cur={x:wp.x,y:wp.y};renderCanvas();return}
   if(tool==='place'&&ghost){ghost.x=snap(wp.x);ghost.y=snap(wp.y);renderGhost()}
   if(tool==='wire'&&draft.length)renderDraft();
+  if(tool==='autowire'&&autoStart)renderAutoDraft();
 });
 function up(e){
   ptrs.delete(e.pointerId);
@@ -1501,15 +1671,19 @@ window.addEventListener('keydown',function(e){
   if(e.target.tagName==='INPUT')return;
   if(document.querySelector('.modal.show')){if(e.key==='Escape')closeModal();return;}
   var k=e.key;
-  if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='z'){
+  if((e.ctrlKey||e.metaKey)&&(k.toLowerCase()==='z'||e.code==='KeyZ')){
     e.preventDefault();
     if(e.shiftKey)redo();else undo();
     return;
   }
-  if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='y'){e.preventDefault();redo();return}
+  if((e.ctrlKey||e.metaKey)&&(k.toLowerCase()==='y'||e.code==='KeyY')){e.preventDefault();redo();return}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'){e.preventDefault();copySel();return}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'){e.preventDefault();pasteClip();return}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyD'){e.preventDefault();copySel();pasteClip();return}
   if(k===' '&&!spaceHeld){spaceHeld=true;prevTool=tool;setTool('hand');e.preventDefault();return}
   if(k==='Escape'){
     if(draft.length)cancelWire();
+    else if(autoStart)cancelAuto();
     else if(tool==='place')setTool('select');
     else{clearSel();renderAll()}
     return;
@@ -1519,6 +1693,8 @@ window.addEventListener('keydown',function(e){
   if(kl==='v'||kl==='м'&&0)setTool('select');
   if(kl==='v')setTool('select');
   if(kl==='w')setTool('wire');
+  if(kl==='a')setTool('autowire');
+  if(kl==='p')setTool('point');
   if(kl==='h')setTool('hand');
   if(kl==='0')fit();
   if(kl==='r'){
@@ -1818,8 +1994,9 @@ $('catSearch').addEventListener('input',renderCatalog);
 function _mkSheet(s){
   return {
     comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
-    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}})}}),
+    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null}}),
     texts:(s.texts||[]).slice(),
+    nodes:(s.nodes||[]).map(function(n){return {x:n.x,y:n.y}}),
     subtitle:s.subtitle||s.title||''
   };
 }
@@ -1846,7 +2023,8 @@ function gotoSheet(i,noFit){
   if(!S.sheets.length)return;
   i=(i+S.sheets.length)%S.sheets.length;
   S.cur=i; var sh=S.sheets[i];
-  S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.sel=null;
+  if(!sh.nodes)sh.nodes=[];
+  S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.nodes=sh.nodes; S.sel=null;
   U.length=0; Rd.length=0;
   buildSheet(); updateSheetNav(); renderProps(true); renderAll();
   if(!noFit)fit();
@@ -1859,7 +2037,7 @@ function loadExternal(d){
   else { S.sheets=[_mkSheet(d)]; }
   S.sheets.forEach(function(sh){ sh.wires.forEach(orthoWire); });  // всё под прямым углом
   S.cur=0;
-  var sh=S.sheets[0]; S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.sel=null;
+  var sh=S.sheets[0]; if(!sh.nodes)sh.nodes=[]; S.comps=sh.comps; S.wires=sh.wires; S.texts=sh.texts; S.nodes=sh.nodes; S.sel=null;
   buildSheet(); updateSheetNav(); renderProps(true); renderAll(); fit();
   var n=S.sheets.reduce(function(a,s){return a+s.comps.length},0);
   toast('Схема из мастера: '+S.sheets.length+' лист(а), '+n+' аппаратов');
@@ -1877,7 +2055,7 @@ window.AtomEditorLoad=loadExternal;
 buildPalette();
 demo();
 /* demo заполнил S.comps/wires/texts → оборачиваем в единственный лист */
-S.sheets=[{comps:S.comps,wires:S.wires,texts:S.texts,subtitle:'схема электрическая'}]; S.cur=0;
+S.sheets=[{comps:S.comps,wires:S.wires,texts:S.texts,nodes:S.nodes,subtitle:'схема электрическая'}]; S.cur=0;
 var _sn=$('sheetNav'); if(_sn)_sn.addEventListener('click',function(){ if(S.sheets.length>1)gotoSheet(S.cur+1); });
 buildSheet();
 updateSheetNav();
