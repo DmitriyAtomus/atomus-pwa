@@ -1120,7 +1120,11 @@ function cabinetSVG(){
   var rows=[],curR=[],used=0;
   items.forEach(function(it){var w=Math.min(it.w,perRow);if(used+w>perRow){rows.push(curR);curR=[];used=0;}curR.push({t:it.t,w:w,k:it.k,key:it.key});used+=w;});
   if(curR.length)rows.push(curR);
-  rows.push([{t:'Клеммники X1…X'+(P.breakers.length),w:perRow,k:'term'}]);
+  ensureTerminals();
+  var termN=(P.terminals||[]).length;                                   // реальное число клемм
+  var termGroups=(function(){var seen=[],set={};(P.terminals||[]).forEach(function(t){var p=String(t.term||'').split(':')[0];if(p&&!set[p]){set[p]=1;seen.push(p);}});return seen;})();
+  var termLbl='Клеммники '+(termGroups.length?(termGroups[0]+'…'+termGroups[termGroups.length-1]):'')+' · '+termN+' кл.';
+  rows.push([{t:termLbl,w:perRow,k:'term',n:termN}]);
   var neededRows=rows.length, overflow=neededRows>maxRows;
   var drawnRows=Math.min(neededRows,maxRows);
   // масштаб мм→px (форма повторяет щит)
@@ -1159,6 +1163,19 @@ function cabinetSVG(){
       if(it.key)cabHits.push({key:it.key,row:r,cx:x+ww/2});
       s+='<g'+drag+hov+'>';
       s+='<rect x="'+x.toFixed(1)+'" y="'+(y+mm(3)).toFixed(1)+'" width="'+Math.max(6,ww).toFixed(1)+'" height="'+hpx.toFixed(1)+'" rx="3" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.2"/>';
+      // клеммник — рисуем реальное число клемм отдельными «ножами» на рейке
+      if(it.k==='term'&&it.n){
+        var tn=it.n, pad2=mm(2.5), tx0=x+pad2, tw=Math.max(6,ww)-pad2*2;
+        var ty0=y+mm(3)+mm(11), ty1=y+mm(3)+hpx-mm(4), slotH=ty1-ty0;       // слоты ниже подписи
+        var sw=tw/tn;
+        for(var ti=0;ti<tn;ti++){
+          var sx=tx0+ti*sw;
+          s+='<rect x="'+sx.toFixed(1)+'" y="'+ty0.toFixed(1)+'" width="'+Math.max(1.2,sw-1).toFixed(1)+'" height="'+slotH.toFixed(1)+'" rx="1" fill="rgba(91,214,162,.10)" stroke="'+c[1]+'" stroke-width="0.7" opacity=".75"/>';
+        }
+        // подпись клеммника — сверху блока, над слотами (не перекрывает их)
+        var tfs=Math.max(7,Math.min(10,modPx*0.62));
+        s+='<text x="'+(x+Math.max(6,ww)/2).toFixed(1)+'" y="'+(y+mm(3)+mm(8)).toFixed(1)+'" font-size="'+tfs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+String(it.t||'')+'</text>';
+      }
       // электромагнитный контактор — рисуем символ катушки (A1—A2) внизу блока
       if(it.k==='km'){
         var coilC=c[1], cxk=x+ww/2, availW=Math.max(10,ww-mm(7));
@@ -1173,7 +1190,7 @@ function cabinetSVG(){
         s+='<text x="'+(x0+cwk+mm(2.5)).toFixed(1)+'" y="'+(yb-mm(2)).toFixed(1)+'" font-size="6" fill="'+coilC+'" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none" opacity=".85">A2</text>';
       }
       var fs=Math.max(7,Math.min(11,modPx*0.7));
-      var lbl=String(it.t||''), cx=x+ww/2, cy=y+mm(3)+hpx/2, textW=lbl.length*fs*0.62;
+      var lbl=(it.k==='term')?'':String(it.t||''), cx=x+ww/2, cy=y+mm(3)+hpx/2, textW=lbl.length*fs*0.62;
       if(lbl){
         if(textW<=ww-3){ // влезает горизонтально
           s+='<text x="'+cx.toFixed(1)+'" y="'+(cy+fs*0.35).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" fill="#C9D4DF" text-anchor="middle" font-family="IBM Plex Mono" pointer-events="none">'+lbl+'</text>';
