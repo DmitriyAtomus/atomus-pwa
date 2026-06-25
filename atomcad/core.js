@@ -29,13 +29,25 @@ function contactorModel(c){ var n=contactorPick(consumerCurrent(c)); return n.m+
 function contactorDimStr(c){ var n=contactorPick(consumerCurrent(c)); return n.w+'×'+n.h+'×'+n.d+' мм · 3-пол.'; }
 // символ УГО для аппарата из «Вспомогат.» в редакторе (ключи совпадают с SYM в editor.html)
 function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'rel3',ssr:'ssr',psu:'psu',vfd:'box',fan:'m3',contactor:'coil',breaker:'qf1',other:'box'})[k]||'box';}
-// нагрузки, закреплённые за общим контактором из «Вспомогат.» (через «что коммутирует»): имя → обозначение контактора
-function auxCoverSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='contactor')return; var tag=a.tag||'KM'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
-function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение общего контактора
-// твердотельные реле (рег. напряжения) из «Вспомогат.» по «что коммутирует»: имя нагрузки → обозначение ТР
-function ssrSet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='ssr')return; var tag=a.tag||'ТР'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
-// промежуточные реле из «Вспомогат.» по «что коммутирует»: имя нагрузки → обозначение реле (KL)
-function relaySet(P){ var s={}; (P&&P.aux||[]).forEach(function(a){ if(a.kind!=='relay')return; var tag=a.tag||'KL'; var tg=Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); tg.forEach(function(t){t=(t||'').trim();if(t)s[t]=tag;}); }); return s; }
+// граф «что коммутирует / что дальше»: цель аппарата — нагрузка ИЛИ другой аппарат (каскад KM→ТР→нагрузка)
+function _auxBy(P){ var m={}; (P&&P.aux||[]).forEach(function(a){ if(a.tag)m[a.tag]=a; if(a.name&&!m[a.name])m[a.name]=a; }); return m; }
+function _auxTg(a){ return Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); }
+// конечные нагрузки аппарата — разворачивая цепочку через промежуточные аппараты (с защитой от циклов)
+function _auxLeaves(a,by,seen){
+  seen=seen||{}; var key=a.tag||a.name; if(key){ if(seen[key])return []; seen[key]=1; }
+  var out=[]; _auxTg(a).forEach(function(t){ t=(t||'').trim(); if(!t)return; var nx=by[t];
+    if(nx&&nx!==a){ out=out.concat(_auxLeaves(nx,by,seen)); } else { out.push(t); } });
+  return out;
+}
+// имя нагрузки → обозначение аппарата данного рода (через каскад)
+function _coverByKind(P,kind,def){ var s={}, by=_auxBy(P); (P&&P.aux||[]).forEach(function(a){ if(a.kind!==kind)return; var tag=a.tag||def; _auxLeaves(a,by).forEach(function(t){ if(t&&!s[t])s[t]=tag; }); }); return s; }
+// нагрузки за магнитным пускателем (контактором); через «что коммутирует» с учётом каскада
+function auxCoverSet(P){ return _coverByKind(P,'contactor','KM'); }
+function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение аппарата
+// твердотельные реле (рег. напряжения) по «что коммутирует»: имя нагрузки → обозначение ТР
+function ssrSet(P){ return _coverByKind(P,'ssr','ТР'); }
+// промежуточные реле по «что коммутирует»: имя нагрузки → обозначение реле (KL)
+function relaySet(P){ return _coverByKind(P,'relay','KL'); }
 
 // низковольтный потребитель (24/12 В) — питается от БП, а не от ввода
 function isLV(c){ return c.phases!==3 && (c.volt||230) < 110; }
@@ -436,20 +448,25 @@ function buildSchematic(P){
       else   { aw.push(W([inX,devY],[comX,devY]));         usedL.push(devY); }
     });
     // ВЫХОДЫ справа: катушка контактора / клемма
+    var apBy=_auxBy(P);                                                        // выход контроллера может указывать прямо на аппарат (KM/KL/ТР)
     outA.forEach(function(o,k){
-      var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, km=kmByName[p.lab], tr=_ssr[p.lab], chx=rpx+130+k*40;
+      var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, chx=rpx+130+k*40;
+      var apx=apBy[p.lab];                                                     // аппарат, назначенный на этот выход
+      var km=(apx&&(apx.kind==='contactor'||apx.kind==='relay'))?apx.tag:kmByName[p.lab];
+      var tr=(apx&&apx.kind==='ssr')?apx.tag:_ssr[p.lab];
+      var olab=apx?((_auxLeaves(apx,apBy).join(', '))||apx.name||p.lab):p.lab; // что в итоге коммутирует (для подписи)
       var oSec=((p.g==='DO'&&km)||(p.g==='AO'&&tr))?1.5:0.75;                  // катушка/ТР — 1,5; сигнал — 0,75
       var ow=W([rpx,py],[chx,py]); ow.sec=oSec;
       at.push({x:chx-22,y:py-14,s:20,ls:0,anchor:'end',tx:'W'+wN}); wN++;      // номер провода выходной цепи
       if(p.g==='DO' && km){
         // DO → катушка KM/KL (силовой контакт — на л.1)
-        ac.push(shortC(km,'coil',outX,devY,'катушка','',p.lab));
+        ac.push(shortC(km,'coil',outX,devY,'катушка','',olab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);
         at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'(л.1)'});   // ссылка на контакт (компактно, слева)
       } else if(p.g==='AO' && tr){
         // AO → вход управления ТР 0-10В (силовой контакт ТР — на л.1)
-        ac.push(shortC(tr,'coil',outX,devY,'управление 0-10В','',p.lab));
+        ac.push(shortC(tr,'coil',outX,devY,'управление 0-10В','',olab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);       // 0В (общий) — на правую шину
         at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'0-10В · ТР (л.1)'});
@@ -479,7 +496,7 @@ g.AtomCore={
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
   buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,
-  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux, relaySet:relaySet,
+  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux, relaySet:relaySet, ssrSet:ssrSet,
   isLV:isLV, lvSupplies:lvSupplies
 };
 })(typeof window!=='undefined'?window:global);
