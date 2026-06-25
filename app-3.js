@@ -8418,7 +8418,8 @@ async function openInboxMessage(inboxId) {
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
         (msg.status === 'unmatched'
-          ? '<button class="btn btn-primary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + msg.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>'
+          ? '<button class="btn btn-primary" style="background:#16a34a;border-color:#16a34a;" onclick="sendInboxToPay(' + msg.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>' +
+            '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + msg.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>'
           : '') +
         (msg.matched_order_id
           ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + msg.matched_order_id + ')">Открыть заказ</button>'
@@ -8470,6 +8471,33 @@ async function forcePollSupplyInbox() {
       }
     }
     await loadSupplyInbox();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// Счёт из входящих (MAX/почта) — сразу «На оплату»: создаёт заказ в статусе
+// to_pay из распознанных реквизитов и уведомляет бухгалтера.
+async function sendInboxToPay(inboxId, overlayId) {
+  if (!confirm('Отправить счёт на оплату?\nБудет создана позиция в разделе «На оплату» с распознанными реквизитами (поставщик, сумма, № счёта), бухгалтер получит уведомление.')) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/to-pay', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    if (overlayId) { const ov = document.getElementById(overlayId); if (ov) ov.remove(); }
+    showToast('Счёт отправлен на оплату' + (j.order_label ? ' · ' + j.order_label : ''), 'success');
+    await loadSupplyInbox();
+    if (j.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(j.order_id);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
