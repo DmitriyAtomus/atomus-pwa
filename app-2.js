@@ -5414,10 +5414,28 @@ async function submitBomImport() {
 
 // ============ КОНЕЦ ЭТАПА 45.5 ============
 
+// v2.45.x: справочник этапов производства (кэш) — для выпадашки этапа в BOM
+async function _ensureWorkStages() {
+  if (!cache._workStages) {
+    try { const r = await apiGet('/api/work-stages'); cache._workStages = r.items || []; }
+    catch (e) { cache._workStages = []; }
+  }
+  return cache._workStages;
+}
+function _bomStageOptionsHtml(selectedId) {
+  const sel = (selectedId == null) ? '' : String(selectedId);
+  let opts = '<option value="">— этап не указан —</option>';
+  (cache._workStages || []).forEach(s => {
+    opts += '<option value="' + s.id + '"' + (String(s.id) === sel ? ' selected' : '') + '>' + escapeHtml(s.name) + '</option>';
+  });
+  return opts;
+}
+
 async function loadModelBom(modelId) {
   const container = document.getElementById('bom-list');
   if (!container) return;
   try {
+    await _ensureWorkStages();  // чтобы редактор BOM сразу показал список этапов
     const r = await apiGet('/api/models/' + modelId + '/bom');
     const items = r.items || [];
     if (!items.length) {
@@ -5444,8 +5462,8 @@ async function loadModelBom(modelId) {
           'onclick="bulkDeleteBomItems(' + modelId + ')"><i class="ti ti-trash"></i> Удалить выбранные (<span id="bom-bulk-count">0</span>)</button>' +
       '</div>';
     }
-    html += '<div class="bom-table">';
-    items.forEach(it => {
+    // v2.45.x: строит HTML одной строки BOM
+    const _bomRowHtml = (it) => {
       // v2.45.24: строка может быть «компонент» или «подсборка» (kind='model')
       const isModel = (it.kind === 'model');
       const have = parseFloat((isModel ? it.child_model_qty : it.component_qty) || 0);
@@ -5476,7 +5494,7 @@ async function loadModelBom(modelId) {
         : (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '');
       // v2.45.28: открываем редактор по bom_id — данные тянем из state, без эскейпинга
       const editCall = 'openBomEditItemById(' + it.id + ')';
-      html += '<div class="bom-row">' +
+      return '<div class="bom-row">' +
         '<div class="bom-row-main">' +
           '<div class="bom-name">' +
             (canManageSales() ? '<input type="checkbox" class="bom-check" data-bomid="' + it.id + '" onchange="_bomBulkUpdate()" style="width:auto;margin-right:8px;vertical-align:-2px;cursor:pointer;">' : '') +
@@ -5499,8 +5517,37 @@ async function loadModelBom(modelId) {
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
       '</div>';
+    };
+
+    // v2.45.x: группируем строки BOM по этапам производства (сварка/покраска/ТЭНы…)
+    const _groups = {};
+    items.forEach(it => {
+      const sid = it.stage_id || 0;
+      if (!_groups[sid]) _groups[sid] = { id: sid, name: it.stage_name || '', sort: (it.stage_sort != null ? it.stage_sort : 99999), items: [] };
+      _groups[sid].items.push(it);
     });
-    html += '</div>';
+    const _groupList = Object.values(_groups).sort((a, b) => {
+      if (a.id === 0) return 1;   // «без этапа» — в конец
+      if (b.id === 0) return -1;
+      return a.sort - b.sort;
+    });
+    const _useStages = _groupList.some(g => g.id !== 0);
+    if (!_useStages) {
+      // этапы не используются — плоский список, как раньше
+      html += '<div class="bom-table">' + items.map(_bomRowHtml).join('') + '</div>';
+    } else {
+      _groupList.forEach((g, gi) => {
+        const label = (g.id === 0) ? 'Без этапа' : (g.name || ('Этап #' + g.id));
+        const icon = (g.id === 0) ? 'ti-dots-circle-horizontal' : ('ti-circle-number-' + (gi + 1));
+        html += '<div class="bom-stage-group">' +
+          '<div class="bom-stage-head' + (g.id === 0 ? ' nostage' : '') + '">' +
+            '<i class="ti ' + icon + '"></i> ' + escapeHtml(label) +
+            '<span class="bom-stage-count">' + g.items.length + '</span>' +
+          '</div>' +
+          '<div class="bom-table">' + g.items.map(_bomRowHtml).join('') + '</div>' +
+        '</div>';
+      });
+    }
     container.innerHTML = html;
   } catch (e) {
     container.innerHTML = '<div class="empty-block">Ошибка загрузки</div>';
@@ -5548,6 +5595,7 @@ async function openBomAddItem(modelId) {
     try { const r = await apiGet('/api/components/categories'); cache.componentCategories = r.categories || []; }
     catch (e) { cache.componentCategories = []; }
   }
+  await _ensureWorkStages();  // v2.45.x: список этапов для выпадашки
   // ЭТАП 32.1: убрана блокировка — если каталог пуст, юзер создаст комплектующее прямо здесь
   // ЭТАП 33.1: вместо <select> — кнопка-picker с поиском и сворачиваемыми категориями
   let m = document.getElementById('bom-add-modal');
@@ -5622,6 +5670,10 @@ async function openBomAddItem(modelId) {
           '</div>' +
         '</div>' +
         '<div id="bom-unit-hint" style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Пусто = единица берётся из карточки компонента. Заполните, если в этой модели нужно другое (например, трубки в метрах).</div>' +
+        // v2.45.x: этап производства, на котором нужна деталь
+        '<label class="form-label"><i class="ti ti-arrow-badge-right"></i> Этап производства</label>' +
+        '<select id="bom-stage" class="form-input" style="margin-bottom:4px;">' + _bomStageOptionsHtml(null) + '</select>' +
+        '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:14px;">Когда деталь нужна по циклу: сварка → покраска → ТЭНы+электрика. Можно оставить пустым.</div>' +
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
           '<input type="checkbox" id="bom-critical" checked />' +
           '<span><b>Критичное</b> — без него сборка не создаётся</span></label>' +
@@ -6030,6 +6082,9 @@ async function submitBomAddItem(modelId) {
   const unit_override = (document.getElementById('bom-unit-override')?.value || '').trim();
   // v2.45.24: для подсборки шлём child_model_id
   const payload = { qty_required, is_critical, comment };
+  // v2.45.x: этап производства (опц.)
+  const _stageSel = document.getElementById('bom-stage');
+  payload.stage_id = _stageSel && _stageSel.value ? parseInt(_stageSel.value) : null;
   if (kind === 'model') {
     if (!state._bomSelectedChildModelId) { showToast('Выбери подсборку из каталога', 'error'); return; }
     payload.child_model_id = state._bomSelectedChildModelId;
@@ -6070,7 +6125,7 @@ function openBomEditItemById(bomId) {
   const isModel = (it.kind === 'model');
   const need = parseFloat(it.qty_required || 0);
   if (isModel) {
-    openBomEditItem(it.id, need, !!it.is_critical, it.comment || '', 0, '', '', '', true);
+    openBomEditItem(it.id, need, !!it.is_critical, it.comment || '', 0, '', '', '', true, it.stage_id || '');
   } else {
     openBomEditItem(
       it.id, need, !!it.is_critical, it.comment || '',
@@ -6079,11 +6134,12 @@ function openBomEditItemById(bomId) {
       it.unit_override || '',
       it.component_unit || '',
       false,
+      it.stage_id || '',
     );
   }
 }
 
-function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName, unitOverride, componentUnit, isModel) {
+function openBomEditItem(bomId, qty, isCritical, comment, componentId, componentName, unitOverride, componentUnit, isModel, stageId) {
   let m = document.getElementById('bom-edit-modal');
   if (!m) {
     m = document.createElement('div');
@@ -6130,6 +6186,9 @@ function openBomEditItem(bomId, qty, isCritical, comment, componentId, component
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;background:var(--bg);padding:10px;border-radius:8px;">' +
           '<input type="checkbox" id="bome-critical"' + (isCritical ? ' checked' : '') + ' />' +
           '<span><b>Критичное</b></span></label>' +
+        // v2.45.x: этап производства
+        '<label class="form-label"><i class="ti ti-arrow-badge-right"></i> Этап производства</label>' +
+        '<select id="bome-stage" class="form-input" style="margin-bottom:14px;">' + _bomStageOptionsHtml(stageId) + '</select>' +
         '<label class="form-label">Комментарий</label>' +
         '<input type="text" id="bome-comment" class="form-input" value="' + escapeHtml(comment) + '" />' +
       '</div>' +
@@ -6146,6 +6205,9 @@ async function submitBomEditItem(bomId, componentId) {
   const comment = (document.getElementById('bome-comment').value || '').trim();
   // v2.45.23: пустая строка → NULL → fallback на components.unit
   const unit_override = (document.getElementById('bome-unit-override')?.value || '').trim();
+  // v2.45.x: этап производства (пусто = сбросить)
+  const _stageSel = document.getElementById('bome-stage');
+  const stage_id = _stageSel ? (_stageSel.value ? parseInt(_stageSel.value) : null) : null;
   const nameInp = document.getElementById('bome-name');
   const newName = (nameInp && nameInp.value || '').trim();
   const origName = (nameInp && nameInp.dataset.orig || '').trim();
@@ -6164,7 +6226,7 @@ async function submitBomEditItem(bomId, componentId) {
     const r = await fetch(API_BASE + '/api/bom/' + bomId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ qty_required, is_critical, comment, unit_override }),
+      body: JSON.stringify({ qty_required, is_critical, comment, unit_override, stage_id }),
     });
     if (!r.ok) { showToast('Не удалось сохранить', 'error'); return; }
     showToast('Сохранено', 'success');
