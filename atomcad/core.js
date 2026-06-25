@@ -306,10 +306,12 @@ function buildSchematic(P){
         pw.push(W([x+55,1410],[x+55,1500]));                                            // вход N
         pt.push({x:x+80,y:1445,s:18,ls:0,anchor:'start',tx:'N'});
         pt.push({x:x-150,y:1505,s:18,ls:0,anchor:'end',tx:'L'});
+        var _pf=(P.aux||[]).filter(function(z){return z.kind==='psu'})[0];
+        var feedTxt=(_pf&&(_pf.target||(Array.isArray(_pf.targets)&&_pf.targets.join(', '))))||'контроллер, датчики';   // «что питает» БП
         pw.push(W([x-55,1800],[x-55,1880]),W([x+55,1800],[x+55,1880]));                 // выход +24В/0В вниз
-        pc.push(C('X'+termN,'termb',x-55,1880,'ЗНИ 1,5 мм²','','+24В')); termN++;
-        pc.push(C('X'+termN,'termb',x+55,1880,'ЗНИ 1,5 мм²','','0В · → контроллер, датчики')); termN++;
-        pt.push({x:x,y:1840,s:18,ls:0,anchor:'middle',tx:'+24В · 0В → контроллер'});
+        pc.push(C('X'+termN,'termb',x-55,1880,'ЗНИ 1,5 мм²','','+24В → '+feedTxt)); termN++;
+        pc.push(C('X'+termN,'termb',x+55,1880,'ЗНИ 1,5 мм²','','0В')); termN++;
+        pt.push({x:x,y:1840,s:18,ls:0,anchor:'middle',tx:'+24В · 0В → '+feedTxt});
         lastX=x; return;
       }
       // цепь отвода: автомат → контактор → (твердотельное реле) → клемма → нагрузка
