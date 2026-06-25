@@ -18553,3 +18553,19 @@
   .team-chat-modal.show-side .tchat-side { transform: translateX(0); }
   .tchat-side-close { display: inline-flex; }
 }
+
+/* v2.45.x: этапы производства в спецификации (BOM по этапам) */
+.bom-stage-group { margin-bottom: 14px; }
+.bom-stage-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 700; color: #4338CA;
+  padding: 4px 2px 8px; text-transform: uppercase; letter-spacing: .3px;
+}
+.bom-stage-head .ti { font-size: 17px; }
+.bom-stage-head.nostage { color: var(--text-light, #94A3B8); }
+.bom-stage-count {
+  margin-left: 6px; background: #EEF2FF; color: #4338CA;
+  border-radius: 9px; font-size: 11px; font-weight: 700;
+  min-width: 18px; height: 18px; line-height: 18px; text-align: center; padding: 0 6px;
+}
+.bom-stage-head.nostage .bom-stage-count { background: #F1F5F9; color: var(--text-light, #94A3B8); }
