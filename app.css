@@ -12956,6 +12956,34 @@
       inset 0 1px 3px rgba(20, 33, 61, 0.12);
   }
 
+  /* v2.x: шапка с 4 действиями (Фото УПД, QR, Чаты, Колокольчик) на узких
+     экранах выходила за край — ужимаем отступы/гэпы шапки, уменьшаем шарик,
+     а длинную надпись Atom CRM позволяем сжать (…), чтобы кнопки действий
+     всегда были видны целиком. */
+  .app.mobile-layout .top-bar {
+    padding: 8px 10px;
+    gap: 7px;
+  }
+  .app.mobile-layout .top-bar .brand-wrap {
+    gap: 7px;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .app.mobile-layout .top-bar .brand-ball {
+    width: 34px;
+    height: 34px;
+  }
+  .app.mobile-layout .top-bar .brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Кнопки действий и гамбургер не сжимаются и не переносятся */
+  .app.mobile-layout .top-bar .scan-btn,
+  .app.mobile-layout .top-bar .notif-btn,
+  .app.mobile-layout .top-bar .hamburger-btn {
+    flex-shrink: 0;
+  }
+
   /* ===== СКРЫВАЕМ СТАРЫЕ TAB-BAR НА МОБИЛЕ ===== */
   .app.mobile-layout #tab-bar-production,
   .app.mobile-layout #tab-bar-sales { display: none !important; }
