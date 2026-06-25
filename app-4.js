@@ -9853,6 +9853,12 @@ const _SHIP_REASON_TEXT = {
   'no_contract':     'Объект не привязан к договору',
   'wrong_contract':  'Объект из другого договора',
   'already_shipped': 'Уже отгружено',
+  'in_production':   'Нельзя — ещё в работе',
+};
+// v2.45.x: статусы карточки канбана по-русски (для сообщения «ещё в работе»)
+const _PWORK_STATUS_RU = {
+  'queue': 'в очереди', 'in_progress': 'в работе',
+  'review': 'на проверке', 'packing': 'на упаковке',
 };
 // v2.45.405: в режиме сборки «already_shipped» означает «уже собрано»
 function _shipReasonText(reason) {
@@ -9932,6 +9938,16 @@ async function handleContinuousShipmentScan(decodedText) {
     vibrate(40);
     state._shipPendingConfirm = { token: token, itemId: itemId, item: d.item || {}, reship: true, shipmentId: d.shipment_id };
     _showShipConfirm(d.item || {}, true);
+  } else if (d.reason === 'in_production') {
+    // v2.45.x: изделие ещё в производстве — отгрузка запрещена
+    flashScanner('error');
+    playBeep('error');
+    vibrate([100, 50, 100]);
+    const bw = d.blocking_work || {};
+    const st = _PWORK_STATUS_RU[bw.status] || 'в работе';
+    const who = bw.assignee_name ? (' · ' + bw.assignee_name) : '';
+    const name = (bw.model_name || (d.item && d.item.name) || 'Изделие');
+    showShipLast('error', 'Нельзя — ещё ' + st, name + ' ещё на производстве' + who + '. Сначала закрой работу на канбане.');
   } else {
     // wrong_contract / unknown / no_contract — показываем тост-ошибку
     flashScanner('error');
@@ -13233,6 +13249,14 @@ let _tchatLastSig       = '';
 
 function _stopTeamChatsPolling() {
   if (_teamChatsPollTimer) { clearInterval(_teamChatsPollTimer); _teamChatsPollTimer = null; }
+}
+
+// Глобальная точка входа в чаты (кнопка в шапке) — работает из любого раздела
+// и для любой роли, в т.ч. для «чистого» монтажника. Экран чатов не привязан
+// к разделу, поэтому просто показываем его поверх текущего.
+function openTeamChatsScreen() {
+  if (typeof selectSidebarItem === 'function') selectSidebarItem('defects-chats');
+  else if (typeof loadTeamChats === 'function') loadTeamChats();
 }
 
 function _tcTrim(s, n) { s = s || ''; return s.length > n ? s.slice(0, n) + '…' : s; }

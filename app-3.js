@@ -8264,6 +8264,23 @@ async function refreshSupplyInboxBadge() {
   } catch (_) {}
 }
 
+// Чип «наше юрлицо-плательщик» (АГ / ТД) — чтобы бухгалтер видел, на кого счёт.
+// pe — объект {tag, short_name} (из ai_data.payer_entity) или {tag, short_name}
+// собранный из полей заказа. withName=true показывает и название юрлица.
+function payerEntityPill(pe, withName) {
+  if (!pe) return '';
+  const tag = (pe.tag || '').trim();
+  if (!tag) return '';
+  const name = pe.short_name || '';
+  const isTD = tag === 'ТД';
+  const bg = isTD ? '#EDE9FE' : '#E0E7FF';
+  const fg = isTD ? '#5B21B6' : '#3730A3';
+  const label = (withName && name) ? (tag + ' · ' + name) : tag;
+  return '<span class="sup-status-pill" style="background:' + bg + ';color:' + fg +
+    ';font-weight:700;" title="Счёт на наше юрлицо: ' + escapeHtml(name || tag) + '">🏢 ' +
+    escapeHtml(label) + '</span>';
+}
+
 function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
@@ -8295,7 +8312,7 @@ function renderSupplyInbox() {
     html += '<div class="sup-row">' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          labelHtml + statusHtml +
+          labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -8407,7 +8424,7 @@ async function openInboxMessage(inboxId) {
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + labelPill + statusPill + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + labelPill + statusPill + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
           '<div style="color:var(--text-light);">От:</div><div>' + fromLine + '</div>' +
           '<div style="color:var(--text-light);">Получено:</div><div style="font-variant-numeric:tabular-nums;">' + escapeHtml(received) + '</div>' +
@@ -8418,7 +8435,8 @@ async function openInboxMessage(inboxId) {
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
         (msg.status === 'unmatched'
-          ? '<button class="btn btn-primary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + msg.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>'
+          ? '<button class="btn btn-primary" style="background:#16a34a;border-color:#16a34a;" onclick="sendInboxToPay(' + msg.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>' +
+            '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + msg.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>'
           : '') +
         (msg.matched_order_id
           ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + msg.matched_order_id + ')">Открыть заказ</button>'
@@ -8470,6 +8488,33 @@ async function forcePollSupplyInbox() {
       }
     }
     await loadSupplyInbox();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// Счёт из входящих (MAX/почта) — сразу «На оплату»: создаёт заказ в статусе
+// to_pay из распознанных реквизитов и уведомляет бухгалтера.
+async function sendInboxToPay(inboxId, overlayId) {
+  if (!confirm('Отправить счёт на оплату?\nБудет создана позиция в разделе «На оплату» с распознанными реквизитами (поставщик, сумма, № счёта), бухгалтер получит уведомление.')) return;
+  try {
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/to-pay', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    if (overlayId) { const ov = document.getElementById(overlayId); if (ov) ov.remove(); }
+    showToast('Счёт отправлен на оплату' + (j.order_label ? ' · ' + j.order_label : ''), 'success');
+    await loadSupplyInbox();
+    if (j.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(j.order_id);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
@@ -9010,7 +9055,8 @@ function renderSupplyOrderDetail(o) {
           'style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg);border:1px dashed var(--border);' +
           'border-radius:8px;padding:4px 10px;font-size:12.5px;' + (mono ? 'font-family:ui-monospace,Consolas,monospace;' : '') + '">' +
           label + ' <i class="ti ti-copy" style="color:var(--text-light);font-size:13px;"></i></span>';
-      html += '<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;">' +
+      html += '<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;align-items:center;">' +
+        payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, true) +
         chip('<b>' + escapeHtml(invTitle) + '</b>', invTitle, false) +
         (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
         (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
@@ -11142,6 +11188,40 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.570',
+    date: '25.06.2026',
+    title: 'Производство: защита отгрузки + «продолжить вчерашнее»',
+    features: [
+      'QR-отгрузка теперь <b>не выпустит изделие, которое ещё в работе</b>. При сканировании, если по этому договору изделие ещё на канбане (в работе / упаковке / проверке), сканер скажет «Нельзя — ещё в работе» и не отгрузит. Сначала закрой работу на канбане',
+      'Автостоп → <b>«вчера не доделал?»</b>: если в 18:00 тебя застопило, а работа не закрыта — на следующий день при заходе в Производство сверху появится баннер «Вчера не доделано: [модель], этап [этап] — Продолжить / Возьму новое». «Продолжить» сразу запускает часики на той же работе и этапе',
+    ],
+  },
+  {
+    version: 'v2.45.569',
+    date: '25.06.2026',
+    title: 'Этапы в спецификации — в один клик',
+    features: [
+      'Этап теперь виден <b>прямо в строке</b> тех. карты: у каждой комплектующей чип «этап». Нажал — выбрал этап (сварка / покраска / ТЭНы+электрика) или <b>создал новый</b> прямо там. Раньше это пряталось в кнопке «изменить»',
+    ],
+  },
+  {
+    version: 'v2.45.568',
+    date: '25.06.2026',
+    title: 'Спецификация по этапам производства',
+    features: [
+      'В тех. карте (BOM) у каждой комплектующей можно указать <b>этап производства</b> — сварка, покраска, ТЭНы+электрика и т.д. Спецификация показывается сгруппированной по этапам, чтобы видеть, что нужно на каждом шаге',
+      'Это первый шаг к поэтапной сборке НВП: закупать и собирать по циклу (сначала сварка — только свои детали, потом покраска, потом ТЭНы и электрика), а не всё сразу',
+    ],
+  },
+  {
+    version: 'v2.45.551',
+    date: '24.06.2026',
+    title: 'Чаты доступны всем — кнопка в шапке',
+    features: [
+      'Кнопка <b>«Чаты»</b> теперь есть в верхней панели — открывается из любого раздела и для любой роли (не только в Сервисе и Монтаже). Так чаты видит каждый сотрудник, кого добавили в группу, независимо от прав',
+    ],
+  },
   {
     version: 'v2.45.545',
     date: '24.06.2026',

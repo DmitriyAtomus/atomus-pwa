@@ -218,6 +218,8 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
     <div class="doc"><span class="dot" id="saveDot"></span>ЩУ-003.001.1 · АГ.ЩУ-003/26</div>
     <div id="sheetTabs" style="display:flex;gap:6px;align-items:center"></div>
     <div id="erc"><span class="w"></span><span id="ercTxt">ERC: всё подключено</span></div>
+    <button class="tb-btn" id="btnSaveDoc" style="background:var(--cyan);color:#06262E;font-weight:600">💾 Сохранить</button>
+    <button class="tb-btn" id="btnLoadDoc">📂 Открыть</button>
     <button class="tb-btn" id="btnCatalog">▦ Каталог CHINT</button>
     <button class="tb-btn" id="btnSpec">▤ Спецификация</button>
     <button class="tb-btn" id="btnPdf">⎙ PDF</button>
@@ -229,7 +231,7 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
   <div class="work">
 
     <aside class="lib" id="libAside">
-      <h2><span class="h2txt">Библиотека · ГОСТ</span><button class="libtog" id="libTog" title="Свернуть/развернуть библиотеку">‹</button></h2>
+      <h2><span class="h2txt">Библиотека · ГОСТ</span><button class="libtog" id="symEdBtn" title="Создать своё УГО">✎</button><button class="libtog" id="libTog" title="Свернуть/развернуть библиотеку">‹</button></h2>
       <div class="lib-list" id="libList"></div>
       <div class="lib-foot">Клик по элементу → клик на лист.<br>Esc — отмена.</div>
     </aside>
@@ -329,6 +331,28 @@ aside h2{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:up
           <div class="specfoot" id="specFoot"></div>
         </div>
       </div>
+      <div id="symEd" class="modal">
+        <div class="card" style="width:760px;max-width:95vw;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <input id="symName" placeholder="Название УГО (напр. Реле контроля фаз)" style="flex:1;background:var(--graphite);border:1px solid var(--line);border-radius:7px;color:var(--txt);padding:8px 10px;font-size:13px">
+            <button class="tb-btn" id="symClose">✕</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+            <button class="tb-btn syt on" data-syt="line">╱ Линия</button>
+            <button class="tb-btn syt" data-syt="dash">┄ Пунктир</button>
+            <button class="tb-btn syt" data-syt="pin">○ Вывод</button>
+            <button class="tb-btn syt" data-syt="text">T Текст</button>
+            <span style="flex:1"></span>
+            <button class="tb-btn" id="symUndo">↺ Стереть</button>
+            <button class="tb-btn" id="symClear">Очистить</button>
+          </div>
+          <svg id="symCanvas" width="100%" height="380" viewBox="-360 -240 720 480" style="background:#F6F8FA;border:1px solid var(--line);border-radius:8px;display:block;touch-action:none"></svg>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <div class="lib-foot" style="flex:1;padding:0;border:none">Линия/Пунктир — кликай точки (двойной клик — закончить). «Вывод» — точка подключения (нумеруется). Сетка 20.</div>
+            <button class="tb-btn" id="symSave" style="background:var(--cyan);color:#06262E;font-weight:600">✓ Сохранить УГО</button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <aside class="props">
@@ -423,6 +447,30 @@ var SYM={
       .concat([DL(-150,100,150,100)])},
   coil:{name:'Катушка',pre:'KM',bb:[-45,-5,52,155],lbl:[-58,88,'end'],
     pins:[[0,0],[0,150]],pr:[L(0,0,0,45),L(0,105,0,150),R(-40,45,80,60),T(30,30,20,'A1'),T(30,135,20,'A2')]},
+  // реле промежуточное РЭК77/3 LED — катушка с блоком светодиодной индикации (10/11) + 3 переключающих контакта (1-9), мех. связь
+  rel3:{name:'Реле пром. РЭК77/3 LED',pre:'KL',bb:[-275,-178,360,212],lbl:[40,206,'middle'],
+    pins:[[-120,-170],[-120,170],[60,-170],[12,0],[60,170],[200,-170],[152,0],[200,170],[340,-170],[292,0],[340,170]],
+    pr:[
+      /* катушка */
+      R(-180,-30,120,60), L(-120,-30,-120,-170), L(-120,30,-120,170),
+      T(-103,-148,20,'10'), T(-103,163,20,'11'),
+      /* блок светодиодной индикации — штриховая рамка + светодиод со стрелками */
+      DL(-262,-46,-180,-46),DL(-180,-46,-180,46),DL(-180,46,-262,46),DL(-262,46,-262,-46),
+      L(-221,-32,-221,-16),L(-233,-16,-209,-16),L(-233,-16,-221,9),L(-209,-16,-221,9),L(-233,9,-209,9),L(-221,9,-221,32),
+      L(-204,-12,-188,-27),L(-198,-26,-188,-27),L(-188,-27,-189,-17),
+      L(-197,-2,-181,-17),L(-191,-16,-181,-17),L(-181,-17,-182,-7),
+      /* механическая связь катушка→контакты */
+      DL(-60,0,340,0),
+      /* контакт 1: НЗ(4) сверху, общий(1) слева, НО(7) снизу */
+      L(60,-170,60,-55), L(60,170,60,55), L(12,0,46,0), L(46,0,70,54),
+      T(40,-148,18,'4'),T(-4,-12,18,'1'),T(40,163,18,'7'),
+      /* контакт 2 */
+      L(200,-170,200,-55), L(200,170,200,55), L(152,0,186,0), L(186,0,210,54),
+      T(180,-148,18,'5'),T(136,-12,18,'2'),T(180,163,18,'8'),
+      /* контакт 3 */
+      L(340,-170,340,-55), L(340,170,340,55), L(292,0,326,0), L(326,0,350,54),
+      T(320,-148,18,'6'),T(276,-12,18,'3'),T(320,163,18,'9')
+    ]},
   c_no:{name:'Контакт НО',pre:'K',bb:[-48,-5,10,155],lbl:[42,88,'start'],
     pins:[[0,0],[0,150]],pr:[L(0,0,0,55),L(0,150,-40,50)]},
   c_nc:{name:'Контакт НЗ',pre:'K',bb:[-48,-5,12,155],lbl:[42,88,'start'],
@@ -501,6 +549,11 @@ function ctrlSym(c){
     pinsArr.push([ex,y]);
   });}
   place(left,-1); place(right,1);
+  // низ корпуса: общий 0В·COM (масса сигналов и аналог. выходов) слева и фаза L·COM реле (откуда питаются катушки сухих контактов) справа
+  var byB=bodyH, gpx=-110, lpx2=110;
+  pr.push(L(gpx,byB,gpx,byB+stub), C(gpx,byB+stub,9), T(gpx,byB+stub+32,26,'0В·COM'));
+  pr.push(L(lpx2,byB,lpx2,byB+stub), C(lpx2,byB+stub,9), T(lpx2,byB+stub+32,26,'L·COM реле'));
+  pinsArr.push([gpx,byB+stub]); pinsArr.push([lpx2,byB+stub]);
   // питание (сверху-слева) — выводы питания контроллера, подключаются от автомата управления.
   // По ГОСТ — только маркировка выводов (+24 В / 0 В), без слова «питание».
   var px1=-195, px2=-55;
@@ -515,14 +568,15 @@ function ctrlSym(c){
   pr.push(T(ax-34,-stub-16,30,'A'), T(bx+34,-stub-16,30,'B'));
   pr.push(T(rmid,-stub-50,24,'RS-485'));
   pinsArr.push([ax,-stub]); pinsArr.push([bx,-stub]);            // A/B — реальные выводы, к ним идёт провод к HMI
-  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, -stub-90, hx+stub+360, bodyH+10],
+  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, -stub-90, hx+stub+360, bodyH+stub+70],
           lbl:[-hx, bodyH+54, 'start'], pins:pinsArr, pr:pr};
 }
-function symFor(c){ return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
+function _ugoSym(u){ var b=u.bb||[-100,-100,100,100]; return {name:'УГО',pre:'A',bb:b,lbl:u.lbl||[0,b[3]+30,'middle'],pins:u.pins||[],pr:u.pr}; }
+function symFor(c){ if(c.ugo&&c.ugo.pr&&c.ugo.pr.length) return _ugoSym(c.ugo); return c.sym==='ctrl' ? ctrlSym(c) : SYM[c.sym]; }
 var PALETTE=[
   ['Защита',['qf3','qf1','fu']],
   ['Коммутация',['kmfull','kmp','kmp1','km3','coil','c_no','c_nc','sb_no','sb_nc']],
-  ['Машины и реле',['m3','kk3','hl']],
+  ['Машины и реле',['m3','kk3','rel3','hl']],
   ['Питание и приборы',['psu','hmi','ssr','box','ntc']],
   ['Клеммы',['term']]
 ];
@@ -785,7 +839,7 @@ function compSvg(c,col,extraOp){
   return h;
 }
 // === сечение кабеля по току линии (ПУЭ-упрощённо, медь) ===
-function _secFor(I){var t=[[10,1.0],[16,1.5],[25,2.5],[32,4],[40,6],[50,10],[80,16],[100,25]];for(var i=0;i<t.length;i++)if(I<=t[i][0])return t[i][1];return 35;}
+function _secFor(I){var t=[[16,1.5],[25,2.5],[32,4],[40,6],[50,10],[80,16],[100,25]];for(var i=0;i<t.length;i++)if(I<=t[i][0])return t[i][1];return 35;}
 // аппараты, подключённые к проводу (по совпадению вывода с концом/сегментом)
 function wireConnComps(w){
   var e=[w.pts[0],w.pts[w.pts.length-1]],res=[];
@@ -867,8 +921,8 @@ function wiresMarkup(forExport){
     var _wc=sel?CY:(w.phase&&PHASE_COL[w.phase]?PHASE_COL[w.phase]:INK);   // цвет по фазе L1/L2/L3
     h+='<path data-w="'+w.id+'" d="'+d+'" stroke="'+_wc+'" stroke-width="6" fill="none" stroke-linejoin="round"/>';
     if(!forExport){ var dHit=w.pts.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y}).join(' '); h+='<path data-w="'+w.id+'" d="'+dHit+'" stroke="rgba(0,0,0,0.001)" stroke-width="40" fill="none"/>'; }
-    var _sec=wireSection(w);
-    if(_sec && (sel || _isFeeder(w,_bus))){
+    var _sec=(w.sec!=null)?String(w.sec).replace('.',','):wireSection(w);
+    if(_sec && (sel || w.sec!=null || _isFeeder(w,_bus))){
       var _lp=wireSegMid(w);
       if(_lp&&_lp.len>=130){
         var _tx=_lp.horiz?_lp.x:(_lp.x+24), _ty=_lp.horiz?(_lp.y-16):_lp.y;
@@ -1217,10 +1271,16 @@ function _projOnSeg(px,py,a,b){
   var dx=b.x-a.x,dy=b.y-a.y,t=((px-a.x)*dx+(py-a.y)*dy)/(dx*dx+dy*dy||1); t=Math.max(0,Math.min(1,t)); return {x:a.x+t*dx,y:a.y+t*dy};
 }
 // ближайшая точка на каком-либо проводе (поставить отвод/точку на линии)
+function _clampSeg(v,p,q){return Math.max(Math.min(p,q),Math.min(Math.max(p,q),v));}
 function wireTapPoint(wx,wy){
   var tol=Math.max(16,13/view.s), best=null, bd=tol;
   S.wires.forEach(function(w){ for(var i=0;i<w.pts.length-1;i++){
-    var pt=_projOnSeg(wx,wy,w.pts[i],w.pts[i+1]), d=Math.max(Math.abs(pt.x-wx),Math.abs(pt.y-wy));
+    var a=w.pts[i],b=w.pts[i+1], pt=_projOnSeg(wx,wy,a,b);
+    // привязка к сетке вдоль линии (точка остаётся на проводе, но в узле сетки)
+    if(a.x===b.x) pt={x:a.x, y:_clampSeg(snap(pt.y),a.y,b.y)};
+    else if(a.y===b.y) pt={x:_clampSeg(snap(pt.x),a.x,b.x), y:a.y};
+    else pt={x:snap(pt.x), y:snap(pt.y)};
+    var d=Math.max(Math.abs(pt.x-wx),Math.abs(pt.y-wy));
     if(d<bd){bd=d;best={x:Math.round(pt.x),y:Math.round(pt.y),wire:w,seg:i};}
   }});
   return best;
@@ -1487,6 +1547,63 @@ function symbolIcon(id){
   h+='</svg>';
   return h;
 }
+/* ============ редактор своего УГО ============ */
+function _usyms(){try{return JSON.parse(localStorage.getItem('atomcad_usyms')||'{}')}catch(e){return {}}}
+function loadUserSyms(){
+  var store=_usyms(), ids=Object.keys(store);
+  ids.forEach(function(id){ SYM[id]=store[id]; });
+  var g=null; for(var i=0;i<PALETTE.length;i++)if(PALETTE[i][0]==='Свои УГО')g=PALETTE[i];
+  if(ids.length){ if(!g){g=['Свои УГО',[]];PALETTE.push(g);} g[1]=ids; }
+}
+var symTool='line', symDraw={pr:[],pins:[]}, symPend=null;
+function openSymEd(){ symDraw={pr:[],pins:[]}; symPend=null; var n=$('symName'); if(n)n.value=''; setSymTool('line'); renderSym(); $('symEd').classList.add('show'); }
+function setSymTool(t){ symTool=t; symPend=null; Array.prototype.forEach.call(document.querySelectorAll('.syt'),function(b){b.classList.toggle('on',b.getAttribute('data-syt')===t)}); renderSym(); }
+function _symSnap(v){return Math.round(v/20)*20;}
+function _symPt(e){ var sv=$('symCanvas'),r=sv.getBoundingClientRect(),vb=sv.viewBox.baseVal;
+  return {x:_symSnap(vb.x+(e.clientX-r.left)/r.width*vb.width), y:_symSnap(vb.y+(e.clientY-r.top)/r.height*vb.height)}; }
+function renderSym(){
+  var h='';
+  for(var gx=-360;gx<=360;gx+=20)h+='<line x1="'+gx+'" y1="-240" x2="'+gx+'" y2="240" stroke="#E3E9EF" stroke-width="1"/>';
+  for(var gy=-240;gy<=240;gy+=20)h+='<line x1="-360" y1="'+gy+'" x2="360" y2="'+gy+'" stroke="#E3E9EF" stroke-width="1"/>';
+  h+='<line x1="-360" y1="0" x2="360" y2="0" stroke="#C7D0D8" stroke-width="1.5"/><line x1="0" y1="-240" x2="0" y2="240" stroke="#C7D0D8" stroke-width="1.5"/>';
+  h+='<g stroke="#1C2B38" stroke-width="4" fill="none" color="#1C2B38">';
+  symDraw.pr.forEach(function(p){h+=prim(p)});
+  h+='</g>';
+  symDraw.pins.forEach(function(p){h+='<circle cx="'+p.x+'" cy="'+p.y+'" r="6" fill="none" stroke="#16B7DB" stroke-width="3"/>';});
+  if(symPend)h+='<circle cx="'+symPend.x+'" cy="'+symPend.y+'" r="6" fill="#16B7DB"/>';
+  $('symCanvas').innerHTML=h;
+}
+function symClick(e){
+  var p=_symPt(e);
+  if(symTool==='line'||symTool==='dash'){
+    if(!symPend){symPend=p;} else { symDraw.pr.push(symTool==='dash'?DL(symPend.x,symPend.y,p.x,p.y):L(symPend.x,symPend.y,p.x,p.y)); symPend=p; }
+  } else if(symTool==='pin'){
+    var n=symDraw.pins.length+1; symDraw.pins.push({x:p.x,y:p.y}); symDraw.pr.push(C(p.x,p.y,7)); symDraw.pr.push(T(p.x+22,p.y+7,18,String(n)));
+  } else if(symTool==='text'){
+    var tx=prompt('Текст:'); if(tx){symDraw.pr.push(T(p.x,p.y,22,tx));}
+  }
+  renderSym();
+}
+function symSave(){
+  if(!symDraw.pr.length){toast('Сначала нарисуй УГО');return;}
+  var name=(($('symName')&&$('symName').value)||'').trim()||'Своё УГО';
+  var xs=[0],ys=[0];
+  symDraw.pr.forEach(function(p){
+    if(p.t==='l'||p.t==='dl'){xs.push(p.x1,p.x2);ys.push(p.y1,p.y2);}
+    else if(p.t==='c'){xs.push(p.x-p.r,p.x+p.r);ys.push(p.y-p.r,p.y+p.r);}
+    else if(p.t==='r'){xs.push(p.x,p.x+p.w);ys.push(p.y,p.y+p.h);}
+    else if(p.t==='t'){xs.push(p.x-40,p.x+40);ys.push(p.y-20,p.y+12);}
+  });
+  symDraw.pins.forEach(function(p){xs.push(p.x);ys.push(p.y);});
+  var bb=[Math.min.apply(null,xs)-12,Math.min.apply(null,ys)-12,Math.max.apply(null,xs)+12,Math.max.apply(null,ys)+12];
+  var id='u'+Date.now();
+  var def={name:name,pre:'A',bb:bb,lbl:[0,bb[3]+30,'middle'],pins:symDraw.pins.map(function(p){return [p.x,p.y]}),pr:symDraw.pr};
+  var store=_usyms(); store[id]=def; try{localStorage.setItem('atomcad_usyms',JSON.stringify(store))}catch(_){}
+  SYM[id]=def; loadUserSyms(); buildPalette();
+  $('symEd').classList.remove('show');
+  toast('УГО «'+name+'» сохранено — раздел «Свои УГО» в библиотеке');
+}
+loadUserSyms();
 function _grpColl(){try{return JSON.parse(localStorage.getItem('atomcad_grp_collapsed')||'{}')}catch(e){return {}}}
 function buildPalette(){
   var h='', coll=_grpColl();
@@ -1728,6 +1845,16 @@ $('btnReset').addEventListener('click',function(){demo();U=[];Rd=[];renderProps(
 $('btnHelp').addEventListener('click',function(){$('help').classList.add('show')});
 $('helpClose').addEventListener('click',function(){$('help').classList.remove('show')});
 $('help').addEventListener('click',function(e){if(e.target===$('help'))$('help').classList.remove('show')});
+// редактор своего УГО
+$('symEdBtn').addEventListener('click',openSymEd);
+$('symClose').addEventListener('click',function(){$('symEd').classList.remove('show')});
+$('symEd').addEventListener('click',function(e){if(e.target===$('symEd'))$('symEd').classList.remove('show')});
+$('symCanvas').addEventListener('click',symClick);
+$('symCanvas').addEventListener('dblclick',function(e){e.preventDefault();symPend=null;renderSym();});
+$('symSave').addEventListener('click',symSave);
+$('symUndo').addEventListener('click',function(){ if(symPend){symPend=null;} else { var last=symDraw.pr[symDraw.pr.length-1]; if(last&&last.t==='t'&&symDraw.pins.length&&symDraw.pr[symDraw.pr.length-2]&&symDraw.pr[symDraw.pr.length-2].t==='c'){ symDraw.pr.pop();symDraw.pr.pop();symDraw.pins.pop(); } else symDraw.pr.pop(); } renderSym(); });
+$('symClear').addEventListener('click',function(){ symDraw={pr:[],pins:[]}; symPend=null; renderSym(); });
+Array.prototype.forEach.call(document.querySelectorAll('.syt'),function(b){ b.addEventListener('click',function(){setSymTool(b.getAttribute('data-syt'))}); });
 $('btnLib').addEventListener('click',function(){document.body.classList.toggle('lib-open');document.body.classList.remove('props-open')});
 // сворачивание левой колонки (библиотека) на десктопе — больше места под лист
 $('libTog').addEventListener('click',function(){
@@ -1997,8 +2124,8 @@ $('catSearch').addEventListener('input',renderCatalog);
 /* ============ листы ============ */
 function _mkSheet(s){
   return {
-    comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{}}}),
-    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null}}),
+    comps:(s.comps||[]).map(function(c){return {id:uid('c'),sym:c.sym,x:c.x,y:c.y,rot:c.rot||0,mirror:!!c.mirror,des:c.des,attrs:c.attrs||{},ugo:(c.ugo&&c.ugo.pr?c.ugo:null)}}),
+    wires:(s.wires||[]).map(function(w){return {id:uid('w'),pts:(w.pts||[]).map(function(p){return {x:p.x,y:p.y}}),phase:w.phase||null,sec:(w.sec!=null?w.sec:null),bus:w.bus||null}}),
     texts:(s.texts||[]).slice(),
     nodes:(s.nodes||[]).map(function(n){return {x:n.x,y:n.y}}),
     subtitle:s.subtitle||s.title||''
@@ -2051,9 +2178,36 @@ window.addEventListener('message',function(e){
   if(e.data.atomcad==='load-schematic'){
     loadExternal(e.data.data);
     if(e.data.code){_docCode=e.data.code;buildSheet();var dc=document.querySelector('.doc');if(dc)dc.innerHTML='<span class="dot" id="saveDot"></span>'+e.data.code;}
+    try{ if(localStorage.getItem(_docKey())) setTimeout(function(){toast('Есть сохранённая версия этого щита — «📂 Открыть», чтобы загрузить');},900); }catch(_){}
   }
 });
 window.AtomEditorLoad=loadExternal;
+
+/* ============ сохранение схемы (локально по обозначению щита) ============ */
+function _docKey(){ return 'atomcad_doc_'+((_docCode||'default').replace(/[^\wА-Яа-я.\-\/]/g,'')); }
+function saveDoc(){
+  try{
+    var snap={code:_docCode,cur:S.cur,sheets:S.sheets.map(function(sh){return {subtitle:sh.subtitle||'',comps:sh.comps,wires:sh.wires,texts:sh.texts,nodes:sh.nodes||[]};})};
+    localStorage.setItem(_docKey(),JSON.stringify(snap));
+    var sd=$('saveDot'); if(sd)sd.style.background='#2E8B57';
+    try{parent.postMessage({atomcad:'save-schematic',code:_docCode,sheets:snap.sheets},'*');}catch(_){}
+    toast('Схема сохранена ('+S.sheets.length+' лист.)');
+  }catch(e){ toast('Не удалось сохранить: '+e.message); }
+}
+function loadDoc(){
+  var raw=null; try{raw=localStorage.getItem(_docKey());}catch(_){}
+  if(!raw){ toast('Нет сохранённой схемы для '+(_docCode||'этого щита')); return; }
+  try{
+    var snap=JSON.parse(raw); if(!snap||!snap.sheets||!snap.sheets.length){toast('Сохранение пустое');return;}
+    S.sheets=snap.sheets.map(_mkSheet); S.cur=Math.min(snap.cur||0,S.sheets.length-1);
+    var sh=S.sheets[S.cur]; if(!sh.nodes)sh.nodes=[]; S.comps=sh.comps;S.wires=sh.wires;S.texts=sh.texts;S.nodes=sh.nodes;S.sel=null;
+    U=[];Rd=[]; buildSheet(); updateSheetNav(); renderProps(true); renderAll(); fit();
+    toast('Загружена сохранённая схема');
+  }catch(e){ toast('Ошибка загрузки: '+e.message); }
+}
+$('btnSaveDoc').addEventListener('click',saveDoc);
+$('btnLoadDoc').addEventListener('click',loadDoc);
+window.addEventListener('keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.code==='KeyS'&&!document.querySelector('.modal.show')){e.preventDefault();saveDoc();} });
 
 /* ============ старт ============ */
 buildPalette();
