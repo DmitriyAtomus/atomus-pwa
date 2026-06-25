@@ -56,6 +56,11 @@ window.addEventListener('message',function(ev){
     if(fe.contentWindow && fe.contentWindow.AtomEditorLoad){ send(); }
     else { fe.addEventListener('load',send,{once:true}); send(); }
   }
+  // редактор сохранил схему → передаём мастеру, он кладёт её в проект и сохраняет на сервере
+  if(d.atomcad==='save-schematic'){
+    var fw=document.getElementById('fw');
+    try{ fw.contentWindow.postMessage({atomcad:'save-schematic',code:d.code,sheets:d.sheets},'*'); }catch(_){}
+  }
 });
 </script>
 </body></html>

@@ -83,6 +83,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
     <button class="tb" onclick="openLibrary()">📂 Мои проекты</button>
     <button class="tb" onclick="saveProject()">⭱ Сохранить</button>
     <button class="tb" onclick="openSaveAs()">⎘ Сохранить как…</button>
+    <button class="tb" onclick="openEditor(true)" title="Построить схему заново из мастера (сбросить ручные правки)">↻ Заново</button>
     <button class="tb cy" onclick="openEditor()">Открыть редактор →</button>
   </div>
 </header>
@@ -1839,13 +1840,20 @@ function exportFile(){
 $('fileIn').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);P=o;P.nameAuto=false;if(!P.id)P.id=uid('prj');if(!P.controller)P.controller={model:CTRLS[0],io:ctrlIO(CTRLS[0])};if(!P.controller.io)P.controller.io=ctrlIO(P.controller.model);$('libMask').classList.remove('show');go(0);updTag();$('saveState').textContent='загружено';toast('Проект загружен из файла');}catch(err){toast('Ошибка чтения файла')}};r.readAsText(f);e.target.value=''};
 
 /* ---- передача схемы в редактор ---- */
-function openEditor(){
+function openEditor(force){
   ensureBreakers();
   if(typeof sortAux==='function')sortAux();   // нормализуем обозначения аппаратов (K→KM и т.п.) перед построением схемы
-  var sch=C.buildSchematic(P);
+  // если на сервере есть сохранённая (отредактированная) схема — открываем её; «↻ Заново» строит из мастера
+  var sch=(!force && P.schematic && P.schematic.sheets && P.schematic.sheets.length) ? P.schematic : C.buildSchematic(P);
   try{parent.postMessage({atomcad:'build-open', name:P.name, code:'АГ.'+P.section+'.'+('00'+P.num).slice(-3)+'/26', schematic:sch},'*');}catch(_){}
-  toast('Схема построена — открываю редактор');
+  toast((!force && P.schematic) ? 'Открываю сохранённую схему' : 'Схема построена — открываю редактор');
 }
+/* редактор сохранил схему (через мост index.html) → кладём в проект и сохраняем на сервере */
+window.addEventListener('message',function(ev){
+  var d=ev.data; if(!d||d.atomcad!=='save-schematic') return;
+  P.schematic={sheets:d.sheets};
+  saveProject().then(function(){toast('Схема сохранена в проекте');}).catch(function(){});
+});
 
 /* ---- навигация ---- */
 var PANELS=[pSection,pController,pConsumers,pSensors,pAux,pBreakers,pTerminals,pCabinet,pSpec];
