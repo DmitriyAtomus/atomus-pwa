@@ -499,8 +499,14 @@ function buildSchematic(P){
     }
     // шина 0В · GND — общий аналогового управления ТР (0-10В), привязан к 0В контроллера (НЕ нейтраль)
     if(usedG.length){ var q0=Math.min.apply(null,usedG), q1=Math.max.apply(null,usedG); aw.push(W([gX,q0],[gX,q1])); at.push({x:gX+24,y:q0-26,s:24,ls:0,anchor:'start',tx:'0В · GND'});
-      at.push({x:gX+24,y:q1+44,s:18,ls:0,anchor:'start',tx:'→ 0В контроллера'});
+      at.push({x:gX+24,y:q1+44,s:18,ls:0,anchor:'start',tx:'→ 0В·COM контроллера'});
     }
+    // нижние клеммы контроллера: 0В·COM (масса) и L·COM реле (фаза катушек) — поясняем питание/общие цепи
+    var byB=ctrlY+G.bodyH+G.stub;
+    aw.push(W([cz-110,byB],[cz-110,byB+70]));
+    at.push({x:cz-110,y:byB+104,s:20,ls:0,anchor:'middle',tx:'0В · GND · COM — общий входов и управления ТР (= 0В питания)'});
+    aw.push(W([cz+110,byB],[cz+110,byB+70]));
+    at.push({x:cz+110,y:byB+104,s:20,ls:0,anchor:'middle',tx:'L 230В → COM реле — фаза на катушки (от QF цепей управления)'});
     var hlN=1;
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});

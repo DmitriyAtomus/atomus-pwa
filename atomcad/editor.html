@@ -549,6 +549,11 @@ function ctrlSym(c){
     pinsArr.push([ex,y]);
   });}
   place(left,-1); place(right,1);
+  // низ корпуса: общий 0В·COM (масса сигналов и аналог. выходов) слева и фаза L·COM реле (откуда питаются катушки сухих контактов) справа
+  var byB=bodyH, gpx=-110, lpx2=110;
+  pr.push(L(gpx,byB,gpx,byB+stub), C(gpx,byB+stub,9), T(gpx,byB+stub+32,26,'0В·COM'));
+  pr.push(L(lpx2,byB,lpx2,byB+stub), C(lpx2,byB+stub,9), T(lpx2,byB+stub+32,26,'L·COM реле'));
+  pinsArr.push([gpx,byB+stub]); pinsArr.push([lpx2,byB+stub]);
   // питание (сверху-слева) — выводы питания контроллера, подключаются от автомата управления.
   // По ГОСТ — только маркировка выводов (+24 В / 0 В), без слова «питание».
   var px1=-195, px2=-55;
@@ -563,7 +568,7 @@ function ctrlSym(c){
   pr.push(T(ax-34,-stub-16,30,'A'), T(bx+34,-stub-16,30,'B'));
   pr.push(T(rmid,-stub-50,24,'RS-485'));
   pinsArr.push([ax,-stub]); pinsArr.push([bx,-stub]);            // A/B — реальные выводы, к ним идёт провод к HMI
-  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, -stub-90, hx+stub+360, bodyH+10],
+  return {name:'Контроллер', pre:'A', bb:[-hx-stub-300, -stub-90, hx+stub+360, bodyH+stub+70],
           lbl:[-hx, bodyH+54, 'start'], pins:pinsArr, pr:pr};
 }
 function _ugoSym(u){ var b=u.bb||[-100,-100,100,100]; return {name:'УГО',pre:'A',bb:b,lbl:u.lbl||[0,b[3]+30,'middle'],pins:u.pins||[],pr:u.pr}; }
