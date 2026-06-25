@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.569";
+const APP_VERSION = "v2.45.570";
 const APP_VERSION_DATE = "25.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2803,6 +2803,9 @@ async function loadProductionDashboard() {
   const container = document.getElementById('dashboard-content');
   if (!container) return;
 
+  // v2.45.x: проверяем «вчера не доделал» — параллельно, баннер вставится сам
+  _checkUnfinishedWork();
+
   // Если есть кеш — рендерим сразу, фоновый refresh
   if (cache.productionKanban) {
     renderProductionDashboard(cache.productionKanban);
@@ -2961,6 +2964,71 @@ function renderProductionDashboard(d) {
   html += '</div>';
 
   container.innerHTML = html;
+  // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
+  _renderResumeBanner();
+}
+
+// ============ v2.45.x: автостоп → «продолжить вчерашнее или новое?» ============
+async function _checkUnfinishedWork() {
+  try {
+    const r = await apiGet('/api/production/my-unfinished');
+    state._unfinishedWork = (r && r.work) || null;
+  } catch (_) {
+    state._unfinishedWork = null;
+  }
+  _renderResumeBanner();
+}
+
+function _renderResumeBanner() {
+  const old = document.getElementById('pwd-resume-banner');
+  if (old) old.remove();
+  const w = state._unfinishedWork;
+  const container = document.getElementById('dashboard-content');
+  if (!w || !container) return;
+  const model = w.model_name || w.work_description || ('Работа #' + w.work_id);
+  const stage = w.stage_name ? (' · этап «' + escapeHtml(w.stage_name) + '»') : '';
+  const banner = document.createElement('div');
+  banner.id = 'pwd-resume-banner';
+  banner.className = 'pwd-resume-banner';
+  banner.innerHTML =
+    '<div class="pwd-resume-ico"><i class="ti ti-player-pause"></i></div>' +
+    '<div class="pwd-resume-txt">' +
+      '<div class="pwd-resume-title">Вчера не доделано — продолжишь?</div>' +
+      '<div class="pwd-resume-sub">' + escapeHtml(model) + stage + ' · тебя застопило автостопом в 18:00</div>' +
+    '</div>' +
+    '<div class="pwd-resume-acts">' +
+      '<button class="btn btn-primary" onclick="resumeUnfinishedWork(' + w.work_id + ',' + (w.stage_id || 'null') + ')"><i class="ti ti-player-play"></i> Продолжить</button>' +
+      '<button class="btn btn-secondary" onclick="dismissUnfinishedWork()">Возьму новое</button>' +
+    '</div>';
+  container.insertBefore(banner, container.firstChild);
+}
+
+async function resumeUnfinishedWork(workId, stageId) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    await fetch(API_BASE + '/api/production/works/' + workId + '/start-helping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(stageId ? { stage_id: stageId } : {}),
+    });
+    state._unfinishedWork = null;
+    const b = document.getElementById('pwd-resume-banner'); if (b) b.remove();
+    if (typeof showToast === 'function') showToast('Продолжаем — часики пошли ⏱', 'success');
+    if (typeof openProductionWorkDetail === 'function') openProductionWorkDetail(workId);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось продолжить', 'error');
+  }
+}
+
+async function dismissUnfinishedWork() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    await fetch(API_BASE + '/api/production/my-unfinished/dismiss', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token },
+    });
+  } catch (_) {}
+  state._unfinishedWork = null;
+  const b = document.getElementById('pwd-resume-banner'); if (b) b.remove();
 }
 
 function pkbEmptyText(colKey) {
