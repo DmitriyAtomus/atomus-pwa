@@ -1544,6 +1544,13 @@ function renderHelpKnowledge() {
   }
   // Обычный режим — по категориям
   let html = '<div style="padding: 0 18px 18px;">';
+  // Идеи и доработки — ИИ-ассистент собирает ТЗ
+  html += '<div onclick="openIdeasModal()" style="cursor:pointer;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:1px solid #C7D2FE;border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
+      '<div style="font-size:26px;">💡</div>' +
+      '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">Идеи и доработки</div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);">Расскажи ИИ, что улучшить в программе — он уточнит детали и оформит заявку разработчику.</div></div>' +
+      '<i class="ti ti-chevron-right" style="color:var(--brand);"></i>' +
+    '</div>';
   HELP_CATEGORIES.forEach(cat => {
     const list = HELP_ARTICLES.filter(a => a.cat === cat.id);
     if (!list.length) return;
@@ -1564,6 +1571,155 @@ function renderHelpCard(a) {
       '<p>' + escapeHtml(a.summary) + '</p>' +
     '</div>' +
     '</div>';
+}
+
+// ============ Идеи / доработки (ИИ-ассистент) ============
+
+function openIdeasModal() {
+  let m = document.getElementById('ideas-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ideas-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;width:100%;display:flex;flex-direction:column;max-height:88vh;">' +
+      '<div class="modal-header"><h3>💡 Идеи и доработки</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'ideas-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="display:flex;gap:8px;padding:10px 16px 0;">' +
+        '<button class="btn btn-primary btn-small" onclick="ideasShowNew()"><i class="ti ti-bulb"></i> Предложить</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="ideasShowList()"><i class="ti ti-list"></i> Заявки</button>' +
+      '</div>' +
+      '<div id="ideas-body" style="flex:1;overflow-y:auto;padding:14px 16px;"></div>' +
+      '<div id="ideas-foot" style="padding:12px 16px;border-top:1px solid var(--border);"></div>' +
+    '</div>';
+  m.classList.add('visible');
+  ideasShowNew();
+}
+
+function ideasShowNew() {
+  state.ideaThreadId = null;
+  const body = document.getElementById('ideas-body');
+  const foot = document.getElementById('ideas-foot');
+  if (!body || !foot) return;
+  body.innerHTML = '<div id="ideas-chat" style="display:flex;flex-direction:column;gap:8px;">' +
+      '<div style="background:#F1F5F9;border-radius:10px;padding:8px 11px;font-size:13.5px;">Привет! Опиши, что хочешь улучшить или добавить в программе — я задам пару уточняющих вопросов и оформлю заявку разработчику.</div>' +
+    '</div>';
+  foot.innerHTML =
+    '<textarea id="idea-input" class="form-input" rows="2" placeholder="Напиши идею…" style="margin-bottom:8px;"></textarea>' +
+    '<div style="display:flex;gap:8px;">' +
+      '<button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="ideaSend()"><i class="ti ti-send"></i> Отправить</button>' +
+      '<button class="btn btn-secondary" id="idea-compile-btn" style="display:none;" onclick="ideaCompile()"><i class="ti ti-file-check"></i> Сформировать ТЗ</button>' +
+    '</div>';
+}
+
+function _ideaAddMsg(role, text) {
+  const chat = document.getElementById('ideas-chat');
+  if (!chat) return null;
+  const mine = role === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = 'border-radius:10px;padding:8px 11px;font-size:13.5px;white-space:pre-wrap;word-break:break-word;' +
+    (mine ? 'background:var(--brand,#2563eb);color:#fff;align-self:flex-end;max-width:88%;' : 'background:#F1F5F9;max-width:92%;');
+  div.textContent = text;
+  chat.appendChild(div);
+  const body = document.getElementById('ideas-body');
+  if (body) body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+async function ideaSend() {
+  const inp = document.getElementById('idea-input');
+  if (!inp) return;
+  const text = (inp.value || '').trim();
+  if (!text) return;
+  inp.value = '';
+  _ideaAddMsg('user', text);
+  const ph = _ideaAddMsg('assistant', '…');
+  try {
+    let d;
+    if (!state.ideaThreadId) {
+      const r = await apiPost('/api/ideas', { text });
+      d = (r && r.data) || {};
+      if (d.thread_id) state.ideaThreadId = d.thread_id;
+    } else {
+      const r = await apiPost('/api/ideas/' + state.ideaThreadId + '/message', { text });
+      d = (r && r.data) || {};
+    }
+    if (ph) ph.textContent = d.reply || 'Принял.';
+    const cb = document.getElementById('idea-compile-btn');
+    if (cb && state.ideaThreadId) cb.style.display = '';
+  } catch (e) {
+    if (ph) ph.textContent = 'Ошибка связи';
+  }
+}
+
+async function ideaCompile() {
+  if (!state.ideaThreadId) { showToast('Сначала опиши идею', 'error'); return; }
+  showToast('Собираю ТЗ…', 'info');
+  try {
+    const r = await apiPost('/api/ideas/' + state.ideaThreadId + '/compile', {});
+    const d = (r && r.data) || {};
+    if (!r.ok || !d.ok) { showToast((d && d.message) || 'Не удалось собрать ТЗ', 'error'); return; }
+    _ideaAddMsg('assistant', 'Готово! Заявка оформлена и передана разработчику. Спасибо 🙌');
+    if (d.spec) _ideaAddMsg('assistant', d.spec);
+    const cb = document.getElementById('idea-compile-btn');
+    if (cb) cb.style.display = 'none';
+    showToast('ТЗ сохранено', 'success');
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+async function ideasShowList() {
+  const body = document.getElementById('ideas-body');
+  const foot = document.getElementById('ideas-foot');
+  if (!body) return;
+  if (foot) foot.innerHTML = '';
+  body.innerHTML = '<div style="color:var(--text-light);font-size:13px;">Загружаем…</div>';
+  let d;
+  try { d = await apiGet('/api/ideas'); } catch (e) { body.innerHTML = '<div style="color:var(--text-light);">Не удалось загрузить</div>'; return; }
+  const ideas = (d && d.ideas) || [];
+  const isDir = !!(d && d.is_director);
+  state._ideasCache = ideas;
+  if (!ideas.length) { body.innerHTML = '<div style="color:var(--text-light);font-size:13px;">Заявок пока нет. Нажми «Предложить» и опиши идею.</div>'; return; }
+  let h = '';
+  if (isDir) {
+    const ready = ideas.filter(x => x.status === 'ready' && x.spec_text);
+    if (ready.length) h += '<button class="btn btn-secondary btn-small" style="margin-bottom:10px;" onclick="ideasCopyAll()"><i class="ti ti-copy"></i> Скопировать все новые ТЗ (' + ready.length + ')</button>';
+  }
+  const stRu = { open: 'в работе с ИИ', ready: 'ТЗ готово', taken: 'взято в работу', done: 'сделано' };
+  ideas.forEach(it => {
+    h += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
+        '<div style="font-weight:600;font-size:13.5px;">' + escapeHtml(it.title || 'Идея') + '</div>' +
+        '<span style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(stRu[it.status] || it.status) + '</span>' +
+      '</div>' +
+      '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(it.author_name || '') + '</div>' +
+      (it.spec_text
+        ? '<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12.5px;color:var(--brand);">Показать ТЗ</summary>' +
+            '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#F8FAFC;border-radius:8px;padding:8px;margin-top:6px;">' + escapeHtml(it.spec_text) + '</pre>' +
+            '<button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="ideaCopySpec(' + it.id + ')"><i class="ti ti-copy"></i> Скопировать ТЗ</button>' +
+          '</details>'
+        : '') +
+    '</div>';
+  });
+  body.innerHTML = h;
+}
+
+function _ideaClipboard(txt) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(() => showToast('Скопировано')).catch(() => showToast('Скопируйте вручную'));
+  } else { showToast('Скопируйте вручную'); }
+}
+function ideaCopySpec(id) {
+  const it = (state._ideasCache || []).find(x => x.id === id);
+  if (it && it.spec_text) _ideaClipboard(it.spec_text);
+}
+function ideasCopyAll() {
+  const ready = (state._ideasCache || []).filter(x => x.status === 'ready' && x.spec_text);
+  if (!ready.length) { showToast('Нет готовых ТЗ', 'info'); return; }
+  const txt = ready.map((x, i) => '### Идея ' + (i + 1) + ' — ' + (x.title || '') + ' (автор: ' + (x.author_name || '') + ')\n' + x.spec_text).join('\n\n---\n\n');
+  _ideaClipboard(txt);
 }
 
 function openHelpArticle(articleId) {
