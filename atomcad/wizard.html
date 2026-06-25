@@ -481,7 +481,9 @@ function pConsumers(){
          '<button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button>'+
          '</div>';
     }else{
-      h+='<div class="row"><span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:38px;justify-content:center">'+esc(c.tag||'')+'</span><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+esc(supplyLabel(c))+' · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+' · '+esc(labelForNeeds(c.needs,c.typeLabel))+'</span></span><span class="pill cy">'+I+' А</span><button class="del" title="Изменить" onclick="startEditConsumer(\''+c.id+'\')">✎</button><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>';
+      var cFeed=(C.consumerFeed?C.consumerFeed(P,c.name):'');   // непосредственный коммутатор перед нагрузкой (из графа «Вспомогат.»)
+      var cFeedTxt=cFeed?('← '+esc(cFeed)):(C.needsContactor(c)?'← коммутатор (авто)':'напрямую');
+      h+='<div class="row"><span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:38px;justify-content:center">'+esc(c.tag||'')+'</span><span class="body"><span class="nm">'+esc(c.name)+'</span><span class="meta">'+esc(supplyLabel(c))+' · '+(c.kw?c.kw+' кВт · ':'')+I+' А'+(c.qty>1?(' · ×'+c.qty):'')+' · '+esc(labelForNeeds(c.needs,c.typeLabel))+' · <span style="color:var(--violet)">'+cFeedTxt+'</span></span></span><span class="pill cy">'+I+' А</span><button class="del" title="Изменить" onclick="startEditConsumer(\''+c.id+'\')">✎</button><button class="del" onclick="rmConsumer(\''+c.id+'\')">✕</button></div>';
     }
   });
   return h;
@@ -795,6 +797,7 @@ function pAux(){
          '<input style="flex:1;min-width:130px;'+FLDST+'" value="'+esc(a.name)+'" placeholder="наименование" onchange="editAuxField(\''+a.id+'\',\'name\',this.value)">'+
          '<input style="width:140px;'+FLDST+';font-family:\'IBM Plex Mono\'" value="'+esc(a.model||'')+'" placeholder="марка / модель" onchange="editAuxField(\''+a.id+'\',\'model\',this.value)">'+
          '<select style="'+FLDST+'" onchange="editAuxField(\''+a.id+'\',\'kind\',this.value)">'+auxKindOptions(a.kind)+'</select>'+
+         (auxSwitches(a.kind)?auxSrcEditor(a):'')+
          (auxSwitches(a.kind)?auxTargetsEditor(a,'switch'):(a.kind==='psu'?auxTargetsEditor(a,'feed'):''))+
          '<input inputmode="decimal" style="width:60px;'+FLDST+'" value="'+(a.a||'')+'" placeholder="А" onchange="editAuxField(\''+a.id+'\',\'a\',this.value)">'+
          '<input inputmode="numeric" style="width:54px;'+FLDST+'" value="'+(a.qty||1)+'" title="кол-во" onchange="editAuxField(\''+a.id+'\',\'qty\',this.value)">'+
@@ -875,8 +878,45 @@ function editAuxAddTarget(id,name){var a=P.aux.filter(function(x){return x.id===
     P.aux.push(na);auxTargets(a).push(na.tag);auxTargetsSync(a);P.breakers=null;dirty();draw();
     toast('Создан '+na.tag+' в цепочке после '+(a.tag||a.name)+' — укажи у него «что дальше»');return;
   }
-  auxTargets(a).push(name);auxTargetsSync(a);dirty();draw();}
-function editAuxRmTarget(id,i){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;auxTargets(a).splice(i,1);auxTargetsSync(a);dirty();draw();}
+  auxTargets(a).push(name);auxTargetsSync(a);
+  var ch=auxByTag(name); if(ch&&ch!==a&&auxSwitches(ch.kind)&&!ch.src)ch.src=(a.tag||a.name);   // цель-аппарат питается от этого (двусторонний граф)
+  P.breakers=null;dirty();draw();}
+function editAuxRmTarget(id,i){var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;
+  var t=auxTargets(a)[i]; auxTargets(a).splice(i,1);auxTargetsSync(a);
+  var ch=auxByTag(t); if(ch&&ch.src===(a.tag||a.name))delete ch.src;                            // убрали связь — снять и обратную ссылку
+  P.breakers=null;dirty();draw();}
+function auxByTag(tag){tag=(tag||'').trim();if(!tag)return null;return (P.aux||[]).filter(function(x){return (x.tag||x.name)===tag;})[0]||null;}
+/* «чем питается» (вход): ввод/шина · автомат QF · другой аппарат (каскад) · выход контроллера (управление) */
+function auxSrcEditor(a){
+  var cur=a.src||'';
+  var h='<div style="display:flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 6px;background:var(--graphite);min-width:170px">';
+  h+='<span style="color:var(--violet);font-size:11px;white-space:nowrap">чем питается</span>';
+  h+='<select title="источник: ввод/шина · автомат · другой аппарат (каскад) · выход контроллера" style="background:transparent;border:none;color:var(--cyan);font-size:12px;outline:none;cursor:pointer;max-width:150px" onchange="editAuxSetSrc(\''+a.id+'\',this.value)">'+auxSrcOptions(a,cur)+'</select>';
+  if(cur)h+='<button class="rm" title="очистить" onclick="editAuxSetSrc(\''+a.id+'\',\'\')">✕</button>';
+  h+='</div>';
+  return h;
+}
+function auxSrcOptions(a,cur){
+  var o='<option value="">'+(cur?('● '+esc(cur)):'— чем питается —')+'</option>';
+  o+='<optgroup label="Силовая"><option value="ВВОД">Ввод / шина L1·L2·L3</option>';
+  (P.breakers||[]).forEach(function(b){ if(b.role==='ввод'||b.role==='цепи управления')return; o+='<option value="'+esc(b.code)+'">'+esc(b.code+' · '+(b.role||''))+'</option>'; });
+  o+='</optgroup>';
+  var others=(P.aux||[]).filter(function(x){return x!==a&&auxSwitches(x.kind);});
+  if(others.length){o+='<optgroup label="Аппарат (каскад)">';others.forEach(function(x){o+='<option value="'+esc(x.tag||x.name)+'">'+esc((x.tag||'')+' · '+(x.name||auxKindLabel(x.kind)))+'</option>';});o+='</optgroup>';}
+  var io=P.controller&&P.controller.io, pins=[];
+  if(io&&io.asg)Object.keys(io.asg).forEach(function(pid){ if(io.asg[pid]===(a.tag||a.name))pins.push(pid); });   // вывод, назначенный на этот аппарат
+  if(io&&io.asg)Object.keys(io.asg).forEach(function(pid){ if(pins.indexOf(pid)<0)pins.push(pid); });
+  if(pins.length){o+='<optgroup label="Контроллер (управление)">';pins.forEach(function(pid){o+='<option value="'+esc(pid)+'">'+esc(pid+' · '+(io.asg[pid]||''))+'</option>';});o+='</optgroup>';}
+  return o;
+}
+function editAuxSetSrc(id,v){
+  var a=P.aux.filter(function(x){return x.id===id})[0];if(!a)return;v=(v||'').trim();
+  var old=a.src||'';                                                       // снять старую обратную связь, если питался от аппарата
+  if(old){var po=auxByTag(old); if(po&&po!==a&&auxSwitches(po.kind)){var t=a.tag||a.name, i=auxTargets(po).indexOf(t); if(i>=0){auxTargets(po).splice(i,1);auxTargetsSync(po);}}}
+  if(v)a.src=v; else delete a.src;
+  if(v){var pn=auxByTag(v); if(pn&&pn!==a&&auxSwitches(pn.kind)){var tt=a.tag||a.name; if(auxTargets(pn).indexOf(tt)<0){auxTargets(pn).push(tt);auxTargetsSync(pn);}}}  // источник-аппарат → отразить в его «что дальше» (двусторонний граф)
+  P.breakers=null;dirty();draw();
+}
 function auxTargetsEditor(a,mode){
   var feed=(mode==='feed');
   var tg=auxTargets(a),h='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 6px;background:var(--graphite);min-width:200px">';

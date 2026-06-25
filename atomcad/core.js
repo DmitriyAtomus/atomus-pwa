@@ -32,15 +32,25 @@ function auxSym2(k){return ({button:'sb_no',estop:'sb_nc',switch:'sb_no',relay:'
 // граф «что коммутирует / что дальше»: цель аппарата — нагрузка ИЛИ другой аппарат (каскад KM→ТР→нагрузка)
 function _auxBy(P){ var m={}; (P&&P.aux||[]).forEach(function(a){ if(a.tag)m[a.tag]=a; if(a.name&&!m[a.name])m[a.name]=a; }); return m; }
 function _auxTg(a){ return Array.isArray(a.targets)?a.targets:(a.target?String(a.target).split(/\s*,\s*/):[]); }
+function _isSwitch(k){ return k==='contactor'||k==='relay'||k==='ssr'; }
+// «дети» аппарата в графе = его targets ∪ аппараты, которые объявили его своим источником (src).
+// Так цепочку можно строить с любого конца: «что он питает» (targets) ИЛИ «чем питается» (src) у соседа.
+function _kids(a,P){ var out=_auxTg(a).slice(), tag=a.tag||a.name;
+  (P&&P.aux||[]).forEach(function(x){ if(x===a||!tag)return; if(x.src&&x.src===tag){ var t=x.tag||x.name; if(t&&out.indexOf(t)<0)out.push(t); } });
+  return out; }
 // конечные нагрузки аппарата — разворачивая цепочку через промежуточные аппараты (с защитой от циклов)
-function _auxLeaves(a,by,seen){
+function _auxLeaves(a,by,P,seen){
   seen=seen||{}; var key=a.tag||a.name; if(key){ if(seen[key])return []; seen[key]=1; }
-  var out=[]; _auxTg(a).forEach(function(t){ t=(t||'').trim(); if(!t)return; var nx=by[t];
-    if(nx&&nx!==a){ out=out.concat(_auxLeaves(nx,by,seen)); } else { out.push(t); } });
+  var out=[]; _kids(a,P).forEach(function(t){ t=(t||'').trim(); if(!t)return; var nx=by[t];
+    if(nx&&nx!==a){ out=out.concat(_auxLeaves(nx,by,P,seen)); } else { out.push(t); } });
   return out;
 }
 // имя нагрузки → обозначение аппарата данного рода (через каскад)
-function _coverByKind(P,kind,def){ var s={}, by=_auxBy(P); (P&&P.aux||[]).forEach(function(a){ if(a.kind!==kind)return; var tag=a.tag||def; _auxLeaves(a,by).forEach(function(t){ if(t&&!s[t])s[t]=tag; }); }); return s; }
+function _coverByKind(P,kind,def){ var s={}, by=_auxBy(P); (P&&P.aux||[]).forEach(function(a){ if(a.kind!==kind)return; var tag=a.tag||def; _auxLeaves(a,by,P).forEach(function(t){ if(t&&!s[t])s[t]=tag; }); }); return s; }
+// «чем питается» аппарат — подпись источника по src: '' если не задан или это вход контроллера (управление, не питание)
+function auxFeedLabel(P,a){ var s=a&&a.src||''; if(!s)return ''; if(/^[AD][IO]\d+$/i.test(s))return ''; if(/^(ввод|шина|bus|__bus__)$/i.test(s))return 'ввод'; return s; }
+// непосредственный коммутатор перед нагрузкой ('' = напрямую): аппарат, у которого нагрузка стоит прямым targets
+function consumerFeed(P,name){ var hit=''; (P&&P.aux||[]).forEach(function(a){ if(!_isSwitch(a.kind))return; if(_auxTg(a).indexOf(name)>=0)hit=a.tag||a.name; }); return hit; }
 // нагрузки за магнитным пускателем (контактором); через «что коммутирует» с учётом каскада
 function auxCoverSet(P){ return _coverByKind(P,'contactor','KM'); }
 function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение аппарата
@@ -290,7 +300,8 @@ function buildSchematic(P){
     if(fitL>=380){ step=Math.min(720,fitL); maxX=2240; }                  // мало колонок — уводим их левее основной надписи, чтобы не заходили
     else { var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(380,Math.floor(fit)); }  // много колонок — раскладываем шире (без наложения аппаратов)
   }
-  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, psuN=1, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P);
+  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, psuN=1, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P), apBy1=_auxBy(P);
+  function _feedNote(tag,x,y){ var a=apBy1[tag], l=a?auxFeedLabel(P,a):''; if(l)pt.push({x:x-86,y:y,s:18,ls:0,anchor:'end',tx:'← '+l}); }   // «чем питается» из графа (src), если задано явно
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
     var _w0=pw.length;                                                                  // запомним, какие провода добавит эта группа — потом раскрасим по фазе
@@ -334,12 +345,14 @@ function buildSchematic(P){
       if(cons&&needsContactor(cons)&&relTag){
         var rpole=(covPole[relTag]=(covPole[relTag]||0)+1);                                // какой контакт реле уходит на эту нагрузку
         pc.push(C(relTag,'c_no',x,1450,'','',cons.name)); kmBot=1600;                      // контакт промежуточного реле (вместо контактора)
+        _feedNote(relTag,x,1425);
         pt.push({x:x+24,y:1500,s:17,ls:0,anchor:'start',tx:String(rpole)});                // общий контакт (1/2/3)
         pt.push({x:x+24,y:1590,s:17,ls:0,anchor:'start',tx:String(rpole+6)});              // НО-контакт (7/8/9)
         if(!(cons.name in kmByName)) kmByName[cons.name]=relTag;
       } else if(cons&&needsContactor(cons)&&covTag){
         var pole=(covPole[covTag]=(covPole[covTag]||0)+1);                                 // какой по счёту полюс общего контактора уходит на эту нагрузку
         pc.push(C(covTag,'kmp1',x,1450,'',' ',cons.name)); kmBot=1780;                     // общий контактор — один полюс на нагрузку (тот же KM, разнесённо)
+        _feedNote(covTag,x,1425);
         pt.push({x:x+24,y:1545,s:17,ls:0,anchor:'start',tx:(2*pole-1)+'/L'+pole});         // маркировка ввода полюса (1/L1, 3/L2, 5/L3…)
         pt.push({x:x+24,y:1685,s:17,ls:0,anchor:'start',tx:(2*pole)+'/T'+pole});           // маркировка выхода полюса (2/T1, 4/T2, 6/T3…)
         if(!(cons.name in kmByName)) kmByName[cons.name]=covTag;
@@ -355,6 +368,7 @@ function buildSchematic(P){
         var sy=kmBot+120;                                                                // твердотельное реле сразу под контактором
         pw.push(W([x,kmBot],[x,sy]));
         pc.push(C(ssrTag,'ssr',x,sy,'','','ТР рег. напряжения · 0-10В'));                 // вход L1 сверху, выход T1 снизу, управление 0-10В
+        _feedNote(ssrTag,x,sy-22);
         pt.push({x:x-150,y:sy+170,s:18,ls:0,anchor:'end',tx:'0-10В ← AO'});               // подсказка по управлению
         termY=sy+440; wnY=sy+360;
         var _tw=W([x,sy+300],[x,termY]); _tw.sec=brSec; pw.push(_tw);                     // выход ТР → клемма (до верхнего пина)
@@ -454,7 +468,7 @@ function buildSchematic(P){
       var apx=apBy[p.lab];                                                     // аппарат, назначенный на этот выход
       var km=(apx&&(apx.kind==='contactor'||apx.kind==='relay'))?apx.tag:kmByName[p.lab];
       var tr=(apx&&apx.kind==='ssr')?apx.tag:_ssr[p.lab];
-      var olab=apx?((_auxLeaves(apx,apBy).join(', '))||apx.name||p.lab):p.lab; // что в итоге коммутирует (для подписи)
+      var olab=apx?((_auxLeaves(apx,apBy,P).join(', '))||apx.name||p.lab):p.lab; // что в итоге коммутирует (для подписи)
       var oSec=((p.g==='DO'&&km)||(p.g==='AO'&&tr))?1.5:0.75;                  // катушка/ТР — 1,5; сигнал — 0,75
       var ow=W([rpx,py],[chx,py]); ow.sec=oSec;
       at.push({x:chx-22,y:py-14,s:20,ls:0,anchor:'end',tx:'W'+wN}); wN++;      // номер провода выходной цепи
@@ -497,6 +511,7 @@ g.AtomCore={
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
   buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,
   auxCoverSet:auxCoverSet, coveredByAux:coveredByAux, relaySet:relaySet, ssrSet:ssrSet,
+  consumerFeed:consumerFeed, auxFeedLabel:auxFeedLabel,
   isLV:isLV, lvSupplies:lvSupplies
 };
 })(typeof window!=='undefined'?window:global);
