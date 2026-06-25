@@ -306,18 +306,22 @@ function fits(p,n){return n==='tr'?!!p.tr:n==='dry'?!!p.dry:true}
 function nextFree(g,n){var io=P.controller.io,a=io.pins[g]||[];for(var i=0;i<a.length;i++)if(!io.asg[a[i].id]&&fits(a[i],n))return a[i].id;return null}
 function ioAdd(it){var s=nextFree(it.g,it.need);if(!s){toast('Нет свободных '+it.g);return}ask('Занять вход/выход?','Посадить «'+it.lbl+'» на '+s+'?',function(){P.controller.io.asg[s]=it.lbl;dirty();draw();toast(it.lbl+' → '+s)})}
 function ioFree(id){var io=P.controller.io;if(!io.asg[id])return;var l=io.asg[id];ask('Снять назначение?','Освободить '+id+' («'+l+'»)?',function(){delete io.asg[id];(P.aux||[]).forEach(function(a){if(a.src===id)delete a.src;if(a.signalTo===id)delete a.signalTo;});dirty();draw();toast('Освобождён '+id)})}
-function ioClick(id,g){var io=P.controller.io;if(io.asg[id])return ioFree(id);var pin=(io.pins[g]||[]).filter(function(p){return p.id===id})[0]||{};openChooser('Что подключить на '+id,ioCandidates(g,pin),function(v){ioAssignPin(id,v);});}
-/* выбор сделан в модалке: аппарат (KM/KL/ТР), «создать», нагрузка напрямую или вручную */
-function ioAssignPin(id,v){var io=P.controller.io;
+function ioClick(id,g){var io=P.controller.io;if(io.asg[id])return ioFree(id);var pin=(io.pins[g]||[]).filter(function(p){return p.id===id})[0]||{};openChooser('Что подключить на '+id,ioCandidates(g,pin),function(v){ioAssignPin(id,v,g);});}
+/* выбор сделан в модалке: аппарат (KM/KL/ТР/SA/SB), «создать», нагрузка/датчик напрямую или вручную.
+   Выход (DO/AO) → у аппарата src=пин («кто включает»); вход (DI) → signalTo=пин («куда идёт сигнал»). */
+function ioAssignPin(id,v,g){var io=P.controller.io;
   if(v==='__manual__'){var nm=prompt('Что подключаем на '+id+'?');if(!nm)return;io.asg[id]=nm;}
-  else if(v==='__new_contactor__'||v==='__new_relay__'||v==='__new_ssr__'){
-    var kind=v.replace('__new_','').replace('__','');
-    var na={id:uid('a'),name:auxKindLabel(kind),kind:kind,manu:auxCat(kind).manu||'',model:auxCat(kind).model||'',tag:auxTagFor(kind),a:0,qty:1,targets:[],src:id};
+  else if(/^__new_/.test(v)){
+    var kind=v.replace('__new_','').replace(/__$/,'');
+    var na={id:uid('a'),name:auxKindLabel(kind),kind:kind,manu:auxCat(kind).manu||'',model:auxCat(kind).model||'',tag:auxTagFor(kind),a:0,qty:1};
+    if(g==='DI'&&auxSignals(kind)){na.signalTo=id;} else {na.targets=[];na.src=id;}
     P.aux.push(na);P.breakers=null;io.asg[id]=na.tag;dirty();draw();
-    toast('Создан '+na.tag+' — на шаге «Вспомогат.» укажи «что дальше»');return;
+    toast('Создан '+na.tag+(g==='DI'&&auxSignals(kind)?(' — сигнал → '+id):' — на шаге «Вспомогат.» укажи «что дальше»'));return;
   }
-  else if(v&&v.charAt(0)==='@'){var ex=(P.aux||[]).filter(function(x){return x.id===v.slice(1)})[0];if(!ex)return;ex.src=id;io.asg[id]=ex.tag;}
-  else io.asg[id]=v;                                            // нагрузка напрямую / имя
+  else if(v&&v.charAt(0)==='@'){var ex=(P.aux||[]).filter(function(x){return x.id===v.slice(1)})[0];if(!ex)return;
+    if(g==='DI'){ if(ex.signalTo==='__term__')rmSignalTerminals(ex); else if(ex.signalTo&&io.asg[ex.signalTo]===ex.tag)delete io.asg[ex.signalTo]; ex.signalTo=id; } else { ex.src=id; }
+    io.asg[id]=ex.tag;}
+  else io.asg[id]=v;                                            // нагрузка/датчик напрямую / имя
   dirty();draw();toast((io.asg[id]||'')+' → '+id);
 }
 function ioCandidates(g,pin){var L=[];
@@ -333,7 +337,13 @@ function ioCandidates(g,pin){var L=[];
     P.sensors.filter(function(s){return /0–10/.test(s.sig)}).forEach(function(s){L.push({label:s.name,value:s.name,tag:'AO'})});
   }
   else if(g==='AI'){P.sensors.forEach(function(s){var tr=/4–20|0–10/.test(s.sig);if(tr&&!pin.tr)return;L.push({label:s.name+' · '+s.sig,value:s.name,tag:'AI'})});}
-  else if(g==='DI'){P.sensors.filter(function(s){return /дискрет/.test(s.sig)}).forEach(function(s){L.push({label:s.name,value:s.name,tag:'DI'})});}
+  else if(g==='DI'){
+    (P.aux||[]).filter(function(a){return auxSignals(a.kind);}).forEach(function(a){L.push({label:(a.tag||'')+' · '+(a.name||auxKindLabel(a.kind)),value:'@'+a.id,tag:'DI'});});
+    P.sensors.filter(function(s){return /дискрет/.test(s.sig)}).forEach(function(s){L.push({label:s.name,value:s.name,tag:'DI'})});
+    L.push({label:'➕ Переключатель (создать)',value:'__new_switch__'});
+    L.push({label:'➕ Кнопка (создать)',value:'__new_button__'});
+    L.push({label:'➕ Грибок аварийный (создать)',value:'__new_estop__'});
+  }
   L.push({label:'Другое (вручную)…',value:'__manual__'});return L;}
 function pController(){
   ensureControllers();
