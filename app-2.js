@@ -850,7 +850,7 @@ function renderHomeSkeleton() {
 
   // ============ ЭТАП 25.0: блоки только для мобилки ============
   // Они показываются ТОЛЬКО когда .app.mobile-layout (через inline CSS у обёртки)
-  html += '<div class="m25-mobile-only" style="margin: 0 -18px 0;">';
+  html += '<div class="m25-mobile-only">';
   // Недельный календарь
   html += '<div class="week-cal25">';
   html += '<div class="week-cal25-head">';

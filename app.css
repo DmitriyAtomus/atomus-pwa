@@ -13272,7 +13272,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-xl-25);
     padding: 12px 8px 8px;
-    margin: 0 18px 8px;   /* v2.45.173: 18px в обёртке -18px = 14px от края, в ряд с остальным */
+    margin: 0 14px 8px;   /* 14px от края — в ряд с приветствием и карточками */
     box-shadow: var(--shadow-sm-25);
   }
   .week-cal25-head {
@@ -13942,11 +13942,13 @@
   }
   /* Внутри m25-mobile-only — без отрицательного margin */
   .m25-mobile-only .kpi-strip { margin: 0; padding: 0 14px 8px; }
-  /* v2.45.173: единый левый край 14px для всего блока главной (обёртка имеет
-     margin:0 -18px, поэтому внутренние отступы = 18px дают 14px от края экрана).
-     Так заголовок секции, календарь и карточки выровнены друг с другом. */
-  .m25-mobile-only .qa25-section-label { margin-left: 18px; margin-right: 18px; }
-  .m25-mobile-only .qa25-grid { padding: 0 18px; }
+  /* Единый левый/правый край 14px для всего блока главной — в ряд с
+     приветствием. Раньше обёртка имела margin:0 -18px (full-bleed) и
+     внутренние отступы 18px, но родитель #home-content на мобиле без
+     горизонтального padding, из-за чего обёртка вылезала за правый край
+     экрана. Теперь без отрицательного margin, отступы напрямую 14px. */
+  .m25-mobile-only .qa25-section-label { margin-left: 14px; margin-right: 14px; }
+  .m25-mobile-only .qa25-grid { padding: 0 14px; }
 
   /* ЭТАП 25.1: на мобиле скрываем десктопные блоки production dashboard
      (они заменены мобильными m25-блоками выше) */
