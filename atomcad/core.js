@@ -36,7 +36,7 @@ function _isSwitch(k){ return k==='contactor'||k==='relay'||k==='ssr'; }
 // «дети» аппарата в графе = его targets ∪ аппараты, которые объявили его своим источником (src).
 // Так цепочку можно строить с любого конца: «что он питает» (targets) ИЛИ «чем питается» (src) у соседа.
 function _kids(a,P){ var out=_auxTg(a).slice(), tag=a.tag||a.name;
-  (P&&P.aux||[]).forEach(function(x){ if(x===a||!tag)return; if(x.src&&x.src===tag){ var t=x.tag||x.name; if(t&&out.indexOf(t)<0)out.push(t); } });
+  (P&&P.aux||[]).forEach(function(x){ if(x===a||!tag)return; var f=x.feed||x.src; if(f&&f===tag){ var t=x.tag||x.name; if(t&&out.indexOf(t)<0)out.push(t); } });   // ребёнок-каскад — кто питается силой от этого аппарата
   return out; }
 // конечные нагрузки аппарата — разворачивая цепочку через промежуточные аппараты (с защитой от циклов)
 function _auxLeaves(a,by,P,seen){
@@ -47,8 +47,8 @@ function _auxLeaves(a,by,P,seen){
 }
 // имя нагрузки → обозначение аппарата данного рода (через каскад)
 function _coverByKind(P,kind,def){ var s={}, by=_auxBy(P); (P&&P.aux||[]).forEach(function(a){ if(a.kind!==kind)return; var tag=a.tag||def; _auxLeaves(a,by,P).forEach(function(t){ if(t&&!s[t])s[t]=tag; }); }); return s; }
-// «чем питается» аппарат — подпись источника по src: '' если не задан или это вход контроллера (управление, не питание)
-function auxFeedLabel(P,a){ var s=a&&a.src||''; if(!s)return ''; if(/^[AD][IO]\d+$/i.test(s))return ''; if(/^(ввод|шина|bus|__bus__)$/i.test(s))return 'ввод'; return s; }
+// «сила ←» аппарат — подпись силового источника по feed (автомат/ввод/каскад); '' если не задан
+function auxFeedLabel(P,a){ var s=a&&(a.feed||a.src)||''; if(!s)return ''; if(/^[AD][IO]\d+$/i.test(s))return ''; if(/^(ввод|шина|bus|__bus__)$/i.test(s))return 'ввод'; return s; }
 // непосредственный коммутатор перед нагрузкой ('' = напрямую): аппарат, у которого нагрузка стоит прямым targets
 function consumerFeed(P,name){ var hit=''; (P&&P.aux||[]).forEach(function(a){ if(!_isSwitch(a.kind))return; if(_auxTg(a).indexOf(name)>=0)hit=a.tag||a.name; }); return hit; }
 // нагрузки за магнитным пускателем (контактором); через «что коммутирует» с учётом каскада
