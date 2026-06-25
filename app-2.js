@@ -5431,6 +5431,30 @@ function _bomStageOptionsHtml(selectedId) {
   return opts;
 }
 
+// v2.45.x: клик по чипу этапа в строке BOM — выбрать существующий или СОЗДАТЬ новый
+// (переиспользуем openStagePicker: там есть поле «свой этап» + кнопка «+»).
+async function openBomStagePicker(bomId) {
+  const stages = (typeof _loadWorkStages === 'function') ? await _loadWorkStages() : await _ensureWorkStages();
+  openStagePicker({
+    title: 'Этап производства для позиции',
+    stages,
+    onPick: async (stageId) => {
+      try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const r = await fetch(API_BASE + '/api/bom/' + bomId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ stage_id: stageId || null }),
+        });
+        if (!r.ok) { showToast('Не удалось сохранить этап', 'error'); return; }
+        cache._workStages = null;  // мог появиться новый этап — обновим кэш выпадашки
+        if (state._currentBomModelId) await loadModelBom(state._currentBomModelId);
+        showToast(stageId ? 'Этап задан' : 'Этап убран', 'success');
+      } catch (e) { showToast('Ошибка', 'error'); }
+    },
+  });
+}
+
 async function loadModelBom(modelId) {
   const container = document.getElementById('bom-list');
   if (!container) return;
@@ -5494,6 +5518,12 @@ async function loadModelBom(modelId) {
         : (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '');
       // v2.45.28: открываем редактор по bom_id — данные тянем из state, без эскейпинга
       const editCall = 'openBomEditItemById(' + it.id + ')';
+      // v2.45.x: чип этапа прямо в строке — клик задаёт/меняет/создаёт этап
+      const stageChip = canManageSales()
+        ? '<button class="bom-stage-chip' + (it.stage_id ? ' set' : '') + '" onclick="openBomStagePicker(' + it.id + ')" title="Этап производства — нажми, чтобы выбрать или создать">' +
+            '<i class="ti ti-arrow-badge-right"></i>' + (it.stage_id ? escapeHtml(it.stage_name || 'этап') : 'этап') +
+          '</button>'
+        : (it.stage_id ? '<span class="bom-stage-chip set"><i class="ti ti-arrow-badge-right"></i>' + escapeHtml(it.stage_name || 'этап') + '</span>' : '');
       return '<div class="bom-row">' +
         '<div class="bom-row-main">' +
           '<div class="bom-name">' +
@@ -5503,7 +5533,7 @@ async function loadModelBom(modelId) {
             stockBadge +
           '</div>' +
           '<div class="bom-meta">' +
-            categoryPart +
+            categoryPart + stageChip +
             (it.comment ? ' · ' + escapeHtml(it.comment) : '') +
           '</div>' +
         '</div>' +
