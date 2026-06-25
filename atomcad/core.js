@@ -449,8 +449,8 @@ function buildSchematic(P){
     var inA=[], outA=[];
     G.left.forEach(function(p,i){ if(p.lab) inA.push({p:p,i:i}); });
     G.right.forEach(function(p,i){ if(p.lab) outA.push({p:p,i:i}); });
-    var inX=lpx-560, comX=inX-220, outX=rpx+560, nX=outX+220;
-    var usedL=[], usedR=[], inBy=_auxBy(P);
+    var inX=lpx-560, comX=inX-220, outX=rpx+560, nX=outX+220, gX=nX+170;
+    var usedL=[], usedN=[], usedG=[], inBy=_auxBy(P);   // usedN — возвраты катушек на N (230В); usedG — общий управления ТР на 0В/GND
     // ВХОДЫ слева: датчик/клемма на своём уровне, провод подведён зигзагом
     inA.forEach(function(o,k){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, isT=(p.g==='AI'), chx=lpx-130-k*40;
@@ -471,29 +471,35 @@ function buildSchematic(P){
       var km=(apx&&(apx.kind==='contactor'||apx.kind==='relay'))?apx.tag:kmByName[p.lab];
       var tr=(apx&&apx.kind==='ssr')?apx.tag:_ssr[p.lab];
       var olab=apx?((_auxLeaves(apx,apBy,P).join(', '))||apx.name||p.lab):p.lab; // что в итоге коммутирует (для подписи)
-      var oSec=((p.g==='DO'&&km)||(p.g==='AO'&&tr))?1.5:0.75;                  // катушка/ТР — 1,5; сигнал — 0,75
+      var isCoil=(p.g==='DO'&&km), isTr=(p.g==='AO'&&tr);
+      var oSec=isCoil?1.5:0.75;                                                // катушка — 1,5; управление ТР 0-10В / сигнал — 0,75
       var ow=W([rpx,py],[chx,py]); ow.sec=oSec;
       at.push({x:chx-22,y:py-14,s:20,ls:0,anchor:'end',tx:'W'+wN}); wN++;      // номер провода выходной цепи
-      if(p.g==='DO' && km){
-        // DO → катушка KM/KL (силовой контакт — на л.1)
+      if(isCoil){
+        // DO → катушка KM/KL: A1 ← выход контроллера (L через реле DO), A2 → N (230В)
         ac.push(shortC(km,'coil',outX,devY,'катушка','',olab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
-        aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);
+        aw.push(W([outX,devY+150],[nX,devY+150])); usedN.push(devY+150);       // возврат катушки → шина N
         at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'(л.1)'});   // ссылка на контакт (компактно, слева)
-      } else if(p.g==='AO' && tr){
-        // AO → вход управления ТР 0-10В (силовой контакт ТР — на л.1)
-        ac.push(shortC(tr,'coil',outX,devY,'управление 0-10В','',olab));
+      } else if(isTr){
+        // AO → управление ТР 0-10В: «+» ← AOn (сигнал), «−» → 0В/GND (общий аналоговый, НЕ нейтраль)
+        ac.push(shortC(tr,'coil',outX,devY,'упр. 0-10В','',olab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
-        aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);       // 0В (общий) — на правую шину
-        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'0-10В · ТР (л.1)'});
+        aw.push(W([outX,devY+150],[gX,devY+150])); usedG.push(devY+150);       // общий ТР → шина 0В/GND
+        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'0-10В · GND · ТР (л.1)'});
       } else {
         ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
       }
     });
     if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); aw.push(W([comX,l0],[comX,l1])); at.push({x:comX-30,y:l0-26,s:24,ls:0,anchor:'end',tx:'общий / 0В'}); }
-    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,ls:0,anchor:'start',tx:'N · 0В'});
-      if(feed24&&cq){ aw.push(W([nX,320],[nX,r0])); }   // QF6 (230В) → шина N катушек/ламп
+    // шина N (230В) — возвраты катушек контакторов/реле; питается от автомата цепей управления (QF)
+    if(usedN.length){ var n0=Math.min.apply(null,usedN), n1=Math.max.apply(null,usedN); aw.push(W([nX,n0],[nX,n1])); at.push({x:nX+24,y:n0-26,s:24,ls:0,anchor:'start',tx:'N · 230В'});
+      if(feed24&&cq){ aw.push(W([nX,320],[nX,n0])); }   // QF (230В) → шина N катушек/ламп
+    }
+    // шина 0В · GND — общий аналогового управления ТР (0-10В), привязан к 0В контроллера (НЕ нейтраль)
+    if(usedG.length){ var q0=Math.min.apply(null,usedG), q1=Math.max.apply(null,usedG); aw.push(W([gX,q0],[gX,q1])); at.push({x:gX+24,y:q0-26,s:24,ls:0,anchor:'start',tx:'0В · GND'});
+      at.push({x:gX+24,y:q1+44,s:18,ls:0,anchor:'start',tx:'→ 0В контроллера'});
     }
     var hlN=1;
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
