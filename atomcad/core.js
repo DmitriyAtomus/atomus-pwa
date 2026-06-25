@@ -450,11 +450,13 @@ function buildSchematic(P){
     G.left.forEach(function(p,i){ if(p.lab) inA.push({p:p,i:i}); });
     G.right.forEach(function(p,i){ if(p.lab) outA.push({p:p,i:i}); });
     var inX=lpx-560, comX=inX-220, outX=rpx+560, nX=outX+220;
-    var usedL=[], usedR=[];
+    var usedL=[], usedR=[], inBy=_auxBy(P);
     // ВХОДЫ слева: датчик/клемма на своём уровне, провод подведён зигзагом
     inA.forEach(function(o,k){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, isT=(p.g==='AI'), chx=lpx-130-k*40;
-      ac.push(shortC('BT'+(k+1), isT?'ntc':'term', inX, devY, isT?'NTC':'', '', p.lab));
+      var inAp=(p.g==='DI')?inBy[p.lab]:null;                                  // DI назначен на сигнальный аппарат (переключатель/кнопка/грибок)?
+      if(inAp){ ac.push(shortC(inAp.tag||p.lab, auxSym2(inAp.kind), inX, devY, '', '', inAp.name||p.lab)); }
+      else ac.push(shortC(isT?('BT'+(k+1)):('XI'+(k+1)), isT?'ntc':'term', inX, devY, isT?'NTC':'', '', p.lab));
       var iw=W([lpx,py],[chx,py]); iw.sec=0.75; aw.push(iw);                    // сигнальная цепь — 0,75 мм²
       aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[inX,devY]));
       at.push({x:chx+22,y:py-14,s:20,ls:0,anchor:'start',tx:'W'+wN}); wN++;     // номер провода входной цепи
