@@ -418,20 +418,27 @@ function buildSchematic(P){
     });
     // ВЫХОДЫ справа: катушка контактора / клемма
     outA.forEach(function(o,k){
-      var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, km=kmByName[p.lab], chx=rpx+130+k*40;
+      var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, km=kmByName[p.lab], tr=_ssr[p.lab], chx=rpx+130+k*40;
       at.push({x:chx-22,y:py-14,s:22,ls:0,anchor:'end',tx:''+(21+k)});        // номер цепи выхода
       if(p.g==='DO' && km){
-        ac.push(shortC(km,'coil',outX,devY,'катушка контактора','',p.lab));
+        // DO → катушка KM/KL (силовой контакт — на л.1)
+        ac.push(shortC(km,'coil',outX,devY,'катушка','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);
         at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'(л.1)'});   // ссылка на контакт (компактно, слева)
+      } else if(p.g==='AO' && tr){
+        // AO → вход управления ТР 0-10В (силовой контакт ТР — на л.1)
+        ac.push(shortC(tr,'coil',outX,devY,'управление 0-10В','',p.lab));
+        aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
+        aw.push(W([outX,devY+150],[nX,devY+150])); usedR.push(devY+150);       // 0В (общий) — на правую шину
+        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'0-10В · ТР (л.1)'});
       } else {
         ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
         aw.push(W([rpx,py],[chx,py])); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
       }
     });
     if(usedL.length){ var l0=Math.min.apply(null,usedL), l1=Math.max.apply(null,usedL); aw.push(W([comX,l0],[comX,l1])); at.push({x:comX-30,y:l0-26,s:24,ls:0,anchor:'end',tx:'общий / 0В'}); }
-    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,ls:0,anchor:'start',tx:'N'}); }
+    if(usedR.length){ var r0=Math.min.apply(null,usedR), r1=Math.max.apply(null,usedR); aw.push(W([nX,r0],[nX,r1])); at.push({x:nX+24,y:r0-26,s:24,ls:0,anchor:'start',tx:'N · 0В'}); }
     var hlN=1;
     (P.aux||[]).forEach(function(a){ if(a.kind==='lamp'){ var q=a.qty||1; for(var k=0;k<q;k++){ var x=cz-200+(hlN-1)*280; ac.push(C(a.tag||('HL'+hlN),'hl',x,520,a.model||'230 В','',a.name)); hlN++; } } });
     sheets.push({title:'цепи управления', comps:ac, wires:aw, texts:at});
