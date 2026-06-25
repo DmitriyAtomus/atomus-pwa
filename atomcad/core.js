@@ -486,7 +486,7 @@ function buildSchematic(P){
         ac.push(shortC(tr,'coil',outX,devY,'упр. 0-10В','',olab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[gX,devY+150])); usedG.push(devY+150);       // общий ТР → шина 0В/GND
-        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'0-10В · GND · ТР (л.1)'});
+        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'(л.1)'});   // кросс-ссылка на силовой контакт ТР; «0-10В/GND» — на шине и в описании
       } else {
         ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
@@ -517,7 +517,38 @@ function buildSchematic(P){
   return {sheets:sheets, comps:pc, wires:pw, texts:pt};
 }
 
+// ───────── авто-проверка оформления листов (наложения подписей, выход за рамку) ─────────
+// грубая оценка габарита надписи: ширина ≈ длина·кегль·0.58 (кириллица/латиница в тех. шрифте), высота ≈ кегль
+function _txtBox(t){
+  var s=t.s||24, w=String(t.tx||'').length*s*0.58, a=t.anchor||'start', x0;
+  if(a==='middle')x0=t.x-w/2; else if(a==='end')x0=t.x-w; else x0=t.x;
+  return {x0:x0, x1:x0+w, y0:t.y-s*0.82, y1:t.y+s*0.22, t:t};
+}
+function _ovFrac(a,b){
+  var ox=Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0), oy=Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0);
+  if(ox<=0||oy<=0)return 0;
+  var fx=ox/Math.min(a.x1-a.x0,b.x1-b.x0), fy=oy/Math.min(a.y1-a.y0,b.y1-b.y0);
+  return Math.min(fx,1)*Math.min(fy,1);
+}
+function lintSheet(sh){
+  var issues=[], T=(sh.texts||[]).filter(function(t){return t.tx&&String(t.tx).trim();});
+  var B=T.map(_txtBox);
+  for(var i=0;i<B.length;i++)for(var j=i+1;j<B.length;j++){
+    if(_ovFrac(B[i],B[j])>=0.30){                                  // существенное перекрытие надписей
+      issues.push({type:'overlap', a:String(B[i].t.tx), b:String(B[j].t.tx), at:[Math.round(B[i].t.x),Math.round(B[i].t.y)]});
+    }
+  }
+  var M=30;                                                         // выход за край листа (paper edge)
+  B.forEach(function(b){ if(b.x0<M||b.x1>SHEET_W-M||b.y0<M||b.y1>SHEET_H-M){
+    issues.push({type:'out-of-frame', tx:String(b.t.tx), at:[Math.round(b.t.x),Math.round(b.t.y)]});
+  }});
+  return issues;
+}
+// прогон линтера по собранной схеме проекта → [{title, issues:[…]}]
+function lint(P){ var r=buildSchematic(P), out=[]; r.sheets.forEach(function(sh){ out.push({title:sh.title, issues:lintSheet(sh)}); }); return out; }
+
 g.AtomCore={
+  lint:lint, lintSheet:lintSheet,
   STD:STD, consumerCurrent:consumerCurrent, stdRating:stdRating, ratingFor:ratingFor,
   buildBreakers:buildBreakers, controlCurrent:controlCurrent, breakerSum:breakerSum, breakerStatus:breakerStatus,
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,

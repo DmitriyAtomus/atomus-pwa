@@ -1993,8 +1993,14 @@ function openEditor(force){
   if(typeof sortAux==='function')sortAux();   // нормализуем обозначения аппаратов (K→KM и т.п.) перед построением схемы
   // если на сервере есть сохранённая (отредактированная) схема — открываем её; «↻ Заново» строит из мастера
   var sch=(!force && P.schematic && P.schematic.sheets && P.schematic.sheets.length) ? P.schematic : C.buildSchematic(P);
+  // авто-проверка оформления: наложения подписей / выход за рамку (сразу, без визуального просмотра)
+  var warn='';
+  try{ if(C.lintSheet && sch && sch.sheets){ var nIss=0, det=[];
+    sch.sheets.forEach(function(s){ var is=C.lintSheet(s); nIss+=is.length; is.forEach(function(x){det.push((s.title||'лист')+': '+(x.type==='overlap'?('«'+x.a+'» ↔ «'+x.b+'»'):('за рамкой «'+x.tx+'»')));}); });
+    if(nIss){ warn=' · ⚠ оформление: '+nIss; if(window.console&&console.warn)console.warn('AtomCAD lint — нарушений: '+nIss+'\n'+det.join('\n')); }
+  } }catch(_){}
   try{parent.postMessage({atomcad:'build-open', name:P.name, code:'АГ.'+P.section+'.'+('00'+P.num).slice(-3)+'/26', schematic:sch},'*');}catch(_){}
-  toast((!force && P.schematic) ? 'Открываю сохранённую схему' : 'Схема построена — открываю редактор');
+  toast(((!force && P.schematic) ? 'Открываю сохранённую схему' : 'Схема построена — открываю редактор')+warn);
 }
 /* редактор сохранил схему (через мост index.html) → кладём в проект и сохраняем на сервере */
 window.addEventListener('message',function(ev){
