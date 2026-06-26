@@ -12983,6 +12983,16 @@
   .app.mobile-layout .top-bar .hamburger-btn {
     flex-shrink: 0;
   }
+  /* Сбрасываем десктопный margin-right:8px у кнопок-колокольчиков в шапке —
+     иначе у последней (колокольчик) справа оставалась пустая синяя полоса
+     8px + 14px padding, из-за чего казалось, что шапка «не доходит» до края.
+     Теперь отступы между иконками ровные (gap), а справа чистые 14px. */
+  .app.mobile-layout .top-bar .notif-btn { margin-right: 0; }
+
+  /* Страховка от горизонтальной прокрутки на мобиле: страница никогда не
+     шире вьюпорта. overflow-x:clip (не hidden!) не создаёт скролл-контейнер
+     и не ломает sticky-шапку. */
+  .app.mobile-layout { overflow-x: clip; }
 
   /* ===== СКРЫВАЕМ СТАРЫЕ TAB-BAR НА МОБИЛЕ ===== */
   .app.mobile-layout #tab-bar-production,

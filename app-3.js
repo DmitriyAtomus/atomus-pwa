@@ -9011,8 +9011,8 @@ function renderSupplyOrderDetail(o) {
         tsEvents.map(e =>
           '<div style="display:flex;align-items:center;gap:10px;font-size:13px;">' +
             '<i class="ti ti-' + e.icon + '" style="color:var(--brand);width:18px;text-align:center;"></i>' +
-            '<div style="min-width:170px;color:var(--text-mid);">' + escapeHtml(e.label) + '</div>' +
-            '<div style="color:var(--text-light);font-variant-numeric:tabular-nums;">' + escapeHtml(_fmtSupOrdTs(e.ts)) + '</div>' +
+            '<div style="flex:1;min-width:0;color:var(--text-mid);">' + escapeHtml(e.label) + '</div>' +
+            '<div style="color:var(--text-light);font-variant-numeric:tabular-nums;white-space:nowrap;">' + escapeHtml(_fmtSupOrdTs(e.ts)) + '</div>' +
           '</div>'
         ).join('') +
       '</div>' +
