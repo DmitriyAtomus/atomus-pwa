@@ -13901,7 +13901,15 @@
 
   /* Блоки на Главной, видимые только на мобилке */
   .m25-mobile-only { display: none; }
-  .app.mobile-layout .m25-mobile-only { display: block; }
+  .app.mobile-layout .m25-mobile-only {
+    display: block;
+    /* Никаких боковых margin у обёртки. !important — чтобы перебить даже
+       старый инлайновый margin:0 -18px из закэшированного app-2.js, если он
+       обновится позже CSS (иначе блок уезжает влево). Отступы задают сами
+       дети — ровно 14px с обеих сторон, в один край с приветствием. */
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
 
   /* ===== Базовый KPI-strip (горизонтальный скролл) ===== */
   .kpi-strip {
