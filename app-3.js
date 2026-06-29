@@ -5547,7 +5547,10 @@ function _componentToTracking(it, group) {
     item_name: it.component_name,
     contract_number: projects,
     contract_id: null,
-    qty: it.recommended_qty,
+    // «Ждём поставку» = уже заказано: показываем фактически ЗАКАЗАННОЕ кол-во
+    // (ordered_qty из позиции заказа, его меняют в превью письма), а не потребность
+    // recommended_qty. Фолбэк на потребность, если связи с заказом нет.
+    qty: (it.ordered_qty != null && it.ordered_qty !== '' ? it.ordered_qty : it.recommended_qty),
     unit: it.unit,
     order_status: it.order_status,
     order_label: it.order_label,
