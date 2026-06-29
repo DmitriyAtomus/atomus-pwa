@@ -8281,6 +8281,20 @@ function payerEntityPill(pe, withName) {
     escapeHtml(label) + '</span>';
 }
 
+// Заметный бейдж «MAX» для счетов, пришедших через мессенджер MAX (а не почту).
+// Источник бэкенд помечает from_addr="max:<id>" + folder="MAX" + ai_data.source="max".
+function isFromMax(m) {
+  m = m || {};
+  return /^max:/i.test(m.from_addr || '') || m.folder === 'MAX' ||
+    ((m.ai_data || {}).source === 'max');
+}
+function maxSourcePill(m) {
+  if (!isFromMax(m)) return '';
+  return '<span class="sup-status-pill" style="background:linear-gradient(135deg,#6D28D9,#4F46E5);' +
+    'color:#fff;font-weight:700;letter-spacing:.3px;box-shadow:0 1px 4px rgba(79,70,229,.45);" ' +
+    'title="Счёт пришёл через мессенджер MAX"><i class="ti ti-message-2"></i> MAX</span>';
+}
+
 function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
@@ -8312,7 +8326,7 @@ function renderSupplyInbox() {
     html += '<div class="sup-row">' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) +
+          maxSourcePill(m) + labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -8424,7 +8438,7 @@ async function openInboxMessage(inboxId) {
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + labelPill + statusPill + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
           '<div style="color:var(--text-light);">От:</div><div>' + fromLine + '</div>' +
           '<div style="color:var(--text-light);">Получено:</div><div style="font-variant-numeric:tabular-nums;">' + escapeHtml(received) + '</div>' +
