@@ -8894,24 +8894,25 @@ async function _payInvSubmit() {
 // ====== МАСТЕР «ОФОРМИТЬ ЗАКАЗ» (v2.45.x) ======
 // Удобное ручное оформление: поставщик → номенклатура (поиск + список) →
 // корзина с кол-вом → телефон для связи + подпись → создать / создать и отправить.
-let _owz = { list: [], me: null };
+let _owz = { list: [], me: null, openCats: {}, custom: 0 };
 
 async function openNewSupplyOrder() {
   if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
-  // Грузим параллельно: поставщиков, номенклатуру, профиль (для телефона/подписи)
-  const [supRes, itemsRes, meRes] = await Promise.all([
+  // Грузим параллельно: поставщиков, каталог комплектующих (как на производстве),
+  // профиль (для телефона/подписи).
+  const [supRes, compRes, meRes] = await Promise.all([
     (cache.suppliers ? Promise.resolve({ suppliers: cache.suppliers })
                      : apiGet('/api/suppliers').catch(() => ({ suppliers: [] }))),
-    (cache.supplyCatalog ? Promise.resolve({ items: cache.supplyCatalog })
-                         : apiGet('/api/supply-items').catch(() => ({ items: [] }))),
+    (cache.components ? Promise.resolve({ components: cache.components })
+                      : apiGet('/api/components').catch(() => ({ components: [] }))),
     (cache.me ? Promise.resolve(cache.me) : apiGet('/api/me').catch(() => null)),
   ]);
   cache.suppliers = supRes.suppliers || [];
-  cache.supplyCatalog = itemsRes.items || [];
+  cache.components = compRes.components || [];
   if (meRes) cache.me = meRes;
   if (!cache.suppliers.length) { showToast('Сначала добавьте хотя бы одного поставщика', 'error'); return; }
 
-  _owz = { list: [], me: cache.me || {} };
+  _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0 };
   const me = _owz.me;
   const signName = (me.full_name || me.short_name || '').trim();
   const signPos = (me.position || '').trim();
@@ -8936,7 +8937,7 @@ async function openNewSupplyOrder() {
         // Номенклатура
         '<label style="font-weight:600;font-size:13px;display:block;margin:4px 0 6px;">Номенклатура комплектующих</label>' +
         '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
-          '<input id="owz-search" type="search" placeholder="Поиск по названию…" oninput="_owzRenderCatalog(this.value)" ' +
+          '<input id="owz-search" type="search" placeholder="Поиск по названию или артикулу…" oninput="_owzRenderCatalog(this.value)" ' +
             'style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
           '<button class="btn btn-secondary btn-small" onclick="_owzNewItem()" title="Добавить новую позицию в номенклатуру"><i class="ti ti-plus"></i> Новая</button>' +
         '</div>' +
@@ -8981,75 +8982,68 @@ function _owzSupplierHint() {
   if (hint) hint.textContent = parts.join('   ') || 'Контакты не заполнены — письмо отправить не получится';
 }
 
-// Схлопываем одинаковые названия в одну строку (номенклатура часто засорена
-// дублями, авто-созданными из спецификаций договоров). Под каждым уникальным
-// названием держим все id — чтобы удалить разом.
-function _owzCatalogDedup() {
-  const map = new Map();
-  (cache.supplyCatalog || []).forEach(it => {
-    const nm = (it.name || '').trim();
-    const key = nm.toLowerCase();
-    if (!key) return;
-    if (!map.has(key)) map.set(key, { id: it.id, name: nm, unit: it.unit || 'шт.', ids: [it.id] });
-    else map.get(key).ids.push(it.id);
-  });
-  _owz._cat = {};
-  const arr = [];
-  map.forEach(v => { _owz._cat[v.id] = v; arr.push(v); });
-  return arr;
-}
-
+// Каталог комплектующих — как на производстве: группы по категориям,
+// сворачиваемые, с поиском. Источник — /api/components.
 function _owzRenderCatalog(filter) {
   const box = document.getElementById('owz-catalog');
   if (!box) return;
   const q = (filter || '').trim().toLowerCase();
-  let items = _owzCatalogDedup();
-  if (q) items = items.filter(it => it.name.toLowerCase().includes(q));
-  if (!items.length) {
+  let comps = cache.components || [];
+  if (q) comps = comps.filter(c =>
+    (c.name || '').toLowerCase().includes(q) || (c.sku || '').toLowerCase().includes(q));
+  if (!comps.length) {
     box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-light);font-size:13px;">' +
-      (q ? 'Ничего не найдено. Можно создать «Новая».' : 'Номенклатура пуста.') + '</div>';
+      (q ? 'Ничего не найдено. Можно добавить кнопкой «Новая».' : 'Каталог комплектующих пуст.') + '</div>';
     return;
   }
-  const chosen = new Set(_owz.list.map(x => x.id));
-  box.innerHTML = items.slice(0, 400).map(it => {
-    const inCart = chosen.has(it.id);
-    const dup = it.ids.length > 1 ? '<span class="owz-cat-dup" title="Одинаковых записей: ' + it.ids.length + '">×' + it.ids.length + '</span>' : '';
-    return '<div class="owz-cat-row' + (inCart ? ' in' : '') + '">' +
-      '<div class="owz-cat-name" onclick="_owzAdd(' + it.id + ')">' + escapeHtml(it.name) +
-        '<span class="owz-cat-unit">' + escapeHtml(it.unit) + '</span>' + dup + '</div>' +
-      '<button class="owz-cat-del" onclick="event.stopPropagation();_owzDeleteItem(' + it.id + ')" title="Удалить из номенклатуры"><i class="ti ti-trash"></i></button>' +
-      '<i class="ti ' + (inCart ? 'ti-check' : 'ti-plus') + '" onclick="_owzAdd(' + it.id + ')"></i>' +
+  const chosen = new Set(_owz.list.map(x => x.cid).filter(v => v != null));
+  // Группируем по категории, как BOM-пикер на производстве
+  const groups = {};
+  comps.forEach(c => { const cat = c.category_name || 'Без категории'; (groups[cat] = groups[cat] || []).push(c); });
+  const cats = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ru'));
+  const allOpen = !!q;
+  box.innerHTML = cats.map(cat => {
+    const isOpen = allOpen || !!_owz.openCats[cat];
+    const items = groups[cat];
+    const rows = items.map(c => {
+      const inCart = chosen.has(c.id);
+      const meta = [];
+      if (c.sku) meta.push(escapeHtml(c.sku));
+      meta.push('остаток: ' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.'));
+      if (c.default_supplier_name) meta.push(escapeHtml(c.default_supplier_name));
+      return '<button type="button" class="bom-picker-item' + (inCart ? ' owz-in' : '') + '" onclick="_owzAdd(' + c.id + ')">' +
+        '<div class="bom-picker-item-name">' + escapeHtml(c.name || '—') +
+          (inCart ? ' <i class="ti ti-check" style="color:#059669;"></i>' : '') + '</div>' +
+        '<div class="bom-picker-item-meta">' + meta.join(' · ') + '</div>' +
+      '</button>';
+    }).join('');
+    return '<div class="bom-picker-group">' +
+      '<button type="button" class="bom-picker-toggle' + (isOpen ? ' open' : '') + '" ' +
+        'onclick="_owzToggleCat(' + JSON.stringify(cat).replace(/"/g, '&quot;') + ')">' +
+        '<i class="ti ti-chevron-right bom-picker-chev"></i>' +
+        '<span>' + escapeHtml(cat) + '</span>' +
+        '<span class="bom-picker-count">' + items.length + '</span>' +
+      '</button>' +
+      '<div class="bom-picker-body"' + (isOpen ? '' : ' style="display:none;"') + '>' + rows + '</div>' +
     '</div>';
   }).join('');
 }
 
-async function _owzDeleteItem(repId) {
-  const entry = _owz._cat && _owz._cat[repId];
-  if (!entry) return;
-  const n = entry.ids.length;
-  if (!confirm('Удалить «' + entry.name + '» из номенклатуры' +
-      (n > 1 ? ' (вместе с ' + (n - 1) + ' дубликатами)' : '') +
-      '?\nПозиция скроется из справочника снабжения.')) return;
-  let ok = 0;
-  for (const id of entry.ids) {
-    try { await apiDelete('/api/supply-items/' + id); ok++; } catch (e) {}
-  }
-  const idset = new Set(entry.ids);
-  cache.supplyCatalog = (cache.supplyCatalog || []).filter(it => !idset.has(it.id));
-  _owz.list = _owz.list.filter(x => !idset.has(x.id));
-  _owzRenderCatalog(document.getElementById('owz-search').value);
-  _owzRenderCart();
-  showToast(ok ? 'Удалено из номенклатуры' : 'Не удалось удалить', ok ? 'success' : 'error');
+function _owzToggleCat(cat) {
+  const inp = document.getElementById('owz-search');
+  if (inp && inp.value.trim()) return; // при активном поиске все группы раскрыты
+  _owz.openCats[cat] = !_owz.openCats[cat];
+  _owzRenderCatalog(inp ? inp.value : '');
 }
 
-function _owzAdd(itemId) {
-  const it = (cache.supplyCatalog || []).find(x => x.id === itemId);
-  if (!it) return;
-  const ex = _owz.list.find(x => x.id === itemId);
-  if (ex) { ex.qty = +(ex.qty + 1).toFixed(3); }
-  else _owz.list.push({ id: it.id, name: it.name, unit: it.unit || 'шт.', qty: 1 });
+function _owzAdd(cid) {
+  const c = (cache.components || []).find(x => x.id === cid);
+  if (!c) return;
+  const ex = _owz.list.find(x => x.cid === cid);
+  if (ex) ex.qty = +(ex.qty + 1).toFixed(3);
+  else _owz.list.push({ id: cid, cid: cid, name: c.name, unit: c.unit || 'шт.', qty: 1 });
   _owzRenderCart();
-  _owzRenderCatalog(document.getElementById('owz-search').value);
+  _owzRenderCatalog((document.getElementById('owz-search') || {}).value || '');
 }
 
 function _owzSetQty(itemId, val) {
@@ -9085,27 +9079,23 @@ function _owzRenderCart() {
   ).join('');
 }
 
-async function _owzNewItem() {
-  const name = (prompt('Название новой позиции номенклатуры:') || '').trim();
+// «Новая» — позиции нет в каталоге: добавляем свободной строкой прямо в заказ
+// (в каталог комплектующих не лезем). При создании заказа бэкенд приведёт её
+// к номенклатуре снабжения по названию.
+function _owzNewItem() {
+  const name = (prompt('Название позиции (свободный ввод):') || '').trim();
   if (!name) return;
   const unit = (prompt('Единица измерения (шт., м, компл. …):', 'шт.') || 'шт.').trim() || 'шт.';
-  try {
-    const r = await apiPost('/api/supply-items', { name, unit, kind: 'material' });
-    const created = r && r.data;
-    if (!created || !created.id) { showToast((created && created.message) || 'Не удалось создать', 'error'); return; }
-    cache.supplyCatalog = cache.supplyCatalog || [];
-    cache.supplyCatalog.unshift({ id: created.id, name: created.name || name, unit: created.unit || unit, kind: 'material' });
-    _owzAdd(created.id);
-    showToast('Позиция добавлена в номенклатуру', 'success');
-    document.getElementById('owz-search').value = '';
-    _owzRenderCatalog('');
-  } catch (e) { showToast('Ошибка', 'error'); }
+  const id = -(++_owz.custom);   // отрицательный id — кастомная строка
+  _owz.list.push({ id: id, cid: null, name: name, unit: unit, qty: 1 });
+  _owzRenderCart();
+  showToast('Позиция добавлена в заказ', 'success');
 }
 
 async function submitOrderWizard(send) {
   const supplierId = parseInt(document.getElementById('owz-supplier').value || '0') || null;
   if (!supplierId) { showToast('Выберите поставщика', 'error'); return; }
-  const items = _owz.list.filter(x => x.qty > 0).map(x => ({ item_id: x.id, qty: x.qty }));
+  const items = _owz.list.filter(x => x.qty > 0).map(x => ({ name: x.name, unit: x.unit, qty: x.qty }));
   if (!items.length) { showToast('Добавьте хотя бы одну позицию с количеством', 'error'); return; }
   const payload = {
     supplier_id: supplierId,
