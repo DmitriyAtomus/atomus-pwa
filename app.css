@@ -18653,3 +18653,48 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .pwd-resume-acts { width: 100%; }
   .pwd-resume-acts .btn { flex: 1; }
 }
+
+/* ====== Мастер «Оформить заказ» (v2.45.x) ====== */
+.owz-modal .modal-content { max-height: 78vh; overflow-y: auto; }
+.owz-catalog {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+}
+.owz-cat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 9px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.owz-cat-row:last-child { border-bottom: none; }
+.owz-cat-row:active { background: var(--brand-bg); }
+.owz-cat-row.in { background: #ECFDF5; }
+.owz-cat-row.in .ti { color: #059669; }
+.owz-cat-row .ti { color: var(--brand); font-size: 18px; flex-shrink: 0; }
+.owz-cat-name { font-size: 13.5px; color: var(--text-dark); line-height: 1.25; }
+.owz-cat-unit {
+  display: inline-block; margin-left: 8px; font-size: 11px;
+  color: var(--text-light); background: var(--bg);
+  border-radius: 5px; padding: 1px 6px;
+}
+.owz-cart { display: flex; flex-direction: column; gap: 6px; }
+.owz-cart-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg); border-radius: 8px; padding: 7px 10px;
+}
+.owz-cart-name { flex: 1; min-width: 0; font-size: 13.5px; color: var(--text-dark); }
+.owz-cart-qty {
+  width: 72px; flex-shrink: 0; text-align: center;
+  padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 7px; font-size: 14px; background: #fff;
+}
+.owz-cart-unit { flex-shrink: 0; font-size: 12px; color: var(--text-light); min-width: 34px; }
+.owz-cart-del {
+  flex-shrink: 0; border: none; background: none; cursor: pointer;
+  color: #B91C1C; width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.owz-cart-del:active { background: #FEE2E2; }

@@ -8740,7 +8740,7 @@ function openSupplyOrderAddMenu() {
       '</div>' +
       '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">' +
         '<button class="btn btn-primary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openNewSupplyOrder();">' +
-          '<i class="ti ti-file-plus"></i> Новый заказ поставщику</button>' +
+          '<i class="ti ti-clipboard-plus"></i> Оформить заказ</button>' +
         '<button class="btn btn-secondary" style="width:100%;justify-content:flex-start;gap:8px;" onclick="' + close + 'openUploadInvoiceToPay();">' +
           '<i class="ti ti-cloud-upload"></i> Загрузить счёт</button>' +
       '</div>' +
@@ -8851,49 +8851,197 @@ async function _payInvSubmit() {
   }
 }
 
+// ====== МАСТЕР «ОФОРМИТЬ ЗАКАЗ» (v2.45.x) ======
+// Удобное ручное оформление: поставщик → номенклатура (поиск + список) →
+// корзина с кол-вом → телефон для связи + подпись → создать / создать и отправить.
+let _owz = { list: [], me: null };
+
 async function openNewSupplyOrder() {
   if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
-  if (!cache.suppliers) {
-    try {
-      const d = await apiGet('/api/suppliers');
-      cache.suppliers = d.suppliers || [];
-    } catch (e) { cache.suppliers = []; }
-  }
-  if (!cache.suppliers.length) {
-    showToast('Сначала добавьте хотя бы одного поставщика', 'error');
-    return;
-  }
+  // Грузим параллельно: поставщиков, номенклатуру, профиль (для телефона/подписи)
+  const [supRes, itemsRes, meRes] = await Promise.all([
+    (cache.suppliers ? Promise.resolve({ suppliers: cache.suppliers })
+                     : apiGet('/api/suppliers').catch(() => ({ suppliers: [] }))),
+    (cache.supplyCatalog ? Promise.resolve({ items: cache.supplyCatalog })
+                         : apiGet('/api/supply-items').catch(() => ({ items: [] }))),
+    (cache.me ? Promise.resolve(cache.me) : apiGet('/api/me').catch(() => null)),
+  ]);
+  cache.suppliers = supRes.suppliers || [];
+  cache.supplyCatalog = itemsRes.items || [];
+  if (meRes) cache.me = meRes;
+  if (!cache.suppliers.length) { showToast('Сначала добавьте хотя бы одного поставщика', 'error'); return; }
+
+  _owz = { list: [], me: cache.me || {} };
+  const me = _owz.me;
+  const signName = (me.full_name || me.short_name || '').trim();
+  const signPos = (me.position || '').trim();
+  const phone = (me.phone || '').trim();
+
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    
-    '<div class="modal" onclick="event.stopPropagation()">' +
+    '<div class="modal owz-modal" onclick="event.stopPropagation()" style="max-width:640px;width:96vw;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-file-invoice"></i> Новый заказ поставщику</h3>' +
+        '<h3><i class="ti ti-clipboard-plus"></i> Оформить заказ</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
+        // Поставщик
         '<div class="form-group"><label>Поставщик *</label>' +
-          '<select id="so-supplier">' +
+          '<select id="owz-supplier" onchange="_owzSupplierHint()">' +
             '<option value="">— выбрать —</option>' +
-            cache.suppliers.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('') +
+            cache.suppliers.map(s => '<option value="' + s.id + '" data-email="' + escapeHtml(s.email || '') + '" data-phone="' + escapeHtml(s.phone || '') + '">' + escapeHtml(s.name) + '</option>').join('') +
           '</select>' +
+          '<div id="owz-sup-hint" style="font-size:12px;color:var(--text-light);margin-top:4px;"></div>' +
         '</div>' +
-        '<div class="form-group"><label>Ожидаемая дата приёмки</label><input type="date" id="so-expected"></div>' +
-        '<div class="form-group"><label>Комментарий</label><textarea id="so-comment" rows="3"></textarea></div>' +
-        '<div class="modal-actions"><button class="btn btn-primary" onclick="saveNewSupplyOrder()"><i class="ti ti-check"></i> Создать черновик</button></div>' +
-        '<div class="modal-note">После создания заказа добавьте в него позиции и отправьте поставщику.</div>' +
+        // Номенклатура
+        '<label style="font-weight:600;font-size:13px;display:block;margin:4px 0 6px;">Номенклатура комплектующих</label>' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
+          '<input id="owz-search" type="search" placeholder="Поиск по названию…" oninput="_owzRenderCatalog(this.value)" ' +
+            'style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
+          '<button class="btn btn-secondary btn-small" onclick="_owzNewItem()" title="Добавить новую позицию в номенклатуру"><i class="ti ti-plus"></i> Новая</button>' +
+        '</div>' +
+        '<div id="owz-catalog" class="owz-catalog"></div>' +
+        // Корзина
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;">' +
+          '<label style="font-weight:600;font-size:13px;">В заказе <span id="owz-cart-count" style="color:var(--text-light);font-weight:400;"></span></label>' +
+        '</div>' +
+        '<div id="owz-cart" class="owz-cart"></div>' +
+        // Доп. поля
+        '<div class="form-group" style="margin-top:12px;"><label>Ожидаемая дата приёмки</label><input type="date" id="owz-expected"></div>' +
+        '<div class="form-group"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно"></textarea></div>' +
+        '<div class="form-group"><label>Телефон для связи <span style="font-weight:400;color:var(--text-light);">(если нет позиции — позвонят сюда)</span></label>' +
+          '<input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …"></div>' +
+        // Подпись
+        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-mid);">' +
+          '<i class="ti ti-signature" style="color:var(--brand);"></i> Подпись: <b>' + (escapeHtml(signName) || '—') + '</b>' +
+          (signPos ? ' · ' + escapeHtml(signPos) : '') +
+          '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">Имя и должность подставляются из вашей карточки и уходят в письмо и документ.</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">' +
+          '<button class="btn btn-secondary" onclick="submitOrderWizard(false)"><i class="ti ti-device-floppy"></i> Сохранить черновик</button>' +
+          '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-send"></i> Создать и отправить</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  _owzRenderCatalog('');
+  _owzRenderCart();
 }
 
-async function saveNewSupplyOrder() {
+function _owzSupplierHint() {
+  const sel = document.getElementById('owz-supplier');
+  const opt = sel && sel.selectedOptions[0];
+  const hint = document.getElementById('owz-sup-hint');
+  if (!opt || !opt.value) { if (hint) hint.textContent = ''; return; }
+  const email = opt.getAttribute('data-email') || '';
+  const phone = opt.getAttribute('data-phone') || '';
+  const parts = [];
+  if (email) parts.push('✉ ' + email);
+  if (phone) parts.push('☎ ' + phone);
+  if (hint) hint.textContent = parts.join('   ') || 'Контакты не заполнены — письмо отправить не получится';
+}
+
+function _owzRenderCatalog(filter) {
+  const box = document.getElementById('owz-catalog');
+  if (!box) return;
+  const q = (filter || '').trim().toLowerCase();
+  let items = cache.supplyCatalog || [];
+  if (q) items = items.filter(it => (it.name || '').toLowerCase().includes(q));
+  if (!items.length) {
+    box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-light);font-size:13px;">' +
+      (q ? 'Ничего не найдено. Можно создать «Новая».' : 'Номенклатура пуста.') + '</div>';
+    return;
+  }
+  const chosen = new Set(_owz.list.map(x => x.id));
+  box.innerHTML = items.slice(0, 300).map(it => {
+    const inCart = chosen.has(it.id);
+    return '<div class="owz-cat-row' + (inCart ? ' in' : '') + '" onclick="_owzAdd(' + it.id + ')">' +
+      '<div class="owz-cat-name">' + escapeHtml(it.name) +
+        '<span class="owz-cat-unit">' + escapeHtml(it.unit || 'шт.') + '</span></div>' +
+      '<i class="ti ' + (inCart ? 'ti-check' : 'ti-plus') + '"></i>' +
+    '</div>';
+  }).join('');
+}
+
+function _owzAdd(itemId) {
+  const it = (cache.supplyCatalog || []).find(x => x.id === itemId);
+  if (!it) return;
+  const ex = _owz.list.find(x => x.id === itemId);
+  if (ex) { ex.qty = +(ex.qty + 1).toFixed(3); }
+  else _owz.list.push({ id: it.id, name: it.name, unit: it.unit || 'шт.', qty: 1 });
+  _owzRenderCart();
+  _owzRenderCatalog(document.getElementById('owz-search').value);
+}
+
+function _owzSetQty(itemId, val) {
+  const ex = _owz.list.find(x => x.id === itemId);
+  if (!ex) return;
+  const n = parseFloat(String(val).replace(',', '.'));
+  ex.qty = (isNaN(n) || n <= 0) ? 0 : n;
+}
+
+function _owzRemove(itemId) {
+  _owz.list = _owz.list.filter(x => x.id !== itemId);
+  _owzRenderCart();
+  _owzRenderCatalog(document.getElementById('owz-search').value);
+}
+
+function _owzRenderCart() {
+  const box = document.getElementById('owz-cart');
+  const cnt = document.getElementById('owz-cart-count');
+  if (!box) return;
+  if (cnt) cnt.textContent = _owz.list.length ? '· ' + _owz.list.length + ' поз.' : '';
+  if (!_owz.list.length) {
+    box.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-light);font-size:13px;border:1px dashed var(--border);border-radius:8px;">Нажимайте на позиции выше, чтобы добавить их в заказ</div>';
+    return;
+  }
+  box.innerHTML = _owz.list.map((x, i) =>
+    '<div class="owz-cart-row">' +
+      '<div class="owz-cart-name">' + (i + 1) + '. ' + escapeHtml(x.name) + '</div>' +
+      '<input class="owz-cart-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
+        'onchange="_owzSetQty(' + x.id + ', this.value)">' +
+      '<span class="owz-cart-unit">' + escapeHtml(x.unit) + '</span>' +
+      '<button class="owz-cart-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
+    '</div>'
+  ).join('');
+}
+
+async function _owzNewItem() {
+  const name = (prompt('Название новой позиции номенклатуры:') || '').trim();
+  if (!name) return;
+  const unit = (prompt('Единица измерения (шт., м, компл. …):', 'шт.') || 'шт.').trim() || 'шт.';
+  try {
+    const r = await apiPost('/api/supply-items', { name, unit, kind: 'material' });
+    const created = r && r.data;
+    if (!created || !created.id) { showToast((created && created.message) || 'Не удалось создать', 'error'); return; }
+    cache.supplyCatalog = cache.supplyCatalog || [];
+    cache.supplyCatalog.unshift({ id: created.id, name: created.name || name, unit: created.unit || unit, kind: 'material' });
+    _owzAdd(created.id);
+    showToast('Позиция добавлена в номенклатуру', 'success');
+    document.getElementById('owz-search').value = '';
+    _owzRenderCatalog('');
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+async function submitOrderWizard(send) {
+  const supplierId = parseInt(document.getElementById('owz-supplier').value || '0') || null;
+  if (!supplierId) { showToast('Выберите поставщика', 'error'); return; }
+  const items = _owz.list.filter(x => x.qty > 0).map(x => ({ item_id: x.id, qty: x.qty }));
+  if (!items.length) { showToast('Добавьте хотя бы одну позицию с количеством', 'error'); return; }
   const payload = {
-    supplier_id:   parseInt(document.getElementById('so-supplier').value || '0') || null,
-    expected_date: document.getElementById('so-expected').value || null,
-    comment:       document.getElementById('so-comment').value.trim(),
+    supplier_id: supplierId,
+    expected_date: document.getElementById('owz-expected').value || null,
+    comment: document.getElementById('owz-comment').value.trim(),
+    contact_phone: document.getElementById('owz-phone').value.trim(),
+    items,
   };
-  if (!payload.supplier_id) { showToast('Выберите поставщика', 'error'); return; }
+  if (send) {
+    const opt = document.getElementById('owz-supplier').selectedOptions[0];
+    if (!opt.getAttribute('data-email')) {
+      showToast('У поставщика не указан email — добавьте его, либо «Сохранить черновик»', 'error');
+      return;
+    }
+  }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders', {
@@ -8903,14 +9051,19 @@ async function saveNewSupplyOrder() {
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      showToast(d.message || 'Не удалось', 'error');
+      showToast(d.message || 'Не удалось создать заказ', 'error');
       return;
     }
     const created = await r.json();
-    showToast('Заказ #' + created.id + ' создан', 'success');
     closeSupplyModal();
     cache.supplyOrders = null;
     state.currentSupplyOrderId = created.id;
+    if (send) {
+      showToast('Заказ #' + created.id + ' создан, отправляем…', 'success');
+      await sendSupplyOrderByEmail(created.id);
+    } else {
+      showToast('Черновик заказа #' + created.id + ' создан', 'success');
+    }
     selectSidebarItem('supply-order-detail');
   } catch (e) {
     showToast('Ошибка', 'error');
@@ -8982,7 +9135,9 @@ function renderSupplyOrderDetail(o) {
 
   // Сведения о поставщике
   html += '<div class="detail-block">' +
-    '<div class="detail-block-title"><i class="ti ti-truck-loading"></i> Поставщик</div>' +
+    '<div class="detail-block-title"><i class="ti ti-truck-loading"></i> Поставщик' +
+      (o.supplier_id ? '<button class="btn btn-secondary btn-small" style="margin-left:auto;" onclick="openEditSupplier(' + o.supplier_id + ')"><i class="ti ti-mail"></i> Переписка</button>' : '') +
+    '</div>' +
     '<div class="detail-grid">' +
       '<div class="detail-item"><div class="detail-label">Название</div><div class="detail-value">' + escapeHtml(o.supplier_name) + '</div></div>' +
       (o.supplier_contact ? '<div class="detail-item"><div class="detail-label">Контакт</div><div class="detail-value">' + escapeHtml(o.supplier_contact) + '</div></div>' : '') +
