@@ -5365,6 +5365,16 @@ const _CP_ORDER_STATUS_RU = {
   cancelled:        ['Заказ отменён',         '#7F1D1D', '#FEE2E2'],
 };
 
+// Количество для показа в «Что закупить»: для ЗАКАЗАННЫХ позиций — фактически
+// заказанное (ordered_qty из позиции заказа, кол-во могли изменить в превью письма),
+// для «К заказу» — потребность (qty). Так «Ждём поставку» показывает то, что в счёте.
+function _cpDisplayQty(it) {
+  if (it.purchase_status === 'ordered' && it.ordered_qty != null && it.ordered_qty !== '') {
+    return it.ordered_qty;
+  }
+  return it.qty || 0;
+}
+
 function _cpRowHtml(it) {
   // v2.45.443: новый вид (карточка buy-item с галочкой/«К заказу») — под переключателем
   if (window.SUPPLY_SHOP_V2) {
@@ -5382,7 +5392,7 @@ function _cpRowHtml(it) {
         '<div class="sv2-buy-title">' + escapeHtml(it.item_name || '—') + '</div>' +
         '<div class="sv2-buy-meta">договор ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</div>' +
       '</div>' +
-      '<span class="sv2-buy-qty">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+      '<span class="sv2-buy-qty">' + _fmtQty(_cpDisplayQty(it)) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
       st2 +
       '<button type="button" class="sv2-buy-x" title="Отметить, что пришло (получено)" style="color:#15803D;" onclick="event.stopPropagation();_cpMarkReceived(' + it.id + ',' + sName2 + ')"><i class="ti ti-check"></i></button>' +
       '<button type="button" class="sv2-buy-x" title="Убрать из закупки (в договоре останется)" onclick="event.stopPropagation();_cpSkipItem(' + it.id + ',' + sName2 + ')"><i class="ti ti-x"></i></button>' +
@@ -5410,7 +5420,7 @@ function _cpRowHtml(it) {
       (it.nc_code ? ' <span style="font-family:monospace;font-size:11px;color:var(--text-light);">' + escapeHtml(it.nc_code) + '</span>' : '') +
       ' <span style="font-size:11px;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
     '</span>' +
-    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(_cpDisplayQty(it)) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
     stBadge +
     // Отметить, что пришло (получено) — уйдёт из «Что закупить»
     '<button type="button" title="Отметить, что пришло (получено)" ' +
