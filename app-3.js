@@ -5365,6 +5365,16 @@ const _CP_ORDER_STATUS_RU = {
   cancelled:        ['Заказ отменён',         '#7F1D1D', '#FEE2E2'],
 };
 
+// Количество для показа в «Что закупить»: для ЗАКАЗАННЫХ позиций — фактически
+// заказанное (ordered_qty из позиции заказа, кол-во могли изменить в превью письма),
+// для «К заказу» — потребность (qty). Так «Ждём поставку» показывает то, что в счёте.
+function _cpDisplayQty(it) {
+  if (it.purchase_status === 'ordered' && it.ordered_qty != null && it.ordered_qty !== '') {
+    return it.ordered_qty;
+  }
+  return it.qty || 0;
+}
+
 function _cpRowHtml(it) {
   // v2.45.443: новый вид (карточка buy-item с галочкой/«К заказу») — под переключателем
   if (window.SUPPLY_SHOP_V2) {
@@ -5382,7 +5392,7 @@ function _cpRowHtml(it) {
         '<div class="sv2-buy-title">' + escapeHtml(it.item_name || '—') + '</div>' +
         '<div class="sv2-buy-meta">договор ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</div>' +
       '</div>' +
-      '<span class="sv2-buy-qty">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+      '<span class="sv2-buy-qty">' + _fmtQty(_cpDisplayQty(it)) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
       st2 +
       '<button type="button" class="sv2-buy-x" title="Отметить, что пришло (получено)" style="color:#15803D;" onclick="event.stopPropagation();_cpMarkReceived(' + it.id + ',' + sName2 + ')"><i class="ti ti-check"></i></button>' +
       '<button type="button" class="sv2-buy-x" title="Убрать из закупки (в договоре останется)" onclick="event.stopPropagation();_cpSkipItem(' + it.id + ',' + sName2 + ')"><i class="ti ti-x"></i></button>' +
@@ -5410,7 +5420,7 @@ function _cpRowHtml(it) {
       (it.nc_code ? ' <span style="font-family:monospace;font-size:11px;color:var(--text-light);">' + escapeHtml(it.nc_code) + '</span>' : '') +
       ' <span style="font-size:11px;color:var(--text-light);">· дог. ' + escapeHtml(it.contract_number || ('#' + it.contract_id)) + '</span>' +
     '</span>' +
-    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(it.qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
+    '<span style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap;">' + _fmtQty(_cpDisplayQty(it)) + ' ' + escapeHtml(it.unit || 'шт.') + '</span>' +
     stBadge +
     // Отметить, что пришло (получено) — уйдёт из «Что закупить»
     '<button type="button" title="Отметить, что пришло (получено)" ' +
@@ -8281,6 +8291,33 @@ function payerEntityPill(pe, withName) {
     escapeHtml(label) + '</span>';
 }
 
+// Заметный бейдж «MAX» для счетов, пришедших через мессенджер MAX (а не почту).
+// Источник бэкенд помечает from_addr="max:<id>" + folder="MAX" + ai_data.source="max".
+function isFromMax(m) {
+  m = m || {};
+  return /^max:/i.test(m.from_addr || '') || m.folder === 'MAX' ||
+    ((m.ai_data || {}).source === 'max');
+}
+function maxSourcePill(m) {
+  if (!isFromMax(m)) return '';
+  return '<span class="sup-status-pill" style="background:linear-gradient(135deg,#6D28D9,#4F46E5);' +
+    'color:#fff;font-weight:700;letter-spacing:.3px;box-shadow:0 1px 4px rgba(79,70,229,.45);" ' +
+    'title="Счёт пришёл через мессенджер MAX"><i class="ti ti-message-2"></i> MAX</span>';
+}
+
+// Чип стадии ОПЛАТЫ привязанного заказа — чтобы во «Входящих» сразу было видно:
+// Новый (счёт пришёл, ещё не на оплате) / На оплате / Оплачен.
+function orderPayStatusPill(m) {
+  if (!m || !m.matched_order_id) return '';
+  var s = m.matched_order_status || '';
+  var label, bg, fg, ic;
+  if (s === 'paid' || s === 'received' || s === 'partial') { label = 'Оплачен'; bg = '#DCFCE7'; fg = '#166534'; ic = '✅'; }
+  else if (s === 'to_pay') { label = 'На оплате'; bg = '#FFEDD5'; fg = '#C2410C'; ic = '💸'; }
+  else if (s === 'cancelled') { label = 'Отменён'; bg = '#F1F5F9'; fg = '#64748B'; ic = '✖'; }
+  else { label = 'Новый'; bg = '#DBEAFE'; fg = '#1E40AF'; ic = '🆕'; }
+  return '<span class="sup-status-pill" style="background:' + bg + ';color:' + fg + ';font-weight:700;">' + ic + ' ' + label + '</span>';
+}
+
 function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
@@ -8312,7 +8349,7 @@ function renderSupplyInbox() {
     html += '<div class="sup-row">' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) +
+          maxSourcePill(m) + labelHtml + statusHtml + orderPayStatusPill(m) + payerEntityPill((m.ai_data || {}).payer_entity, false) +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -8424,7 +8461,7 @@ async function openInboxMessage(inboxId) {
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + labelPill + statusPill + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + orderPayStatusPill(msg) + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
           '<div style="color:var(--text-light);">От:</div><div>' + fromLine + '</div>' +
           '<div style="color:var(--text-light);">Получено:</div><div style="font-variant-numeric:tabular-nums;">' + escapeHtml(received) + '</div>' +
