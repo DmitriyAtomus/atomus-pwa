@@ -5596,8 +5596,9 @@ function _cpTrackingBlockHtml(ordered) {
     if (g.phone) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
       (g.id ? 'onclick="openEditSupplier(' + g.id + ')" title="Открыть карточку поставщика"' : 'disabled') +
       '><i class="ti ti-phone"></i> ' + escapeHtml(g.phone) + '</button>');
-    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px 2px;">' +
-      '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--text-dark);"><i class="ti ti-truck" style="color:var(--brand);"></i> ' +
+    h += '<div class="sup-track-head" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 14px 4px;">' +
+      _supAvatarHtml(g.name, !g.id) +
+      '<span style="flex:1;font-size:13.5px;font-weight:800;color:var(--text-dark);min-width:120px;">' +
       escapeHtml(g.name || '(поставщик не назначен)') + '</span>' +
       contactBtns.join('') +
     '</div>';
@@ -5699,9 +5700,9 @@ function _cpTrackingRowHtml(it) {
       'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
       '<i class="ti ti-circle-check"></i> Отметить, что пришло</button>';
   }
-  return '<div style="padding:9px 14px;border-bottom:1px dashed var(--border);">' +
+  return '<div class="sup-track-row" style="padding:11px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;">' +
       qtyChip +
       ageBadge +
       stBadge +
@@ -5709,6 +5710,7 @@ function _cpTrackingRowHtml(it) {
       receivedBtn +
       returnBtn +
     '</div>' +
+    _supDeliveryStepperHtml(it.order_status) +
   '</div>';
 }
 
@@ -6017,6 +6019,45 @@ function _shopApplyLocal(items) {
   return { items: out, hiddenCount };
 }
 
+// v2.45.x: редизайн «Что закупить» — KPI-строка, табы, аватары поставщиков, степпер доставки
+function _supInitials(name) {
+  const w = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return '—';
+  if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
+  return (w[0][0] + w[1][0]).toUpperCase();
+}
+function _supAvatarHtml(name, warn) {
+  if (warn) return '<span class="sup-ava warn">?</span>';
+  return '<span class="sup-ava">' + escapeHtml(_supInitials(name)) + '</span>';
+}
+function _supKpiCard(icon, cls, num, lbl) {
+  return '<div class="sup-kpi ' + cls + '"><div class="sup-kpi-ic"><i class="ti ti-' + icon + '"></i></div>' +
+    '<div><div class="sup-kpi-num">' + num + '</div><div class="sup-kpi-lbl">' + escapeHtml(lbl) + '</div></div></div>';
+}
+function supSwitchTab(t) {
+  window._supTab = t;
+  document.querySelectorAll('#sup-shop-content .sup-pane').forEach(p => { p.hidden = (p.dataset.pane !== t); });
+  document.querySelectorAll('#sup-shop-content .sup-seg button').forEach(b => { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
+}
+// Степпер доставки: Заказан → Оплачен → В пути → На складе (по статусу заказа)
+function _supDeliveryStepperHtml(orderStatus) {
+  let done = 1, now = 1, lbl0 = 'Заказан';
+  switch (orderStatus) {
+    case 'draft': done = 0; now = 0; lbl0 = 'Заказ создан'; break;
+    case 'sent': case 'awaiting_invoice': case 'invoice_received': case 'to_pay': done = 1; now = 1; break;
+    case 'paid': case 'partial': done = 2; now = 2; break;
+    case 'received': done = 4; now = 4; break;
+  }
+  const labels = [lbl0, 'Оплачен', 'В пути', 'На складе'];
+  let h = '<div class="sup-steps">';
+  for (let i = 0; i < 4; i++) {
+    if (i > 0) h += '<span class="sup-step-line' + (i <= done ? ' done' : '') + '"></span>';
+    const cls = i < done ? 'done' : (i === now ? 'now' : '');
+    h += '<span class="sup-step ' + cls + '"><span class="dot">' + (i < done ? '✓' : '') + '</span>' + escapeHtml(labels[i]) + '</span>';
+  }
+  return h + '</div>';
+}
+
 function renderSupplyShopping(d) {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
@@ -6051,14 +6092,26 @@ function renderSupplyShopping(d) {
         '<button class="btn btn-secondary btn-sm" onclick="shopUnhideAll()"><i class="ti ti-eye"></i>Показать все</button>' +
       '</div>'
     : '';
-  if (!visibleGroups.length) {
-    container.innerHTML = cpBlock + waitingBlock + hiddenToolbar + '<div class="empty-block" style="padding: 32px 16px;">' +
-      '<i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
-      '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">' +
-        (totalHidden > 0 ? 'Все оставшиеся позиции скрыты вами вручную.' : 'Всё в норме — низкого остатка и дефицита не обнаружено.') +
-      '</div></div>';
-    return;
-  }
+  // v2.45.x: KPI-строка одним взглядом
+  const _pendCp = cpItems.filter(x => x.purchase_status !== 'ordered').length;
+  const _lowCnt = visibleGroups.reduce((s, g) => s + (g.items_count || 0), 0);
+  const buyCount = _pendCp + _lowCnt;
+  const waitCount = waitingItems.length;
+  const _today = new Date().toISOString().slice(0, 10);
+  const longWait = waitingItems.filter(it => { const dd = _daysSince(it.ordered_at); return dd !== null && dd >= 14; }).length;
+  const arriveToday = waitingItems.filter(it => it.order_expected && String(it.order_expected).slice(0, 10) === _today).length;
+  const kpiStrip = '<div class="sup-kpis">' +
+    _supKpiCard('shopping-cart', 'brand', buyCount, 'К закупке') +
+    _supKpiCard('truck-delivery', 'blue', waitCount, 'Ждём поставку') +
+    _supKpiCard('clock-exclamation', 'red', longWait, 'Долго ждём (&gt;14дн)') +
+    _supKpiCard('calendar-check', 'green', arriveToday, 'Сегодня на складе') +
+  '</div>';
+  // Табы: К закупке / Ждём поставку
+  const tab = (window._supTab === 'wait') ? 'wait' : 'buy';
+  const segTabs = '<div class="sup-seg">' +
+    '<button data-tab="buy" class="' + (tab === 'buy' ? 'on' : '') + '" onclick="supSwitchTab(\'buy\')"><i class="ti ti-shopping-cart"></i> К закупке <span class="cnt">' + buyCount + '</span></button>' +
+    '<button data-tab="wait" class="' + (tab === 'wait' ? 'on' : '') + '" onclick="supSwitchTab(\'wait\')"><i class="ti ti-truck-delivery"></i> Ждём поставку <span class="cnt">' + waitCount + '</span></button>' +
+  '</div>';
   // v2.45.442: переключатель нового/старого вида «Что закупить» (для отката)
   const v2Toggle = '<div class="sv2-toggle-bar">' +
       '<span><i class="ti ti-' + (window.SUPPLY_SHOP_V2 ? 'sparkles' : 'history') + '"></i> ' +
@@ -6067,7 +6120,7 @@ function renderSupplyShopping(d) {
         (window.SUPPLY_SHOP_V2 ? 'Вернуть старый' : 'Включить новый') +
       '</button>' +
     '</div>';
-  let html = v2Toggle + cpBlock + waitingBlock + hiddenToolbar;
+  let groupsHtml = '';
   // v2.44.35: selection state для bulk-assign в группе «не назначен»
   if (!window._noSupSelected) window._noSupSelected = new Set();
   // Чистим невалидные id (если строка ушла после прошлого назначения)
@@ -6208,10 +6261,10 @@ function renderSupplyShopping(d) {
       '</div>';
     }).join('');
 
-    html += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
+    groupsHtml += '<div class="sup-shop-group' + (noSupplier ? ' no-supplier' : '') + '">' +
       '<div class="sup-shop-group-head">' +
         '<div class="sup-shop-group-name">' +
-          '<i class="ti ti-truck"></i>' + escapeHtml(supName) +
+          _supAvatarHtml(supName, noSupplier) + escapeHtml(supName) +
           '<span class="sup-shop-group-count">' + (g.items_count || 0) + ' ' +
             (g.items_count === 1 ? 'позиция' : (g.items_count < 5 ? 'позиции' : 'позиций')) +
           '</span>' +
@@ -6287,7 +6340,16 @@ function renderSupplyShopping(d) {
       ) +
     '</div>';
   });
-  container.innerHTML = html;
+  // Собираем две вкладки: «К закупке» (покупные + низкий остаток) и «Ждём поставку»
+  const buyInner = (cpBlock + groupsHtml + hiddenToolbar) ||
+    '<div class="empty-block" style="padding:32px 16px;"><i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
+    '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Всё в норме — закупать нечего.</div></div>';
+  const waitInner = waitingBlock ||
+    '<div class="empty-block" style="padding:32px 16px;"><i class="ti ti-truck-off" style="color:var(--text-faint);font-size:28px;"></i>' +
+    '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Пока ничего не ждём — заказы поедут сюда.</div></div>';
+  const buyPane  = '<div class="sup-pane" data-pane="buy"'  + (tab === 'buy'  ? '' : ' hidden') + '>' + buyInner  + '</div>';
+  const waitPane = '<div class="sup-pane" data-pane="wait"' + (tab === 'wait' ? '' : ' hidden') + '>' + waitInner + '</div>';
+  container.innerHTML = kpiStrip + segTabs + v2Toggle + buyPane + waitPane;
   // v2.45.444: кардинальный новый вид — класс на контейнере перекрывает стили групп/шапок
   container.classList.toggle('sv2-mode', !!window.SUPPLY_SHOP_V2);
 }
@@ -11412,6 +11474,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.580',
+    date: '25.06.2026',
+    title: '«Что закупить» — новый дизайн',
+    features: [
+      'Сверху — <b>4 цифры одним взглядом</b>: к закупке, ждём поставку, долго ждём (красным — где затык), сегодня на складе',
+      'Два таба — <b>«К закупке»</b> и <b>«Ждём поставку»</b>, чтобы не скроллить всё подряд',
+      'У поставщиков — <b>аватары</b> с инициалами; у позиций в ожидании — <b>трекер доставки</b> (Заказан → Оплачен → В пути → На складе), видно, на каком шаге каждая',
+      'Всё под переключателем «Новый вид» — если что, кнопкой «Вернуть старый» откатишься на прежний вид',
+    ],
+  },
   {
     version: 'v2.45.570',
     date: '25.06.2026',

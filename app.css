@@ -18713,3 +18713,40 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .owz-catalog { max-height: 320px; }
 .owz-catalog .bom-picker-group { margin: 0; }
 .bom-picker-item.owz-in { background: #ECFDF5; }
+/* ============ v2.45.x: «Что закупить» — KPI, табы, аватары, степпер доставки ============ */
+#sup-shop-content .sup-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+#sup-shop-content .sup-kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 2px rgba(27,32,48,.04);}
+#sup-shop-content .sup-kpi-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+#sup-shop-content .sup-kpi-num{font-size:21px;font-weight:800;line-height:1;letter-spacing:-.5px;}
+#sup-shop-content .sup-kpi-lbl{font-size:11.5px;color:var(--text-light);margin-top:3px;}
+#sup-shop-content .sup-kpi.brand .sup-kpi-ic{background:var(--brand-bg);color:var(--brand);}
+#sup-shop-content .sup-kpi.blue  .sup-kpi-ic{background:#E7EEFB;color:#3257B0;}
+#sup-shop-content .sup-kpi.red   .sup-kpi-ic{background:var(--danger-bg);color:var(--danger);}
+#sup-shop-content .sup-kpi.red   .sup-kpi-num{color:var(--danger);}
+#sup-shop-content .sup-kpi.green .sup-kpi-ic{background:var(--success-bg);color:var(--success);}
+
+#sup-shop-content .sup-seg{display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:14px;gap:2px;}
+#sup-shop-content .sup-seg button{border:none;background:transparent;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:700;color:var(--text-light);cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+#sup-shop-content .sup-seg button.on{background:var(--brand);color:#fff;}
+#sup-shop-content .sup-seg .cnt{background:var(--brand-bg);color:var(--brand);border-radius:20px;font-size:11px;padding:1px 7px;font-weight:700;}
+#sup-shop-content .sup-seg button.on .cnt{background:rgba(255,255,255,.25);color:#fff;}
+
+.sup-ava{width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-light));flex-shrink:0;}
+.sup-ava.warn{background:linear-gradient(135deg,#E0A02A,#C9870F);}
+.sup-shop-group-name .sup-ava{margin-right:4px;}
+
+.sup-steps{display:flex;align-items:center;gap:0;margin-top:9px;flex-wrap:wrap;}
+.sup-step{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--text-faint);}
+.sup-step .dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--border-strong);background:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;}
+.sup-step.done{color:var(--success);}
+.sup-step.done .dot{background:var(--success);border-color:var(--success);}
+.sup-step.now{color:var(--brand);}
+.sup-step.now .dot{border-color:var(--brand);background:var(--brand-bg);}
+.sup-step-line{width:22px;height:2px;background:var(--border-strong);margin:0 5px;}
+.sup-step-line.done{background:var(--success);}
+
+@media(max-width:760px){
+  #sup-shop-content .sup-kpis{grid-template-columns:repeat(2,1fr);}
+  #sup-shop-content .sup-seg{display:flex;}
+  #sup-shop-content .sup-seg button{flex:1;justify-content:center;}
+}
