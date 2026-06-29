@@ -8295,6 +8295,19 @@ function maxSourcePill(m) {
     'title="Счёт пришёл через мессенджер MAX"><i class="ti ti-message-2"></i> MAX</span>';
 }
 
+// Чип стадии ОПЛАТЫ привязанного заказа — чтобы во «Входящих» сразу было видно:
+// Новый (счёт пришёл, ещё не на оплате) / На оплате / Оплачен.
+function orderPayStatusPill(m) {
+  if (!m || !m.matched_order_id) return '';
+  var s = m.matched_order_status || '';
+  var label, bg, fg, ic;
+  if (s === 'paid' || s === 'received' || s === 'partial') { label = 'Оплачен'; bg = '#DCFCE7'; fg = '#166534'; ic = '✅'; }
+  else if (s === 'to_pay') { label = 'На оплате'; bg = '#FFEDD5'; fg = '#C2410C'; ic = '💸'; }
+  else if (s === 'cancelled') { label = 'Отменён'; bg = '#F1F5F9'; fg = '#64748B'; ic = '✖'; }
+  else { label = 'Новый'; bg = '#DBEAFE'; fg = '#1E40AF'; ic = '🆕'; }
+  return '<span class="sup-status-pill" style="background:' + bg + ';color:' + fg + ';font-weight:700;">' + ic + ' ' + label + '</span>';
+}
+
 function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
@@ -8326,7 +8339,7 @@ function renderSupplyInbox() {
     html += '<div class="sup-row">' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          maxSourcePill(m) + labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) +
+          maxSourcePill(m) + labelHtml + statusHtml + orderPayStatusPill(m) + payerEntityPill((m.ai_data || {}).payer_entity, false) +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -8438,7 +8451,7 @@ async function openInboxMessage(inboxId) {
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + orderPayStatusPill(msg) + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
           '<div style="color:var(--text-light);">От:</div><div>' + fromLine + '</div>' +
           '<div style="color:var(--text-light);">Получено:</div><div style="font-variant-numeric:tabular-nums;">' + escapeHtml(received) + '</div>' +
