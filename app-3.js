@@ -7947,16 +7947,22 @@ function renderSupplyOrders() {
   }
 
   list.forEach(o => {
-    const total = o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '';
+    // v2.45.607: у заказов «на оплату» позиций часто нет (total_amount=0),
+    // но сумма к оплате есть в распознанном счёте → берём invoice_total как фолбэк.
+    const totalNum = o.total_amount || o.invoice_total || 0;
+    const total = totalNum ? Math.round(totalNum).toLocaleString('ru-RU') + ' ₽' : '';
     const label = o.order_label || ('#' + o.id);
     const hasNew = !!o.has_new_invoice;
     const hasInvoice = !!o.invoice_file_key;
     const isSel = state.supplyOrdersSelected.has(o.id);
+    const entColor = _entityBorderColor(o.invoice_payer_tag);
     let rowStyle = '';
     if (isSel) {
       rowStyle = 'style="border-color:#2563EB;background:rgba(37,99,235,0.05);"';
     } else if (hasNew) {
       rowStyle = 'style="border-left:4px solid #2563EB;background:linear-gradient(90deg,rgba(37,99,235,0.06),transparent 50%);"';
+    } else if (entColor) {
+      rowStyle = 'style="border-left:4px solid ' + entColor + ';"';
     }
     const newPill = hasNew
       ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">📄 НОВЫЙ СЧЁТ</span>'
@@ -7983,6 +7989,7 @@ function renderSupplyOrders() {
         '<div class="sup-row-meta">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
+          payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
@@ -8575,6 +8582,12 @@ async function refreshSupplyInboxBadge() {
       }
     }
   } catch (_) {}
+}
+
+// v2.45.607: цвет левой границы карточки по юрлицу-плательщику (АГ/ТД).
+// Те же цвета, что у текста чипа payerEntityPill, чтобы граница и метка совпадали.
+function _entityBorderColor(tag) {
+  return tag === 'ТД' ? '#5B21B6' : (tag === 'АГ' ? '#3730A3' : '');
 }
 
 // Чип «наше юрлицо-плательщик» (АГ / ТД) — чтобы бухгалтер видел, на кого счёт.
@@ -17219,8 +17232,8 @@ function renderDevelopmentDetail(dev) {
   if (!pane) return;
   if (!dev) {
     pane.innerHTML = '<div class="dev-empty"><i class="ti ti-bulb"></i>' +
-      '<div class="dev-empty-title">Выбери разработку слева</div>' +
-      '<div class="dev-empty-sub">или создай новую кнопкой «Новая разработка»</div>' +
+      '<div class="dev-empty-title">Выбери разработку из списка</div>' +
+      '<div class="dev-empty-sub">или создай новую кнопкой «+»</div>' +
     '</div>';
     return;
   }
