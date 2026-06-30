@@ -56,6 +56,18 @@ var CASES=[];
   CASES.push({name:'каскад KM→ТР + сигнал на клемму',P:P});
 })();
 
+// 4) частотники: автомат→ПЧ→двигатель + управление (AO задание, DO пуск, DI авария)
+(function(){
+  var P={consumers:[{id:"m1",name:"Приточный вентилятор",phases:3,volt:400,kw:2.2,needs:"motor"},
+                    {id:"m2",name:"Вытяжной вентилятор",phases:3,volt:400,kw:1.5,needs:"motor"}],
+    aux:[{id:"u1",tag:"UZ1",kind:"vfd",name:"Частотный преобр.",feed:"QF2",targets:["Приточный вентилятор"],ctrl:"AO1",vfdStart:"K1",vfdFault:"DI1"},
+         {id:"u2",tag:"UZ2",kind:"vfd",name:"Частотный преобр.",feed:"QF3",targets:["Вытяжной вентилятор"],ctrl:"AO2",vfdStart:"K2",vfdFault:"DI2"}],
+    sensors:[], terminals:[],
+    controller:ctrl("ОВЕН ПР200","24В",4,2,4,4)};
+  P.controller.io.asg={AO1:"UZ1",K1:"UZ1",DI1:"UZ1",AO2:"UZ2",K2:"UZ2",DI2:"UZ2"};
+  CASES.push({name:"частотники (ПЧ) — сила+управление",P:P});
+})();
+
 // ── прогон ──
 var total=0;
 CASES.forEach(function(cs){

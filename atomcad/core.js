@@ -50,12 +50,14 @@ function _coverByKind(P,kind,def){ var s={}, by=_auxBy(P); (P&&P.aux||[]).forEac
 // «сила ←» аппарат — подпись силового источника по feed (автомат/ввод/каскад); '' если не задан
 function auxFeedLabel(P,a){ var s=a&&(a.feed||a.src)||''; if(!s)return ''; if(/^[AD][IO]\d+$/i.test(s))return ''; if(/^(ввод|шина|bus|__bus__)$/i.test(s))return 'ввод'; return s; }
 // непосредственный коммутатор перед нагрузкой ('' = напрямую): аппарат, у которого нагрузка стоит прямым targets
-function consumerFeed(P,name){ var hit=''; (P&&P.aux||[]).forEach(function(a){ if(!_isSwitch(a.kind))return; if(_auxTg(a).indexOf(name)>=0)hit=a.tag||a.name; }); return hit; }
+function consumerFeed(P,name){ var hit=''; (P&&P.aux||[]).forEach(function(a){ if(!_isSwitch(a.kind)&&a.kind!=='vfd')return; if(_auxTg(a).indexOf(name)>=0)hit=a.tag||a.name; }); return hit; }
 // нагрузки за магнитным пускателем (контактором); через «что коммутирует» с учётом каскада
 function auxCoverSet(P){ return _coverByKind(P,'contactor','KM'); }
 function coveredByAux(set,c,unitName){ return set&&(set[unitName]||set[c&&c.name])||''; }   // '' если не закреплена, иначе обозначение аппарата
 // твердотельные реле (рег. напряжения) по «что коммутирует»: имя нагрузки → обозначение ТР
 function ssrSet(P){ return _coverByKind(P,'ssr','ТР'); }
+// частотные преобразователи (ПЧ) по «что коммутирует»: имя двигателя → обозначение ПЧ (UZ)
+function vfdSet(P){ return _coverByKind(P,'vfd','UZ'); }
 // промежуточные реле по «что коммутирует»: имя нагрузки → обозначение реле (KL)
 function relaySet(P){ return _coverByKind(P,'relay','KL'); }
 
@@ -300,7 +302,7 @@ function buildSchematic(P){
     if(fitL>=380){ step=Math.min(720,fitL); maxX=2240; }                  // мало колонок — уводим их левее основной надписи, чтобы не заходили
     else { var fit=(maxX-gx)/nT; if(fit<step) step=Math.max(380,Math.floor(fit)); }  // много колонок — раскладываем шире (без наложения аппаратов)
   }
-  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, psuN=1, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P), apBy1=_auxBy(P);
+  var bx=gx+step, lastX=gx, kmN=1+(P.aux||[]).filter(function(a){return a.kind==='contactor'}).length, phI=0, wN=1, termN=2, psuN=1, _covS=auxCoverSet(P), _ssr=ssrSet(P), _rel=relaySet(P), _vfd=vfdSet(P), apBy1=_auxBy(P);
   function _feedNote(tag,x,y){ var a=apBy1[tag], l=a?auxFeedLabel(P,a):''; if(l)pt.push({x:x-86,y:y,s:18,ls:0,anchor:'end',tx:'← '+l}); }   // «чем питается» из графа (src), если задано явно
   cols.forEach(function(col,ci){ col.x=bx+ci*step; });
   groups.forEach(function(g){
@@ -341,8 +343,17 @@ function buildSchematic(P){
       var covTag=coveredByAux(_covS,cons,col.l&&col.l.name);
       var relTag=cons?(_rel[col.l&&col.l.name]||_rel[cons.name]||''):'';
       var ssrTag=cons?(_ssr[col.l&&col.l.name]||_ssr[cons.name]||''):'';
+      var vfdTag=cons?(_vfd[col.l&&col.l.name]||_vfd[cons.name]||''):'';
       var kmBot=1450;                                                                    // низ предыдущего аппарата (по умолчанию — сразу отвод)
-      if(cons&&needsContactor(cons)&&relTag){
+      if(cons&&vfdTag){
+        // частотный преобразователь: вход L1/L2/L3 (от автомата) сверху, выход U/V/W (на двигатель) снизу
+        pc.push(C(vfdTag,'box',x,1500,'','','Частотный преобразователь · L1/L2/L3 → U/V/W')); kmBot=1840;
+        _feedNote(vfdTag,x,1470);
+        pt.push({x:x+34,y:1505,s:17,ls:0,anchor:'start',tx:'L1/L2/L3'});
+        pt.push({x:x+34,y:1835,s:17,ls:0,anchor:'start',tx:'U/V/W'});
+        pt.push({x:x-86,y:1690,s:18,ls:0,anchor:'end',tx:'упр. → л.2'});
+        if(!(cons.name in kmByName)) kmByName[cons.name]=vfdTag;
+      } else if(cons&&needsContactor(cons)&&relTag){
         var rpole=(covPole[relTag]=(covPole[relTag]||0)+1);                                // какой контакт реле уходит на эту нагрузку
         pc.push(C(relTag,'c_no',x,1450,'','',cons.name)); kmBot=1600;                      // контакт промежуточного реле (вместо контактора)
         _feedNote(relTag,x,1425);
@@ -455,7 +466,7 @@ function buildSchematic(P){
     inA.forEach(function(o,k){
       var p=o.p, py=ctrlY+G.pinY(o.i), devY=baseY+k*SP, isT=(p.g==='AI'), chx=lpx-130-k*40;
       var inAp=(p.g==='DI')?inBy[p.lab]:null;                                  // DI назначен на сигнальный аппарат (переключатель/кнопка/грибок)?
-      if(inAp){ ac.push(shortC(inAp.tag||p.lab, auxSym2(inAp.kind), inX, devY, '', '', inAp.name||p.lab)); }
+      if(inAp){ ac.push(shortC(inAp.tag||p.lab, auxSym2(inAp.kind), inX, devY, '', '', inAp.kind==='vfd'?'авария ПЧ':(inAp.name||p.lab))); }
       else ac.push(shortC(isT?('BT'+(k+1)):('XI'+(k+1)), isT?'ntc':'term', inX, devY, isT?'NTC':'', '', p.lab));
       var iw=W([lpx,py],[chx,py]); iw.sec=0.75; aw.push(iw);                    // сигнальная цепь — 0,75 мм²
       aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[inX,devY]));
@@ -471,8 +482,8 @@ function buildSchematic(P){
       var km=(apx&&(apx.kind==='contactor'||apx.kind==='relay'))?apx.tag:kmByName[p.lab];
       var tr=(apx&&apx.kind==='ssr')?apx.tag:_ssr[p.lab];
       var olab=apx?((_auxLeaves(apx,apBy,P).join(', '))||apx.name||p.lab):p.lab; // что в итоге коммутирует (для подписи)
-      var isCoil=(p.g==='DO'&&km), isTr=(p.g==='AO'&&tr);
-      var oSec=isCoil?1.5:0.75;                                                // катушка — 1,5; управление ТР 0-10В / сигнал — 0,75
+      var isVfd=apx&&apx.kind==='vfd', isCoil=(p.g==='DO'&&km&&!isVfd), isTr=(p.g==='AO'&&tr);
+      var oSec=isCoil?1.5:0.75;                                                // катушка — 1,5; управление ТР 0-10В / сигнал / ПЧ — 0,75
       var ow=W([rpx,py],[chx,py]); ow.sec=oSec;
       at.push({x:chx-22,y:py-14,s:20,ls:0,anchor:'end',tx:'W'+wN}); wN++;      // номер провода выходной цепи
       if(isCoil){
@@ -487,6 +498,12 @@ function buildSchematic(P){
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
         aw.push(W([outX,devY+150],[gX,devY+150])); usedG.push(devY+150);       // общий ТР → шина 0В/GND
         at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'(л.1)'});   // кросс-ссылка на силовой контакт ТР; «0-10В/GND» — на шине и в описании
+      } else if(isVfd){
+        // выход контроллера → частотник: AO = задание 0-10В, DO = пуск/стоп (дискр.); силовая часть ПЧ — на л.1
+        ac.push(shortC(apx.tag,'box',outX,devY,'',' ',(p.g==='AO')?'ПЧ · задание 0-10В':'ПЧ · пуск/стоп (DI)'));
+        aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
+        aw.push(W([outX,devY+150],[gX,devY+150])); usedG.push(devY+150);       // общий управления ПЧ → 0В/GND (не нейтраль)
+        at.push({x:outX-150,y:devY+120,s:20,ls:0,anchor:'end',tx:'ПЧ (л.1)'});
       } else {
         ac.push(shortC('XO'+(k+1),'term',outX,devY,'','',p.lab));
         aw.push(ow); aw.push(W([chx,py],[chx,devY])); aw.push(W([chx,devY],[outX,devY]));
@@ -554,7 +571,7 @@ g.AtomCore={
   phaseBalance:phaseBalance, sectionFor:sectionFor, ioFree:ioFree, ioTotal:ioTotal,
   buildSpec:buildSpec, moduleCount:moduleCount, pickEnclosure:pickEnclosure, ENCL:ENCL,
   buildSchematic:buildSchematic, needsContactor:needsContactor, contactorModel:contactorModel, contactorPick:contactorPick, contactorDimStr:contactorDimStr,
-  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux, relaySet:relaySet, ssrSet:ssrSet,
+  auxCoverSet:auxCoverSet, coveredByAux:coveredByAux, relaySet:relaySet, ssrSet:ssrSet, vfdSet:vfdSet,
   consumerFeed:consumerFeed, auxFeedLabel:auxFeedLabel,
   isLV:isLV, lvSupplies:lvSupplies
 };
