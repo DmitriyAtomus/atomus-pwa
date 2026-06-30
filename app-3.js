@@ -7768,16 +7768,22 @@ function renderSupplyOrders() {
   }
 
   list.forEach(o => {
-    const total = o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '';
+    // v2.45.577: для заказов «на оплату» позиций часто нет (total_amount=0),
+    // но сумма к оплате есть в распознанном счёте → берём invoice_total как фолбэк.
+    const totalNum = o.total_amount || o.invoice_total || 0;
+    const total = totalNum ? Math.round(totalNum).toLocaleString('ru-RU') + ' ₽' : '';
     const label = o.order_label || ('#' + o.id);
     const hasNew = !!o.has_new_invoice;
     const hasInvoice = !!o.invoice_file_key;
     const isSel = state.supplyOrdersSelected.has(o.id);
+    const entColor = _entityBorderColor(o.invoice_payer_tag);
     let rowStyle = '';
     if (isSel) {
       rowStyle = 'style="border-color:#2563EB;background:rgba(37,99,235,0.05);"';
     } else if (hasNew) {
       rowStyle = 'style="border-left:4px solid #2563EB;background:linear-gradient(90deg,rgba(37,99,235,0.06),transparent 50%);"';
+    } else if (entColor) {
+      rowStyle = 'style="border-left:4px solid ' + entColor + ';"';
     }
     const newPill = hasNew
       ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">📄 НОВЫЙ СЧЁТ</span>'
@@ -7804,6 +7810,7 @@ function renderSupplyOrders() {
         '<div class="sup-row-meta">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
+          payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
@@ -8267,6 +8274,12 @@ async function refreshSupplyInboxBadge() {
 // Чип «наше юрлицо-плательщик» (АГ / ТД) — чтобы бухгалтер видел, на кого счёт.
 // pe — объект {tag, short_name} (из ai_data.payer_entity) или {tag, short_name}
 // собранный из полей заказа. withName=true показывает и название юрлица.
+// v2.45.577: цвет левой границы карточки по юрлицу-плательщику (АГ/ТД).
+// Те же цвета, что и в payerEntityPill (текст чипа), чтобы граница и метка совпадали.
+function _entityBorderColor(tag) {
+  return tag === 'ТД' ? '#5B21B6' : (tag === 'АГ' ? '#3730A3' : '');
+}
+
 function payerEntityPill(pe, withName) {
   if (!pe) return '';
   const tag = (pe.tag || '').trim();
@@ -8309,10 +8322,23 @@ function renderSupplyInbox() {
     const attCount = (m.attachments || []).length;
     const attText = attCount > 0 ? attCount + ' вложение' + (attCount > 1 ? 'й' : '') : 'без вложений';
     const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
-    html += '<div class="sup-row">' +
+    // v2.45.577: канал приёма счёта — MAX или e-mail (раньше у всех висела иконка конверта).
+    const isMax = m.folder === 'MAX' || /^max:/i.test(m.from_addr || '') || (((m.ai_data || {}).source || '') === 'max');
+    const channelPill = isMax
+      ? '<span class="sup-status-pill" style="background:#EDE9FE;color:#6D28D9;font-weight:700;" title="Канал: MAX"><i class="ti ti-message-2"></i> MAX</span>'
+      : '<span class="sup-status-pill" style="background:#E0F2FE;color:#075985;font-weight:700;" title="Канал: e-mail"><i class="ti ti-mail"></i> Email</span>';
+    // v2.45.577: сумма счёта прямо в карточке (распознанный итог с НДС).
+    const sumNum = ((m.ai_data || {}).totals || {}).sum_with_vat;
+    const sumPill = sumNum
+      ? '<span class="sup-status-pill" style="background:#ECFDF5;color:#047857;font-weight:700;" title="Сумма счёта"><i class="ti ti-currency-rubel"></i>' + Math.round(sumNum).toLocaleString('ru-RU') + ' ₽</span>'
+      : '';
+    // v2.45.577: цветная левая граница по юрлицу-плательщику (АГ/ТД).
+    const entColor = _entityBorderColor(((m.ai_data || {}).payer_entity || {}).tag);
+    const rowStyle = entColor ? ' style="border-left:4px solid ' + entColor + ';"' : '';
+    html += '<div class="sup-row"' + rowStyle + '>' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) +
+          channelPill + labelHtml + statusHtml + payerEntityPill((m.ai_data || {}).payer_entity, false) + sumPill +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -8323,7 +8349,7 @@ function renderSupplyInbox() {
       '</div>' +
       // v2.45.36: ровные кнопки — иконочные с явным классом sup-row-icon
       '<div class="sup-row-actions">' +
-        '<button class="btn btn-secondary" onclick="openInboxMessage(' + m.id + ')" title="Открыть письмо"><i class="ti ti-mail-opened"></i> Открыть</button>' +
+        '<button class="btn btn-secondary" onclick="openInboxMessage(' + m.id + ')" title="' + (isMax ? 'Открыть сообщение MAX' : 'Открыть письмо') + '"><i class="ti ' + (isMax ? 'ti-message-2' : 'ti-mail-opened') + '"></i> Открыть</button>' +
         (attCount > 0 ? '<button class="btn btn-secondary sup-row-icon" onclick="downloadInboxAttachmentDirect(' + m.id + ', 0, null)" title="Скачать первое вложение"><i class="ti ti-download"></i></button>' : '') +
         (m.status === 'unmatched'
           ? '<button class="btn btn-primary" onclick="openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать</button>'
