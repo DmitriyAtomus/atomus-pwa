@@ -19332,3 +19332,57 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .tc2-meta{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11.5px;color:var(--text-faint);}
 .tc2-meta i{font-size:13px;}
 .tc2-own{color:var(--warning);font-weight:600;}
+
+/* ===== «Оформить заказ» — обновлённый вид (v2.45.6xx) ===== */
+.owz2.owz-modal{display:flex;flex-direction:column;max-height:90vh;max-width:660px;}
+.owz2 .modal-content{flex:1;overflow-y:auto;max-height:none;}
+.owz2 .owz2-inp{width:100%;box-sizing:border-box;padding:10px 13px;border:1px solid var(--border-strong);border-radius:10px;font-size:14px;outline:none;background:#fff;color:var(--text-dark);}
+.owz2 .owz2-inp:focus{border-color:var(--brand-light);}
+.owz2 textarea.owz2-inp{resize:vertical;font-family:inherit;}
+.owz2-sec-l{font-size:11px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;display:flex;align-items:center;gap:7px;}
+.owz2-sec-l:first-child{margin-top:2px;}
+.owz2-sec-l i{font-size:14px;color:var(--text-light);}
+.owz2-sec-l #owz-cart-count{color:var(--text-light);font-weight:600;text-transform:none;letter-spacing:0;}
+.owz2-srow{display:flex;gap:8px;align-items:center;}
+.owz2-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:520px){.owz2-grid2{grid-template-columns:1fr;}}
+.owz2-sup-list{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:240px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12);}
+.owz2-sup-card{display:flex;align-items:center;gap:12px;background:var(--brand-bg);border:1px solid #CFE0F5;border-radius:12px;padding:11px 14px;}
+.owz2-sup-ava{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand-light));color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.owz2-sup-body{flex:1;min-width:0;}
+.owz2-sup-name{font-weight:800;font-size:14.5px;color:var(--text-dark);}
+.owz2-sup-contacts{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;}
+.owz2-sup-chip{font-size:11.5px;color:var(--brand);background:#fff;border:1px solid #D4E3F4;border-radius:6px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;}
+.owz2-sup-chip i{font-size:12px;}
+.owz2-sup-chip.warn{color:var(--danger);border-color:#EBC4BC;background:#FCF1EE;}
+.owz2-sup-change{margin-left:auto;font-size:12px;color:var(--brand);font-weight:600;background:#fff;border:1px solid #CFE0F5;border-radius:8px;padding:6px 11px;cursor:pointer;flex-shrink:0;}
+.owz2-catalog{border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:280px;background:#fff;}
+.owz2-cat-grp{border-bottom:1px solid var(--border);}
+.owz2-cat-grp:last-child{border-bottom:none;}
+.owz2-cat-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
+.owz2-cat-head:hover{background:#FBFCFE;}
+.owz2-cat-ic{width:30px;height:30px;border-radius:8px;background:var(--brand-bg);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.owz2-cat-ic i{font-size:15px;}
+.owz2-cat-name{font-size:13.5px;font-weight:700;color:var(--text-dark);}
+.owz2-cat-cnt{margin-left:auto;font-size:11px;font-weight:800;background:#EEF1F6;color:var(--text-light);border-radius:20px;padding:1px 9px;}
+.owz2-cat-chev{color:var(--text-faint);font-size:15px;}
+.owz2-cat-item{display:flex;align-items:center;gap:10px;padding:9px 13px 9px 40px;border-top:1px solid #F1F4F9;cursor:pointer;}
+.owz2-cat-item:hover{background:#FBFCFE;}
+.owz2-cat-item.in{background:#F0F9F4;}
+.owz2-ci-main{flex:1;min-width:0;}
+.owz2-ci-name{font-size:13px;font-weight:600;color:var(--text-dark);}
+.owz2-ci-meta{font-size:11px;color:var(--text-faint);margin-top:2px;}
+.owz2-ci-add{width:26px;height:26px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.owz2-ci-add.done{background:var(--success-bg);border-color:#BFE0CC;color:var(--success);}
+.owz2-crow{display:flex;align-items:center;gap:9px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 11px;margin-bottom:7px;}
+.owz2-c-num{width:20px;height:20px;border-radius:6px;background:var(--brand);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.owz2-c-name{flex:1;min-width:0;font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.owz2-c-qty{width:64px;text-align:center;padding:6px;border:1px solid var(--border-strong);border-radius:8px;font-size:14px;font-weight:700;flex-shrink:0;}
+.owz2-c-unit{width:74px;padding:6px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;background:#fff;flex-shrink:0;}
+.owz2-c-del{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:#fff;color:var(--danger);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.owz2-sign{display:flex;align-items:flex-start;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-top:14px;}
+.owz2-sign-ic{color:var(--brand);font-size:17px;}
+.owz2-sign-t{font-size:13px;color:var(--text-mid);}
+.owz2-sign-t b{color:var(--text-dark);}
+.owz2-sign-sub{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
+.owz2-foot{display:flex;gap:10px;justify-content:flex-end;padding:13px 20px;border-top:1px solid var(--border);background:#FBFCFE;flex-shrink:0;flex-wrap:wrap;}
