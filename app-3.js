@@ -7348,7 +7348,9 @@ async function submitOrderPreview(orderId) {
     // Не закрываем модалку моментально — даём пользователю прочитать «Отправлено»
     setTimeout(() => {
       document.getElementById('order-preview-modal')?.remove();
-      loadSupplyShopping();
+      cache.supplyOrders = null;
+      if (typeof loadSupplyOrders === 'function') loadSupplyOrders();
+      if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
     }, 1200);
   } catch (e) {
     clearTimeout(timeoutTimer);
@@ -9611,7 +9613,7 @@ async function openNewSupplyOrder() {
         '</div>' +
         '<div class="modal-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">' +
           '<button class="btn btn-secondary" onclick="submitOrderWizard(false)"><i class="ti ti-device-floppy"></i> Сохранить черновик</button>' +
-          '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-send"></i> Создать и отправить</button>' +
+          '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-mail-search"></i> Проверить письмо и отправить</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -9875,12 +9877,26 @@ async function submitOrderWizard(send) {
     cache.supplyOrders = null;
     state.currentSupplyOrderId = created.id;
     if (send) {
+      // v2.45.605: не шлём вслепую — открываем превью письма (та же модалка, что
+      // у «Сформировать заказ»): видно текст, можно поправить и отправить.
+      try {
+        const pr = await fetch(API_BASE + '/api/supply-orders/' + created.id + '/preview', {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (pr.ok) {
+          const draft = await pr.json();
+          _renderOrderPreviewModal(draft);
+          return;   // остаёмся на месте, поверх — окно превью
+        }
+      } catch (_) { /* не валимся — ниже запасной путь */ }
+      // Запасной путь: превью не получили — отправляем напрямую, как раньше.
       showToast('Заказ #' + created.id + ' создан, отправляем…', 'success');
       await sendSupplyOrderByEmail(created.id);
+      selectSidebarItem('supply-order-detail');
     } else {
       showToast('Черновик заказа #' + created.id + ' создан', 'success');
+      selectSidebarItem('supply-order-detail');
     }
-    selectSidebarItem('supply-order-detail');
   } catch (e) {
     showToast('Ошибка', 'error');
   }
@@ -12159,6 +12175,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.605',
+    date: '30.06.2026',
+    title: 'Заказ поставщику: видно письмо перед отправкой',
+    features: [
+      'В мастере «Оформить заказ» кнопка теперь — <b>«Проверить письмо и отправить»</b>: сначала показываем <b>текст письма поставщику</b>, а уже потом отправляем',
+      'В окне превью можно <b>поправить тему и текст</b> письма, проверить позиции и количество, открыть вложение-DOCX — и только затем нажать «Отправить»',
+      'Раньше «Создать и отправить» уходило сразу, текст письма было не видно',
+    ],
+  },
   {
     version: 'v2.45.604',
     date: '30.06.2026',
