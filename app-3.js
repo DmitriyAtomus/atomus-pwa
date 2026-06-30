@@ -7949,6 +7949,51 @@ function setSupplyOrdFilter(f) {
 
 // ============ v2.45.265: ПРИЁМ УПД ИЗ 1С-ЭДО ============
 
+// Выделение для массового удаления УПД из ЭДО
+let _edoSel = new Set();
+
+function _edoToggle(id, checked) {
+  if (checked) _edoSel.add(id); else _edoSel.delete(id);
+  // синхронизируем «Выбрать все»
+  const all = document.querySelectorAll('#edo-upd-list .edo-cb');
+  const selAll = document.getElementById('edo-selall-cb');
+  if (selAll) selAll.checked = all.length > 0 && _edoSel.size === all.length;
+  _edoUpdateBar();
+}
+
+function _edoToggleAll(checked) {
+  _edoSel = new Set();
+  document.querySelectorAll('#edo-upd-list .edo-cb').forEach(cb => {
+    cb.checked = checked;
+    if (checked) _edoSel.add(parseInt(cb.getAttribute('data-id'), 10));
+  });
+  _edoUpdateBar();
+}
+
+function _edoUpdateBar() {
+  const cnt = document.getElementById('edo-sel-count');
+  const btn = document.getElementById('edo-del-btn');
+  const n = _edoSel.size;
+  if (cnt) cnt.textContent = n ? ('Выбрано: ' + n) : '';
+  if (btn) btn.disabled = !n;
+}
+
+async function _edoDeleteSelected() {
+  const ids = Array.from(_edoSel);
+  if (!ids.length) return;
+  if (!confirm('Удалить выбранные документы (' + ids.length + ')?\nОни исчезнут из списка приёма УПД.')) return;
+  try {
+    const r = await apiPost('/api/edo/upd/delete', { ids });
+    if (r.ok) {
+      showToast('Удалено: ' + ((r.data && r.data.deleted) || ids.length), 'success');
+      _edoSel = new Set();
+      loadEdoUpd();
+    } else {
+      showToast((r.data && r.data.message) || 'Не удалось удалить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
 async function loadEdoUpd() {
   const box = document.getElementById('edo-upd-list');
   if (!box) return;
@@ -7969,7 +8014,8 @@ async function loadEdoUpd() {
         '<span style="font-size:12px;color:var(--text-light);">Как только 1С отправит документ — он появится здесь и придёт пуш.</span></div>';
       return;
     }
-    box.innerHTML = items.map(u => {
+    _edoSel = new Set();   // сброс выделения при каждой загрузке списка
+    const rows = items.map(u => {
       const total = u.total_with_vat
         ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽' : '';
       const st = u.matched_order_id
@@ -7979,7 +8025,9 @@ async function loadEdoUpd() {
       const intakeBadge = u.intake_invoice_id
         ? ' <span style="font-size:11px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:1px 8px;border-radius:6px;"><i class="ti ti-package-import" style="font-size:11px;"></i> В приёмке</span>'
         : '';
-      return '<div class="sup-row" onclick="openEdoUpdDetail(' + u.id + ')" style="cursor:pointer;">' +
+      return '<div class="sup-row edo-row" onclick="openEdoUpdDetail(' + u.id + ')" style="cursor:pointer;">' +
+        '<input type="checkbox" class="edo-cb" data-id="' + u.id + '" title="Выбрать" ' +
+          'onclick="event.stopPropagation();_edoToggle(' + u.id + ',this.checked)">' +
         '<div class="sup-row-icon"><i class="ti ti-file-text"></i></div>' +
         '<div class="sup-row-body">' +
           '<div class="sup-row-title">УПД № ' + escapeHtml(u.number || 'б/н') +
@@ -7993,6 +8041,14 @@ async function loadEdoUpd() {
         '</div>' +
       '</div>';
     }).join('');
+    box.innerHTML =
+      '<div class="edo-bulkbar">' +
+        '<label class="edo-selall"><input type="checkbox" id="edo-selall-cb" onclick="_edoToggleAll(this.checked)"> Выбрать все</label>' +
+        '<span class="edo-sel-count" id="edo-sel-count"></span>' +
+        '<button class="btn btn-small edo-del-btn" id="edo-del-btn" onclick="_edoDeleteSelected()" disabled>' +
+          '<i class="ti ti-trash"></i> Удалить выбранные</button>' +
+      '</div>' + rows;
+    _edoUpdateBar();
   } catch (e) {
     box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e && e.message || e)) + '</div>';
   }

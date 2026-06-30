@@ -18713,3 +18713,25 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .owz-catalog { max-height: 320px; }
 .owz-catalog .bom-picker-group { margin: 0; }
 .bom-picker-item.owz-in { background: #ECFDF5; }
+
+/* ====== Массовое удаление УПД из ЭДО ====== */
+.edo-bulkbar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 12px; margin-bottom: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+}
+.edo-selall {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; color: var(--text-mid); cursor: pointer; user-select: none;
+}
+.edo-selall input { width: 17px; height: 17px; cursor: pointer; }
+.edo-sel-count { font-size: 13px; font-weight: 600; color: var(--brand); }
+.edo-del-btn {
+  margin-left: auto; background: #DC2626; color: #fff; border: none;
+}
+.edo-del-btn:disabled { background: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
+.edo-row .edo-cb {
+  width: 18px; height: 18px; flex-shrink: 0; cursor: pointer;
+  margin-right: 4px; align-self: center;
+}
