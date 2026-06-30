@@ -4505,9 +4505,8 @@ async function loadSuppliers() {
   if (!container) return;
   container.innerHTML = '<div class="loading-block">Загружаем поставщиков…</div>';
   try {
-    const params = new URLSearchParams();
-    if (state.supplierSearch) params.set('search', state.supplierSearch);
-    const d = await apiGet('/api/suppliers' + (params.toString() ? '?' + params.toString() : ''));
+    // v2.45.x: грузим всех, поиск (в т.ч. по продукции) — на клиенте, мгновенно
+    const d = await apiGet('/api/suppliers');
     cache.suppliers = d.suppliers || [];
     renderSuppliers();
   } catch (e) {
@@ -4515,15 +4514,91 @@ async function loadSuppliers() {
   }
 }
 
+// v2.45.x: «Поставщики» — карточки с аватарами, кликабельными контактами, продукцией
+function _splInitials(name) {
+  let s = String(name || '').replace(/[«»"'()]/g, ' ').replace(/-/g, ' ')
+    .replace(/\b(ООО|ОАО|ЗАО|ПАО|АО|ИП|ТД|ТПК|завод|компания)\b/gi, ' ').trim();
+  const w = s.split(/\s+/).filter(Boolean);
+  if (!w.length) { const t = String(name || '').replace(/\s/g, ''); return t.slice(0, 2).toUpperCase() || '—'; }
+  if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
+  return (w[0][0] + w[1][0]).toUpperCase();
+}
+function _splColorIdx(name) {
+  let h = 0; const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % 6;
+}
+function _splFilter(list) {
+  const q = (state.supplierSearch || '').toLowerCase().trim();
+  if (!q) return list;
+  return list.filter(s => {
+    const hay = [s.name, s.inn, s.comment, s.contact_person, s.phone, s.email].filter(Boolean).join(' ').toLowerCase();
+    return hay.indexOf(q) !== -1;
+  });
+}
+function _splCard(s, canManage) {
+  const chips = [];
+  if (s.contact_person) chips.push('<span class="spl-chip person"><span class="em">👤</span> ' + escapeHtml(s.contact_person) + '</span>');
+  if (s.phone) {
+    const isWa = /whats\s?app|ватсап/i.test(s.phone);
+    const tel = String(s.phone).replace(/[^\d+]/g, '');
+    chips.push('<a class="spl-chip ' + (isWa ? 'wa' : 'phone') + '" href="tel:' + escapeHtml(tel) + '" onclick="event.stopPropagation();"><span class="em">' + (isWa ? '💬' : '📞') + '</span> ' + escapeHtml(s.phone) + '</a>');
+  }
+  if (s.email) chips.push('<a class="spl-chip mail" href="mailto:' + escapeHtml(s.email) + '" onclick="event.stopPropagation();"><span class="em">✉</span> ' + escapeHtml(s.email) + '</a>');
+  const contactsHtml = chips.length
+    ? '<div class="spl-contacts">' + chips.join('') + '</div>'
+    : '<div class="spl-empty">Контакты не заполнены — нажми, чтобы добавить</div>';
+  const prod = s.comment ? '<div class="spl-prod"><span class="em">📦</span><span><b>Возит:</b> ' + escapeHtml(s.comment) + '</span></div>' : '';
+  const innRow = s.inn ? '<div class="spl-inn">ИНН ' + escapeHtml(s.inn) + '</div>' : '';
+  const actions = canManage
+    ? '<div class="spl-card-actions">' +
+        '<button class="spl-iact" title="Карточка поставщика" onclick="event.stopPropagation();openEditSupplier(' + s.id + ')"><span class="em">✏️</span></button>' +
+        '<button class="spl-iact del" title="Удалить" onclick="event.stopPropagation();deleteSupplier(' + s.id + ')"><span class="em">🗑</span></button>' +
+      '</div>'
+    : '';
+  return '<div class="spl-card" onclick="openEditSupplier(' + s.id + ')">' +
+    actions +
+    '<div class="spl-card-top"><div class="spl-ava a' + _splColorIdx(s.name) + '">' + escapeHtml(_splInitials(s.name)) + '</div>' +
+      '<div class="spl-name-wrap"><div class="spl-name">' + escapeHtml(s.name) + '</div>' + innRow + '</div></div>' +
+    contactsHtml + prod +
+  '</div>';
+}
+function toggleSupV2() {
+  window.SUP_V2 = !window.SUP_V2;
+  try { localStorage.setItem('supV2', window.SUP_V2 ? '1' : '0'); } catch (_) {}
+  renderSuppliers();
+}
+
 function renderSuppliers() {
   const container = document.getElementById('sup-sup-list');
-  const list = cache.suppliers || [];
-  document.getElementById('sup-sup-counter').textContent = list.length;
-  if (!list.length) {
-    container.innerHTML = '<div class="empty-block"><i class="ti ti-truck-loading"></i>Поставщиков пока нет</div>';
+  if (!container) return;
+  const all = cache.suppliers || [];
+  const counter = document.getElementById('sup-sup-counter');
+  if (counter) counter.textContent = all.length;
+  window.SUP_V2 = localStorage.getItem('supV2') !== '0';
+  const toggle = '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SUP_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.SUP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleSupV2()">' + (window.SUP_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+  if (!all.length) {
+    container.innerHTML = toggle + '<div class="empty-block"><i class="ti ti-truck-loading"></i>Поставщиков пока нет</div>';
     return;
   }
+  const list = _splFilter(all);
   const canManage = canManageSupply();
+  if (!window.SUP_V2) { container.innerHTML = toggle + _renderSuppliersOld(list, canManage); return; }
+  if (!list.length) {
+    container.innerHTML = toggle + '<div class="empty-block" style="padding:28px;"><i class="ti ti-search-off"></i>Ничего не найдено по «' + escapeHtml(state.supplierSearch) + '»</div>';
+    return;
+  }
+  let html = toggle + '<div class="spl-grid">';
+  list.forEach(s => { html += _splCard(s, canManage); });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// Старый вид (для отката) — прежний плоский список строк
+function _renderSuppliersOld(list, canManage) {
   let html = '';
   list.forEach(s => {
     const lines = [];
@@ -4541,16 +4616,14 @@ function renderSuppliers() {
       (canManage ? '<div class="sup-row-actions"><button class="btn-icon-warning" onclick="event.stopPropagation(); deleteSupplier(' + s.id + ')" title="Удалить"><i class="ti ti-trash"></i></button></div>' : '') +
       '</div>';
   });
-  container.innerHTML = html;
+  return html;
 }
 
 function onSupplierSearchInput() {
   const input = document.getElementById('sup-sup-search');
-  clearTimeout(state.supplierSearchTimer);
-  state.supplierSearchTimer = setTimeout(() => {
-    state.supplierSearch = input.value.trim();
-    loadSuppliers();
-  }, 300);
+  // v2.45.x: фильтрация на клиенте — мгновенно, по названию/ИНН/продукции/контактам
+  state.supplierSearch = (input.value || '').trim();
+  renderSuppliers();
 }
 
 function openNewSupplier() {
@@ -11706,6 +11779,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.584',
+    date: '25.06.2026',
+    title: '«Поставщики» — новый дизайн',
+    features: [
+      'Поставщики теперь карточками с <b>аватарами</b> — удобно листать и искать глазами',
+      'Контакты — <b>кликабельными чипами</b>: тап по телефону звонит, по почте — пишет письмо, WhatsApp отдельным зелёным чипом',
+      '<b>«Возит: …»</b> (продукция) видно сразу — понятно, кто что поставляет',
+      '<b>Поиск</b> работает мгновенно и теперь ищет ещё и <b>по продукции</b> (например, «насос» → найдёт «Все насосы»)',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний список',
+    ],
+  },
   {
     version: 'v2.45.583',
     date: '25.06.2026',
