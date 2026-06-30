@@ -13633,20 +13633,79 @@ async function _silentRefreshTeamChats() {
   } catch (_) {}
 }
 
+// v2.45.6xx: переключатель нового/старого вида списка чатов
+function _tcToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.TC_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.TC_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleChatsV2()">' + (window.TC_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function toggleChatsV2() {
+  window.TC_V2 = !window.TC_V2;
+  try { localStorage.setItem('tcV2', window.TC_V2 ? '1' : '0'); } catch (_) {}
+  renderTeamChatList(state._teamChats || []);
+}
+
+function _tcInitials(s) {
+  const m = String(s || '').match(/[a-zA-Zа-яА-ЯёЁ0-9]+/g) || [];
+  if (m.length >= 2) return (m[0][0] + m[1][0]).toUpperCase();
+  if (m.length === 1) return m[0].slice(0, 2).toUpperCase();
+  return '#';
+}
+function _tcColorIdx(s) {
+  let h = 0; const str = String(s || '');
+  for (let i = 0; i < str.length; i++) h = (h + str.charCodeAt(i)) % 4;
+  return h;
+}
+
+// v2.45.6xx: строка-карточка чата (новый вид)
+function _tcRowV2(c) {
+  const lm = c.last_message;
+  let preview = 'Нет сообщений', sys = false;
+  if (lm) {
+    if (lm.is_system) { preview = lm.text; sys = true; }
+    else {
+      const who = lm.author_name ? (lm.author_name + ': ') : '';
+      preview = who + (lm.text || (lm.has_files ? '📎 файл' : ''));
+    }
+  }
+  const t = c.last_at ? _tchatListTime(c.last_at) : '';
+  const isUnread = c.unread > 0;
+  const unread = isUnread ? '<span class="tc2-unread">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' : '';
+  const crown = c.role === 'owner' ? '<span class="tc2-crown"><i class="ti ti-crown"></i></span>' : '';
+  const owner = c.role === 'owner' ? ' · <span class="tc2-own">вы владелец</span>' : '';
+  const mc = c.members_count || 1;
+  return '<div class="tc2-row' + (isUnread ? ' unread' : '') + '" onclick="openTeamChat(' + c.id + ')">'
+    + '<div class="tc2-ava a' + _tcColorIdx(c.title) + '">' + escapeHtml(_tcInitials(c.title)) + crown + '</div>'
+    + '<div class="tc2-main">'
+    + '<div class="tc2-r1"><span class="tc2-title">' + escapeHtml(c.title) + '</span><span class="tc2-time">' + escapeHtml(t) + '</span></div>'
+    + '<div class="tc2-r2"><span class="tc2-preview' + (sys ? ' sys' : '') + '">' + escapeHtml(_tcTrim(preview, 80)) + '</span>' + unread + '</div>'
+    + '<div class="tc2-meta"><i class="ti ti-users"></i> ' + mc + ' ' + _plural(mc, ['участник', 'участника', 'участников']) + owner + '</div>'
+    + '</div></div>';
+}
+
 function renderTeamChatList(chats) {
   const box = document.getElementById('team-chats-content');
   const counter = document.getElementById('team-chats-counter');
   if (counter) counter.textContent = chats.length;
   if (!box) return;
+  state._teamChats = chats;
+  window.TC_V2 = (localStorage.getItem('tcV2') !== '0');
+  const toggle = _tcToggleBar();
   if (!chats.length) {
-    box.innerHTML = '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
+    box.innerHTML = toggle + '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
       + '<i class="ti ti-messages" style="font-size:42px;opacity:.4;"></i><br><br>'
       + 'Пока нет ни одного чата.<br>Создайте чат, пригласите монтажников и коллег — и общайтесь.<br><br>'
       + '<button class="btn btn-primary" onclick="openTeamPick(\'create\')"><i class="ti ti-plus"></i> Создать чат</button>'
       + '</div>';
     return;
   }
-  let html = '<div class="tcl-list">';
+  if (window.TC_V2) {
+    box.innerHTML = toggle + '<div class="tc2-list">' + chats.map(_tcRowV2).join('') + '</div>';
+    return;
+  }
+  let html = toggle + '<div class="tcl-list">';
   chats.forEach(c => {
     const lm = c.last_message;
     let preview = 'Нет сообщений';
