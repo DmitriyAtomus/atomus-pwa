@@ -8011,6 +8011,54 @@ function setSupplyOrdFilter(f) {
 
 // ============ v2.45.265: ПРИЁМ УПД ИЗ 1С-ЭДО ============
 
+// v2.45.x: «Приём УПД от ЭДО» — группировка (нужно оприходовать / в приёмке) + карточки
+function _edoKpi(cls, emoji, num, lbl) {
+  return '<div class="edo-kpi ' + cls + '"><div class="edo-kpi-ic"><span class="em">' + emoji + '</span></div>' +
+    '<div><div class="edo-kpi-num">' + num + '</div><div class="edo-kpi-lbl">' + escapeHtml(lbl) + '</div></div></div>';
+}
+function _edoSec(emoji, title, count) {
+  return '<div class="edo-sec"><span class="em">' + emoji + '</span> ' + escapeHtml(title) + ' <span class="cnt">' + count + '</span></div>';
+}
+function _edoInitials(name) {
+  return (typeof _updSupInitials === 'function') ? _updSupInitials(name) : (typeof _supInitials === 'function' ? _supInitials(name) : '—');
+}
+function _edoCard(u, inIntake) {
+  const total = (u.total_with_vat != null && Number(u.total_with_vat) > 0)
+    ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
+  const num = 'УПД № ' + escapeHtml(u.number || 'б/н') + (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '');
+  const supplier = u.seller_name || '—';
+  const ava = '<div class="edo-ava">' + escapeHtml(_edoInitials(supplier)) + '</div>';
+  const typeChip = u.function ? '<span class="edo-chip type">' + escapeHtml(u.function) + '</span>' : '';
+  const linkChip = u.matched_order_id
+    ? '<span class="edo-chip link"><span class="em">✅</span> привязан → ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span>'
+    : '<span class="edo-chip nolink"><span class="em">🔗</span> не привязан</span>';
+  const intakeChip = inIntake ? '<span class="edo-chip intake"><span class="em">📦</span> в приёмке</span>' : '';
+  const subParts = ['<b>' + escapeHtml(supplier) + '</b>'];
+  if (u.seller_inn) subParts.push('ИНН ' + escapeHtml(u.seller_inn));
+  let acts;
+  if (inIntake) {
+    acts = '<button class="btn" onclick="event.stopPropagation();selectSidebarItem(\'supply-invoice-intake\')"><span class="em">➡</span> Открыть приёмку</button>';
+  } else {
+    acts = '<button class="btn btn-primary" onclick="event.stopPropagation();edoUpdToIntake(' + u.id + ')"><span class="em">📦</span> Оприходовать</button>';
+    if (!u.matched_order_id) acts += '<button class="btn edo-link-btn" onclick="event.stopPropagation();openEdoUpdOrderPicker(' + u.id + ')"><span class="em">🔗</span> Привязать</button>';
+  }
+  acts += '<button class="btn edo-icon" title="Открыть карточку" onclick="event.stopPropagation();openEdoUpdDetail(' + u.id + ')"><span class="em">👁</span></button>';
+  return '<div class="edo-upd' + (inIntake ? ' ok' : '') + '" onclick="openEdoUpdDetail(' + u.id + ')">' +
+    ava +
+    '<div class="edo-body">' +
+      '<div class="edo-top"><span class="edo-num">' + num + '</span>' + typeChip + intakeChip + linkChip + '</div>' +
+      '<div class="edo-sub">' + subParts.join(' · ') + '</div>' +
+    '</div>' +
+    (total ? '<div class="edo-sum">' + total + ' ₽<small>с НДС</small></div>' : '') +
+    '<div class="edo-acts">' + acts + '</div>' +
+  '</div>';
+}
+function toggleEdoV2() {
+  window.EDO_V2 = !window.EDO_V2;
+  try { localStorage.setItem('edoV2', window.EDO_V2 ? '1' : '0'); } catch (_) {}
+  loadEdoUpd();
+}
+
 async function loadEdoUpd() {
   const box = document.getElementById('edo-upd-list');
   if (!box) return;
@@ -8026,38 +8074,69 @@ async function loadEdoUpd() {
       badge.textContent = fresh;
       badge.style.display = fresh ? '' : 'none';
     }
+    window.EDO_V2 = localStorage.getItem('edoV2') !== '0';
     if (!items.length) {
       box.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-download"></i>УПД из ЭДО пока не приходили.<br>' +
         '<span style="font-size:12px;color:var(--text-light);">Как только 1С отправит документ — он появится здесь и придёт пуш.</span></div>';
       return;
     }
-    box.innerHTML = items.map(u => {
-      const total = u.total_with_vat
-        ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽' : '';
-      const st = u.matched_order_id
-        ? '<span style="font-size:11px;font-weight:700;color:#065F46;background:#D1FAE5;padding:1px 8px;border-radius:6px;">Привязан ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span>'
-        : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">Не привязан</span>';
-      // v2.45.268: пометка «оприходован» прямо в списке
-      const intakeBadge = u.intake_invoice_id
-        ? ' <span style="font-size:11px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:1px 8px;border-radius:6px;"><i class="ti ti-package-import" style="font-size:11px;"></i> В приёмке</span>'
-        : '';
-      return '<div class="sup-row" onclick="openEdoUpdDetail(' + u.id + ')" style="cursor:pointer;">' +
-        '<div class="sup-row-icon"><i class="ti ti-file-text"></i></div>' +
-        '<div class="sup-row-body">' +
-          '<div class="sup-row-title">УПД № ' + escapeHtml(u.number || 'б/н') +
-            (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '') + '</div>' +
-          '<div class="sup-row-meta" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
-            '<span>' + escapeHtml(u.seller_name || '—') + '</span>' +
-            (total ? '<span style="font-weight:700;color:var(--text-dark);">' + total + '</span>' : '') +
-            (u.function ? '<span style="color:var(--text-light);">' + escapeHtml(u.function) + '</span>' : '') +
-            st + intakeBadge +
-          '</div>' +
-        '</div>' +
+    const toggle = '<div class="sv2-toggle-bar">' +
+        '<span><i class="ti ti-' + (window.EDO_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.EDO_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+        '<button class="sv2-toggle-btn" onclick="toggleEdoV2()">' + (window.EDO_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
       '</div>';
-    }).join('');
+    if (!window.EDO_V2) { box.innerHTML = toggle + _renderEdoOld(items); return; }
+    // Группировка: ещё не в приёмке (нужно оприходовать) / уже в приёмке
+    const need = [], inIntake = [];
+    items.forEach(u => { (u.intake_invoice_id ? inIntake : need).push(u); });
+    const noLink = items.filter(u => !u.matched_order_id).length;
+    let html = toggle;
+    html += '<div class="edo-kpis">' +
+      _edoKpi('act', '📥', need.length, 'Нужно оприходовать') +
+      _edoKpi('link', '🔗', noLink, 'Не привязаны к заказу') +
+      _edoKpi('ok', '📦', inIntake.length, 'В приёмке') +
+      _edoKpi('tot', '📄', items.length, 'Всего за период') +
+    '</div>';
+    if (need.length) {
+      html += _edoSec('📥', 'Нужно оприходовать', need.length) +
+        '<div class="edo-hint">Документы из ЭДО, ещё не отправленные на склад. Привяжи к заказу и оприходуй.</div>';
+      need.forEach(u => { html += _edoCard(u, false); });
+    }
+    if (inIntake.length) {
+      html += _edoSec('📦', 'В приёмке', inIntake.length) +
+        '<div class="edo-hint">Уже отправлены в «Приёмку УПД» — оприходование идёт там.</div>';
+      inIntake.forEach(u => { html += _edoCard(u, true); });
+    }
+    box.innerHTML = html;
   } catch (e) {
     box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e && e.message || e)) + '</div>';
   }
+}
+
+// Старый вид (для отката) — прежний плоский список
+function _renderEdoOld(items) {
+  return items.map(u => {
+    const total = u.total_with_vat
+      ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽' : '';
+    const st = u.matched_order_id
+      ? '<span style="font-size:11px;font-weight:700;color:#065F46;background:#D1FAE5;padding:1px 8px;border-radius:6px;">Привязан ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span>'
+      : '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:1px 8px;border-radius:6px;">Не привязан</span>';
+    const intakeBadge = u.intake_invoice_id
+      ? ' <span style="font-size:11px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:1px 8px;border-radius:6px;"><i class="ti ti-package-import" style="font-size:11px;"></i> В приёмке</span>'
+      : '';
+    return '<div class="sup-row" onclick="openEdoUpdDetail(' + u.id + ')" style="cursor:pointer;">' +
+      '<div class="sup-row-icon"><i class="ti ti-file-text"></i></div>' +
+      '<div class="sup-row-body">' +
+        '<div class="sup-row-title">УПД № ' + escapeHtml(u.number || 'б/н') +
+          (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '') + '</div>' +
+        '<div class="sup-row-meta" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+          '<span>' + escapeHtml(u.seller_name || '—') + '</span>' +
+          (total ? '<span style="font-weight:700;color:var(--text-dark);">' + total + '</span>' : '') +
+          (u.function ? '<span style="color:var(--text-light);">' + escapeHtml(u.function) + '</span>' : '') +
+          st + intakeBadge +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function _edoDateRu(iso) {
@@ -11627,6 +11706,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.583',
+    date: '25.06.2026',
+    title: '«Приём УПД от ЭДО» — новый дизайн',
+    features: [
+      'Документы из 1С-ЭДО разложены: <b>«Нужно оприходовать»</b> (ещё не на складе) наверх, <b>«В приёмке»</b> — ниже',
+      'Сверху счётчики: сколько нужно оприходовать, сколько не привязано к заказу, сколько уже в приёмке',
+      'На карточке — поставщик, номер/дата УПД, тип (СЧФДОП), сумма с НДС и привязка к заказу. Прямо из списка кнопки <b>«Оприходовать»</b> и <b>«Привязать»</b> — не открывая карточку',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний список',
+    ],
+  },
   {
     version: 'v2.45.582',
     date: '25.06.2026',
