@@ -8655,7 +8655,14 @@ function _ibxInvoiceCard(m, isMatched) {
     acts = (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
       '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>';
   } else {
+    // v2.45.596: «На оплату» прямо на карточке (раньше — только внутри «Письмо»).
+    // Создаёт позицию в разделе «На оплату» из распознанных реквизитов, минуя
+    // привязку к заказу. Показываем только если есть документ-вложение (счёт).
+    const payBtn = (di >= 0)
+      ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>'
+      : '';
     acts = '<button class="btn btn-primary ibx-grow" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать к заказу</button>' +
+      payBtn +
       '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>' +
       _ibxDelBtn(m);
   }
@@ -11992,6 +11999,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.596',
+    date: '30.06.2026',
+    title: '«На оплату» прямо на карточке счёта',
+    features: [
+      'У входящего счёта (раздел «Счета — нужна привязка») кнопка <b>«На оплату»</b> теперь прямо на карточке — не нужно заходить в «Письмо»',
+      'Удобно, когда счёт <b>запросил вручную</b> и хочешь сразу отправить его в оплату, минуя привязку к заказу',
+      'Кнопка появляется только если к письму приложен документ-счёт',
+    ],
+  },
   {
     version: 'v2.45.595',
     date: '30.06.2026',
