@@ -6347,14 +6347,80 @@ async function loadDefectsList() {
     const d = await apiGet('/api/defects' + q);
     const list = d.defects || [];
     if (counter) counter.textContent = list.length;
-    if (!list.length) {
-      container.innerHTML = '<div class="empty-block"><i class="ti ti-mood-empty"></i>Замечаний пока нет</div>';
-      return;
-    }
-    container.innerHTML = list.map(renderDefectRow).join('');
+    state._defectsList = list;
+    _renderDefectsListBody();
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
   }
+}
+
+// v2.45.6xx: переключатель нового/старого вида списка замечаний
+function _dfToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.DF_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.DF_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleDefectsV2()">' + (window.DF_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function toggleDefectsV2() {
+  window.DF_V2 = !window.DF_V2;
+  try { localStorage.setItem('dfV2', window.DF_V2 ? '1' : '0'); } catch (_) {}
+  _renderDefectsListBody();
+}
+
+function _renderDefectsListBody() {
+  const container = document.getElementById('defects-list-content');
+  if (!container) return;
+  window.DF_V2 = (localStorage.getItem('dfV2') !== '0');
+  const toggle = _dfToggleBar();
+  const list = state._defectsList || [];
+  if (!list.length) {
+    container.innerHTML = toggle + '<div class="empty-block"><i class="ti ti-mood-empty"></i>Замечаний пока нет</div>';
+    return;
+  }
+  if (window.DF_V2) {
+    container.innerHTML = toggle + '<div class="df-list">' + list.map(_dfRowV2).join('') + '</div>';
+  } else {
+    container.innerHTML = toggle + list.map(renderDefectRow).join('');
+  }
+}
+
+// v2.45.6xx: строка-карточка замечания (новый вид)
+function _dfRowV2(d) {
+  const ti = DEFECT_TYPE_LABELS[d.type] || DEFECT_TYPE_LABELS.defect;
+  const typeKey = (d.type && DEFECT_TYPE_LABELS[d.type]) ? d.type : 'defect';
+  const stripMap = { new: 'df-new', in_progress: 'df-prog', resolved: 'df-done', rejected: 'df-rej' };
+  const stPillMap = { new: 'new', in_progress: 'prog', resolved: 'done', rejected: 'rej' };
+  const stripCls = stripMap[d.status] || 'df-new';
+  const stPill = stPillMap[d.status] || 'new';
+
+  let target = '';
+  if (d.assembly_id) {
+    target = '<span class="df-target"><i class="ti ti-tool"></i> ' + escapeHtml(d.model_name || ('Сборка #' + d.assembly_id)) + (d.model_article ? ' · ' + escapeHtml(d.model_article) : '') + '</span>';
+  } else if (d.contract_id) {
+    target = '<span class="df-target"><i class="ti ti-file-text"></i> Договор ' + escapeHtml(d.contract_number || ('#' + d.contract_id)) + '</span>';
+  }
+
+  const date = (d.created_at || '').replace('T', ' ').slice(0, 16);
+  let meta = '';
+  if (d.author_name) meta += '<span class="df-mi"><span class="df-mava">' + escapeHtml(getInitials(d.author_name)) + '</span>' + escapeHtml(d.author_name) + '</span>';
+  if (d.author_phone) meta += '<span class="df-mi"><i class="ti ti-phone"></i> ' + escapeHtml(d.author_phone) + '</span>';
+  if (d.location) meta += '<span class="df-mi"><i class="ti ti-map-pin"></i> ' + escapeHtml(d.location) + '</span>';
+  if (d.photos_count) meta += '<span class="df-mi"><i class="ti ti-photo"></i> ' + d.photos_count + ' фото</span>';
+  meta += '<span class="df-mi"><i class="ti ti-clock"></i> ' + escapeHtml(date) + '</span>';
+
+  return '<div class="df-row ' + stripCls + '" onclick="openDefectDetail(' + d.id + ')">' +
+    '<div class="df-ic ' + ti.cls + '"><i class="ti ' + ti.icon + '"></i></div>' +
+    '<div class="df-body">' +
+      '<div class="df-top">' +
+        '<span class="df-type-pill ' + ti.cls + '"><i class="ti ' + ti.icon + '"></i> ' + escapeHtml(ti.label) + '</span>' +
+        '<span class="df-st ' + stPill + '">' + escapeHtml(d.status_label || '') + '</span>' +
+        target +
+      '</div>' +
+      '<div class="df-desc">' + escapeHtml(d.description || '') + '</div>' +
+      '<div class="df-meta">' + meta + '</div>' +
+    '</div>' +
+  '</div>';
 }
 
 /** Мобильный клик по фильтр-чипсу — синхронизирует с сайдбаром. */
@@ -7832,6 +7898,21 @@ function syncMainTabFromSection(sectionName, screenName) {
 }
 
 // ============ ACTION SHEET (+ кнопка) ============
+
+// v2.45.607: единая кнопка «+» на мобиле. Раньше у экранов был свой плавающий
+// FAB И центральный «+» таб-бара — два одинаковых плюса. Теперь FAB на мобиле
+// скрыт (CSS), а центральный «+» делает контекстное действие активного экрана:
+// если на экране есть свой .fab — жмём его (Новая заявка / Добавить заказ /
+// Новая доработка / Новый чат / Новый монтаж), иначе открываем общий лист создания.
+function mobilePlusAction() {
+  const active = document.querySelector('.screen.active');
+  if (active) {
+    const fab = active.querySelector('.fab');
+    // inline display:none = FAB сейчас неактуален (например, install-fab до выбора)
+    if (fab && fab.style.display !== 'none') { fab.click(); return; }
+  }
+  openActionSheet25();
+}
 
 function openActionSheet25() {
   const sh = document.getElementById('action-sheet-25');
@@ -12159,6 +12240,18 @@ function _srNavMonth(delta) {
 }
 
 function _srRender(box, d) {
+  window.SR_V2 = (localStorage.getItem('srV2') !== '0');
+  const toggle = _sr2ToggleBar();
+  box.innerHTML = toggle + (window.SR_V2 ? _sr2Body(d) : _srOldBody(d));
+  const dateInput = document.getElementById('sr-date');
+  if (dateInput) {
+    dateInput.addEventListener('change', _srPrefillFromDate);
+    _srPrefillFromDate();
+  }
+}
+
+// === Старый вид (для отката) ===
+function _srOldBody(d) {
   let html = '<div class="sr-toolbar">' +
       '<button class="btn btn-secondary btn-small" onclick="_srNavMonth(-1)" title="Предыдущий месяц"><i class="ti ti-chevron-left"></i></button>' +
       '<div class="sr-month">' + escapeHtml(_srMonthLabel(d.month)) + '</div>' +
@@ -12166,12 +12259,150 @@ function _srRender(box, d) {
     '</div>';
   if (d.can_edit) html += _srFormHtml(d);
   html += _srManagersHtml(d);
-  box.innerHTML = html;
-  const dateInput = document.getElementById('sr-date');
-  if (dateInput) {
-    dateInput.addEventListener('change', _srPrefillFromDate);
-    _srPrefillFromDate();
+  return html;
+}
+
+// === Новый вид (v2.45.5xx) ===
+function _sr2ToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SR_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.SR_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleReportsV2()">' + (window.SR_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function toggleReportsV2() {
+  window.SR_V2 = !window.SR_V2;
+  try { localStorage.setItem('srV2', window.SR_V2 ? '1' : '0'); } catch (_) {}
+  const box = document.getElementById('sales-reports-body');
+  if (box && _srState.data) _srRender(box, _srState.data);
+  else loadSalesReports();
+}
+
+// эмодзи и цветовой класс по метрике
+var _SR2_ICON = { calls: '📞', connects: '✅', new_leads: '📥', offers: '📄', deals: '🤝', revenue: '💰' };
+var _SR2_CCLS = { calls: 'c-call', connects: 'c-conn', new_leads: 'c-lead', offers: 'c-kp', deals: 'c-deal', revenue: 'c-rev' };
+
+function _sr2Body(d) {
+  let html = '<div class="sr2-mnav-row"><div class="sr2-mnav">' +
+      '<button onclick="_srNavMonth(-1)" title="Предыдущий месяц">‹</button>' +
+      '<span class="sr2-m">' + escapeHtml(_srMonthLabel(d.month)) + '</span>' +
+      '<button onclick="_srNavMonth(1)" title="Следующий месяц">›</button>' +
+    '</div></div>';
+
+  html += _sr2SummaryHtml(d);
+  if (d.can_edit) html += _sr2FormHtml(d);
+
+  const mgrs = d.managers || [];
+  if (!mgrs.length) {
+    html += '<div class="empty-block"><i class="ti ti-chart-bar"></i>За ' + escapeHtml(_srMonthLabel(d.month).toLowerCase()) + ' отчётов пока нет.' +
+      (d.can_edit ? '<br><span style="font-size:13px;color:var(--text-light);">Заполни форму выше и нажми «Сохранить».</span>' : '') + '</div>';
+  } else {
+    html += '<div class="sr2-sec"><span class="em">👥</span> По менеджерам</div>';
+    mgrs.forEach((m, idx) => { html += _sr2ManagerCardHtml(m, idx, d); });
   }
+  return html;
+}
+
+function _sr2SummaryHtml(d) {
+  const mgrs = d.managers || [];
+  if (!mgrs.length) return '';
+  const sum = {};
+  _SR_FIELDS.forEach(f => { sum[f.key] = 0; });
+  mgrs.forEach(m => { const t = m.totals || {}; _SR_FIELDS.forEach(f => { sum[f.key] += (Number(t[f.key]) || 0); }); });
+  let tiles = '';
+  _SR_FIELDS.forEach(f => {
+    const val = f.money ? formatMoneyShort(sum[f.key]) : _srFmtNum(sum[f.key]);
+    tiles += '<div class="sr2-kpi' + (f.money ? ' rev' : '') + '">' +
+        '<div class="sr2-kpi-ic ' + _SR2_CCLS[f.key] + '"><span class="em">' + _SR2_ICON[f.key] + '</span></div>' +
+        '<div class="sr2-kpi-num">' + val + '</div>' +
+        '<div class="sr2-kpi-lbl">' + escapeHtml(f.short) + '</div>' +
+      '</div>';
+  });
+  return '<div class="sr2-sec"><span class="em">📊</span> Сводка за ' + escapeHtml(_srMonthLabel(d.month).toLowerCase()) + (mgrs.length > 1 ? ' · все менеджеры' : '') + '</div>' +
+    '<div class="sr2-kpis">' + tiles + '</div>';
+}
+
+function _sr2FormHtml(d) {
+  const today = d.today || _srTodayIso();
+  let inputs = '';
+  _SR_FIELDS.forEach(f => {
+    inputs += '<div class="sr2-fld' + (f.money ? ' rev' : '') + '">' +
+        '<label for="sr-' + f.key + '"><span class="em">' + _SR2_ICON[f.key] + '</span> ' + escapeHtml(f.short) + '</label>' +
+        '<input type="number" inputmode="numeric" min="0" step="1" id="sr-' + f.key + '" value="0" onfocus="this.select()">' +
+      '</div>';
+  });
+  return '<div class="sr2-sec"><span class="em">✏️</span> Мой отчёт за день</div>' +
+    '<div class="sr2-form">' +
+      '<div class="sr2-form-sub">Внеси цифры за день — «итого» за месяц посчитается само.</div>' +
+      '<div class="sr2-frow">' +
+        '<div class="sr2-fld date"><label for="sr-date">Дата</label>' +
+          '<input type="date" id="sr-date" value="' + today + '" max="' + today + '"></div>' +
+        inputs +
+        '<div class="sr2-grow"></div>' +
+        '<button class="btn btn-primary" id="sr-save-btn" onclick="saveSalesReport()"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      '</div>' +
+      '<div class="sr2-form-hint" id="sr-form-hint"></div>' +
+    '</div>';
+}
+
+function _sr2Funnel(t) {
+  const calls = Number(t.calls) || 0, connects = Number(t.connects) || 0, leads = Number(t.new_leads) || 0, deals = Number(t.deals) || 0;
+  if (!calls && !connects && !leads && !deals) return '';
+  const pct = (part, whole) => whole > 0 ? Math.round(part / whole * 100) : 0;
+  const node = (val, word) => '<span class="sr2-fn-node"><b>' + _srFmtNum(val) + '</b> ' + word + '</span>';
+  const arrow = (p, cls) => '<span class="sr2-fn-pct' + (cls ? ' ' + cls : '') + '">' + p + '%</span>';
+  return '<div class="sr2-funnel">' +
+    node(calls, 'звонков') + arrow(pct(connects, calls)) +
+    node(connects, 'дозвонов') + arrow(pct(leads, connects)) +
+    node(leads, 'заявок') + arrow(pct(deals, leads), 'warn') +
+    node(deals, 'сделок') +
+  '</div>';
+}
+
+function _sr2ToggleDaily(n) {
+  const el = document.getElementById('sr2-daily-' + n);
+  if (el) el.classList.toggle('open');
+}
+
+function _sr2ManagerCardHtml(m, idx, d) {
+  const t = m.totals || {};
+  let tiles = '';
+  _SR_FIELDS.forEach(f => {
+    const val = f.money ? formatMoneyShort(t[f.key]) : _srFmtNum(t[f.key]);
+    tiles += '<div class="sr2-tile' + (f.money ? ' rev' : '') + '"><div class="v">' + val + '</div><div class="l">' + escapeHtml(f.short) + '</div></div>';
+  });
+
+  const head = '<tr><th>Дата</th>' + _SR_FIELDS.map(f => '<th>' + escapeHtml(f.short) + '</th>').join('') + '<th></th></tr>';
+  const rows = (m.reports || []).map(r => {
+    const cum = r.cum || {};
+    const cells = _SR_FIELDS.map(f =>
+      '<td' + (f.money ? ' class="rev-c"' : '') + '>' + (f.money ? _srFmtNum(r[f.key]) : (r[f.key] || 0)) +
+        '<span class="cum">' + (f.money ? _srFmtNum(cum[f.key]) : (cum[f.key] || 0)) + '</span></td>').join('');
+    const act = '<button class="sr2-ibtn" title="Скопировать для Telegram" onclick="_srCopyReport(' + idx + ',\'' + r.report_date + '\')"><i class="ti ti-copy"></i></button>' +
+      (d.can_edit ? '<button class="sr2-ibtn" title="Удалить" onclick="deleteSalesReport(' + r.id + ')"><i class="ti ti-trash"></i></button>' : '');
+    return '<tr><td>' + escapeHtml(_srFmtDateRu(r.report_date)) + '</td>' + cells + '<td class="sr2-tact-cell">' + act + '</td></tr>';
+  }).join('');
+
+  const cnt = (m.reports || []).length;
+  const daily = cnt ?
+    '<div class="sr2-daily" id="sr2-daily-' + idx + '">' +
+      '<button class="sr2-daily-toggle" onclick="_sr2ToggleDaily(' + idx + ')"><span class="em">📅</span> По дням (' + cnt + ') <span class="sr2-caret em">▾</span></button>' +
+      '<div class="sr2-daily-body"><div class="sr2-table-wrap"><table class="sr2-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
+        '<div class="sr2-table-note">маленькое число снизу — нарастающий итог с начала месяца</div></div></div>' +
+    '</div>' : '';
+
+  const periodWord = (_srMonthLabel(d.month).split(' ')[0] || '').toLowerCase();
+  return '<div class="sr2-mgr">' +
+      '<div class="sr2-mgr-head">' +
+        '<div class="sr2-ava">' + escapeHtml(getInitials(m.name)) + '</div>' +
+        '<div class="sr2-mgr-id"><div class="sr2-mgr-name">' + escapeHtml(m.name || '—') + '</div>' +
+          (m.position ? '<div class="sr2-mgr-pos">' + escapeHtml(m.position) + '</div>' : '') + '</div>' +
+        '<div class="sr2-mgr-period">Итого<br>за ' + escapeHtml(periodWord) + '</div>' +
+      '</div>' +
+      '<div class="sr2-tiles">' + tiles + '</div>' +
+      _sr2Funnel(t) +
+      daily +
+    '</div>';
 }
 
 function _srFormHtml(d) {
@@ -13417,20 +13648,79 @@ async function _silentRefreshTeamChats() {
   } catch (_) {}
 }
 
+// v2.45.6xx: переключатель нового/старого вида списка чатов
+function _tcToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.TC_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.TC_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleChatsV2()">' + (window.TC_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function toggleChatsV2() {
+  window.TC_V2 = !window.TC_V2;
+  try { localStorage.setItem('tcV2', window.TC_V2 ? '1' : '0'); } catch (_) {}
+  renderTeamChatList(state._teamChats || []);
+}
+
+function _tcInitials(s) {
+  const m = String(s || '').match(/[a-zA-Zа-яА-ЯёЁ0-9]+/g) || [];
+  if (m.length >= 2) return (m[0][0] + m[1][0]).toUpperCase();
+  if (m.length === 1) return m[0].slice(0, 2).toUpperCase();
+  return '#';
+}
+function _tcColorIdx(s) {
+  let h = 0; const str = String(s || '');
+  for (let i = 0; i < str.length; i++) h = (h + str.charCodeAt(i)) % 4;
+  return h;
+}
+
+// v2.45.6xx: строка-карточка чата (новый вид)
+function _tcRowV2(c) {
+  const lm = c.last_message;
+  let preview = 'Нет сообщений', sys = false;
+  if (lm) {
+    if (lm.is_system) { preview = lm.text; sys = true; }
+    else {
+      const who = lm.author_name ? (lm.author_name + ': ') : '';
+      preview = who + (lm.text || (lm.has_files ? '📎 файл' : ''));
+    }
+  }
+  const t = c.last_at ? _tchatListTime(c.last_at) : '';
+  const isUnread = c.unread > 0;
+  const unread = isUnread ? '<span class="tc2-unread">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' : '';
+  const crown = c.role === 'owner' ? '<span class="tc2-crown"><i class="ti ti-crown"></i></span>' : '';
+  const owner = c.role === 'owner' ? ' · <span class="tc2-own">вы владелец</span>' : '';
+  const mc = c.members_count || 1;
+  return '<div class="tc2-row' + (isUnread ? ' unread' : '') + '" onclick="openTeamChat(' + c.id + ')">'
+    + '<div class="tc2-ava a' + _tcColorIdx(c.title) + '">' + escapeHtml(_tcInitials(c.title)) + crown + '</div>'
+    + '<div class="tc2-main">'
+    + '<div class="tc2-r1"><span class="tc2-title">' + escapeHtml(c.title) + '</span><span class="tc2-time">' + escapeHtml(t) + '</span></div>'
+    + '<div class="tc2-r2"><span class="tc2-preview' + (sys ? ' sys' : '') + '">' + escapeHtml(_tcTrim(preview, 80)) + '</span>' + unread + '</div>'
+    + '<div class="tc2-meta"><i class="ti ti-users"></i> ' + mc + ' ' + _plural(mc, ['участник', 'участника', 'участников']) + owner + '</div>'
+    + '</div></div>';
+}
+
 function renderTeamChatList(chats) {
   const box = document.getElementById('team-chats-content');
   const counter = document.getElementById('team-chats-counter');
   if (counter) counter.textContent = chats.length;
   if (!box) return;
+  state._teamChats = chats;
+  window.TC_V2 = (localStorage.getItem('tcV2') !== '0');
+  const toggle = _tcToggleBar();
   if (!chats.length) {
-    box.innerHTML = '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
+    box.innerHTML = toggle + '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
       + '<i class="ti ti-messages" style="font-size:42px;opacity:.4;"></i><br><br>'
       + 'Пока нет ни одного чата.<br>Создайте чат, пригласите монтажников и коллег — и общайтесь.<br><br>'
       + '<button class="btn btn-primary" onclick="openTeamPick(\'create\')"><i class="ti ti-plus"></i> Создать чат</button>'
       + '</div>';
     return;
   }
-  let html = '<div class="tcl-list">';
+  if (window.TC_V2) {
+    box.innerHTML = toggle + '<div class="tc2-list">' + chats.map(_tcRowV2).join('') + '</div>';
+    return;
+  }
+  let html = toggle + '<div class="tcl-list">';
   chats.forEach(c => {
     const lm = c.last_message;
     let preview = 'Нет сообщений';

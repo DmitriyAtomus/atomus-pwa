@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.589-radio-local-only";
+const APP_VERSION = "v2.45.611-radio-local-only";
 const APP_VERSION_DATE = "30.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2878,7 +2878,8 @@ function renderProductionDashboard(d) {
     });
   });
 
-  let html = '';
+  window.PKB_V2 = (localStorage.getItem('pkbV2') !== '0');
+  let html = _pkbToggleBar();
 
   // --- Шапка ---
   const updatedStr = formatPkbDateTime(fetchedAt);
@@ -2945,6 +2946,7 @@ function renderProductionDashboard(d) {
       : '';
     html += '<div class="pkb-col ' + def.cls + activeCls + colCollapsedCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
     html +=   '<div class="pkb-col-head"' + headClickAttr + '>';
+    html +=     '<span class="pkb-col-dot"></span>';
     html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
     html +=     '<div class="pkb-col-count">' + items.length + '</div>';
     html +=     chevron;
@@ -2964,8 +2966,24 @@ function renderProductionDashboard(d) {
   html += '</div>';
 
   container.innerHTML = html;
+  container.classList.toggle('pkb-v2', !!window.PKB_V2);
   // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
   _renderResumeBanner();
+}
+
+// v2.45.5xx: переключатель нового/старого вида Производства
+function _pkbToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.PKB_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.PKB_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="togglePkbV2()">' + (window.PKB_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function togglePkbV2() {
+  window.PKB_V2 = !window.PKB_V2;
+  try { localStorage.setItem('pkbV2', window.PKB_V2 ? '1' : '0'); } catch (_) {}
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+  else if (typeof loadProductionDashboard === 'function') loadProductionDashboard();
 }
 
 // ============ v2.45.x: автостоп → «продолжить вчерашнее или новое?» ============
@@ -3090,24 +3108,24 @@ function renderPkbKpi(kpi) {
   let html = '<div class="pkb-kpi-grid">';
 
   // 1. В очереди
-  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false);
+  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false, 'ti-clipboard-list');
 
   // 2. В работе
   const inProgHint = inProgAss ? (inProgAss + ' ' + plural(inProgAss, 'сборщик', 'сборщика', 'сборщиков')) : '—';
-  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false);
+  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false, 'ti-tool');
 
   // 3. Просрочка
-  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0);
+  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0, 'ti-alert-triangle');
 
   // 4. На проверке (или Заблокированы, если есть)
   if (blockedCnt > 0) {
-    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false);
+    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false, 'ti-lock');
   } else {
-    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false);
+    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false, 'ti-checks');
   }
 
   // 5. v2.34.2: Упаковка
-  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false);
+  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false, 'ti-package');
 
   // 6. За неделю
   let weekVal, weekHint;
@@ -3119,18 +3137,22 @@ function renderPkbKpi(kpi) {
     weekVal = String(weekDone);
     weekHint = 'завершено';
   }
-  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false);
+  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false, 'ti-circle-check');
 
   html += '</div>';
   return html;
 }
 
-function pkbKpiCard(label, value, hint, cls, clickable) {
+function pkbKpiCard(label, value, hint, cls, clickable, icon) {
   const clickAttr = clickable ? ' onclick="pkbFilterOverdue()"' : '';
+  const iconHtml = icon ? '<div class="pkb-kpi-ic"><i class="ti ' + icon + '"></i></div>' : '';
   return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + '"' + clickAttr + '>' +
-           '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
-           '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
-           '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
+           iconHtml +
+           '<div class="pkb-kpi-body">' +
+             '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
+             '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
+             '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
+           '</div>' +
          '</div>';
 }
 
@@ -9796,11 +9818,58 @@ async function loadOffers() {
   }
 }
 
+function toggleOffersV2() {
+  window.KP_V2 = !window.KP_V2;
+  try { localStorage.setItem('kpV2', window.KP_V2 ? '1' : '0'); } catch (_) {}
+  renderOffersList();
+}
+
+function _offersV2ToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.KP_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.KP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleOffersV2()">' + (window.KP_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+// v2.45.5xx: статусная плашка КП (новый вид списка)
+function _kpStatusPill(o) {
+  const cls = (['draft', 'sent', 'accepted', 'rejected'].includes(o.status)) ? o.status : 'draft';
+  return '<span class="kp-pill ' + cls + '">' + escapeHtml(o.status_label || o.status || '—') + '</span>';
+}
+
+// v2.45.5xx: строка-карточка КП (новый вид списка)
+function _kpRow(o) {
+  let stripCls = '';
+  if (o.status === 'sent') stripCls = 'sent';
+  else if (o.status === 'accepted') stripCls = 'accepted';
+  else if (o.status === 'rejected') stripCls = 'rejected';
+
+  const vbadge = (o.version && o.version > 1) ? '<span class="kp-vbadge">v' + o.version + '</span>' : '';
+  const sub = escapeHtml(o.number || '—') + (o.contractor_inn ? ' · ИНН ' + escapeHtml(o.contractor_inn) : '');
+
+  const mgrName = o.manager_name || '—';
+  const mgr = '<div class="kp-mgr"><span class="kp-mgr-ava">' + escapeHtml(getInitials(mgrName)) + '</span>' +
+    '<span class="kp-mgr-name">' + escapeHtml(mgrName) + '</span></div>';
+
+  const sumZero = !o.total_sum ? ' zero' : '';
+  const sumHtml = '<div class="kp-sum"><span class="kp-sum-lbl">сумма</span><span class="kp-sum-v' + sumZero + '">' + formatMoney(o.total_sum) + '</span></div>';
+
+  return '<div class="kp-row ' + stripCls + '" onclick="openOffer(' + o.id + ')">' +
+    '<div class="kp-ava">' + escapeHtml(getInitials(o.contractor_name)) + '</div>' +
+    '<div class="kp-main">' +
+      '<div class="kp-top"><span class="kp-client">' + escapeHtml(o.contractor_name || '—') + '</span>' + _kpStatusPill(o) + vbadge + '</div>' +
+      '<div class="kp-sub">' + sub + '</div>' +
+    '</div>' +
+    '<div class="kp-right">' + sumHtml + mgr + '<span class="kp-arrow em">›</span></div>' +
+  '</div>';
+}
+
 function renderOffersList() {
   const container = document.getElementById('so-content');
   const counts = cache.offersCounts || {};
   const filter = state.offersFilter;
   const search = (state.offersSearch || '').toLowerCase().trim();
+  window.KP_V2 = (localStorage.getItem('kpV2') !== '0');
 
   // Чипсы
   document.querySelectorAll('#so-filters .filter-chip').forEach(chip => {
@@ -9833,16 +9902,28 @@ function renderOffersList() {
     );
   }
 
+  const toggle = _offersV2ToggleBar();
+
   if (!list.length) {
     let h = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Нет КП под этот фильтр';
     if (canManageSales() && filter === 'all' && !search) {
       h += '<br><br><button class="btn btn-primary" onclick="openNewOffer()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первое</button>';
     }
     h += '</div>';
-    container.innerHTML = h;
+    container.innerHTML = toggle + h;
     return;
   }
 
+  // v2.45.5xx: новый вид — карточки-строки
+  if (window.KP_V2) {
+    let html = toggle + '<div class="kp-list">';
+    list.forEach(o => { html += _kpRow(o); });
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
+  // === Старый вид (для отката) ===
   if (state.isDesktop) {
     let html = '<div style="padding: 0 0 16px;"><div class="offers-table">';
     html += '<div class="oft-header">' +
@@ -9863,7 +9944,7 @@ function renderOffersList() {
         '</div>';
     });
     html += '</div></div>';
-    container.innerHTML = html;
+    container.innerHTML = toggle + html;
   } else {
     let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
     list.forEach(o => {
@@ -9882,7 +9963,7 @@ function renderOffersList() {
         '</div>';
     });
     html += '</div>';
-    container.innerHTML = html;
+    container.innerHTML = toggle + html;
   }
 }
 

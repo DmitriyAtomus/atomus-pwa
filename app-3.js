@@ -3357,8 +3357,26 @@ async function loadPartsDashboard() {
   }
 }
 
+function _ptToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.PT_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.PT_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="togglePtV2()">' + (window.PT_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function togglePtV2() {
+  window.PT_V2 = !window.PT_V2;
+  try { localStorage.setItem('ptV2', window.PT_V2 ? '1' : '0'); } catch (_) {}
+  renderPartsDashboard();
+}
+
 function renderPartsDashboard() {
   const d = state.ptData || { kpis: {}, categories: [], items: [] };
+  window.PT_V2 = (localStorage.getItem('ptV2') !== '0');
+  const pane = document.getElementById('pt-pane');
+  if (pane) pane.classList.toggle('pt-v2', !!window.PT_V2);
+  const tg = document.getElementById('pt-toggle');
+  if (tg) tg.innerHTML = _ptToggleBar();
   _renderPtKpis(d.kpis);
   _renderPtAiHint(d);
   _renderPtChips(d.categories, d.kpis.total || 0);
@@ -3376,12 +3394,15 @@ function _renderPtKpis(k) {
       value: k.total || 0,
       hint: (k.categories_count || 0) + ' ' + _plural(k.categories_count || 0, ['категория', 'категории', 'категорий']),
       tone: '',
+      icon: 'ti-packages',
     },
     {
       label: 'Ниже минимума',
       value: k.below_min || 0,
       hint: (k.below_min || 0) > 0 ? 'требуется закупка' : 'всё в норме',
       tone: 'tone-red',
+      vcls: 'pk-low',
+      icon: 'ti-trending-down',
       clickable: (k.below_min || 0) > 0,
       onclick: 'setPtCategoryFilter(null); togglePtAttention(true)',
     },
@@ -3390,22 +3411,29 @@ function _renderPtKpis(k) {
       value: k.zero || 0,
       hint: (k.zero || 0) > 0 ? 'остаток 0' : 'не пусто нигде',
       tone: 'tone-yellow',
+      vcls: 'pk-zero',
+      icon: 'ti-circle-x',
     },
     {
       label: 'Ожидается приход',
       value: Math.round(k.incoming || 0),
       hint: (k.incoming_orders || 0) + ' ' + _plural(k.incoming_orders || 0, ['заказ', 'заказа', 'заказов']) + ' поставщикам',
       tone: 'tone-blue',
+      vcls: 'pk-in',
+      icon: 'ti-truck-delivery',
       clickable: (k.incoming_orders || 0) > 0,
       onclick: "selectSidebarItem('supply-orders')",
     },
   ];
   host.innerHTML = kpis.map(x =>
-    '<div class="fp-kpi ' + x.tone + (x.clickable ? ' clickable' : '') + '"' +
+    '<div class="fp-kpi ' + x.tone + (x.vcls ? ' ' + x.vcls : '') + (x.clickable ? ' clickable' : '') + '"' +
       (x.onclick ? ' onclick="' + x.onclick + '"' : '') + '>' +
-      '<div class="fp-kpi-label">' + escapeHtml(x.label) + '</div>' +
-      '<div class="fp-kpi-value">' + x.value + '</div>' +
-      '<div class="fp-kpi-hint">' + escapeHtml(x.hint) + '</div>' +
+      '<div class="fp-kpi-ic"><i class="ti ' + (x.icon || 'ti-box') + '"></i></div>' +
+      '<div class="fp-kpi-body">' +
+        '<div class="fp-kpi-label">' + escapeHtml(x.label) + '</div>' +
+        '<div class="fp-kpi-value">' + x.value + '</div>' +
+        '<div class="fp-kpi-hint">' + escapeHtml(x.hint) + '</div>' +
+      '</div>' +
     '</div>'
   ).join('');
 }
@@ -3680,6 +3708,7 @@ function _renderPtRow(it) {
   const actionHtml = '<div class="pt-row-action">' + mainBtn + defectBtn + '</div>';
 
   return '<div class="pt-row s-' + st + '" onclick="openPtItemDetail(' + it.id + ')">' +
+    '<span class="pt-row-cat-ic"><i class="ti ' + _nvIconFor(it.category_name) + '"></i></span>' +
     '<span class="pt-row-dot ' + st + '"></span>' +
     '<div>' +
       '<div class="pt-row-name">' + escapeHtml(it.name) +
@@ -7319,7 +7348,9 @@ async function submitOrderPreview(orderId) {
     // Не закрываем модалку моментально — даём пользователю прочитать «Отправлено»
     setTimeout(() => {
       document.getElementById('order-preview-modal')?.remove();
-      loadSupplyShopping();
+      cache.supplyOrders = null;
+      if (typeof loadSupplyOrders === 'function') loadSupplyOrders();
+      if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
     }, 1200);
   } catch (e) {
     clearTimeout(timeoutTimer);
@@ -7916,16 +7947,22 @@ function renderSupplyOrders() {
   }
 
   list.forEach(o => {
-    const total = o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '';
+    // v2.45.607: у заказов «на оплату» позиций часто нет (total_amount=0),
+    // но сумма к оплате есть в распознанном счёте → берём invoice_total как фолбэк.
+    const totalNum = o.total_amount || o.invoice_total || 0;
+    const total = totalNum ? Math.round(totalNum).toLocaleString('ru-RU') + ' ₽' : '';
     const label = o.order_label || ('#' + o.id);
     const hasNew = !!o.has_new_invoice;
     const hasInvoice = !!o.invoice_file_key;
     const isSel = state.supplyOrdersSelected.has(o.id);
+    const entColor = _entityBorderColor(o.invoice_payer_tag);
     let rowStyle = '';
     if (isSel) {
       rowStyle = 'style="border-color:#2563EB;background:rgba(37,99,235,0.05);"';
     } else if (hasNew) {
       rowStyle = 'style="border-left:4px solid #2563EB;background:linear-gradient(90deg,rgba(37,99,235,0.06),transparent 50%);"';
+    } else if (entColor) {
+      rowStyle = 'style="border-left:4px solid ' + entColor + ';"';
     }
     const newPill = hasNew
       ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">📄 НОВЫЙ СЧЁТ</span>'
@@ -7952,6 +7989,7 @@ function renderSupplyOrders() {
         '<div class="sup-row-meta">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
+          payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
@@ -8546,6 +8584,12 @@ async function refreshSupplyInboxBadge() {
   } catch (_) {}
 }
 
+// v2.45.607: цвет левой границы карточки по юрлицу-плательщику (АГ/ТД).
+// Те же цвета, что у текста чипа payerEntityPill, чтобы граница и метка совпадали.
+function _entityBorderColor(tag) {
+  return tag === 'ТД' ? '#5B21B6' : (tag === 'АГ' ? '#3730A3' : '');
+}
+
 // Чип «наше юрлицо-плательщик» (АГ / ТД) — чтобы бухгалтер видел, на кого счёт.
 // pe — объект {tag, short_name} (из ai_data.payer_entity) или {tag, short_name}
 // собранный из полей заказа. withName=true показывает и название юрлица.
@@ -8652,10 +8696,25 @@ function _ibxInvoiceCard(m, isMatched) {
   }
   let acts = '';
   if (isMatched) {
-    acts = (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
+    // v2.45.598: «Оплатить» прямо на карточке привязанного счёта — переводит
+    // САМ заказ в «На оплату» (без задвоения: счёт уже привязан к этому заказу,
+    // УПД потом его и закроет). Скрываем, если заказ уже оплачивается/оплачен/отменён.
+    const _payable = m.matched_order_id &&
+      ['to_pay', 'paid', 'received', 'partial', 'cancelled'].indexOf(m.matched_order_status || '') < 0;
+    acts = (_payable
+        ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
+        : '') +
+      (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
       '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>';
   } else {
+    // v2.45.596: «На оплату» прямо на карточке (раньше — только внутри «Письмо»).
+    // Создаёт позицию в разделе «На оплату» из распознанных реквизитов, минуя
+    // привязку к заказу. Показываем только если есть документ-вложение (счёт).
+    const payBtn = (di >= 0)
+      ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>'
+      : '';
     acts = '<button class="btn btn-primary ibx-grow" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать к заказу</button>' +
+      payBtn +
       '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>' +
       _ibxDelBtn(m);
   }
@@ -8921,6 +8980,9 @@ async function openInboxMessage(inboxId) {
         (msg.matched_order_id
           ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + msg.matched_order_id + ')">Открыть заказ</button>'
           : '') +
+        ((msg.from_addr && String(msg.from_addr).indexOf('@') >= 0)
+          ? '<button class="btn btn-primary" onclick="openInboxReply(' + msg.id + ')"><i class="ti ti-corner-up-left"></i> Ответить</button>'
+          : '') +
         '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
       '</div>' +
     '</div>';
@@ -8997,6 +9059,119 @@ async function sendInboxToPay(inboxId, overlayId) {
     if (j.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(j.order_id);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.45.598: оплата ПРИВЯЗАННОГО счёта — переводит сам заказ в «На оплату».
+// Счёт уже привязан к этому заказу, поэтому задвоения нет: бухгалтер платит,
+// а пришедшая позже УПД закроет именно этот заказ.
+async function payInboxOrderToPay(orderId, orderLabel) {
+  if (!orderId) return;
+  if (!confirm('Передать счёт на оплату?\nЗаказ ' + (orderLabel || ('#' + orderId)) +
+      ' перейдёт в раздел «На оплату», бухгалтер получит уведомление.')) return;
+  try {
+    // supplyOrderTransitionConfirmed (app-1.js) при необходимости спросит пароль.
+    const res = await supplyOrderTransitionConfirmed(orderId, 'to_pay');
+    if (res.cancelled) return;
+    if (!res.ok) {
+      showToast(res.message || ('Не удалось (HTTP ' + res.status + ')'), 'error');
+      return;
+    }
+    showToast('Счёт передан на оплату · ' + (orderLabel || ('#' + orderId)), 'success');
+    cache.supplyOrders = null;
+    await loadSupplyInbox();
+  } catch (e) {
+    showToast('Сеть: не удалось передать на оплату', 'error');
+  }
+}
+
+// v2.45.595: ответ поставщику прямо из карточки письма (например «пришлите счёт»).
+// Тема уходит как «Re: <исходная>» — метка [Заявка ORD-N] остаётся, поэтому
+// будущий счёт-ответ снова сам привяжется к заказу. Подпись и цитата исходного
+// письма добавляются на бэкенде.
+window._inboxReplyTpls = [
+  'Здравствуйте!\n\nПришлите, пожалуйста, счёт на эту заявку.',
+  'Здравствуйте!\n\nПодскажите, пожалуйста, срок поставки по этой заявке.',
+  'Здравствуйте!\n\nПришлите, пожалуйста, счёт и укажите срок поставки по этой заявке.',
+];
+function openInboxReply(inboxId) {
+  const msg = (cache.supplyInbox || []).find(x => x.id === inboxId) || {};
+  const toName = (msg.from_name || '').trim();
+  const toAddr = (msg.from_addr || '').trim();
+  const toLine = (toName ? toName + ' <' + toAddr + '>' : toAddr) || '—';
+  let subj = (msg.subject || 'Ваша заявка').trim();
+  const reSubj = /^re:/i.test(subj) ? subj : ('Re: ' + subj);
+
+  const overlayId = 'inbox-reply-modal';
+  let m = document.getElementById(overlayId); if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay';
+  const tplBtn = (i, label) =>
+    '<button type="button" class="btn btn-secondary btn-small" ' +
+      'onclick="var t=document.getElementById(\'inbox-reply-text\');t.value=window._inboxReplyTpls[' + i + '];t.focus();">' +
+      escapeHtml(label) + '</button>';
+  m.innerHTML =
+    '<div class="modal" style="max-width:560px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-corner-up-left"></i> Ответить поставщику</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
+          '<div style="color:var(--text-light);">Кому:</div><div>' + escapeHtml(toLine) + '</div>' +
+          '<div style="color:var(--text-light);">Тема:</div><div style="font-weight:600;">' + escapeHtml(reSubj) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">' +
+          tplBtn(0, 'Пришлите счёт') + tplBtn(1, 'Уточните срок') + tplBtn(2, 'Счёт + срок') +
+        '</div>' +
+        '<textarea id="inbox-reply-text" rows="6" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical;">' +
+          escapeHtml(window._inboxReplyTpls[0]) +
+        '</textarea>' +
+        '<div style="margin-top:8px;color:var(--text-light);font-size:12px;line-height:1.4;">' +
+          '<i class="ti ti-info-circle"></i> Подпись и цитата исходного письма добавятся автоматически. ' +
+          'Письмо уйдёт в ту же переписку — когда поставщик пришлёт счёт ответом, он сам привяжется к заказу.' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="inbox-reply-send" onclick="sendInboxReply(' + inboxId + ',\'' + overlayId + '\')"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.classList.add('visible');
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  setTimeout(() => { const t = document.getElementById('inbox-reply-text'); if (t) t.focus(); }, 50);
+}
+
+async function sendInboxReply(inboxId, overlayId) {
+  const ta = document.getElementById('inbox-reply-text');
+  const text = (ta && ta.value || '').trim();
+  if (!text) { showToast('Напишите текст ответа', 'warning'); if (ta) ta.focus(); return; }
+  const btn = document.getElementById('inbox-reply-send');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/reply', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+      return;
+    }
+    const ov = document.getElementById(overlayId); if (ov) ov.remove();
+    // Закрываем и саму карточку письма, если открыта
+    const letterOv = document.getElementById('inbox-msg-modal'); if (letterOv) letterOv.remove();
+    showToast('Ответ отправлен поставщику', 'success');
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
   }
 }
 
@@ -9399,7 +9574,8 @@ async function openNewSupplyOrder() {
   if (meRes) cache.me = meRes;
   if (!cache.suppliers.length) { showToast('Сначала добавьте хотя бы одного поставщика', 'error'); return; }
 
-  _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0 };
+  _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0,
+           supplierId: null, supplierEmail: '', supplierPhone: '', supplierName: '' };
   const me = _owz.me;
   const signName = (me.full_name || me.short_name || '').trim();
   const signPos = (me.position || '').trim();
@@ -9407,48 +9583,54 @@ async function openNewSupplyOrder() {
 
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal owz-modal" onclick="event.stopPropagation()" style="max-width:640px;width:96vw;">' +
+    '<div class="modal owz-modal owz2" onclick="event.stopPropagation()" style="max-width:660px;width:96vw;">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-clipboard-plus"></i> Оформить заказ</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
-        // Поставщик
-        '<div class="form-group"><label>Поставщик *</label>' +
-          '<select id="owz-supplier" onchange="_owzSupplierHint()">' +
-            '<option value="">— выбрать —</option>' +
-            cache.suppliers.map(s => '<option value="' + s.id + '" data-email="' + escapeHtml(s.email || '') + '" data-phone="' + escapeHtml(s.phone || '') + '">' + escapeHtml(s.name) + '</option>').join('') +
-          '</select>' +
+        // Поставщик — поиск с подсказками (начни вводить название) + карточка выбранного
+        '<div class="owz2-sec-l"><i class="ti ti-truck"></i> Поставщик</div>' +
+        '<div class="form-group" style="position:relative;margin-bottom:0;" id="owz-sup-search-wrap">' +
+          '<input id="owz-supplier-search" type="text" autocomplete="off" placeholder="Начните вводить название…" ' +
+            'oninput="_owzSupFilter(this.value)" onfocus="_owzSupFilter(this.value)" ' +
+            'onkeydown="_owzSupKey(event)" ' +
+            'onblur="setTimeout(function(){var b=document.getElementById(\'owz-supplier-list\');if(b)b.style.display=\'none\';},180)" ' +
+            'class="owz2-inp">' +
+          '<div id="owz-supplier-list" class="owz2-sup-list" style="display:none;"></div>' +
           '<div id="owz-sup-hint" style="font-size:12px;color:var(--text-light);margin-top:4px;"></div>' +
         '</div>' +
-        // Номенклатура
-        '<label style="font-weight:600;font-size:13px;display:block;margin:4px 0 6px;">Номенклатура комплектующих</label>' +
-        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
-          '<input id="owz-search" type="search" placeholder="Поиск по названию или артикулу…" oninput="_owzRenderCatalog(this.value)" ' +
-            'style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
-          '<button class="btn btn-secondary btn-small" onclick="_owzNewItem()" title="Добавить новую позицию в номенклатуру"><i class="ti ti-plus"></i> Новая</button>' +
+        '<div id="owz-sup-card"></div>' +
+        // Что заказываем
+        '<div class="owz2-sec-l"><i class="ti ti-package"></i> Что заказываем</div>' +
+        '<div class="owz2-srow">' +
+          '<input id="owz-search" type="search" placeholder="Поиск или впишите свою позицию…" oninput="_owzRenderCatalog(this.value)" ' +
+            'onkeydown="if(event.key===\'Enter\'){event.preventDefault();_owzAddTyped();}" class="owz2-inp" style="flex:1;min-width:0;">' +
+          '<button class="btn btn-secondary" onclick="_owzNewItem()" title="Добавить позицию свободным текстом — в справочник она не добавляется"><i class="ti ti-plus"></i> Вписать</button>' +
         '</div>' +
-        '<div id="owz-catalog" class="owz-catalog"></div>' +
+        '<div id="owz-catalog" class="owz2-catalog"></div>' +
         // Корзина
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;">' +
-          '<label style="font-weight:600;font-size:13px;">В заказе <span id="owz-cart-count" style="color:var(--text-light);font-weight:400;"></span></label>' +
-        '</div>' +
+        '<div class="owz2-sec-l"><i class="ti ti-shopping-cart"></i> В заказе <span id="owz-cart-count"></span></div>' +
         '<div id="owz-cart" class="owz-cart"></div>' +
-        // Доп. поля
-        '<div class="form-group" style="margin-top:12px;"><label>Ожидаемая дата приёмки</label><input type="date" id="owz-expected"></div>' +
-        '<div class="form-group"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно"></textarea></div>' +
-        '<div class="form-group"><label>Телефон для связи <span style="font-weight:400;color:var(--text-light);">(если нет позиции — позвонят сюда)</span></label>' +
-          '<input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …"></div>' +
+        // Детали заказа
+        '<div class="owz2-sec-l"><i class="ti ti-settings"></i> Детали заказа</div>' +
+        '<div class="owz2-grid2">' +
+          '<div class="form-group" style="margin:0;"><label>Ожидаемая дата приёмки</label><input type="date" id="owz-expected" class="owz2-inp"></div>' +
+          '<div class="form-group" style="margin:0;"><label>Телефон для связи</label><input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …" class="owz2-inp"></div>' +
+        '</div>' +
+        '<div class="form-group" style="margin-top:12px;"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно" class="owz2-inp"></textarea></div>' +
         // Подпись
-        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-mid);">' +
-          '<i class="ti ti-signature" style="color:var(--brand);"></i> Подпись: <b>' + (escapeHtml(signName) || '—') + '</b>' +
-          (signPos ? ' · ' + escapeHtml(signPos) : '') +
-          '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">Имя и должность подставляются из вашей карточки и уходят в письмо и документ.</div>' +
+        '<div class="owz2-sign">' +
+          '<i class="ti ti-signature owz2-sign-ic"></i>' +
+          '<div class="owz2-sign-t">Подпись: <b>' + (escapeHtml(signName) || '—') + '</b>' +
+            (signPos ? ' · ' + escapeHtml(signPos) : '') +
+            '<div class="owz2-sign-sub">Имя и должность подставляются из вашей карточки и уходят в письмо и документ.</div>' +
+          '</div>' +
         '</div>' +
-        '<div class="modal-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">' +
-          '<button class="btn btn-secondary" onclick="submitOrderWizard(false)"><i class="ti ti-device-floppy"></i> Сохранить черновик</button>' +
-          '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-send"></i> Создать и отправить</button>' +
-        '</div>' +
+      '</div>' +
+      '<div class="owz2-foot">' +
+        '<button class="btn btn-secondary" onclick="submitOrderWizard(false)"><i class="ti ti-device-floppy"></i> Сохранить черновик</button>' +
+        '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-mail-search"></i> Проверить письмо и отправить</button>' +
       '</div>' +
     '</div>';
   m.classList.add('visible');
@@ -9457,16 +9639,105 @@ async function openNewSupplyOrder() {
 }
 
 function _owzSupplierHint() {
-  const sel = document.getElementById('owz-supplier');
-  const opt = sel && sel.selectedOptions[0];
   const hint = document.getElementById('owz-sup-hint');
-  if (!opt || !opt.value) { if (hint) hint.textContent = ''; return; }
-  const email = opt.getAttribute('data-email') || '';
-  const phone = opt.getAttribute('data-phone') || '';
+  if (!hint) return;
+  if (!_owz.supplierId) { hint.textContent = ''; return; }
   const parts = [];
-  if (email) parts.push('✉ ' + email);
-  if (phone) parts.push('☎ ' + phone);
-  if (hint) hint.textContent = parts.join('   ') || 'Контакты не заполнены — письмо отправить не получится';
+  if (_owz.supplierEmail) parts.push('✉ ' + _owz.supplierEmail);
+  if (_owz.supplierPhone) parts.push('☎ ' + _owz.supplierPhone);
+  hint.textContent = parts.join('   ') || 'Контакты не заполнены — письмо отправить не получится';
+}
+
+// Поставщик: фильтр-подсказки при вводе названия
+function _owzSupFilter(q) {
+  const box = document.getElementById('owz-supplier-list');
+  if (!box) return;
+  // если изменили текст после выбора — сбрасываем выбранного, пока не кликнут заново
+  const inp = document.getElementById('owz-supplier-search');
+  if (_owz.supplierId && inp && (inp.value || '').trim() !== _owz.supplierName) {
+    _owz.supplierId = null; _owz.supplierEmail = ''; _owz.supplierPhone = ''; _owz.supplierName = '';
+    _owzSupplierHint();
+  }
+  const s = (q || '').trim().toLowerCase();
+  let sup = cache.suppliers || [];
+  if (s) sup = sup.filter(x => (x.name || '').toLowerCase().includes(s) || (x.email || '').toLowerCase().includes(s));
+  sup = sup.slice(0, 50);
+  if (!sup.length) {
+    box.innerHTML = '<div style="padding:10px 12px;color:var(--text-light);font-size:13px;">Поставщик не найден. Добавить можно в Справочники → Поставщики.</div>';
+    box.style.display = 'block';
+    return;
+  }
+  box.innerHTML = sup.map(x =>
+    '<div onclick="_owzSupPick(' + x.id + ')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);" ' +
+      'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+      '<div style="font-weight:600;font-size:14px;">' + escapeHtml(x.name || '—') + '</div>' +
+      ((x.email || x.phone)
+        ? '<div style="font-size:12px;color:var(--text-light);">' +
+            [x.email ? '✉ ' + escapeHtml(x.email) : '', x.phone ? '☎ ' + escapeHtml(x.phone) : ''].filter(Boolean).join('   ') +
+          '</div>'
+        : '') +
+    '</div>'
+  ).join('');
+  box.style.display = 'block';
+}
+
+function _owzSupPick(id) {
+  const x = (cache.suppliers || []).find(s => s.id === id);
+  if (!x) return;
+  _owz.supplierId = x.id;
+  _owz.supplierEmail = x.email || '';
+  _owz.supplierPhone = x.phone || '';
+  _owz.supplierName = x.name || '';
+  const inp = document.getElementById('owz-supplier-search');
+  if (inp) inp.value = x.name || '';
+  const box = document.getElementById('owz-supplier-list');
+  if (box) box.style.display = 'none';
+  _owzSupplierHint();
+  _owzRenderSupplier();
+}
+
+// v2.45.6xx: карточка выбранного поставщика (вместо поля поиска)
+function _owzRenderSupplier() {
+  const card = document.getElementById('owz-sup-card');
+  const wrap = document.getElementById('owz-sup-search-wrap');
+  if (!card) return;
+  if (!_owz.supplierId) {
+    card.innerHTML = '';
+    if (wrap) wrap.style.display = '';
+    return;
+  }
+  if (wrap) wrap.style.display = 'none';
+  const chips = [];
+  if (_owz.supplierEmail) chips.push('<span class="owz2-sup-chip"><i class="ti ti-mail"></i> ' + escapeHtml(_owz.supplierEmail) + '</span>');
+  if (_owz.supplierPhone) chips.push('<span class="owz2-sup-chip"><i class="ti ti-phone"></i> ' + escapeHtml(_owz.supplierPhone) + '</span>');
+  if (!chips.length) chips.push('<span class="owz2-sup-chip warn"><i class="ti ti-alert-triangle"></i> контакты не заполнены — письмо не уйдёт</span>');
+  card.innerHTML = '<div class="owz2-sup-card">' +
+    '<div class="owz2-sup-ava">' + escapeHtml(getInitials(_owz.supplierName)) + '</div>' +
+    '<div class="owz2-sup-body"><div class="owz2-sup-name">' + escapeHtml(_owz.supplierName || '—') + '</div>' +
+      '<div class="owz2-sup-contacts">' + chips.join('') + '</div></div>' +
+    '<button type="button" class="owz2-sup-change" onclick="_owzSupChange()">Сменить</button>' +
+  '</div>';
+}
+
+function _owzSupChange() {
+  _owz.supplierId = null; _owz.supplierEmail = ''; _owz.supplierPhone = ''; _owz.supplierName = '';
+  const inp = document.getElementById('owz-supplier-search');
+  if (inp) inp.value = '';
+  _owzSupplierHint();
+  _owzRenderSupplier();
+  if (inp) inp.focus();
+}
+
+// Enter в поле поставщика — выбрать единственного совпавшего
+function _owzSupKey(e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const inp = document.getElementById('owz-supplier-search');
+  const s = ((inp && inp.value) || '').trim().toLowerCase();
+  if (!s) return;
+  const matches = (cache.suppliers || []).filter(x =>
+    (x.name || '').toLowerCase().includes(s) || (x.email || '').toLowerCase().includes(s));
+  if (matches.length === 1) _owzSupPick(matches[0].id);
 }
 
 // Каталог комплектующих — как на производстве: группы по категориям,
@@ -9479,8 +9750,15 @@ function _owzRenderCatalog(filter) {
   if (q) comps = comps.filter(c =>
     (c.name || '').toLowerCase().includes(q) || (c.sku || '').toLowerCase().includes(q));
   if (!comps.length) {
+    const raw = (filter || '').trim();
     box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-light);font-size:13px;">' +
-      (q ? 'Ничего не найдено. Можно добавить кнопкой «Новая».' : 'Каталог комплектующих пуст.') + '</div>';
+      (q
+        ? 'В справочнике такого нет.<br>' +
+          '<button type="button" class="btn btn-primary btn-small" style="margin-top:10px;" onclick="_owzAddTyped()">' +
+            '<i class="ti ti-plus"></i> Добавить «' + escapeHtml(raw) + '» в заказ</button>' +
+          '<div style="margin-top:6px;color:var(--text-light);font-size:11.5px;">Позиция уйдёт в заказ как есть — в справочник не добавляется.</div>'
+        : 'Каталог комплектующих пуст.') +
+      '</div>';
     return;
   }
   const chosen = new Set(_owz.list.map(x => x.cid).filter(v => v != null));
@@ -9498,20 +9776,20 @@ function _owzRenderCatalog(filter) {
       if (c.sku) meta.push(escapeHtml(c.sku));
       meta.push('остаток: ' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.'));
       if (c.default_supplier_name) meta.push(escapeHtml(c.default_supplier_name));
-      return '<button type="button" class="bom-picker-item' + (inCart ? ' owz-in' : '') + '" onclick="_owzAdd(' + c.id + ')">' +
-        '<div class="bom-picker-item-name">' + escapeHtml(c.name || '—') +
-          (inCart ? ' <i class="ti ti-check" style="color:#059669;"></i>' : '') + '</div>' +
-        '<div class="bom-picker-item-meta">' + meta.join(' · ') + '</div>' +
-      '</button>';
+      return '<div class="owz2-cat-item' + (inCart ? ' in' : '') + '" onclick="_owzAdd(' + c.id + ')">' +
+        '<div class="owz2-ci-main"><div class="owz2-ci-name">' + escapeHtml(c.name || '—') + '</div>' +
+          '<div class="owz2-ci-meta">' + meta.join(' · ') + '</div></div>' +
+        '<span class="owz2-ci-add' + (inCart ? ' done' : '') + '"><i class="ti ti-' + (inCart ? 'check' : 'plus') + '"></i></span>' +
+      '</div>';
     }).join('');
-    return '<div class="bom-picker-group">' +
-      '<button type="button" class="bom-picker-toggle' + (isOpen ? ' open' : '') + '" ' +
-        'onclick="_owzToggleCat(' + JSON.stringify(cat).replace(/"/g, '&quot;') + ')">' +
-        '<i class="ti ti-chevron-right bom-picker-chev"></i>' +
-        '<span>' + escapeHtml(cat) + '</span>' +
-        '<span class="bom-picker-count">' + items.length + '</span>' +
-      '</button>' +
-      '<div class="bom-picker-body"' + (isOpen ? '' : ' style="display:none;"') + '>' + rows + '</div>' +
+    return '<div class="owz2-cat-grp">' +
+      '<div class="owz2-cat-head" onclick="_owzToggleCat(' + JSON.stringify(cat).replace(/"/g, '&quot;') + ')">' +
+        '<span class="owz2-cat-ic"><i class="ti ' + _nvIconFor(cat) + '"></i></span>' +
+        '<span class="owz2-cat-name">' + escapeHtml(cat) + '</span>' +
+        '<span class="owz2-cat-cnt">' + items.length + '</span>' +
+        '<i class="ti ti-chevron-' + (isOpen ? 'down' : 'right') + ' owz2-cat-chev"></i>' +
+      '</div>' +
+      '<div class="owz2-cat-body"' + (isOpen ? '' : ' style="display:none;"') + '>' + rows + '</div>' +
     '</div>';
   }).join('');
 }
@@ -9540,6 +9818,23 @@ function _owzSetQty(itemId, val) {
   ex.qty = (isNaN(n) || n <= 0) ? 0 : n;
 }
 
+function _owzSetUnit(itemId, val) {
+  const ex = _owz.list.find(x => x.id === itemId);
+  if (!ex) return;
+  ex.unit = (val || 'шт.').trim() || 'шт.';
+}
+
+// Частые единицы измерения для выпадашки в корзине. Если у позиции единица
+// нестандартная (из справочника) — добавляем её первой, чтобы не потерять.
+function _owzUnitOptions(current) {
+  const base = ['шт.', 'м', 'пог.м', 'м²', 'м³', 'компл.', 'упак.', 'кг', 'л', 'набор', 'рулон'];
+  const cur = (current || 'шт.').trim() || 'шт.';
+  const list = base.indexOf(cur) >= 0 ? base.slice() : [cur].concat(base);
+  return list.map(u =>
+    '<option value="' + escapeHtml(u) + '"' + (u === cur ? ' selected' : '') + '>' + escapeHtml(u) + '</option>'
+  ).join('');
+}
+
 function _owzRemove(itemId) {
   _owz.list = _owz.list.filter(x => x.id !== itemId);
   _owzRenderCart();
@@ -9556,32 +9851,50 @@ function _owzRenderCart() {
     return;
   }
   box.innerHTML = _owz.list.map((x, i) =>
-    '<div class="owz-cart-row">' +
-      '<div class="owz-cart-name">' + (i + 1) + '. ' + escapeHtml(x.name) + '</div>' +
-      '<input class="owz-cart-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
+    '<div class="owz2-crow">' +
+      '<span class="owz2-c-num">' + (i + 1) + '</span>' +
+      '<span class="owz2-c-name">' + escapeHtml(x.name) + '</span>' +
+      '<input class="owz2-c-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
         'onchange="_owzSetQty(' + x.id + ', this.value)">' +
-      '<span class="owz-cart-unit">' + escapeHtml(x.unit) + '</span>' +
-      '<button class="owz-cart-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
+      '<select class="owz2-c-unit" onchange="_owzSetUnit(' + x.id + ', this.value)" title="Единица измерения">' +
+        _owzUnitOptions(x.unit) +
+      '</select>' +
+      '<button class="owz2-c-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
     '</div>'
   ).join('');
 }
 
-// «Новая» — позиции нет в каталоге: добавляем свободной строкой прямо в заказ
-// (в каталог комплектующих не лезем). При создании заказа бэкенд приведёт её
-// к номенклатуре снабжения по названию.
+// Добавить позицию свободным текстом прямо в заказ (в справочник НЕ добавляем).
+// Берём то, что вписано в строку поиска. Единица по умолчанию «шт.».
+function _owzAddTyped() {
+  const inp = document.getElementById('owz-search');
+  const name = ((inp && inp.value) || '').trim();
+  if (!name) { if (inp) inp.focus(); return; }
+  const id = -(++_owz.custom);   // отрицательный id — кастомная строка
+  _owz.list.push({ id: id, cid: null, name: name, unit: 'шт.', qty: 1 });
+  if (inp) inp.value = '';
+  _owzRenderCart();
+  _owzRenderCatalog('');
+  showToast('Добавлено в заказ: ' + name, 'success');
+}
+
+// Кнопка «Вписать»: если в поиске уже есть текст — добавляем его сразу;
+// иначе спрашиваем название (и единицу) через prompt как запасной путь.
 function _owzNewItem() {
+  const inp = document.getElementById('owz-search');
+  if (((inp && inp.value) || '').trim()) { _owzAddTyped(); return; }
   const name = (prompt('Название позиции (свободный ввод):') || '').trim();
   if (!name) return;
   const unit = (prompt('Единица измерения (шт., м, компл. …):', 'шт.') || 'шт.').trim() || 'шт.';
-  const id = -(++_owz.custom);   // отрицательный id — кастомная строка
+  const id = -(++_owz.custom);
   _owz.list.push({ id: id, cid: null, name: name, unit: unit, qty: 1 });
   _owzRenderCart();
   showToast('Позиция добавлена в заказ', 'success');
 }
 
 async function submitOrderWizard(send) {
-  const supplierId = parseInt(document.getElementById('owz-supplier').value || '0') || null;
-  if (!supplierId) { showToast('Выберите поставщика', 'error'); return; }
+  const supplierId = _owz.supplierId || null;
+  if (!supplierId) { showToast('Выберите поставщика из списка', 'error'); return; }
   const items = _owz.list.filter(x => x.qty > 0).map(x => ({ name: x.name, unit: x.unit, qty: x.qty }));
   if (!items.length) { showToast('Добавьте хотя бы одну позицию с количеством', 'error'); return; }
   const payload = {
@@ -9592,8 +9905,7 @@ async function submitOrderWizard(send) {
     items,
   };
   if (send) {
-    const opt = document.getElementById('owz-supplier').selectedOptions[0];
-    if (!opt.getAttribute('data-email')) {
+    if (!_owz.supplierEmail) {
       showToast('У поставщика не указан email — добавьте его, либо «Сохранить черновик»', 'error');
       return;
     }
@@ -9615,12 +9927,26 @@ async function submitOrderWizard(send) {
     cache.supplyOrders = null;
     state.currentSupplyOrderId = created.id;
     if (send) {
+      // v2.45.605: не шлём вслепую — открываем превью письма (та же модалка, что
+      // у «Сформировать заказ»): видно текст, можно поправить и отправить.
+      try {
+        const pr = await fetch(API_BASE + '/api/supply-orders/' + created.id + '/preview', {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (pr.ok) {
+          const draft = await pr.json();
+          _renderOrderPreviewModal(draft);
+          return;   // остаёмся на месте, поверх — окно превью
+        }
+      } catch (_) { /* не валимся — ниже запасной путь */ }
+      // Запасной путь: превью не получили — отправляем напрямую, как раньше.
       showToast('Заказ #' + created.id + ' создан, отправляем…', 'success');
       await sendSupplyOrderByEmail(created.id);
+      selectSidebarItem('supply-order-detail');
     } else {
       showToast('Черновик заказа #' + created.id + ' создан', 'success');
+      selectSidebarItem('supply-order-detail');
     }
-    selectSidebarItem('supply-order-detail');
   } catch (e) {
     showToast('Ошибка', 'error');
   }
@@ -11899,6 +12225,228 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.609',
+    date: '30.06.2026',
+    title: 'Атом Электрика — вернули тёмную тему',
+    features: [
+      'По просьбе вернули мастеру «Атом Электрика» прежнюю тёмную тему',
+    ],
+  },
+  {
+    version: 'v2.45.608',
+    date: '30.06.2026',
+    title: 'Атом Электрика — светлая тема',
+    features: [
+      'Мастер «Атом Электрика» теперь на <b>белом фоне</b> вместо чёрного — карточки, формы и списки в светлой теме',
+      'Электрическая схема осталась на тёмном холсте (так читаемее), как и было',
+    ],
+  },
+  {
+    version: 'v2.45.607',
+    date: '30.06.2026',
+    title: 'Монтажный договор — кнопка «Закрыть договор»',
+    features: [
+      'В карточке монтажного договора появилась кнопка <b>«Закрыть договор»</b> — когда монтаж сдан клиенту, договор можно закрыть (раньше у монтажных договоров переключателя статуса не было)',
+      'Закрытый договор можно вернуть в работу кнопкой «вернуть в работу»',
+    ],
+  },
+  {
+    version: 'v2.45.606',
+    date: '30.06.2026',
+    title: '«Оформить заказ» — обновлённый вид',
+    features: [
+      'Форма заказа собрана по секциям: <b>Поставщик · Что заказываем · В заказе · Детали</b>',
+      'Выбранный поставщик показывается <b>карточкой</b> — аватар, название, почта и телефон чипами, кнопка «Сменить»',
+      'Каталог комплектующих — с <b>иконками категорий</b> и счётчиками; у позиции «＋», у добавленных — галочка',
+      'Кнопки <b>«Сохранить черновик» и «Проверить письмо и отправить» закреплены внизу</b> — всегда под рукой, не нужно прокручивать',
+      'Поиск поставщика, «вписать свою позицию», выбор единицы измерения — работают как раньше',
+    ],
+  },
+  {
+    version: 'v2.45.605',
+    date: '30.06.2026',
+    title: 'Заказ поставщику: видно письмо перед отправкой',
+    features: [
+      'В мастере «Оформить заказ» кнопка теперь — <b>«Проверить письмо и отправить»</b>: сначала показываем <b>текст письма поставщику</b>, а уже потом отправляем',
+      'В окне превью можно <b>поправить тему и текст</b> письма, проверить позиции и количество, открыть вложение-DOCX — и только затем нажать «Отправить»',
+      'Раньше «Создать и отправить» уходило сразу, текст письма было не видно',
+    ],
+  },
+  {
+    version: 'v2.45.604',
+    date: '30.06.2026',
+    title: 'Заказ поставщику: выбор единицы измерения',
+    features: [
+      'В корзине заказа у каждой позиции теперь можно <b>выбрать единицу</b>: шт., м, пог.м, м², компл., упак., кг, л и др.',
+      'Особенно удобно для вписанных вручную позиций — например, кабель в <b>метрах</b>',
+    ],
+  },
+  {
+    version: 'v2.45.603',
+    date: '30.06.2026',
+    title: '«Чаты» — новый вид списка',
+    features: [
+      'Чаты теперь в стиле мессенджера: <b>аватар с инициалами</b> (цвет по названию), у владельца — значок <b>короны</b> 👑',
+      'Название жирно + время справа; у чатов с непрочитанными — синий акцент и <b>счётчик непрочитанных</b>',
+      'Превью последнего сообщения; системные сообщения («добавил участника») — курсивом',
+      'Снизу — число участников и «вы владелец». Создание чата и открытие — как раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний вид',
+    ],
+  },
+  {
+    version: 'v2.45.602',
+    date: '30.06.2026',
+    title: 'Заказ поставщику: вписал позицию — и готово',
+    features: [
+      'В «Оформить заказ» <b>поставщик теперь с поиском</b>: начни вводить название — система подберёт; клик по подсказке выбирает его',
+      'Позицию, которой нет в справочнике, <b>можно просто вписать</b> — нажми Enter (или «Добавить … в заказ») и она уйдёт в заказ как есть',
+      'Создавать новую номенклатуру для этого <b>не нужно</b> — вписанная позиция в справочник не добавляется, просто едет в заказ',
+    ],
+  },
+  {
+    version: 'v2.45.601',
+    date: '30.06.2026',
+    title: '«Замечания» (Сервис) — новый вид',
+    features: [
+      'Список замечаний теперь карточками с <b>цветной полосой слева по статусу:</b> 🔵 Новое, 🟠 В работе, 🟢 Решено, ⚪ Отклонено. Видно состояние с одного взгляда',
+      '<b>Иконка в кружке = тип:</b> 🐞 Дефект (красный), ⚠️ Замечание (янтарный), 💡 Улучшение (зелёный), ❓ Вопрос (синий)',
+      'К чему относится (сборка / договор) — чипом справа; внизу автор с мини-аватаром, место, фото и дата',
+      'Фильтры слева (Все / Новые / В работе / Решённые / Отклонённые) и открытие карточки — как раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний вид',
+    ],
+  },
+  {
+    version: 'v2.45.600',
+    date: '30.06.2026',
+    title: '«Комплектующие» (Склад) — новый вид',
+    features: [
+      'KPI-плитки сверху теперь с <b>иконками</b> и цветными акцентами: всего позиций, ниже минимума, нет в наличии, ожидается приход',
+      'Строки позиций — с <b>цветной полосой слева по состоянию склада:</b> 🔴 нет в наличии, 🟠 критично (ниже минимума), 🟢 в норме, 🔵 избыток. Видно дефицит и запас по цвету',
+      'У каждой позиции — иконка категории, артикул отдельным чипом, остаток крупно (с минимумом), расход в месяц',
+      'Баннер дефицита под план, чипы категорий, поиск, фильтры «В наличии» / «Требуют внимания», кнопки «Заказать» / «Расход» / «Брак» — всё как раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний вид',
+    ],
+  },
+  {
+    version: 'v2.45.599',
+    date: '30.06.2026',
+    title: '«Производство» — новый вид (визуальный)',
+    features: [
+      'KPI-плитки сверху теперь с <b>иконками</b> и цветными акцентами: в очереди, в работе, просрочка, заблокированы, упаковка, за неделю — статус виден с одного взгляда',
+      'Колонки канбана помечены <b>цветной точкой</b>: очередь — серая, в работе — синяя, проверка — янтарная, упаковка — фиолетовая, готово — зелёная',
+      'Карточки и бары загрузки чуть аккуратнее (скруглённые статус-чипы)',
+      'Вся логика прежняя: перетаскивание карточек, AI-анализ, батч-помощь, таймеры «сейчас», блокировки по деталям',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на привычный вид',
+    ],
+  },
+  {
+    version: 'v2.45.598',
+    date: '30.06.2026',
+    title: 'Кнопка «Оплатить» на пришедшем счёте',
+    features: [
+      'У <b>привязанного к заказу</b> счёта на карточке появилась кнопка <b>«Оплатить»</b> — счёт пришёл, жмёшь, и заказ уходит в раздел «На оплату», бухгалтер получает уведомление',
+      'Платит <b>через сам заказ</b> — без задвоения: пришедшая позже УПД закроет именно этот заказ',
+      'Если запросил счёт вручную и он не привязался — сначала «Привязать к заказу», затем на карточке появится «Оплатить»',
+      'Кнопка скрыта, если заказ уже оплачивается, оплачен или отменён',
+    ],
+  },
+  {
+    version: 'v2.45.597',
+    date: '30.06.2026',
+    title: '«Отчёты менеджеров» — новый вид',
+    features: [
+      '<b>«Сводка за месяц»</b> сверху — 6 плиток с общими цифрами по всем менеджерам: звонки, дозвоны, заявки, КП, сделки, выручка. Видно общую картину сразу',
+      'Каждый менеджер — <b>карточкой с аватаром</b> и плитками итогов за месяц (выручка — золотом)',
+      '<b>Воронка конверсии</b> 🟢 — звонки → дозвоны → заявки → сделки с процентами на каждом шаге. Сразу понятно, где теряются клиенты и насколько эффективен менеджер',
+      '<b>«По дням»</b> — таблица сворачивается, чтобы не было простыни; внутри дневные цифры, нарастающий итог и кнопки «копировать для Telegram» и «удалить»',
+      'Ввод за день, копирование в Telegram, удаление и переключение месяцев — как раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний вид',
+    ],
+  },
+  {
+    version: 'v2.45.596',
+    date: '30.06.2026',
+    title: '«На оплату» прямо на карточке счёта',
+    features: [
+      'У входящего счёта (раздел «Счета — нужна привязка») кнопка <b>«На оплату»</b> теперь прямо на карточке — не нужно заходить в «Письмо»',
+      'Удобно, когда счёт <b>запросил вручную</b> и хочешь сразу отправить его в оплату, минуя привязку к заказу',
+      'Кнопка появляется только если к письму приложен документ-счёт',
+    ],
+  },
+  {
+    version: 'v2.45.595',
+    date: '30.06.2026',
+    title: 'Ответить поставщику прямо из письма',
+    features: [
+      'В карточке входящего письма появилась кнопка <b>«Ответить»</b> — можно написать поставщику, не выходя из CRM',
+      'Есть быстрые заготовки: <b>«Пришлите счёт»</b>, <b>«Уточните срок»</b>, <b>«Счёт + срок»</b> — текст подставляется в одно касание, его можно дописать',
+      'Ответ уходит <b>в ту же переписку</b> (тема «Re: [Заявка ORD-N]»), <b>подпись и цитата</b> их письма добавляются автоматически',
+      'Когда поставщик пришлёт счёт ответом — он, как и раньше, <b>сам привяжется к заказу</b> по метке заявки',
+    ],
+  },
+  {
+    version: 'v2.45.594',
+    date: '30.06.2026',
+    title: '«Коммерческие предложения» — новый вид списка',
+    features: [
+      'КП теперь <b>карточками-строками</b> с <b>аватаром клиента</b> — листать и искать глазами проще',
+      '<b>Цвет полосы слева = статус КП:</b> серая — черновик, 🔵 синяя — отправлен, 🟢 зелёная — принят, 🔴 красная — отклонён. Пробежал глазами список — сразу видно, где что',
+      'Контрагент крупно + статусная плашка того же цвета; для версий выше первой — значок <b>v2</b>',
+      'Ниже — <b>№ КП и ИНН</b>; справа крупно <b>сумма</b> и <b>менеджер</b> с мини-аватаром',
+      'Поиск, фильтры (Все / Черновики / Отправлены / Приняты / Отклонены) и открытие КП — как раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежнюю таблицу',
+    ],
+  },
+  {
+    version: 'v2.45.593',
+    date: '30.06.2026',
+    title: 'Приёмка УПД сама закрывает закупку',
+    features: [
+      'Когда оприходуешь поступление по <b>УПД от поставщика</b>, заказ снабжения теперь <b>закрывается автоматически</b> — больше не висит в «Ждём поставки»',
+      'Позиции уходят из списка <b>«Что закупить»</b> сами, как только заказ принят полностью',
+      'В договоре связанные позиции автоматически отмечаются <b>«Получено»</b> — не нужно проставлять руками',
+      'Сопоставление строк УПД с заказом стало умнее: ловит позицию и по <b>коду модели</b>, и по <b>НС-артикулу</b>, даже если в счёте название написано чуть иначе',
+    ],
+  },
+  {
+    version: 'v2.45.592',
+    date: '30.06.2026',
+    title: 'Защита от повторных счетов',
+    features: [
+      'Если один и тот же счёт случайно прислать в бота <b>дважды</b> — он больше <b>не уйдёт в оплату повторно</b>',
+      'Проверяем по <b>ИНН поставщика, сумме и номеру счёта</b> среди всех ранее загруженных — в ответ придёт «этот счёт уже есть в боте»',
+    ],
+  },
+  {
+    version: 'v2.45.591',
+    date: '29.06.2026',
+    title: 'Заказ поставщику — отправка до Миасса',
+    features: [
+      'В письмо и в <b>заявку поставщику</b> автоматически добавляется строка: «просим отправить транспортной компанией до г. Миасс» — не нужно дописывать вручную',
+    ],
+  },
+  {
+    version: 'v2.45.590',
+    date: '29.06.2026',
+    title: 'Схема (PDF) у модели снова открывается',
+    features: [
+      'Исправили ошибку, из-за которой <b>«Схема (PDF)»</b> у модели не открывалась (выдавала 404) — теперь файл открывается как положено',
+    ],
+  },
+  {
+    version: 'v2.45.589',
+    date: '30.06.2026',
+    title: '«Договоры» — новый вид списка',
+    features: [
+      'Список договоров теперь <b>карточками-строками</b> с <b>аватаром клиента</b> — листать и искать глазами проще',
+      'Слева <b>цветная полоса</b> по сроку: 🔴 просрочен, 🟢 в работе в срок, серая — отгружен/закрыт',
+      'Контрагент крупно + <b>статусная плашка</b>; для горящих — значок <b>⚠️ ПРОСРОЧЕН / 🔥 ГОРИТ</b>',
+      'Справа в одну линию: <b>срок</b> (красный чип, если просрочен), <b>сумма</b> крупно и <b>менеджер</b> — суммы выстроены в колонку, удобно пробежать глазами',
+      'Поиск и фильтры (Все / В производстве / Готов к отгрузке / Отгружен / Закрыт) — прежние; клик открывает договор как и раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежнюю таблицу',
+    ],
+  },
   {
     version: 'v2.45.587',
     date: '30.06.2026',
@@ -16710,8 +17258,8 @@ function renderDevelopmentDetail(dev) {
   if (!pane) return;
   if (!dev) {
     pane.innerHTML = '<div class="dev-empty"><i class="ti ti-bulb"></i>' +
-      '<div class="dev-empty-title">Выбери разработку слева</div>' +
-      '<div class="dev-empty-sub">или создай новую кнопкой «Новая разработка»</div>' +
+      '<div class="dev-empty-title">Выбери разработку из списка</div>' +
+      '<div class="dev-empty-sub">или создай новую кнопкой «+»</div>' +
     '</div>';
     return;
   }

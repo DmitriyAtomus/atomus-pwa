@@ -8372,11 +8372,25 @@ function _contractTypeLabel(t) {
   return 'поставка';
 }
 
+function toggleContractsV2() {
+  window.CT_V2 = !window.CT_V2;
+  try { localStorage.setItem('ctV2', window.CT_V2 ? '1' : '0'); } catch (_) {}
+  renderContractsList();
+}
+
+function _ctV2ToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.CT_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.CT_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleContractsV2()">' + (window.CT_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
 function renderContractsList() {
   const container = document.getElementById('sc-content');
   const counts = cache.contractsCounts || {};
   const filter = state.salesContractsFilter;
   const search = (state.salesContractsSearch || '').toLowerCase().trim();
+  window.CT_V2 = (localStorage.getItem('ctV2') !== '0');
 
   // Обновляем счётчики в чипсах
   document.querySelectorAll('#sc-filters .filter-chip').forEach(chip => {
@@ -8413,11 +8427,23 @@ function renderContractsList() {
     );
   }
 
+  const toggle = _ctV2ToggleBar();
+
   if (!list.length) {
-    container.innerHTML = '<div class="empty-block"><i class="ti ti-file-text"></i>Нет договоров под этот фильтр</div>';
+    container.innerHTML = toggle + '<div class="empty-block"><i class="ti ti-file-text"></i>Нет договоров под этот фильтр</div>';
     return;
   }
 
+  // v2.45.5xx: новый вид — карточки-строки (адаптивные)
+  if (window.CT_V2) {
+    let html = toggle + '<div class="ct2-list">';
+    list.forEach(c => { html += _ct2Row(c); });
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
+  // === Старый вид (для отката) ===
   // На десктопе — таблица, на мобильном — карточки
   if (state.isDesktop) {
     let html = '<div style="padding: 0 0 16px;"><div class="contracts-table">';
@@ -8458,7 +8484,7 @@ function renderContractsList() {
         '</div>';
     });
     html += '</div></div>';
-    container.innerHTML = html;
+    container.innerHTML = toggle + html;
   } else {
     let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
     list.forEach(c => {
@@ -8478,8 +8504,60 @@ function renderContractsList() {
         '</div>';
     });
     html += '</div>';
-    container.innerHTML = html;
+    container.innerHTML = toggle + html;
   }
+}
+
+// v2.45.5xx: статусная плашка договора (новый вид списка)
+function _ct2StatusPill(c) {
+  const map = {
+    production: 'prod', ready: 'ready', shipped: 'ship',
+    partially_shipped: 'part', closed: 'closed', draft: 'draft',
+  };
+  const cls = map[c.status] || 'closed';
+  return '<span class="ct2-pill ' + cls + '">' + escapeHtml(c.status_label || c.status || '—') + '</span>';
+}
+
+// v2.45.5xx: строка-карточка договора (новый вид списка)
+function _ct2Row(c) {
+  const urg = getContractUrgencyClass(c);
+  let stripCls = '';
+  if (urg === 'urg-overdue') stripCls = 'late';
+  else if (urg === 'urg-urgent') stripCls = 'hot';
+  else if (urg === 'urg-soon' || urg === 'urg-ok') stripCls = 'ok';
+  else if (urg === 'urg-done') stripCls = 'done';
+
+  let urgPill = '';
+  if (urg === 'urg-overdue') urgPill = '<span class="ct2-urg over"><span class="em">⚠️</span> ПРОСРОЧЕН</span>';
+  else if (urg === 'urg-urgent') urgPill = '<span class="ct2-urg hot"><span class="em">🔥</span> ГОРИТ</span>';
+
+  let dchCls = '';
+  if (urg === 'urg-overdue') dchCls = ' late';
+  else if (urg === 'urg-urgent') dchCls = ' hot';
+  const dateChip = '<span class="ct2-date-chip' + dchCls + '">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</span>';
+
+  const sub = escapeHtml(c.number || '—') + ' · ' +
+    escapeHtml(_contractTypeLabel(c.contract_type)) + ' · ' +
+    escapeHtml(legalEntityShortName(c.legal_entity));
+
+  const mgrName = c.manager_name || '—';
+  const mgr = '<div class="ct2-mgr"><span class="ct2-mgr-ava">' + escapeHtml(getInitials(mgrName)) + '</span>' +
+    '<span class="ct2-mgr-name">' + escapeHtml(mgrName) + '</span></div>';
+
+  const sumHtml = canSeeMoney() ? '<div class="ct2-sum">' + formatMoney(c.sum_amount) + '</div>' : '';
+
+  return '<div class="ct2-row ' + stripCls + '" onclick="openContract(' + c.id + ')">' +
+    '<div class="ct2-ava">' + escapeHtml(getInitials(c.contractor_name)) + '</div>' +
+    '<div class="ct2-main">' +
+      '<div class="ct2-top"><span class="ct2-client">' + escapeHtml(c.contractor_name || '—') + '</span>' + _ct2StatusPill(c) + urgPill + '</div>' +
+      '<div class="ct2-sub">' + sub + '</div>' +
+    '</div>' +
+    '<div class="ct2-right">' +
+      '<div class="ct2-term"><span class="ct2-term-lbl">срок</span>' + dateChip + '</div>' +
+      sumHtml + mgr +
+      '<span class="ct2-arrow em">›</span>' +
+    '</div>' +
+  '</div>';
 }
 
 // --------- КАРТОЧКА ДОГОВОРА ----------
@@ -8609,6 +8687,29 @@ function renderContractDetail(c) {
       'onmouseout="this.style.color=\'var(--text-light)\';this.style.borderColor=\'var(--border)\';" ' +
       'title="Пересчитать привязки сборок к договорам (cleanup + backfill)">' +
       '<i class="ti ti-refresh"></i> Пересобрать резервы</button>';
+  }
+
+  // Монтажный договор: производственного статус-переключателя нет (статусы — в
+  // блоке «Монтаж»), но по завершении монтаж сдан и договор нужно закрыть.
+  // Отдельная кнопка «Закрыть договор» (changeContractStatus сам спросит пароль
+  // и подтверждение, т.к. сборок/коробок к отгрузке у монтажа обычно нет).
+  if (canEdit && !isDraft && isInstallOnly) {
+    html += '<div style="margin-top:16px;">';
+    if (c.status === 'closed') {
+      html += '<div style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#047857;">' +
+        '<i class="ti ti-lock-check"></i> Договор закрыт</div>' +
+        '<button onclick="changeContractStatus(' + c.id + ', \'production\')" ' +
+        'style="margin-left:10px;padding:6px 12px;font-size:12px;background:transparent;color:var(--text-light);' +
+        'border:1px dashed var(--border);border-radius:8px;cursor:pointer;">' +
+        '<i class="ti ti-rotate"></i> вернуть в работу</button>';
+    } else {
+      html += '<button onclick="changeContractStatus(' + c.id + ', \'closed\')" ' +
+        'style="padding:9px 16px;font-size:13.5px;font-weight:600;background:var(--brand);color:#fff;' +
+        'border:none;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">' +
+        '<i class="ti ti-circle-check"></i> Закрыть договор</button>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:6px;">Монтаж сдан клиенту — можно закрыть договор</div>';
+    }
+    html += '</div>';
   }
 
   // Детали
