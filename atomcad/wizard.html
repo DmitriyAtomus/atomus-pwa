@@ -7,7 +7,7 @@
 <title>AtomCAD · Мастер</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--graphite:#15191F;--panel:#FFFFFF;--panel2:#EEF2F6;--line:#E2E8F0;--desk:#F5F7FA;--paper:#F6F8FA;--ink:#1C2B38;--cyan:#16B7DB;--cyandim:rgba(22,183,219,.12);--amber:#FFC400;--txt:#1C2B38;--dim:#6B7785;--ok:#5BD6A2;--red:#FF7A7A;--teal:#36C5D6;--violet:#B98AF0}
+:root{--graphite:#15191F;--panel:#1C222B;--panel2:#212935;--line:#2A323E;--desk:#10141A;--paper:#F6F8FA;--ink:#1C2B38;--cyan:#16B7DB;--cyandim:rgba(22,183,219,.12);--amber:#FFC400;--txt:#C9D4DF;--dim:#6B7785;--ok:#5BD6A2;--red:#FF7A7A;--teal:#36C5D6;--violet:#B98AF0}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--desk);color:var(--txt);font-family:'IBM Plex Sans',system-ui,sans-serif;display:flex;flex-direction:column;height:100%;overflow:hidden}
@@ -23,14 +23,14 @@ body{background:var(--desk);color:var(--txt);font-family:'IBM Plex Sans',system-
 .step.on .num{background:var(--cyan);color:#06262E;border-color:transparent}.step.done .num{background:rgba(91,214,162,.18);color:var(--ok);border-color:transparent}
 .step .lbl{font-size:12px;color:var(--dim)}.step.on .lbl{color:var(--txt);font-weight:600}.step.done .lbl{color:var(--txt)}
 .wrap{flex:1;overflow-y:auto;padding:20px 14px 86px}.sheet{max-width:1000px;margin:0 auto}
-.h{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}.h h2{font-size:19px;font-weight:600;color:#1C2B38}.h .c{font-size:12px;color:var(--cyan);font-family:'IBM Plex Mono'}
+.h{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}.h h2{font-size:19px;font-weight:600;color:#E7EEF4}.h .c{font-size:12px;color:var(--cyan);font-family:'IBM Plex Mono'}
 .sub{font-size:13px;color:var(--dim);margin-bottom:18px;line-height:1.5}
 .grid{display:grid;gap:11px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
 @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px}
 .card.sel{border-color:var(--amber);background:linear-gradient(180deg,rgba(255,196,0,.06),transparent)}.card.sel2{border-color:rgba(22,183,219,.5)}
 .cardpick{cursor:pointer}.cardpick:hover{border-color:#3A4450}
-.ctitle{display:flex;align-items:center;gap:10px}.cname{font-size:14px;font-weight:600;color:#1C2B38}.ccode{display:block;font-family:'IBM Plex Mono';font-size:11px;color:var(--dim);margin-top:3px}.cname{display:block}
+.ctitle{display:flex;align-items:center;gap:10px}.cname{font-size:14px;font-weight:600;color:#E7EEF4}.ccode{display:block;font-family:'IBM Plex Mono';font-size:11px;color:var(--dim);margin-top:3px}.cname{display:block}
 .cnt{margin-left:auto;background:var(--graphite);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:12px;color:var(--dim);font-family:'IBM Plex Mono'}
 .chk{margin-left:auto;width:21px;height:21px;border-radius:50%;background:var(--amber);color:#3A2E00;display:flex;align-items:center;justify-content:center;font-size:12px}.chk.cy{background:var(--cyan);color:#06262E}
 .form{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:14px}
@@ -41,14 +41,14 @@ body{background:var(--desk);color:var(--txt);font-family:'IBM Plex Sans',system-
 .fld input.w70{width:74px}.fld input.w90{width:92px}
 .addbtn{background:var(--cyan);border:none;color:#06262E;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;height:36px}
 .row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:9px}
-.row .body{flex:1;min-width:0}.row .nm{display:block;font-size:13.5px;font-weight:500;color:#1C2B38}.row .meta{display:block;font-size:11.5px;color:var(--dim);margin-top:3px;font-family:'IBM Plex Mono'}
+.row .body{flex:1;min-width:0}.row .nm{display:block;font-size:13.5px;font-weight:500;color:#E7EEF4}.row .meta{display:block;font-size:11.5px;color:var(--dim);margin-top:3px;font-family:'IBM Plex Mono'}
 .pill{display:inline-flex;gap:4px;background:var(--graphite);border:1px solid var(--line);border-radius:18px;padding:2px 9px;font-size:11px;color:var(--txt);font-family:'IBM Plex Mono';margin-left:6px}
 .pill.cy{color:var(--cyan)}.pill.gr{color:var(--ok)}
 .del{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:none;color:var(--dim);cursor:pointer}
 .empty{font-size:12.5px;color:#566370;padding:8px 2px}
 .counts{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:12px 0}@media(max-width:640px){.counts{grid-template-columns:repeat(2,1fr)}}
 .cc{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px}.cc .t{font-size:10px;color:var(--dim);text-transform:uppercase;display:flex;gap:6px;align-items:center}.cc .t .d{width:8px;height:8px;border-radius:2px}
-.cc .big{font-family:'IBM Plex Mono';font-size:20px;font-weight:600;margin-top:3px;color:#1C2B38}.cc .big small{font-size:11px;color:var(--dim)}.cc .bar{height:5px;border-radius:3px;background:var(--graphite);margin-top:6px;overflow:hidden}.cc .bar i{display:block;height:100%}.cc.warn .big{color:var(--red)}
+.cc .big{font-family:'IBM Plex Mono';font-size:20px;font-weight:600;margin-top:3px;color:#E7EEF4}.cc .big small{font-size:11px;color:var(--dim)}.cc .bar{height:5px;border-radius:3px;background:var(--graphite);margin-top:6px;overflow:hidden}.cc .bar i{display:block;height:100%}.cc.warn .big{color:var(--red)}
 .pins{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}@media(max-width:640px){.pins{grid-template-columns:1fr}}
 .pin{display:flex;align-items:center;gap:8px;background:var(--graphite);border:1px solid var(--line);border-radius:9px;padding:7px 9px;cursor:pointer;font-size:12px}
 .pin .id{font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:var(--dim);width:32px;text-align:center;border-radius:5px;padding:2px 0;background:var(--panel2)}
@@ -64,14 +64,14 @@ body{background:var(--desk);color:var(--txt);font-family:'IBM Plex Sans',system-
 .brow .bar{height:6px;border-radius:4px;background:var(--graphite);margin:8px 0;overflow:hidden}.brow .bar i{display:block;height:100%}
 .lchips{display:flex;gap:6px;flex-wrap:wrap}.lchip{display:inline-flex;align-items:center;gap:6px;background:var(--graphite);border:1px solid var(--line);border-radius:16px;padding:2px 6px 2px 9px;font-size:11px}.lchip .a{font-family:'IBM Plex Mono';color:var(--dim)}.lchip .rm{width:15px;height:15px;border-radius:50%;border:none;background:rgba(255,122,122,.15);color:var(--red);cursor:pointer;font-size:9px;line-height:1}
 .over{color:var(--red);font-size:12px;margin-top:6px}
-.phase{display:flex;gap:9px;margin-bottom:12px}.phbox{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px;text-align:center}.phbox .l{font-size:11px;color:var(--dim);font-family:'IBM Plex Mono'}.phbox .v{font-family:'IBM Plex Mono';font-size:17px;font-weight:600;color:#1C2B38;margin-top:3px}
+.phase{display:flex;gap:9px;margin-bottom:12px}.phbox{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px;text-align:center}.phbox .l{font-size:11px;color:var(--dim);font-family:'IBM Plex Mono'}.phbox .v{font-family:'IBM Plex Mono';font-size:17px;font-weight:600;color:#E7EEF4;margin-top:3px}
 .svgcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:13px}.svgcard svg{width:100%;height:auto;display:block;background:var(--graphite);border-radius:9px}
 table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{background:var(--panel2);color:var(--dim);text-align:left;padding:8px 9px;font-size:9.5px;text-transform:uppercase;border-bottom:1px solid var(--line)}table.spec td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--txt)}table.spec td.d{font-family:'IBM Plex Mono';color:var(--cyan);white-space:nowrap}table.spec td.c{text-align:center;color:var(--dim)}
 .note{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.45}
 .foot{position:fixed;left:0;right:0;bottom:0;padding:11px 14px;background:linear-gradient(180deg,rgba(16,20,26,0),var(--desk) 30%)}.foot .inner{max-width:1000px;margin:0 auto;display:flex;gap:9px;align-items:center}
 .nav{border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:11px;padding:11px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer}.nav.cy{background:var(--cyan);border-color:transparent;color:#06262E}.nav:disabled{opacity:.4;cursor:default}.spacer{flex:1}.savechip{font-size:11.5px;color:var(--dim);display:flex;gap:6px;align-items:center}.savechip .d{width:7px;height:7px;border-radius:50%;background:var(--ok)}
 .mask{position:fixed;inset:0;background:rgba(8,12,17,.7);display:none;align-items:center;justify-content:center;z-index:40}.mask.show{display:flex}
-.confirm{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px;max-width:360px;width:92%}.confirm h4{font-size:15px;margin-bottom:8px;color:#1C2B38}.confirm p{font-size:13px;color:var(--dim);margin-bottom:15px;line-height:1.5}.confirm .r{display:flex;gap:9px}.confirm button{flex:1;border-radius:10px;padding:11px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--line)}.confirm .ok{background:var(--cyan);border-color:transparent;color:#06262E}.confirm .no{background:none;color:var(--dim)}
+.confirm{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px;max-width:360px;width:92%}.confirm h4{font-size:15px;margin-bottom:8px;color:#E7EEF4}.confirm p{font-size:13px;color:var(--dim);margin-bottom:15px;line-height:1.5}.confirm .r{display:flex;gap:9px}.confirm button{flex:1;border-radius:10px;padding:11px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--line)}.confirm .ok{background:var(--cyan);border-color:transparent;color:#06262E}.confirm .no{background:none;color:var(--dim)}
 .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#10212F;color:#fff;font-size:12px;padding:9px 14px;border-radius:10px;opacity:0;transition:opacity .25s;z-index:45;border:1px solid var(--line);white-space:nowrap}.toast.show{opacity:1}
 </style>
 </head>
@@ -121,7 +121,7 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
 <div id="cabTip" style="position:fixed;z-index:60;display:none;pointer-events:none;background:#10212F;color:#fff;font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);max-width:280px;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.4)"></div>
-<div id="cabCard" style="position:fixed;z-index:70;display:none;left:50%;top:90px;transform:translateX(-50%);min-width:280px;max-width:360px;background:#13202B;color:#1C2B38;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55)">
+<div id="cabCard" style="position:fixed;z-index:70;display:none;left:50%;top:90px;transform:translateX(-50%);min-width:280px;max-width:360px;background:#13202B;color:#E7EEF4;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55)">
   <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)">
     <span id="cabCardTag" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--cyan)"></span>
     <span id="cabCardType" style="font-size:12px;color:#8FA0AE"></span>
@@ -176,7 +176,7 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 var cfCb=null,cfNoCb=null;
 function ask(t,x,cb,noCb){$('cfT').textContent=t;$('cfX').textContent=x;cfCb=cb;cfNoCb=noCb||null;$('mask').classList.add('show')}
 $('cfOk').onclick=function(){$('mask').classList.remove('show');var f=cfCb;cfCb=null;cfNoCb=null;if(f)f()};$('cfNo').onclick=function(){$('mask').classList.remove('show');var f=cfNoCb;cfCb=null;cfNoCb=null;if(f)f()};
-function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0'+(it.used?';opacity:.6':'')+'">'+esc(it.label)+(it.note?'<span class="tag" style="background:rgba(22,183,219,.16);border:1px solid #16B7DB;color:#0C6E86">✓ '+esc(it.note)+'</span>':'')+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
+function openChooser(title,items,cb){$('chT').textContent=title;var h='';items.forEach(function(it,i){h+='<button class="pbtn" data-i="'+i+'" style="margin:0'+(it.used?';opacity:.6':'')+'">'+esc(it.label)+(it.note?'<span class="tag" style="background:rgba(22,183,219,.16);border:1px solid #16B7DB;color:#9be0f5">✓ '+esc(it.note)+'</span>':'')+(it.tag?'<span class="tag '+it.tag+'">'+it.tag+'</span>':'')+'</button>'});$('chList').innerHTML=h;Array.prototype.forEach.call($('chList').children,function(el){el.onclick=function(){$('chMask').classList.remove('show');cb(items[+el.dataset.i].value)}});$('chMask').classList.add('show')}
 $('chNo').onclick=function(){$('chMask').classList.remove('show')};
 function toast(t){var e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},2400)}
 
@@ -249,7 +249,7 @@ function pSectionDrawings(code){
   else{items.forEach(function(p){
     h+='<button class="pbtn" style="margin:0 0 7px;align-items:flex-start;gap:11px" onclick="openDrawing(\''+esc(p.id)+'\')">'+
          '<span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left">'+
-           '<span style="color:#1C2B38;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name||'Без названия')+'</span>'+
+           '<span style="color:#E7EEF4;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name||'Без названия')+'</span>'+
            '<span class="mono" style="font-size:10.5px;color:var(--dim)">'+esc(p.section+'.'+pad3(p.num))+' · '+fmtWhen(p.when)+(p.owner?' · '+esc(p.owner):'')+'</span>'+
          '</span>'+
          '<span class="tag AI" style="flex:0 0 auto">открыть ✎</span>'+
@@ -428,7 +428,7 @@ function hmiBlock(){
     h+='<div class="note" style="margin-top:2px">'+(H_.supply?('питание '+esc(H_.supply)+' · '):'')+'связь RS-485 с контроллером. Вырез нарисуется на двери штриховкой и попадёт в спецификацию.</div>';
     if(H_.terminals&&H_.terminals.length){
       h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
-      H_.terminals.forEach(function(t){h+='<span class="tag" style="background:rgba(91,214,162,.12);border:1px solid #2E8B57;color:#15803D;padding:2px 7px;border-radius:6px;font-family:\'IBM Plex Mono\';font-size:11px">'+esc(t)+'</span>';});
+      H_.terminals.forEach(function(t){h+='<span class="tag" style="background:rgba(91,214,162,.12);border:1px solid #2E8B57;color:#9be6c4;padding:2px 7px;border-radius:6px;font-family:\'IBM Plex Mono\';font-size:11px">'+esc(t)+'</span>';});
       h+='</div>';
     }
   }
@@ -817,7 +817,7 @@ function pAux(){
          '<button class="addbtn" onclick="doneEditAux()">✓ Готово</button>'+
          '<button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }else{
-      h+='<div class="row">'+(a.ugo?ugoSvgBox(a.ugo):auxSym(a.kind))+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(a.ctrl?(' · <span style="color:var(--amber)">'+esc(coilLabel(a.kind))+' ← '+esc(a.ctrl)+'</span>'):'')+(a.feed?(' · <span style="color:var(--violet)">сила ← '+esc(a.feed)+'</span>'):'')+(auxSwitches(a.kind)?(' · '+(a.target?('коммутирует → '+esc(a.target)):'<span style="color:var(--amber)">коммутирует?</span>')):'')+(a.kind==='psu'&&a.target?(' · питает → '+esc(a.target)):'')+(a.signalTo?(' · <span style="color:#0E7C8B">сигнал → '+esc(a.signalTo==='__term__'?'клемма':a.signalTo)+'</span>'):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
+      h+='<div class="row">'+(a.ugo?ugoSvgBox(a.ugo):auxSym(a.kind))+'<span class="pill" style="font-family:\'IBM Plex Mono\';color:var(--cyan);min-width:42px;justify-content:center">'+esc(a.tag||'')+'</span><span class="body"><span class="nm">'+esc(a.name)+'</span><span class="meta">'+esc(auxKindLabel(a.kind))+(a.model?(' · '+esc(a.model)):'')+(a.ctrl?(' · <span style="color:var(--amber)">'+esc(coilLabel(a.kind))+' ← '+esc(a.ctrl)+'</span>'):'')+(a.feed?(' · <span style="color:var(--violet)">сила ← '+esc(a.feed)+'</span>'):'')+(auxSwitches(a.kind)?(' · '+(a.target?('коммутирует → '+esc(a.target)):'<span style="color:var(--amber)">коммутирует?</span>')):'')+(a.kind==='psu'&&a.target?(' · питает → '+esc(a.target)):'')+(a.signalTo?(' · <span style="color:#3fd0c0">сигнал → '+esc(a.signalTo==='__term__'?'клемма':a.signalTo)+'</span>'):'')+(a.qty>1?(' · ×'+a.qty):'')+(a.a?(' · '+a.a+' А'):'')+'</span></span><button class="del" title="Изменить" onclick="startEditAux(\''+a.id+'\')">✎</button><button class="del" onclick="rmAux(\''+a.id+'\')">✕</button></div>';
     }
   });
   return h;}
@@ -975,7 +975,7 @@ function auxSignals(kind){return kind==='switch'||kind==='button'||kind==='estop
 function auxSignalEditor(a){
   var cur=a.signalTo||'', curTxt=cur==='__term__'?'на клемму':cur;
   var h='<div style="display:flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 6px;background:var(--graphite);min-width:160px">';
-  h+='<span style="color:#0E7C8B;font-size:11px;white-space:nowrap">сигнал →</span>';
+  h+='<span style="color:#3fd0c0;font-size:11px;white-space:nowrap">сигнал →</span>';
   h+='<select title="дискретный сигнал: на вход контроллера (DI) или на клемму" style="background:transparent;border:none;color:var(--cyan);font-size:12px;outline:none;cursor:pointer;max-width:150px" onchange="editAuxSetSignal(\''+a.id+'\',this.value)">'+auxSignalOptions(a,cur,curTxt)+'</select>';
   if(cur)h+='<button class="rm" title="очистить" onclick="editAuxSetSignal(\''+a.id+'\',\'\')">✕</button>';
   h+='</div>';
@@ -1835,7 +1835,7 @@ async function openLibrary(){
       var open=cid!=null&&String(r.id)===String(cid);
       h+='<button class="pbtn" data-open="'+esc(r.id)+'" style="margin:0;align-items:flex-start;gap:11px">'+
            '<span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left">'+
-             '<span style="color:#1C2B38;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'Без названия')+(open?' <span class="tag AI" style="margin-left:4px">открыт</span>':'')+'</span>'+
+             '<span style="color:#E7EEF4;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'Без названия')+(open?' <span class="tag AI" style="margin-left:4px">открыт</span>':'')+'</span>'+
              '<span class="mono" style="font-size:10.5px;color:var(--dim)">'+esc((r.section||'')+'.'+('00'+(r.num||0)).slice(-3))+' · '+fmtWhen(r.when)+(r.owner?' · '+esc(r.owner):'')+'</span>'+
            '</span>'+
            '<span class="del" data-del="'+esc(r.id)+'" data-name="'+esc(r.name||'')+'" title="Удалить" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center">✕</span>'+
@@ -1943,7 +1943,7 @@ async function recognizeDatasheet(){
 }
 function renderDatasheet(d){
   var dim=d.dimensions||{},io=d.io||{};
-  function row(l,v){return (v==null||v==='')?'':'<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--dim);min-width:120px;font-size:12px">'+l+'</span><span style="color:#1C2B38;font-size:12.5px">'+esc(v)+'</span></div>';}
+  function row(l,v){return (v==null||v==='')?'':'<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--dim);min-width:120px;font-size:12px">'+l+'</span><span style="color:#E7EEF4;font-size:12.5px">'+esc(v)+'</span></div>';}
   var dimStr=(dim.width_mm||'?')+'×'+(dim.height_mm||'?')+(dim.depth_mm?'×'+dim.depth_mm:'')+' мм';
   var ioArr=[];if(io.relays)ioArr.push(io.relays+' реле');if(io.analog_inputs)ioArr.push(io.analog_inputs+' AI');if(io.digital_inputs)ioArr.push(io.digital_inputs+' DI');if(io.analog_outputs)ioArr.push(io.analog_outputs+' AO');
   var ioComplete=(d.io_complete!==false);
