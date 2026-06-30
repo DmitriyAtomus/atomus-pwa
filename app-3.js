@@ -9570,51 +9570,54 @@ async function openNewSupplyOrder() {
 
   const m = document.getElementById('supply-modal');
   m.innerHTML =
-    '<div class="modal owz-modal" onclick="event.stopPropagation()" style="max-width:640px;width:96vw;">' +
+    '<div class="modal owz-modal owz2" onclick="event.stopPropagation()" style="max-width:660px;width:96vw;">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-clipboard-plus"></i> Оформить заказ</h3>' +
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
-        // Поставщик — поиск с подсказками (начни вводить название)
-        '<div class="form-group" style="position:relative;"><label>Поставщик *</label>' +
+        // Поставщик — поиск с подсказками (начни вводить название) + карточка выбранного
+        '<div class="owz2-sec-l"><i class="ti ti-truck"></i> Поставщик</div>' +
+        '<div class="form-group" style="position:relative;margin-bottom:0;" id="owz-sup-search-wrap">' +
           '<input id="owz-supplier-search" type="text" autocomplete="off" placeholder="Начните вводить название…" ' +
             'oninput="_owzSupFilter(this.value)" onfocus="_owzSupFilter(this.value)" ' +
             'onkeydown="_owzSupKey(event)" ' +
             'onblur="setTimeout(function(){var b=document.getElementById(\'owz-supplier-list\');if(b)b.style.display=\'none\';},180)" ' +
-            'style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
-          '<div id="owz-supplier-list" style="display:none;position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:240px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>' +
+            'class="owz2-inp">' +
+          '<div id="owz-supplier-list" class="owz2-sup-list" style="display:none;"></div>' +
           '<div id="owz-sup-hint" style="font-size:12px;color:var(--text-light);margin-top:4px;"></div>' +
         '</div>' +
-        // Номенклатура
-        '<label style="font-weight:600;font-size:13px;display:block;margin:4px 0 6px;">Номенклатура комплектующих</label>' +
-        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
+        '<div id="owz-sup-card"></div>' +
+        // Что заказываем
+        '<div class="owz2-sec-l"><i class="ti ti-package"></i> Что заказываем</div>' +
+        '<div class="owz2-srow">' +
           '<input id="owz-search" type="search" placeholder="Поиск или впишите свою позицию…" oninput="_owzRenderCatalog(this.value)" ' +
-            'onkeydown="if(event.key===\'Enter\'){event.preventDefault();_owzAddTyped();}" ' +
-            'style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
-          '<button class="btn btn-secondary btn-small" onclick="_owzNewItem()" title="Добавить позицию свободным текстом — в справочник она не добавляется"><i class="ti ti-plus"></i> Вписать</button>' +
+            'onkeydown="if(event.key===\'Enter\'){event.preventDefault();_owzAddTyped();}" class="owz2-inp" style="flex:1;min-width:0;">' +
+          '<button class="btn btn-secondary" onclick="_owzNewItem()" title="Добавить позицию свободным текстом — в справочник она не добавляется"><i class="ti ti-plus"></i> Вписать</button>' +
         '</div>' +
-        '<div id="owz-catalog" class="owz-catalog"></div>' +
+        '<div id="owz-catalog" class="owz2-catalog"></div>' +
         // Корзина
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;">' +
-          '<label style="font-weight:600;font-size:13px;">В заказе <span id="owz-cart-count" style="color:var(--text-light);font-weight:400;"></span></label>' +
-        '</div>' +
+        '<div class="owz2-sec-l"><i class="ti ti-shopping-cart"></i> В заказе <span id="owz-cart-count"></span></div>' +
         '<div id="owz-cart" class="owz-cart"></div>' +
-        // Доп. поля
-        '<div class="form-group" style="margin-top:12px;"><label>Ожидаемая дата приёмки</label><input type="date" id="owz-expected"></div>' +
-        '<div class="form-group"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно"></textarea></div>' +
-        '<div class="form-group"><label>Телефон для связи <span style="font-weight:400;color:var(--text-light);">(если нет позиции — позвонят сюда)</span></label>' +
-          '<input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …"></div>' +
+        // Детали заказа
+        '<div class="owz2-sec-l"><i class="ti ti-settings"></i> Детали заказа</div>' +
+        '<div class="owz2-grid2">' +
+          '<div class="form-group" style="margin:0;"><label>Ожидаемая дата приёмки</label><input type="date" id="owz-expected" class="owz2-inp"></div>' +
+          '<div class="form-group" style="margin:0;"><label>Телефон для связи</label><input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …" class="owz2-inp"></div>' +
+        '</div>' +
+        '<div class="form-group" style="margin-top:12px;"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно" class="owz2-inp"></textarea></div>' +
         // Подпись
-        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-mid);">' +
-          '<i class="ti ti-signature" style="color:var(--brand);"></i> Подпись: <b>' + (escapeHtml(signName) || '—') + '</b>' +
-          (signPos ? ' · ' + escapeHtml(signPos) : '') +
-          '<div style="font-size:11.5px;color:var(--text-light);margin-top:2px;">Имя и должность подставляются из вашей карточки и уходят в письмо и документ.</div>' +
+        '<div class="owz2-sign">' +
+          '<i class="ti ti-signature owz2-sign-ic"></i>' +
+          '<div class="owz2-sign-t">Подпись: <b>' + (escapeHtml(signName) || '—') + '</b>' +
+            (signPos ? ' · ' + escapeHtml(signPos) : '') +
+            '<div class="owz2-sign-sub">Имя и должность подставляются из вашей карточки и уходят в письмо и документ.</div>' +
+          '</div>' +
         '</div>' +
-        '<div class="modal-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">' +
-          '<button class="btn btn-secondary" onclick="submitOrderWizard(false)"><i class="ti ti-device-floppy"></i> Сохранить черновик</button>' +
-          '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-mail-search"></i> Проверить письмо и отправить</button>' +
-        '</div>' +
+      '</div>' +
+      '<div class="owz2-foot">' +
+        '<button class="btn btn-secondary" onclick="submitOrderWizard(false)"><i class="ti ti-device-floppy"></i> Сохранить черновик</button>' +
+        '<button class="btn btn-primary" onclick="submitOrderWizard(true)"><i class="ti ti-mail-search"></i> Проверить письмо и отправить</button>' +
       '</div>' +
     '</div>';
   m.classList.add('visible');
@@ -9677,6 +9680,39 @@ function _owzSupPick(id) {
   const box = document.getElementById('owz-supplier-list');
   if (box) box.style.display = 'none';
   _owzSupplierHint();
+  _owzRenderSupplier();
+}
+
+// v2.45.6xx: карточка выбранного поставщика (вместо поля поиска)
+function _owzRenderSupplier() {
+  const card = document.getElementById('owz-sup-card');
+  const wrap = document.getElementById('owz-sup-search-wrap');
+  if (!card) return;
+  if (!_owz.supplierId) {
+    card.innerHTML = '';
+    if (wrap) wrap.style.display = '';
+    return;
+  }
+  if (wrap) wrap.style.display = 'none';
+  const chips = [];
+  if (_owz.supplierEmail) chips.push('<span class="owz2-sup-chip"><i class="ti ti-mail"></i> ' + escapeHtml(_owz.supplierEmail) + '</span>');
+  if (_owz.supplierPhone) chips.push('<span class="owz2-sup-chip"><i class="ti ti-phone"></i> ' + escapeHtml(_owz.supplierPhone) + '</span>');
+  if (!chips.length) chips.push('<span class="owz2-sup-chip warn"><i class="ti ti-alert-triangle"></i> контакты не заполнены — письмо не уйдёт</span>');
+  card.innerHTML = '<div class="owz2-sup-card">' +
+    '<div class="owz2-sup-ava">' + escapeHtml(getInitials(_owz.supplierName)) + '</div>' +
+    '<div class="owz2-sup-body"><div class="owz2-sup-name">' + escapeHtml(_owz.supplierName || '—') + '</div>' +
+      '<div class="owz2-sup-contacts">' + chips.join('') + '</div></div>' +
+    '<button type="button" class="owz2-sup-change" onclick="_owzSupChange()">Сменить</button>' +
+  '</div>';
+}
+
+function _owzSupChange() {
+  _owz.supplierId = null; _owz.supplierEmail = ''; _owz.supplierPhone = ''; _owz.supplierName = '';
+  const inp = document.getElementById('owz-supplier-search');
+  if (inp) inp.value = '';
+  _owzSupplierHint();
+  _owzRenderSupplier();
+  if (inp) inp.focus();
 }
 
 // Enter в поле поставщика — выбрать единственного совпавшего
@@ -9727,20 +9763,20 @@ function _owzRenderCatalog(filter) {
       if (c.sku) meta.push(escapeHtml(c.sku));
       meta.push('остаток: ' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.'));
       if (c.default_supplier_name) meta.push(escapeHtml(c.default_supplier_name));
-      return '<button type="button" class="bom-picker-item' + (inCart ? ' owz-in' : '') + '" onclick="_owzAdd(' + c.id + ')">' +
-        '<div class="bom-picker-item-name">' + escapeHtml(c.name || '—') +
-          (inCart ? ' <i class="ti ti-check" style="color:#059669;"></i>' : '') + '</div>' +
-        '<div class="bom-picker-item-meta">' + meta.join(' · ') + '</div>' +
-      '</button>';
+      return '<div class="owz2-cat-item' + (inCart ? ' in' : '') + '" onclick="_owzAdd(' + c.id + ')">' +
+        '<div class="owz2-ci-main"><div class="owz2-ci-name">' + escapeHtml(c.name || '—') + '</div>' +
+          '<div class="owz2-ci-meta">' + meta.join(' · ') + '</div></div>' +
+        '<span class="owz2-ci-add' + (inCart ? ' done' : '') + '"><i class="ti ti-' + (inCart ? 'check' : 'plus') + '"></i></span>' +
+      '</div>';
     }).join('');
-    return '<div class="bom-picker-group">' +
-      '<button type="button" class="bom-picker-toggle' + (isOpen ? ' open' : '') + '" ' +
-        'onclick="_owzToggleCat(' + JSON.stringify(cat).replace(/"/g, '&quot;') + ')">' +
-        '<i class="ti ti-chevron-right bom-picker-chev"></i>' +
-        '<span>' + escapeHtml(cat) + '</span>' +
-        '<span class="bom-picker-count">' + items.length + '</span>' +
-      '</button>' +
-      '<div class="bom-picker-body"' + (isOpen ? '' : ' style="display:none;"') + '>' + rows + '</div>' +
+    return '<div class="owz2-cat-grp">' +
+      '<div class="owz2-cat-head" onclick="_owzToggleCat(' + JSON.stringify(cat).replace(/"/g, '&quot;') + ')">' +
+        '<span class="owz2-cat-ic"><i class="ti ' + _nvIconFor(cat) + '"></i></span>' +
+        '<span class="owz2-cat-name">' + escapeHtml(cat) + '</span>' +
+        '<span class="owz2-cat-cnt">' + items.length + '</span>' +
+        '<i class="ti ti-chevron-' + (isOpen ? 'down' : 'right') + ' owz2-cat-chev"></i>' +
+      '</div>' +
+      '<div class="owz2-cat-body"' + (isOpen ? '' : ' style="display:none;"') + '>' + rows + '</div>' +
     '</div>';
   }).join('');
 }
@@ -9802,14 +9838,15 @@ function _owzRenderCart() {
     return;
   }
   box.innerHTML = _owz.list.map((x, i) =>
-    '<div class="owz-cart-row">' +
-      '<div class="owz-cart-name">' + (i + 1) + '. ' + escapeHtml(x.name) + '</div>' +
-      '<input class="owz-cart-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
+    '<div class="owz2-crow">' +
+      '<span class="owz2-c-num">' + (i + 1) + '</span>' +
+      '<span class="owz2-c-name">' + escapeHtml(x.name) + '</span>' +
+      '<input class="owz2-c-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
         'onchange="_owzSetQty(' + x.id + ', this.value)">' +
-      '<select class="owz-cart-unit" onchange="_owzSetUnit(' + x.id + ', this.value)" title="Единица измерения">' +
+      '<select class="owz2-c-unit" onchange="_owzSetUnit(' + x.id + ', this.value)" title="Единица измерения">' +
         _owzUnitOptions(x.unit) +
       '</select>' +
-      '<button class="owz-cart-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
+      '<button class="owz2-c-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
     '</div>'
   ).join('');
 }
@@ -12175,6 +12212,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.606',
+    date: '30.06.2026',
+    title: '«Оформить заказ» — обновлённый вид',
+    features: [
+      'Форма заказа собрана по секциям: <b>Поставщик · Что заказываем · В заказе · Детали</b>',
+      'Выбранный поставщик показывается <b>карточкой</b> — аватар, название, почта и телефон чипами, кнопка «Сменить»',
+      'Каталог комплектующих — с <b>иконками категорий</b> и счётчиками; у позиции «＋», у добавленных — галочка',
+      'Кнопки <b>«Сохранить черновик» и «Проверить письмо и отправить» закреплены внизу</b> — всегда под рукой, не нужно прокручивать',
+      'Поиск поставщика, «вписать свою позицию», выбор единицы измерения — работают как раньше',
+    ],
+  },
   {
     version: 'v2.45.605',
     date: '30.06.2026',
