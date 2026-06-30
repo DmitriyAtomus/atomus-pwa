@@ -2388,7 +2388,8 @@
             <i class="ti ti-plus"></i>
           </button>
         </div>
-        <div class="content-inner" style="max-width: 760px;">
+        <!-- v2.45.578: убран узкий max-width:760px — список чатов тянется на всю ширину контентной колонки (как остальные страницы) -->
+        <div class="content-inner">
           <div class="page-header">
             <div class="page-header-title">
               <i class="ti ti-messages"></i>
@@ -2697,7 +2698,7 @@
       <i class="ti ti-search"></i>
       <span>Поиск</span>
     </button>
-    <button class="tab25 plus-tab25" onclick="openActionSheet25()">
+    <button class="tab25 plus-tab25" onclick="mobilePlusAction()">
       <div class="plus-fab25"><i class="ti ti-plus"></i></div>
     </button>
     <button class="tab25" data-main-tab="notifications" onclick="switchMainTab('notifications')">

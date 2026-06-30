@@ -12695,7 +12695,10 @@
     display: none;       /* скрыт на десктопе */
   }
   .app.mobile-layout .fab {
-    display: flex;
+    /* v2.45.578: на мобиле центральный «+» таб-бара всегда виден и теперь
+       выполняет контекстное действие экрана (mobilePlusAction → клик по этому .fab),
+       поэтому сам плавающий FAB прячем, чтобы не было двух кнопок «+». */
+    display: none;
     position: fixed;
     bottom: 80px;        /* Всегда поднят над возможным tab-bar (60px высота + 20px зазор) */
     right: 18px;
@@ -17409,6 +17412,12 @@
   .si-status-chip.s-confirmed { background: rgba(29,158,117,0.15); color: #0A5B41; }
   .si-status-chip.s-partial   { background: rgba(186,117,23,0.15); color: #854F0B; }
   .si-status-chip.s-cancel    { background: var(--bg); color: var(--text-light); }
+  /* v2.45.578: реальные классы из siStatusChipClass() — раньше их не было в CSS,
+     поэтому «ОПРИХОДОВАНО»/«С отказами» рендерились как простой серый текст без фона. */
+  .si-status-chip.sc-success  { background: rgba(29,158,117,0.15); color: #0A5B41; }
+  .si-status-chip.sc-warn     { background: rgba(186,117,23,0.15); color: #854F0B; }
+  .si-status-chip.sc-muted    { background: var(--bg); color: var(--text-light); }
+  .si-status-chip.sc-info     { background: #E0F2FE; color: #075985; }
 
   /* --- Зона загрузки --- */
   .si-upload-zone {

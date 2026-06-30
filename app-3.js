@@ -15956,8 +15956,8 @@ function renderDevelopmentDetail(dev) {
   if (!pane) return;
   if (!dev) {
     pane.innerHTML = '<div class="dev-empty"><i class="ti ti-bulb"></i>' +
-      '<div class="dev-empty-title">Выбери разработку слева</div>' +
-      '<div class="dev-empty-sub">или создай новую кнопкой «Новая разработка»</div>' +
+      '<div class="dev-empty-title">Выбери разработку из списка</div>' +
+      '<div class="dev-empty-sub">или создай новую кнопкой «+»</div>' +
     '</div>';
     return;
   }
