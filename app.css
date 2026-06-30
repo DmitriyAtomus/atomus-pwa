@@ -18691,7 +18691,11 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   padding: 6px 8px; border: 1px solid var(--border);
   border-radius: 7px; font-size: 14px; background: #fff;
 }
-.owz-cart-unit { flex-shrink: 0; font-size: 12px; color: var(--text-light); min-width: 34px; }
+.owz-cart-unit {
+  flex-shrink: 0; width: 80px; padding: 6px 6px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; background: #fff; color: var(--text-dark); cursor: pointer;
+}
 .owz-cart-del {
   flex-shrink: 0; border: none; background: none; cursor: pointer;
   color: #B91C1C; width: 28px; height: 28px; border-radius: 6px;
