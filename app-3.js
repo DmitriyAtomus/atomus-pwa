@@ -8652,7 +8652,15 @@ function _ibxInvoiceCard(m, isMatched) {
   }
   let acts = '';
   if (isMatched) {
-    acts = (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
+    // v2.45.598: «Оплатить» прямо на карточке привязанного счёта — переводит
+    // САМ заказ в «На оплату» (без задвоения: счёт уже привязан к этому заказу,
+    // УПД потом его и закроет). Скрываем, если заказ уже оплачивается/оплачен/отменён.
+    const _payable = m.matched_order_id &&
+      ['to_pay', 'paid', 'received', 'partial', 'cancelled'].indexOf(m.matched_order_status || '') < 0;
+    acts = (_payable
+        ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
+        : '') +
+      (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
       '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>';
   } else {
     // v2.45.596: «На оплату» прямо на карточке (раньше — только внутри «Письмо»).
@@ -9007,6 +9015,29 @@ async function sendInboxToPay(inboxId, overlayId) {
     if (j.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(j.order_id);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.45.598: оплата ПРИВЯЗАННОГО счёта — переводит сам заказ в «На оплату».
+// Счёт уже привязан к этому заказу, поэтому задвоения нет: бухгалтер платит,
+// а пришедшая позже УПД закроет именно этот заказ.
+async function payInboxOrderToPay(orderId, orderLabel) {
+  if (!orderId) return;
+  if (!confirm('Передать счёт на оплату?\nЗаказ ' + (orderLabel || ('#' + orderId)) +
+      ' перейдёт в раздел «На оплату», бухгалтер получит уведомление.')) return;
+  try {
+    // supplyOrderTransitionConfirmed (app-1.js) при необходимости спросит пароль.
+    const res = await supplyOrderTransitionConfirmed(orderId, 'to_pay');
+    if (res.cancelled) return;
+    if (!res.ok) {
+      showToast(res.message || ('Не удалось (HTTP ' + res.status + ')'), 'error');
+      return;
+    }
+    showToast('Счёт передан на оплату · ' + (orderLabel || ('#' + orderId)), 'success');
+    cache.supplyOrders = null;
+    await loadSupplyInbox();
+  } catch (e) {
+    showToast('Сеть: не удалось передать на оплату', 'error');
   }
 }
 
@@ -11999,6 +12030,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.598',
+    date: '30.06.2026',
+    title: 'Кнопка «Оплатить» на пришедшем счёте',
+    features: [
+      'У <b>привязанного к заказу</b> счёта на карточке появилась кнопка <b>«Оплатить»</b> — счёт пришёл, жмёшь, и заказ уходит в раздел «На оплату», бухгалтер получает уведомление',
+      'Платит <b>через сам заказ</b> — без задвоения: пришедшая позже УПД закроет именно этот заказ',
+      'Если запросил счёт вручную и он не привязался — сначала «Привязать к заказу», затем на карточке появится «Оплатить»',
+      'Кнопка скрыта, если заказ уже оплачивается, оплачен или отменён',
+    ],
+  },
   {
     version: 'v2.45.597',
     date: '30.06.2026',
