@@ -7899,6 +7899,21 @@ function syncMainTabFromSection(sectionName, screenName) {
 
 // ============ ACTION SHEET (+ кнопка) ============
 
+// v2.45.607: единая кнопка «+» на мобиле. Раньше у экранов был свой плавающий
+// FAB И центральный «+» таб-бара — два одинаковых плюса. Теперь FAB на мобиле
+// скрыт (CSS), а центральный «+» делает контекстное действие активного экрана:
+// если на экране есть свой .fab — жмём его (Новая заявка / Добавить заказ /
+// Новая доработка / Новый чат / Новый монтаж), иначе открываем общий лист создания.
+function mobilePlusAction() {
+  const active = document.querySelector('.screen.active');
+  if (active) {
+    const fab = active.querySelector('.fab');
+    // inline display:none = FAB сейчас неактуален (например, install-fab до выбора)
+    if (fab && fab.style.display !== 'none') { fab.click(); return; }
+  }
+  openActionSheet25();
+}
+
 function openActionSheet25() {
   const sh = document.getElementById('action-sheet-25');
   if (!sh) return;
