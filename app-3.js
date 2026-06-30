@@ -9559,7 +9559,8 @@ async function openNewSupplyOrder() {
   if (meRes) cache.me = meRes;
   if (!cache.suppliers.length) { showToast('Сначала добавьте хотя бы одного поставщика', 'error'); return; }
 
-  _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0 };
+  _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0,
+           supplierId: null, supplierEmail: '', supplierPhone: '', supplierName: '' };
   const me = _owz.me;
   const signName = (me.full_name || me.short_name || '').trim();
   const signPos = (me.position || '').trim();
@@ -9573,20 +9574,23 @@ async function openNewSupplyOrder() {
         '<button class="modal-close" onclick="closeSupplyModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
-        // Поставщик
-        '<div class="form-group"><label>Поставщик *</label>' +
-          '<select id="owz-supplier" onchange="_owzSupplierHint()">' +
-            '<option value="">— выбрать —</option>' +
-            cache.suppliers.map(s => '<option value="' + s.id + '" data-email="' + escapeHtml(s.email || '') + '" data-phone="' + escapeHtml(s.phone || '') + '">' + escapeHtml(s.name) + '</option>').join('') +
-          '</select>' +
+        // Поставщик — поиск с подсказками (начни вводить название)
+        '<div class="form-group" style="position:relative;"><label>Поставщик *</label>' +
+          '<input id="owz-supplier-search" type="text" autocomplete="off" placeholder="Начните вводить название…" ' +
+            'oninput="_owzSupFilter(this.value)" onfocus="_owzSupFilter(this.value)" ' +
+            'onkeydown="_owzSupKey(event)" ' +
+            'onblur="setTimeout(function(){var b=document.getElementById(\'owz-supplier-list\');if(b)b.style.display=\'none\';},180)" ' +
+            'style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
+          '<div id="owz-supplier-list" style="display:none;position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:240px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>' +
           '<div id="owz-sup-hint" style="font-size:12px;color:var(--text-light);margin-top:4px;"></div>' +
         '</div>' +
         // Номенклатура
         '<label style="font-weight:600;font-size:13px;display:block;margin:4px 0 6px;">Номенклатура комплектующих</label>' +
         '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
-          '<input id="owz-search" type="search" placeholder="Поиск по названию или артикулу…" oninput="_owzRenderCatalog(this.value)" ' +
+          '<input id="owz-search" type="search" placeholder="Поиск или впишите свою позицию…" oninput="_owzRenderCatalog(this.value)" ' +
+            'onkeydown="if(event.key===\'Enter\'){event.preventDefault();_owzAddTyped();}" ' +
             'style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
-          '<button class="btn btn-secondary btn-small" onclick="_owzNewItem()" title="Добавить новую позицию в номенклатуру"><i class="ti ti-plus"></i> Новая</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="_owzNewItem()" title="Добавить позицию свободным текстом — в справочник она не добавляется"><i class="ti ti-plus"></i> Вписать</button>' +
         '</div>' +
         '<div id="owz-catalog" class="owz-catalog"></div>' +
         // Корзина
@@ -9617,16 +9621,72 @@ async function openNewSupplyOrder() {
 }
 
 function _owzSupplierHint() {
-  const sel = document.getElementById('owz-supplier');
-  const opt = sel && sel.selectedOptions[0];
   const hint = document.getElementById('owz-sup-hint');
-  if (!opt || !opt.value) { if (hint) hint.textContent = ''; return; }
-  const email = opt.getAttribute('data-email') || '';
-  const phone = opt.getAttribute('data-phone') || '';
+  if (!hint) return;
+  if (!_owz.supplierId) { hint.textContent = ''; return; }
   const parts = [];
-  if (email) parts.push('✉ ' + email);
-  if (phone) parts.push('☎ ' + phone);
-  if (hint) hint.textContent = parts.join('   ') || 'Контакты не заполнены — письмо отправить не получится';
+  if (_owz.supplierEmail) parts.push('✉ ' + _owz.supplierEmail);
+  if (_owz.supplierPhone) parts.push('☎ ' + _owz.supplierPhone);
+  hint.textContent = parts.join('   ') || 'Контакты не заполнены — письмо отправить не получится';
+}
+
+// Поставщик: фильтр-подсказки при вводе названия
+function _owzSupFilter(q) {
+  const box = document.getElementById('owz-supplier-list');
+  if (!box) return;
+  // если изменили текст после выбора — сбрасываем выбранного, пока не кликнут заново
+  const inp = document.getElementById('owz-supplier-search');
+  if (_owz.supplierId && inp && (inp.value || '').trim() !== _owz.supplierName) {
+    _owz.supplierId = null; _owz.supplierEmail = ''; _owz.supplierPhone = ''; _owz.supplierName = '';
+    _owzSupplierHint();
+  }
+  const s = (q || '').trim().toLowerCase();
+  let sup = cache.suppliers || [];
+  if (s) sup = sup.filter(x => (x.name || '').toLowerCase().includes(s) || (x.email || '').toLowerCase().includes(s));
+  sup = sup.slice(0, 50);
+  if (!sup.length) {
+    box.innerHTML = '<div style="padding:10px 12px;color:var(--text-light);font-size:13px;">Поставщик не найден. Добавить можно в Справочники → Поставщики.</div>';
+    box.style.display = 'block';
+    return;
+  }
+  box.innerHTML = sup.map(x =>
+    '<div onclick="_owzSupPick(' + x.id + ')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);" ' +
+      'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+      '<div style="font-weight:600;font-size:14px;">' + escapeHtml(x.name || '—') + '</div>' +
+      ((x.email || x.phone)
+        ? '<div style="font-size:12px;color:var(--text-light);">' +
+            [x.email ? '✉ ' + escapeHtml(x.email) : '', x.phone ? '☎ ' + escapeHtml(x.phone) : ''].filter(Boolean).join('   ') +
+          '</div>'
+        : '') +
+    '</div>'
+  ).join('');
+  box.style.display = 'block';
+}
+
+function _owzSupPick(id) {
+  const x = (cache.suppliers || []).find(s => s.id === id);
+  if (!x) return;
+  _owz.supplierId = x.id;
+  _owz.supplierEmail = x.email || '';
+  _owz.supplierPhone = x.phone || '';
+  _owz.supplierName = x.name || '';
+  const inp = document.getElementById('owz-supplier-search');
+  if (inp) inp.value = x.name || '';
+  const box = document.getElementById('owz-supplier-list');
+  if (box) box.style.display = 'none';
+  _owzSupplierHint();
+}
+
+// Enter в поле поставщика — выбрать единственного совпавшего
+function _owzSupKey(e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const inp = document.getElementById('owz-supplier-search');
+  const s = ((inp && inp.value) || '').trim().toLowerCase();
+  if (!s) return;
+  const matches = (cache.suppliers || []).filter(x =>
+    (x.name || '').toLowerCase().includes(s) || (x.email || '').toLowerCase().includes(s));
+  if (matches.length === 1) _owzSupPick(matches[0].id);
 }
 
 // Каталог комплектующих — как на производстве: группы по категориям,
@@ -9639,8 +9699,15 @@ function _owzRenderCatalog(filter) {
   if (q) comps = comps.filter(c =>
     (c.name || '').toLowerCase().includes(q) || (c.sku || '').toLowerCase().includes(q));
   if (!comps.length) {
+    const raw = (filter || '').trim();
     box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-light);font-size:13px;">' +
-      (q ? 'Ничего не найдено. Можно добавить кнопкой «Новая».' : 'Каталог комплектующих пуст.') + '</div>';
+      (q
+        ? 'В справочнике такого нет.<br>' +
+          '<button type="button" class="btn btn-primary btn-small" style="margin-top:10px;" onclick="_owzAddTyped()">' +
+            '<i class="ti ti-plus"></i> Добавить «' + escapeHtml(raw) + '» в заказ</button>' +
+          '<div style="margin-top:6px;color:var(--text-light);font-size:11.5px;">Позиция уйдёт в заказ как есть — в справочник не добавляется.</div>'
+        : 'Каталог комплектующих пуст.') +
+      '</div>';
     return;
   }
   const chosen = new Set(_owz.list.map(x => x.cid).filter(v => v != null));
@@ -9726,22 +9793,37 @@ function _owzRenderCart() {
   ).join('');
 }
 
-// «Новая» — позиции нет в каталоге: добавляем свободной строкой прямо в заказ
-// (в каталог комплектующих не лезем). При создании заказа бэкенд приведёт её
-// к номенклатуре снабжения по названию.
+// Добавить позицию свободным текстом прямо в заказ (в справочник НЕ добавляем).
+// Берём то, что вписано в строку поиска. Единица по умолчанию «шт.».
+function _owzAddTyped() {
+  const inp = document.getElementById('owz-search');
+  const name = ((inp && inp.value) || '').trim();
+  if (!name) { if (inp) inp.focus(); return; }
+  const id = -(++_owz.custom);   // отрицательный id — кастомная строка
+  _owz.list.push({ id: id, cid: null, name: name, unit: 'шт.', qty: 1 });
+  if (inp) inp.value = '';
+  _owzRenderCart();
+  _owzRenderCatalog('');
+  showToast('Добавлено в заказ: ' + name, 'success');
+}
+
+// Кнопка «Вписать»: если в поиске уже есть текст — добавляем его сразу;
+// иначе спрашиваем название (и единицу) через prompt как запасной путь.
 function _owzNewItem() {
+  const inp = document.getElementById('owz-search');
+  if (((inp && inp.value) || '').trim()) { _owzAddTyped(); return; }
   const name = (prompt('Название позиции (свободный ввод):') || '').trim();
   if (!name) return;
   const unit = (prompt('Единица измерения (шт., м, компл. …):', 'шт.') || 'шт.').trim() || 'шт.';
-  const id = -(++_owz.custom);   // отрицательный id — кастомная строка
+  const id = -(++_owz.custom);
   _owz.list.push({ id: id, cid: null, name: name, unit: unit, qty: 1 });
   _owzRenderCart();
   showToast('Позиция добавлена в заказ', 'success');
 }
 
 async function submitOrderWizard(send) {
-  const supplierId = parseInt(document.getElementById('owz-supplier').value || '0') || null;
-  if (!supplierId) { showToast('Выберите поставщика', 'error'); return; }
+  const supplierId = _owz.supplierId || null;
+  if (!supplierId) { showToast('Выберите поставщика из списка', 'error'); return; }
   const items = _owz.list.filter(x => x.qty > 0).map(x => ({ name: x.name, unit: x.unit, qty: x.qty }));
   if (!items.length) { showToast('Добавьте хотя бы одну позицию с количеством', 'error'); return; }
   const payload = {
@@ -9752,8 +9834,7 @@ async function submitOrderWizard(send) {
     items,
   };
   if (send) {
-    const opt = document.getElementById('owz-supplier').selectedOptions[0];
-    if (!opt.getAttribute('data-email')) {
+    if (!_owz.supplierEmail) {
       showToast('У поставщика не указан email — добавьте его, либо «Сохранить черновик»', 'error');
       return;
     }
@@ -12059,6 +12140,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.602',
+    date: '30.06.2026',
+    title: 'Заказ поставщику: вписал позицию — и готово',
+    features: [
+      'В «Оформить заказ» <b>поставщик теперь с поиском</b>: начни вводить название — система подберёт; клик по подсказке выбирает его',
+      'Позицию, которой нет в справочнике, <b>можно просто вписать</b> — нажми Enter (или «Добавить … в заказ») и она уйдёт в заказ как есть',
+      'Создавать новую номенклатуру для этого <b>не нужно</b> — вписанная позиция в справочник не добавляется, просто едет в заказ',
+    ],
+  },
   {
     version: 'v2.45.601',
     date: '30.06.2026',
