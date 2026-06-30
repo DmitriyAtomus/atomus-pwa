@@ -8698,6 +8698,29 @@ function renderContractDetail(c) {
       '<i class="ti ti-refresh"></i> Пересобрать резервы</button>';
   }
 
+  // Монтажный договор: производственного статус-переключателя нет (статусы — в
+  // блоке «Монтаж»), но по завершении монтаж сдан и договор нужно закрыть.
+  // Отдельная кнопка «Закрыть договор» (changeContractStatus сам спросит пароль
+  // и подтверждение, т.к. сборок/коробок к отгрузке у монтажа обычно нет).
+  if (canEdit && !isDraft && isInstallOnly) {
+    html += '<div style="margin-top:16px;">';
+    if (c.status === 'closed') {
+      html += '<div style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#047857;">' +
+        '<i class="ti ti-lock-check"></i> Договор закрыт</div>' +
+        '<button onclick="changeContractStatus(' + c.id + ', \'production\')" ' +
+        'style="margin-left:10px;padding:6px 12px;font-size:12px;background:transparent;color:var(--text-light);' +
+        'border:1px dashed var(--border);border-radius:8px;cursor:pointer;">' +
+        '<i class="ti ti-rotate"></i> вернуть в работу</button>';
+    } else {
+      html += '<button onclick="changeContractStatus(' + c.id + ', \'closed\')" ' +
+        'style="padding:9px 16px;font-size:13.5px;font-weight:600;background:var(--brand);color:#fff;' +
+        'border:none;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">' +
+        '<i class="ti ti-circle-check"></i> Закрыть договор</button>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:6px;">Монтаж сдан клиенту — можно закрыть договор</div>';
+    }
+    html += '</div>';
+  }
+
   // Детали
   html += '<div class="detail-grid">';
   html += '<div class="detail-item"><div class="detail-label">Юрлицо</div>' +
