@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.589-contracts-list-v2";
+const APP_VERSION = "v2.45.594-offers-list-v2";
 const APP_VERSION_DATE = "30.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9796,11 +9796,58 @@ async function loadOffers() {
   }
 }
 
+function toggleOffersV2() {
+  window.KP_V2 = !window.KP_V2;
+  try { localStorage.setItem('kpV2', window.KP_V2 ? '1' : '0'); } catch (_) {}
+  renderOffersList();
+}
+
+function _offersV2ToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.KP_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.KP_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleOffersV2()">' + (window.KP_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+// v2.45.5xx: статусная плашка КП (новый вид списка)
+function _kpStatusPill(o) {
+  const cls = (['draft', 'sent', 'accepted', 'rejected'].includes(o.status)) ? o.status : 'draft';
+  return '<span class="kp-pill ' + cls + '">' + escapeHtml(o.status_label || o.status || '—') + '</span>';
+}
+
+// v2.45.5xx: строка-карточка КП (новый вид списка)
+function _kpRow(o) {
+  let stripCls = '';
+  if (o.status === 'sent') stripCls = 'sent';
+  else if (o.status === 'accepted') stripCls = 'accepted';
+  else if (o.status === 'rejected') stripCls = 'rejected';
+
+  const vbadge = (o.version && o.version > 1) ? '<span class="kp-vbadge">v' + o.version + '</span>' : '';
+  const sub = escapeHtml(o.number || '—') + (o.contractor_inn ? ' · ИНН ' + escapeHtml(o.contractor_inn) : '');
+
+  const mgrName = o.manager_name || '—';
+  const mgr = '<div class="kp-mgr"><span class="kp-mgr-ava">' + escapeHtml(getInitials(mgrName)) + '</span>' +
+    '<span class="kp-mgr-name">' + escapeHtml(mgrName) + '</span></div>';
+
+  const sumZero = !o.total_sum ? ' zero' : '';
+  const sumHtml = '<div class="kp-sum"><span class="kp-sum-lbl">сумма</span><span class="kp-sum-v' + sumZero + '">' + formatMoney(o.total_sum) + '</span></div>';
+
+  return '<div class="kp-row ' + stripCls + '" onclick="openOffer(' + o.id + ')">' +
+    '<div class="kp-ava">' + escapeHtml(getInitials(o.contractor_name)) + '</div>' +
+    '<div class="kp-main">' +
+      '<div class="kp-top"><span class="kp-client">' + escapeHtml(o.contractor_name || '—') + '</span>' + _kpStatusPill(o) + vbadge + '</div>' +
+      '<div class="kp-sub">' + sub + '</div>' +
+    '</div>' +
+    '<div class="kp-right">' + sumHtml + mgr + '<span class="kp-arrow em">›</span></div>' +
+  '</div>';
+}
+
 function renderOffersList() {
   const container = document.getElementById('so-content');
   const counts = cache.offersCounts || {};
   const filter = state.offersFilter;
   const search = (state.offersSearch || '').toLowerCase().trim();
+  window.KP_V2 = (localStorage.getItem('kpV2') !== '0');
 
   // Чипсы
   document.querySelectorAll('#so-filters .filter-chip').forEach(chip => {
@@ -9833,16 +9880,28 @@ function renderOffersList() {
     );
   }
 
+  const toggle = _offersV2ToggleBar();
+
   if (!list.length) {
     let h = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Нет КП под этот фильтр';
     if (canManageSales() && filter === 'all' && !search) {
       h += '<br><br><button class="btn btn-primary" onclick="openNewOffer()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первое</button>';
     }
     h += '</div>';
-    container.innerHTML = h;
+    container.innerHTML = toggle + h;
     return;
   }
 
+  // v2.45.5xx: новый вид — карточки-строки
+  if (window.KP_V2) {
+    let html = toggle + '<div class="kp-list">';
+    list.forEach(o => { html += _kpRow(o); });
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
+  // === Старый вид (для отката) ===
   if (state.isDesktop) {
     let html = '<div style="padding: 0 0 16px;"><div class="offers-table">';
     html += '<div class="oft-header">' +
@@ -9863,7 +9922,7 @@ function renderOffersList() {
         '</div>';
     });
     html += '</div></div>';
-    container.innerHTML = html;
+    container.innerHTML = toggle + html;
   } else {
     let html = '<div class="contract-cards" style="padding-top: 12px; padding-bottom: 20px;">';
     list.forEach(o => {
@@ -9882,7 +9941,7 @@ function renderOffersList() {
         '</div>';
     });
     html += '</div>';
-    container.innerHTML = html;
+    container.innerHTML = toggle + html;
   }
 }
 
