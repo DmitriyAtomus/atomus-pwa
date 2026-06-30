@@ -558,7 +558,7 @@ function editConsField(id,field,val){var c=P.consumers.filter(function(x){return
   else if(field==='kw')c.kw=parseFloat(val)||0;
   else if(field==='qty')c.qty=Math.max(1,parseInt(val,10)||1);
   else if(field==='type'){var tl=(val||'').trim()||'двигатель';c.typeLabel=tl;c.needs=typeNeeds(tl);addCtypeCustom(tl);}
-  P.breakers=null;dirty();
+  P.breakers=null;dirty();draw();   // питание/мощность изменились → сброс автоматов + перерисовка (ток, полюса, контактор пересчитываются сразу)
 }
 
 /* 4 датчики */
