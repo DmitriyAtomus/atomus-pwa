@@ -10171,10 +10171,83 @@ function renderSiMobileHeader() {
   );
 }
 
+// v2.45.x: «Приёмка УПД» — группировка по статусу + карточки (под переключателем)
+function _updSupInitials(name) {
+  let s = String(name || '').replace(/[«»"'()]/g, ' ')
+    .replace(/общество с ограниченной ответственностью/gi, ' ')
+    .replace(/\b(ООО|ОАО|ЗАО|ПАО|АО|ИП|ТД|ТПК)\b/gi, ' ').trim();
+  const w = s.split(/\s+/).filter(Boolean);
+  if (!w.length) return (typeof _supInitials === 'function' ? _supInitials(name) : '—');
+  if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
+  return (w[0][0] + w[1][0]).toUpperCase();
+}
+function _updMoney(x) { return Math.round(Number(x) || 0).toLocaleString('ru-RU'); }
+function _updKpi(cls, emoji, num, lbl) {
+  return '<div class="upd-kpi ' + cls + '"><div class="upd-kpi-ic"><span class="em">' + emoji + '</span></div>' +
+    '<div><div class="upd-kpi-num">' + num + '</div><div class="upd-kpi-lbl">' + escapeHtml(lbl) + '</div></div></div>';
+}
+function _updSec(emoji, title, count) {
+  return '<div class="upd-sec"><span class="em">' + emoji + '</span> ' + escapeHtml(title) + ' <span class="cnt">' + count + '</span></div>';
+}
+function _updDelBtn(inv, status) {
+  if (status === 'cancelled') return '';
+  const confirmed = (status === 'confirmed' || status === 'partially_refused');
+  const handler = confirmed ? 'deleteConfirmedSupplyInvoice' : 'deleteSupplyInvoiceFromList';
+  const title = confirmed ? 'Отменить оприходование' : 'Удалить черновик';
+  return '<button class="btn upd-icon" title="' + title + '" onclick="event.stopPropagation();' + handler + '(' + inv.id + ')"><span class="em">🗑</span></button>';
+}
+function _updCard(inv, kind) {
+  const status = inv.status || 'draft';
+  const isPending = (inv.recognition_state === 'pending');
+  const rawName = inv.source_file_name || '';
+  const looksLikeTimestamp = /^\d{10,}\.[a-z]+$/i.test(rawName) || /^IMG_\d+/i.test(rawName);
+  const num = inv.document_number ? ('УПД №' + escapeHtml(inv.document_number))
+    : (rawName && !looksLikeTimestamp ? escapeHtml(rawName) : (inv.created_at ? ('Скан от ' + siFmtDate(inv.created_at)) : 'Скан'));
+  const dateStr = inv.document_date ? (' от ' + siFmtDate(inv.document_date)) : '';
+  const supplier = inv.supplier_name_raw || '—';
+  const ava = (kind === 'wait')
+    ? '<div class="upd-ava wait"><span class="em">📄</span></div>'
+    : '<div class="upd-ava">' + escapeHtml(_updSupInitials(supplier)) + '</div>';
+  let chip;
+  if (isPending) chip = '<span class="upd-chip wait"><span class="em">⏳</span> ждёт распознавания</span>';
+  else if (status === 'draft') chip = '<span class="upd-chip draft"><span class="em">📝</span> черновик</span>';
+  else if (status === 'confirmed') chip = '<span class="upd-chip ok"><span class="em">✅</span> оприходовано</span>';
+  else if (status === 'partially_refused') chip = '<span class="upd-chip warn"><span class="em">⚠️</span> с отказами</span>';
+  else chip = '<span class="upd-chip mut">' + escapeHtml(siStatusLabel(status)) + '</span>';
+  const contractChip = inv.contract_number ? '<span class="upd-chip doc">Дог. №' + escapeHtml(inv.contract_number) + '</span>' : '';
+  const parts = ['<b>' + escapeHtml(supplier) + '</b>'];
+  if (inv.pages_count && inv.pages_count > 1) parts.push(inv.pages_count + ' стр.');
+  if (inv.items_count > 0) parts.push(inv.items_count + ' поз.');
+  if (inv.created_at) parts.push((status === 'confirmed' ? '' : 'создано ') + siFmtDateTime(inv.created_at));
+  const sumHtml = (inv.sum_with_vat != null && Number(inv.sum_with_vat) > 0)
+    ? '<div class="upd-sum">' + _updMoney(inv.sum_with_vat) + ' ₽<small>с НДС</small></div>' : '';
+  let acts;
+  if (isPending) acts = '<button class="btn btn-primary" onclick="event.stopPropagation();loadSupplyInvoiceDetail(' + inv.id + ')"><span class="em">✨</span> Распознать</button>';
+  else if (status === 'draft') acts = '<button class="btn btn-primary" onclick="event.stopPropagation();loadSupplyInvoiceDetail(' + inv.id + ')"><span class="em">✅</span> Оприходовать</button>';
+  else acts = '<button class="btn" onclick="event.stopPropagation();loadSupplyInvoiceDetail(' + inv.id + ')"><span class="em">👁</span> Открыть</button>';
+  acts += '<button class="btn upd-icon" title="Открыть файл" onclick="event.stopPropagation();openSupplyInvoiceFile(' + inv.id + ')"><span class="em">📎</span></button>';
+  acts += _updDelBtn(inv, status);
+  return '<div class="upd ' + kind + '" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
+    ava +
+    '<div class="upd-body">' +
+      '<div class="upd-top"><span class="upd-num">' + num + escapeHtml(dateStr) + '</span>' + chip + contractChip + '</div>' +
+      '<div class="upd-sub">' + parts.join(' · ') + '</div>' +
+    '</div>' +
+    sumHtml +
+    '<div class="upd-acts">' + acts + '</div>' +
+  '</div>';
+}
+function toggleUpdV2() {
+  window.UPD_V2 = !window.UPD_V2;
+  try { localStorage.setItem('updV2', window.UPD_V2 ? '1' : '0'); } catch (_) {}
+  loadSupplyInvoicesList();
+}
+
 function renderSupplyInvoicesList(items) {
   const body = document.getElementById('si-screen-body');
   if (!body) return;
   const isMobile = !!(state && !state.isDesktop);
+  window.UPD_V2 = localStorage.getItem('updV2') !== '0';
 
   if (!items.length) {
     if (isMobile) {
@@ -10196,7 +10269,51 @@ function renderSupplyInvoicesList(items) {
     return;
   }
 
-  let html = isMobile ? renderSiMobileHeader() : '';
+  const toggle = '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.UPD_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.UPD_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleUpdV2()">' + (window.UPD_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+  const headBlk = isMobile ? renderSiMobileHeader() : '';
+
+  if (!window.UPD_V2) { body.innerHTML = headBlk + toggle + _renderUpdOldList(items); return; }
+
+  // Группировка по статусу
+  const pending = [], drafts = [], done = [], other = [];
+  items.forEach(inv => {
+    const st = inv.status || 'draft';
+    if (inv.recognition_state === 'pending') pending.push(inv);
+    else if (st === 'draft') drafts.push(inv);
+    else if (st === 'confirmed' || st === 'partially_refused') done.push(inv);
+    else other.push(inv);
+  });
+  let html = headBlk + toggle;
+  html += '<div class="upd-kpis">' +
+    _updKpi('draft', '📝', drafts.length, 'Черновики — оприходовать') +
+    _updKpi('wait', '⏳', pending.length, 'Ждут распознавания') +
+    _updKpi('ok', '✅', done.length, 'Оприходовано') +
+    _updKpi('tot', '📄', items.length, 'Всего за период') +
+  '</div>';
+  if (pending.length) {
+    html += _updSec('⏳', 'Ждут распознавания', pending.length) +
+      '<div class="upd-hint">Файл загружен, ИИ ещё не разобрал реквизиты. Открой — запустится распознавание.</div>';
+    pending.forEach(inv => { html += _updCard(inv, 'wait'); });
+  }
+  if (drafts.length) {
+    html += _updSec('📝', 'Черновики — проверить и оприходовать', drafts.length) +
+      '<div class="upd-hint">Реквизиты распознаны. Открой, сверь позиции и оприходуй на склад.</div>';
+    drafts.forEach(inv => { html += _updCard(inv, 'draft'); });
+  }
+  if (done.length) {
+    html += _updSec('✅', 'Оприходовано', done.length);
+    done.forEach(inv => { html += _updCard(inv, 'ok'); });
+  }
+  other.forEach(inv => { html += _updCard(inv, 'mut'); });
+  body.innerHTML = html;
+}
+
+// Старый вид (для отката) — прежний плоский список карточек
+function _renderUpdOldList(items) {
+  let html = '';
   items.forEach(inv => {
     const status = inv.status || 'draft';
     // Pending-распознавание показываем особым чипом — Дмитрий с компа должен видеть, какие УПД ждут запуска
@@ -10249,7 +10366,7 @@ function renderSupplyInvoicesList(items) {
         '</div>' +
       '</div>';
   });
-  body.innerHTML = html;
+  return html;
 }
 
 // Удаление из списка с подтверждением
