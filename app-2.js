@@ -324,6 +324,16 @@ function renderContractsProgressForSales() {
     return;
   }
 
+  // v2.45.5xx: новый вид — карточки с аватаром, полосой готовности и чипом срока
+  if (window.SALES_V2) {
+    let html = '<div class="sd-sec"><div class="sd-sec-t"><span class="em">🛠️</span> Готовность договоров в работе <span class="sd-cnt">' + list.length + '</span></div></div>';
+    html += '<div class="sd-rc-wrap">';
+    list.forEach(c => { html += _sdReadinessCard(c); });
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
   let html = '<div class="section-label" style="margin-top: 20px;">Готовность договоров в работе · ' + list.length + '</div>';
   html += '<div style="padding: 0 18px;">';
   list.forEach(c => {
@@ -8026,12 +8036,219 @@ async function loadSalesDashboard() {
   }
 }
 
+// v2.45.5xx: переключатель нового/старого вида Главной продаж
 function renderSalesDashboard() {
+  window.SALES_V2 = (localStorage.getItem('salesV2') !== '0');
+  if (window.SALES_V2) { _renderSalesDashboardNew(); }
+  else { _renderSalesDashboardOld(); }
+}
+
+function toggleSalesV2() {
+  window.SALES_V2 = !window.SALES_V2;
+  try { localStorage.setItem('salesV2', window.SALES_V2 ? '1' : '0'); } catch (_) {}
+  renderSalesDashboard();
+}
+
+function _sdSalesToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SALES_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.SALES_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleSalesV2()">' + (window.SALES_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function _sdQuickTilesHtml() {
+  let html = '<div class="more-section-title" style="padding: 6px 4px 8px;">БЫСТРЫЙ ДОСТУП</div>';
+  html += '<div class="quick-tiles">';
+  html += '<div class="quick-tile" onclick="selectSidebarItem(\'sales-offers\')">' +
+    '<div class="qt-icon"><i class="ti ti-file-invoice"></i></div>' +
+    '<div class="qt-body"><div class="qt-title">КП</div><div class="qt-meta">Коммерческие предложения</div></div></div>';
+  html += '<div class="quick-tile" onclick="selectSidebarItem(\'sales-contractors\')">' +
+    '<div class="qt-icon"><i class="ti ti-briefcase"></i></div>' +
+    '<div class="qt-body"><div class="qt-title">Контрагенты</div><div class="qt-meta">База клиентов</div></div></div>';
+  html += '<div class="quick-tile" onclick="selectSidebarItem(\'sale-products\')">' +
+    '<div class="qt-icon"><i class="ti ti-shopping-cart"></i></div>' +
+    '<div class="qt-body"><div class="qt-title">Каталог</div><div class="qt-meta">Продажная номенклатура</div></div></div>';
+  html += '<div class="quick-tile" onclick="selectSidebarItem(\'sales-more\')">' +
+    '<div class="qt-icon"><i class="ti ti-menu-2"></i></div>' +
+    '<div class="qt-body"><div class="qt-title">Ещё</div><div class="qt-meta">Профиль и настройки</div></div></div>';
+  html += '</div>';
+  return html;
+}
+
+// --- Новый вид ---
+function _renderSalesDashboardNew() {
   const container = document.getElementById('sales-dashboard-content');
   const contracts = cache.contracts || [];
   const counts = cache.contractsCounts || {};
 
-  let html = '';
+  let html = '<div class="sd-wrap">' + _sdSalesToggleBar();
+
+  // KPI
+  html += '<div class="sd-kpis">';
+  html += _sdKpi('tot',    '📄', counts.total || 0,      'Всего договоров');
+  html += _sdKpi('prod',   '🏭', counts.production || 0, 'В производстве');
+  html += _sdKpi('ship-r', '📦', counts.ready || 0,      'К отгрузке');
+  html += _sdKpi('done',   '✅', counts.shipped || 0,    'Отгружено');
+  html += '</div>';
+
+  // Плитки быстрого доступа (только на мобильном)
+  if (!state.isDesktop) html += _sdQuickTilesHtml();
+
+  // Блок «Готовность договоров в работе» — заполняется асинхронно
+  html += '<div id="sales-progress-block"></div>';
+
+  // Срочные — delivery_date в течение 7 дней и не закрыты
+  const today = new Date();
+  const weekAhead = new Date(today); weekAhead.setDate(today.getDate() + 7);
+  const todayStr = today.toISOString().slice(0, 10);
+  const weekStr = weekAhead.toISOString().slice(0, 10);
+  const urgent = contracts.filter(c =>
+    c.status !== 'closed' && c.delivery_date &&
+    c.delivery_date >= todayStr && c.delivery_date <= weekStr
+  ).slice(0, 5);
+
+  if (urgent.length) {
+    html += '<div class="sd-sec"><div class="sd-sec-t"><span class="em">🔥</span> Срочные · сроки в ближайшие 7 дней <span class="sd-cnt">' + urgent.length + '</span></div>' +
+      '<a onclick="selectSidebarItem(\'sales-contracts\')">Все →</a></div>';
+    html += '<div class="sd-list">';
+    urgent.forEach(c => html += _sdContractRow(c, true));
+    html += '</div>';
+  }
+
+  // Последние созданные
+  if (contracts.length) {
+    html += '<div class="sd-sec"><div class="sd-sec-t"><span class="em">🕓</span> Последние договоры</div>' +
+      '<a onclick="selectSidebarItem(\'sales-contracts\')">Все →</a></div>';
+    html += '<div class="sd-list">';
+    contracts.slice(0, 5).forEach(c => html += _sdContractRow(c, false));
+    html += '</div>';
+  } else {
+    html += '<div class="empty-block"><i class="ti ti-file-text"></i>Пока нет ни одного договора';
+    if (canManageSales()) {
+      html += '<br><br><button class="btn btn-primary" onclick="openNewContract()" style="margin: 0 auto;"><i class="ti ti-plus"></i> Создать первый</button>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div>'; // .sd-wrap
+  container.innerHTML = html;
+
+  // после рендера — асинхронно подгружаем прогресс
+  loadContractsProgressForSales();
+}
+
+// KPI-плитка нового вида
+function _sdKpi(cls, emoji, num, label) {
+  return '<div class="sd-kpi ' + cls + '">' +
+    '<div class="sd-kpi-ic"><span class="em">' + emoji + '</span></div>' +
+    '<div><div class="sd-kpi-num">' + escapeHtml(String(num)) + '</div>' +
+    '<div class="sd-kpi-lbl">' + escapeHtml(label) + '</div></div>' +
+  '</div>';
+}
+
+// статусная плашка договора (новый вид)
+function _sdStatusPill(c) {
+  const map = {
+    production: ['prod', 'В производстве'],
+    ready:      ['ready', 'К отгрузке'],
+    shipped:    ['ship', 'Отгружен'],
+    partially_shipped: ['part', 'Отгружен частично'],
+    closed:     ['done', 'Закрыт'],
+    draft:      ['none', 'Черновик'],
+  };
+  const m = map[c.status];
+  const cls = m ? m[0] : 'none';
+  const label = c.status_label || (m ? m[1] : (c.status || '—'));
+  return '<span class="sd-pill ' + cls + '">' + escapeHtml(label) + '</span>';
+}
+
+// строка договора в списках «Срочные» / «Последние»
+function _sdContractRow(c, showDateChip) {
+  const urg = getContractUrgencyClass(c);
+  let icCls = '';
+  if (urg === 'urg-overdue' || urg === 'urg-urgent') icCls = 'late';
+  else if (urg === 'urg-soon') icCls = 'soon';
+  else if (urg === 'urg-ok' || urg === 'urg-done') icCls = 'ok';
+
+  let meta = '';
+  if (!showDateChip && c.delivery_date) meta += 'срок ' + formatDate(c.delivery_date) + ' · ';
+  meta += escapeHtml(c.manager_name || 'без менеджера');
+
+  let dateChip = '';
+  if (showDateChip && c.delivery_date) {
+    let dcCls = '';
+    if (urg === 'urg-overdue') dcCls = ' late';
+    else if (urg === 'urg-urgent' || urg === 'urg-soon') dcCls = ' soon';
+    dateChip = '<span class="sd-date-chip' + dcCls + '">срок ' + formatDate(c.delivery_date) + '</span>';
+  }
+
+  return '<div class="sd-rec" onclick="openContract(' + c.id + ')">' +
+    '<div class="sd-rec-ic ' + icCls + '"><span class="em">📄</span></div>' +
+    '<div class="sd-rec-body">' +
+      '<div class="sd-rec-title">' + escapeHtml(c.number || '—') + ' · ' + escapeHtml(c.contractor_name || '—') + '</div>' +
+      '<div class="sd-rec-meta">' + meta + '</div>' +
+    '</div>' +
+    '<div class="sd-rec-right">' + dateChip + _sdStatusPill(c) + '</div>' +
+  '</div>';
+}
+
+// карточка готовности договора (новый вид)
+function _sdReadinessCard(c) {
+  const qty = c.assemblies_qty || 0;
+  const hasAssemblies = qty > 0;
+  const realPct = (c.progress_pct != null) ? Math.max(0, Math.min(100, c.progress_pct)) : null;
+  const hasWork = hasAssemblies || (realPct != null);
+  const urg = getContractUrgencyClass(c);
+
+  let cardCls = 'none', barColor = '#CBD5E1';
+  if (hasWork) {
+    if (urg === 'urg-overdue') { cardCls = 'late'; barColor = 'var(--danger)'; }
+    else if (urg === 'urg-urgent' || urg === 'urg-soon') { cardCls = 'soon'; barColor = 'var(--warning)'; }
+    else { cardCls = 'ontime'; barColor = 'var(--success)'; }
+  }
+
+  let widthPct = 0, pctLabel = '0%', pctStyle = '';
+  if (realPct != null) { widthPct = realPct; pctLabel = realPct + '%'; }
+  else if (hasAssemblies) { widthPct = 50; pctLabel = '50%'; }
+  else { pctStyle = ' style="color:var(--text-faint);"'; }
+
+  let chip;
+  if (!hasWork) {
+    chip = '<span class="sd-chip none">нет сборок</span>';
+  } else if (c.delivery_date) {
+    const txt = formatContractDeadline(c.delivery_date);
+    let chCls = 'ontime', emo = '📅';
+    if (urg === 'urg-overdue') { chCls = 'late'; emo = '⏰'; }
+    else if (urg === 'urg-urgent' || urg === 'urg-soon') { chCls = 'soon'; }
+    chip = '<span class="sd-chip ' + chCls + '"><span class="em">' + emo + '</span> ' + escapeHtml(txt) + '</span>';
+  } else {
+    chip = '<span class="sd-chip none">без срока</span>';
+  }
+
+  const asm = hasAssemblies
+    ? '<span class="sd-rc-asm"><span class="em">🧩</span> ' + qty + ' ' + pluralAssemblies(qty) + '</span>'
+    : '<span class="sd-rc-asm">сборки не заведены</span>';
+
+  return '<div class="sd-rc ' + cardCls + '" onclick="openContractDetail(' + c.id + ')">' +
+    '<div class="sd-ava">' + escapeHtml(getInitials(c.contractor_name)) + '</div>' +
+    '<div class="sd-rc-body">' +
+      '<div class="sd-rc-top"><span class="sd-rc-num">' + escapeHtml(c.number || '—') + '</span>' + chip + '</div>' +
+      '<div class="sd-rc-client">' + escapeHtml(c.contractor_name || '—') + '</div>' +
+      '<div class="sd-rc-bar-row">' +
+        '<div class="sd-rc-bar"><span style="width:' + widthPct + '%;background:' + barColor + ';"></span></div>' +
+        '<div class="sd-rc-pct"' + pctStyle + '>' + pctLabel + '</div>' + asm +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+// --- Старый вид (для отката) ---
+function _renderSalesDashboardOld() {
+  const container = document.getElementById('sales-dashboard-content');
+  const contracts = cache.contracts || [];
+  const counts = cache.contractsCounts || {};
+
+  let html = _sdSalesToggleBar();
 
   // KPI
   html += '<div class="kpi-grid">';
