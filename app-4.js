@@ -12159,6 +12159,18 @@ function _srNavMonth(delta) {
 }
 
 function _srRender(box, d) {
+  window.SR_V2 = (localStorage.getItem('srV2') !== '0');
+  const toggle = _sr2ToggleBar();
+  box.innerHTML = toggle + (window.SR_V2 ? _sr2Body(d) : _srOldBody(d));
+  const dateInput = document.getElementById('sr-date');
+  if (dateInput) {
+    dateInput.addEventListener('change', _srPrefillFromDate);
+    _srPrefillFromDate();
+  }
+}
+
+// === Старый вид (для отката) ===
+function _srOldBody(d) {
   let html = '<div class="sr-toolbar">' +
       '<button class="btn btn-secondary btn-small" onclick="_srNavMonth(-1)" title="Предыдущий месяц"><i class="ti ti-chevron-left"></i></button>' +
       '<div class="sr-month">' + escapeHtml(_srMonthLabel(d.month)) + '</div>' +
@@ -12166,12 +12178,150 @@ function _srRender(box, d) {
     '</div>';
   if (d.can_edit) html += _srFormHtml(d);
   html += _srManagersHtml(d);
-  box.innerHTML = html;
-  const dateInput = document.getElementById('sr-date');
-  if (dateInput) {
-    dateInput.addEventListener('change', _srPrefillFromDate);
-    _srPrefillFromDate();
+  return html;
+}
+
+// === Новый вид (v2.45.5xx) ===
+function _sr2ToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.SR_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.SR_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleReportsV2()">' + (window.SR_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function toggleReportsV2() {
+  window.SR_V2 = !window.SR_V2;
+  try { localStorage.setItem('srV2', window.SR_V2 ? '1' : '0'); } catch (_) {}
+  const box = document.getElementById('sales-reports-body');
+  if (box && _srState.data) _srRender(box, _srState.data);
+  else loadSalesReports();
+}
+
+// эмодзи и цветовой класс по метрике
+var _SR2_ICON = { calls: '📞', connects: '✅', new_leads: '📥', offers: '📄', deals: '🤝', revenue: '💰' };
+var _SR2_CCLS = { calls: 'c-call', connects: 'c-conn', new_leads: 'c-lead', offers: 'c-kp', deals: 'c-deal', revenue: 'c-rev' };
+
+function _sr2Body(d) {
+  let html = '<div class="sr2-mnav-row"><div class="sr2-mnav">' +
+      '<button onclick="_srNavMonth(-1)" title="Предыдущий месяц">‹</button>' +
+      '<span class="sr2-m">' + escapeHtml(_srMonthLabel(d.month)) + '</span>' +
+      '<button onclick="_srNavMonth(1)" title="Следующий месяц">›</button>' +
+    '</div></div>';
+
+  html += _sr2SummaryHtml(d);
+  if (d.can_edit) html += _sr2FormHtml(d);
+
+  const mgrs = d.managers || [];
+  if (!mgrs.length) {
+    html += '<div class="empty-block"><i class="ti ti-chart-bar"></i>За ' + escapeHtml(_srMonthLabel(d.month).toLowerCase()) + ' отчётов пока нет.' +
+      (d.can_edit ? '<br><span style="font-size:13px;color:var(--text-light);">Заполни форму выше и нажми «Сохранить».</span>' : '') + '</div>';
+  } else {
+    html += '<div class="sr2-sec"><span class="em">👥</span> По менеджерам</div>';
+    mgrs.forEach((m, idx) => { html += _sr2ManagerCardHtml(m, idx, d); });
   }
+  return html;
+}
+
+function _sr2SummaryHtml(d) {
+  const mgrs = d.managers || [];
+  if (!mgrs.length) return '';
+  const sum = {};
+  _SR_FIELDS.forEach(f => { sum[f.key] = 0; });
+  mgrs.forEach(m => { const t = m.totals || {}; _SR_FIELDS.forEach(f => { sum[f.key] += (Number(t[f.key]) || 0); }); });
+  let tiles = '';
+  _SR_FIELDS.forEach(f => {
+    const val = f.money ? formatMoneyShort(sum[f.key]) : _srFmtNum(sum[f.key]);
+    tiles += '<div class="sr2-kpi' + (f.money ? ' rev' : '') + '">' +
+        '<div class="sr2-kpi-ic ' + _SR2_CCLS[f.key] + '"><span class="em">' + _SR2_ICON[f.key] + '</span></div>' +
+        '<div class="sr2-kpi-num">' + val + '</div>' +
+        '<div class="sr2-kpi-lbl">' + escapeHtml(f.short) + '</div>' +
+      '</div>';
+  });
+  return '<div class="sr2-sec"><span class="em">📊</span> Сводка за ' + escapeHtml(_srMonthLabel(d.month).toLowerCase()) + (mgrs.length > 1 ? ' · все менеджеры' : '') + '</div>' +
+    '<div class="sr2-kpis">' + tiles + '</div>';
+}
+
+function _sr2FormHtml(d) {
+  const today = d.today || _srTodayIso();
+  let inputs = '';
+  _SR_FIELDS.forEach(f => {
+    inputs += '<div class="sr2-fld' + (f.money ? ' rev' : '') + '">' +
+        '<label for="sr-' + f.key + '"><span class="em">' + _SR2_ICON[f.key] + '</span> ' + escapeHtml(f.short) + '</label>' +
+        '<input type="number" inputmode="numeric" min="0" step="1" id="sr-' + f.key + '" value="0" onfocus="this.select()">' +
+      '</div>';
+  });
+  return '<div class="sr2-sec"><span class="em">✏️</span> Мой отчёт за день</div>' +
+    '<div class="sr2-form">' +
+      '<div class="sr2-form-sub">Внеси цифры за день — «итого» за месяц посчитается само.</div>' +
+      '<div class="sr2-frow">' +
+        '<div class="sr2-fld date"><label for="sr-date">Дата</label>' +
+          '<input type="date" id="sr-date" value="' + today + '" max="' + today + '"></div>' +
+        inputs +
+        '<div class="sr2-grow"></div>' +
+        '<button class="btn btn-primary" id="sr-save-btn" onclick="saveSalesReport()"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      '</div>' +
+      '<div class="sr2-form-hint" id="sr-form-hint"></div>' +
+    '</div>';
+}
+
+function _sr2Funnel(t) {
+  const calls = Number(t.calls) || 0, connects = Number(t.connects) || 0, leads = Number(t.new_leads) || 0, deals = Number(t.deals) || 0;
+  if (!calls && !connects && !leads && !deals) return '';
+  const pct = (part, whole) => whole > 0 ? Math.round(part / whole * 100) : 0;
+  const node = (val, word) => '<span class="sr2-fn-node"><b>' + _srFmtNum(val) + '</b> ' + word + '</span>';
+  const arrow = (p, cls) => '<span class="sr2-fn-pct' + (cls ? ' ' + cls : '') + '">' + p + '%</span>';
+  return '<div class="sr2-funnel">' +
+    node(calls, 'звонков') + arrow(pct(connects, calls)) +
+    node(connects, 'дозвонов') + arrow(pct(leads, connects)) +
+    node(leads, 'заявок') + arrow(pct(deals, leads), 'warn') +
+    node(deals, 'сделок') +
+  '</div>';
+}
+
+function _sr2ToggleDaily(n) {
+  const el = document.getElementById('sr2-daily-' + n);
+  if (el) el.classList.toggle('open');
+}
+
+function _sr2ManagerCardHtml(m, idx, d) {
+  const t = m.totals || {};
+  let tiles = '';
+  _SR_FIELDS.forEach(f => {
+    const val = f.money ? formatMoneyShort(t[f.key]) : _srFmtNum(t[f.key]);
+    tiles += '<div class="sr2-tile' + (f.money ? ' rev' : '') + '"><div class="v">' + val + '</div><div class="l">' + escapeHtml(f.short) + '</div></div>';
+  });
+
+  const head = '<tr><th>Дата</th>' + _SR_FIELDS.map(f => '<th>' + escapeHtml(f.short) + '</th>').join('') + '<th></th></tr>';
+  const rows = (m.reports || []).map(r => {
+    const cum = r.cum || {};
+    const cells = _SR_FIELDS.map(f =>
+      '<td' + (f.money ? ' class="rev-c"' : '') + '>' + (f.money ? _srFmtNum(r[f.key]) : (r[f.key] || 0)) +
+        '<span class="cum">' + (f.money ? _srFmtNum(cum[f.key]) : (cum[f.key] || 0)) + '</span></td>').join('');
+    const act = '<button class="sr2-ibtn" title="Скопировать для Telegram" onclick="_srCopyReport(' + idx + ',\'' + r.report_date + '\')"><i class="ti ti-copy"></i></button>' +
+      (d.can_edit ? '<button class="sr2-ibtn" title="Удалить" onclick="deleteSalesReport(' + r.id + ')"><i class="ti ti-trash"></i></button>' : '');
+    return '<tr><td>' + escapeHtml(_srFmtDateRu(r.report_date)) + '</td>' + cells + '<td class="sr2-tact-cell">' + act + '</td></tr>';
+  }).join('');
+
+  const cnt = (m.reports || []).length;
+  const daily = cnt ?
+    '<div class="sr2-daily" id="sr2-daily-' + idx + '">' +
+      '<button class="sr2-daily-toggle" onclick="_sr2ToggleDaily(' + idx + ')"><span class="em">📅</span> По дням (' + cnt + ') <span class="sr2-caret em">▾</span></button>' +
+      '<div class="sr2-daily-body"><div class="sr2-table-wrap"><table class="sr2-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
+        '<div class="sr2-table-note">маленькое число снизу — нарастающий итог с начала месяца</div></div></div>' +
+    '</div>' : '';
+
+  const periodWord = (_srMonthLabel(d.month).split(' ')[0] || '').toLowerCase();
+  return '<div class="sr2-mgr">' +
+      '<div class="sr2-mgr-head">' +
+        '<div class="sr2-ava">' + escapeHtml(getInitials(m.name)) + '</div>' +
+        '<div class="sr2-mgr-id"><div class="sr2-mgr-name">' + escapeHtml(m.name || '—') + '</div>' +
+          (m.position ? '<div class="sr2-mgr-pos">' + escapeHtml(m.position) + '</div>' : '') + '</div>' +
+        '<div class="sr2-mgr-period">Итого<br>за ' + escapeHtml(periodWord) + '</div>' +
+      '</div>' +
+      '<div class="sr2-tiles">' + tiles + '</div>' +
+      _sr2Funnel(t) +
+      daily +
+    '</div>';
 }
 
 function _srFormHtml(d) {
