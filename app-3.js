@@ -9767,6 +9767,23 @@ function _owzSetQty(itemId, val) {
   ex.qty = (isNaN(n) || n <= 0) ? 0 : n;
 }
 
+function _owzSetUnit(itemId, val) {
+  const ex = _owz.list.find(x => x.id === itemId);
+  if (!ex) return;
+  ex.unit = (val || 'шт.').trim() || 'шт.';
+}
+
+// Частые единицы измерения для выпадашки в корзине. Если у позиции единица
+// нестандартная (из справочника) — добавляем её первой, чтобы не потерять.
+function _owzUnitOptions(current) {
+  const base = ['шт.', 'м', 'пог.м', 'м²', 'м³', 'компл.', 'упак.', 'кг', 'л', 'набор', 'рулон'];
+  const cur = (current || 'шт.').trim() || 'шт.';
+  const list = base.indexOf(cur) >= 0 ? base.slice() : [cur].concat(base);
+  return list.map(u =>
+    '<option value="' + escapeHtml(u) + '"' + (u === cur ? ' selected' : '') + '>' + escapeHtml(u) + '</option>'
+  ).join('');
+}
+
 function _owzRemove(itemId) {
   _owz.list = _owz.list.filter(x => x.id !== itemId);
   _owzRenderCart();
@@ -9787,7 +9804,9 @@ function _owzRenderCart() {
       '<div class="owz-cart-name">' + (i + 1) + '. ' + escapeHtml(x.name) + '</div>' +
       '<input class="owz-cart-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
         'onchange="_owzSetQty(' + x.id + ', this.value)">' +
-      '<span class="owz-cart-unit">' + escapeHtml(x.unit) + '</span>' +
+      '<select class="owz-cart-unit" onchange="_owzSetUnit(' + x.id + ', this.value)" title="Единица измерения">' +
+        _owzUnitOptions(x.unit) +
+      '</select>' +
       '<button class="owz-cart-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
     '</div>'
   ).join('');
@@ -12140,6 +12159,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.604',
+    date: '30.06.2026',
+    title: 'Заказ поставщику: выбор единицы измерения',
+    features: [
+      'В корзине заказа у каждой позиции теперь можно <b>выбрать единицу</b>: шт., м, пог.м, м², компл., упак., кг, л и др.',
+      'Особенно удобно для вписанных вручную позиций — например, кабель в <b>метрах</b>',
+    ],
+  },
   {
     version: 'v2.45.603',
     date: '30.06.2026',
