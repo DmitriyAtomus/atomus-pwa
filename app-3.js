@@ -3357,8 +3357,26 @@ async function loadPartsDashboard() {
   }
 }
 
+function _ptToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.PT_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.PT_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="togglePtV2()">' + (window.PT_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function togglePtV2() {
+  window.PT_V2 = !window.PT_V2;
+  try { localStorage.setItem('ptV2', window.PT_V2 ? '1' : '0'); } catch (_) {}
+  renderPartsDashboard();
+}
+
 function renderPartsDashboard() {
   const d = state.ptData || { kpis: {}, categories: [], items: [] };
+  window.PT_V2 = (localStorage.getItem('ptV2') !== '0');
+  const pane = document.getElementById('pt-pane');
+  if (pane) pane.classList.toggle('pt-v2', !!window.PT_V2);
+  const tg = document.getElementById('pt-toggle');
+  if (tg) tg.innerHTML = _ptToggleBar();
   _renderPtKpis(d.kpis);
   _renderPtAiHint(d);
   _renderPtChips(d.categories, d.kpis.total || 0);
@@ -3376,12 +3394,15 @@ function _renderPtKpis(k) {
       value: k.total || 0,
       hint: (k.categories_count || 0) + ' ' + _plural(k.categories_count || 0, ['категория', 'категории', 'категорий']),
       tone: '',
+      icon: 'ti-packages',
     },
     {
       label: 'Ниже минимума',
       value: k.below_min || 0,
       hint: (k.below_min || 0) > 0 ? 'требуется закупка' : 'всё в норме',
       tone: 'tone-red',
+      vcls: 'pk-low',
+      icon: 'ti-trending-down',
       clickable: (k.below_min || 0) > 0,
       onclick: 'setPtCategoryFilter(null); togglePtAttention(true)',
     },
@@ -3390,22 +3411,29 @@ function _renderPtKpis(k) {
       value: k.zero || 0,
       hint: (k.zero || 0) > 0 ? 'остаток 0' : 'не пусто нигде',
       tone: 'tone-yellow',
+      vcls: 'pk-zero',
+      icon: 'ti-circle-x',
     },
     {
       label: 'Ожидается приход',
       value: Math.round(k.incoming || 0),
       hint: (k.incoming_orders || 0) + ' ' + _plural(k.incoming_orders || 0, ['заказ', 'заказа', 'заказов']) + ' поставщикам',
       tone: 'tone-blue',
+      vcls: 'pk-in',
+      icon: 'ti-truck-delivery',
       clickable: (k.incoming_orders || 0) > 0,
       onclick: "selectSidebarItem('supply-orders')",
     },
   ];
   host.innerHTML = kpis.map(x =>
-    '<div class="fp-kpi ' + x.tone + (x.clickable ? ' clickable' : '') + '"' +
+    '<div class="fp-kpi ' + x.tone + (x.vcls ? ' ' + x.vcls : '') + (x.clickable ? ' clickable' : '') + '"' +
       (x.onclick ? ' onclick="' + x.onclick + '"' : '') + '>' +
-      '<div class="fp-kpi-label">' + escapeHtml(x.label) + '</div>' +
-      '<div class="fp-kpi-value">' + x.value + '</div>' +
-      '<div class="fp-kpi-hint">' + escapeHtml(x.hint) + '</div>' +
+      '<div class="fp-kpi-ic"><i class="ti ' + (x.icon || 'ti-box') + '"></i></div>' +
+      '<div class="fp-kpi-body">' +
+        '<div class="fp-kpi-label">' + escapeHtml(x.label) + '</div>' +
+        '<div class="fp-kpi-value">' + x.value + '</div>' +
+        '<div class="fp-kpi-hint">' + escapeHtml(x.hint) + '</div>' +
+      '</div>' +
     '</div>'
   ).join('');
 }
@@ -3680,6 +3708,7 @@ function _renderPtRow(it) {
   const actionHtml = '<div class="pt-row-action">' + mainBtn + defectBtn + '</div>';
 
   return '<div class="pt-row s-' + st + '" onclick="openPtItemDetail(' + it.id + ')">' +
+    '<span class="pt-row-cat-ic"><i class="ti ' + _nvIconFor(it.category_name) + '"></i></span>' +
     '<span class="pt-row-dot ' + st + '"></span>' +
     '<div>' +
       '<div class="pt-row-name">' + escapeHtml(it.name) +
@@ -12030,6 +12059,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.600',
+    date: '30.06.2026',
+    title: '«Комплектующие» (Склад) — новый вид',
+    features: [
+      'KPI-плитки сверху теперь с <b>иконками</b> и цветными акцентами: всего позиций, ниже минимума, нет в наличии, ожидается приход',
+      'Строки позиций — с <b>цветной полосой слева по состоянию склада:</b> 🔴 нет в наличии, 🟠 критично (ниже минимума), 🟢 в норме, 🔵 избыток. Видно дефицит и запас по цвету',
+      'У каждой позиции — иконка категории, артикул отдельным чипом, остаток крупно (с минимумом), расход в месяц',
+      'Баннер дефицита под план, чипы категорий, поиск, фильтры «В наличии» / «Требуют внимания», кнопки «Заказать» / «Расход» / «Брак» — всё как раньше',
+      'Под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний вид',
+    ],
+  },
   {
     version: 'v2.45.599',
     date: '30.06.2026',
