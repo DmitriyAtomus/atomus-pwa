@@ -19185,3 +19185,44 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   #sales-reports-body .sr2-grow{display:none;}
   #sales-reports-body .sr2-frow > .btn{width:100%;justify-content:center;}
 }
+
+/* ===== Производство — новый вид (v2.45.5xx) ===== */
+/* иконка KPI и точка колонки видны только в новом виде */
+#dashboard-content .pkb-kpi-ic{display:none;}
+#dashboard-content .pkb-col-dot{display:none;}
+#dashboard-content .pkb-kpi-body{display:flex;flex-direction:column;gap:4px;min-width:0;}
+
+/* --- KPI-плитки: иконка в цветном кружке + цветная полоса слева --- */
+#dashboard-content.pkb-v2 .pkb-kpi{flex-direction:row;align-items:center;gap:11px;border-radius:13px;border-left:1px solid var(--border);position:relative;overflow:hidden;padding:13px 15px;}
+#dashboard-content.pkb-v2 .pkb-kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#9AA1B0;}
+#dashboard-content.pkb-v2 .pkb-kpi-ic{display:flex;width:38px;height:38px;border-radius:10px;align-items:center;justify-content:center;flex-shrink:0;background:#EEF1F6;color:#6E7689;}
+#dashboard-content.pkb-v2 .pkb-kpi-ic i{font-size:19px;}
+#dashboard-content.pkb-v2 .pkb-kpi-value{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+#dashboard-content.pkb-v2 .pkb-kpi-label{font-weight:700;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-neutral::before{background:#9AA1B0;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-info::before{background:#3257B0;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-info .pkb-kpi-ic{background:#E7EEFB;color:#3257B0;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-danger::before{background:#B5260C;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-danger .pkb-kpi-ic{background:#FCE8E2;color:#B5260C;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-warning::before{background:#B5560C;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-warning .pkb-kpi-ic{background:#FDF0E3;color:#B5560C;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-violet::before{background:#6A4B9C;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-violet .pkb-kpi-ic{background:#F0EAFA;color:#6A4B9C;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-success::before{background:#1F7B3F;}
+#dashboard-content.pkb-v2 .pkb-kpi.k-success .pkb-kpi-ic{background:#E8F4ED;color:#1F7B3F;}
+
+/* --- Цветная точка в заголовке колонки канбана --- */
+#dashboard-content.pkb-v2 .pkb-col-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-right:1px;background:#9AA1B0;}
+#dashboard-content.pkb-v2 .pkb-col.c-queue   .pkb-col-dot{background:#9AA1B0;}
+#dashboard-content.pkb-v2 .pkb-col.c-active  .pkb-col-dot{background:#3257B0;}
+#dashboard-content.pkb-v2 .pkb-col.c-review  .pkb-col-dot{background:#B5710C;}
+#dashboard-content.pkb-v2 .pkb-col.c-packing .pkb-col-dot{background:#6A4B9C;}
+#dashboard-content.pkb-v2 .pkb-col.c-done    .pkb-col-dot{background:#1F7B3F;}
+#dashboard-content.pkb-v2 .pkb-col-head{align-items:center;gap:8px;}
+
+/* --- Лёгкая полировка карточек и баров в новом виде --- */
+#dashboard-content.pkb-v2 .pkb-wc{border-radius:11px;}
+#dashboard-content.pkb-v2 .pkb-wc-bar,
+#dashboard-content.pkb-v2 .pkb-wc-blocked{border-radius:6px;}
+#dashboard-content.pkb-v2 .pkb-wl-status{border-radius:20px;padding:4px 11px;}
+#dashboard-content.pkb-v2 .pkb-wl-bar{border-radius:8px;}
