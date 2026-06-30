@@ -18806,3 +18806,44 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 #sup-inbox-list .ibx-noise-from{font-size:11.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #sup-inbox-list .ibx-noise-acts{display:flex;gap:5px;flex-shrink:0;align-items:center;}
 @media(max-width:760px){#sup-inbox-list .ibx-sum{grid-template-columns:1fr;}}
+
+/* ============ v2.45.x: «Приёмка УПД» — группировка по статусу ============ */
+#si-screen-body .em{font-style:normal;font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif;line-height:1;}
+#si-screen-body .upd-icon{width:34px;height:34px;justify-content:center;padding:0;color:var(--text-light);}
+#si-screen-body .upd-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0 6px;}
+#si-screen-body .upd-kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 2px rgba(27,32,48,.04);}
+#si-screen-body .upd-kpi-ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;}
+#si-screen-body .upd-kpi-num{font-size:22px;font-weight:800;line-height:1;}
+#si-screen-body .upd-kpi-lbl{font-size:11.5px;color:var(--text-light);margin-top:3px;}
+#si-screen-body .upd-kpi.draft .upd-kpi-ic{background:var(--warning-bg);color:var(--warning);} #si-screen-body .upd-kpi.draft .upd-kpi-num{color:var(--warning);}
+#si-screen-body .upd-kpi.wait .upd-kpi-ic{background:#EEF1FB;color:#3257B0;}
+#si-screen-body .upd-kpi.ok .upd-kpi-ic{background:var(--success-bg);color:var(--success);}
+#si-screen-body .upd-kpi.tot .upd-kpi-ic{background:var(--brand-bg);color:var(--brand);}
+
+#si-screen-body .upd-sec{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--text-mid);text-transform:uppercase;letter-spacing:.5px;margin:20px 2px 10px;}
+#si-screen-body .upd-sec .cnt{background:var(--brand-bg);color:var(--brand);border-radius:20px;font-size:11px;padding:1px 8px;}
+#si-screen-body .upd-hint{font-size:12px;color:var(--text-light);margin:-4px 2px 11px;}
+
+#si-screen-body .upd{background:#fff;border:1px solid var(--border);border-left:4px solid var(--warning);border-radius:13px;padding:13px 16px;margin-bottom:11px;display:flex;align-items:center;gap:13px;box-shadow:0 1px 2px rgba(27,32,48,.04);cursor:pointer;}
+#si-screen-body .upd:hover{border-color:var(--border-strong);}
+#si-screen-body .upd.ok{border-left-color:var(--success);}
+#si-screen-body .upd.wait{border-left-color:#3257B0;}
+#si-screen-body .upd.mut{border-left-color:var(--border-strong);opacity:.85;}
+#si-screen-body .upd-ava{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-light));flex-shrink:0;}
+#si-screen-body .upd-ava.wait{background:linear-gradient(135deg,#3257B0,#4F46E5);}
+#si-screen-body .upd-body{flex:1;min-width:0;}
+#si-screen-body .upd-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#si-screen-body .upd-num{font-weight:800;font-size:15px;color:var(--text-dark);}
+#si-screen-body .upd-sub{font-size:12.5px;color:var(--text-light);margin-top:4px;}
+#si-screen-body .upd-sub b{color:var(--text-mid);font-weight:600;}
+#si-screen-body .upd-sum{font-size:15px;font-weight:800;color:var(--text-dark);white-space:nowrap;text-align:right;}
+#si-screen-body .upd-sum small{font-size:11px;color:var(--text-faint);font-weight:600;display:block;}
+#si-screen-body .upd-acts{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+#si-screen-body .upd-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;white-space:nowrap;}
+#si-screen-body .upd-chip.draft{background:var(--warning-bg);color:var(--warning);}
+#si-screen-body .upd-chip.wait{background:#EEF1FB;color:#3257B0;}
+#si-screen-body .upd-chip.ok{background:var(--success-bg);color:var(--success);}
+#si-screen-body .upd-chip.warn{background:#FDF0E3;color:#B5560C;}
+#si-screen-body .upd-chip.doc{background:#E0E7FF;color:#3730A3;}
+#si-screen-body .upd-chip.mut{background:#F1F4F9;color:var(--text-light);}
+@media(max-width:760px){#si-screen-body .upd-kpis{grid-template-columns:repeat(2,1fr);}#si-screen-body .upd{flex-wrap:wrap;}#si-screen-body .upd-acts{width:100%;}#si-screen-body .upd-sum{text-align:left;}}
