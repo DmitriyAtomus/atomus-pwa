@@ -8383,17 +8383,170 @@ function orderPayStatusPill(m) {
   return '<span class="sup-status-pill" style="background:' + bg + ';color:' + fg + ';font-weight:700;">' + ic + ' ' + label + '</span>';
 }
 
+// v2.45.x: документ-вложение (счёт) — pdf/excel/word/изображение; аудио/видео/архив — нет
+function _inboxDocIndex(m) {
+  const atts = (m && m.attachments) || [];
+  for (let i = 0; i < atts.length; i++) {
+    const n = String(atts[i].name || '').toLowerCase();
+    if (/\.(pdf|xlsx?|docx?|odt|rtf|jpe?g|png|heic|heif|tiff?|bmp|webp)$/.test(n)) return i;
+  }
+  return -1;
+}
+function _inboxInitials(m) {
+  const nm = (m.from_name || '').trim();
+  if (nm) return _supInitials(nm);
+  const addr = String(m.from_addr || '');
+  const dom = (addr.split('@')[1] || addr).replace(/^www\./, '').split('.')[0];
+  return _supInitials(dom || '?');
+}
+function _inboxAvatarHtml(m) {
+  return '<div class="ibx-ava' + (isFromMax(m) ? ' max' : '') + '">' + escapeHtml(_inboxInitials(m)) + '</div>';
+}
+function _ibxDelBtn(m) {
+  return (state.user && (state.user.roles || []).includes('director'))
+    ? '<button class="btn ibx-icon" title="Удалить письмо" onclick="deleteInboxMessage(' + m.id + ')"><span class="em">🗑</span></button>'
+    : '';
+}
+function _ibxSumCard(cls, emoji, num, lbl) {
+  return '<div class="ibx-sum-card ' + cls + '"><div class="ibx-sum-ic"><span class="em">' + emoji + '</span></div>' +
+    '<div><div class="ibx-sum-num">' + num + '</div><div class="ibx-sum-lbl">' + escapeHtml(lbl) + '</div></div></div>';
+}
+function _ibxSecTitle(emoji, title, count) {
+  return '<div class="ibx-sec"><span class="em">' + emoji + '</span> ' + escapeHtml(title) + ' <span class="cnt">' + count + '</span></div>';
+}
+
+function _ibxInvoiceCard(m, isMatched) {
+  const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
+  const atts = m.attachments || [];
+  const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
+  let chips = '';
+  if (isMatched) {
+    chips += '<span class="ibx-chip ok"><span class="em">✅</span> привязан → ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>';
+    chips += orderPayStatusPill(m);
+  } else {
+    chips += '<span class="ibx-chip need"><span class="em">🔗</span> нужна привязка</span>';
+  }
+  chips += maxSourcePill(m);
+  if (m.detected_label && !isMatched) chips += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
+  chips += payerEntityPill((m.ai_data || {}).payer_entity, false);
+  let attBlock = '';
+  if (di >= 0) {
+    const a = atts[di];
+    const kb = Math.round((a.size || 0) / 1024);
+    const nm = escapeHtml(a.name || 'файл');
+    attBlock = '<div class="ibx-att">' +
+      '<div class="ibx-att-ic"><span class="em">📄</span></div>' +
+      '<div class="ibx-att-name" title="' + nm + '">' + nm + '</div>' +
+      '<div class="ibx-att-size">' + kb + ' КБ</div>' +
+      '<button class="btn btn-sm" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + di + ',null)"><span class="em">👁</span> Открыть</button>' +
+    '</div>';
+  } else if (isMatched && atts.length) {
+    attBlock = '<div class="ibx-att-mini"><span class="em">📎</span> ' + atts.length + ' вложени' + (atts.length > 1 ? 'й' : 'е') + '</div>';
+  }
+  let acts = '';
+  if (isMatched) {
+    acts = (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
+      '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>';
+  } else {
+    acts = '<button class="btn btn-primary ibx-grow" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать к заказу</button>' +
+      '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>' +
+      _ibxDelBtn(m);
+  }
+  return '<div class="ibx-card' + (isMatched ? ' matched' : '') + '"><div class="ibx-card-top">' +
+    _inboxAvatarHtml(m) +
+    '<div class="ibx-card-body">' +
+      '<div class="ibx-chips">' + chips + '</div>' +
+      '<div class="ibx-subj">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
+      '<div class="ibx-from">' + escapeHtml(m.from_name || m.from_addr || '—') + ' · ' + escapeHtml(received) + '</div>' +
+      attBlock +
+      '<div class="ibx-acts">' + acts + '</div>' +
+    '</div>' +
+  '</div></div>';
+}
+
+function _ibxNoiseRow(m) {
+  const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
+  const atts = m.attachments || [];
+  let reason = 'без вложений';
+  if (atts.length) reason = 'вложение не документ';
+  const ordChip = m.detected_label ? ' <span class="ibx-chip ord mini">' + escapeHtml(m.detected_label) + '</span>' : '';
+  const ico = m.detected_label ? '📨' : (isFromMax(m) ? '💬' : '📢');
+  return '<div class="ibx-noise">' +
+    '<div class="ibx-noise-ava"><span class="em">' + ico + '</span></div>' +
+    '<div class="ibx-noise-body">' +
+      '<div class="ibx-noise-subj">' + escapeHtml(m.subject || '(без темы)') + ordChip + '</div>' +
+      '<div class="ibx-noise-from">' + escapeHtml(m.from_name || m.from_addr || '—') + ' · ' + escapeHtml(received) + ' · ' + reason + '</div>' +
+    '</div>' +
+    '<div class="ibx-noise-acts"><button class="btn btn-sm" onclick="openInboxMessage(' + m.id + ')">Открыть</button>' + _ibxDelBtn(m) + '</div>' +
+  '</div>';
+}
+
+function toggleInboxV2() {
+  window.INBOX_V2 = !window.INBOX_V2;
+  try { localStorage.setItem('inboxV2', window.INBOX_V2 ? '1' : '0'); } catch (_) {}
+  renderSupplyInbox();
+}
+function toggleInboxNoise() {
+  window._ibxNoiseOpen = !window._ibxNoiseOpen;
+  const w = document.getElementById('ibx-noise-wrap'); if (w) w.style.display = window._ibxNoiseOpen ? '' : 'none';
+  const c = document.getElementById('ibx-noise-cnt'); if (c) c.textContent = c.textContent.replace(/[▾▴]/, window._ibxNoiseOpen ? '▴' : '▾');
+}
+
 function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
   const items = cache.supplyInbox || [];
+  window.INBOX_V2 = localStorage.getItem('inboxV2') !== '0';
   const statusHtml = _supplyInboxStatusHTML();
+  const toggle = '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.INBOX_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.INBOX_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleInboxV2()">' + (window.INBOX_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
   if (!items.length) {
-    list.innerHTML = statusHtml +
+    list.innerHTML = toggle + statusHtml +
       '<div class="empty-block"><i class="ti ti-mailbox-off"></i>Писем нет. Робот проверяет почту orders@atomus-group.ru раз в минуту.</div>';
     return;
   }
-  let html = statusHtml + '<div class="sup-list-rows">';
+  if (!window.INBOX_V2) { list.innerHTML = toggle + statusHtml + _renderInboxOldRows(items); return; }
+
+  // Классификация: счёт (есть документ-вложение, не привязан) / привязано / не счёт
+  const invoices = [], matched = [], noise = [];
+  items.forEach(m => {
+    m._docIdx = _inboxDocIndex(m);
+    if (m.status === 'matched' || m.matched_order_id) matched.push(m);
+    else if (m._docIdx >= 0) invoices.push(m);
+    else noise.push(m);
+  });
+  let html = toggle + statusHtml;
+  html += '<div class="ibx-sum">' +
+    _ibxSumCard('act', '🧾', invoices.length, 'Счета — нужна привязка') +
+    _ibxSumCard('ok', '✅', matched.length, 'Привязано к заказам') +
+    _ibxSumCard('mut', '📭', noise.length, 'Не счёт (рассылки)') +
+  '</div>';
+  if (invoices.length) {
+    html += _ibxSecTitle('🧾', 'Счета — нужна привязка', invoices.length);
+    html += '<div class="ibx-hint">Письма с вложением-документом от поставщика. Проверь и привяжи к заказу — уйдёт в оплату.</div>';
+    invoices.forEach(m => { html += _ibxInvoiceCard(m, false); });
+  }
+  if (matched.length) {
+    html += _ibxSecTitle('✅', 'Привязанные счета', matched.length);
+    matched.forEach(m => { html += _ibxInvoiceCard(m, true); });
+  }
+  if (noise.length) {
+    html += _ibxSecTitle('📭', 'Не похоже на счёт', noise.length);
+    html += '<div class="ibx-hint">Рассылки, уведомления и письма без вложений. Свёрнуто, чтобы не мешали — разверни, если нужно.</div>';
+    html += '<div class="ibx-noise-head" onclick="toggleInboxNoise()"><span class="em">📭</span> Письма без вложений — рассылки и уведомления' +
+      '<span class="cnt" id="ibx-noise-cnt">' + noise.length + ' писем ' + (window._ibxNoiseOpen ? '▴' : '▾') + '</span></div>';
+    html += '<div class="ibx-noise-wrap" id="ibx-noise-wrap"' + (window._ibxNoiseOpen ? '' : ' style="display:none;"') + '>';
+    noise.forEach(m => { html += _ibxNoiseRow(m); });
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+// Старый вид (для отката) — прежний плоский список строк
+function _renderInboxOldRows(items) {
+  let html = '<div class="sup-list-rows">';
   items.forEach(m => {
     const labelHtml = m.detected_label
       ? '<span class="sup-status-pill" style="background:var(--brand-bg);color:var(--brand);font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(m.detected_label) + '</span>'
@@ -8440,7 +8593,7 @@ function renderSupplyInbox() {
     '</div>';
   });
   html += '</div>';
-  list.innerHTML = html;
+  return html;
 }
 
 function setSupplyInboxFilter(f) {
@@ -11474,6 +11627,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.581',
+    date: '25.06.2026',
+    title: '«Входящие счета» — новый дизайн',
+    features: [
+      'Письма теперь разложены по смыслу: <b>счета с вложением-документом</b> (PDF/Excel/Word) — наверх крупными карточками с кнопкой «Привязать к заказу», а <b>рассылки и уведомления без вложений</b> — свёрнуты вниз серой группой, чтобы не мешали',
+      'Сверху — счётчики: сколько счетов ждут привязки, сколько уже привязано, сколько рассылок. Сразу видно объём работы',
+      'У счёта видно отправителя (аватар), сам файл-вложение, метку MAX и плательщика (АГ/ТД)',
+      'Всё под переключателем «Новый вид» — кнопкой «Вернуть старый» откатишься на прежний список',
+    ],
+  },
   {
     version: 'v2.45.580',
     date: '25.06.2026',
