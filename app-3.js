@@ -8921,6 +8921,9 @@ async function openInboxMessage(inboxId) {
         (msg.matched_order_id
           ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + msg.matched_order_id + ')">Открыть заказ</button>'
           : '') +
+        ((msg.from_addr && String(msg.from_addr).indexOf('@') >= 0)
+          ? '<button class="btn btn-primary" onclick="openInboxReply(' + msg.id + ')"><i class="ti ti-corner-up-left"></i> Ответить</button>'
+          : '') +
         '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
       '</div>' +
     '</div>';
@@ -8997,6 +9000,96 @@ async function sendInboxToPay(inboxId, overlayId) {
     if (j.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(j.order_id);
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.45.595: ответ поставщику прямо из карточки письма (например «пришлите счёт»).
+// Тема уходит как «Re: <исходная>» — метка [Заявка ORD-N] остаётся, поэтому
+// будущий счёт-ответ снова сам привяжется к заказу. Подпись и цитата исходного
+// письма добавляются на бэкенде.
+window._inboxReplyTpls = [
+  'Здравствуйте!\n\nПришлите, пожалуйста, счёт на эту заявку.',
+  'Здравствуйте!\n\nПодскажите, пожалуйста, срок поставки по этой заявке.',
+  'Здравствуйте!\n\nПришлите, пожалуйста, счёт и укажите срок поставки по этой заявке.',
+];
+function openInboxReply(inboxId) {
+  const msg = (cache.supplyInbox || []).find(x => x.id === inboxId) || {};
+  const toName = (msg.from_name || '').trim();
+  const toAddr = (msg.from_addr || '').trim();
+  const toLine = (toName ? toName + ' <' + toAddr + '>' : toAddr) || '—';
+  let subj = (msg.subject || 'Ваша заявка').trim();
+  const reSubj = /^re:/i.test(subj) ? subj : ('Re: ' + subj);
+
+  const overlayId = 'inbox-reply-modal';
+  let m = document.getElementById(overlayId); if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay';
+  const tplBtn = (i, label) =>
+    '<button type="button" class="btn btn-secondary btn-small" ' +
+      'onclick="var t=document.getElementById(\'inbox-reply-text\');t.value=window._inboxReplyTpls[' + i + '];t.focus();">' +
+      escapeHtml(label) + '</button>';
+  m.innerHTML =
+    '<div class="modal" style="max-width:560px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-corner-up-left"></i> Ответить поставщику</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
+          '<div style="color:var(--text-light);">Кому:</div><div>' + escapeHtml(toLine) + '</div>' +
+          '<div style="color:var(--text-light);">Тема:</div><div style="font-weight:600;">' + escapeHtml(reSubj) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">' +
+          tplBtn(0, 'Пришлите счёт') + tplBtn(1, 'Уточните срок') + tplBtn(2, 'Счёт + срок') +
+        '</div>' +
+        '<textarea id="inbox-reply-text" rows="6" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical;">' +
+          escapeHtml(window._inboxReplyTpls[0]) +
+        '</textarea>' +
+        '<div style="margin-top:8px;color:var(--text-light);font-size:12px;line-height:1.4;">' +
+          '<i class="ti ti-info-circle"></i> Подпись и цитата исходного письма добавятся автоматически. ' +
+          'Письмо уйдёт в ту же переписку — когда поставщик пришлёт счёт ответом, он сам привяжется к заказу.' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="inbox-reply-send" onclick="sendInboxReply(' + inboxId + ',\'' + overlayId + '\')"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.classList.add('visible');
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  setTimeout(() => { const t = document.getElementById('inbox-reply-text'); if (t) t.focus(); }, 50);
+}
+
+async function sendInboxReply(inboxId, overlayId) {
+  const ta = document.getElementById('inbox-reply-text');
+  const text = (ta && ta.value || '').trim();
+  if (!text) { showToast('Напишите текст ответа', 'warning'); if (ta) ta.focus(); return; }
+  const btn = document.getElementById('inbox-reply-send');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/reply', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+      return;
+    }
+    const ov = document.getElementById(overlayId); if (ov) ov.remove();
+    // Закрываем и саму карточку письма, если открыта
+    const letterOv = document.getElementById('inbox-msg-modal'); if (letterOv) letterOv.remove();
+    showToast('Ответ отправлен поставщику', 'success');
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
   }
 }
 
@@ -11899,6 +11992,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.595',
+    date: '30.06.2026',
+    title: 'Ответить поставщику прямо из письма',
+    features: [
+      'В карточке входящего письма появилась кнопка <b>«Ответить»</b> — можно написать поставщику, не выходя из CRM',
+      'Есть быстрые заготовки: <b>«Пришлите счёт»</b>, <b>«Уточните срок»</b>, <b>«Счёт + срок»</b> — текст подставляется в одно касание, его можно дописать',
+      'Ответ уходит <b>в ту же переписку</b> (тема «Re: [Заявка ORD-N]»), <b>подпись и цитата</b> их письма добавляются автоматически',
+      'Когда поставщик пришлёт счёт ответом — он, как и раньше, <b>сам привяжется к заказу</b> по метке заявки',
+    ],
+  },
   {
     version: 'v2.45.594',
     date: '30.06.2026',
