@@ -6347,14 +6347,80 @@ async function loadDefectsList() {
     const d = await apiGet('/api/defects' + q);
     const list = d.defects || [];
     if (counter) counter.textContent = list.length;
-    if (!list.length) {
-      container.innerHTML = '<div class="empty-block"><i class="ti ti-mood-empty"></i>Замечаний пока нет</div>';
-      return;
-    }
-    container.innerHTML = list.map(renderDefectRow).join('');
+    state._defectsList = list;
+    _renderDefectsListBody();
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
   }
+}
+
+// v2.45.6xx: переключатель нового/старого вида списка замечаний
+function _dfToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.DF_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.DF_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="toggleDefectsV2()">' + (window.DF_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function toggleDefectsV2() {
+  window.DF_V2 = !window.DF_V2;
+  try { localStorage.setItem('dfV2', window.DF_V2 ? '1' : '0'); } catch (_) {}
+  _renderDefectsListBody();
+}
+
+function _renderDefectsListBody() {
+  const container = document.getElementById('defects-list-content');
+  if (!container) return;
+  window.DF_V2 = (localStorage.getItem('dfV2') !== '0');
+  const toggle = _dfToggleBar();
+  const list = state._defectsList || [];
+  if (!list.length) {
+    container.innerHTML = toggle + '<div class="empty-block"><i class="ti ti-mood-empty"></i>Замечаний пока нет</div>';
+    return;
+  }
+  if (window.DF_V2) {
+    container.innerHTML = toggle + '<div class="df-list">' + list.map(_dfRowV2).join('') + '</div>';
+  } else {
+    container.innerHTML = toggle + list.map(renderDefectRow).join('');
+  }
+}
+
+// v2.45.6xx: строка-карточка замечания (новый вид)
+function _dfRowV2(d) {
+  const ti = DEFECT_TYPE_LABELS[d.type] || DEFECT_TYPE_LABELS.defect;
+  const typeKey = (d.type && DEFECT_TYPE_LABELS[d.type]) ? d.type : 'defect';
+  const stripMap = { new: 'df-new', in_progress: 'df-prog', resolved: 'df-done', rejected: 'df-rej' };
+  const stPillMap = { new: 'new', in_progress: 'prog', resolved: 'done', rejected: 'rej' };
+  const stripCls = stripMap[d.status] || 'df-new';
+  const stPill = stPillMap[d.status] || 'new';
+
+  let target = '';
+  if (d.assembly_id) {
+    target = '<span class="df-target"><i class="ti ti-tool"></i> ' + escapeHtml(d.model_name || ('Сборка #' + d.assembly_id)) + (d.model_article ? ' · ' + escapeHtml(d.model_article) : '') + '</span>';
+  } else if (d.contract_id) {
+    target = '<span class="df-target"><i class="ti ti-file-text"></i> Договор ' + escapeHtml(d.contract_number || ('#' + d.contract_id)) + '</span>';
+  }
+
+  const date = (d.created_at || '').replace('T', ' ').slice(0, 16);
+  let meta = '';
+  if (d.author_name) meta += '<span class="df-mi"><span class="df-mava">' + escapeHtml(getInitials(d.author_name)) + '</span>' + escapeHtml(d.author_name) + '</span>';
+  if (d.author_phone) meta += '<span class="df-mi"><i class="ti ti-phone"></i> ' + escapeHtml(d.author_phone) + '</span>';
+  if (d.location) meta += '<span class="df-mi"><i class="ti ti-map-pin"></i> ' + escapeHtml(d.location) + '</span>';
+  if (d.photos_count) meta += '<span class="df-mi"><i class="ti ti-photo"></i> ' + d.photos_count + ' фото</span>';
+  meta += '<span class="df-mi"><i class="ti ti-clock"></i> ' + escapeHtml(date) + '</span>';
+
+  return '<div class="df-row ' + stripCls + '" onclick="openDefectDetail(' + d.id + ')">' +
+    '<div class="df-ic ' + ti.cls + '"><i class="ti ' + ti.icon + '"></i></div>' +
+    '<div class="df-body">' +
+      '<div class="df-top">' +
+        '<span class="df-type-pill ' + ti.cls + '"><i class="ti ' + ti.icon + '"></i> ' + escapeHtml(ti.label) + '</span>' +
+        '<span class="df-st ' + stPill + '">' + escapeHtml(d.status_label || '') + '</span>' +
+        target +
+      '</div>' +
+      '<div class="df-desc">' + escapeHtml(d.description || '') + '</div>' +
+      '<div class="df-meta">' + meta + '</div>' +
+    '</div>' +
+  '</div>';
 }
 
 /** Мобильный клик по фильтр-чипсу — синхронизирует с сайдбаром. */
