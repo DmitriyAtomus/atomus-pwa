@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.598-inbox-pay-btn";
+const APP_VERSION = "v2.45.599-production-v2";
 const APP_VERSION_DATE = "30.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2878,7 +2878,8 @@ function renderProductionDashboard(d) {
     });
   });
 
-  let html = '';
+  window.PKB_V2 = (localStorage.getItem('pkbV2') !== '0');
+  let html = _pkbToggleBar();
 
   // --- Шапка ---
   const updatedStr = formatPkbDateTime(fetchedAt);
@@ -2945,6 +2946,7 @@ function renderProductionDashboard(d) {
       : '';
     html += '<div class="pkb-col ' + def.cls + activeCls + colCollapsedCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
     html +=   '<div class="pkb-col-head"' + headClickAttr + '>';
+    html +=     '<span class="pkb-col-dot"></span>';
     html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
     html +=     '<div class="pkb-col-count">' + items.length + '</div>';
     html +=     chevron;
@@ -2964,8 +2966,24 @@ function renderProductionDashboard(d) {
   html += '</div>';
 
   container.innerHTML = html;
+  container.classList.toggle('pkb-v2', !!window.PKB_V2);
   // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
   _renderResumeBanner();
+}
+
+// v2.45.5xx: переключатель нового/старого вида Производства
+function _pkbToggleBar() {
+  return '<div class="sv2-toggle-bar">' +
+      '<span><i class="ti ti-' + (window.PKB_V2 ? 'sparkles' : 'history') + '"></i> ' + (window.PKB_V2 ? 'Новый вид' : 'Старый вид') + '</span>' +
+      '<button class="sv2-toggle-btn" onclick="togglePkbV2()">' + (window.PKB_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
+    '</div>';
+}
+
+function togglePkbV2() {
+  window.PKB_V2 = !window.PKB_V2;
+  try { localStorage.setItem('pkbV2', window.PKB_V2 ? '1' : '0'); } catch (_) {}
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+  else if (typeof loadProductionDashboard === 'function') loadProductionDashboard();
 }
 
 // ============ v2.45.x: автостоп → «продолжить вчерашнее или новое?» ============
@@ -3090,24 +3108,24 @@ function renderPkbKpi(kpi) {
   let html = '<div class="pkb-kpi-grid">';
 
   // 1. В очереди
-  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false);
+  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false, 'ti-clipboard-list');
 
   // 2. В работе
   const inProgHint = inProgAss ? (inProgAss + ' ' + plural(inProgAss, 'сборщик', 'сборщика', 'сборщиков')) : '—';
-  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false);
+  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false, 'ti-tool');
 
   // 3. Просрочка
-  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0);
+  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0, 'ti-alert-triangle');
 
   // 4. На проверке (или Заблокированы, если есть)
   if (blockedCnt > 0) {
-    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false);
+    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false, 'ti-lock');
   } else {
-    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false);
+    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false, 'ti-checks');
   }
 
   // 5. v2.34.2: Упаковка
-  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false);
+  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false, 'ti-package');
 
   // 6. За неделю
   let weekVal, weekHint;
@@ -3119,18 +3137,22 @@ function renderPkbKpi(kpi) {
     weekVal = String(weekDone);
     weekHint = 'завершено';
   }
-  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false);
+  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false, 'ti-circle-check');
 
   html += '</div>';
   return html;
 }
 
-function pkbKpiCard(label, value, hint, cls, clickable) {
+function pkbKpiCard(label, value, hint, cls, clickable, icon) {
   const clickAttr = clickable ? ' onclick="pkbFilterOverdue()"' : '';
+  const iconHtml = icon ? '<div class="pkb-kpi-ic"><i class="ti ' + icon + '"></i></div>' : '';
   return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + '"' + clickAttr + '>' +
-           '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
-           '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
-           '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
+           iconHtml +
+           '<div class="pkb-kpi-body">' +
+             '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
+             '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
+             '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
+           '</div>' +
          '</div>';
 }
 
