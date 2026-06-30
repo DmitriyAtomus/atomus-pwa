@@ -120,6 +120,20 @@ table.spec{width:100%;border-collapse:collapse;font-size:11.5px}table.spec th{ba
 </div></div>
 <div class="mask" id="dsMask"><div class="confirm" style="max-width:470px"><h4>Распознать контроллер по даташиту</h4><p style="margin-bottom:12px">Загрузи PDF или фото даташита — ИИ прочитает его и выпишет модель, габариты (мм) и состав входов/выходов.</p><div id="dsBody"></div><div class="r" style="gap:9px;margin-top:4px"><button class="ok" id="dsPickBtn" style="flex:1">⭳ Выбрать файл</button><button class="no" id="dsClose" style="flex:1">Закрыть</button></div></div></div>
 <div class="toast" id="toast"></div>
+<!-- ИИ-ассистент: чат, который заполняет проект структурными действиями -->
+<button id="asstBtn" title="ИИ-ассистент" onclick="asstToggle()" style="position:fixed;right:18px;bottom:18px;z-index:80;width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:linear-gradient(135deg,#16b7db,#3f6fd0);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.45)">🤖</button>
+<div id="asstPanel" style="position:fixed;right:18px;bottom:84px;z-index:80;display:none;width:380px;max-width:calc(100vw - 36px);height:520px;max-height:calc(100vh - 120px);flex-direction:column;background:#13202B;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden">
+  <div style="display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid var(--line)">
+    <span style="font-size:18px">🤖</span><b style="color:var(--cyan);font-size:14px;flex:1">Ассистент щита</b>
+    <span style="color:var(--dim);font-size:11px">заполняет проект</span>
+    <button onclick="asstToggle()" style="background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer">✕</button>
+  </div>
+  <div id="asstLog" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px;font-size:13px;line-height:1.45"></div>
+  <div style="display:flex;gap:7px;padding:10px;border-top:1px solid var(--line)">
+    <textarea id="asstIn" rows="1" placeholder="напр. добавь приточный 2.2кВт через частотник, задание с AO1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();asstSend();}" style="flex:1;resize:none;background:var(--graphite);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-size:13px;padding:8px 10px;font-family:inherit;outline:none"></textarea>
+    <button id="asstSendBtn" onclick="asstSend()" style="background:var(--cyan);border:none;border-radius:9px;color:#04222b;font-weight:700;padding:0 14px;cursor:pointer">➤</button>
+  </div>
+</div>
 <div id="cabTip" style="position:fixed;z-index:60;display:none;pointer-events:none;background:#10212F;color:#fff;font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);max-width:280px;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.4)"></div>
 <div id="cabCard" style="position:fixed;z-index:70;display:none;left:50%;top:90px;transform:translateX(-50%);min-width:280px;max-width:360px;background:#13202B;color:#E7EEF4;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55)">
   <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)">
@@ -2074,6 +2088,99 @@ window.addEventListener('message',function(ev){
   P.schematic={sheets:d.sheets};
   saveProject().then(function(){toast('Схема сохранена в проекте');}).catch(function(){});
 });
+
+/* ================= ИИ-АССИСТЕНТ ================= */
+var asstHist=[], asstBusy=false, asstHello=false;
+function asstToggle(){var p=$('asstPanel');var open=p.style.display!=='flex';p.style.display=open?'flex':'none';
+  if(open){ if(!asstHello){asstHello=true;asstAdd('bot','Привет! Опиши, что добавить или изменить — я внесу. Напр.: «добавь приточный вентилятор 2.2 кВт через частотник, задание с AO1, пуск с DO1».');} setTimeout(function(){$('asstIn').focus();},50); }
+}
+function asstAdd(role,text){
+  var log=$('asstLog'), me=(role==='me');
+  var d=document.createElement('div');
+  d.style.cssText='align-self:'+(me?'flex-end':'flex-start')+';max-width:86%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;'+(me?'background:#1d3a4a;color:#eaf3f8':'background:var(--graphite);color:var(--txt);border:1px solid var(--line)');
+  d.textContent=text; log.appendChild(d); log.scrollTop=log.scrollHeight; return d;
+}
+/* компактный снимок проекта для модели (без схемы — только данные) */
+function asstState(){
+  var io=P.controller&&P.controller.io||{}, pins={};
+  ['DO','AO','DI','AI'].forEach(function(g){pins[g]=((io.pins||{})[g]||[]).map(function(p){return p.id;});});
+  return {
+    project:{name:P.name||'',section:P.section||'',num:P.num||''},
+    controller:{model:(P.controller&&P.controller.model)||'', pins:pins, asg:(io.asg||{})},
+    consumers:(P.consumers||[]).map(function(c){return {tag:c.tag,name:c.name,kw:c.kw,phases:c.phases,volt:c.volt,qty:c.qty||1,type:labelForNeeds(c.needs,c.typeLabel)};}),
+    aux:(P.aux||[]).map(function(a){return {tag:a.tag,kind:a.kind,name:a.name,model:a.model||'',feed:a.feed||'',targets:auxTargets(a),ctrl:a.ctrl||'',vfdStart:a.vfdStart||'',vfdFault:a.vfdFault||'',signalTo:a.signalTo||'',qty:a.qty||1};})
+  };
+}
+async function asstSend(){
+  if(asstBusy)return; var inp=$('asstIn'), text=(inp.value||'').trim(); if(!text)return;
+  if(!srvOn()){toast('Ассистент работает в CRM (нужна авторизация)');return;}
+  inp.value=''; asstAdd('me',text); asstHist.push({role:'user',text:text});
+  asstBusy=true; var btn=$('asstSendBtn'); if(btn)btn.disabled=true;
+  var wait=asstAdd('bot','…думаю');
+  try{
+    var d=await apiReq('POST','/api/atomcad/assistant',{message:text,state:asstState(),history:asstHist.slice(0,-1)});
+    wait.remove();
+    var rep=(d.reply||'').trim(), acts=d.actions||[];
+    var res=applyAssistantActions(acts);
+    var summary=res.applied.length?('\n✓ '+res.applied.join('; ')):'';
+    var errs=res.errors.length?('\n⚠ '+res.errors.join('; ')):'';
+    asstAdd('bot',(rep||'Готово')+summary+errs);
+    asstHist.push({role:'assistant',text:rep||'(действия применены)'});
+    if(res.applied.length){ if(typeof sortAux==='function')sortAux(); P.breakers=null; dirty(); draw(); }
+  }catch(err){ wait.remove(); asstAdd('bot','Ошибка: '+err.message); }
+  asstBusy=false; if(btn)btn.disabled=false; inp.focus();
+}
+/* ---- применение структурных действий к проекту ---- */
+function _norm(s){return String(s||'').trim().toLowerCase();}
+function _findConsumer(m){m=_norm(m);return (P.consumers||[]).filter(function(c){return _norm(c.tag)===m||_norm(c.name)===m;})[0]||null;}
+function _findAuxM(m){m=_norm(m);return (P.aux||[]).filter(function(a){return _norm(a.tag)===m||_norm(a.name)===m;})[0]||null;}
+function _supplyFrom(phases,volt){var ph=(+phases===3)?3:1; var v=+volt|| (ph===3?400:230); return {phases:ph,volt:v};}
+function _linkPin(a,pin){ if(!pin)return; var io=P.controller&&P.controller.io; if(io&&io.pins){var ok=['DO','AO','DI','AI'].some(function(g){return (io.pins[g]||[]).some(function(p){return p.id===pin;});}); if(ok&&io.asg)io.asg[pin]=a.tag||a.name;} }
+function applyAssistantActions(actions){
+  var applied=[], errors=[];
+  (actions||[]).forEach(function(act){
+    if(!act||!act.type)return;
+    try{
+      var t=act.type;
+      if(t==='noop')return;
+      else if(t==='add_consumer'){
+        var s=_supplyFrom(act.phases,act.volt), typ=(act.ctype||act.typeLabel||'двигатель');
+        var c={id:uid('c'),name:act.name||'Потребитель',tag:(act.tag||tagFor(act.name||'E')),phases:s.phases,volt:s.volt,kw:parseFloat(act.kw)||0,qty:Math.max(1,parseInt(act.qty,10)||1),needs:typeNeeds(typ),typeLabel:typ};
+        if(act.a)c.a=parseFloat(act.a)||0;
+        P.consumers.push(c); applied.push('потребитель '+c.name);
+      }
+      else if(t==='update_consumer'){
+        var c=_findConsumer(act.match); if(!c){errors.push('не нашёл потребителя «'+(act.match||'')+'»');return;}
+        if(act.name!=null)c.name=act.name; if(act.kw!=null)c.kw=parseFloat(act.kw)||0; if(act.qty!=null)c.qty=Math.max(1,parseInt(act.qty,10)||1);
+        if(act.phases!=null||act.volt!=null){var s=_supplyFrom(act.phases!=null?act.phases:c.phases,act.volt!=null?act.volt:c.volt);c.phases=s.phases;c.volt=s.volt;}
+        if(act.ctype!=null||act.typeLabel!=null){var tl=act.ctype||act.typeLabel;c.typeLabel=tl;c.needs=typeNeeds(tl);}
+        applied.push('изменён '+(c.tag||c.name));
+      }
+      else if(t==='remove_consumer'){var c=_findConsumer(act.match); if(!c){errors.push('нет потребителя «'+(act.match||'')+'»');return;} P.consumers=P.consumers.filter(function(x){return x!==c;}); applied.push('удалён '+(c.tag||c.name));}
+      else if(t==='add_aux'){
+        var k=act.kind||'other', cat=auxCat(k);
+        var a={id:uid('a'),name:act.name||cat.label,kind:k,manu:act.manu||cat.manu||'',model:act.model||cat.model||'',tag:(act.tag||auxTagFor(k)),a:parseFloat(act.a)||0,qty:Math.max(1,parseInt(act.qty,10)||1)};
+        if(act.feed)a.feed=act.feed;
+        if(Array.isArray(act.targets)){a.targets=act.targets.slice();auxTargetsSync(a);}
+        ['ctrl','vfdStart','vfdFault','signalTo'].forEach(function(f){if(act[f]){a[f]=act[f];_linkPin(a,act[f]);}});
+        P.aux.push(a); applied.push('аппарат '+a.tag+' ('+(auxKindLabel(k))+')');
+      }
+      else if(t==='update_aux'){
+        var a=_findAuxM(act.match); if(!a){errors.push('не нашёл аппарат «'+(act.match||'')+'»');return;}
+        if(act.name!=null)a.name=act.name; if(act.model!=null)a.model=act.model; if(act.qty!=null)a.qty=Math.max(1,parseInt(act.qty,10)||1); if(act.a!=null)a.a=parseFloat(act.a)||0;
+        if(act.feed!=null)a.feed=act.feed||undefined;
+        if(Array.isArray(act.targets)){a.targets=act.targets.slice();auxTargetsSync(a);}
+        ['ctrl','vfdStart','vfdFault','signalTo'].forEach(function(f){if(act[f]!=null){a[f]=act[f]||undefined;if(act[f])_linkPin(a,act[f]);}});
+        applied.push('изменён '+(a.tag||a.name));
+      }
+      else if(t==='remove_aux'){var a=_findAuxM(act.match); if(!a){errors.push('нет аппарата «'+(act.match||'')+'»');return;} P.aux=P.aux.filter(function(x){return x!==a;}); applied.push('удалён '+(a.tag||a.name));}
+      else if(t==='set_controller'){ if(act.model&&typeof setCtrl==='function'){setCtrl(act.model);} else if(act.model){P.controller=P.controller||{};P.controller.model=act.model;} applied.push('контроллер '+(act.model||'')); }
+      else if(t==='set_project'){ if(act.name!=null)P.name=act.name; if(act.section!=null)P.section=act.section; if(act.num!=null)P.num=act.num; applied.push('раздел/имя проекта'); }
+      else errors.push('неизвестное действие «'+t+'»');
+    }catch(e){ errors.push((act.type||'?')+': '+e.message); }
+  });
+  return {applied:applied,errors:errors};
+}
 
 /* ---- навигация ---- */
 var PANELS=[pSection,pController,pConsumers,pSensors,pAux,pBreakers,pTerminals,pCabinet,pSpec];
