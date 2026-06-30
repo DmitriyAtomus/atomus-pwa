@@ -34,7 +34,7 @@
   input, textarea { -webkit-appearance: none; appearance: none; }
   /* v2.45.230: галочки BOM — глобальный appearance:none прятал нативные
      чекбоксы (рисовались пустыми/невидимыми). Возвращаем вид. */
-  .bom-check, #bom-check-all, .cp-check, .edo-cb, #edo-selall-cb {
+  .bom-check, #bom-check-all, .cp-check, .edo-cb, #edo-selall-cb, .ibx-cb, #ibx-selall-cb {
     -webkit-appearance: checkbox !important;
     appearance: auto !important;
     width: 16px !important;
@@ -18941,3 +18941,7 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 #sup-sup-list .spl-prod b{color:var(--text-light);font-weight:600;}
 #sup-sup-list .spl-empty{margin-top:10px;font-size:12px;color:var(--text-faint);font-style:italic;}
 @media(max-width:720px){#sup-sup-list .spl-grid{grid-template-columns:1fr;}#sup-sup-list .spl-name-wrap{padding-right:58px;}}
+/* Чекбокс выбора во «Входящих счетах» */
+.ibx-card .ibx-cb, .ibx-noise .ibx-cb {
+  flex-shrink: 0; cursor: pointer; align-self: flex-start; margin-top: 2px;
+}

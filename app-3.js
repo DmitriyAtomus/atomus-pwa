@@ -8659,7 +8659,11 @@ function _ibxInvoiceCard(m, isMatched) {
       '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>' +
       _ibxDelBtn(m);
   }
+  const _cb = (state.user && (state.user.roles || []).includes('director'))
+    ? '<input type="checkbox" class="ibx-cb" data-id="' + m.id + '" title="Выбрать" onclick="event.stopPropagation();_ibxToggle(' + m.id + ',this.checked)">'
+    : '';
   return '<div class="ibx-card' + (isMatched ? ' matched' : '') + '"><div class="ibx-card-top">' +
+    _cb +
     _inboxAvatarHtml(m) +
     '<div class="ibx-card-body">' +
       '<div class="ibx-chips">' + chips + '</div>' +
@@ -8678,7 +8682,11 @@ function _ibxNoiseRow(m) {
   if (atts.length) reason = 'вложение не документ';
   const ordChip = m.detected_label ? ' <span class="ibx-chip ord mini">' + escapeHtml(m.detected_label) + '</span>' : '';
   const ico = m.detected_label ? '📨' : (isFromMax(m) ? '💬' : '📢');
+  const _cb = (state.user && (state.user.roles || []).includes('director'))
+    ? '<input type="checkbox" class="ibx-cb" data-id="' + m.id + '" title="Выбрать" onclick="event.stopPropagation();_ibxToggle(' + m.id + ',this.checked)">'
+    : '';
   return '<div class="ibx-noise">' +
+    _cb +
     '<div class="ibx-noise-ava"><span class="em">' + ico + '</span></div>' +
     '<div class="ibx-noise-body">' +
       '<div class="ibx-noise-subj">' + escapeHtml(m.subject || '(без темы)') + ordChip + '</div>' +
@@ -8703,6 +8711,15 @@ function renderSupplyInbox() {
   const list = document.getElementById('sup-inbox-list');
   if (!list) return;
   const items = cache.supplyInbox || [];
+  _ibxSel = new Set();   // сброс выделения при перерисовке
+  const _ibxCanDel = state.user && (state.user.roles || []).includes('director');
+  const ibxBulk = _ibxCanDel ? (
+    '<div class="edo-bulkbar">' +
+      '<label class="edo-selall"><input type="checkbox" id="ibx-selall-cb" onclick="_ibxToggleAll(this.checked)"> Выбрать все</label>' +
+      '<span class="edo-sel-count" id="ibx-sel-count"></span>' +
+      '<button class="btn btn-small edo-del-btn" id="ibx-del-btn" onclick="_ibxDeleteSelected()" disabled>' +
+        '<i class="ti ti-trash"></i> Удалить выбранные</button>' +
+    '</div>') : '';
   window.INBOX_V2 = localStorage.getItem('inboxV2') !== '0';
   const statusHtml = _supplyInboxStatusHTML();
   const toggle = '<div class="sv2-toggle-bar">' +
@@ -8724,7 +8741,7 @@ function renderSupplyInbox() {
     else if (m._docIdx >= 0) invoices.push(m);
     else noise.push(m);
   });
-  let html = toggle + statusHtml;
+  let html = toggle + statusHtml + ibxBulk;
   html += '<div class="ibx-sum">' +
     _ibxSumCard('act', '🧾', invoices.length, 'Счета — нужна привязка') +
     _ibxSumCard('ok', '✅', matched.length, 'Привязано к заказам') +
@@ -8749,6 +8766,7 @@ function renderSupplyInbox() {
     html += '</div>';
   }
   list.innerHTML = html;
+  _ibxUpdateBar();
 }
 
 // Старый вид (для отката) — прежний плоский список строк
@@ -9129,6 +9147,53 @@ async function useInboxAttachmentAsInvoice(inboxId, idx) {
 
 // v2.45.33: удаление inbox-сообщения (только директор). Кладёт DELETE на бэк,
 // который убирает запись из БД + чистит файлы вложений в storage.
+// Выделение для массового удаления входящих счетов (писем)
+let _ibxSel = new Set();
+
+function _ibxToggle(id, checked) {
+  if (checked) _ibxSel.add(id); else _ibxSel.delete(id);
+  const all = document.querySelectorAll('#sup-inbox-list .ibx-cb');
+  const selAll = document.getElementById('ibx-selall-cb');
+  if (selAll) selAll.checked = all.length > 0 && _ibxSel.size === all.length;
+  _ibxUpdateBar();
+}
+
+function _ibxToggleAll(checked) {
+  _ibxSel = new Set();
+  document.querySelectorAll('#sup-inbox-list .ibx-cb').forEach(cb => {
+    cb.checked = checked;
+    if (checked) _ibxSel.add(parseInt(cb.getAttribute('data-id'), 10));
+  });
+  _ibxUpdateBar();
+}
+
+function _ibxUpdateBar() {
+  const cnt = document.getElementById('ibx-sel-count');
+  const btn = document.getElementById('ibx-del-btn');
+  const n = _ibxSel.size;
+  if (cnt) cnt.textContent = n ? ('Выбрано: ' + n) : '';
+  if (btn) btn.disabled = !n;
+}
+
+async function _ibxDeleteSelected() {
+  const ids = Array.from(_ibxSel);
+  if (!ids.length) return;
+  if (!confirm('Удалить выбранные письма (' + ids.length + ')?\n\nЗаписи и приложенные файлы будут стёрты безвозвратно.')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  let ok = 0;
+  for (const id of ids) {
+    try {
+      const r = await fetch(API_BASE + '/api/supply-inbox/' + id, {
+        method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (r.ok) ok++;
+    } catch (e) {}
+  }
+  showToast(ok ? ('Удалено: ' + ok) : 'Не удалось удалить', ok ? 'success' : 'error');
+  _ibxSel = new Set();
+  if (typeof loadSupplyInbox === 'function') loadSupplyInbox().catch(() => {});
+}
+
 async function deleteInboxMessage(inboxId) {
   if (!confirm('Удалить это письмо из «Входящих счетов»?\n\nЗапись и приложенные файлы будут стёрты безвозвратно.')) return;
   try {
