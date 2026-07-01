@@ -10168,6 +10168,20 @@ function renderSupplyOrderDetail(o) {
         (invDateRu ? ' от ' + invDateRu : '');
       const invTotal = (o.invoice_total !== null && o.invoice_total !== undefined)
         ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
+      // v2.45.617: НДС — «в т.ч. НДС … / без НДС …». Если НДС явно 0 — «без НДС».
+      const _fmt2 = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+      const _vat = (o.invoice_vat_sum !== null && o.invoice_vat_sum !== undefined) ? Number(o.invoice_vat_sum) : null;
+      const _woVat = (o.invoice_sum_without_vat !== null && o.invoice_sum_without_vat !== undefined) ? Number(o.invoice_sum_without_vat) : null;
+      const _infoChip = (txt, bg, fg, bd) =>
+        '<span style="display:inline-flex;align-items:center;gap:5px;background:' + bg + ';border:1px solid ' + bd +
+        ';color:' + fg + ';border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;">' + txt + '</span>';
+      let vatChips = '';
+      if (_vat !== null && _vat > 0) {
+        vatChips = _infoChip('в т.ч. НДС ' + _fmt2(_vat) + ' ₽', '#ECFDF5', '#065F46', '#6EE7B7')
+          + (_woVat !== null ? _infoChip('без НДС ' + _fmt2(_woVat) + ' ₽', 'var(--bg)', 'var(--text-mid)', 'var(--border)') : '');
+      } else if (_vat === 0) {
+        vatChips = _infoChip('без НДС', 'var(--bg)', 'var(--text-mid)', 'var(--border)');
+      }
       const chip = (label, copyVal, mono) =>
         '<span onclick="_copyTxt(' + JSON.stringify(String(copyVal)).replace(/"/g, '&quot;') + ')" ' +
           'title="Нажми — скопируется" ' +
@@ -10179,6 +10193,7 @@ function renderSupplyOrderDetail(o) {
         chip('<b>' + escapeHtml(invTitle) + '</b>', invTitle, false) +
         (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
         (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
+        vatChips +
         (o.invoice_org ? chip(escapeHtml(o.invoice_org), o.invoice_org, false) : '') +
         // v2.45.x: срок поставки/изготовления (заметным оранжевым)
         (o.invoice_delivery_term ? '<span style="display:inline-flex;align-items:center;gap:6px;background:#FFEDD5;border:1px solid #FDBA74;color:#9A3412;border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:700;"><i class="ti ti-truck-delivery"></i> Срок поставки: ' + escapeHtml(o.invoice_delivery_term) + '</span>' : '') +
@@ -12307,6 +12322,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.617',
+    date: '01.07.2026',
+    title: 'Счёт: НДС и просмотр фото из бота',
+    features: [
+      'В карточке заказа под счётом теперь видно <b>НДС</b>: «в т.ч. НДС … ₽» и «без НДС … ₽» (а если счёт без НДС — так и пишем)',
+      'Суммы берутся из <b>распознанного счёта</b> — для новых и повторно распознанных («Распознать заново»)',
+      'Исправили просмотр <b>фото-счетов из бота</b>: JPEG без расширения раньше не открывался в «Просмотреть» — теперь тип определяется по содержимому файла',
+    ],
+  },
   {
     version: 'v2.45.616',
     date: '01.07.2026',
