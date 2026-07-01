@@ -9643,9 +9643,16 @@ function _renderReservationBadge(item) {
 function _renderPurchaseBadge(item) {
   const status = (item.purchase_status || 'pending');
   let cls = 'b-pending', icon = 'ti-shopping-cart', txt = 'К заказу', nextStatus = 'ordered', tip = 'Клик — переключить на «Заказано»';
+  let extraStyle = '';
   if (status === 'ordered') {
     cls = 'b-ordered'; icon = 'ti-truck'; txt = 'Заказано'; nextStatus = 'received';
     tip = 'Клик — переключить на «Готово» (пришло)';
+    // v2.45.x: заказ снабжения получен НЕ полностью → «Пришло частично» (янтарный)
+    if (item.delivery_state === 'partial') {
+      icon = 'ti-truck-loading'; txt = 'Пришло частично';
+      extraStyle = 'background:#FEF3C7;color:#92400E;border-color:#FCD34D;';
+      tip = 'Часть позиции уже поступила по заказу; клик — отметить «Готово»';
+    }
   } else if (status === 'received') {
     cls = 'b-received'; icon = 'ti-circle-check'; txt = 'Готово'; nextStatus = 'pending';
     tip = 'Клик — вернуть в «К заказу»';
@@ -9656,7 +9663,8 @@ function _renderPurchaseBadge(item) {
     : '';
   const lockCls = canEdit ? '' : ' locked';
   const title = canEdit ? tip : ('Статус закупки: ' + txt);
-  return ' <span class="spec-item-purchase ' + cls + lockCls + '"' + click + ' title="' + escapeHtml(title) + '">' +
+  const styleAttr = extraStyle ? (' style="' + extraStyle + '"') : '';
+  return ' <span class="spec-item-purchase ' + cls + lockCls + '"' + styleAttr + click + ' title="' + escapeHtml(title) + '">' +
     '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
 }
 
