@@ -5536,6 +5536,21 @@
     gap: 10px;
     padding: 10px 12px;
   }
+  /* v2.45.615: пояснение к выбранному статусу-разделу заказов */
+  .sup-ord-desc {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    background: #EFF6FF;
+    color: #1E40AF;
+    border: 1px solid #DBEAFE;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 4px 0 12px;
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+  .sup-ord-desc i { flex-shrink: 0; margin-top: 1px; font-size: 15px; }
   /* Перебиваем общий мобильный column-режим — у заказа одна кнопка, тесниться нечему */
   .app.mobile-layout .sup-row.sup-ord-card {
     flex-direction: row;
