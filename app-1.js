@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.610-ui-fixes";
+const APP_VERSION = "v2.45.611-task-from-chat";
 const APP_VERSION_DATE = "30.06.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2279,6 +2279,24 @@ function closeContractChat() {
   _cchatPendingFiles = [];
   _renderChatAttachPreview();
   if (typeof refreshNotifBadge === 'function') refreshNotifBadge();
+}
+
+// v2.45.611: «Поручить» из чата договора — закрываем чат и открываем форму
+// новой задачи, уже привязанную к этому договору (там выбираем исполнителя и срок).
+// Исполнителю уходит web-push при создании (бэкенд notify_task_assigned_push).
+function createTaskFromContractChat() {
+  const cid = state.currentContractId;
+  if (!cid) { showToast('Договор не выбран', 'error'); return; }
+  if (typeof canManageTasks === 'function' && !canManageTasks()) {
+    showToast('Создавать задачи может директор, зам или менеджер', 'error');
+    return;
+  }
+  closeContractChat();
+  if (typeof openNewTaskForContract === 'function') {
+    openNewTaskForContract(cid);
+  } else {
+    showToast('Форма задач недоступна', 'error');
+  }
 }
 
 async function loadContractChat(contractId, silent) {
