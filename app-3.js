@@ -6132,14 +6132,57 @@ function _supAvatarHtml(name, warn) {
   if (warn) return '<span class="sup-ava warn">?</span>';
   return '<span class="sup-ava">' + escapeHtml(_supInitials(name)) + '</span>';
 }
-function _supKpiCard(icon, cls, num, lbl) {
-  return '<div class="sup-kpi ' + cls + '"><div class="sup-kpi-ic"><i class="ti ti-' + icon + '"></i></div>' +
+function _supKpiCard(icon, cls, num, lbl, onclick) {
+  // v2.45.x: карточка-счётчик может быть кликабельной — открывает список.
+  const clickAttrs = onclick
+    ? ' sup-kpi-click" role="button" tabindex="0" title="Нажмите, чтобы открыть список" style="cursor:pointer;" onclick="' + onclick + '"'
+    : '"';
+  return '<div class="sup-kpi ' + cls + clickAttrs + '><div class="sup-kpi-ic"><i class="ti ti-' + icon + '"></i></div>' +
     '<div><div class="sup-kpi-num">' + num + '</div><div class="sup-kpi-lbl">' + escapeHtml(lbl) + '</div></div></div>';
 }
 function supSwitchTab(t) {
   window._supTab = t;
   document.querySelectorAll('#sup-shop-content .sup-pane').forEach(p => { p.hidden = (p.dataset.pane !== t); });
   document.querySelectorAll('#sup-shop-content .sup-seg button').forEach(b => { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
+}
+
+// v2.45.x: клик по карточке-счётчику наверху «Что закупить».
+// «К закупке» → вкладка закупки; «Ждём поставку» → вся вкладка ожидания;
+// «Долго ждём» / «Сегодня на складе» → вкладка ожидания, отфильтрованная.
+function supKpiClick(kind) {
+  if (kind === 'buy') { window._supWaitFilter = 'all'; supSwitchTab('buy'); return; }
+  window._supWaitFilter = (kind === 'long' || kind === 'today') ? kind : 'all';
+  _supRenderWaitPane();
+  supSwitchTab('wait');
+}
+
+// Перерисовывает содержимое вкладки «Ждём поставку» согласно активному фильтру.
+function _supRenderWaitPane() {
+  const pane = document.querySelector('#sup-shop-content .sup-pane[data-pane="wait"]');
+  if (!pane) return;
+  const all = window._supWaitingItems || [];
+  const filter = window._supWaitFilter || 'all';
+  const today = new Date().toISOString().slice(0, 10);
+  let items = all, bannerTxt = '';
+  if (filter === 'long') {
+    items = all.filter(it => { const dd = _daysSince(it.ordered_at); return dd !== null && dd >= 14; });
+    bannerTxt = 'Показаны только те, что ждём дольше 14 дней';
+  } else if (filter === 'today') {
+    items = all.filter(it => it.order_expected && String(it.order_expected).slice(0, 10) === today);
+    bannerTxt = 'Показаны только те, что должны прийти сегодня';
+  }
+  const banner = bannerTxt
+    ? '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 2px;padding:8px 12px;' +
+        'background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;font-size:13px;color:#92400E;">' +
+        '<i class="ti ti-filter"></i><span style="flex:1;min-width:120px;">' + escapeHtml(bannerTxt) + '</span>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="supKpiClick(\'wait\')"><i class="ti ti-x"></i> показать все</button>' +
+      '</div>'
+    : '';
+  const inner = items.length
+    ? _cpTrackingBlockHtml(items)
+    : '<div class="empty-block" style="padding:28px 16px;"><i class="ti ti-mood-smile" style="color:#16A34A;font-size:26px;"></i>' +
+      '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Здесь пусто — ничего под этот фильтр.</div></div>';
+  pane.innerHTML = banner + inner;
 }
 // Степпер доставки: Заказан → Оплачен → В пути → На складе (по статусу заказа)
 function _supDeliveryStepperHtml(orderStatus) {
@@ -6202,11 +6245,14 @@ function renderSupplyShopping(d) {
   const _today = new Date().toISOString().slice(0, 10);
   const longWait = waitingItems.filter(it => { const dd = _daysSince(it.ordered_at); return dd !== null && dd >= 14; }).length;
   const arriveToday = waitingItems.filter(it => it.order_expected && String(it.order_expected).slice(0, 10) === _today).length;
+  // v2.45.x: запоминаем список «ждём поставку», чтобы перерисовывать вкладку по
+  // клику на карточку-счётчик (Долго ждём / Сегодня на складе).
+  window._supWaitingItems = waitingItems;
   const kpiStrip = '<div class="sup-kpis">' +
-    _supKpiCard('shopping-cart', 'brand', buyCount, 'К закупке') +
-    _supKpiCard('truck-delivery', 'blue', waitCount, 'Ждём поставку') +
-    _supKpiCard('clock-exclamation', 'red', longWait, 'Долго ждём (&gt;14дн)') +
-    _supKpiCard('calendar-check', 'green', arriveToday, 'Сегодня на складе') +
+    _supKpiCard('shopping-cart', 'brand', buyCount, 'К закупке', "supKpiClick('buy')") +
+    _supKpiCard('truck-delivery', 'blue', waitCount, 'Ждём поставку', "supKpiClick('wait')") +
+    _supKpiCard('clock-exclamation', 'red', longWait, 'Долго ждём (&gt;14дн)', "supKpiClick('long')") +
+    _supKpiCard('calendar-check', 'green', arriveToday, 'Сегодня на складе', "supKpiClick('today')") +
   '</div>';
   // Табы: К закупке / Ждём поставку
   const tab = (window._supTab === 'wait') ? 'wait' : 'buy';
@@ -12225,6 +12271,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.612',
+    date: '01.07.2026',
+    title: 'Что закупить: карточки-счётчики кликабельны',
+    features: [
+      'Карточки наверху («К закупке», «Ждём поставку», «Долго ждём &gt;14дн», «Сегодня на складе») теперь <b>кликабельны</b>',
+      'Нажми <b>«Долго ждём»</b> — откроется список именно этих позиций, сразу видно, о чём речь и кого теребить',
+      '«Сегодня на складе» — покажет то, что должно прийти сегодня; в отфильтрованном списке есть кнопка <b>«показать все»</b>',
+    ],
+  },
   {
     version: 'v2.45.609',
     date: '30.06.2026',
