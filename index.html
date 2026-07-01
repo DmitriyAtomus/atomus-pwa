@@ -2753,7 +2753,13 @@
         <h3><i class="ti ti-message-circle"></i> <span id="cchat-title">Чат по договору</span></h3>
         <div class="chat-subtitle" id="cchat-subtitle"></div>
       </div>
-      <button class="modal-close" onclick="closeContractChat()"><i class="ti ti-x"></i></button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <!-- v2.45.611: поручить задачу прямо из обсуждения по договору -->
+        <button class="btn btn-secondary" onclick="createTaskFromContractChat()" title="Создать задачу по этому договору и назначить исполнителя" style="padding:6px 12px;font-size:13px;white-space:nowrap;">
+          <i class="ti ti-clipboard-plus"></i> Поручить
+        </button>
+        <button class="modal-close" onclick="closeContractChat()"><i class="ti ti-x"></i></button>
+      </div>
     </div>
     <div class="cchat-messages" id="cchat-messages">
       <div class="loading-block">Загружаем сообщения…</div>
