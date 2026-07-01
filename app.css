@@ -18763,6 +18763,9 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 #sup-shop-content .sup-kpi.red   .sup-kpi-ic{background:var(--danger-bg);color:var(--danger);}
 #sup-shop-content .sup-kpi.red   .sup-kpi-num{color:var(--danger);}
 #sup-shop-content .sup-kpi.green .sup-kpi-ic{background:var(--success-bg);color:var(--success);}
+#sup-shop-content .sup-kpi.sup-kpi-click{transition:box-shadow .12s,transform .12s,border-color .12s;}
+#sup-shop-content .sup-kpi.sup-kpi-click:hover{box-shadow:0 4px 12px rgba(27,32,48,.12);transform:translateY(-1px);border-color:var(--brand);}
+#sup-shop-content .sup-kpi.sup-kpi-click:active{transform:translateY(0);}
 
 #sup-shop-content .sup-seg{display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:14px;gap:2px;}
 #sup-shop-content .sup-seg button{border:none;background:transparent;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:700;color:var(--text-light);cursor:pointer;display:inline-flex;align-items:center;gap:7px;}

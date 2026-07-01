@@ -1600,8 +1600,9 @@ function _radioState() {
       if (saved && typeof saved.volume === 'number') {
         window._radio.volume = Math.max(0, Math.min(1, saved.volume));
       }
-      if (saved && saved.target) window._radio.target = saved.target;
-      if (saved && saved.tvStationId) window._radio.tvStationId = saved.tvStationId;
+      // «Око офиса» убрано — радио всегда играет локально в СРМ, даже если в
+      // сохранённом состоянии остался target='tv'.
+      window._radio.target = 'local';
     } catch (e) {}
   }
   return window._radio;
@@ -1641,7 +1642,7 @@ function renderSidebarRadio() {
 // Рендер тела модалки (тёмная панель с управлением + список станций).
 function _renderRadioModalBody() {
   const s = _radioState();
-  const isTv = s.target === 'tv';
+  const isTv = false;   // «Око офиса» убрано — радио слушаем только в СРМ
   const curId = isTv ? s.tvStationId : s.stationId;
   const station = curId ? _radioGetStation(curId) : null;
   const stationName = station ? station.name : 'Выберите волну';
@@ -1653,15 +1654,6 @@ function _renderRadioModalBody() {
     : '<i class="ti ti-radio"></i>Радио';
   const volPct = Math.round((s.volume || 0) * 100);
   const volIcon = volPct === 0 ? 'ti-volume-off' : (volPct < 40 ? 'ti-volume-2' : 'ti-volume');
-
-  // Переключатель назначения: здесь (в браузере) / на телевизор «Око офиса»
-  const btnBase = 'flex:1;padding:9px 8px;border-radius:9px;border:1px solid #2a3550;background:#141d30;color:#cdd8ee;cursor:pointer;font-size:14px;font-weight:600;';
-  const btnAct  = 'background:#2D5F8B;color:#fff;border-color:#2D5F8B;';
-  const targetRow =
-    '<div class="radio-target" style="display:flex;gap:8px;padding:12px 14px 2px;">' +
-      '<button style="' + btnBase + (!isTv ? btnAct : '') + '" onclick="setRadioTarget(\'local\')"><i class="ti ti-device-speaker"></i> Здесь</button>' +
-      '<button style="' + btnBase + (isTv ? btnAct : '') + '" onclick="setRadioTarget(\'tv\')">👁️ Око офиса</button>' +
-    '</div>';
 
   let items = '';
   RADIO_STATIONS.forEach((st, i) => {
@@ -1683,7 +1675,6 @@ function _renderRadioModalBody() {
       '</div>';
 
   return (
-    targetRow +
     '<div class="radio-modal-top' + (isLoading ? ' hr-loading' : '') + '">' +
       '<div class="hr-top">' +
         '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Стоп' : 'Играть') + '">' +
