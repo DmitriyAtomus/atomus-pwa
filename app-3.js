@@ -8017,7 +8017,10 @@ function renderSupplyOrders() {
           ? '<span class="sup-status-pill" style="background:#E0E7FF;color:#3730A3;"><i class="ti ti-file-check"></i> счёт привязан</span>'
           : '');
 
-    const itemsWord = (typeof _plural === 'function') ? _plural(o.items_count, ['позиция', 'позиции', 'позиций']) : 'позиций';
+    // v2.45.616: у заказов «на оплату» своих строк нет (items_count=0), но есть
+    // распознанные позиции счёта → показываем их количество как фолбэк.
+    const itemsCount = o.items_count || ((o.invoice_items && o.invoice_items.length) || 0);
+    const itemsWord = (typeof _plural === 'function') ? _plural(itemsCount, ['позиция', 'позиции', 'позиций']) : 'позиций';
     html += '<div class="sup-row sup-ord-card" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
     if (canDelete) {
       html += '<label class="sup-check-wrap" onclick="event.stopPropagation();">' +
@@ -8037,7 +8040,7 @@ function renderSupplyOrders() {
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
-          '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
+          '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
         '</div>' +
@@ -12304,6 +12307,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.616',
+    date: '01.07.2026',
+    title: 'Заказы на оплату: видно число позиций из счёта',
+    features: [
+      'У заказов, созданных из <b>входящего счёта</b> («На оплату»), в списке больше не пишется «0 позиций», если позиции есть',
+      'Теперь показываем количество <b>распознанных строк счёта</b> — например «4 позиции» вместо «0»',
+    ],
+  },
   {
     version: 'v2.45.614',
     date: '01.07.2026',
