@@ -7964,6 +7964,7 @@ function _renderSupplyOrdTabCounts() {
 function renderSupplyOrders() {
   const container = document.getElementById('sup-ord-list');
   const list = cache.supplyOrders || [];
+  if (typeof _renderSupplyOrdDesc === 'function') _renderSupplyOrdDesc();  // v2.45.615: пояснение к разделу
   document.getElementById('sup-ord-counter').textContent = list.length;
   // Подчистим выбранные id, которых уже нет в текущем списке
   const visibleIds = new Set(list.map(o => o.id));
@@ -8160,9 +8161,41 @@ async function deleteSupplyOrder(orderId, label) {
   }
 }
 
+// v2.45.615: пояснение к каждому статусу-разделу заказов поставщикам —
+// что это за раздел и почему заказ сюда попал. Один источник и для строки-описания
+// под фильтрами, и для всплывающих подсказок (title) на самих чипах.
+const SUP_ORD_DESC = {
+  open:             'В работе — активные заказы в процессе: черновики, отправленные, ждущие счёт, оплату или поставку. Без оплаченных и полностью полученных.',
+  draft:            'Черновик — заказ создан, но ещё не отправлен поставщику. Дополняете позициями и отправляете.',
+  sent:             'Отправлен — заказ ушёл поставщику, ждём ответ и счёт на оплату.',
+  awaiting_invoice: 'Ждут счёт — заказ отправлен, ждём от поставщика счёт, чтобы поставить на оплату.',
+  invoice_received: 'Счёт пришёл — поставщик прислал счёт, его можно отправлять на оплату.',
+  to_pay:           'К оплате — счёт привязан и готов к оплате: очередь бухгалтеру. Тот же список открывает раздел «На оплату» слева.',
+  paid:             'Оплачены — счёт оплачен, ждём поставку от поставщика.',
+  partial:          'Частично — пришла часть позиций заказа, ждём остаток.',
+  received:         'Получены — заказ полностью поставлен и оприходован на склад.',
+  all:              'Все — все заказы поставщикам, в любом статусе.',
+};
+
+function _renderSupplyOrdDesc() {
+  const f = state.supplyOrdFilter || 'open';
+  const text = SUP_ORD_DESC[f] || '';
+  const el = document.getElementById('sup-ord-desc');
+  if (el) {
+    el.innerHTML = text ? '<i class="ti ti-info-circle"></i> ' + escapeHtml(text) : '';
+    el.style.display = text ? '' : 'none';
+  }
+  // Всплывающая подсказка на каждом чипе-статусе
+  document.querySelectorAll('[data-sup-ord]').forEach(b => {
+    const d = SUP_ORD_DESC[b.dataset.supOrd];
+    if (d) b.title = d;
+  });
+}
+
 function setSupplyOrdFilter(f) {
   state.supplyOrdFilter = f;
   document.querySelectorAll('[data-sup-ord]').forEach(b => b.classList.toggle('active', b.dataset.supOrd === f));
+  _renderSupplyOrdDesc();
   loadSupplyOrders();
 }
 
