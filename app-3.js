@@ -10605,10 +10605,14 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const fn = (filename || '').toLowerCase();
-    const isPdf = ct.includes('pdf') || fn.endsWith('.pdf');
-    const isImg = ct.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/.test(fn);
+    // v2.45.618: тип берём в первую очередь из content-type сервера (он теперь
+    // определяется по содержимому файла). Имя файла — лишь запасной признак, т.к.
+    // файлы из бота бывают с неверным расширением (WebP/JPEG, сохранённые как .pdf).
+    const ctKnown = ct && ct !== 'application/octet-stream';
+    const isImg = ct.startsWith('image/') || (!ctKnown && /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/.test(fn));
+    const isPdf = !isImg && (ct.includes('pdf') || (!ctKnown && fn.endsWith('.pdf')));
     // v2.45.261: Excel-счёт — рисуем таблицей прямо в карточке
-    const isXls = /\.(xlsx|xlsm|xls)$/.test(fn) || ct.includes('spreadsheet') || ct.includes('ms-excel');
+    const isXls = !isImg && !isPdf && (ct.includes('spreadsheet') || ct.includes('ms-excel') || (!ctKnown && /\.(xlsx|xlsm|xls)$/.test(fn)));
     if (isXls) {
       URL.revokeObjectURL(url);
       try {
@@ -12322,6 +12326,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.618',
+    date: '01.07.2026',
+    title: 'Просмотр счёта: открываем по содержимому файла',
+    features: [
+      'Исправили просмотр счетов, где <b>имя файла врёт</b>: фото из бота, сохранённое как «invoice.pdf», раньше не открывалось (ошибка «Не удалось загрузить PDF») — теперь тип определяется по <b>содержимому</b>, и такой счёт открывается как картинка',
+    ],
+  },
   {
     version: 'v2.45.617',
     date: '01.07.2026',
