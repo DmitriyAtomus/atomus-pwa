@@ -5675,6 +5675,10 @@ async function loadModelBom(modelId) {
           '<div class="bom-qty-lbl">в наличии</div></div>' +
         (canManageSales() ?
           '<div class="bom-actions">' +
+            // v2.45.633: «Сопоставить со складом» — подобрать похожую складскую
+            // позицию и привязать (тогда остаток/наличие синхронизируются). Для
+            // компонентов, не для подсборок.
+            (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomRelink(' + it.id + ', ' + JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ', ' + modelId + ')" title="Сопоставить со складом (выбрать похожую позицию)"><i class="ti ti-arrows-exchange"></i></button>' : '') +
             '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
@@ -7642,8 +7646,8 @@ async function _doBomPreview() {
 // ---- Ручное сопоставление строки спецификации со складской позицией ----
 // Когда авто-матч не нашёл остаток (позиция показана «есть 0», хотя на складе
 // она есть под другой/дублирующей записью) — даём выбрать нужную вручную.
-function openBomRelink(bomId, name) {
-  state._bomRelink = { bomId: bomId, name: name || '' };
+function openBomRelink(bomId, name, modelId) {
+  state._bomRelink = { bomId: bomId, name: name || '', modelId: (modelId != null ? modelId : null) };
   let ov = document.getElementById('bom-relink-overlay');
   if (!ov) {
     ov = document.createElement('div');
@@ -7716,7 +7720,9 @@ async function relinkBomComponent(componentId) {
     if (resp && resp.ok) {
       showToast('Позиция сопоставлена со складом', 'success');
       closeBomRelink();
-      _doBomPreview();
+      // v2.45.633: обновляем нужный вид — редактор Тех.карты модели или превью дефицита
+      if (st.modelId != null && typeof loadModelBom === 'function') loadModelBom(st.modelId);
+      else if (typeof _doBomPreview === 'function') _doBomPreview();
     } else {
       showToast((resp && resp.data && resp.data.message) || 'Не удалось сопоставить', 'error');
     }
