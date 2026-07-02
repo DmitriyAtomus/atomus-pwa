@@ -4620,18 +4620,35 @@ async function uploadModelScheme(modelId, input) {
   input.value = '';
 }
 
+// v2.45.630: защита от повторных кликов + индикатор + клиентский таймаут,
+// чтобы схема не «висела» молча и не приходилось жать несколько раз.
+window._schemeLoading = window._schemeLoading || {};
 async function downloadModelScheme(modelId) {
+  if (window._schemeLoading[modelId]) { showToast('Схема уже открывается…', 'info'); return; }
+  window._schemeLoading[modelId] = true;
+  showToast('Открываю схему…', 'info');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/models/' + modelId + '/scheme-file', {
       headers: { 'Authorization': 'Bearer ' + token },
+      signal: ctrl.signal,
     });
-    if (!r.ok) { showToast('Не удалось открыть', 'error'); return; }
+    clearTimeout(timer);
+    if (!r.ok) { showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+  } catch (e) {
+    clearTimeout(timer);
+    showToast(e && e.name === 'AbortError'
+      ? 'Схема грузится дольше обычного — нажми ещё раз'
+      : ('Ошибка: ' + (e && e.message || e)), 'error');
+  } finally {
+    window._schemeLoading[modelId] = false;
+  }
 }
 
 async function deleteModelSchemeFile(modelId) {
