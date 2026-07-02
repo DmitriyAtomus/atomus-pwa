@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.633-mobile-polish";
+const APP_VERSION = "v2.45.634-cockpit-v1";
 const APP_VERSION_DATE = "01.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2989,7 +2989,14 @@ function renderProductionDashboard(d) {
       '<button onclick="pkbResetFilter()"><i class="ti ti-x"></i> сбросить</button></div>';
   }
 
-  // --- v2.45.627: строка «узких мест» — автоматические выводы из данных доски ---
+  // --- v2.45.634: «кабина» — на десктопе справа тёмная панель «Сегодня»
+  // (внимание/отгрузки/задачи), контент слева. На мобильном панель скрыта,
+  // а «узкие места» остаются в потоке.
+  const railOn = localStorage.getItem('pkbRail') !== '0';
+  html += '<div class="pkb-cockpit' + (railOn ? '' : ' rail-off') + '">';
+  html += '<div class="pkb-cmain">';
+
+  // --- v2.45.627: строка «узких мест» (на десктопе живёт в правой панели) ---
   html += _pkbInsightsHtml(_activeAll, _queueAll, d.workload || {}, defHrs);
 
   // --- Виджет загрузки сборщиков (Stage 29.4) ---
@@ -3059,10 +3066,122 @@ function renderProductionDashboard(d) {
   });
   html += '</div>';
 
+  // конец .pkb-cmain, затем правая панель «Сегодня» (v2.45.634)
+  html += '</div>';
+  html += _pkbRailHtml(_activeAll, _queueAll, railOn);
+  html += '</div>';   // конец .pkb-cockpit
+
   container.innerHTML = html;
   container.classList.toggle('pkb-v2', !!window.PKB_V2);
+  _fillPkbRail();
   // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
   _renderResumeBanner();
+}
+
+// ============ v2.45.634: правая панель «Сегодня» (кабина) ============
+function pkbToggleRail() {
+  const cur = localStorage.getItem('pkbRail') !== '0';
+  try { localStorage.setItem('pkbRail', cur ? '0' : '1'); } catch (e) {}
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
+
+function _pkbRailHtml(activeWorks, queueWorks, on) {
+  if (!on) {
+    return '<div class="pkb-rail-collapsed" onclick="pkbToggleRail()" title="Развернуть панель «Сегодня»">«</div>';
+  }
+  let html = '<aside class="pkb-rail">';
+  html += '<div class="pkb-rail-collapse" onclick="pkbToggleRail()" title="Свернуть панель">»</div>';
+
+  // ТРЕБУЕТ ВНИМАНИЯ — те же выводы, что чипы «узких мест», в тёмных строках
+  const overdue = activeWorks.filter(w => w.is_overdue);
+  const blocked = activeWorks.filter(w => w.is_blocked);
+  html += '<div class="pkb-rail-t"><i class="ti ti-alert-triangle"></i> Требует внимания</div>';
+  if (!overdue.length && !blocked.length) {
+    html += '<div class="pkb-rail-row muted">Всё спокойно ✓</div>';
+  } else {
+    if (overdue.length) {
+      const byWho = {};
+      overdue.forEach(w => { const n = w.assignee_short_name || 'без исполнителя'; byWho[n] = 1; });
+      const who = Object.keys(byWho).join(', ');
+      let worst = 0;
+      overdue.forEach(w => { worst = Math.max(worst, pkbOverdueDays(w.deadline_at)); });
+      html += '<div class="pkb-rail-row" onclick="pkbSetFilter(\'overdue\')">' +
+        '<span class="pkb-rail-dot" style="background:#F87171;"></span>' +
+        '<span><b>' + overdue.length + '</b> ' + plural(overdue.length, 'просрочка', 'просрочки', 'просрочек') + ' · ' + escapeHtml(who) + '</span>' +
+        '<span class="pkb-rail-late">−' + worst + ' дн</span></div>';
+    }
+    if (blocked.length) {
+      const missSet = new Set();
+      blocked.forEach(w => (w.missing_components || []).forEach(mc => missSet.add(mc.component_id || mc.name || mc)));
+      html += '<div class="pkb-rail-row" onclick="pkbSetFilter(\'blocked\')">' +
+        '<span class="pkb-rail-dot" style="background:#FBBF24;"></span>' +
+        '<span><b>' + blocked.length + '</b> ' + plural(blocked.length, 'работа', 'работы', 'работ') + ' без деталей</span>' +
+        (missSet.size ? '<span class="pkb-rail-meta">' + missSet.size + ' поз.</span>' : '') + '</div>';
+      html += '<div class="pkb-rail-row sub" onclick="selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')">' +
+        '<span class="pkb-rail-dot" style="background:transparent;"></span><span>что закупить →</span></div>';
+    }
+  }
+
+  html += '<div class="pkb-rail-sep"></div>';
+  html += '<div class="pkb-rail-t"><i class="ti ti-truck-delivery"></i> Отгрузки</div>';
+  html += '<div id="pkb-rail-ship"><div class="pkb-rail-row muted">Загружаем…</div></div>';
+
+  html += '<div class="pkb-rail-sep"></div>';
+  html += '<div class="pkb-rail-t"><i class="ti ti-checklist"></i> Мои задачи</div>';
+  html += '<div id="pkb-rail-tasks"><div class="pkb-rail-row muted">Загружаем…</div></div>';
+
+  html += '</aside>';
+  return html;
+}
+
+// Асинхронное наполнение панели: отгрузки + мои задачи (лёгкие эндпоинты главной)
+async function _fillPkbRail() {
+  const shipEl = document.getElementById('pkb-rail-ship');
+  if (shipEl) {
+    try {
+      if (!cache.upcomingShipments) cache.upcomingShipments = await apiGet('/api/home/upcoming-shipments');
+      const list = (cache.upcomingShipments && cache.upcomingShipments.contracts) || [];
+      if (!list.length) {
+        shipEl.innerHTML = '<div class="pkb-rail-row muted">Ближайших отгрузок нет</div>';
+      } else {
+        const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+        shipEl.innerHTML = list.slice(0, 4).map(c => {
+          let dNum = '—', dMon = '', late = false, chip = '';
+          const diff = c.days_to_deadline;
+          if (c.delivery_date) {
+            const dt = new Date(c.delivery_date);
+            if (!isNaN(dt.getTime())) { dNum = dt.getDate(); dMon = months[dt.getMonth()]; }
+          }
+          if (diff != null) {
+            if (diff < 0) { late = true; chip = '<span class="pkb-rail-late">−' + Math.abs(diff) + ' дн</span>'; }
+            else if (diff === 0) { late = true; chip = '<span class="pkb-rail-late">сегодня</span>'; }
+            else chip = '<span class="pkb-rail-meta">' + diff + ' дн</span>';
+          }
+          return '<div class="pkb-rail-row" onclick="openContractDetail(' + c.id + ')">' +
+            '<span class="pkb-rail-date' + (late ? ' late' : '') + '">' + dNum + '<small>' + dMon + '</small></span>' +
+            '<span class="pkb-rail-ell">' + escapeHtml(c.number || '—') + ' · ' + escapeHtml(c.contractor_name || '') + '</span>' +
+            chip + '</div>';
+        }).join('');
+      }
+    } catch (e) { shipEl.innerHTML = '<div class="pkb-rail-row muted">—</div>'; }
+  }
+  const taskEl = document.getElementById('pkb-rail-tasks');
+  if (taskEl) {
+    try {
+      if (!cache.myTasks) cache.myTasks = await apiGet('/api/home/my-tasks');
+      const tl = (cache.myTasks && cache.myTasks.tasks) || [];
+      if (!tl.length) {
+        taskEl.innerHTML = '<div class="pkb-rail-row muted" onclick="goToSection(\'tasks\', \'tasks-mine\')">Нет активных ✓</div>';
+      } else {
+        taskEl.innerHTML = tl.slice(0, 3).map(t =>
+          '<div class="pkb-rail-row" onclick="goToSection(\'tasks\', \'tasks-mine\')">' +
+            '<span class="pkb-rail-dot" style="background:#7FB2E5;"></span>' +
+            '<span class="pkb-rail-ell">' + escapeHtml(t.title || t.name || 'Задача') + '</span></div>'
+        ).join('') +
+        (tl.length > 3 ? '<div class="pkb-rail-row sub" onclick="goToSection(\'tasks\', \'tasks-mine\')"><span class="pkb-rail-dot" style="background:transparent;"></span><span>ещё ' + (tl.length - 3) + ' →</span></div>' : '');
+      }
+    } catch (e) { taskEl.innerHTML = '<div class="pkb-rail-row muted">—</div>'; }
+  }
 }
 
 // v2.45.5xx: переключатель нового/старого вида Производства
@@ -4170,6 +4289,36 @@ function closeProductionWorkDetail() {
   const m = document.getElementById('pkb-detail-modal');
   if (m) m.remove();
 }
+
+// ============ v2.45.634: глобальный поиск на десктопе (Ctrl+K) ============
+// Переиспользуем мобильный экран поиска search25 — на десктопе он оформлен
+// CSS'ом как центральная панель-оверлей.
+function openDesktopSearch() {
+  const so = document.getElementById('search25-screen');
+  if (!so) return;
+  so.style.display = 'block';
+  setTimeout(() => {
+    const inp = document.getElementById('search25-input');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 60);
+}
+function closeDesktopSearch() {
+  const so = document.getElementById('search25-screen');
+  if (!so) return;
+  // На мобильном экран закрывается нижними табами — не трогаем его там
+  const isDesktop = document.getElementById('app') &&
+    document.getElementById('app').classList.contains('desktop-layout');
+  if (isDesktop) so.style.display = 'none';
+}
+document.addEventListener('keydown', function (e) {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.key === 'л' || e.key === 'Л')) {
+    e.preventDefault();
+    openDesktopSearch();
+  } else if (e.key === 'Escape') {
+    const so = document.getElementById('search25-screen');
+    if (so && so.style.display !== 'none') closeDesktopSearch();
+  }
+});
 
 async function showProductionWorkQr(workId) {
   try {

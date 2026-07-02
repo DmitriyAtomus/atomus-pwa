@@ -19807,3 +19807,117 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .pwd-team-row { row-gap: 6px; }
   .pwd-team-row .pkb-btn { margin-left: 0 !important; }
 }
+
+/* ====== v2.45.634: единая шапка (десктоп) + «кабина» с правой панелью ====== */
+
+/* Кнопка глобального поиска в шапке */
+.hdr-search-btn {
+  display: none;   /* показываем только на десктопе */
+  align-items: center; gap: 7px;
+  height: 34px; padding: 0 12px; margin-right: 2px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+  border-radius: 10px; color: #B9C7DB; font-size: 12.5px; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+}
+.hdr-search-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
+.hdr-search-btn kbd {
+  font-size: 9.5px; background: rgba(255,255,255,.14); border-radius: 4px;
+  padding: 1px 5px; font-family: inherit; letter-spacing: .3px;
+}
+.app.desktop-layout .hdr-search-btn { display: inline-flex; }
+
+/* Десктоп: кнопки шапки — единый «стеклянный» стиль (как на мобильной шапке) */
+.app.desktop-layout .top-bar .scan-btn {
+  background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.10)) !important;
+  border: none !important; color: #fff !important;
+  height: 34px; border-radius: 10px; font-weight: 700; font-size: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 1px 3px rgba(10,25,47,.3);
+}
+.app.desktop-layout .top-bar .scan-btn:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.16)) !important;
+}
+.app.desktop-layout .top-bar .scan-btn i { color: #fff !important; }
+.app.desktop-layout .top-bar .notif-btn {
+  background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.10));
+  border: none; color: #fff; width: 34px; height: 34px; border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 1px 3px rgba(10,25,47,.3);
+  margin-right: 0;
+}
+.app.desktop-layout .top-bar .notif-btn:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.16));
+}
+/* Профиль-пилюля */
+.app.desktop-layout .top-bar .user-block {
+  background: rgba(255,255,255,.10); border-radius: 999px; padding: 4px 12px 4px 10px;
+}
+.app.desktop-layout .top-bar .user-block:hover { background: rgba(255,255,255,.16); }
+
+/* Поиск search25 на десктопе — центральная панель-оверлей */
+.app.desktop-layout #search25-screen {
+  top: 64px; left: 50%; right: auto; bottom: auto;
+  transform: translateX(-50%);
+  width: 660px; max-width: calc(100vw - 40px); max-height: 76vh;
+  border-radius: 16px; border: 1px solid var(--border);
+  box-shadow: 0 18px 60px rgba(10, 25, 47, .35), 0 0 0 100vmax rgba(10, 25, 47, .35);
+  padding: 16px 0 18px; z-index: 60;
+}
+
+/* ===== Кабина: контент + правая тёмная панель ===== */
+.pkb-cockpit { display: block; }
+.app.desktop-layout .pkb-cockpit {
+  display: grid; grid-template-columns: 1fr 262px; gap: 14px; align-items: start;
+}
+.app.desktop-layout .pkb-cockpit.rail-off { grid-template-columns: 1fr 18px; }
+.pkb-cmain { min-width: 0; }
+/* «Узкие места» на десктопе живут в панели — в потоке прячем */
+.app.desktop-layout .pkb-insights { display: none; }
+
+.pkb-rail {
+  display: none;
+  background: linear-gradient(180deg, #1B3A5C, #16304D);
+  border-radius: 14px; padding: 12px 10px 14px;
+  position: sticky; top: 74px; max-height: calc(100vh - 90px); overflow-y: auto;
+}
+.app.desktop-layout .pkb-rail { display: block; }
+.pkb-rail-collapsed { display: none; }
+.app.desktop-layout .pkb-rail-collapsed {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; min-height: 120px; position: sticky; top: 74px;
+  background: linear-gradient(180deg, #1B3A5C, #16304D);
+  border-radius: 10px; color: #8FB4D9; font-weight: 800; cursor: pointer;
+}
+.pkb-rail-collapse {
+  position: absolute; right: 8px; top: 8px; width: 22px; height: 22px;
+  border-radius: 7px; background: rgba(255,255,255,.10); color: #8FB4D9;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 12px; cursor: pointer;
+}
+.pkb-rail-collapse:hover { background: rgba(255,255,255,.18); color: #fff; }
+.pkb-rail-t {
+  font-size: 10px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase;
+  color: #7E93AC; padding: 4px 8px 6px; display: flex; align-items: center; gap: 5px;
+}
+.pkb-rail-t .ti { font-size: 12px; }
+.pkb-rail-sep { height: 1px; background: rgba(255,255,255,.10); margin: 9px 4px; }
+.pkb-rail-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 9px;
+  font-size: 12px; color: #C7D5E6; cursor: pointer; line-height: 1.3;
+}
+.pkb-rail-row:hover { background: rgba(255,255,255,.07); color: #fff; }
+.pkb-rail-row b { color: #fff; }
+.pkb-rail-row.muted { color: #7E93AC; cursor: default; }
+.pkb-rail-row.muted:hover { background: none; }
+.pkb-rail-row.sub { padding-top: 2px; color: #8FB4D9; font-weight: 700; }
+.pkb-rail-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.pkb-rail-late { margin-left: auto; color: #FCA5A5; font-weight: 800; font-size: 11px; white-space: nowrap; }
+.pkb-rail-meta { margin-left: auto; color: #7E93AC; font-size: 11px; white-space: nowrap; }
+.pkb-rail-ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pkb-rail-date {
+  min-width: 34px; text-align: center; background: rgba(255,255,255,.10);
+  border-radius: 7px; padding: 3px 2px; font-size: 11px; font-weight: 800;
+  color: #fff; line-height: 1.1; flex-shrink: 0;
+}
+.pkb-rail-date small { display: block; font-size: 7.5px; font-weight: 700; color: #7E93AC; text-transform: uppercase; }
+.pkb-rail-date.late { background: rgba(239,68,68,.25); }
+.pkb-rail-date.late, .pkb-rail-date.late small { color: #FCA5A5; }

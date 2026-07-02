@@ -151,14 +151,18 @@
         </button>
       </nav>
     </div>
-    <button class="scan-btn scan-btn--camera" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную">
+    <!-- v2.45.634: глобальный поиск из шапки (Ctrl+K) — только десктоп -->
+    <button class="hdr-search-btn" onclick="openDesktopSearch()" title="Поиск по всей СРМ: договоры, задачи, контрагенты… (Ctrl+K)">
+      <i class="ti ti-search"></i><span class="hdr-search-txt">Поиск…</span><kbd>Ctrl K</kbd>
+    </button>
+    <button class="scan-btn scan-btn--camera" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную (Фото УПД)">
       <i class="ti ti-camera"></i>
-      <span class="scan-btn-text">Фото УПД</span>
+      <span class="scan-btn-text">УПД</span>
     </button>
     <input type="file" id="si-camera-direct-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleCameraDirect(event)">
     <button class="scan-btn scan-btn--qr" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
-      <span class="scan-btn-text">QR-скан</span>
+      <span class="scan-btn-text">QR</span>
     </button>
     <!-- v2.45.x: глобальная кнопка чатов — доступна во всех разделах и всем ролям -->
     <button class="notif-btn" id="team-chats-top-btn" onclick="openTeamChatsScreen()" title="Чаты">
