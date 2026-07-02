@@ -446,6 +446,24 @@ function filterComponentsList() {
   renderComponentsList();
 }
 
+// v2.45.622: «раскрытие» упаковок — если у компонента задана фасовка
+// (purchase_pack > 1), показываем «фасовка N шт/упак» и во сколько упаковок
+// раскладывается текущий остаток (напр. «300 шт = 3 упак»).
+function _compPackHint(c) {
+  const pack = Number(c && c.purchase_pack || 0);
+  if (!(pack > 1)) return '';
+  const unit = (c.unit || 'шт.');
+  const qty = Number(c.qty_on_stock || 0);
+  let unfold = '';
+  if (qty > 0) {
+    const packs = Math.floor(qty / pack + 1e-9);
+    const rem = Math.round((qty - packs * pack) * 1000) / 1000;
+    if (packs > 0) unfold = ' · = ' + packs + ' упак' + (rem > 0 ? ' + ' + _fmtQty(rem) + ' ' + escapeHtml(unit) : '');
+  }
+  return ' <span style="color:var(--text-light);"><i class="ti ti-box" style="font-size:11px;"></i> фасовка ' +
+    _fmtQty(pack) + ' ' + escapeHtml(unit) + '/упак' + unfold + '</span>';
+}
+
 function renderComponentsList() {
   const container = document.getElementById('comp-list-container');
   const counter = document.getElementById('comp-counter');
@@ -543,6 +561,7 @@ function renderComponentsList() {
           '</div>' +
           '<div class="comp-meta">' +
             (c.default_supplier_name ? '<i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '<span style="color:var(--text-light);">без поставщика</span>') +
+            _compPackHint(c) +
           '</div>' +
         '</div>' +
         '<div class="comp-row-qty ' + (zeroStock ? 'zero' : (lowStock ? 'low' : '')) + '">' +
@@ -12351,6 +12370,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.622',
+    date: '02.07.2026',
+    title: 'Склад: раскрытие упаковок в штуки',
+    features: [
+      'У комплектующих с фасовкой на складе теперь видно <b>«фасовка 100 шт/упак»</b> и раскрытие остатка — например <b>«300 шт = 3 упак»</b>',
+      'Понятно, что склад считает в штуках, а не в упаковках',
+    ],
+  },
   {
     version: 'v2.45.621',
     date: '02.07.2026',
