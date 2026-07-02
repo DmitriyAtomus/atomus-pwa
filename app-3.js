@@ -8792,6 +8792,117 @@ function _ibxSecTitle(emoji, title, count) {
   return '<div class="ibx-sec"><span class="em">' + emoji + '</span> ' + escapeHtml(title) + ' <span class="cnt">' + count + '</span></div>';
 }
 
+// v2.45.623: окно счёта из «Входящих» — расшифровка (реквизиты + суммы с НДС +
+// позиции) и предпросмотр файла, как в карточке заказа на «На оплату».
+async function openInboxInvoice(inboxId) {
+  let m = (cache.supplyInbox || []).find(x => x.id === inboxId);
+  if (!m || !('ai_data' in m)) {
+    try { const list = await apiGet('/api/supply-inbox?status=all'); cache.supplyInbox = list.items || []; m = cache.supplyInbox.find(x => x.id === inboxId); } catch (_) {}
+  }
+  if (!m) { showToast('Счёт не найден', 'error'); return; }
+  const ai = m.ai_data || {}, doc = ai.document || {}, tot = ai.totals || {}, sup = ai.supplier || {};
+  const items = Array.isArray(ai.items) ? ai.items : [];
+  const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
+  const atts = m.attachments || [];
+  const att = atts[di >= 0 ? di : 0] || {};
+  const fname = att.name || '';
+  const _f2 = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+  const num = String(doc.number || '').trim(), dt = String(doc.date || '').trim();
+  const withV = (tot.sum_with_vat != null) ? Number(tot.sum_with_vat) : null;
+  const woV = (tot.sum_without_vat != null) ? Number(tot.sum_without_vat) : null;
+  const vat = (tot.vat_sum != null) ? Number(tot.vat_sum) : null;
+  const chip = (label, cp) => '<span onclick="_copyTxt(' + JSON.stringify(String(cp)).replace(/"/g, '&quot;') + ')" title="Нажми — скопируется" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:4px 10px;font-size:12.5px;">' + label + ' <i class="ti ti-copy" style="color:var(--text-light);font-size:13px;"></i></span>';
+  const info = (t, bg, fg, bd) => '<span style="display:inline-flex;align-items:center;gap:5px;background:' + bg + ';border:1px solid ' + bd + ';color:' + fg + ';border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;">' + t + '</span>';
+  let chips = payerEntityPill(ai.payer_entity, true);
+  if (num) chips += chip('№ ' + escapeHtml(num), num);
+  if (dt) chips += chip(escapeHtml(dt), dt);
+  if (withV != null) chips += chip('<b>' + _f2(withV) + ' ₽</b>', String(withV));
+  if (vat != null && vat > 0) chips += info('в т.ч. НДС ' + _f2(vat) + ' ₽', '#ECFDF5', '#065F46', '#6EE7B7') + (woV != null ? info('без НДС ' + _f2(woV) + ' ₽', 'var(--bg)', 'var(--text-mid)', 'var(--border)') : '');
+  else if (vat === 0) chips += info('без НДС', 'var(--bg)', 'var(--text-mid)', 'var(--border)');
+  if (sup.name) chips += chip(escapeHtml(sup.name), sup.name);
+  let posHtml;
+  if (items.length) {
+    posHtml = '<div style="margin-top:12px;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;margin-bottom:6px;">Позиции из счёта (' + items.length + ')</div>';
+    items.forEach((it, i) => {
+      const nm = escapeHtml(it.name || it.name_raw || '—');
+      const q = (it.qty != null) ? _fmtQty(it.qty) : '';
+      const u = escapeHtml(it.unit || '');
+      const pr = (it.price != null) ? _f2(it.price) + ' ₽' : '';
+      const s = (it.sum_with_vat != null ? it.sum_with_vat : it.sum_without_vat);
+      const sTxt = (s != null) ? _f2(s) + ' ₽' : '';
+      posHtml += '<div style="display:flex;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:13px;align-items:baseline;">' +
+        '<div style="flex:1;min-width:0;">' + (i + 1) + '. ' + nm + (pr ? ' <span style="color:var(--text-light);font-size:11.5px;">· ' + pr + '</span>' : '') + '</div>' +
+        (q ? '<div style="white-space:nowrap;color:#2563EB;font-weight:700;">' + q + ' ' + u + '</div>' : '') +
+        (sTxt ? '<div style="white-space:nowrap;font-weight:600;min-width:78px;text-align:right;">' + sTxt + '</div>' : '') +
+      '</div>';
+    });
+    posHtml += '</div>';
+  } else {
+    posHtml = '<div style="margin-top:12px;color:var(--text-light);font-size:13px;font-style:italic;">Позиции не распознаны — смотри файл ниже.</div>';
+  }
+  const overlayId = 'inbox-invoice-modal';
+  let ov = document.getElementById(overlayId); if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = overlayId; ov.className = 'modal-overlay';
+  const dlName = String(fname || 'счёт').replace(/'/g, "\\'");
+  ov.innerHTML =
+    '<div class="modal" style="max-width:820px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h2><i class="ti ti-receipt"></i> Счёт' + (num ? ' № ' + escapeHtml(num) : '') + '</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' + chips + '</div>' +
+        posHtml +
+        '<div style="margin-top:14px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;">Предпросмотр</div>' +
+        '<div id="inbox-inv-preview" style="margin-top:6px;"><div style="padding:14px;color:var(--text-light);text-align:center;">Загружаем файл…</div></div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+        (m.matched_order_id
+          ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + m.matched_order_id + ')"><i class="ti ti-package"></i> Открыть заказ</button>'
+          : '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>' +
+            '<button class="btn" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>') +
+        '<button class="btn btn-secondary" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + (di >= 0 ? di : 0) + ',\'' + escapeHtml(dlName) + '\')"><i class="ti ti-download"></i> Скачать</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.classList.add('visible');
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+  _loadInboxInvPreview(m.id, di >= 0 ? di : 0, fname);
+}
+
+async function _loadInboxInvPreview(inboxId, idx, filename) {
+  const cont = document.getElementById('inbox-inv-preview');
+  if (!cont) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/download', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { cont.innerHTML = '<div style="padding:14px;color:var(--danger);font-size:13px;">Не удалось загрузить файл (HTTP ' + r.status + '). Попробуй «Скачать».</div>'; return; }
+    const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const fn = (filename || '').toLowerCase();
+    const ctKnown = ct && ct !== 'application/octet-stream';
+    const isImg = ct.startsWith('image/') || (!ctKnown && /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/.test(fn));
+    const isPdf = !isImg && (ct.includes('pdf') || (!ctKnown && fn.endsWith('.pdf')));
+    if (isImg) {
+      cont.innerHTML = '<img src="' + url + '" alt="Счёт" style="max-width:100%;max-height:70vh;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;" />';
+    } else if (isPdf) {
+      if (state && state.isDesktop) {
+        cont.innerHTML = '<iframe src="' + url + '#view=FitH" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
+      } else {
+        cont.innerHTML = '<div style="padding:16px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;">' +
+          '<i class="ti ti-file-type-pdf" style="font-size:40px;color:#C0392B;"></i>' +
+          '<div style="margin:8px 0;font-size:13px;word-break:break-word;">' + escapeHtml(filename || 'счёт.pdf') + '</div>' +
+          '<button class="btn btn-primary" onclick="window.open(\'' + url + '\',\'_blank\')"><i class="ti ti-external-link"></i> Открыть PDF</button></div>';
+      }
+    } else {
+      cont.innerHTML = '<div style="padding:14px;background:var(--bg);border-radius:8px;color:var(--text-mid);font-size:13px;">Этот формат не показывается в браузере (например, Excel). Нажми «Скачать».</div>';
+    }
+  } catch (e) {
+    cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Ошибка загрузки файла.</div>';
+  }
+}
+
 function _ibxInvoiceCard(m, isMatched) {
   const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
   const atts = m.attachments || [];
@@ -8815,7 +8926,8 @@ function _ibxInvoiceCard(m, isMatched) {
       '<div class="ibx-att-ic"><span class="em">📄</span></div>' +
       '<div class="ibx-att-name" title="' + nm + '">' + nm + '</div>' +
       '<div class="ibx-att-size">' + kb + ' КБ</div>' +
-      '<button class="btn btn-sm" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + di + ',null)"><span class="em">👁</span> Открыть</button>' +
+      // v2.45.623: «Открыть» — окно счёта с расшифровкой + предпросмотром (как на «На оплату»)
+      '<button class="btn btn-sm" onclick="openInboxInvoice(' + m.id + ')"><span class="em">👁</span> Открыть</button>' +
     '</div>';
   } else if (isMatched && atts.length) {
     attBlock = '<div class="ibx-att-mini"><span class="em">📎</span> ' + atts.length + ' вложени' + (atts.length > 1 ? 'й' : 'е') + '</div>';
@@ -12370,6 +12482,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.623',
+    date: '02.07.2026',
+    title: 'Входящие счета: «Открыть» с расшифровкой и предпросмотром',
+    features: [
+      'Кнопка <b>«Открыть»</b> у входящего счёта теперь открывает окно как на «На оплату»: <b>реквизиты</b> (№, дата, поставщик), <b>суммы с НДС/без НДС</b> и <b>позиции из счёта</b>',
+      'Тут же — <b>предпросмотр</b> самого файла (PDF или фото), не нужно скачивать',
+      'Кнопки «Привязать к заказу» / «На оплату» / «Скачать» — прямо в окне',
+    ],
+  },
   {
     version: 'v2.45.622',
     date: '02.07.2026',
