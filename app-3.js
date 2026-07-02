@@ -5692,8 +5692,10 @@ function _componentToTracking(it, group) {
     supplier_phone: group ? group.supplier_phone : '',
     supplier_contact: group ? group.supplier_contact : '',
     _is_component: true,
+    component_id: it.component_id || null,
     order_id: it.order_id || null,
     order_item_id: it.order_item_id || null,
+    order_item_received: it.order_item_received || 0,
     order_expected: it.order_expected || null,
     order_place: it.order_place || null,
     order_label_short: it.order_label,
@@ -5822,10 +5824,26 @@ function _cpTrackingRowHtml(it) {
   }
   // Кнопка «получено» — товар пришёл, закрываем позицию заказа (для уже
   // отправленных/оплаченных, не черновик). Закрытый заказ уходит из «Ждём поставку».
+  // Если позиция уже отмечена полученной (received_qty >= qty) — вместо кнопки
+  // зелёный чип «Пришло» + «Приход на склад» (пока не оприходовано, остаток
+  // низкий, и позиция остаётся в «Что закупить»).
   let receivedBtn = '';
-  if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
+  const _itemReceived = it._is_component && it.order_item_id &&
+    parseFloat(it.order_item_received || 0) >= parseFloat(it.qty || 0) && parseFloat(it.qty || 0) > 0;
+  if (_itemReceived) {
+    receivedBtn = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;' +
+      'color:#047857;background:#D1FAE5;padding:3px 10px;border-radius:999px;white-space:nowrap;">' +
+      '<i class="ti ti-circle-check-filled"></i> Пришло</span>' +
+      (it.component_id
+        ? '<button type="button" onclick="openComponentReceiveModal(' + it.component_id + ')" ' +
+          'title="Оприходовать на склад — остаток поднимется и позиция уйдёт из списка" ' +
+          'style="display:inline-flex;align-items:center;gap:4px;background:#047857;border:none;color:#fff;border-radius:8px;' +
+          'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+          '<i class="ti ti-package-import"></i> Приход на склад</button>'
+        : '');
+  } else if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
     receivedBtn = '<button type="button" onclick="shopMarkReceived(' + it.order_item_id +
-      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\', ' + (it.component_id || 'null') + ')" ' +
       'title="Товар пришёл — нажмите, чтобы отметить позицию полученной (заказ закроется)" ' +
       'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #34D399;color:#047857;border-radius:8px;' +
       'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
@@ -5841,7 +5859,7 @@ function _cpTrackingRowHtml(it) {
       receivedBtn +
       returnBtn +
     '</div>' +
-    _supDeliveryStepperHtml(it.order_status) +
+    _supDeliveryStepperHtml(_itemReceived ? 'received' : it.order_status) +
   '</div>';
 }
 
@@ -5931,9 +5949,9 @@ async function saveEta(orderId, clear) {
 }
 
 // v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
-async function shopMarkReceived(orderItemId, name) {
+async function shopMarkReceived(orderItemId, name, componentId) {
   if (!orderItemId) return;
-  if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nЗаказ закроется (статус «получен»), позиция уйдёт из «Ждём поставку».')) return;
+  if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nПозиция заказа закроется, дальше сразу откроется «Приход на склад» — оприходуй, чтобы остаток поднялся и позиция ушла из «Что закупить».')) return;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders/items/' + orderItemId + '/received', {
@@ -5948,6 +5966,11 @@ async function shopMarkReceived(orderItemId, name) {
     showToast('Отмечено полученным', 'success');
     if (typeof cache !== 'undefined') { cache.supplyOrders = null; cache.supplyRequests = null; }
     if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+    // Сразу предлагаем оприходовать: без прихода остаток не поднимется и
+    // позиция так и будет висеть в «Что закупить» (низкий остаток).
+    if (componentId && typeof openComponentReceiveModal === 'function') {
+      openComponentReceiveModal(componentId);
+    }
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
