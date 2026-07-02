@@ -3786,12 +3786,12 @@ function renderModels(d) {
             '<span class="models-subgroup-count">' + withoutSubgroup.length + '</span>' +
           '</button>' +
           '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">' +
-            '<div class="card">';
+            '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         withoutSubgroup.forEach(m => { html += _renderModelRow(m); });
         html += '</div></div></div>';
       } else {
         // Если нет подгрупп — рендерим как обычно одной картой
-        html += '<div class="card">';
+        html += '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         withoutSubgroup.forEach(m => { html += _renderModelRow(m); });
         html += '</div>';
       }
@@ -3858,7 +3858,7 @@ function renderModels(d) {
         '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
       // Без категории — карточкой как раньше
       if (noCat.length) {
-        html += '<div class="card">';
+        html += '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         noCat.forEach(m => { html += _renderModelRow(m); });
         html += '</div>';
       }
@@ -3888,7 +3888,7 @@ function renderModels(d) {
             renameBtn +
           '</div>' +
           '<div class="models-subgroup-body" data-subkey="' + catKey + '" style="' + (catOpen ? '' : 'display:none;') + '">' +
-            '<div class="card">';
+            '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         cat.items.forEach(m => { html += _renderModelRow(m); });
         html += '</div></div></div>';
       });
@@ -3909,38 +3909,73 @@ function _highlightAisi(text) {
     .replace(/(Нерж\.?(?:\s*AISI)?)/gi, m => '<span class="lbl-aisi">' + m + '</span>');
 }
 
+// v2.45.x: шапка-легенда колонок наличия — печатается один раз на карточку
+// (подгруппу/категорию), чтобы цифры в строках читались как таблица.
+function _modelRowsHeaderHtml() {
+  return '<div class="nvt-head">' +
+    '<div>Позиция</div>' +
+    '<div class="nvt-num" title="Готовых сборок на складе">Готово</div>' +
+    '<div class="nvt-num" title="Зарезервировано под договоры">Резерв</div>' +
+    '<div class="nvt-num" title="Комплектующих в дефиците / можно собирать">К закупке</div>' +
+    '<div></div>' +
+  '</div>';
+}
+
 function _renderModelRow(m) {
-  const title = m.name + (m.extra ? ' · ' + m.extra : '');
   const isAisi = ((m.name || '').toUpperCase().includes('AISI')) ||
                  ((m.exec_fixed || '').toLowerCase().startsWith('нерж'));
-  const meta = [];
-  if (m.article) meta.push(m.article);
-  if (m.exec_mode === 'choice') meta.push('испол.: ' + m.exec_label_st + ' / ' + m.exec_label_ne);
-  else if (m.exec_mode === 'fixed' && m.exec_fixed) meta.push('испол.: ' + m.exec_fixed);
-  if (m.needs_ip) meta.push('IP');
-  const inactiveCls = m.is_active ? '' : ' emp-inactive';
-  const aisiRowCls = isAisi ? ' model-row-aisi' : '';
-  let stockBadges = '';
-  if (typeof m.assemblies_ready === 'number') {
-    if (m.assemblies_ready > 0) {
-      stockBadges += '<span class="model-badge mb-stock" title="Готовых сборок на складе"><i class="ti ti-package"></i>В наличии: ' + m.assemblies_ready + '</span>';
-    }
-    if (m.assemblies_reserved > 0) {
-      stockBadges += '<span class="model-badge mb-reserved" title="Зарезервировано под договоры"><i class="ti ti-lock"></i>Резерв: ' + m.assemblies_reserved + '</span>';
-    }
-    if (m.bom_shortage > 0) {
-      stockBadges += '<span class="model-badge mb-shortage" title="Комплектующих в дефиците для сборки"><i class="ti ti-shopping-cart"></i>К закупке: ' + m.bom_shortage + '</span>';
-    } else if (m.bom_total > 0 && m.assemblies_ready === 0) {
-      stockBadges += '<span class="model-badge mb-ready" title="Все комплектующие в наличии — можно собирать"><i class="ti ti-tool"></i>К сборке</span>';
-    }
+  // Название без «шумных» повторов AISI — вместо них один тег «НЕРЖ · AISI».
+  let title = m.name + (m.extra ? ' · ' + m.extra : '');
+  if (isAisi) {
+    title = title.replace(/\s*\bAISI\b\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
   }
-  return '<div class="employee-row' + inactiveCls + aisiRowCls + '" style="cursor:pointer;" onclick="openModelDetail(' + m.id + ')">' +
-    '<div class="emp-info"><div class="emp-name">' + _highlightAisi(title) + '</div>' +
-    '<div class="emp-meta">' + _highlightAisi(meta.join(' · ') || '—') +
-      (stockBadges ? '<div class="model-badges-row">' + stockBadges + '</div>' : '') +
-    '</div></div>' +
-    '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
-    '</div>';
+  const tag = isAisi ? ' <span class="nvt-tag-nerzh">НЕРЖ · AISI</span>' : '';
+  // Мета: артикул моноширинным + исполнение (если оно не «нерж», уже показанное тегом) + IP
+  const metaBits = [];
+  if (m.article) metaBits.push('<span class="nvt-art-code">' + escapeHtml(m.article) + '</span>');
+  if (m.exec_mode === 'choice') metaBits.push('испол.: ' + escapeHtml((m.exec_label_st || '') + ' / ' + (m.exec_label_ne || '')));
+  else if (m.exec_mode === 'fixed' && m.exec_fixed && !isAisi) metaBits.push('испол.: ' + escapeHtml(m.exec_fixed));
+  if (m.needs_ip) metaBits.push('<span class="nvt-ip">IP</span>');
+  const inactiveCls = m.is_active ? '' : ' emp-inactive';
+
+  // Колонки наличия. Если склад не считался (нет with_stock) — прочерки.
+  const hasStock = (typeof m.assemblies_ready === 'number');
+  const ready = hasStock ? (m.assemblies_ready || 0) : null;
+  const reserved = hasStock ? (m.assemblies_reserved || 0) : null;
+  const shortage = hasStock ? (m.bom_shortage || 0) : null;
+  const canBuild = hasStock && shortage === 0 && (m.bom_total || 0) > 0 && ready === 0;
+
+  const dash = '<span class="nvt-z">—</span>';
+  const colReady = (ready && ready > 0) ? '<span class="nvt-v nvt-ok">' + ready + '</span>' : dash;
+  const colReserved = (reserved && reserved > 0) ? '<span class="nvt-v nvt-res">' + reserved + '</span>' : dash;
+  let colAction;
+  if (shortage && shortage > 0) {
+    colAction = '<span class="nvt-v nvt-buy" title="Комплектующих в дефиците для сборки">' + shortage + '</span>';
+  } else if (canBuild) {
+    colAction = '<span class="nvt-pill-build" title="Все комплектующие в наличии — можно собирать"><i class="ti ti-tool"></i>к сборке</span>';
+  } else {
+    colAction = dash;
+  }
+
+  // Цветовая полоска-статус слева: 🔴 нет готовых и нужна закупка · 🟢 есть готовые ·
+  // 🟡 можно собирать · ⬜ пусто/не считалось.
+  let stCls = 'nvt-st-none';
+  if (hasStock) {
+    if (ready > 0) stCls = 'nvt-st-ok';
+    else if (shortage > 0) stCls = 'nvt-st-buy';
+    else if (canBuild) stCls = 'nvt-st-build';
+  }
+
+  return '<div class="nvt-row ' + stCls + inactiveCls + '" onclick="openModelDetail(' + m.id + ')">' +
+    '<div class="nvt-main">' +
+      '<div class="nvt-name">' + escapeHtml(title) + tag + '</div>' +
+      (metaBits.length ? '<div class="nvt-art">' + metaBits.join(' <span class="nvt-dot">·</span> ') + '</div>' : '') +
+    '</div>' +
+    '<div class="nvt-num">' + colReady + '</div>' +
+    '<div class="nvt-num">' + colReserved + '</div>' +
+    '<div class="nvt-num">' + colAction + '</div>' +
+    '<div class="nvt-chev"><i class="ti ti-chevron-right"></i></div>' +
+  '</div>';
 }
 
 // ============ ЭТАП 32: Карточка модели с тех. картой ============
