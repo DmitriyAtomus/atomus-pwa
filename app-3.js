@@ -321,33 +321,64 @@ function renderComponentsCatalogList() {
   catNames.forEach(cat => {
     const items = groups[cat];
     const isOpen = allOpen ? true : !!state.ccListOpenCats[cat];
+    // Сводка категории: сколько позиций «к закупке» (ниже минимума) и с браком —
+    // видно проблемные категории, не раскрывая их.
+    let gBuy = 0, gDef = 0;
+    items.forEach(c => {
+      const stq = parseFloat(c.qty_on_stock || 0), mn = parseFloat(c.min_stock || 0);
+      if (mn > 0 && stq < mn) gBuy++;
+      if (parseFloat(c.qty_defective || 0) > 0) gDef++;
+    });
+    const gChips =
+      (gBuy ? '<span class="cct-gchip buy">к закупке: ' + gBuy + '</span>' : '') +
+      (gDef ? '<span class="cct-gchip def">брак: ' + gDef + '</span>' : '');
     html += '<div class="comp-group">' +
       '<button type="button" class="comp-group-toggle' + (isOpen ? ' open' : '') + '" ' +
         'onclick="toggleCatalogGroup(\'' + cat.replace(/'/g, "\\'") + '\')">' +
         '<i class="ti ti-chevron-right comp-group-chev"></i>' +
         '<span>' + escapeHtml(cat) + '</span>' +
         '<span class="comp-group-count">' + items.length + '</span>' +
+        (gChips ? '<span class="cct-gchips">' + gChips + '</span>' : '') +
       '</button>' +
       '<div class="comp-group-body"' + (isOpen ? '' : ' style="display:none;"') + '>' +
-        '<div class="comp-table">';
+        '<div class="cct-card">' +
+          '<div class="cct-head">' +
+            '<div>Позиция</div>' +
+            '<div class="cct-c">На складе</div>' +
+            '<div class="cct-c cct-hide-m" title="Минимальный запас">Мин.</div>' +
+            '<div class="cct-c">Статус</div>' +
+            '<div class="cct-c">Брак</div>' +
+            '<div></div>' +
+          '</div>';
     items.forEach(c => {
+      const stq = parseFloat(c.qty_on_stock || 0);
+      const mn = parseFloat(c.min_stock || 0);
       const defectQty = parseFloat(c.qty_defective || 0);
-      const defectBadge = defectQty > 0
-        ? ' <span class="comp-defect-badge" title="В браке — нажми чтобы посмотреть"><i class="ti ti-alert-triangle"></i>брак ' + _fmtQty(defectQty) + '</span>'
-        : '';
-      html += '<div class="comp-row" style="grid-template-columns: 1fr auto auto;cursor:pointer;" onclick="openComponentForm(' + c.id + ')">' +
-        '<div class="comp-row-main">' +
-          '<div class="comp-name">' + escapeHtml(c.name || '—') +
-            (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
+      const low = mn > 0 && stq < mn;
+      // Полоска-статус: 🟥 ниже минимума → 🟨 есть брак → 🟩 есть остаток → ⬜ пусто
+      const stCls = low ? 'cct-st-buy' : (defectQty > 0 ? 'cct-st-def' : (stq > 0 ? 'cct-st-ok' : 'cct-st-zero'));
+      // Колонка «Статус»: к закупке N / брак N / ✓ ок / —
+      let pills = '';
+      if (low) pills += '<span class="cct-pill buy" title="Докупить до минимума"><i class="ti ti-shopping-cart"></i>к закупке ' + _fmtQty(mn - stq) + '</span>';
+      if (defectQty > 0) pills += '<span class="cct-pill def" title="В браке"><i class="ti ti-alert-triangle"></i>брак ' + _fmtQty(defectQty) + '</span>';
+      if (!pills) pills = stq > 0 ? '<span class="cct-pill ok"><i class="ti ti-check"></i>ок</span>' : '<span class="cct-z">—</span>';
+      const vCls = stq <= 0 ? ' zero' : (low ? ' low' : '');
+      html += '<div class="cct-row ' + stCls + '" onclick="openComponentForm(' + c.id + ')">' +
+        '<div class="cct-main">' +
+          '<div class="cct-name">' + escapeHtml(c.name || '—') +
+            (c.sku ? '<span class="cct-sku">' + escapeHtml(c.sku) + '</span>' : '') +
           '</div>' +
-          '<div class="comp-meta">' +
-            'на складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
-            defectBadge +
-            (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
-          '</div>' +
+          (c.default_supplier_name
+            ? '<div class="cct-sup"><i class="ti ti-truck"></i> ' + escapeHtml(c.default_supplier_name) + '</div>'
+            : '') +
         '</div>' +
-        '<button class="comp-defect-btn" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (parseFloat(c.qty_on_stock) || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-bandage"></i><span>Брак</span></button>' +
-        '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
+        '<div class="cct-c cct-stock"><span class="cct-v' + vCls + '">' + _fmtQty(stq) + '</span><span class="cct-u">' + escapeHtml(c.unit || 'шт.') + '</span></div>' +
+        '<div class="cct-c cct-min cct-hide-m">' + (mn > 0 ? _fmtQty(mn) : '—') + '</div>' +
+        '<div class="cct-c cct-status">' + pills + '</div>' +
+        '<div class="cct-c">' +
+          '<button class="cct-brak" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (stq || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-bandage"></i></button>' +
+        '</div>' +
+        '<div class="cct-chev"><i class="ti ti-chevron-right"></i></div>' +
       '</div>';
     });
     html += '</div></div></div>';
