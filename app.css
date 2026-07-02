@@ -825,6 +825,7 @@
   .kpi-card.kpi-amber  { --kpi-accent: #D97706; --kpi-bg: linear-gradient(135deg, #F59E0B, #D97706); --kpi-bg-soft: #FEF3E2; }
   .kpi-card.kpi-green  { --kpi-accent: #16A34A; --kpi-bg: linear-gradient(135deg, #22C55E, #16A34A); --kpi-bg-soft: #E8F5E9; }
   .kpi-card.kpi-violet { --kpi-accent: #7E22CE; --kpi-bg: linear-gradient(135deg, #A855F7, #7E22CE); --kpi-bg-soft: #F3E8FF; }
+  .kpi-card.kpi-red    { --kpi-accent: #DC2626; --kpi-bg: linear-gradient(135deg, #EF4444, #DC2626); --kpi-bg-soft: #FEE2E2; }
   /* v2.45.173: объёмные (3D) иконки KPI — блик сверху, тень-«подъём» в цвет,
      лёгкая внутренняя тень снизу (как у быстрых действий). */
   .kpi-card .kpi-icon {
@@ -19708,3 +19709,55 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 #sc-content .ct2-term-sub.hot { color: var(--warning, #92400E); font-weight: 700; }
 
 @media (max-width: 900px) { #sc-content .ct2-prog { display: none; } }
+
+/* ====== Главная (Обзор): пульс, внимание, воронка-полоса, 2 колонки (v2.45.631) ====== */
+.app.desktop-layout .home-cols {
+  display: grid; grid-template-columns: 1.55fr 1fr; gap: 0 18px; align-items: start;
+}
+.home-att-list { display: flex; flex-direction: column; gap: 7px; }
+.home-att-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px; cursor: pointer; font-size: 13px;
+  border: 1px solid var(--border); background: #fff; transition: filter .12s;
+}
+.home-att-row:hover { filter: brightness(.98); }
+.home-att-row.sev-danger, .home-att-row.sev-critical { background: #FEF2F2; border-color: #FECACA; }
+.home-att-row.sev-warning { background: #FFFBEB; border-color: #FDE68A; }
+.home-att-ic {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; border: 1px solid var(--border); font-size: 14px;
+}
+.home-att-row.sev-danger .home-att-ic, .home-att-row.sev-critical .home-att-ic { color: #B91C1C; }
+.home-att-row.sev-warning .home-att-ic { color: #92400E; }
+.home-att-t { color: var(--text-mid); line-height: 1.35; min-width: 0; }
+.home-att-t b { color: var(--text-dark); }
+.home-att-meta { color: var(--text-light); }
+.home-att-go { margin-left: auto; color: var(--brand); font-weight: 700; font-size: 12px; white-space: nowrap; }
+
+.home-fun-bar { display: flex; height: 34px; border-radius: 10px; overflow: hidden; margin-bottom: 9px; }
+.home-fun-seg {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 12.5px; font-weight: 800; color: #fff; min-width: 34px; cursor: pointer;
+  transition: filter .12s;
+}
+.home-fun-seg:hover { filter: brightness(1.08); }
+.home-fun-seg small { font-weight: 600; opacity: .85; font-size: 10px; }
+.home-fun-seg + .home-fun-seg { border-left: 2px solid #fff; }
+.home-fun-legend { display: flex; gap: 13px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-light); }
+.home-fun-legend i { font-style: normal; display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 4px; }
+@media (max-width: 620px) { .home-fun-seg small { display: none; } }
+
+.home-top-row2 { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-top: 1px dashed var(--border); }
+.home-top-row2:first-child { border-top: none; }
+.home-top-medal { width: 24px; text-align: center; font-size: 15px; flex-shrink: 0; }
+.home-top-name2 { font-size: 12.5px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-top-bar { flex: 1.1; height: 6px; border-radius: 3px; background: #EDF1F7; overflow: hidden; }
+.home-top-bar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
+.home-top-hrs { font-size: 11px; font-weight: 700; color: var(--text-mid); white-space: nowrap; }
+
+.home-tasks-compact {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 13px; font-size: 13px; color: var(--text-mid); cursor: pointer;
+}

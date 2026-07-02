@@ -884,44 +884,49 @@ function renderHomeSkeleton() {
   html += '</div>';
 
   // v2.43.98: KPI «Сегодня» — sticky-обёртка, цифры всегда перед глазами при скролле
+  // v2.45.631: блок стал «Пульсом» — деньги в работе / просрочка / производство / КП
   html += '<div class="home-kpi-sticky">';
-  html += '<div class="home-kpi-title"><i class="ti ti-calendar-stats"></i>Сегодня</div>';
+  html += '<div class="home-kpi-title"><i class="ti ti-activity-heartbeat"></i>Пульс дня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
   html += '</div>';
 
   // v2.45.31: виджет «Калькулятор холода» переехал в левый сайдбар (пункт «Калькулятор холода»)
   // на главной больше не показываем.
 
-  // v2.43.98: Воронка производства — пять стадий с цифрами
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-stairs-up"></i>Воронка производства</div>';
-  html += '<div id="home-funnel-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
   // v2.43.98: Алерты (только директор/мастер/зам)
+  // v2.45.631: «Требует внимания» — выше воронки, конкретика вместо счётчиков
   const _hasManage = (typeof hasPermission === 'function') && hasPermission('production.manage');
   if (_hasManage) {
-    html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-alert-triangle"></i>Алерты</div>';
+    html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-alert-triangle"></i>Требует внимания сегодня</div>';
     html += '<div id="home-alerts-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   }
 
-  // v2.43.98: ТОП сборщиков за неделю
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-trophy"></i>ТОП сборщиков за неделю</div>';
-  html += '<div id="home-top-assemblers-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // v2.43.98: Воронка производства — v2.45.631: одна пропорциональная полоса
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-stairs-up"></i>Воронка производства</div>';
+  html += '<div id="home-funnel-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
-  // ЭТАП 16В: «Мои задачи»
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-checklist"></i>Мои задачи</div>';
-  html += '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
-  // ЭТАП 16Г: «Ближайшие отгрузки»
-  html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 16px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
-  html += '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
+  // v2.45.631: двухколоночная сетка на десктопе — слева поток работы, справа лента
+  html += '<div class="home-cols">';
+  html +=   '<div class="home-col">';
   // ЭТАП 31.4: «Договоры в работе» — переехало сюда с главной Производства
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-briefcase"></i>Договоры в работе</div>';
-  html += '<div id="home-contracts-progress-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-briefcase"></i>Договоры в работе</div>';
+  html +=     '<div id="home-contracts-progress-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // ЭТАП 16В: «Мои задачи»
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-checklist"></i>Мои задачи</div>';
+  html +=     '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  html +=   '</div>';
+  html +=   '<div class="home-col">';
+  // ЭТАП 16Г: «Ближайшие отгрузки»
+  html +=     '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 16px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
+  html +=     '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // v2.43.98: ТОП сборщиков за неделю
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-trophy"></i>Топ сборщиков за неделю</div>';
+  html +=     '<div id="home-top-assemblers-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   // Курс валют placeholder
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
-  html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
+  html +=     '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
+  html +=   '</div>';
+  html += '</div>';
 
   // ЭТАП 16Г: «Последние действия» — только для директора (v2.8.2)
   const _isDirector = state.user && (state.user.roles || []).includes('director');
@@ -1309,31 +1314,58 @@ function renderHomeKpi() {
   if (!el) return;
   const data = (cache.homeKpi && cache.homeKpi.kpi) || {};
   const tiles = [];
+  // v2.45.631: «Пульс» — деньги и просрочка из договоров с прогрессом
+  // (contracts-with-progress грузится параллельно; когда придёт — перерисуемся).
+  const cwp = cache.contractsWithProgress || null;
+  const money = (typeof canSeeMoney === 'function') && canSeeMoney();
+  let workSum = 0, overN = 0, overSum = 0, worstOver = 0;
+  if (cwp && cwp.length) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    cwp.forEach(c => {
+      workSum += parseFloat(c.sum_amount || 0);
+      if (c.delivery_date && c.status !== 'shipped' && c.status !== 'closed') {
+        const dd = Math.round((new Date(c.delivery_date + 'T00:00:00') - today) / 86400000);
+        if (dd < 0) { overN++; overSum += parseFloat(c.sum_amount || 0); worstOver = Math.max(worstOver, -dd); }
+      }
+    });
+  }
   if ('contracts_active' in data) {
     tiles.push({
-      label: 'договоров', value: data.contracts_active, trend: 'в производстве',
-      icon: 'ti-file-text', color: 'blue',
+      label: money && cwp ? 'деньги в работе' : 'договоров',
+      value: money && cwp ? formatMoneyShort(workSum) : data.contracts_active,
+      trend: (data.contracts_active || 0) + ' ' + plural(data.contracts_active || 0, 'договор', 'договора', 'договоров') + ' в производстве',
+      icon: 'ti-cash', color: 'blue',
       action: () => goToSection('sales', 'sales-contracts')
     });
-  }
-  if ('offers_active' in data) {
-    tiles.push({
-      label: 'КП в работе', value: data.offers_active, trend: 'черновики и отправленные',
-      icon: 'ti-file-invoice', color: 'amber',
-      action: () => goToSection('sales', 'sales-offers')
-    });
+    // Просрочка — красная плитка (или спокойная зелёная, если чисто)
+    if (cwp) {
+      tiles.push(overN > 0 ? {
+        label: 'просрочено',
+        value: money ? formatMoneyShort(overSum) : overN,
+        trend: overN + ' ' + plural(overN, 'договор', 'договора', 'договоров') + ' · худший −' + worstOver + ' дн',
+        icon: 'ti-alert-triangle', color: 'red',
+        action: () => goToSection('sales', 'sales-contracts')
+      } : {
+        label: 'просрочка', value: '0', trend: 'все договоры в графике ✓',
+        icon: 'ti-circle-check', color: 'green',
+      });
+    }
   }
   if ('assemblies_today' in data) {
+    // v2.45.631: + очередь производства из воронки (если уже загрузилась)
+    const _fq = ((cache.homeExtras && cache.homeExtras.funnel) || []).find(s => s.status === 'queue');
     tiles.push({
-      label: 'сборок сегодня', value: data.assemblies_today, trend: 'шт.',
+      label: 'производство', value: data.assemblies_today, trend: 'сборок сегодня' + (_fq ? ' · очередь ' + (_fq.count || 0) : ''),
       icon: 'ti-tool', color: 'green',
       action: () => goToSection('production', 'history')
     });
   }
-  if ('offers_accepted_month_sum' in data) {
+  if ('offers_active' in data) {
     tiles.push({
-      label: 'принято КП', value: formatMoneyShort(data.offers_accepted_month_sum), trend: 'за месяц',
-      icon: 'ti-coin', color: 'violet'
+      label: 'КП в работе', value: data.offers_active,
+      trend: ('offers_accepted_month_sum' in data) ? ('принято за месяц: ' + formatMoneyShort(data.offers_accepted_month_sum)) : 'черновики и отправленные',
+      icon: 'ti-file-invoice', color: 'amber',
+      action: () => goToSection('sales', 'sales-offers')
     });
   }
   if (!tiles.length) {
@@ -1372,6 +1404,8 @@ async function loadHomeDashboardExtras() {
     renderHomeFunnel();
     renderHomeAlerts();
     renderHomeTopAssemblers();
+    // v2.45.631: плитка «производство» в Пульсе показывает очередь из воронки
+    if (cache.homeKpi) renderHomeKpi();
   } catch (e) {
     const f = document.getElementById('home-funnel-block');
     if (f) f.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить воронку</div>';
@@ -1390,15 +1424,25 @@ function renderHomeFunnel() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>Пока нет активных работ</div>';
     return;
   }
-  let html = '<div class="home-funnel">';
+  // v2.45.631: одна цветная полоса — ширина сегмента пропорциональна количеству.
+  // Нулевые стадии остаются узкими метками, чтобы воронка читалась целиком.
+  const colors = { queue: '#94A3B8', in_progress: '#2D5F8B', review: '#F59E0B', packing: '#8B5CF6', done: '#10B981' };
+  let bar = '<div class="home-fun-bar">';
   stages.forEach(s => {
-    html += '<div class="home-funnel-stage" data-st="' + escapeText(s.status) + '" onclick="homeFunnelClick(\'' + escapeText(s.status) + '\')">' +
-      '<div class="stage-label">' + escapeText(s.label) + '</div>' +
-      '<div class="stage-count">' + escapeText(String(s.count || 0)) + '</div>' +
-      '</div>';
+    const n = s.count || 0;
+    const flex = Math.max(n, 0.55);
+    bar += '<div class="home-fun-seg" style="flex:' + flex + ';background:' + (colors[s.status] || '#94A3B8') + ';" ' +
+      'onclick="homeFunnelClick(\'' + escapeText(s.status) + '\')" title="' + escapeText(s.label) + ': ' + n + '">' +
+      n + (n > 0 ? ' <small>' + escapeText(String(s.label || '').toLowerCase()) + '</small>' : '') +
+    '</div>';
   });
-  html += '</div>';
-  el.innerHTML = html;
+  bar += '</div>';
+  let legend = '<div class="home-fun-legend">';
+  stages.forEach(s => {
+    legend += '<span><i style="background:' + (colors[s.status] || '#94A3B8') + ';"></i>' + escapeText(s.label) + ' · ' + (s.count || 0) + '</span>';
+  });
+  legend += '</div>';
+  el.innerHTML = '<div class="card" style="padding:12px 14px;">' + bar + legend + '</div>';
 }
 
 function homeFunnelClick(status) {
@@ -1414,15 +1458,40 @@ function renderHomeAlerts() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-circle-check"></i>Алертов нет — всё спокойно</div>';
     return;
   }
-  let html = '<div class="home-alerts-list">';
+  // v2.45.631: конкретика по просроченным договорам — кто и на сколько дней
+  // (из contracts-with-progress, если уже загрузились).
+  let overDetail = '';
+  const cwp = cache.contractsWithProgress || [];
+  if (cwp.length) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const over = [];
+    cwp.forEach(c => {
+      if (c.delivery_date && c.status !== 'shipped' && c.status !== 'closed') {
+        const dd = Math.round((new Date(c.delivery_date + 'T00:00:00') - today) / 86400000);
+        if (dd < 0) over.push({ name: c.contractor_name || c.number, days: -dd });
+      }
+    });
+    over.sort((a, b) => b.days - a.days);
+    if (over.length) {
+      const names = over.slice(0, 2).map(o => {
+        const short = String(o.name).split(/\s+/).slice(0, 1).join(' ');
+        return short + ' (−' + o.days + ' дн)';
+      });
+      overDetail = names.join(', ') + (over.length > 2 ? ' и ещё ' + (over.length - 2) : '');
+    }
+  }
+  let html = '<div class="home-att-list">';
   alerts.forEach((a, i) => {
-    html += '<div class="home-alert" data-sev="' + escapeText(a.severity || 'info') + '" onclick="homeAlertClick(' + i + ')">' +
-      '<i class="ti ' + escapeText(a.icon || 'ti-alert-triangle') + ' alert-icon"></i>' +
-      '<div class="alert-body">' +
-        '<div class="alert-title">' + escapeText(a.title || '') + '</div>' +
-        '<div class="alert-meta">' + escapeText(a.meta || '') + '</div>' +
-      '</div>' +
-      '<div class="alert-count">' + escapeText(String(a.count || 0)) + '</div>' +
+    const sev = a.severity || 'info';
+    const meta = (a.link === 'contracts' && overDetail) ? overDetail : (a.meta || '');
+    const goTxt = a.link === 'production' ? 'к канбану →'
+      : a.link === 'contracts' ? 'к договорам →'
+      : a.link === 'warehouse' ? 'к остаткам →' : 'открыть →';
+    html += '<div class="home-att-row sev-' + escapeText(sev) + '" onclick="homeAlertClick(' + i + ')">' +
+      '<span class="home-att-ic"><i class="ti ' + escapeText(a.icon || 'ti-alert-triangle') + '"></i></span>' +
+      '<span class="home-att-t"><b>' + escapeText(a.title || '') + (a.count ? ' · ' + a.count : '') + '</b>' +
+        (meta ? '<span class="home-att-meta"> — ' + escapeText(meta) + '</span>' : '') + '</span>' +
+      '<span class="home-att-go">' + goTxt + '</span>' +
       '</div>';
   });
   html += '</div>';
@@ -1450,17 +1519,18 @@ function renderHomeTopAssemblers() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>За неделю никто не отметил часы</div>';
     return;
   }
-  let html = '<div class="home-top-assemblers">';
+  // v2.45.631: медали + шкала часов относительно лидера
+  const maxH = Math.max.apply(null, rows.map(r => parseFloat(r.hours || 0)).concat([1]));
+  const medals = ['🥇', '🥈', '🥉'];
+  let html = '<div class="home-top-assemblers card" style="padding:6px 14px;">';
   rows.forEach((r, i) => {
-    const rank = i + 1;
-    const rankCls = rank <= 3 ? ' r' + rank : '';
-    html += '<div class="home-top-row' + rankCls + '">' +
-      '<div class="top-rank">' + rank + '</div>' +
-      '<div class="top-name">' + escapeText(r.name || '—') + '</div>' +
-      '<div class="top-stats">' +
-        '<span><b>' + escapeText(String(r.hours || 0)) + '</b> ч</span>' +
-        '<span><b>' + escapeText(String(r.works || 0)) + '</b> работ</span>' +
-      '</div>' +
+    const h = parseFloat(r.hours || 0);
+    const pct = Math.round(h / maxH * 100);
+    html += '<div class="home-top-row2">' +
+      '<span class="home-top-medal">' + (medals[i] || (i + 1) + '.') + '</span>' +
+      '<span class="home-top-name2">' + escapeText(r.name || '—') + '</span>' +
+      '<span class="home-top-bar"><i style="width:' + pct + '%;"></i></span>' +
+      '<span class="home-top-hrs">' + escapeText(String(r.hours || 0)) + ' ч · ' + escapeText(String(r.works || 0)) + ' ' + plural(r.works || 0, 'работа', 'работы', 'работ') + '</span>' +
       '</div>';
   });
   html += '</div>';
@@ -3340,13 +3410,20 @@ function renderHomeMyTasks() {
   const el = document.getElementById('home-tasks-block');
   if (!el) return;
   const d = cache.myTasks || { tasks: [], total_open: 0 };
+  // v2.45.631: пустой блок сворачивается в одну строку — не занимает пол-экрана
+  if (!d.tasks || !d.tasks.length) {
+    el.innerHTML = '<div class="home-tasks-compact" onclick="goToSection(\'tasks\', \'tasks-mine\')">' +
+      '<i class="ti ti-circle-check" style="color:#16A34A;"></i> Нет активных задач' +
+      '<span style="margin-left:auto;color:var(--brand);font-weight:700;font-size:12px;">все →</span></div>';
+    return;
+  }
   let html = '<div class="home-tasks-widget">';
   html += '<div class="htw-head">';
   html += '<i class="ti ti-checklist"></i>';
   html += '<div class="htw-title">Мои задачи · ' + (d.total_open || 0) + ' открытых</div>';
   html += '<a class="htw-link" onclick="goToSection(\'tasks\', \'tasks-mine\')">все →</a>';
   html += '</div>';
-  if (!d.tasks || !d.tasks.length) {
+  if (false) {
     html += '<div class="htw-empty"><i class="ti ti-circle-check"></i>Нет активных задач</div>';
   } else {
     html += '<div class="htw-list">';
@@ -3374,6 +3451,8 @@ async function loadHomeContractsProgress() {
     const d = await apiGet('/api/contracts-with-progress');
     cache.contractsWithProgress = d.contracts || [];
     renderHomeContractsProgress();
+    // v2.45.631: «Пульс» использует суммы/просрочку из договоров — перерисуем
+    if (cache.homeKpi) renderHomeKpi();
   } catch (e) {
     el.innerHTML = '';
   }
