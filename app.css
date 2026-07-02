@@ -19668,3 +19668,43 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .pwd-facts { grid-template-columns: 1fr 1fr; }
   .pwd-team-l { width: 100%; }
 }
+
+/* ====== Договоры: сводка-чипы, готовность, срок с дельтой (v2.45.629) ====== */
+#sc-content .ct2-sumrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+#sc-content .ct2-sumchip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #fff; border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 13px; font-size: 12.5px; color: var(--text-mid); cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+#sc-content .ct2-sumchip:hover { background: var(--brand-bg, #EAF2FA); }
+#sc-content .ct2-sumchip.on { background: var(--danger-bg, #FEE2E2); border-color: #FCA5A5; color: var(--danger, #B91C1C); }
+#sc-content .ct2-sumchip b { color: var(--text-dark); }
+#sc-content .ct2-sumchip.on b { color: var(--danger, #B91C1C); }
+#sc-content .ct2-sumdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+#sc-content .ct2-sumdot.b { background: var(--brand); }
+#sc-content .ct2-sumdot.r { background: #EF4444; }
+#sc-content .ct2-sumdot.g { background: #10B981; }
+
+#sc-content .ct2-num { font-family: ui-monospace, Consolas, monospace; color: var(--text-mid); }
+#sc-content .ct2-td-badge {
+  font-size: 9px; font-weight: 800; background: #EDE9FE; color: #6D28D9;
+  border-radius: 4px; padding: 1px 5px; vertical-align: 1px;
+}
+#sc-content .ct2-row.ct2-closed { opacity: .72; }
+
+#sc-content .ct2-prog { width: 190px; flex-shrink: 0; min-width: 0; }
+#sc-content .ct2-prog-lbl {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text-faint); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#sc-content .ct2-prog-lbl b { color: var(--text-mid); font-size: 10.5px; }
+#sc-content .ct2-prog-bar { height: 7px; border-radius: 4px; background: #EDF1F7; overflow: hidden; }
+#sc-content .ct2-prog-bar i { display: block; height: 100%; border-radius: 4px; }
+#sc-content .ct2-prog-none { font-size: 11px; color: var(--text-faint); font-style: italic; }
+
+#sc-content .ct2-term-sub { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
+#sc-content .ct2-term-sub.late { color: var(--danger, #B91C1C); font-weight: 700; }
+#sc-content .ct2-term-sub.hot { color: var(--warning, #92400E); font-weight: 700; }
+
+@media (max-width: 900px) { #sc-content .ct2-prog { display: none; } }

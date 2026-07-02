@@ -8471,8 +8471,23 @@ function renderContractsList() {
 
   // v2.45.5xx: новый вид — карточки-строки (адаптивные)
   if (window.CT_V2) {
-    let html = toggle + '<div class="ct2-list">';
-    list.forEach(c => { html += _ct2Row(c); });
+    // v2.45.629: чип «Просрочено» может дополнительно сузить список
+    let shown = list;
+    if (window._ctOverdueOnly) {
+      shown = shown.filter(c => getContractUrgencyClass(c) === 'urg-overdue');
+    }
+    // Просроченные всплывают наверх (стабильно, остальной порядок сохраняется)
+    shown = shown.slice().sort((a, b) => {
+      const ao = getContractUrgencyClass(a) === 'urg-overdue' ? 0 : 1;
+      const bo = getContractUrgencyClass(b) === 'urg-overdue' ? 0 : 1;
+      return ao - bo;
+    });
+    let html = toggle + _ct2SummaryChips() + '<div class="ct2-list">';
+    if (!shown.length) {
+      html += '<div class="empty-block"><i class="ti ti-file-text"></i>Нет договоров под этот фильтр</div>';
+    } else {
+      shown.forEach(c => { html += _ct2Row(c); });
+    }
     html += '</div>';
     container.innerHTML = html;
     return;
@@ -8554,6 +8569,42 @@ function _ct2StatusPill(c) {
 }
 
 // v2.45.5xx: строка-карточка договора (новый вид списка)
+// v2.45.629: сводка-чипы над списком договоров — деньги в работе, просрочка,
+// отгружено. Клик по чипу — фильтр (просрочка — свой toggle поверх табов).
+function _ct2SummaryChips() {
+  const all = cache.contracts || [];
+  if (!all.length) return '';
+  const money = canSeeMoney();
+  const fmtM = v => {
+    if (!money) return '';
+    if (v >= 1000000) return ' · ' + (v / 1000000).toFixed(2).replace('.', ',').replace(/,?0+$/, '') + ' млн ₽';
+    return v > 0 ? ' · ' + formatMoney(v) : '';
+  };
+  let workN = 0, workS = 0, overN = 0, overS = 0, shipN = 0, shipS = 0;
+  all.forEach(c => {
+    const s = parseFloat(c.sum_amount || 0);
+    if (c.status === 'production' || c.status === 'ready' || c.status === 'partially_shipped') { workN++; workS += s; }
+    if (getContractUrgencyClass(c) === 'urg-overdue') { overN++; overS += s; }
+    if (c.status === 'shipped') { shipN++; shipS += s; }
+  });
+  let html = '<div class="ct2-sumrow">';
+  if (workN) {
+    html += '<span class="ct2-sumchip" onclick="state.salesContractsFilter=\'production\';window._ctOverdueOnly=false;renderContractsList();">' +
+      '<span class="ct2-sumdot b"></span>В работе <b>' + workN + escapeHtml(fmtM(workS)) + '</b></span>';
+  }
+  if (overN) {
+    html += '<span class="ct2-sumchip' + (window._ctOverdueOnly ? ' on' : '') + '" onclick="window._ctOverdueOnly=!window._ctOverdueOnly;renderContractsList();">' +
+      '<span class="ct2-sumdot r"></span>Просрочено <b>' + overN + escapeHtml(fmtM(overS)) + '</b>' +
+      (window._ctOverdueOnly ? ' ✓' : ' — показать') + '</span>';
+  }
+  if (shipN) {
+    html += '<span class="ct2-sumchip" onclick="state.salesContractsFilter=\'shipped\';window._ctOverdueOnly=false;renderContractsList();">' +
+      '<span class="ct2-sumdot g"></span>Отгружено <b>' + shipN + escapeHtml(fmtM(shipS)) + '</b></span>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function _ct2Row(c) {
   const urg = getContractUrgencyClass(c);
   let stripCls = '';
@@ -8561,19 +8612,55 @@ function _ct2Row(c) {
   else if (urg === 'urg-urgent') stripCls = 'hot';
   else if (urg === 'urg-soon' || urg === 'urg-ok') stripCls = 'ok';
   else if (urg === 'urg-done') stripCls = 'done';
+  if (c.status === 'closed') stripCls += ' ct2-closed';
 
   let urgPill = '';
   if (urg === 'urg-overdue') urgPill = '<span class="ct2-urg over"><span class="em">⚠️</span> ПРОСРОЧЕН</span>';
   else if (urg === 'urg-urgent') urgPill = '<span class="ct2-urg hot"><span class="em">🔥</span> ГОРИТ</span>';
 
-  let dchCls = '';
+  // v2.45.629: срок с дельтой — «−8 дней» / «завтра» / «через 25 дн»
+  let dchCls = '', termSub = '';
   if (urg === 'urg-overdue') dchCls = ' late';
   else if (urg === 'urg-urgent') dchCls = ' hot';
+  if (c.delivery_date) {
+    try {
+      const _t = new Date(); _t.setHours(0, 0, 0, 0);
+      const _d = Math.round((new Date(c.delivery_date + 'T00:00:00') - _t) / 86400000);
+      if (_d < 0) termSub = '<span class="ct2-term-sub late">−' + Math.abs(_d) + ' ' + plural(Math.abs(_d), 'день', 'дня', 'дней') + '</span>';
+      else if (_d === 0) termSub = '<span class="ct2-term-sub hot">сегодня</span>';
+      else if (_d === 1) termSub = '<span class="ct2-term-sub hot">завтра</span>';
+      else if (c.status !== 'shipped' && c.status !== 'closed') termSub = '<span class="ct2-term-sub">через ' + _d + ' дн</span>';
+    } catch (e) {}
+  }
   const dateChip = '<span class="ct2-date-chip' + dchCls + '">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</span>';
 
-  const sub = escapeHtml(c.number || '—') + ' · ' +
-    escapeHtml(_contractTypeLabel(c.contract_type)) + ' · ' +
-    escapeHtml(legalEntityShortName(c.legal_entity));
+  // Тип с иконкой + юрлицо (ТД — мини-бейджем)
+  const typeIcon = c.contract_type === 'supply_install' ? '🚚🔧' : (c.contract_type === 'install_only' ? '🔧' : '🚚');
+  const entName = legalEntityShortName(c.legal_entity);
+  const isTd = String(c.legal_entity || '').toLowerCase().indexOf('td') >= 0;
+  const entHtml = (isTd ? '<span class="ct2-td-badge">ТД</span> ' : '') + escapeHtml(entName);
+  const sub = '<span class="ct2-num">' + escapeHtml(c.number || '—') + '</span> · ' +
+    '<span class="em">' + typeIcon + '</span> ' + escapeHtml(_contractTypeLabel(c.contract_type)) + ' · ' + entHtml;
+
+  // v2.45.629: полоса готовности производства (те же данные, что «Главная продаж»)
+  let progHtml = '';
+  if (c.status === 'production' || c.status === 'ready' || c.status === 'partially_shipped') {
+    const qty = c.assemblies_qty || 0;
+    const pct = (c.progress_pct != null) ? Math.max(0, Math.min(100, c.progress_pct)) : null;
+    let barColor = '#10B981';
+    if (urg === 'urg-overdue') barColor = '#EF4444';
+    else if (urg === 'urg-urgent' || urg === 'urg-soon') barColor = '#F59E0B';
+    if (pct != null || qty > 0) {
+      const shown = (pct != null) ? pct : 0;
+      progHtml = '<div class="ct2-prog" title="Готовность производства по сборкам договора">' +
+        '<div class="ct2-prog-lbl">готовность <b>' + (pct != null ? pct + '%' : '—') + (qty ? ' · ' + qty + ' ' + pluralAssemblies(qty) : '') + '</b></div>' +
+        '<div class="ct2-prog-bar"><i style="width:' + shown + '%;background:' + barColor + ';"></i></div>' +
+      '</div>';
+    } else {
+      progHtml = '<div class="ct2-prog"><div class="ct2-prog-lbl">готовность</div>' +
+        '<div class="ct2-prog-none">сборки не заведены</div></div>';
+    }
+  }
 
   const mgrName = c.manager_name || '—';
   const mgr = '<div class="ct2-mgr"><span class="ct2-mgr-ava">' + escapeHtml(getInitials(mgrName)) + '</span>' +
@@ -8587,8 +8674,9 @@ function _ct2Row(c) {
       '<div class="ct2-top"><span class="ct2-client">' + escapeHtml(c.contractor_name || '—') + '</span>' + _ct2StatusPill(c) + urgPill + '</div>' +
       '<div class="ct2-sub">' + sub + '</div>' +
     '</div>' +
+    progHtml +
     '<div class="ct2-right">' +
-      '<div class="ct2-term"><span class="ct2-term-lbl">срок</span>' + dateChip + '</div>' +
+      '<div class="ct2-term"><span class="ct2-term-lbl">срок</span>' + dateChip + termSub + '</div>' +
       sumHtml + mgr +
       '<span class="ct2-arrow em">›</span>' +
     '</div>' +
