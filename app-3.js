@@ -3311,6 +3311,14 @@ async function openFpModelDetail(modelId) {
               ' · ' + reservedBadge +
             '</div>' +
           '</div>' +
+          // v2.45.620: «Списать» прямо из списка сборок модели — для свободных
+          // (зарезервированные обещаны договору, их сперва надо освободить).
+          (!s.contract_id
+            ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);border-color:#FCA5A5;" ' +
+                'title="Списать эту сборку со склада (брак/использована/инвентаризация)" ' +
+                'onclick="event.stopPropagation(); promptWriteOff(' + s.id + ',' + (s.stock_qty || 0) + ').then(function(ok){ if(ok){ var m=document.getElementById(\'fp-model-assemblies-modal\'); if(m) m.classList.remove(\'visible\'); } });">' +
+                '<i class="ti ti-package-export"></i> Списать</button>'
+            : '') +
           '<i class="ti ti-chevron-right" style="color:var(--text-light);font-size:18px;"></i>' +
         '</div>';
     });
@@ -4400,10 +4408,10 @@ async function changeAssemblyStatus(assemblyId, newStatus) {
 
 async function promptWriteOff(assemblyId, currentStock) {
   const reason = prompt('Укажите причину списания (брак, бой и т.п.):');
-  if (reason === null) return;
+  if (reason === null) return false;
   if (!reason.trim()) {
     showToast('Без причины списать нельзя', 'error');
-    return;
+    return false;
   }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -4423,7 +4431,7 @@ async function promptWriteOff(assemblyId, currentStock) {
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       showToast(d.message || 'Не удалось списать', 'error');
-      return;
+      return false;
     }
     showToast('Списано', 'success');
     closeAssemblyStockModal();
@@ -4434,8 +4442,10 @@ async function promptWriteOff(assemblyId, currentStock) {
       if (state.activeWarehouseTab === 'stock')     loadFinishedProductsDashboard();
       if (state.activeWarehouseTab === 'movements') loadWarehouseMovements();
     }
+    return true;
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+    return false;
   }
 }
 
@@ -12326,6 +12336,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.620',
+    date: '02.07.2026',
+    title: 'Склад: списать сборку прямо из списка модели',
+    features: [
+      'В окне <b>«Сборки этой модели на складе»</b> у каждой свободной сборки появилась кнопка <b>«Списать»</b> — брак, использовали, инвентаризация',
+      'Спросит причину, спишет со склада и запишет в <b>Журнал движений</b>',
+      'У зарезервированных под договор сборок кнопки нет — их сперва нужно освободить',
+    ],
+  },
   {
     version: 'v2.45.619',
     date: '02.07.2026',
