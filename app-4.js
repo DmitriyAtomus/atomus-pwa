@@ -7776,6 +7776,144 @@ async function chooseContractForDefect(contractId) {
  * Открывает drawer-меню текущего раздела (мобила).
  * Берёт активный sidebar (по data-visible="1") и показывает его как drawer.
  */
+// ===== v2.45.638: динамические блоки шторки — лента разделов, поиск, «Сегодня» =====
+const DRW_SECTIONS = [
+  { code: 'home',         icon: 'ti-home',               label: 'Главная' },
+  { code: 'production',   icon: 'ti-tool',               label: 'Производ.' },
+  { code: 'sales',        icon: 'ti-briefcase',          label: 'Продажи' },
+  { code: 'tasks',        icon: 'ti-checklist',          label: 'Задачи' },
+  { code: 'warehouse',    icon: 'ti-building-warehouse', label: 'Склад' },
+  { code: 'supply',       icon: 'ti-shopping-cart',      label: 'Снабжен.' },
+  { code: 'defects',      icon: 'ti-alert-circle',       label: 'Сервис' },
+  { code: 'installation', icon: 'ti-tools',              label: 'Монтаж' },
+  { code: 'hr',           icon: 'ti-id-badge',           label: 'Кадры' },
+  { code: 'help',         icon: 'ti-help-circle',        label: 'Помощь' },
+];
+
+function _drwGoSection(code) {
+  const cur = document.querySelector('.sidebar.drawer-mode');
+  if (cur && cur.dataset.section === code) { closeSectionDrawer(); return; }
+  // Мгновенно прячем текущую шторку, переключаем раздел и открываем его шторку —
+  // ощущение «переключил, не закрывая».
+  if (cur) cur.classList.remove('drawer-mode', 'open');
+  try { selectSection(code); } catch (e) {}
+  setTimeout(() => { try { openSectionDrawer(); } catch (e) {} }, 120);
+}
+
+function _drwOpenSearch() {
+  closeSectionDrawer();
+  setTimeout(() => { try { switchMainTab('search'); } catch (e) { try { openDesktopSearch(); } catch (e2) {} } }, 100);
+}
+
+function _drwGo(section, item, filter) {
+  closeSectionDrawer();
+  try { selectSection(section); } catch (e) {}
+  setTimeout(() => {
+    try { selectSidebarItem(item); } catch (e) {}
+    if (filter) setTimeout(() => { try { pkbSetFilter(filter); } catch (e) {} }, 450);
+  }, 100);
+}
+
+function _drwOpenContract(id) {
+  closeSectionDrawer();
+  setTimeout(() => { try { openContractDetail(id); } catch (e) {} }, 100);
+}
+
+function _drwOverdueContracts() {
+  window._ctOverdueOnly = true;
+  _drwGo('sales', 'sales-contracts');
+}
+
+// Строки «Сегодня» — из уже загруженных кэшей (без запросов). Пусто — блок не показываем.
+function _drwTodayRows(sec) {
+  const rows = [];
+  if (sec === 'production' || sec === 'home') {
+    const works = (cache.productionKanban && cache.productionKanban.works) || [];
+    const act = works.filter(w => ['queue', 'in_progress', 'review', 'packing'].indexOf(w.status) >= 0);
+    const over = act.filter(w => w.is_overdue);
+    const blocked = act.filter(w => w.is_blocked);
+    if (over.length) {
+      let worst = 0;
+      over.forEach(w => { try { worst = Math.max(worst, pkbOverdueDays(w.deadline_at)); } catch (e) {} });
+      rows.push('<div class="drw-trow" onclick="_drwGo(\'production\',\'dashboard\',\'overdue\')">' +
+        '<span class="drw-tdot" style="background:#F87171;"></span>' +
+        '<span><b>' + over.length + '</b> ' + plural(over.length, 'просрочка', 'просрочки', 'просрочек') +
+        (worst > 0 ? ' · худшая −' + worst + ' дн' : '') + '</span><span class="drw-tgo">показать →</span></div>');
+    }
+    if (blocked.length) {
+      rows.push('<div class="drw-trow" onclick="_drwGo(\'production\',\'dashboard\',\'blocked\')">' +
+        '<span class="drw-tdot" style="background:#FBBF24;"></span>' +
+        '<span><b>' + blocked.length + '</b> ' + plural(blocked.length, 'работа', 'работы', 'работ') + ' без деталей</span>' +
+        '<span class="drw-tgo">показать →</span></div>');
+    }
+  }
+  if (sec === 'sales') {
+    const cwp = cache.contractsWithProgress || [];
+    if (cwp.length) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      let overN = 0, worst = 0;
+      cwp.forEach(c => {
+        if (c.delivery_date && c.status !== 'shipped' && c.status !== 'closed') {
+          const dd = Math.round((new Date(c.delivery_date + 'T00:00:00') - today) / 86400000);
+          if (dd < 0) { overN++; worst = Math.max(worst, -dd); }
+        }
+      });
+      if (overN) {
+        rows.push('<div class="drw-trow" onclick="_drwOverdueContracts()">' +
+          '<span class="drw-tdot" style="background:#F87171;"></span>' +
+          '<span><b>' + overN + '</b> ' + plural(overN, 'договор просрочен', 'договора просрочены', 'договоров просрочены') + ' · −' + worst + ' дн</span>' +
+          '<span class="drw-tgo">показать →</span></div>');
+      }
+    }
+  }
+  if (sec === 'production' || sec === 'home' || sec === 'sales') {
+    const ships = (cache.upcomingShipments && cache.upcomingShipments.contracts) || [];
+    if (ships.length) {
+      const c = ships[0];
+      let dStr = '';
+      if (c.delivery_date) {
+        const p = String(c.delivery_date).slice(0, 10).split('-');
+        if (p.length === 3) dStr = p[2] + '.' + p[1];
+      }
+      const late = (c.days_to_deadline != null && c.days_to_deadline <= 0);
+      rows.push('<div class="drw-trow" onclick="_drwOpenContract(' + c.id + ')">' +
+        '<span class="drw-tdot" style="background:' + (late ? '#F87171' : '#7FB2E5') + ';"></span>' +
+        '<span>Отгрузка <b>' + escapeHtml(dStr || '—') + '</b> · ' + escapeHtml((c.contractor_name || c.number || '').slice(0, 22)) + '</span>' +
+        '<span class="drw-tgo">открыть →</span></div>');
+    }
+  }
+  return rows.join('');
+}
+
+function _drwInjectExtras(sidebar) {
+  // Пересобираем блоки при каждом открытии (данные из кэшей могли обновиться)
+  sidebar.querySelectorAll('.drw-x').forEach(n => n.remove());
+  const sec = sidebar.dataset.section || '';
+
+  // Верх: лента разделов + поиск
+  const top = document.createElement('div');
+  top.className = 'drw-x drw-top';
+  let strip = '<div class="drw-secs">';
+  DRW_SECTIONS.forEach(s => {
+    strip += '<div class="drw-sec' + (s.code === sec ? ' on' : '') + '" onclick="_drwGoSection(\'' + s.code + '\')">' +
+      '<i class="ti ' + s.icon + '"></i><span>' + s.label + '</span></div>';
+  });
+  strip += '</div>';
+  top.innerHTML = strip +
+    '<div class="drw-search" onclick="_drwOpenSearch()"><i class="ti ti-search"></i> Договор, сборка, деталь…</div>';
+  sidebar.insertBefore(top, sidebar.firstChild);
+
+  // Низ: «Сегодня» перед футером профиля
+  const todayRows = _drwTodayRows(sec);
+  if (todayRows) {
+    const t = document.createElement('div');
+    t.className = 'drw-x drw-today';
+    t.innerHTML = '<div class="drw-grp">Сегодня</div>' + todayRows;
+    const foot = sidebar.querySelector('.sidebar-footer');
+    if (foot) sidebar.insertBefore(t, foot); else sidebar.appendChild(t);
+  }
+}
+
 function openSectionDrawer() {
   // Находим активный sidebar (тот что data-visible="1" для текущего раздела)
   const sidebar = document.querySelector('.sidebar[data-visible="1"]');
@@ -7785,6 +7923,9 @@ function openSectionDrawer() {
   document.querySelectorAll('.sidebar.drawer-mode').forEach(s => {
     s.classList.remove('drawer-mode', 'open');
   });
+
+  // v2.45.638: лента разделов + поиск + «Сегодня»
+  try { _drwInjectExtras(sidebar); } catch (e) {}
 
   sidebar.classList.add('drawer-mode');
   // Добавляем кнопку закрытия если её ещё нет
