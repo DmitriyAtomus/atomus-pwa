@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.635-cockpit-v1";
+const APP_VERSION = "v2.45.636-journal-compact";
 const APP_VERSION_DATE = "01.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4614,23 +4614,31 @@ function renderProductionWorkDetail(w) {
                 '<button class="pwd-session-del" title="Удалить запись" onclick="removePwdSession(' + s.id + ',' + w.id + ')"><i class="ti ti-trash"></i></button>' +
               '</div>')
           : '';
-        // v2.44.72: бейдж этапа в журнале сессий
-        const stageBadge = s.stage_name
-          ? ' <span class="pwd-help-chip-stage" style="cursor:default;">' + escapeHtml(s.stage_name) + '</span>'
-          : '';
-        html += '<div class="pwd-session-row" id="pwd-session-row-' + s.id + '" data-session-id="' + s.id + '" data-session-date="' + escapeHtml(s.session_date || '') + '" data-hours="' + (s.hours != null ? s.hours : '') + '" data-note="' + escapeHtml(s.note || '') + '">' +
-                  '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
-                  '<div class="pwd-session-body">' +
-                    '<div class="pwd-session-top">' +
-                      '<span class="pwd-session-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
-                        ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
-                        stageBadge +
-                      '</span>' +
-                      '<span class="pwd-session-meta">' + escapeHtml(dateStr + hoursStr) + '</span>' +
-                    '</div>' +
-                    (s.note ? '<div class="pwd-session-note">' + escapeHtml(s.note) + '</div>' : '') +
+        // v2.45.636: компактный стиль как в «Сводках» — часы крупно, этап и
+        // «авто-стоп» чипами; кнопки редактирования сохранены.
+        let noteChip = '', noteText = '';
+        if (s.note) {
+          const am = String(s.note).match(/авто-?стоп[^0-9]*(\d{1,2}:\d{2})?/i);
+          if (am) noteChip = '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп' + (am[1] ? ' ' + am[1] : '') + '</span>';
+          else noteText = '<div class="jrn-note">' + escapeHtml(s.note) + '</div>';
+        }
+        const _h = (s.hours != null) ? parseFloat(s.hours) : null;
+        html += '<div class="jrn-e' + (s.role === 'main' ? ' jrn-main' : '') + ' jrn-has-acts" id="pwd-session-row-' + s.id + '" data-session-id="' + s.id + '" data-session-date="' + escapeHtml(s.session_date || '') + '" data-hours="' + (s.hours != null ? s.hours : '') + '" data-note="' + escapeHtml(s.note || '') + '">' +
+                  '<div class="pkb-wl-avatar ac-' + avColorIdx + ' jrn-ava">' + escapeHtml(initials) + '</div>' +
+                  '<div class="jrn-top">' +
+                    '<span class="jrn-nm">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
+                    '<span class="jrn-role ' + (s.role === 'main' ? 'mn' : 'co') + '">' + (s.role === 'main' ? 'главный' : 'соисп.') + '</span>' +
                   '</div>' +
-                  actions +
+                  ((_h != null && _h > 0)
+                    ? '<div class="jrn-hrs">' + formatHours(_h) + ' <small>ч</small></div>'
+                    : '<div></div>') +
+                  (actions || '<span></span>') +
+                  '<div class="jrn-sub">' +
+                    '<span class="jrn-w">' + escapeHtml(dateStr) + '</span>' +
+                    (s.stage_name ? '<span class="jrn-chip op"><i class="ti ti-tool"></i>' + escapeHtml(s.stage_name) + '</span>' : '') +
+                    noteChip +
+                  '</div>' +
+                  noteText +
                 '</div>';
       });
       html += '</div>';
@@ -6973,53 +6981,75 @@ function renderSummary(d) {
     }
 
     // Последние записи — с группировкой по датам
+    // v2.45.636: компактные карточки — часы крупно справа, Σ за день в заголовке,
+    // дубль «артикул · название» схлопнут, «[авто-стоп]» — маленький чип.
     if ((sb.entries || []).length) {
       html += '<div class="section"><h3 class="section-title">' +
                 '<span>Последние записи</span>' +
                 '<span style="font-weight:400;color:var(--text-light);font-size:12.5px;">' + sb.entries.length + ' из ' + totalEntries + '</span>' +
               '</h3></div>';
-      html += '<div class="ssn-entries-list">';
+      // Итоги по дням: количество записей и сумма часов
+      const _dayAgg = {};
+      sb.entries.forEach(s => {
+        const k = s.session_date || '—';
+        if (!_dayAgg[k]) _dayAgg[k] = { n: 0, h: 0 };
+        _dayAgg[k].n++;
+        _dayAgg[k].h += (s.hours != null ? Number(s.hours) || 0 : 0);
+      });
+      const _todayIso = new Date().toISOString().slice(0, 10);
+      const _yestIso = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      html += '<div class="jrn-list">';
       let prevDate = null;
       sb.entries.forEach(s => {
         const initials = getInitials(s.employee_short_name || s.employee_full_name || '?');
         const avColorIdx = ((s.employee_id || 0) % 8);
-        const dateStr = s.session_date ? formatPkbDate(s.session_date) : '—';
         const hrs = (s.hours != null) ? Number(s.hours) : null;
-        const hoursStr = (hrs != null && hrs > 0) ? (fmtH(hrs) + 'ч') : '';
-        const modelStr = s.model_name
-          ? ((s.model_article ? s.model_article + ' · ' : '') + s.model_name)
-          : '';
-        const contractStr = s.contract_number
-          ? ('№' + String(s.contract_number).replace(/^[№#\s]+/, '') + (s.contractor_name ? ' · ' + s.contractor_name : ''))
-          : '';
-        const roleLabel = s.role === 'main' ? 'главный' : 'соисполнитель';
-        const roleCls   = s.role === 'main' ? 'pwd-role-main' : 'pwd-role-co';
-        // Заголовок-разделитель если новая дата
+        // Заголовок дня с итогом
         if (s.session_date !== prevDate) {
-          html += '<div class="ssn-date-divider"><i class="ti ti-calendar-event"></i> ' + escapeHtml(dateStr) + '</div>';
+          const agg = _dayAgg[s.session_date || '—'] || { n: 0, h: 0 };
+          const iso = String(s.session_date || '').slice(0, 10);
+          const rel = iso === _todayIso ? ' · сегодня' : (iso === _yestIso ? ' · вчера' : '');
+          html += '<div class="jrn-day">' + escapeHtml(s.session_date ? formatPkbDate(s.session_date) : '—') +
+            '<span class="jrn-day-sub">' + rel + ' · ' + agg.n + ' ' + plural(agg.n, 'запись', 'записи', 'записей') + '</span>' +
+            (agg.h > 0 ? '<span class="jrn-day-sum">Σ ' + fmtH(agg.h) + ' ч</span>' : '') +
+          '</div>';
           prevDate = s.session_date;
         }
-        // v2.45.164: проваливаемся в карточку работы (что за работа, кто и что делал)
+        // Модель без дубля: артикул показываем, только если отличается от названия
+        const _art = String(s.model_article || '').trim();
+        const _mn = String(s.model_name || '').trim();
+        let workBits = [];
+        if (_mn) workBits.push((_art && _art.toLowerCase() !== _mn.toLowerCase()) ? (_art + ' · ' + _mn) : _mn);
+        else if (_art) workBits.push(_art);
+        if (s.contract_number) workBits.push('№' + String(s.contract_number).replace(/^[№#\s]+/, ''));
+        if (s.contractor_name) workBits.push(s.contractor_name);
+        // Заметка: «авто-стоп» — чипом, остальное — мелким текстом
+        let noteChip = '', noteText = '';
+        if (s.note) {
+          const am = String(s.note).match(/авто-?стоп[^0-9]*(\d{1,2}:\d{2})?/i);
+          if (am) noteChip = '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп' + (am[1] ? ' ' + am[1] : '') + '</span>';
+          else noteText = '<div class="jrn-note">' + escapeHtml(s.note) + '</div>';
+        }
+        const isMain = s.role === 'main';
         const _clickable = !!s.work_id;
-        html += '<div class="ssn-entry' + (_clickable ? ' ssn-entry-click' : '') + '"' +
+        html += '<div class="jrn-e' + (isMain ? ' jrn-main' : '') + '"' +
                   (_clickable ? ' onclick="openProductionWorkDetail(' + s.work_id + ')" style="cursor:pointer;"' : '') + '>' +
-                  '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:36px;height:36px;font-size:12px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
-                  '<div class="ssn-entry-body">' +
-                    '<div class="ssn-entry-top">' +
-                      '<span class="ssn-entry-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
-                        ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
-                      '</span>' +
-                      (hoursStr ? '<span class="ssn-entry-hours">' + escapeHtml(hoursStr) + '</span>' : '<span></span>') +
-                    '</div>' +
-                    (modelStr || contractStr ? '<div class="ssn-entry-work">' +
-                      (modelStr ? '<i class="ti ti-package"></i> ' + escapeHtml(modelStr) : '') +
-                      (contractStr ? ' <span style="color:var(--text-light);">· ' + escapeHtml(contractStr) + '</span>' : '') +
-                    '</div>' : '') +
-                    (s.stage_name ? '<div class="ssn-entry-work" style="color:var(--text-light);"><i class="ti ti-tool"></i> ' + escapeHtml(s.stage_name) + '</div>' : '') +
-                    (s.note ? '<div class="ssn-entry-note">' + escapeHtml(s.note) + '</div>' : '') +
-                  '</div>' +
-                  (_clickable ? '<i class="ti ti-chevron-right" style="color:var(--text-light);align-self:center;flex-shrink:0;font-size:18px;"></i>' : '') +
-                '</div>';
+          '<div class="pkb-wl-avatar ac-' + avColorIdx + ' jrn-ava">' + escapeHtml(initials) + '</div>' +
+          '<div class="jrn-top">' +
+            '<span class="jrn-nm">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
+            '<span class="jrn-role ' + (isMain ? 'mn' : 'co') + '">' + (isMain ? 'главный' : 'соисп.') + '</span>' +
+          '</div>' +
+          ((hrs != null && hrs > 0)
+            ? '<div class="jrn-hrs">' + fmtH(hrs) + ' <small>ч</small></div>'
+            : '<div></div>') +
+          (_clickable ? '<i class="ti ti-chevron-right jrn-chev"></i>' : '<span class="jrn-chev"></span>') +
+          '<div class="jrn-sub">' +
+            (workBits.length ? '<span class="jrn-w">' + escapeHtml(workBits.join(' · ')) + '</span>' : '') +
+            (s.stage_name ? '<span class="jrn-chip op"><i class="ti ti-tool"></i>' + escapeHtml(s.stage_name) + '</span>' : '') +
+            noteChip +
+          '</div>' +
+          noteText +
+        '</div>';
       });
       html += '</div>';
     }
