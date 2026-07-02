@@ -1862,16 +1862,12 @@
                          placeholder="Название, артикул или производитель…"
                          oninput="onPtSearchInput()">
                 </div>
-                <button class="pt-instock-btn" id="pt-instock-btn" onclick="togglePtInStock()">
-                  <i class="ti ti-package"></i>
-                  <span>В наличии</span>
-                  <span class="pt-chip-qty" id="pt-instock-count">0</span>
-                </button>
-                <button class="pt-attn-btn" id="pt-attn-btn" onclick="togglePtAttention()">
-                  <i class="ti ti-alert-triangle"></i>
-                  <span>Требуют внимания</span>
-                  <span class="pt-chip-qty" id="pt-attn-count">0</span>
-                </button>
+              </div>
+              <!-- v2.45.641: сегмент статусов с количеством вместо двух разнесённых кнопок -->
+              <div class="pt-seg" id="pt-seg">
+                <button id="pt-seg-all" class="on" onclick="setPtSeg('all')">Все <small id="pt-seg-all-n">0</small></button>
+                <button id="pt-seg-stock" onclick="setPtSeg('stock')">В наличии <small id="pt-seg-stock-n">0</small></button>
+                <button id="pt-seg-attn" class="pt-seg-bad" onclick="setPtSeg('attn')">⚠ Внимание <small id="pt-seg-attn-n">0</small></button>
               </div>
 
               <!-- Список позиций -->

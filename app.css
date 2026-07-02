@@ -20113,3 +20113,44 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .fpm-off:hover { background: #FEF2F2; }
 .fpm-off-ph { width: 30px; flex-shrink: 0; }
 .fpm-chev { color: var(--text-faint); font-size: 15px; flex-shrink: 0; }
+
+/* ====== Склад · Комплектующие: лента, сегмент, строки (v2.45.641) ====== */
+/* Чипы категорий — одна прокручиваемая лента на мобильном */
+@media (max-width: 760px) {
+  .pt-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 8px; }
+  .pt-chips::-webkit-scrollbar { display: none; }
+  .pt-chips .pt-chip { flex-shrink: 0; }
+}
+.pt-chip-more { border-style: dashed !important; color: var(--brand) !important; }
+
+.pt-cs-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 12px; border-bottom: 1px solid var(--border);
+  font-size: 14px; cursor: pointer; border-radius: 8px;
+}
+.pt-cs-row:hover { background: var(--bg); }
+.pt-cs-row.on { background: var(--brand-bg); color: var(--brand); font-weight: 700; }
+.pt-cs-row b { font-size: 12px; color: var(--text-faint); font-weight: 700; }
+.pt-cs-row.on b { color: var(--brand); }
+.pt-cs-new { color: var(--brand); font-weight: 700; border-bottom: none; }
+
+.pt-seg { display: flex; background: #E9EEF5; border-radius: 11px; padding: 3px; margin: 0 18px 12px; }
+.pt-seg button {
+  flex: 1; border: none; background: none; cursor: pointer;
+  padding: 8px 4px; border-radius: 9px; font-family: inherit;
+  font-size: 12px; font-weight: 700; color: var(--text-mid);
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+}
+.pt-seg button small { font-size: 10.5px; font-weight: 800; color: var(--text-faint); }
+.pt-seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 3px rgba(20,33,61,.10); }
+.pt-seg button.pt-seg-bad.on { color: #B91C1C; }
+.pt-seg button.on small { color: inherit; }
+
+.pt-stock-n { font-weight: 800; font-variant-numeric: tabular-nums; }
+.pt-stock-n small { font-size: 10px; color: var(--text-faint); font-weight: 700; }
+.pt-stock-min { display: block; font-size: 9.5px; color: var(--text-faint); font-weight: 600; margin-top: 1px; }
+
+.btn-order.pt-ordered {
+  background: #D1FAE5 !important; color: #047857 !important;
+  border-color: #A7F3D0 !important;
+}

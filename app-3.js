@@ -3783,43 +3783,91 @@ function openPtOrderFromShortage(componentId, recommendedQty, supplyItemId) {
 }
 
 function _renderPtChips(categories, total) {
+  // v2.45.641: одна лента вместо стены чипов — сортировка по количеству,
+  // пустые скрыты, полный список (включая «+ Раздел») — в шторке «Все разделы».
   const host = document.getElementById('pt-chips');
   if (!host) return;
+  const cats = (categories || []).slice().sort((a, b) => (b.count || 0) - (a.count || 0));
+  const visible = cats.filter(c => (c.count || 0) > 0).slice(0, 10);
+  // Активная категория всегда видна, даже если пустая или за пределами топа
+  if (state.ptCategoryFilter != null && !visible.some(c => c.id === state.ptCategoryFilter)) {
+    const act = cats.find(c => c.id === state.ptCategoryFilter);
+    if (act) visible.unshift(act);
+  }
   let html = '<button class="pt-chip ' + (state.ptCategoryFilter == null ? 'active' : '') +
     '" onclick="setPtCategoryFilter(null)">' +
     'Все <span class="pt-chip-qty">' + total + '</span></button>';
-  (categories || []).forEach(c => {
+  visible.forEach(c => {
     const active = state.ptCategoryFilter === c.id;
     html += '<button class="pt-chip ' + (active ? 'active' : '') +
       '" onclick="setPtCategoryFilter(' + c.id + ')">' +
       escapeHtml(c.name) + ' <span class="pt-chip-qty">' + c.count + '</span>' +
       '</button>';
   });
-  // Кнопка создания нового раздела (после всех категорий, пунктирная)
-  html += '<button class="pt-chip" style="border-style:dashed;color:var(--brand);" onclick="createComponentCategoryPrompt()">' +
-    '<i class="ti ti-plus" style="font-size:12px;"></i> Раздел</button>';
+  html += '<button class="pt-chip pt-chip-more" onclick="openPtCatSheet()">' +
+    'Все разделы <i class="ti ti-chevron-down" style="font-size:12px;"></i></button>';
   host.innerHTML = html;
 }
 
+// v2.45.641: полный список разделов (включая пустые) + создание нового
+function openPtCatSheet() {
+  let m = document.getElementById('pt-cat-sheet');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'pt-cat-sheet';
+  m.className = 'modal-overlay visible';
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  const cats = ((state.ptData && state.ptData.categories) || []).slice()
+    .sort((a, b) => (b.count || 0) - (a.count || 0));
+  const total = (state.ptData && state.ptData.kpis && state.ptData.kpis.total) || 0;
+  let rows = '<div class="pt-cs-row' + (state.ptCategoryFilter == null ? ' on' : '') + '" onclick="setPtCategoryFilter(null);document.getElementById(\'pt-cat-sheet\').remove();">' +
+    '<span>Все разделы</span><b>' + total + '</b></div>';
+  cats.forEach(c => {
+    rows += '<div class="pt-cs-row' + (state.ptCategoryFilter === c.id ? ' on' : '') + '" onclick="setPtCategoryFilter(' + c.id + ');document.getElementById(\'pt-cat-sheet\').remove();">' +
+      '<span>' + escapeHtml(c.name) + '</span><b>' + (c.count || 0) + '</b></div>';
+  });
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-category"></i> Разделы</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pt-cat-sheet\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' + rows +
+        '<div class="pt-cs-row pt-cs-new" onclick="document.getElementById(\'pt-cat-sheet\').remove();createComponentCategoryPrompt();">' +
+          '<span><i class="ti ti-plus"></i> Новый раздел</span></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+// v2.45.641: сегмент «Все / В наличии / Внимание» вместо двух кнопок
+function setPtSeg(mode) {
+  state.ptInStockOnly = (mode === 'stock');
+  state.ptAttentionOnly = (mode === 'attn');
+  _ptSyncSeg();
+  _renderPtList();
+}
+
+function _ptSyncSeg() {
+  const mode = state.ptAttentionOnly ? 'attn' : (state.ptInStockOnly ? 'stock' : 'all');
+  [['pt-seg-all', 'all'], ['pt-seg-stock', 'stock'], ['pt-seg-attn', 'attn']].forEach(p => {
+    const b = document.getElementById(p[0]);
+    if (b) b.classList.toggle('on', mode === p[1]);
+  });
+}
+
 function _renderPtAttentionBtn(n) {
-  const btn = document.getElementById('pt-attn-btn');
-  const cnt = document.getElementById('pt-attn-count');
-  if (!btn || !cnt) return;
-  cnt.textContent = n;
-  btn.classList.toggle('zero', n === 0);  // спрятать если 0
-  btn.classList.toggle('active', state.ptAttentionOnly && n > 0);
+  const cnt = document.getElementById('pt-seg-attn-n');
+  if (cnt) cnt.textContent = n;
+  _ptSyncSeg();
 }
 
 function _renderPtInStockBtn() {
-  const btn = document.getElementById('pt-instock-btn');
-  const cnt = document.getElementById('pt-instock-count');
-  if (!btn || !cnt) return;
-  // Сколько позиций имеет qty_on_stock > 0
   const items = (state.ptData && state.ptData.items) || [];
   const inStock = items.filter(it => (parseFloat(it.qty_on_stock) || 0) > 0).length;
-  cnt.textContent = inStock;
-  btn.classList.toggle('zero', inStock === 0);
-  btn.classList.toggle('active', !!state.ptInStockOnly);
+  const cs = document.getElementById('pt-seg-stock-n');
+  if (cs) cs.textContent = inStock;
+  const ca = document.getElementById('pt-seg-all-n');
+  if (ca) ca.textContent = items.length;
+  _ptSyncSeg();
 }
 
 function _renderPtList() {
@@ -3864,20 +3912,12 @@ function _renderPtRow(it) {
     ? '<div class="pt-defect-pill" onclick="event.stopPropagation();openPtDefectsForComponent(' + it.id + ')" title="Заявки по этому комплектующему в Сервисе"><i class="ti ti-alert-triangle"></i>брак ' + _fmtNum(defectQty) + '</div>'
     : '';
 
-  // Stock колонка
-  let stockHtml;
-  if (it.min_stock > 0) {
-    stockHtml = '<div class="pt-row-stock ' + st + '">' +
-      _fmtNum(it.qty_on_stock) +
-      ' <span class="pt-row-stock-sub">/ ' + _fmtNum(it.min_stock) + ' ' + escapeHtml(unit) + '</span>' +
-      defectBadge +
-      '</div>';
-  } else {
-    stockHtml = '<div class="pt-row-stock ' + st + '">' +
-      _fmtNum(it.qty_on_stock) + ' <span class="pt-row-stock-sub">' + escapeHtml(unit) + '</span>' +
-      defectBadge +
-      '</div>';
-  }
+  // Stock колонка — v2.45.641: остаток крупно, «мин. N» отдельной строкой под ним
+  const stockHtml = '<div class="pt-row-stock ' + st + '">' +
+    '<span class="pt-stock-n">' + _fmtNum(it.qty_on_stock) + ' <small>' + escapeHtml(unit) + '</small></span>' +
+    (it.min_stock > 0 ? '<span class="pt-stock-min">мин. ' + _fmtNum(it.min_stock) + '</span>' : '') +
+    defectBadge +
+    '</div>';
 
   // Consumption
   const consumeHtml = '<div class="pt-row-consume">' +
@@ -3897,19 +3937,32 @@ function _renderPtRow(it) {
   let mainBtn;
   if (st === 'zero' || st === 'critical') {
     const recommend = Math.max(1, Math.round((it.min_stock || 1) * 2 - (it.qty_on_stock || 0)));
-    mainBtn = '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
-      '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span></button>';
+    // v2.45.641: если заявку по позиции уже оформляли в этой сессии — зелёная ✓
+    const ordered = !!(window._ptOrdered && window._ptOrdered[it.id]);
+    mainBtn = ordered
+      ? '<button class="btn-order pt-ordered" title="Заявка оформлялась в этой сессии — нажми, чтобы оформить ещё" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
+          '<i class="ti ti-check"></i><span>В заявке</span></button>'
+      : '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
+          '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span></button>';
   } else {
     mainBtn = '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
       '<i class="ti ti-minus"></i><span>Расход</span></button>';
   }
   const actionHtml = '<div class="pt-row-action">' + mainBtn + defectBtn + '</div>';
 
+  // v2.45.641: артикул из названия не дублируем — «(0.8) AG-06.000.001 Корпус» +
+  // серым «AG-06.000.001» ещё раз выглядело как два артикула.
+  let dispName = String(it.name || '');
+  const _sku = String(it.sku || '').trim();
+  if (_sku && _sku.length >= 4 && dispName.indexOf(_sku) >= 0) {
+    dispName = dispName.split(_sku).join(' ').replace(/\s{2,}/g, ' ').trim();
+  }
+
   return '<div class="pt-row s-' + st + '" onclick="openPtItemDetail(' + it.id + ')">' +
     '<span class="pt-row-cat-ic"><i class="ti ' + _nvIconFor(it.category_name) + '"></i></span>' +
     '<span class="pt-row-dot ' + st + '"></span>' +
     '<div>' +
-      '<div class="pt-row-name">' + escapeHtml(it.name) +
+      '<div class="pt-row-name">' + escapeHtml(dispName || it.name || '—') +
         (it.sku ? '<span class="pt-row-sku">' + escapeHtml(it.sku) + '</span>' : '') +
       '</div>' +
       '<div class="pt-row-sub">' + escapeHtml(it.category_name || '—') + '</div>' +
@@ -3937,22 +3990,13 @@ function setPtCategoryFilter(catId) {
   _renderPtList();
 }
 
+// Совместимость: КПИ-плитки дёргают эти функции — теперь они управляют сегментом
 function togglePtAttention(forceOn) {
-  if (forceOn === true) {
-    state.ptAttentionOnly = true;
-  } else {
-    state.ptAttentionOnly = !state.ptAttentionOnly;
-  }
-  if (state.ptData) {
-    _renderPtAttentionBtn(state.ptData.kpis.attention_count || 0);
-  }
-  _renderPtList();
+  setPtSeg((forceOn === true || !state.ptAttentionOnly) ? 'attn' : 'all');
 }
 
 function togglePtInStock() {
-  state.ptInStockOnly = !state.ptInStockOnly;
-  _renderPtInStockBtn();
-  _renderPtList();
+  setPtSeg(state.ptInStockOnly ? 'all' : 'stock');
 }
 
 let _ptSearchTimer = null;
@@ -3974,7 +4018,11 @@ function openPtOrder(componentId, recommendedQty) {
   // ЭТАП 28.3.1: если у компонента есть связь — заказываем прозрачно
   const item = (state.ptData && state.ptData.items || []).find(i => i.id === componentId);
   if (!item) { showToast('Позиция не найдена', 'error'); return; }
+  // v2.45.641: помечаем «в заявке» на время сессии — защита от дублей заявок
+  window._ptOrdered = window._ptOrdered || {};
+  window._ptOrdered[componentId] = 1;
   _doPtOrder(componentId, recommendedQty, item.supply_item_id);
+  _renderPtList();
 }
 
 function _doPtOrder(componentId, recommendedQty, supplyItemId) {
