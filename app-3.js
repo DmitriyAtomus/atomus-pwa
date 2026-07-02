@@ -495,6 +495,116 @@ function _compPackHint(c) {
     _fmtQty(pack) + ' ' + escapeHtml(unit) + '/упак' + unfold + '</span>';
 }
 
+// ===== v2.45.627: ручное объединение дублей комплектующих =====
+// Авто-«Дубли» ловит только по артикулу/имени; для одинаковых по сути позиций
+// с РАЗНЫМИ названиями (напр. автоматы CHINT) — выбираешь галочками и сливаешь.
+function _compMergeToggle(id, checked) {
+  if (!state.compMergeSel) state.compMergeSel = new Set();
+  if (checked) state.compMergeSel.add(id); else state.compMergeSel.delete(id);
+  _compMergeRefreshBar();
+  // подсветка строки без полной перерисовки — просто перерисуем список
+  if (typeof renderComponentsList === 'function') renderComponentsList();
+}
+function _compMergeClear() {
+  state.compMergeSel = new Set();
+  _compMergeRefreshBar();
+  if (typeof renderComponentsList === 'function') renderComponentsList();
+}
+function _compMergeRefreshBar() {
+  let bar = document.getElementById('comp-merge-bar');
+  const n = (state.compMergeSel && state.compMergeSel.size) || 0;
+  if (n < 1) { if (bar) bar.remove(); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'comp-merge-bar';
+    bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:1200;background:#111827;color:#fff;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px;';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML =
+    '<span>Выбрано: <b>' + n + '</b></span>' +
+    '<button class="btn btn-primary btn-small"' + (n < 2 ? ' disabled' : '') + ' onclick="openCompMergeModal()"><i class="ti ti-git-merge"></i> Объединить</button>' +
+    '<button class="btn btn-secondary btn-small" onclick="_compMergeClear()">Сбросить</button>';
+}
+function openCompMergeModal() {
+  const ids = Array.from(state.compMergeSel || []);
+  if (ids.length < 2) { showToast('Выбери минимум 2 позиции', 'warning'); return; }
+  const all = cache.components || [];
+  const sel = ids.map(id => all.find(c => c.id === id)).filter(Boolean);
+  if (sel.length < 2) { showToast('Позиции не найдены — обнови список', 'error'); return; }
+  let best = sel[0];
+  sel.forEach(c => { if ((Number(c.qty_on_stock) || 0) > (Number(best.qty_on_stock) || 0)) best = c; });
+  const overlayId = 'comp-merge-modal';
+  let m = document.getElementById(overlayId); if (m) m.remove();
+  m = document.createElement('div'); m.id = overlayId; m.className = 'modal-overlay';
+  const rows = sel.map(c =>
+    '<label style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+      '<input type="radio" name="comp-merge-keep" value="' + c.id + '"' + (c.id === best.id ? ' checked' : '') + ' style="margin-top:3px;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:600;font-size:13.5px;word-break:break-word;">' + escapeHtml(c.name || '—') + (c.sku ? ' <span style="color:var(--text-light);font-weight:400;">' + escapeHtml(c.sku) + '</span>' : '') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">id ' + c.id + ' · ' + escapeHtml(c.category_name || '—') + ' · остаток <b>' + _fmtQty(c.qty_on_stock || 0) + ' ' + escapeHtml(c.unit || 'шт.') + '</b></div>' +
+      '</div>' +
+    '</label>'
+  ).join('');
+  const totalQty = sel.reduce((s, c) => s + (Number(c.qty_on_stock) || 0), 0);
+  m.innerHTML =
+    '<div class="modal" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-git-merge"></i> Объединить позиции (' + sel.length + ')</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="font-size:13px;color:var(--text-mid);margin-bottom:10px;">Выбери <b>главную</b> позицию — в неё сольются остальные. Остатки сложатся, ссылки в BOM/договорах и движения перенесутся, лишние уйдут в архив (не удаляются).</div>' +
+        rows +
+        '<div style="margin-top:8px;font-size:13px;color:var(--text-mid);">Итоговый остаток на главной: <b>' + _fmtQty(totalQty) + '</b></div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="comp-merge-go" onclick="submitCompMerge()"><i class="ti ti-git-merge"></i> Объединить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m); m.classList.add('visible');
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+}
+async function submitCompMerge() {
+  const keepRadio = document.querySelector('input[name="comp-merge-keep"]:checked');
+  if (!keepRadio) { showToast('Выбери главную позицию', 'error'); return; }
+  const keepId = parseInt(keepRadio.value, 10);
+  const mergeIds = Array.from(state.compMergeSel || []).filter(id => id !== keepId);
+  if (!mergeIds.length) { showToast('Нужно минимум 2 позиции', 'error'); return; }
+  const btn = document.getElementById('comp-merge-go');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Объединяю…'; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ keep_id: keepId, merge_ids: mergeIds }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || e.detail || ('Не удалось объединить (HTTP ' + r.status + ')'), 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-git-merge"></i> Объединить'; }
+      return;
+    }
+    const d = await r.json();
+    let msg = 'Объединено: ' + (d.merged_count || mergeIds.length);
+    if (d.updated) {
+      const u = d.updated, parts = [];
+      if (u.model_bom_moved) parts.push('BOM: ' + u.model_bom_moved);
+      if (u.contract_items) parts.push('договоров: ' + u.contract_items);
+      if (u.movements) parts.push('движений: ' + u.movements);
+      if (parts.length) msg += ' (' + parts.join(', ') + ')';
+    }
+    showToast(msg, 'success');
+    const mm = document.getElementById('comp-merge-modal'); if (mm) mm.remove();
+    state.compMergeSel = new Set();
+    _compMergeRefreshBar();
+    cache.components = null;
+    if (typeof loadWarehouseComponents === 'function') loadWarehouseComponents();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-git-merge"></i> Объединить'; }
+  }
+}
+
 function renderComponentsList() {
   const container = document.getElementById('comp-list-container');
   const counter = document.getElementById('comp-counter');
@@ -584,7 +694,8 @@ function renderComponentsList() {
     items.forEach(c => {
       const lowStock = (c.min_stock > 0 && c.qty_on_stock < c.min_stock);
       const zeroStock = (c.qty_on_stock <= 0);
-      html += '<div class="comp-row">' +
+      const isSel = !!(state.compMergeSel && state.compMergeSel.has(c.id));
+      html += '<div class="comp-row"' + (isSel ? ' style="background:rgba(37,99,235,0.06);"' : '') + '>' +
         '<div class="comp-row-main" onclick="openComponentDetail(' + c.id + ')">' +
           '<div class="comp-name">' + _highlightAisi(c.name || '—') +
             (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
@@ -600,6 +711,10 @@ function renderComponentsList() {
           '<div class="comp-qty-unit">' + escapeHtml(c.unit || 'шт.') + '</div>' +
         '</div>' +
         '<div class="comp-row-actions">' +
+          // v2.45.627: галочка «выбрать для объединения дублей»
+          '<label title="Выбрать для объединения" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;padding:4px;cursor:pointer;">' +
+            '<input type="checkbox"' + (isSel ? ' checked' : '') + ' onchange="_compMergeToggle(' + c.id + ', this.checked)">' +
+          '</label>' +
           '<button class="btn btn-secondary btn-small" title="Приход" onclick="openComponentReceiveModal(' + c.id + ')"><i class="ti ti-package-import"></i></button>' +
           '<button class="btn btn-secondary btn-small" title="Списать" onclick="openComponentWriteoffModal(' + c.id + ')"><i class="ti ti-package-export"></i></button>' +
           '<button class="btn btn-secondary btn-small" title="История" onclick="openComponentMovements(' + c.id + ')"><i class="ti ti-history"></i></button>' +
@@ -12536,6 +12651,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.629',
+    date: '02.07.2026',
+    title: 'Склад: ручное объединение дублей',
+    features: [
+      'На «Комплектующих» у каждой позиции появилась <b>галочка</b> — отметь одинаковые по сути позиции (даже с разными названиями, как автоматы CHINT) и внизу жми <b>«Объединить»</b>',
+      'Выбираешь <b>главную</b> позицию — в неё сольются остальные: <b>остатки складываются</b>, ссылки в спецификациях/договорах и движения переносятся, лишние уходят в архив',
+      'Помогает, когда авто-«Дубли» не ловит их (названия/артикулы разные), а по факту это один и тот же товар',
+    ],
+  },
   {
     version: 'v2.45.623',
     date: '02.07.2026',
