@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.627-production-dashboard";
+const APP_VERSION = "v2.45.628-work-detail-upgrade";
 const APP_VERSION_DATE = "01.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4222,29 +4222,66 @@ function renderProductionWorkDetail(w) {
     html += '<div class="pkb-form-error" style="margin-bottom:14px;"><i class="ti ti-alert-triangle"></i> Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
   }
 
-  html += '<dl class="pkb-detail-grid">';
+  // v2.45.628: факт-плитки вместо плоского списка — срок с дельтой и цветом,
+  // кликабельный договор, часы план/факт вместе, мини-шкала прогресса.
+  html += '<div class="pwd-facts">';
   if (w.contract_number) {
-    html += '<dt>Договор</dt><dd>' + formatContractNum(w.contract_number) + (w.contractor_name ? (' · ' + escapeHtml(w.contractor_name)) : '') + '</dd>';
+    const cOpen = w.contract_id
+      ? ' class="pwd-fact pwd-fact-link" onclick="closeProductionWorkDetail();state.currentContractId=' + w.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" title="Открыть договор"'
+      : ' class="pwd-fact"';
+    html += '<div' + cOpen + '><div class="pwd-fact-l">Договор</div><div class="pwd-fact-v">' +
+      formatContractNum(w.contract_number) +
+      (w.contract_id ? ' <i class="ti ti-external-link pwd-fact-ext"></i>' : '') +
+      (w.contractor_name ? '<div class="pwd-fact-sub">' + escapeHtml(w.contractor_name) + '</div>' : '') +
+      '</div></div>';
   }
-  html += '<dt>Кол-во</dt><dd>' + (w.qty || 1) + ' шт.</dd>';
-  if (w.deadline_at) html += '<dt>Срок</dt><dd>' + escapeHtml(formatPkbDate(w.deadline_at)) + '</dd>';
-  // Исполнитель — ВСЕГДА показываем строку (даже если не назначен) + кнопка назначить/сменить
+  if (w.deadline_at) {
+    const _iso = String(w.deadline_at).slice(0, 10);
+    const _dLeft = Math.round((new Date(_iso) - new Date(new Date().toISOString().slice(0, 10))) / 86400000);
+    let _dTxt, _dCls;
+    if (w.is_overdue || _dLeft < 0) { _dTxt = 'просрочен на ' + Math.abs(_dLeft) + ' дн'; _dCls = ' bad'; }
+    else if (_dLeft === 0) { _dTxt = 'сегодня'; _dCls = ' warn'; }
+    else if (_dLeft === 1) { _dTxt = 'завтра'; _dCls = ' warn'; }
+    else { _dTxt = 'через ' + _dLeft + ' дн'; _dCls = ''; }
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Срок</div><div class="pwd-fact-v' + _dCls + '">' +
+      escapeHtml(formatPkbDate(w.deadline_at)) +
+      '<div class="pwd-fact-sub' + _dCls + '">' + escapeHtml(_dTxt) + '</div></div></div>';
+  }
+  html += '<div class="pwd-fact"><div class="pwd-fact-l">Кол-во</div><div class="pwd-fact-v">' + (w.qty || 1) + ' шт.</div></div>';
+  if (w.estimated_hours != null || w.actual_hours != null) {
+    const _hp = [];
+    if (w.estimated_hours != null) _hp.push('план ' + w.estimated_hours + 'ч');
+    if (w.actual_hours != null) _hp.push('факт ' + w.actual_hours + 'ч');
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Часы</div><div class="pwd-fact-v">' + escapeHtml(_hp.join(' · ')) + '</div></div>';
+  }
+  // Прогресс — для статусов без редактируемого слайдера ниже
+  if (w.progress != null && w.status !== 'in_progress' && w.status !== 'review' && w.status !== 'packing') {
+    const _p = Math.max(0, Math.min(100, Number(w.progress || 0)));
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Прогресс</div><div class="pwd-fact-v">' + _p + '%' +
+      '<div class="pwd-fact-meter"><i style="width:' + _p + '%;"></i></div></div></div>';
+  }
+  if (w.execution_type && w.execution_type !== 'standard') html += '<div class="pwd-fact"><div class="pwd-fact-l">Исполнение</div><div class="pwd-fact-v">' + escapeHtml(w.execution_type) + '</div></div>';
+  if (w.ip_rating) html += '<div class="pwd-fact"><div class="pwd-fact-l">IP</div><div class="pwd-fact-v">' + escapeHtml(w.ip_rating) + '</div></div>';
+  if (w.started_at)  html += '<div class="pwd-fact"><div class="pwd-fact-l">Начато</div><div class="pwd-fact-v pwd-fact-sm">' + escapeHtml(formatPkbDateTime(w.started_at)) + '</div></div>';
+  if (w.finished_at) html += '<div class="pwd-fact"><div class="pwd-fact-l">Завершено</div><div class="pwd-fact-v pwd-fact-sm">' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</div></div>';
+  html += '</div>';
+
+  // Команда: ответственный + соисполнители — единый блок с аватарами
   {
     const canAssign = hasPermission('production.manage') && w.status !== 'done' && w.status !== 'cancelled';
     const btnLabel = w.assignee_short_name ? 'Сменить' : 'Назначить';
     const btnIcon  = w.assignee_short_name ? 'ti-user-edit' : 'ti-user-plus';
+    const assigneeAv = w.assignee_short_name
+      ? '<span class="pkb-wl-avatar ac-' + ((w.assignee_id || 0) % 8) + '" style="width:22px;height:22px;font-size:9px;">' + escapeHtml(getInitials(w.assignee_short_name)) + '</span> '
+      : '';
     const valueText = w.assignee_short_name
-      ? escapeHtml(w.assignee_short_name)
+      ? assigneeAv + '<b>' + escapeHtml(w.assignee_short_name) + '</b>'
       : '<span style="color:var(--text-faint);font-style:italic;">не назначен</span>';
     const btn = canAssign
-      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:8px;vertical-align:middle;" onclick="openAssignProductionWorkerModal(' + w.id + ')"><i class="ti ' + btnIcon + '" style="font-size:12px;"></i>' + btnLabel + '</button>'
+      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:auto;" onclick="openAssignProductionWorkerModal(' + w.id + ')"><i class="ti ' + btnIcon + '" style="font-size:12px;"></i>' + btnLabel + '</button>'
       : '';
-    html += '<dt>Ответственный</dt><dd>' + valueText + btn + '</dd>';
-  }
-  // v2.43.33: соисполнители — кто ещё подключался временно
-  {
     const coList = w.co_assignees || [];
-    const canEditCo = hasPermission('production.manage') && w.status !== 'done' && w.status !== 'cancelled';
+    const canEditCo = canAssign;
     let coHtml = '';
     if (coList.length) {
       coHtml = coList.map(co => {
@@ -4256,25 +4293,20 @@ function renderProductionWorkDetail(w) {
                 '</span>';
       }).join(' ');
     } else {
-      coHtml = '<span style="color:var(--text-faint);font-style:italic;">никого ещё не подключали</span>';
+      coHtml = '<span style="color:var(--text-faint);font-style:italic;font-size:12px;">никого ещё не подключали</span>';
     }
     const addBtn = canEditCo
-      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:8px;vertical-align:middle;" onclick="openAddCoAssigneeModal(' + w.id + ')"><i class="ti ti-user-plus" style="font-size:12px;"></i>Подключить</button>'
+      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:auto;" onclick="openAddCoAssigneeModal(' + w.id + ')"><i class="ti ti-user-plus" style="font-size:12px;"></i>Подключить</button>'
       : '';
-    html += '<dt>Соисполнители</dt><dd>' + coHtml + addBtn + '</dd>';
+    html += '<div class="pwd-team">' +
+      '<div class="pwd-team-row"><span class="pwd-team-l">Ответственный</span><span class="pwd-team-v">' + valueText + '</span>' + btn + '</div>' +
+      '<div class="pwd-team-row"><span class="pwd-team-l">Соисполнители</span><span class="pwd-team-v">' + coHtml + '</span>' + addBtn + '</div>' +
+    '</div>';
   }
-  if (w.estimated_hours != null) html += '<dt>План часов</dt><dd>' + w.estimated_hours + 'ч</dd>';
-  if (w.actual_hours != null) html += '<dt>Факт часов</dt><dd>' + w.actual_hours + 'ч</dd>';
-  // v2.43.31: прогресс — показываем всегда (для in_progress в виде редактируемого слайдера ниже)
-  if (w.progress != null && w.status !== 'in_progress' && w.status !== 'review' && w.status !== 'packing') {
-    html += '<dt>Прогресс</dt><dd>' + w.progress + '%</dd>';
+
+  if (w.description) {
+    html += '<div class="pwd-desc"><i class="ti ti-file-description"></i><span style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</span></div>';
   }
-  if (w.execution_type && w.execution_type !== 'standard') html += '<dt>Исполнение</dt><dd>' + escapeHtml(w.execution_type) + '</dd>';
-  if (w.ip_rating) html += '<dt>IP</dt><dd>' + escapeHtml(w.ip_rating) + '</dd>';
-  if (w.started_at)  html += '<dt>Начато</dt><dd>'    + escapeHtml(formatPkbDateTime(w.started_at)) + '</dd>';
-  if (w.finished_at) html += '<dt>Завершено</dt><dd>' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</dd>';
-  if (w.description) html += '<dt>Описание</dt><dd style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</dd>';
-  html += '</dl>';
 
   // v2.43.31: блок прогресса с возможностью редактирования (только in_progress/review/packing)
   const canEditWork = hasPermission('production.manage') &&
@@ -5408,10 +5440,16 @@ function renderPkbBomBlock(w) {
   const titleText = hasCritical
     ? 'Дефицит — работа заблокирована'
     : 'Дефицит некритичных компонентов';
+  // v2.45.628: сводка «N позиций · −M шт» + переход в «Что закупить»
+  const totalDef = missing.reduce((s, m) => s + (parseFloat(m.deficit) || 0), 0);
 
   let html = '<div class="pkb-bom-block">';
-  html +=   '<div class="pkb-bom-title" style="color:' + titleColor + ';">';
+  html +=   '<div class="pkb-bom-title" style="color:' + titleColor + ';display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
   html +=     '<i class="ti ' + titleIcon + '"></i>' + escapeHtml(titleText);
+  html +=     '<span style="font-weight:600;color:var(--text-light);font-size:11.5px;">· ' + missing.length + ' ' + plural(missing.length, 'позиция', 'позиции', 'позиций') + ' · −' + pkbFmtQty(totalDef) + ' шт.</span>';
+  html +=     '<button class="pkb-btn" style="margin-left:auto;padding:3px 10px;font-size:11.5px;" ' +
+                'onclick="closeProductionWorkDetail();selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')" ' +
+                'title="Открыть Снабжение → Что закупить"><i class="ti ti-shopping-cart" style="font-size:12px;"></i> Что закупить</button>';
   html +=   '</div>';
   html +=   '<div class="pkb-bom-list">';
   // v2.43.81: кнопка «Сопоставить со склада» — закрыть BOM-строку ручным списанием
