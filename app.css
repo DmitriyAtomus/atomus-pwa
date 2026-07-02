@@ -19761,3 +19761,49 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   background: #fff; border: 1px solid var(--border); border-radius: 10px;
   padding: 10px 13px; font-size: 13px; color: var(--text-mid); cursor: pointer;
 }
+
+/* ====== v2.45.632: мобильная полировка переработанных экранов ====== */
+
+/* Договоры: на телефоне полоса готовности НЕ прячется, а встаёт третьей
+   строкой на всю ширину (под названием, до блока срок/сумма) */
+@media (max-width: 760px) {
+  #sc-content .ct2-prog { display: block; width: 100%; padding-left: 58px; }
+  #sc-content .ct2-sumrow { gap: 6px; }
+  #sc-content .ct2-sumchip { font-size: 11.5px; padding: 5px 10px; }
+}
+
+/* Производство: строка сборщика — часы/статус/«свободен» в углу сверху,
+   как раньше статус (обёртка заняла grid-area старого статуса) */
+@media (max-width: 720px) {
+  .pkb-wl-right { grid-area: stat; justify-content: flex-end; flex-wrap: wrap; gap: 5px; }
+  .pkb-wl-hrs { font-size: 11.5px; }
+  .pkb-wl-free { display: none; }   /* узко; «недогруз» и так виден */
+}
+
+/* Производство: чипы «узких мест» на телефоне — колонкой на всю ширину */
+@media (max-width: 700px) {
+  .pkb-insights { flex-direction: column; gap: 6px; }
+  .pkb-ins { width: 100%; flex-wrap: wrap; font-size: 12px; }
+  .pkb-ins-go { margin-left: auto; }
+}
+
+/* Главная: строки «Требует внимания» — текст переносится, ссылка вправо вниз */
+@media (max-width: 620px) {
+  .home-att-row { flex-wrap: wrap; align-items: flex-start; }
+  .home-att-t { flex: 1 1 calc(100% - 40px); }
+  .home-att-go { width: 100%; text-align: right; margin-left: 0; }
+  .home-fun-bar { height: 30px; }
+  .home-top-hrs { font-size: 10px; }
+}
+
+/* Приём УПД / Входящие счета: панель массового удаления переносится */
+@media (max-width: 620px) {
+  .edo-bulkbar { flex-wrap: wrap; gap: 8px; }
+  .edo-bulkbar .edo-del-btn { margin-left: 0; }
+}
+
+/* Карточка работы: команда — кнопки не вылетают за край */
+@media (max-width: 560px) {
+  .pwd-team-row { row-gap: 6px; }
+  .pwd-team-row .pkb-btn { margin-left: 0 !important; }
+}
