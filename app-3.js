@@ -8625,17 +8625,32 @@ function _supplyInboxStatusHTML() {
       '<div>IMAP-робот не настроен. Добавь в Railway переменные <b>IMAP_USER</b> и <b>IMAP_PASSWORD</b>.</div>' +
     '</div>';
   }
+  // v2.45.621: разовый сбой связи (напр. TLS-таймаут Яндекса) сам чинится на
+  // следующем опросе — не пугаем красным. Красный только при устойчивом сбое
+  // (fail_streak ≥ 3 подряд ≈ 3+ минуты без связи).
+  const failStreak = Number(s.fail_streak || (s.ok === false ? 1 : 0));
+  const sustainedFail = (s.ok === false) && failStreak >= 3;
   let icon, color, bg, border;
   if (s.ok === true) {
     icon = 'ti-check'; color = '#0A5B41'; bg = 'rgba(34,197,94,0.08)'; border = 'rgba(34,197,94,0.25)';
-  } else if (s.ok === false) {
+  } else if (sustainedFail) {
     icon = 'ti-alert-triangle'; color = '#7F1D1D'; bg = '#FEE2E2'; border = '#FCA5A5';
+  } else if (s.ok === false) {
+    icon = 'ti-refresh'; color = '#92400E'; bg = '#FEF3C7'; border = '#FCD34D';   // жёлтый: разовый блип
   } else {
     icon = 'ti-loader'; color = 'var(--text-mid)'; bg = 'var(--bg)'; border = 'var(--border)';
   }
+  const _fmtTs = (v) => v ? escapeHtml(String(v).replace('T', ' ').substring(0, 16)) : '';
   let line2;
   if (s.ok === false) {
-    line2 = 'Этап «' + escapeHtml(s.stage || 'unknown') + '»: ' + escapeHtml(s.error || 'неизвестная ошибка');
+    if (sustainedFail) {
+      line2 = 'Почта не отвечает ' + failStreak + ' проверок подряд. Этап «' + escapeHtml(s.stage || 'unknown') +
+        '»: ' + escapeHtml(s.error || 'неизвестная ошибка') +
+        (s.last_ok_at ? '. Последний успех: ' + _fmtTs(s.last_ok_at) : '');
+    } else {
+      line2 = 'Разовый сбой связи с почтой (' + escapeHtml(s.error || 'таймаут') + ') — повторяем через ' +
+        (cfg.interval_sec || 60) + ' с. Приём писем не остановлен.';
+    }
   } else if (s.ok === true) {
     const parts = [];
     parts.push('Найдено в ящике: ' + (s.found_uids || 0));
@@ -12336,6 +12351,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.621',
+    date: '02.07.2026',
+    title: 'Входящие счета: разовый сбой почты не пугает красным',
+    features: [
+      'Если IMAP-робот <b>разово</b> не смог подключиться к почте (таймаут Яндекса) — теперь <b>жёлтая</b> плашка «повторяем через минуту», а не тревожная красная: приём писем не остановлен, следующая проверка обычно проходит',
+      'Красным горит только при <b>устойчивом</b> сбое (не отвечает несколько проверок подряд) — тогда показываем, когда был последний успех',
+    ],
+  },
   {
     version: 'v2.45.620',
     date: '02.07.2026',
