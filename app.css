@@ -20034,3 +20034,44 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   background: rgba(255,255,255,.10); color: #C7D5E6;
   border-radius: 10px;
 }
+
+/* ====== Склад · Готовая продукция: строки v2 (v2.45.639) ====== */
+.fp-row.fp2 {
+  grid-template-columns: 12px 1fr 84px 52px 16px;
+  gap: 4px 10px;
+  border-left: 3px solid #34D399;
+  border-radius: 12px;
+}
+.fp-row.fp2.av-mix { border-left-color: #F59E0B; }
+.fp-row.fp2.av-res { border-left-color: #F87171; }
+.fp-row.fp2.fp2-isdead { background: rgba(226,75,74,.04); }
+.fp2-main { min-width: 0; }
+.fp2-q { text-align: center; }
+.fp2-n { font-size: 16px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.fp2-n small { font-size: 10px; color: var(--text-faint); font-weight: 700; }
+.fp2-q.free .fp2-n { color: #047857; }
+.fp2-q.zero .fp2-n { color: #D3DAE4; }
+.fp2-of { font-size: 9.5px; color: var(--text-faint); font-weight: 600; margin-top: 2px; white-space: nowrap; }
+.fp2-bar { margin-top: 4px; height: 4px; border-radius: 2px; background: #FDE68A; overflow: hidden; }
+.fp2-bar i { display: block; height: 100%; background: #34D399; }
+.fp2-chev { color: var(--text-faint); font-size: 14px; }
+.fp2-res {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600; color: #92400E;
+  background: #FEF3C7; border-radius: 7px; padding: 4px 9px;
+  margin-top: 3px; min-width: 0;
+}
+.fp2-res .ti { font-size: 12px; flex-shrink: 0; }
+.fp2-res-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fp2-res-more { margin-left: auto; flex-shrink: 0; background: #fff; border-radius: 5px; padding: 1px 6px; font-size: 10px; font-weight: 800; }
+.fp2-dead {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600; color: #8C2A2A;
+  background: #FEE2E2; border-radius: 7px; padding: 4px 9px; margin-top: 3px;
+}
+@media (max-width: 480px) {
+  .fp-row.fp2 { grid-template-columns: 10px 1fr 76px 14px; }
+  .fp-row.fp2 .fp-row-age { display: none; }
+}

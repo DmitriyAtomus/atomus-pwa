@@ -3259,7 +3259,24 @@ function _renderFpList() {
   // Фильтр по статусу
   if (state.fpStatusFilter === 'free')     items = items.filter(it => it.free_qty > 0 && it.reserved_qty === 0);
   if (state.fpStatusFilter === 'reserved') items = items.filter(it => it.reserved_qty > 0);
+  if (state.fpStatusFilter === 'mixed')    items = items.filter(it => it.free_qty > 0 && it.reserved_qty > 0);
   if (state.fpStatusFilter === 'dead90')   items = items.filter(it => it.age_category === 'dead');
+
+  // v2.45.639: живые счётчики на табах фильтров (по полному списку, до фильтра)
+  {
+    const all = state.fpData.items || [];
+    const cnt = {
+      all: all.length,
+      free: all.filter(it => it.free_qty > 0 && it.reserved_qty === 0).length,
+      reserved: all.filter(it => it.reserved_qty > 0).length,
+      mixed: all.filter(it => it.free_qty > 0 && it.reserved_qty > 0).length,
+    };
+    const lbl = { all: 'Все', free: 'Свободные', reserved: 'Резерв', mixed: 'Смешанные' };
+    document.querySelectorAll('.filter-tab[data-fp-status]').forEach(b => {
+      const k = b.dataset.fpStatus;
+      if (lbl[k] != null) b.textContent = lbl[k] + (cnt[k] ? ' · ' + cnt[k] : '');
+    });
+  }
 
   // Фильтр по категории
   if (state.fpCategoryFilter != null) {
@@ -3306,70 +3323,64 @@ function _renderFpList() {
 }
 
 function _renderFpRow(it) {
-  const isReserved = it.reserved_qty > 0;
+  // v2.45.639: цвет полоски = доступность, «свободно из всего» с мини-баром,
+  // резерв — отдельной жёлтой строкой на всю ширину (не ломает сетку).
   const isFullyReserved = it.free_qty === 0 && it.reserved_qty > 0;
   const isMixed = it.free_qty > 0 && it.reserved_qty > 0;
   const isDead = it.age_category === 'dead';
+  const avCls = isFullyReserved ? 'av-res' : (isMixed ? 'av-mix' : 'av-free');
 
-  const rowTone = isDead ? 'tone-red' : (isReserved ? 'tone-yellow' : '');
+  // Подстрока — всегда категория + кол-во сборок (резерв ушёл в свою строку)
+  const subParts = [];
+  if (it.direction_name) subParts.push(escapeHtml(it.direction_name));
+  subParts.push(it.assemblies_count + ' ' + _plural(it.assemblies_count, ['сборка', 'сборки', 'сборок']));
 
-  // Подстрока
-  let subText = '';
-  let subClass = '';
-  if (isDead) {
-    subClass = 'dead';
-    subText = '<i class="ti ti-alert-triangle" style="font-size:12px;"></i>Лежит больше 90 дней — проверить актуальность';
-  } else if (isReserved) {
-    subClass = 'reserved';
+  // Количество: свободно крупно, «из N шт» + мини-бар доли свободного
+  let qtyHtml;
+  if (it.reserved_qty > 0) {
+    const pct = it.total_qty > 0 ? Math.round(it.free_qty / it.total_qty * 100) : 0;
+    qtyHtml = '<div class="fp2-q' + (it.free_qty === 0 ? ' zero' : '') + '">' +
+      '<div class="fp2-n">' + it.free_qty + ' <small>св.</small></div>' +
+      '<div class="fp2-of">из ' + it.total_qty + ' шт</div>' +
+      '<div class="fp2-bar"><i style="width:' + pct + '%;"></i></div>' +
+    '</div>';
+  } else {
+    qtyHtml = '<div class="fp2-q free">' +
+      '<div class="fp2-n">' + it.total_qty + ' <small>шт</small></div>' +
+      '<div class="fp2-of">все свободны</div>' +
+    '</div>';
+  }
+
+  // Резерв — одной строкой с обрезкой
+  let resLine = '';
+  if (it.reserved_qty > 0) {
     const r = (it.reservations || [])[0];
     if (r) {
-      // v2.45.58: если в contract_number уже есть «№» в начале — не дублируем
-      const _rawN = String(r.contract_number || '—');
-      const _cleanN = _rawN.replace(/^№\s*/, '');
-      let resTxt = '<i class="ti ti-lock" style="font-size:12px;"></i>Резерв: №' + escapeHtml(_cleanN);
-      if (r.contractor_name) resTxt += ' · ' + escapeHtml(r.contractor_name);
-      if ((it.reservations || []).length > 1) {
-        resTxt += ' <span style="color:var(--text-light);">+' + ((it.reservations.length - 1)) + ' договор.</span>';
-      }
-      subText = resTxt;
+      const _cleanN = String(r.contract_number || '—').replace(/^№\s*/, '');
+      resLine = '<div class="fp2-res"><i class="ti ti-lock"></i>' +
+        '<span class="fp2-res-txt">' + it.reserved_qty + ' в резерве: №' + escapeHtml(_cleanN) +
+        (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : '') + '</span>' +
+        ((it.reservations || []).length > 1 ? '<span class="fp2-res-more">+' + (it.reservations.length - 1) + ' дог.</span>' : '') +
+      '</div>';
     }
-  } else {
-    // обычная — категория + кол-во сборок
-    const parts = [];
-    if (it.direction_name) parts.push(escapeHtml(it.direction_name));
-    parts.push(it.assemblies_count + ' ' + _plural(it.assemblies_count, ['сборка', 'сборки', 'сборок']));
-    subText = parts.join(' · ');
   }
+  // Залежалось — своей строкой
+  const deadLine = isDead
+    ? '<div class="fp2-dead"><i class="ti ti-alert-triangle"></i>Лежит больше 90 дней — проверить актуальность</div>'
+    : '';
 
-  // Количество: показываем X / Y если есть и резерв и свободно
-  let qtyHtml;
-  if (isMixed) {
-    qtyHtml = '<div class="fp-row-qty">' + it.free_qty + ' <span class="fp-row-qty-sub">/ ' + it.total_qty + ' шт</span></div>';
-  } else {
-    qtyHtml = '<div class="fp-row-qty">' + it.total_qty + ' <span class="fp-row-qty-sub">шт</span></div>';
-  }
-
-  // Возраст
-  const ageCls = it.age_category;
-  const ageText = it.oldest_age_days + ' дн';
-
-  // Бейдж
-  let badgeHtml;
-  if (isMixed)            badgeHtml = '<span class="fp-row-badge mixed">смешан</span>';
-  else if (isFullyReserved) badgeHtml = '<span class="fp-row-badge reserved">резерв</span>';
-  else                    badgeHtml = '<span class="fp-row-badge free">свободна</span>';
-
-  return '<div class="fp-row ' + rowTone + '" onclick="openFpModelDetail(' + it.model_id + ')">' +
-    '<span class="fp-row-dot ' + it.age_category + '"></span>' +
-    '<div>' +
+  return '<div class="fp-row fp2 ' + avCls + (isDead ? ' fp2-isdead' : '') + '" onclick="openFpModelDetail(' + it.model_id + ')">' +
+    '<span class="fp-row-dot ' + it.age_category + '" title="Возраст самой старой сборки"></span>' +
+    '<div class="fp2-main">' +
       '<div class="fp-row-name">' + escapeHtml(it.model_name) +
         (it.model_article ? '<span class="fp-row-article">' + escapeHtml(it.model_article) + '</span>' : '') +
       '</div>' +
-      '<div class="fp-row-sub ' + subClass + '">' + subText + '</div>' +
+      '<div class="fp-row-sub">' + subParts.join(' · ') + '</div>' +
     '</div>' +
     qtyHtml +
-    '<div class="fp-row-age ' + ageCls + '">' + ageText + '</div>' +
-    badgeHtml +
+    '<div class="fp-row-age ' + it.age_category + '">' + it.oldest_age_days + ' дн</div>' +
+    '<i class="ti ti-chevron-right fp2-chev"></i>' +
+    resLine + deadLine +
     '</div>';
 }
 
