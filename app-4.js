@@ -11327,6 +11327,24 @@ async function openSiQtyEditPrompt(itemId, currentQty) {
   }
 }
 
+// v2.45.619: правка фасовки (штук в упаковке) — если распозналось криво.
+// Приход в штуки = кол-во упаковок × эта фасовка.
+async function openSiPackEditPrompt(itemId, currentPack) {
+  const s = prompt('Штук в одной упаковке (например 100):', String(currentPack || '').replace(/\s/g, ''));
+  if (s === null) return;
+  const v = parseFloat(String(s).replace(',', '.').replace(/\s/g, ''));
+  if (isNaN(v) || v <= 0) { showToast('Некорректное число', 'error'); return; }
+  const invoiceId = siState.currentInvoiceId;
+  if (!invoiceId) { showToast('Нет открытой УПД', 'error'); return; }
+  try {
+    await apiPatch('/api/supply/invoices/' + invoiceId + '/items/' + itemId, { pack_size: v });
+    showToast('Фасовка обновлена: ' + v + ' шт/упак', 'success');
+    loadSupplyInvoiceDetail(invoiceId);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
 // Быстрое редактирование name (полное название позиции) — если Claude распознал криво
 async function openSiNameEditPrompt(itemId, currentName) {
   const newName = prompt('Название позиции:', currentName || '');
@@ -11436,8 +11454,18 @@ function renderSiItemRow(it) {
   const qtyStyle = 'text-align:right;font-variant-numeric:tabular-nums;' +
                    (it.is_refused ? 'text-decoration:line-through;' : 'cursor:pointer;border-bottom:1px dashed transparent;') ;
   const qtyAttr = it.is_refused ? '' : ' onclick="openSiQtyEditPrompt(' + it.id + ',\'' + qty + '\')"';
-  html += '<div style="' + qtyStyle + '"' + qtyTitle + qtyAttr + '>' +
-            qty + ' ' + escapeHtml(unit) +
+  // v2.45.619: если строка в упаковках и известна фасовка — показываем перевод
+  // «= N шт (×фасовка)» под количеством. Клик по нему правит фасовку.
+  const packEff = Number(it.pack_effective || 1);
+  const packLine = (!it.is_refused && packEff > 1)
+    ? '<div style="font-size:11px;color:#065F46;font-weight:700;cursor:pointer;margin-top:2px;white-space:nowrap;" ' +
+        'title="Штук в упаковке — нажмите, чтобы поправить" ' +
+        'onclick="event.stopPropagation();openSiPackEditPrompt(' + it.id + ',' + packEff + ')">' +
+        '= ' + pkbFmtQty(it.qty_base) + ' шт <span style="color:var(--text-faint);font-weight:400;">(×' + pkbFmtQty(packEff) + ')</span></div>'
+    : '';
+  html += '<div style="text-align:right;">' +
+            '<div style="' + qtyStyle + '"' + qtyTitle + qtyAttr + '>' + qty + ' ' + escapeHtml(unit) + '</div>' +
+            packLine +
           '</div>';
   // destination select
   html += '<div>' + renderSiDestSelect(it) + '</div>';
