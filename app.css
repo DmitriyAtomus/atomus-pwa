@@ -19550,3 +19550,70 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .cct-brak { width: 26px; height: 26px; }
   .cct-gchips { display: none; }
 }
+
+/* ====== Производство: KPI-фильтры, узкие места, сегментная загрузка (v2.45.627) ====== */
+.pkb-kpi.clickable { cursor: pointer; position: relative; transition: box-shadow .12s, transform .12s; }
+.pkb-kpi.clickable:hover { box-shadow: 0 3px 10px rgba(20,33,61,.10); transform: translateY(-1px); }
+.pkb-kpi.pkb-kpi-active { outline: 2px solid var(--brand); outline-offset: -2px; }
+.pkb-kpi-flt { position: absolute; top: 7px; right: 9px; font-size: 9.5px; font-weight: 700; color: var(--text-faint); }
+.pkb-kpi.pkb-kpi-active .pkb-kpi-flt { color: var(--brand); }
+.pkb-kpi-meter { margin: 5px 0 2px; height: 5px; border-radius: 3px; background: #EDF1F7; overflow: hidden; }
+.pkb-kpi-meter i { display: block; height: 100%; border-radius: 3px; background: #047857; }
+
+.pkb-filter-banner {
+  display: flex; align-items: center; gap: 9px;
+  margin: 10px 0 0; padding: 8px 13px;
+  background: var(--brand-bg, #EAF2FA); border: 1px solid #BFD5E8; border-radius: 10px;
+  font-size: 13px; font-weight: 600; color: var(--brand);
+}
+.pkb-filter-banner button {
+  margin-left: auto; border: none; background: #fff; color: var(--brand);
+  border-radius: 7px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+
+.pkb-insights { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.pkb-ins {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #fff; border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 12px; font-size: 12.5px; color: var(--text-mid); cursor: pointer;
+  transition: background .12s;
+}
+.pkb-ins:hover { background: var(--brand-bg, #EAF2FA); }
+.pkb-ins.pkb-ins-static { cursor: default; }
+.pkb-ins.pkb-ins-static:hover { background: #fff; }
+.pkb-ins b { color: var(--text-dark); }
+.pkb-ins-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.pkb-ins-dot.r { background: #EF4444; }
+.pkb-ins-dot.y { background: #F59E0B; }
+.pkb-ins-dot.b { background: var(--brand); }
+.pkb-ins-go { color: var(--brand); font-weight: 700; white-space: nowrap; }
+
+/* Легенда и сегменты шкалы загрузки */
+.pkb-wl-legend { display: inline-flex; gap: 10px; font-size: 11px; color: var(--text-light); margin-left: 10px; }
+.pkb-wl-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.pkb-wl-sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.pkb-wl-sw.sw-main { background: var(--brand); }
+.pkb-wl-sw.sw-help { background: #A8C4DC; }
+.pkb-wl-sw.sw-over { background: repeating-linear-gradient(45deg, #EF4444, #EF4444 3px, #F87171 3px, #F87171 6px); }
+/* Полупрозрачные, как старая заливка, — поверх идёт тёмный текст «чем занят» */
+.pkb-wl-seg { position: absolute; top: 0; height: 100%; opacity: .5; }
+.pkb-wl-seg-main { background: var(--brand); border-radius: 6px 0 0 6px; }
+.pkb-wl-seg-help { background: #7FA7C9; border-left: 2px solid #fff; }
+.pkb-wl-seg-over { background: repeating-linear-gradient(45deg, #EF4444, #EF4444 5px, #F87171 5px, #F87171 10px); border-left: 2px solid #fff; border-radius: 0 6px 6px 0; opacity: .65; }
+.pkb-wl-row-active { background: var(--brand-bg, #EAF2FA); border-radius: 8px; }
+.pkb-wl-right { display: flex; align-items: center; gap: 7px; justify-content: flex-end; flex-wrap: wrap; }
+.pkb-wl-hrs { font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-dark); white-space: nowrap; }
+.pkb-wl-free {
+  font-size: 10.5px; font-weight: 700; color: var(--brand);
+  background: var(--brand-bg, #EAF2FA); border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+
+/* Σ часов в шапке колонки, часы в строке прогресса карточки */
+.pkb-col-sum { font-size: 10.5px; font-weight: 700; color: var(--text-faint); margin-left: auto; white-space: nowrap; }
+.pkb-wc-hrs-inline { font-size: 10.5px; color: var(--text-light); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .pkb-wl-legend { display: none; }
+  .pkb-kpi-flt { display: none; }
+}

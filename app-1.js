@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.626-components-table-view";
+const APP_VERSION = "v2.45.627-production-dashboard";
 const APP_VERSION_DATE = "01.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2861,6 +2861,42 @@ async function fetchProductionKanban() {
   };
 }
 
+// v2.45.627: фильтры доски — клик по KPI-плитке («Просрочка», «Нет деталей»)
+// или по сборщику в «Загрузке» показывает только его карточки. Повторный клик — сброс.
+let _pkbFilter = null;   // {type:'overdue'|'blocked'|'assignee', id, name}
+
+function pkbSetFilter(type, id, name) {
+  if (_pkbFilter && _pkbFilter.type === type && (_pkbFilter.id || null) === (id || null)) {
+    _pkbFilter = null;
+  } else {
+    _pkbFilter = { type: type, id: id || null, name: name || '' };
+  }
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
+function pkbResetFilter() {
+  _pkbFilter = null;
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
+function _pkbMatchFilter(w) {
+  if (!_pkbFilter) return true;
+  if (_pkbFilter.type === 'overdue') return !!w.is_overdue;
+  if (_pkbFilter.type === 'blocked') return !!w.is_blocked;
+  if (_pkbFilter.type === 'assignee') {
+    if (w.assignee_id === _pkbFilter.id) return true;
+    return (w.co_assignee_ids || []).indexOf(_pkbFilter.id) >= 0;
+  }
+  return true;
+}
+
+// Часы работы для планирования: факт из журнала → расчётные → дефолт (16ч)
+function _pkbWorkHours(w, defHrs) {
+  const sh = parseFloat(w.session_hours || 0);
+  if (sh > 0) return sh;
+  const eh = parseFloat(w.estimated_hours || 0);
+  if (eh > 0) return eh;
+  return defHrs || 16;
+}
+
 function renderProductionDashboard(d) {
   const container = document.getElementById('dashboard-content');
   if (!container) return;
@@ -2896,6 +2932,22 @@ function renderProductionDashboard(d) {
     });
   });
 
+  // v2.45.627: экстры для KPI/инсайтов считаем ДО фильтрации (полная картина)
+  const defHrs = (d.workload && d.workload.default_hours_per_work) || 16;
+  const _queueAll = byCol.queue.slice();
+  const _activeAll = byCol.queue.concat(byCol.in_progress, byCol.review, byCol.packing);
+  const queueHours = _queueAll.reduce((s, w) => s + _pkbWorkHours(w, defHrs), 0);
+  let worstOverdue = 0;
+  _activeAll.forEach(w => {
+    if (w.is_overdue) worstOverdue = Math.max(worstOverdue, pkbOverdueDays(w.deadline_at));
+  });
+  const kpiExtras = { queueHours: queueHours, worstOverdue: worstOverdue };
+
+  // Применяем активный фильтр к колонкам (после подсчёта экстр)
+  if (_pkbFilter) {
+    Object.keys(byCol).forEach(k => { byCol[k] = byCol[k].filter(_pkbMatchFilter); });
+  }
+
   window.PKB_V2 = (localStorage.getItem('pkbV2') !== '0');
   let html = _pkbToggleBar();
 
@@ -2925,7 +2977,20 @@ function renderProductionDashboard(d) {
   html += '</div>';
 
   // --- KPI ряд ---
-  html += renderPkbKpi(kpi);
+  html += renderPkbKpi(kpi, kpiExtras);
+
+  // --- v2.45.627: баннер активного фильтра ---
+  if (_pkbFilter) {
+    const fLbl = _pkbFilter.type === 'overdue' ? 'только просроченные'
+      : _pkbFilter.type === 'blocked' ? 'только «нет деталей»'
+      : 'только работы: ' + escapeHtml(_pkbFilter.name || '');
+    html += '<div class="pkb-filter-banner"><i class="ti ti-filter"></i>' +
+      '<span>Показаны ' + fLbl + '</span>' +
+      '<button onclick="pkbResetFilter()"><i class="ti ti-x"></i> сбросить</button></div>';
+  }
+
+  // --- v2.45.627: строка «узких мест» — автоматические выводы из данных доски ---
+  html += _pkbInsightsHtml(_activeAll, _queueAll, d.workload || {}, defHrs);
 
   // --- Виджет загрузки сборщиков (Stage 29.4) ---
   html += renderPkbWorkload(d.workload || { workers: [], norm_hours: 40 });
@@ -2962,11 +3027,22 @@ function renderProductionDashboard(d) {
     const chevron = isDoneCol
       ? '<i class="ti ' + (collapsed ? 'ti-chevron-down' : 'ti-chevron-up') + '" style="margin-left:auto;font-size:14px;color:var(--text-light);"></i>'
       : '';
+    // v2.45.627: Σ часов колонки — ёмкость видна без открытия карточек.
+    // Очередь — расчётные часы (или дефолт), «В работе» — фактические из журнала.
+    let colSum = '';
+    if (def.key === 'queue' && items.length) {
+      const h = items.reduce((s, w) => s + _pkbWorkHours(w, defHrs), 0);
+      colSum = '<div class="pkb-col-sum" title="Суммарные расчётные часы работ в колонке">Σ ~' + formatHours(h) + 'ч</div>';
+    } else if (def.key === 'in_progress' && items.length) {
+      const h = items.reduce((s, w) => s + parseFloat(w.session_hours || 0), 0);
+      if (h > 0) colSum = '<div class="pkb-col-sum" title="Суммарные фактические часы по журналу">Σ ' + formatHours(h) + 'ч</div>';
+    }
     html += '<div class="pkb-col ' + def.cls + activeCls + colCollapsedCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
     html +=   '<div class="pkb-col-head"' + headClickAttr + '>';
     html +=     '<span class="pkb-col-dot"></span>';
     html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
     html +=     '<div class="pkb-col-count">' + items.length + '</div>';
+    html +=     colSum;
     html +=     chevron;
     html +=   '</div>';
     if (!collapsed) {
@@ -3110,8 +3186,10 @@ function pkbSwitchMobileColumn(colKey) {
   if (col) col.classList.add('active');
 }
 
-function renderPkbKpi(kpi) {
+function renderPkbKpi(kpi, ex) {
   // kpi: { queue, in_progress: {count, assignees}, review, packing, overdue, blocked, week_done, week_plan }
+  // ex (v2.45.627): { queueHours, worstOverdue } — считаются из работ доски
+  ex = ex || {};
   const queueCnt    = (kpi.queue != null) ? kpi.queue : 0;
   const inProgObj   = kpi.in_progress || {};
   const inProgCnt   = (typeof inProgObj === 'object') ? (inProgObj.count || 0) : inProgObj;
@@ -3125,58 +3203,137 @@ function renderPkbKpi(kpi) {
 
   let html = '<div class="pkb-kpi-grid">';
 
-  // 1. В очереди
-  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false, 'ti-clipboard-list');
+  // 1. В очереди — с ёмкостью в часах
+  const queueHint = (ex.queueHours > 0) ? ('≈ ' + formatHours(ex.queueHours) + ' ч работ') : 'ждут сборщика';
+  html += pkbKpiCard('В очереди', queueCnt, queueHint, 'k-neutral', { icon: 'ti-clipboard-list' });
 
   // 2. В работе
   const inProgHint = inProgAss ? (inProgAss + ' ' + plural(inProgAss, 'сборщик', 'сборщика', 'сборщиков')) : '—';
-  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false, 'ti-tool');
+  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', { icon: 'ti-tool' });
 
-  // 3. Просрочка
-  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0, 'ti-alert-triangle');
+  // 3. Просрочка — клик фильтрует доску
+  const odHint = overdueCnt > 0
+    ? (ex.worstOverdue > 0 ? 'худшая — ' + ex.worstOverdue + ' ' + plural(ex.worstOverdue, 'день', 'дня', 'дней') : 'требуют внимания')
+    : 'нет просрочек';
+  html += pkbKpiCard('Просрочка', overdueCnt, odHint, 'k-danger', {
+    icon: 'ti-alert-triangle',
+    onclick: overdueCnt > 0 ? "pkbSetFilter('overdue')" : '',
+    active: _pkbFilter && _pkbFilter.type === 'overdue',
+  });
 
-  // 4. На проверке (или Заблокированы, если есть)
+  // 4. Нет деталей (бывш. «Заблокированы») — клик фильтрует; либо «На проверке»
   if (blockedCnt > 0) {
-    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false, 'ti-lock');
+    html += pkbKpiCard('Нет деталей', blockedCnt, 'ждут комплектующих', 'k-warning', {
+      icon: 'ti-lock',
+      onclick: "pkbSetFilter('blocked')",
+      active: _pkbFilter && _pkbFilter.type === 'blocked',
+    });
   } else {
-    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false, 'ti-checks');
+    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', { icon: 'ti-checks' });
   }
 
   // 5. v2.34.2: Упаковка
-  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false, 'ti-package');
+  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', { icon: 'ti-package' });
 
-  // 6. За неделю
-  let weekVal, weekHint;
+  // 6. За неделю — с мини-шкалой факт/план
+  let weekVal, weekHint, weekMeter = null;
   if (weekPlan != null && weekPlan > 0) {
-    weekVal = weekDone + ' / ' + weekPlan;
     const pct = Math.round(weekDone / weekPlan * 100);
-    weekHint = 'факт / план · ' + pct + '%';
+    weekVal = weekDone + ' / ' + weekPlan;
+    weekHint = pct + '% плана';
+    weekMeter = Math.min(100, pct);
   } else {
     weekVal = String(weekDone);
     weekHint = 'завершено';
   }
-  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false, 'ti-circle-check');
+  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', { icon: 'ti-circle-check', meterPct: weekMeter });
 
   html += '</div>';
   return html;
 }
 
-function pkbKpiCard(label, value, hint, cls, clickable, icon) {
-  const clickAttr = clickable ? ' onclick="pkbFilterOverdue()"' : '';
-  const iconHtml = icon ? '<div class="pkb-kpi-ic"><i class="ti ' + icon + '"></i></div>' : '';
-  return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + '"' + clickAttr + '>' +
+function pkbKpiCard(label, value, hint, cls, opts) {
+  opts = opts || {};
+  const clickable = !!opts.onclick;
+  const clickAttr = clickable ? ' onclick="' + opts.onclick + '"' : '';
+  const activeCls = opts.active ? ' pkb-kpi-active' : '';
+  const iconHtml = opts.icon ? '<div class="pkb-kpi-ic"><i class="ti ' + opts.icon + '"></i></div>' : '';
+  const meterHtml = (opts.meterPct != null)
+    ? '<div class="pkb-kpi-meter"><i style="width:' + opts.meterPct + '%;"></i></div>'
+    : '';
+  const fltHtml = clickable ? '<span class="pkb-kpi-flt">' + (opts.active ? 'фильтр ✓' : 'фильтр') + '</span>' : '';
+  return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + activeCls + '"' + clickAttr +
+           (clickable ? ' title="Нажми — доска покажет только эти работы; повторно — сброс"' : '') + '>' +
            iconHtml +
            '<div class="pkb-kpi-body">' +
              '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
              '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
+             meterHtml +
              '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
            '</div>' +
+           fltHtml +
          '</div>';
 }
 
-function pkbFilterOverdue() {
-  // Заглушка под фильтр просрочки. В следующем стейдже.
-  showToast('Фильтр по просрочке — в следующем стейдже', 'info');
+// v2.45.627: строка «узких мест» — автоматические выводы из данных доски (без AI).
+// activeWorks — все незавершённые работы (до фильтра), queueWorks — очередь.
+function _pkbInsightsHtml(activeWorks, queueWorks, workload, defHrs) {
+  const chips = [];
+
+  // 1. Где сосредоточена просрочка (по исполнителям)
+  const overdue = activeWorks.filter(w => w.is_overdue);
+  if (overdue.length) {
+    const byWho = {};
+    overdue.forEach(w => {
+      const who = w.assignee_short_name || 'без исполнителя';
+      byWho[who] = (byWho[who] || 0) + 1;
+    });
+    const names = Object.keys(byWho);
+    let txt;
+    if (names.length === 1) {
+      txt = (overdue.length === 1 ? 'Просрочка' : (overdue.length === 2 ? 'Обе просрочки' : 'Все ' + overdue.length + ' просрочки')) +
+        ' — <b>' + escapeHtml(names[0]) + '</b>';
+    } else {
+      txt = '<b>' + overdue.length + '</b> ' + plural(overdue.length, 'просрочка', 'просрочки', 'просрочек') +
+        ' у ' + names.length + ' ' + plural(names.length, 'исполнителя', 'исполнителей', 'исполнителей');
+    }
+    chips.push('<span class="pkb-ins" onclick="pkbSetFilter(\'overdue\')"><span class="pkb-ins-dot r"></span>' + txt +
+      ' <span class="pkb-ins-go">показать →</span></span>');
+  }
+
+  // 2. Сколько работ ждёт деталей + переход в «Что закупить»
+  const blocked = activeWorks.filter(w => w.is_blocked);
+  if (blocked.length) {
+    const missSet = new Set();
+    blocked.forEach(w => (w.missing_components || []).forEach(mc => missSet.add(mc.component_id || mc.name || mc)));
+    const missTxt = missSet.size ? ' — дефицит по ' + missSet.size + ' ' + plural(missSet.size, 'позиции', 'позициям', 'позициям') : '';
+    chips.push('<span class="pkb-ins" onclick="pkbSetFilter(\'blocked\')"><span class="pkb-ins-dot y"></span>' +
+      '<b>' + blocked.length + '</b> ' + plural(blocked.length, 'работа ждёт', 'работы ждут', 'работ ждут') + ' деталей' + escapeHtml(missTxt) +
+      ' <span class="pkb-ins-go" onclick="event.stopPropagation();selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')">что закупить →</span></span>');
+  }
+
+  // 3. Ёмкость очереди в часах и днях при текущем составе сборщиков
+  if (queueWorks.length) {
+    const qh = queueWorks.reduce((s, w) => s + _pkbWorkHours(w, defHrs), 0);
+    const nWorkers = ((workload && workload.workers) || []).length || 1;
+    const days = qh / (8 * nWorkers);
+    const daysR = days >= 10 ? Math.round(days) : Math.round(days * 2) / 2;
+    chips.push('<span class="pkb-ins pkb-ins-static"><span class="pkb-ins-dot b"></span>Очередь ≈ <b>' + formatHours(qh) + ' ч</b>' +
+      ' ≈ <b>' + daysR + ' раб. ' + plural(Math.ceil(daysR), 'день', 'дня', 'дней') + '</b> на ' + nWorkers + ' ' + plural(nWorkers, 'сборщика', 'сборщиков', 'сборщиков') + '</span>');
+  }
+
+  // 4. Ближайший срок в очереди
+  const dated = queueWorks.filter(w => w.deadline_at && !w.is_overdue);
+  if (dated.length) {
+    let minIso = null;
+    dated.forEach(w => { const iso = String(w.deadline_at).slice(0, 10); if (!minIso || iso < minIso) minIso = iso; });
+    const cnt = dated.filter(w => String(w.deadline_at).slice(0, 10) === minIso).length;
+    chips.push('<span class="pkb-ins pkb-ins-static"><span class="pkb-ins-dot b"></span>Ближайший срок в очереди — <b>' +
+      escapeHtml(formatPkbDate(minIso)) + '</b> · ' + cnt + ' ' + plural(cnt, 'работа', 'работы', 'работ') + '</span>');
+  }
+
+  if (!chips.length) return '';
+  return '<div class="pkb-insights">' + chips.join('') + '</div>';
 }
 
 // ============ Stage 29.4: виджет загрузки сборщиков ============
@@ -3209,6 +3366,9 @@ function renderPkbWorkload(workload) {
                 '• Тильда (~) рядом со значением означает что часы оценочные.&#10;' +
                 '• Норма ' + norm + 'ч/неделю. Чтобы получить точные часы — заполните «расч. часы» в карточке работы."></i>' +
               '</div>';
+  html +=     '<span class="pkb-wl-legend"><span><i class="pkb-wl-sw sw-main"></i>основная</span>' +
+                '<span><i class="pkb-wl-sw sw-help"></i>помощь</span>' +
+                '<span><i class="pkb-wl-sw sw-over"></i>сверх нормы</span></span>';
   html +=     '<div class="pkb-workload-norm" title="Норма ' + norm + 'ч в неделю. Работы без указанных часов считаются по ' + defHrs + 'ч.">' +
                 'норма ' + norm + 'ч / неделю' +
               '</div>';
@@ -3320,17 +3480,43 @@ function renderPkbWorkload(workload) {
         '</button>'
       : '';
 
-    html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
+    // v2.45.627: сегментная шкала — тёмное «основная», светлое «помощь» (по долям
+    // работ), штриховка — сверх нормы. Шкала до 130% нормы, риска нормы на 100%.
+    const SCALE = 130;
+    const clamped = Math.min(pct, SCALE);
+    const withinNorm = Math.min(clamped, 100);
+    const overPart = Math.max(0, clamped - 100);
+    const mainShare = works > 0 ? (mainN / works) : 1;
+    const wMain = (withinNorm * mainShare) / SCALE * 100;
+    const wHelp = (withinNorm * (1 - mainShare)) / SCALE * 100;
+    const wOver = overPart / SCALE * 100;
+    const normPos = 100 / SCALE * 100;
+    // Свободные часы до нормы — кому отдать работу из очереди
+    const freeHrs = Math.max(0, norm - hours);
+    const hrsPrefix = isEstimated ? '~' : '';
+    const clickAttr = ' onclick="pkbSetFilter(\'assignee\', ' + w.employee_id + ', ' + JSON.stringify(name).replace(/"/g, '&quot;') + ')"';
+    const isFiltered = _pkbFilter && _pkbFilter.type === 'assignee' && _pkbFilter.id === w.employee_id;
+
+    html += '<div class="pkb-wl-row' + (isFiltered ? ' pkb-wl-row-active' : '') + '" data-employee-id="' + w.employee_id + '"' + clickAttr +
+      ' style="cursor:pointer;" title="' + escapeHtml((w.full_name || name) + ' — нажми, чтобы показать на доске только его работы') + '">';
     html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
     html +=   '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + stopBtn + '</div>';
     html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
     if (works > 0) {
-      html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
+      html += '<div class="pkb-wl-seg pkb-wl-seg-main" style="left:0;width:' + wMain.toFixed(1) + '%;"></div>';
+      if (wHelp > 0.5) html += '<div class="pkb-wl-seg pkb-wl-seg-help" style="left:' + wMain.toFixed(1) + '%;width:' + wHelp.toFixed(1) + '%;"></div>';
+      if (wOver > 0.5) html += '<div class="pkb-wl-seg pkb-wl-seg-over" style="left:' + (wMain + wHelp).toFixed(1) + '%;width:' + wOver.toFixed(1) + '%;"></div>';
     }
-    html +=   '<div class="pkb-wl-norm-line" title="80% — норма"></div>';
+    html +=   '<div class="pkb-wl-norm-line" style="left:' + normPos.toFixed(1) + '%;" title="Норма загрузки (2 работы / ' + norm + 'ч в неделю)"></div>';
     html +=   '<div class="pkb-wl-bar-text">' + escapeHtml(barText) + '</div>';
     html +=   '</div>';
-    html +=   '<div class="pkb-wl-status s-' + status + '">' + escapeHtml(statusLabel) + '</div>';
+    html +=   '<div class="pkb-wl-right">' +
+                '<span class="pkb-wl-hrs" title="' + (isEstimated ? 'Часы оценочные' : 'Часы по журналу/расчёту') + '">' + hrsPrefix + formatHours(hours) + 'ч</span>' +
+                '<span class="pkb-wl-status s-' + status + '">' + escapeHtml(statusLabel) + '</span>' +
+                ((status === 'undersized' && works >= 0 && freeHrs > 0)
+                  ? '<span class="pkb-wl-free" title="Сколько часов можно догрузить до нормы">свободен ~' + formatHours(freeHrs) + 'ч</span>'
+                  : '') +
+              '</div>';
     html += '</div>';
   });
 
@@ -3712,7 +3898,10 @@ function renderPkbWorkCard(w, colKey) {
     } else if (urgencyClass === ' b-tomorrow') {
       badgesHtml += '<div class="pkb-wc-bar b-tomorrow"><i class="ti ti-clock"></i>Срок завтра</div>';
     } else {
-      badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + '</div>';
+      // v2.45.627: дельта в днях — «до 27.07 · 25 дн»
+      const _dLeft = Math.round((new Date(String(w.deadline_at).slice(0, 10)) - new Date(new Date().toISOString().slice(0, 10))) / 86400000);
+      const _dTxt = _dLeft > 0 ? ' · ' + _dLeft + ' дн' : '';
+      badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + _dTxt + '</div>';
     }
   } else if (colKey === 'in_progress') {
     const startedDays = w.started_at ? pkbDaysSince(w.started_at) : 0;
@@ -3733,9 +3922,15 @@ function renderPkbWorkCard(w, colKey) {
   }
 
   // v2.24.0 (Stage 30.0): бейдж блокировки по BOM — только для активных колонок
+  // v2.45.627: показываем СКОЛЬКО позиций не хватает, а в подсказке — каких именно
   if (w.is_blocked && colKey !== 'done') {
-    badgesHtml += '<div class="pkb-wc-blocked" title="Не хватает критичных компонентов">' +
-                    '<i class="ti ti-lock"></i>Нет деталей' +
+    const _miss = w.missing_components || [];
+    const _missTitle = _miss.length
+      ? 'Не хватает:\n' + _miss.map(mc => '• ' + (mc.name || mc.component_name || mc) +
+          (mc.shortage ? ' — ' + mc.shortage : '')).join('\n')
+      : 'Не хватает критичных компонентов';
+    badgesHtml += '<div class="pkb-wc-blocked" title="' + escapeHtml(_missTitle) + '">' +
+                    '<i class="ti ti-lock"></i>Нет деталей' + (_miss.length ? ' · ' + _miss.length : '') +
                   '</div>';
   }
 
@@ -3772,7 +3967,8 @@ function renderPkbWorkCard(w, colKey) {
   }
 
   // v2.43.97: бейдж часов по этой работе из журнала участия
-  const sh = parseFloat(w.session_hours || 0);
+  // v2.45.627: для «В работе» часы показываются в строке прогресса — бейдж не дублируем
+  const sh = (colKey === 'in_progress') ? 0 : parseFloat(w.session_hours || 0);
   if (sh > 0) {
     const hrsStr = (sh % 1 === 0 ? Math.round(sh) : sh.toFixed(1)) + 'ч';
     html += '<div class="pkb-wc-hours" title="Сумма часов по журналу участия">' +
@@ -3795,10 +3991,15 @@ function renderPkbWorkCard(w, colKey) {
     const commentIcon = (w.comment && w.comment.trim())
       ? '<i class="ti ti-message-circle pkb-wc-comment-icon" title="Есть комментарий"></i>'
       : '';
+    // v2.45.627: фактические часы рядом с процентом — темп виден сразу
+    const _sh2 = parseFloat(w.session_hours || 0);
+    const _shTxt = _sh2 > 0
+      ? '<span class="pkb-wc-hrs-inline" title="Часы по журналу участия">· ' + formatHours(_sh2) + 'ч</span>'
+      : '';
     html += '<div class="pkb-wc-progress">' +
               '<div class="pkb-wc-av ac-' + avColorIdx + '" title="' + escapeHtml(w.assignee_short_name || '—') + '">' + escapeHtml(initials) + '</div>' +
               '<div class="pkb-wc-bar-track"><div class="pkb-wc-bar-fill ' + fillCls + '" style="width: ' + pct + '%"></div></div>' +
-              '<div class="pkb-wc-pct">' + pct + '%</div>' +
+              '<div class="pkb-wc-pct">' + pct + '%</div>' + _shTxt +
               commentIcon +
             '</div>';
   } else if (colKey === 'review' || colKey === 'done') {
