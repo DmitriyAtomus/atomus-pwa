@@ -3462,40 +3462,54 @@ async function openFpModelDetail(modelId) {
       body.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>Сборок на складе не найдено</div>';
       return;
     }
+    // v2.45.640: компактная шапка со сводкой + строки в стиле склада —
+    // цвет полоски = доступность, дата по-русски с возрастом, «Списать» иконкой.
     const modelName = stock[0].model_name || '';
     const modelArt  = stock[0].model_article || '';
+    const freeN = stock.filter(s => !s.contract_id).length;
+    const resN = stock.length - freeN;
+    const _fmtD = iso => {
+      const p = String(iso || '').slice(0, 10).split('-');
+      return p.length === 3 ? (p[2] + '.' + p[1] + '.' + p[0].slice(2)) : (iso || '—');
+    };
+    const _ageD = iso => {
+      const t = Date.parse(String(iso || '').slice(0, 10));
+      if (!t || isNaN(t)) return null;
+      return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+    };
     let html =
-      '<div style="background:var(--brand-bg);padding:12px 14px;border-radius:10px;margin-bottom:14px;">' +
-        '<div style="font-weight:600;font-size:15px;color:var(--text-dark);">' + escapeHtml(modelName) + '</div>' +
-        (modelArt ? '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' + escapeHtml(modelArt) + '</div>' : '') +
-        '<div style="font-size:13px;color:var(--brand);margin-top:6px;">Всего на складе: <b>' + stock.length + '</b> сборок</div>' +
+      '<div class="fpm-head">' +
+        '<div class="fpm-name">' + escapeHtml(modelName) +
+          (modelArt ? '<span class="fpm-art">' + escapeHtml(modelArt) + '</span>' : '') + '</div>' +
+        '<div class="fpm-chips">' +
+          '<span class="fpm-chip">' + stock.length + ' ' + _plural(stock.length, ['сборка', 'сборки', 'сборок']) + '</span>' +
+          (freeN ? '<span class="fpm-chip ok">' + freeN + ' ' + _plural(freeN, ['свободна', 'свободны', 'свободны']) + '</span>' : '') +
+          (resN ? '<span class="fpm-chip res">🔒 ' + resN + ' в резерве</span>' : '') +
+        '</div>' +
       '</div>';
-    html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+    html += '<div class="fpm-list">';
     stock.forEach(s => {
-      const reservedBadge = s.contract_id
-        ? '<span style="background:#FEF3C7;color:#854F0B;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">резерв · ' + escapeHtml(s.contract_number || '') + '</span>'
-        : '<span style="background:rgba(29,158,117,0.15);color:#0A5B41;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">свободна</span>';
+      const isRes = !!s.contract_id;
       const exec = [s.execution_label || s.execution, s.ip_class].filter(Boolean).join(' · ');
+      const age = _ageD(s.assembly_date);
+      const chip = isRes
+        ? '<span class="fpm-chip res">🔒 №' + escapeHtml(String(s.contract_number || '—').replace(/^№\s*/, '')) + '</span>'
+        : '<span class="fpm-chip ok">свободна</span>';
+      const writeOff = !isRes
+        ? '<button class="fpm-off" title="Списать эту сборку со склада (брак/использована/инвентаризация)" ' +
+            'onclick="event.stopPropagation(); promptWriteOff(' + s.id + ',' + (s.stock_qty || 0) + ').then(function(ok){ if(ok){ var m=document.getElementById(\'fp-model-assemblies-modal\'); if(m) m.classList.remove(\'visible\'); } });">' +
+            '<i class="ti ti-package-export"></i></button>'
+        : '<span class="fpm-off-ph"></span>';
       html +=
-        '<div class="modal-item" style="border:1px solid var(--border);border-radius:10px;border-bottom:1px solid var(--border);margin-bottom:0;" onclick="document.getElementById(\'fp-model-assemblies-modal\').classList.remove(\'visible\'); openAssemblyStock(' + s.id + ')">' +
-          '<div class="mi-icon"><i class="ti ti-package"></i></div>' +
-          '<div class="mi-text">' +
-            '<div class="mi-title">Сборка #' + s.id + ' · ' + (s.stock_qty || 0) + ' шт.</div>' +
-            '<div class="mi-meta">' +
-              escapeHtml(s.assembly_date || '—') +
-              (exec ? ' · ' + escapeHtml(exec) : '') +
-              ' · ' + reservedBadge +
-            '</div>' +
+        '<div class="fpm-row ' + (isRes ? 'res' : 'ok') + '" onclick="document.getElementById(\'fp-model-assemblies-modal\').classList.remove(\'visible\'); openAssemblyStock(' + s.id + ')">' +
+          '<div class="fpm-main">' +
+            '<div class="fpm-id">#' + s.id + ((s.stock_qty || 0) > 1 ? ' <span class="fpm-qty">· ' + s.stock_qty + ' шт.</span>' : '') + '</div>' +
+            '<div class="fpm-meta">' + escapeHtml(_fmtD(s.assembly_date)) +
+              (age != null ? ' · лежит ' + age + ' дн' : '') +
+              (exec ? ' · ' + escapeHtml(exec) : '') + '</div>' +
           '</div>' +
-          // v2.45.620: «Списать» прямо из списка сборок модели — для свободных
-          // (зарезервированные обещаны договору, их сперва надо освободить).
-          (!s.contract_id
-            ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);border-color:#FCA5A5;" ' +
-                'title="Списать эту сборку со склада (брак/использована/инвентаризация)" ' +
-                'onclick="event.stopPropagation(); promptWriteOff(' + s.id + ',' + (s.stock_qty || 0) + ').then(function(ok){ if(ok){ var m=document.getElementById(\'fp-model-assemblies-modal\'); if(m) m.classList.remove(\'visible\'); } });">' +
-                '<i class="ti ti-package-export"></i> Списать</button>'
-            : '') +
-          '<i class="ti ti-chevron-right" style="color:var(--text-light);font-size:18px;"></i>' +
+          chip + writeOff +
+          '<i class="ti ti-chevron-right fpm-chev"></i>' +
         '</div>';
     });
     html += '</div>';

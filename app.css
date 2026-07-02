@@ -20075,3 +20075,41 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .fp-row.fp2 { grid-template-columns: 10px 1fr 76px 14px; }
   .fp-row.fp2 .fp-row-age { display: none; }
 }
+
+/* ====== Модалка «Сборки этой модели на складе» (v2.45.640) ====== */
+.fpm-head {
+  background: var(--brand-bg); border-radius: 12px;
+  padding: 11px 13px; margin-bottom: 12px;
+}
+.fpm-name { font-weight: 700; font-size: 15px; color: var(--text-dark); }
+.fpm-art { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--text-light); font-weight: 400; margin-left: 8px; }
+.fpm-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.fpm-chip {
+  font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px;
+  background: #fff; color: var(--text-mid); white-space: nowrap;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.fpm-chip.ok { background: #D1FAE5; color: #047857; }
+.fpm-chip.res { background: #FEF3C7; color: #92400E; }
+.fpm-list { display: flex; flex-direction: column; gap: 7px; }
+.fpm-row {
+  display: flex; align-items: center; gap: 9px;
+  background: #fff; border: 1px solid var(--border); border-radius: 11px;
+  border-left: 3px solid #34D399;
+  padding: 9px 11px 9px 9px; cursor: pointer; transition: background .12s;
+}
+.fpm-row:hover { background: #F8FAFD; }
+.fpm-row.res { border-left-color: #F59E0B; }
+.fpm-main { flex: 1; min-width: 0; }
+.fpm-id { font-weight: 800; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.fpm-qty { font-weight: 600; color: var(--text-mid); font-size: 12px; }
+.fpm-meta { font-size: 11.5px; color: var(--text-light); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fpm-off {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  border: 1px solid #FCD9D9; background: #fff; color: #B91C1C;
+  font-size: 14px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fpm-off:hover { background: #FEF2F2; }
+.fpm-off-ph { width: 30px; flex-shrink: 0; }
+.fpm-chev { color: var(--text-faint); font-size: 15px; flex-shrink: 0; }
