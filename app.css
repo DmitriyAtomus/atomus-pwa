@@ -20622,3 +20622,21 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .imd-facts { grid-template-columns: 1fr; }
   .imd-step .lbl { max-width: 56px; }
 }
+
+/* v2.45.657: дата выезда и контакт на объекте прямо в плитках карточки монтажа */
+.imd-date-inp {
+  margin-top: 7px; width: 100%; border: 1.5px solid var(--border); border-radius: 9px;
+  padding: 5px 9px; font-size: 12px; font-family: inherit; color: var(--text-dark);
+  background: #fff; cursor: pointer;
+}
+.imd-date-inp:hover, .imd-date-inp:focus { border-color: var(--brand); outline: none; }
+.imd-tile.wide { grid-column: 1 / -1; }
+.imd-tile.rel { position: relative; }
+.imd-pencil {
+  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px;
+  border: 1.5px solid var(--border); border-radius: 8px; background: #fff;
+  color: #64748B; font-size: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.imd-pencil:hover { color: var(--brand); border-color: #93B4F5; }
+.imd-tel { color: var(--brand); font-weight: 700; text-decoration: none; font-size: 13px; }

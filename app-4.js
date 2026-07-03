@@ -13298,9 +13298,15 @@ function _renderInstallationDetail(d) {
     else _dateSub = 'через ' + _dl + ' ' + _plural(_dl, ['день', 'дня', 'дней']);
   } else if (_isDone) { _dateSub = 'сдан клиенту'; _dateCls = 'ok'; }
   var tiles = '';
+  // v2.45.657: дата выезда меняется прямо в плитке (управляющим)
   tiles += '<div class="imd-tile' + (_dateCls ? ' ' + _dateCls : '') + '"><small>Выезд</small>' +
     '<b>' + (_dIso ? escapeHtml(_installFmtDate(d.scheduled_date)) : '<span class="imd-miss">дата не назначена</span>') + '</b>' +
-    (_dateSub ? '<span>' + _dateSub + '</span>' : '') + '</div>';
+    (_dateSub ? '<span>' + _dateSub + '</span>' : '') +
+    (canManage
+      ? '<input type="date" class="imd-date-inp" value="' + escapeHtml(_dIso) + '" ' +
+        'title="Поменять дату выезда" onchange="_imdSetDate(' + d.id + ', this.value)">'
+      : '') +
+  '</div>';
   var _seenSub = '';
   if (d.assigned_employee_id) {
     _seenSub = d.installer_first_opened_at
@@ -13322,6 +13328,22 @@ function _renderInstallationDetail(d) {
       '<small>Договор</small><b>' + escapeHtml(d.contract_number) + '</b>' +
       '<span>' + escapeHtml(d.contractor_name || '') + (d.contractor_phone ? ' · ' + escapeHtml(d.contractor_phone) : '') + (d.contract_id ? ' →' : '') + '</span></div>';
   }
+  // v2.45.657: с кем держать связь на объекте (контакт заказчика)
+  var _cName = d.contact_name || '';
+  var _cPhone = d.contact_phone || '';
+  var _cArgs = JSON.stringify(_cName).replace(/"/g, '&quot;') + ', ' + JSON.stringify(_cPhone).replace(/"/g, '&quot;');
+  tiles += '<div class="imd-tile wide rel"><small>Связь на объекте</small>' +
+    (canManage
+      ? '<button class="imd-pencil" title="Указать контакт" onclick="event.stopPropagation();_imdEditContact(' + d.id + ', ' + _cArgs + ')"><i class="ti ti-pencil"></i></button>'
+      : '') +
+    ((_cName || _cPhone)
+      ? '<b>' + escapeHtml(_cName || 'Контакт') + '</b>' +
+        (_cPhone
+          ? '<span><a class="imd-tel" href="tel:' + escapeHtml(_cPhone.replace(/[^+\d]/g, '')) + '" onclick="event.stopPropagation()">📞 ' + escapeHtml(_cPhone) + '</a></span>'
+          : '')
+      : '<b><span class="imd-miss">контакт не указан</span></b>' +
+        (canManage ? '<span>кому звонить с объекта — тапни ✎</span>' : '')) +
+  '</div>';
   var tilesHtml = '<div class="imd-facts">' + tiles + '</div>';
 
   // v2.45.656: отчёты — таймлайн с точками, чипом смены статуса и фото
@@ -13457,6 +13479,32 @@ function _renderInstallationDetail(d) {
   m.classList.add('visible');
   // v2.45.448: подгрузить встроенный чат по договору
   if (d.contract_id) loadMontageChat(d.contract_id);
+}
+
+// v2.45.657: сменить дату выезда прямо из плитки карточки
+async function _imdSetDate(installationId, val) {
+  try {
+    await apiPatch('/api/installations/' + installationId, { scheduled_date: val || '' });
+    if (typeof showToast === 'function') showToast(val ? 'Дата выезда обновлена' : 'Дата выезда снята', 'success');
+    await openInstallationDetail(installationId);
+    if (typeof loadInstallationList === 'function') loadInstallationList();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось сохранить дату', 'error');
+  }
+}
+// v2.45.657: контакт заказчика на объекте — с кем держать связь
+async function _imdEditContact(installationId, curName, curPhone) {
+  var nm = prompt('С кем держать связь на объекте? (имя, должность)', curName || '');
+  if (nm === null) return;
+  var ph = prompt('Телефон контакта', curPhone || '');
+  if (ph === null) return;
+  try {
+    await apiPatch('/api/installations/' + installationId, { contact_name: nm.trim(), contact_phone: ph.trim() });
+    if (typeof showToast === 'function') showToast('Контакт на объекте сохранён', 'success');
+    await openInstallationDetail(installationId);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось сохранить контакт', 'error');
+  }
 }
 
 // v2.45.445: назначить/сменить монтажника прямо из карточки монтажа
@@ -13671,6 +13719,8 @@ async function _openInstallationForm(inst) {
         '<label>Адрес / объект<input type="text" id="if-address" value="' + escapeHtml(inst && inst.object_address || '') + '" placeholder="г. Челябинск, ул. …"></label>' +
         '<label>Дата монтажа<input type="date" id="if-date" value="' + escapeHtml(inst && inst.scheduled_date || '') + '"></label>' +
         '<label>Монтажник<select id="if-assignee">' + optHtml + '</select></label>' +
+        '<label>Связь на объекте — кто<input type="text" id="if-contact-name" value="' + escapeHtml(inst && inst.contact_name || '') + '" placeholder="Иван Петрович, прораб"></label>' +
+        '<label>Телефон контакта<input type="tel" id="if-contact-phone" value="' + escapeHtml(inst && inst.contact_phone || '') + '" placeholder="+7 …"></label>' +
         '<label>Детали для монтажника<textarea id="if-notes" rows="3" placeholder="Состав, нюансы, контакты на объекте…">' + escapeHtml(inst && inst.notes || '') + '</textarea></label>' +
       '</div>' +
       '<div class="modal-footer" style="padding:14px 18px;display:flex;justify-content:flex-end;gap:8px;">' +
@@ -13690,6 +13740,8 @@ async function submitInstallationForm(id) {
     scheduled_date: (document.getElementById('if-date') || {}).value || '',
     assigned_employee_id: parseInt((document.getElementById('if-assignee') || {}).value, 10) || null,
     notes: (document.getElementById('if-notes') || {}).value || '',
+    contact_name: (document.getElementById('if-contact-name') || {}).value || '',
+    contact_phone: (document.getElementById('if-contact-phone') || {}).value || '',
   };
   try {
     if (id) { await apiPatch('/api/installations/' + id, body); showToast('Сохранено', 'success'); }
