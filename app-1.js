@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.646-nav-rail";
+const APP_VERSION = "v2.45.647-desktop-search-panel";
 const APP_VERSION_DATE = "01.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4389,6 +4389,20 @@ function closeProductionWorkDetail() {
 function openDesktopSearch() {
   const so = document.getElementById('search25-screen');
   if (!so) return;
+  // v2.45.647: экран поиска лежит в DOM вне #app — десктопное оформление
+  // (центральная панель) вешаем классом на сам оверлей.
+  const isDesktop = document.getElementById('app') &&
+    document.getElementById('app').classList.contains('desktop-layout');
+  if (isDesktop) {
+    so.classList.add('search25-desktop');
+    // Подсказка внизу панели (один раз)
+    if (!so.querySelector('.s25d-hint')) {
+      const hint = document.createElement('div');
+      hint.className = 's25d-hint';
+      hint.innerHTML = '<span><kbd>Esc</kbd> — закрыть</span><span><kbd>Ctrl K</kbd> — открыть откуда угодно</span>';
+      so.appendChild(hint);
+    }
+  }
   so.style.display = 'block';
   setTimeout(() => {
     const inp = document.getElementById('search25-input');
@@ -4399,18 +4413,25 @@ function closeDesktopSearch() {
   const so = document.getElementById('search25-screen');
   if (!so) return;
   // На мобильном экран закрывается нижними табами — не трогаем его там
-  const isDesktop = document.getElementById('app') &&
-    document.getElementById('app').classList.contains('desktop-layout');
-  if (isDesktop) so.style.display = 'none';
+  if (so.classList.contains('search25-desktop')) {
+    so.classList.remove('search25-desktop');
+    so.style.display = 'none';
+  }
 }
 document.addEventListener('keydown', function (e) {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.key === 'л' || e.key === 'Л')) {
     e.preventDefault();
     openDesktopSearch();
   } else if (e.key === 'Escape') {
-    const so = document.getElementById('search25-screen');
-    if (so && so.style.display !== 'none') closeDesktopSearch();
+    closeDesktopSearch();
   }
+});
+// Клик по затемнению вокруг панели — закрыть (панель и кнопка в шапке не считаются)
+document.addEventListener('click', function (e) {
+  const so = document.getElementById('search25-screen');
+  if (!so || !so.classList.contains('search25-desktop') || so.style.display === 'none') return;
+  if (e.target.closest('#search25-screen') || e.target.closest('.hdr-search-btn')) return;
+  closeDesktopSearch();
 });
 
 async function showProductionWorkQr(workId) {

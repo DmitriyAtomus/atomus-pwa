@@ -19852,15 +19852,51 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 .app.desktop-layout .top-bar .user-block:hover { background: rgba(255,255,255,.16); }
 
-/* Поиск search25 на десктопе — центральная панель-оверлей */
-.app.desktop-layout #search25-screen {
-  top: 64px; left: 50%; right: auto; bottom: auto;
+/* Поиск search25 на десктопе — центральная панель-оверлей.
+   v2.45.647: экран лежит вне #app, поэтому оформление вешается классом
+   .search25-desktop (ставит openDesktopSearch), а не через .app.desktop-layout. */
+#search25-screen.search25-desktop {
+  top: 76px; left: 50%; right: auto; bottom: auto;
   transform: translateX(-50%);
-  width: 660px; max-width: calc(100vw - 40px); max-height: 76vh;
-  border-radius: 16px; border: 1px solid var(--border);
-  box-shadow: 0 18px 60px rgba(10, 25, 47, .35), 0 0 0 100vmax rgba(10, 25, 47, .35);
-  padding: 16px 0 18px; z-index: 60;
+  width: 680px; max-width: calc(100vw - 40px); max-height: 74vh;
+  background: #fff;
+  border-radius: 18px; border: 1px solid var(--border);
+  box-shadow: 0 24px 70px rgba(10, 25, 47, .40), 0 0 0 100vmax rgba(10, 25, 47, .45);
+  padding: 8px 0 0; z-index: 60;
+  overflow-y: auto;
+  animation: s25d-pop .16s ease-out;
 }
+@keyframes s25d-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.98); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+/* Заголовок «Поиск» не нужен — панель говорит сама за себя */
+#search25-screen.search25-desktop > div:first-child h2 { display: none; }
+#search25-screen.search25-desktop > div:first-child { padding: 0 !important; }
+/* Крупная строка поиска */
+#search25-screen.search25-desktop .search25-bar {
+  margin: 6px 14px 4px; border-radius: 12px;
+  border: 2px solid var(--brand);
+  box-shadow: 0 2px 10px rgba(45, 95, 139, .12);
+}
+#search25-screen.search25-desktop .search25-bar input { font-size: 15px; }
+/* Чипы фильтров — компактной строкой */
+#search25-screen.search25-desktop .search25-chips-wrap { padding-top: 2px; }
+/* Подсказка внизу панели */
+.s25d-hint {
+  display: flex; gap: 18px; justify-content: center;
+  border-top: 1px solid var(--border);
+  padding: 8px 14px; margin-top: 8px;
+  font-size: 11px; color: var(--text-faint);
+  position: sticky; bottom: 0; background: #fff;
+}
+.s25d-hint kbd {
+  font-family: inherit; font-size: 10px; font-weight: 700;
+  background: #F1F5F9; border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px;
+}
+.s25d-hint { display: none; }
+#search25-screen.search25-desktop .s25d-hint { display: flex; }
 
 /* ===== Кабина: контент + правая тёмная панель ===== */
 .pkb-cockpit { display: block; }
