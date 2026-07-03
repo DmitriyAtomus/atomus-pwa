@@ -9225,6 +9225,8 @@ async function openInboxInvoice(inboxId) {
   if (vat != null && vat > 0) chips += info('в т.ч. НДС ' + _f2(vat) + ' ₽', '#ECFDF5', '#065F46', '#6EE7B7') + (woV != null ? info('без НДС ' + _f2(woV) + ' ₽', 'var(--bg)', 'var(--text-mid)', 'var(--border)') : '');
   else if (vat === 0) chips += info('без НДС', 'var(--bg)', 'var(--text-mid)', 'var(--border)');
   if (sup.name) chips += chip(escapeHtml(sup.name), sup.name);
+  // v2.45.643: назначение из MAX-бота («на что счёт»)
+  if (m.user_comment) chips += info('🏷 ' + escapeHtml(m.user_comment), '#FEF3C7', '#92400E', '#FCD34D');
   let posHtml;
   if (items.length) {
     posHtml = '<div style="margin-top:12px;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;margin-bottom:6px;">Позиции из счёта (' + items.length + ')</div>';
@@ -10672,6 +10674,8 @@ function renderSupplyOrderDetail(o) {
       (o.order_label ? '<div class="detail-item"><div class="detail-label">Метка</div><div class="detail-value" style="font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(o.order_label) + '</div></div>' : '') +
       (o.contract_number ? '<div class="detail-item"><div class="detail-label">Договор</div><div class="detail-value">№' + escapeHtml(o.contract_number) + '</div></div>' : '') +
     '</div>' +
+    // v2.45.643: «Назначение» из MAX-бота («на что счёт») — заметно для бухгалтера
+    (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
 
@@ -12887,6 +12891,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.644',
+    date: '03.07.2026',
+    title: 'Счёт из MAX: назначение «на что этот счёт»',
+    features: [
+      'Когда кидаешь счёт в бота MAX, он спрашивает <b>«На что этот счёт?»</b> — пишешь одним сообщением (например «ТО Машины»)',
+      'Бухгалтер видит это <b>«Назначение»</b> заметной плашкой в карточке заказа «На оплату» (и при открытии счёта из «Входящих»)',
+      'Комментарий необязательный; привязывается к последнему присланному счёту; если счёт уже ушёл в оплату — назначение всё равно к нему добавится',
+    ],
+  },
   {
     version: 'v2.45.642',
     date: '03.07.2026',
