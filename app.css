@@ -20640,3 +20640,12 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 .imd-pencil:hover { color: var(--brand); border-color: #93B4F5; }
 .imd-tel { color: var(--brand); font-weight: 700; text-decoration: none; font-size: 13px; }
+
+/* v2.45.658: редактируемое «сколько монтировать» в спецификации монтажа */
+.idi-qty { cursor: pointer; border-radius: 8px; padding: 2px 7px; transition: background .12s; white-space: nowrap; }
+.idi-qty:hover { background: #EFF6FF; color: var(--brand); }
+.idi-qty .ti { font-size: 11px; opacity: .55; }
+.idi-qty.ov { background: #FEF3C7; color: #92400E; font-weight: 700; }
+.idi-qty.ov:hover { background: #FDE68A; }
+.idi-ovhint { font-weight: 500; opacity: .75; }
+.idi-row.idi-skip .idi-name { text-decoration: line-through; opacity: .5; }

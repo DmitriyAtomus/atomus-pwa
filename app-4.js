@@ -13414,12 +13414,30 @@ function _renderInstallationDetail(d) {
   if (itemsHtml) itemsHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-clipboard-list"></i> Что нужно сделать по договору</div>' + itemsHtml + '</div>';
 
   // v2.45.447: спецификация договора (что монтировать) — для исполнителя
+  // v2.45.658: количество «сколько монтировать в этот выезд» редактируется тапом
+  // (переопределение хранится на монтаже, спецификация договора не меняется)
   var specHtml = '';
   if (d.contract_spec && d.contract_spec.length) {
+    window._imdSpecOv = {};
+    d.contract_spec.forEach(function (s) {
+      if (s.mount_qty != null && Number(s.mount_qty) !== Number(s.qty)) {
+        window._imdSpecOv[String(s.name || '')] = Number(s.mount_qty);
+      }
+    });
     specHtml = '<div class="idi-wrap"><div class="idi-title"><i class="ti ti-list-details"></i> Спецификация — что монтировать <span class="idi-cnt">' + d.contract_spec.length + '</span></div>';
     d.contract_spec.forEach(function (s) {
-      specHtml += '<div class="idi-row"><span class="idi-name">' + escapeHtml(s.name || '—') + '</span>' +
-        '<span class="idi-meta">' + (parseFloat(s.qty) || 0) + ' ' + escapeHtml(s.unit || 'шт.') + '</span></div>';
+      var cq = parseFloat(s.qty) || 0;
+      var mq = (s.mount_qty != null) ? (parseFloat(s.mount_qty) || 0) : cq;
+      var changed = mq !== cq;
+      var unit = escapeHtml(s.unit || 'шт.');
+      var qtyInner = mq + ' ' + unit + (changed ? ' <small class="idi-ovhint">из ' + cq + '</small>' : '');
+      var qtyHtml = canManage
+        ? '<span class="idi-meta idi-qty' + (changed ? ' ov' : '') + '" ' +
+            'onclick="_imdEditSpecQty(' + d.id + ', ' + JSON.stringify(String(s.name || '')).replace(/"/g, '&quot;') + ', ' + mq + ', ' + cq + ')" ' +
+            'title="' + (changed ? 'По договору: ' + cq + ' · ' : '') + 'Тапни, чтобы изменить, сколько монтировать в этот выезд">' +
+            qtyInner + ' <i class="ti ti-pencil"></i></span>'
+        : '<span class="idi-meta">' + qtyInner + '</span>';
+      specHtml += '<div class="idi-row' + (mq <= 0 ? ' idi-skip' : '') + '"><span class="idi-name">' + escapeHtml(s.name || '—') + '</span>' + qtyHtml + '</div>';
     });
     specHtml += '</div>';
   }
@@ -13492,6 +13510,37 @@ async function _imdSetDate(installationId, val) {
     if (typeof showToast === 'function') showToast('Не удалось сохранить дату', 'error');
   }
 }
+// v2.45.658: сколько штук монтировать в этот выезд — правится тапом по количеству.
+// Пусто — вернуть как по договору, 0 — в этом монтаже позицию не монтируем.
+async function _imdEditSpecQty(installationId, name, current, contractQty) {
+  var v = prompt(
+    'Сколько монтировать: «' + name + '»?\n\n' +
+    'По договору: ' + contractQty + '. Пусто — вернуть как по договору. 0 — в этот выезд не монтируем.',
+    String(current)
+  );
+  if (v === null) return;
+  var map = window._imdSpecOv || {};
+  var t = String(v).trim().replace(',', '.');
+  if (!t) {
+    delete map[name];
+  } else {
+    var n = Number(t);
+    if (!isFinite(n) || n < 0) {
+      if (typeof showToast === 'function') showToast('Введите неотрицательное число', 'error');
+      return;
+    }
+    if (n === Number(contractQty)) delete map[name];
+    else map[name] = n;
+  }
+  try {
+    await apiPatch('/api/installations/' + installationId, { spec_overrides: map });
+    if (typeof showToast === 'function') showToast('Количество на монтаж сохранено', 'success');
+    await openInstallationDetail(installationId);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось сохранить количество', 'error');
+  }
+}
+
 // v2.45.657: контакт заказчика на объекте — с кем держать связь
 async function _imdEditContact(installationId, curName, curPhone) {
   var nm = prompt('С кем держать связь на объекте? (имя, должность)', curName || '');
