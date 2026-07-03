@@ -9401,10 +9401,35 @@ async function _loadInboxInvPreview(inboxId, idx, filename) {
   }
 }
 
+// v2.45.650: человеческая дата получения — «сегодня · 05:28», «вчера · 04:51»,
+// «1 июля · 11:20». Счета старше 2 дней подсвечиваем: залежались.
+function _ibxWhen(iso) {
+  if (!iso) return { text: '—', cls: '', full: '' };
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (isNaN(d.getTime())) return { text: String(iso).slice(0, 16), cls: '', full: String(iso) };
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const now = new Date();
+  const day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((day0 - dd) / 86400000);
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  let text, cls = '';
+  if (diff <= 0) { text = 'сегодня · ' + hm; cls = 'td'; }
+  else if (diff === 1) { text = 'вчера · ' + hm; cls = 'yd'; }
+  else {
+    text = d.getDate() + ' ' + months[d.getMonth()] + ' · ' + hm;
+    if (d.getFullYear() !== now.getFullYear()) text = d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear() + ' · ' + hm;
+    cls = diff >= 3 ? 'old' : '';
+  }
+  const full = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ', ' + hm +
+    (diff >= 2 ? ' — ' + diff + ' ' + _plural(diff, ['день', 'дня', 'дней']) + ' назад' : '');
+  return { text: text, cls: cls, full: full };
+}
+
 function _ibxInvoiceCard(m, isMatched) {
   const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
   const atts = m.attachments || [];
-  const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
+  const when = _ibxWhen(m.received_at);
   let chips = '';
   if (isMatched) {
     chips += '<span class="ibx-chip ok"><span class="em">✅</span> привязан → ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>';
@@ -9461,9 +9486,11 @@ function _ibxInvoiceCard(m, isMatched) {
     _cb +
     _inboxAvatarHtml(m) +
     '<div class="ibx-card-body">' +
-      '<div class="ibx-chips">' + chips + '</div>' +
+      '<div class="ibx-chips">' + chips +
+        '<span class="ibx-when ' + when.cls + '" title="' + escapeHtml(when.full) + '"><i class="ti ti-clock"></i>' + escapeHtml(when.text) + '</span>' +
+      '</div>' +
       '<div class="ibx-subj">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
-      '<div class="ibx-from">' + escapeHtml(m.from_name || m.from_addr || '—') + ' · ' + escapeHtml(received) + '</div>' +
+      '<div class="ibx-from">' + escapeHtml(m.from_name || m.from_addr || '—') + '</div>' +
       attBlock +
       '<div class="ibx-acts">' + acts + '</div>' +
     '</div>' +
@@ -9471,7 +9498,7 @@ function _ibxInvoiceCard(m, isMatched) {
 }
 
 function _ibxNoiseRow(m) {
-  const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
+  const received = _ibxWhen(m.received_at).text;
   const atts = m.attachments || [];
   let reason = 'без вложений';
   if (atts.length) reason = 'вложение не документ';
@@ -9494,6 +9521,34 @@ function _ibxNoiseRow(m) {
 function toggleInboxV2() {
   window.INBOX_V2 = !window.INBOX_V2;
   try { localStorage.setItem('inboxV2', window.INBOX_V2 ? '1' : '0'); } catch (_) {}
+  renderSupplyInbox();
+}
+// v2.45.650: длинные секции сворачиваем — первые 4 карточки, остальное за кнопкой
+// «Показать ещё N», чтобы не листать вглубь. Состояние живёт до перерисовки раздела.
+function _ibxCardsCollapsed(list, isMatched, key) {
+  const LIMIT = 4;
+  let out = '';
+  list.slice(0, LIMIT).forEach(m => { out += _ibxInvoiceCard(m, isMatched); });
+  if (list.length > LIMIT) {
+    const open = !!(window._ibxMoreOpen && window._ibxMoreOpen[key]);
+    const hidden = list.length - LIMIT;
+    // самое старое из скрытых — чтобы было видно, насколько глубоко копится
+    const oldest = _ibxWhen(list[list.length - 1] && list[list.length - 1].received_at);
+    out += '<div id="ibx-more-' + key + '"' + (open ? '' : ' style="display:none;"') + '>';
+    list.slice(LIMIT).forEach(m => { out += _ibxInvoiceCard(m, isMatched); });
+    out += '</div>';
+    out += '<button class="ibx-more-btn" id="ibx-more-btn-' + key + '" data-n="' + hidden + '" onclick="_ibxToggleMore(\'' + key + '\')">' +
+      (open
+        ? '<i class="ti ti-chevron-up"></i> Свернуть — показывать только первые ' + LIMIT
+        : '<i class="ti ti-chevron-down"></i> Показать ещё ' + hidden + ' ' + _plural(hidden, ['счёт', 'счёта', 'счетов']) +
+          (oldest.text && oldest.text !== '—' ? ' <small>· самый старый: ' + escapeHtml(oldest.text) + '</small>' : '')) +
+    '</button>';
+  }
+  return out;
+}
+function _ibxToggleMore(key) {
+  window._ibxMoreOpen = window._ibxMoreOpen || {};
+  window._ibxMoreOpen[key] = !window._ibxMoreOpen[key];
   renderSupplyInbox();
 }
 function toggleInboxNoise() {
@@ -9545,11 +9600,11 @@ function renderSupplyInbox() {
   if (invoices.length) {
     html += _ibxSecTitle('🧾', 'Счета — нужна привязка', invoices.length);
     html += '<div class="ibx-hint">Письма с вложением-документом от поставщика. Проверь и привяжи к заказу — уйдёт в оплату.</div>';
-    invoices.forEach(m => { html += _ibxInvoiceCard(m, false); });
+    html += _ibxCardsCollapsed(invoices, false, 'inv');
   }
   if (matched.length) {
     html += _ibxSecTitle('✅', 'Привязанные счета', matched.length);
-    matched.forEach(m => { html += _ibxInvoiceCard(m, true); });
+    html += _ibxCardsCollapsed(matched, true, 'mat');
   }
   if (noise.length) {
     html += _ibxSecTitle('📭', 'Не похоже на счёт', noise.length);
