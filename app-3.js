@@ -6327,6 +6327,20 @@ function _shopGetQtyMap() {
 function _shopSaveQtyMap(map) {
   try { localStorage.setItem(SHOP_QTY_KEY, JSON.stringify(map)); } catch (e) {}
 }
+// v2.45.644: массовое скрытие выбранных позиций (галочки в «поставщик не назначен»)
+function nsHideSelected() {
+  const ids = Array.from(window._noSupSelected || []);
+  if (!ids.length) { showToast('Сначала отметь позиции галочками', 'info'); return; }
+  if (!confirm('Убрать выбранные позиции (' + ids.length + ') из «Что закупить»?\n\n' +
+    'Они перестанут показываться и не попадут в новый заказ. Это локально (только на этом устройстве) — вернуть можно кнопкой «Показать скрытые».')) return;
+  const set = _shopGetHidden();
+  ids.forEach(cid => set.add(cid));
+  _shopSaveHidden(set);
+  window._noSupSelected.clear();
+  showToast('Убрано из списка: ' + ids.length, 'success');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+
 async function shopHideItem(componentId, name) {
   if (!confirm('Убрать «' + (name || '') + '» из «Что закупить»?\n\nПозиция перестанет показываться и не попадёт в новый заказ. Это локально (только на этом устройстве). Можно вернуть кнопкой «Показать скрытые».')) return;
   const set = _shopGetHidden();
@@ -6776,6 +6790,9 @@ function renderSupplyShopping(d) {
             '<button class="btn btn-secondary btn-sm" id="ns-accept-btn" style="display:none;" onclick="nsAcceptSuggested()" ' +
               'title="Назначить всем выбранным поставщиков из подсказок «обычно: …»">' +
               '<i class="ti ti-wand"></i>Принять предложенных</button>' +
+            '<button class="btn btn-secondary btn-sm ns-remove-btn" onclick="nsHideSelected()" ' +
+              'title="Убрать выбранные позиции из «Что закупить» (локально; вернуть — «Показать скрытые»)">' +
+              '<i class="ti ti-trash"></i>Убрать из списка</button>' +
             '<button class="btn btn-secondary btn-sm" onclick="clearNoSupSelection()">' +
               '<i class="ti ti-x"></i>Снять выбор</button>' +
           '</div>'
