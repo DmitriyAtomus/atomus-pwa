@@ -20189,3 +20189,51 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .ns-bulk-bar .ns-bulk-info { font-size: 13px; }
 .ns-bulk-bar .ns-bulk-info b { font-size: 14px; }
 .ns-bulk-bar .btn-secondary { background: rgba(255,255,255,.14); color: #fff; border-color: transparent; }
+
+/* ====== Вертикальная рельса разделов (десктоп, v2.45.646) ====== */
+.section-rail { display: none; }
+.app.desktop-layout .section-rail {
+  display: flex; flex-direction: column; gap: 3px; align-items: center;
+  background: #122A47; padding: 10px 6px;
+  position: sticky; top: 64px; align-self: start;
+  height: calc(100vh - 64px); overflow-y: auto; scrollbar-width: none;
+}
+.app.desktop-layout .section-rail::-webkit-scrollbar { display: none; }
+/* Сетка: рельса + сайдбар раздела + контент */
+.app.desktop-layout .body-layout { grid-template-columns: 64px 210px 1fr; }
+.app.desktop-layout.rail-off .body-layout { grid-template-columns: 210px 1fr; }
+.app.desktop-layout.rail-off .section-rail { display: none; }
+/* Верхние табы разделов скрыты, пока рельса включена */
+.app.desktop-layout:not(.rail-off) .top-bar .section-switcher-wrap,
+.app.desktop-layout:not(.rail-off) .top-bar .section-scroll-pair { display: none; }
+
+.rail-i {
+  width: 52px; padding: 7px 2px 6px; border-radius: 12px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  color: #7E93AC; font-size: 8.5px; font-weight: 700; text-align: center;
+  position: relative; flex-shrink: 0; user-select: none;
+  transition: background .12s, color .12s;
+}
+.rail-i .ti { font-size: 19px; }
+.rail-i:hover { background: rgba(255,255,255,.08); color: #C7D5E6; }
+.rail-i.on { background: #fff; color: var(--brand); }
+.rail-b {
+  position: absolute; top: 1px; right: 3px; min-width: 16px; height: 16px;
+  border-radius: 999px; font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  border: 2px solid #122A47;
+}
+.rail-b.r { background: #EF4444; color: #fff; }
+.rail-b.y { background: #F59E0B; color: #431407; }
+.rail-sp { flex: 1; }
+.rail-toggle { opacity: .6; }
+.rail-toggle:hover { opacity: 1; }
+
+/* Кнопка «вернуть рельсу», когда включены верхние табы */
+.rail-restore-btn {
+  height: 34px; width: 34px; border-radius: 10px; border: none; cursor: pointer;
+  background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.10));
+  color: #fff; font-size: 15px; flex-shrink: 0;
+  display: none; align-items: center; justify-content: center;
+}
+.app.desktop-layout .rail-restore-btn { display: inline-flex; }

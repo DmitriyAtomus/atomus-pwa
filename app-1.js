@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.645-ns-bulk-hide";
+const APP_VERSION = "v2.45.646-nav-rail";
 const APP_VERSION_DATE = "01.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1377,11 +1377,104 @@ function canSeeMoney() {
 
 // ============ ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ ============
 
+// ============ v2.45.646: вертикальная рельса разделов (десктоп) ============
+const RAIL_SECTIONS = [
+  { code: 'home',         icon: 'ti-home',               label: 'Главная' },
+  { code: 'production',   icon: 'ti-tool',               label: 'Произв.' },
+  { code: 'sales',        icon: 'ti-briefcase',          label: 'Продажи' },
+  { code: 'tasks',        icon: 'ti-checklist',          label: 'Задачи' },
+  { code: 'warehouse',    icon: 'ti-building-warehouse', label: 'Склад' },
+  { code: 'supply',       icon: 'ti-shopping-cart',      label: 'Снабж.' },
+  { code: 'defects',      icon: 'ti-alert-circle',       label: 'Сервис' },
+  { code: 'installation', icon: 'ti-tools',              label: 'Монтаж' },
+  { code: 'hr',           icon: 'ti-id-badge',           label: 'Кадры' },
+  { code: 'help',         icon: 'ti-help-circle',        label: 'Помощь' },
+];
+
+function navRailOn() { return localStorage.getItem('navRail') !== '0'; }
+// Первичная отрисовка рельсы после загрузки приложения
+setTimeout(function () { try { renderSectionRail(); } catch (e) {} }, 600);
+
+function toggleNavRail() {
+  try { localStorage.setItem('navRail', navRailOn() ? '0' : '1'); } catch (e) {}
+  renderSectionRail();
+}
+
+// Живые счётчики на разделах — из уже загруженных кэшей (без запросов)
+function _railBadges() {
+  const b = {};
+  try {
+    const works = (cache.productionKanban && cache.productionKanban.works) || [];
+    const over = works.filter(w => w.is_overdue && ['queue', 'in_progress', 'review', 'packing'].indexOf(w.status) >= 0).length;
+    if (over) b.production = { n: over, cls: 'r' };
+  } catch (e) {}
+  try {
+    const cwp = cache.contractsWithProgress || [];
+    if (cwp.length) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const over = cwp.filter(c => c.delivery_date && c.status !== 'shipped' && c.status !== 'closed' &&
+        (new Date(c.delivery_date + 'T00:00:00') < today)).length;
+      if (over) b.sales = { n: over, cls: 'r' };
+    }
+  } catch (e) {}
+  try {
+    const attn = state.ptData && state.ptData.kpis && state.ptData.kpis.attention_count;
+    if (attn) b.warehouse = { n: attn, cls: 'y' };
+  } catch (e) {}
+  try {
+    const inbox = cache.supplyInbox || [];
+    const unm = inbox.filter(m => m.status === 'unmatched').length;
+    if (unm) b.supply = { n: unm, cls: 'r' };
+  } catch (e) {}
+  return b;
+}
+
+function renderSectionRail() {
+  const rail = document.getElementById('section-rail');
+  const app = document.getElementById('app');
+  if (!rail || !app) return;
+  const on = navRailOn();
+  app.classList.toggle('rail-off', !on);
+  // Кнопка «вернуть рельсу» в шапке, когда рельса выключена
+  let rb = document.getElementById('rail-restore-btn');
+  if (!on) {
+    if (!rb) {
+      rb = document.createElement('button');
+      rb.id = 'rail-restore-btn';
+      rb.className = 'rail-restore-btn';
+      rb.title = 'Включить боковую панель разделов';
+      rb.innerHTML = '<i class="ti ti-layout-sidebar"></i>';
+      rb.onclick = toggleNavRail;
+      const sw = document.getElementById('section-switcher-wrap');
+      if (sw && sw.parentNode) sw.parentNode.insertBefore(rb, sw);
+    }
+    rail.innerHTML = '';
+    return;
+  }
+  if (rb) rb.remove();
+  const badges = _railBadges();
+  const cur = state.currentSection || 'home';
+  let html = '';
+  RAIL_SECTIONS.forEach(s => {
+    const bd = badges[s.code];
+    html += '<div class="rail-i' + (s.code === cur ? ' on' : '') + '" onclick="selectSection(\'' + s.code + '\')" title="' + escapeHtml(s.label) + '">' +
+      '<i class="ti ' + s.icon + '"></i><span>' + s.label + '</span>' +
+      (bd ? '<b class="rail-b ' + bd.cls + '">' + (bd.n > 99 ? '99+' : bd.n) + '</b>' : '') +
+    '</div>';
+  });
+  html += '<div class="rail-sp"></div>';
+  html += '<div class="rail-i rail-toggle" onclick="toggleNavRail()" title="Скрыть панель — вернуть верхние табы разделов">' +
+    '<i class="ti ti-layout-navbar"></i><span>табы</span></div>';
+  rail.innerHTML = html;
+}
+
 function selectSection(sectionName) {
   const config = SECTION_CONFIG[sectionName];
   if (!config) return;
 
   state.currentSection = sectionName;
+  // v2.45.646: обновляем рельсу разделов (активный + свежие счётчики из кэшей)
+  try { renderSectionRail(); } catch (e) {}
 
   // ЭТАП 25.1: data-section на app — для CSS-селекторов (гамбургер видим/скрыт и т.д.)
   const appEl0 = document.getElementById('app');
