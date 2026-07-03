@@ -13271,36 +13271,60 @@ function _renderInstallationDetail(d) {
   var canManage = !!d.can_manage;
   var canReport = !!d.can_report;
 
-  // лента статусов (быстрая смена)
-  var flowHtml = _installStatusFlow.map(function (s) {
-    var active = s === d.status;
-    return '<button class="btn btn-small" onclick="changeInstallationStatus(' + d.id + ',\'' + s + '\')" ' +
-      'style="border:1px solid ' + _installStatusColor(s) + ';' +
-      (active ? 'background:' + _installStatusColor(s) + ';color:#fff;' : 'background:#fff;color:' + _installStatusColor(s) + ';') +
-      'border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;margin:2px;">' +
-      escapeHtml(_installStatusLabels[s]) + '</button>';
-  }).join('');
+  // v2.45.656: степпер статуса вместо ленты кнопок — 5 шагов с галочками
+  var _flowIdx = _installStatusFlow.indexOf(d.status);
+  var _isDone = d.status === 'handed_over';
+  var _isCancelled = d.status === 'cancelled';
+  var flowHtml = '<div class="imd-steps">' + _installStatusFlow.map(function (s, i) {
+    var cls = '';
+    if (_isDone || i < _flowIdx) cls = 'done';
+    else if (i === _flowIdx) cls = 'cur';
+    return '<div class="imd-step ' + cls + '" onclick="changeInstallationStatus(' + d.id + ',\'' + s + '\')" ' +
+      'title="Поставить статус «' + escapeHtml(_installStatusLabels[s] || s) + '»">' +
+        '<span class="dot">' + ((_isDone || i < _flowIdx) ? '✓' : (i + 1)) + '</span>' +
+        '<span class="lbl">' + escapeHtml(_installStatusLabels[s] || s) + '</span>' +
+      '</div>';
+  }).join('<span class="imd-step-line"></span>') + '</div>' +
+  (_isCancelled ? '<div class="imd-cancelled"><i class="ti ti-ban"></i> Монтаж отменён</div>' : '');
 
-  var meta = [];
-  if (d.scheduled_date)  meta.push('<div><i class="ti ti-calendar"></i> ' + _installFmtDate(d.scheduled_date) + '</div>');
-  if (d.object_address)  meta.push('<div><i class="ti ti-map-pin"></i> ' + escapeHtml(d.object_address) + '</div>');
-  if (d.assignee_name)   meta.push('<div><i class="ti ti-user"></i> ' + escapeHtml(d.assignee_name) + '</div>');
-  // v2.45.394: «заходил ли монтажник» — открывал ли назначенный исполнитель свой
-  // монтаж сам (в отличие от смены статуса из офиса). Видно: был или нет.
+  // v2.45.656: факт-плитки вместо строчек меты
+  var _todayIso2 = _mntToday();
+  var _dIso = String(d.scheduled_date || '').slice(0, 10);
+  var _dateSub = '', _dateCls = '';
+  if (_dIso && !_isDone && !_isCancelled) {
+    var _dl = Math.round((new Date(_dIso + 'T00:00:00') - new Date(_todayIso2 + 'T00:00:00')) / 86400000);
+    if (_dl < 0) { _dateSub = 'просрочен на ' + Math.abs(_dl) + ' ' + _plural(Math.abs(_dl), ['день', 'дня', 'дней']); _dateCls = 'bad'; }
+    else if (_dl === 0) { _dateSub = 'сегодня'; _dateCls = 'hot'; }
+    else _dateSub = 'через ' + _dl + ' ' + _plural(_dl, ['день', 'дня', 'дней']);
+  } else if (_isDone) { _dateSub = 'сдан клиенту'; _dateCls = 'ok'; }
+  var tiles = '';
+  tiles += '<div class="imd-tile' + (_dateCls ? ' ' + _dateCls : '') + '"><small>Выезд</small>' +
+    '<b>' + (_dIso ? escapeHtml(_installFmtDate(d.scheduled_date)) : '<span class="imd-miss">дата не назначена</span>') + '</b>' +
+    (_dateSub ? '<span>' + _dateSub + '</span>' : '') + '</div>';
+  var _seenSub = '';
   if (d.assigned_employee_id) {
-    var _who = d.assignee_name ? escapeHtml(d.assignee_name) : 'Монтажник';
-    if (d.installer_first_opened_at) {
-      var _seen = _installFmtDateTime(d.installer_last_seen_at || d.installer_first_opened_at);
-      meta.push('<div style="color:#15803D;font-weight:600;"><i class="ti ti-circle-check"></i> ' + _who + ' заходил: ' + escapeHtml(_seen) +
-        ((d.installer_open_count || 0) > 1 ? ' <span style="color:var(--text-light,#94A3B8);font-weight:400;">· открывал ' + d.installer_open_count + ' р.</span>' : '') + '</div>');
-    } else {
-      meta.push('<div style="color:#B45309;"><i class="ti ti-eye-off"></i> ' + _who + ' ещё не открывал монтаж</div>');
-    }
+    _seenSub = d.installer_first_opened_at
+      ? '<span class="imd-ok">заходил: ' + escapeHtml(_installFmtDateTime(d.installer_last_seen_at || d.installer_first_opened_at)) +
+        ((d.installer_open_count || 0) > 1 ? ' · ' + d.installer_open_count + ' р.' : '') + '</span>'
+      : '<span class="imd-warn">ещё не открывал монтаж</span>';
   }
-  if (d.contract_number) meta.push('<div><i class="ti ti-file-text"></i> Договор ' + escapeHtml(d.contract_number) + (d.contractor_name ? ' · ' + escapeHtml(d.contractor_name) : '') + '</div>');
-  if (d.contractor_phone) meta.push('<div><i class="ti ti-phone"></i> ' + escapeHtml(d.contractor_phone) + '</div>');
+  tiles += '<div class="imd-tile"><small>Монтажник</small>' +
+    '<b>' + (d.assignee_name ? escapeHtml(d.assignee_name) : '<span class="imd-miss">не назначен</span>') + '</b>' + _seenSub + '</div>';
+  if (d.object_address) {
+    tiles += '<div class="imd-tile click" onclick="window.open(\'https://yandex.ru/maps/?text=' +
+      encodeURIComponent(d.object_address) + '\', \'_blank\')"><small>Адрес объекта</small>' +
+      '<b>📍 ' + escapeHtml(d.object_address) + '</b><span>открыть на карте →</span></div>';
+  } else {
+    tiles += '<div class="imd-tile"><small>Адрес объекта</small><b><span class="imd-miss">не указан</span></b></div>';
+  }
+  if (d.contract_number) {
+    tiles += '<div class="imd-tile' + (d.contract_id ? ' click" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\');openContractDetail(' + d.contract_id + ')"' : '"') + '>' +
+      '<small>Договор</small><b>' + escapeHtml(d.contract_number) + '</b>' +
+      '<span>' + escapeHtml(d.contractor_name || '') + (d.contractor_phone ? ' · ' + escapeHtml(d.contractor_phone) : '') + (d.contract_id ? ' →' : '') + '</span></div>';
+  }
+  var tilesHtml = '<div class="imd-facts">' + tiles + '</div>';
 
-  // отчёты
+  // v2.45.656: отчёты — таймлайн с точками, чипом смены статуса и фото
   var reportsHtml = (d.reports || []).map(function (r) {
     var photos = (r.photos || []).map(function (p) {
       var url = API_BASE + p.url;
@@ -13310,15 +13334,20 @@ function _renderInstallationDetail(d) {
       var ic = ((p.content_type || '').indexOf('video/') === 0) ? 'ti-video' : 'ti-file';
       return '<a href="' + url + '" target="_blank" class="ir-fileatt"><i class="ti ' + ic + '"></i><span>' + escapeHtml(p.name || 'Файл') + '</span></a>';
     }).join('');
-    return '<div style="border-top:1px solid var(--border,#E2E8F0);padding:10px 0;">' +
-      '<div style="font-size:12px;color:var(--text-light,#94A3B8);">' +
-        escapeHtml(r.author_name || 'Монтажник') + ' · ' + escapeHtml(r.created_at || '') +
-        (r.status_to_label ? ' · <b style="color:' + _installStatusColor(r.status_to) + '">→ ' + escapeHtml(r.status_to_label) + '</b>' : '') +
-      '</div>' +
-      (r.text ? '<div style="margin-top:4px;white-space:pre-wrap;">' + escapeHtml(r.text) + '</div>' : '') +
-      (photos ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + photos + '</div>' : '') +
+    var stChip = r.status_to_label
+      ? '<span class="imd-tst" style="color:' + _installStatusColor(r.status_to) + ';border-color:' + _installStatusColor(r.status_to) + ';">→ ' + escapeHtml(r.status_to_label) + '</span>'
+      : '';
+    return '<div class="imd-tle' + (r.status_to ? ' has-status' : '') + '">' +
+      '<div class="imd-tle-h"><b>' + escapeHtml(r.author_name || 'Монтажник') + '</b>' + stChip +
+        '<span class="tm">' + escapeHtml(String(r.created_at || '').slice(0, 16).replace('T', ' ')) + '</span></div>' +
+      (r.text ? '<div class="imd-tle-txt">' + escapeHtml(r.text) + '</div>' : '') +
+      (photos ? '<div class="imd-tle-ph">' + photos + '</div>' : '') +
     '</div>';
-  }).join('') || '<div style="color:var(--text-light,#94A3B8);font-size:13px;padding:8px 0;">Отчётов пока нет.</div>';
+  }).join('');
+  reportsHtml = reportsHtml
+    ? '<div class="imd-tl">' + reportsHtml + '</div>'
+    : '<div class="imd-noreports"><i class="ti ti-message-off"></i> Отчётов с поля пока нет' +
+      (_dateCls === 'bad' ? ' — а дата выезда уже прошла' : '') + '.</div>';
 
   // статусы для select в форме отчёта
   var statusOptions = '<option value="">— не менять статус —</option>' + _installStatusFlow.map(function (s) {
@@ -13402,24 +13431,24 @@ function _renderInstallationDetail(d) {
   }
 
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">' +
-      '<div class="modal-header">' +
-        '<h3><i class="ti ti-tools"></i> ' + escapeHtml(d.title || 'Монтаж') + '</h3>' +
-        '<button class="modal-close" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
-      '</div>' +
-      '<div style="padding:18px;max-height:74vh;overflow:auto;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">' +
-          '<span style="font-size:13px;font-weight:600;color:#fff;background:' + color + ';padding:4px 12px;border-radius:999px;">' + escapeHtml(_installStatusLabels[d.status] || d.status) + '</span>' +
-          '<div style="display:flex;gap:6px;">' + manageBtns + '</div>' +
+    '<div class="modal imd-modal" onclick="event.stopPropagation()" style="max-width:720px;">' +
+      '<div class="imd-hero">' +
+        '<button class="imd-x" onclick="document.getElementById(\'installation-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+        '<div class="imd-hero-top">' +
+          '<span class="imd-status" style="background:' + color + ';">' + escapeHtml(_installStatusLabels[d.status] || d.status) + '</span>' +
+          (manageBtns ? '<div class="imd-mng">' + manageBtns + '</div>' : '') +
         '</div>' +
-        (meta.length ? '<div style="display:flex;flex-direction:column;gap:4px;color:var(--text-mid,#475569);font-size:14px;margin-bottom:10px;">' + meta.join('') + '</div>' : '') +
+        '<div class="imd-title"><i class="ti ti-tools"></i> ' + escapeHtml(d.title || 'Монтаж') + '</div>' +
+      '</div>' +
+      '<div class="imd-body">' +
+        tilesHtml +
         assigneeCtrl +
-        (d.notes ? '<div style="background:var(--bg-soft,#F1F5F9);border-radius:8px;padding:10px;margin-bottom:10px;white-space:pre-wrap;"><b>Детали для монтажника:</b><br>' + escapeHtml(d.notes) + '</div>' : '') +
+        '<div class="imd-sec-t">Статус монтажа <small>· тапни шаг, чтобы сменить</small></div>' +
+        flowHtml +
+        (d.notes ? '<div class="imd-notes"><b>Детали для монтажника</b>' + escapeHtml(d.notes) + '</div>' : '') +
         itemsHtml +
         specHtml +
-        '<div style="font-size:12px;color:var(--text-light,#94A3B8);margin-bottom:4px;">Сменить статус:</div>' +
-        '<div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">' + flowHtml + '</div>' +
-        '<div style="font-weight:600;margin-top:12px;"><i class="ti ti-history"></i> Отчёты</div>' +
+        '<div class="imd-sec-t">Отчёты с поля' + ((d.reports || []).length ? ' <span class="imd-cnt">' + d.reports.length + '</span>' : '') + '</div>' +
         reportsHtml +
         reportForm +
         chatBlock +
