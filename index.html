@@ -6141,6 +6141,30 @@ async function _tlhRun(dryRun) {
   @media (max-width: 480px) {
     .cc-grid { grid-template-columns: 1fr; }
   }
+  /* v2.45.653: редизайн вкладки «Результат» */
+  .cc-hero {
+    background: linear-gradient(135deg, #0C4A6E 0%, #075985 55%, #0369A1 100%);
+    border-radius: 14px; padding: 18px 18px 15px; color: #fff;
+    text-align: center; margin-bottom: 14px;
+    box-shadow: 0 10px 24px rgba(7, 89, 133, .25);
+  }
+  .cc-hero-lbl { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #BAE6FD; }
+  .cc-hero-lbl .ti { margin-right: 4px; }
+  .cc-hero-num { font-size: 44px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .cc-hero-num small { font-size: 20px; font-weight: 700; color: #BAE6FD; }
+  .cc-hero-steps { font-size: 12.5px; color: #D9F0FE; margin-top: 6px; }
+  .cc-hero-steps b { color: #fff; font-variant-numeric: tabular-nums; }
+  .cc-hero-steps .ti { font-size: 11px; opacity: .7; margin: 0 2px; }
+  .cc-hero-note { font-size: 11px; color: #9CD5F5; margin-top: 7px; opacity: .9; }
+  .cc-qbar {
+    display: flex; height: 14px; border-radius: 999px; overflow: hidden;
+    background: #E2E8F0; margin: 4px 0 2px;
+  }
+  .cc-qbar span { display: block; height: 100%; min-width: 2px; }
+  .cc-qdot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 7px; flex-shrink: 0;
+  }
 </style>
 <script>
 // ============================================================
@@ -6251,9 +6275,8 @@ function _ccPersonHeat(tInside) {
   return 280;
 }
 
-// Коэффициент инфильтрации через дверь (эмпирический):
-// Вт через 1 м² проёма при разнице температур ΔT, за минуту открытия.
-// Базовое значение «полное открытие = 8 Вт/(мин·м²·К)».
+// (v2.45.653: старый эмпирический коэффициент двери убран — расчёт Q₆ теперь
+// по формуле Тамма прямо в _ccCalculate; функция оставлена для совместимости)
 function _ccDoorPsi(deltaT, hasTambour) {
   const base = 8;
   return base * Math.max(deltaT, 0) * (hasTambour ? 0.5 : 1.0);
@@ -7151,7 +7174,7 @@ function _ccTabMode() {
     '</div>' +
     '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> «Время работы» — обычно 18–22 ч/сут (компрессор не работает 24/7, есть оттайки). ' +
-      '«Запас» — на просчёты, износ компрессора, нестандартные нагрузки. Стандартно 10–20 %.' +
+      '«Запас» — покрывает вентиляторы воздухоохладителя, тепло оттайки, износ компрессора и пиковые нагрузки. Стандартно 10–20 %.' +
     '</div>' +
   '</div>';
 }
@@ -7397,15 +7420,19 @@ function _ccFormulaHtml(key, det, qW) {
   }
   if (key === 'q6') {
     const d = det.q6 || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₆ — инфильтрация через дверь</div>' +
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₆ — инфильтрация через дверь (формула Тамма)</div>' +
       '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
-        'Q₆ = 8 × ΔT × A_двери × (минут/1440) × K_тамбура' +
+        'V̇ = ⅓ × A × √(g × H × ΔT / T_нар) &nbsp;→&nbsp; Q_мгнов = V̇ × ρ × cₚ × ΔT &nbsp;→&nbsp; Q₆ = Q_мгнов × (мин/1440) × K_тамбура' +
       '</div>' +
-      '<div>Дверь: <b>' + d.doorH + '×' + d.doorW + ' мм</b>, площадь A = ' + d.doorArea + ' м²<br/>' +
-        'Открытие: <b>' + d.doorMin + ' мин/сут</b> · ΔT за дверью: ' + d.dTdoor + ' °C · ' +
+      '<div>Дверь: <b>' + d.doorH + '×' + d.doorW + ' мм</b>, площадь A = ' + d.doorArea + ' м² · ΔT за дверью: ' + d.dTdoor + ' °C<br/>' +
+        (d.vFlow !== undefined
+          ? 'Поток при открытой двери V̇ ≈ <b>' + d.vFlow + ' м³/с</b> → мгновенный приток ≈ <b>' + G(d, 'qInst', '—') + ' Вт</b><br/>'
+          : '') +
+        'Открытие: <b>' + d.doorMin + ' мин/сут</b> · ' +
         'K_тамбура = <b>' + d.tambK + '</b> ' + (d.tambour ? '(тамбур есть, ÷2)' : '(без тамбура)') +
       '</div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₆ = 8 × ' + d.dTdoor + ' × ' + d.doorArea + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="font-size:11.5px;color:var(--text-mid);margin-top:4px;">ρ = 1.25 кг/м³, cₚ = 1005 Дж/(кг·К). Пока дверь открыта, тёплый воздух конвекцией замещает холодный через весь проём — поэтому мгновенный приток большой, но усредняется по суткам.</div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₆ = ' + G(d, 'qInst', '—') + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'qVent') {
     const d = det.qVent || {};
@@ -7469,10 +7496,37 @@ function _ccTabResult() {
   const det = r.details || {};
   // Сопоставляем строку с ключом details — по индексу:
   const detKeys = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'qVent', 'qResp'];
-  return clientBlock +
+  // v2.45.653: цвета статей — для сегментной полосы и точек в строках
+  const qColors = { q1: '#3B82F6', q2: '#F97316', q3: '#EC4899', q4: '#EAB308', q5: '#8B5CF6', q6: '#14B8A6', qVent: '#0EA5E9', qResp: '#22C55E' };
+  const workCoeffTxt = (r.workHours && r.workHours < 24)
+    ? '× 24/' + r.workHours + ' ч работы' : 'работа 24 ч/сут';
+
+  // Герой-блок: главная цифра сверху + как она получилась
+  const hero =
+    '<div class="cc-hero">' +
+      '<div class="cc-hero-lbl"><i class="ti ti-snowflake"></i> Рекомендуемая мощность холода</div>' +
+      '<div class="cc-hero-num">' + totalWithSafetyKw.toFixed(2) + ' <small>кВт</small></div>' +
+      '<div class="cc-hero-steps">' +
+        'Σ притоков <b>' + (sumW / 1000).toFixed(2) + '</b> кВт' +
+        ' <i class="ti ti-arrow-right"></i> ' + workCoeffTxt + ' = <b>' + totalKw.toFixed(2) + '</b> кВт' +
+        ' <i class="ti ti-arrow-right"></i> запас +' + r.safety + '% = <b>' + totalWithSafetyKw.toFixed(2) + '</b> кВт' +
+      '</div>' +
+      '<div class="cc-hero-note">Запас покрывает вентиляторы воздухоохладителя, тепло оттайки и пиковые нагрузки</div>' +
+    '</div>';
+
+  // Сегментная полоса долей
+  const segs = rows.map(([n, v], i) => {
+    const key = detKeys[i] || '';
+    const pct = (Number(v) || 0) / sumW * 100;
+    if (pct <= 0.2) return '';
+    return '<span style="width:' + pct.toFixed(2) + '%;background:' + (qColors[key] || '#94A3B8') + ';" title="' + n + ' · ' + pct.toFixed(1) + '%"></span>';
+  }).join('');
+
+  return hero +
     '<div class="cc-section">' +
-    '<h4><i class="ti ti-chart-bar"></i> Теплопритоки по составляющим</h4>' +
-    '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">' +
+    '<h4><i class="ti ti-chart-bar"></i> Из чего складывается</h4>' +
+    '<div class="cc-qbar">' + segs + '</div>' +
+    '<div style="font-size:11.5px;color:var(--text-light);margin:6px 0 8px;">' +
       '<i class="ti ti-cursor-text"></i> Кликни на строку — раскроется формула и пошаговый расчёт' +
     '</div>' +
     '<div class="cc-result">' +
@@ -7482,9 +7536,10 @@ function _ccTabResult() {
         const formula = _ccFormulaHtml(key, det, v);
         return '<div class="cc-result-row" style="cursor:pointer;border-bottom:1px solid #F1F5F9;flex-direction:column;align-items:stretch;" ' +
           'onclick="_ccToggleFormula(this)">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-            '<span><i class="ti ti-chevron-down cc-chev" style="font-size:11px;color:var(--text-light);margin-right:4px;transition:transform .15s;"></i>' + n + '</span>' +
-            '<span class="v" style="text-align:right;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+            '<span style="display:flex;align-items:center;min-width:0;"><i class="ti ti-chevron-down cc-chev" style="font-size:11px;color:var(--text-light);margin-right:5px;transition:transform .15s;"></i>' +
+              '<span class="cc-qdot" style="background:' + (qColors[key] || '#94A3B8') + ';"></span>' + n + '</span>' +
+            '<span class="v" style="text-align:right;white-space:nowrap;">' +
               (v / 1000).toFixed(3) + ' кВт ' +
               '<span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + pct + '%)</span>' +
             '</span>' +
@@ -7495,14 +7550,9 @@ function _ccTabResult() {
         '</div>';
       }).join('') +
       '<div class="cc-result-row" style="font-weight:600;"><span>Сумма теплопритоков</span>' +
-        '<span class="v">' + totalKw.toFixed(2) + ' кВт</span></div>' +
-      '<div class="cc-result-row" style="font-weight:600;"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
+        '<span class="v">' + (sumW / 1000).toFixed(2) + ' кВт</span></div>' +
+      '<div class="cc-result-row" style="font-weight:600;"><span>С учётом работы ' + r.workHours + ' ч/сут и запаса ' + r.safety + '%</span>' +
         '<span class="v">' + totalWithSafetyKw.toFixed(2) + ' кВт</span></div>' +
-    '</div>' +
-    '<div style="background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:10px;padding:16px;margin-top:16px;text-align:center;">' +
-      '<div style="font-size:13px;color:#0C4A6E;margin-bottom:4px;">Рекомендуемая мощность холода</div>' +
-      '<div style="font-size:36px;font-weight:700;color:#0C4A6E;line-height:1;">' + totalWithSafetyKw.toFixed(2) + ' кВт</div>' +
-      '<div style="font-size:12px;color:#0C4A6E;opacity:0.8;margin-top:6px;">с учётом работы оборудования ' + r.workHours + ' ч/сут</div>' +
     '</div>' +
     // v2.45.31: кнопка сохранения расчёта
     // v2.45.96: + печать / сохранение в PDF
@@ -7510,7 +7560,7 @@ function _ccTabResult() {
       '<button class="btn btn-secondary" onclick="_ccPrintReport()"><i class="ti ti-printer"></i> Печать / PDF</button>' +
       '<button class="btn btn-secondary" onclick="_ccSaveResult()"><i class="ti ti-device-floppy"></i> Сохранить расчёт</button>' +
     '</div>' +
-  '</div>';
+  '</div>' + clientBlock;
 }
 
 // v2.45.96: печать / сохранение в PDF.
@@ -8253,7 +8303,12 @@ function _ccCalculate() {
   const q5fork   = (cnd.forklifts || 0) * (cnd.forkliftKw || 0) * 1000 *
                    ((cnd.forkliftHrs || 0) / 24);
   const q5 = q5motors + q5fork;
-  // Q6 — инфильтрация через дверь
+  // Q6 — инфильтрация через дверь (v2.45.653: упрощённая формула Тамма).
+  // Старая эмпирика «8 Вт/(м²·К)» занижала приток в десятки раз: при открытой
+  // двери идёт конвективный обмен тёплого и холодного воздуха через весь проём.
+  //   V̇ = ⅓ × A × √(g × H_проёма × ΔT / T_нар)   [м³/с]
+  //   Q_мгнов = V̇ × ρ × cₚ × ΔT                  [Вт при открытой двери]
+  //   Q₆ = Q_мгнов × (минут открытия / 1440) × K_тамбура
   const dh = (_ccState.door.hMm || 0) / 1000;
   const dw = (_ccState.door.wMm || 0) / 1000;
   const doorArea = dh * dw;
@@ -8261,14 +8316,12 @@ function _ccCalculate() {
   // Среднюю t° за дверью берём как (t_стен_среднюю) — упрощённо.
   const tDoorOut = g.walls.reduce((s, w) => s + w.tOut, 0) / 4;
   const dT_door = Math.max(tDoorOut - ti, 0);
-  // ψ × A × мин/сут / минут_в_сутках = Вт усреднённое по суткам.
-  const psi = _ccDoorPsi(dT_door, _ccState.door.hasTambour);
-  const q6 = psi * doorArea * (doorMin / 1440) * dT_door;
-  // (умножили на ΔT дважды? нет — psi уже линеен по ΔT, но он Вт/(мин·м²·К), а
-  // здесь у нас Вт/(м²·К). Скорректируем: убираем второй ΔT.)
-  // Перепишем чисто: средняя инфильтрация (Вт) = 8 × ΔT × A × (min/сут)/1440 × tamb_k
   const _tambK = _ccState.door.hasTambour ? 0.5 : 1.0;
-  const q6Clean = 8 * dT_door * doorArea * (doorMin / 1440) * _tambK;
+  const vFlow = (dT_door > 0 && doorArea > 0 && dh > 0)
+    ? (doorArea / 3) * Math.sqrt(9.81 * dh * dT_door / (273 + tDoorOut))
+    : 0;
+  const q6Inst  = vFlow * 1.25 * 1005 * dT_door;   // ρ=1.25 кг/м³, cₚ=1005 Дж/(кг·К)
+  const q6Clean = q6Inst * (doorMin / 1440) * _tambK;
 
   // v2.45.105: Q-вентиляция от приточного воздухообмена.
   // V_воз = объём камеры × N_обменов; m = V × 1.293 кг/м³; cp_воз ≈ 1005 Дж/(кг·К);
@@ -8341,7 +8394,8 @@ function _ccCalculate() {
     q6: { doorH: _ccState.door.hMm || 0, doorW: _ccState.door.wMm || 0,
           doorArea: doorArea.toFixed(2), doorMin: doorMin,
           dTdoor: dT_door.toFixed(1), tambour: _ccState.door.hasTambour ? 1 : 0,
-          tambK: _tambK },
+          tambK: _tambK,
+          vFlow: vFlow.toFixed(2), qInst: Math.round(q6Inst) },
     qVent: { airChanges: airChanges, volume: cameraVolume.toFixed(1),
              dTdoor: dT_door.toFixed(1) },
     qResp: { mass: p2.storageMassKg || 0, wpt: p2.breathingHeatWPerTon || 0,
