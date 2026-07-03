@@ -13113,6 +13113,81 @@ async function loadInstallationList() {
   }
 }
 
+// v2.45.655: список монтажей v2 — группы по срочности, просрочки выезда кричат,
+// статус-цепочка из 5 шагов и отчёты прямо в строке.
+function _mntToday() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _mntGroup(r, todayIso) {
+  if (r.status === 'handed_over' || r.status === 'cancelled') return 'done';
+  var d = String(r.scheduled_date || '').slice(0, 10);
+  if (!d) return 'nodate';
+  if (d < todayIso) return 'late';
+  if (d === todayIso) return 'today';
+  return 'upcoming';
+}
+function _mntRow(r, grp, todayIso) {
+  var MONTHS = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
+  var isDone = r.status === 'handed_over';
+  var isCancelled = r.status === 'cancelled';
+  // Блок даты слева
+  var dteHtml;
+  var dIso = String(r.scheduled_date || '').slice(0, 10);
+  if (!dIso) {
+    dteHtml = '<div class="mnt-dte q"><b>дата?</b></div>';
+  } else {
+    var dd = new Date(dIso + 'T00:00:00');
+    var lag = '';
+    if (grp === 'late') {
+      var days = Math.round((new Date(todayIso + 'T00:00:00') - dd) / 86400000);
+      lag = '<span class="mnt-lag">−' + days + ' дн</span>';
+    }
+    dteHtml = '<div class="mnt-dte"><small>' + MONTHS[dd.getMonth()] + '</small><b>' + dd.getDate() + '</b>' + lag + '</div>';
+  }
+  // Заголовок: № договора · заказчик (без трёх повторов), иначе title
+  var title, subBits = [];
+  if (r.contract_number) {
+    title = '<span class="mnt-num">' + escapeHtml(String(r.contract_number).replace(/^№\s*/, '№')) + '</span> · ' + escapeHtml(r.contractor_name || 'Монтаж');
+    if (r.title && String(r.title).indexOf(String(r.contract_number)) < 0) subBits.push(escapeHtml(r.title));
+  } else {
+    title = escapeHtml(r.title || 'Монтаж');
+  }
+  subBits.unshift('<span class="mnt-adr">' + (r.object_address ? escapeHtml(r.object_address) : 'адрес не указан') + '</span>');
+  if (grp === 'today') subBits.push('<b style="color:#1D4ED8;">сегодня</b>');
+  else if (grp === 'upcoming' && dIso) {
+    var inDays = Math.round((new Date(dIso + 'T00:00:00') - new Date(todayIso + 'T00:00:00')) / 86400000);
+    subBits.push('через ' + inDays + ' ' + _plural(inDays, ['день', 'дня', 'дней']));
+  }
+  // Монтажник
+  var whoHtml = r.assignee_name
+    ? '<span class="mnt-ava">' + escapeHtml((typeof getInitials === 'function') ? getInitials(r.assignee_name) : r.assignee_name.slice(0, 2)) + '</span>' +
+      '<span class="mnt-whonm">' + escapeHtml(r.assignee_name) + '</span>'
+    : '<span class="mnt-none">монтажник не назначен</span>';
+  // Статус-цепочка из 5 шагов
+  var flow = _installStatusFlow && _installStatusFlow.length ? _installStatusFlow : ['planned', 'en_route', 'on_site', 'mounted', 'handed_over'];
+  var idx = flow.indexOf(r.status);
+  var steps = flow.map(function (s, i) {
+    if (isCancelled) return '<i></i>';
+    if (isDone) return '<i class="ok"></i>';
+    return '<i class="' + (i <= idx ? 'on' : '') + '"></i>';
+  }).join('');
+  var stLbl = escapeHtml(_installStatusLabels[r.status] || r.status);
+  if (grp === 'late' && idx <= 0) stLbl += ' · выезда не было';
+  // Отчёты
+  var repN = Number(r.reports_count || 0);
+  var repCls = (repN === 0 && (grp === 'late' || grp === 'today')) ? ' zero' : '';
+  return '<div class="mnt-r ' + grp + (isCancelled ? ' cancelled' : '') + '" onclick="openInstallationDetail(' + r.id + ')">' +
+    dteHtml +
+    '<div class="mnt-main">' +
+      '<div class="mnt-t">' + title + '</div>' +
+      '<div class="mnt-sub">' + subBits.join(' <span class="mnt-dot">·</span> ') + '</div>' +
+    '</div>' +
+    '<div class="mnt-who">' + whoHtml + '</div>' +
+    '<div class="mnt-st"><div class="mnt-steps">' + steps + '</div><div class="mnt-stlbl">' + stLbl + '</div></div>' +
+    '<div class="mnt-acts"><span class="mnt-rep' + repCls + '">отчётов: ' + repN + '</span><i class="ti ti-chevron-right mnt-chev"></i></div>' +
+  '</div>';
+}
 function renderInstallationList(rows) {
   var box = document.getElementById('installation-list-content');
   if (!box) return;
@@ -13123,27 +13198,39 @@ function renderInstallationList(rows) {
       '</div>';
     return;
   }
-  var html = '<div class="install-cards" style="display:flex;flex-direction:column;gap:10px;">';
-  rows.forEach(function (r) {
-    var color = _installStatusColor(r.status);
-    var meta = [];
-    if (r.scheduled_date) meta.push('<i class="ti ti-calendar"></i> ' + _installFmtDate(r.scheduled_date));
-    if (r.object_address) meta.push('<i class="ti ti-map-pin"></i> ' + escapeHtml(r.object_address));
-    if (r.assignee_name)  meta.push('<i class="ti ti-user"></i> ' + escapeHtml(r.assignee_name));
-    if (r.contract_number) meta.push('<i class="ti ti-file-text"></i> ' + escapeHtml(r.contract_number) + (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : ''));
-    html +=
-      '<div class="card" onclick="openInstallationDetail(' + r.id + ')" style="cursor:pointer;border:1px solid var(--border,#E2E8F0);border-radius:12px;padding:14px 16px;background:#fff;">' +
-        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">' +
-          '<div style="font-weight:600;font-size:15px;">' + escapeHtml(r.title || 'Монтаж') + '</div>' +
-          '<span style="flex:none;font-size:12px;font-weight:600;color:#fff;background:' + color + ';padding:3px 9px;border-radius:999px;">' +
-            escapeHtml(_installStatusLabels[r.status] || r.status) + '</span>' +
-        '</div>' +
-        (meta.length ? '<div style="margin-top:8px;color:var(--text-mid,#64748B);font-size:13px;display:flex;flex-wrap:wrap;gap:12px;">' +
-          meta.map(function (m) { return '<span>' + m + '</span>'; }).join('') + '</div>' : '') +
-        (r.reports_count ? '<div style="margin-top:8px;color:var(--text-light,#94A3B8);font-size:12px;"><i class="ti ti-camera"></i> отчётов: ' + r.reports_count + '</div>' : '') +
-      '</div>';
-  });
-  html += '</div>';
+  var todayIso = _mntToday();
+  var groups = { late: [], today: [], nodate: [], upcoming: [], done: [] };
+  rows.forEach(function (r) { groups[_mntGroup(r, todayIso)].push(r); });
+  groups.late.sort(function (a, b) { return String(a.scheduled_date || '').localeCompare(String(b.scheduled_date || '')); });
+  groups.upcoming.sort(function (a, b) { return String(a.scheduled_date || '').localeCompare(String(b.scheduled_date || '')); });
+  groups.done.sort(function (a, b) { return String(b.scheduled_date || b.updated_at || '').localeCompare(String(a.scheduled_date || a.updated_at || '')); });
+
+  var html = '';
+  // KPI-строка — только на «Все» (на фильтрах данные неполные)
+  if (state.installFilter === 'all') {
+    var monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    var doneMonth = groups.done.filter(function (r) {
+      return r.status === 'handed_over' && String(r.scheduled_date || r.updated_at || '').slice(0, 10) >= monthAgo;
+    }).length;
+    html += '<div class="mnt-kpis">' +
+      '<div class="mnt-kpi red"><div class="ic">🚨</div><div><div class="n">' + groups.late.length + '</div><div class="l">Выезд просрочен</div></div></div>' +
+      '<div class="mnt-kpi blue"><div class="ic">📅</div><div><div class="n">' + groups.today.length + '</div><div class="l">Сегодня на объектах</div></div></div>' +
+      '<div class="mnt-kpi amber"><div class="ic">❓</div><div><div class="n">' + groups.nodate.length + '</div><div class="l">Без даты выезда</div></div></div>' +
+      '<div class="mnt-kpi gray"><div class="ic">🗓</div><div><div class="n">' + groups.upcoming.length + '</div><div class="l">Запланировано дальше</div></div></div>' +
+      '<div class="mnt-kpi green"><div class="ic">✅</div><div><div class="n">' + doneMonth + '</div><div class="l">Сдано за месяц</div></div></div>' +
+    '</div>';
+  }
+  function section(key, cls, icon, name) {
+    var list = groups[key];
+    if (!list.length) return;
+    html += '<div class="mnt-sec' + (cls ? ' ' + cls : '') + '">' + icon + ' ' + name + ' <span class="cnt">' + list.length + '</span></div>';
+    html += '<div class="mnt-list">' + list.map(function (r) { return _mntRow(r, key, todayIso); }).join('') + '</div>';
+  }
+  section('late', 'alarm', '🚨', 'Просрочен выезд');
+  section('today', 'today', '📅', 'Сегодня');
+  section('nodate', 'warn', '❓', 'Без даты выезда');
+  section('upcoming', '', '🗓', 'Ближайшие');
+  section('done', '', '✅', 'Сданы');
   box.innerHTML = html;
 }
 

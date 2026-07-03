@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.654-cold-calc-scheme";
+const APP_VERSION = "v2.45.655-montage-v2";
 const APP_VERSION_DATE = "03.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3216,6 +3216,8 @@ function _pkbRailHtml(activeWorks, queueWorks, on) {
   }
   // v2.45.649: «вчера без записей» — наполняется асинхронно из /api/production/day-gaps
   html += '<div id="pkb-rail-gaps"></div>';
+  // v2.45.655: просроченные выезды на монтаж
+  html += '<div id="pkb-rail-mnt"></div>';
 
   html += '<div class="pkb-rail-sep"></div>';
   html += '<div class="pkb-rail-t"><i class="ti ti-truck-delivery"></i> Отгрузки</div>';
@@ -3245,6 +3247,23 @@ async function _fillPkbRail() {
           '<span><b>' + ppl.length + '</b> без записей за вчера · ' + escapeHtml(names) + '</span></div>';
       } else gapsEl.innerHTML = '';
     } catch (e) { gapsEl.innerHTML = ''; }
+  }
+  // v2.45.655: монтажи с просроченной датой выезда (статус так и «запланирован»)
+  const mntEl = document.getElementById('pkb-rail-mnt');
+  if (mntEl) {
+    try {
+      const m = await apiGet('/api/installations?include_done=0');
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const late = ((m && m.installations) || []).filter(r =>
+        r.status !== 'handed_over' && r.status !== 'cancelled' &&
+        r.scheduled_date && String(r.scheduled_date).slice(0, 10) < todayIso);
+      if (late.length) {
+        mntEl.innerHTML = '<div class="pkb-rail-row" onclick="goToSection(\'installation\', \'installation-list\')" ' +
+          'title="Дата выезда прошла, монтаж не сдан — открыть раздел Монтаж">' +
+          '<span class="pkb-rail-dot" style="background:#F87171;"></span>' +
+          '<span><b>' + late.length + '</b> ' + plural(late.length, 'монтаж', 'монтажа', 'монтажей') + ' — выезд просрочен</span></div>';
+      } else mntEl.innerHTML = '';
+    } catch (e) { mntEl.innerHTML = ''; }
   }
   const shipEl = document.getElementById('pkb-rail-ship');
   if (shipEl) {
