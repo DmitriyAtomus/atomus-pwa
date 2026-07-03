@@ -6554,7 +6554,42 @@ function renderSupplyShopping(d) {
   visibleGroups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
-    const itemRows = (g.items || []).map(it => {
+    // v2.45.642: у «не назначен» позиции группируются по проекту (первому
+    // договору из plan_contracts) — вместо колонки «Причина» с 50 повторами.
+    let orderedItems = g.items || [];
+    if (noSupplier) {
+      const nsGroups = {};
+      orderedItems.forEach(it => {
+        const key = (Array.isArray(it.plan_contracts) && it.plan_contracts.length)
+          ? ('№' + String(it.plan_contracts[0]).replace(/^№\s*/, ''))
+          : 'на склад';
+        (nsGroups[key] = nsGroups[key] || []).push(it);
+      });
+      orderedItems = [];
+      Object.keys(nsGroups).sort((a, b) => nsGroups[b].length - nsGroups[a].length).forEach(k => {
+        orderedItems.push({ _nsHead: k, _ids: nsGroups[k].map(x => x.component_id), _n: nsGroups[k].length });
+        orderedItems = orderedItems.concat(nsGroups[k]);
+      });
+    }
+    const itemRows = orderedItems.map(it => {
+      // Заголовок группы-проекта
+      if (it._nsHead) {
+        const idsJson = escapeHtml(JSON.stringify(it._ids));
+        const title = it._nsHead === 'на склад'
+          ? '<i class="ti ti-building-warehouse"></i> пополнение склада'
+          : '<i class="ti ti-briefcase"></i> под проект <span class="nsg-num">' + escapeHtml(it._nsHead) + '</span>';
+        return '<tr class="nsg-head">' +
+          '<td class="ns-check-cell"><label class="ns-check-label">' +
+            '<input type="checkbox" class="nsg-check" data-ids="' + idsJson + '" onchange="onNsGroupCheck(this)" title="Выбрать всю группу">' +
+          '</label></td>' +
+          '<td colspan="3"><span class="nsg-title">' + title + '</span>' +
+            '<span class="nsg-cnt">' + it._n + ' ' + _plural(it._n, ['позиция', 'позиции', 'позиций']) + '</span></td>' +
+          '<td colspan="2" style="text-align:right;">' +
+            '<button class="btn btn-secondary btn-sm" data-ids="' + idsJson + '" onclick="nsAssignGroup(this)" ' +
+              'title="Выбрать группу и назначить одного поставщика на все её позиции">' +
+              '<i class="ti ti-truck"></i>Поставщик на группу</button></td>' +
+        '</tr>';
+      }
       // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
       const planContracts = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
       let reasonBadge = it.reason
@@ -6593,9 +6628,11 @@ function renderSupplyShopping(d) {
             ' onchange="onNoSupRowCheck(this)">' +
           '</label></td>'
         : '';
+      // v2.45.642: слот поставщика — заполняется подсказкой «обычно: …» асинхронно
       const assignCell = noSupplier
-        ? '<td class="ssp-action"><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
-            '<i class="ti ti-truck"></i>Поставщик</button></td>'
+        ? '<td class="ssp-action"><span class="ns-sup-slot" data-cid="' + it.component_id + '">' +
+            '<button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
+            '<i class="ti ti-truck"></i>Поставщик</button></span></td>'
         : '';
       // v2.45.286: qty можно менять кликом, рядом — крестик «скрыть позицию»
       const safeName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
@@ -6632,13 +6669,16 @@ function renderSupplyShopping(d) {
             escapeHtml(it.component_name) +
           '</span>' +
           (it.sku ? '<span class="ssp-sku" style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
+          (noSupplier && orderBadge ? ' ' + orderBadge : '') +
         '</td>' +
         '<td class="ssp-stock" style="text-align:right;color:var(--text-light);font-size:12px;">' +
-          '<span class="ssp-meta-label">остаток/мин: </span>' +
-          escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
+          '<span class="ssp-meta-label">остаток: </span>' +
+          escapeHtml(String(it.qty_on_stock)) +
+          (parseFloat(it.min_stock) > 0 ? ' <span style="color:var(--text-faint);">/ мин. ' + escapeHtml(String(it.min_stock)) + '</span>' : '') +
         '</td>' +
         qtyCell +
-        '<td class="ssp-reason-cell"><div class="ssp-reason-wrap">' + reasonBadge + orderBadge + '</div></td>' +
+        // v2.45.642: у «не назначен» причина живёт в заголовке группы — ячейки нет
+        (noSupplier ? '' : '<td class="ssp-reason-cell"><div class="ssp-reason-wrap">' + reasonBadge + orderBadge + '</div></td>') +
         assignCell +
         removeCell +
       '</tr>';
@@ -6733,6 +6773,9 @@ function renderSupplyShopping(d) {
             '</span>' +
             '<button class="btn btn-primary btn-sm" onclick="bulkAssignSupplier()">' +
               '<i class="ti ti-truck"></i>Назначить поставщика всем</button>' +
+            '<button class="btn btn-secondary btn-sm" id="ns-accept-btn" style="display:none;" onclick="nsAcceptSuggested()" ' +
+              'title="Назначить всем выбранным поставщиков из подсказок «обычно: …»">' +
+              '<i class="ti ti-wand"></i>Принять предложенных</button>' +
             '<button class="btn btn-secondary btn-sm" onclick="clearNoSupSelection()">' +
               '<i class="ti ti-x"></i>Снять выбор</button>' +
           '</div>'
@@ -6748,10 +6791,11 @@ function renderSupplyShopping(d) {
             : ''
           ) +
           '<th>Позиция</th>' +
-          '<th style="text-align:right;width:120px;">остаток / мин.</th>' +
+          '<th style="text-align:right;width:110px;">остаток</th>' +
           '<th style="text-align:right;width:140px;">Заказать</th>' +
-          '<th style="width:160px;">Причина</th>' +
-          (noSupplier ? '<th style="width:150px;">Действие</th>' : '') +
+          // v2.45.642: у «не назначен» причина ушла в заголовки групп-проектов
+          (noSupplier ? '' : '<th style="width:160px;">Причина</th>') +
+          (noSupplier ? '<th style="width:210px;">Поставщик</th>' : '') +
           '<th style="width:40px;"></th>' +
         '</tr></thead>' +
         '<tbody>' + itemRows + '</tbody>' +
@@ -6771,6 +6815,8 @@ function renderSupplyShopping(d) {
   container.innerHTML = kpiStrip + segTabs + v2Toggle + buyPane + waitPane;
   // v2.45.444: кардинальный новый вид — класс на контейнере перекрывает стили групп/шапок
   container.classList.toggle('sv2-mode', !!window.SUPPLY_SHOP_V2);
+  // v2.45.642: асинхронно заполняем подсказки поставщиков «обычно: …»
+  _fillNsSuggestions();
 }
 
 /* ============ ЭТАП 52 (v2.44.73): заказ из shopping-list с превью ============ */
@@ -7743,6 +7789,123 @@ function onNoSupRowCheck(checkbox) {
   if (checkbox.checked) window._noSupSelected.add(cid);
   else window._noSupSelected.delete(cid);
   _refreshNoSupBulkBar();
+}
+
+// v2.45.642: чекбокс группы-проекта — выбирает/снимает все её позиции
+function onNsGroupCheck(checkbox) {
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  let ids = [];
+  try { ids = JSON.parse(checkbox.dataset.ids || '[]'); } catch (e) {}
+  ids.forEach(cid => {
+    if (checkbox.checked) window._noSupSelected.add(cid);
+    else window._noSupSelected.delete(cid);
+    const cb = document.querySelector('.ns-row-check[data-cid="' + cid + '"]');
+    if (cb) cb.checked = checkbox.checked;
+  });
+  _refreshNoSupBulkBar();
+}
+
+// «Поставщик на группу» — выбрать все позиции группы и открыть выбор поставщика
+function nsAssignGroup(btn) {
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  let ids = [];
+  try { ids = JSON.parse(btn.dataset.ids || '[]'); } catch (e) {}
+  window._noSupSelected.clear();
+  ids.forEach(cid => {
+    window._noSupSelected.add(cid);
+    const cb = document.querySelector('.ns-row-check[data-cid="' + cid + '"]');
+    if (cb) cb.checked = true;
+  });
+  _refreshNoSupBulkBar();
+  bulkAssignSupplier();
+}
+
+// v2.45.642: подсказка поставщика — «обычно: X» по категории компонента
+// (самый частый default_supplier среди компонентов той же категории).
+async function _fillNsSuggestions() {
+  const slots = document.querySelectorAll('.ns-sup-slot');
+  if (!slots.length) return;
+  try {
+    if (!cache.components || !cache.components.length) {
+      const r = await apiGet('/api/components');
+      cache.components = (r && r.components) || [];
+    }
+  } catch (e) { return; }
+  const comps = cache.components || [];
+  // категория → {supplier_id: count} по компонентам, у которых поставщик задан
+  const catTop = {};
+  const supName = {};
+  comps.forEach(c => {
+    if (!c.default_supplier_id) return;
+    const cat = c.category_name || '—';
+    (catTop[cat] = catTop[cat] || {})[c.default_supplier_id] =
+      ((catTop[cat] || {})[c.default_supplier_id] || 0) + 1;
+    if (c.default_supplier_name) supName[c.default_supplier_id] = c.default_supplier_name;
+  });
+  const byId = {};
+  comps.forEach(c => { byId[c.id] = c; });
+  window._nsSuggest = {};
+  slots.forEach(slot => {
+    const cid = parseInt(slot.dataset.cid, 10);
+    const comp = byId[cid];
+    if (!comp) return;
+    const counts = catTop[comp.category_name || '—'];
+    if (!counts) return;
+    let bestId = null, bestN = 0;
+    Object.keys(counts).forEach(sid => { if (counts[sid] > bestN) { bestN = counts[sid]; bestId = parseInt(sid, 10); } });
+    if (!bestId || bestN < 2) return;   // подсказываем только при уверенности (≥2 совпадений)
+    const nm = supName[bestId];
+    if (!nm) return;
+    window._nsSuggest[cid] = { id: bestId, name: nm };
+    slot.innerHTML = '<span class="ns-sup-hint" onclick="nsAssignOne(' + cid + ',' + bestId + ',' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')" ' +
+      'title="Обычно позиции этой категории поставляет ' + escapeHtml(nm) + ' — нажми, чтобы назначить">' +
+      'обычно: <b>' + escapeHtml(nm) + '</b><span class="ns-sup-set">назначить ✓</span></span>' +
+      '<button class="ssp-remove-btn" style="margin-left:4px;" title="Выбрать другого поставщика" onclick="assignSupplierTo(' + cid + ')"><i class="ti ti-dots"></i></button>';
+  });
+  // Кнопка «Принять предложенных» в массовой панели — показать, если есть подсказки
+  const acc = document.getElementById('ns-accept-btn');
+  if (acc) acc.style.display = Object.keys(window._nsSuggest).length ? '' : 'none';
+}
+
+async function nsAssignOne(cid, supplierId, supplierName) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/' + cid, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_supplier_id: supplierId }),
+    });
+    if (!r.ok) { showToast('Не удалось назначить', 'error'); return; }
+    showToast('Назначен: ' + supplierName, 'success');
+    if (window._noSupSelected) window._noSupSelected.delete(cid);
+    loadSupplyShopping();
+  } catch (e) { showToast('Ошибка сети', 'error'); }
+}
+
+// «Принять предложенных» — назначить подсказанных поставщиков всем выбранным
+async function nsAcceptSuggested() {
+  const ids = Array.from(window._noSupSelected || []);
+  const sugg = window._nsSuggest || {};
+  const targets = ids.filter(cid => sugg[cid]);
+  if (!targets.length) {
+    showToast('Среди выбранных нет позиций с подсказкой — назначь вручную', 'info');
+    return;
+  }
+  if (!confirm('Назначить предложенных поставщиков ' + targets.length + ' ' + _plural(targets.length, ['позиции', 'позициям', 'позициям']) + '?')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  let ok = 0;
+  for (const cid of targets) {
+    try {
+      const r = await fetch(API_BASE + '/api/components/' + cid, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_supplier_id: sugg[cid].id }),
+      });
+      if (r.ok) { ok++; window._noSupSelected.delete(cid); }
+    } catch (e) {}
+  }
+  showToast('Назначено: ' + ok + ' из ' + targets.length, ok ? 'success' : 'error');
+  loadSupplyShopping();
 }
 
 function onNoSupCheckAll(headerCheck) {
