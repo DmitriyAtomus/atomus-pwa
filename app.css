@@ -20649,3 +20649,15 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .idi-qty.ov:hover { background: #FDE68A; }
 .idi-ovhint { font-weight: 500; opacity: .75; }
 .idi-row.idi-skip .idi-name { text-decoration: line-through; opacity: .5; }
+
+/* v2.45.660: сводка суммы по фильтру в «Заказах поставщикам» */
+.sup-ord-sumbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: linear-gradient(135deg, #EFF6FF, #F5F9FF);
+  border: 1px solid #BFDBFE; border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 10px;
+  font-size: 13px; color: #1E3A8A;
+}
+.sup-ord-sumbar .ti { font-size: 16px; color: #2563EB; }
+.sup-ord-sumbar b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.sup-ord-sumbar .nosum { color: #64748B; font-size: 12px; }

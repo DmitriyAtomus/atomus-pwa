@@ -8505,6 +8505,24 @@ function renderSupplyOrders() {
   const canDelete = canManageSupply();
 
   let html = '';
+  // v2.45.660: сводка по текущему фильтру — сколько заказов и на какую сумму
+  // (директору/бухгалтеру): «Оплачены 43 · Σ 1 234 567 ₽». Заказы без суммы
+  // считаем отдельно, чтобы Σ не выглядела полной, если по части сумм нет.
+  if (typeof canSeeMoney === 'function' && canSeeMoney()) {
+    let sum = 0, noSum = 0;
+    list.forEach(o => {
+      const t = Number(o.total_amount || o.invoice_total || 0);
+      if (t > 0) sum += t; else noSum++;
+    });
+    if (sum > 0) {
+      html += '<div class="sup-ord-sumbar">' +
+        '<i class="ti ti-sum"></i>' +
+        '<span>' + list.length + ' ' + _plural(list.length, ['заказ', 'заказа', 'заказов']) +
+          ' на сумму <b>' + Math.round(sum).toLocaleString('ru-RU') + ' ₽</b></span>' +
+        (noSum > 0 ? '<span class="nosum">· ещё ' + noSum + ' без суммы</span>' : '') +
+      '</div>';
+    }
+  }
   // Шапка-выделить-всё
   if (canDelete) {
     const allChecked = list.length > 0 && state.supplyOrdersSelected.size === list.length;
