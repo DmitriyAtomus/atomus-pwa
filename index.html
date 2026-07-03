@@ -6759,6 +6759,31 @@ function _ccRenderSchema() {
           '<stop offset="0" stop-color="#E2E8F0"/>' +
           '<stop offset="1" stop-color="#94A3B8"/>' +
         '</linearGradient>' +
+        // v2.45.654: освещение граней + тень + двери — объёмный вид
+        '<linearGradient id="cc-shade-front" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>' +
+          '<stop offset="1" stop-color="#0C4A6E" stop-opacity="0.10"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="cc-shade-right" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="#0C4A6E" stop-opacity="0.30"/>' +
+          '<stop offset="1" stop-color="#0C4A6E" stop-opacity="0.08"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="cc-shade-top" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/>' +
+          '<stop offset="1" stop-color="#BAE6FD" stop-opacity="0.45"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="cc-door-grad" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#FEF3C7"/>' +
+          '<stop offset="1" stop-color="#FCD34D"/>' +
+        '</linearGradient>' +
+        '<radialGradient id="cc-ground" cx="0.5" cy="0.5" r="0.5">' +
+          '<stop offset="0" stop-color="#0C4A6E" stop-opacity="0.20"/>' +
+          '<stop offset="0.7" stop-color="#0C4A6E" stop-opacity="0.07"/>' +
+          '<stop offset="1" stop-color="#0C4A6E" stop-opacity="0"/>' +
+        '</radialGradient>' +
+        '<filter id="cc-drop" x="-30%" y="-30%" width="160%" height="160%">' +
+          '<feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#0C4A6E" flood-opacity="0.35"/>' +
+        '</filter>' +
       '</defs>' +
 
       '<text x="' + (SVG_W/2) + '" y="26" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#0C4A6E">КАМЕРА · ' +
@@ -6766,6 +6791,16 @@ function _ccRenderSchema() {
         (aLen * bLen).toFixed(1) + ' м² · ' + (aLen * bLen * h).toFixed(1) + ' м³' +
       '</text>' +
 
+      // v2.45.654: мягкая тень на «земле» под камерой — даёт объём
+      (() => {
+        const xs = [P.bfl.x, P.bfr.x, P.bbr.x, P.bll.x];
+        const ys = [P.bfl.y, P.bfr.y, P.bbr.y, P.bll.y];
+        const scx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+        const scy = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2 + 10;
+        const srx = (Math.max.apply(null, xs) - Math.min.apply(null, xs)) / 2 * 1.15;
+        const sry = Math.max((Math.max.apply(null, ys) - Math.min.apply(null, ys)) / 2 * 0.85, 24);
+        return '<ellipse cx="' + scx.toFixed(1) + '" cy="' + scy.toFixed(1) + '" rx="' + srx.toFixed(1) + '" ry="' + sry.toFixed(1) + '" fill="url(#cc-ground)"/>';
+      })() +
       // ПОЛ — снизу (видимый только через скос)
       '<polygon points="' + poly(P.bfl, P.bfr, P.bbr, P.bll) + '" ' +
         'fill="url(#cc-floor-grad)" stroke="#475569" stroke-width="1" opacity="0.85"/>' +
@@ -6778,12 +6813,14 @@ function _ccRenderSchema() {
       '<polygon points="' + poly(P.bfl, P.bll, P.tll, P.tfl) + '" ' +
         'fill="' + LEFT_FILL + '" stroke="#475569" stroke-width="0.7" opacity="0.4" stroke-dasharray="3 3"/>' +
 
-      // ПРАВАЯ СТЕНА Б-2 (видимая)
+      // ПРАВАЯ СТЕНА Б-2 (видимая) + затенение (свет слева-сверху)
       '<polygon points="' + poly(P.bfr, P.bbr, P.tbr, P.tfr) + '" ' +
         'fill="' + RIGHT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      // ПЕРЕДНЯЯ СТЕНА А-1 (видимая)
+      '<polygon points="' + poly(P.bfr, P.bbr, P.tbr, P.tfr) + '" fill="url(#cc-shade-right)"/>' +
+      // ПЕРЕДНЯЯ СТЕНА А-1 (видимая) + блик
       '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" ' +
         'fill="' + FRONT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" fill="url(#cc-shade-front)"/>' +
       // v2.45.116: дверь на передней грани (А-1) — по центру стены у пола
       (() => {
         const door = _ccState.door || {};
@@ -6804,17 +6841,42 @@ function _ccRenderSchema() {
         const dTopY    = (D3.y + D4.y) / 2;
         const dBotY    = (D1.y + D2.y) / 2;
         const dH       = Math.max(20, dBotY - dTopY);
+        // v2.45.654: дверь с градиентом, порожком и ручкой
+        const hx = D1.x + (D2.x - D1.x) * 0.16;
+        const hy = D1.y + (D2.y - D1.y) * 0.16 - dH * 0.48;
         return '<polygon points="' + poly(D1, D2, D3, D4) + '" ' +
-          'fill="#FEF3C7" stroke="#92400E" stroke-width="1.5" opacity="0.95"/>' +
+          'fill="url(#cc-door-grad)" stroke="#92400E" stroke-width="1.5" opacity="0.97"/>' +
           // петля справа — короткая линия
           '<line x1="' + D2.x + '" y1="' + D2.y + '" x2="' + D3.x + '" y2="' + D3.y + '" stroke="#92400E" stroke-width="2.5"/>' +
-          // только «🚪 Дверь» внутри
+          // порожек
+          '<line x1="' + (D1.x - 3) + '" y1="' + (D1.y + 2) + '" x2="' + (D2.x + 3) + '" y2="' + (D2.y + 2) + '" stroke="#92400E" stroke-width="2" opacity="0.55"/>' +
+          // ручка со стороны, противоположной петле
+          '<circle cx="' + hx.toFixed(1) + '" cy="' + hy.toFixed(1) + '" r="2.4" fill="#92400E"/>' +
           '<text x="' + dCenterX + '" y="' + (dTopY + dH * 0.55) + '" ' +
             'text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#92400E">🚪 Дверь</text>';
       })() +
-      // ПОТОЛОК (видимый)
+      // ПОТОЛОК (видимый) + глянцевый блик
       '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" ' +
         'fill="#F0F9FF" stroke="#0C4A6E" stroke-width="1.5" opacity="0.85"/>' +
+      '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" fill="url(#cc-shade-top)" opacity="0.6"/>' +
+      // v2.45.654: снежинки на потолке + бейдж t° внутри на передней грани
+      (() => {
+        const c1 = proj(aLen * 0.25, bLen * 0.55, h);
+        const c2 = proj(aLen * 0.72, bLen * 0.35, h);
+        const ti = (_ccState.tInside != null) ? _ccState.tInside : null;
+        let s = '<text x="' + c1.x.toFixed(1) + '" y="' + c1.y.toFixed(1) + '" text-anchor="middle" font-size="13" opacity="0.45">❄</text>' +
+                '<text x="' + c2.x.toFixed(1) + '" y="' + c2.y.toFixed(1) + '" text-anchor="middle" font-size="10" opacity="0.35">❄</text>';
+        if (ti !== null && aLen > 0 && h > 0) {
+          const bc = proj(aLen / 2, 0, h * 0.8);
+          const label = '❄ ' + ti + '°C внутри';
+          const bw = label.length * 6.4 + 20;
+          s += '<rect x="' + (bc.x - bw / 2).toFixed(1) + '" y="' + (bc.y - 12).toFixed(1) + '" width="' + bw.toFixed(0) + '" height="24" rx="12" ' +
+              'fill="#0C4A6E" filter="url(#cc-drop)" opacity="0.94"/>' +
+            '<text x="' + bc.x.toFixed(1) + '" y="' + (bc.y + 4).toFixed(1) + '" text-anchor="middle" ' +
+              'font-family="Arial" font-size="11.5" font-weight="700" fill="white">' + label + '</text>';
+        }
+        return s;
+      })() +
 
       // === v2.45.128: ВЫНОСКИ — линии от центра граней к разноцветным плашкам ===
       (() => {
@@ -6836,9 +6898,9 @@ function _ccRenderSchema() {
           const bx = tx - boxW / 2, by = ty - boxH / 2;
           return '<line x1="' + fx + '" y1="' + fy + '" x2="' + tx + '" y2="' + ty +
               '" stroke="' + color + '" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.7"/>' +
-            '<circle cx="' + fx + '" cy="' + fy + '" r="3" fill="' + color + '"/>' +
+            '<circle cx="' + fx + '" cy="' + fy + '" r="3.5" fill="' + color + '" stroke="white" stroke-width="1.2"/>' +
             '<rect x="' + bx + '" y="' + by + '" width="' + boxW + '" height="' + boxH +
-              '" rx="6" ry="6" fill="' + color + '"/>' +
+              '" rx="8" ry="8" fill="' + color + '" stroke="rgba(255,255,255,0.5)" stroke-width="1" filter="url(#cc-drop)"/>' +
             '<text x="' + tx + '" y="' + (ty + (sub ? -4 : 4)) +
               '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="white">' +
               title + '</text>' +
