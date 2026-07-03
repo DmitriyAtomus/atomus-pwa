@@ -6352,6 +6352,75 @@ function shopUnhideAll() {
   _shopSaveHidden(new Set());
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
+// v2.45.648: окно «Скрытые позиции» — посмотреть список и вернуть выборочно или все,
+// вместо старого «Показать все», который сбрасывал весь набор разом.
+function openShopHiddenModal() {
+  let m = document.getElementById('shop-hidden-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'shop-hidden-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:82vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-eye-off"></i> Скрытые позиции</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'shop-hidden-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" id="shop-hidden-body" style="overflow-y:auto;padding-top:8px;"></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  _renderShopHiddenBody();
+}
+function _renderShopHiddenBody() {
+  const body = document.getElementById('shop-hidden-body');
+  if (!body) return;
+  const items = window._shopHiddenItems || [];
+  if (!items.length) {
+    body.innerHTML = '<div class="shh-empty"><i class="ti ti-eye-check"></i>Скрытых позиций нет — всё показывается в списке</div>';
+    return;
+  }
+  let html = '<div class="shh-note"><i class="ti ti-info-circle"></i>Эти позиции убраны из «Что закупить» на этом устройстве и не попадают в новые заказы. Верни нужные — они снова появятся в списке.</div>';
+  items.forEach(it => {
+    const plan = Array.isArray(it.plan_contracts) && it.plan_contracts.length
+      ? 'под проект: ' + it.plan_contracts.slice(0, 2).map(n => '№' + n).join(', ') + (it.plan_contracts.length > 2 ? ' +' + (it.plan_contracts.length - 2) : '')
+      : 'на склад';
+    html += '<div class="shh-row">' +
+      '<div class="shh-info">' +
+        '<div class="shh-name">' + escapeHtml(it.component_name || '') + '</div>' +
+        '<div class="shh-sub">' +
+          '<b>' + escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') + '</b>' +
+          ' · ' + (it._sup_name ? escapeHtml(it._sup_name) : 'поставщик не назначен') +
+          ' · ' + escapeHtml(plan) +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-secondary btn-sm shh-return" onclick="shopReturnHidden(' + it.component_id + ')">' +
+        '<i class="ti ti-arrow-back-up"></i>Вернуть</button>' +
+    '</div>';
+  });
+  html += '<div class="shh-footer"><button class="btn btn-primary" onclick="shopReturnAllHidden()">' +
+    '<i class="ti ti-eye"></i>Вернуть все (' + items.length + ')</button></div>';
+  body.innerHTML = html;
+}
+function shopReturnHidden(componentId) {
+  const set = _shopGetHidden();
+  set.delete(componentId);
+  _shopSaveHidden(set);
+  window._shopHiddenItems = (window._shopHiddenItems || []).filter(it => it.component_id !== componentId);
+  _renderShopHiddenBody();
+  // Если вернули последнюю — окно больше не нужно
+  if (!(window._shopHiddenItems || []).length) {
+    const m = document.getElementById('shop-hidden-modal');
+    if (m) m.remove();
+  }
+  showToast('Позиция вернулась в список', 'success');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+function shopReturnAllHidden() {
+  const n = (window._shopHiddenItems || []).length;
+  const m = document.getElementById('shop-hidden-modal');
+  if (m) m.remove();
+  shopUnhideAll();
+  showToast('Возвращено в список: ' + n, 'success');
+}
 function shopEditQty(componentId, currentQty, unit) {
   const v = prompt('Сколько ' + (unit || 'шт.') + ' заказать?\n\nПусто — вернуть рекомендованное количество.', String(currentQty));
   if (v === null) return;
@@ -6386,16 +6455,17 @@ function toggleSupplyShopV2() {
   localStorage.setItem('supplyShopV2', cur ? '0' : '1');
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
-// Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount}
+// Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount, hiddenItems}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
   const qtyMap = _shopGetQtyMap();
   let hiddenCount = 0;
+  const hiddenItems = [];
   const out = (items || []).filter(it => {
     // v2.45.428: уже заказанные/оплаченные — не «к закупке», а «ждём поставку».
     // Исключаем из групп и из формирования заказа (чтобы не заказывать повторно).
     if (it.order_status) return false;
-    if (hidden.has(it.component_id)) { hiddenCount++; return false; }
+    if (hidden.has(it.component_id)) { hiddenCount++; hiddenItems.push(it); return false; }
     return true;
   }).map(it => {
     if (qtyMap[it.component_id] != null) {
@@ -6403,7 +6473,7 @@ function _shopApplyLocal(items) {
     }
     return it;
   });
-  return { items: out, hiddenCount };
+  return { items: out, hiddenCount, hiddenItems };
 }
 
 // v2.45.x: редизайн «Что закупить» — KPI-строка, табы, аватары поставщиков, степпер доставки
@@ -6500,17 +6570,21 @@ function renderSupplyShopping(d) {
   // комплектующие (их убираем из групп «к закупке», чтобы не предлагались снова).
   const waitingItems = cpItems.filter(x => x.purchase_status === 'ordered');
   // v2.45.286: применяем локальные скрытие/переопределения к каждой группе
+  // v2.45.648: скрытые собираем в список — чтобы показать их в окне и вернуть выборочно
   let totalHidden = 0;
+  const hiddenAcc = [];
   groups.forEach(g => {
     // заказанные комплектующие → в «Ждём поставку» (из исходных, до фильтра)
     (g.items || []).forEach(it => {
       if (it.order_status) waitingItems.push(_componentToTracking(it, g));
     });
     const r = _shopApplyLocal(g.items);   // исключает заказанные + скрытые
+    r.hiddenItems.forEach(it => hiddenAcc.push(Object.assign({ _sup_name: g.supplier_name || '' }, it)));
     g.items = r.items;
     g.items_count = r.items.length;
     totalHidden += r.hiddenCount;
   });
+  window._shopHiddenItems = hiddenAcc;
   const waitingBlock = _waitingDeliveryBlockHtml(waitingItems);
   // Группы, в которых не осталось позиций после фильтра — выкидываем
   const visibleGroups = groups.filter(g => (g.items || []).length > 0);
@@ -6519,7 +6593,7 @@ function renderSupplyShopping(d) {
     ? '<div class="sup-shop-hidden-bar">' +
         '<i class="ti ti-eye-off"></i>' +
         '<span>Скрыто ' + totalHidden + ' ' + _plural(totalHidden, ['позиция', 'позиции', 'позиций']) + ' (только на этом устройстве)</span>' +
-        '<button class="btn btn-secondary btn-sm" onclick="shopUnhideAll()"><i class="ti ti-eye"></i>Показать все</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openShopHiddenModal()"><i class="ti ti-eye"></i>Показать скрытые</button>' +
       '</div>'
     : '';
   // v2.45.x: KPI-строка одним взглядом
