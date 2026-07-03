@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.648-hidden-items-modal";
+const APP_VERSION = "v2.45.649-morning-day-gaps";
 const APP_VERSION_DATE = "03.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3214,6 +3214,8 @@ function _pkbRailHtml(activeWorks, queueWorks, on) {
         '<span class="pkb-rail-dot" style="background:transparent;"></span><span>что закупить →</span></div>';
     }
   }
+  // v2.45.649: «вчера без записей» — наполняется асинхронно из /api/production/day-gaps
+  html += '<div id="pkb-rail-gaps"></div>';
 
   html += '<div class="pkb-rail-sep"></div>';
   html += '<div class="pkb-rail-t"><i class="ti ti-truck-delivery"></i> Отгрузки</div>';
@@ -3229,6 +3231,21 @@ function _pkbRailHtml(activeWorks, queueWorks, on) {
 
 // Асинхронное наполнение панели: отгрузки + мои задачи (лёгкие эндпоинты главной)
 async function _fillPkbRail() {
+  // v2.45.649: «вчера без записей» — пока мастер не ответил в утреннем окне
+  const gapsEl = document.getElementById('pkb-rail-gaps');
+  if (gapsEl) {
+    try {
+      const g = await apiGet('/api/production/day-gaps');
+      const ppl = (g && g.people) || [];
+      if (ppl.length) {
+        const names = ppl.slice(0, 3).map(p => p.short_name || p.full_name).filter(Boolean).join(', ');
+        gapsEl.innerHTML = '<div class="pkb-rail-row" onclick="selectSidebarItem(\'summary\')" ' +
+          'title="Мастер ещё не указал, чем занимались — спросится в утреннем окне">' +
+          '<span class="pkb-rail-dot" style="background:#F87171;"></span>' +
+          '<span><b>' + ppl.length + '</b> без записей за вчера · ' + escapeHtml(names) + '</span></div>';
+      } else gapsEl.innerHTML = '';
+    } catch (e) { gapsEl.innerHTML = ''; }
+  }
   const shipEl = document.getElementById('pkb-rail-ship');
   if (shipEl) {
     try {
@@ -4734,6 +4751,8 @@ function renderProductionWorkDetail(w) {
         if (s.note) {
           const am = String(s.note).match(/авто-?стоп[^0-9]*(\d{1,2}:\d{2})?/i);
           if (am) noteChip = '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп' + (am[1] ? ' ' + am[1] : '') + '</span>';
+          // v2.45.649: запись создана из утреннего опроса мастера — маленький чип
+          else if (/дозаполнено/i.test(String(s.note))) noteChip = '<span class="jrn-chip dn-late"><i class="ti ti-pencil"></i>дозаполнено утром</span>';
           else noteText = '<div class="jrn-note">' + escapeHtml(s.note) + '</div>';
         }
         const _h = (s.hours != null) ? parseFloat(s.hours) : null;
@@ -7129,6 +7148,23 @@ function renderSummary(d) {
           '</div>';
           prevDate = s.session_date;
         }
+        // v2.45.649: заметка дня из утреннего опроса мастера («отгул», «хозработы»)
+        if (s.is_day_note) {
+          const dnChip = (s.day_note_kind === 'off')
+            ? '<span class="jrn-chip dn-off"><i class="ti ti-beach"></i>' + escapeHtml(s.day_note_off_kind || 'отгул') + '</span>'
+            : '<span class="jrn-chip dn-oth"><i class="ti ti-broom"></i>не по сборке</span>';
+          html += '<div class="jrn-e jrn-dnote">' +
+            '<div class="pkb-wl-avatar ac-' + avColorIdx + ' jrn-ava">' + escapeHtml(initials) + '</div>' +
+            '<div class="jrn-top"><span class="jrn-nm">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span></div>' +
+            '<div class="jrn-hrs jrn-hrs-dash">—</div>' +
+            '<span class="jrn-chev"></span>' +
+            '<div class="jrn-sub">' + dnChip +
+              (s.note ? '<span class="jrn-w">' + escapeHtml(s.note) + '</span>' : '') +
+              (s.created_by_short_name ? '<span class="jrn-w jrn-dn-by">указал: ' + escapeHtml(s.created_by_short_name) + '</span>' : '') +
+            '</div>' +
+          '</div>';
+          return;
+        }
         // Модель без дубля: артикул показываем, только если отличается от названия
         const _art = String(s.model_article || '').trim();
         const _mn = String(s.model_name || '').trim();
@@ -7142,6 +7178,8 @@ function renderSummary(d) {
         if (s.note) {
           const am = String(s.note).match(/авто-?стоп[^0-9]*(\d{1,2}:\d{2})?/i);
           if (am) noteChip = '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп' + (am[1] ? ' ' + am[1] : '') + '</span>';
+          // v2.45.649: запись создана из утреннего опроса мастера — маленький чип
+          else if (/дозаполнено/i.test(String(s.note))) noteChip = '<span class="jrn-chip dn-late"><i class="ti ti-pencil"></i>дозаполнено утром</span>';
           else noteText = '<div class="jrn-note">' + escapeHtml(s.note) + '</div>';
         }
         const isMain = s.role === 'main';

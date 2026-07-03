@@ -13614,18 +13614,33 @@ async function _maybeMorningProgress() {
     // и сразу подставляем текущий % готовности с карточки канбана
     let active = [];
     try { const d = await apiGet('/api/production/works?status=in_progress'); active = (d && d.works) || []; }
-    catch (e) { return; }
+    catch (e) { active = []; }
     active = active.filter(w => w && w.status === 'in_progress');
-    if (!active.length) return;                            // нет работ в работе — не мешаем
+    // v2.45.649: «вчера без записей» — люди без журнала за последний рабочий день.
+    // Сервер возвращает только неотвеченных, поэтому после сабмита окно не повторяется.
+    let gaps = null;
+    try { const g = await apiGet('/api/production/day-gaps'); if (g && g.people && g.people.length) gaps = g; }
+    catch (e) { gaps = null; }
     const rec = (_mpLoadStore()[_mpToday()]) || {};
-    if (active.every(w => rec[w.id] != null)) return;      // на сегодня уже отмечено
-    _renderMorningProgress(active);
+    const pctPending = active.length > 0 && !active.every(w => rec[w.id] != null);
+    if (!pctPending && !gaps) return;                      // ни %, ни вопросов — не мешаем
+    _renderMorningProgress(active, gaps);
   } catch (e) { /* окно не должно ломать вход в приложение */ }
 }
 
-function _renderMorningProgress(active) {
+function _renderMorningProgress(active, gaps) {
   const rec = (_mpLoadStore()[_mpToday()]) || {};
-  state._mp = { active: active, filled: {} };
+  state._mp = {
+    active: active, filled: {},
+    // v2.45.649: утренний опрос «чем занимался вчера»
+    gaps: (gaps && gaps.people) || [],
+    gapWorks: (gaps && gaps.works) || [],
+    gapDate: (gaps && gaps.date) || '',
+    gapAns: {},
+  };
+  state._mp.gaps.forEach(p => {
+    state._mp.gapAns[p.employee_id] = { mode: null, work_id: null, hours: 7, off_kind: null, comment: '' };
+  });
   // v2.45.364: пред-заполняем текущим % (rec за сегодня, иначе серверный progress с карточки)
   active.forEach(w => {
     const cur = (rec[w.id] != null) ? rec[w.id] : (w.progress != null ? Math.max(0, Math.min(100, parseInt(w.progress, 10) || 0)) : 0);
@@ -13672,6 +13687,9 @@ function _renderMorningProgress(active) {
       '</div>';
   });
 
+  // v2.45.649: блок «Вчера без записей» — вопросы по людям без журнала
+  const gapsHtml = _ydBlockHtml();
+
   const ov = document.createElement('div');
   ov.id = 'morning-progress-overlay';
   ov.className = 'mp-overlay';
@@ -13683,9 +13701,12 @@ function _renderMorningProgress(active) {
         '<div class="mp-h1">Доброе утро' + greet + ' 👋</div>' +
         '<div class="mp-date">' + dateStr + ' · смена началась</div>' +
       '</div>' +
-      '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Проверьте % готовности по каждой работе в производстве — текущие значения подставлены, поправьте, если изменилось.</span></div>' +
-      '<div class="mp-counter"><span id="mp-counter-txt"></span><div class="mp-cbar"><div id="mp-cbar-fill"></div></div></div>' +
-      '<div class="mp-list">' + items + '</div>' +
+      (active.length
+        ? '<div class="mp-note"><i class="ti ti-alert-triangle"></i><span>Проверьте % готовности по каждой работе в производстве — текущие значения подставлены, поправьте, если изменилось.</span></div>' +
+          '<div class="mp-counter"><span id="mp-counter-txt"></span><div class="mp-cbar"><div id="mp-cbar-fill"></div></div></div>' +
+          '<div class="mp-list">' + items + '</div>'
+        : '') +
+      gapsHtml +
       '<div class="mp-foot">' +
         '<button class="mp-cta" id="mp-cta" disabled onclick="_mpSubmit()"><i class="ti ti-lock"></i> Начать смену</button>' +
         '<div class="mp-hint" id="mp-hint"></div>' +
@@ -13693,6 +13714,150 @@ function _renderMorningProgress(active) {
     '</div>';
   document.body.appendChild(ov);
   document.body.style.overflow = 'hidden';
+  _mpUpdateState();
+}
+
+// ============ v2.45.649: «Вчера без записей» — утренний опрос по людям ============
+function _ydDateLabel(iso) {
+  if (!iso) return 'вчера';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return 'вчера';
+  const wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][d.getDay()];
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  return wd + ', ' + d.getDate() + ' ' + months[d.getMonth()];
+}
+
+function _ydBlockHtml() {
+  const g = state._mp;
+  if (!g || !g.gaps.length) return '';
+  let persons = '';
+  g.gaps.forEach(p => {
+    const eid = p.employee_id;
+    const nm = p.short_name || p.full_name || ('#' + eid);
+    const initials = (typeof getInitials === 'function') ? getInitials(nm) : nm.slice(0, 2).toUpperCase();
+    const colorIdx = (eid || 0) % 8;
+    // список действующих работ (сворачиваемый скроллом при большом числе)
+    let workRows = '';
+    g.gapWorks.forEach(w => {
+      const sub = [w.contract_number ? '№' + String(w.contract_number).replace(/^[№#\s]+/, '') : '', w.contractor_name || ''].filter(Boolean).join(' · ');
+      const stRu = { queue: 'в очереди', in_progress: 'в работе', review: 'на проверке', packing: 'упаковка' }[w.status] || '';
+      workRows += '<div class="yd-work" data-wid="' + w.id + '" onclick="_ydWork(' + eid + ',' + w.id + ',this)">' +
+        '<span class="yd-radio"></span>' +
+        '<div class="yd-wmain"><div class="yd-wn">' + escapeHtml(w.title || '') + '</div>' +
+          '<div class="yd-ws">' + escapeHtml([sub, stRu].filter(Boolean).join(' · ')) + '</div></div>' +
+      '</div>';
+    });
+    persons +=
+      '<div class="yd-person" id="yd-p-' + eid + '">' +
+        '<div class="yd-ptop">' +
+          '<div class="pkb-wl-avatar ac-' + colorIdx + ' yd-ava">' + escapeHtml(initials) + '</div>' +
+          '<div class="yd-pmain">' +
+            '<div class="yd-pname">' + escapeHtml(nm) + '</div>' +
+            '<div class="yd-psub">вчера 0 ч в журнале</div>' +
+          '</div>' +
+          '<span class="yd-status todo" id="yd-st-' + eid + '">не указано</span>' +
+        '</div>' +
+        '<div class="yd-chips" id="yd-chips-' + eid + '">' +
+          '<span class="yd-chip" data-m="work" onclick="_ydMode(' + eid + ',\'work\',this)"><i class="ti ti-tool"></i>Работал на сборке</span>' +
+          '<span class="yd-chip" data-m="other" onclick="_ydMode(' + eid + ',\'other\',this)"><i class="ti ti-broom"></i>Хозработы / другое</span>' +
+          '<span class="yd-chip" data-m="off" onclick="_ydMode(' + eid + ',\'off\',this)"><i class="ti ti-beach"></i>Отгул / болел</span>' +
+        '</div>' +
+        '<div class="yd-detail" id="yd-work-' + eid + '" style="display:none;">' +
+          '<div class="yd-workpick">' + workRows + '</div>' +
+          '<div class="yd-hours"><span class="yd-hlbl">Сколько часов:</span>' +
+            '<div class="yd-step">' +
+              '<button type="button" onclick="_ydH(' + eid + ',-1)">−</button>' +
+              '<span class="yd-hval"><b id="yd-h-' + eid + '">7</b> ч</span>' +
+              '<button type="button" onclick="_ydH(' + eid + ',1)">+</button>' +
+            '</div></div>' +
+        '</div>' +
+        '<div class="yd-detail" id="yd-other-' + eid + '" style="display:none;">' +
+          '<textarea class="yd-comment" id="yd-txt-' + eid + '" rows="2" ' +
+            'placeholder="Чем занимался? Например: перемотка кабеля, погрузка…" ' +
+            'oninput="_ydTxt(' + eid + ', this)"></textarea>' +
+          '<div class="yd-quick">' +
+            ['уборка цеха', 'погрузка / отгрузка', 'закупка / поездка', 'помогал на монтаже'].map(q =>
+              '<span onclick="_ydQuick(' + eid + ', this)">' + q + '</span>').join('') +
+          '</div>' +
+        '</div>' +
+        '<div class="yd-detail" id="yd-off-' + eid + '" style="display:none;">' +
+          '<div class="yd-chips yd-offkinds">' +
+            ['отгул', 'болел', 'отпуск', 'выходной'].map(k =>
+              '<span class="yd-chip" onclick="_ydOff(' + eid + ', \'' + k + '\', this)">' + k + '</span>').join('') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  });
+  const n = g.gaps.length;
+  return '<div class="yd-block">' +
+    '<div class="yd-head"><i class="ti ti-alert-circle"></i><div>' +
+      '<b>За ' + _ydDateLabel(g.gapDate) + ' нет записей — ' + n + ' ' + _plural(n, ['человек', 'человека', 'человек']) + '</b>' +
+      '<span>Укажи, чем занимались. Часы попадут в журнал, причина — в сводку дня.</span>' +
+    '</div></div>' +
+    '<div class="yd-list">' + persons + '</div>' +
+  '</div>';
+}
+
+function _ydMode(eid, mode, el) {
+  const a = state._mp && state._mp.gapAns[eid];
+  if (!a) return;
+  a.mode = mode;
+  const chips = document.getElementById('yd-chips-' + eid);
+  if (chips) chips.querySelectorAll('.yd-chip').forEach(c => c.classList.toggle('on', c === el));
+  ['work', 'other', 'off'].forEach(m => {
+    const d = document.getElementById('yd-' + m + '-' + eid);
+    if (d) d.style.display = (m === mode) ? 'block' : 'none';
+  });
+  _ydRefresh(eid);
+}
+function _ydWork(eid, workId, el) {
+  const a = state._mp && state._mp.gapAns[eid];
+  if (!a) return;
+  a.work_id = workId;
+  const box = document.getElementById('yd-work-' + eid);
+  if (box) box.querySelectorAll('.yd-work').forEach(w => w.classList.toggle('on', w === el));
+  _ydRefresh(eid);
+}
+function _ydH(eid, delta) {
+  const a = state._mp && state._mp.gapAns[eid];
+  if (!a) return;
+  a.hours = Math.max(1, Math.min(12, (a.hours || 7) + delta));
+  const el = document.getElementById('yd-h-' + eid);
+  if (el) el.textContent = a.hours;
+  _ydRefresh(eid);
+}
+function _ydTxt(eid, el) {
+  const a = state._mp && state._mp.gapAns[eid];
+  if (!a) return;
+  a.comment = (el.value || '').trim();
+  _ydRefresh(eid);
+}
+function _ydQuick(eid, el) {
+  const txt = document.getElementById('yd-txt-' + eid);
+  if (txt) { txt.value = el.textContent; _ydTxt(eid, txt); }
+}
+function _ydOff(eid, kind, el) {
+  const a = state._mp && state._mp.gapAns[eid];
+  if (!a) return;
+  a.off_kind = kind;
+  const box = document.getElementById('yd-off-' + eid);
+  if (box) box.querySelectorAll('.yd-chip').forEach(c => c.classList.toggle('on', c === el));
+  _ydRefresh(eid);
+}
+function _ydDone(a) {
+  if (!a || !a.mode) return false;
+  if (a.mode === 'work') return !!a.work_id && (a.hours || 0) > 0;
+  if (a.mode === 'other') return (a.comment || '').length > 1;
+  if (a.mode === 'off') return !!a.off_kind;
+  return false;
+}
+function _ydRefresh(eid) {
+  const a = state._mp && state._mp.gapAns[eid];
+  const ok = _ydDone(a);
+  const st = document.getElementById('yd-st-' + eid);
+  if (st) { st.textContent = ok ? '✓ указано' : 'не указано'; st.className = 'yd-status ' + (ok ? 'ok' : 'todo'); }
+  const card = document.getElementById('yd-p-' + eid);
+  if (card) card.classList.toggle('is-done', ok);
   _mpUpdateState();
 }
 
@@ -13716,14 +13881,21 @@ function _mpUpdateState() {
   const fill = document.getElementById('mp-cbar-fill');
   if (fill) fill.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
   const left = total - done;
+  // v2.45.649: плюс неотвеченные вопросы «чем занимался вчера»
+  const gapsLeft = (state._mp.gaps || []).filter(p => !_ydDone(state._mp.gapAns[p.employee_id])).length;
+  const allDone = left === 0 && gapsLeft === 0;
   const cta = document.getElementById('mp-cta');
   const hint = document.getElementById('mp-hint');
   if (cta) {
-    cta.disabled = left !== 0;
-    cta.classList.toggle('ready', left === 0);
-    cta.innerHTML = left === 0 ? 'Начать смену <i class="ti ti-arrow-right"></i>' : '<i class="ti ti-lock"></i> Начать смену';
+    cta.disabled = !allDone;
+    cta.classList.toggle('ready', allDone);
+    cta.innerHTML = allDone ? 'Начать смену <i class="ti ti-arrow-right"></i>' : '<i class="ti ti-lock"></i> Начать смену';
   }
-  if (hint) hint.innerHTML = left === 0 ? 'Готово — хорошей смены!' : ('Заполните все позиции — осталось <b>' + left + '</b>');
+  if (hint) {
+    if (allDone) hint.innerHTML = 'Готово — хорошей смены!';
+    else if (left > 0) hint.innerHTML = 'Заполните все позиции — осталось <b>' + left + '</b>';
+    else hint.innerHTML = 'Укажите, чем занимались вчера — осталось <b>' + gapsLeft + '</b>';
+  }
 }
 
 function _mpSubmit() {
@@ -13731,6 +13903,8 @@ function _mpSubmit() {
   const total = state._mp.active.length;
   const done = state._mp.active.filter(c => state._mp.filled[c.id] != null).length;
   if (done < total) return; // защита: не закрываем, пока не всё
+  // v2.45.649: и пока не отвечено по всем «вчера без записей»
+  if ((state._mp.gaps || []).some(p => !_ydDone(state._mp.gapAns[p.employee_id]))) return;
   const store = _mpLoadStore();
   const today = _mpToday();
   store[today] = store[today] || {};
@@ -13743,6 +13917,27 @@ function _mpSubmit() {
       state._mp.active.forEach(function (w) {
         apiPatch('/api/production/works/' + w.id + '/progress', { progress: state._mp.filled[w.id] }).catch(function () {});
       });
+    }
+  } catch (e) {}
+  // v2.45.649: ответы «чем занимался вчера» → журнал участия / заметки дня
+  try {
+    const g = state._mp;
+    if (g.gaps && g.gaps.length && typeof apiPost === 'function') {
+      const answers = g.gaps.map(function (p) {
+        const a = g.gapAns[p.employee_id] || {};
+        return {
+          employee_id: p.employee_id,
+          kind: a.mode,
+          work_id: a.work_id,
+          hours: a.hours,
+          comment: a.comment,
+          off_kind: a.off_kind,
+        };
+      });
+      apiPost('/api/production/day-answers', { date: g.gapDate, answers: answers }).then(function () {
+        // журнал/сводки могли быть уже загружены — сбросим кэш, чтобы подтянулись записи
+        try { if (typeof cache === 'object') { delete cache.summaryData; } } catch (e2) {}
+      }).catch(function () {});
     }
   } catch (e) {}
   const ov = document.getElementById('morning-progress-overlay');

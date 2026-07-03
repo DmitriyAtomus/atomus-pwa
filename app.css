@@ -20307,3 +20307,71 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   padding: 28px 12px; color: var(--text-secondary); font-size: 13px; text-align: center;
 }
 .shh-empty .ti { font-size: 30px; color: #10B981; }
+
+/* === v2.45.649: утренний опрос «Вчера без записей» (блок в окне «Начать смену») === */
+.yd-block { margin: 13px 0 2px; }
+.yd-head {
+  margin: 0 16px; padding: 10px 12px; border-radius: 12px 12px 0 0;
+  background: #FEF2F2; border: 1px solid #FECACA; border-bottom: none;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.yd-head .ti { color: #DC2626; font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+.yd-head b { font-size: 12.5px; color: #991B1B; display: block; }
+.yd-head span { font-size: 11.5px; color: #B45454; line-height: 1.35; }
+.yd-list { margin: 0 16px; border: 1px solid #FECACA; border-radius: 0 0 12px 12px; overflow: hidden; }
+.yd-person { padding: 12px 12px 13px; background: #FFFBFA; }
+.yd-person + .yd-person { border-top: 1px solid #FECACA; }
+.yd-person.is-done { background: #F7FDF9; }
+.yd-ptop { display: flex; align-items: center; gap: 10px; }
+.yd-ava { width: 34px !important; height: 34px !important; font-size: 12px !important; flex-shrink: 0; }
+.yd-pmain { flex: 1; min-width: 0; }
+.yd-pname { font-size: 13.5px; font-weight: 700; color: var(--text-dark); }
+.yd-psub { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+.yd-status { margin-left: auto; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.yd-status.todo { color: #DC2626; }
+.yd-status.ok { color: #15803D; }
+.yd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-left: 44px; }
+.yd-chip {
+  border: 1.5px solid var(--border); background: #fff; border-radius: 999px;
+  padding: 6px 11px; font-size: 12px; font-weight: 600; color: var(--text-secondary, #64748B);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  transition: background .13s, border-color .13s, color .13s; user-select: none;
+}
+.yd-chip .ti { font-size: 13px; }
+.yd-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.yd-offkinds { padding-left: 0; margin-top: 0; }
+.yd-detail { margin: 10px 0 0 44px; }
+.yd-workpick { display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; }
+.yd-work {
+  border: 1.5px solid var(--border); border-radius: 11px; padding: 8px 11px;
+  display: flex; align-items: center; gap: 9px; cursor: pointer; background: #fff;
+  transition: border-color .13s, background .13s;
+}
+.yd-work.on { border-color: var(--brand); background: #EFF6FF; box-shadow: 0 0 0 1px var(--brand) inset; }
+.yd-wmain { min-width: 0; }
+.yd-wn { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yd-ws { font-size: 10.5px; color: var(--text-light); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yd-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #CBD5E1; flex-shrink: 0; }
+.yd-work.on .yd-radio { border-color: var(--brand); background: radial-gradient(circle, var(--brand) 45%, transparent 52%); }
+.yd-hours { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+.yd-hlbl { font-size: 12px; color: var(--text-secondary, #64748B); font-weight: 600; }
+.yd-step { display: flex; align-items: center; border: 1.5px solid var(--border); border-radius: 11px; overflow: hidden; background: #fff; }
+.yd-step button { width: 36px; height: 34px; border: none; background: #F4F6FA; font-size: 17px; font-weight: 700; color: var(--brand); cursor: pointer; }
+.yd-hval { width: 54px; text-align: center; font-size: 12px; color: var(--text-light); }
+.yd-hval b { font-size: 15px; font-weight: 800; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.yd-comment {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 11px; padding: 9px 11px;
+  font-size: 12.5px; font-family: inherit; resize: none; outline: none; background: #fff;
+}
+.yd-comment:focus { border-color: var(--brand); }
+.yd-quick { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.yd-quick span { font-size: 11px; padding: 4px 9px; border-radius: 999px; background: #F1F5F9; color: var(--text-secondary, #64748B); cursor: pointer; }
+.yd-quick span:active { background: #E2E8F0; }
+
+/* Заметки дня в журнале Сводок + чип «дозаполнено утром» */
+.jrn-e.jrn-dnote { opacity: .92; }
+.jrn-hrs-dash { color: #94A3B8 !important; font-weight: 600 !important; }
+.jrn-chip.dn-off { background: #F1F5F9; color: #475569; }
+.jrn-chip.dn-oth { background: #FEF9C3; color: #854D0E; }
+.jrn-chip.dn-late { background: #EDE9FE; color: #6D28D9; }
+.jrn-dn-by { opacity: .65; }
