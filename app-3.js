@@ -9155,7 +9155,13 @@ function _supplyInboxStatusHTML() {
   } else {
     icon = 'ti-loader'; color = 'var(--text-mid)'; bg = 'var(--bg)'; border = 'var(--border)';
   }
-  const _fmtTs = (v) => v ? escapeHtml(String(v).replace('T', ' ').substring(0, 16)) : '';
+  // v2.45.651: серверное UTC-время → екатеринбургское, в человеческом виде
+  const _fmtTs = (v) => {
+    const d = _ibxEkbDate(v);
+    if (!d) return v ? escapeHtml(String(v).replace('T', ' ').substring(0, 16)) : '';
+    return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') +
+      ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  };
   let line2;
   if (s.ok === false) {
     if (sustainedFail) {
@@ -9178,7 +9184,7 @@ function _supplyInboxStatusHTML() {
   } else {
     line2 = 'Робот ещё не запускался — подождите ' + (cfg.interval_sec || 60) + ' секунд или нажмите «Проверить»';
   }
-  const ts = s.at ? escapeHtml(String(s.at).replace('T', ' ').substring(0, 16)) : '—';
+  const ts = s.at ? (_fmtTs(s.at) || '—') : '—';
   return '<div style="background:' + bg + ';border:1px solid ' + border + ';color:' + color + ';border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:flex-start;gap:10px;">' +
     '<i class="ti ' + icon + '" style="font-size:18px;flex-shrink:0;margin-top:1px;"></i>' +
     '<div style="flex:1;min-width:0;">' +
@@ -9401,27 +9407,38 @@ async function _loadInboxInvPreview(inboxId, idx, filename) {
   }
 }
 
-// v2.45.650: человеческая дата получения — «сегодня · 05:28», «вчера · 04:51»,
-// «1 июля · 11:20». Счета старше 2 дней подсвечиваем: залежались.
+// v2.45.651: сервер пишет время в UTC — пересчитываем на екатеринбургское (UTC+5,
+// без переходов). Читаем сдвинутую дату через getUTC*, чтобы не зависеть от
+// часового пояса устройства.
+const _IBX_TZ_MS = 5 * 3600 * 1000;
+function _ibxEkbDate(iso) {
+  if (!iso) return null;
+  let s = String(iso).trim().replace(' ', 'T');
+  if (!/[Zz]$|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';   // без зоны — считаем UTC (так пишет сервер)
+  const t = Date.parse(s);
+  return isNaN(t) ? null : new Date(t + _IBX_TZ_MS);
+}
+// v2.45.650: человеческая дата получения — «сегодня · 10:28», «вчера · 09:51»,
+// «1 июля · 16:20». Счета старше 2 дней подсвечиваем: залежались.
 function _ibxWhen(iso) {
   if (!iso) return { text: '—', cls: '', full: '' };
-  const d = new Date(String(iso).replace(' ', 'T'));
-  if (isNaN(d.getTime())) return { text: String(iso).slice(0, 16), cls: '', full: String(iso) };
-  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  const now = new Date();
-  const day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const d = _ibxEkbDate(iso);
+  if (!d) return { text: String(iso).slice(0, 16), cls: '', full: String(iso) };
+  const now = new Date(Date.now() + _IBX_TZ_MS);
+  const hm = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  const day0 = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dd = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
   const diff = Math.round((day0 - dd) / 86400000);
   const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   let text, cls = '';
   if (diff <= 0) { text = 'сегодня · ' + hm; cls = 'td'; }
   else if (diff === 1) { text = 'вчера · ' + hm; cls = 'yd'; }
   else {
-    text = d.getDate() + ' ' + months[d.getMonth()] + ' · ' + hm;
-    if (d.getFullYear() !== now.getFullYear()) text = d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear() + ' · ' + hm;
+    text = d.getUTCDate() + ' ' + months[d.getUTCMonth()] + ' · ' + hm;
+    if (d.getUTCFullYear() !== now.getUTCFullYear()) text = d.getUTCDate() + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear() + ' · ' + hm;
     cls = diff >= 3 ? 'old' : '';
   }
-  const full = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ', ' + hm +
+  const full = d.getUTCDate() + ' ' + months[d.getUTCMonth()] + ' ' + d.getUTCFullYear() + ', ' + hm + ' (Екб)' +
     (diff >= 2 ? ' — ' + diff + ' ' + _plural(diff, ['день', 'дня', 'дней']) + ' назад' : '');
   return { text: text, cls: cls, full: full };
 }
