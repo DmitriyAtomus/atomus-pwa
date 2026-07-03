@@ -9440,78 +9440,81 @@ function _ibxWhen(iso) {
   }
   const full = d.getUTCDate() + ' ' + months[d.getUTCMonth()] + ' ' + d.getUTCFullYear() + ', ' + hm + ' (Екб)' +
     (diff >= 2 ? ' — ' + diff + ' ' + _plural(diff, ['день', 'дня', 'дней']) + ' назад' : '');
-  return { text: text, cls: cls, full: full };
+  return { text: text, cls: cls, full: full, diff: diff };
 }
 
+// v2.45.652: компактная строка вместо большой карточки (~52px против ~150px):
+// имя файла + метки, отправитель и документ второй строчкой, дата справа,
+// действия маленькими кнопками. Клик по строке открывает счёт с расшифровкой.
+// Полоска слева — возраст: синяя сегодня, жёлтая 1-2 дня, красная 3+ дня.
 function _ibxInvoiceCard(m, isMatched) {
   const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
   const atts = m.attachments || [];
   const when = _ibxWhen(m.received_at);
-  let chips = '';
+  const ageCls = when.cls === 'td' ? 'today' : (when.cls === 'old' ? 'stale' : '');
+
+  // Метки в строке заголовка
+  let tags = maxSourcePill(m);
   if (isMatched) {
-    chips += '<span class="ibx-chip ok"><span class="em">✅</span> привязан → ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>';
-    chips += orderPayStatusPill(m);
-  } else {
-    chips += '<span class="ibx-chip need"><span class="em">🔗</span> нужна привязка</span>';
+    tags = '<span class="ibx-chip ok"><span class="em">✅</span> ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>' +
+      orderPayStatusPill(m) + tags;
+  } else if (m.detected_label) {
+    tags += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
   }
-  chips += maxSourcePill(m);
-  if (m.detected_label && !isMatched) chips += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
-  chips += payerEntityPill((m.ai_data || {}).payer_entity, false);
-  let attBlock = '';
+  tags += payerEntityPill((m.ai_data || {}).payer_entity, false);
+
+  // Вторая строка: отправитель · документ (имя не дублируем, если совпадает с темой)
+  const from = m.from_name || m.from_addr || '—';
+  let docBit = '';
   if (di >= 0) {
     const a = atts[di];
     const kb = Math.round((a.size || 0) / 1024);
-    const nm = escapeHtml(a.name || 'файл');
-    attBlock = '<div class="ibx-att">' +
-      '<div class="ibx-att-ic"><span class="em">📄</span></div>' +
-      '<div class="ibx-att-name" title="' + nm + '">' + nm + '</div>' +
-      '<div class="ibx-att-size">' + kb + ' КБ</div>' +
-      // v2.45.623: «Открыть» — окно счёта с расшифровкой + предпросмотром (как на «На оплату»)
-      '<button class="btn btn-sm" onclick="openInboxInvoice(' + m.id + ')"><span class="em">👁</span> Открыть</button>' +
-    '</div>';
-  } else if (isMatched && atts.length) {
-    attBlock = '<div class="ibx-att-mini"><span class="em">📎</span> ' + atts.length + ' вложени' + (atts.length > 1 ? 'й' : 'е') + '</div>';
+    const sameName = String(a.name || '').trim().toLowerCase() === String(m.subject || '').trim().toLowerCase();
+    docBit = ' · <span class="ibx-r-doc"><span class="em">📄</span> ' +
+      (sameName ? '' : escapeHtml(a.name || 'файл') + ' · ') + kb + ' КБ</span>';
+  } else if (atts.length) {
+    docBit = ' · <span class="ibx-r-doc"><span class="em">📎</span> ' + atts.length + ' влож.</span>';
   }
+
+  // Дата справа: «сегодня / 10:28», у залежавшихся — «⚠ N дн»
+  const wp = when.text.split(' · ');
+  const whenHtml = '<div class="ibx-r-when" title="' + escapeHtml(when.full) + '">' +
+    escapeHtml(wp[0] || '') + (when.cls === 'old' && when.diff ? ' <span class="wrn">⚠ ' + when.diff + ' дн</span>' : '') +
+    '<small>' + escapeHtml(wp[1] || '') + '</small></div>';
+
+  // Действия
   let acts = '';
   if (isMatched) {
-    // v2.45.598: «Оплатить» прямо на карточке привязанного счёта — переводит
-    // САМ заказ в «На оплату» (без задвоения: счёт уже привязан к этому заказу,
-    // УПД потом его и закроет). Скрываем, если заказ уже оплачивается/оплачен/отменён.
     const _payable = m.matched_order_id &&
       ['to_pay', 'paid', 'received', 'partial', 'cancelled'].indexOf(m.matched_order_status || '') < 0;
     acts = (_payable
-        ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
+        ? '<button class="ibx-b paysolid" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
         : '') +
-      (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
-      '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>';
+      (m.matched_order_id ? '<button class="ibx-b" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Заказ</button>' : '') +
+      '<button class="ibx-ic" title="Письмо" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span></button>';
   } else {
-    // v2.45.596: «На оплату» прямо на карточке (раньше — только внутри «Письмо»).
-    // Создаёт позицию в разделе «На оплату» из распознанных реквизитов, минуя
-    // привязку к заказу. Показываем только если есть документ-вложение (счёт).
-    const payBtn = (di >= 0)
-      ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>'
-      : '';
-    acts = '<button class="btn btn-primary ibx-grow" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать к заказу</button>' +
-      payBtn +
-      '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>' +
-      _ibxDelBtn(m);
+    acts = '<button class="ibx-b link" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать</button>' +
+      (di >= 0 ? '<button class="ibx-b pay" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>' : '') +
+      '<button class="ibx-ic" title="Письмо" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span></button>' +
+      ((state.user && (state.user.roles || []).includes('director'))
+        ? '<button class="ibx-ic" title="Удалить письмо" onclick="deleteInboxMessage(' + m.id + ')"><span class="em">🗑</span></button>'
+        : '');
   }
+
   const _cb = (state.user && (state.user.roles || []).includes('director'))
     ? '<input type="checkbox" class="ibx-cb" data-id="' + m.id + '" title="Выбрать" onclick="event.stopPropagation();_ibxToggle(' + m.id + ',this.checked)">'
     : '';
-  return '<div class="ibx-card' + (isMatched ? ' matched' : '') + '"><div class="ibx-card-top">' +
+  const openFn = di >= 0 ? 'openInboxInvoice(' + m.id + ')' : 'openInboxMessage(' + m.id + ')';
+  return '<div class="ibx-r ' + ageCls + (isMatched ? ' matched' : '') + '" onclick="' + openFn + '" title="Открыть ' + (di >= 0 ? 'счёт с расшифровкой' : 'письмо') + '">' +
     _cb +
     _inboxAvatarHtml(m) +
-    '<div class="ibx-card-body">' +
-      '<div class="ibx-chips">' + chips +
-        '<span class="ibx-when ' + when.cls + '" title="' + escapeHtml(when.full) + '"><i class="ti ti-clock"></i>' + escapeHtml(when.text) + '</span>' +
-      '</div>' +
-      '<div class="ibx-subj">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
-      '<div class="ibx-from">' + escapeHtml(m.from_name || m.from_addr || '—') + '</div>' +
-      attBlock +
-      '<div class="ibx-acts">' + acts + '</div>' +
+    '<div class="ibx-r-main">' +
+      '<div class="ibx-r-t"><span class="ibx-r-nm">' + escapeHtml(m.subject || '(без темы)') + '</span>' + tags + '</div>' +
+      '<div class="ibx-r-sub">' + escapeHtml(from) + docBit + '</div>' +
     '</div>' +
-  '</div></div>';
+    whenHtml +
+    '<div class="ibx-r-acts" onclick="event.stopPropagation()">' + acts + '</div>' +
+  '</div>';
 }
 
 function _ibxNoiseRow(m) {
@@ -9544,7 +9547,8 @@ function toggleInboxV2() {
 // «Показать ещё N», чтобы не листать вглубь. Состояние живёт до перерисовки раздела.
 function _ibxCardsCollapsed(list, isMatched, key) {
   const LIMIT = 4;
-  let out = '';
+  // v2.45.652: строки живут в общем контейнере с разделителями
+  let out = '<div class="ibx-rows">';
   list.slice(0, LIMIT).forEach(m => { out += _ibxInvoiceCard(m, isMatched); });
   if (list.length > LIMIT) {
     const open = !!(window._ibxMoreOpen && window._ibxMoreOpen[key]);
@@ -9561,6 +9565,7 @@ function _ibxCardsCollapsed(list, isMatched, key) {
           (oldest.text && oldest.text !== '—' ? ' <small>· самый старый: ' + escapeHtml(oldest.text) + '</small>' : '')) +
     '</button>';
   }
+  out += '</div>';
   return out;
 }
 function _ibxToggleMore(key) {

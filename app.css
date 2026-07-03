@@ -20397,3 +20397,69 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 .ibx-more-btn:hover { background: #EFF6FF; border-color: #93B4F5; }
 .ibx-more-btn small { font-weight: 500; color: var(--text-light); }
+
+/* === v2.45.652: входящие счета — компактные строки вместо карточек === */
+#sup-inbox-list .ibx-rows {
+  background: var(--card-bg, #fff); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden; margin-bottom: 16px;
+}
+#sup-inbox-list .ibx-r {
+  display: grid; grid-template-columns: 26px 30px minmax(0, 1fr) auto auto; gap: 10px;
+  align-items: center; padding: 9px 12px 9px 8px; cursor: pointer;
+  border-left: 3px solid #F59E0B; border-top: 1px solid var(--border);
+  transition: background .12s;
+}
+#sup-inbox-list .ibx-rows > .ibx-r:first-child { border-top: none; }
+#sup-inbox-list .ibx-r:hover { background: #F8FAFD; }
+#sup-inbox-list .ibx-r.today { border-left-color: #2563EB; }
+#sup-inbox-list .ibx-r.stale { border-left-color: #DC2626; background: #FFFBF7; }
+#sup-inbox-list .ibx-r.stale:hover { background: #FFF6EC; }
+#sup-inbox-list .ibx-r.matched { border-left-color: #22C55E; }
+#sup-inbox-list .ibx-r .ibx-cb { width: 16px; height: 16px; justify-self: center; margin: 0; }
+#sup-inbox-list .ibx-r .ibx-ava { width: 30px; height: 30px; border-radius: 50%; font-size: 10.5px; }
+.ibx-r-main { min-width: 0; }
+.ibx-r-t { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ibx-r-nm { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ibx-r-t .ibx-chip { flex-shrink: 0; padding: 1.5px 7px; font-size: 9.5px; }
+.ibx-r-sub {
+  font-size: 11px; color: var(--text-light); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ibx-r-doc { color: #475569; font-weight: 600; }
+.ibx-r-when {
+  font-size: 11px; font-weight: 700; color: #475569; text-align: right;
+  font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.25;
+}
+.ibx-r-when small { display: block; font-weight: 500; color: var(--text-light); font-size: 10px; }
+.ibx-r.today .ibx-r-when { color: #1D4ED8; }
+.ibx-r.stale .ibx-r-when { color: #B91C1C; }
+.ibx-r-when .wrn { color: #B91C1C; }
+.ibx-r-acts { display: flex; gap: 6px; align-items: center; }
+.ibx-b {
+  height: 30px; border-radius: 9px; border: 1.5px solid var(--border); background: #fff;
+  color: var(--text-dark); cursor: pointer; font-size: 12px; font-weight: 700;
+  padding: 0 11px; display: inline-flex; align-items: center; gap: 5px;
+  font-family: inherit; white-space: nowrap;
+}
+.ibx-b.link { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ibx-b.link:hover { filter: brightness(1.08); }
+.ibx-b.pay { color: #15803D; border-color: #BBF7D0; }
+.ibx-b.pay:hover { background: #F0FDF4; }
+.ibx-b.paysolid { background: #16a34a; border-color: #16a34a; color: #fff; }
+.ibx-ic {
+  width: 30px; height: 30px; border-radius: 9px; border: 1.5px solid var(--border);
+  background: #fff; color: #64748B; cursor: pointer; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ibx-ic:hover { color: var(--text-dark); border-color: #CBD5E1; }
+#sup-inbox-list .ibx-rows .ibx-more-btn {
+  width: 100%; margin: 0; border: none; border-top: 1px solid var(--border);
+  border-radius: 0; background: #F8FAFD;
+}
+@media (max-width: 720px) {
+  #sup-inbox-list .ibx-r {
+    grid-template-columns: 26px 30px minmax(0, 1fr) auto; row-gap: 7px;
+  }
+  #sup-inbox-list .ibx-r .ibx-r-when { grid-row: 1; grid-column: 4; }
+  #sup-inbox-list .ibx-r .ibx-r-acts { grid-row: 2; grid-column: 2 / 5; flex-wrap: wrap; }
+}
