@@ -7646,18 +7646,23 @@ async function _doBomPreview() {
 // ---- Ручное сопоставление строки спецификации со складской позицией ----
 // Когда авто-матч не нашёл остаток (позиция показана «есть 0», хотя на складе
 // она есть под другой/дублирующей записью) — даём выбрать нужную вручную.
+let _bomRelinkAllComps = null;
 function openBomRelink(bomId, name, modelId) {
   state._bomRelink = { bomId: bomId, name: name || '', modelId: (modelId != null ? modelId : null) };
+  _bomRelinkAllComps = null;   // v2.45.635: перезагрузим склад свежим при каждом открытии
+  // Пересоздаём модалку заново (не переиспользуем — иначе тянется старое состояние)
   let ov = document.getElementById('bom-relink-overlay');
-  if (!ov) {
-    ov = document.createElement('div');
-    ov.id = 'bom-relink-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
-    ov.onclick = function (e) { if (e.target === ov) closeBomRelink(); };
-    document.body.appendChild(ov);
-  }
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'bom-relink-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  // Закрываем ТОЛЬКО по клику на фон. Клики/mousedown внутри карточки гасим,
+  // чтобы событие не «утекало» к родительской модалке модели (она закрывалась
+  // по клику-вне — из-за этого окно «вылетало»).
+  ov.addEventListener('mousedown', function (e) { if (e.target === ov) closeBomRelink(); });
+  document.body.appendChild(ov);
   ov.innerHTML =
-    '<div onclick="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:540px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:540px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
       '<div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);">' +
         '<h3 style="margin:0;font-size:16px;"><i class="ti ti-arrows-exchange"></i> Сопоставить со складом</h3>' +
         '<button class="modal-close" onclick="closeBomRelink()" style="background:none;border:none;font-size:20px;cursor:pointer;"><i class="ti ti-x"></i></button>' +
@@ -7686,14 +7691,46 @@ function _bomRelinkSearchDebounced(q) {
   _bomRelinkDebounce = setTimeout(function () { _doBomRelinkSearch(q); }, 250);
 }
 
+// v2.45.635: нормализация — вниз регистр, ё→е, убираем всю пунктуацию/пробелы.
+// «РДК-8.4», «РДК-8,4», «РДК 8 4» → «рдк84» (совпадут).
+function _relinkNorm(s) {
+  return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^0-9a-zа-яё]+/g, '');
+}
+function _relinkTokens(s) {
+  return String(s || '').toLowerCase().replace(/ё/g, 'е').split(/[^0-9a-zа-яё]+/).filter(t => t.length >= 2);
+}
+async function _bomRelinkEnsureComps() {
+  if (_bomRelinkAllComps) return _bomRelinkAllComps;
+  try { const d = await apiGet('/api/components'); _bomRelinkAllComps = d.components || []; }
+  catch (e) { _bomRelinkAllComps = []; }
+  return _bomRelinkAllComps;
+}
 async function _doBomRelinkSearch(q) {
   const box = document.getElementById('bom-relink-results');
   if (!box) return;
+  box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);">Ищем похожие…</div>';
   try {
-    const data = await apiGet('/api/components?search=' + encodeURIComponent(q || ''));
-    const comps = (data.components || []).slice(0, 50);
+    const all = await _bomRelinkEnsureComps();
+    const qn = _relinkNorm(q);
+    const qtokens = _relinkTokens(q);
+    let scored;
+    if (!qn) {
+      // пустой запрос — показываем то, что на складе (по остатку)
+      scored = all.map(c => ({ c, s: (Number(c.qty_on_stock) || 0) > 0 ? 1 : 0 }));
+    } else {
+      scored = all.map(c => {
+        const nn = _relinkNorm(c.name) + _relinkNorm(c.sku);
+        let s = 0;
+        if (nn.includes(qn)) s += 100;                          // прямое вхождение целиком
+        qtokens.forEach(t => { if (nn.includes(t)) s += 10; }); // совпадение по словам
+        if (s > 0 && (Number(c.qty_on_stock) || 0) > 0) s += 1; // «живые» — выше
+        return { c, s };
+      }).filter(x => x.s > 0);
+    }
+    scored.sort((a, b) => b.s - a.s || String(a.c.name || '').localeCompare(String(b.c.name || '')));
+    const comps = scored.slice(0, 50).map(x => x.c);
     if (!comps.length) {
-      box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);">Ничего не найдено</div>';
+      box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);line-height:1.5;">Ничего похожего не нашлось.<br>Попробуй короче — только марку или артикул (напр. «РДК» или «NXB-63S»).</div>';
       return;
     }
     box.innerHTML = comps.map(function (c) {
@@ -7733,7 +7770,7 @@ async function relinkBomComponent(componentId) {
 
 function closeBomRelink() {
   const ov = document.getElementById('bom-relink-overlay');
-  if (ov) ov.style.display = 'none';
+  if (ov) ov.remove();
 }
 
 // ---- Взять тех.карту (BOM) из другой модели ----
