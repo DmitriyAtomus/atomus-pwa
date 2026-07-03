@@ -13824,6 +13824,9 @@ async function _maybeMorningProgress() {
     const roles = (state.user && state.user.roles) || [];
     // v2.45.359: только мастеру (и НЕ директору) — у директора роль master тоже есть
     if (!roles.includes('master') || roles.includes('director')) return;
+    // v2.45.659: бухгалтеру утреннее окно не показываем, даже если у него есть
+    // роль master — «Начать смену» и вопросы про людей только у мастера цеха
+    if (roles.includes('accountant')) return;
     // v2.45.404: Михаил Шевелёв пока не заполняет утреннюю готовность — не показываем
     if (typeof _isShevelevMaster === 'function' && _isShevelevMaster()) return;
     if (document.getElementById('morning-progress-overlay')) return;
