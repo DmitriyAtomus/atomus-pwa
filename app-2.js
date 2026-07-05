@@ -2516,9 +2516,29 @@ function renderTasksScreen(d) {
   }
 }
 
+// v2.45.661: информативный список — пульс, «у кого сколько», группы по сроку
+function _taskDayDiff(iso) {
+  if (!iso) return null;
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = new Date(String(iso).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d.getTime())) return null;
+    return Math.round((d - today) / 86400000);
+  } catch (e) { return null; }
+}
+function _tasksWhoFilter(who) {
+  state.tasksWho = (state.tasksWho === who) ? null : who;
+  if (window._tasksLastPayload) renderTasksList(window._tasksLastPayload);
+}
+async function _tasksTakeWork(ev, id) {
+  ev.stopPropagation();
+  await changeTaskStatus(id, 'in_progress');
+  loadTasksList();
+}
 function renderTasksList(d) {
   const container = document.getElementById('tasks-list-content');
   const tasks = d.tasks || [];
+  window._tasksLastPayload = d;
   if (!tasks.length) {
     let html = '<div class="empty-block"><i class="ti ti-checklist"></i>';
     html += state.tasksFilter === 'open' ? 'Открытых задач нет.' : 'В этом фильтре нет задач.';
@@ -2529,8 +2549,84 @@ function renderTasksList(d) {
     container.innerHTML = html;
     return;
   }
-  let html = '<div style="padding: 0 18px;">';
-  tasks.forEach(t => { html += renderTaskRow(t); });
+  const c = d.counts || {};
+  const open = tasks.filter(t => t.status === 'new' || t.status === 'in_progress');
+
+  let html = '<div style="padding: 0 18px 8px;">';
+
+  // Пульс (не показываем на фильтре «Готовые» — там нечего считать)
+  if (state.tasksFilter !== 'done') {
+    let late = 0, todayN = 0, tomorrowN = 0;
+    open.forEach(t => {
+      const diff = _taskDayDiff(t.deadline);
+      if (diff === null) return;
+      if (diff < 0) late++;
+      else if (diff === 0) todayN++;
+      else if (diff === 1) tomorrowN++;
+    });
+    html += '<div class="tk-pulse">' +
+      '<div class="tk-pu' + (late ? ' red' : '') + '"><b>' + late + '</b><small>Просрочено</small></div>' +
+      '<div class="tk-pu blue"><b>' + todayN + '</b><small>Сегодня</small></div>' +
+      '<div class="tk-pu amber"><b>' + tomorrowN + '</b><small>Завтра</small></div>' +
+      '<div class="tk-pu"><b>' + (c.in_progress || 0) + '</b><small>В работе</small></div>' +
+    '</div>';
+  }
+
+  // «У кого сколько» — по открытым; тап фильтрует
+  const byWho = {};
+  let noAss = 0;
+  open.forEach(t => {
+    if (!t.assignee_id) { noAss++; return; }
+    const k = t.assignee_id;
+    if (!byWho[k]) byWho[k] = { id: k, name: t.assignee_name || ('#' + k), n: 0 };
+    byWho[k].n++;
+  });
+  const whoList = Object.values(byWho).sort((a, b) => b.n - a.n);
+  if (whoList.length > 1 || noAss > 0) {
+    html += '<div class="tk-who">';
+    whoList.forEach(w => {
+      const initials = (typeof getInitials === 'function') ? getInitials(w.name) : w.name.slice(0, 2);
+      const colorIdx = (w.id || 0) % 8;
+      html += '<span class="tk-who-chip' + (state.tasksWho === w.id ? ' on' : '') + '" onclick="_tasksWhoFilter(' + w.id + ')">' +
+        '<span class="pkb-wl-avatar ac-' + colorIdx + ' tk-who-ava">' + escapeHtml(initials) + '</span>' +
+        escapeHtml(w.name.split(' ')[0]) + ' <b>' + w.n + '</b></span>';
+    });
+    if (noAss > 0) {
+      html += '<span class="tk-who-chip none' + (state.tasksWho === 'none' ? ' on' : '') + '" onclick="_tasksWhoFilter(\'none\')">без исполнителя ' + noAss + '</span>';
+    }
+    html += '</div>';
+  }
+
+  // Фильтр по исполнителю
+  let list = tasks;
+  if (state.tasksWho === 'none') list = tasks.filter(t => !t.assignee_id);
+  else if (state.tasksWho) list = tasks.filter(t => t.assignee_id === state.tasksWho);
+
+  // Группировка по сроку
+  const groups = { late: [], today: [], tomorrow: [], week: [], later: [], nodate: [], done: [] };
+  list.forEach(t => {
+    if (t.status === 'done' || t.status === 'cancelled') { groups.done.push(t); return; }
+    const diff = _taskDayDiff(t.deadline);
+    if (diff === null) groups.nodate.push(t);
+    else if (diff < 0) groups.late.push(t);
+    else if (diff === 0) groups.today.push(t);
+    else if (diff === 1) groups.tomorrow.push(t);
+    else if (diff <= 7) groups.week.push(t);
+    else groups.later.push(t);
+  });
+  const section = (key, cls, icon, name) => {
+    const g = groups[key];
+    if (!g.length) return;
+    html += '<div class="tk-sec' + (cls ? ' ' + cls : '') + '">' + icon + ' ' + name + ' <span class="cnt">' + g.length + '</span></div>';
+    g.forEach(t => { html += renderTaskRow(t); });
+  };
+  section('late', 'alarm', '🔥', 'Просрочено');
+  section('today', 'today', '📅', 'Сегодня');
+  section('tomorrow', 'tom', '📅', 'Завтра');
+  section('week', '', '🗓', 'На неделе');
+  section('later', '', '🗓', 'Позже');
+  section('nodate', 'warn', '❓', 'Без срока');
+  section('done', '', '✅', 'Готовые');
   html += '</div>';
   container.innerHTML = html;
 }
@@ -2646,47 +2742,97 @@ async function _tasksQuickDone(ev, taskId) {
   } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
 }
 
+// v2.45.661: строка задачи — вся суть в две-три строчки (статус, исполнитель,
+// срок с дельтой, источник, договор, возраст, кто поставил)
 function renderTaskRow(t) {
   const isDone = t.status === 'done' || t.status === 'cancelled';
-  const priorityCls = t.priority || 'normal';
-  const meta = [];
-  if (t.assignee_name) meta.push('<span><i class="ti ti-user"></i>' + escapeHtml(t.assignee_name) + '</span>');
-  // Дедлайн с подсветкой
-  if (t.deadline) {
-    let cls = '';
-    try {
-      const diff = Math.round((new Date(t.deadline) - new Date()) / 86400000);
-      if (!isDone && diff < 0) cls = ' urgent';
-      else if (!isDone && diff <= 1) cls = ' soon';
-    } catch (e) {}
-    meta.push('<span class="task-meta-deadline' + cls + '"><i class="ti ti-clock"></i>' +
-              escapeHtml(formatTaskDeadline(t.deadline)) + '</span>');
+  const diff = _taskDayDiff(t.deadline);
+  // класс строки: полоска слева
+  let rowCls = '';
+  if (isDone) rowCls = 'done';
+  else if (diff !== null && diff < 0) rowCls = 'late';
+  else if (diff === 0) rowCls = 'today';
+  else if (diff === 1) rowCls = 'tom';
+  else if (t.priority === 'urgent') rowCls = 'urgent';
+  else if (t.status === 'in_progress') rowCls = 'work';
+
+  // Заголовок: 🔥 у срочных + статус-чип
+  const fire = (t.priority === 'urgent' && !isDone) ? '<span class="tkr-fire">🔥</span> ' : '';
+  let stChip = '';
+  if (!isDone && t.status === 'new') stChip = ' <span class="tkr-st new">НОВАЯ</span>';
+  else if (t.status === 'in_progress') stChip = ' <span class="tkr-st work">В РАБОТЕ</span>';
+  else if (t.status === 'cancelled') stChip = ' <span class="tkr-st cancel">ОТМЕНЕНА</span>';
+
+  // Строка 1: исполнитель + срок
+  let line1 = '';
+  if (t.assignee_name) {
+    const colorIdx = (t.assignee_id || 0) % 8;
+    const initials = (typeof getInitials === 'function') ? getInitials(t.assignee_name) : '?';
+    line1 += '<span class="pkb-wl-avatar ac-' + colorIdx + ' tkr-ava">' + escapeHtml(initials) + '</span>' +
+      '<span class="tkr-nm">' + escapeHtml(t.assignee_name) + '</span>';
+  } else if (!isDone) {
+    line1 += '<span class="tkr-noass">исполнитель не назначен</span>';
   }
-  if (t.source) meta.push('<span><i class="ti ti-tag"></i>' + escapeHtml(t.source) + '</span>');
-  // ЭТАП 16В-2: бейдж договора
-  if (t.contract_id && t.contract_number) {
-    const archived = !t.contract_is_active;
-    const label = t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '');
-    meta.push(
-      '<span class="task-meta-contract' + (archived ? ' archived' : '') +
-      '" onclick="event.stopPropagation(); openContractFromTask(' + t.contract_id + ')" title="' +
-      escapeHtml(archived ? 'Договор в архиве' : 'Перейти в договор') + '">' +
-      '<i class="ti ti-file-text"></i>' + escapeHtml(label) + '</span>'
-    );
+  if (isDone && t.done_at) {
+    // сколько дней делали: от created_at до done_at
+    let dur = '';
+    try {
+      const dd = Math.max(0, Math.round((new Date(t.done_at) - new Date(t.created_at)) / 86400000));
+      dur = dd === 0 ? 'в тот же день' : 'за ' + dd + ' ' + _plural(dd, ['день', 'дня', 'дней']);
+    } catch (e) {}
+    line1 += '<span class="tkr-doneat">✓ сделано ' + escapeHtml(String(t.done_at).slice(0, 10).split('-').reverse().slice(0, 2).join('.')) +
+      (dur ? ' · ' + dur : '') + '</span>';
+  } else if (t.deadline) {
+    let dlCls = '';
+    if (!isDone && diff !== null) {
+      if (diff < 0) dlCls = ' bad';
+      else if (diff <= 1) dlCls = ' tom';
+    }
+    line1 += '<span class="tkr-dl' + dlCls + '">⏰ ' + escapeHtml(formatTaskDeadline(t.deadline)) +
+      (diff !== null && diff < 0 ? ' · −' + Math.abs(diff) + ' дн' : '') + '</span>';
   }
 
-  // v2.43.92: быстрое «Готово» прямо на карточке для открытых задач
-  const quickDoneBtn = !isDone
-    ? '<button class="task-quick-done" onclick="_tasksQuickDone(event,' + t.id + ')" title="Отметить готовой"><i class="ti ti-check"></i></button>'
-    : '';
-  return '<div class="task-row ' + (isDone ? 'task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
-    '<div class="task-row-priority ' + priorityCls + '"></div>' +
-    '<div class="task-row-body">' +
-      '<div class="task-row-title">' + escapeHtml(t.title) + '</div>' +
-      (meta.length ? '<div class="task-row-meta">' + meta.join('') + '</div>' : '') +
+  // Строка 2: источник, договор, возраст + кто поставил
+  const tags = [];
+  if (t.source) {
+    const isVoice = /max[_\s-]?voice/i.test(t.source);
+    tags.push('<span class="tkr-tag' + (isVoice ? ' voice' : '') + '">' +
+      (isVoice ? '🎙 голосом из MAX' : '🏷 ' + escapeHtml(t.source)) + '</span>');
+  }
+  if (t.contract_id && t.contract_number) {
+    const archived = !t.contract_is_active;
+    tags.push('<span class="tkr-tag ct' + (archived ? ' arch' : '') + '" ' +
+      'onclick="event.stopPropagation(); openContractFromTask(' + t.contract_id + ')" ' +
+      'title="' + (archived ? 'Договор в архиве' : 'Перейти в договор') + '">📄 ' +
+      escapeHtml(t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '')) + '</span>');
+  }
+  if (!isDone && t.created_at) {
+    let ageTxt = '', ageOld = false;
+    try {
+      const ad = Math.max(0, Math.round((Date.now() - new Date(String(t.created_at).replace(' ', 'T') + 'Z')) / 86400000));
+      ageOld = ad >= 7;
+      ageTxt = ad === 0 ? 'поставлена сегодня' : (ad === 1 ? 'поставлена вчера' : (ageOld ? 'висит ' + ad + ' дн' : 'поставлена ' + ad + ' дн назад'));
+    } catch (e) {}
+    if (ageTxt) tags.push('<span class="tkr-age' + (ageOld ? ' old' : '') + '">' + ageTxt +
+      (t.creator_name ? ' · ' + escapeHtml(t.creator_name) : '') + '</span>');
+  }
+
+  // Действия: ✓ готово + «взять в работу» у новых
+  let acts = '';
+  if (!isDone) {
+    acts = '<div class="tkr-acts">' +
+      '<button class="task-quick-done" onclick="_tasksQuickDone(event,' + t.id + ')" title="Отметить готовой"><i class="ti ti-check"></i></button>' +
+      (t.status === 'new' ? '<span class="tkr-take" onclick="_tasksTakeWork(event,' + t.id + ')">взять в работу</span>' : '') +
+    '</div>';
+  }
+
+  return '<div class="task-row tkr ' + rowCls + (isDone ? ' task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
+    '<div class="tkr-main">' +
+      '<div class="tkr-title">' + fire + escapeHtml(t.title) + stChip + '</div>' +
+      (line1 ? '<div class="tkr-l1">' + line1 + '</div>' : '') +
+      (tags.length ? '<div class="tkr-l2">' + tags.join('') + '</div>' : '') +
     '</div>' +
-    '<div class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</div>' +
-    quickDoneBtn +
+    acts +
     '</div>';
 }
 
