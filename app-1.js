@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.676-security-presence";
+const APP_VERSION = "v2.45.677-presence-gender";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1807,6 +1807,12 @@ function stopSecurity() {
 // Журнал присутствия: кто сейчас на месте + приходы/уходы (GET /api/security/presence, директору)
 let _securityPresenceTimer = null;
 function _secEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+// Глагол по полу: женщины «пришла/ушла», остальные «пришёл/ушёл»
+const _SEC_FEMALE = ['Екатерина', 'Олеся', 'Любовь'];
+function _secVerb(name, event) {
+  const f = _SEC_FEMALE.indexOf(String(name || '').trim()) >= 0;
+  return event === 'in' ? (f ? 'пришла' : 'пришёл') : (f ? 'ушла' : 'ушёл');
+}
 async function _securityLoadPresence() {
   const box = document.getElementById('security-presence-log');
   const pres = document.getElementById('security-present');
@@ -1825,7 +1831,7 @@ async function _securityLoadPresence() {
         const col = inn ? '#2e9e5b' : '#c0392b';
         return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(128,128,128,.15);">'
           + '<i class="ti ' + ic + '" style="color:' + col + ';font-size:16px;"></i>'
-          + '<b>' + _secEsc(e.name) + '</b>&nbsp;' + (inn ? 'пришёл' : 'ушёл')
+          + '<b>' + _secEsc(e.name) + '</b>&nbsp;' + _secVerb(e.name, e.event)
           + '<span class="text-muted" style="margin-left:auto;">' + _secEsc(e.time || '') + '</span></div>';
       }).join('');
     }
