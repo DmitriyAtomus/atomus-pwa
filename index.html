@@ -766,7 +766,10 @@
           <div id="security-status" class="text-muted" style="font-size:13px;">Подключение к камере…</div>
         </div>
         <div class="content-inner" style="max-width:100%;">
-          <div style="background:#0b0f17;border-radius:12px;overflow:hidden;position:relative;max-width:1000px;margin:0 auto;">
+          <div id="security-video-wrap" style="background:#0b0f17;border-radius:12px;overflow:hidden;position:relative;max-width:1000px;margin:0 auto;">
+            <!-- Живой стрим go2rtc (WebRTC/MSE через туннель) — низкая задержка -->
+            <iframe id="security-live" title="Живая камера" allow="autoplay; fullscreen" style="display:none;width:100%;aspect-ratio:16/9;border:none;background:#0b0f17;"></iframe>
+            <!-- Снимок-фолбэк (если живой стрим недоступен) -->
             <img id="security-frame" alt="Камера офиса" style="display:none;width:100%;height:auto;background:#0b0f17;" />
             <div id="security-placeholder" style="padding:60px 20px;text-align:center;color:#8a94a6;">
               <i class="ti ti-video" style="font-size:42px;"></i>
