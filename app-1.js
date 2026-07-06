@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.672-umbrella-variants";
+const APP_VERSION = "v2.45.673-security-live";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1751,14 +1751,55 @@ async function _securityTick() {
     if (st) st.textContent = 'Нет связи с сервером';
   }
 }
+let _securityModeTimer = null;
+let _securityLiveSrc = '';
+// Узнаём адрес живого стрима (go2rtc через туннель). Пусто -> живого нет, показываем снимки.
+async function secGetStreamUrl() {
+  try {
+    const r = await fetch(API_BASE + '/api/security/stream-url?_=' + Date.now(), {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') }, cache: 'no-store'
+    });
+    if (r.status === 200) { const j = await r.json(); return (j && j.url) || ''; }
+  } catch (e) {}
+  return '';
+}
+function secShowLive(url) {
+  const live = document.getElementById('security-live');
+  const img = document.getElementById('security-frame');
+  const ph = document.getElementById('security-placeholder');
+  const st = document.getElementById('security-status');
+  if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }  // снимки не нужны
+  if (img) img.style.display = 'none';
+  if (ph) ph.style.display = 'none';
+  if (live) {
+    const src = url + '/stream.html?src=office&mode=mse';   // MSE — надёжно через туннель, низкая задержка
+    if (_securityLiveSrc !== src) { live.src = src; _securityLiveSrc = src; }
+    live.style.display = '';
+  }
+  if (st) st.textContent = 'Живой стрим · низкая задержка';
+}
+function secShowSnapshots() {
+  const live = document.getElementById('security-live');
+  if (live) { live.style.display = 'none'; if (live.src && live.src.indexOf('trycloudflare') >= 0) live.src = 'about:blank'; }
+  _securityLiveSrc = '';
+  if (!_securityTimer) { _securityTick(); _securityTimer = setInterval(_securityTick, 700); }
+}
+async function _securityDecideMode() {
+  const url = await secGetStreamUrl();
+  if (url) secShowLive(url); else secShowSnapshots();
+}
 function loadSecurity() {
   stopSecurity();
   secZoom(0);
-  _securityTick();
-  _securityTimer = setInterval(_securityTick, 700);
+  _securityDecideMode();
+  _securityModeTimer = setInterval(_securityDecideMode, 15000);  // живой мог появиться/пропасть
 }
 function stopSecurity() {
   if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }
+  if (_securityModeTimer) { clearInterval(_securityModeTimer); _securityModeTimer = null; }
+  const live = document.getElementById('security-live');
+  if (live && live.src && live.src.indexOf('trycloudflare') >= 0) live.src = 'about:blank';
+  _securityLiveSrc = '';
 }
 // PTZ: стрелки шлют команду на бэкенд (require_director) -> поллер .30 крутит камеру по ONVIF
 function secPtz(dir) {
@@ -1771,12 +1812,12 @@ function secPtz(dir) {
 // Зум — цифровой (у камеры нет оптического): CSS-масштаб кадра, контейнер обрезает края
 let _secZoom = 1;
 function secZoom(delta) {
-  const img = document.getElementById('security-frame');
-  if (!img) return;
   if (delta === 0) _secZoom = 1;
   else _secZoom = Math.max(1, Math.min(3.5, _secZoom + delta * 0.4));
-  img.style.transformOrigin = 'center center';
-  img.style.transform = 'scale(' + _secZoom + ')';
+  ['security-frame', 'security-live'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) { el.style.transformOrigin = 'center center'; el.style.transform = 'scale(' + _secZoom + ')'; }
+  });
 }
 
 function goHome() {
