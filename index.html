@@ -235,6 +235,10 @@
         </a>
         <!-- v2.45.39: пункт «Калькулятор холода» убран с главного сайдбара
              (остался в Продажах). -->
+        <!-- Безопасность: живой просмотр камеры офиса. Только директору (показ в app-1.js). -->
+        <button class="nav-item" id="sb-security" data-nav="security" onclick="selectSidebarItem('security')" style="display:none;">
+          <i class="ti ti-shield-lock"></i><span>Безопасность</span>
+        </button>
       </div>
 
       <!-- Внешние сервисы -->
@@ -741,6 +745,30 @@
         </div>
         <div class="content-inner" id="big-cal-body" style="max-width: 100%;">
           <div class="loading-block">Загружаем календарь…</div>
+        </div>
+      </div>
+
+      <!-- ============ БЕЗОПАСНОСТЬ (камера офиса, только директор) ============ -->
+      <div class="screen" data-screen="security" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <i class="ti ti-shield-lock"></i>
+            <h1>Безопасность</h1>
+          </div>
+          <div id="security-status" class="text-muted" style="font-size:13px;">Подключение к камере…</div>
+        </div>
+        <div class="content-inner" style="max-width:100%;">
+          <div style="background:#0b0f17;border-radius:12px;overflow:hidden;position:relative;max-width:1000px;margin:0 auto;">
+            <img id="security-frame" alt="Камера офиса" style="display:none;width:100%;height:auto;background:#0b0f17;" />
+            <div id="security-placeholder" style="padding:60px 20px;text-align:center;color:#8a94a6;">
+              <i class="ti ti-video" style="font-size:42px;"></i>
+              <div style="margin-top:10px;">Ожидание кадра с камеры…</div>
+            </div>
+          </div>
+          <div class="text-muted" style="font-size:12px;margin-top:10px;text-align:center;">
+            Камера офиса · обновление ~1 раз в секунду · доступ только директору
+          </div>
         </div>
       </div>
 

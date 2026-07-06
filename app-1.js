@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.615-order-status-hints";
-const APP_VERSION_DATE = "01.07.2026";
+const APP_VERSION = "v2.45.616-security-camera";
+const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1319,6 +1319,12 @@ function renderProfile() {
     else navEmp.style.display = 'none';
   }
 
+  // Условный показ «Безопасность» (камера офиса) только директору
+  const navSec = document.getElementById('sb-security');
+  if (navSec) {
+    navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
+  }
+
   // Условный показ «Новая сборка»
   const navNew = document.getElementById('nav-new-assembly');
   const tabPlus = document.getElementById('tab-plus');
@@ -1611,6 +1617,54 @@ function selectSidebarItem(screenName) {
   // «Ещё»
   if (screenName === 'production-more') renderProductionMore();
   if (screenName === 'sales-more') renderSalesMore();
+  // Безопасность (камера офиса): запускаем опрос кадра, при уходе — останавливаем
+  if (screenName === 'security') loadSecurity(); else stopSecurity();
+}
+
+// ============ БЕЗОПАСНОСТЬ: живой просмотр камеры офиса ============
+// Тянем кадр с бэкенда (GET /api/security/frame, require_director) через fetch с токеном,
+// показываем как <img>. ~1 раз/сек. blob-URL чистим, чтобы не течь памяти.
+let _securityTimer = null;
+async function _securityTick() {
+  const img = document.getElementById('security-frame');
+  const ph  = document.getElementById('security-placeholder');
+  const st  = document.getElementById('security-status');
+  if (!img) { stopSecurity(); return; }
+  try {
+    const r = await fetch(API_BASE + '/api/security/frame?_=' + Date.now(), {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      cache: 'no-store'
+    });
+    if (r.status === 200) {
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const old = img.getAttribute('data-blob');
+      img.onload = function () { if (old) { try { URL.revokeObjectURL(old); } catch (e) {} } };
+      img.src = url;
+      img.setAttribute('data-blob', url);
+      img.style.display = '';
+      if (ph) ph.style.display = 'none';
+      const age = r.headers.get('X-Frame-Age');
+      if (st) st.textContent = 'В эфире · кадр ' + (age != null ? age : '?') + ' сек назад';
+    } else if (r.status === 404) {
+      if (st) st.textContent = 'Ожидание кадра с камеры…';
+    } else if (r.status === 403) {
+      if (st) st.textContent = 'Доступ только директору';
+      stopSecurity();
+    } else {
+      if (st) st.textContent = 'Ошибка ' + r.status;
+    }
+  } catch (e) {
+    if (st) st.textContent = 'Нет связи с сервером';
+  }
+}
+function loadSecurity() {
+  stopSecurity();
+  _securityTick();
+  _securityTimer = setInterval(_securityTick, 1200);
+}
+function stopSecurity() {
+  if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }
 }
 
 function goHome() {
