@@ -4799,6 +4799,15 @@ async function downloadModelScheme(modelId) {
     });
     clearTimeout(timer);
     if (!r.ok) { showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
+    // v2.45.645: сервер вернул прямую ссылку на R2 → открываем напрямую (быстро).
+    const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+    if (ct.includes('application/json')) {
+      const j = await r.json().catch(() => ({}));
+      if (j && j.url) { window.open(j.url, '_blank'); return; }
+      showToast('Не удалось получить ссылку на схему', 'error');
+      return;
+    }
+    // фолбэк — файл проксирован байтами (диск / без S3)
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
