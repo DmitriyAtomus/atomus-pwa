@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.677-presence-gender";
+const APP_VERSION = "v2.45.678-presence-gender2";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1808,9 +1808,10 @@ function stopSecurity() {
 let _securityPresenceTimer = null;
 function _secEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 // Глагол по полу: женщины «пришла/ушла», остальные «пришёл/ушёл»
-const _SEC_FEMALE = ['Екатерина', 'Олеся', 'Любовь'];
+const _SEC_FEMALE = ['Екатерина', 'Олеся', 'Любовь', 'Ольга', 'Мария', 'Анна', 'Наталья', 'Ирина', 'Елена'];
 function _secVerb(name, event) {
-  const f = _SEC_FEMALE.indexOf(String(name || '').trim()) >= 0;
+  const first = String(name || '').trim().split(/\s+/)[0];   // по имени, не по всей строке
+  const f = _SEC_FEMALE.indexOf(first) >= 0;
   return event === 'in' ? (f ? 'пришла' : 'пришёл') : (f ? 'ушла' : 'ушёл');
 }
 async function _securityLoadPresence() {
