@@ -2679,9 +2679,12 @@ function _renderComponentDuplicates(data) {
       '</label>';
     });
     html += '</div>' +
-      '<div class="dup-group-actions">' +
+      '<div class="dup-group-actions" style="display:flex;gap:8px;flex-wrap:wrap;">' +
         '<button class="btn btn-primary btn-small" onclick="mergeDuplicateGroup(' + gi + ')">' +
           '<i class="ti ti-merge"></i> Склеить группу' +
+        '</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="markDupGroupDifferent(' + gi + ')" title="Это разные позиции — убрать из подсказок">' +
+          '<i class="ti ti-arrows-split-2"></i> Разное' +
         '</button>' +
       '</div>' +
     '</div>';
@@ -2689,6 +2692,28 @@ function _renderComponentDuplicates(data) {
   body.innerHTML = html;
   // Сохраним сами группы в state — пригодится для confirmMerge
   state._dupGroups = groups;
+}
+
+// v2.45.666: «Разное» — пометить группу как НЕ дубли, убрать из подсказок навсегда.
+async function markDupGroupDifferent(gi) {
+  const groups = state._dupGroups || [];
+  const g = groups[gi];
+  if (!g) return;
+  const ids = g.items.map(it => it.id);
+  if (!confirm('Пометить эти позиции как РАЗНЫЕ (не дубли)?\n\n' +
+               g.items.map(it => '• ' + it.name).join('\n') + '\n\n' +
+               'Группа исчезнет из подсказок. Если позже добавится похожая позиция — появится снова.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/duplicates/ignore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ids: ids }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+    showToast('Помечено как разное', 'success');
+    if (typeof openComponentDuplicates === 'function') openComponentDuplicates();  // перезагрузить список
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 async function mergeDuplicateGroup(gi) {
@@ -13081,6 +13106,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.666',
+    date: '06.07.2026',
+    title: 'Дубли: кнопка «Разное»',
+    features: [
+      'В окне «Дубли в номенклатуре» у каждой группы появилась кнопка <b>«Разное»</b> — если позиции на самом деле разные (напр. 06×15 и 06×22, 6А и 4А), жми её, и группа <b>исчезнет из подсказок</b>',
+      'Если позже добавится похожая позиция — группа появится снова (помечается конкретный состав)',
+    ],
+  },
   {
     version: 'v2.45.665',
     date: '06.07.2026',
