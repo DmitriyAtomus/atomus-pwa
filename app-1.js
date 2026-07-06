@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.670-security-ptz";
+const APP_VERSION = "v2.45.671-security-ptz-layout";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1755,7 +1755,7 @@ function loadSecurity() {
   stopSecurity();
   secZoom(0);
   _securityTick();
-  _securityTimer = setInterval(_securityTick, 1200);
+  _securityTimer = setInterval(_securityTick, 700);
 }
 function stopSecurity() {
   if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }
