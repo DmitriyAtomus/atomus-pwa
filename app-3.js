@@ -8586,6 +8586,8 @@ function renderSupplyOrders() {
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
+          // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
+          (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
         '</div>' +
       '</div>' +
       (canDelete
@@ -10862,6 +10864,8 @@ function renderSupplyOrderDetail(o) {
     '</div>' +
     // v2.45.643: «Назначение» из MAX-бота («на что счёт») — заметно для бухгалтера
     (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
+    // v2.45.665: внешний статус поставки (из ЛК Всеинструментов)
+    (o.ext_status ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#E7EEFB;border:1px solid #B9CCEF;color:#2749A0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-truck-delivery" style="font-size:16px;"></i> Поставка: ' + escapeHtml(o.ext_status) + (o.expected_date ? ' · придёт ' + escapeHtml(o.expected_date) : '') + '</div>' : '') +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
 
@@ -13077,6 +13081,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.665',
+    date: '06.07.2026',
+    title: 'Поставки Всеинструментов подтягиваются в CRM',
+    features: [
+      'Даты доставки и статусы заказов из личного кабинета <b>Всеинструментов</b> теперь автоматически попадают в заказ снабжения (через браузерный помощник)',
+      'В карточке заказа и списке — плашка <b>«Поставка: Доставляется в магазин · придёт 07.07»</b>; дата видна и в «Ждём поставку»',
+    ],
+  },
   {
     version: 'v2.45.663',
     date: '06.07.2026',
