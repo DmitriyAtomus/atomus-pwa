@@ -7916,6 +7916,7 @@ async function _doBomRelinkSearch(q) {
           '<div style="white-space:nowrap;font-weight:700;color:' + stockColor + ';font-size:12.5px;margin-top:2px;">на складе: ' + _fmtQty(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div></div>' +
         '<div style="display:flex;flex-direction:column;gap:5px;white-space:nowrap;flex:none;">' +
           '<button class="btn btn-primary btn-small" onclick="relinkBomComponent(' + c.id + ')" title="Привязать только эту строку Тех.карты к складской позиции">Привязать</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="addBomVariant(' + c.id + ', ' + cNameAttr + ')" title="Сделать эту позицию вариантом обобщённой (обе остаются, наличие = сумма вариантов)"><i class="ti ti-versions"></i> Как вариант</button>' +
           '<button class="btn btn-secondary btn-small" onclick="mergeBomComponentInto(' + c.id + ', ' + cNameAttr + ')" title="Считать одинаковыми: перенести ВСЕ ссылки и остаток на эту позицию (во всех моделях)"><i class="ti ti-merge"></i> Склеить</button>' +
         '</div>' +
       '</div>';
@@ -7967,6 +7968,29 @@ async function mergeBomComponentInto(componentId, name) {
     }
   } catch (e) {
     showToast('Ошибка склейки', 'error');
+  }
+}
+
+// v2.45.673: «Как вариант» — сделать выбранную позицию вариантом обобщённой из
+// строки Тех.карты (обе остаются; наличие обобщённой = сумма вариантов).
+async function addBomVariant(componentId, name) {
+  const st = state._bomRelink || {};
+  if (!st.bomId) return;
+  if (!confirm('Сделать «' + (name || 'позицию') + '» вариантом обобщённой «' + (st.name || '') + '»?\n\n' +
+               'Обе позиции останутся. Наличие обобщённой будет считаться суммой её вариантов.')) return;
+  try {
+    const resp = await apiPost('/api/model-bom/' + st.bomId + '/add-variant', { component_id: componentId });
+    if (resp && resp.ok) {
+      showToast('Добавлено как вариант', 'success');
+      closeBomRelink();
+      if (st.modelId != null && typeof loadModelBom === 'function') loadModelBom(st.modelId);
+      else if (typeof _doBomPreview === 'function') _doBomPreview();
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
+    } else {
+      showToast((resp && resp.data && resp.data.message) || 'Не удалось', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка', 'error');
   }
 }
 
