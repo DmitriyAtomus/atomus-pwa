@@ -7908,11 +7908,16 @@ async function _doBomRelinkSearch(q) {
       const stock = (c.qty_on_stock !== undefined && c.qty_on_stock !== null) ? c.qty_on_stock : 0;
       const sku = c.sku ? ('<span style="color:var(--text-light);font-size:12px;"> · ' + escapeHtml(c.sku) + '</span>') : '';
       const stockColor = stock > 0 ? '#15803D' : '#B25E00';
-      return '<div class="bom-relink-row" onclick="relinkBomComponent(' + c.id + ')" ' +
-        'style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
-        '<div><div style="font-weight:600;">' + escapeHtml(c.name || '') + sku + '</div>' +
-          (c.category_name ? '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(c.category_name) + '</div>' : '') + '</div>' +
-        '<div style="white-space:nowrap;font-weight:700;color:' + stockColor + ';">' + _fmtQty(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
+      const cNameAttr = JSON.stringify(c.name || '').replace(/"/g, '&quot;');
+      return '<div class="bom-relink-row" ' +
+        'style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">' +
+        '<div style="min-width:0;"><div style="font-weight:600;">' + escapeHtml(c.name || '') + sku + '</div>' +
+          (c.category_name ? '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(c.category_name) + '</div>' : '') +
+          '<div style="white-space:nowrap;font-weight:700;color:' + stockColor + ';font-size:12.5px;margin-top:2px;">на складе: ' + _fmtQty(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:5px;white-space:nowrap;flex:none;">' +
+          '<button class="btn btn-primary btn-small" onclick="relinkBomComponent(' + c.id + ')" title="Привязать только эту строку Тех.карты к складской позиции">Привязать</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="mergeBomComponentInto(' + c.id + ', ' + cNameAttr + ')" title="Считать одинаковыми: перенести ВСЕ ссылки и остаток на эту позицию (во всех моделях)"><i class="ti ti-merge"></i> Склеить</button>' +
+        '</div>' +
       '</div>';
     }).join('');
   } catch (e) {
@@ -7931,11 +7936,37 @@ async function relinkBomComponent(componentId) {
       // v2.45.633: обновляем нужный вид — редактор Тех.карты модели или превью дефицита
       if (st.modelId != null && typeof loadModelBom === 'function') loadModelBom(st.modelId);
       else if (typeof _doBomPreview === 'function') _doBomPreview();
+      // v2.45.668: закуп мог измениться — обновим, если открыт
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
     } else {
       showToast((resp && resp.data && resp.data.message) || 'Не удалось сопоставить', 'error');
     }
   } catch (e) {
     showToast('Ошибка сопоставления', 'error');
+  }
+}
+
+// v2.45.668: «Склеить» — считать позицию строки Тех.карты дублем выбранной складской
+// и слить в неё (перенос ВСЕХ ссылок во всех моделях/договорах + сложить остаток).
+async function mergeBomComponentInto(componentId, name) {
+  const st = state._bomRelink || {};
+  if (!st.bomId) return;
+  if (!confirm('Склеить «' + (st.name || 'позицию') + '» с «' + (name || '') + '»?\n\n' +
+               'Это одна и та же позиция: во ВСЕХ моделях и договорах ссылки перейдут на выбранную складскую, ' +
+               'остатки сложатся, дубль деактивируется. Дефицит уйдёт везде.')) return;
+  try {
+    const resp = await apiPost('/api/model-bom/' + st.bomId + '/merge-into', { component_id: componentId });
+    if (resp && resp.ok) {
+      showToast('Склеено со складом', 'success');
+      closeBomRelink();
+      if (st.modelId != null && typeof loadModelBom === 'function') loadModelBom(st.modelId);
+      else if (typeof _doBomPreview === 'function') _doBomPreview();
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
+    } else {
+      showToast((resp && resp.data && resp.data.message) || 'Не удалось склеить', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка склейки', 'error');
   }
 }
 
