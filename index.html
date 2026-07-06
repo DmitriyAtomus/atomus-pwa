@@ -803,6 +803,19 @@
           <div class="text-muted" style="font-size:12px;margin-top:10px;text-align:center;">
             Камера офиса · обновление ~1 раз в секунду · доступ только директору
           </div>
+          <!-- Журнал присутствия: кто сейчас на месте + приходы/уходы (по распознаванию лиц) -->
+          <div style="max-width:1000px;margin:22px auto 0;">
+            <div style="display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;">
+              <i class="ti ti-users"></i> Присутствие
+              <span id="security-present" class="text-muted" style="font-weight:400;font-size:13px;"></span>
+            </div>
+            <div id="security-presence-log" style="font-size:13px;">
+              <div class="text-muted">Загрузка журнала…</div>
+            </div>
+            <div class="text-muted" style="font-size:11px;margin-top:8px;">
+              По распознаванию лиц (камера обходит офис ~каждые 5 мин). Точность зависит от того, кто внесён в базу.
+            </div>
+          </div>
         </div>
       </div>
 

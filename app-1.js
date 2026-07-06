@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.675-yd-autosave";
+const APP_VERSION = "v2.45.676-security-presence";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1793,13 +1793,45 @@ function loadSecurity() {
   secZoom(0);
   _securityDecideMode();
   _securityModeTimer = setInterval(_securityDecideMode, 15000);  // живой мог появиться/пропасть
+  _securityLoadPresence();
+  _securityPresenceTimer = setInterval(_securityLoadPresence, 20000);
 }
 function stopSecurity() {
   if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }
   if (_securityModeTimer) { clearInterval(_securityModeTimer); _securityModeTimer = null; }
+  if (_securityPresenceTimer) { clearInterval(_securityPresenceTimer); _securityPresenceTimer = null; }
   const live = document.getElementById('security-live');
   if (live && live.src && live.src.indexOf('trycloudflare') >= 0) live.src = 'about:blank';
   _securityLiveSrc = '';
+}
+// Журнал присутствия: кто сейчас на месте + приходы/уходы (GET /api/security/presence, директору)
+let _securityPresenceTimer = null;
+function _secEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+async function _securityLoadPresence() {
+  const box = document.getElementById('security-presence-log');
+  const pres = document.getElementById('security-present');
+  try {
+    const r = await fetch(API_BASE + '/api/security/presence?_=' + Date.now(), {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') }, cache: 'no-store'
+    });
+    if (r.status !== 200) { if (box) box.innerHTML = '<div class="text-muted">Журнал недоступен</div>'; return; }
+    const j = await r.json();
+    if (pres) pres.textContent = (j.present && j.present.length) ? ('· сейчас на месте: ' + j.present.join(', ')) : '· сейчас никого не видно';
+    if (box) {
+      if (!j.events || !j.events.length) { box.innerHTML = '<div class="text-muted">Пока нет событий (камера ещё присматривается)</div>'; return; }
+      box.innerHTML = j.events.map(function (e) {
+        const inn = e.event === 'in';
+        const ic = inn ? 'ti-login-2' : 'ti-logout';
+        const col = inn ? '#2e9e5b' : '#c0392b';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(128,128,128,.15);">'
+          + '<i class="ti ' + ic + '" style="color:' + col + ';font-size:16px;"></i>'
+          + '<b>' + _secEsc(e.name) + '</b>&nbsp;' + (inn ? 'пришёл' : 'ушёл')
+          + '<span class="text-muted" style="margin-left:auto;">' + _secEsc(e.time || '') + '</span></div>';
+      }).join('');
+    }
+  } catch (e) {
+    if (box) box.innerHTML = '<div class="text-muted">Нет связи</div>';
+  }
 }
 // PTZ: стрелки шлют команду на бэкенд (require_director) -> поллер .30 крутит камеру по ONVIF
 function secPtz(dir) {
