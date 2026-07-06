@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.669-security-camera";
+const APP_VERSION = "v2.45.670-security-ptz";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1753,11 +1753,30 @@ async function _securityTick() {
 }
 function loadSecurity() {
   stopSecurity();
+  secZoom(0);
   _securityTick();
   _securityTimer = setInterval(_securityTick, 1200);
 }
 function stopSecurity() {
   if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }
+}
+// PTZ: стрелки шлют команду на бэкенд (require_director) -> поллер .30 крутит камеру по ONVIF
+function secPtz(dir) {
+  fetch(API_BASE + '/api/security/ptz', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dir: dir, dur: 0.5 })
+  }).catch(function () {});
+}
+// Зум — цифровой (у камеры нет оптического): CSS-масштаб кадра, контейнер обрезает края
+let _secZoom = 1;
+function secZoom(delta) {
+  const img = document.getElementById('security-frame');
+  if (!img) return;
+  if (delta === 0) _secZoom = 1;
+  else _secZoom = Math.max(1, Math.min(3.5, _secZoom + delta * 0.4));
+  img.style.transformOrigin = 'center center';
+  img.style.transform = 'scale(' + _secZoom + ')';
 }
 
 function goHome() {
