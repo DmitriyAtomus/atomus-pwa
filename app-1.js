@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.616-security-camera";
+const APP_VERSION = "v2.45.669-security-camera";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1383,11 +1383,104 @@ function canSeeMoney() {
 
 // ============ ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ ============
 
+// ============ v2.45.646: вертикальная рельса разделов (десктоп) ============
+const RAIL_SECTIONS = [
+  { code: 'home',         icon: 'ti-home',               label: 'Главная' },
+  { code: 'production',   icon: 'ti-tool',               label: 'Произв.' },
+  { code: 'sales',        icon: 'ti-briefcase',          label: 'Продажи' },
+  { code: 'tasks',        icon: 'ti-checklist',          label: 'Задачи' },
+  { code: 'warehouse',    icon: 'ti-building-warehouse', label: 'Склад' },
+  { code: 'supply',       icon: 'ti-shopping-cart',      label: 'Снабж.' },
+  { code: 'defects',      icon: 'ti-alert-circle',       label: 'Сервис' },
+  { code: 'installation', icon: 'ti-tools',              label: 'Монтаж' },
+  { code: 'hr',           icon: 'ti-id-badge',           label: 'Кадры' },
+  { code: 'help',         icon: 'ti-help-circle',        label: 'Помощь' },
+];
+
+function navRailOn() { return localStorage.getItem('navRail') !== '0'; }
+// Первичная отрисовка рельсы после загрузки приложения
+setTimeout(function () { try { renderSectionRail(); } catch (e) {} }, 600);
+
+function toggleNavRail() {
+  try { localStorage.setItem('navRail', navRailOn() ? '0' : '1'); } catch (e) {}
+  renderSectionRail();
+}
+
+// Живые счётчики на разделах — из уже загруженных кэшей (без запросов)
+function _railBadges() {
+  const b = {};
+  try {
+    const works = (cache.productionKanban && cache.productionKanban.works) || [];
+    const over = works.filter(w => w.is_overdue && ['queue', 'in_progress', 'review', 'packing'].indexOf(w.status) >= 0).length;
+    if (over) b.production = { n: over, cls: 'r' };
+  } catch (e) {}
+  try {
+    const cwp = cache.contractsWithProgress || [];
+    if (cwp.length) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const over = cwp.filter(c => c.delivery_date && c.status !== 'shipped' && c.status !== 'closed' &&
+        (new Date(c.delivery_date + 'T00:00:00') < today)).length;
+      if (over) b.sales = { n: over, cls: 'r' };
+    }
+  } catch (e) {}
+  try {
+    const attn = state.ptData && state.ptData.kpis && state.ptData.kpis.attention_count;
+    if (attn) b.warehouse = { n: attn, cls: 'y' };
+  } catch (e) {}
+  try {
+    const inbox = cache.supplyInbox || [];
+    const unm = inbox.filter(m => m.status === 'unmatched').length;
+    if (unm) b.supply = { n: unm, cls: 'r' };
+  } catch (e) {}
+  return b;
+}
+
+function renderSectionRail() {
+  const rail = document.getElementById('section-rail');
+  const app = document.getElementById('app');
+  if (!rail || !app) return;
+  const on = navRailOn();
+  app.classList.toggle('rail-off', !on);
+  // Кнопка «вернуть рельсу» в шапке, когда рельса выключена
+  let rb = document.getElementById('rail-restore-btn');
+  if (!on) {
+    if (!rb) {
+      rb = document.createElement('button');
+      rb.id = 'rail-restore-btn';
+      rb.className = 'rail-restore-btn';
+      rb.title = 'Включить боковую панель разделов';
+      rb.innerHTML = '<i class="ti ti-layout-sidebar"></i>';
+      rb.onclick = toggleNavRail;
+      const sw = document.getElementById('section-switcher-wrap');
+      if (sw && sw.parentNode) sw.parentNode.insertBefore(rb, sw);
+    }
+    rail.innerHTML = '';
+    return;
+  }
+  if (rb) rb.remove();
+  const badges = _railBadges();
+  const cur = state.currentSection || 'home';
+  let html = '';
+  RAIL_SECTIONS.forEach(s => {
+    const bd = badges[s.code];
+    html += '<div class="rail-i' + (s.code === cur ? ' on' : '') + '" onclick="selectSection(\'' + s.code + '\')" title="' + escapeHtml(s.label) + '">' +
+      '<i class="ti ' + s.icon + '"></i><span>' + s.label + '</span>' +
+      (bd ? '<b class="rail-b ' + bd.cls + '">' + (bd.n > 99 ? '99+' : bd.n) + '</b>' : '') +
+    '</div>';
+  });
+  html += '<div class="rail-sp"></div>';
+  html += '<div class="rail-i rail-toggle" onclick="toggleNavRail()" title="Скрыть панель — вернуть верхние табы разделов">' +
+    '<i class="ti ti-layout-navbar"></i><span>табы</span></div>';
+  rail.innerHTML = html;
+}
+
 function selectSection(sectionName) {
   const config = SECTION_CONFIG[sectionName];
   if (!config) return;
 
   state.currentSection = sectionName;
+  // v2.45.646: обновляем рельсу разделов (активный + свежие счётчики из кэшей)
+  try { renderSectionRail(); } catch (e) {}
 
   // ЭТАП 25.1: data-section на app — для CSS-селекторов (гамбургер видим/скрыт и т.д.)
   const appEl0 = document.getElementById('app');
@@ -2915,6 +3008,42 @@ async function fetchProductionKanban() {
   };
 }
 
+// v2.45.627: фильтры доски — клик по KPI-плитке («Просрочка», «Нет деталей»)
+// или по сборщику в «Загрузке» показывает только его карточки. Повторный клик — сброс.
+let _pkbFilter = null;   // {type:'overdue'|'blocked'|'assignee', id, name}
+
+function pkbSetFilter(type, id, name) {
+  if (_pkbFilter && _pkbFilter.type === type && (_pkbFilter.id || null) === (id || null)) {
+    _pkbFilter = null;
+  } else {
+    _pkbFilter = { type: type, id: id || null, name: name || '' };
+  }
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
+function pkbResetFilter() {
+  _pkbFilter = null;
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
+function _pkbMatchFilter(w) {
+  if (!_pkbFilter) return true;
+  if (_pkbFilter.type === 'overdue') return !!w.is_overdue;
+  if (_pkbFilter.type === 'blocked') return !!w.is_blocked;
+  if (_pkbFilter.type === 'assignee') {
+    if (w.assignee_id === _pkbFilter.id) return true;
+    return (w.co_assignee_ids || []).indexOf(_pkbFilter.id) >= 0;
+  }
+  return true;
+}
+
+// Часы работы для планирования: факт из журнала → расчётные → дефолт (16ч)
+function _pkbWorkHours(w, defHrs) {
+  const sh = parseFloat(w.session_hours || 0);
+  if (sh > 0) return sh;
+  const eh = parseFloat(w.estimated_hours || 0);
+  if (eh > 0) return eh;
+  return defHrs || 16;
+}
+
 function renderProductionDashboard(d) {
   const container = document.getElementById('dashboard-content');
   if (!container) return;
@@ -2950,6 +3079,22 @@ function renderProductionDashboard(d) {
     });
   });
 
+  // v2.45.627: экстры для KPI/инсайтов считаем ДО фильтрации (полная картина)
+  const defHrs = (d.workload && d.workload.default_hours_per_work) || 16;
+  const _queueAll = byCol.queue.slice();
+  const _activeAll = byCol.queue.concat(byCol.in_progress, byCol.review, byCol.packing);
+  const queueHours = _queueAll.reduce((s, w) => s + _pkbWorkHours(w, defHrs), 0);
+  let worstOverdue = 0;
+  _activeAll.forEach(w => {
+    if (w.is_overdue) worstOverdue = Math.max(worstOverdue, pkbOverdueDays(w.deadline_at));
+  });
+  const kpiExtras = { queueHours: queueHours, worstOverdue: worstOverdue };
+
+  // Применяем активный фильтр к колонкам (после подсчёта экстр)
+  if (_pkbFilter) {
+    Object.keys(byCol).forEach(k => { byCol[k] = byCol[k].filter(_pkbMatchFilter); });
+  }
+
   window.PKB_V2 = (localStorage.getItem('pkbV2') !== '0');
   let html = _pkbToggleBar();
 
@@ -2979,7 +3124,27 @@ function renderProductionDashboard(d) {
   html += '</div>';
 
   // --- KPI ряд ---
-  html += renderPkbKpi(kpi);
+  html += renderPkbKpi(kpi, kpiExtras);
+
+  // --- v2.45.627: баннер активного фильтра ---
+  if (_pkbFilter) {
+    const fLbl = _pkbFilter.type === 'overdue' ? 'только просроченные'
+      : _pkbFilter.type === 'blocked' ? 'только «нет деталей»'
+      : 'только работы: ' + escapeHtml(_pkbFilter.name || '');
+    html += '<div class="pkb-filter-banner"><i class="ti ti-filter"></i>' +
+      '<span>Показаны ' + fLbl + '</span>' +
+      '<button onclick="pkbResetFilter()"><i class="ti ti-x"></i> сбросить</button></div>';
+  }
+
+  // --- v2.45.634: «кабина» — на десктопе справа тёмная панель «Сегодня»
+  // (внимание/отгрузки/задачи), контент слева. На мобильном панель скрыта,
+  // а «узкие места» остаются в потоке.
+  const railOn = localStorage.getItem('pkbRail') !== '0';
+  html += '<div class="pkb-cockpit' + (railOn ? '' : ' rail-off') + '">';
+  html += '<div class="pkb-cmain">';
+
+  // --- v2.45.627: строка «узких мест» (на десктопе живёт в правой панели) ---
+  html += _pkbInsightsHtml(_activeAll, _queueAll, d.workload || {}, defHrs);
 
   // --- Виджет загрузки сборщиков (Stage 29.4) ---
   html += renderPkbWorkload(d.workload || { workers: [], norm_hours: 40 });
@@ -3016,11 +3181,22 @@ function renderProductionDashboard(d) {
     const chevron = isDoneCol
       ? '<i class="ti ' + (collapsed ? 'ti-chevron-down' : 'ti-chevron-up') + '" style="margin-left:auto;font-size:14px;color:var(--text-light);"></i>'
       : '';
+    // v2.45.627: Σ часов колонки — ёмкость видна без открытия карточек.
+    // Очередь — расчётные часы (или дефолт), «В работе» — фактические из журнала.
+    let colSum = '';
+    if (def.key === 'queue' && items.length) {
+      const h = items.reduce((s, w) => s + _pkbWorkHours(w, defHrs), 0);
+      colSum = '<div class="pkb-col-sum" title="Суммарные расчётные часы работ в колонке">Σ ~' + formatHours(h) + 'ч</div>';
+    } else if (def.key === 'in_progress' && items.length) {
+      const h = items.reduce((s, w) => s + parseFloat(w.session_hours || 0), 0);
+      if (h > 0) colSum = '<div class="pkb-col-sum" title="Суммарные фактические часы по журналу">Σ ' + formatHours(h) + 'ч</div>';
+    }
     html += '<div class="pkb-col ' + def.cls + activeCls + colCollapsedCls + '" data-pkb-col="' + def.key + '"' + dropAttrs + '>';
     html +=   '<div class="pkb-col-head"' + headClickAttr + '>';
     html +=     '<span class="pkb-col-dot"></span>';
     html +=     '<div class="pkb-col-name">' + escapeHtml(def.title) + '</div>';
     html +=     '<div class="pkb-col-count">' + items.length + '</div>';
+    html +=     colSum;
     html +=     chevron;
     html +=   '</div>';
     if (!collapsed) {
@@ -3037,10 +3213,158 @@ function renderProductionDashboard(d) {
   });
   html += '</div>';
 
+  // конец .pkb-cmain, затем правая панель «Сегодня» (v2.45.634)
+  html += '</div>';
+  html += _pkbRailHtml(_activeAll, _queueAll, railOn);
+  html += '</div>';   // конец .pkb-cockpit
+
   container.innerHTML = html;
   container.classList.toggle('pkb-v2', !!window.PKB_V2);
+  _fillPkbRail();
   // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
   _renderResumeBanner();
+}
+
+// ============ v2.45.634: правая панель «Сегодня» (кабина) ============
+function pkbToggleRail() {
+  const cur = localStorage.getItem('pkbRail') !== '0';
+  try { localStorage.setItem('pkbRail', cur ? '0' : '1'); } catch (e) {}
+  if (cache.productionKanban) renderProductionDashboard(cache.productionKanban);
+}
+
+function _pkbRailHtml(activeWorks, queueWorks, on) {
+  if (!on) {
+    return '<div class="pkb-rail-collapsed" onclick="pkbToggleRail()" title="Развернуть панель «Сегодня»">«</div>';
+  }
+  let html = '<aside class="pkb-rail">';
+  html += '<div class="pkb-rail-collapse" onclick="pkbToggleRail()" title="Свернуть панель">»</div>';
+
+  // ТРЕБУЕТ ВНИМАНИЯ — те же выводы, что чипы «узких мест», в тёмных строках
+  const overdue = activeWorks.filter(w => w.is_overdue);
+  const blocked = activeWorks.filter(w => w.is_blocked);
+  html += '<div class="pkb-rail-t"><i class="ti ti-alert-triangle"></i> Требует внимания</div>';
+  if (!overdue.length && !blocked.length) {
+    html += '<div class="pkb-rail-row muted">Всё спокойно ✓</div>';
+  } else {
+    if (overdue.length) {
+      const byWho = {};
+      overdue.forEach(w => { const n = w.assignee_short_name || 'без исполнителя'; byWho[n] = 1; });
+      const who = Object.keys(byWho).join(', ');
+      let worst = 0;
+      overdue.forEach(w => { worst = Math.max(worst, pkbOverdueDays(w.deadline_at)); });
+      html += '<div class="pkb-rail-row" onclick="pkbSetFilter(\'overdue\')">' +
+        '<span class="pkb-rail-dot" style="background:#F87171;"></span>' +
+        '<span><b>' + overdue.length + '</b> ' + plural(overdue.length, 'просрочка', 'просрочки', 'просрочек') + ' · ' + escapeHtml(who) + '</span>' +
+        '<span class="pkb-rail-late">−' + worst + ' дн</span></div>';
+    }
+    if (blocked.length) {
+      const missSet = new Set();
+      blocked.forEach(w => (w.missing_components || []).forEach(mc => missSet.add(mc.component_id || mc.name || mc)));
+      html += '<div class="pkb-rail-row" onclick="pkbSetFilter(\'blocked\')">' +
+        '<span class="pkb-rail-dot" style="background:#FBBF24;"></span>' +
+        '<span><b>' + blocked.length + '</b> ' + plural(blocked.length, 'работа', 'работы', 'работ') + ' без деталей</span>' +
+        (missSet.size ? '<span class="pkb-rail-meta">' + missSet.size + ' поз.</span>' : '') + '</div>';
+      html += '<div class="pkb-rail-row sub" onclick="selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')">' +
+        '<span class="pkb-rail-dot" style="background:transparent;"></span><span>что закупить →</span></div>';
+    }
+  }
+  // v2.45.649: «вчера без записей» — наполняется асинхронно из /api/production/day-gaps
+  html += '<div id="pkb-rail-gaps"></div>';
+  // v2.45.655: просроченные выезды на монтаж
+  html += '<div id="pkb-rail-mnt"></div>';
+
+  html += '<div class="pkb-rail-sep"></div>';
+  html += '<div class="pkb-rail-t"><i class="ti ti-truck-delivery"></i> Отгрузки</div>';
+  html += '<div id="pkb-rail-ship"><div class="pkb-rail-row muted">Загружаем…</div></div>';
+
+  html += '<div class="pkb-rail-sep"></div>';
+  html += '<div class="pkb-rail-t"><i class="ti ti-checklist"></i> Мои задачи</div>';
+  html += '<div id="pkb-rail-tasks"><div class="pkb-rail-row muted">Загружаем…</div></div>';
+
+  html += '</aside>';
+  return html;
+}
+
+// Асинхронное наполнение панели: отгрузки + мои задачи (лёгкие эндпоинты главной)
+async function _fillPkbRail() {
+  // v2.45.649: «вчера без записей» — пока мастер не ответил в утреннем окне
+  const gapsEl = document.getElementById('pkb-rail-gaps');
+  if (gapsEl) {
+    try {
+      const g = await apiGet('/api/production/day-gaps');
+      const ppl = (g && g.people) || [];
+      if (ppl.length) {
+        const names = ppl.slice(0, 3).map(p => p.short_name || p.full_name).filter(Boolean).join(', ');
+        gapsEl.innerHTML = '<div class="pkb-rail-row" onclick="selectSidebarItem(\'summary\')" ' +
+          'title="Мастер ещё не указал, чем занимались — спросится в утреннем окне">' +
+          '<span class="pkb-rail-dot" style="background:#F87171;"></span>' +
+          '<span><b>' + ppl.length + '</b> без записей за вчера · ' + escapeHtml(names) + '</span></div>';
+      } else gapsEl.innerHTML = '';
+    } catch (e) { gapsEl.innerHTML = ''; }
+  }
+  // v2.45.655: монтажи с просроченной датой выезда (статус так и «запланирован»)
+  const mntEl = document.getElementById('pkb-rail-mnt');
+  if (mntEl) {
+    try {
+      const m = await apiGet('/api/installations?include_done=0');
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const late = ((m && m.installations) || []).filter(r =>
+        r.status !== 'handed_over' && r.status !== 'cancelled' &&
+        r.scheduled_date && String(r.scheduled_date).slice(0, 10) < todayIso);
+      if (late.length) {
+        mntEl.innerHTML = '<div class="pkb-rail-row" onclick="goToSection(\'installation\', \'installation-list\')" ' +
+          'title="Дата выезда прошла, монтаж не сдан — открыть раздел Монтаж">' +
+          '<span class="pkb-rail-dot" style="background:#F87171;"></span>' +
+          '<span><b>' + late.length + '</b> ' + plural(late.length, 'монтаж', 'монтажа', 'монтажей') + ' — выезд просрочен</span></div>';
+      } else mntEl.innerHTML = '';
+    } catch (e) { mntEl.innerHTML = ''; }
+  }
+  const shipEl = document.getElementById('pkb-rail-ship');
+  if (shipEl) {
+    try {
+      if (!cache.upcomingShipments) cache.upcomingShipments = await apiGet('/api/home/upcoming-shipments');
+      const list = (cache.upcomingShipments && cache.upcomingShipments.contracts) || [];
+      if (!list.length) {
+        shipEl.innerHTML = '<div class="pkb-rail-row muted">Ближайших отгрузок нет</div>';
+      } else {
+        const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+        shipEl.innerHTML = list.slice(0, 4).map(c => {
+          let dNum = '—', dMon = '', late = false, chip = '';
+          const diff = c.days_to_deadline;
+          if (c.delivery_date) {
+            const dt = new Date(c.delivery_date);
+            if (!isNaN(dt.getTime())) { dNum = dt.getDate(); dMon = months[dt.getMonth()]; }
+          }
+          if (diff != null) {
+            if (diff < 0) { late = true; chip = '<span class="pkb-rail-late">−' + Math.abs(diff) + ' дн</span>'; }
+            else if (diff === 0) { late = true; chip = '<span class="pkb-rail-late">сегодня</span>'; }
+            else chip = '<span class="pkb-rail-meta">' + diff + ' дн</span>';
+          }
+          return '<div class="pkb-rail-row" onclick="openContractDetail(' + c.id + ')">' +
+            '<span class="pkb-rail-date' + (late ? ' late' : '') + '">' + dNum + '<small>' + dMon + '</small></span>' +
+            '<span class="pkb-rail-ell">' + escapeHtml(c.number || '—') + ' · ' + escapeHtml(c.contractor_name || '') + '</span>' +
+            chip + '</div>';
+        }).join('');
+      }
+    } catch (e) { shipEl.innerHTML = '<div class="pkb-rail-row muted">—</div>'; }
+  }
+  const taskEl = document.getElementById('pkb-rail-tasks');
+  if (taskEl) {
+    try {
+      if (!cache.myTasks) cache.myTasks = await apiGet('/api/home/my-tasks');
+      const tl = (cache.myTasks && cache.myTasks.tasks) || [];
+      if (!tl.length) {
+        taskEl.innerHTML = '<div class="pkb-rail-row muted" onclick="goToSection(\'tasks\', \'tasks-mine\')">Нет активных ✓</div>';
+      } else {
+        taskEl.innerHTML = tl.slice(0, 3).map(t =>
+          '<div class="pkb-rail-row" onclick="goToSection(\'tasks\', \'tasks-mine\')">' +
+            '<span class="pkb-rail-dot" style="background:#7FB2E5;"></span>' +
+            '<span class="pkb-rail-ell">' + escapeHtml(t.title || t.name || 'Задача') + '</span></div>'
+        ).join('') +
+        (tl.length > 3 ? '<div class="pkb-rail-row sub" onclick="goToSection(\'tasks\', \'tasks-mine\')"><span class="pkb-rail-dot" style="background:transparent;"></span><span>ещё ' + (tl.length - 3) + ' →</span></div>' : '');
+      }
+    } catch (e) { taskEl.innerHTML = '<div class="pkb-rail-row muted">—</div>'; }
+  }
 }
 
 // v2.45.5xx: переключатель нового/старого вида Производства
@@ -3164,8 +3488,10 @@ function pkbSwitchMobileColumn(colKey) {
   if (col) col.classList.add('active');
 }
 
-function renderPkbKpi(kpi) {
+function renderPkbKpi(kpi, ex) {
   // kpi: { queue, in_progress: {count, assignees}, review, packing, overdue, blocked, week_done, week_plan }
+  // ex (v2.45.627): { queueHours, worstOverdue } — считаются из работ доски
+  ex = ex || {};
   const queueCnt    = (kpi.queue != null) ? kpi.queue : 0;
   const inProgObj   = kpi.in_progress || {};
   const inProgCnt   = (typeof inProgObj === 'object') ? (inProgObj.count || 0) : inProgObj;
@@ -3179,58 +3505,137 @@ function renderPkbKpi(kpi) {
 
   let html = '<div class="pkb-kpi-grid">';
 
-  // 1. В очереди
-  html += pkbKpiCard('В очереди', queueCnt, 'ждут сборщика', 'k-neutral', false, 'ti-clipboard-list');
+  // 1. В очереди — с ёмкостью в часах
+  const queueHint = (ex.queueHours > 0) ? ('≈ ' + formatHours(ex.queueHours) + ' ч работ') : 'ждут сборщика';
+  html += pkbKpiCard('В очереди', queueCnt, queueHint, 'k-neutral', { icon: 'ti-clipboard-list' });
 
   // 2. В работе
   const inProgHint = inProgAss ? (inProgAss + ' ' + plural(inProgAss, 'сборщик', 'сборщика', 'сборщиков')) : '—';
-  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', false, 'ti-tool');
+  html += pkbKpiCard('В работе', inProgCnt, inProgHint, 'k-info', { icon: 'ti-tool' });
 
-  // 3. Просрочка
-  html += pkbKpiCard('Просрочка', overdueCnt, overdueCnt > 0 ? 'требуют внимания' : 'нет просрочек', 'k-danger', overdueCnt > 0, 'ti-alert-triangle');
+  // 3. Просрочка — клик фильтрует доску
+  const odHint = overdueCnt > 0
+    ? (ex.worstOverdue > 0 ? 'худшая — ' + ex.worstOverdue + ' ' + plural(ex.worstOverdue, 'день', 'дня', 'дней') : 'требуют внимания')
+    : 'нет просрочек';
+  html += pkbKpiCard('Просрочка', overdueCnt, odHint, 'k-danger', {
+    icon: 'ti-alert-triangle',
+    onclick: overdueCnt > 0 ? "pkbSetFilter('overdue')" : '',
+    active: _pkbFilter && _pkbFilter.type === 'overdue',
+  });
 
-  // 4. На проверке (или Заблокированы, если есть)
+  // 4. Нет деталей (бывш. «Заблокированы») — клик фильтрует; либо «На проверке»
   if (blockedCnt > 0) {
-    html += pkbKpiCard('Заблокированы', blockedCnt, 'нет комплектующих', 'k-warning', false, 'ti-lock');
+    html += pkbKpiCard('Нет деталей', blockedCnt, 'ждут комплектующих', 'k-warning', {
+      icon: 'ti-lock',
+      onclick: "pkbSetFilter('blocked')",
+      active: _pkbFilter && _pkbFilter.type === 'blocked',
+    });
   } else {
-    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', false, 'ti-checks');
+    html += pkbKpiCard('На проверке', reviewCnt, reviewCnt > 0 ? 'ждут ОТК' : '—', 'k-warning', { icon: 'ti-checks' });
   }
 
   // 5. v2.34.2: Упаковка
-  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', false, 'ti-package');
+  html += pkbKpiCard('Упаковка', packingCnt, packingCnt > 0 ? 'в дерево / картон' : '—', 'k-violet', { icon: 'ti-package' });
 
-  // 6. За неделю
-  let weekVal, weekHint;
+  // 6. За неделю — с мини-шкалой факт/план
+  let weekVal, weekHint, weekMeter = null;
   if (weekPlan != null && weekPlan > 0) {
-    weekVal = weekDone + ' / ' + weekPlan;
     const pct = Math.round(weekDone / weekPlan * 100);
-    weekHint = 'факт / план · ' + pct + '%';
+    weekVal = weekDone + ' / ' + weekPlan;
+    weekHint = pct + '% плана';
+    weekMeter = Math.min(100, pct);
   } else {
     weekVal = String(weekDone);
     weekHint = 'завершено';
   }
-  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', false, 'ti-circle-check');
+  html += pkbKpiCard('За неделю', weekVal, weekHint, 'k-success', { icon: 'ti-circle-check', meterPct: weekMeter });
 
   html += '</div>';
   return html;
 }
 
-function pkbKpiCard(label, value, hint, cls, clickable, icon) {
-  const clickAttr = clickable ? ' onclick="pkbFilterOverdue()"' : '';
-  const iconHtml = icon ? '<div class="pkb-kpi-ic"><i class="ti ' + icon + '"></i></div>' : '';
-  return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + '"' + clickAttr + '>' +
+function pkbKpiCard(label, value, hint, cls, opts) {
+  opts = opts || {};
+  const clickable = !!opts.onclick;
+  const clickAttr = clickable ? ' onclick="' + opts.onclick + '"' : '';
+  const activeCls = opts.active ? ' pkb-kpi-active' : '';
+  const iconHtml = opts.icon ? '<div class="pkb-kpi-ic"><i class="ti ' + opts.icon + '"></i></div>' : '';
+  const meterHtml = (opts.meterPct != null)
+    ? '<div class="pkb-kpi-meter"><i style="width:' + opts.meterPct + '%;"></i></div>'
+    : '';
+  const fltHtml = clickable ? '<span class="pkb-kpi-flt">' + (opts.active ? 'фильтр ✓' : 'фильтр') + '</span>' : '';
+  return '<div class="pkb-kpi ' + cls + (clickable ? ' clickable' : '') + activeCls + '"' + clickAttr +
+           (clickable ? ' title="Нажми — доска покажет только эти работы; повторно — сброс"' : '') + '>' +
            iconHtml +
            '<div class="pkb-kpi-body">' +
              '<div class="pkb-kpi-label">' + escapeHtml(label) + '</div>' +
              '<div class="pkb-kpi-value">' + escapeHtml(String(value)) + '</div>' +
+             meterHtml +
              '<div class="pkb-kpi-hint">' + escapeHtml(hint || '') + '</div>' +
            '</div>' +
+           fltHtml +
          '</div>';
 }
 
-function pkbFilterOverdue() {
-  // Заглушка под фильтр просрочки. В следующем стейдже.
-  showToast('Фильтр по просрочке — в следующем стейдже', 'info');
+// v2.45.627: строка «узких мест» — автоматические выводы из данных доски (без AI).
+// activeWorks — все незавершённые работы (до фильтра), queueWorks — очередь.
+function _pkbInsightsHtml(activeWorks, queueWorks, workload, defHrs) {
+  const chips = [];
+
+  // 1. Где сосредоточена просрочка (по исполнителям)
+  const overdue = activeWorks.filter(w => w.is_overdue);
+  if (overdue.length) {
+    const byWho = {};
+    overdue.forEach(w => {
+      const who = w.assignee_short_name || 'без исполнителя';
+      byWho[who] = (byWho[who] || 0) + 1;
+    });
+    const names = Object.keys(byWho);
+    let txt;
+    if (names.length === 1) {
+      txt = (overdue.length === 1 ? 'Просрочка' : (overdue.length === 2 ? 'Обе просрочки' : 'Все ' + overdue.length + ' просрочки')) +
+        ' — <b>' + escapeHtml(names[0]) + '</b>';
+    } else {
+      txt = '<b>' + overdue.length + '</b> ' + plural(overdue.length, 'просрочка', 'просрочки', 'просрочек') +
+        ' у ' + names.length + ' ' + plural(names.length, 'исполнителя', 'исполнителей', 'исполнителей');
+    }
+    chips.push('<span class="pkb-ins" onclick="pkbSetFilter(\'overdue\')"><span class="pkb-ins-dot r"></span>' + txt +
+      ' <span class="pkb-ins-go">показать →</span></span>');
+  }
+
+  // 2. Сколько работ ждёт деталей + переход в «Что закупить»
+  const blocked = activeWorks.filter(w => w.is_blocked);
+  if (blocked.length) {
+    const missSet = new Set();
+    blocked.forEach(w => (w.missing_components || []).forEach(mc => missSet.add(mc.component_id || mc.name || mc)));
+    const missTxt = missSet.size ? ' — дефицит по ' + missSet.size + ' ' + plural(missSet.size, 'позиции', 'позициям', 'позициям') : '';
+    chips.push('<span class="pkb-ins" onclick="pkbSetFilter(\'blocked\')"><span class="pkb-ins-dot y"></span>' +
+      '<b>' + blocked.length + '</b> ' + plural(blocked.length, 'работа ждёт', 'работы ждут', 'работ ждут') + ' деталей' + escapeHtml(missTxt) +
+      ' <span class="pkb-ins-go" onclick="event.stopPropagation();selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')">что закупить →</span></span>');
+  }
+
+  // 3. Ёмкость очереди в часах и днях при текущем составе сборщиков
+  if (queueWorks.length) {
+    const qh = queueWorks.reduce((s, w) => s + _pkbWorkHours(w, defHrs), 0);
+    const nWorkers = ((workload && workload.workers) || []).length || 1;
+    const days = qh / (8 * nWorkers);
+    const daysR = days >= 10 ? Math.round(days) : Math.round(days * 2) / 2;
+    chips.push('<span class="pkb-ins pkb-ins-static"><span class="pkb-ins-dot b"></span>Очередь ≈ <b>' + formatHours(qh) + ' ч</b>' +
+      ' ≈ <b>' + daysR + ' раб. ' + plural(Math.ceil(daysR), 'день', 'дня', 'дней') + '</b> на ' + nWorkers + ' ' + plural(nWorkers, 'сборщика', 'сборщиков', 'сборщиков') + '</span>');
+  }
+
+  // 4. Ближайший срок в очереди
+  const dated = queueWorks.filter(w => w.deadline_at && !w.is_overdue);
+  if (dated.length) {
+    let minIso = null;
+    dated.forEach(w => { const iso = String(w.deadline_at).slice(0, 10); if (!minIso || iso < minIso) minIso = iso; });
+    const cnt = dated.filter(w => String(w.deadline_at).slice(0, 10) === minIso).length;
+    chips.push('<span class="pkb-ins pkb-ins-static"><span class="pkb-ins-dot b"></span>Ближайший срок в очереди — <b>' +
+      escapeHtml(formatPkbDate(minIso)) + '</b> · ' + cnt + ' ' + plural(cnt, 'работа', 'работы', 'работ') + '</span>');
+  }
+
+  if (!chips.length) return '';
+  return '<div class="pkb-insights">' + chips.join('') + '</div>';
 }
 
 // ============ Stage 29.4: виджет загрузки сборщиков ============
@@ -3263,6 +3668,9 @@ function renderPkbWorkload(workload) {
                 '• Тильда (~) рядом со значением означает что часы оценочные.&#10;' +
                 '• Норма ' + norm + 'ч/неделю. Чтобы получить точные часы — заполните «расч. часы» в карточке работы."></i>' +
               '</div>';
+  html +=     '<span class="pkb-wl-legend"><span><i class="pkb-wl-sw sw-main"></i>основная</span>' +
+                '<span><i class="pkb-wl-sw sw-help"></i>помощь</span>' +
+                '<span><i class="pkb-wl-sw sw-over"></i>сверх нормы</span></span>';
   html +=     '<div class="pkb-workload-norm" title="Норма ' + norm + 'ч в неделю. Работы без указанных часов считаются по ' + defHrs + 'ч.">' +
                 'норма ' + norm + 'ч / неделю' +
               '</div>';
@@ -3374,17 +3782,43 @@ function renderPkbWorkload(workload) {
         '</button>'
       : '';
 
-    html += '<div class="pkb-wl-row" data-employee-id="' + w.employee_id + '" title="' + escapeHtml(w.full_name || name) + '">';
+    // v2.45.627: сегментная шкала — тёмное «основная», светлое «помощь» (по долям
+    // работ), штриховка — сверх нормы. Шкала до 130% нормы, риска нормы на 100%.
+    const SCALE = 130;
+    const clamped = Math.min(pct, SCALE);
+    const withinNorm = Math.min(clamped, 100);
+    const overPart = Math.max(0, clamped - 100);
+    const mainShare = works > 0 ? (mainN / works) : 1;
+    const wMain = (withinNorm * mainShare) / SCALE * 100;
+    const wHelp = (withinNorm * (1 - mainShare)) / SCALE * 100;
+    const wOver = overPart / SCALE * 100;
+    const normPos = 100 / SCALE * 100;
+    // Свободные часы до нормы — кому отдать работу из очереди
+    const freeHrs = Math.max(0, norm - hours);
+    const hrsPrefix = isEstimated ? '~' : '';
+    const clickAttr = ' onclick="pkbSetFilter(\'assignee\', ' + w.employee_id + ', ' + JSON.stringify(name).replace(/"/g, '&quot;') + ')"';
+    const isFiltered = _pkbFilter && _pkbFilter.type === 'assignee' && _pkbFilter.id === w.employee_id;
+
+    html += '<div class="pkb-wl-row' + (isFiltered ? ' pkb-wl-row-active' : '') + '" data-employee-id="' + w.employee_id + '"' + clickAttr +
+      ' style="cursor:pointer;" title="' + escapeHtml((w.full_name || name) + ' — нажми, чтобы показать на доске только его работы') + '">';
     html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
     html +=   '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + stopBtn + '</div>';
     html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
     if (works > 0) {
-      html += '<div class="pkb-wl-bar-fill s-' + status + '" style="width: ' + fillWidth + '%;"></div>';
+      html += '<div class="pkb-wl-seg pkb-wl-seg-main" style="left:0;width:' + wMain.toFixed(1) + '%;"></div>';
+      if (wHelp > 0.5) html += '<div class="pkb-wl-seg pkb-wl-seg-help" style="left:' + wMain.toFixed(1) + '%;width:' + wHelp.toFixed(1) + '%;"></div>';
+      if (wOver > 0.5) html += '<div class="pkb-wl-seg pkb-wl-seg-over" style="left:' + (wMain + wHelp).toFixed(1) + '%;width:' + wOver.toFixed(1) + '%;"></div>';
     }
-    html +=   '<div class="pkb-wl-norm-line" title="80% — норма"></div>';
+    html +=   '<div class="pkb-wl-norm-line" style="left:' + normPos.toFixed(1) + '%;" title="Норма загрузки (2 работы / ' + norm + 'ч в неделю)"></div>';
     html +=   '<div class="pkb-wl-bar-text">' + escapeHtml(barText) + '</div>';
     html +=   '</div>';
-    html +=   '<div class="pkb-wl-status s-' + status + '">' + escapeHtml(statusLabel) + '</div>';
+    html +=   '<div class="pkb-wl-right">' +
+                '<span class="pkb-wl-hrs" title="' + (isEstimated ? 'Часы оценочные' : 'Часы по журналу/расчёту') + '">' + hrsPrefix + formatHours(hours) + 'ч</span>' +
+                '<span class="pkb-wl-status s-' + status + '">' + escapeHtml(statusLabel) + '</span>' +
+                ((status === 'undersized' && works >= 0 && freeHrs > 0)
+                  ? '<span class="pkb-wl-free" title="Сколько часов можно догрузить до нормы">свободен ~' + formatHours(freeHrs) + 'ч</span>'
+                  : '') +
+              '</div>';
     html += '</div>';
   });
 
@@ -3766,7 +4200,10 @@ function renderPkbWorkCard(w, colKey) {
     } else if (urgencyClass === ' b-tomorrow') {
       badgesHtml += '<div class="pkb-wc-bar b-tomorrow"><i class="ti ti-clock"></i>Срок завтра</div>';
     } else {
-      badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + '</div>';
+      // v2.45.627: дельта в днях — «до 27.07 · 25 дн»
+      const _dLeft = Math.round((new Date(String(w.deadline_at).slice(0, 10)) - new Date(new Date().toISOString().slice(0, 10))) / 86400000);
+      const _dTxt = _dLeft > 0 ? ' · ' + _dLeft + ' дн' : '';
+      badgesHtml += '<div class="pkb-wc-bar b-deadline"><i class="ti ti-calendar"></i>До ' + escapeHtml(labelDate) + _dTxt + '</div>';
     }
   } else if (colKey === 'in_progress') {
     const startedDays = w.started_at ? pkbDaysSince(w.started_at) : 0;
@@ -3787,9 +4224,15 @@ function renderPkbWorkCard(w, colKey) {
   }
 
   // v2.24.0 (Stage 30.0): бейдж блокировки по BOM — только для активных колонок
+  // v2.45.627: показываем СКОЛЬКО позиций не хватает, а в подсказке — каких именно
   if (w.is_blocked && colKey !== 'done') {
-    badgesHtml += '<div class="pkb-wc-blocked" title="Не хватает критичных компонентов">' +
-                    '<i class="ti ti-lock"></i>Нет деталей' +
+    const _miss = w.missing_components || [];
+    const _missTitle = _miss.length
+      ? 'Не хватает:\n' + _miss.map(mc => '• ' + (mc.name || mc.component_name || mc) +
+          (mc.shortage ? ' — ' + mc.shortage : '')).join('\n')
+      : 'Не хватает критичных компонентов';
+    badgesHtml += '<div class="pkb-wc-blocked" title="' + escapeHtml(_missTitle) + '">' +
+                    '<i class="ti ti-lock"></i>Нет деталей' + (_miss.length ? ' · ' + _miss.length : '') +
                   '</div>';
   }
 
@@ -3826,7 +4269,8 @@ function renderPkbWorkCard(w, colKey) {
   }
 
   // v2.43.97: бейдж часов по этой работе из журнала участия
-  const sh = parseFloat(w.session_hours || 0);
+  // v2.45.627: для «В работе» часы показываются в строке прогресса — бейдж не дублируем
+  const sh = (colKey === 'in_progress') ? 0 : parseFloat(w.session_hours || 0);
   if (sh > 0) {
     const hrsStr = (sh % 1 === 0 ? Math.round(sh) : sh.toFixed(1)) + 'ч';
     html += '<div class="pkb-wc-hours" title="Сумма часов по журналу участия">' +
@@ -3849,10 +4293,15 @@ function renderPkbWorkCard(w, colKey) {
     const commentIcon = (w.comment && w.comment.trim())
       ? '<i class="ti ti-message-circle pkb-wc-comment-icon" title="Есть комментарий"></i>'
       : '';
+    // v2.45.627: фактические часы рядом с процентом — темп виден сразу
+    const _sh2 = parseFloat(w.session_hours || 0);
+    const _shTxt = _sh2 > 0
+      ? '<span class="pkb-wc-hrs-inline" title="Часы по журналу участия">· ' + formatHours(_sh2) + 'ч</span>'
+      : '';
     html += '<div class="pkb-wc-progress">' +
               '<div class="pkb-wc-av ac-' + avColorIdx + '" title="' + escapeHtml(w.assignee_short_name || '—') + '">' + escapeHtml(initials) + '</div>' +
               '<div class="pkb-wc-bar-track"><div class="pkb-wc-bar-fill ' + fillCls + '" style="width: ' + pct + '%"></div></div>' +
-              '<div class="pkb-wc-pct">' + pct + '%</div>' +
+              '<div class="pkb-wc-pct">' + pct + '%</div>' + _shTxt +
               commentIcon +
             '</div>';
   } else if (colKey === 'review' || colKey === 'done') {
@@ -4024,6 +4473,57 @@ function closeProductionWorkDetail() {
   if (m) m.remove();
 }
 
+// ============ v2.45.634: глобальный поиск на десктопе (Ctrl+K) ============
+// Переиспользуем мобильный экран поиска search25 — на десктопе он оформлен
+// CSS'ом как центральная панель-оверлей.
+function openDesktopSearch() {
+  const so = document.getElementById('search25-screen');
+  if (!so) return;
+  // v2.45.647: экран поиска лежит в DOM вне #app — десктопное оформление
+  // (центральная панель) вешаем классом на сам оверлей.
+  const isDesktop = document.getElementById('app') &&
+    document.getElementById('app').classList.contains('desktop-layout');
+  if (isDesktop) {
+    so.classList.add('search25-desktop');
+    // Подсказка внизу панели (один раз)
+    if (!so.querySelector('.s25d-hint')) {
+      const hint = document.createElement('div');
+      hint.className = 's25d-hint';
+      hint.innerHTML = '<span><kbd>Esc</kbd> — закрыть</span><span><kbd>Ctrl K</kbd> — открыть откуда угодно</span>';
+      so.appendChild(hint);
+    }
+  }
+  so.style.display = 'block';
+  setTimeout(() => {
+    const inp = document.getElementById('search25-input');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 60);
+}
+function closeDesktopSearch() {
+  const so = document.getElementById('search25-screen');
+  if (!so) return;
+  // На мобильном экран закрывается нижними табами — не трогаем его там
+  if (so.classList.contains('search25-desktop')) {
+    so.classList.remove('search25-desktop');
+    so.style.display = 'none';
+  }
+}
+document.addEventListener('keydown', function (e) {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.key === 'л' || e.key === 'Л')) {
+    e.preventDefault();
+    openDesktopSearch();
+  } else if (e.key === 'Escape') {
+    closeDesktopSearch();
+  }
+});
+// Клик по затемнению вокруг панели — закрыть (панель и кнопка в шапке не считаются)
+document.addEventListener('click', function (e) {
+  const so = document.getElementById('search25-screen');
+  if (!so || !so.classList.contains('search25-desktop') || so.style.display === 'none') return;
+  if (e.target.closest('#search25-screen') || e.target.closest('.hdr-search-btn')) return;
+  closeDesktopSearch();
+});
+
 async function showProductionWorkQr(workId) {
   try {
     const w = await apiGet('/api/production/works/' + workId);
@@ -4075,29 +4575,66 @@ function renderProductionWorkDetail(w) {
     html += '<div class="pkb-form-error" style="margin-bottom:14px;"><i class="ti ti-alert-triangle"></i> Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
   }
 
-  html += '<dl class="pkb-detail-grid">';
+  // v2.45.628: факт-плитки вместо плоского списка — срок с дельтой и цветом,
+  // кликабельный договор, часы план/факт вместе, мини-шкала прогресса.
+  html += '<div class="pwd-facts">';
   if (w.contract_number) {
-    html += '<dt>Договор</dt><dd>' + formatContractNum(w.contract_number) + (w.contractor_name ? (' · ' + escapeHtml(w.contractor_name)) : '') + '</dd>';
+    const cOpen = w.contract_id
+      ? ' class="pwd-fact pwd-fact-link" onclick="closeProductionWorkDetail();state.currentContractId=' + w.contract_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-contract-detail\');" title="Открыть договор"'
+      : ' class="pwd-fact"';
+    html += '<div' + cOpen + '><div class="pwd-fact-l">Договор</div><div class="pwd-fact-v">' +
+      formatContractNum(w.contract_number) +
+      (w.contract_id ? ' <i class="ti ti-external-link pwd-fact-ext"></i>' : '') +
+      (w.contractor_name ? '<div class="pwd-fact-sub">' + escapeHtml(w.contractor_name) + '</div>' : '') +
+      '</div></div>';
   }
-  html += '<dt>Кол-во</dt><dd>' + (w.qty || 1) + ' шт.</dd>';
-  if (w.deadline_at) html += '<dt>Срок</dt><dd>' + escapeHtml(formatPkbDate(w.deadline_at)) + '</dd>';
-  // Исполнитель — ВСЕГДА показываем строку (даже если не назначен) + кнопка назначить/сменить
+  if (w.deadline_at) {
+    const _iso = String(w.deadline_at).slice(0, 10);
+    const _dLeft = Math.round((new Date(_iso) - new Date(new Date().toISOString().slice(0, 10))) / 86400000);
+    let _dTxt, _dCls;
+    if (w.is_overdue || _dLeft < 0) { _dTxt = 'просрочен на ' + Math.abs(_dLeft) + ' дн'; _dCls = ' bad'; }
+    else if (_dLeft === 0) { _dTxt = 'сегодня'; _dCls = ' warn'; }
+    else if (_dLeft === 1) { _dTxt = 'завтра'; _dCls = ' warn'; }
+    else { _dTxt = 'через ' + _dLeft + ' дн'; _dCls = ''; }
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Срок</div><div class="pwd-fact-v' + _dCls + '">' +
+      escapeHtml(formatPkbDate(w.deadline_at)) +
+      '<div class="pwd-fact-sub' + _dCls + '">' + escapeHtml(_dTxt) + '</div></div></div>';
+  }
+  html += '<div class="pwd-fact"><div class="pwd-fact-l">Кол-во</div><div class="pwd-fact-v">' + (w.qty || 1) + ' шт.</div></div>';
+  if (w.estimated_hours != null || w.actual_hours != null) {
+    const _hp = [];
+    if (w.estimated_hours != null) _hp.push('план ' + w.estimated_hours + 'ч');
+    if (w.actual_hours != null) _hp.push('факт ' + w.actual_hours + 'ч');
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Часы</div><div class="pwd-fact-v">' + escapeHtml(_hp.join(' · ')) + '</div></div>';
+  }
+  // Прогресс — для статусов без редактируемого слайдера ниже
+  if (w.progress != null && w.status !== 'in_progress' && w.status !== 'review' && w.status !== 'packing') {
+    const _p = Math.max(0, Math.min(100, Number(w.progress || 0)));
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Прогресс</div><div class="pwd-fact-v">' + _p + '%' +
+      '<div class="pwd-fact-meter"><i style="width:' + _p + '%;"></i></div></div></div>';
+  }
+  if (w.execution_type && w.execution_type !== 'standard') html += '<div class="pwd-fact"><div class="pwd-fact-l">Исполнение</div><div class="pwd-fact-v">' + escapeHtml(w.execution_type) + '</div></div>';
+  if (w.ip_rating) html += '<div class="pwd-fact"><div class="pwd-fact-l">IP</div><div class="pwd-fact-v">' + escapeHtml(w.ip_rating) + '</div></div>';
+  if (w.started_at)  html += '<div class="pwd-fact"><div class="pwd-fact-l">Начато</div><div class="pwd-fact-v pwd-fact-sm">' + escapeHtml(formatPkbDateTime(w.started_at)) + '</div></div>';
+  if (w.finished_at) html += '<div class="pwd-fact"><div class="pwd-fact-l">Завершено</div><div class="pwd-fact-v pwd-fact-sm">' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</div></div>';
+  html += '</div>';
+
+  // Команда: ответственный + соисполнители — единый блок с аватарами
   {
     const canAssign = hasPermission('production.manage') && w.status !== 'done' && w.status !== 'cancelled';
     const btnLabel = w.assignee_short_name ? 'Сменить' : 'Назначить';
     const btnIcon  = w.assignee_short_name ? 'ti-user-edit' : 'ti-user-plus';
+    const assigneeAv = w.assignee_short_name
+      ? '<span class="pkb-wl-avatar ac-' + ((w.assignee_id || 0) % 8) + '" style="width:22px;height:22px;font-size:9px;">' + escapeHtml(getInitials(w.assignee_short_name)) + '</span> '
+      : '';
     const valueText = w.assignee_short_name
-      ? escapeHtml(w.assignee_short_name)
+      ? assigneeAv + '<b>' + escapeHtml(w.assignee_short_name) + '</b>'
       : '<span style="color:var(--text-faint);font-style:italic;">не назначен</span>';
     const btn = canAssign
-      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:8px;vertical-align:middle;" onclick="openAssignProductionWorkerModal(' + w.id + ')"><i class="ti ' + btnIcon + '" style="font-size:12px;"></i>' + btnLabel + '</button>'
+      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:auto;" onclick="openAssignProductionWorkerModal(' + w.id + ')"><i class="ti ' + btnIcon + '" style="font-size:12px;"></i>' + btnLabel + '</button>'
       : '';
-    html += '<dt>Ответственный</dt><dd>' + valueText + btn + '</dd>';
-  }
-  // v2.43.33: соисполнители — кто ещё подключался временно
-  {
     const coList = w.co_assignees || [];
-    const canEditCo = hasPermission('production.manage') && w.status !== 'done' && w.status !== 'cancelled';
+    const canEditCo = canAssign;
     let coHtml = '';
     if (coList.length) {
       coHtml = coList.map(co => {
@@ -4109,25 +4646,20 @@ function renderProductionWorkDetail(w) {
                 '</span>';
       }).join(' ');
     } else {
-      coHtml = '<span style="color:var(--text-faint);font-style:italic;">никого ещё не подключали</span>';
+      coHtml = '<span style="color:var(--text-faint);font-style:italic;font-size:12px;">никого ещё не подключали</span>';
     }
     const addBtn = canEditCo
-      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:8px;vertical-align:middle;" onclick="openAddCoAssigneeModal(' + w.id + ')"><i class="ti ti-user-plus" style="font-size:12px;"></i>Подключить</button>'
+      ? ' <button class="pkb-btn" style="padding:2px 10px;font-size:11.5px;margin-left:auto;" onclick="openAddCoAssigneeModal(' + w.id + ')"><i class="ti ti-user-plus" style="font-size:12px;"></i>Подключить</button>'
       : '';
-    html += '<dt>Соисполнители</dt><dd>' + coHtml + addBtn + '</dd>';
+    html += '<div class="pwd-team">' +
+      '<div class="pwd-team-row"><span class="pwd-team-l">Ответственный</span><span class="pwd-team-v">' + valueText + '</span>' + btn + '</div>' +
+      '<div class="pwd-team-row"><span class="pwd-team-l">Соисполнители</span><span class="pwd-team-v">' + coHtml + '</span>' + addBtn + '</div>' +
+    '</div>';
   }
-  if (w.estimated_hours != null) html += '<dt>План часов</dt><dd>' + w.estimated_hours + 'ч</dd>';
-  if (w.actual_hours != null) html += '<dt>Факт часов</dt><dd>' + w.actual_hours + 'ч</dd>';
-  // v2.43.31: прогресс — показываем всегда (для in_progress в виде редактируемого слайдера ниже)
-  if (w.progress != null && w.status !== 'in_progress' && w.status !== 'review' && w.status !== 'packing') {
-    html += '<dt>Прогресс</dt><dd>' + w.progress + '%</dd>';
+
+  if (w.description) {
+    html += '<div class="pwd-desc"><i class="ti ti-file-description"></i><span style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</span></div>';
   }
-  if (w.execution_type && w.execution_type !== 'standard') html += '<dt>Исполнение</dt><dd>' + escapeHtml(w.execution_type) + '</dd>';
-  if (w.ip_rating) html += '<dt>IP</dt><dd>' + escapeHtml(w.ip_rating) + '</dd>';
-  if (w.started_at)  html += '<dt>Начато</dt><dd>'    + escapeHtml(formatPkbDateTime(w.started_at)) + '</dd>';
-  if (w.finished_at) html += '<dt>Завершено</dt><dd>' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</dd>';
-  if (w.description) html += '<dt>Описание</dt><dd style="white-space:pre-wrap;">' + escapeHtml(w.description) + '</dd>';
-  html += '</dl>';
 
   // v2.43.31: блок прогресса с возможностью редактирования (только in_progress/review/packing)
   const canEditWork = hasPermission('production.manage') &&
@@ -4286,23 +4818,33 @@ function renderProductionWorkDetail(w) {
                 '<button class="pwd-session-del" title="Удалить запись" onclick="removePwdSession(' + s.id + ',' + w.id + ')"><i class="ti ti-trash"></i></button>' +
               '</div>')
           : '';
-        // v2.44.72: бейдж этапа в журнале сессий
-        const stageBadge = s.stage_name
-          ? ' <span class="pwd-help-chip-stage" style="cursor:default;">' + escapeHtml(s.stage_name) + '</span>'
-          : '';
-        html += '<div class="pwd-session-row" id="pwd-session-row-' + s.id + '" data-session-id="' + s.id + '" data-session-date="' + escapeHtml(s.session_date || '') + '" data-hours="' + (s.hours != null ? s.hours : '') + '" data-note="' + escapeHtml(s.note || '') + '">' +
-                  '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
-                  '<div class="pwd-session-body">' +
-                    '<div class="pwd-session-top">' +
-                      '<span class="pwd-session-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
-                        ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
-                        stageBadge +
-                      '</span>' +
-                      '<span class="pwd-session-meta">' + escapeHtml(dateStr + hoursStr) + '</span>' +
-                    '</div>' +
-                    (s.note ? '<div class="pwd-session-note">' + escapeHtml(s.note) + '</div>' : '') +
+        // v2.45.636: компактный стиль как в «Сводках» — часы крупно, этап и
+        // «авто-стоп» чипами; кнопки редактирования сохранены.
+        let noteChip = '', noteText = '';
+        if (s.note) {
+          const am = String(s.note).match(/авто-?стоп[^0-9]*(\d{1,2}:\d{2})?/i);
+          if (am) noteChip = '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп' + (am[1] ? ' ' + am[1] : '') + '</span>';
+          // v2.45.649: запись создана из утреннего опроса мастера — маленький чип
+          else if (/дозаполнено/i.test(String(s.note))) noteChip = '<span class="jrn-chip dn-late"><i class="ti ti-pencil"></i>дозаполнено утром</span>';
+          else noteText = '<div class="jrn-note">' + escapeHtml(s.note) + '</div>';
+        }
+        const _h = (s.hours != null) ? parseFloat(s.hours) : null;
+        html += '<div class="jrn-e' + (s.role === 'main' ? ' jrn-main' : '') + ' jrn-has-acts" id="pwd-session-row-' + s.id + '" data-session-id="' + s.id + '" data-session-date="' + escapeHtml(s.session_date || '') + '" data-hours="' + (s.hours != null ? s.hours : '') + '" data-note="' + escapeHtml(s.note || '') + '">' +
+                  '<div class="pkb-wl-avatar ac-' + avColorIdx + ' jrn-ava">' + escapeHtml(initials) + '</div>' +
+                  '<div class="jrn-top">' +
+                    '<span class="jrn-nm">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
+                    '<span class="jrn-role ' + (s.role === 'main' ? 'mn' : 'co') + '">' + (s.role === 'main' ? 'главный' : 'соисп.') + '</span>' +
                   '</div>' +
-                  actions +
+                  ((_h != null && _h > 0)
+                    ? '<div class="jrn-hrs">' + formatHours(_h) + ' <small>ч</small></div>'
+                    : '<div></div>') +
+                  (actions || '<span></span>') +
+                  '<div class="jrn-sub">' +
+                    '<span class="jrn-w">' + escapeHtml(dateStr) + '</span>' +
+                    (s.stage_name ? '<span class="jrn-chip op"><i class="ti ti-tool"></i>' + escapeHtml(s.stage_name) + '</span>' : '') +
+                    noteChip +
+                  '</div>' +
+                  noteText +
                 '</div>';
       });
       html += '</div>';
@@ -5261,10 +5803,16 @@ function renderPkbBomBlock(w) {
   const titleText = hasCritical
     ? 'Дефицит — работа заблокирована'
     : 'Дефицит некритичных компонентов';
+  // v2.45.628: сводка «N позиций · −M шт» + переход в «Что закупить»
+  const totalDef = missing.reduce((s, m) => s + (parseFloat(m.deficit) || 0), 0);
 
   let html = '<div class="pkb-bom-block">';
-  html +=   '<div class="pkb-bom-title" style="color:' + titleColor + ';">';
+  html +=   '<div class="pkb-bom-title" style="color:' + titleColor + ';display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
   html +=     '<i class="ti ' + titleIcon + '"></i>' + escapeHtml(titleText);
+  html +=     '<span style="font-weight:600;color:var(--text-light);font-size:11.5px;">· ' + missing.length + ' ' + plural(missing.length, 'позиция', 'позиции', 'позиций') + ' · −' + pkbFmtQty(totalDef) + ' шт.</span>';
+  html +=     '<button class="pkb-btn" style="margin-left:auto;padding:3px 10px;font-size:11.5px;" ' +
+                'onclick="closeProductionWorkDetail();selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')" ' +
+                'title="Открыть Снабжение → Что закупить"><i class="ti ti-shopping-cart" style="font-size:12px;"></i> Что закупить</button>';
   html +=   '</div>';
   html +=   '<div class="pkb-bom-list">';
   // v2.43.81: кнопка «Сопоставить со склада» — закрыть BOM-строку ручным списанием
@@ -6639,53 +7187,94 @@ function renderSummary(d) {
     }
 
     // Последние записи — с группировкой по датам
+    // v2.45.636: компактные карточки — часы крупно справа, Σ за день в заголовке,
+    // дубль «артикул · название» схлопнут, «[авто-стоп]» — маленький чип.
     if ((sb.entries || []).length) {
       html += '<div class="section"><h3 class="section-title">' +
                 '<span>Последние записи</span>' +
                 '<span style="font-weight:400;color:var(--text-light);font-size:12.5px;">' + sb.entries.length + ' из ' + totalEntries + '</span>' +
               '</h3></div>';
-      html += '<div class="ssn-entries-list">';
+      // Итоги по дням: количество записей и сумма часов
+      const _dayAgg = {};
+      sb.entries.forEach(s => {
+        const k = s.session_date || '—';
+        if (!_dayAgg[k]) _dayAgg[k] = { n: 0, h: 0 };
+        _dayAgg[k].n++;
+        _dayAgg[k].h += (s.hours != null ? Number(s.hours) || 0 : 0);
+      });
+      const _todayIso = new Date().toISOString().slice(0, 10);
+      const _yestIso = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      html += '<div class="jrn-list">';
       let prevDate = null;
       sb.entries.forEach(s => {
         const initials = getInitials(s.employee_short_name || s.employee_full_name || '?');
         const avColorIdx = ((s.employee_id || 0) % 8);
-        const dateStr = s.session_date ? formatPkbDate(s.session_date) : '—';
         const hrs = (s.hours != null) ? Number(s.hours) : null;
-        const hoursStr = (hrs != null && hrs > 0) ? (fmtH(hrs) + 'ч') : '';
-        const modelStr = s.model_name
-          ? ((s.model_article ? s.model_article + ' · ' : '') + s.model_name)
-          : '';
-        const contractStr = s.contract_number
-          ? ('№' + String(s.contract_number).replace(/^[№#\s]+/, '') + (s.contractor_name ? ' · ' + s.contractor_name : ''))
-          : '';
-        const roleLabel = s.role === 'main' ? 'главный' : 'соисполнитель';
-        const roleCls   = s.role === 'main' ? 'pwd-role-main' : 'pwd-role-co';
-        // Заголовок-разделитель если новая дата
+        // Заголовок дня с итогом
         if (s.session_date !== prevDate) {
-          html += '<div class="ssn-date-divider"><i class="ti ti-calendar-event"></i> ' + escapeHtml(dateStr) + '</div>';
+          const agg = _dayAgg[s.session_date || '—'] || { n: 0, h: 0 };
+          const iso = String(s.session_date || '').slice(0, 10);
+          const rel = iso === _todayIso ? ' · сегодня' : (iso === _yestIso ? ' · вчера' : '');
+          html += '<div class="jrn-day">' + escapeHtml(s.session_date ? formatPkbDate(s.session_date) : '—') +
+            '<span class="jrn-day-sub">' + rel + ' · ' + agg.n + ' ' + plural(agg.n, 'запись', 'записи', 'записей') + '</span>' +
+            (agg.h > 0 ? '<span class="jrn-day-sum">Σ ' + fmtH(agg.h) + ' ч</span>' : '') +
+          '</div>';
           prevDate = s.session_date;
         }
-        // v2.45.164: проваливаемся в карточку работы (что за работа, кто и что делал)
+        // v2.45.649: заметка дня из утреннего опроса мастера («отгул», «хозработы»)
+        if (s.is_day_note) {
+          const dnChip = (s.day_note_kind === 'off')
+            ? '<span class="jrn-chip dn-off"><i class="ti ti-beach"></i>' + escapeHtml(s.day_note_off_kind || 'отгул') + '</span>'
+            : '<span class="jrn-chip dn-oth"><i class="ti ti-broom"></i>не по сборке</span>';
+          html += '<div class="jrn-e jrn-dnote">' +
+            '<div class="pkb-wl-avatar ac-' + avColorIdx + ' jrn-ava">' + escapeHtml(initials) + '</div>' +
+            '<div class="jrn-top"><span class="jrn-nm">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span></div>' +
+            '<div class="jrn-hrs jrn-hrs-dash">—</div>' +
+            '<span class="jrn-chev"></span>' +
+            '<div class="jrn-sub">' + dnChip +
+              (s.note ? '<span class="jrn-w">' + escapeHtml(s.note) + '</span>' : '') +
+              (s.created_by_short_name ? '<span class="jrn-w jrn-dn-by">указал: ' + escapeHtml(s.created_by_short_name) + '</span>' : '') +
+            '</div>' +
+          '</div>';
+          return;
+        }
+        // Модель без дубля: артикул показываем, только если отличается от названия
+        const _art = String(s.model_article || '').trim();
+        const _mn = String(s.model_name || '').trim();
+        let workBits = [];
+        if (_mn) workBits.push((_art && _art.toLowerCase() !== _mn.toLowerCase()) ? (_art + ' · ' + _mn) : _mn);
+        else if (_art) workBits.push(_art);
+        if (s.contract_number) workBits.push('№' + String(s.contract_number).replace(/^[№#\s]+/, ''));
+        if (s.contractor_name) workBits.push(s.contractor_name);
+        // Заметка: «авто-стоп» — чипом, остальное — мелким текстом
+        let noteChip = '', noteText = '';
+        if (s.note) {
+          const am = String(s.note).match(/авто-?стоп[^0-9]*(\d{1,2}:\d{2})?/i);
+          if (am) noteChip = '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп' + (am[1] ? ' ' + am[1] : '') + '</span>';
+          // v2.45.649: запись создана из утреннего опроса мастера — маленький чип
+          else if (/дозаполнено/i.test(String(s.note))) noteChip = '<span class="jrn-chip dn-late"><i class="ti ti-pencil"></i>дозаполнено утром</span>';
+          else noteText = '<div class="jrn-note">' + escapeHtml(s.note) + '</div>';
+        }
+        const isMain = s.role === 'main';
         const _clickable = !!s.work_id;
-        html += '<div class="ssn-entry' + (_clickable ? ' ssn-entry-click' : '') + '"' +
+        html += '<div class="jrn-e' + (isMain ? ' jrn-main' : '') + '"' +
                   (_clickable ? ' onclick="openProductionWorkDetail(' + s.work_id + ')" style="cursor:pointer;"' : '') + '>' +
-                  '<div class="pkb-wl-avatar ac-' + avColorIdx + '" style="width:36px;height:36px;font-size:12px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
-                  '<div class="ssn-entry-body">' +
-                    '<div class="ssn-entry-top">' +
-                      '<span class="ssn-entry-name">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) +
-                        ' <span class="pwd-role-badge ' + roleCls + '">' + roleLabel + '</span>' +
-                      '</span>' +
-                      (hoursStr ? '<span class="ssn-entry-hours">' + escapeHtml(hoursStr) + '</span>' : '<span></span>') +
-                    '</div>' +
-                    (modelStr || contractStr ? '<div class="ssn-entry-work">' +
-                      (modelStr ? '<i class="ti ti-package"></i> ' + escapeHtml(modelStr) : '') +
-                      (contractStr ? ' <span style="color:var(--text-light);">· ' + escapeHtml(contractStr) + '</span>' : '') +
-                    '</div>' : '') +
-                    (s.stage_name ? '<div class="ssn-entry-work" style="color:var(--text-light);"><i class="ti ti-tool"></i> ' + escapeHtml(s.stage_name) + '</div>' : '') +
-                    (s.note ? '<div class="ssn-entry-note">' + escapeHtml(s.note) + '</div>' : '') +
-                  '</div>' +
-                  (_clickable ? '<i class="ti ti-chevron-right" style="color:var(--text-light);align-self:center;flex-shrink:0;font-size:18px;"></i>' : '') +
-                '</div>';
+          '<div class="pkb-wl-avatar ac-' + avColorIdx + ' jrn-ava">' + escapeHtml(initials) + '</div>' +
+          '<div class="jrn-top">' +
+            '<span class="jrn-nm">' + escapeHtml(s.employee_short_name || s.employee_full_name || ('#' + s.employee_id)) + '</span>' +
+            '<span class="jrn-role ' + (isMain ? 'mn' : 'co') + '">' + (isMain ? 'главный' : 'соисп.') + '</span>' +
+          '</div>' +
+          ((hrs != null && hrs > 0)
+            ? '<div class="jrn-hrs">' + fmtH(hrs) + ' <small>ч</small></div>'
+            : '<div></div>') +
+          (_clickable ? '<i class="ti ti-chevron-right jrn-chev"></i>' : '<span class="jrn-chev"></span>') +
+          '<div class="jrn-sub">' +
+            (workBits.length ? '<span class="jrn-w">' + escapeHtml(workBits.join(' · ')) + '</span>' : '') +
+            (s.stage_name ? '<span class="jrn-chip op"><i class="ti ti-tool"></i>' + escapeHtml(s.stage_name) + '</span>' : '') +
+            noteChip +
+          '</div>' +
+          noteText +
+        '</div>';
       });
       html += '</div>';
     }

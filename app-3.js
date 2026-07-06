@@ -321,33 +321,64 @@ function renderComponentsCatalogList() {
   catNames.forEach(cat => {
     const items = groups[cat];
     const isOpen = allOpen ? true : !!state.ccListOpenCats[cat];
+    // Сводка категории: сколько позиций «к закупке» (ниже минимума) и с браком —
+    // видно проблемные категории, не раскрывая их.
+    let gBuy = 0, gDef = 0;
+    items.forEach(c => {
+      const stq = parseFloat(c.qty_on_stock || 0), mn = parseFloat(c.min_stock || 0);
+      if (mn > 0 && stq < mn) gBuy++;
+      if (parseFloat(c.qty_defective || 0) > 0) gDef++;
+    });
+    const gChips =
+      (gBuy ? '<span class="cct-gchip buy">к закупке: ' + gBuy + '</span>' : '') +
+      (gDef ? '<span class="cct-gchip def">брак: ' + gDef + '</span>' : '');
     html += '<div class="comp-group">' +
       '<button type="button" class="comp-group-toggle' + (isOpen ? ' open' : '') + '" ' +
         'onclick="toggleCatalogGroup(\'' + cat.replace(/'/g, "\\'") + '\')">' +
         '<i class="ti ti-chevron-right comp-group-chev"></i>' +
         '<span>' + escapeHtml(cat) + '</span>' +
         '<span class="comp-group-count">' + items.length + '</span>' +
+        (gChips ? '<span class="cct-gchips">' + gChips + '</span>' : '') +
       '</button>' +
       '<div class="comp-group-body"' + (isOpen ? '' : ' style="display:none;"') + '>' +
-        '<div class="comp-table">';
+        '<div class="cct-card">' +
+          '<div class="cct-head">' +
+            '<div>Позиция</div>' +
+            '<div class="cct-c">На складе</div>' +
+            '<div class="cct-c cct-hide-m" title="Минимальный запас">Мин.</div>' +
+            '<div class="cct-c">Статус</div>' +
+            '<div class="cct-c">Брак</div>' +
+            '<div></div>' +
+          '</div>';
     items.forEach(c => {
+      const stq = parseFloat(c.qty_on_stock || 0);
+      const mn = parseFloat(c.min_stock || 0);
       const defectQty = parseFloat(c.qty_defective || 0);
-      const defectBadge = defectQty > 0
-        ? ' <span class="comp-defect-badge" title="В браке — нажми чтобы посмотреть"><i class="ti ti-alert-triangle"></i>брак ' + _fmtQty(defectQty) + '</span>'
-        : '';
-      html += '<div class="comp-row" style="grid-template-columns: 1fr auto auto;cursor:pointer;" onclick="openComponentForm(' + c.id + ')">' +
-        '<div class="comp-row-main">' +
-          '<div class="comp-name">' + escapeHtml(c.name || '—') +
-            (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
+      const low = mn > 0 && stq < mn;
+      // Полоска-статус: 🟥 ниже минимума → 🟨 есть брак → 🟩 есть остаток → ⬜ пусто
+      const stCls = low ? 'cct-st-buy' : (defectQty > 0 ? 'cct-st-def' : (stq > 0 ? 'cct-st-ok' : 'cct-st-zero'));
+      // Колонка «Статус»: к закупке N / брак N / ✓ ок / —
+      let pills = '';
+      if (low) pills += '<span class="cct-pill buy" title="Докупить до минимума"><i class="ti ti-shopping-cart"></i>к закупке ' + _fmtQty(mn - stq) + '</span>';
+      if (defectQty > 0) pills += '<span class="cct-pill def" title="В браке"><i class="ti ti-alert-triangle"></i>брак ' + _fmtQty(defectQty) + '</span>';
+      if (!pills) pills = stq > 0 ? '<span class="cct-pill ok"><i class="ti ti-check"></i>ок</span>' : '<span class="cct-z">—</span>';
+      const vCls = stq <= 0 ? ' zero' : (low ? ' low' : '');
+      html += '<div class="cct-row ' + stCls + '" onclick="openComponentForm(' + c.id + ')">' +
+        '<div class="cct-main">' +
+          '<div class="cct-name">' + escapeHtml(c.name || '—') +
+            (c.sku ? '<span class="cct-sku">' + escapeHtml(c.sku) + '</span>' : '') +
           '</div>' +
-          '<div class="comp-meta">' +
-            'на складе: <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
-            defectBadge +
-            (c.default_supplier_name ? ' · <i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '') +
-          '</div>' +
+          (c.default_supplier_name
+            ? '<div class="cct-sup"><i class="ti ti-truck"></i> ' + escapeHtml(c.default_supplier_name) + '</div>'
+            : '') +
         '</div>' +
-        '<button class="comp-defect-btn" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (parseFloat(c.qty_on_stock) || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-bandage"></i><span>Брак</span></button>' +
-        '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
+        '<div class="cct-c cct-stock"><span class="cct-v' + vCls + '">' + _fmtQty(stq) + '</span><span class="cct-u">' + escapeHtml(c.unit || 'шт.') + '</span></div>' +
+        '<div class="cct-c cct-min cct-hide-m">' + (mn > 0 ? _fmtQty(mn) : '—') + '</div>' +
+        '<div class="cct-c cct-status">' + pills + '</div>' +
+        '<div class="cct-c">' +
+          '<button class="cct-brak" onclick="event.stopPropagation();openMarkDefectiveModal(' + c.id + ',\'' + escapeHtml((c.name || '').replace(/\\\\/g, '\\\\\\\\').replace(/\'/g, "\\\\'")) + '\',' + (stq || 0) + ',\'' + escapeHtml(c.unit || 'шт.') + '\')" title="Пометить брак"><i class="ti ti-bandage"></i></button>' +
+        '</div>' +
+        '<div class="cct-chev"><i class="ti ti-chevron-right"></i></div>' +
       '</div>';
     });
     html += '</div></div></div>';
@@ -446,6 +477,134 @@ function filterComponentsList() {
   renderComponentsList();
 }
 
+// v2.45.622: «раскрытие» упаковок — если у компонента задана фасовка
+// (purchase_pack > 1), показываем «фасовка N шт/упак» и во сколько упаковок
+// раскладывается текущий остаток (напр. «300 шт = 3 упак»).
+function _compPackHint(c) {
+  const pack = Number(c && c.purchase_pack || 0);
+  if (!(pack > 1)) return '';
+  const unit = (c.unit || 'шт.');
+  const qty = Number(c.qty_on_stock || 0);
+  let unfold = '';
+  if (qty > 0) {
+    const packs = Math.floor(qty / pack + 1e-9);
+    const rem = Math.round((qty - packs * pack) * 1000) / 1000;
+    if (packs > 0) unfold = ' · = ' + packs + ' упак' + (rem > 0 ? ' + ' + _fmtQty(rem) + ' ' + escapeHtml(unit) : '');
+  }
+  return ' <span style="color:var(--text-light);"><i class="ti ti-box" style="font-size:11px;"></i> фасовка ' +
+    _fmtQty(pack) + ' ' + escapeHtml(unit) + '/упак' + unfold + '</span>';
+}
+
+// ===== v2.45.627: ручное объединение дублей комплектующих =====
+// Авто-«Дубли» ловит только по артикулу/имени; для одинаковых по сути позиций
+// с РАЗНЫМИ названиями (напр. автоматы CHINT) — выбираешь галочками и сливаешь.
+function _compMergeToggle(id, checked) {
+  if (!state.compMergeSel) state.compMergeSel = new Set();
+  if (checked) state.compMergeSel.add(id); else state.compMergeSel.delete(id);
+  _compMergeRefreshBar();
+  // подсветка строки без полной перерисовки — просто перерисуем список
+  if (typeof renderComponentsList === 'function') renderComponentsList();
+}
+function _compMergeClear() {
+  state.compMergeSel = new Set();
+  _compMergeRefreshBar();
+  if (typeof renderComponentsList === 'function') renderComponentsList();
+}
+function _compMergeRefreshBar() {
+  let bar = document.getElementById('comp-merge-bar');
+  const n = (state.compMergeSel && state.compMergeSel.size) || 0;
+  if (n < 1) { if (bar) bar.remove(); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'comp-merge-bar';
+    bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:1200;background:#111827;color:#fff;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px;';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML =
+    '<span>Выбрано: <b>' + n + '</b></span>' +
+    '<button class="btn btn-primary btn-small"' + (n < 2 ? ' disabled' : '') + ' onclick="openCompMergeModal()"><i class="ti ti-git-merge"></i> Объединить</button>' +
+    '<button class="btn btn-secondary btn-small" onclick="_compMergeClear()">Сбросить</button>';
+}
+function openCompMergeModal() {
+  const ids = Array.from(state.compMergeSel || []);
+  if (ids.length < 2) { showToast('Выбери минимум 2 позиции', 'warning'); return; }
+  const all = cache.components || [];
+  const sel = ids.map(id => all.find(c => c.id === id)).filter(Boolean);
+  if (sel.length < 2) { showToast('Позиции не найдены — обнови список', 'error'); return; }
+  let best = sel[0];
+  sel.forEach(c => { if ((Number(c.qty_on_stock) || 0) > (Number(best.qty_on_stock) || 0)) best = c; });
+  const overlayId = 'comp-merge-modal';
+  let m = document.getElementById(overlayId); if (m) m.remove();
+  m = document.createElement('div'); m.id = overlayId; m.className = 'modal-overlay';
+  const rows = sel.map(c =>
+    '<label style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+      '<input type="radio" name="comp-merge-keep" value="' + c.id + '"' + (c.id === best.id ? ' checked' : '') + ' style="margin-top:3px;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:600;font-size:13.5px;word-break:break-word;">' + escapeHtml(c.name || '—') + (c.sku ? ' <span style="color:var(--text-light);font-weight:400;">' + escapeHtml(c.sku) + '</span>' : '') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);">id ' + c.id + ' · ' + escapeHtml(c.category_name || '—') + ' · остаток <b>' + _fmtQty(c.qty_on_stock || 0) + ' ' + escapeHtml(c.unit || 'шт.') + '</b></div>' +
+      '</div>' +
+    '</label>'
+  ).join('');
+  const totalQty = sel.reduce((s, c) => s + (Number(c.qty_on_stock) || 0), 0);
+  m.innerHTML =
+    '<div class="modal" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-git-merge"></i> Объединить позиции (' + sel.length + ')</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="font-size:13px;color:var(--text-mid);margin-bottom:10px;">Выбери <b>главную</b> позицию — в неё сольются остальные. Остатки сложатся, ссылки в BOM/договорах и движения перенесутся, лишние уйдут в архив (не удаляются).</div>' +
+        rows +
+        '<div style="margin-top:8px;font-size:13px;color:var(--text-mid);">Итоговый остаток на главной: <b>' + _fmtQty(totalQty) + '</b></div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="comp-merge-go" onclick="submitCompMerge()"><i class="ti ti-git-merge"></i> Объединить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m); m.classList.add('visible');
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+}
+async function submitCompMerge() {
+  const keepRadio = document.querySelector('input[name="comp-merge-keep"]:checked');
+  if (!keepRadio) { showToast('Выбери главную позицию', 'error'); return; }
+  const keepId = parseInt(keepRadio.value, 10);
+  const mergeIds = Array.from(state.compMergeSel || []).filter(id => id !== keepId);
+  if (!mergeIds.length) { showToast('Нужно минимум 2 позиции', 'error'); return; }
+  const btn = document.getElementById('comp-merge-go');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Объединяю…'; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ keep_id: keepId, merge_ids: mergeIds }),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      showToast(e.message || e.detail || ('Не удалось объединить (HTTP ' + r.status + ')'), 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-git-merge"></i> Объединить'; }
+      return;
+    }
+    const d = await r.json();
+    let msg = 'Объединено: ' + (d.merged_count || mergeIds.length);
+    if (d.updated) {
+      const u = d.updated, parts = [];
+      if (u.model_bom_moved) parts.push('BOM: ' + u.model_bom_moved);
+      if (u.contract_items) parts.push('договоров: ' + u.contract_items);
+      if (u.movements) parts.push('движений: ' + u.movements);
+      if (parts.length) msg += ' (' + parts.join(', ') + ')';
+    }
+    showToast(msg, 'success');
+    const mm = document.getElementById('comp-merge-modal'); if (mm) mm.remove();
+    state.compMergeSel = new Set();
+    _compMergeRefreshBar();
+    cache.components = null;
+    if (typeof loadWarehouseComponents === 'function') loadWarehouseComponents();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-git-merge"></i> Объединить'; }
+  }
+}
+
 function renderComponentsList() {
   const container = document.getElementById('comp-list-container');
   const counter = document.getElementById('comp-counter');
@@ -535,7 +694,8 @@ function renderComponentsList() {
     items.forEach(c => {
       const lowStock = (c.min_stock > 0 && c.qty_on_stock < c.min_stock);
       const zeroStock = (c.qty_on_stock <= 0);
-      html += '<div class="comp-row">' +
+      const isSel = !!(state.compMergeSel && state.compMergeSel.has(c.id));
+      html += '<div class="comp-row"' + (isSel ? ' style="background:rgba(37,99,235,0.06);"' : '') + '>' +
         '<div class="comp-row-main" onclick="openComponentDetail(' + c.id + ')">' +
           '<div class="comp-name">' + _highlightAisi(c.name || '—') +
             (c.sku ? ' <span class="comp-sku">' + escapeHtml(c.sku) + '</span>' : '') +
@@ -543,6 +703,7 @@ function renderComponentsList() {
           '</div>' +
           '<div class="comp-meta">' +
             (c.default_supplier_name ? '<i class="ti ti-truck" style="font-size:11px;"></i> ' + escapeHtml(c.default_supplier_name) : '<span style="color:var(--text-light);">без поставщика</span>') +
+            _compPackHint(c) +
           '</div>' +
         '</div>' +
         '<div class="comp-row-qty ' + (zeroStock ? 'zero' : (lowStock ? 'low' : '')) + '">' +
@@ -550,6 +711,10 @@ function renderComponentsList() {
           '<div class="comp-qty-unit">' + escapeHtml(c.unit || 'шт.') + '</div>' +
         '</div>' +
         '<div class="comp-row-actions">' +
+          // v2.45.627: галочка «выбрать для объединения дублей»
+          '<label title="Выбрать для объединения" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;padding:4px;cursor:pointer;">' +
+            '<input type="checkbox"' + (isSel ? ' checked' : '') + ' onchange="_compMergeToggle(' + c.id + ', this.checked)">' +
+          '</label>' +
           '<button class="btn btn-secondary btn-small" title="Приход" onclick="openComponentReceiveModal(' + c.id + ')"><i class="ti ti-package-import"></i></button>' +
           '<button class="btn btn-secondary btn-small" title="Списать" onclick="openComponentWriteoffModal(' + c.id + ')"><i class="ti ti-package-export"></i></button>' +
           '<button class="btn btn-secondary btn-small" title="История" onclick="openComponentMovements(' + c.id + ')"><i class="ti ti-history"></i></button>' +
@@ -2514,9 +2679,12 @@ function _renderComponentDuplicates(data) {
       '</label>';
     });
     html += '</div>' +
-      '<div class="dup-group-actions">' +
+      '<div class="dup-group-actions" style="display:flex;gap:8px;flex-wrap:wrap;">' +
         '<button class="btn btn-primary btn-small" onclick="mergeDuplicateGroup(' + gi + ')">' +
           '<i class="ti ti-merge"></i> Склеить группу' +
+        '</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="markDupGroupDifferent(' + gi + ')" title="Это разные позиции — убрать из подсказок">' +
+          '<i class="ti ti-arrows-split-2"></i> Разное' +
         '</button>' +
       '</div>' +
     '</div>';
@@ -2524,6 +2692,28 @@ function _renderComponentDuplicates(data) {
   body.innerHTML = html;
   // Сохраним сами группы в state — пригодится для confirmMerge
   state._dupGroups = groups;
+}
+
+// v2.45.666: «Разное» — пометить группу как НЕ дубли, убрать из подсказок навсегда.
+async function markDupGroupDifferent(gi) {
+  const groups = state._dupGroups || [];
+  const g = groups[gi];
+  if (!g) return;
+  const ids = g.items.map(it => it.id);
+  if (!confirm('Пометить эти позиции как РАЗНЫЕ (не дубли)?\n\n' +
+               g.items.map(it => '• ' + it.name).join('\n') + '\n\n' +
+               'Группа исчезнет из подсказок. Если позже добавится похожая позиция — появится снова.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/duplicates/ignore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ids: ids }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+    showToast('Помечено как разное', 'success');
+    if (typeof openComponentDuplicates === 'function') openComponentDuplicates();  // перезагрузить список
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 async function mergeDuplicateGroup(gi) {
@@ -3094,7 +3284,24 @@ function _renderFpList() {
   // Фильтр по статусу
   if (state.fpStatusFilter === 'free')     items = items.filter(it => it.free_qty > 0 && it.reserved_qty === 0);
   if (state.fpStatusFilter === 'reserved') items = items.filter(it => it.reserved_qty > 0);
+  if (state.fpStatusFilter === 'mixed')    items = items.filter(it => it.free_qty > 0 && it.reserved_qty > 0);
   if (state.fpStatusFilter === 'dead90')   items = items.filter(it => it.age_category === 'dead');
+
+  // v2.45.639: живые счётчики на табах фильтров (по полному списку, до фильтра)
+  {
+    const all = state.fpData.items || [];
+    const cnt = {
+      all: all.length,
+      free: all.filter(it => it.free_qty > 0 && it.reserved_qty === 0).length,
+      reserved: all.filter(it => it.reserved_qty > 0).length,
+      mixed: all.filter(it => it.free_qty > 0 && it.reserved_qty > 0).length,
+    };
+    const lbl = { all: 'Все', free: 'Свободные', reserved: 'Резерв', mixed: 'Смешанные' };
+    document.querySelectorAll('.filter-tab[data-fp-status]').forEach(b => {
+      const k = b.dataset.fpStatus;
+      if (lbl[k] != null) b.textContent = lbl[k] + (cnt[k] ? ' · ' + cnt[k] : '');
+    });
+  }
 
   // Фильтр по категории
   if (state.fpCategoryFilter != null) {
@@ -3141,70 +3348,64 @@ function _renderFpList() {
 }
 
 function _renderFpRow(it) {
-  const isReserved = it.reserved_qty > 0;
+  // v2.45.639: цвет полоски = доступность, «свободно из всего» с мини-баром,
+  // резерв — отдельной жёлтой строкой на всю ширину (не ломает сетку).
   const isFullyReserved = it.free_qty === 0 && it.reserved_qty > 0;
   const isMixed = it.free_qty > 0 && it.reserved_qty > 0;
   const isDead = it.age_category === 'dead';
+  const avCls = isFullyReserved ? 'av-res' : (isMixed ? 'av-mix' : 'av-free');
 
-  const rowTone = isDead ? 'tone-red' : (isReserved ? 'tone-yellow' : '');
+  // Подстрока — всегда категория + кол-во сборок (резерв ушёл в свою строку)
+  const subParts = [];
+  if (it.direction_name) subParts.push(escapeHtml(it.direction_name));
+  subParts.push(it.assemblies_count + ' ' + _plural(it.assemblies_count, ['сборка', 'сборки', 'сборок']));
 
-  // Подстрока
-  let subText = '';
-  let subClass = '';
-  if (isDead) {
-    subClass = 'dead';
-    subText = '<i class="ti ti-alert-triangle" style="font-size:12px;"></i>Лежит больше 90 дней — проверить актуальность';
-  } else if (isReserved) {
-    subClass = 'reserved';
+  // Количество: свободно крупно, «из N шт» + мини-бар доли свободного
+  let qtyHtml;
+  if (it.reserved_qty > 0) {
+    const pct = it.total_qty > 0 ? Math.round(it.free_qty / it.total_qty * 100) : 0;
+    qtyHtml = '<div class="fp2-q' + (it.free_qty === 0 ? ' zero' : '') + '">' +
+      '<div class="fp2-n">' + it.free_qty + ' <small>св.</small></div>' +
+      '<div class="fp2-of">из ' + it.total_qty + ' шт</div>' +
+      '<div class="fp2-bar"><i style="width:' + pct + '%;"></i></div>' +
+    '</div>';
+  } else {
+    qtyHtml = '<div class="fp2-q free">' +
+      '<div class="fp2-n">' + it.total_qty + ' <small>шт</small></div>' +
+      '<div class="fp2-of">все свободны</div>' +
+    '</div>';
+  }
+
+  // Резерв — одной строкой с обрезкой
+  let resLine = '';
+  if (it.reserved_qty > 0) {
     const r = (it.reservations || [])[0];
     if (r) {
-      // v2.45.58: если в contract_number уже есть «№» в начале — не дублируем
-      const _rawN = String(r.contract_number || '—');
-      const _cleanN = _rawN.replace(/^№\s*/, '');
-      let resTxt = '<i class="ti ti-lock" style="font-size:12px;"></i>Резерв: №' + escapeHtml(_cleanN);
-      if (r.contractor_name) resTxt += ' · ' + escapeHtml(r.contractor_name);
-      if ((it.reservations || []).length > 1) {
-        resTxt += ' <span style="color:var(--text-light);">+' + ((it.reservations.length - 1)) + ' договор.</span>';
-      }
-      subText = resTxt;
+      const _cleanN = String(r.contract_number || '—').replace(/^№\s*/, '');
+      resLine = '<div class="fp2-res"><i class="ti ti-lock"></i>' +
+        '<span class="fp2-res-txt">' + it.reserved_qty + ' в резерве: №' + escapeHtml(_cleanN) +
+        (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : '') + '</span>' +
+        ((it.reservations || []).length > 1 ? '<span class="fp2-res-more">+' + (it.reservations.length - 1) + ' дог.</span>' : '') +
+      '</div>';
     }
-  } else {
-    // обычная — категория + кол-во сборок
-    const parts = [];
-    if (it.direction_name) parts.push(escapeHtml(it.direction_name));
-    parts.push(it.assemblies_count + ' ' + _plural(it.assemblies_count, ['сборка', 'сборки', 'сборок']));
-    subText = parts.join(' · ');
   }
+  // Залежалось — своей строкой
+  const deadLine = isDead
+    ? '<div class="fp2-dead"><i class="ti ti-alert-triangle"></i>Лежит больше 90 дней — проверить актуальность</div>'
+    : '';
 
-  // Количество: показываем X / Y если есть и резерв и свободно
-  let qtyHtml;
-  if (isMixed) {
-    qtyHtml = '<div class="fp-row-qty">' + it.free_qty + ' <span class="fp-row-qty-sub">/ ' + it.total_qty + ' шт</span></div>';
-  } else {
-    qtyHtml = '<div class="fp-row-qty">' + it.total_qty + ' <span class="fp-row-qty-sub">шт</span></div>';
-  }
-
-  // Возраст
-  const ageCls = it.age_category;
-  const ageText = it.oldest_age_days + ' дн';
-
-  // Бейдж
-  let badgeHtml;
-  if (isMixed)            badgeHtml = '<span class="fp-row-badge mixed">смешан</span>';
-  else if (isFullyReserved) badgeHtml = '<span class="fp-row-badge reserved">резерв</span>';
-  else                    badgeHtml = '<span class="fp-row-badge free">свободна</span>';
-
-  return '<div class="fp-row ' + rowTone + '" onclick="openFpModelDetail(' + it.model_id + ')">' +
-    '<span class="fp-row-dot ' + it.age_category + '"></span>' +
-    '<div>' +
+  return '<div class="fp-row fp2 ' + avCls + (isDead ? ' fp2-isdead' : '') + '" onclick="openFpModelDetail(' + it.model_id + ')">' +
+    '<span class="fp-row-dot ' + it.age_category + '" title="Возраст самой старой сборки"></span>' +
+    '<div class="fp2-main">' +
       '<div class="fp-row-name">' + escapeHtml(it.model_name) +
         (it.model_article ? '<span class="fp-row-article">' + escapeHtml(it.model_article) + '</span>' : '') +
       '</div>' +
-      '<div class="fp-row-sub ' + subClass + '">' + subText + '</div>' +
+      '<div class="fp-row-sub">' + subParts.join(' · ') + '</div>' +
     '</div>' +
     qtyHtml +
-    '<div class="fp-row-age ' + ageCls + '">' + ageText + '</div>' +
-    badgeHtml +
+    '<div class="fp-row-age ' + it.age_category + '">' + it.oldest_age_days + ' дн</div>' +
+    '<i class="ti ti-chevron-right fp2-chev"></i>' +
+    resLine + deadLine +
     '</div>';
 }
 
@@ -3286,32 +3487,54 @@ async function openFpModelDetail(modelId) {
       body.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>Сборок на складе не найдено</div>';
       return;
     }
+    // v2.45.640: компактная шапка со сводкой + строки в стиле склада —
+    // цвет полоски = доступность, дата по-русски с возрастом, «Списать» иконкой.
     const modelName = stock[0].model_name || '';
     const modelArt  = stock[0].model_article || '';
+    const freeN = stock.filter(s => !s.contract_id).length;
+    const resN = stock.length - freeN;
+    const _fmtD = iso => {
+      const p = String(iso || '').slice(0, 10).split('-');
+      return p.length === 3 ? (p[2] + '.' + p[1] + '.' + p[0].slice(2)) : (iso || '—');
+    };
+    const _ageD = iso => {
+      const t = Date.parse(String(iso || '').slice(0, 10));
+      if (!t || isNaN(t)) return null;
+      return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+    };
     let html =
-      '<div style="background:var(--brand-bg);padding:12px 14px;border-radius:10px;margin-bottom:14px;">' +
-        '<div style="font-weight:600;font-size:15px;color:var(--text-dark);">' + escapeHtml(modelName) + '</div>' +
-        (modelArt ? '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' + escapeHtml(modelArt) + '</div>' : '') +
-        '<div style="font-size:13px;color:var(--brand);margin-top:6px;">Всего на складе: <b>' + stock.length + '</b> сборок</div>' +
+      '<div class="fpm-head">' +
+        '<div class="fpm-name">' + escapeHtml(modelName) +
+          (modelArt ? '<span class="fpm-art">' + escapeHtml(modelArt) + '</span>' : '') + '</div>' +
+        '<div class="fpm-chips">' +
+          '<span class="fpm-chip">' + stock.length + ' ' + _plural(stock.length, ['сборка', 'сборки', 'сборок']) + '</span>' +
+          (freeN ? '<span class="fpm-chip ok">' + freeN + ' ' + _plural(freeN, ['свободна', 'свободны', 'свободны']) + '</span>' : '') +
+          (resN ? '<span class="fpm-chip res">🔒 ' + resN + ' в резерве</span>' : '') +
+        '</div>' +
       '</div>';
-    html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+    html += '<div class="fpm-list">';
     stock.forEach(s => {
-      const reservedBadge = s.contract_id
-        ? '<span style="background:#FEF3C7;color:#854F0B;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">резерв · ' + escapeHtml(s.contract_number || '') + '</span>'
-        : '<span style="background:rgba(29,158,117,0.15);color:#0A5B41;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">свободна</span>';
+      const isRes = !!s.contract_id;
       const exec = [s.execution_label || s.execution, s.ip_class].filter(Boolean).join(' · ');
+      const age = _ageD(s.assembly_date);
+      const chip = isRes
+        ? '<span class="fpm-chip res">🔒 №' + escapeHtml(String(s.contract_number || '—').replace(/^№\s*/, '')) + '</span>'
+        : '<span class="fpm-chip ok">свободна</span>';
+      const writeOff = !isRes
+        ? '<button class="fpm-off" title="Списать эту сборку со склада (брак/использована/инвентаризация)" ' +
+            'onclick="event.stopPropagation(); promptWriteOff(' + s.id + ',' + (s.stock_qty || 0) + ').then(function(ok){ if(ok){ var m=document.getElementById(\'fp-model-assemblies-modal\'); if(m) m.classList.remove(\'visible\'); } });">' +
+            '<i class="ti ti-package-export"></i></button>'
+        : '<span class="fpm-off-ph"></span>';
       html +=
-        '<div class="modal-item" style="border:1px solid var(--border);border-radius:10px;border-bottom:1px solid var(--border);margin-bottom:0;" onclick="document.getElementById(\'fp-model-assemblies-modal\').classList.remove(\'visible\'); openAssemblyStock(' + s.id + ')">' +
-          '<div class="mi-icon"><i class="ti ti-package"></i></div>' +
-          '<div class="mi-text">' +
-            '<div class="mi-title">Сборка #' + s.id + ' · ' + (s.stock_qty || 0) + ' шт.</div>' +
-            '<div class="mi-meta">' +
-              escapeHtml(s.assembly_date || '—') +
-              (exec ? ' · ' + escapeHtml(exec) : '') +
-              ' · ' + reservedBadge +
-            '</div>' +
+        '<div class="fpm-row ' + (isRes ? 'res' : 'ok') + '" onclick="document.getElementById(\'fp-model-assemblies-modal\').classList.remove(\'visible\'); openAssemblyStock(' + s.id + ')">' +
+          '<div class="fpm-main">' +
+            '<div class="fpm-id">#' + s.id + ((s.stock_qty || 0) > 1 ? ' <span class="fpm-qty">· ' + s.stock_qty + ' шт.</span>' : '') + '</div>' +
+            '<div class="fpm-meta">' + escapeHtml(_fmtD(s.assembly_date)) +
+              (age != null ? ' · лежит ' + age + ' дн' : '') +
+              (exec ? ' · ' + escapeHtml(exec) : '') + '</div>' +
           '</div>' +
-          '<i class="ti ti-chevron-right" style="color:var(--text-light);font-size:18px;"></i>' +
+          chip + writeOff +
+          '<i class="ti ti-chevron-right fpm-chev"></i>' +
         '</div>';
     });
     html += '</div>';
@@ -3585,43 +3808,91 @@ function openPtOrderFromShortage(componentId, recommendedQty, supplyItemId) {
 }
 
 function _renderPtChips(categories, total) {
+  // v2.45.641: одна лента вместо стены чипов — сортировка по количеству,
+  // пустые скрыты, полный список (включая «+ Раздел») — в шторке «Все разделы».
   const host = document.getElementById('pt-chips');
   if (!host) return;
+  const cats = (categories || []).slice().sort((a, b) => (b.count || 0) - (a.count || 0));
+  const visible = cats.filter(c => (c.count || 0) > 0).slice(0, 10);
+  // Активная категория всегда видна, даже если пустая или за пределами топа
+  if (state.ptCategoryFilter != null && !visible.some(c => c.id === state.ptCategoryFilter)) {
+    const act = cats.find(c => c.id === state.ptCategoryFilter);
+    if (act) visible.unshift(act);
+  }
   let html = '<button class="pt-chip ' + (state.ptCategoryFilter == null ? 'active' : '') +
     '" onclick="setPtCategoryFilter(null)">' +
     'Все <span class="pt-chip-qty">' + total + '</span></button>';
-  (categories || []).forEach(c => {
+  visible.forEach(c => {
     const active = state.ptCategoryFilter === c.id;
     html += '<button class="pt-chip ' + (active ? 'active' : '') +
       '" onclick="setPtCategoryFilter(' + c.id + ')">' +
       escapeHtml(c.name) + ' <span class="pt-chip-qty">' + c.count + '</span>' +
       '</button>';
   });
-  // Кнопка создания нового раздела (после всех категорий, пунктирная)
-  html += '<button class="pt-chip" style="border-style:dashed;color:var(--brand);" onclick="createComponentCategoryPrompt()">' +
-    '<i class="ti ti-plus" style="font-size:12px;"></i> Раздел</button>';
+  html += '<button class="pt-chip pt-chip-more" onclick="openPtCatSheet()">' +
+    'Все разделы <i class="ti ti-chevron-down" style="font-size:12px;"></i></button>';
   host.innerHTML = html;
 }
 
+// v2.45.641: полный список разделов (включая пустые) + создание нового
+function openPtCatSheet() {
+  let m = document.getElementById('pt-cat-sheet');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'pt-cat-sheet';
+  m.className = 'modal-overlay visible';
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  const cats = ((state.ptData && state.ptData.categories) || []).slice()
+    .sort((a, b) => (b.count || 0) - (a.count || 0));
+  const total = (state.ptData && state.ptData.kpis && state.ptData.kpis.total) || 0;
+  let rows = '<div class="pt-cs-row' + (state.ptCategoryFilter == null ? ' on' : '') + '" onclick="setPtCategoryFilter(null);document.getElementById(\'pt-cat-sheet\').remove();">' +
+    '<span>Все разделы</span><b>' + total + '</b></div>';
+  cats.forEach(c => {
+    rows += '<div class="pt-cs-row' + (state.ptCategoryFilter === c.id ? ' on' : '') + '" onclick="setPtCategoryFilter(' + c.id + ');document.getElementById(\'pt-cat-sheet\').remove();">' +
+      '<span>' + escapeHtml(c.name) + '</span><b>' + (c.count || 0) + '</b></div>';
+  });
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-category"></i> Разделы</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pt-cat-sheet\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' + rows +
+        '<div class="pt-cs-row pt-cs-new" onclick="document.getElementById(\'pt-cat-sheet\').remove();createComponentCategoryPrompt();">' +
+          '<span><i class="ti ti-plus"></i> Новый раздел</span></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+// v2.45.641: сегмент «Все / В наличии / Внимание» вместо двух кнопок
+function setPtSeg(mode) {
+  state.ptInStockOnly = (mode === 'stock');
+  state.ptAttentionOnly = (mode === 'attn');
+  _ptSyncSeg();
+  _renderPtList();
+}
+
+function _ptSyncSeg() {
+  const mode = state.ptAttentionOnly ? 'attn' : (state.ptInStockOnly ? 'stock' : 'all');
+  [['pt-seg-all', 'all'], ['pt-seg-stock', 'stock'], ['pt-seg-attn', 'attn']].forEach(p => {
+    const b = document.getElementById(p[0]);
+    if (b) b.classList.toggle('on', mode === p[1]);
+  });
+}
+
 function _renderPtAttentionBtn(n) {
-  const btn = document.getElementById('pt-attn-btn');
-  const cnt = document.getElementById('pt-attn-count');
-  if (!btn || !cnt) return;
-  cnt.textContent = n;
-  btn.classList.toggle('zero', n === 0);  // спрятать если 0
-  btn.classList.toggle('active', state.ptAttentionOnly && n > 0);
+  const cnt = document.getElementById('pt-seg-attn-n');
+  if (cnt) cnt.textContent = n;
+  _ptSyncSeg();
 }
 
 function _renderPtInStockBtn() {
-  const btn = document.getElementById('pt-instock-btn');
-  const cnt = document.getElementById('pt-instock-count');
-  if (!btn || !cnt) return;
-  // Сколько позиций имеет qty_on_stock > 0
   const items = (state.ptData && state.ptData.items) || [];
   const inStock = items.filter(it => (parseFloat(it.qty_on_stock) || 0) > 0).length;
-  cnt.textContent = inStock;
-  btn.classList.toggle('zero', inStock === 0);
-  btn.classList.toggle('active', !!state.ptInStockOnly);
+  const cs = document.getElementById('pt-seg-stock-n');
+  if (cs) cs.textContent = inStock;
+  const ca = document.getElementById('pt-seg-all-n');
+  if (ca) ca.textContent = items.length;
+  _ptSyncSeg();
 }
 
 function _renderPtList() {
@@ -3666,20 +3937,12 @@ function _renderPtRow(it) {
     ? '<div class="pt-defect-pill" onclick="event.stopPropagation();openPtDefectsForComponent(' + it.id + ')" title="Заявки по этому комплектующему в Сервисе"><i class="ti ti-alert-triangle"></i>брак ' + _fmtNum(defectQty) + '</div>'
     : '';
 
-  // Stock колонка
-  let stockHtml;
-  if (it.min_stock > 0) {
-    stockHtml = '<div class="pt-row-stock ' + st + '">' +
-      _fmtNum(it.qty_on_stock) +
-      ' <span class="pt-row-stock-sub">/ ' + _fmtNum(it.min_stock) + ' ' + escapeHtml(unit) + '</span>' +
-      defectBadge +
-      '</div>';
-  } else {
-    stockHtml = '<div class="pt-row-stock ' + st + '">' +
-      _fmtNum(it.qty_on_stock) + ' <span class="pt-row-stock-sub">' + escapeHtml(unit) + '</span>' +
-      defectBadge +
-      '</div>';
-  }
+  // Stock колонка — v2.45.641: остаток крупно, «мин. N» отдельной строкой под ним
+  const stockHtml = '<div class="pt-row-stock ' + st + '">' +
+    '<span class="pt-stock-n">' + _fmtNum(it.qty_on_stock) + ' <small>' + escapeHtml(unit) + '</small></span>' +
+    (it.min_stock > 0 ? '<span class="pt-stock-min">мин. ' + _fmtNum(it.min_stock) + '</span>' : '') +
+    defectBadge +
+    '</div>';
 
   // Consumption
   const consumeHtml = '<div class="pt-row-consume">' +
@@ -3699,19 +3962,32 @@ function _renderPtRow(it) {
   let mainBtn;
   if (st === 'zero' || st === 'critical') {
     const recommend = Math.max(1, Math.round((it.min_stock || 1) * 2 - (it.qty_on_stock || 0)));
-    mainBtn = '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
-      '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span></button>';
+    // v2.45.641: если заявку по позиции уже оформляли в этой сессии — зелёная ✓
+    const ordered = !!(window._ptOrdered && window._ptOrdered[it.id]);
+    mainBtn = ordered
+      ? '<button class="btn-order pt-ordered" title="Заявка оформлялась в этой сессии — нажми, чтобы оформить ещё" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
+          '<i class="ti ti-check"></i><span>В заявке</span></button>'
+      : '<button class="btn-order" onclick="event.stopPropagation();openPtOrder(' + it.id + ',' + recommend + ')">' +
+          '<i class="ti ti-shopping-cart-plus"></i><span>Заказать</span></button>';
   } else {
     mainBtn = '<button class="btn-writeoff" onclick="event.stopPropagation();openPtWriteoff(' + it.id + ')">' +
       '<i class="ti ti-minus"></i><span>Расход</span></button>';
   }
   const actionHtml = '<div class="pt-row-action">' + mainBtn + defectBtn + '</div>';
 
+  // v2.45.641: артикул из названия не дублируем — «(0.8) AG-06.000.001 Корпус» +
+  // серым «AG-06.000.001» ещё раз выглядело как два артикула.
+  let dispName = String(it.name || '');
+  const _sku = String(it.sku || '').trim();
+  if (_sku && _sku.length >= 4 && dispName.indexOf(_sku) >= 0) {
+    dispName = dispName.split(_sku).join(' ').replace(/\s{2,}/g, ' ').trim();
+  }
+
   return '<div class="pt-row s-' + st + '" onclick="openPtItemDetail(' + it.id + ')">' +
     '<span class="pt-row-cat-ic"><i class="ti ' + _nvIconFor(it.category_name) + '"></i></span>' +
     '<span class="pt-row-dot ' + st + '"></span>' +
     '<div>' +
-      '<div class="pt-row-name">' + escapeHtml(it.name) +
+      '<div class="pt-row-name">' + escapeHtml(dispName || it.name || '—') +
         (it.sku ? '<span class="pt-row-sku">' + escapeHtml(it.sku) + '</span>' : '') +
       '</div>' +
       '<div class="pt-row-sub">' + escapeHtml(it.category_name || '—') + '</div>' +
@@ -3739,22 +4015,13 @@ function setPtCategoryFilter(catId) {
   _renderPtList();
 }
 
+// Совместимость: КПИ-плитки дёргают эти функции — теперь они управляют сегментом
 function togglePtAttention(forceOn) {
-  if (forceOn === true) {
-    state.ptAttentionOnly = true;
-  } else {
-    state.ptAttentionOnly = !state.ptAttentionOnly;
-  }
-  if (state.ptData) {
-    _renderPtAttentionBtn(state.ptData.kpis.attention_count || 0);
-  }
-  _renderPtList();
+  setPtSeg((forceOn === true || !state.ptAttentionOnly) ? 'attn' : 'all');
 }
 
 function togglePtInStock() {
-  state.ptInStockOnly = !state.ptInStockOnly;
-  _renderPtInStockBtn();
-  _renderPtList();
+  setPtSeg(state.ptInStockOnly ? 'all' : 'stock');
 }
 
 let _ptSearchTimer = null;
@@ -3776,7 +4043,11 @@ function openPtOrder(componentId, recommendedQty) {
   // ЭТАП 28.3.1: если у компонента есть связь — заказываем прозрачно
   const item = (state.ptData && state.ptData.items || []).find(i => i.id === componentId);
   if (!item) { showToast('Позиция не найдена', 'error'); return; }
+  // v2.45.641: помечаем «в заявке» на время сессии — защита от дублей заявок
+  window._ptOrdered = window._ptOrdered || {};
+  window._ptOrdered[componentId] = 1;
   _doPtOrder(componentId, recommendedQty, item.supply_item_id);
+  _renderPtList();
 }
 
 function _doPtOrder(componentId, recommendedQty, supplyItemId) {
@@ -4400,10 +4671,10 @@ async function changeAssemblyStatus(assemblyId, newStatus) {
 
 async function promptWriteOff(assemblyId, currentStock) {
   const reason = prompt('Укажите причину списания (брак, бой и т.п.):');
-  if (reason === null) return;
+  if (reason === null) return false;
   if (!reason.trim()) {
     showToast('Без причины списать нельзя', 'error');
-    return;
+    return false;
   }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -4423,7 +4694,7 @@ async function promptWriteOff(assemblyId, currentStock) {
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       showToast(d.message || 'Не удалось списать', 'error');
-      return;
+      return false;
     }
     showToast('Списано', 'success');
     closeAssemblyStockModal();
@@ -4434,8 +4705,10 @@ async function promptWriteOff(assemblyId, currentStock) {
       if (state.activeWarehouseTab === 'stock')     loadFinishedProductsDashboard();
       if (state.activeWarehouseTab === 'movements') loadWarehouseMovements();
     }
+    return true;
   } catch (e) {
     showToast('Ошибка соединения', 'error');
+    return false;
   }
 }
 
@@ -5663,8 +5936,10 @@ function _componentToTracking(it, group) {
     supplier_phone: group ? group.supplier_phone : '',
     supplier_contact: group ? group.supplier_contact : '',
     _is_component: true,
+    component_id: it.component_id || null,
     order_id: it.order_id || null,
     order_item_id: it.order_item_id || null,
+    order_item_received: it.order_item_received || 0,
     order_expected: it.order_expected || null,
     order_place: it.order_place || null,
     order_label_short: it.order_label,
@@ -5793,10 +6068,26 @@ function _cpTrackingRowHtml(it) {
   }
   // Кнопка «получено» — товар пришёл, закрываем позицию заказа (для уже
   // отправленных/оплаченных, не черновик). Закрытый заказ уходит из «Ждём поставку».
+  // Если позиция уже отмечена полученной (received_qty >= qty) — вместо кнопки
+  // зелёный чип «Пришло» + «Приход на склад» (пока не оприходовано, остаток
+  // низкий, и позиция остаётся в «Что закупить»).
   let receivedBtn = '';
-  if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
+  const _itemReceived = it._is_component && it.order_item_id &&
+    parseFloat(it.order_item_received || 0) >= parseFloat(it.qty || 0) && parseFloat(it.qty || 0) > 0;
+  if (_itemReceived) {
+    receivedBtn = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;' +
+      'color:#047857;background:#D1FAE5;padding:3px 10px;border-radius:999px;white-space:nowrap;">' +
+      '<i class="ti ti-circle-check-filled"></i> Пришло</span>' +
+      (it.component_id
+        ? '<button type="button" onclick="openComponentReceiveModal(' + it.component_id + ')" ' +
+          'title="Оприходовать на склад — остаток поднимется и позиция уйдёт из списка" ' +
+          'style="display:inline-flex;align-items:center;gap:4px;background:#047857;border:none;color:#fff;border-radius:8px;' +
+          'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+          '<i class="ti ti-package-import"></i> Приход на склад</button>'
+        : '');
+  } else if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
     receivedBtn = '<button type="button" onclick="shopMarkReceived(' + it.order_item_id +
-      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\', ' + (it.component_id || 'null') + ')" ' +
       'title="Товар пришёл — нажмите, чтобы отметить позицию полученной (заказ закроется)" ' +
       'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #34D399;color:#047857;border-radius:8px;' +
       'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
@@ -5812,7 +6103,7 @@ function _cpTrackingRowHtml(it) {
       receivedBtn +
       returnBtn +
     '</div>' +
-    _supDeliveryStepperHtml(it.order_status) +
+    _supDeliveryStepperHtml(_itemReceived ? 'received' : it.order_status) +
   '</div>';
 }
 
@@ -5902,9 +6193,9 @@ async function saveEta(orderId, clear) {
 }
 
 // v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
-async function shopMarkReceived(orderItemId, name) {
+async function shopMarkReceived(orderItemId, name, componentId) {
   if (!orderItemId) return;
-  if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nЗаказ закроется (статус «получен»), позиция уйдёт из «Ждём поставку».')) return;
+  if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nПозиция заказа закроется, дальше сразу откроется «Приход на склад» — оприходуй, чтобы остаток поднялся и позиция ушла из «Что закупить».')) return;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders/items/' + orderItemId + '/received', {
@@ -5919,6 +6210,11 @@ async function shopMarkReceived(orderItemId, name) {
     showToast('Отмечено полученным', 'success');
     if (typeof cache !== 'undefined') { cache.supplyOrders = null; cache.supplyRequests = null; }
     if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+    // Сразу предлагаем оприходовать: без прихода остаток не поднимется и
+    // позиция так и будет висеть в «Что закупить» (низкий остаток).
+    if (componentId && typeof openComponentReceiveModal === 'function') {
+      openComponentReceiveModal(componentId);
+    }
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
@@ -6056,6 +6352,20 @@ function _shopGetQtyMap() {
 function _shopSaveQtyMap(map) {
   try { localStorage.setItem(SHOP_QTY_KEY, JSON.stringify(map)); } catch (e) {}
 }
+// v2.45.644: массовое скрытие выбранных позиций (галочки в «поставщик не назначен»)
+function nsHideSelected() {
+  const ids = Array.from(window._noSupSelected || []);
+  if (!ids.length) { showToast('Сначала отметь позиции галочками', 'info'); return; }
+  if (!confirm('Убрать выбранные позиции (' + ids.length + ') из «Что закупить»?\n\n' +
+    'Они перестанут показываться и не попадут в новый заказ. Это локально (только на этом устройстве) — вернуть можно кнопкой «Показать скрытые».')) return;
+  const set = _shopGetHidden();
+  ids.forEach(cid => set.add(cid));
+  _shopSaveHidden(set);
+  window._noSupSelected.clear();
+  showToast('Убрано из списка: ' + ids.length, 'success');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+
 async function shopHideItem(componentId, name) {
   if (!confirm('Убрать «' + (name || '') + '» из «Что закупить»?\n\nПозиция перестанет показываться и не попадёт в новый заказ. Это локально (только на этом устройстве). Можно вернуть кнопкой «Показать скрытые».')) return;
   const set = _shopGetHidden();
@@ -6066,6 +6376,75 @@ async function shopHideItem(componentId, name) {
 function shopUnhideAll() {
   _shopSaveHidden(new Set());
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+// v2.45.648: окно «Скрытые позиции» — посмотреть список и вернуть выборочно или все,
+// вместо старого «Показать все», который сбрасывал весь набор разом.
+function openShopHiddenModal() {
+  let m = document.getElementById('shop-hidden-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'shop-hidden-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:82vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-eye-off"></i> Скрытые позиции</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'shop-hidden-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" id="shop-hidden-body" style="overflow-y:auto;padding-top:8px;"></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  _renderShopHiddenBody();
+}
+function _renderShopHiddenBody() {
+  const body = document.getElementById('shop-hidden-body');
+  if (!body) return;
+  const items = window._shopHiddenItems || [];
+  if (!items.length) {
+    body.innerHTML = '<div class="shh-empty"><i class="ti ti-eye-check"></i>Скрытых позиций нет — всё показывается в списке</div>';
+    return;
+  }
+  let html = '<div class="shh-note"><i class="ti ti-info-circle"></i>Эти позиции убраны из «Что закупить» на этом устройстве и не попадают в новые заказы. Верни нужные — они снова появятся в списке.</div>';
+  items.forEach(it => {
+    const plan = Array.isArray(it.plan_contracts) && it.plan_contracts.length
+      ? 'под проект: ' + it.plan_contracts.slice(0, 2).map(n => '№' + n).join(', ') + (it.plan_contracts.length > 2 ? ' +' + (it.plan_contracts.length - 2) : '')
+      : 'на склад';
+    html += '<div class="shh-row">' +
+      '<div class="shh-info">' +
+        '<div class="shh-name">' + escapeHtml(it.component_name || '') + '</div>' +
+        '<div class="shh-sub">' +
+          '<b>' + escapeHtml(String(it.recommended_qty)) + ' ' + escapeHtml(it.unit || 'шт.') + '</b>' +
+          ' · ' + (it._sup_name ? escapeHtml(it._sup_name) : 'поставщик не назначен') +
+          ' · ' + escapeHtml(plan) +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-secondary btn-sm shh-return" onclick="shopReturnHidden(' + it.component_id + ')">' +
+        '<i class="ti ti-arrow-back-up"></i>Вернуть</button>' +
+    '</div>';
+  });
+  html += '<div class="shh-footer"><button class="btn btn-primary" onclick="shopReturnAllHidden()">' +
+    '<i class="ti ti-eye"></i>Вернуть все (' + items.length + ')</button></div>';
+  body.innerHTML = html;
+}
+function shopReturnHidden(componentId) {
+  const set = _shopGetHidden();
+  set.delete(componentId);
+  _shopSaveHidden(set);
+  window._shopHiddenItems = (window._shopHiddenItems || []).filter(it => it.component_id !== componentId);
+  _renderShopHiddenBody();
+  // Если вернули последнюю — окно больше не нужно
+  if (!(window._shopHiddenItems || []).length) {
+    const m = document.getElementById('shop-hidden-modal');
+    if (m) m.remove();
+  }
+  showToast('Позиция вернулась в список', 'success');
+  if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+}
+function shopReturnAllHidden() {
+  const n = (window._shopHiddenItems || []).length;
+  const m = document.getElementById('shop-hidden-modal');
+  if (m) m.remove();
+  shopUnhideAll();
+  showToast('Возвращено в список: ' + n, 'success');
 }
 function shopEditQty(componentId, currentQty, unit) {
   const v = prompt('Сколько ' + (unit || 'шт.') + ' заказать?\n\nПусто — вернуть рекомендованное количество.', String(currentQty));
@@ -6101,16 +6480,17 @@ function toggleSupplyShopV2() {
   localStorage.setItem('supplyShopV2', cur ? '0' : '1');
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
-// Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount}
+// Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount, hiddenItems}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
   const qtyMap = _shopGetQtyMap();
   let hiddenCount = 0;
+  const hiddenItems = [];
   const out = (items || []).filter(it => {
     // v2.45.428: уже заказанные/оплаченные — не «к закупке», а «ждём поставку».
     // Исключаем из групп и из формирования заказа (чтобы не заказывать повторно).
     if (it.order_status) return false;
-    if (hidden.has(it.component_id)) { hiddenCount++; return false; }
+    if (hidden.has(it.component_id)) { hiddenCount++; hiddenItems.push(it); return false; }
     return true;
   }).map(it => {
     if (qtyMap[it.component_id] != null) {
@@ -6118,7 +6498,7 @@ function _shopApplyLocal(items) {
     }
     return it;
   });
-  return { items: out, hiddenCount };
+  return { items: out, hiddenCount, hiddenItems };
 }
 
 // v2.45.x: редизайн «Что закупить» — KPI-строка, табы, аватары поставщиков, степпер доставки
@@ -6215,17 +6595,21 @@ function renderSupplyShopping(d) {
   // комплектующие (их убираем из групп «к закупке», чтобы не предлагались снова).
   const waitingItems = cpItems.filter(x => x.purchase_status === 'ordered');
   // v2.45.286: применяем локальные скрытие/переопределения к каждой группе
+  // v2.45.648: скрытые собираем в список — чтобы показать их в окне и вернуть выборочно
   let totalHidden = 0;
+  const hiddenAcc = [];
   groups.forEach(g => {
     // заказанные комплектующие → в «Ждём поставку» (из исходных, до фильтра)
     (g.items || []).forEach(it => {
       if (it.order_status) waitingItems.push(_componentToTracking(it, g));
     });
     const r = _shopApplyLocal(g.items);   // исключает заказанные + скрытые
+    r.hiddenItems.forEach(it => hiddenAcc.push(Object.assign({ _sup_name: g.supplier_name || '' }, it)));
     g.items = r.items;
     g.items_count = r.items.length;
     totalHidden += r.hiddenCount;
   });
+  window._shopHiddenItems = hiddenAcc;
   const waitingBlock = _waitingDeliveryBlockHtml(waitingItems);
   // Группы, в которых не осталось позиций после фильтра — выкидываем
   const visibleGroups = groups.filter(g => (g.items || []).length > 0);
@@ -6234,7 +6618,7 @@ function renderSupplyShopping(d) {
     ? '<div class="sup-shop-hidden-bar">' +
         '<i class="ti ti-eye-off"></i>' +
         '<span>Скрыто ' + totalHidden + ' ' + _plural(totalHidden, ['позиция', 'позиции', 'позиций']) + ' (только на этом устройстве)</span>' +
-        '<button class="btn btn-secondary btn-sm" onclick="shopUnhideAll()"><i class="ti ti-eye"></i>Показать все</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openShopHiddenModal()"><i class="ti ti-eye"></i>Показать скрытые</button>' +
       '</div>'
     : '';
   // v2.45.x: KPI-строка одним взглядом
@@ -6283,7 +6667,42 @@ function renderSupplyShopping(d) {
   visibleGroups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
-    const itemRows = (g.items || []).map(it => {
+    // v2.45.642: у «не назначен» позиции группируются по проекту (первому
+    // договору из plan_contracts) — вместо колонки «Причина» с 50 повторами.
+    let orderedItems = g.items || [];
+    if (noSupplier) {
+      const nsGroups = {};
+      orderedItems.forEach(it => {
+        const key = (Array.isArray(it.plan_contracts) && it.plan_contracts.length)
+          ? ('№' + String(it.plan_contracts[0]).replace(/^№\s*/, ''))
+          : 'на склад';
+        (nsGroups[key] = nsGroups[key] || []).push(it);
+      });
+      orderedItems = [];
+      Object.keys(nsGroups).sort((a, b) => nsGroups[b].length - nsGroups[a].length).forEach(k => {
+        orderedItems.push({ _nsHead: k, _ids: nsGroups[k].map(x => x.component_id), _n: nsGroups[k].length });
+        orderedItems = orderedItems.concat(nsGroups[k]);
+      });
+    }
+    const itemRows = orderedItems.map(it => {
+      // Заголовок группы-проекта
+      if (it._nsHead) {
+        const idsJson = escapeHtml(JSON.stringify(it._ids));
+        const title = it._nsHead === 'на склад'
+          ? '<i class="ti ti-building-warehouse"></i> пополнение склада'
+          : '<i class="ti ti-briefcase"></i> под проект <span class="nsg-num">' + escapeHtml(it._nsHead) + '</span>';
+        return '<tr class="nsg-head">' +
+          '<td class="ns-check-cell"><label class="ns-check-label">' +
+            '<input type="checkbox" class="nsg-check" data-ids="' + idsJson + '" onchange="onNsGroupCheck(this)" title="Выбрать всю группу">' +
+          '</label></td>' +
+          '<td colspan="3"><span class="nsg-title">' + title + '</span>' +
+            '<span class="nsg-cnt">' + it._n + ' ' + _plural(it._n, ['позиция', 'позиции', 'позиций']) + '</span></td>' +
+          '<td colspan="2" style="text-align:right;">' +
+            '<button class="btn btn-secondary btn-sm" data-ids="' + idsJson + '" onclick="nsAssignGroup(this)" ' +
+              'title="Выбрать группу и назначить одного поставщика на все её позиции">' +
+              '<i class="ti ti-truck"></i>Поставщик на группу</button></td>' +
+        '</tr>';
+      }
       // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
       const planContracts = Array.isArray(it.plan_contracts) ? it.plan_contracts : [];
       let reasonBadge = it.reason
@@ -6322,9 +6741,11 @@ function renderSupplyShopping(d) {
             ' onchange="onNoSupRowCheck(this)">' +
           '</label></td>'
         : '';
+      // v2.45.642: слот поставщика — заполняется подсказкой «обычно: …» асинхронно
       const assignCell = noSupplier
-        ? '<td class="ssp-action"><button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
-            '<i class="ti ti-truck"></i>Поставщик</button></td>'
+        ? '<td class="ssp-action"><span class="ns-sup-slot" data-cid="' + it.component_id + '">' +
+            '<button class="btn btn-secondary btn-sm" onclick="assignSupplierTo(' + it.component_id + ')">' +
+            '<i class="ti ti-truck"></i>Поставщик</button></span></td>'
         : '';
       // v2.45.286: qty можно менять кликом, рядом — крестик «скрыть позицию»
       const safeName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
@@ -6361,13 +6782,16 @@ function renderSupplyShopping(d) {
             escapeHtml(it.component_name) +
           '</span>' +
           (it.sku ? '<span class="ssp-sku" style="color:var(--text-light);margin-left:6px;font-size:11.5px;">' + escapeHtml(it.sku) + '</span>' : '') +
+          (noSupplier && orderBadge ? ' ' + orderBadge : '') +
         '</td>' +
         '<td class="ssp-stock" style="text-align:right;color:var(--text-light);font-size:12px;">' +
-          '<span class="ssp-meta-label">остаток/мин: </span>' +
-          escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) +
+          '<span class="ssp-meta-label">остаток: </span>' +
+          escapeHtml(String(it.qty_on_stock)) +
+          (parseFloat(it.min_stock) > 0 ? ' <span style="color:var(--text-faint);">/ мин. ' + escapeHtml(String(it.min_stock)) + '</span>' : '') +
         '</td>' +
         qtyCell +
-        '<td class="ssp-reason-cell"><div class="ssp-reason-wrap">' + reasonBadge + orderBadge + '</div></td>' +
+        // v2.45.642: у «не назначен» причина живёт в заголовке группы — ячейки нет
+        (noSupplier ? '' : '<td class="ssp-reason-cell"><div class="ssp-reason-wrap">' + reasonBadge + orderBadge + '</div></td>') +
         assignCell +
         removeCell +
       '</tr>';
@@ -6462,6 +6886,12 @@ function renderSupplyShopping(d) {
             '</span>' +
             '<button class="btn btn-primary btn-sm" onclick="bulkAssignSupplier()">' +
               '<i class="ti ti-truck"></i>Назначить поставщика всем</button>' +
+            '<button class="btn btn-secondary btn-sm" id="ns-accept-btn" style="display:none;" onclick="nsAcceptSuggested()" ' +
+              'title="Назначить всем выбранным поставщиков из подсказок «обычно: …»">' +
+              '<i class="ti ti-wand"></i>Принять предложенных</button>' +
+            '<button class="btn btn-secondary btn-sm ns-remove-btn" onclick="nsHideSelected()" ' +
+              'title="Убрать выбранные позиции из «Что закупить» (локально; вернуть — «Показать скрытые»)">' +
+              '<i class="ti ti-trash"></i>Убрать из списка</button>' +
             '<button class="btn btn-secondary btn-sm" onclick="clearNoSupSelection()">' +
               '<i class="ti ti-x"></i>Снять выбор</button>' +
           '</div>'
@@ -6477,10 +6907,11 @@ function renderSupplyShopping(d) {
             : ''
           ) +
           '<th>Позиция</th>' +
-          '<th style="text-align:right;width:120px;">остаток / мин.</th>' +
+          '<th style="text-align:right;width:110px;">остаток</th>' +
           '<th style="text-align:right;width:140px;">Заказать</th>' +
-          '<th style="width:160px;">Причина</th>' +
-          (noSupplier ? '<th style="width:150px;">Действие</th>' : '') +
+          // v2.45.642: у «не назначен» причина ушла в заголовки групп-проектов
+          (noSupplier ? '' : '<th style="width:160px;">Причина</th>') +
+          (noSupplier ? '<th style="width:210px;">Поставщик</th>' : '') +
           '<th style="width:40px;"></th>' +
         '</tr></thead>' +
         '<tbody>' + itemRows + '</tbody>' +
@@ -6500,6 +6931,8 @@ function renderSupplyShopping(d) {
   container.innerHTML = kpiStrip + segTabs + v2Toggle + buyPane + waitPane;
   // v2.45.444: кардинальный новый вид — класс на контейнере перекрывает стили групп/шапок
   container.classList.toggle('sv2-mode', !!window.SUPPLY_SHOP_V2);
+  // v2.45.642: асинхронно заполняем подсказки поставщиков «обычно: …»
+  _fillNsSuggestions();
 }
 
 /* ============ ЭТАП 52 (v2.44.73): заказ из shopping-list с превью ============ */
@@ -7474,6 +7907,123 @@ function onNoSupRowCheck(checkbox) {
   _refreshNoSupBulkBar();
 }
 
+// v2.45.642: чекбокс группы-проекта — выбирает/снимает все её позиции
+function onNsGroupCheck(checkbox) {
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  let ids = [];
+  try { ids = JSON.parse(checkbox.dataset.ids || '[]'); } catch (e) {}
+  ids.forEach(cid => {
+    if (checkbox.checked) window._noSupSelected.add(cid);
+    else window._noSupSelected.delete(cid);
+    const cb = document.querySelector('.ns-row-check[data-cid="' + cid + '"]');
+    if (cb) cb.checked = checkbox.checked;
+  });
+  _refreshNoSupBulkBar();
+}
+
+// «Поставщик на группу» — выбрать все позиции группы и открыть выбор поставщика
+function nsAssignGroup(btn) {
+  if (!window._noSupSelected) window._noSupSelected = new Set();
+  let ids = [];
+  try { ids = JSON.parse(btn.dataset.ids || '[]'); } catch (e) {}
+  window._noSupSelected.clear();
+  ids.forEach(cid => {
+    window._noSupSelected.add(cid);
+    const cb = document.querySelector('.ns-row-check[data-cid="' + cid + '"]');
+    if (cb) cb.checked = true;
+  });
+  _refreshNoSupBulkBar();
+  bulkAssignSupplier();
+}
+
+// v2.45.642: подсказка поставщика — «обычно: X» по категории компонента
+// (самый частый default_supplier среди компонентов той же категории).
+async function _fillNsSuggestions() {
+  const slots = document.querySelectorAll('.ns-sup-slot');
+  if (!slots.length) return;
+  try {
+    if (!cache.components || !cache.components.length) {
+      const r = await apiGet('/api/components');
+      cache.components = (r && r.components) || [];
+    }
+  } catch (e) { return; }
+  const comps = cache.components || [];
+  // категория → {supplier_id: count} по компонентам, у которых поставщик задан
+  const catTop = {};
+  const supName = {};
+  comps.forEach(c => {
+    if (!c.default_supplier_id) return;
+    const cat = c.category_name || '—';
+    (catTop[cat] = catTop[cat] || {})[c.default_supplier_id] =
+      ((catTop[cat] || {})[c.default_supplier_id] || 0) + 1;
+    if (c.default_supplier_name) supName[c.default_supplier_id] = c.default_supplier_name;
+  });
+  const byId = {};
+  comps.forEach(c => { byId[c.id] = c; });
+  window._nsSuggest = {};
+  slots.forEach(slot => {
+    const cid = parseInt(slot.dataset.cid, 10);
+    const comp = byId[cid];
+    if (!comp) return;
+    const counts = catTop[comp.category_name || '—'];
+    if (!counts) return;
+    let bestId = null, bestN = 0;
+    Object.keys(counts).forEach(sid => { if (counts[sid] > bestN) { bestN = counts[sid]; bestId = parseInt(sid, 10); } });
+    if (!bestId || bestN < 2) return;   // подсказываем только при уверенности (≥2 совпадений)
+    const nm = supName[bestId];
+    if (!nm) return;
+    window._nsSuggest[cid] = { id: bestId, name: nm };
+    slot.innerHTML = '<span class="ns-sup-hint" onclick="nsAssignOne(' + cid + ',' + bestId + ',' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')" ' +
+      'title="Обычно позиции этой категории поставляет ' + escapeHtml(nm) + ' — нажми, чтобы назначить">' +
+      'обычно: <b>' + escapeHtml(nm) + '</b><span class="ns-sup-set">назначить ✓</span></span>' +
+      '<button class="ssp-remove-btn" style="margin-left:4px;" title="Выбрать другого поставщика" onclick="assignSupplierTo(' + cid + ')"><i class="ti ti-dots"></i></button>';
+  });
+  // Кнопка «Принять предложенных» в массовой панели — показать, если есть подсказки
+  const acc = document.getElementById('ns-accept-btn');
+  if (acc) acc.style.display = Object.keys(window._nsSuggest).length ? '' : 'none';
+}
+
+async function nsAssignOne(cid, supplierId, supplierName) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/' + cid, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_supplier_id: supplierId }),
+    });
+    if (!r.ok) { showToast('Не удалось назначить', 'error'); return; }
+    showToast('Назначен: ' + supplierName, 'success');
+    if (window._noSupSelected) window._noSupSelected.delete(cid);
+    loadSupplyShopping();
+  } catch (e) { showToast('Ошибка сети', 'error'); }
+}
+
+// «Принять предложенных» — назначить подсказанных поставщиков всем выбранным
+async function nsAcceptSuggested() {
+  const ids = Array.from(window._noSupSelected || []);
+  const sugg = window._nsSuggest || {};
+  const targets = ids.filter(cid => sugg[cid]);
+  if (!targets.length) {
+    showToast('Среди выбранных нет позиций с подсказкой — назначь вручную', 'info');
+    return;
+  }
+  if (!confirm('Назначить предложенных поставщиков ' + targets.length + ' ' + _plural(targets.length, ['позиции', 'позициям', 'позициям']) + '?')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  let ok = 0;
+  for (const cid of targets) {
+    try {
+      const r = await fetch(API_BASE + '/api/components/' + cid, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_supplier_id: sugg[cid].id }),
+      });
+      if (r.ok) { ok++; window._noSupSelected.delete(cid); }
+    } catch (e) {}
+  }
+  showToast('Назначено: ' + ok + ' из ' + targets.length, ok ? 'success' : 'error');
+  loadSupplyShopping();
+}
+
 function onNoSupCheckAll(headerCheck) {
   if (!window._noSupSelected) window._noSupSelected = new Set();
   const visible = document.querySelectorAll('.ns-row-check');
@@ -7980,6 +8530,24 @@ function renderSupplyOrders() {
   const canDelete = canManageSupply();
 
   let html = '';
+  // v2.45.660: сводка по текущему фильтру — сколько заказов и на какую сумму
+  // (директору/бухгалтеру): «Оплачены 43 · Σ 1 234 567 ₽». Заказы без суммы
+  // считаем отдельно, чтобы Σ не выглядела полной, если по части сумм нет.
+  if (typeof canSeeMoney === 'function' && canSeeMoney()) {
+    let sum = 0, noSum = 0;
+    list.forEach(o => {
+      const t = Number(o.total_amount || o.invoice_total || 0);
+      if (t > 0) sum += t; else noSum++;
+    });
+    if (sum > 0) {
+      html += '<div class="sup-ord-sumbar">' +
+        '<i class="ti ti-sum"></i>' +
+        '<span>' + list.length + ' ' + _plural(list.length, ['заказ', 'заказа', 'заказов']) +
+          ' на сумму <b>' + Math.round(sum).toLocaleString('ru-RU') + ' ₽</b></span>' +
+        (noSum > 0 ? '<span class="nosum">· ещё ' + noSum + ' без суммы</span>' : '') +
+      '</div>';
+    }
+  }
   // Шапка-выделить-всё
   if (canDelete) {
     const allChecked = list.length > 0 && state.supplyOrdersSelected.size === list.length;
@@ -8017,7 +8585,10 @@ function renderSupplyOrders() {
           ? '<span class="sup-status-pill" style="background:#E0E7FF;color:#3730A3;"><i class="ti ti-file-check"></i> счёт привязан</span>'
           : '');
 
-    const itemsWord = (typeof _plural === 'function') ? _plural(o.items_count, ['позиция', 'позиции', 'позиций']) : 'позиций';
+    // v2.45.616: у заказов «на оплату» своих строк нет (items_count=0), но есть
+    // распознанные позиции счёта → показываем их количество как фолбэк.
+    const itemsCount = o.items_count || ((o.invoice_items && o.invoice_items.length) || 0);
+    const itemsWord = (typeof _plural === 'function') ? _plural(itemsCount, ['позиция', 'позиции', 'позиций']) : 'позиций';
     html += '<div class="sup-row sup-ord-card" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
     if (canDelete) {
       html += '<label class="sup-check-wrap" onclick="event.stopPropagation();">' +
@@ -8037,9 +8608,11 @@ function renderSupplyOrders() {
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
-          '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + o.items_count + ' ' + itemsWord + '</span>' +
+          '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
+          // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
+          (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
         '</div>' +
       '</div>' +
       (canDelete
@@ -8612,17 +9185,38 @@ function _supplyInboxStatusHTML() {
       '<div>IMAP-робот не настроен. Добавь в Railway переменные <b>IMAP_USER</b> и <b>IMAP_PASSWORD</b>.</div>' +
     '</div>';
   }
+  // v2.45.621: разовый сбой связи (напр. TLS-таймаут Яндекса) сам чинится на
+  // следующем опросе — не пугаем красным. Красный только при устойчивом сбое
+  // (fail_streak ≥ 3 подряд ≈ 3+ минуты без связи).
+  const failStreak = Number(s.fail_streak || (s.ok === false ? 1 : 0));
+  const sustainedFail = (s.ok === false) && failStreak >= 3;
   let icon, color, bg, border;
   if (s.ok === true) {
     icon = 'ti-check'; color = '#0A5B41'; bg = 'rgba(34,197,94,0.08)'; border = 'rgba(34,197,94,0.25)';
-  } else if (s.ok === false) {
+  } else if (sustainedFail) {
     icon = 'ti-alert-triangle'; color = '#7F1D1D'; bg = '#FEE2E2'; border = '#FCA5A5';
+  } else if (s.ok === false) {
+    icon = 'ti-refresh'; color = '#92400E'; bg = '#FEF3C7'; border = '#FCD34D';   // жёлтый: разовый блип
   } else {
     icon = 'ti-loader'; color = 'var(--text-mid)'; bg = 'var(--bg)'; border = 'var(--border)';
   }
+  // v2.45.651: серверное UTC-время → екатеринбургское, в человеческом виде
+  const _fmtTs = (v) => {
+    const d = _ibxEkbDate(v);
+    if (!d) return v ? escapeHtml(String(v).replace('T', ' ').substring(0, 16)) : '';
+    return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') +
+      ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  };
   let line2;
   if (s.ok === false) {
-    line2 = 'Этап «' + escapeHtml(s.stage || 'unknown') + '»: ' + escapeHtml(s.error || 'неизвестная ошибка');
+    if (sustainedFail) {
+      line2 = 'Почта не отвечает ' + failStreak + ' проверок подряд. Этап «' + escapeHtml(s.stage || 'unknown') +
+        '»: ' + escapeHtml(s.error || 'неизвестная ошибка') +
+        (s.last_ok_at ? '. Последний успех: ' + _fmtTs(s.last_ok_at) : '');
+    } else {
+      line2 = 'Разовый сбой связи с почтой (' + escapeHtml(s.error || 'таймаут') + ') — повторяем через ' +
+        (cfg.interval_sec || 60) + ' с. Приём писем не остановлен.';
+    }
   } else if (s.ok === true) {
     const parts = [];
     parts.push('Найдено в ящике: ' + (s.found_uids || 0));
@@ -8635,7 +9229,7 @@ function _supplyInboxStatusHTML() {
   } else {
     line2 = 'Робот ещё не запускался — подождите ' + (cfg.interval_sec || 60) + ' секунд или нажмите «Проверить»';
   }
-  const ts = s.at ? escapeHtml(String(s.at).replace('T', ' ').substring(0, 16)) : '—';
+  const ts = s.at ? (_fmtTs(s.at) || '—') : '—';
   return '<div style="background:' + bg + ';border:1px solid ' + border + ';color:' + color + ';border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:flex-start;gap:10px;">' +
     '<i class="ti ' + icon + '" style="font-size:18px;flex-shrink:0;margin-top:1px;"></i>' +
     '<div style="flex:1;min-width:0;">' +
@@ -8745,76 +9339,231 @@ function _ibxSecTitle(emoji, title, count) {
   return '<div class="ibx-sec"><span class="em">' + emoji + '</span> ' + escapeHtml(title) + ' <span class="cnt">' + count + '</span></div>';
 }
 
+// v2.45.623: окно счёта из «Входящих» — расшифровка (реквизиты + суммы с НДС +
+// позиции) и предпросмотр файла, как в карточке заказа на «На оплату».
+async function openInboxInvoice(inboxId) {
+  let m = (cache.supplyInbox || []).find(x => x.id === inboxId);
+  if (!m || !('ai_data' in m)) {
+    try { const list = await apiGet('/api/supply-inbox?status=all'); cache.supplyInbox = list.items || []; m = cache.supplyInbox.find(x => x.id === inboxId); } catch (_) {}
+  }
+  if (!m) { showToast('Счёт не найден', 'error'); return; }
+  const ai = m.ai_data || {}, doc = ai.document || {}, tot = ai.totals || {}, sup = ai.supplier || {};
+  const items = Array.isArray(ai.items) ? ai.items : [];
+  const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
+  const atts = m.attachments || [];
+  const att = atts[di >= 0 ? di : 0] || {};
+  const fname = att.name || '';
+  const _f2 = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+  const num = String(doc.number || '').trim(), dt = String(doc.date || '').trim();
+  const withV = (tot.sum_with_vat != null) ? Number(tot.sum_with_vat) : null;
+  const woV = (tot.sum_without_vat != null) ? Number(tot.sum_without_vat) : null;
+  const vat = (tot.vat_sum != null) ? Number(tot.vat_sum) : null;
+  const chip = (label, cp) => '<span onclick="_copyTxt(' + JSON.stringify(String(cp)).replace(/"/g, '&quot;') + ')" title="Нажми — скопируется" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:4px 10px;font-size:12.5px;">' + label + ' <i class="ti ti-copy" style="color:var(--text-light);font-size:13px;"></i></span>';
+  const info = (t, bg, fg, bd) => '<span style="display:inline-flex;align-items:center;gap:5px;background:' + bg + ';border:1px solid ' + bd + ';color:' + fg + ';border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;">' + t + '</span>';
+  let chips = payerEntityPill(ai.payer_entity, true);
+  if (num) chips += chip('№ ' + escapeHtml(num), num);
+  if (dt) chips += chip(escapeHtml(dt), dt);
+  if (withV != null) chips += chip('<b>' + _f2(withV) + ' ₽</b>', String(withV));
+  if (vat != null && vat > 0) chips += info('в т.ч. НДС ' + _f2(vat) + ' ₽', '#ECFDF5', '#065F46', '#6EE7B7') + (woV != null ? info('без НДС ' + _f2(woV) + ' ₽', 'var(--bg)', 'var(--text-mid)', 'var(--border)') : '');
+  else if (vat === 0) chips += info('без НДС', 'var(--bg)', 'var(--text-mid)', 'var(--border)');
+  if (sup.name) chips += chip(escapeHtml(sup.name), sup.name);
+  // v2.45.643: назначение из MAX-бота («на что счёт»)
+  if (m.user_comment) chips += info('🏷 ' + escapeHtml(m.user_comment), '#FEF3C7', '#92400E', '#FCD34D');
+  let posHtml;
+  if (items.length) {
+    posHtml = '<div style="margin-top:12px;"><div style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;margin-bottom:6px;">Позиции из счёта (' + items.length + ')</div>';
+    items.forEach((it, i) => {
+      const nm = escapeHtml(it.name || it.name_raw || '—');
+      const q = (it.qty != null) ? _fmtQty(it.qty) : '';
+      const u = escapeHtml(it.unit || '');
+      const pr = (it.price != null) ? _f2(it.price) + ' ₽' : '';
+      const s = (it.sum_with_vat != null ? it.sum_with_vat : it.sum_without_vat);
+      const sTxt = (s != null) ? _f2(s) + ' ₽' : '';
+      posHtml += '<div style="display:flex;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:13px;align-items:baseline;">' +
+        '<div style="flex:1;min-width:0;">' + (i + 1) + '. ' + nm + (pr ? ' <span style="color:var(--text-light);font-size:11.5px;">· ' + pr + '</span>' : '') + '</div>' +
+        (q ? '<div style="white-space:nowrap;color:#2563EB;font-weight:700;">' + q + ' ' + u + '</div>' : '') +
+        (sTxt ? '<div style="white-space:nowrap;font-weight:600;min-width:78px;text-align:right;">' + sTxt + '</div>' : '') +
+      '</div>';
+    });
+    posHtml += '</div>';
+  } else {
+    posHtml = '<div style="margin-top:12px;color:var(--text-light);font-size:13px;font-style:italic;">Позиции не распознаны — смотри файл ниже.</div>';
+  }
+  const overlayId = 'inbox-invoice-modal';
+  let ov = document.getElementById(overlayId); if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = overlayId; ov.className = 'modal-overlay';
+  const dlName = String(fname || 'счёт').replace(/'/g, "\\'");
+  ov.innerHTML =
+    '<div class="modal" style="max-width:820px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h2><i class="ti ti-receipt"></i> Счёт' + (num ? ' № ' + escapeHtml(num) : '') + '</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' + chips + '</div>' +
+        posHtml +
+        '<div style="margin-top:14px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;">Предпросмотр</div>' +
+        '<div id="inbox-inv-preview" style="margin-top:6px;"><div style="padding:14px;color:var(--text-light);text-align:center;">Загружаем файл…</div></div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+        (m.matched_order_id
+          ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + m.matched_order_id + ')"><i class="ti ti-package"></i> Открыть заказ</button>'
+          : '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>' +
+            '<button class="btn" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>') +
+        '<button class="btn btn-secondary" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + (di >= 0 ? di : 0) + ',\'' + escapeHtml(dlName) + '\')"><i class="ti ti-download"></i> Скачать</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.classList.add('visible');
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+  _loadInboxInvPreview(m.id, di >= 0 ? di : 0, fname);
+}
+
+async function _loadInboxInvPreview(inboxId, idx, filename) {
+  const cont = document.getElementById('inbox-inv-preview');
+  if (!cont) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/download', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { cont.innerHTML = '<div style="padding:14px;color:var(--danger);font-size:13px;">Не удалось загрузить файл (HTTP ' + r.status + '). Попробуй «Скачать».</div>'; return; }
+    const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const fn = (filename || '').toLowerCase();
+    const ctKnown = ct && ct !== 'application/octet-stream';
+    const isImg = ct.startsWith('image/') || (!ctKnown && /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/.test(fn));
+    const isPdf = !isImg && (ct.includes('pdf') || (!ctKnown && fn.endsWith('.pdf')));
+    if (isImg) {
+      cont.innerHTML = '<img src="' + url + '" alt="Счёт" style="max-width:100%;max-height:70vh;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;" />';
+    } else if (isPdf) {
+      if (state && state.isDesktop) {
+        cont.innerHTML = '<iframe src="' + url + '#view=FitH" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
+      } else {
+        cont.innerHTML = '<div style="padding:16px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;">' +
+          '<i class="ti ti-file-type-pdf" style="font-size:40px;color:#C0392B;"></i>' +
+          '<div style="margin:8px 0;font-size:13px;word-break:break-word;">' + escapeHtml(filename || 'счёт.pdf') + '</div>' +
+          '<button class="btn btn-primary" onclick="window.open(\'' + url + '\',\'_blank\')"><i class="ti ti-external-link"></i> Открыть PDF</button></div>';
+      }
+    } else {
+      cont.innerHTML = '<div style="padding:14px;background:var(--bg);border-radius:8px;color:var(--text-mid);font-size:13px;">Этот формат не показывается в браузере (например, Excel). Нажми «Скачать».</div>';
+    }
+  } catch (e) {
+    cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Ошибка загрузки файла.</div>';
+  }
+}
+
+// v2.45.651: сервер пишет время в UTC — пересчитываем на екатеринбургское (UTC+5,
+// без переходов). Читаем сдвинутую дату через getUTC*, чтобы не зависеть от
+// часового пояса устройства.
+const _IBX_TZ_MS = 5 * 3600 * 1000;
+function _ibxEkbDate(iso) {
+  if (!iso) return null;
+  let s = String(iso).trim().replace(' ', 'T');
+  if (!/[Zz]$|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';   // без зоны — считаем UTC (так пишет сервер)
+  const t = Date.parse(s);
+  return isNaN(t) ? null : new Date(t + _IBX_TZ_MS);
+}
+// v2.45.650: человеческая дата получения — «сегодня · 10:28», «вчера · 09:51»,
+// «1 июля · 16:20». Счета старше 2 дней подсвечиваем: залежались.
+function _ibxWhen(iso) {
+  if (!iso) return { text: '—', cls: '', full: '' };
+  const d = _ibxEkbDate(iso);
+  if (!d) return { text: String(iso).slice(0, 16), cls: '', full: String(iso) };
+  const now = new Date(Date.now() + _IBX_TZ_MS);
+  const hm = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  const day0 = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dd = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const diff = Math.round((day0 - dd) / 86400000);
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  let text, cls = '';
+  if (diff <= 0) { text = 'сегодня · ' + hm; cls = 'td'; }
+  else if (diff === 1) { text = 'вчера · ' + hm; cls = 'yd'; }
+  else {
+    text = d.getUTCDate() + ' ' + months[d.getUTCMonth()] + ' · ' + hm;
+    if (d.getUTCFullYear() !== now.getUTCFullYear()) text = d.getUTCDate() + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear() + ' · ' + hm;
+    cls = diff >= 3 ? 'old' : '';
+  }
+  const full = d.getUTCDate() + ' ' + months[d.getUTCMonth()] + ' ' + d.getUTCFullYear() + ', ' + hm + ' (Екб)' +
+    (diff >= 2 ? ' — ' + diff + ' ' + _plural(diff, ['день', 'дня', 'дней']) + ' назад' : '');
+  return { text: text, cls: cls, full: full, diff: diff };
+}
+
+// v2.45.652: компактная строка вместо большой карточки (~52px против ~150px):
+// имя файла + метки, отправитель и документ второй строчкой, дата справа,
+// действия маленькими кнопками. Клик по строке открывает счёт с расшифровкой.
+// Полоска слева — возраст: синяя сегодня, жёлтая 1-2 дня, красная 3+ дня.
 function _ibxInvoiceCard(m, isMatched) {
   const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
   const atts = m.attachments || [];
-  const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
-  let chips = '';
+  const when = _ibxWhen(m.received_at);
+  const ageCls = when.cls === 'td' ? 'today' : (when.cls === 'old' ? 'stale' : '');
+
+  // Метки в строке заголовка
+  let tags = maxSourcePill(m);
   if (isMatched) {
-    chips += '<span class="ibx-chip ok"><span class="em">✅</span> привязан → ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>';
-    chips += orderPayStatusPill(m);
-  } else {
-    chips += '<span class="ibx-chip need"><span class="em">🔗</span> нужна привязка</span>';
+    tags = '<span class="ibx-chip ok"><span class="em">✅</span> ' + escapeHtml(m.matched_order_label || ('#' + m.matched_order_id)) + '</span>' +
+      orderPayStatusPill(m) + tags;
+  } else if (m.detected_label) {
+    tags += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
   }
-  chips += maxSourcePill(m);
-  if (m.detected_label && !isMatched) chips += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
-  chips += payerEntityPill((m.ai_data || {}).payer_entity, false);
-  let attBlock = '';
+  tags += payerEntityPill((m.ai_data || {}).payer_entity, false);
+
+  // Вторая строка: отправитель · документ (имя не дублируем, если совпадает с темой)
+  const from = m.from_name || m.from_addr || '—';
+  let docBit = '';
   if (di >= 0) {
     const a = atts[di];
     const kb = Math.round((a.size || 0) / 1024);
-    const nm = escapeHtml(a.name || 'файл');
-    attBlock = '<div class="ibx-att">' +
-      '<div class="ibx-att-ic"><span class="em">📄</span></div>' +
-      '<div class="ibx-att-name" title="' + nm + '">' + nm + '</div>' +
-      '<div class="ibx-att-size">' + kb + ' КБ</div>' +
-      '<button class="btn btn-sm" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + di + ',null)"><span class="em">👁</span> Открыть</button>' +
-    '</div>';
-  } else if (isMatched && atts.length) {
-    attBlock = '<div class="ibx-att-mini"><span class="em">📎</span> ' + atts.length + ' вложени' + (atts.length > 1 ? 'й' : 'е') + '</div>';
+    const sameName = String(a.name || '').trim().toLowerCase() === String(m.subject || '').trim().toLowerCase();
+    docBit = ' · <span class="ibx-r-doc"><span class="em">📄</span> ' +
+      (sameName ? '' : escapeHtml(a.name || 'файл') + ' · ') + kb + ' КБ</span>';
+  } else if (atts.length) {
+    docBit = ' · <span class="ibx-r-doc"><span class="em">📎</span> ' + atts.length + ' влож.</span>';
   }
+
+  // Дата справа: «сегодня / 10:28», у залежавшихся — «⚠ N дн»
+  const wp = when.text.split(' · ');
+  const whenHtml = '<div class="ibx-r-when" title="' + escapeHtml(when.full) + '">' +
+    escapeHtml(wp[0] || '') + (when.cls === 'old' && when.diff ? ' <span class="wrn">⚠ ' + when.diff + ' дн</span>' : '') +
+    '<small>' + escapeHtml(wp[1] || '') + '</small></div>';
+
+  // Действия
   let acts = '';
   if (isMatched) {
-    // v2.45.598: «Оплатить» прямо на карточке привязанного счёта — переводит
-    // САМ заказ в «На оплату» (без задвоения: счёт уже привязан к этому заказу,
-    // УПД потом его и закроет). Скрываем, если заказ уже оплачивается/оплачен/отменён.
     const _payable = m.matched_order_id &&
       ['to_pay', 'paid', 'received', 'partial', 'cancelled'].indexOf(m.matched_order_status || '') < 0;
     acts = (_payable
-        ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
+        ? '<button class="ibx-b paysolid" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
         : '') +
-      (m.matched_order_id ? '<button class="btn" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Открыть заказ ' + escapeHtml(m.matched_order_label || '') + '</button>' : '') +
-      '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>';
+      (m.matched_order_id ? '<button class="ibx-b" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Заказ</button>' : '') +
+      '<button class="ibx-ic" title="Письмо" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span></button>';
   } else {
-    // v2.45.596: «На оплату» прямо на карточке (раньше — только внутри «Письмо»).
-    // Создаёт позицию в разделе «На оплату» из распознанных реквизитов, минуя
-    // привязку к заказу. Показываем только если есть документ-вложение (счёт).
-    const payBtn = (di >= 0)
-      ? '<button class="btn ibx-grow" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>'
-      : '';
-    acts = '<button class="btn btn-primary ibx-grow" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать к заказу</button>' +
-      payBtn +
-      '<button class="btn" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span> Письмо</button>' +
-      _ibxDelBtn(m);
+    acts = '<button class="ibx-b link" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать</button>' +
+      (di >= 0 ? '<button class="ibx-b pay" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>' : '') +
+      '<button class="ibx-ic" title="Письмо" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span></button>' +
+      ((state.user && (state.user.roles || []).includes('director'))
+        ? '<button class="ibx-ic" title="Удалить письмо" onclick="deleteInboxMessage(' + m.id + ')"><span class="em">🗑</span></button>'
+        : '');
   }
+
   const _cb = (state.user && (state.user.roles || []).includes('director'))
     ? '<input type="checkbox" class="ibx-cb" data-id="' + m.id + '" title="Выбрать" onclick="event.stopPropagation();_ibxToggle(' + m.id + ',this.checked)">'
     : '';
-  return '<div class="ibx-card' + (isMatched ? ' matched' : '') + '"><div class="ibx-card-top">' +
+  const openFn = di >= 0 ? 'openInboxInvoice(' + m.id + ')' : 'openInboxMessage(' + m.id + ')';
+  return '<div class="ibx-r ' + ageCls + (isMatched ? ' matched' : '') + '" onclick="' + openFn + '" title="Открыть ' + (di >= 0 ? 'счёт с расшифровкой' : 'письмо') + '">' +
     _cb +
     _inboxAvatarHtml(m) +
-    '<div class="ibx-card-body">' +
-      '<div class="ibx-chips">' + chips + '</div>' +
-      '<div class="ibx-subj">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
-      '<div class="ibx-from">' + escapeHtml(m.from_name || m.from_addr || '—') + ' · ' + escapeHtml(received) + '</div>' +
-      attBlock +
-      '<div class="ibx-acts">' + acts + '</div>' +
+    '<div class="ibx-r-main">' +
+      '<div class="ibx-r-t"><span class="ibx-r-nm">' + escapeHtml(m.subject || '(без темы)') + '</span>' + tags + '</div>' +
+      '<div class="ibx-r-sub">' + escapeHtml(from) + docBit + '</div>' +
     '</div>' +
-  '</div></div>';
+    whenHtml +
+    '<div class="ibx-r-acts" onclick="event.stopPropagation()">' + acts + '</div>' +
+  '</div>';
 }
 
 function _ibxNoiseRow(m) {
-  const received = (m.received_at || '').replace('T', ' ').substring(0, 16);
+  const received = _ibxWhen(m.received_at).text;
   const atts = m.attachments || [];
   let reason = 'без вложений';
   if (atts.length) reason = 'вложение не документ';
@@ -8837,6 +9586,36 @@ function _ibxNoiseRow(m) {
 function toggleInboxV2() {
   window.INBOX_V2 = !window.INBOX_V2;
   try { localStorage.setItem('inboxV2', window.INBOX_V2 ? '1' : '0'); } catch (_) {}
+  renderSupplyInbox();
+}
+// v2.45.650: длинные секции сворачиваем — первые 4 карточки, остальное за кнопкой
+// «Показать ещё N», чтобы не листать вглубь. Состояние живёт до перерисовки раздела.
+function _ibxCardsCollapsed(list, isMatched, key) {
+  const LIMIT = 4;
+  // v2.45.652: строки живут в общем контейнере с разделителями
+  let out = '<div class="ibx-rows">';
+  list.slice(0, LIMIT).forEach(m => { out += _ibxInvoiceCard(m, isMatched); });
+  if (list.length > LIMIT) {
+    const open = !!(window._ibxMoreOpen && window._ibxMoreOpen[key]);
+    const hidden = list.length - LIMIT;
+    // самое старое из скрытых — чтобы было видно, насколько глубоко копится
+    const oldest = _ibxWhen(list[list.length - 1] && list[list.length - 1].received_at);
+    out += '<div id="ibx-more-' + key + '"' + (open ? '' : ' style="display:none;"') + '>';
+    list.slice(LIMIT).forEach(m => { out += _ibxInvoiceCard(m, isMatched); });
+    out += '</div>';
+    out += '<button class="ibx-more-btn" id="ibx-more-btn-' + key + '" data-n="' + hidden + '" onclick="_ibxToggleMore(\'' + key + '\')">' +
+      (open
+        ? '<i class="ti ti-chevron-up"></i> Свернуть — показывать только первые ' + LIMIT
+        : '<i class="ti ti-chevron-down"></i> Показать ещё ' + hidden + ' ' + _plural(hidden, ['счёт', 'счёта', 'счетов']) +
+          (oldest.text && oldest.text !== '—' ? ' <small>· самый старый: ' + escapeHtml(oldest.text) + '</small>' : '')) +
+    '</button>';
+  }
+  out += '</div>';
+  return out;
+}
+function _ibxToggleMore(key) {
+  window._ibxMoreOpen = window._ibxMoreOpen || {};
+  window._ibxMoreOpen[key] = !window._ibxMoreOpen[key];
   renderSupplyInbox();
 }
 function toggleInboxNoise() {
@@ -8888,11 +9667,11 @@ function renderSupplyInbox() {
   if (invoices.length) {
     html += _ibxSecTitle('🧾', 'Счета — нужна привязка', invoices.length);
     html += '<div class="ibx-hint">Письма с вложением-документом от поставщика. Проверь и привяжи к заказу — уйдёт в оплату.</div>';
-    invoices.forEach(m => { html += _ibxInvoiceCard(m, false); });
+    html += _ibxCardsCollapsed(invoices, false, 'inv');
   }
   if (matched.length) {
     html += _ibxSecTitle('✅', 'Привязанные счета', matched.length);
-    matched.forEach(m => { html += _ibxInvoiceCard(m, true); });
+    html += _ibxCardsCollapsed(matched, true, 'mat');
   }
   if (noise.length) {
     html += _ibxSecTitle('📭', 'Не похоже на счёт', noise.length);
@@ -10108,6 +10887,10 @@ function renderSupplyOrderDetail(o) {
       (o.order_label ? '<div class="detail-item"><div class="detail-label">Метка</div><div class="detail-value" style="font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(o.order_label) + '</div></div>' : '') +
       (o.contract_number ? '<div class="detail-item"><div class="detail-label">Договор</div><div class="detail-value">№' + escapeHtml(o.contract_number) + '</div></div>' : '') +
     '</div>' +
+    // v2.45.643: «Назначение» из MAX-бота («на что счёт») — заметно для бухгалтера
+    (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
+    // v2.45.665: внешний статус поставки (из ЛК Всеинструментов)
+    (o.ext_status ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#E7EEFB;border:1px solid #B9CCEF;color:#2749A0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-truck-delivery" style="font-size:16px;"></i> Поставка: ' + escapeHtml(o.ext_status) + (o.expected_date ? ' · придёт ' + escapeHtml(o.expected_date) : '') + '</div>' : '') +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
 
@@ -10165,6 +10948,20 @@ function renderSupplyOrderDetail(o) {
         (invDateRu ? ' от ' + invDateRu : '');
       const invTotal = (o.invoice_total !== null && o.invoice_total !== undefined)
         ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
+      // v2.45.617: НДС — «в т.ч. НДС … / без НДС …». Если НДС явно 0 — «без НДС».
+      const _fmt2 = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+      const _vat = (o.invoice_vat_sum !== null && o.invoice_vat_sum !== undefined) ? Number(o.invoice_vat_sum) : null;
+      const _woVat = (o.invoice_sum_without_vat !== null && o.invoice_sum_without_vat !== undefined) ? Number(o.invoice_sum_without_vat) : null;
+      const _infoChip = (txt, bg, fg, bd) =>
+        '<span style="display:inline-flex;align-items:center;gap:5px;background:' + bg + ';border:1px solid ' + bd +
+        ';color:' + fg + ';border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;">' + txt + '</span>';
+      let vatChips = '';
+      if (_vat !== null && _vat > 0) {
+        vatChips = _infoChip('в т.ч. НДС ' + _fmt2(_vat) + ' ₽', '#ECFDF5', '#065F46', '#6EE7B7')
+          + (_woVat !== null ? _infoChip('без НДС ' + _fmt2(_woVat) + ' ₽', 'var(--bg)', 'var(--text-mid)', 'var(--border)') : '');
+      } else if (_vat === 0) {
+        vatChips = _infoChip('без НДС', 'var(--bg)', 'var(--text-mid)', 'var(--border)');
+      }
       const chip = (label, copyVal, mono) =>
         '<span onclick="_copyTxt(' + JSON.stringify(String(copyVal)).replace(/"/g, '&quot;') + ')" ' +
           'title="Нажми — скопируется" ' +
@@ -10176,6 +10973,7 @@ function renderSupplyOrderDetail(o) {
         chip('<b>' + escapeHtml(invTitle) + '</b>', invTitle, false) +
         (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
         (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
+        vatChips +
         (o.invoice_org ? chip(escapeHtml(o.invoice_org), o.invoice_org, false) : '') +
         // v2.45.x: срок поставки/изготовления (заметным оранжевым)
         (o.invoice_delivery_term ? '<span style="display:inline-flex;align-items:center;gap:6px;background:#FFEDD5;border:1px solid #FDBA74;color:#9A3412;border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:700;"><i class="ti ti-truck-delivery"></i> Срок поставки: ' + escapeHtml(o.invoice_delivery_term) + '</span>' : '') +
@@ -10587,10 +11385,14 @@ async function toggleSupplyOrderInvoicePreview(orderId, filename) {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const fn = (filename || '').toLowerCase();
-    const isPdf = ct.includes('pdf') || fn.endsWith('.pdf');
-    const isImg = ct.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/.test(fn);
+    // v2.45.618: тип берём в первую очередь из content-type сервера (он теперь
+    // определяется по содержимому файла). Имя файла — лишь запасной признак, т.к.
+    // файлы из бота бывают с неверным расширением (WebP/JPEG, сохранённые как .pdf).
+    const ctKnown = ct && ct !== 'application/octet-stream';
+    const isImg = ct.startsWith('image/') || (!ctKnown && /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/.test(fn));
+    const isPdf = !isImg && (ct.includes('pdf') || (!ctKnown && fn.endsWith('.pdf')));
     // v2.45.261: Excel-счёт — рисуем таблицей прямо в карточке
-    const isXls = /\.(xlsx|xlsm|xls)$/.test(fn) || ct.includes('spreadsheet') || ct.includes('ms-excel');
+    const isXls = !isImg && !isPdf && (ct.includes('spreadsheet') || ct.includes('ms-excel') || (!ctKnown && /\.(xlsx|xlsm|xls)$/.test(fn)));
     if (isXls) {
       URL.revokeObjectURL(url);
       try {
@@ -12305,12 +13107,171 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.45.616',
+    version: 'v2.45.669',
     date: '06.07.2026',
     title: 'Безопасность: живой просмотр камеры офиса (директору)',
     features: [
       'Новый раздел <b>«Безопасность»</b> на главной — живой просмотр камеры офиса (~1 кадр/сек)',
       'Доступ <b>только директору</b>, работает и из офиса, и удалённо',
+    ],
+  },
+  {
+    version: 'v2.45.668',
+    date: '06.07.2026',
+    title: 'Сопоставить со складом: кнопка «Склеить»',
+    features: [
+      'В окне «Сопоставить со складом» у каждой складской позиции теперь две кнопки: <b>«Привязать»</b> (как раньше — только эта строка) и <b>«Склеить»</b>',
+      '<b>«Склеить»</b> — когда это одна и та же позиция (напр. «C6» и «1P 6А»): переносит ВСЕ ссылки во всех моделях/договорах на складскую и складывает остаток. Дефицит уходит <b>сразу и везде</b>',
+      'После действия список «Что закупить» обновляется автоматически',
+    ],
+  },
+  {
+    version: 'v2.45.666',
+    date: '06.07.2026',
+    title: 'Дубли: кнопка «Разное»',
+    features: [
+      'В окне «Дубли в номенклатуре» у каждой группы появилась кнопка <b>«Разное»</b> — если позиции на самом деле разные (напр. 06×15 и 06×22, 6А и 4А), жми её, и группа <b>исчезнет из подсказок</b>',
+      'Если позже добавится похожая позиция — группа появится снова (помечается конкретный состав)',
+    ],
+  },
+  {
+    version: 'v2.45.665',
+    date: '06.07.2026',
+    title: 'Поставки Всеинструментов подтягиваются в CRM',
+    features: [
+      'Даты доставки и статусы заказов из личного кабинета <b>Всеинструментов</b> теперь автоматически попадают в заказ снабжения (через браузерный помощник)',
+      'В карточке заказа и списке — плашка <b>«Поставка: Доставляется в магазин · придёт 07.07»</b>; дата видна и в «Ждём поставку»',
+    ],
+  },
+  {
+    version: 'v2.45.663',
+    date: '06.07.2026',
+    title: 'Схема (PDF) открывается сразу',
+    features: [
+      'Схема теперь качается <b>напрямую из хранилища</b> (CDN), а не через наш сервер — открывается почти мгновенно, без «долго открывается»',
+    ],
+  },
+  {
+    version: 'v2.45.644',
+    date: '03.07.2026',
+    title: 'Счёт из MAX: назначение «на что этот счёт»',
+    features: [
+      'Когда кидаешь счёт в бота MAX, он спрашивает <b>«На что этот счёт?»</b> — пишешь одним сообщением (например «ТО Машины»)',
+      'Бухгалтер видит это <b>«Назначение»</b> заметной плашкой в карточке заказа «На оплату» (и при открытии счёта из «Входящих»)',
+      'Комментарий необязательный; привязывается к последнему присланному счёту; если счёт уже ушёл в оплату — назначение всё равно к нему добавится',
+    ],
+  },
+  {
+    version: 'v2.45.642',
+    date: '03.07.2026',
+    title: 'Сопоставить со складом: умный подбор + фикс «вылетает»',
+    features: [
+      'Подбор похожих стал <b>умнее</b>: «РДК-8.4» теперь находит «РДК-8,4» и т.п. (не важны запятые/дефисы/пробелы и порядок слов) — ищем по словам и артикулу',
+      'Исправили: клик по окну (не по строке поиска) больше <b>не закрывал</b> модалку и карточку модели',
+    ],
+  },
+  {
+    version: 'v2.45.634',
+    date: '02.07.2026',
+    title: 'Тех. карта: кнопка «Сопоставить со складом»',
+    features: [
+      'У каждой позиции BOM (Тех. карта модели) появилась кнопка <b>«Сопоставить со складом»</b> (⇄) — открывает список <b>похожих</b> складских позиций и привязывает нужную',
+      'После загрузки BOM из Excel позиции часто заводятся заново («0 в наличии») — теперь их легко привязать к уже существующим на складе (РДК, реле, автоматы), чтобы <b>остаток и наличие синхронизировались</b>',
+    ],
+  },
+  {
+    version: 'v2.45.632',
+    date: '02.07.2026',
+    title: 'Схема (PDF) открывается быстро, без зависаний',
+    features: [
+      'Убрали «висит 2 минуты, надо кликать несколько раз»: файлы из хранилища больше <b>не зависают на минуты</b> при плохой связи — быстрый отказ и повтор вместо долгого ожидания',
+      'При открытии схемы — индикатор «Открываю схему…» и защита от повторных нажатий; если долго — понятное сообщение',
+    ],
+  },
+  {
+    version: 'v2.45.629',
+    date: '02.07.2026',
+    title: 'Склад: ручное объединение дублей',
+    features: [
+      'На «Комплектующих» у каждой позиции появилась <b>галочка</b> — отметь одинаковые по сути позиции (даже с разными названиями, как автоматы CHINT) и внизу жми <b>«Объединить»</b>',
+      'Выбираешь <b>главную</b> позицию — в неё сольются остальные: <b>остатки складываются</b>, ссылки в спецификациях/договорах и движения переносятся, лишние уходят в архив',
+      'Помогает, когда авто-«Дубли» не ловит их (названия/артикулы разные), а по факту это один и тот же товар',
+    ],
+  },
+  {
+    version: 'v2.45.623',
+    date: '02.07.2026',
+    title: 'Входящие счета: «Открыть» с расшифровкой и предпросмотром',
+    features: [
+      'Кнопка <b>«Открыть»</b> у входящего счёта теперь открывает окно как на «На оплату»: <b>реквизиты</b> (№, дата, поставщик), <b>суммы с НДС/без НДС</b> и <b>позиции из счёта</b>',
+      'Тут же — <b>предпросмотр</b> самого файла (PDF или фото), не нужно скачивать',
+      'Кнопки «Привязать к заказу» / «На оплату» / «Скачать» — прямо в окне',
+    ],
+  },
+  {
+    version: 'v2.45.622',
+    date: '02.07.2026',
+    title: 'Склад: раскрытие упаковок в штуки',
+    features: [
+      'У комплектующих с фасовкой на складе теперь видно <b>«фасовка 100 шт/упак»</b> и раскрытие остатка — например <b>«300 шт = 3 упак»</b>',
+      'Понятно, что склад считает в штуках, а не в упаковках',
+    ],
+  },
+  {
+    version: 'v2.45.621',
+    date: '02.07.2026',
+    title: 'Входящие счета: разовый сбой почты не пугает красным',
+    features: [
+      'Если IMAP-робот <b>разово</b> не смог подключиться к почте (таймаут Яндекса) — теперь <b>жёлтая</b> плашка «повторяем через минуту», а не тревожная красная: приём писем не остановлен, следующая проверка обычно проходит',
+      'Красным горит только при <b>устойчивом</b> сбое (не отвечает несколько проверок подряд) — тогда показываем, когда был последний успех',
+    ],
+  },
+  {
+    version: 'v2.45.620',
+    date: '02.07.2026',
+    title: 'Склад: списать сборку прямо из списка модели',
+    features: [
+      'В окне <b>«Сборки этой модели на складе»</b> у каждой свободной сборки появилась кнопка <b>«Списать»</b> — брак, использовали, инвентаризация',
+      'Спросит причину, спишет со склада и запишет в <b>Журнал движений</b>',
+      'У зарезервированных под договор сборок кнопки нет — их сперва нужно освободить',
+    ],
+  },
+  {
+    version: 'v2.45.619',
+    date: '02.07.2026',
+    title: 'Приёмка УПД: упаковки считаются в штуках',
+    features: [
+      'Если в УПД пришло «1 упак», а заказ был на «100 шт» — система понимает, что <b>1 упаковка = 100 штук</b>, и заказ закрывается <b>полностью</b> (больше не «Доставка частично» по ошибке)',
+      'Фасовка берётся из карточки компонента (кратность закупки) или из названия «(100шт/упак)» — <b>заводить ничего не нужно</b>',
+      'На экране приёмки под количеством видно перевод <b>«= 100 шт (×100)»</b> — можно нажать и <b>поправить</b>, если распозналось криво',
+      'Так же корректно приходуется на склад: 1 упаковка = 100 штук, а не 1',
+    ],
+  },
+  {
+    version: 'v2.45.618',
+    date: '01.07.2026',
+    title: 'Просмотр счёта: открываем по содержимому файла',
+    features: [
+      'Исправили просмотр счетов, где <b>имя файла врёт</b>: фото из бота, сохранённое как «invoice.pdf», раньше не открывалось (ошибка «Не удалось загрузить PDF») — теперь тип определяется по <b>содержимому</b>, и такой счёт открывается как картинка',
+    ],
+  },
+  {
+    version: 'v2.45.617',
+    date: '01.07.2026',
+    title: 'Счёт: НДС и просмотр фото из бота',
+    features: [
+      'В карточке заказа под счётом теперь видно <b>НДС</b>: «в т.ч. НДС … ₽» и «без НДС … ₽» (а если счёт без НДС — так и пишем)',
+      'Суммы берутся из <b>распознанного счёта</b> — для новых и повторно распознанных («Распознать заново»)',
+      'Исправили просмотр <b>фото-счетов из бота</b>: JPEG без расширения раньше не открывался в «Просмотреть» — теперь тип определяется по содержимому файла',
+    ],
+  },
+  {
+    version: 'v2.45.616',
+    date: '01.07.2026',
+    title: 'Заказы на оплату: видно число позиций из счёта',
+    features: [
+      'У заказов, созданных из <b>входящего счёта</b> («На оплату»), в списке больше не пишется «0 позиций», если позиции есть',
+      'Теперь показываем количество <b>распознанных строк счёта</b> — например «4 позиции» вместо «0»',
     ],
   },
   {

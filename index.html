@@ -151,14 +151,18 @@
         </button>
       </nav>
     </div>
-    <button class="scan-btn scan-btn--camera" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную">
+    <!-- v2.45.634: глобальный поиск из шапки (Ctrl+K) — только десктоп -->
+    <button class="hdr-search-btn" onclick="openDesktopSearch()" title="Поиск по всей СРМ: договоры, задачи, контрагенты… (Ctrl+K)">
+      <i class="ti ti-search"></i><span class="hdr-search-txt">Поиск…</span><kbd>Ctrl K</kbd>
+    </button>
+    <button class="scan-btn scan-btn--camera" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную (Фото УПД)">
       <i class="ti ti-camera"></i>
-      <span class="scan-btn-text">Фото УПД</span>
+      <span class="scan-btn-text">УПД</span>
     </button>
     <input type="file" id="si-camera-direct-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleCameraDirect(event)">
     <button class="scan-btn scan-btn--qr" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
-      <span class="scan-btn-text">QR-скан</span>
+      <span class="scan-btn-text">QR</span>
     </button>
     <!-- v2.45.x: глобальная кнопка чатов — доступна во всех разделах и всем ролям -->
     <button class="notif-btn" id="team-chats-top-btn" onclick="openTeamChatsScreen()" title="Чаты">
@@ -209,6 +213,9 @@
   </div>
 
   <div class="body-layout">
+
+    <!-- v2.45.646: вертикальная рельса разделов (десктоп) — наполняется renderSectionRail() -->
+    <nav id="section-rail" class="section-rail"></nav>
 
     <!-- ============ SIDEBAR (десктоп) - меняется в зависимости от раздела ============ -->
 
@@ -1831,6 +1838,7 @@
                   <button class="filter-tab active" data-fp-status="all"   onclick="setFpStatusFilter('all')">Все</button>
                   <button class="filter-tab"        data-fp-status="free"  onclick="setFpStatusFilter('free')">Свободные</button>
                   <button class="filter-tab"        data-fp-status="reserved" onclick="setFpStatusFilter('reserved')">Резерв</button>
+                  <button class="filter-tab"        data-fp-status="mixed" onclick="setFpStatusFilter('mixed')">Смешанные</button>
                 </div>
                 <button class="filter-tab" id="fp-sort-btn" onclick="toggleFpSort()" title="Сортировать">
                   <i class="ti ti-arrows-sort"></i> <span id="fp-sort-label">По возрасту</span>
@@ -1885,16 +1893,12 @@
                          placeholder="Название, артикул или производитель…"
                          oninput="onPtSearchInput()">
                 </div>
-                <button class="pt-instock-btn" id="pt-instock-btn" onclick="togglePtInStock()">
-                  <i class="ti ti-package"></i>
-                  <span>В наличии</span>
-                  <span class="pt-chip-qty" id="pt-instock-count">0</span>
-                </button>
-                <button class="pt-attn-btn" id="pt-attn-btn" onclick="togglePtAttention()">
-                  <i class="ti ti-alert-triangle"></i>
-                  <span>Требуют внимания</span>
-                  <span class="pt-chip-qty" id="pt-attn-count">0</span>
-                </button>
+              </div>
+              <!-- v2.45.641: сегмент статусов с количеством вместо двух разнесённых кнопок -->
+              <div class="pt-seg" id="pt-seg">
+                <button id="pt-seg-all" class="on" onclick="setPtSeg('all')">Все <small id="pt-seg-all-n">0</small></button>
+                <button id="pt-seg-stock" onclick="setPtSeg('stock')">В наличии <small id="pt-seg-stock-n">0</small></button>
+                <button id="pt-seg-attn" class="pt-seg-bad" onclick="setPtSeg('attn')">⚠ Внимание <small id="pt-seg-attn-n">0</small></button>
               </div>
 
               <!-- Список позиций -->
@@ -6165,6 +6169,30 @@ async function _tlhRun(dryRun) {
   @media (max-width: 480px) {
     .cc-grid { grid-template-columns: 1fr; }
   }
+  /* v2.45.653: редизайн вкладки «Результат» */
+  .cc-hero {
+    background: linear-gradient(135deg, #0C4A6E 0%, #075985 55%, #0369A1 100%);
+    border-radius: 14px; padding: 18px 18px 15px; color: #fff;
+    text-align: center; margin-bottom: 14px;
+    box-shadow: 0 10px 24px rgba(7, 89, 133, .25);
+  }
+  .cc-hero-lbl { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #BAE6FD; }
+  .cc-hero-lbl .ti { margin-right: 4px; }
+  .cc-hero-num { font-size: 44px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .cc-hero-num small { font-size: 20px; font-weight: 700; color: #BAE6FD; }
+  .cc-hero-steps { font-size: 12.5px; color: #D9F0FE; margin-top: 6px; }
+  .cc-hero-steps b { color: #fff; font-variant-numeric: tabular-nums; }
+  .cc-hero-steps .ti { font-size: 11px; opacity: .7; margin: 0 2px; }
+  .cc-hero-note { font-size: 11px; color: #9CD5F5; margin-top: 7px; opacity: .9; }
+  .cc-qbar {
+    display: flex; height: 14px; border-radius: 999px; overflow: hidden;
+    background: #E2E8F0; margin: 4px 0 2px;
+  }
+  .cc-qbar span { display: block; height: 100%; min-width: 2px; }
+  .cc-qdot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 7px; flex-shrink: 0;
+  }
 </style>
 <script>
 // ============================================================
@@ -6275,9 +6303,8 @@ function _ccPersonHeat(tInside) {
   return 280;
 }
 
-// Коэффициент инфильтрации через дверь (эмпирический):
-// Вт через 1 м² проёма при разнице температур ΔT, за минуту открытия.
-// Базовое значение «полное открытие = 8 Вт/(мин·м²·К)».
+// (v2.45.653: старый эмпирический коэффициент двери убран — расчёт Q₆ теперь
+// по формуле Тамма прямо в _ccCalculate; функция оставлена для совместимости)
 function _ccDoorPsi(deltaT, hasTambour) {
   const base = 8;
   return base * Math.max(deltaT, 0) * (hasTambour ? 0.5 : 1.0);
@@ -6760,6 +6787,31 @@ function _ccRenderSchema() {
           '<stop offset="0" stop-color="#E2E8F0"/>' +
           '<stop offset="1" stop-color="#94A3B8"/>' +
         '</linearGradient>' +
+        // v2.45.654: освещение граней + тень + двери — объёмный вид
+        '<linearGradient id="cc-shade-front" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>' +
+          '<stop offset="1" stop-color="#0C4A6E" stop-opacity="0.10"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="cc-shade-right" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="#0C4A6E" stop-opacity="0.30"/>' +
+          '<stop offset="1" stop-color="#0C4A6E" stop-opacity="0.08"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="cc-shade-top" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/>' +
+          '<stop offset="1" stop-color="#BAE6FD" stop-opacity="0.45"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="cc-door-grad" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#FEF3C7"/>' +
+          '<stop offset="1" stop-color="#FCD34D"/>' +
+        '</linearGradient>' +
+        '<radialGradient id="cc-ground" cx="0.5" cy="0.5" r="0.5">' +
+          '<stop offset="0" stop-color="#0C4A6E" stop-opacity="0.20"/>' +
+          '<stop offset="0.7" stop-color="#0C4A6E" stop-opacity="0.07"/>' +
+          '<stop offset="1" stop-color="#0C4A6E" stop-opacity="0"/>' +
+        '</radialGradient>' +
+        '<filter id="cc-drop" x="-30%" y="-30%" width="160%" height="160%">' +
+          '<feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#0C4A6E" flood-opacity="0.35"/>' +
+        '</filter>' +
       '</defs>' +
 
       '<text x="' + (SVG_W/2) + '" y="26" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#0C4A6E">КАМЕРА · ' +
@@ -6767,6 +6819,16 @@ function _ccRenderSchema() {
         (aLen * bLen).toFixed(1) + ' м² · ' + (aLen * bLen * h).toFixed(1) + ' м³' +
       '</text>' +
 
+      // v2.45.654: мягкая тень на «земле» под камерой — даёт объём
+      (() => {
+        const xs = [P.bfl.x, P.bfr.x, P.bbr.x, P.bll.x];
+        const ys = [P.bfl.y, P.bfr.y, P.bbr.y, P.bll.y];
+        const scx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+        const scy = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2 + 10;
+        const srx = (Math.max.apply(null, xs) - Math.min.apply(null, xs)) / 2 * 1.15;
+        const sry = Math.max((Math.max.apply(null, ys) - Math.min.apply(null, ys)) / 2 * 0.85, 24);
+        return '<ellipse cx="' + scx.toFixed(1) + '" cy="' + scy.toFixed(1) + '" rx="' + srx.toFixed(1) + '" ry="' + sry.toFixed(1) + '" fill="url(#cc-ground)"/>';
+      })() +
       // ПОЛ — снизу (видимый только через скос)
       '<polygon points="' + poly(P.bfl, P.bfr, P.bbr, P.bll) + '" ' +
         'fill="url(#cc-floor-grad)" stroke="#475569" stroke-width="1" opacity="0.85"/>' +
@@ -6779,12 +6841,14 @@ function _ccRenderSchema() {
       '<polygon points="' + poly(P.bfl, P.bll, P.tll, P.tfl) + '" ' +
         'fill="' + LEFT_FILL + '" stroke="#475569" stroke-width="0.7" opacity="0.4" stroke-dasharray="3 3"/>' +
 
-      // ПРАВАЯ СТЕНА Б-2 (видимая)
+      // ПРАВАЯ СТЕНА Б-2 (видимая) + затенение (свет слева-сверху)
       '<polygon points="' + poly(P.bfr, P.bbr, P.tbr, P.tfr) + '" ' +
         'fill="' + RIGHT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
-      // ПЕРЕДНЯЯ СТЕНА А-1 (видимая)
+      '<polygon points="' + poly(P.bfr, P.bbr, P.tbr, P.tfr) + '" fill="url(#cc-shade-right)"/>' +
+      // ПЕРЕДНЯЯ СТЕНА А-1 (видимая) + блик
       '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" ' +
         'fill="' + FRONT_FILL + '" stroke="#0C4A6E" stroke-width="1.5"/>' +
+      '<polygon points="' + poly(P.bfl, P.bfr, P.tfr, P.tfl) + '" fill="url(#cc-shade-front)"/>' +
       // v2.45.116: дверь на передней грани (А-1) — по центру стены у пола
       (() => {
         const door = _ccState.door || {};
@@ -6805,17 +6869,42 @@ function _ccRenderSchema() {
         const dTopY    = (D3.y + D4.y) / 2;
         const dBotY    = (D1.y + D2.y) / 2;
         const dH       = Math.max(20, dBotY - dTopY);
+        // v2.45.654: дверь с градиентом, порожком и ручкой
+        const hx = D1.x + (D2.x - D1.x) * 0.16;
+        const hy = D1.y + (D2.y - D1.y) * 0.16 - dH * 0.48;
         return '<polygon points="' + poly(D1, D2, D3, D4) + '" ' +
-          'fill="#FEF3C7" stroke="#92400E" stroke-width="1.5" opacity="0.95"/>' +
+          'fill="url(#cc-door-grad)" stroke="#92400E" stroke-width="1.5" opacity="0.97"/>' +
           // петля справа — короткая линия
           '<line x1="' + D2.x + '" y1="' + D2.y + '" x2="' + D3.x + '" y2="' + D3.y + '" stroke="#92400E" stroke-width="2.5"/>' +
-          // только «🚪 Дверь» внутри
+          // порожек
+          '<line x1="' + (D1.x - 3) + '" y1="' + (D1.y + 2) + '" x2="' + (D2.x + 3) + '" y2="' + (D2.y + 2) + '" stroke="#92400E" stroke-width="2" opacity="0.55"/>' +
+          // ручка со стороны, противоположной петле
+          '<circle cx="' + hx.toFixed(1) + '" cy="' + hy.toFixed(1) + '" r="2.4" fill="#92400E"/>' +
           '<text x="' + dCenterX + '" y="' + (dTopY + dH * 0.55) + '" ' +
             'text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#92400E">🚪 Дверь</text>';
       })() +
-      // ПОТОЛОК (видимый)
+      // ПОТОЛОК (видимый) + глянцевый блик
       '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" ' +
         'fill="#F0F9FF" stroke="#0C4A6E" stroke-width="1.5" opacity="0.85"/>' +
+      '<polygon points="' + poly(P.tfl, P.tfr, P.tbr, P.tll) + '" fill="url(#cc-shade-top)" opacity="0.6"/>' +
+      // v2.45.654: снежинки на потолке + бейдж t° внутри на передней грани
+      (() => {
+        const c1 = proj(aLen * 0.25, bLen * 0.55, h);
+        const c2 = proj(aLen * 0.72, bLen * 0.35, h);
+        const ti = (_ccState.tInside != null) ? _ccState.tInside : null;
+        let s = '<text x="' + c1.x.toFixed(1) + '" y="' + c1.y.toFixed(1) + '" text-anchor="middle" font-size="13" opacity="0.45">❄</text>' +
+                '<text x="' + c2.x.toFixed(1) + '" y="' + c2.y.toFixed(1) + '" text-anchor="middle" font-size="10" opacity="0.35">❄</text>';
+        if (ti !== null && aLen > 0 && h > 0) {
+          const bc = proj(aLen / 2, 0, h * 0.8);
+          const label = '❄ ' + ti + '°C внутри';
+          const bw = label.length * 6.4 + 20;
+          s += '<rect x="' + (bc.x - bw / 2).toFixed(1) + '" y="' + (bc.y - 12).toFixed(1) + '" width="' + bw.toFixed(0) + '" height="24" rx="12" ' +
+              'fill="#0C4A6E" filter="url(#cc-drop)" opacity="0.94"/>' +
+            '<text x="' + bc.x.toFixed(1) + '" y="' + (bc.y + 4).toFixed(1) + '" text-anchor="middle" ' +
+              'font-family="Arial" font-size="11.5" font-weight="700" fill="white">' + label + '</text>';
+        }
+        return s;
+      })() +
 
       // === v2.45.128: ВЫНОСКИ — линии от центра граней к разноцветным плашкам ===
       (() => {
@@ -6837,9 +6926,9 @@ function _ccRenderSchema() {
           const bx = tx - boxW / 2, by = ty - boxH / 2;
           return '<line x1="' + fx + '" y1="' + fy + '" x2="' + tx + '" y2="' + ty +
               '" stroke="' + color + '" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.7"/>' +
-            '<circle cx="' + fx + '" cy="' + fy + '" r="3" fill="' + color + '"/>' +
+            '<circle cx="' + fx + '" cy="' + fy + '" r="3.5" fill="' + color + '" stroke="white" stroke-width="1.2"/>' +
             '<rect x="' + bx + '" y="' + by + '" width="' + boxW + '" height="' + boxH +
-              '" rx="6" ry="6" fill="' + color + '"/>' +
+              '" rx="8" ry="8" fill="' + color + '" stroke="rgba(255,255,255,0.5)" stroke-width="1" filter="url(#cc-drop)"/>' +
             '<text x="' + tx + '" y="' + (ty + (sub ? -4 : 4)) +
               '" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="white">' +
               title + '</text>' +
@@ -7175,7 +7264,7 @@ function _ccTabMode() {
     '</div>' +
     '<div class="cc-hint">' +
       '<i class="ti ti-info-circle"></i> «Время работы» — обычно 18–22 ч/сут (компрессор не работает 24/7, есть оттайки). ' +
-      '«Запас» — на просчёты, износ компрессора, нестандартные нагрузки. Стандартно 10–20 %.' +
+      '«Запас» — покрывает вентиляторы воздухоохладителя, тепло оттайки, износ компрессора и пиковые нагрузки. Стандартно 10–20 %.' +
     '</div>' +
   '</div>';
 }
@@ -7421,15 +7510,19 @@ function _ccFormulaHtml(key, det, qW) {
   }
   if (key === 'q6') {
     const d = det.q6 || {};
-    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₆ — инфильтрация через дверь</div>' +
+    return '<div style="font-weight:700;color:#0C4A6E;margin-bottom:6px;">Q₆ — инфильтрация через дверь (формула Тамма)</div>' +
       '<div style="margin-bottom:8px;font-family:monospace;background:white;padding:8px 10px;border-radius:4px;">' +
-        'Q₆ = 8 × ΔT × A_двери × (минут/1440) × K_тамбура' +
+        'V̇ = ⅓ × A × √(g × H × ΔT / T_нар) &nbsp;→&nbsp; Q_мгнов = V̇ × ρ × cₚ × ΔT &nbsp;→&nbsp; Q₆ = Q_мгнов × (мин/1440) × K_тамбура' +
       '</div>' +
-      '<div>Дверь: <b>' + d.doorH + '×' + d.doorW + ' мм</b>, площадь A = ' + d.doorArea + ' м²<br/>' +
-        'Открытие: <b>' + d.doorMin + ' мин/сут</b> · ΔT за дверью: ' + d.dTdoor + ' °C · ' +
+      '<div>Дверь: <b>' + d.doorH + '×' + d.doorW + ' мм</b>, площадь A = ' + d.doorArea + ' м² · ΔT за дверью: ' + d.dTdoor + ' °C<br/>' +
+        (d.vFlow !== undefined
+          ? 'Поток при открытой двери V̇ ≈ <b>' + d.vFlow + ' м³/с</b> → мгновенный приток ≈ <b>' + G(d, 'qInst', '—') + ' Вт</b><br/>'
+          : '') +
+        'Открытие: <b>' + d.doorMin + ' мин/сут</b> · ' +
         'K_тамбура = <b>' + d.tambK + '</b> ' + (d.tambour ? '(тамбур есть, ÷2)' : '(без тамбура)') +
       '</div>' +
-      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₆ = 8 × ' + d.dTdoor + ' × ' + d.doorArea + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
+      '<div style="font-size:11.5px;color:var(--text-mid);margin-top:4px;">ρ = 1.25 кг/м³, cₚ = 1005 Дж/(кг·К). Пока дверь открыта, тёплый воздух конвекцией замещает холодный через весь проём — поэтому мгновенный приток большой, но усредняется по суткам.</div>' +
+      '<div style="margin-top:8px;text-align:right;font-weight:700;color:#0C4A6E;">Итого Q₆ = ' + G(d, 'qInst', '—') + ' × ' + d.doorMin + '/1440 × ' + d.tambK + ' = ' + Math.round(qW) + ' Вт = ' + kw + ' кВт</div>';
   }
   if (key === 'qVent') {
     const d = det.qVent || {};
@@ -7493,10 +7586,37 @@ function _ccTabResult() {
   const det = r.details || {};
   // Сопоставляем строку с ключом details — по индексу:
   const detKeys = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'qVent', 'qResp'];
-  return clientBlock +
+  // v2.45.653: цвета статей — для сегментной полосы и точек в строках
+  const qColors = { q1: '#3B82F6', q2: '#F97316', q3: '#EC4899', q4: '#EAB308', q5: '#8B5CF6', q6: '#14B8A6', qVent: '#0EA5E9', qResp: '#22C55E' };
+  const workCoeffTxt = (r.workHours && r.workHours < 24)
+    ? '× 24/' + r.workHours + ' ч работы' : 'работа 24 ч/сут';
+
+  // Герой-блок: главная цифра сверху + как она получилась
+  const hero =
+    '<div class="cc-hero">' +
+      '<div class="cc-hero-lbl"><i class="ti ti-snowflake"></i> Рекомендуемая мощность холода</div>' +
+      '<div class="cc-hero-num">' + totalWithSafetyKw.toFixed(2) + ' <small>кВт</small></div>' +
+      '<div class="cc-hero-steps">' +
+        'Σ притоков <b>' + (sumW / 1000).toFixed(2) + '</b> кВт' +
+        ' <i class="ti ti-arrow-right"></i> ' + workCoeffTxt + ' = <b>' + totalKw.toFixed(2) + '</b> кВт' +
+        ' <i class="ti ti-arrow-right"></i> запас +' + r.safety + '% = <b>' + totalWithSafetyKw.toFixed(2) + '</b> кВт' +
+      '</div>' +
+      '<div class="cc-hero-note">Запас покрывает вентиляторы воздухоохладителя, тепло оттайки и пиковые нагрузки</div>' +
+    '</div>';
+
+  // Сегментная полоса долей
+  const segs = rows.map(([n, v], i) => {
+    const key = detKeys[i] || '';
+    const pct = (Number(v) || 0) / sumW * 100;
+    if (pct <= 0.2) return '';
+    return '<span style="width:' + pct.toFixed(2) + '%;background:' + (qColors[key] || '#94A3B8') + ';" title="' + n + ' · ' + pct.toFixed(1) + '%"></span>';
+  }).join('');
+
+  return hero +
     '<div class="cc-section">' +
-    '<h4><i class="ti ti-chart-bar"></i> Теплопритоки по составляющим</h4>' +
-    '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">' +
+    '<h4><i class="ti ti-chart-bar"></i> Из чего складывается</h4>' +
+    '<div class="cc-qbar">' + segs + '</div>' +
+    '<div style="font-size:11.5px;color:var(--text-light);margin:6px 0 8px;">' +
       '<i class="ti ti-cursor-text"></i> Кликни на строку — раскроется формула и пошаговый расчёт' +
     '</div>' +
     '<div class="cc-result">' +
@@ -7506,9 +7626,10 @@ function _ccTabResult() {
         const formula = _ccFormulaHtml(key, det, v);
         return '<div class="cc-result-row" style="cursor:pointer;border-bottom:1px solid #F1F5F9;flex-direction:column;align-items:stretch;" ' +
           'onclick="_ccToggleFormula(this)">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-            '<span><i class="ti ti-chevron-down cc-chev" style="font-size:11px;color:var(--text-light);margin-right:4px;transition:transform .15s;"></i>' + n + '</span>' +
-            '<span class="v" style="text-align:right;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+            '<span style="display:flex;align-items:center;min-width:0;"><i class="ti ti-chevron-down cc-chev" style="font-size:11px;color:var(--text-light);margin-right:5px;transition:transform .15s;"></i>' +
+              '<span class="cc-qdot" style="background:' + (qColors[key] || '#94A3B8') + ';"></span>' + n + '</span>' +
+            '<span class="v" style="text-align:right;white-space:nowrap;">' +
               (v / 1000).toFixed(3) + ' кВт ' +
               '<span style="color:var(--text-light);font-weight:500;font-size:12px;">(' + pct + '%)</span>' +
             '</span>' +
@@ -7519,14 +7640,9 @@ function _ccTabResult() {
         '</div>';
       }).join('') +
       '<div class="cc-result-row" style="font-weight:600;"><span>Сумма теплопритоков</span>' +
-        '<span class="v">' + totalKw.toFixed(2) + ' кВт</span></div>' +
-      '<div class="cc-result-row" style="font-weight:600;"><span>С коэффициентом запаса (' + r.safety + '%)</span>' +
+        '<span class="v">' + (sumW / 1000).toFixed(2) + ' кВт</span></div>' +
+      '<div class="cc-result-row" style="font-weight:600;"><span>С учётом работы ' + r.workHours + ' ч/сут и запаса ' + r.safety + '%</span>' +
         '<span class="v">' + totalWithSafetyKw.toFixed(2) + ' кВт</span></div>' +
-    '</div>' +
-    '<div style="background:linear-gradient(135deg,#E0F2FE,#F0F9FF);border:1px solid #BAE6FD;border-radius:10px;padding:16px;margin-top:16px;text-align:center;">' +
-      '<div style="font-size:13px;color:#0C4A6E;margin-bottom:4px;">Рекомендуемая мощность холода</div>' +
-      '<div style="font-size:36px;font-weight:700;color:#0C4A6E;line-height:1;">' + totalWithSafetyKw.toFixed(2) + ' кВт</div>' +
-      '<div style="font-size:12px;color:#0C4A6E;opacity:0.8;margin-top:6px;">с учётом работы оборудования ' + r.workHours + ' ч/сут</div>' +
     '</div>' +
     // v2.45.31: кнопка сохранения расчёта
     // v2.45.96: + печать / сохранение в PDF
@@ -7534,7 +7650,7 @@ function _ccTabResult() {
       '<button class="btn btn-secondary" onclick="_ccPrintReport()"><i class="ti ti-printer"></i> Печать / PDF</button>' +
       '<button class="btn btn-secondary" onclick="_ccSaveResult()"><i class="ti ti-device-floppy"></i> Сохранить расчёт</button>' +
     '</div>' +
-  '</div>';
+  '</div>' + clientBlock;
 }
 
 // v2.45.96: печать / сохранение в PDF.
@@ -8277,7 +8393,12 @@ function _ccCalculate() {
   const q5fork   = (cnd.forklifts || 0) * (cnd.forkliftKw || 0) * 1000 *
                    ((cnd.forkliftHrs || 0) / 24);
   const q5 = q5motors + q5fork;
-  // Q6 — инфильтрация через дверь
+  // Q6 — инфильтрация через дверь (v2.45.653: упрощённая формула Тамма).
+  // Старая эмпирика «8 Вт/(м²·К)» занижала приток в десятки раз: при открытой
+  // двери идёт конвективный обмен тёплого и холодного воздуха через весь проём.
+  //   V̇ = ⅓ × A × √(g × H_проёма × ΔT / T_нар)   [м³/с]
+  //   Q_мгнов = V̇ × ρ × cₚ × ΔT                  [Вт при открытой двери]
+  //   Q₆ = Q_мгнов × (минут открытия / 1440) × K_тамбура
   const dh = (_ccState.door.hMm || 0) / 1000;
   const dw = (_ccState.door.wMm || 0) / 1000;
   const doorArea = dh * dw;
@@ -8285,14 +8406,12 @@ function _ccCalculate() {
   // Среднюю t° за дверью берём как (t_стен_среднюю) — упрощённо.
   const tDoorOut = g.walls.reduce((s, w) => s + w.tOut, 0) / 4;
   const dT_door = Math.max(tDoorOut - ti, 0);
-  // ψ × A × мин/сут / минут_в_сутках = Вт усреднённое по суткам.
-  const psi = _ccDoorPsi(dT_door, _ccState.door.hasTambour);
-  const q6 = psi * doorArea * (doorMin / 1440) * dT_door;
-  // (умножили на ΔT дважды? нет — psi уже линеен по ΔT, но он Вт/(мин·м²·К), а
-  // здесь у нас Вт/(м²·К). Скорректируем: убираем второй ΔT.)
-  // Перепишем чисто: средняя инфильтрация (Вт) = 8 × ΔT × A × (min/сут)/1440 × tamb_k
   const _tambK = _ccState.door.hasTambour ? 0.5 : 1.0;
-  const q6Clean = 8 * dT_door * doorArea * (doorMin / 1440) * _tambK;
+  const vFlow = (dT_door > 0 && doorArea > 0 && dh > 0)
+    ? (doorArea / 3) * Math.sqrt(9.81 * dh * dT_door / (273 + tDoorOut))
+    : 0;
+  const q6Inst  = vFlow * 1.25 * 1005 * dT_door;   // ρ=1.25 кг/м³, cₚ=1005 Дж/(кг·К)
+  const q6Clean = q6Inst * (doorMin / 1440) * _tambK;
 
   // v2.45.105: Q-вентиляция от приточного воздухообмена.
   // V_воз = объём камеры × N_обменов; m = V × 1.293 кг/м³; cp_воз ≈ 1005 Дж/(кг·К);
@@ -8365,7 +8484,8 @@ function _ccCalculate() {
     q6: { doorH: _ccState.door.hMm || 0, doorW: _ccState.door.wMm || 0,
           doorArea: doorArea.toFixed(2), doorMin: doorMin,
           dTdoor: dT_door.toFixed(1), tambour: _ccState.door.hasTambour ? 1 : 0,
-          tambK: _tambK },
+          tambK: _tambK,
+          vFlow: vFlow.toFixed(2), qInst: Math.round(q6Inst) },
     qVent: { airChanges: airChanges, volume: cameraVolume.toFixed(1),
              dTdoor: dT_door.toFixed(1) },
     qResp: { mass: p2.storageMassKg || 0, wpt: p2.breathingHeatWPerTon || 0,

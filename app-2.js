@@ -884,44 +884,49 @@ function renderHomeSkeleton() {
   html += '</div>';
 
   // v2.43.98: KPI «Сегодня» — sticky-обёртка, цифры всегда перед глазами при скролле
+  // v2.45.631: блок стал «Пульсом» — деньги в работе / просрочка / производство / КП
   html += '<div class="home-kpi-sticky">';
-  html += '<div class="home-kpi-title"><i class="ti ti-calendar-stats"></i>Сегодня</div>';
+  html += '<div class="home-kpi-title"><i class="ti ti-activity-heartbeat"></i>Пульс дня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
   html += '</div>';
 
   // v2.45.31: виджет «Калькулятор холода» переехал в левый сайдбар (пункт «Калькулятор холода»)
   // на главной больше не показываем.
 
-  // v2.43.98: Воронка производства — пять стадий с цифрами
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-stairs-up"></i>Воронка производства</div>';
-  html += '<div id="home-funnel-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
   // v2.43.98: Алерты (только директор/мастер/зам)
+  // v2.45.631: «Требует внимания» — выше воронки, конкретика вместо счётчиков
   const _hasManage = (typeof hasPermission === 'function') && hasPermission('production.manage');
   if (_hasManage) {
-    html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-alert-triangle"></i>Алерты</div>';
+    html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-alert-triangle"></i>Требует внимания сегодня</div>';
     html += '<div id="home-alerts-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   }
 
-  // v2.43.98: ТОП сборщиков за неделю
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-trophy"></i>ТОП сборщиков за неделю</div>';
-  html += '<div id="home-top-assemblers-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // v2.43.98: Воронка производства — v2.45.631: одна пропорциональная полоса
+  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-stairs-up"></i>Воронка производства</div>';
+  html += '<div id="home-funnel-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
 
-  // ЭТАП 16В: «Мои задачи»
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-checklist"></i>Мои задачи</div>';
-  html += '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
-  // ЭТАП 16Г: «Ближайшие отгрузки»
-  html += '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 16px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
-  html += '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
+  // v2.45.631: двухколоночная сетка на десктопе — слева поток работы, справа лента
+  html += '<div class="home-cols">';
+  html +=   '<div class="home-col">';
   // ЭТАП 31.4: «Договоры в работе» — переехало сюда с главной Производства
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-briefcase"></i>Договоры в работе</div>';
-  html += '<div id="home-contracts-progress-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
-
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-briefcase"></i>Договоры в работе</div>';
+  html +=     '<div id="home-contracts-progress-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // ЭТАП 16В: «Мои задачи»
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-checklist"></i>Мои задачи</div>';
+  html +=     '<div id="home-tasks-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  html +=   '</div>';
+  html +=   '<div class="home-col">';
+  // ЭТАП 16Г: «Ближайшие отгрузки»
+  html +=     '<div class="home-kpi-title" id="home-shipments-title" style="margin-top: 16px;"><i class="ti ti-truck-delivery"></i>Ближайшие отгрузки</div>';
+  html +=     '<div id="home-shipments-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
+  // v2.43.98: ТОП сборщиков за неделю
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-trophy"></i>Топ сборщиков за неделю</div>';
+  html +=     '<div id="home-top-assemblers-block"><div class="loading-block" style="padding: 14px;">Загружаем…</div></div>';
   // Курс валют placeholder
-  html += '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
-  html += '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
+  html +=     '<div class="home-kpi-title" style="margin-top: 16px;"><i class="ti ti-currency-ruble"></i>Курсы ЦБ РФ</div>';
+  html +=     '<div id="home-cbr-block"><div class="loading-block" style="padding: 14px;">Загружаем курс валют…</div></div>';
+  html +=   '</div>';
+  html += '</div>';
 
   // ЭТАП 16Г: «Последние действия» — только для директора (v2.8.2)
   const _isDirector = state.user && (state.user.roles || []).includes('director');
@@ -1309,31 +1314,58 @@ function renderHomeKpi() {
   if (!el) return;
   const data = (cache.homeKpi && cache.homeKpi.kpi) || {};
   const tiles = [];
+  // v2.45.631: «Пульс» — деньги и просрочка из договоров с прогрессом
+  // (contracts-with-progress грузится параллельно; когда придёт — перерисуемся).
+  const cwp = cache.contractsWithProgress || null;
+  const money = (typeof canSeeMoney === 'function') && canSeeMoney();
+  let workSum = 0, overN = 0, overSum = 0, worstOver = 0;
+  if (cwp && cwp.length) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    cwp.forEach(c => {
+      workSum += parseFloat(c.sum_amount || 0);
+      if (c.delivery_date && c.status !== 'shipped' && c.status !== 'closed') {
+        const dd = Math.round((new Date(c.delivery_date + 'T00:00:00') - today) / 86400000);
+        if (dd < 0) { overN++; overSum += parseFloat(c.sum_amount || 0); worstOver = Math.max(worstOver, -dd); }
+      }
+    });
+  }
   if ('contracts_active' in data) {
     tiles.push({
-      label: 'договоров', value: data.contracts_active, trend: 'в производстве',
-      icon: 'ti-file-text', color: 'blue',
+      label: money && cwp ? 'деньги в работе' : 'договоров',
+      value: money && cwp ? formatMoneyShort(workSum) : data.contracts_active,
+      trend: (data.contracts_active || 0) + ' ' + plural(data.contracts_active || 0, 'договор', 'договора', 'договоров') + ' в производстве',
+      icon: 'ti-cash', color: 'blue',
       action: () => goToSection('sales', 'sales-contracts')
     });
-  }
-  if ('offers_active' in data) {
-    tiles.push({
-      label: 'КП в работе', value: data.offers_active, trend: 'черновики и отправленные',
-      icon: 'ti-file-invoice', color: 'amber',
-      action: () => goToSection('sales', 'sales-offers')
-    });
+    // Просрочка — красная плитка (или спокойная зелёная, если чисто)
+    if (cwp) {
+      tiles.push(overN > 0 ? {
+        label: 'просрочено',
+        value: money ? formatMoneyShort(overSum) : overN,
+        trend: overN + ' ' + plural(overN, 'договор', 'договора', 'договоров') + ' · худший −' + worstOver + ' дн',
+        icon: 'ti-alert-triangle', color: 'red',
+        action: () => goToSection('sales', 'sales-contracts')
+      } : {
+        label: 'просрочка', value: '0', trend: 'все договоры в графике ✓',
+        icon: 'ti-circle-check', color: 'green',
+      });
+    }
   }
   if ('assemblies_today' in data) {
+    // v2.45.631: + очередь производства из воронки (если уже загрузилась)
+    const _fq = ((cache.homeExtras && cache.homeExtras.funnel) || []).find(s => s.status === 'queue');
     tiles.push({
-      label: 'сборок сегодня', value: data.assemblies_today, trend: 'шт.',
+      label: 'производство', value: data.assemblies_today, trend: 'сборок сегодня' + (_fq ? ' · очередь ' + (_fq.count || 0) : ''),
       icon: 'ti-tool', color: 'green',
       action: () => goToSection('production', 'history')
     });
   }
-  if ('offers_accepted_month_sum' in data) {
+  if ('offers_active' in data) {
     tiles.push({
-      label: 'принято КП', value: formatMoneyShort(data.offers_accepted_month_sum), trend: 'за месяц',
-      icon: 'ti-coin', color: 'violet'
+      label: 'КП в работе', value: data.offers_active,
+      trend: ('offers_accepted_month_sum' in data) ? ('принято за месяц: ' + formatMoneyShort(data.offers_accepted_month_sum)) : 'черновики и отправленные',
+      icon: 'ti-file-invoice', color: 'amber',
+      action: () => goToSection('sales', 'sales-offers')
     });
   }
   if (!tiles.length) {
@@ -1372,6 +1404,8 @@ async function loadHomeDashboardExtras() {
     renderHomeFunnel();
     renderHomeAlerts();
     renderHomeTopAssemblers();
+    // v2.45.631: плитка «производство» в Пульсе показывает очередь из воронки
+    if (cache.homeKpi) renderHomeKpi();
   } catch (e) {
     const f = document.getElementById('home-funnel-block');
     if (f) f.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить воронку</div>';
@@ -1390,15 +1424,25 @@ function renderHomeFunnel() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>Пока нет активных работ</div>';
     return;
   }
-  let html = '<div class="home-funnel">';
+  // v2.45.631: одна цветная полоса — ширина сегмента пропорциональна количеству.
+  // Нулевые стадии остаются узкими метками, чтобы воронка читалась целиком.
+  const colors = { queue: '#94A3B8', in_progress: '#2D5F8B', review: '#F59E0B', packing: '#8B5CF6', done: '#10B981' };
+  let bar = '<div class="home-fun-bar">';
   stages.forEach(s => {
-    html += '<div class="home-funnel-stage" data-st="' + escapeText(s.status) + '" onclick="homeFunnelClick(\'' + escapeText(s.status) + '\')">' +
-      '<div class="stage-label">' + escapeText(s.label) + '</div>' +
-      '<div class="stage-count">' + escapeText(String(s.count || 0)) + '</div>' +
-      '</div>';
+    const n = s.count || 0;
+    const flex = Math.max(n, 0.55);
+    bar += '<div class="home-fun-seg" style="flex:' + flex + ';background:' + (colors[s.status] || '#94A3B8') + ';" ' +
+      'onclick="homeFunnelClick(\'' + escapeText(s.status) + '\')" title="' + escapeText(s.label) + ': ' + n + '">' +
+      n + (n > 0 ? ' <small>' + escapeText(String(s.label || '').toLowerCase()) + '</small>' : '') +
+    '</div>';
   });
-  html += '</div>';
-  el.innerHTML = html;
+  bar += '</div>';
+  let legend = '<div class="home-fun-legend">';
+  stages.forEach(s => {
+    legend += '<span><i style="background:' + (colors[s.status] || '#94A3B8') + ';"></i>' + escapeText(s.label) + ' · ' + (s.count || 0) + '</span>';
+  });
+  legend += '</div>';
+  el.innerHTML = '<div class="card" style="padding:12px 14px;">' + bar + legend + '</div>';
 }
 
 function homeFunnelClick(status) {
@@ -1414,15 +1458,40 @@ function renderHomeAlerts() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-circle-check"></i>Алертов нет — всё спокойно</div>';
     return;
   }
-  let html = '<div class="home-alerts-list">';
+  // v2.45.631: конкретика по просроченным договорам — кто и на сколько дней
+  // (из contracts-with-progress, если уже загрузились).
+  let overDetail = '';
+  const cwp = cache.contractsWithProgress || [];
+  if (cwp.length) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const over = [];
+    cwp.forEach(c => {
+      if (c.delivery_date && c.status !== 'shipped' && c.status !== 'closed') {
+        const dd = Math.round((new Date(c.delivery_date + 'T00:00:00') - today) / 86400000);
+        if (dd < 0) over.push({ name: c.contractor_name || c.number, days: -dd });
+      }
+    });
+    over.sort((a, b) => b.days - a.days);
+    if (over.length) {
+      const names = over.slice(0, 2).map(o => {
+        const short = String(o.name).split(/\s+/).slice(0, 1).join(' ');
+        return short + ' (−' + o.days + ' дн)';
+      });
+      overDetail = names.join(', ') + (over.length > 2 ? ' и ещё ' + (over.length - 2) : '');
+    }
+  }
+  let html = '<div class="home-att-list">';
   alerts.forEach((a, i) => {
-    html += '<div class="home-alert" data-sev="' + escapeText(a.severity || 'info') + '" onclick="homeAlertClick(' + i + ')">' +
-      '<i class="ti ' + escapeText(a.icon || 'ti-alert-triangle') + ' alert-icon"></i>' +
-      '<div class="alert-body">' +
-        '<div class="alert-title">' + escapeText(a.title || '') + '</div>' +
-        '<div class="alert-meta">' + escapeText(a.meta || '') + '</div>' +
-      '</div>' +
-      '<div class="alert-count">' + escapeText(String(a.count || 0)) + '</div>' +
+    const sev = a.severity || 'info';
+    const meta = (a.link === 'contracts' && overDetail) ? overDetail : (a.meta || '');
+    const goTxt = a.link === 'production' ? 'к канбану →'
+      : a.link === 'contracts' ? 'к договорам →'
+      : a.link === 'warehouse' ? 'к остаткам →' : 'открыть →';
+    html += '<div class="home-att-row sev-' + escapeText(sev) + '" onclick="homeAlertClick(' + i + ')">' +
+      '<span class="home-att-ic"><i class="ti ' + escapeText(a.icon || 'ti-alert-triangle') + '"></i></span>' +
+      '<span class="home-att-t"><b>' + escapeText(a.title || '') + (a.count ? ' · ' + a.count : '') + '</b>' +
+        (meta ? '<span class="home-att-meta"> — ' + escapeText(meta) + '</span>' : '') + '</span>' +
+      '<span class="home-att-go">' + goTxt + '</span>' +
       '</div>';
   });
   html += '</div>';
@@ -1450,17 +1519,18 @@ function renderHomeTopAssemblers() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>За неделю никто не отметил часы</div>';
     return;
   }
-  let html = '<div class="home-top-assemblers">';
+  // v2.45.631: медали + шкала часов относительно лидера
+  const maxH = Math.max.apply(null, rows.map(r => parseFloat(r.hours || 0)).concat([1]));
+  const medals = ['🥇', '🥈', '🥉'];
+  let html = '<div class="home-top-assemblers card" style="padding:6px 14px;">';
   rows.forEach((r, i) => {
-    const rank = i + 1;
-    const rankCls = rank <= 3 ? ' r' + rank : '';
-    html += '<div class="home-top-row' + rankCls + '">' +
-      '<div class="top-rank">' + rank + '</div>' +
-      '<div class="top-name">' + escapeText(r.name || '—') + '</div>' +
-      '<div class="top-stats">' +
-        '<span><b>' + escapeText(String(r.hours || 0)) + '</b> ч</span>' +
-        '<span><b>' + escapeText(String(r.works || 0)) + '</b> работ</span>' +
-      '</div>' +
+    const h = parseFloat(r.hours || 0);
+    const pct = Math.round(h / maxH * 100);
+    html += '<div class="home-top-row2">' +
+      '<span class="home-top-medal">' + (medals[i] || (i + 1) + '.') + '</span>' +
+      '<span class="home-top-name2">' + escapeText(r.name || '—') + '</span>' +
+      '<span class="home-top-bar"><i style="width:' + pct + '%;"></i></span>' +
+      '<span class="home-top-hrs">' + escapeText(String(r.hours || 0)) + ' ч · ' + escapeText(String(r.works || 0)) + ' ' + plural(r.works || 0, 'работа', 'работы', 'работ') + '</span>' +
       '</div>';
   });
   html += '</div>';
@@ -2446,9 +2516,29 @@ function renderTasksScreen(d) {
   }
 }
 
+// v2.45.661: информативный список — пульс, «у кого сколько», группы по сроку
+function _taskDayDiff(iso) {
+  if (!iso) return null;
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = new Date(String(iso).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d.getTime())) return null;
+    return Math.round((d - today) / 86400000);
+  } catch (e) { return null; }
+}
+function _tasksWhoFilter(who) {
+  state.tasksWho = (state.tasksWho === who) ? null : who;
+  if (window._tasksLastPayload) renderTasksList(window._tasksLastPayload);
+}
+async function _tasksTakeWork(ev, id) {
+  ev.stopPropagation();
+  await changeTaskStatus(id, 'in_progress');
+  loadTasksList();
+}
 function renderTasksList(d) {
   const container = document.getElementById('tasks-list-content');
   const tasks = d.tasks || [];
+  window._tasksLastPayload = d;
   if (!tasks.length) {
     let html = '<div class="empty-block"><i class="ti ti-checklist"></i>';
     html += state.tasksFilter === 'open' ? 'Открытых задач нет.' : 'В этом фильтре нет задач.';
@@ -2459,8 +2549,84 @@ function renderTasksList(d) {
     container.innerHTML = html;
     return;
   }
-  let html = '<div style="padding: 0 18px;">';
-  tasks.forEach(t => { html += renderTaskRow(t); });
+  const c = d.counts || {};
+  const open = tasks.filter(t => t.status === 'new' || t.status === 'in_progress');
+
+  let html = '<div style="padding: 0 18px 8px;">';
+
+  // Пульс (не показываем на фильтре «Готовые» — там нечего считать)
+  if (state.tasksFilter !== 'done') {
+    let late = 0, todayN = 0, tomorrowN = 0;
+    open.forEach(t => {
+      const diff = _taskDayDiff(t.deadline);
+      if (diff === null) return;
+      if (diff < 0) late++;
+      else if (diff === 0) todayN++;
+      else if (diff === 1) tomorrowN++;
+    });
+    html += '<div class="tk-pulse">' +
+      '<div class="tk-pu' + (late ? ' red' : '') + '"><b>' + late + '</b><small>Просрочено</small></div>' +
+      '<div class="tk-pu blue"><b>' + todayN + '</b><small>Сегодня</small></div>' +
+      '<div class="tk-pu amber"><b>' + tomorrowN + '</b><small>Завтра</small></div>' +
+      '<div class="tk-pu"><b>' + (c.in_progress || 0) + '</b><small>В работе</small></div>' +
+    '</div>';
+  }
+
+  // «У кого сколько» — по открытым; тап фильтрует
+  const byWho = {};
+  let noAss = 0;
+  open.forEach(t => {
+    if (!t.assignee_id) { noAss++; return; }
+    const k = t.assignee_id;
+    if (!byWho[k]) byWho[k] = { id: k, name: t.assignee_name || ('#' + k), n: 0 };
+    byWho[k].n++;
+  });
+  const whoList = Object.values(byWho).sort((a, b) => b.n - a.n);
+  if (whoList.length > 1 || noAss > 0) {
+    html += '<div class="tk-who">';
+    whoList.forEach(w => {
+      const initials = (typeof getInitials === 'function') ? getInitials(w.name) : w.name.slice(0, 2);
+      const colorIdx = (w.id || 0) % 8;
+      html += '<span class="tk-who-chip' + (state.tasksWho === w.id ? ' on' : '') + '" onclick="_tasksWhoFilter(' + w.id + ')">' +
+        '<span class="pkb-wl-avatar ac-' + colorIdx + ' tk-who-ava">' + escapeHtml(initials) + '</span>' +
+        escapeHtml(w.name.split(' ')[0]) + ' <b>' + w.n + '</b></span>';
+    });
+    if (noAss > 0) {
+      html += '<span class="tk-who-chip none' + (state.tasksWho === 'none' ? ' on' : '') + '" onclick="_tasksWhoFilter(\'none\')">без исполнителя ' + noAss + '</span>';
+    }
+    html += '</div>';
+  }
+
+  // Фильтр по исполнителю
+  let list = tasks;
+  if (state.tasksWho === 'none') list = tasks.filter(t => !t.assignee_id);
+  else if (state.tasksWho) list = tasks.filter(t => t.assignee_id === state.tasksWho);
+
+  // Группировка по сроку
+  const groups = { late: [], today: [], tomorrow: [], week: [], later: [], nodate: [], done: [] };
+  list.forEach(t => {
+    if (t.status === 'done' || t.status === 'cancelled') { groups.done.push(t); return; }
+    const diff = _taskDayDiff(t.deadline);
+    if (diff === null) groups.nodate.push(t);
+    else if (diff < 0) groups.late.push(t);
+    else if (diff === 0) groups.today.push(t);
+    else if (diff === 1) groups.tomorrow.push(t);
+    else if (diff <= 7) groups.week.push(t);
+    else groups.later.push(t);
+  });
+  const section = (key, cls, icon, name) => {
+    const g = groups[key];
+    if (!g.length) return;
+    html += '<div class="tk-sec' + (cls ? ' ' + cls : '') + '">' + icon + ' ' + name + ' <span class="cnt">' + g.length + '</span></div>';
+    g.forEach(t => { html += renderTaskRow(t); });
+  };
+  section('late', 'alarm', '🔥', 'Просрочено');
+  section('today', 'today', '📅', 'Сегодня');
+  section('tomorrow', 'tom', '📅', 'Завтра');
+  section('week', '', '🗓', 'На неделе');
+  section('later', '', '🗓', 'Позже');
+  section('nodate', 'warn', '❓', 'Без срока');
+  section('done', '', '✅', 'Готовые');
   html += '</div>';
   container.innerHTML = html;
 }
@@ -2576,47 +2742,97 @@ async function _tasksQuickDone(ev, taskId) {
   } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
 }
 
+// v2.45.661: строка задачи — вся суть в две-три строчки (статус, исполнитель,
+// срок с дельтой, источник, договор, возраст, кто поставил)
 function renderTaskRow(t) {
   const isDone = t.status === 'done' || t.status === 'cancelled';
-  const priorityCls = t.priority || 'normal';
-  const meta = [];
-  if (t.assignee_name) meta.push('<span><i class="ti ti-user"></i>' + escapeHtml(t.assignee_name) + '</span>');
-  // Дедлайн с подсветкой
-  if (t.deadline) {
-    let cls = '';
-    try {
-      const diff = Math.round((new Date(t.deadline) - new Date()) / 86400000);
-      if (!isDone && diff < 0) cls = ' urgent';
-      else if (!isDone && diff <= 1) cls = ' soon';
-    } catch (e) {}
-    meta.push('<span class="task-meta-deadline' + cls + '"><i class="ti ti-clock"></i>' +
-              escapeHtml(formatTaskDeadline(t.deadline)) + '</span>');
+  const diff = _taskDayDiff(t.deadline);
+  // класс строки: полоска слева
+  let rowCls = '';
+  if (isDone) rowCls = 'done';
+  else if (diff !== null && diff < 0) rowCls = 'late';
+  else if (diff === 0) rowCls = 'today';
+  else if (diff === 1) rowCls = 'tom';
+  else if (t.priority === 'urgent') rowCls = 'urgent';
+  else if (t.status === 'in_progress') rowCls = 'work';
+
+  // Заголовок: 🔥 у срочных + статус-чип
+  const fire = (t.priority === 'urgent' && !isDone) ? '<span class="tkr-fire">🔥</span> ' : '';
+  let stChip = '';
+  if (!isDone && t.status === 'new') stChip = ' <span class="tkr-st new">НОВАЯ</span>';
+  else if (t.status === 'in_progress') stChip = ' <span class="tkr-st work">В РАБОТЕ</span>';
+  else if (t.status === 'cancelled') stChip = ' <span class="tkr-st cancel">ОТМЕНЕНА</span>';
+
+  // Строка 1: исполнитель + срок
+  let line1 = '';
+  if (t.assignee_name) {
+    const colorIdx = (t.assignee_id || 0) % 8;
+    const initials = (typeof getInitials === 'function') ? getInitials(t.assignee_name) : '?';
+    line1 += '<span class="pkb-wl-avatar ac-' + colorIdx + ' tkr-ava">' + escapeHtml(initials) + '</span>' +
+      '<span class="tkr-nm">' + escapeHtml(t.assignee_name) + '</span>';
+  } else if (!isDone) {
+    line1 += '<span class="tkr-noass">исполнитель не назначен</span>';
   }
-  if (t.source) meta.push('<span><i class="ti ti-tag"></i>' + escapeHtml(t.source) + '</span>');
-  // ЭТАП 16В-2: бейдж договора
-  if (t.contract_id && t.contract_number) {
-    const archived = !t.contract_is_active;
-    const label = t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '');
-    meta.push(
-      '<span class="task-meta-contract' + (archived ? ' archived' : '') +
-      '" onclick="event.stopPropagation(); openContractFromTask(' + t.contract_id + ')" title="' +
-      escapeHtml(archived ? 'Договор в архиве' : 'Перейти в договор') + '">' +
-      '<i class="ti ti-file-text"></i>' + escapeHtml(label) + '</span>'
-    );
+  if (isDone && t.done_at) {
+    // сколько дней делали: от created_at до done_at
+    let dur = '';
+    try {
+      const dd = Math.max(0, Math.round((new Date(t.done_at) - new Date(t.created_at)) / 86400000));
+      dur = dd === 0 ? 'в тот же день' : 'за ' + dd + ' ' + _plural(dd, ['день', 'дня', 'дней']);
+    } catch (e) {}
+    line1 += '<span class="tkr-doneat">✓ сделано ' + escapeHtml(String(t.done_at).slice(0, 10).split('-').reverse().slice(0, 2).join('.')) +
+      (dur ? ' · ' + dur : '') + '</span>';
+  } else if (t.deadline) {
+    let dlCls = '';
+    if (!isDone && diff !== null) {
+      if (diff < 0) dlCls = ' bad';
+      else if (diff <= 1) dlCls = ' tom';
+    }
+    line1 += '<span class="tkr-dl' + dlCls + '">⏰ ' + escapeHtml(formatTaskDeadline(t.deadline)) +
+      (diff !== null && diff < 0 ? ' · −' + Math.abs(diff) + ' дн' : '') + '</span>';
   }
 
-  // v2.43.92: быстрое «Готово» прямо на карточке для открытых задач
-  const quickDoneBtn = !isDone
-    ? '<button class="task-quick-done" onclick="_tasksQuickDone(event,' + t.id + ')" title="Отметить готовой"><i class="ti ti-check"></i></button>'
-    : '';
-  return '<div class="task-row ' + (isDone ? 'task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
-    '<div class="task-row-priority ' + priorityCls + '"></div>' +
-    '<div class="task-row-body">' +
-      '<div class="task-row-title">' + escapeHtml(t.title) + '</div>' +
-      (meta.length ? '<div class="task-row-meta">' + meta.join('') + '</div>' : '') +
+  // Строка 2: источник, договор, возраст + кто поставил
+  const tags = [];
+  if (t.source) {
+    const isVoice = /max[_\s-]?voice/i.test(t.source);
+    tags.push('<span class="tkr-tag' + (isVoice ? ' voice' : '') + '">' +
+      (isVoice ? '🎙 голосом из MAX' : '🏷 ' + escapeHtml(t.source)) + '</span>');
+  }
+  if (t.contract_id && t.contract_number) {
+    const archived = !t.contract_is_active;
+    tags.push('<span class="tkr-tag ct' + (archived ? ' arch' : '') + '" ' +
+      'onclick="event.stopPropagation(); openContractFromTask(' + t.contract_id + ')" ' +
+      'title="' + (archived ? 'Договор в архиве' : 'Перейти в договор') + '">📄 ' +
+      escapeHtml(t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '')) + '</span>');
+  }
+  if (!isDone && t.created_at) {
+    let ageTxt = '', ageOld = false;
+    try {
+      const ad = Math.max(0, Math.round((Date.now() - new Date(String(t.created_at).replace(' ', 'T') + 'Z')) / 86400000));
+      ageOld = ad >= 7;
+      ageTxt = ad === 0 ? 'поставлена сегодня' : (ad === 1 ? 'поставлена вчера' : (ageOld ? 'висит ' + ad + ' дн' : 'поставлена ' + ad + ' дн назад'));
+    } catch (e) {}
+    if (ageTxt) tags.push('<span class="tkr-age' + (ageOld ? ' old' : '') + '">' + ageTxt +
+      (t.creator_name ? ' · ' + escapeHtml(t.creator_name) : '') + '</span>');
+  }
+
+  // Действия: ✓ готово + «взять в работу» у новых
+  let acts = '';
+  if (!isDone) {
+    acts = '<div class="tkr-acts">' +
+      '<button class="task-quick-done" onclick="_tasksQuickDone(event,' + t.id + ')" title="Отметить готовой"><i class="ti ti-check"></i></button>' +
+      (t.status === 'new' ? '<span class="tkr-take" onclick="_tasksTakeWork(event,' + t.id + ')">взять в работу</span>' : '') +
+    '</div>';
+  }
+
+  return '<div class="task-row tkr ' + rowCls + (isDone ? ' task-done' : '') + '" onclick="openTaskDetail(' + t.id + ')">' +
+    '<div class="tkr-main">' +
+      '<div class="tkr-title">' + fire + escapeHtml(t.title) + stChip + '</div>' +
+      (line1 ? '<div class="tkr-l1">' + line1 + '</div>' : '') +
+      (tags.length ? '<div class="tkr-l2">' + tags.join('') + '</div>' : '') +
     '</div>' +
-    '<div class="task-status-pill ' + t.status + '">' + escapeHtml(t.status_label) + '</div>' +
-    quickDoneBtn +
+    acts +
     '</div>';
 }
 
@@ -2776,6 +2992,22 @@ function renderTaskDetail(t) {
   // Описание
   if (t.description) {
     html += '<div class="task-detail-description">' + escapeHtml(t.description).replace(/\n/g, '<br>') + '</div>';
+  }
+
+  // v2.45.662: файлы задачи (прикреплённые через MAX-бота)
+  if (t.files && t.files.length) {
+    html += '<div class="task-files"><div class="task-files-t"><i class="ti ti-paperclip"></i> Файлы <span class="cnt">' + t.files.length + '</span></div>';
+    t.files.forEach(f => {
+      const kb = Math.round((f.size || 0) / 1024);
+      const isImg = String(f.content_type || '').indexOf('image/') === 0;
+      html += '<a class="task-file-row" href="' + API_BASE + f.url + '" target="_blank">' +
+        '<span class="tf-ic"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i></span>' +
+        '<span class="tf-nm">' + escapeHtml(f.name || 'файл') + '</span>' +
+        (kb ? '<span class="tf-sz">' + kb + ' КБ</span>' : '') +
+        '<i class="ti ti-external-link tf-open"></i>' +
+      '</a>';
+    });
+    html += '</div>';
   }
 
   // Карточки-факты
@@ -3340,13 +3572,20 @@ function renderHomeMyTasks() {
   const el = document.getElementById('home-tasks-block');
   if (!el) return;
   const d = cache.myTasks || { tasks: [], total_open: 0 };
+  // v2.45.631: пустой блок сворачивается в одну строку — не занимает пол-экрана
+  if (!d.tasks || !d.tasks.length) {
+    el.innerHTML = '<div class="home-tasks-compact" onclick="goToSection(\'tasks\', \'tasks-mine\')">' +
+      '<i class="ti ti-circle-check" style="color:#16A34A;"></i> Нет активных задач' +
+      '<span style="margin-left:auto;color:var(--brand);font-weight:700;font-size:12px;">все →</span></div>';
+    return;
+  }
   let html = '<div class="home-tasks-widget">';
   html += '<div class="htw-head">';
   html += '<i class="ti ti-checklist"></i>';
   html += '<div class="htw-title">Мои задачи · ' + (d.total_open || 0) + ' открытых</div>';
   html += '<a class="htw-link" onclick="goToSection(\'tasks\', \'tasks-mine\')">все →</a>';
   html += '</div>';
-  if (!d.tasks || !d.tasks.length) {
+  if (false) {
     html += '<div class="htw-empty"><i class="ti ti-circle-check"></i>Нет активных задач</div>';
   } else {
     html += '<div class="htw-list">';
@@ -3374,6 +3613,8 @@ async function loadHomeContractsProgress() {
     const d = await apiGet('/api/contracts-with-progress');
     cache.contractsWithProgress = d.contracts || [];
     renderHomeContractsProgress();
+    // v2.45.631: «Пульс» использует суммы/просрочку из договоров — перерисуем
+    if (cache.homeKpi) renderHomeKpi();
   } catch (e) {
     el.innerHTML = '';
   }
@@ -3786,12 +4027,12 @@ function renderModels(d) {
             '<span class="models-subgroup-count">' + withoutSubgroup.length + '</span>' +
           '</button>' +
           '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">' +
-            '<div class="card">';
+            '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         withoutSubgroup.forEach(m => { html += _renderModelRow(m); });
         html += '</div></div></div>';
       } else {
         // Если нет подгрупп — рендерим как обычно одной картой
-        html += '<div class="card">';
+        html += '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         withoutSubgroup.forEach(m => { html += _renderModelRow(m); });
         html += '</div>';
       }
@@ -3858,7 +4099,7 @@ function renderModels(d) {
         '<div class="models-subgroup-body" data-subkey="' + subKey + '" style="' + (subOpen ? '' : 'display:none;') + '">';
       // Без категории — карточкой как раньше
       if (noCat.length) {
-        html += '<div class="card">';
+        html += '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         noCat.forEach(m => { html += _renderModelRow(m); });
         html += '</div>';
       }
@@ -3888,7 +4129,7 @@ function renderModels(d) {
             renameBtn +
           '</div>' +
           '<div class="models-subgroup-body" data-subkey="' + catKey + '" style="' + (catOpen ? '' : 'display:none;') + '">' +
-            '<div class="card">';
+            '<div class="card nvt-card">' + _modelRowsHeaderHtml();
         cat.items.forEach(m => { html += _renderModelRow(m); });
         html += '</div></div></div>';
       });
@@ -3909,38 +4150,73 @@ function _highlightAisi(text) {
     .replace(/(Нерж\.?(?:\s*AISI)?)/gi, m => '<span class="lbl-aisi">' + m + '</span>');
 }
 
+// v2.45.x: шапка-легенда колонок наличия — печатается один раз на карточку
+// (подгруппу/категорию), чтобы цифры в строках читались как таблица.
+function _modelRowsHeaderHtml() {
+  return '<div class="nvt-head">' +
+    '<div>Позиция</div>' +
+    '<div class="nvt-num" title="Готовых сборок на складе">Готово</div>' +
+    '<div class="nvt-num" title="Зарезервировано под договоры">Резерв</div>' +
+    '<div class="nvt-num" title="Комплектующих в дефиците / можно собирать">К закупке</div>' +
+    '<div></div>' +
+  '</div>';
+}
+
 function _renderModelRow(m) {
-  const title = m.name + (m.extra ? ' · ' + m.extra : '');
   const isAisi = ((m.name || '').toUpperCase().includes('AISI')) ||
                  ((m.exec_fixed || '').toLowerCase().startsWith('нерж'));
-  const meta = [];
-  if (m.article) meta.push(m.article);
-  if (m.exec_mode === 'choice') meta.push('испол.: ' + m.exec_label_st + ' / ' + m.exec_label_ne);
-  else if (m.exec_mode === 'fixed' && m.exec_fixed) meta.push('испол.: ' + m.exec_fixed);
-  if (m.needs_ip) meta.push('IP');
-  const inactiveCls = m.is_active ? '' : ' emp-inactive';
-  const aisiRowCls = isAisi ? ' model-row-aisi' : '';
-  let stockBadges = '';
-  if (typeof m.assemblies_ready === 'number') {
-    if (m.assemblies_ready > 0) {
-      stockBadges += '<span class="model-badge mb-stock" title="Готовых сборок на складе"><i class="ti ti-package"></i>В наличии: ' + m.assemblies_ready + '</span>';
-    }
-    if (m.assemblies_reserved > 0) {
-      stockBadges += '<span class="model-badge mb-reserved" title="Зарезервировано под договоры"><i class="ti ti-lock"></i>Резерв: ' + m.assemblies_reserved + '</span>';
-    }
-    if (m.bom_shortage > 0) {
-      stockBadges += '<span class="model-badge mb-shortage" title="Комплектующих в дефиците для сборки"><i class="ti ti-shopping-cart"></i>К закупке: ' + m.bom_shortage + '</span>';
-    } else if (m.bom_total > 0 && m.assemblies_ready === 0) {
-      stockBadges += '<span class="model-badge mb-ready" title="Все комплектующие в наличии — можно собирать"><i class="ti ti-tool"></i>К сборке</span>';
-    }
+  // Название без «шумных» повторов AISI — вместо них один тег «НЕРЖ · AISI».
+  let title = m.name + (m.extra ? ' · ' + m.extra : '');
+  if (isAisi) {
+    title = title.replace(/\s*\bAISI\b\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
   }
-  return '<div class="employee-row' + inactiveCls + aisiRowCls + '" style="cursor:pointer;" onclick="openModelDetail(' + m.id + ')">' +
-    '<div class="emp-info"><div class="emp-name">' + _highlightAisi(title) + '</div>' +
-    '<div class="emp-meta">' + _highlightAisi(meta.join(' · ') || '—') +
-      (stockBadges ? '<div class="model-badges-row">' + stockBadges + '</div>' : '') +
-    '</div></div>' +
-    '<div style="color:var(--text-light);font-size:18px;"><i class="ti ti-chevron-right"></i></div>' +
-    '</div>';
+  const tag = isAisi ? ' <span class="nvt-tag-nerzh">НЕРЖ · AISI</span>' : '';
+  // Мета: артикул моноширинным + исполнение (если оно не «нерж», уже показанное тегом) + IP
+  const metaBits = [];
+  if (m.article) metaBits.push('<span class="nvt-art-code">' + escapeHtml(m.article) + '</span>');
+  if (m.exec_mode === 'choice') metaBits.push('испол.: ' + escapeHtml((m.exec_label_st || '') + ' / ' + (m.exec_label_ne || '')));
+  else if (m.exec_mode === 'fixed' && m.exec_fixed && !isAisi) metaBits.push('испол.: ' + escapeHtml(m.exec_fixed));
+  if (m.needs_ip) metaBits.push('<span class="nvt-ip">IP</span>');
+  const inactiveCls = m.is_active ? '' : ' emp-inactive';
+
+  // Колонки наличия. Если склад не считался (нет with_stock) — прочерки.
+  const hasStock = (typeof m.assemblies_ready === 'number');
+  const ready = hasStock ? (m.assemblies_ready || 0) : null;
+  const reserved = hasStock ? (m.assemblies_reserved || 0) : null;
+  const shortage = hasStock ? (m.bom_shortage || 0) : null;
+  const canBuild = hasStock && shortage === 0 && (m.bom_total || 0) > 0 && ready === 0;
+
+  const dash = '<span class="nvt-z">—</span>';
+  const colReady = (ready && ready > 0) ? '<span class="nvt-v nvt-ok">' + ready + '</span>' : dash;
+  const colReserved = (reserved && reserved > 0) ? '<span class="nvt-v nvt-res">' + reserved + '</span>' : dash;
+  let colAction;
+  if (shortage && shortage > 0) {
+    colAction = '<span class="nvt-v nvt-buy" title="Комплектующих в дефиците для сборки">' + shortage + '</span>';
+  } else if (canBuild) {
+    colAction = '<span class="nvt-pill-build" title="Все комплектующие в наличии — можно собирать"><i class="ti ti-tool"></i>к сборке</span>';
+  } else {
+    colAction = dash;
+  }
+
+  // Цветовая полоска-статус слева: 🔴 нет готовых и нужна закупка · 🟢 есть готовые ·
+  // 🟡 можно собирать · ⬜ пусто/не считалось.
+  let stCls = 'nvt-st-none';
+  if (hasStock) {
+    if (ready > 0) stCls = 'nvt-st-ok';
+    else if (shortage > 0) stCls = 'nvt-st-buy';
+    else if (canBuild) stCls = 'nvt-st-build';
+  }
+
+  return '<div class="nvt-row ' + stCls + inactiveCls + '" onclick="openModelDetail(' + m.id + ')">' +
+    '<div class="nvt-main">' +
+      '<div class="nvt-name">' + escapeHtml(title) + tag + '</div>' +
+      (metaBits.length ? '<div class="nvt-art">' + metaBits.join(' <span class="nvt-dot">·</span> ') + '</div>' : '') +
+    '</div>' +
+    '<div class="nvt-num">' + colReady + '</div>' +
+    '<div class="nvt-num">' + colReserved + '</div>' +
+    '<div class="nvt-num">' + colAction + '</div>' +
+    '<div class="nvt-chev"><i class="ti ti-chevron-right"></i></div>' +
+  '</div>';
 }
 
 // ============ ЭТАП 32: Карточка модели с тех. картой ============
@@ -4506,18 +4782,44 @@ async function uploadModelScheme(modelId, input) {
   input.value = '';
 }
 
+// v2.45.630: защита от повторных кликов + индикатор + клиентский таймаут,
+// чтобы схема не «висела» молча и не приходилось жать несколько раз.
+window._schemeLoading = window._schemeLoading || {};
 async function downloadModelScheme(modelId) {
+  if (window._schemeLoading[modelId]) { showToast('Схема уже открывается…', 'info'); return; }
+  window._schemeLoading[modelId] = true;
+  showToast('Открываю схему…', 'info');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/models/' + modelId + '/scheme-file', {
       headers: { 'Authorization': 'Bearer ' + token },
+      signal: ctrl.signal,
     });
-    if (!r.ok) { showToast('Не удалось открыть', 'error'); return; }
+    clearTimeout(timer);
+    if (!r.ok) { showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
+    // v2.45.645: сервер вернул прямую ссылку на R2 → открываем напрямую (быстро).
+    const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+    if (ct.includes('application/json')) {
+      const j = await r.json().catch(() => ({}));
+      if (j && j.url) { window.open(j.url, '_blank'); return; }
+      showToast('Не удалось получить ссылку на схему', 'error');
+      return;
+    }
+    // фолбэк — файл проксирован байтами (диск / без S3)
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (e) { showToast('Ошибка: ' + (e && e.message || e), 'error'); }
+  } catch (e) {
+    clearTimeout(timer);
+    showToast(e && e.name === 'AbortError'
+      ? 'Схема грузится дольше обычного — нажми ещё раз'
+      : ('Ошибка: ' + (e && e.message || e)), 'error');
+  } finally {
+    window._schemeLoading[modelId] = false;
+  }
 }
 
 async function deleteModelSchemeFile(modelId) {
@@ -5544,6 +5846,10 @@ async function loadModelBom(modelId) {
           '<div class="bom-qty-lbl">в наличии</div></div>' +
         (canManageSales() ?
           '<div class="bom-actions">' +
+            // v2.45.633: «Сопоставить со складом» — подобрать похожую складскую
+            // позицию и привязать (тогда остаток/наличие синхронизируются). Для
+            // компонентов, не для подсборок.
+            (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomRelink(' + it.id + ', ' + JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ', ' + modelId + ')" title="Сопоставить со складом (выбрать похожую позицию)"><i class="ti ti-arrows-exchange"></i></button>' : '') +
             '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
@@ -7511,18 +7817,23 @@ async function _doBomPreview() {
 // ---- Ручное сопоставление строки спецификации со складской позицией ----
 // Когда авто-матч не нашёл остаток (позиция показана «есть 0», хотя на складе
 // она есть под другой/дублирующей записью) — даём выбрать нужную вручную.
-function openBomRelink(bomId, name) {
-  state._bomRelink = { bomId: bomId, name: name || '' };
+let _bomRelinkAllComps = null;
+function openBomRelink(bomId, name, modelId) {
+  state._bomRelink = { bomId: bomId, name: name || '', modelId: (modelId != null ? modelId : null) };
+  _bomRelinkAllComps = null;   // v2.45.635: перезагрузим склад свежим при каждом открытии
+  // Пересоздаём модалку заново (не переиспользуем — иначе тянется старое состояние)
   let ov = document.getElementById('bom-relink-overlay');
-  if (!ov) {
-    ov = document.createElement('div');
-    ov.id = 'bom-relink-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
-    ov.onclick = function (e) { if (e.target === ov) closeBomRelink(); };
-    document.body.appendChild(ov);
-  }
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'bom-relink-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  // Закрываем ТОЛЬКО по клику на фон. Клики/mousedown внутри карточки гасим,
+  // чтобы событие не «утекало» к родительской модалке модели (она закрывалась
+  // по клику-вне — из-за этого окно «вылетало»).
+  ov.addEventListener('mousedown', function (e) { if (e.target === ov) closeBomRelink(); });
+  document.body.appendChild(ov);
   ov.innerHTML =
-    '<div onclick="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:540px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:540px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
       '<div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);">' +
         '<h3 style="margin:0;font-size:16px;"><i class="ti ti-arrows-exchange"></i> Сопоставить со складом</h3>' +
         '<button class="modal-close" onclick="closeBomRelink()" style="background:none;border:none;font-size:20px;cursor:pointer;"><i class="ti ti-x"></i></button>' +
@@ -7551,25 +7862,62 @@ function _bomRelinkSearchDebounced(q) {
   _bomRelinkDebounce = setTimeout(function () { _doBomRelinkSearch(q); }, 250);
 }
 
+// v2.45.635: нормализация — вниз регистр, ё→е, убираем всю пунктуацию/пробелы.
+// «РДК-8.4», «РДК-8,4», «РДК 8 4» → «рдк84» (совпадут).
+function _relinkNorm(s) {
+  return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^0-9a-zа-яё]+/g, '');
+}
+function _relinkTokens(s) {
+  return String(s || '').toLowerCase().replace(/ё/g, 'е').split(/[^0-9a-zа-яё]+/).filter(t => t.length >= 2);
+}
+async function _bomRelinkEnsureComps() {
+  if (_bomRelinkAllComps) return _bomRelinkAllComps;
+  try { const d = await apiGet('/api/components'); _bomRelinkAllComps = d.components || []; }
+  catch (e) { _bomRelinkAllComps = []; }
+  return _bomRelinkAllComps;
+}
 async function _doBomRelinkSearch(q) {
   const box = document.getElementById('bom-relink-results');
   if (!box) return;
+  box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);">Ищем похожие…</div>';
   try {
-    const data = await apiGet('/api/components?search=' + encodeURIComponent(q || ''));
-    const comps = (data.components || []).slice(0, 50);
+    const all = await _bomRelinkEnsureComps();
+    const qn = _relinkNorm(q);
+    const qtokens = _relinkTokens(q);
+    let scored;
+    if (!qn) {
+      // пустой запрос — показываем то, что на складе (по остатку)
+      scored = all.map(c => ({ c, s: (Number(c.qty_on_stock) || 0) > 0 ? 1 : 0 }));
+    } else {
+      scored = all.map(c => {
+        const nn = _relinkNorm(c.name) + _relinkNorm(c.sku);
+        let s = 0;
+        if (nn.includes(qn)) s += 100;                          // прямое вхождение целиком
+        qtokens.forEach(t => { if (nn.includes(t)) s += 10; }); // совпадение по словам
+        if (s > 0 && (Number(c.qty_on_stock) || 0) > 0) s += 1; // «живые» — выше
+        return { c, s };
+      }).filter(x => x.s > 0);
+    }
+    scored.sort((a, b) => b.s - a.s || String(a.c.name || '').localeCompare(String(b.c.name || '')));
+    const comps = scored.slice(0, 50).map(x => x.c);
     if (!comps.length) {
-      box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);">Ничего не найдено</div>';
+      box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);line-height:1.5;">Ничего похожего не нашлось.<br>Попробуй короче — только марку или артикул (напр. «РДК» или «NXB-63S»).</div>';
       return;
     }
     box.innerHTML = comps.map(function (c) {
       const stock = (c.qty_on_stock !== undefined && c.qty_on_stock !== null) ? c.qty_on_stock : 0;
       const sku = c.sku ? ('<span style="color:var(--text-light);font-size:12px;"> · ' + escapeHtml(c.sku) + '</span>') : '';
       const stockColor = stock > 0 ? '#15803D' : '#B25E00';
-      return '<div class="bom-relink-row" onclick="relinkBomComponent(' + c.id + ')" ' +
-        'style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
-        '<div><div style="font-weight:600;">' + escapeHtml(c.name || '') + sku + '</div>' +
-          (c.category_name ? '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(c.category_name) + '</div>' : '') + '</div>' +
-        '<div style="white-space:nowrap;font-weight:700;color:' + stockColor + ';">' + _fmtQty(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
+      const cNameAttr = JSON.stringify(c.name || '').replace(/"/g, '&quot;');
+      return '<div class="bom-relink-row" ' +
+        'style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">' +
+        '<div style="min-width:0;"><div style="font-weight:600;">' + escapeHtml(c.name || '') + sku + '</div>' +
+          (c.category_name ? '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(c.category_name) + '</div>' : '') +
+          '<div style="white-space:nowrap;font-weight:700;color:' + stockColor + ';font-size:12.5px;margin-top:2px;">на складе: ' + _fmtQty(stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:5px;white-space:nowrap;flex:none;">' +
+          '<button class="btn btn-primary btn-small" onclick="relinkBomComponent(' + c.id + ')" title="Привязать только эту строку Тех.карты к складской позиции">Привязать</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="mergeBomComponentInto(' + c.id + ', ' + cNameAttr + ')" title="Считать одинаковыми: перенести ВСЕ ссылки и остаток на эту позицию (во всех моделях)"><i class="ti ti-merge"></i> Склеить</button>' +
+        '</div>' +
       '</div>';
     }).join('');
   } catch (e) {
@@ -7585,7 +7933,11 @@ async function relinkBomComponent(componentId) {
     if (resp && resp.ok) {
       showToast('Позиция сопоставлена со складом', 'success');
       closeBomRelink();
-      _doBomPreview();
+      // v2.45.633: обновляем нужный вид — редактор Тех.карты модели или превью дефицита
+      if (st.modelId != null && typeof loadModelBom === 'function') loadModelBom(st.modelId);
+      else if (typeof _doBomPreview === 'function') _doBomPreview();
+      // v2.45.668: закуп мог измениться — обновим, если открыт
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
     } else {
       showToast((resp && resp.data && resp.data.message) || 'Не удалось сопоставить', 'error');
     }
@@ -7594,9 +7946,33 @@ async function relinkBomComponent(componentId) {
   }
 }
 
+// v2.45.668: «Склеить» — считать позицию строки Тех.карты дублем выбранной складской
+// и слить в неё (перенос ВСЕХ ссылок во всех моделях/договорах + сложить остаток).
+async function mergeBomComponentInto(componentId, name) {
+  const st = state._bomRelink || {};
+  if (!st.bomId) return;
+  if (!confirm('Склеить «' + (st.name || 'позицию') + '» с «' + (name || '') + '»?\n\n' +
+               'Это одна и та же позиция: во ВСЕХ моделях и договорах ссылки перейдут на выбранную складскую, ' +
+               'остатки сложатся, дубль деактивируется. Дефицит уйдёт везде.')) return;
+  try {
+    const resp = await apiPost('/api/model-bom/' + st.bomId + '/merge-into', { component_id: componentId });
+    if (resp && resp.ok) {
+      showToast('Склеено со складом', 'success');
+      closeBomRelink();
+      if (st.modelId != null && typeof loadModelBom === 'function') loadModelBom(st.modelId);
+      else if (typeof _doBomPreview === 'function') _doBomPreview();
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
+    } else {
+      showToast((resp && resp.data && resp.data.message) || 'Не удалось склеить', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка склейки', 'error');
+  }
+}
+
 function closeBomRelink() {
   const ov = document.getElementById('bom-relink-overlay');
-  if (ov) ov.style.display = 'none';
+  if (ov) ov.remove();
 }
 
 // ---- Взять тех.карту (BOM) из другой модели ----
@@ -8436,8 +8812,23 @@ function renderContractsList() {
 
   // v2.45.5xx: новый вид — карточки-строки (адаптивные)
   if (window.CT_V2) {
-    let html = toggle + '<div class="ct2-list">';
-    list.forEach(c => { html += _ct2Row(c); });
+    // v2.45.629: чип «Просрочено» может дополнительно сузить список
+    let shown = list;
+    if (window._ctOverdueOnly) {
+      shown = shown.filter(c => getContractUrgencyClass(c) === 'urg-overdue');
+    }
+    // Просроченные всплывают наверх (стабильно, остальной порядок сохраняется)
+    shown = shown.slice().sort((a, b) => {
+      const ao = getContractUrgencyClass(a) === 'urg-overdue' ? 0 : 1;
+      const bo = getContractUrgencyClass(b) === 'urg-overdue' ? 0 : 1;
+      return ao - bo;
+    });
+    let html = toggle + _ct2SummaryChips() + '<div class="ct2-list">';
+    if (!shown.length) {
+      html += '<div class="empty-block"><i class="ti ti-file-text"></i>Нет договоров под этот фильтр</div>';
+    } else {
+      shown.forEach(c => { html += _ct2Row(c); });
+    }
     html += '</div>';
     container.innerHTML = html;
     return;
@@ -8519,6 +8910,42 @@ function _ct2StatusPill(c) {
 }
 
 // v2.45.5xx: строка-карточка договора (новый вид списка)
+// v2.45.629: сводка-чипы над списком договоров — деньги в работе, просрочка,
+// отгружено. Клик по чипу — фильтр (просрочка — свой toggle поверх табов).
+function _ct2SummaryChips() {
+  const all = cache.contracts || [];
+  if (!all.length) return '';
+  const money = canSeeMoney();
+  const fmtM = v => {
+    if (!money) return '';
+    if (v >= 1000000) return ' · ' + (v / 1000000).toFixed(2).replace('.', ',').replace(/,?0+$/, '') + ' млн ₽';
+    return v > 0 ? ' · ' + formatMoney(v) : '';
+  };
+  let workN = 0, workS = 0, overN = 0, overS = 0, shipN = 0, shipS = 0;
+  all.forEach(c => {
+    const s = parseFloat(c.sum_amount || 0);
+    if (c.status === 'production' || c.status === 'ready' || c.status === 'partially_shipped') { workN++; workS += s; }
+    if (getContractUrgencyClass(c) === 'urg-overdue') { overN++; overS += s; }
+    if (c.status === 'shipped') { shipN++; shipS += s; }
+  });
+  let html = '<div class="ct2-sumrow">';
+  if (workN) {
+    html += '<span class="ct2-sumchip" onclick="state.salesContractsFilter=\'production\';window._ctOverdueOnly=false;renderContractsList();">' +
+      '<span class="ct2-sumdot b"></span>В работе <b>' + workN + escapeHtml(fmtM(workS)) + '</b></span>';
+  }
+  if (overN) {
+    html += '<span class="ct2-sumchip' + (window._ctOverdueOnly ? ' on' : '') + '" onclick="window._ctOverdueOnly=!window._ctOverdueOnly;renderContractsList();">' +
+      '<span class="ct2-sumdot r"></span>Просрочено <b>' + overN + escapeHtml(fmtM(overS)) + '</b>' +
+      (window._ctOverdueOnly ? ' ✓' : ' — показать') + '</span>';
+  }
+  if (shipN) {
+    html += '<span class="ct2-sumchip" onclick="state.salesContractsFilter=\'shipped\';window._ctOverdueOnly=false;renderContractsList();">' +
+      '<span class="ct2-sumdot g"></span>Отгружено <b>' + shipN + escapeHtml(fmtM(shipS)) + '</b></span>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function _ct2Row(c) {
   const urg = getContractUrgencyClass(c);
   let stripCls = '';
@@ -8526,19 +8953,55 @@ function _ct2Row(c) {
   else if (urg === 'urg-urgent') stripCls = 'hot';
   else if (urg === 'urg-soon' || urg === 'urg-ok') stripCls = 'ok';
   else if (urg === 'urg-done') stripCls = 'done';
+  if (c.status === 'closed') stripCls += ' ct2-closed';
 
   let urgPill = '';
   if (urg === 'urg-overdue') urgPill = '<span class="ct2-urg over"><span class="em">⚠️</span> ПРОСРОЧЕН</span>';
   else if (urg === 'urg-urgent') urgPill = '<span class="ct2-urg hot"><span class="em">🔥</span> ГОРИТ</span>';
 
-  let dchCls = '';
+  // v2.45.629: срок с дельтой — «−8 дней» / «завтра» / «через 25 дн»
+  let dchCls = '', termSub = '';
   if (urg === 'urg-overdue') dchCls = ' late';
   else if (urg === 'urg-urgent') dchCls = ' hot';
+  if (c.delivery_date) {
+    try {
+      const _t = new Date(); _t.setHours(0, 0, 0, 0);
+      const _d = Math.round((new Date(c.delivery_date + 'T00:00:00') - _t) / 86400000);
+      if (_d < 0) termSub = '<span class="ct2-term-sub late">−' + Math.abs(_d) + ' ' + plural(Math.abs(_d), 'день', 'дня', 'дней') + '</span>';
+      else if (_d === 0) termSub = '<span class="ct2-term-sub hot">сегодня</span>';
+      else if (_d === 1) termSub = '<span class="ct2-term-sub hot">завтра</span>';
+      else if (c.status !== 'shipped' && c.status !== 'closed') termSub = '<span class="ct2-term-sub">через ' + _d + ' дн</span>';
+    } catch (e) {}
+  }
   const dateChip = '<span class="ct2-date-chip' + dchCls + '">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</span>';
 
-  const sub = escapeHtml(c.number || '—') + ' · ' +
-    escapeHtml(_contractTypeLabel(c.contract_type)) + ' · ' +
-    escapeHtml(legalEntityShortName(c.legal_entity));
+  // Тип с иконкой + юрлицо (ТД — мини-бейджем)
+  const typeIcon = c.contract_type === 'supply_install' ? '🚚🔧' : (c.contract_type === 'install_only' ? '🔧' : '🚚');
+  const entName = legalEntityShortName(c.legal_entity);
+  const isTd = String(c.legal_entity || '').toLowerCase().indexOf('td') >= 0;
+  const entHtml = (isTd ? '<span class="ct2-td-badge">ТД</span> ' : '') + escapeHtml(entName);
+  const sub = '<span class="ct2-num">' + escapeHtml(c.number || '—') + '</span> · ' +
+    '<span class="em">' + typeIcon + '</span> ' + escapeHtml(_contractTypeLabel(c.contract_type)) + ' · ' + entHtml;
+
+  // v2.45.629: полоса готовности производства (те же данные, что «Главная продаж»)
+  let progHtml = '';
+  if (c.status === 'production' || c.status === 'ready' || c.status === 'partially_shipped') {
+    const qty = c.assemblies_qty || 0;
+    const pct = (c.progress_pct != null) ? Math.max(0, Math.min(100, c.progress_pct)) : null;
+    let barColor = '#10B981';
+    if (urg === 'urg-overdue') barColor = '#EF4444';
+    else if (urg === 'urg-urgent' || urg === 'urg-soon') barColor = '#F59E0B';
+    if (pct != null || qty > 0) {
+      const shown = (pct != null) ? pct : 0;
+      progHtml = '<div class="ct2-prog" title="Готовность производства по сборкам договора">' +
+        '<div class="ct2-prog-lbl">готовность <b>' + (pct != null ? pct + '%' : '—') + (qty ? ' · ' + qty + ' ' + pluralAssemblies(qty) : '') + '</b></div>' +
+        '<div class="ct2-prog-bar"><i style="width:' + shown + '%;background:' + barColor + ';"></i></div>' +
+      '</div>';
+    } else {
+      progHtml = '<div class="ct2-prog"><div class="ct2-prog-lbl">готовность</div>' +
+        '<div class="ct2-prog-none">сборки не заведены</div></div>';
+    }
+  }
 
   const mgrName = c.manager_name || '—';
   const mgr = '<div class="ct2-mgr"><span class="ct2-mgr-ava">' + escapeHtml(getInitials(mgrName)) + '</span>' +
@@ -8552,8 +9015,9 @@ function _ct2Row(c) {
       '<div class="ct2-top"><span class="ct2-client">' + escapeHtml(c.contractor_name || '—') + '</span>' + _ct2StatusPill(c) + urgPill + '</div>' +
       '<div class="ct2-sub">' + sub + '</div>' +
     '</div>' +
+    progHtml +
     '<div class="ct2-right">' +
-      '<div class="ct2-term"><span class="ct2-term-lbl">срок</span>' + dateChip + '</div>' +
+      '<div class="ct2-term"><span class="ct2-term-lbl">срок</span>' + dateChip + termSub + '</div>' +
       sumHtml + mgr +
       '<span class="ct2-arrow em">›</span>' +
     '</div>' +
