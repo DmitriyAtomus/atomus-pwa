@@ -953,6 +953,98 @@ async function openComponentForm(componentId) {
       } catch (e) { /* марок нет — не показываем */ }
     })();
   }
+  // v2.45.671: варианты обобщённой позиции («зонтик»): чем закрыт + управление.
+  if (componentId) {
+    (async () => {
+      try {
+        const dc = await apiGet('/api/components/' + componentId);
+        const variants = (dc && dc.variants) || [];
+        const isVariant = dc && dc.umbrella_id;
+        let html = '';
+        if (variants.length) {
+          const rows = variants.map(v =>
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;">' +
+              '<span style="font-size:13px;min-width:0;">' + escapeHtml(v.name || '') + '</span>' +
+              '<span style="white-space:nowrap;flex:none;"><b>' + _fmtQty(v.qty_on_stock) + '</b> ' + escapeHtml(v.unit || 'шт.') +
+                ' <button class="btn btn-secondary btn-small" style="padding:1px 7px;margin-left:4px;" title="Отвязать вариант" onclick="detachVariant(' + v.id + ')">✕</button></span>' +
+            '</div>'
+          ).join('');
+          html = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);margin-bottom:4px;"><i class="ti ti-versions"></i> Варианты (чем закрыт) · наличие всего <b>' + _fmtQty(dc.effective_stock) + '</b></div>' + rows;
+        } else if (isVariant) {
+          html = '<div style="font-size:12.5px;color:var(--text-light);"><i class="ti ti-arrow-up"></i> Вариант обобщённой: <b>' + escapeHtml(dc.umbrella_name || ('#' + dc.umbrella_id)) + '</b> <button class="btn btn-secondary btn-small" style="margin-left:6px;" onclick="detachVariant(' + componentId + ')">Отвязать</button></div>';
+        } else {
+          html = '<div style="font-size:12px;color:var(--text-light);">Обобщённая позиция? Привяжи конкретные модели как варианты — наличие будет считаться суммой.</div>';
+        }
+        if (!isVariant) html += '<button class="btn btn-secondary btn-small" style="margin-top:8px;" onclick="openAddVariant(' + componentId + ')"><i class="ti ti-plus"></i> Добавить вариант</button>';
+        const box = document.createElement('div');
+        box.style.cssText = 'padding:10px 18px;border-bottom:1px solid var(--border);background:#F5FBF7;';
+        box.innerHTML = html;
+        const modalEl = m.querySelector('.modal');
+        const header = modalEl && modalEl.querySelector('.modal-header');
+        if (header && header.parentNode) header.parentNode.insertBefore(box, header.nextSibling);
+      } catch (e) { /* не критично */ }
+    })();
+  }
+}
+
+// v2.45.671: отвязать вариант от обобщённой позиции.
+async function detachVariant(variantId) {
+  try {
+    const r = await apiPost('/api/components/' + variantId + '/umbrella', { umbrella_id: null });
+    if (r && r.ok) { showToast('Отвязано', 'success'); if (typeof openComponentDetail === 'function') { closeComponentForm(); } if (typeof loadWarehouseComponents === 'function') loadWarehouseComponents(); else if (typeof loadComponentsCatalog === 'function') loadComponentsCatalog(); if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch(e){} } }
+    else showToast('Не удалось отвязать', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+// v2.45.671: добавить вариант — простой поиск складской позиции.
+async function openAddVariant(umbrellaId) {
+  let comps = cache.components || [];
+  if (!comps.length) { try { const r = await apiGet('/api/components'); comps = r.components || []; cache.components = comps; } catch (e) {} }
+  let ov = document.getElementById('add-variant-overlay');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'add-variant-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.addEventListener('mousedown', function (e) { if (e.target === ov) ov.remove(); });
+  ov.innerHTML =
+    '<div onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:520px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">' +
+      '<div class="modal-header" style="padding:14px 18px;border-bottom:1px solid var(--border);"><h3 style="margin:0;font-size:16px;">Добавить вариант</h3><button class="modal-close" onclick="document.getElementById(\'add-variant-overlay\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:14px 18px;overflow:auto;">' +
+        '<input id="add-variant-search" type="text" placeholder="Поиск конкретной модели (напр. XG-TXE35)…" oninput="_renderAddVariant(' + umbrellaId + ',this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;margin-bottom:10px;font-size:14px;">' +
+        '<div id="add-variant-results"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  _renderAddVariant(umbrellaId, '');
+  setTimeout(function () { const i = document.getElementById('add-variant-search'); if (i) i.focus(); }, 50);
+}
+
+function _renderAddVariant(umbrellaId, q) {
+  const box = document.getElementById('add-variant-results');
+  if (!box) return;
+  const qn = (q || '').toLowerCase().replace(/[^0-9a-zа-яё]+/g, '');
+  const comps = (cache.components || []).filter(c => c.id !== umbrellaId && !c.umbrella_id);
+  const scored = comps.filter(c => !qn || (String(c.name || '') + String(c.sku || '')).toLowerCase().replace(/[^0-9a-zа-яё]+/g, '').includes(qn)).slice(0, 40);
+  if (!scored.length) { box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-light);">Ничего не найдено</div>'; return; }
+  box.innerHTML = scored.map(c =>
+    '<div onclick="submitAddVariant(' + c.id + ',' + umbrellaId + ')" style="display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+      '<span style="font-weight:600;">' + escapeHtml(c.name || '') + (c.sku ? ' <span style="color:var(--text-light);font-size:12px;">· ' + escapeHtml(c.sku) + '</span>' : '') + '</span>' +
+      '<span style="white-space:nowrap;font-weight:700;">' + _fmtQty(c.qty_on_stock || 0) + ' ' + escapeHtml(c.unit || 'шт.') + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+async function submitAddVariant(componentId, umbrellaId) {
+  try {
+    const r = await apiPost('/api/components/' + componentId + '/umbrella', { umbrella_id: umbrellaId });
+    if (r && r.ok) {
+      showToast('Вариант добавлен', 'success');
+      const ov = document.getElementById('add-variant-overlay'); if (ov) ov.remove();
+      closeComponentForm();
+      if (typeof loadWarehouseComponents === 'function') loadWarehouseComponents(); else if (typeof loadComponentsCatalog === 'function') loadComponentsCatalog();
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
+    } else showToast((r && r.data && r.data.message) || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 function closeComponentForm() {
@@ -13106,6 +13198,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.672',
+    date: '06.07.2026',
+    title: 'Обобщённые позиции и их варианты («зонтик»)',
+    features: [
+      'Позиция вроде <b>«Наружный блок 12»</b> может быть <b>обобщённой</b>, а её закрывают конкретные модели (варианты): XG-TXE35RHA-ODU и др.',
+      'Наличие обобщённой = <b>сумма вариантов</b>; в «Что закупить» дефицит считается по сумме (нет ложного «низкий остаток», когда вариант есть на складе)',
+      'В карточке позиции — блок <b>«Варианты (чем закрыт)»</b> с разбивкой и кнопкой «Добавить вариант»/отвязать',
+    ],
+  },
   {
     version: 'v2.45.671',
     date: '06.07.2026',
