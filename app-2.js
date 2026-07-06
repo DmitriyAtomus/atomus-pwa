@@ -2994,6 +2994,22 @@ function renderTaskDetail(t) {
     html += '<div class="task-detail-description">' + escapeHtml(t.description).replace(/\n/g, '<br>') + '</div>';
   }
 
+  // v2.45.662: файлы задачи (прикреплённые через MAX-бота)
+  if (t.files && t.files.length) {
+    html += '<div class="task-files"><div class="task-files-t"><i class="ti ti-paperclip"></i> Файлы <span class="cnt">' + t.files.length + '</span></div>';
+    t.files.forEach(f => {
+      const kb = Math.round((f.size || 0) / 1024);
+      const isImg = String(f.content_type || '').indexOf('image/') === 0;
+      html += '<a class="task-file-row" href="' + API_BASE + f.url + '" target="_blank">' +
+        '<span class="tf-ic"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i></span>' +
+        '<span class="tf-nm">' + escapeHtml(f.name || 'файл') + '</span>' +
+        (kb ? '<span class="tf-sz">' + kb + ' КБ</span>' : '') +
+        '<i class="ti ti-external-link tf-open"></i>' +
+      '</a>';
+    });
+    html += '</div>';
+  }
+
   // Карточки-факты
   html += '<div class="task-facts-grid">';
   // Исполнитель
