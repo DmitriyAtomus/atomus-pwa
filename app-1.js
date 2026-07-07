@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.689-smart-queue";
+const APP_VERSION = "v2.45.692-smart-queue";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -6763,28 +6763,32 @@ function toggleRecentMore() {
     : '<i class="ti ti-chevron-down"></i> Показать ещё ' + count;
 }
 
-function renderRecordHtml(r) {
-  const meta = [];
-  if (r.workers && r.workers.length) meta.push(r.workers.join(', '));
-  if (r.execution) meta.push(r.execution);
-  if (r.ip_class) meta.push(r.ip_class);
+function renderRecordHtml(r, opts) {
+  const o = opts || {};
   const title = r.model_name + (r.model_extra ? ' · ' + r.model_extra : '');
-  const dateStr = isToday(r.date) ? 'сегодня' : formatDate(r.date);
   const iconCls = getDirectionIcon(r.direction_code);
   // ЭТАП 15: бейдж договора или «на склад»
   let badge = '';
   if (r.contract_id && r.contract_number) {
-    const tip = r.contract_contractor_name ? ' (' + r.contract_contractor_name + ')' : '';
     badge = '<span class="assembly-contract-badge" title="' + escapeHtml(r.contract_contractor_name || '') + '">' +
             '<i class="ti ti-file-text"></i>' + escapeHtml(r.contract_number) + '</span>';
   } else {
     badge = '<span class="assembly-warehouse-badge" title="На склад"><i class="ti ti-building-warehouse"></i>склад</span>';
   }
+  // v2.45.690: метаданные — сборщики с иконкой, без дубля даты в журнале
+  // (в журнале дата уже в заголовке дня; opts.hideDate её убирает)
+  const bits = [];
+  if (!o.hideDate) bits.push(isToday(r.date) ? 'сегодня' : formatDate(r.date));
+  if (r.workers && r.workers.length) {
+    bits.push('<i class="ti ti-users"></i> ' + escapeHtml(r.workers.join(', ')));
+  }
+  if (r.execution) bits.push(escapeHtml(r.execution));
+  if (r.ip_class) bits.push(escapeHtml(r.ip_class));
   return '<div class="record">' +
     '<div class="record-icon"><i class="ti ' + iconCls + '"></i></div>' +
     '<div class="record-body">' +
       '<div class="record-title">' + escapeHtml(title) + badge + '</div>' +
-      '<div class="record-meta">' + dateStr + (meta.length ? ' · ' + escapeHtml(meta.join(' · ')) : '') + '</div>' +
+      (bits.length ? '<div class="record-meta">' + bits.join(' · ') + '</div>' : '') +
     '</div>' +
     '<div class="record-qty">' + r.qty + '<small>шт.</small></div>' +
     '</div>';
@@ -6831,10 +6835,15 @@ function renderHistory(d) {
   sortedDates.forEach(date => {
     const records = groups[date];
     const totalQty = records.reduce((sum, r) => sum + r.qty, 0);
-    const todayLabel = isToday(date) ? ' · сегодня' : '';
-    html += '<div class="day-header"><b>' + formatDateLong(date) + '</b>' + todayLabel + ' · ' + totalQty + ' шт.</div>';
+    // v2.45.690: заголовок дня — дата, чип «сегодня», линия-разделитель и итог справа
+    html += '<div class="day-header2">' +
+      '<span class="d">' + formatDateLong(date) + '</span>' +
+      (isToday(date) ? '<span class="today-pill">сегодня</span>' : '') +
+      '<span class="rule"></span>' +
+      '<span class="tot">' + totalQty + ' шт.</span>' +
+    '</div>';
     html += '<div class="card">';
-    records.forEach(r => html += renderRecordHtml(r));
+    records.forEach(r => html += renderRecordHtml(r, { hideDate: true }));
     html += '</div>';
   });
   container.innerHTML = html;

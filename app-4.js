@@ -13830,6 +13830,10 @@ async function _maybeMorningProgress() {
     // v2.45.404: Михаил Шевелёв пока не заполняет утреннюю готовность — не показываем
     if (typeof _isShevelevMaster === 'function' && _isShevelevMaster()) return;
     if (document.getElementById('morning-progress-overlay')) return;
+    // v2.45.680: показываем максимум ОДИН раз за день. Раньше окно всплывало при
+    // каждом открытии/перезагрузке, пока % не подтверждён — теперь, если сегодня уже
+    // показывали, больше не дёргаем (даже если мастер закрыл без «Начать смену»).
+    try { const _s0 = _mpLoadStore(); if (_s0[_mpToday()] && _s0[_mpToday()]._shown) return; } catch (e) {}
     // v2.45.364: только то, что «В работе» в производстве (production works status=in_progress),
     // и сразу подставляем текущий % готовности с карточки канбана
     let active = [];
@@ -13844,6 +13848,8 @@ async function _maybeMorningProgress() {
     const rec = (_mpLoadStore()[_mpToday()]) || {};
     const pctPending = active.length > 0 && !active.every(w => rec[w.id] != null);
     if (!pctPending && !gaps) return;                      // ни %, ни вопросов — не мешаем
+    // v2.45.680: отмечаем, что сегодня окно уже показали — повторно не всплывёт
+    try { const _s = _mpLoadStore(); const _t = _mpToday(); _s[_t] = _s[_t] || {}; _s[_t]._shown = true; _mpSaveStore(_s); } catch (e) {}
     _renderMorningProgress(active, gaps);
   } catch (e) { /* окно не должно ломать вход в приложение */ }
 }
