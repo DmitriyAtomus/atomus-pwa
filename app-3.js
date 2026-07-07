@@ -11111,6 +11111,43 @@ async function _payInvSubmit() {
 // корзина с кол-вом → телефон для связи + подпись → создать / создать и отправить.
 let _owz = { list: [], me: null, openCats: {}, custom: 0 };
 
+// v2.45.694: авто-черновик формы заказа в браузере — чтобы при ошибке/закрытии/
+// перезагрузке введённое не терялось, а восстанавливалось при следующем открытии.
+const OWZ_DRAFT_KEY = 'owz_order_draft';
+let _owzAutosaveTimer = null;
+function _owzSnapshot() {
+  const g = id => { const el = document.getElementById(id); return el ? (el.value || '') : ''; };
+  return {
+    supplierId: _owz.supplierId || null, supplierName: _owz.supplierName || '',
+    supplierEmail: _owz.supplierEmail || '', supplierPhone: _owz.supplierPhone || '',
+    list: (_owz.list || []).map(x => ({ name: x.name, unit: x.unit, qty: x.qty, id: x.id || null })),
+    expected: g('owz-expected'), phone: g('owz-phone'), comment: g('owz-comment'), at: Date.now(),
+  };
+}
+function _owzHasContent(s) { return !!(s && ((s.list && s.list.length) || s.supplierId || (s.comment || '').trim())); }
+function _owzSaveDraft() { try { const s = _owzSnapshot(); if (_owzHasContent(s)) localStorage.setItem(OWZ_DRAFT_KEY, JSON.stringify(s)); } catch (e) {} }
+function _owzClearDraft() { try { localStorage.removeItem(OWZ_DRAFT_KEY); } catch (e) {} if (_owzAutosaveTimer) { clearInterval(_owzAutosaveTimer); _owzAutosaveTimer = null; } }
+function _owzStartAutosave() {
+  if (_owzAutosaveTimer) clearInterval(_owzAutosaveTimer);
+  _owzAutosaveTimer = setInterval(function () {
+    if (!document.getElementById('owz-search')) { clearInterval(_owzAutosaveTimer); _owzAutosaveTimer = null; return; }
+    _owzSaveDraft();
+  }, 3000);
+}
+function _owzMaybeRestoreDraft() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(OWZ_DRAFT_KEY) || 'null'); } catch (e) { s = null; }
+  if (!_owzHasContent(s)) return;
+  if (!confirm('Есть незавершённый черновик заказа' + (s.supplierName ? ' («' + s.supplierName + '»)' : '') + '. Продолжить его?')) { _owzClearDraft(); return; }
+  _owz.list = (s.list || []).map(x => ({ name: x.name, unit: x.unit || 'шт.', qty: x.qty || 1, id: x.id || null }));
+  const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  setV('owz-expected', s.expected); setV('owz-phone', s.phone); setV('owz-comment', s.comment);
+  if (s.supplierId && (cache.suppliers || []).find(x => x.id === s.supplierId)) _owzSupPick(s.supplierId);
+  else if (s.supplierName) { _owz.supplierName = s.supplierName; _owz.supplierEmail = s.supplierEmail || ''; _owz.supplierPhone = s.supplierPhone || ''; }
+  _owzRenderCart();
+  if (typeof showToast === 'function') showToast('Черновик восстановлен', 'success');
+}
+
 async function openNewSupplyOrder() {
   if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
   // Грузим параллельно: поставщиков, каталог комплектующих (как на производстве),
@@ -11189,6 +11226,8 @@ async function openNewSupplyOrder() {
   m.classList.add('visible');
   _owzRenderCatalog('');
   _owzRenderCart();
+  _owzMaybeRestoreDraft();   // v2.45.694: предложить продолжить незавершённый черновик
+  _owzStartAutosave();       // и авто-сохранять по мере заполнения
 }
 
 function _owzSupplierHint() {
@@ -11403,10 +11442,16 @@ function _owzRenderCart() {
     box.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-light);font-size:13px;border:1px dashed var(--border);border-radius:8px;">Нажимайте на позиции выше, чтобы добавить их в заказ</div>';
     return;
   }
+  // v2.45.693: название позиции можно поправить (карандаш или клик по имени) —
+  // например, переписать под формулировку из прайса поставщика
   box.innerHTML = _owz.list.map((x, i) =>
     '<div class="owz2-crow">' +
       '<span class="owz2-c-num">' + (i + 1) + '</span>' +
-      '<span class="owz2-c-name">' + escapeHtml(x.name) + '</span>' +
+      '<span class="owz2-c-name" onclick="_owzEditName(' + x.id + ')" title="Нажми, чтобы изменить название">' +
+        escapeHtml(x.name) +
+        (x.renamed ? ' <span class="owz2-c-ren" title="Название изменено вручную">✎ изменено</span>' : '') +
+      '</span>' +
+      '<button class="owz2-c-edit" onclick="_owzEditName(' + x.id + ')" title="Изменить название"><i class="ti ti-pencil"></i></button>' +
       '<input class="owz2-c-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
         'onchange="_owzSetQty(' + x.id + ', this.value)">' +
       '<select class="owz2-c-unit" onchange="_owzSetUnit(' + x.id + ', this.value)" title="Единица измерения">' +
@@ -11415,6 +11460,22 @@ function _owzRenderCart() {
       '<button class="owz2-c-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
     '</div>'
   ).join('');
+}
+
+// v2.45.693: правка названия позиции в заказе (после выбора из каталога)
+function _owzEditName(itemId) {
+  const ex = _owz.list.find(x => x.id === itemId);
+  if (!ex) return;
+  const v = prompt('Название позиции — как написать в заявке поставщику:', ex.name);
+  if (v === null) return;
+  const name = v.trim();
+  if (!name) { showToast('Название не может быть пустым', 'error'); return; }
+  if (name !== ex.name) {
+    ex.name = name;
+    ex.renamed = true;
+    _owzRenderCart();
+    showToast('Название изменено', 'success');
+  }
 }
 
 // Добавить позицию свободным текстом прямо в заказ (в справочник НЕ добавляем).
@@ -11472,10 +11533,12 @@ async function submitOrderWizard(send) {
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      showToast(d.message || 'Не удалось создать заказ', 'error');
+      _owzSaveDraft();   // v2.45.694: не теряем введённое — восстановится при след. открытии
+      showToast((d.message || 'Не удалось создать заказ') + ' — черновик сохранён, откроется при следующем «Новый заказ»', 'error');
       return;
     }
     const created = await r.json();
+    _owzClearDraft();   // успех — локальный черновик больше не нужен
     closeSupplyModal();
     cache.supplyOrders = null;
     state.currentSupplyOrderId = created.id;
@@ -11501,7 +11564,8 @@ async function submitOrderWizard(send) {
       selectSidebarItem('supply-order-detail');
     }
   } catch (e) {
-    showToast('Ошибка', 'error');
+    _owzSaveDraft();   // v2.45.694: сеть/сбой — сохранили черновик локально
+    showToast('Сбой — черновик заказа сохранён, откроется при следующем «Новый заказ»', 'error');
   }
 }
 
@@ -13809,6 +13873,14 @@ const HELP_CHANGELOG = [
     features: [
       'Кнопка <b>«Архив по дням»</b> в разделе «Безопасность»: кто во сколько пришёл и ушёл, по датам (хранится в базе)',
       'Пока камера на двери — распознаёт почти <b>в реальном моменте</b>; обход столов ~каждую минуту',
+    ],
+  },
+  {
+    version: 'v2.45.694',
+    date: '07.07.2026',
+    title: 'Заказ: не теряется при сбое — авто-черновик',
+    features: [
+      'Пока оформляешь заказ, введённое <b>авто-сохраняется</b>. Если что-то пошло не так (ошибка, закрыл окно, обновил страницу) — при следующем «Новый заказ» предложит <b>продолжить черновик</b>',
     ],
   },
   {
