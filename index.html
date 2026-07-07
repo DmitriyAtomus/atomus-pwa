@@ -703,6 +703,18 @@
       </div>
     </aside>
 
+    <!-- v2.45.692: Почта и MAX — переписка -->
+    <aside class="sidebar" id="sidebar-mail" data-section="mail" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-mail"></i> Почта и MAX
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="mail-messenger" onclick="selectSidebarItem('mail-messenger')">
+          <i class="ti ti-messages"></i><span>Переписка</span>
+        </button>
+      </div>
+    </aside>
+
     <!-- SIDEBAR заглушки для остальных разделов (без меню, пустой) -->
     <aside class="sidebar" id="sidebar-coming" data-section="coming" data-visible="0">
       <div class="sidebar-title">
@@ -2014,6 +2026,18 @@
       <!-- ============ КОНЕЦ ИНВЕНТАРИЗАЦИИ ============ -->
 
       <!-- ============ ЛОГИСТИКА: ЗАБРАТЬ / В ПУТИ (v2.45.678) ============ -->
+      <!-- ============ ПОЧТА И MAX: мессенджер (v2.45.692) ============ -->
+      <div class="screen" data-screen="mail-messenger" data-section="mail">
+        <div class="content-inner" style="max-width:100%;padding:0;">
+          <div id="mail-messenger-root" style="display:flex;height:calc(100vh - 120px);min-height:420px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card);">
+            <div id="mail-conv-list" style="width:320px;min-width:240px;border-right:1px solid var(--border);overflow-y:auto;background:var(--bg);"><div class="loading-block">Загрузка…</div></div>
+            <div id="mail-thread-pane" style="flex:1;display:flex;flex-direction:column;min-width:0;">
+              <div id="mail-thread-empty" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-light);text-align:center;padding:20px;">Выбери собеседника слева, чтобы открыть переписку</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="screen" data-screen="logistics-pickups" data-section="logistics">
         <div class="content-inner" style="max-width: 900px;">
           <div class="screen-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
