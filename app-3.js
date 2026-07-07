@@ -6033,6 +6033,33 @@ function _logiTitle(it) {
   const sup = it.supplier_name ? escapeHtml(it.supplier_name) : '';
   return (sup ? sup + ' <span style="font-weight:400;color:var(--text-light);">· заказ ' : '<span style="font-weight:600;">Заказ ') + escapeHtml(String(num)) + '</span>';
 }
+// v2.45.682: раскрывающийся список «что забирать» (товары заказа: из ЛК
+// поставщика, из наших позиций или из распознанного счёта)
+function _logiItemsBlock(it, label) {
+  const items = it.order_items || [];
+  if (!items.length) return '';
+  const id = 'logi-items-' + it.order_id;
+  const rows = items.map(x => {
+    const q = Number(x.qty);
+    return '<div style="padding:3px 0;border-bottom:1px dashed var(--border);font-size:12.5px;color:var(--text-mid);">' +
+      escapeHtml(x.name || '') +
+      (q > 0 ? ' <span style="color:var(--text-light);white-space:nowrap;">· ' + (q % 1 ? q : Math.round(q)) + ' шт.</span>' : '') +
+    '</div>';
+  }).join('');
+  return '<div style="margin-top:8px;">' +
+    '<button type="button" onclick="logiToggleItems(\'' + id + '\', this)" ' +
+    'style="background:none;border:none;color:var(--brand);font-size:12.5px;font-weight:600;cursor:pointer;padding:0;">' +
+    '▸ ' + escapeHtml(label || 'Что забирать') + ' · ' + items.length + '</button>' +
+    '<div id="' + id + '" style="display:none;margin-top:4px;padding:6px 10px;background:rgba(100,116,139,.07);border-radius:8px;">' + rows + '</div>' +
+  '</div>';
+}
+function logiToggleItems(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = (open ? '▸' : '▾') + btn.textContent.slice(1);
+}
 function _logiReadyCard(it) {
   const place = it.pickup_place ? '<div style="font-size:13px;color:var(--text-mid);margin-top:6px;"><i class="ti ti-map-pin" style="color:#15803D;"></i> ' + escapeHtml(it.pickup_place) + '</div>' : '';
   const countSum = _logiCountSum(it);
@@ -6044,6 +6071,7 @@ function _logiReadyCard(it) {
         (countSum ? '<div style="font-size:13px;color:var(--text-mid);margin-top:3px;">' + countSum + '</div>' : '') +
         '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"><span style="background:#DCFCE7;color:#15803D;border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;"><i class="ti ti-package"></i> готов к выдаче</span>' + chips + '</div>' +
         place +
+        _logiItemsBlock(it, 'Что забирать') +
       '</div>' +
       '<div style="flex:none;">' + _logiReserveChip(it.reserve) + '</div>' +
     '</div>' +
@@ -6063,6 +6091,7 @@ function _logiTransitCard(it) {
       (countSum ? '<div style="font-size:12.5px;color:var(--text-mid);margin-top:2px;">' + countSum + '</div>' : '') +
       (chips ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">' + chips + '</div>' : '') +
       place +
+      _logiItemsBlock(it, 'Что в заказе') +
     '</div>' +
     '<div style="flex:none;">' + _logiEtaChip(it.expected_date) + '</div>' +
   '</div>';
@@ -13495,6 +13524,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.682',
+    date: '07.07.2026',
+    title: 'Логистика: видно, что забирать и где',
+    features: [
+      'На карточке заказа — раскрывающийся список <b>«Что забирать»</b>: названия товаров с количеством (из ЛК поставщика, из позиций заказа или из распознанного счёта — что есть)',
+      'У заказов «в пути» — такой же список «Что в заказе»',
+      'Адрес самовывоза 📍 показывается, как только придёт из синка ЛК',
+    ],
+  },
   {
     version: 'v2.45.681',
     date: '07.07.2026',
