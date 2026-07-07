@@ -5155,6 +5155,21 @@ function showSupplierModal(s) {
             '</div>' +
           '</div>'
         : '') +
+        // v2.45.687: подключение поставщика к MAX (чат через нашего бота)
+        (isEdit && canManage ?
+          '<div class="form-group">' +
+            '<label>MAX <span style="text-transform:none;font-weight:400;color:var(--text-light);">— чат с поставщиком в мессенджере</span></label>' +
+            '<div id="sm-max-block" style="margin-top:4px;">' +
+              (s.max_linked
+                ? '<span class="sm-max-ok">✅ Подключён' + (s.max_linked_at ? ' · с ' + escapeHtml(String(s.max_linked_at).slice(0, 10).split('-').reverse().join('.')) : '') + '</span>' +
+                  '<div style="font-size:11.5px;color:var(--text-light);margin-top:3px;">Канал «MAX» доступен в переписке любого заказа этого поставщика</div>'
+                : (s.max_invite_code
+                    ? _smMaxCodeHtml(s.max_invite_code)
+                    : '<button type="button" class="btn btn-secondary" onclick="supplierMaxInvite(' + s.id + ')"><i class="ti ti-message-circle"></i> Пригласить в MAX</button>' +
+                      '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">Выдаст код: контакт поставщика пишет его нашему боту в MAX — и канал подключён</div>')) +
+            '</div>' +
+          '</div>'
+        : '') +
         // Переписка с поставщиком — входящие письма (из IMAP-инбокса)
         (isEdit ?
           '<div class="form-group">' +
@@ -5170,6 +5185,29 @@ function showSupplierModal(s) {
   m.classList.add('visible');
   if (isEdit && canManage) _refreshSupplierPriceCount(s.id);
   if (isEdit) _loadSupplierCorrespondence(s.id);
+}
+
+// v2.45.687: приглашение поставщика в MAX — код + инструкция
+function _smMaxCodeHtml(code) {
+  const instr = 'Здравствуйте! Подключитесь к чату с АТОМУС ГРУПП в MAX: найдите нашего бота (тот, через которого присылаете счета) и отправьте ему код: ' + code;
+  return '<div class="sm-max-code">Код приглашения: <b>' + escapeHtml(code) + '</b> ' +
+      '<button type="button" class="btn btn-secondary btn-small" ' +
+        'onclick="navigator.clipboard.writeText(' + JSON.stringify(instr).replace(/"/g, '&quot;') + ').then(function(){showToast(\'Инструкция скопирована — отправь поставщику\',\'success\')})">' +
+        '<i class="ti ti-copy"></i> Скопировать инструкцию</button></div>' +
+    '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;">Отправь инструкцию контакту поставщика. Как только он напишет код боту — канал подключится, и «MAX» появится в переписке заказов.</div>';
+}
+async function supplierMaxInvite(sid) {
+  try {
+    const r = await apiPost('/api/suppliers/' + sid + '/max-invite', {});
+    if (!r.ok) {
+      showToast((r.data && r.data.message) || 'Не удалось получить код', 'error');
+      return;
+    }
+    const box = document.getElementById('sm-max-block');
+    if (box) box.innerHTML = _smMaxCodeHtml(r.data.code);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
 }
 
 async function _loadSupplierCorrespondence(supplierId) {
@@ -5276,13 +5314,41 @@ async function openOrderThread(orderId) {
         '<button class="icon-btn" onclick="document.getElementById(\'order-thread-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
       '<div class="oct-sub" id="oct-sub"></div>' +
       '<div class="oct-thread" id="oct-thread"><div class="loading-block">Загружаем…</div></div>' +
-      '<div class="oct-composer">' +
-        '<textarea id="oct-input" rows="2" placeholder="Написать поставщику… уйдёт письмом, ответ привяжется к заказу"></textarea>' +
-        '<button class="btn btn-primary oct-send" id="oct-send" onclick="_octSend(' + orderId + ')" title="Отправить"><i class="ti ti-send"></i></button>' +
+      '<div class="oct-composer-wrap">' +
+        '<div class="oct-chan" id="oct-chan"></div>' +
+        '<div class="oct-composer">' +
+          '<textarea id="oct-input" rows="2" placeholder="Написать поставщику… уйдёт письмом, ответ привяжется к заказу"></textarea>' +
+          '<button class="btn btn-primary oct-send" id="oct-send" onclick="_octSend(' + orderId + ')" title="Отправить"><i class="ti ti-send"></i></button>' +
+        '</div>' +
       '</div>' +
     '</div>';
   document.body.appendChild(m);
+  window._octChannel = 'email';   // v2.45.687: канал по умолчанию — почта
   await _octLoad(orderId);
+}
+
+// v2.45.687: переключатель канала Почта / MAX
+function _octRenderChan(sup) {
+  const box = document.getElementById('oct-chan');
+  if (!box) return;
+  const ch = window._octChannel || 'email';
+  const maxOk = !!(sup && sup.max_linked);
+  box.innerHTML =
+    '<button type="button" class="oct-chan-btn' + (ch === 'email' ? ' on' : '') + '" onclick="_octSetChan(\'email\')">📧 Почта</button>' +
+    '<button type="button" class="oct-chan-btn max' + (ch === 'max' ? ' on' : '') + (maxOk ? '' : ' dis') + '" ' +
+      (maxOk ? 'onclick="_octSetChan(\'max\')"' : 'onclick="showToast(\'Поставщик не подключён к MAX — пригласи его из карточки поставщика (кнопка «Пригласить в MAX»)\', \'info\')"') + '>' +
+      '💬 MAX' + (maxOk ? '' : ' <small>не подключён</small>') + '</button>' +
+    '<span class="oct-chan-hint">' + (ch === 'max'
+      ? 'уйдёт поставщику в MAX через бота'
+      : 'тема письма подставится — ответ привяжется к заказу сам') + '</span>';
+  const inp = document.getElementById('oct-input');
+  if (inp) inp.placeholder = ch === 'max'
+    ? 'Написать поставщику в MAX…'
+    : 'Написать поставщику… уйдёт письмом, ответ привяжется к заказу';
+}
+function _octSetChan(ch) {
+  window._octChannel = ch;
+  _octRenderChan(window._octSupplier || {});
 }
 
 async function _octLoad(orderId) {
@@ -5292,12 +5358,15 @@ async function _octLoad(orderId) {
   try {
     const d = await apiGet('/api/supply-orders/' + orderId + '/thread');
     const s = d.supplier || {};
+    window._octSupplier = s;
+    _octRenderChan(s);
     if (sub) {
       sub.innerHTML = '<b>' + escapeHtml(d.order_label || ('#' + orderId)) + '</b> · ' + escapeHtml(s.name || '—') +
         (s.contact ? ' · ' + escapeHtml(s.contact) : '') +
         (s.email ? ' · <span class="oct-mail">' + escapeHtml(s.email) + '</span>'
                  : ' · <span class="oct-nomail">email не указан — заполни в карточке поставщика</span>') +
-        (s.phone ? ' · ' + escapeHtml(s.phone) : '');
+        (s.phone ? ' · ' + escapeHtml(s.phone) : '') +
+        (s.max_linked ? ' · <span class="oct-maxst">💬 MAX подключён</span>' : '');
     }
     const list = d.entries || [];
     if (!list.length) {
@@ -5322,8 +5391,11 @@ async function _octLoad(orderId) {
             escapeHtml(String(a.name || '').replace(/'/g, "\\'")) + '\')"><i class="ti ti-paperclip"></i>' +
             escapeHtml(a.name || 'файл') + '</span>').join('') + '</div>';
       }
+      const chChip = e.channel === 'max'
+        ? ' <span class="oct-ch max">MAX</span>'
+        : (e.dir === 'out' && e.channel ? ' <span class="oct-ch">ПОЧТА</span>' : '');
       html += '<div class="oct-msg ' + (e.dir === 'out' ? 'out' : 'in') + '">' +
-        '<div class="oct-who">' + escapeHtml(e.who || '') + '</div>' +
+        '<div class="oct-who">' + escapeHtml(e.who || '') + chChip + '</div>' +
         (body
           ? '<div class="oct-txt">' + escapeHtml(body).replace(/\n/g, '<br>') + '</div>'
           : '<div class="oct-txt oct-subj-only">' + escapeHtml(e.subject || '(без текста)') + '</div>') +
@@ -5345,13 +5417,14 @@ async function _octSend(orderId) {
   if (!text) { showToast('Напиши текст сообщения', 'info'); return; }
   if (btn) btn.disabled = true;
   try {
-    const r = await apiPost('/api/supply-orders/' + orderId + '/thread', { text: text });
+    const ch = window._octChannel || 'email';
+    const r = await apiPost('/api/supply-orders/' + orderId + '/thread', { text: text, channel: ch });
     if (!r.ok) {
       showToast((r.data && r.data.message) || 'Не удалось отправить', 'error');
       return;
     }
     if (inp) inp.value = '';
-    showToast('Отправлено поставщику', 'success');
+    showToast(ch === 'max' ? 'Отправлено в MAX' : 'Отправлено письмом', 'success');
     await _octLoad(orderId);
   } finally {
     if (btn) btn.disabled = false;
