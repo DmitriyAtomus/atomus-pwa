@@ -4969,7 +4969,10 @@ const SUPPLY_ORDER_STATUS_LABELS = {
 function canManageSupply() {
   if (!state.user) return false;
   const roles = state.user.roles || [];
-  return roles.includes('director') || roles.includes('zam') || roles.includes('manager');
+  if (roles.includes('director') || roles.includes('zam') || roles.includes('manager')) return true;
+  // v2.45.690: уважаем гранулярное право «управление снабжением» из уровня доступа —
+  // директор может открыть заказы мастеру/кому угодно через «Уровни доступа».
+  return (typeof hasPermission === 'function') && hasPermission('supply.manage');
 }
 
 // ========== ПОСТАВЩИКИ ==========
@@ -13727,6 +13730,14 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.691',
+    date: '07.07.2026',
+    title: 'Заказы: доступ по уровню (не только директор/зам/менеджер)',
+    features: [
+      'Работа с заказами поставщикам теперь открывается по праву <b>«Управление снабжением»</b> в уровне доступа — директор может дать доступ мастеру или кому угодно через «Уровни доступа»',
+    ],
+  },
   {
     version: 'v2.45.690',
     date: '07.07.2026',
