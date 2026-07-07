@@ -5988,7 +5988,7 @@ function _logiReserveChip(raw) {
     if (days < 0) { fg = '#7F1D1D'; bg = '#FEE2E2'; label = '⚠ срок хранения истёк (' + dateTxt + ')'; }
     else if (days === 0) { fg = '#7F1D1D'; bg = '#FEE2E2'; label = '⚠ храним до сегодня — забрать!'; }
     else if (days <= 2) { fg = '#9A3412'; bg = '#FFEDD5'; label = '⏳ храним до ' + dateTxt + ' · ' + (days === 1 ? 'остался 1 день' : 'осталось 2 дня'); }
-    else { label = '⏳ храним до ' + dateTxt + ' · осталось ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней'); }
+    else { label = '⏳ храним до ' + dateTxt + ' · ' + _logiPlural(days, 'остался', 'осталось', 'осталось') + ' ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней'); }
   }
   return '<span style="background:' + bg + ';color:' + fg + ';border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">' + escapeHtml(label) + '</span>';
 }
@@ -5996,17 +5996,20 @@ function _logiReserveChip(raw) {
 function _logiStatusChips(extStatus, opts) {
   const o = opts || {};
   let parts = String(extStatus || '').split('|').map(s => s.trim()).filter(Boolean);
-  // дубли-обобщения: «Доставляется» лишний, если есть «Доставляется в магазин»
-  parts = parts.filter((p, i) => !parts.some((q, j) => j !== i && q.toLowerCase() !== p.toLowerCase() && q.toLowerCase().indexOf(p.toLowerCase()) === 0));
+  // дубли-обобщения: «Доставляется» лишний, если есть «Доставляется в магазин».
+  // Сравниваем по границе слова (префикс + пробел), чтобы «Готов» не пропадал
+  // из-за постороннего «Готовится к отправке».
+  parts = parts.filter((p, i) => !parts.some((q, j) => j !== i && q.toLowerCase().indexOf(p.toLowerCase() + ' ') === 0));
   // на карточке «Забрать сейчас» строка «Готов к выдаче» дублирует заголовок секции
   if (o.hideReady) parts = parts.filter(p => p.toLowerCase().indexOf('выдаче') === -1);
-  const seen = {};
+  const seen = Object.create(null);
   let html = '';
   parts.forEach(p => {
     const k = p.toLowerCase();
     if (seen[k]) return; seen[k] = 1;
     let fg = '#475569', bg = '#F1F5F9';
-    if (k.indexOf('оплачен') !== -1) { fg = '#065F46'; bg = '#ECFDF5'; }
+    if (k.indexOf('не оплачен') !== -1) { fg = '#92400E'; bg = '#FEF3C7'; }
+    else if (k.indexOf('оплачен') !== -1) { fg = '#065F46'; bg = '#ECFDF5'; }
     else if (k.indexOf('выдаче') !== -1) { fg = '#15803D'; bg = '#DCFCE7'; }
     else if (k.indexOf('доставля') !== -1 || k.indexOf('в пути') !== -1 || k.indexOf('заказан') !== -1) { fg = '#2749A0'; bg = '#EFF4FD'; }
     else if (k.indexOf('выдан') !== -1 || k.indexOf('получен') !== -1) { fg = '#475569'; bg = '#F1F5F9'; }
@@ -6020,7 +6023,8 @@ function _logiCountSum(it) {
   const bits = [];
   const n = Number(it.ext_items || it.items_count || 0);
   if (n > 0) bits.push(n + ' ' + _logiPlural(n, 'товар', 'товара', 'товаров'));
-  const sum = _logiSum(it.ext_sum != null && it.ext_sum !== '' ? it.ext_sum : it.invoice_total);
+  const extSum = Number(it.ext_sum);
+  const sum = _logiSum(extSum > 0 ? extSum : it.invoice_total);
   if (sum) bits.push(sum);
   return bits.join(' · ');
 }
@@ -6070,14 +6074,21 @@ function _logiDoneRow(it) {
       '<div style="font-size:13px;font-weight:600;color:var(--text-mid);">' + _logiTitle(it) + '</div>' +
       (countSum ? '<div style="font-size:12px;color:var(--text-light);">' + countSum + '</div>' : '') +
     '</div>' +
-    '<div style="flex:none;display:flex;gap:5px;flex-wrap:wrap;">' + _logiStatusChips(it.ext_status) + '</div>' +
+    '<div style="flex:none;display:flex;gap:5px;flex-wrap:wrap;align-items:center;">' + _logiStatusChips(it.ext_status) +
+      // без «скрыть» выданные копились бы в списке вечно (у них нет кнопки «Забрал»)
+      '<button type="button" onclick="logiPickupDone(' + it.order_id + ', true)" title="Убрать из списка" ' +
+      'style="background:none;border:1px solid var(--border);color:var(--text-light);border-radius:6px;padding:2px 8px;font-size:11.5px;cursor:pointer;">скрыть</button>' +
+    '</div>' +
   '</div>';
 }
-async function logiPickupDone(orderId) {
-  if (!confirm('Отметить заказ как забранный? Уйдёт из списка «Забрать».')) return;
+async function logiPickupDone(orderId, fromDone) {
+  const msg = fromDone
+    ? 'Скрыть этот заказ из логистики? Он уже выдан/завершён.'
+    : 'Отметить заказ как забранный? Уйдёт из списка «Забрать».';
+  if (!confirm(msg)) return;
   try {
     const r = await apiPost('/api/logistics/pickups/' + orderId + '/done', { done: true });
-    if (r && r.ok) { showToast('Отмечено: забрал', 'success'); loadLogisticsPickups(); }
+    if (r && r.ok) { showToast(fromDone ? 'Скрыто' : 'Отмечено: забрал', 'success'); loadLogisticsPickups(); }
     else showToast('Не удалось', 'error');
   } catch (e) { showToast('Ошибка', 'error'); }
 }
