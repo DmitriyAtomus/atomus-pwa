@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.706";
+const APP_VERSION = "v2.45.707";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13856,6 +13856,15 @@ function _mydayRowMin(r) {
   return (r._base || 0) + live;
 }
 
+// 👤 кто делает работу (живые + отметившиеся сегодня)
+function _mydayPeople(r) {
+  const ppl = r.people || [];
+  if (!ppl.length) return '';
+  const shown = ppl.slice(0, 3).join(', ');
+  const more = ppl.length > 3 ? ' и ещё ' + (ppl.length - 3) : '';
+  return ' · 👤 ' + escapeHtml(shown + more);
+}
+
 function renderMyDayStrip() {
   const box = document.getElementById('pkb-myday');
   if (!box) return;
@@ -13872,6 +13881,7 @@ function renderMyDayStrip() {
       '<span class="dot"></span>' +
       '<div class="t"><div class="nm">' + escapeHtml(r.name) + '</div>' +
       '<div class="sub">' + (run ? 'идёт сейчас' : 'на паузе') +
+        _mydayPeople(r) +
         (r.last_note || r.live_note ? ' · ' + escapeHtml(r.live_note || r.last_note) : '') +
         (proj ? ' · ' + escapeHtml(proj) : '') + '</div></div>' +
       (run
@@ -14041,7 +14051,8 @@ function openMyDaySegments(workId) {
   let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
     '<div class="myday-h4">' + escapeHtml(row.name) + '</div>' +
     '<div class="myday-msub">' + escapeHtml([row.contract_number, row.contractor_name].filter(Boolean).join(' · ')) +
-    (row.last_note || row.live_note ? ' · 📝 ' + escapeHtml(row.live_note || row.last_note) : '') + '</div>' +
+    (row.last_note || row.live_note ? ' · 📝 ' + escapeHtml(row.live_note || row.last_note) : '') +
+    ((row.people || []).length ? '<br>👤 делают: ' + escapeHtml(row.people.join(', ')) : '') + '</div>' +
     '<div class="myday-clock' + (run ? '' : ' paused') + '"><div class="c">' + _mydayFmtMin(mins) + '</div>' +
     '<div class="s">' + (run ? 'идёт сейчас' : 'на паузе') + '</div></div>' +
     '<div class="myday-stats">' +
