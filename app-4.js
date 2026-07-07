@@ -14071,6 +14071,29 @@ function _ydDone(a) {
   if (a.mode === 'off') return !!a.off_kind;
   return false;
 }
+let _ydSaveTimers = {};
+// v2.45.674: авто-сохранение ответа «чем занимался вчера» СРАЗУ по мере заполнения,
+// а не только по кнопке «Начать смену». Иначе при хард-релоаде (смена версии/обновление)
+// незасейвленный ответ терялся и вопрос выскакивал снова.
+function _ydAutoSave(eid) {
+  const g = state._mp;
+  if (!g) return;
+  const a = g.gapAns[eid];
+  if (!_ydDone(a) || a._saved) return;
+  clearTimeout(_ydSaveTimers[eid]);
+  _ydSaveTimers[eid] = setTimeout(async function () {
+    if (!_ydDone(a) || a._saved || a._saving || typeof apiPost !== 'function') return;
+    a._saving = true;
+    try {
+      const r = await apiPost('/api/production/day-answers', {
+        date: g.gapDate,
+        answers: [{ employee_id: eid, kind: a.mode, work_id: a.work_id, hours: a.hours, comment: a.comment, off_kind: a.off_kind }],
+      });
+      if (r && r.ok) a._saved = true;
+    } catch (e) { /* повторим при следующем изменении/по кнопке */ }
+    a._saving = false;
+  }, 700);
+}
 function _ydRefresh(eid) {
   const a = state._mp && state._mp.gapAns[eid];
   const ok = _ydDone(a);
@@ -14078,6 +14101,7 @@ function _ydRefresh(eid) {
   if (st) { st.textContent = ok ? '✓ указано' : 'не указано'; st.className = 'yd-status ' + (ok ? 'ok' : 'todo'); }
   const card = document.getElementById('yd-p-' + eid);
   if (card) card.classList.toggle('is-done', ok);
+  if (ok) _ydAutoSave(eid);   // засейвить сразу, как ответ стал полным (переживёт релоад)
   _mpUpdateState();
 }
 

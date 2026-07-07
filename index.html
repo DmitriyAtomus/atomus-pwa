@@ -131,8 +131,8 @@
         <button class="section-tab" data-section="warehouse" title="Открыть складские операции">
           <i class="ti ti-building-warehouse"></i>Склад
         </button>
-        <button class="section-tab" data-section="logistics" title="Открыть логистику (скоро)">
-          <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
+        <button class="section-tab" data-section="logistics" title="Логистика — что забрать">
+          <i class="ti ti-truck"></i>Логистика
         </button>
         <button class="section-tab" data-section="supply" title="Открыть снабжение">
           <i class="ti ti-shopping-cart"></i>Снабжение
@@ -242,6 +242,10 @@
         </a>
         <!-- v2.45.39: пункт «Калькулятор холода» убран с главного сайдбара
              (остался в Продажах). -->
+        <!-- Безопасность: живой просмотр камеры офиса. Только директору (показ в app-1.js). -->
+        <button class="nav-item" id="sb-security" data-nav="security" onclick="selectSidebarItem('security')" style="display:none;">
+          <i class="ti ti-shield-lock"></i><span>Безопасность</span>
+        </button>
       </div>
 
       <!-- Внешние сервисы -->
@@ -687,6 +691,18 @@
       </div>
     </aside>
 
+    <!-- v2.45.678: Логистика — забрать / в пути -->
+    <aside class="sidebar" id="sidebar-logistics" data-section="logistics" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-truck-delivery"></i> Логистика
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="logistics-pickups" onclick="selectSidebarItem('logistics-pickups')">
+          <i class="ti ti-package-import"></i><span>Забрать / В пути</span><span class="nav-badge" id="logistics-badge" style="display:none;"></span>
+        </button>
+      </div>
+    </aside>
+
     <!-- SIDEBAR заглушки для остальных разделов (без меню, пустой) -->
     <aside class="sidebar" id="sidebar-coming" data-section="coming" data-visible="0">
       <div class="sidebar-title">
@@ -748,6 +764,70 @@
         </div>
         <div class="content-inner" id="big-cal-body" style="max-width: 100%;">
           <div class="loading-block">Загружаем календарь…</div>
+        </div>
+      </div>
+
+      <!-- ============ БЕЗОПАСНОСТЬ (камера офиса, только директор) ============ -->
+      <div class="screen" data-screen="security" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <i class="ti ti-shield-lock"></i>
+            <h1>Безопасность</h1>
+          </div>
+          <div id="security-status" class="text-muted" style="font-size:13px;">Подключение к камере…</div>
+        </div>
+        <div class="content-inner" style="max-width:100%;">
+          <div id="security-video-wrap" style="background:#0b0f17;border-radius:12px;overflow:hidden;position:relative;max-width:1000px;margin:0 auto;">
+            <!-- Живой стрим go2rtc (WebRTC/MSE через туннель) — низкая задержка -->
+            <iframe id="security-live" title="Живая камера" allow="autoplay; fullscreen" style="display:none;width:100%;aspect-ratio:16/9;border:none;background:#0b0f17;"></iframe>
+            <!-- Снимок-фолбэк (если живой стрим недоступен) -->
+            <img id="security-frame" alt="Камера офиса" style="display:none;width:100%;height:auto;background:#0b0f17;" />
+            <div id="security-placeholder" style="padding:60px 20px;text-align:center;color:#8a94a6;">
+              <i class="ti ti-video" style="font-size:42px;"></i>
+              <div style="margin-top:10px;">Ожидание кадра с камеры…</div>
+            </div>
+          </div>
+          <!-- Пульт PTZ ПОД видео: стрелки (реальный поворот) + зум (цифровой) -->
+          <style>
+            .sec-btn{width:46px;height:46px;border:none;border-radius:9px;background:#1b2842;color:#e8eefc;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s;}
+            .sec-btn:hover{background:#2d5fbe;}
+            .sec-btn:active{background:#2f6bd8;transform:scale(.94);}
+          </style>
+          <div style="display:flex;justify-content:center;align-items:center;gap:30px;margin-top:16px;flex-wrap:wrap;">
+            <div style="display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);gap:6px;">
+              <span></span>
+              <button class="sec-btn" onclick="secPtz('up')" title="Вверх"><i class="ti ti-chevron-up"></i></button>
+              <span></span>
+              <button class="sec-btn" onclick="secPtz('left')" title="Влево"><i class="ti ti-chevron-left"></i></button>
+              <button class="sec-btn" onclick="secZoom(0)" title="Сбросить зум"><i class="ti ti-focus-2"></i></button>
+              <button class="sec-btn" onclick="secPtz('right')" title="Вправо"><i class="ti ti-chevron-right"></i></button>
+              <span></span>
+              <button class="sec-btn" onclick="secPtz('down')" title="Вниз"><i class="ti ti-chevron-down"></i></button>
+              <span></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="sec-btn" onclick="secZoom(-1)" title="Отдалить"><i class="ti ti-minus"></i></button>
+              <span class="text-muted" style="font-size:12px;">Зум</span>
+              <button class="sec-btn" onclick="secZoom(1)" title="Приблизить"><i class="ti ti-plus"></i></button>
+            </div>
+          </div>
+          <div class="text-muted" style="font-size:12px;margin-top:10px;text-align:center;">
+            Камера офиса · обновление ~1 раз в секунду · доступ только директору
+          </div>
+          <!-- Журнал присутствия: кто сейчас на месте + приходы/уходы (по распознаванию лиц) -->
+          <div style="max-width:1000px;margin:22px auto 0;">
+            <div style="display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;">
+              <i class="ti ti-users"></i> Присутствие
+              <span id="security-present" class="text-muted" style="font-weight:400;font-size:13px;"></span>
+            </div>
+            <div id="security-presence-log" style="font-size:13px;">
+              <div class="text-muted">Загрузка журнала…</div>
+            </div>
+            <div class="text-muted" style="font-size:11px;margin-top:8px;">
+              По распознаванию лиц (камера обходит офис ~каждые 5 мин). Точность зависит от того, кто внесён в базу.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1933,7 +2013,18 @@
       </div>
       <!-- ============ КОНЕЦ ИНВЕНТАРИЗАЦИИ ============ -->
 
-      <!-- ============ ЗАГЛУШКА: ЛОГИСТИКА ============ -->
+      <!-- ============ ЛОГИСТИКА: ЗАБРАТЬ / В ПУТИ (v2.45.678) ============ -->
+      <div class="screen" data-screen="logistics-pickups" data-section="logistics">
+        <div class="content-inner" style="max-width: 900px;">
+          <div class="screen-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
+            <h1 style="margin:0;font-size:20px;"><i class="ti ti-truck-delivery"></i> Логистика — забрать</h1>
+            <button class="btn btn-secondary btn-small" onclick="loadLogisticsPickups()"><i class="ti ti-refresh"></i> Обновить</button>
+          </div>
+          <div id="logistics-content"><div class="loading-block">Загрузка…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ ЗАГЛУШКА: ЛОГИСТИКА (старая, не используется) ============ -->
       <div class="screen" data-screen="coming-logistics" data-section="logistics">
         <div class="content-inner" style="max-width: 100%;">
           <div class="coming-soon">

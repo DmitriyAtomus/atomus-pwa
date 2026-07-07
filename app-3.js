@@ -953,6 +953,98 @@ async function openComponentForm(componentId) {
       } catch (e) { /* марок нет — не показываем */ }
     })();
   }
+  // v2.45.671: варианты обобщённой позиции («зонтик»): чем закрыт + управление.
+  if (componentId) {
+    (async () => {
+      try {
+        const dc = await apiGet('/api/components/' + componentId);
+        const variants = (dc && dc.variants) || [];
+        const isVariant = dc && dc.umbrella_id;
+        let html = '';
+        if (variants.length) {
+          const rows = variants.map(v =>
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;">' +
+              '<span style="font-size:13px;min-width:0;">' + escapeHtml(v.name || '') + '</span>' +
+              '<span style="white-space:nowrap;flex:none;"><b>' + _fmtQty(v.qty_on_stock) + '</b> ' + escapeHtml(v.unit || 'шт.') +
+                ' <button class="btn btn-secondary btn-small" style="padding:1px 7px;margin-left:4px;" title="Отвязать вариант" onclick="detachVariant(' + v.id + ')">✕</button></span>' +
+            '</div>'
+          ).join('');
+          html = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);margin-bottom:4px;"><i class="ti ti-versions"></i> Варианты (чем закрыт) · наличие всего <b>' + _fmtQty(dc.effective_stock) + '</b></div>' + rows;
+        } else if (isVariant) {
+          html = '<div style="font-size:12.5px;color:var(--text-light);"><i class="ti ti-arrow-up"></i> Вариант обобщённой: <b>' + escapeHtml(dc.umbrella_name || ('#' + dc.umbrella_id)) + '</b> <button class="btn btn-secondary btn-small" style="margin-left:6px;" onclick="detachVariant(' + componentId + ')">Отвязать</button></div>';
+        } else {
+          html = '<div style="font-size:12px;color:var(--text-light);">Обобщённая позиция? Привяжи конкретные модели как варианты — наличие будет считаться суммой.</div>';
+        }
+        if (!isVariant) html += '<button class="btn btn-secondary btn-small" style="margin-top:8px;" onclick="openAddVariant(' + componentId + ')"><i class="ti ti-plus"></i> Добавить вариант</button>';
+        const box = document.createElement('div');
+        box.style.cssText = 'padding:10px 18px;border-bottom:1px solid var(--border);background:#F5FBF7;';
+        box.innerHTML = html;
+        const modalEl = m.querySelector('.modal');
+        const header = modalEl && modalEl.querySelector('.modal-header');
+        if (header && header.parentNode) header.parentNode.insertBefore(box, header.nextSibling);
+      } catch (e) { /* не критично */ }
+    })();
+  }
+}
+
+// v2.45.671: отвязать вариант от обобщённой позиции.
+async function detachVariant(variantId) {
+  try {
+    const r = await apiPost('/api/components/' + variantId + '/umbrella', { umbrella_id: null });
+    if (r && r.ok) { showToast('Отвязано', 'success'); if (typeof openComponentDetail === 'function') { closeComponentForm(); } if (typeof loadWarehouseComponents === 'function') loadWarehouseComponents(); else if (typeof loadComponentsCatalog === 'function') loadComponentsCatalog(); if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch(e){} } }
+    else showToast('Не удалось отвязать', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+// v2.45.671: добавить вариант — простой поиск складской позиции.
+async function openAddVariant(umbrellaId) {
+  let comps = cache.components || [];
+  if (!comps.length) { try { const r = await apiGet('/api/components'); comps = r.components || []; cache.components = comps; } catch (e) {} }
+  let ov = document.getElementById('add-variant-overlay');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'add-variant-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.addEventListener('mousedown', function (e) { if (e.target === ov) ov.remove(); });
+  ov.innerHTML =
+    '<div onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" style="background:var(--card,#fff);border-radius:14px;max-width:520px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">' +
+      '<div class="modal-header" style="padding:14px 18px;border-bottom:1px solid var(--border);"><h3 style="margin:0;font-size:16px;">Добавить вариант</h3><button class="modal-close" onclick="document.getElementById(\'add-variant-overlay\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:14px 18px;overflow:auto;">' +
+        '<input id="add-variant-search" type="text" placeholder="Поиск конкретной модели (напр. XG-TXE35)…" oninput="_renderAddVariant(' + umbrellaId + ',this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;margin-bottom:10px;font-size:14px;">' +
+        '<div id="add-variant-results"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  _renderAddVariant(umbrellaId, '');
+  setTimeout(function () { const i = document.getElementById('add-variant-search'); if (i) i.focus(); }, 50);
+}
+
+function _renderAddVariant(umbrellaId, q) {
+  const box = document.getElementById('add-variant-results');
+  if (!box) return;
+  const qn = (q || '').toLowerCase().replace(/[^0-9a-zа-яё]+/g, '');
+  const comps = (cache.components || []).filter(c => c.id !== umbrellaId && !c.umbrella_id);
+  const scored = comps.filter(c => !qn || (String(c.name || '') + String(c.sku || '')).toLowerCase().replace(/[^0-9a-zа-яё]+/g, '').includes(qn)).slice(0, 40);
+  if (!scored.length) { box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-light);">Ничего не найдено</div>'; return; }
+  box.innerHTML = scored.map(c =>
+    '<div onclick="submitAddVariant(' + c.id + ',' + umbrellaId + ')" style="display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+      '<span style="font-weight:600;">' + escapeHtml(c.name || '') + (c.sku ? ' <span style="color:var(--text-light);font-size:12px;">· ' + escapeHtml(c.sku) + '</span>' : '') + '</span>' +
+      '<span style="white-space:nowrap;font-weight:700;">' + _fmtQty(c.qty_on_stock || 0) + ' ' + escapeHtml(c.unit || 'шт.') + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+async function submitAddVariant(componentId, umbrellaId) {
+  try {
+    const r = await apiPost('/api/components/' + componentId + '/umbrella', { umbrella_id: umbrellaId });
+    if (r && r.ok) {
+      showToast('Вариант добавлен', 'success');
+      const ov = document.getElementById('add-variant-overlay'); if (ov) ov.remove();
+      closeComponentForm();
+      if (typeof loadWarehouseComponents === 'function') loadWarehouseComponents(); else if (typeof loadComponentsCatalog === 'function') loadComponentsCatalog();
+      if (typeof loadSupplyShopping === 'function') { try { loadSupplyShopping(); } catch (e) {} }
+    } else showToast((r && r.data && r.data.message) || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 function closeComponentForm() {
@@ -2679,9 +2771,12 @@ function _renderComponentDuplicates(data) {
       '</label>';
     });
     html += '</div>' +
-      '<div class="dup-group-actions">' +
+      '<div class="dup-group-actions" style="display:flex;gap:8px;flex-wrap:wrap;">' +
         '<button class="btn btn-primary btn-small" onclick="mergeDuplicateGroup(' + gi + ')">' +
           '<i class="ti ti-merge"></i> Склеить группу' +
+        '</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="markDupGroupDifferent(' + gi + ')" title="Это разные позиции — убрать из подсказок">' +
+          '<i class="ti ti-arrows-split-2"></i> Разное' +
         '</button>' +
       '</div>' +
     '</div>';
@@ -2689,6 +2784,28 @@ function _renderComponentDuplicates(data) {
   body.innerHTML = html;
   // Сохраним сами группы в state — пригодится для confirmMerge
   state._dupGroups = groups;
+}
+
+// v2.45.666: «Разное» — пометить группу как НЕ дубли, убрать из подсказок навсегда.
+async function markDupGroupDifferent(gi) {
+  const groups = state._dupGroups || [];
+  const g = groups[gi];
+  if (!g) return;
+  const ids = g.items.map(it => it.id);
+  if (!confirm('Пометить эти позиции как РАЗНЫЕ (не дубли)?\n\n' +
+               g.items.map(it => '• ' + it.name).join('\n') + '\n\n' +
+               'Группа исчезнет из подсказок. Если позже добавится похожая позиция — появится снова.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/components/duplicates/ignore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ids: ids }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось', 'error'); return; }
+    showToast('Помечено как разное', 'success');
+    if (typeof openComponentDuplicates === 'function') openComponentDuplicates();  // перезагрузить список
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 async function mergeDuplicateGroup(gi) {
@@ -5801,6 +5918,64 @@ async function deleteSupplyItem(itemId) {
 // ========== ЗАЯВКИ ==========
 
 // v2.44.33: «Что закупить» — список к закупке по поставщикам
+// ============ ЛОГИСТИКА: забрать / в пути (v2.45.678) ============
+async function loadLogisticsPickups() {
+  const box = document.getElementById('logistics-content');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-block">Загрузка…</div>';
+  try {
+    const d = await apiGet('/api/logistics/pickups');
+    const ready = d.ready || [], transit = d.in_transit || [];
+    let html = '';
+    html += '<div style="font-weight:700;font-size:15px;margin:4px 0 8px;color:#15803D;"><i class="ti ti-package-import"></i> Забрать сейчас · ' + ready.length + '</div>';
+    html += ready.length ? ready.map(_logiReadyCard).join('') : '<div class="empty-block" style="margin-bottom:8px;">Нечего забирать — всё принято.</div>';
+    html += '<div style="font-weight:700;font-size:15px;margin:20px 0 8px;color:#3257B0;"><i class="ti ti-truck-loading"></i> В пути / ожидается · ' + transit.length + '</div>';
+    html += transit.length ? transit.map(_logiTransitCard).join('') : '<div class="empty-block">Ничего в пути.</div>';
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
+  }
+}
+function _logiSum(v) { return (v != null && v !== '') ? Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽' : ''; }
+function _logiReadyCard(it) {
+  const num = it.invoice_number || it.order_label || ('#' + it.order_id);
+  const place = it.pickup_place ? '<div style="font-size:13px;color:var(--text-mid);margin-top:5px;"><i class="ti ti-map-pin"></i> ' + escapeHtml(it.pickup_place) + '</div>' : '';
+  const reserve = it.reserve ? '<span style="background:#FEF3C7;color:#92400E;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">резерв до ' + escapeHtml(it.reserve) + '</span>' : '';
+  const sum = _logiSum(it.invoice_total);
+  return '<div style="border:1px solid var(--border);border-left:3px solid #15803D;border-radius:10px;padding:12px 14px;margin-bottom:8px;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">' +
+      '<div style="min-width:0;">' +
+        '<div style="font-weight:700;">' + escapeHtml(it.supplier_name || 'Поставщик') + ' · ' + escapeHtml(String(num)) + '</div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-top:2px;">' + (it.items_count || 0) + ' поз.' + (sum ? ' · ' + sum : '') + ' · <b style="color:#15803D;">' + escapeHtml(it.ext_status || 'готов к выдаче') + '</b></div>' + place +
+      '</div>' +
+      '<div style="flex:none;">' + reserve + '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+      '<button class="btn btn-primary btn-small" onclick="logiPickupDone(' + it.order_id + ')"><i class="ti ti-check"></i> Забрал</button>' +
+      (it.supplier_phone ? '<a class="btn btn-secondary btn-small" href="tel:' + escapeHtml(String(it.supplier_phone).replace(/[^0-9+]/g, '')) + '"><i class="ti ti-phone"></i> ' + escapeHtml(it.supplier_phone) + '</a>' : '') +
+    '</div>' +
+  '</div>';
+}
+function _logiTransitCard(it) {
+  const num = it.invoice_number || it.order_label || ('#' + it.order_id);
+  const eta = it.expected_date ? '<span style="background:#E7EEFB;color:#2749A0;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">придёт ' + escapeHtml(it.expected_date) + '</span>' : '';
+  return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+    '<div style="min-width:0;">' +
+      '<div style="font-weight:600;">' + escapeHtml(it.supplier_name || 'Поставщик') + ' · ' + escapeHtml(String(num)) + '</div>' +
+      '<div style="font-size:12.5px;color:var(--text-light);">' + (it.items_count || 0) + ' поз. · ' + escapeHtml(it.ext_status || '') + '</div>' +
+    '</div>' +
+    '<div style="flex:none;">' + eta + '</div>' +
+  '</div>';
+}
+async function logiPickupDone(orderId) {
+  if (!confirm('Отметить заказ как забранный? Уйдёт из списка «Забрать».')) return;
+  try {
+    const r = await apiPost('/api/logistics/pickups/' + orderId + '/done', { done: true });
+    if (r && r.ok) { showToast('Отмечено: забрал', 'success'); loadLogisticsPickups(); }
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
 async function loadSupplyShopping() {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
@@ -8706,6 +8881,8 @@ function renderSupplyOrders() {
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
+          // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
+          (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
         '</div>' +
       '</div>' +
       (canDelete
@@ -10984,6 +11161,8 @@ function renderSupplyOrderDetail(o) {
     '</div>' +
     // v2.45.643: «Назначение» из MAX-бота («на что счёт») — заметно для бухгалтера
     (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
+    // v2.45.665: внешний статус поставки (из ЛК Всеинструментов)
+    (o.ext_status ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#E7EEFB;border:1px solid #B9CCEF;color:#2749A0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-truck-delivery" style="font-size:16px;"></i> Поставка: ' + escapeHtml(o.ext_status) + (o.expected_date ? ' · придёт ' + escapeHtml(o.expected_date) : '') + '</div>' : '') +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
 
@@ -13199,6 +13378,126 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.679',
+    date: '07.07.2026',
+    title: 'Новый раздел «Логистика» — что забрать',
+    features: [
+      'В меню появился раздел <b>«Логистика»</b>: <b>«Забрать сейчас»</b> (готовые к выдаче — адрес самовывоза, срок резерва, что забрать) и <b>«В пути / ожидается»</b> (когда придёт)',
+      'Данные тянутся из синка Всеинструментов автоматически. Кнопка <b>«Забрал»</b> убирает позицию из списка',
+    ],
+  },
+  {
+    version: 'v2.45.676',
+    date: '06.07.2026',
+    title: 'Безопасность: журнал присутствия (кто пришёл/ушёл)',
+    features: [
+      'В разделе «Безопасность» появился блок <b>«Присутствие»</b>: кто сейчас на месте и лента приходов/уходов',
+      'Строится по распознаванию лиц (камера обходит офис ~каждые 5 мин)',
+    ],
+  },
+  {
+    version: 'v2.45.675',
+    date: '06.07.2026',
+    title: 'Утро: ответ «чем занимался вчера» сохраняется сразу',
+    features: [
+      'Ответ по человеку (напр. «Хозработы — запуск чиллера») теперь сохраняется <b>сразу</b>, как заполнил, а не только по кнопке «Начать смену»',
+      'Из-за этого вопрос больше <b>не выскакивает повторно</b> после обновления страницы',
+    ],
+  },
+  {
+    version: 'v2.45.674',
+    date: '06.07.2026',
+    title: 'Безопасность: живое видео с камеры (почти без задержки)',
+    features: [
+      'Камера теперь показывает <b>живой поток</b> (WebRTC/MSE) — плавно и с малой задержкой, как в приложении',
+      'Если живой поток недоступен — автоматически показываются <b>снимки</b> (как раньше)',
+      'Стрелки и зум работают в обоих режимах',
+    ],
+  },
+  {
+    version: 'v2.45.673',
+    date: '06.07.2026',
+    title: 'Варианты: авто-привязка при приёмке + кнопка «Как вариант»',
+    features: [
+      'При приёмке УПД конкретная модель, закрывшая заказ на обобщённую позицию, <b>автоматически становится её вариантом</b>',
+      'В «Сопоставить со складом» появилась кнопка <b>«Как вариант»</b> (рядом с «Привязать»/«Склеить») — привязать конкретную к обобщённой, не сливая их',
+    ],
+  },
+  {
+    version: 'v2.45.672',
+    date: '06.07.2026',
+    title: 'Обобщённые позиции и их варианты («зонтик»)',
+    features: [
+      'Позиция вроде <b>«Наружный блок 12»</b> может быть <b>обобщённой</b>, а её закрывают конкретные модели (варианты): XG-TXE35RHA-ODU и др.',
+      'Наличие обобщённой = <b>сумма вариантов</b>; в «Что закупить» дефицит считается по сумме (нет ложного «низкий остаток», когда вариант есть на складе)',
+      'В карточке позиции — блок <b>«Варианты (чем закрыт)»</b> с разбивкой и кнопкой «Добавить вариант»/отвязать',
+    ],
+  },
+  {
+    version: 'v2.45.671',
+    date: '06.07.2026',
+    title: 'Безопасность: кнопки под видео + меньше задержка',
+    features: [
+      'Кнопки управления камерой перенесены <b>под видео</b> — не перекрывают кадр',
+      'Задержка картинки заметно снижена (камера отдаёт кадры без «холодного старта»)',
+    ],
+  },
+  {
+    version: 'v2.45.670',
+    date: '06.07.2026',
+    title: 'Безопасность: пульт управления камерой (стрелки + зум)',
+    features: [
+      'В разделе «Безопасность» появились <b>стрелки</b> — камеру можно крутить влево/вправо/вверх/вниз прямо из CRM',
+      'Кнопки <b>зума</b> (+/−) и сброс — цифровое приближение кадра',
+      'Пока ты рулишь вручную, авто-патруль камеры <b>ставится на паузу</b>',
+    ],
+  },
+  {
+    version: 'v2.45.669',
+    date: '06.07.2026',
+    title: 'Безопасность: живой просмотр камеры офиса (директору)',
+    features: [
+      'Новый раздел <b>«Безопасность»</b> на главной — живой просмотр камеры офиса (~1 кадр/сек)',
+      'Доступ <b>только директору</b>, работает и из офиса, и удалённо',
+    ],
+  },
+  {
+    version: 'v2.45.668',
+    date: '06.07.2026',
+    title: 'Сопоставить со складом: кнопка «Склеить»',
+    features: [
+      'В окне «Сопоставить со складом» у каждой складской позиции теперь две кнопки: <b>«Привязать»</b> (как раньше — только эта строка) и <b>«Склеить»</b>',
+      '<b>«Склеить»</b> — когда это одна и та же позиция (напр. «C6» и «1P 6А»): переносит ВСЕ ссылки во всех моделях/договорах на складскую и складывает остаток. Дефицит уходит <b>сразу и везде</b>',
+      'После действия список «Что закупить» обновляется автоматически',
+    ],
+  },
+  {
+    version: 'v2.45.666',
+    date: '06.07.2026',
+    title: 'Дубли: кнопка «Разное»',
+    features: [
+      'В окне «Дубли в номенклатуре» у каждой группы появилась кнопка <b>«Разное»</b> — если позиции на самом деле разные (напр. 06×15 и 06×22, 6А и 4А), жми её, и группа <b>исчезнет из подсказок</b>',
+      'Если позже добавится похожая позиция — группа появится снова (помечается конкретный состав)',
+    ],
+  },
+  {
+    version: 'v2.45.665',
+    date: '06.07.2026',
+    title: 'Поставки Всеинструментов подтягиваются в CRM',
+    features: [
+      'Даты доставки и статусы заказов из личного кабинета <b>Всеинструментов</b> теперь автоматически попадают в заказ снабжения (через браузерный помощник)',
+      'В карточке заказа и списке — плашка <b>«Поставка: Доставляется в магазин · придёт 07.07»</b>; дата видна и в «Ждём поставку»',
+    ],
+  },
+  {
+    version: 'v2.45.663',
+    date: '06.07.2026',
+    title: 'Схема (PDF) открывается сразу',
+    features: [
+      'Схема теперь качается <b>напрямую из хранилища</b> (CDN), а не через наш сервер — открывается почти мгновенно, без «долго открывается»',
+    ],
+  },
   {
     version: 'v2.45.644',
     date: '03.07.2026',
