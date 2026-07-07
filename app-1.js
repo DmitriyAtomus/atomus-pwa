@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.688-max-supplier-chat";
+const APP_VERSION = "v2.45.689-smart-queue";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3305,6 +3305,9 @@ function renderProductionDashboard(d) {
       html += '<div class="pkb-col-body' + bodyExtra + '">';
       if (items.length === 0) {
         html += '<div class="pkb-col-empty">' + escapeHtml(pkbEmptyText(def.key)) + '</div>';
+      } else if (def.key === 'queue') {
+        // v2.45.689: умная очередь — места, секции, причины, пин
+        html += _smartQueueHtml(items, works, defHrs);
       } else {
         items.forEach(w => html += renderPkbWorkCard(w, def.key));
       }
@@ -3412,6 +3415,18 @@ async function _fillPkbRail() {
       const late = ((m && m.installations) || []).filter(r =>
         r.status !== 'handed_over' && r.status !== 'cancelled' &&
         r.scheduled_date && String(r.scheduled_date).slice(0, 10) < todayIso);
+      // v2.45.689: карта «договор → ближайший монтаж» для умной очереди
+      // (монтаж диктует дедлайн сборки). Обновится при следующем рендере доски.
+      try {
+        const map = {};
+        ((m && m.installations) || []).forEach(r => {
+          if (!r.contract_id || !r.scheduled_date) return;
+          if (r.status === 'handed_over' || r.status === 'cancelled') return;
+          const d = String(r.scheduled_date).slice(0, 10);
+          if (!map[r.contract_id] || d < map[r.contract_id]) map[r.contract_id] = d;
+        });
+        window._sqInstByContract = map;
+      } catch (e) {}
       if (late.length) {
         mntEl.innerHTML = '<div class="pkb-rail-row" onclick="goToSection(\'installation\', \'installation-list\')" ' +
           'title="Дата выезда прошла, монтаж не сдан — открыть раздел Монтаж">' +
@@ -3466,6 +3481,162 @@ async function _fillPkbRail() {
       }
     } catch (e) { taskEl.innerHTML = '<div class="pkb-rail-row muted">—</div>'; }
   }
+}
+
+// ============ v2.45.689: УМНАЯ ОЧЕРЕДЬ — места, причины, секции, пин ============
+// Запас времени: дней до дедлайна минус оставшаяся работа / мощность цеха.
+// Секции: 🔥 горит (запас ≤ 1 дн) · 📋 по плану · ⛔ ждут детали · 🕐 без срока.
+// Пин директора (queue_pin) поднимает работу наверх поверх любых расчётов.
+function _sqFmtD(iso) {
+  if (!iso) return '';
+  const p = String(iso).slice(0, 10).split('-');
+  return p.length === 3 ? p[2] + '.' + p[1] : String(iso);
+}
+function _smartQueueData(items, works, defHrs) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // Мощность цеха: сколько сборщиков реально в работе (минимум 2) × 8ч
+  const act = new Set();
+  works.forEach(w => { if (w.status === 'in_progress' && w.assignee_id) act.add(w.assignee_id); });
+  const cap = Math.max(act.size, 2) * 8;
+  // Работы на доске по договорам — для «🏁 замыкает»
+  const byContract = {};
+  works.forEach(w => {
+    if (w.contract_id && w.status !== 'done' && w.status !== 'cancelled') {
+      (byContract[w.contract_id] = byContract[w.contract_id] || []).push(w);
+    }
+  });
+  // Деньги договора (если кэш договоров уже подгружался) и даты монтажей (из панели)
+  const money = {};
+  try {
+    ((cache.contractsWithProgress && cache.contractsWithProgress.contracts) || []).forEach(c => {
+      if (c.id) money[c.id] = Number(c.sum_amount || 0);
+    });
+  } catch (e) {}
+  const inst = window._sqInstByContract || {};
+
+  const entries = items.map(w => {
+    const est = _pkbWorkHours(w, defHrs);
+    const rem = Math.max(est - Number(w.session_hours || 0), 1);
+    let dl = w.deadline_at || w.contract_delivery_date || null;
+    let dlIsMontage = false;
+    const im = w.contract_id ? inst[w.contract_id] : null;
+    if (im && (!dl || im < String(dl).slice(0, 10))) { dl = im; dlIsMontage = true; }
+    let slack = null;
+    if (dl) {
+      const d = new Date(String(dl).slice(0, 10) + 'T00:00:00');
+      if (!isNaN(d.getTime())) slack = Math.round((d - today) / 86400000) - rem / cap;
+    }
+    const missing = (w.missing_components || []).length;
+    const pinned = Number(w.queue_pin || 0) > 0;
+    let section;
+    if (missing > 0) section = 'wait';
+    else if (slack === null) section = 'nodate';
+    else if (slack <= 1) section = 'fire';
+    else section = 'plan';
+    return { w, est, rem, dl, dlIsMontage, slack, missing, pinned, section };
+  });
+
+  const secOrder = { fire: 0, plan: 1, wait: 2, nodate: 3 };
+  entries.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    if (!a.pinned && secOrder[a.section] !== secOrder[b.section]) return secOrder[a.section] - secOrder[b.section];
+    const as = a.slack === null ? 9999 : a.slack;
+    const bs = b.slack === null ? 9999 : b.slack;
+    if (Math.abs(as - bs) > 0.01) return as - bs;
+    const am = money[a.w.contract_id] || 0, bm = money[b.w.contract_id] || 0;
+    if (am !== bm) return bm - am;
+    return (a.w.id || 0) - (b.w.id || 0);
+  });
+
+  // Причины (после сортировки — знаем соседей для «серии» и места)
+  entries.forEach((e, i) => {
+    e.place = i + 1;
+    const r = [];
+    const w = e.w;
+    if (e.pinned) r.push('<span class="sq-w pin">📌 закреплено вручную</span>');
+    if (e.slack !== null) {
+      if (e.slack <= 0) r.push('<span class="sq-w bad">не успеваем: дефицит ~' + Math.round(-e.slack * (cap / 8) * 8) + 'ч к ' + _sqFmtD(e.dl) + '</span>');
+      else if (e.slack <= 1) r.push('<span class="sq-w bad">впритык: запас &lt;1 дн при ' + Math.round(e.rem) + 'ч работы</span>');
+      else if (e.slack <= 3) r.push('<span class="sq-w warn">запас ~' + Math.round(e.slack) + ' дн</span>');
+      else r.push('<span class="sq-w">запас ~' + Math.round(e.slack) + ' дн</span>');
+    }
+    if (e.dlIsMontage) r.push('<span class="sq-w bad">🔧 монтаж ' + _sqFmtD(e.dl) + ' — раньше отгрузки</span>');
+    if (e.missing > 0) {
+      // крайняя дата деталей: дедлайн минус время сборки
+      if (e.dl && e.slack !== null) {
+        const need = new Date(String(e.dl).slice(0, 10) + 'T00:00:00');
+        need.setDate(need.getDate() - Math.ceil(e.rem / cap));
+        const nIso = need.toISOString().slice(0, 10);
+        const late = need < today;
+        r.push('<span class="sq-w ' + (late ? 'bad' : 'warn') + '">детали нужны в цеху до ' + _sqFmtD(nIso) + (late ? ' — уже поздно ❗' : '') + '</span>');
+      }
+    } else if (e.section !== 'nodate') {
+      r.push('<span class="sq-w good">детали есть ✓</span>');
+    }
+    const m = money[w.contract_id] || 0;
+    if (m >= 500000) r.push('<span class="sq-w warn">💰 договор ' + (m / 1000000).toFixed(1).replace('.', ',') + ' млн ₽</span>');
+    if (w.contract_id && (byContract[w.contract_id] || []).length === 1) {
+      r.push('<span class="sq-w good">🏁 последняя работа по ' + escapeHtml(w.contract_number || 'договору') + '</span>');
+    }
+    if (e.est <= 4 && e.missing === 0) r.push('<span class="sq-w info">⚡ быстрая ~' + Math.round(e.est) + 'ч — затычка в конец дня</span>');
+    if (!e.dl && w.created_at) {
+      const age = Math.round((Date.now() - new Date(String(w.created_at).replace(' ', 'T') + 'Z')) / 86400000);
+      if (age >= 30) r.push('<span class="sq-w warn">⏳ висит ' + age + ' дн — подними или закрой</span>');
+    }
+    if (i > 0 && entries[i - 1].w.model_id && entries[i - 1].w.model_id === w.model_id) {
+      r.push('<span class="sq-w ser">серия с №' + entries[i - 1].place + ' — та же модель</span>');
+    }
+    e.reasons = r;
+  });
+  return { entries, cap };
+}
+
+function _smartQueueHtml(items, works, defHrs) {
+  const { entries, cap } = _smartQueueData(items, works, defHrs);
+  const SEC = {
+    fire:   { cls: 'fire', t: '🔥 Горит — успеваем впритык' },
+    plan:   { cls: '',     t: '📋 Дальше по плану' },
+    wait:   { cls: 'wait', t: '⛔ Ждут детали' },
+    nodate: { cls: '',     t: '🕐 Без срока' },
+  };
+  let html = '';
+  // «Кому что брать»: самая горящая из готовых к сборке
+  const next = entries.find(e => e.missing === 0 && e.section !== 'nodate');
+  if (next) {
+    html += '<div class="sq-next">👉 Следующему свободному сборщику: <b>' +
+      escapeHtml(next.w.model_name || next.w.description || ('Работа #' + next.w.id)) +
+      '</b> (№' + next.place + ' в очереди)</div>';
+  }
+  let prevSec = null;
+  let pinShown = false;
+  entries.forEach(e => {
+    if (e.pinned) {
+      if (!pinShown) { html += '<div class="sq-sec pin">📌 Закреплено</div>'; pinShown = true; }
+    } else if (e.section !== prevSec) {
+      const s = SEC[e.section];
+      html += '<div class="sq-sec ' + s.cls + '">' + s.t + '</div>';
+      prevSec = e.section;
+    }
+    html += '<div class="sq-item sq-' + e.section + '">' +
+      '<span class="sq-n' + (e.section === 'fire' ? ' fire' : '') + '">' + e.place + '</span>' +
+      '<span class="sq-pin' + (e.pinned ? ' on' : '') + '" title="' + (e.pinned ? 'Открепить' : 'Закрепить наверху очереди') + '" ' +
+        'onclick="event.stopPropagation();sqTogglePin(' + e.w.id + ',' + (e.pinned ? 0 : 1) + ')">📌</span>' +
+      renderPkbWorkCard(e.w, 'queue') +
+      (e.reasons.length ? '<div class="sq-why">' + e.reasons.join('') + '</div>' : '') +
+    '</div>';
+  });
+  return html;
+}
+
+async function sqTogglePin(workId, val) {
+  try {
+    await apiPatch('/api/production/works/' + workId, { queue_pin: val ? 1 : 0 });
+    showToast(val ? '📌 Закреплено наверху очереди' : 'Пин снят — место по расчёту', 'success');
+  } catch (e) {
+    showToast('Не удалось изменить пин', 'error');
+    return;
+  }
+  if (typeof loadProductionDashboard === 'function') loadProductionDashboard();
 }
 
 // v2.45.5xx: переключатель нового/старого вида Производства
