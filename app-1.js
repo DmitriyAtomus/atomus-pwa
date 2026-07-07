@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.704";
+const APP_VERSION = "v2.45.705";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13929,9 +13929,21 @@ function _mydayStartModalHtml() {
     '<input class="myday-inp" id="mds-note" placeholder="начни печатать — подскажу из прошлых…" oninput="mdsNoteChips()">' +
     '<div id="mds-notechips">' + _mdsNoteChipsHtml() + '</div>' +
     '<button class="myday-go" onclick="mydayGo()"><i class="ti ti-player-play"></i> Погнали' +
-    (_mds.mates.length ? ' · ' + (_mds.mates.length + 1) + ' чел.' : '') + '</button>';
+    _mdsMatesLabel(mates) + '</button>';
   return h;
 }
+function _mdsMatesLabel(mates) {
+  // подпись без счёта «N чел.» — раньше «2 чел.» читалось как ошибка
+  if (!_mds.mates.length) return '';
+  const names = _mds.mates.map(id => {
+    const m = (mates || []).find(x => x.id === id);
+    return m ? m.name : null;
+  }).filter(Boolean);
+  if (!names.length) return '';
+  if (names.length <= 2) return ' · вместе с: ' + escapeHtml(names.join(', '));
+  return ' · вместе с ' + names.length + ' напарниками';
+}
+
 function _mdsNoteChipsHtml() {
   const inp = document.getElementById('mds-note');
   const q = inp ? inp.value.trim().toLowerCase() : '';
