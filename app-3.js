@@ -5918,37 +5918,130 @@ async function deleteSupplyItem(itemId) {
 // ========== ЗАЯВКИ ==========
 
 // v2.44.33: «Что закупить» — список к закупке по поставщикам
-// ============ ЛОГИСТИКА: забрать / в пути (v2.45.678) ============
+// ============ ЛОГИСТИКА: забрать / в пути (v2.45.678, переработано v2.45.681) ============
 async function loadLogisticsPickups() {
   const box = document.getElementById('logistics-content');
   if (!box) return;
   box.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
     const d = await apiGet('/api/logistics/pickups');
-    const ready = d.ready || [], transit = d.in_transit || [];
+    const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
     html += '<div style="font-weight:700;font-size:15px;margin:4px 0 8px;color:#15803D;"><i class="ti ti-package-import"></i> Забрать сейчас · ' + ready.length + '</div>';
     html += ready.length ? ready.map(_logiReadyCard).join('') : '<div class="empty-block" style="margin-bottom:8px;">Нечего забирать — всё принято.</div>';
     html += '<div style="font-weight:700;font-size:15px;margin:20px 0 8px;color:#3257B0;"><i class="ti ti-truck-loading"></i> В пути / ожидается · ' + transit.length + '</div>';
     html += transit.length ? transit.map(_logiTransitCard).join('') : '<div class="empty-block">Ничего в пути.</div>';
+    if (done.length) {
+      html += '<div style="font-weight:700;font-size:14px;margin:20px 0 8px;color:var(--text-light);"><i class="ti ti-circle-check"></i> Выдано / завершено · ' + (d.done_count || done.length) + '</div>';
+      html += done.map(_logiDoneRow).join('');
+    }
     box.innerHTML = html;
   } catch (e) {
     box.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
   }
 }
 function _logiSum(v) { return (v != null && v !== '') ? Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽' : ''; }
-function _logiReadyCard(it) {
+function _logiPlural(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+// Разница даты (YYYY-MM-DD или ДД.ММ.ГГГГ) с сегодняшним днём, в целых днях.
+function _logiDaysFromToday(dateStr) {
+  if (!dateStr) return null;
+  let iso = String(dateStr).trim();
+  const m = iso.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+  if (m) iso = m[3] + '-' + m[2] + '-' + m[1];
+  iso = iso.slice(0, 10);
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((d - today) / 86400000);
+}
+function _logiHumanDate(dateStr) {
+  const m = String(dateStr || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+  const iso = m ? (m[3] + '-' + m[2] + '-' + m[1]) : String(dateStr || '').slice(0, 10);
+  const days = _logiDaysFromToday(iso);
+  if (days === 0) return 'сегодня';
+  if (days === 1) return 'завтра';
+  return _fmtDateRuShort(iso) || String(dateStr || '');
+}
+// «придёт завтра» / «придёт 13 июля» / просрочено — «ждали 7 июля ⚠»
+function _logiEtaChip(iso) {
+  if (!iso) return '';
+  const days = _logiDaysFromToday(iso);
+  const txt = _logiHumanDate(iso);
+  let fg = '#2749A0', bg = '#E7EEFB', label = 'придёт ' + txt;
+  if (days !== null && days < 0) { fg = '#7F1D1D'; bg = '#FEE2E2'; label = 'ждали ' + txt + ' ⚠'; }
+  else if (days === 0) { fg = '#065F46'; bg = '#D1FAE5'; label = 'придёт сегодня'; }
+  return '<span style="background:' + bg + ';color:' + fg + ';border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">' + escapeHtml(label) + '</span>';
+}
+// «⏳ храним до 20 июля · осталось 3 дня» — чем ближе срок, тем тревожнее цвет
+function _logiReserveChip(raw) {
+  if (!raw) return '';
+  const days = _logiDaysFromToday(raw);
+  const dateTxt = _logiHumanDate(raw);
+  let fg = '#92400E', bg = '#FEF3C7', label = '⏳ храним до ' + dateTxt;
+  if (days !== null) {
+    if (days < 0) { fg = '#7F1D1D'; bg = '#FEE2E2'; label = '⚠ срок хранения истёк (' + dateTxt + ')'; }
+    else if (days === 0) { fg = '#7F1D1D'; bg = '#FEE2E2'; label = '⚠ храним до сегодня — забрать!'; }
+    else if (days <= 2) { fg = '#9A3412'; bg = '#FFEDD5'; label = '⏳ храним до ' + dateTxt + ' · ' + (days === 1 ? 'остался 1 день' : 'осталось 2 дня'); }
+    else { label = '⏳ храним до ' + dateTxt + ' · осталось ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней'); }
+  }
+  return '<span style="background:' + bg + ';color:' + fg + ';border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">' + escapeHtml(label) + '</span>';
+}
+// «Доставляется в магазин | Доставляется | Оплачен» → аккуратные чипы без дублей
+function _logiStatusChips(extStatus, opts) {
+  const o = opts || {};
+  let parts = String(extStatus || '').split('|').map(s => s.trim()).filter(Boolean);
+  // дубли-обобщения: «Доставляется» лишний, если есть «Доставляется в магазин»
+  parts = parts.filter((p, i) => !parts.some((q, j) => j !== i && q.toLowerCase() !== p.toLowerCase() && q.toLowerCase().indexOf(p.toLowerCase()) === 0));
+  // на карточке «Забрать сейчас» строка «Готов к выдаче» дублирует заголовок секции
+  if (o.hideReady) parts = parts.filter(p => p.toLowerCase().indexOf('выдаче') === -1);
+  const seen = {};
+  let html = '';
+  parts.forEach(p => {
+    const k = p.toLowerCase();
+    if (seen[k]) return; seen[k] = 1;
+    let fg = '#475569', bg = '#F1F5F9';
+    if (k.indexOf('оплачен') !== -1) { fg = '#065F46'; bg = '#ECFDF5'; }
+    else if (k.indexOf('выдаче') !== -1) { fg = '#15803D'; bg = '#DCFCE7'; }
+    else if (k.indexOf('доставля') !== -1 || k.indexOf('в пути') !== -1 || k.indexOf('заказан') !== -1) { fg = '#2749A0'; bg = '#EFF4FD'; }
+    else if (k.indexOf('выдан') !== -1 || k.indexOf('получен') !== -1) { fg = '#475569'; bg = '#F1F5F9'; }
+    else if (k.indexOf('отмен') !== -1) { fg = '#7F1D1D'; bg = '#FEE2E2'; }
+    html += '<span style="background:' + bg + ';color:' + fg + ';border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:600;white-space:nowrap;">' + escapeHtml(p.toLowerCase()) + '</span>';
+  });
+  return html;
+}
+// «4 товара · 29 292 ₽» — берём данные ЛК поставщика, если своих позиций нет
+function _logiCountSum(it) {
+  const bits = [];
+  const n = Number(it.ext_items || it.items_count || 0);
+  if (n > 0) bits.push(n + ' ' + _logiPlural(n, 'товар', 'товара', 'товаров'));
+  const sum = _logiSum(it.ext_sum != null && it.ext_sum !== '' ? it.ext_sum : it.invoice_total);
+  if (sum) bits.push(sum);
+  return bits.join(' · ');
+}
+function _logiTitle(it) {
   const num = it.invoice_number || it.order_label || ('#' + it.order_id);
-  const place = it.pickup_place ? '<div style="font-size:13px;color:var(--text-mid);margin-top:5px;"><i class="ti ti-map-pin"></i> ' + escapeHtml(it.pickup_place) + '</div>' : '';
-  const reserve = it.reserve ? '<span style="background:#FEF3C7;color:#92400E;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">резерв до ' + escapeHtml(it.reserve) + '</span>' : '';
-  const sum = _logiSum(it.invoice_total);
-  return '<div style="border:1px solid var(--border);border-left:3px solid #15803D;border-radius:10px;padding:12px 14px;margin-bottom:8px;">' +
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">' +
+  const sup = it.supplier_name ? escapeHtml(it.supplier_name) : '';
+  return (sup ? sup + ' <span style="font-weight:400;color:var(--text-light);">· заказ ' : '<span style="font-weight:600;">Заказ ') + escapeHtml(String(num)) + '</span>';
+}
+function _logiReadyCard(it) {
+  const place = it.pickup_place ? '<div style="font-size:13px;color:var(--text-mid);margin-top:6px;"><i class="ti ti-map-pin" style="color:#15803D;"></i> ' + escapeHtml(it.pickup_place) + '</div>' : '';
+  const countSum = _logiCountSum(it);
+  const chips = _logiStatusChips(it.ext_status, { hideReady: true });
+  return '<div style="border:1px solid var(--border);border-left:3px solid #15803D;border-radius:10px;padding:12px 14px;margin-bottom:8px;background:linear-gradient(90deg,rgba(21,128,61,.04),transparent 40%);">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">' +
       '<div style="min-width:0;">' +
-        '<div style="font-weight:700;">' + escapeHtml(it.supplier_name || 'Поставщик') + ' · ' + escapeHtml(String(num)) + '</div>' +
-        '<div style="font-size:12.5px;color:var(--text-light);margin-top:2px;">' + (it.items_count || 0) + ' поз.' + (sum ? ' · ' + sum : '') + ' · <b style="color:#15803D;">' + escapeHtml(it.ext_status || 'готов к выдаче') + '</b></div>' + place +
+        '<div style="font-weight:700;">' + _logiTitle(it) + '</div>' +
+        (countSum ? '<div style="font-size:13px;color:var(--text-mid);margin-top:3px;">' + countSum + '</div>' : '') +
+        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"><span style="background:#DCFCE7;color:#15803D;border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;"><i class="ti ti-package"></i> готов к выдаче</span>' + chips + '</div>' +
+        place +
       '</div>' +
-      '<div style="flex:none;">' + reserve + '</div>' +
+      '<div style="flex:none;">' + _logiReserveChip(it.reserve) + '</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
       '<button class="btn btn-primary btn-small" onclick="logiPickupDone(' + it.order_id + ')"><i class="ti ti-check"></i> Забрал</button>' +
@@ -5957,14 +6050,27 @@ function _logiReadyCard(it) {
   '</div>';
 }
 function _logiTransitCard(it) {
-  const num = it.invoice_number || it.order_label || ('#' + it.order_id);
-  const eta = it.expected_date ? '<span style="background:#E7EEFB;color:#2749A0;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">придёт ' + escapeHtml(it.expected_date) + '</span>' : '';
-  return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+  const countSum = _logiCountSum(it);
+  const chips = _logiStatusChips(it.ext_status);
+  const place = it.pickup_place ? '<div style="font-size:12.5px;color:var(--text-light);margin-top:4px;"><i class="ti ti-map-pin"></i> ' + escapeHtml(it.pickup_place) + '</div>' : '';
+  return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">' +
     '<div style="min-width:0;">' +
-      '<div style="font-weight:600;">' + escapeHtml(it.supplier_name || 'Поставщик') + ' · ' + escapeHtml(String(num)) + '</div>' +
-      '<div style="font-size:12.5px;color:var(--text-light);">' + (it.items_count || 0) + ' поз. · ' + escapeHtml(it.ext_status || '') + '</div>' +
+      '<div style="font-weight:600;">' + _logiTitle(it) + '</div>' +
+      (countSum ? '<div style="font-size:12.5px;color:var(--text-mid);margin-top:2px;">' + countSum + '</div>' : '') +
+      (chips ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">' + chips + '</div>' : '') +
+      place +
     '</div>' +
-    '<div style="flex:none;">' + eta + '</div>' +
+    '<div style="flex:none;">' + _logiEtaChip(it.expected_date) + '</div>' +
+  '</div>';
+}
+function _logiDoneRow(it) {
+  const countSum = _logiCountSum(it);
+  return '<div style="border:1px dashed var(--border);border-radius:10px;padding:8px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;opacity:.75;">' +
+    '<div style="min-width:0;">' +
+      '<div style="font-size:13px;font-weight:600;color:var(--text-mid);">' + _logiTitle(it) + '</div>' +
+      (countSum ? '<div style="font-size:12px;color:var(--text-light);">' + countSum + '</div>' : '') +
+    '</div>' +
+    '<div style="flex:none;display:flex;gap:5px;flex-wrap:wrap;">' + _logiStatusChips(it.ext_status) + '</div>' +
   '</div>';
 }
 async function logiPickupDone(orderId) {
@@ -13378,6 +13484,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.681',
+    date: '07.07.2026',
+    title: 'Логистика — карточки по-человечески',
+    features: [
+      'Даты стали понятными: <b>«придёт завтра»</b>, «придёт 13 июля», просроченное — красным «ждали 5 июля ⚠»',
+      'Срок хранения с обратным отсчётом: <b>«⏳ храним до 20 июля · осталось 13 дней»</b>, в последние дни — тревожным цветом',
+      'Вместо «0 поз.» — реальные <b>товары и суммы из ЛК поставщика</b> («4 товара · 5 944 ₽»), они теперь сохраняются при синке',
+      'Статусы — аккуратными цветными чипами без дублей (раньше: «Доставляется в магазин | Доставляется | Оплачен»)',
+      'Заказы со статусом <b>«Выдан»</b> больше не висят «В пути» — ушли в отдельный серый блок «Выдано / завершено»',
+    ],
+  },
   {
     version: 'v2.45.679',
     date: '07.07.2026',
