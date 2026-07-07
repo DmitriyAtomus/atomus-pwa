@@ -6201,6 +6201,27 @@ async function mailBindSupplier(peer, supplierId) {
     } else showToast('Не удалось', 'error');
   } catch (e) { showToast('Ошибка', 'error'); }
 }
+// v2.45.698: памятка «как подключить менеджера к MAX» — доступна всегда (кнопка в меню раздела)
+function showMaxConnectHelp() {
+  const old = document.getElementById('mail-help-overlay'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'mail-help-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div style="background:var(--card);border-radius:14px;width:min(480px,94vw);max-height:86vh;overflow-y:auto;" onclick="event.stopPropagation()">' +
+    '<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span><i class="ti ti-help-circle" style="color:var(--brand);"></i> Как подключить менеджера к MAX</span><button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mail-help-overlay\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div style="padding:16px;font-size:13.5px;color:var(--text-mid);line-height:1.6;">' +
+      'Бот <b>не может написать первым</b> — сначала человек должен открыть с ним диалог.' +
+      '<ol style="margin:10px 0 0;padding-left:20px;">' +
+        '<li>Менеджер находит в MAX бота <b>Atom</b> (тот, куда вы присылаете счета) и открывает чат.</li>' +
+        '<li>Пишет боту любое сообщение (можно «привет» или сразу счёт) — это авторизация.</li>' +
+        '<li>Он появляется в списке слева — жми на него и <b>«Привязать к поставщику»</b>.</li>' +
+        '<li>После привязки переписка и его счета относятся к нужному поставщику.</li>' +
+      '</ol>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(ov);
+}
 
 // ============ ЛОГИСТИКА: забрать / в пути (v2.45.678, дизайн v2.45.685) ============
 async function loadLogisticsPickups() {
@@ -13933,6 +13954,32 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.701',
+    date: '07.07.2026',
+    title: 'Присутствие: сколько был / отсутствовал (разворот по сессиям)',
+    features: [
+      'В «Архиве по дням» у каждого — <b>сколько был</b> и <b>сколько отсутствовал</b> за день',
+      'Клик по человеку разворачивает <b>сессии</b>: пришёл → ушёл и длительность каждой',
+      'Исправлено «мельтешение» журнала: «ушёл» теперь только после 12 минут отсутствия (устойчиво к промахам распознавания)',
+    ],
+  },
+  {
+    version: 'v2.45.700',
+    date: '07.07.2026',
+    title: 'Почта и MAX: исправлено прозрачное окно памятки',
+    features: [
+      'Окно «Как подключить менеджера» и окно привязки к поставщику больше не прозрачные (была не определена переменная фона) — открываются нормальным белым окном',
+    ],
+  },
+  {
+    version: 'v2.45.699',
+    date: '07.07.2026',
+    title: 'Почта и MAX: памятка теперь всегда под рукой',
+    features: [
+      'Памятка «Как подключить менеджера к MAX» больше не пропадает при открытии переписки — в меню раздела есть кнопка <b>«Как подключить менеджера»</b>, открывает памятку в окне',
+    ],
+  },
   {
     version: 'v2.45.697',
     date: '07.07.2026',
