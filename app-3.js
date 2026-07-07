@@ -9318,6 +9318,12 @@ function renderSupplyOrders() {
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
           (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
+          // v2.45.699: кто оформил заказ — видно, чей это счёт
+          (o.created_by_name
+            ? '<span class="sup-ord-who" title="Кто оформил заказ"><span class="sup-ord-who-ava">' +
+                escapeHtml((typeof getInitials === 'function') ? getInitials(o.created_by_name) : o.created_by_name.slice(0, 2)) +
+              '</span>' + escapeHtml(o.created_by_name) + '</span>'
+            : '') +
           // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
           (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
         '</div>' +
@@ -11704,6 +11710,8 @@ function renderSupplyOrderDetail(o) {
       (o.supplier_email ? '<div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">' + escapeHtml(o.supplier_email) + '</div></div>' : '') +
       (o.expected_date ? '<div class="detail-item"><div class="detail-label">Ожидаем</div><div class="detail-value">' + escapeHtml(o.expected_date) + '</div></div>' : '') +
       (o.order_label ? '<div class="detail-item"><div class="detail-label">Метка</div><div class="detail-value" style="font-family:ui-monospace,Consolas,monospace;">' + escapeHtml(o.order_label) + '</div></div>' : '') +
+      // v2.45.699: кто оформил заказ
+      (o.created_by_name ? '<div class="detail-item"><div class="detail-label">Оформил</div><div class="detail-value">' + escapeHtml(o.created_by_name) + '</div></div>' : '') +
       (o.contract_number ? '<div class="detail-item"><div class="detail-label">Договор</div><div class="detail-value">№' + escapeHtml(o.contract_number) + '</div></div>' : '') +
     '</div>' +
     // v2.45.643: «Назначение» из MAX-бота («на что счёт») — заметно для бухгалтера
