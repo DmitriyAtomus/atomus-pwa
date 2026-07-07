@@ -6211,10 +6211,10 @@ function showMaxConnectHelp() {
   ov.innerHTML = '<div style="background:var(--card);border-radius:14px;width:min(480px,94vw);max-height:86vh;overflow-y:auto;" onclick="event.stopPropagation()">' +
     '<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span><i class="ti ti-help-circle" style="color:var(--brand);"></i> Как подключить менеджера к MAX</span><button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mail-help-overlay\').remove()"><i class="ti ti-x"></i></button></div>' +
     '<div style="padding:16px;font-size:13.5px;color:var(--text-mid);line-height:1.6;">' +
-      'Бот <b>не может написать первым</b> — сначала человек должен открыть с ним диалог.' +
+      'Бот <b>не может написать первым</b> — сначала поставщик должен открыть с ним диалог.' +
       '<ol style="margin:10px 0 0;padding-left:20px;">' +
-        '<li>Менеджер находит в MAX бота <b>Atom</b> (тот, куда вы присылаете счета) и открывает чат.</li>' +
-        '<li>Пишет боту любое сообщение (можно «привет» или сразу счёт) — это авторизация.</li>' +
+        '<li>Дай поставщику ссылку на бота <b>«Атомус Групп Общение»</b>: <a href="https://max.ru/id7415103479_1_bot" target="_blank" style="color:var(--brand);">max.ru/id7415103479_1_bot</a></li>' +
+        '<li>Поставщик открывает чат и пишет любое сообщение (можно «привет» или сразу счёт) — это авторизация.</li>' +
         '<li>Он появляется в списке слева — жми на него и <b>«Привязать к поставщику»</b>.</li>' +
         '<li>После привязки переписка и его счета относятся к нужному поставщику.</li>' +
       '</ol>' +
