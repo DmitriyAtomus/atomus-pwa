@@ -5140,6 +5140,10 @@ function showSupplierModal(s) {
           '<div><label>Телефон</label><input type="text" id="sm-phone" value="' + escapeHtml(isEdit ? s.phone : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
           '<div><label>Email</label><input type="email" id="sm-email" value="' + escapeHtml(isEdit ? s.email : '') + '" ' + (canManage ? '' : 'disabled') + '></div>' +
         '</div>' +
+        // v2.45.687: адрес самовывоза — показывается на карточках в «Логистике»,
+        // если синк ЛК не прислал адрес конкретного заказа
+        '<div class="form-group"><label>Адрес самовывоза <span style="text-transform:none;font-weight:400;color:var(--text-light);">— где забирать заказы (виден в Логистике)</span></label>' +
+          '<input type="text" id="sm-address" value="' + escapeHtml(isEdit ? (s.address || '') : '') + '" placeholder="напр. ул. Богдана Хмельницкого, д. 4Б, ТЦ «Домострой»" ' + (canManage ? '' : 'disabled') + '></div>' +
         '<div class="form-group"><label>Комментарий</label><textarea id="sm-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? s.comment : '') + '</textarea></div>' +
         // v2.45.239: прайс поставщика — его номенклатура для сопоставления в заявках
         (isEdit && canManage ?
@@ -5872,6 +5876,7 @@ async function saveSupplier(supplierId) {
     contact_person: document.getElementById('sm-contact').value.trim(),
     phone:          document.getElementById('sm-phone').value.trim(),
     email:          document.getElementById('sm-email').value.trim(),
+    address:        (document.getElementById('sm-address') || { value: '' }).value.trim(),
     comment:        document.getElementById('sm-comment').value.trim(),
   };
   if (!payload.name) { showToast('Укажите название', 'error'); return; }
@@ -13722,6 +13727,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.687',
+    date: '07.07.2026',
+    title: 'Логистика: адрес самовывоза на карточке',
+    features: [
+      'На карточках «Забрать» и «В пути» показывается <b>адрес самовывоза 📍</b>: из синка ЛК поставщика, а если он не пришёл — из карточки поставщика',
+      'В карточке поставщика (Снабжение → Поставщики) появилось поле <b>«Адрес самовывоза»</b> — заполни один раз, и адрес будет на всех заказах этого поставщика',
+    ],
+  },
   {
     version: 'v2.45.685',
     date: '07.07.2026',
