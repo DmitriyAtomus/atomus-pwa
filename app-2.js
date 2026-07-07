@@ -11450,12 +11450,13 @@ function renderProductionTree() {
           bySg[s].items.push(m);
         } else noSg.push(m);
       });
-      if (noSg.length) {
-        // v2.45.681: длинный список без подгрупп разбиваем на авто-серии по
-        // артикулу (ЩУ-001-…, ЩУ-002-…) — вместо простыни на сто строк
+      // v2.45.681/684: длинные списки разбиваем на авто-серии по артикулу
+      // (ЩУ-001-…, ЩУ-002-…) — раскрываешь «001», потом «002», а не листаешь всё
+      function _seriesHtml(items, keyPrefix) {
+        let out = '';
         const bySer = {};
-        if (noSg.length > 15) {
-          noSg.forEach(m => {
+        if (items.length > 15) {
+          items.forEach(m => {
             const a = String(m.article || m.name || '').trim();
             const seg = a.split(/[-–\s]+/).filter(Boolean);
             const ser = seg.length >= 2 ? (seg[0] + '-' + seg[1]) : (seg[0] || 'Прочее');
@@ -11465,26 +11466,30 @@ function renderProductionTree() {
         const serNames = Object.keys(bySer).sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
         if (serNames.length > 1) {
           serNames.forEach(ser => {
-            const sKey = 'pser:' + dirId + ':' + ser;
+            const sKey = keyPrefix + ':' + ser;
             const sOpen = autoOpen || !!og[sKey];
-            h += '<div class="sp-tree-subgroup">' +
+            out += '<div class="sp-tree-subgroup">' +
               '<button type="button" class="sp-tree-toggle subgroup' + (sOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + sKey.replace(/'/g, "\\'") + '\')">' +
                 '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
                 '<span>Серия ' + escapeHtml(ser) + '</span>' +
                 '<span class="sp-tree-count subgroup">' + bySer[ser].length + '</span>' +
               '</button>';
             if (sOpen) {
-              h += '<div class="sp-tree-items">';
-              bySer[ser].forEach(m => { h += _prodPickItem(m, dirName); });
-              h += '</div>';
+              out += '<div class="sp-tree-items">';
+              bySer[ser].forEach(m => { out += _prodPickItem(m, dirName); });
+              out += '</div>';
             }
-            h += '</div>';
+            out += '</div>';
           });
         } else {
-          h += '<div class="sp-tree-items">';
-          noSg.forEach(m => { h += _prodPickItem(m, dirName); });
-          h += '</div>';
+          out += '<div class="sp-tree-items">';
+          items.forEach(m => { out += _prodPickItem(m, dirName); });
+          out += '</div>';
         }
+        return out;
+      }
+      if (noSg.length) {
+        h += _seriesHtml(noSg, 'pser:' + dirId);
       }
       Object.keys(bySg).sort((a, b) => (bySg[a].name || '').localeCompare(bySg[b].name || '', 'ru')).forEach(s => {
         const sg = bySg[s];
@@ -11497,9 +11502,8 @@ function renderProductionTree() {
             '<span class="sp-tree-count subgroup">' + sg.items.length + '</span>' +
           '</button>';
         if (sOpen) {
-          h += '<div class="sp-tree-items">';
-          sg.items.forEach(m => { h += _prodPickItem(m, dirName); });
-          h += '</div>';
+          // v2.45.684: серии и внутри подгруппы («Стандартные» → ЩУ-001, ЩУ-002…)
+          h += _seriesHtml(sg.items, 'pser:' + dirId + ':' + s);
         }
         h += '</div>';
       });

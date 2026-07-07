@@ -2915,12 +2915,10 @@ async function openComponentReceiveModal(preselectedId) {
     m.onclick = (e) => { if (e.target === m) closeComponentReceiveModal(); };
     document.body.appendChild(m);
   }
-  const opts = components.map(c =>
-    '<option value="' + c.id + '"' + (preselectedId === c.id ? ' selected' : '') + '>' +
-    escapeHtml(c.name) + (c.sku ? ' (' + escapeHtml(c.sku) + ')' : '') +
-    ' — на складе: ' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.') +
-    '</option>'
-  ).join('');
+  // v2.45.684: вместо гигантского select — поиск с выпадашкой; марки —
+  // не весь каталог вперемешку, а история марок выбранного компонента (чипами)
+  const pre = preselectedId ? components.find(c => c.id === preselectedId) : null;
+  window._recvCompId = pre ? pre.id : null;
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
       '<div class="modal-header">' +
@@ -2929,14 +2927,22 @@ async function openComponentReceiveModal(preselectedId) {
       '</div>' +
       '<div style="padding:18px;">' +
         '<label class="form-label">Комплектующее *</label>' +
-        '<select id="recv-component" class="form-input" style="margin-bottom:14px;">' + opts + '</select>' +
+        '<div class="recv-comp-wrap">' +
+          '<input type="text" id="recv-comp-search" class="form-input" autocomplete="off" ' +
+            'placeholder="Начни печатать название или артикул…" ' +
+            'value="' + (pre ? escapeHtml(pre.name) : '') + '" ' +
+            'oninput="_recvFilterComp(this.value)" onfocus="_recvFilterComp(this.value)">' +
+          '<div id="recv-comp-dd" class="recv-dd" style="display:none;"></div>' +
+          '<div id="recv-comp-info" class="recv-comp-info">' +
+            (pre ? _recvCompInfoHtml(pre) : 'Компонент не выбран — найди его поиском выше') +
+          '</div>' +
+        '</div>' +
         '<label class="form-label">Что пришло — марка и количество *</label>' +
-        '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Можно несколько марок сразу (напр. 3 Hisense + 2 Royal). Марку выбери из номенклатуры или впиши; оставь пустой — без марки.</div>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Можно несколько марок сразу (напр. 3 Hisense + 2 Royal). Тапни марку из истории, впиши свою или оставь пустой — без марки.</div>' +
+        '<div id="recv-brand-chips" class="recv-brand-chips"></div>' +
         '<div id="recv-lines"></div>' +
         '<button type="button" class="btn btn-secondary btn-small" onclick="recvAddBrandRow()" style="margin:2px 0 14px;"><i class="ti ti-plus"></i> Добавить марку</button>' +
-        '<datalist id="recv-brand-list">' +
-          components.map(c => '<option value="' + escapeHtml(c.name) + '">').join('') +
-        '</datalist>' +
+        '<datalist id="recv-brand-list"></datalist>' +
         '<label class="form-label">Поставщик (опционально)</label>' +
         '<select id="recv-supplier" class="form-input" style="margin-bottom:14px;">' +
           '<option value="">— Не указан —</option>' +
@@ -2952,6 +2958,7 @@ async function openComponentReceiveModal(preselectedId) {
     '</div>';
   m.classList.add('visible');
   recvAddBrandRow();  // одна строка по умолчанию
+  if (pre) _recvLoadBrands(pre.id);   // v2.45.684: история марок предвыбранного
 
   // Подгружаем поставщиков если ещё нет
   if (!cache.suppliers) {
@@ -2972,6 +2979,78 @@ function closeComponentReceiveModal() {
   if (m) m.classList.remove('visible');
 }
 
+// ============ v2.45.684: поиск компонента + марки-чипы в приходе ============
+function _recvCompInfoHtml(c) {
+  const low = c.min_qty != null && Number(c.qty_on_stock) < Number(c.min_qty);
+  return '<span class="' + (low ? 'recv-low' : 'recv-ok') + '">✓ ' + escapeHtml(c.name) + '</span>' +
+    (c.sku ? ' · <span class="recv-sku">' + escapeHtml(c.sku) + '</span>' : '') +
+    ' · остаток <b>' + _fmtQty(c.qty_on_stock) + '</b> ' + escapeHtml(c.unit || 'шт.') +
+    (c.min_qty != null ? ' / мин ' + _fmtQty(c.min_qty) : '');
+}
+function _recvFilterComp(q) {
+  const dd = document.getElementById('recv-comp-dd');
+  if (!dd) return;
+  const ql = (q || '').toLowerCase().trim();
+  const list = (cache.components || [])
+    .filter(c => !ql ||
+      (c.name || '').toLowerCase().includes(ql) ||
+      (c.sku || '').toLowerCase().includes(ql))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
+  if (!list.length) {
+    dd.innerHTML = '<div class="recv-dd-empty">Ничего не найдено</div>';
+    dd.style.display = '';
+    return;
+  }
+  const MAX = 50;
+  dd.innerHTML = list.slice(0, MAX).map(c => {
+    const low = c.min_qty != null && Number(c.qty_on_stock) < Number(c.min_qty);
+    return '<div class="recv-dd-row" onclick="_recvPickComp(' + c.id + ')">' +
+      '<div class="recv-dd-nm">' + escapeHtml(c.name) +
+        (c.sku ? ' <span class="recv-sku">' + escapeHtml(c.sku) + '</span>' : '') + '</div>' +
+      '<div class="recv-dd-q' + (low ? ' low' : '') + '">' + _fmtQty(c.qty_on_stock) + ' ' + escapeHtml(c.unit || 'шт.') + '</div>' +
+    '</div>';
+  }).join('') +
+  (list.length > MAX ? '<div class="recv-dd-empty">…ещё ' + (list.length - MAX) + ' — уточни поиск</div>' : '');
+  dd.style.display = '';
+}
+function _recvPickComp(id) {
+  const c = (cache.components || []).find(x => x.id === id);
+  if (!c) return;
+  window._recvCompId = id;
+  const inp = document.getElementById('recv-comp-search');
+  if (inp) inp.value = c.name;
+  const dd = document.getElementById('recv-comp-dd');
+  if (dd) dd.style.display = 'none';
+  const info = document.getElementById('recv-comp-info');
+  if (info) info.innerHTML = _recvCompInfoHtml(c);
+  _recvLoadBrands(id);
+}
+// История марок компонента → чипы (тап — заполняет строку) + datalist
+async function _recvLoadBrands(componentId) {
+  const box = document.getElementById('recv-brand-chips');
+  const dl = document.getElementById('recv-brand-list');
+  if (box) box.innerHTML = '';
+  if (dl) dl.innerHTML = '';
+  try {
+    const r = await apiGet('/api/components/' + componentId + '/brands');
+    const brands = ((r && r.brands) || []).filter(b => (b.brand || '').trim());
+    if (!brands.length || window._recvCompId !== componentId) return;
+    if (dl) dl.innerHTML = brands.map(b => '<option value="' + escapeHtml(b.brand) + '">').join('');
+    if (box) {
+      box.innerHTML = brands.slice(0, 8).map(b =>
+        '<span class="recv-chip" onclick="_recvChipTap(' + JSON.stringify(String(b.brand)).replace(/"/g, '&quot;') + ')">' +
+          escapeHtml(b.brand) + (Number(b.qty) > 0 ? ' <small>' + _fmtQty(b.qty) + '</small>' : '') +
+        '</span>').join('');
+    }
+  } catch (e) { /* марок может не быть — не страшно */ }
+}
+function _recvChipTap(brand) {
+  // Заполняем первую пустую строку марки, иначе добавляем новую
+  const empty = Array.from(document.querySelectorAll('#recv-lines .recv-line-brand')).find(i => !(i.value || '').trim());
+  if (empty) empty.value = brand;
+  else recvAddBrandRow(brand, 1);
+}
+
 // Строка прихода «марка + количество» (можно несколько за один приход)
 function recvAddBrandRow(brand, qty) {
   const box = document.getElementById('recv-lines');
@@ -2990,7 +3069,8 @@ function recvAddBrandRow(brand, qty) {
 }
 
 async function submitComponentReceive() {
-  const component_id = parseInt(document.getElementById('recv-component').value);
+  const component_id = parseInt(window._recvCompId, 10);
+  if (!component_id) { showToast('Сначала выбери комплектующее поиском', 'error'); return; }
   const supplier_id = document.getElementById('recv-supplier').value || null;
   const reason = document.getElementById('recv-reason').value || '';
   const rows = Array.from(document.querySelectorAll('#recv-lines .recv-line'));
