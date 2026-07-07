@@ -9,6 +9,7 @@
     --text-faint: #9AA1B0;
     --bg: #F4F6FA;
     --surface: #FFFFFF;
+    --card: #FFFFFF;           /* v2.45.700: был не определён -> var(--card) рисовался прозрачным (окна «Почта/MAX») */
     --border: #E5E9F0;
     --border-strong: #D5DAE5;
     --success: #1F7B3F;
