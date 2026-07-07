@@ -5798,6 +5798,64 @@ async function deleteSupplyItem(itemId) {
 // ========== ЗАЯВКИ ==========
 
 // v2.44.33: «Что закупить» — список к закупке по поставщикам
+// ============ ЛОГИСТИКА: забрать / в пути (v2.45.678) ============
+async function loadLogisticsPickups() {
+  const box = document.getElementById('logistics-content');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-block">Загрузка…</div>';
+  try {
+    const d = await apiGet('/api/logistics/pickups');
+    const ready = d.ready || [], transit = d.in_transit || [];
+    let html = '';
+    html += '<div style="font-weight:700;font-size:15px;margin:4px 0 8px;color:#15803D;"><i class="ti ti-package-import"></i> Забрать сейчас · ' + ready.length + '</div>';
+    html += ready.length ? ready.map(_logiReadyCard).join('') : '<div class="empty-block" style="margin-bottom:8px;">Нечего забирать — всё принято.</div>';
+    html += '<div style="font-weight:700;font-size:15px;margin:20px 0 8px;color:#3257B0;"><i class="ti ti-truck-loading"></i> В пути / ожидается · ' + transit.length + '</div>';
+    html += transit.length ? transit.map(_logiTransitCard).join('') : '<div class="empty-block">Ничего в пути.</div>';
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
+  }
+}
+function _logiSum(v) { return (v != null && v !== '') ? Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽' : ''; }
+function _logiReadyCard(it) {
+  const num = it.invoice_number || it.order_label || ('#' + it.order_id);
+  const place = it.pickup_place ? '<div style="font-size:13px;color:var(--text-mid);margin-top:5px;"><i class="ti ti-map-pin"></i> ' + escapeHtml(it.pickup_place) + '</div>' : '';
+  const reserve = it.reserve ? '<span style="background:#FEF3C7;color:#92400E;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">резерв до ' + escapeHtml(it.reserve) + '</span>' : '';
+  const sum = _logiSum(it.invoice_total);
+  return '<div style="border:1px solid var(--border);border-left:3px solid #15803D;border-radius:10px;padding:12px 14px;margin-bottom:8px;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">' +
+      '<div style="min-width:0;">' +
+        '<div style="font-weight:700;">' + escapeHtml(it.supplier_name || 'Поставщик') + ' · ' + escapeHtml(String(num)) + '</div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-top:2px;">' + (it.items_count || 0) + ' поз.' + (sum ? ' · ' + sum : '') + ' · <b style="color:#15803D;">' + escapeHtml(it.ext_status || 'готов к выдаче') + '</b></div>' + place +
+      '</div>' +
+      '<div style="flex:none;">' + reserve + '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+      '<button class="btn btn-primary btn-small" onclick="logiPickupDone(' + it.order_id + ')"><i class="ti ti-check"></i> Забрал</button>' +
+      (it.supplier_phone ? '<a class="btn btn-secondary btn-small" href="tel:' + escapeHtml(String(it.supplier_phone).replace(/[^0-9+]/g, '')) + '"><i class="ti ti-phone"></i> ' + escapeHtml(it.supplier_phone) + '</a>' : '') +
+    '</div>' +
+  '</div>';
+}
+function _logiTransitCard(it) {
+  const num = it.invoice_number || it.order_label || ('#' + it.order_id);
+  const eta = it.expected_date ? '<span style="background:#E7EEFB;color:#2749A0;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;">придёт ' + escapeHtml(it.expected_date) + '</span>' : '';
+  return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+    '<div style="min-width:0;">' +
+      '<div style="font-weight:600;">' + escapeHtml(it.supplier_name || 'Поставщик') + ' · ' + escapeHtml(String(num)) + '</div>' +
+      '<div style="font-size:12.5px;color:var(--text-light);">' + (it.items_count || 0) + ' поз. · ' + escapeHtml(it.ext_status || '') + '</div>' +
+    '</div>' +
+    '<div style="flex:none;">' + eta + '</div>' +
+  '</div>';
+}
+async function logiPickupDone(orderId) {
+  if (!confirm('Отметить заказ как забранный? Уйдёт из списка «Забрать».')) return;
+  try {
+    const r = await apiPost('/api/logistics/pickups/' + orderId + '/done', { done: true });
+    if (r && r.ok) { showToast('Отмечено: забрал', 'success'); loadLogisticsPickups(); }
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
 async function loadSupplyShopping() {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
@@ -13198,6 +13256,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.679',
+    date: '07.07.2026',
+    title: 'Новый раздел «Логистика» — что забрать',
+    features: [
+      'В меню появился раздел <b>«Логистика»</b>: <b>«Забрать сейчас»</b> (готовые к выдаче — адрес самовывоза, срок резерва, что забрать) и <b>«В пути / ожидается»</b> (когда придёт)',
+      'Данные тянутся из синка Всеинструментов автоматически. Кнопка <b>«Забрал»</b> убирает позицию из списка',
+    ],
+  },
   {
     version: 'v2.45.676',
     date: '06.07.2026',
