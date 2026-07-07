@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.700-fix-card-var";
+const APP_VERSION = "v2.45.701-presence-durations";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1830,6 +1830,21 @@ function secToggleArchive() {
   if (box.style.display === 'none') { box.style.display = ''; secLoadArchive(); }
   else { box.style.display = 'none'; }
 }
+function secFmtDur(sec) {
+  sec = Math.max(0, Math.round(sec || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return h + 'ч ' + m + 'м';
+  if (m > 0) return m + 'м';
+  return '<1м';
+}
+function secToggleSessions(el) {
+  const s = el.querySelector('.sec-sessions');
+  const ch = el.querySelector('.sec-chev');
+  if (!s) return;
+  const open = s.style.display !== 'none';
+  s.style.display = open ? 'none' : '';
+  if (ch) ch.style.transform = open ? '' : 'rotate(90deg)';
+}
 async function secLoadArchive() {
   const box = document.getElementById('security-archive');
   if (!box) return;
@@ -1843,17 +1858,27 @@ async function secLoadArchive() {
     if (!j.days || !j.days.length) { box.innerHTML = '<div class="text-muted">Архив пока пуст (накопится за день)</div>'; return; }
     box.innerHTML = j.days.map(function (d) {
       const rows = d.people.map(function (p) {
-        return '<tr>'
-          + '<td style="padding:4px 12px 4px 0;"><b>' + _secEsc(p.name) + '</b></td>'
-          + '<td style="padding:4px 16px 4px 0;color:#2e9e5b;">' + (p['in'] ? '→ ' + _secEsc(p['in']) : '—') + '</td>'
-          + '<td style="padding:4px 0;color:#c0392b;">' + (p.out ? '← ' + _secEsc(p.out) : '—') + '</td>'
-          + '</tr>';
+        const sess = (p.sessions || []).map(function (s) {
+          return '<div style="padding:2px 0 2px 22px;">'
+            + '<span style="color:#2e9e5b;">→ ' + _secEsc(s['in'] || '?') + '</span>'
+            + ' — ' + (s.out ? '<span style="color:#c0392b;">← ' + _secEsc(s.out) + '</span>' : '<span style="color:#2e9e5b;">сейчас</span>')
+            + ' <span class="text-muted">· ' + secFmtDur(s.sec) + '</span></div>';
+        }).join('');
+        const status = p.here_now ? '<span style="color:#2e9e5b;">· сейчас на месте</span>'
+                                  : (p.out ? '<span class="text-muted">· ушёл в ' + _secEsc(p.out) + '</span>' : '');
+        return '<div class="sec-person" onclick="secToggleSessions(this)" style="cursor:pointer;padding:7px 0;border-bottom:1px solid rgba(128,128,128,.15);">'
+          + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          + '<i class="ti ti-chevron-right sec-chev" style="font-size:14px;transition:transform .15s;"></i>'
+          + '<b>' + _secEsc(p.name) + '</b>'
+          + '<span style="margin-left:auto;font-size:12px;">был <b style="color:#2e9e5b;">' + secFmtDur(p.present_sec) + '</b> · отсутствовал <b style="color:#c0392b;">' + secFmtDur(p.absent_sec) + '</b></span>'
+          + '</div>'
+          + '<div style="font-size:12px;color:#5a6b85;margin:2px 0 0 22px;">пришёл ' + _secEsc(p['in'] || '?') + ' ' + status + '</div>'
+          + '<div class="sec-sessions" style="display:none;margin-top:4px;font-size:12px;">' + (sess || '<div style="padding-left:22px;" class="text-muted">нет сессий</div>') + '</div>'
+          + '</div>';
       }).join('');
-      return '<div style="margin-bottom:16px;">'
-        + '<div style="font-weight:600;margin-bottom:4px;"><i class="ti ti-calendar" style="font-size:14px;"></i> ' + _secEsc(secFmtDay(d.day)) + '</div>'
-        + '<table style="font-size:13px;border-collapse:collapse;">'
-        + '<thead><tr class="text-muted" style="font-size:11px;"><th style="text-align:left;padding-right:12px;">Сотрудник</th><th style="text-align:left;padding-right:16px;">Пришёл</th><th style="text-align:left;">Ушёл</th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>';
+      return '<div style="margin-bottom:18px;">'
+        + '<div style="font-weight:600;margin-bottom:6px;"><i class="ti ti-calendar" style="font-size:14px;"></i> ' + _secEsc(secFmtDay(d.day)) + '</div>'
+        + rows + '</div>';
     }).join('');
   } catch (e) { box.innerHTML = '<div class="text-muted">Нет связи</div>'; }
 }
