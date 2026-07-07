@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.695-owz-edit-name";
+const APP_VERSION = "v2.45.696-presence-archive";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1818,6 +1818,44 @@ function _secVerb(name, event) {
   const first = String(name || '').trim().split(/\s+/)[0];   // по имени, не по всей строке
   const f = _SEC_FEMALE.indexOf(first) >= 0;
   return event === 'in' ? (f ? 'пришла' : 'пришёл') : (f ? 'ушла' : 'ушёл');
+}
+// Архив присутствия по дням: кто во сколько пришёл/ушёл (GET /api/security/presence/archive)
+function secFmtDay(d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || ''));
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : d;
+}
+function secToggleArchive() {
+  const box = document.getElementById('security-archive');
+  if (!box) return;
+  if (box.style.display === 'none') { box.style.display = ''; secLoadArchive(); }
+  else { box.style.display = 'none'; }
+}
+async function secLoadArchive() {
+  const box = document.getElementById('security-archive');
+  if (!box) return;
+  box.innerHTML = '<div class="text-muted">Загрузка архива…</div>';
+  try {
+    const r = await fetch(API_BASE + '/api/security/presence/archive?days=30&_=' + Date.now(), {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') }, cache: 'no-store'
+    });
+    if (r.status !== 200) { box.innerHTML = '<div class="text-muted">Архив недоступен</div>'; return; }
+    const j = await r.json();
+    if (!j.days || !j.days.length) { box.innerHTML = '<div class="text-muted">Архив пока пуст (накопится за день)</div>'; return; }
+    box.innerHTML = j.days.map(function (d) {
+      const rows = d.people.map(function (p) {
+        return '<tr>'
+          + '<td style="padding:4px 12px 4px 0;"><b>' + _secEsc(p.name) + '</b></td>'
+          + '<td style="padding:4px 16px 4px 0;color:#2e9e5b;">' + (p['in'] ? '→ ' + _secEsc(p['in']) : '—') + '</td>'
+          + '<td style="padding:4px 0;color:#c0392b;">' + (p.out ? '← ' + _secEsc(p.out) : '—') + '</td>'
+          + '</tr>';
+      }).join('');
+      return '<div style="margin-bottom:16px;">'
+        + '<div style="font-weight:600;margin-bottom:4px;"><i class="ti ti-calendar" style="font-size:14px;"></i> ' + _secEsc(secFmtDay(d.day)) + '</div>'
+        + '<table style="font-size:13px;border-collapse:collapse;">'
+        + '<thead><tr class="text-muted" style="font-size:11px;"><th style="text-align:left;padding-right:12px;">Сотрудник</th><th style="text-align:left;padding-right:16px;">Пришёл</th><th style="text-align:left;">Ушёл</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<div class="text-muted">Нет связи</div>'; }
 }
 async function _securityLoadPresence() {
   const box = document.getElementById('security-presence-log');
