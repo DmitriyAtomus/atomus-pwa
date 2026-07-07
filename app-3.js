@@ -4995,12 +4995,14 @@ async function _loadSupplierCorrespondence(supplierId) {
     return;
   }
   let html = '<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px;">';
-  items.forEach(m => {
+  window._supCorrItems = items;   // v2.45.663: для кнопки «Ответить»
+  items.forEach((m, _i) => {
     const dt = _supCorrDate(m.received_at);
     const who = escapeHtml(m.from_name || m.from_addr || 'Поставщик');
     const subj = escapeHtml(m.subject || '(без темы)');
     const ord = m.order_label ? ('<span style="font-size:11px;background:var(--brand-bg,#eef2ff);color:var(--brand,#2563eb);border-radius:6px;padding:1px 6px;margin-left:6px;">' + escapeHtml(m.order_label) + '</span>') : '';
-    const body = (m.body_text || '').trim();
+    // v2.45.663: цитаты предыдущих писем сворачиваем — читается только сам ответ
+    const body = _mailStripQuote(m.body_text);
     const bodyShort = body.length > 320 ? (escapeHtml(body.slice(0, 320)) + '…') : escapeHtml(body);
     let atts = '';
     if (m.attachments && m.attachments.length) {
@@ -5020,6 +5022,9 @@ async function _loadSupplierCorrespondence(supplierId) {
       '<div style="font-size:13px;font-weight:500;margin-top:3px;">' + subj + '</div>' +
       (bodyShort ? '<div style="font-size:12.5px;color:var(--text);margin-top:5px;white-space:pre-wrap;word-break:break-word;">' + bodyShort + '</div>' : '') +
       atts +
+      // v2.45.663: ответить прямо из карточки поставщика
+      '<div style="margin-top:8px;"><button class="btn btn-secondary btn-small" onclick="openInboxReply(' + m.id + ', window._supCorrItems[' + _i + '])">' +
+        '<i class="ti ti-corner-up-left"></i> Ответить</button></div>' +
     '</div>';
   });
   html += '</div>';
@@ -5039,6 +5044,121 @@ function _supCorrDate(s) {
 
 function closeSupplyModal() {
   document.getElementById('supply-modal').classList.remove('visible');
+}
+
+// ============ v2.45.663: переписка по заказу — лента почты в карточке заказа ============
+// Сворачивает цитаты предыдущих писем («> …», «Понедельник, … от Atomus Group»)
+function _mailStripQuote(text) {
+  const lines = String(text || '').split('\n');
+  const out = [];
+  let cut = false;
+  for (const ln of lines) {
+    const t = ln.trim();
+    if (t.startsWith('>') ||
+        /^-{2,}\s*(исходное|original|перес)/i.test(t) ||
+        /^(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье)\b.*\bот\b/i.test(t) ||
+        /^\d{1,2}\s+\S+\s+\d{4}\s*г?\.?,.*(написал|пишет)/i.test(t) ||
+        /^on .* wrote:?$/i.test(t)) { cut = true; break; }
+    out.push(ln);
+  }
+  let s = out.join('\n').trim();
+  if (cut && s) s += '\n… цитата скрыта';
+  return s || String(text || '').trim();
+}
+
+async function openOrderThread(orderId) {
+  let m = document.getElementById('order-thread-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'order-thread-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal oct-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header"><h3><i class="ti ti-messages"></i> Переписка по заказу</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'order-thread-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="oct-sub" id="oct-sub"></div>' +
+      '<div class="oct-thread" id="oct-thread"><div class="loading-block">Загружаем…</div></div>' +
+      '<div class="oct-composer">' +
+        '<textarea id="oct-input" rows="2" placeholder="Написать поставщику… уйдёт письмом, ответ привяжется к заказу"></textarea>' +
+        '<button class="btn btn-primary oct-send" id="oct-send" onclick="_octSend(' + orderId + ')" title="Отправить"><i class="ti ti-send"></i></button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  await _octLoad(orderId);
+}
+
+async function _octLoad(orderId) {
+  const box = document.getElementById('oct-thread');
+  const sub = document.getElementById('oct-sub');
+  if (!box) return;
+  try {
+    const d = await apiGet('/api/supply-orders/' + orderId + '/thread');
+    const s = d.supplier || {};
+    if (sub) {
+      sub.innerHTML = '<b>' + escapeHtml(d.order_label || ('#' + orderId)) + '</b> · ' + escapeHtml(s.name || '—') +
+        (s.contact ? ' · ' + escapeHtml(s.contact) : '') +
+        (s.email ? ' · <span class="oct-mail">' + escapeHtml(s.email) + '</span>'
+                 : ' · <span class="oct-nomail">email не указан — заполни в карточке поставщика</span>') +
+        (s.phone ? ' · ' + escapeHtml(s.phone) : '');
+    }
+    const list = d.entries || [];
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-block"><i class="ti ti-mail"></i>Писем по заказу пока нет. ' +
+        'Напиши первым — метка ' + escapeHtml(d.order_label || '') + ' подставится в тему, и ответ поставщика привяжется сюда сам.</div>';
+      return;
+    }
+    let html = '';
+    let prevDay = '';
+    list.forEach(e => {
+      const day = String(e.at || '').slice(0, 10);
+      if (day && day !== prevDay) {
+        html += '<div class="oct-day">' + escapeHtml(day.split('-').reverse().join('.')) + '</div>';
+        prevDay = day;
+      }
+      const tm = String(e.at || '').slice(11, 16);
+      const body = _mailStripQuote(e.text);
+      let atts = '';
+      if (e.attachments && e.attachments.length && e.inbox_id) {
+        atts = '<div class="oct-atts">' + e.attachments.map(a =>
+          '<span class="oct-att" onclick="downloadInboxAttachmentDirect(' + e.inbox_id + ',' + a.idx + ',\'' +
+            escapeHtml(String(a.name || '').replace(/'/g, "\\'")) + '\')"><i class="ti ti-paperclip"></i>' +
+            escapeHtml(a.name || 'файл') + '</span>').join('') + '</div>';
+      }
+      html += '<div class="oct-msg ' + (e.dir === 'out' ? 'out' : 'in') + '">' +
+        '<div class="oct-who">' + escapeHtml(e.who || '') + '</div>' +
+        (body
+          ? '<div class="oct-txt">' + escapeHtml(body).replace(/\n/g, '<br>') + '</div>'
+          : '<div class="oct-txt oct-subj-only">' + escapeHtml(e.subject || '(без текста)') + '</div>') +
+        atts +
+        '<div class="oct-tm">' + escapeHtml(tm) + '</div>' +
+      '</div>';
+    });
+    box.innerHTML = html;
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить переписку</div>';
+  }
+}
+
+async function _octSend(orderId) {
+  const inp = document.getElementById('oct-input');
+  const btn = document.getElementById('oct-send');
+  const text = (inp && inp.value || '').trim();
+  if (!text) { showToast('Напиши текст сообщения', 'info'); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiPost('/api/supply-orders/' + orderId + '/thread', { text: text });
+    if (!r.ok) {
+      showToast((r.data && r.data.message) || 'Не удалось отправить', 'error');
+      return;
+    }
+    if (inp) inp.value = '';
+    showToast('Отправлено поставщику', 'success');
+    await _octLoad(orderId);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ============ v2.45.239: прайс поставщика (номенклатура для заявок) ============
@@ -9925,8 +10045,9 @@ window._inboxReplyTpls = [
   'Здравствуйте!\n\nПодскажите, пожалуйста, срок поставки по этой заявке.',
   'Здравствуйте!\n\nПришлите, пожалуйста, счёт и укажите срок поставки по этой заявке.',
 ];
-function openInboxReply(inboxId) {
-  const msg = (cache.supplyInbox || []).find(x => x.id === inboxId) || {};
+function openInboxReply(inboxId, msgObj) {
+  // v2.45.663: msgObj — когда письмо не из инбокс-кэша (переписка поставщика)
+  const msg = msgObj || (cache.supplyInbox || []).find(x => x.id === inboxId) || {};
   const toName = (msg.from_name || '').trim();
   const toAddr = (msg.from_addr || '').trim();
   const toLine = (toName ? toName + ' <' + toAddr + '>' : toAddr) || '—';
@@ -10849,7 +10970,8 @@ function renderSupplyOrderDetail(o) {
   // Сведения о поставщике
   html += '<div class="detail-block">' +
     '<div class="detail-block-title"><i class="ti ti-truck-loading"></i> Поставщик' +
-      (o.supplier_id ? '<button class="btn btn-secondary btn-small" style="margin-left:auto;" onclick="openEditSupplier(' + o.supplier_id + ')"><i class="ti ti-mail"></i> Переписка</button>' : '') +
+      '<button class="btn btn-secondary btn-small" style="margin-left:auto;" onclick="openOrderThread(' + o.id + ')"><i class="ti ti-messages"></i> Переписка</button>' +
+      (o.supplier_id ? '<button class="btn btn-secondary btn-small" onclick="openEditSupplier(' + o.supplier_id + ')" title="Карточка поставщика"><i class="ti ti-user-cog"></i></button>' : '') +
     '</div>' +
     '<div class="detail-grid">' +
       '<div class="detail-item"><div class="detail-label">Название</div><div class="detail-value">' + escapeHtml(o.supplier_name) + '</div></div>' +

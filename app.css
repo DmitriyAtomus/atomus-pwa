@@ -20735,3 +20735,43 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .tf-nm { font-size: 12.5px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tf-sz { font-size: 11px; color: var(--text-light); white-space: nowrap; }
 .tf-open { color: #CBD5E1; font-size: 13px; }
+
+/* === v2.45.663: переписка по заказу — чат-лента === */
+.oct-modal { max-width: 640px; max-height: 86vh; display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
+.oct-modal .modal-header { flex-shrink: 0; }
+.oct-sub {
+  padding: 8px 18px; font-size: 12px; color: var(--text-light);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.oct-sub b { color: var(--brand); }
+.oct-mail { color: var(--brand); font-weight: 600; }
+.oct-nomail { color: #B45309; font-weight: 700; }
+.oct-thread {
+  flex: 1; overflow-y: auto; padding: 14px 16px;
+  background: #F8FAFD; display: flex; flex-direction: column; gap: 10px;
+  min-height: 220px;
+}
+.oct-day { text-align: center; font-size: 10px; font-weight: 800; color: #94A3B8; letter-spacing: .05em; margin: 4px 0 0; }
+.oct-msg { max-width: 82%; border-radius: 14px; padding: 9px 13px; font-size: 13px; line-height: 1.5; }
+.oct-msg.in { align-self: flex-start; background: #fff; border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.oct-msg.out { align-self: flex-end; background: #E7EFFF; border: 1px solid #C9DBFC; border-bottom-right-radius: 4px; }
+.oct-who { font-size: 10.5px; font-weight: 800; margin-bottom: 3px; color: #B45309; }
+.oct-msg.out .oct-who { color: var(--brand); }
+.oct-txt { word-break: break-word; }
+.oct-subj-only { color: var(--text-light); font-style: italic; }
+.oct-tm { font-size: 10px; color: var(--text-light); font-weight: 600; margin-top: 4px; text-align: right; }
+.oct-atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.oct-att {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  background: #F1F5F9; border: 1px solid var(--border); border-radius: 8px;
+  padding: 4px 9px; font-size: 11.5px; font-weight: 700; color: #475569;
+}
+.oct-att:hover { border-color: #93B4F5; color: var(--brand); }
+.oct-composer { display: flex; gap: 8px; padding: 11px 14px; border-top: 1px solid var(--border); flex-shrink: 0; align-items: flex-end; }
+.oct-composer textarea {
+  flex: 1; border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 9px 12px; font-size: 13px; font-family: inherit; resize: none; outline: none;
+}
+.oct-composer textarea:focus { border-color: var(--brand); }
+.oct-send { height: 40px; width: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
