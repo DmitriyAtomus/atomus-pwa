@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.705";
+const APP_VERSION = "v2.45.706";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13817,7 +13817,7 @@ function formatNumberShort(n) {
 // «Закончил» убирает строку (время остаётся в журнале сессий и на карточке).
 var _myday = null;
 var _mydayTicker = null;
-var _mds = { workId: null, stageId: null, mates: [] };   // состояние модалки старта
+var _mds = { workId: null, stageId: null, performers: [] };   // состояние модалки старта (кто делает)
 
 async function loadMyDayStrip() {
   const box = document.getElementById('pkb-myday');
@@ -13895,7 +13895,8 @@ async function openMyDayStart(workId) {
     showToast('Твой пользователь не привязан к сотруднику — попроси директора привязать', 'error');
     return;
   }
-  _mds = { workId: workId, stageId: null, mates: [] };
+  var selfId = (_myday.employee && _myday.employee.id) || null;
+  _mds = { workId: workId, stageId: null, performers: selfId ? [selfId] : [] };
   _renderMyDayModal(_mydayStartModalHtml());
   setTimeout(() => { const d = document.getElementById('mds-note'); if (d) d.focus(); }, 60);
 }
@@ -13921,9 +13922,14 @@ function _mydayStartModalHtml() {
     h += '<div class="myday-lbl">Что делаешь (этап)</div><div class="myday-chips">' +
       stages.map(st => '<span class="myday-chip' + (_mds.stageId === st.id ? ' on' : '') + '" onclick="mdsStage(' + st.id + ')">' + escapeHtml(st.name) + '</span>').join('') + '</div>';
   }
-  if (mates.length) {
-    h += '<div class="myday-lbl">Кто с тобой (время запишется каждому)</div><div class="myday-chips">' +
-      mates.slice(0, 12).map(mt => '<span class="myday-chip' + (_mds.mates.indexOf(mt.id) >= 0 ? ' on' : '') + '" onclick="mdsMate(' + mt.id + ')">👥 ' + escapeHtml(mt.name) + '</span>').join('') + '</div>';
+  // v2.45.706: «Кто делает» — я в списке первым (по умолчанию выбран);
+  // директор может снять себя и отметить работу за сборщика
+  const selfEmp = _myday.employee && _myday.employee.id ? _myday.employee : null;
+  const people = (selfEmp ? [{ id: selfEmp.id, name: selfEmp.name, self: true }] : []).concat(mates.slice(0, 12));
+  if (people.length) {
+    h += '<div class="myday-lbl">Кто делает (время запишется каждому)</div><div class="myday-chips">' +
+      people.map(mt => '<span class="myday-chip' + (_mds.performers.indexOf(mt.id) >= 0 ? ' on' : '') + '" onclick="mdsMate(' + mt.id + ')">' +
+        (mt.self ? '⭐ Я — ' : '👥 ') + escapeHtml(mt.name) + '</span>').join('') + '</div>';
   }
   h += '<div class="myday-lbl">Что именно (коротко, попадёт в журнал)</div>' +
     '<input class="myday-inp" id="mds-note" placeholder="начни печатать — подскажу из прошлых…" oninput="mdsNoteChips()">' +
@@ -13933,15 +13939,17 @@ function _mydayStartModalHtml() {
   return h;
 }
 function _mdsMatesLabel(mates) {
-  // подпись без счёта «N чел.» — раньше «2 чел.» читалось как ошибка
-  if (!_mds.mates.length) return '';
-  const names = _mds.mates.map(id => {
+  // честная подпись: кто реально будет работать
+  const selfId = (_myday && _myday.employee && _myday.employee.id) || null;
+  const withSelf = selfId != null && _mds.performers.indexOf(selfId) >= 0;
+  const others = _mds.performers.filter(id => id !== selfId).map(id => {
     const m = (mates || []).find(x => x.id === id);
     return m ? m.name : null;
   }).filter(Boolean);
-  if (!names.length) return '';
-  if (names.length <= 2) return ' · вместе с: ' + escapeHtml(names.join(', '));
-  return ' · вместе с ' + names.length + ' напарниками';
+  if (!others.length) return '';                     // только я — без хвоста
+  const list = others.length <= 2 ? others.join(', ') : others.length + ' чел.';
+  if (withSelf) return ' · вместе с: ' + escapeHtml(list);   // я + другие
+  return ' · за: ' + escapeHtml(list);                        // отмечаю за других
 }
 
 function _mdsNoteChipsHtml() {
@@ -13963,8 +13971,8 @@ function mdsUseNote(i, elBtn) {
 }
 function mdsStage(id) { _mds.stageId = (_mds.stageId === id ? null : id); _mdsKeepNoteRerender(); }
 function mdsMate(id) {
-  const k = _mds.mates.indexOf(id);
-  if (k >= 0) _mds.mates.splice(k, 1); else _mds.mates.push(id);
+  const k = _mds.performers.indexOf(id);
+  if (k >= 0) _mds.performers.splice(k, 1); else _mds.performers.push(id);
   _mdsKeepNoteRerender();
 }
 function _mdsKeepNoteRerender() {
@@ -13980,10 +13988,11 @@ async function mydayGo() {
   const inp = document.getElementById('mds-note');
   const note = inp ? inp.value.trim() : '';
   const workId = _mds.workId;
+  if (!_mds.performers.length) { showToast('Выбери, кто делает работу', 'error'); return; }
   closeMyDayModal();
   try {
     const r = await apiPost('/api/production/works/' + workId + '/timer/start',
-      { note: note, stage_id: _mds.stageId, mate_ids: _mds.mates });
+      { note: note, stage_id: _mds.stageId, performer_ids: _mds.performers });
     if (r && r.ok) {
       showToast('Погнали! Таймер идёт', 'success');
       cache.productionKanban = null;
