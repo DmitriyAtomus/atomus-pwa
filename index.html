@@ -820,12 +820,14 @@
             <div style="display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;">
               <i class="ti ti-users"></i> Присутствие
               <span id="security-present" class="text-muted" style="font-weight:400;font-size:13px;"></span>
+              <button class="btn btn-secondary btn-small" style="margin-left:auto;" onclick="secToggleArchive()"><i class="ti ti-calendar-stats"></i> Архив по дням</button>
             </div>
             <div id="security-presence-log" style="font-size:13px;">
               <div class="text-muted">Загрузка журнала…</div>
             </div>
+            <div id="security-archive" style="display:none;margin-top:12px;"></div>
             <div class="text-muted" style="font-size:11px;margin-top:8px;">
-              По распознаванию лиц (камера обходит офис ~каждые 5 мин). Точность зависит от того, кто внесён в базу.
+              По распознаванию лиц (камера обходит офис ~каждую минуту, следит за дверью). Точность зависит от того, кто внесён в базу.
             </div>
           </div>
         </div>
