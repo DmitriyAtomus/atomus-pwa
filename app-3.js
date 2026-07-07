@@ -6079,6 +6079,78 @@ async function deleteSupplyItem(itemId) {
 // ========== ЗАЯВКИ ==========
 
 // v2.44.33: «Что закупить» — список к закупке по поставщикам
+// ============ ПОЧТА И MAX: мессенджер (v2.45.692) ============
+async function loadMailMessenger() {
+  const list = document.getElementById('mail-conv-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-block">Загрузка…</div>';
+  try {
+    const d = await apiGet('/api/mail/conversations');
+    const convs = d.conversations || [];
+    state._mailConvs = convs;
+    list.innerHTML = convs.length ? convs.map(_mailConvRow).join('') : '<div class="empty-block">Переписок пока нет</div>';
+    if (state._mailPeer) { const el = list.querySelector('.mail-conv[data-peer="' + (window.CSS && CSS.escape ? CSS.escape(state._mailPeer) : state._mailPeer) + '"]'); if (el) el.style.background = 'var(--brand-bg)'; }
+  } catch (e) { list.innerHTML = '<div class="empty-block">Не удалось загрузить</div>'; }
+}
+function _mailChanIcon(ch) { return ch === 'max' ? '💬' : '📧'; }
+function _mailShortTime(iso) { if (!iso) return ''; return String(iso).slice(0, 16).replace('T', ' ').replace(/^2\d\d\d-/, ''); }
+function _mailConvRow(c) {
+  const peerAttr = encodeURIComponent(c.peer);
+  return '<div class="mail-conv" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;">' +
+    '<div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _mailChanIcon(c.channel) + ' ' + escapeHtml(c.from_name || c.peer) + '</div><div style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(_mailShortTime(c.last_at)) + '</div></div>' +
+    '<div style="font-size:12.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">' + escapeHtml(c.preview || '') + '</div>' +
+  '</div>';
+}
+async function openMailThread(peer) {
+  state._mailPeer = peer;
+  const pane = document.getElementById('mail-thread-pane');
+  if (!pane) return;
+  document.querySelectorAll('.mail-conv').forEach(el => { el.style.background = (el.dataset.peer === peer) ? 'var(--brand-bg)' : ''; });
+  pane.innerHTML = '<div class="loading-block">Загрузка переписки…</div>';
+  try {
+    const d = await apiGet('/api/mail/thread?peer=' + encodeURIComponent(peer));
+    const msgs = d.messages || [];
+    const conv = (state._mailConvs || []).find(c => c.peer === peer) || {};
+    const canReply = (d.channel === 'email') || (d.channel === 'max');
+    let html = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;">' + _mailChanIcon(d.channel) + ' ' + escapeHtml(conv.from_name || peer) + '</div>';
+    html += '<div id="mail-thread-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg);">';
+    html += msgs.length ? msgs.map(_mailMsgBubble).join('') : '<div style="color:var(--text-light);text-align:center;">Сообщений нет</div>';
+    html += '</div>';
+    if (canReply) {
+      html += '<div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;">' +
+        '<textarea id="mail-reply-text" rows="2" placeholder="Написать ответ…" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>' +
+        '<button class="btn btn-primary" onclick="sendMailReply()" title="Отправить" style="align-self:flex-end;"><i class="ti ti-send"></i></button>' +
+      '</div>';
+    }
+    pane.innerHTML = html;
+    const m = document.getElementById('mail-thread-msgs'); if (m) m.scrollTop = m.scrollHeight;
+  } catch (e) { pane.innerHTML = '<div class="empty-block">Не удалось загрузить переписку</div>'; }
+}
+function _mailMsgBubble(m) {
+  const out = m.dir === 'out';
+  const who = out ? 'Мы' : (m.from_name || '');
+  const atts = (m.attachments || []).length ? '<div style="font-size:11.5px;margin-top:4px;opacity:.8;">📎 ' + m.attachments.length + '</div>' : '';
+  const subj = (m.subject && !out) ? '<div style="font-size:11px;color:var(--text-light);margin-bottom:2px;">' + escapeHtml(m.subject) + '</div>' : '';
+  return '<div style="max-width:80%;align-self:' + (out ? 'flex-end' : 'flex-start') + ';background:' + (out ? '#DCF0FF' : 'var(--card)') + ';border:1px solid var(--border);border-radius:12px;padding:8px 12px;">' +
+    (who ? '<div style="font-size:11px;font-weight:600;color:var(--text-mid);margin-bottom:2px;">' + escapeHtml(who) + '</div>' : '') + subj +
+    '<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.4;word-break:break-word;">' + escapeHtml((m.body || '').slice(0, 4000)) + '</div>' + atts +
+    '<div style="font-size:10.5px;color:var(--text-light);text-align:right;margin-top:3px;">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
+  '</div>';
+}
+async function sendMailReply() {
+  const peer = state._mailPeer;
+  const ta = document.getElementById('mail-reply-text');
+  if (!peer || !ta) return;
+  const body = (ta.value || '').trim();
+  if (!body) return;
+  ta.disabled = true;
+  try {
+    const r = await apiPost('/api/mail/reply', { peer: peer, body: body });
+    if (r && r.ok) { ta.value = ''; showToast('Отправлено', 'success'); openMailThread(peer); loadMailMessenger(); }
+    else { showToast((r && r.data && r.data.message) || (r && r.message) || 'Не отправлено', 'error'); ta.disabled = false; }
+  } catch (e) { showToast('Ошибка отправки', 'error'); ta.disabled = false; }
+}
+
 // ============ ЛОГИСТИКА: забрать / в пути (v2.45.678, дизайн v2.45.685) ============
 async function loadLogisticsPickups() {
   const box = document.getElementById('logistics-content');
@@ -13730,6 +13802,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.693',
+    date: '07.07.2026',
+    title: 'Новый раздел «Почта и MAX» — переписка',
+    features: [
+      'Появился раздел <b>«Почта/MAX»</b> в виде мессенджера: слева список собеседников (email и MAX), справа — вся переписка с ними',
+      'Можно <b>отвечать прямо из раздела</b>: email уходит через почту, MAX — через бота. Наши ответы сохраняются в ленте переписки',
+    ],
+  },
   {
     version: 'v2.45.691',
     date: '07.07.2026',
