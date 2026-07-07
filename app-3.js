@@ -10058,25 +10058,49 @@ function _ibxInvoiceCard(m, isMatched) {
   '</div>';
 }
 
-function _ibxNoiseRow(m) {
+function _ibxNoiseRow(m, isCorr) {
   const received = _ibxWhen(m.received_at).text;
   const atts = m.attachments || [];
   let reason = 'без вложений';
   if (atts.length) reason = 'вложение не документ';
   const ordChip = m.detected_label ? ' <span class="ibx-chip ord mini">' + escapeHtml(m.detected_label) + '</span>' : '';
-  const ico = m.detected_label ? '📨' : (isFromMax(m) ? '💬' : '📢');
+  const ico = isCorr ? '✉️' : (isFromMax(m) ? '💬' : '📢');
   const _cb = (state.user && (state.user.roles || []).includes('director'))
     ? '<input type="checkbox" class="ibx-cb" data-id="' + m.id + '" title="Выбрать" onclick="event.stopPropagation();_ibxToggle(' + m.id + ',this.checked)">'
     : '';
-  return '<div class="ibx-noise">' +
+  // v2.45.685: у писем-ответов по заявке — кнопка в переписку заказа
+  const corrBtn = (isCorr && m.detected_label)
+    ? '<button class="btn btn-sm ibx-corr-btn" onclick="_ibxOpenThreadByLabel(\'' + escapeHtml(String(m.detected_label).replace(/'/g, "\\'")) + '\')"><i class="ti ti-messages"></i> Переписка</button>'
+    : '';
+  return '<div class="ibx-noise' + (isCorr ? ' corr' : '') + '">' +
     _cb +
     '<div class="ibx-noise-ava"><span class="em">' + ico + '</span></div>' +
     '<div class="ibx-noise-body">' +
       '<div class="ibx-noise-subj">' + escapeHtml(m.subject || '(без темы)') + ordChip + '</div>' +
       '<div class="ibx-noise-from">' + escapeHtml(m.from_name || m.from_addr || '—') + ' · ' + escapeHtml(received) + ' · ' + reason + '</div>' +
     '</div>' +
-    '<div class="ibx-noise-acts"><button class="btn btn-sm" onclick="openInboxMessage(' + m.id + ')">Открыть</button>' + _ibxDelBtn(m) + '</div>' +
+    '<div class="ibx-noise-acts">' + corrBtn +
+      '<button class="btn btn-sm" onclick="openInboxMessage(' + m.id + ')">Открыть</button>' + _ibxDelBtn(m) + '</div>' +
   '</div>';
+}
+
+// v2.45.685: открыть переписку заказа по его метке (ORD-171) из входящих
+async function _ibxOpenThreadByLabel(label) {
+  try {
+    if (!cache.supplyOrders || !cache.supplyOrders.length) {
+      const d = await apiGet('/api/supply-orders');
+      cache.supplyOrders = (d && d.orders) || [];
+    }
+    const o = (cache.supplyOrders || []).find(x => (x.order_label || '') === label);
+    if (o) { openOrderThread(o.id); return; }
+    showToast('Заказ ' + label + ' не найден', 'error');
+  } catch (e) {
+    showToast('Не удалось открыть переписку', 'error');
+  }
+}
+function toggleInboxCorr() {
+  window._ibxCorrOpen = (window._ibxCorrOpen === false);
+  renderSupplyInbox();
 }
 
 function toggleInboxV2() {
@@ -10146,19 +10170,22 @@ function renderSupplyInbox() {
   }
   if (!window.INBOX_V2) { list.innerHTML = toggle + statusHtml + _renderInboxOldRows(items); return; }
 
-  // Классификация: счёт (есть документ-вложение, не привязан) / привязано / не счёт
-  const invoices = [], matched = [], noise = [];
+  // Классификация: счёт (есть документ-вложение, не привязан) / привязано /
+  // v2.45.685: переписка по заявкам (ответы с меткой ORD-N, без документа) / рассылки
+  const invoices = [], matched = [], corr = [], noise = [];
   items.forEach(m => {
     m._docIdx = _inboxDocIndex(m);
     if (m.status === 'matched' || m.matched_order_id) matched.push(m);
     else if (m._docIdx >= 0) invoices.push(m);
+    else if (m.detected_label) corr.push(m);
     else noise.push(m);
   });
   let html = toggle + statusHtml + ibxBulk;
   html += '<div class="ibx-sum">' +
     _ibxSumCard('act', '🧾', invoices.length, 'Счета — нужна привязка') +
     _ibxSumCard('ok', '✅', matched.length, 'Привязано к заказам') +
-    _ibxSumCard('mut', '📭', noise.length, 'Не счёт (рассылки)') +
+    _ibxSumCard('corr', '✉️', corr.length, 'Переписка по заявкам') +
+    _ibxSumCard('mut', '📭', noise.length, 'Рассылки') +
   '</div>';
   if (invoices.length) {
     html += _ibxSecTitle('🧾', 'Счета — нужна привязка', invoices.length);
@@ -10168,6 +10195,17 @@ function renderSupplyInbox() {
   if (matched.length) {
     html += _ibxSecTitle('✅', 'Привязанные счета', matched.length);
     html += _ibxCardsCollapsed(matched, true, 'mat');
+  }
+  // v2.45.685: переписка по заявкам — отдельно от рассылок, с переходом в тред заказа
+  if (corr.length) {
+    const corrOpen = window._ibxCorrOpen !== false;
+    html += _ibxSecTitle('✉️', 'Переписка по заявкам', corr.length);
+    html += '<div class="ibx-hint">Ответы поставщиков на наши заявки (без счёта во вложении). Кнопка «Переписка» открывает всю ленту по заказу.</div>';
+    html += '<div class="ibx-noise-head corr" onclick="toggleInboxCorr()"><span class="em">✉️</span> Письма по заказам' +
+      '<span class="cnt">' + corr.length + ' ' + _plural(corr.length, ['письмо', 'письма', 'писем']) + ' ' + (corrOpen ? '▴' : '▾') + '</span></div>';
+    html += '<div class="ibx-noise-wrap"' + (corrOpen ? '' : ' style="display:none;"') + '>';
+    corr.forEach(m => { html += _ibxNoiseRow(m, true); });
+    html += '</div>';
   }
   if (noise.length) {
     html += _ibxSecTitle('📭', 'Не похоже на счёт', noise.length);

@@ -20805,3 +20805,10 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 .recv-chip:hover { background: #DBEAFE; }
 .recv-chip small { font-weight: 600; color: #64748B; }
+
+/* v2.45.685: входящие — переписка по заявкам отдельно от рассылок */
+.ibx-sum-card.corr .ibx-sum-ic { background: #EDE9FE; }
+.ibx-noise.corr { border-left: 3px solid #7C3AED; background: #FDFCFF; }
+.ibx-noise-head.corr { background: #F5F3FF; border-color: #DDD6FE; color: #4C1D95; }
+.ibx-corr-btn { color: #6D28D9 !important; border-color: #DDD6FE !important; white-space: nowrap; }
+.ibx-corr-btn:hover { background: #F5F3FF !important; }
