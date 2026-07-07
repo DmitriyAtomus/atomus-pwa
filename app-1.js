@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.703-supplier-bot-memo";
+const APP_VERSION = "v2.45.704";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3303,6 +3303,9 @@ function renderProductionDashboard(d) {
       '<button onclick="pkbResetFilter()"><i class="ti ti-x"></i> сбросить</button></div>';
   }
 
+  // v2.45.703: полоса «Мой день» — таймер работ (заполняется после рендера)
+  html += '<div id="pkb-myday"></div>';
+
   // --- v2.45.634: «кабина» — на десктопе справа тёмная панель «Сегодня»
   // (внимание/отгрузки/задачи), контент слева. На мобильном панель скрыта,
   // а «узкие места» остаются в потоке.
@@ -3393,6 +3396,8 @@ function renderProductionDashboard(d) {
   _fillPkbRail();
   // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
   _renderResumeBanner();
+  // v2.45.703: полоса «Мой день»
+  loadMyDayStrip();
 }
 
 // ============ v2.45.634: правая панель «Сегодня» (кабина) ============
@@ -4655,6 +4660,11 @@ function renderPkbWorkCard(w, colKey) {
                 commentIcon +
               '</div>';
     }
+  }
+
+  // v2.45.703: быстрый старт таймера «Мой день» (очередь и в работе)
+  if (colKey === 'queue' || colKey === 'in_progress') {
+    html += '<button class="pkb-wc-startbtn" onclick="event.stopPropagation();openMyDayStart(' + w.id + ')" title="Начать работу — таймер «Мой день»"><i class="ti ti-player-play"></i> Начать</button>';
   }
 
   html += '</div>';
@@ -13801,3 +13811,258 @@ function formatNumberShort(n) {
   return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
+
+// ============ v2.45.703: «МОЙ ДЕНЬ» — таймер с паузами на канбане ============
+// Полоса над доской: каждая незакрытая работа — своя строка; паузная гаснет,
+// «Закончил» убирает строку (время остаётся в журнале сессий и на карточке).
+var _myday = null;
+var _mydayTicker = null;
+var _mds = { workId: null, stageId: null, mates: [] };   // состояние модалки старта
+
+async function loadMyDayStrip() {
+  const box = document.getElementById('pkb-myday');
+  if (!box) return;
+  try {
+    _myday = await apiGet('/api/production/my-day');
+    // база для живого пересчёта: minutes без live-дельты на момент загрузки
+    (_myday.rows || []).forEach(r => { r._base = (r.minutes || 0) - (r.live_minutes || 0); });
+    _myday._closed_extra = (_myday.day_total_minutes || 0) -
+      (_myday.rows || []).reduce((s, r) => s + (r.minutes || 0), 0);
+    renderMyDayStrip();
+    if (!_mydayTicker) {
+      _mydayTicker = setInterval(() => {
+        if (document.getElementById('pkb-myday') && _myday &&
+            (_myday.rows || []).some(r => r.status === 'run')) renderMyDayStrip();
+      }, 30000);
+    }
+  } catch (e) { box.innerHTML = ''; }
+}
+
+function _mydayFmtMin(m) {
+  m = Math.max(0, Math.round(m));
+  const h = Math.floor(m / 60), mm = m % 60;
+  return ((h ? h + ' ч ' : '') + (mm || !h ? mm + ' мин' : '')).trim();
+}
+function _mydayRowMin(r) {
+  if (r.status !== 'run' || !r.live_started_at) return r.minutes || 0;
+  let live = 0;
+  try {
+    const start = new Date(String(r.live_started_at).replace(' ', 'T') + 'Z');
+    live = Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
+    if (typeof _calculateLunchMinutes === 'function') {
+      live = Math.max(0, live - _calculateLunchMinutes(start, new Date()));
+    }
+  } catch (e) { live = r.live_minutes || 0; }
+  return (r._base || 0) + live;
+}
+
+function renderMyDayStrip() {
+  const box = document.getElementById('pkb-myday');
+  if (!box) return;
+  if (!_myday || _myday.no_employee || !(_myday.rows || []).length) { box.innerHTML = ''; return; }
+  const rows = _myday.rows;
+  let total = _myday._closed_extra || 0;
+  let html = '<div class="myday-strip">';
+  rows.forEach(r => {
+    const run = r.status === 'run';
+    const mins = _mydayRowMin(r);
+    total += mins;
+    const proj = [r.contract_number, r.contractor_name].filter(Boolean).join(' · ');
+    html += '<div class="myday-row ' + (run ? 'run' : 'pz') + '" onclick="openMyDaySegments(' + r.work_id + ')">' +
+      '<span class="dot"></span>' +
+      '<div class="t"><div class="nm">' + escapeHtml(r.name) + '</div>' +
+      '<div class="sub">' + (run ? 'идёт сейчас' : 'на паузе') +
+        (r.last_note || r.live_note ? ' · ' + escapeHtml(r.live_note || r.last_note) : '') +
+        (proj ? ' · ' + escapeHtml(proj) : '') + '</div></div>' +
+      (run
+        ? '<button class="myday-btn pause" onclick="event.stopPropagation();mydayPause(' + r.work_id + ')"><i class="ti ti-player-pause"></i> Пауза</button>'
+        : '<button class="myday-btn resume" onclick="event.stopPropagation();mydayResume(' + r.work_id + ')"><i class="ti ti-player-play"></i> Продолжить</button>') +
+      '<button class="myday-btn fin" onclick="event.stopPropagation();mydayFinish(' + r.work_id + ')"><i class="ti ti-check"></i> Закончил</button>' +
+      '<span class="clk">' + _mydayFmtMin(mins) + '</span>' +
+    '</div>';
+  });
+  const pct = Math.min(100, Math.round(total / 480 * 100));
+  html += '<div class="myday-dayline"><span>день:</span><div class="bar"><div class="f" style="width:' + pct + '%"></div></div>' +
+    '<span>' + _mydayFmtMin(total) + ' из 8 ч</span></div>';
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+// --------- модалка старта: этап + напарники + «что именно» с памятью ---------
+async function openMyDayStart(workId) {
+  if (!_myday) { try { _myday = await apiGet('/api/production/my-day'); } catch (e) { _myday = null; } }
+  if (!_myday || _myday.no_employee) {
+    showToast('Твой пользователь не привязан к сотруднику — попроси директора привязать', 'error');
+    return;
+  }
+  _mds = { workId: workId, stageId: null, mates: [] };
+  _renderMyDayModal(_mydayStartModalHtml());
+  setTimeout(() => { const d = document.getElementById('mds-note'); if (d) d.focus(); }, 60);
+}
+
+function _renderMyDayModal(inner) {
+  let m = document.getElementById('myday-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'myday-modal';
+    document.body.appendChild(m);
+  }
+  m.innerHTML = inner ? '<div class="myday-ovl" onclick="closeMyDayModal()">' +
+    '<div class="myday-modal" onclick="event.stopPropagation()">' + inner + '</div></div>' : '';
+}
+function closeMyDayModal() { _renderMyDayModal(''); }
+
+function _mydayStartModalHtml() {
+  const stages = _myday.stages || [];
+  const mates = _myday.mates || [];
+  let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
+    '<div class="myday-h4"><i class="ti ti-player-play"></i> Начать работу</div>';
+  if (stages.length) {
+    h += '<div class="myday-lbl">Что делаешь (этап)</div><div class="myday-chips">' +
+      stages.map(st => '<span class="myday-chip' + (_mds.stageId === st.id ? ' on' : '') + '" onclick="mdsStage(' + st.id + ')">' + escapeHtml(st.name) + '</span>').join('') + '</div>';
+  }
+  if (mates.length) {
+    h += '<div class="myday-lbl">Кто с тобой (время запишется каждому)</div><div class="myday-chips">' +
+      mates.slice(0, 12).map(mt => '<span class="myday-chip' + (_mds.mates.indexOf(mt.id) >= 0 ? ' on' : '') + '" onclick="mdsMate(' + mt.id + ')">👥 ' + escapeHtml(mt.name) + '</span>').join('') + '</div>';
+  }
+  h += '<div class="myday-lbl">Что именно (коротко, попадёт в журнал)</div>' +
+    '<input class="myday-inp" id="mds-note" placeholder="начни печатать — подскажу из прошлых…" oninput="mdsNoteChips()">' +
+    '<div id="mds-notechips">' + _mdsNoteChipsHtml() + '</div>' +
+    '<button class="myday-go" onclick="mydayGo()"><i class="ti ti-player-play"></i> Погнали' +
+    (_mds.mates.length ? ' · ' + (_mds.mates.length + 1) + ' чел.' : '') + '</button>';
+  return h;
+}
+function _mdsNoteChipsHtml() {
+  const inp = document.getElementById('mds-note');
+  const q = inp ? inp.value.trim().toLowerCase() : '';
+  let pool = (_myday.note_suggestions || []).slice();
+  if (q) pool = pool.filter(x => x.note.toLowerCase().indexOf(q) !== -1 && x.note.toLowerCase() !== q);
+  pool = pool.slice(0, 6);
+  if (!pool.length) return '';
+  return '<div class="myday-chips" style="margin-top:7px;">' + pool.map((x, i) =>
+    '<span class="myday-chip mem" onclick="mdsUseNote(' + i + ', this)">↻ ' + escapeHtml(x.note) + '</span>').join('') + '</div>';
+}
+function mdsNoteChips() { const b = document.getElementById('mds-notechips'); if (b) b.innerHTML = _mdsNoteChipsHtml(); }
+function mdsUseNote(i, elBtn) {
+  const inp = document.getElementById('mds-note');
+  const txt = elBtn ? elBtn.textContent.replace(/^↻\s*/, '') : '';
+  if (inp && txt) { inp.value = txt; inp.focus(); }
+  mdsNoteChips();
+}
+function mdsStage(id) { _mds.stageId = (_mds.stageId === id ? null : id); _mdsKeepNoteRerender(); }
+function mdsMate(id) {
+  const k = _mds.mates.indexOf(id);
+  if (k >= 0) _mds.mates.splice(k, 1); else _mds.mates.push(id);
+  _mdsKeepNoteRerender();
+}
+function _mdsKeepNoteRerender() {
+  const inp = document.getElementById('mds-note');
+  const val = inp ? inp.value : '';
+  _renderMyDayModal(_mydayStartModalHtml());
+  const inp2 = document.getElementById('mds-note');
+  if (inp2) { inp2.value = val; }
+  mdsNoteChips();
+}
+
+async function mydayGo() {
+  const inp = document.getElementById('mds-note');
+  const note = inp ? inp.value.trim() : '';
+  const workId = _mds.workId;
+  closeMyDayModal();
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/start',
+      { note: note, stage_id: _mds.stageId, mate_ids: _mds.mates });
+    if (r && r.ok) {
+      showToast('Погнали! Таймер идёт', 'success');
+      cache.productionKanban = null;
+      loadProductionDashboard();
+    } else showToast((r && r.message) || 'Не удалось начать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+async function mydayPause(workId) {
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/pause', {});
+    if (r && r.ok) { showToast('Пауза · записано ' + _mydayFmtMin(r.minutes || 0), 'success'); }
+    else showToast((r && r.message) || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  cache.productionKanban = null; loadProductionDashboard();
+}
+async function mydayResume(workId) {
+  const row = ((_myday && _myday.rows) || []).find(r => r.work_id === workId);
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/start',
+      { note: (row && row.last_note) || '', stage_id: (row && row.last_stage_id) || null });
+    if (r && r.ok) showToast('Продолжаем', 'success');
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  cache.productionKanban = null; loadProductionDashboard();
+}
+async function mydayFinish(workId) {
+  if (!confirm('Закончил — всё сделано? Строка уйдёт из «Моего дня», время останется в журнале.')) return;
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/finish', {});
+    if (r && r.ok) {
+      const m = r.stopped && r.stopped.minutes ? ' · записано ' + _mydayFmtMin(r.stopped.minutes) : '';
+      showToast('Готово' + m, 'success');
+    } else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  closeMyDayModal();
+  cache.productionKanban = null; loadProductionDashboard();
+}
+
+// --------- карточка отрезков (провалиться в работу) ---------
+function openMyDaySegments(workId) {
+  const row = ((_myday && _myday.rows) || []).find(r => r.work_id === workId);
+  if (!row) return;
+  const run = row.status === 'run';
+  const mins = _mydayRowMin(row);
+  const stops = row.segments.length - 0;
+  let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
+    '<div class="myday-h4">' + escapeHtml(row.name) + '</div>' +
+    '<div class="myday-msub">' + escapeHtml([row.contract_number, row.contractor_name].filter(Boolean).join(' · ')) +
+    (row.last_note || row.live_note ? ' · 📝 ' + escapeHtml(row.live_note || row.last_note) : '') + '</div>' +
+    '<div class="myday-clock' + (run ? '' : ' paused') + '"><div class="c">' + _mydayFmtMin(mins) + '</div>' +
+    '<div class="s">' + (run ? 'идёт сейчас' : 'на паузе') + '</div></div>' +
+    '<div class="myday-stats">' +
+      '<div class="st"><div class="v">' + _mydayFmtMin(mins) + '</div><div class="k">чистого</div></div>' +
+      '<div class="st"><div class="v">' + (row.segments.length + (run ? 1 : 0)) + '</div><div class="k">отрезков</div></div>' +
+      '<div class="st"><div class="v">' + stops + '</div><div class="k">стопов</div></div>' +
+    '</div>' +
+    '<div class="myday-lbl">Отрезки (✎ — поправить, если забыл нажать стоп)</div>';
+  row.segments.forEach((g, i) => {
+    const t1 = g.started_at ? String(g.started_at).slice(11, 16) : '—';
+    const t2 = g.ended_at ? String(g.ended_at).slice(11, 16) : '…';
+    h += '<div class="myday-seg"><span class="no">' + (i + 1) + '</span>' +
+      '<span class="rng">' + t1 + ' – ' + t2 + (g.note ? ' · ' + escapeHtml(g.note) : '') + '</span>' +
+      '<span class="len">' + _mydayFmtMin(g.minutes) + '</span>' +
+      '<button class="ed" onclick="mydayEditSeg(' + g.id + ',' + g.minutes + ',' + workId + ')" title="Поправить минуты"><i class="ti ti-pencil"></i></button></div>';
+  });
+  if (run) {
+    h += '<div class="myday-seg live"><span class="no">' + (row.segments.length + 1) + '</span>' +
+      '<span class="rng">идёт сейчас…</span><span class="len">' + _mydayFmtMin(mins - (row._base || 0)) + '</span></div>';
+  }
+  h += '<div class="myday-actions">' +
+    (run
+      ? '<button class="myday-btn pause big" onclick="mydayPause(' + workId + ');closeMyDayModal()"><i class="ti ti-player-pause"></i> Пауза</button>'
+      : '<button class="myday-btn resume big" onclick="mydayResume(' + workId + ');closeMyDayModal()"><i class="ti ti-player-play"></i> Продолжить</button>') +
+    '<button class="myday-btn fin big" onclick="mydayFinish(' + workId + ')"><i class="ti ti-check"></i> Закончил — всё сделано</button>' +
+  '</div>';
+  _renderMyDayModal(h);
+}
+async function mydayEditSeg(sessionId, curMinutes, workId) {
+  const v = prompt('Сколько минут длился этот отрезок на самом деле?', curMinutes);
+  if (v == null) return;
+  const m = parseInt(v, 10);
+  if (isNaN(m) || m < 1) { showToast('Введи число минут (≥1)', 'error'); return; }
+  try {
+    const r = await fetch(API_BASE + '/api/production/my-day/sessions/' + sessionId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY) },
+      body: JSON.stringify({ minutes: m }),
+    });
+    if (!r.ok) { showToast('Не удалось поправить', 'error'); return; }
+    showToast('Поправлено: ' + _mydayFmtMin(m), 'success');
+    await loadMyDayStrip();
+    openMyDaySegments(workId);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
