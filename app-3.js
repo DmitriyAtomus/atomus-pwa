@@ -11331,10 +11331,16 @@ function _owzRenderCart() {
     box.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-light);font-size:13px;border:1px dashed var(--border);border-radius:8px;">Нажимайте на позиции выше, чтобы добавить их в заказ</div>';
     return;
   }
+  // v2.45.693: название позиции можно поправить (карандаш или клик по имени) —
+  // например, переписать под формулировку из прайса поставщика
   box.innerHTML = _owz.list.map((x, i) =>
     '<div class="owz2-crow">' +
       '<span class="owz2-c-num">' + (i + 1) + '</span>' +
-      '<span class="owz2-c-name">' + escapeHtml(x.name) + '</span>' +
+      '<span class="owz2-c-name" onclick="_owzEditName(' + x.id + ')" title="Нажми, чтобы изменить название">' +
+        escapeHtml(x.name) +
+        (x.renamed ? ' <span class="owz2-c-ren" title="Название изменено вручную">✎ изменено</span>' : '') +
+      '</span>' +
+      '<button class="owz2-c-edit" onclick="_owzEditName(' + x.id + ')" title="Изменить название"><i class="ti ti-pencil"></i></button>' +
       '<input class="owz2-c-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
         'onchange="_owzSetQty(' + x.id + ', this.value)">' +
       '<select class="owz2-c-unit" onchange="_owzSetUnit(' + x.id + ', this.value)" title="Единица измерения">' +
@@ -11343,6 +11349,22 @@ function _owzRenderCart() {
       '<button class="owz2-c-del" onclick="_owzRemove(' + x.id + ')" title="Убрать"><i class="ti ti-x"></i></button>' +
     '</div>'
   ).join('');
+}
+
+// v2.45.693: правка названия позиции в заказе (после выбора из каталога)
+function _owzEditName(itemId) {
+  const ex = _owz.list.find(x => x.id === itemId);
+  if (!ex) return;
+  const v = prompt('Название позиции — как написать в заявке поставщику:', ex.name);
+  if (v === null) return;
+  const name = v.trim();
+  if (!name) { showToast('Название не может быть пустым', 'error'); return; }
+  if (name !== ex.name) {
+    ex.name = name;
+    ex.renamed = true;
+    _owzRenderCart();
+    showToast('Название изменено', 'success');
+  }
 }
 
 // Добавить позицию свободным текстом прямо в заказ (в справочник НЕ добавляем).
