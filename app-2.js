@@ -11383,16 +11383,22 @@ function onNomPickerFilter(value) {
 }
 
 // v2.45.210: позиция-модель в дереве пикера производства (кликабельна для выбора)
+// v2.45.681: не дублируем имя, если оно совпадает с артикулом («ЩУ-001-002 · ЩУ 001.002»)
 function _prodPickItem(m, dirName) {
   const article = m.article || '';
   const name = m.name || '';
   const extra = m.extra || '';
+  const _norm = s => String(s || '').toLowerCase().replace(/[^a-zа-яё0-9]/g, '');
+  const dup = article && name && _norm(article) === _norm(name);
   const label = (article ? article + ' · ' : '') + name;
   const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
   const dirJson = JSON.stringify(dirName || '').replace(/"/g, '&quot;');
   return '<div class="sp-tree-item" onclick="pickNomModel(' + m.id + ',' + labelJson + ',' + dirJson + ')">' +
     '<div class="sp-tree-item-main">' +
-      '<div class="sp-tree-item-name">' + (article ? '<b>' + escapeHtml(article) + '</b> ' : '') + escapeHtml(name) + '</div>' +
+      '<div class="sp-tree-item-name">' +
+        (article ? '<b>' + escapeHtml(article) + '</b> ' : '') +
+        (dup ? '' : escapeHtml(name)) +
+      '</div>' +
       (extra ? '<div class="sp-tree-item-meta">' + escapeHtml(extra) + '</div>' : '') +
     '</div>' +
   '</div>';
@@ -11445,9 +11451,40 @@ function renderProductionTree() {
         } else noSg.push(m);
       });
       if (noSg.length) {
-        h += '<div class="sp-tree-items">';
-        noSg.forEach(m => { h += _prodPickItem(m, dirName); });
-        h += '</div>';
+        // v2.45.681: длинный список без подгрупп разбиваем на авто-серии по
+        // артикулу (ЩУ-001-…, ЩУ-002-…) — вместо простыни на сто строк
+        const bySer = {};
+        if (noSg.length > 15) {
+          noSg.forEach(m => {
+            const a = String(m.article || m.name || '').trim();
+            const seg = a.split(/[-–\s]+/).filter(Boolean);
+            const ser = seg.length >= 2 ? (seg[0] + '-' + seg[1]) : (seg[0] || 'Прочее');
+            (bySer[ser] = bySer[ser] || []).push(m);
+          });
+        }
+        const serNames = Object.keys(bySer).sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
+        if (serNames.length > 1) {
+          serNames.forEach(ser => {
+            const sKey = 'pser:' + dirId + ':' + ser;
+            const sOpen = autoOpen || !!og[sKey];
+            h += '<div class="sp-tree-subgroup">' +
+              '<button type="button" class="sp-tree-toggle subgroup' + (sOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + sKey.replace(/'/g, "\\'") + '\')">' +
+                '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
+                '<span>Серия ' + escapeHtml(ser) + '</span>' +
+                '<span class="sp-tree-count subgroup">' + bySer[ser].length + '</span>' +
+              '</button>';
+            if (sOpen) {
+              h += '<div class="sp-tree-items">';
+              bySer[ser].forEach(m => { h += _prodPickItem(m, dirName); });
+              h += '</div>';
+            }
+            h += '</div>';
+          });
+        } else {
+          h += '<div class="sp-tree-items">';
+          noSg.forEach(m => { h += _prodPickItem(m, dirName); });
+          h += '</div>';
+        }
       }
       Object.keys(bySg).sort((a, b) => (bySg[a].name || '').localeCompare(bySg[b].name || '', 'ru')).forEach(s => {
         const sg = bySg[s];
