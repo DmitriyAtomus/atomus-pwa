@@ -11286,6 +11286,7 @@ function _owzSupPick(id) {
   if (box) box.style.display = 'none';
   _owzSupplierHint();
   _owzRenderSupplier();
+  _owzSaveDraft();   // v2.45.696: черновик сразу и при выборе поставщика
 }
 
 // v2.45.6xx: карточка выбранного поставщика (вместо поля поиска)
@@ -11401,6 +11402,7 @@ function _owzAdd(cid) {
   else _owz.list.push({ id: cid, cid: cid, name: c.name, unit: c.unit || 'шт.', qty: 1 });
   _owzRenderCart();
   _owzRenderCatalog((document.getElementById('owz-search') || {}).value || '');
+  _owzSaveDraft();   // v2.45.696: черновик после каждой позиции, не по таймеру
 }
 
 function _owzSetQty(itemId, val) {
@@ -11408,12 +11410,14 @@ function _owzSetQty(itemId, val) {
   if (!ex) return;
   const n = parseFloat(String(val).replace(',', '.'));
   ex.qty = (isNaN(n) || n <= 0) ? 0 : n;
+  _owzSaveDraft();   // v2.45.696
 }
 
 function _owzSetUnit(itemId, val) {
   const ex = _owz.list.find(x => x.id === itemId);
   if (!ex) return;
   ex.unit = (val || 'шт.').trim() || 'шт.';
+  _owzSaveDraft();   // v2.45.696
 }
 
 // Частые единицы измерения для выпадашки в корзине. Если у позиции единица
@@ -11431,6 +11435,7 @@ function _owzRemove(itemId) {
   _owz.list = _owz.list.filter(x => x.id !== itemId);
   _owzRenderCart();
   _owzRenderCatalog(document.getElementById('owz-search').value);
+  _owzSaveDraft();   // v2.45.696
 }
 
 function _owzRenderCart() {
@@ -11474,6 +11479,7 @@ function _owzEditName(itemId) {
     ex.name = name;
     ex.renamed = true;
     _owzRenderCart();
+    _owzSaveDraft();   // v2.45.696
     showToast('Название изменено', 'success');
   }
 }
@@ -11489,6 +11495,7 @@ function _owzAddTyped() {
   if (inp) inp.value = '';
   _owzRenderCart();
   _owzRenderCatalog('');
+  _owzSaveDraft();   // v2.45.696
   showToast('Добавлено в заказ: ' + name, 'success');
 }
 
@@ -11503,6 +11510,7 @@ function _owzNewItem() {
   const id = -(++_owz.custom);
   _owz.list.push({ id: id, cid: null, name: name, unit: unit, qty: 1 });
   _owzRenderCart();
+  _owzSaveDraft();   // v2.45.696
   showToast('Позиция добавлена в заказ', 'success');
 }
 
