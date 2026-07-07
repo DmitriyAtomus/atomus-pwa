@@ -6112,7 +6112,17 @@ async function openMailThread(peer) {
     const msgs = d.messages || [];
     const conv = (state._mailConvs || []).find(c => c.peer === peer) || {};
     const canReply = (d.channel === 'email') || (d.channel === 'max');
-    let html = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;">' + _mailChanIcon(d.channel) + ' ' + escapeHtml(conv.from_name || peer) + '</div>';
+    const rawName = conv.raw_name || conv.from_name || peer;
+    const title = d.supplier_name || conv.from_name || peer;
+    const supChip = d.supplier_name
+      ? '<span style="background:#E7F5EC;color:#15803D;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap;"><i class="ti ti-building-store"></i> ' + escapeHtml(d.supplier_name) + '</span>'
+      : '<span style="color:var(--text-light);font-size:12px;font-weight:500;">не привязан к поставщику</span>';
+    const peerEnc = encodeURIComponent(peer);
+    const bindBtn = '<button class="btn btn-secondary btn-small" onclick="openMailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'))"><i class="ti ti-link"></i> ' + (d.supplier_name ? 'Сменить' : 'Привязать к поставщику') + '</button>';
+    let html = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<div style="min-width:0;"><div style="font-weight:700;">' + _mailChanIcon(d.channel) + ' ' + escapeHtml(title) + '</div>' +
+      '<div style="margin-top:3px;display:flex;gap:8px;align-items:center;">' + supChip + (d.supplier_name && rawName !== title ? '<span style="font-size:11px;color:var(--text-light);">' + escapeHtml(rawName) + '</span>' : '') + '</div></div>' +
+      bindBtn + '</div>';
     html += '<div id="mail-thread-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg);">';
     html += msgs.length ? msgs.map(_mailMsgBubble).join('') : '<div style="color:var(--text-light);text-align:center;">Сообщений нет</div>';
     html += '</div>';
@@ -6149,6 +6159,47 @@ async function sendMailReply() {
     if (r && r.ok) { ta.value = ''; showToast('Отправлено', 'success'); openMailThread(peer); loadMailMessenger(); }
     else { showToast((r && r.data && r.data.message) || (r && r.message) || 'Не отправлено', 'error'); ta.disabled = false; }
   } catch (e) { showToast('Ошибка отправки', 'error'); ta.disabled = false; }
+}
+
+// v2.45.696: привязка собеседника переписки к поставщику
+async function openMailBindSupplier(peer) {
+  if (!cache.suppliers) { try { const d = await apiGet('/api/suppliers'); cache.suppliers = d.suppliers || []; } catch (e) { cache.suppliers = []; } }
+  state._mailBindPeer = peer;
+  const old = document.getElementById('mail-bind-overlay'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'mail-bind-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+  const peerEnc = encodeURIComponent(peer);
+  ov.innerHTML = '<div style="background:var(--card);border-radius:14px;width:min(440px,94vw);max-height:82vh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()">' +
+    '<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between;align-items:center;">Привязать к поставщику<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mail-bind-overlay\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<input id="mail-bind-search" placeholder="Поиск поставщика…" oninput="_mailBindFilter(this.value)" style="margin:12px 16px 8px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;">' +
+    '<div id="mail-bind-list" style="overflow-y:auto;padding:0 16px 8px;"></div>' +
+    '<div style="padding:10px 16px;border-top:1px solid var(--border);"><button class="btn btn-secondary btn-small" onclick="mailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'), null)"><i class="ti ti-unlink"></i> Отвязать</button></div>' +
+  '</div>';
+  document.body.appendChild(ov);
+  _mailBindFilter('');
+  const si = document.getElementById('mail-bind-search'); if (si) si.focus();
+}
+function _mailBindFilter(q) {
+  const box = document.getElementById('mail-bind-list'); if (!box) return;
+  const nq = (q || '').toLowerCase().trim();
+  const sups = (cache.suppliers || []).filter(s => !nq || (s.name || '').toLowerCase().includes(nq) || (s.inn || '').includes(nq));
+  const peerEnc = encodeURIComponent(state._mailBindPeer || '');
+  box.innerHTML = sups.slice(0, 80).map(s =>
+    '<div onclick="mailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'),' + s.id + ')" style="padding:9px 10px;border-bottom:1px solid var(--border);cursor:pointer;">' +
+    escapeHtml(s.name || ('#' + s.id)) + (s.inn ? '<span style="font-size:11px;color:var(--text-light);"> · ИНН ' + escapeHtml(s.inn) + '</span>' : '') + '</div>'
+  ).join('') || '<div class="empty-block">Не найдено</div>';
+}
+async function mailBindSupplier(peer, supplierId) {
+  try {
+    const r = await apiPost('/api/mail/bind', { peer: peer, supplier_id: supplierId || 0 });
+    if (r && r.ok) {
+      showToast(supplierId ? 'Привязано к поставщику' : 'Отвязано', 'success');
+      const ov = document.getElementById('mail-bind-overlay'); if (ov) ov.remove();
+      loadMailMessenger(); openMailThread(peer);
+    } else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 
 // ============ ЛОГИСТИКА: забрать / в пути (v2.45.678, дизайн v2.45.685) ============
@@ -13866,6 +13917,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.697',
+    date: '07.07.2026',
+    title: 'Почта и MAX: привязка собеседника к поставщику + памятка',
+    features: [
+      'В переписке появилась кнопка <b>«Привязать к поставщику»</b> — собеседник (email или MAX) закрепляется за поставщиком, и его переписка/счета относятся к нему',
+      'На пустом экране раздела — <b>памятка</b>, как подключить менеджера к MAX (он должен первым написать боту)',
+      'MAX теперь показывает <b>честный статус доставки</b>: если бот не смог отправить (собеседник не начинал диалог) — видно ошибку, а не ложное «отправлено»',
+    ],
+  },
   {
     version: 'v2.45.694',
     date: '07.07.2026',
