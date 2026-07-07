@@ -20805,3 +20805,80 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 .recv-chip:hover { background: #DBEAFE; }
 .recv-chip small { font-weight: 600; color: #64748B; }
+
+/* ============ v2.45.685: Логистика — забрать (дизайн-проход) ============ */
+.logi-sec { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 15px; margin: 22px 0 10px; color: var(--text-dark); }
+.logi-sec:first-child { margin-top: 2px; }
+.logi-sec i { font-size: 17px; }
+.logi-sec .logi-cnt { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--bg); color: var(--text-mid); }
+.logi-sec.g { color: var(--success); } .logi-sec.g .logi-cnt { background: var(--success-bg); color: var(--success); }
+.logi-sec.b { color: var(--brand); } .logi-sec.b .logi-cnt { background: var(--brand-bg); color: var(--brand); }
+.logi-sec.mut { color: var(--text-light); font-size: 13.5px; }
+
+.logi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 10px; transition: box-shadow .15s ease; overflow: hidden; }
+.logi-card:hover { box-shadow: 0 6px 20px rgba(27, 32, 48, .08); }
+.logi-card.ready { border-color: #BFDCCB; box-shadow: 0 4px 16px rgba(31, 123, 63, .08); }
+
+.logi-head { display: flex; align-items: center; gap: 11px; padding: 12px 15px; }
+.logi-card.ready .logi-head { background: var(--success-bg); border-bottom: 1px solid #D3E9DC; }
+.logi-ava { flex: none; width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 19px; background: var(--brand-bg); color: var(--brand); }
+.logi-card.ready .logi-ava { background: #fff; color: var(--success); }
+.logi-t { min-width: 0; flex: 1; }
+.logi-sup { font-weight: 800; font-size: 14.5px; color: var(--text-dark); line-height: 1.25; }
+.logi-num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+.logi-sum { flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.logi-sum .rub { font-weight: 800; font-size: 16px; color: var(--text-dark); white-space: nowrap; }
+.logi-sum .cnt { font-size: 11.5px; color: var(--text-light); margin-top: 1px; }
+
+.logi-eta { flex: none; text-align: center; border-radius: 11px; padding: 6px 12px; min-width: 88px; background: var(--brand-bg); color: var(--brand); }
+.logi-eta .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em; opacity: .8; font-weight: 700; }
+.logi-eta .val { font-weight: 800; font-size: 13.5px; margin-top: 1px; white-space: nowrap; }
+.logi-eta.today { background: var(--success-bg); color: var(--success); }
+.logi-eta.late { background: var(--danger-bg); color: var(--danger); }
+
+.logi-body { padding: 11px 15px 13px; }
+.logi-card.ready .logi-body { padding-top: 12px; }
+
+.logi-strip { display: flex; align-items: center; gap: 8px; border-radius: 9px; padding: 8px 11px; font-size: 12.5px; font-weight: 700; margin-bottom: 10px; background: var(--warning-bg); color: var(--warning); }
+.logi-strip.bad { background: var(--danger-bg); color: var(--danger); }
+
+.logi-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 9px; }
+.logi-chip { border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: var(--bg); color: var(--text-mid); }
+.logi-chip.ok { background: var(--success-bg); color: var(--success); }
+.logi-chip.move { background: var(--brand-bg); color: var(--brand); }
+.logi-chip.warn { background: var(--warning-bg); color: var(--warning); }
+.logi-chip.bad { background: var(--danger-bg); color: var(--danger); }
+
+.logi-place { display: flex; gap: 7px; align-items: flex-start; font-size: 13px; color: var(--text-mid); line-height: 1.4; margin-bottom: 4px; }
+.logi-place i { color: var(--success); margin-top: 1px; flex: none; }
+
+.logi-items-btn { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; padding: 4px 0; color: var(--brand); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.logi-items-btn:hover { text-decoration: underline; }
+.logi-items { margin-top: 4px; padding: 4px 12px; background: var(--bg); border-radius: 10px; }
+.logi-item { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; color: var(--text-mid); line-height: 1.35; }
+.logi-item:last-child { border-bottom: none; }
+.logi-item .q { color: var(--text-light); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.logi-foot { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 0 15px 14px; }
+.logi-take { display: inline-flex; align-items: center; gap: 7px; background: var(--success); color: #fff; border: none; border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; transition: filter .12s; }
+.logi-take:hover { filter: brightness(1.08); }
+.logi-call { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: var(--text-mid); border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 600; }
+.logi-call:hover { border-color: var(--border-strong); }
+
+.logi-done { display: flex; align-items: center; gap: 10px; border: 1px dashed var(--border); border-radius: 12px; padding: 9px 13px; margin-bottom: 7px; background: var(--surface); }
+.logi-done .logi-ava { width: 30px; height: 30px; border-radius: 8px; font-size: 14px; background: var(--bg); color: var(--text-faint); }
+.logi-done .logi-sup { font-size: 13px; color: var(--text-mid); font-weight: 700; }
+.logi-done .logi-num { font-size: 10.5px; }
+.logi-done .right { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.logi-hide { background: none; border: 1px solid var(--border); color: var(--text-light); border-radius: 7px; padding: 3px 10px; font-size: 11.5px; cursor: pointer; }
+.logi-hide:hover { color: var(--text-mid); border-color: var(--border-strong); }
+
+.logi-empty { display: flex; align-items: center; gap: 9px; color: var(--text-light); font-size: 13px; background: var(--surface); border: 1px dashed var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
+.logi-empty i { font-size: 17px; color: var(--text-faint); }
+
+@media (max-width: 560px) {
+  .logi-head { flex-wrap: wrap; }
+  .logi-sum, .logi-eta { margin-left: 51px; text-align: left; }
+  .logi-eta { min-width: 0; }
+  .logi-take { flex: 1; justify-content: center; }
+}
