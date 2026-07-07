@@ -131,8 +131,8 @@
         <button class="section-tab" data-section="warehouse" title="Открыть складские операции">
           <i class="ti ti-building-warehouse"></i>Склад
         </button>
-        <button class="section-tab" data-section="logistics" title="Открыть логистику (скоро)">
-          <i class="ti ti-truck"></i>Логистика<span class="soon-badge">скоро</span>
+        <button class="section-tab" data-section="logistics" title="Логистика — что забрать">
+          <i class="ti ti-truck"></i>Логистика
         </button>
         <button class="section-tab" data-section="supply" title="Открыть снабжение">
           <i class="ti ti-shopping-cart"></i>Снабжение
@@ -688,6 +688,18 @@
       <div class="sidebar-version">
         Atom CRM<br>
         <span class="sidebar-version-text">—</span>
+      </div>
+    </aside>
+
+    <!-- v2.45.678: Логистика — забрать / в пути -->
+    <aside class="sidebar" id="sidebar-logistics" data-section="logistics" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-truck-delivery"></i> Логистика
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="logistics-pickups" onclick="selectSidebarItem('logistics-pickups')">
+          <i class="ti ti-package-import"></i><span>Забрать / В пути</span><span class="nav-badge" id="logistics-badge" style="display:none;"></span>
+        </button>
       </div>
     </aside>
 
@@ -2001,7 +2013,18 @@
       </div>
       <!-- ============ КОНЕЦ ИНВЕНТАРИЗАЦИИ ============ -->
 
-      <!-- ============ ЗАГЛУШКА: ЛОГИСТИКА ============ -->
+      <!-- ============ ЛОГИСТИКА: ЗАБРАТЬ / В ПУТИ (v2.45.678) ============ -->
+      <div class="screen" data-screen="logistics-pickups" data-section="logistics">
+        <div class="content-inner" style="max-width: 900px;">
+          <div class="screen-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
+            <h1 style="margin:0;font-size:20px;"><i class="ti ti-truck-delivery"></i> Логистика — забрать</h1>
+            <button class="btn btn-secondary btn-small" onclick="loadLogisticsPickups()"><i class="ti ti-refresh"></i> Обновить</button>
+          </div>
+          <div id="logistics-content"><div class="loading-block">Загрузка…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ ЗАГЛУШКА: ЛОГИСТИКА (старая, не используется) ============ -->
       <div class="screen" data-screen="coming-logistics" data-section="logistics">
         <div class="content-inner" style="max-width: 100%;">
           <div class="coming-soon">

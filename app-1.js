@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.678-presence-gender2";
+const APP_VERSION = "v2.45.679-logistics";
 const APP_VERSION_DATE = "06.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -52,7 +52,7 @@ const SECTION_CONFIG = {
   sales:      { sidebar: 'sidebar-sales',      defaultScreen: 'sales-dashboard' },
   tasks:      { sidebar: 'sidebar-tasks',      defaultScreen: 'tasks-list' },       // ЭТАП 16В
   warehouse:  { sidebar: 'sidebar-warehouse',  defaultScreen: 'warehouse-dashboard' },     // ЭТАП 18 → 28.1
-  logistics:  { sidebar: 'sidebar-coming',     defaultScreen: 'coming-logistics', comingSoon: true },
+  logistics:  { sidebar: 'sidebar-logistics',  defaultScreen: 'logistics-pickups' },  // v2.45.678
   supply:     { sidebar: 'sidebar-supply',     defaultScreen: 'supply-shopping' },    // ЭТАП 19; v2.45.339: открывать сразу «Что закупить»
   defects:    { sidebar: 'sidebar-defects',    defaultScreen: 'defects-list' },       // ЭТАП 22
   installation: { sidebar: 'sidebar-installation', defaultScreen: 'installation-list' }, // v2.45.346 Монтаж
@@ -1391,6 +1391,7 @@ const RAIL_SECTIONS = [
   { code: 'tasks',        icon: 'ti-checklist',          label: 'Задачи' },
   { code: 'warehouse',    icon: 'ti-building-warehouse', label: 'Склад' },
   { code: 'supply',       icon: 'ti-shopping-cart',      label: 'Снабж.' },
+  { code: 'logistics',    icon: 'ti-truck-delivery',     label: 'Логистика' },
   { code: 'defects',      icon: 'ti-alert-circle',       label: 'Сервис' },
   { code: 'installation', icon: 'ti-tools',              label: 'Монтаж' },
   { code: 'hr',           icon: 'ti-id-badge',           label: 'Кадры' },
@@ -1670,6 +1671,7 @@ function selectSidebarItem(screenName) {
   }
   if (screenName === 'components-catalog')   loadComponentsCatalog();
   // ЭТАП 19: снабжение
+  if (screenName === 'logistics-pickups' && typeof loadLogisticsPickups === 'function') loadLogisticsPickups();  // v2.45.678
   if (screenName === 'supply-shopping')     loadSupplyShopping();
   if (screenName === 'supply-requests')     loadSupplyRequests();
   if (screenName === 'supply-orders')       loadSupplyOrders();
