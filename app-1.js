@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.708";
+const APP_VERSION = "v2.45.709";
 const APP_VERSION_DATE = "07.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1434,6 +1434,10 @@ function _railBadges() {
     const inbox = cache.supplyInbox || [];
     const unm = inbox.filter(m => m.status === 'unmatched').length;
     if (unm) b.supply = { n: unm, cls: 'r' };
+  } catch (e) {}
+  // v2.45.709: непрочитанные в «Почта и MAX»
+  try {
+    if (state._mailUnreadTotal) b.mail = { n: state._mailUnreadTotal, cls: 'r' };
   } catch (e) {}
   return b;
 }

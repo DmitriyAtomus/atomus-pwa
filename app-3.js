@@ -6088,6 +6088,7 @@ async function loadMailMessenger() {
     const d = await apiGet('/api/mail/conversations');
     state._mailConvs = d.conversations || [];
     _mailRenderList();
+    _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, c) => s2 + (c.unread || 0), 0));
   } catch (e) { list.innerHTML = '<div class="empty-block">Не удалось загрузить</div>'; }
 }
 // v2.45.708: фильтры каналов + новый список
@@ -6127,14 +6128,16 @@ function _mailConvRow(c) {
   const sup = c.supplier_name
     ? '<div class="mm-sup ok"><i class="ti ti-link"></i> ' + escapeHtml(c.supplier_name) + '</div>'
     : '<div class="mm-sup no"><i class="ti ti-alert-triangle"></i> не привязан к поставщику</div>';
-  return '<div class="mail-conv mm-row' + (sel ? ' sel' : '') + '" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))">' +
+  const unr = Number(c.unread || 0);
+  return '<div class="mail-conv mm-row' + (sel ? ' sel' : '') + (unr ? ' unr' : '') + '" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))">' +
     '<div class="mm-ava ' + _mailAvaCls(c.peer) + '">' + escapeHtml(_mailInitials(c.from_name || c.peer)) +
       '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
     '<div class="mm-t">' +
       '<div class="mm-nm">' + escapeHtml(c.from_name || c.peer) + ' <span class="mm-ch ' + (isMax ? 'max' : 'mail') + '">' + (isMax ? 'MAX' : 'ПОЧТА') + '</span></div>' +
       '<div class="mm-prev">' + escapeHtml(c.preview || '') + '</div>' + sup +
     '</div>' +
-    '<div class="mm-tm">' + escapeHtml(_mailShortTime(c.last_at)) + '</div>' +
+    '<div class="mm-meta"><span class="mm-tm">' + escapeHtml(_mailShortTime(c.last_at)) + '</span>' +
+      (unr ? '<span class="mm-unr">' + (unr > 99 ? '99+' : unr) + '</span>' : '') + '</div>' +
   '</div>';
 }
 async function openMailThread(peer) {
@@ -6179,8 +6182,37 @@ async function openMailThread(peer) {
     }
     pane.innerHTML = html;
     const m = document.getElementById('mail-thread-msgs'); if (m) m.scrollTop = m.scrollHeight;
+    // v2.45.709: открыл диалог → прочитано (кружок гаснет, бейджи пересчитываются)
+    try {
+      const cv = (state._mailConvs || []).find(c => c.peer === peer);
+      if (cv && cv.unread) {
+        apiPost('/api/mail/read', { peer: peer }).catch(() => {});
+        cv.unread = 0;
+        _mailRenderList();
+        _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, c) => s2 + (c.unread || 0), 0));
+      }
+    } catch (e2) {}
   } catch (e) { pane.innerHTML = '<div class="empty-block">Не удалось загрузить переписку</div>'; }
 }
+// v2.45.709: бейдж непрочитанных — раздел на рейле + пункт меню
+function _mailApplyUnreadTotal(n) {
+  state._mailUnreadTotal = n || 0;
+  const b = document.getElementById('mail-unread-badge');
+  if (b) {
+    if (state._mailUnreadTotal > 0) { b.textContent = state._mailUnreadTotal; b.style.display = ''; }
+    else b.style.display = 'none';
+  }
+  try { if (typeof renderSectionRail === 'function') renderSectionRail(); } catch (e) {}
+}
+async function refreshMailUnread() {
+  try {
+    const d = await apiGet('/api/mail/unread-count');
+    _mailApplyUnreadTotal(d.count || 0);
+  } catch (e) {}
+}
+// старт: через 4 сек после загрузки, дальше каждые 2 минуты
+setTimeout(function () { try { refreshMailUnread(); } catch (e) {} }, 4000);
+setInterval(function () { try { refreshMailUnread(); } catch (e) {} }, 120000);
 // v2.45.708: суть письма отдельно от цитаты/подписи (сворачиваются)
 function _mailSplitBody(body) {
   const lines = String(body || '').slice(0, 12000).split('\n');
