@@ -6086,26 +6086,62 @@ async function loadMailMessenger() {
   list.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
     const d = await apiGet('/api/mail/conversations');
-    const convs = d.conversations || [];
-    state._mailConvs = convs;
-    list.innerHTML = convs.length ? convs.map(_mailConvRow).join('') : '<div class="empty-block">Переписок пока нет</div>';
-    if (state._mailPeer) { const el = list.querySelector('.mail-conv[data-peer="' + (window.CSS && CSS.escape ? CSS.escape(state._mailPeer) : state._mailPeer) + '"]'); if (el) el.style.background = 'var(--brand-bg)'; }
+    state._mailConvs = d.conversations || [];
+    _mailRenderList();
   } catch (e) { list.innerHTML = '<div class="empty-block">Не удалось загрузить</div>'; }
+}
+// v2.45.708: фильтры каналов + новый список
+function _mailSetFilter(f) { state._mailFilter = f; _mailRenderList(); }
+function _mailRenderList() {
+  const list = document.getElementById('mail-conv-list');
+  if (!list) return;
+  const convs = state._mailConvs || [];
+  const f = state._mailFilter || 'all';
+  const cMax = convs.filter(c => c.channel === 'max').length;
+  const cMail = convs.length - cMax;
+  const shown = convs.filter(c => f === 'all' || (f === 'max' ? c.channel === 'max' : c.channel !== 'max'));
+  let html = '<div class="mm-filters">' +
+    '<button class="mm-filter' + (f === 'all' ? ' on' : '') + '" onclick="_mailSetFilter(\'all\')">Все <span class="c">' + convs.length + '</span></button>' +
+    '<button class="mm-filter' + (f === 'mail' ? ' on' : '') + '" onclick="_mailSetFilter(\'mail\')"><i class="ti ti-mail"></i> Почта <span class="c">' + cMail + '</span></button>' +
+    '<button class="mm-filter' + (f === 'max' ? ' on' : '') + '" onclick="_mailSetFilter(\'max\')"><i class="ti ti-message-circle"></i> MAX <span class="c">' + cMax + '</span></button>' +
+  '</div>';
+  html += shown.length ? shown.map(_mailConvRow).join('')
+    : '<div class="empty-block">' + (convs.length ? 'В этом канале пусто' : 'Переписок пока нет') + '</div>';
+  list.innerHTML = html;
+}
+function _mailInitials(n) {
+  const p = String(n || '').replace(/["«»]/g, '').trim().split(/\s+/);
+  return ((p[0] ? p[0][0] : '') + (p[1] ? p[1][0] : (p[0] && p[0][1] ? p[0][1] : ''))).toUpperCase() || '✉';
+}
+function _mailAvaCls(peer) {
+  let h = 0; const s = String(peer || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
+  return 'c' + (h % 5);
 }
 function _mailChanIcon(ch) { return ch === 'max' ? '💬' : '📧'; }
 function _mailShortTime(iso) { if (!iso) return ''; return String(iso).slice(0, 16).replace('T', ' ').replace(/^2\d\d\d-/, ''); }
 function _mailConvRow(c) {
   const peerAttr = encodeURIComponent(c.peer);
-  return '<div class="mail-conv" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;">' +
-    '<div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _mailChanIcon(c.channel) + ' ' + escapeHtml(c.from_name || c.peer) + '</div><div style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(_mailShortTime(c.last_at)) + '</div></div>' +
-    '<div style="font-size:12.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">' + escapeHtml(c.preview || '') + '</div>' +
+  const isMax = c.channel === 'max';
+  const sel = state._mailPeer === c.peer;
+  const sup = c.supplier_name
+    ? '<div class="mm-sup ok"><i class="ti ti-link"></i> ' + escapeHtml(c.supplier_name) + '</div>'
+    : '<div class="mm-sup no"><i class="ti ti-alert-triangle"></i> не привязан к поставщику</div>';
+  return '<div class="mail-conv mm-row' + (sel ? ' sel' : '') + '" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))">' +
+    '<div class="mm-ava ' + _mailAvaCls(c.peer) + '">' + escapeHtml(_mailInitials(c.from_name || c.peer)) +
+      '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
+    '<div class="mm-t">' +
+      '<div class="mm-nm">' + escapeHtml(c.from_name || c.peer) + ' <span class="mm-ch ' + (isMax ? 'max' : 'mail') + '">' + (isMax ? 'MAX' : 'ПОЧТА') + '</span></div>' +
+      '<div class="mm-prev">' + escapeHtml(c.preview || '') + '</div>' + sup +
+    '</div>' +
+    '<div class="mm-tm">' + escapeHtml(_mailShortTime(c.last_at)) + '</div>' +
   '</div>';
 }
 async function openMailThread(peer) {
   state._mailPeer = peer;
   const pane = document.getElementById('mail-thread-pane');
   if (!pane) return;
-  document.querySelectorAll('.mail-conv').forEach(el => { el.style.background = (el.dataset.peer === peer) ? 'var(--brand-bg)' : ''; });
+  document.querySelectorAll('.mail-conv').forEach(el => { el.classList.toggle('sel', el.dataset.peer === peer); });
   pane.innerHTML = '<div class="loading-block">Загрузка переписки…</div>';
   try {
     const d = await apiGet('/api/mail/thread?peer=' + encodeURIComponent(peer));
@@ -6114,37 +6150,92 @@ async function openMailThread(peer) {
     const canReply = (d.channel === 'email') || (d.channel === 'max');
     const rawName = conv.raw_name || conv.from_name || peer;
     const title = d.supplier_name || conv.from_name || peer;
-    const supChip = d.supplier_name
-      ? '<span style="background:#E7F5EC;color:#15803D;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap;"><i class="ti ti-building-store"></i> ' + escapeHtml(d.supplier_name) + '</span>'
-      : '<span style="color:var(--text-light);font-size:12px;font-weight:500;">не привязан к поставщику</span>';
+    const isMax = d.channel === 'max';
     const peerEnc = encodeURIComponent(peer);
     const bindBtn = '<button class="btn btn-secondary btn-small" onclick="openMailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'))"><i class="ti ti-link"></i> ' + (d.supplier_name ? 'Сменить' : 'Привязать к поставщику') + '</button>';
-    let html = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
-      '<div style="min-width:0;"><div style="font-weight:700;">' + _mailChanIcon(d.channel) + ' ' + escapeHtml(title) + '</div>' +
-      '<div style="margin-top:3px;display:flex;gap:8px;align-items:center;">' + supChip + (d.supplier_name && rawName !== title ? '<span style="font-size:11px;color:var(--text-light);">' + escapeHtml(rawName) + '</span>' : '') + '</div></div>' +
+    let html = '<div class="mm-thhead">' +
+      '<div class="mm-ava ' + _mailAvaCls(peer) + '">' + escapeHtml(_mailInitials(title)) +
+        '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
+      '<div style="min-width:0;flex:1;"><div style="font-weight:800;display:flex;gap:7px;align-items:center;">' + escapeHtml(title) +
+        ' <span class="mm-ch ' + (isMax ? 'max' : 'mail') + '">' + (isMax ? 'MAX' : 'ПОЧТА') + '</span></div>' +
+      '<div style="margin-top:2px;font-size:11.5px;color:var(--text-light);">' +
+        (d.supplier_name
+          ? '<span style="color:var(--success);font-weight:600;"><i class="ti ti-link"></i> ' + escapeHtml(d.supplier_name) + '</span>' + (rawName !== title ? ' · ' + escapeHtml(rawName) : '')
+          : escapeHtml(rawName)) + '</div></div>' +
       bindBtn + '</div>';
+    if (!d.supplier_name) {
+      html += '<div class="mm-bindstrip"><i class="ti ti-alert-triangle"></i> Не привязан к поставщику — письма не попадут в карточки заказов' +
+        '<button onclick="openMailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'))">Привязать</button></div>';
+    }
     html += '<div id="mail-thread-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg);">';
     html += msgs.length ? msgs.map(_mailMsgBubble).join('') : '<div style="color:var(--text-light);text-align:center;">Сообщений нет</div>';
     html += '</div>';
     if (canReply) {
-      html += '<div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;">' +
-        '<textarea id="mail-reply-text" rows="2" placeholder="Написать ответ…" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>' +
-        '<button class="btn btn-primary" onclick="sendMailReply()" title="Отправить" style="align-self:flex-end;"><i class="ti ti-send"></i></button>' +
+      html += '<div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">' +
+        '<span class="mm-ch ' + (isMax ? 'max' : 'mail') + '" style="align-self:center;flex:none;" title="Канал ответа">' + (isMax ? '💬 MAX' : '✉ ПОЧТА') + '</span>' +
+        '<textarea id="mail-reply-text" rows="2" placeholder="Написать ответ… (уйдёт ' + (isMax ? 'в MAX' : 'письмом') + ')" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>' +
+        '<button class="btn btn-primary" onclick="sendMailReply()" title="Отправить"><i class="ti ti-send"></i></button>' +
       '</div>';
     }
     pane.innerHTML = html;
     const m = document.getElementById('mail-thread-msgs'); if (m) m.scrollTop = m.scrollHeight;
   } catch (e) { pane.innerHTML = '<div class="empty-block">Не удалось загрузить переписку</div>'; }
 }
+// v2.45.708: суть письма отдельно от цитаты/подписи (сворачиваются)
+function _mailSplitBody(body) {
+  const lines = String(body || '').slice(0, 12000).split('\n');
+  let cut = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) continue;
+    if (t.startsWith('>') ||
+        /^(От:|From:|On .+ wrote:|-{2,}\s*$)/i.test(t) ||
+        /^\d{2}\.\d{2}\.\d{4}.{0,12}(пишет|wrote)/i.test(t) ||
+        (i > 0 && /^(с уважением|best regards|подпись\s*$|--\s*$)/i.test(t))) { cut = i; break; }
+  }
+  const main = lines.slice(0, cut).join('\n').trim();
+  const rest = lines.slice(cut).join('\n').trim();
+  if (!main) return { main: rest, rest: '' };
+  return { main: main, rest: rest };
+}
+var _mailFoldSeq = 0;
+function _mailToggleFold(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (btn) btn.innerHTML = (open ? '<i class="ti ti-chevron-right"></i> ' : '<i class="ti ti-chevron-down"></i> ') + btn.dataset.lbl;
+}
 function _mailMsgBubble(m) {
   const out = m.dir === 'out';
-  const who = out ? 'Мы' : (m.from_name || '');
-  const atts = (m.attachments || []).length ? '<div style="font-size:11.5px;margin-top:4px;opacity:.8;">📎 ' + m.attachments.length + '</div>' : '';
-  const subj = (m.subject && !out) ? '<div style="font-size:11px;color:var(--text-light);margin-bottom:2px;">' + escapeHtml(m.subject) + '</div>' : '';
-  return '<div style="max-width:80%;align-self:' + (out ? 'flex-end' : 'flex-start') + ';background:' + (out ? '#DCF0FF' : 'var(--card)') + ';border:1px solid var(--border);border-radius:12px;padding:8px 12px;">' +
-    (who ? '<div style="font-size:11px;font-weight:600;color:var(--text-mid);margin-bottom:2px;">' + escapeHtml(who) + '</div>' : '') + subj +
-    '<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.4;word-break:break-word;">' + escapeHtml((m.body || '').slice(0, 4000)) + '</div>' + atts +
-    '<div style="font-size:10.5px;color:var(--text-light);text-align:right;margin-top:3px;">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
+  const who = out ? 'Ты' : (m.from_name || '');
+  const subj = (m.subject && !out) ? '<div class="mm-subj">' + escapeHtml(m.subject) + '</div>' : '';
+  const parts = _mailSplitBody(m.body || '');
+  let fold = '';
+  if (parts.rest) {
+    const fid = 'mmfold-' + (++_mailFoldSeq);
+    fold = '<button class="mm-fold" data-lbl="подпись и цитата" onclick="_mailToggleFold(\'' + fid + '\', this)"><i class="ti ti-chevron-right"></i> подпись и цитата</button>' +
+      '<div id="' + fid + '" class="mm-folded" style="display:none;">' + escapeHtml(parts.rest.slice(0, 6000)) + '</div>';
+  }
+  // вложения — карточками с именем (скачивание как в ленте заказа)
+  let atts = '';
+  const list = m.attachments || [];
+  if (list.length && !out && typeof m.id === 'number') {
+    atts = '<div class="mm-atts">' + list.map(function (a, i) {
+      const name = (a && (a.name || a.filename)) ? (a.name || a.filename) : (typeof a === 'string' ? a : 'файл');
+      const idx = (a && a.idx != null) ? a.idx : i;
+      const ext = (String(name).split('.').pop() || '').toUpperCase().slice(0, 4);
+      return '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
+        escapeHtml(String(name).replace(/'/g, "\\'")) + '\')"><span class="ic">' + escapeHtml(ext || '📎') + '</span>' +
+        escapeHtml(name) + '</span>';
+    }).join('') + '</div>';
+  } else if (list.length) {
+    atts = '<div class="mm-atts"><span class="mm-att"><span class="ic">📎</span>' + list.length + ' влож.</span></div>';
+  }
+  return '<div class="mm-bub ' + (out ? 'out' : 'in') + '">' +
+    (who ? '<div class="mm-who">' + escapeHtml(who) + '</div>' : '') + subj +
+    '<div class="mm-body">' + escapeHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
+    '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
   '</div>';
 }
 async function sendMailReply() {
@@ -13954,6 +14045,19 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.708',
+    date: '08.07.2026',
+    title: 'Почта и MAX — понятно, что откуда',
+    features: [
+      'Канал виден сразу: <b>бейдж на аватарке</b> (✉ синий — почта, 💬 фиолетовый — MAX) + чип у имени',
+      'Фильтры над списком: <b>Все · Почта · MAX</b> со счётчиками',
+      'Письмо читается как чат: наши сообщения справа, их — слева; <b>подпись и цитата свёрнуты</b> в «▸ подпись и цитата»',
+      '<b>Вложения — карточками</b> с именем файла (PDF и т.д.) — клик скачивает',
+      'Привязка к поставщику видна в списке (зелёная 🔗 / янтарная ⚠) и жёлтой полосой в переписке',
+      'У поля ответа видно, куда уйдёт сообщение: ✉ почтой или 💬 в MAX',
+    ],
+  },
   {
     version: 'v2.45.704',
     date: '07.07.2026',
