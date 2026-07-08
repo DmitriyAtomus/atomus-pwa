@@ -6217,18 +6217,27 @@ function _mailMsgBubble(m) {
     fold = '<button class="mm-fold" data-lbl="подпись и цитата" onclick="_mailToggleFold(\'' + fid + '\', this)"><i class="ti ti-chevron-right"></i> подпись и цитата</button>' +
       '<div id="' + fid + '" class="mm-folded" style="display:none;">' + escapeHtml(parts.rest.slice(0, 6000)) + '</div>';
   }
-  // вложения — карточками с именем (скачивание как в ленте заказа)
+  // вложения — карточками с именем (скачивание как в ленте заказа).
+  // v2.45.7xx: для входящих файлов «на просмотр» из бота «Общение» (kind='chat')
+  // рядом кнопка «Оформить как счёт»; у уже оформленных (kind='invoice') — отметка.
   let atts = '';
   const list = m.attachments || [];
   if (list.length && !out && typeof m.id === 'number') {
+    const canProm = (m.kind === 'chat') && (typeof canManageSupply === 'function' && canManageSupply());
     atts = '<div class="mm-atts">' + list.map(function (a, i) {
       const name = (a && (a.name || a.filename)) ? (a.name || a.filename) : (typeof a === 'string' ? a : 'файл');
       const idx = (a && a.idx != null) ? a.idx : i;
       const ext = (String(name).split('.').pop() || '').toUpperCase().slice(0, 4);
-      return '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
+      const card = '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
         escapeHtml(String(name).replace(/'/g, "\\'")) + '\')"><span class="ic">' + escapeHtml(ext || '📎') + '</span>' +
         escapeHtml(name) + '</span>';
-    }).join('') + '</div>';
+      const prom = canProm
+        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:6px;" onclick="promoteChatAttachment(' + m.id + ',' + idx + ')"><i class="ti ti-file-invoice"></i> Оформить как счёт</button>'
+        : '';
+      return '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' + card + prom + '</div>';
+    }).join('') +
+      ((m.kind === 'invoice') ? '<div style="font-size:11px;color:#15803D;font-weight:600;margin-top:2px;"><i class="ti ti-check"></i> оформлен как счёт</div>' : '') +
+      '</div>';
   } else if (list.length) {
     atts = '<div class="mm-atts"><span class="mm-att"><span class="ic">📎</span>' + list.length + ' влож.</span></div>';
   }
@@ -6237,6 +6246,23 @@ function _mailMsgBubble(m) {
     '<div class="mm-body">' + escapeHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
     '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
   '</div>';
+}
+
+// v2.45.7xx: оформить файл из переписки «Почта/MAX» как входящий счёт.
+async function promoteChatAttachment(inboxId, idx) {
+  if (typeof canManageSupply === 'function' && !canManageSupply()) {
+    showToast('Доступно директору, заму, менеджеру', 'error'); return;
+  }
+  if (!confirm('Оформить этот файл как входящий счёт? Он появится в разделе «Входящие счета».')) return;
+  try {
+    const r = await apiPost('/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/to-invoice', {});
+    if (r && r.ok && r.data && r.data.ok) {
+      showToast(r.data.recognized ? 'Оформлено как счёт — реквизиты распознаны' : 'Оформлено как счёт', 'success');
+      if (state._mailPeer) openMailThread(state._mailPeer);
+    } else {
+      showToast((r && r.data && (r.data.message || r.data.error)) || 'Не удалось оформить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 async function sendMailReply() {
   const peer = state._mailPeer;
