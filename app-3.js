@@ -10437,6 +10437,16 @@ function _ibxInvoiceCard(m, isMatched) {
   }
   tags += payerEntityPill((m.ai_data || {}).payer_entity, false);
 
+  // v2.45.7xx: для читаемости показываем ПОСТАВЩИКА (главным) и СУММУ.
+  // Раньше строка = тема + обрезанный отправитель, без суммы → «ничего не понятно».
+  const _ai2 = m.ai_data || {};
+  const _supNm = (_ai2.supplier || {}).name || '';
+  const _nameMain = _supNm || m.subject || '(без темы)';
+  const _amt = (_ai2.totals || {}).sum_with_vat;
+  const _sumHtml = (_amt != null && _amt !== '' && !isNaN(Number(_amt)))
+    ? '<div class="ibx-r-sum" title="Сумма счёта">' + Number(_amt).toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' ₽</div>'
+    : '';
+
   // Вторая строка: отправитель · документ (имя не дублируем, если совпадает с темой)
   const from = m.from_name || m.from_addr || '—';
   let docBit = '';
@@ -10453,6 +10463,7 @@ function _ibxInvoiceCard(m, isMatched) {
   // Дата справа: «сегодня / 10:28», у залежавшихся — «⚠ N дн»
   const wp = when.text.split(' · ');
   const whenHtml = '<div class="ibx-r-when" title="' + escapeHtml(when.full) + '">' +
+    _sumHtml +
     escapeHtml(wp[0] || '') + (when.cls === 'old' && when.diff ? ' <span class="wrn">⚠ ' + when.diff + ' дн</span>' : '') +
     '<small>' + escapeHtml(wp[1] || '') + '</small></div>';
 
@@ -10483,7 +10494,7 @@ function _ibxInvoiceCard(m, isMatched) {
     _cb +
     _inboxAvatarHtml(m) +
     '<div class="ibx-r-main">' +
-      '<div class="ibx-r-t"><span class="ibx-r-nm">' + escapeHtml(m.subject || '(без темы)') + '</span>' + tags + '</div>' +
+      '<div class="ibx-r-t"><span class="ibx-r-nm">' + escapeHtml(_nameMain) + '</span>' + tags + '</div>' +
       '<div class="ibx-r-sub">' + escapeHtml(from) + docBit + '</div>' +
     '</div>' +
     whenHtml +

@@ -20432,6 +20432,8 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.25;
 }
 .ibx-r-when small { display: block; font-weight: 500; color: var(--text-light); font-size: 10px; }
+/* v2.45.7xx: сумма счёта — крупно над датой (главное число для мастера/оплаты) */
+.ibx-r-sum { display: block; font-size: 15px; font-weight: 800; color: var(--text-dark); line-height: 1.15; margin-bottom: 2px; white-space: nowrap; }
 .ibx-r.today .ibx-r-when { color: #1D4ED8; }
 .ibx-r.stale .ibx-r-when { color: #B91C1C; }
 .ibx-r-when .wrn { color: #B91C1C; }
