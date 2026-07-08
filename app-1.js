@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.717-chats-hub";
+const APP_VERSION = "v2.45.718-chat-to-contract";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2597,6 +2597,19 @@ function closeContractChat() {
   _cchatPendingFiles = [];
   _renderChatAttachPreview();
   if (typeof refreshNotifBadge === 'function') refreshNotifBadge();
+}
+
+// v2.45.718: из чата — в карточку договора (работает из любого места, включая хаб «Чаты»)
+function openContractFromChat() {
+  const cid = state.currentContractId;
+  if (!cid) { showToast('Договор не выбран', 'error'); return; }
+  closeContractChat();
+  if (typeof openContractDetail === 'function') {
+    openContractDetail(cid);
+  } else {
+    selectSection('sales');
+    selectSidebarItem('sales-contract-detail');
+  }
 }
 
 // v2.45.611: «Поручить» из чата договора — закрываем чат и открываем форму
