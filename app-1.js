@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.713";
+const APP_VERSION = "v2.45.714";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -13923,6 +13923,8 @@ function renderMyDayStrip() {
         (mine ? '' : '<span class="who">👤 ' + escapeHtml(r.employee_name || '') + '</span> · ') +
         (run ? 'идёт сейчас' : 'на паузе') +
         _mydayPeople(r) +
+        // v2.45.714: этап + «что именно» — мастер видит, какая работа проставлена
+        (r.stage_name ? ' · <b>' + escapeHtml(r.stage_name) + '</b>' : '') +
         (r.last_note || r.live_note ? ' · ' + escapeHtml(r.live_note || r.last_note) : '') +
         (proj ? ' · ' + escapeHtml(proj) : '') + '</div></div>' +
       (canTouch
@@ -14130,6 +14132,7 @@ function openMyDaySegments(workId, empId) {
   let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
     '<div class="myday-h4">' + escapeHtml(row.name) + '</div>' +
     '<div class="myday-msub">' + escapeHtml([row.contract_number, row.contractor_name].filter(Boolean).join(' · ')) +
+    (row.stage_name ? ' · <b>' + escapeHtml(row.stage_name) + '</b>' : '') +
     (row.last_note || row.live_note ? ' · 📝 ' + escapeHtml(row.live_note || row.last_note) : '') +
     (mine ? '' : '<br>👤 делает: <b>' + escapeHtml(row.employee_name || '') + '</b>') +
     ((row.people || []).length ? '<br>👤 делают: ' + escapeHtml(row.people.join(', ')) : '') + '</div>' +
