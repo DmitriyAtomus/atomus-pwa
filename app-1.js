@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.711";
+const APP_VERSION = "v2.45.712";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4600,6 +4600,10 @@ function renderPkbWorkCard(w, colKey) {
     titleHtml += ' <span class="work-type-badge wt-' + w.work_type + '" style="margin-left:4px;font-size:10px;">' +
                  escapeHtml(_wtLabels[w.work_type] || w.work_type) + '</span>';
   }
+  // v2.45.712: метка изделия — различает одинаковые модели на одном заказе
+  if (w.label) {
+    titleHtml += ' <span class="pkb-wc-tag">' + escapeHtml(w.label) + '</span>';
+  }
   titleHtml += '</div>';
   html += titleHtml;
 
@@ -4813,6 +4817,7 @@ async function openProductionWorkDetail(workId) {
 
   try {
     const w = await apiGet('/api/production/works/' + workId);
+    state._pkbDetailWork = w;   // v2.45.712: для правки метки без перезапроса
     renderProductionWorkDetail(w);
   } catch (e) {
     overlay.querySelector('.modal-body').innerHTML =
@@ -4893,6 +4898,20 @@ async function showProductionWorkQr(workId) {
   }
 }
 
+// v2.45.712: метка изделия — чтобы различать два одинаковых на одном заказе
+async function editWorkLabel(workId) {
+  const w = state._pkbDetailWork && state._pkbDetailWork.id === workId ? state._pkbDetailWork : null;
+  const cur = (w && w.label) || '';
+  const v = prompt('Метка изделия — коротко, чтобы отличать одинаковые на заказе\n(например: №1, №2, левый, с рекуператором). Пусто — убрать.', cur);
+  if (v == null) return;
+  try {
+    await apiPatch('/api/production/works/' + workId, { label: v.trim() });
+    showToast(v.trim() ? 'Метка: ' + v.trim() : 'Метка убрана', 'success');
+    cache.productionKanban = null;
+    openProductionWorkDetail(workId);
+  } catch (e) { showToast('Не удалось сохранить метку', 'error'); }
+}
+
 function renderProductionWorkDetail(w) {
   const overlay = document.getElementById('pkb-detail-modal');
   if (!overlay) return;
@@ -4911,7 +4930,11 @@ function renderProductionWorkDetail(w) {
 
   let html = '';
   html += '<div class="modal-header">';
-  html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + '</h3>';
+  // v2.45.712: метка изделия — кликом можно прописать/поменять («№1», «левый»…)
+  const labelChip = w.label
+    ? '<span class="pkb-wc-tag big" onclick="editWorkLabel(' + w.id + ')" title="Изменить метку">' + escapeHtml(w.label) + ' <i class="ti ti-pencil"></i></span>'
+    : '<span class="pkb-wc-tag big empty" onclick="editWorkLabel(' + w.id + ')" title="Метка различает одинаковые изделия на одном заказе"><i class="ti ti-tag"></i> метка</span>';
+  html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + ' ' + labelChip + '</h3>';
   html +=   '<span class="pkb-status-chip ' + statusCls + '">' + escapeHtml(statusLabel) + '</span>';
   // v2.43.70: QR-код сборки прямо из карточки работы — нужен на упаковке/проверке,
   // когда изделие физически готово, а до страницы «Сборки» идти неудобно.
