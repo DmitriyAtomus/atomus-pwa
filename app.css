@@ -21025,6 +21025,11 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .myday-row.pz { opacity: .55; }
 .myday-row.pz:hover { opacity: 1; }
 .myday-row.pz .clk { color: var(--warning); font-size: 14px; }
+/* v2.45.710: командная полоса — чужие строки помечены именем */
+.myday-row .sub .who { font-weight: 800; color: var(--brand); }
+.myday-row.other { background: linear-gradient(90deg, var(--brand-bg), transparent 55%); border-radius: 8px; padding-left: 8px; margin-left: -6px; }
+.myday-row.other .clk { color: var(--brand); }
+.myday-row.other.pz .clk { color: var(--warning); }
 .myday-btn { border: none; border-radius: 9px; padding: 7px 12px; font-size: 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .myday-btn.pause { background: var(--warning-bg); color: var(--warning); border: 1px solid #E8CB93; }
 .myday-btn.resume { background: var(--brand); color: #fff; }

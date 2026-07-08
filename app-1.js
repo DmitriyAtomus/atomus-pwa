@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.709";
-const APP_VERSION_DATE = "07.07.2026";
+const APP_VERSION = "v2.45.710";
+const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -13830,8 +13830,10 @@ async function loadMyDayStrip() {
     _myday = await apiGet('/api/production/my-day');
     // база для живого пересчёта: minutes без live-дельты на момент загрузки
     (_myday.rows || []).forEach(r => { r._base = (r.minutes || 0) - (r.live_minutes || 0); });
+    // v2.45.710: полоса командная — в day_total только СВОИ минуты
     _myday._closed_extra = (_myday.day_total_minutes || 0) -
-      (_myday.rows || []).reduce((s, r) => s + (r.minutes || 0), 0);
+      (_myday.rows || []).filter(r => r.mine !== false)
+        .reduce((s, r) => s + (r.minutes || 0), 0);
     renderMyDayStrip();
     if (!_mydayTicker) {
       _mydayTicker = setInterval(() => {
@@ -13869,6 +13871,13 @@ function _mydayPeople(r) {
   return ' · 👤 ' + escapeHtml(shown + more);
 }
 
+// строка теперь — пара (работа, человек): мастер видит и чужие таймеры
+function _mydayRowArgs(r) {
+  return r.work_id + ',' + (r.employee_id != null ? r.employee_id : 'null');
+}
+function _mydayCanTouch(r) {
+  return r.mine !== false || !!(_myday && _myday.can_manage_others);
+}
 function renderMyDayStrip() {
   const box = document.getElementById('pkb-myday');
   if (!box) return;
@@ -13878,25 +13887,32 @@ function renderMyDayStrip() {
   let html = '<div class="myday-strip">';
   rows.forEach(r => {
     const run = r.status === 'run';
+    const mine = r.mine !== false;
     const mins = _mydayRowMin(r);
-    total += mins;
+    if (mine) total += mins;
+    const canTouch = _mydayCanTouch(r);
+    const args = _mydayRowArgs(r);
     const proj = [r.contract_number, r.contractor_name].filter(Boolean).join(' · ');
-    html += '<div class="myday-row ' + (run ? 'run' : 'pz') + '" onclick="openMyDaySegments(' + r.work_id + ')">' +
+    html += '<div class="myday-row ' + (run ? 'run' : 'pz') + (mine ? '' : ' other') + '" onclick="openMyDaySegments(' + args + ')">' +
       '<span class="dot"></span>' +
       '<div class="t"><div class="nm">' + escapeHtml(r.name) + '</div>' +
-      '<div class="sub">' + (run ? 'идёт сейчас' : 'на паузе') +
+      '<div class="sub">' +
+        (mine ? '' : '<span class="who">👤 ' + escapeHtml(r.employee_name || '') + '</span> · ') +
+        (run ? 'идёт сейчас' : 'на паузе') +
         _mydayPeople(r) +
         (r.last_note || r.live_note ? ' · ' + escapeHtml(r.live_note || r.last_note) : '') +
         (proj ? ' · ' + escapeHtml(proj) : '') + '</div></div>' +
-      (run
-        ? '<button class="myday-btn pause" onclick="event.stopPropagation();mydayPause(' + r.work_id + ')"><i class="ti ti-player-pause"></i> Пауза</button>'
-        : '<button class="myday-btn resume" onclick="event.stopPropagation();mydayResume(' + r.work_id + ')"><i class="ti ti-player-play"></i> Продолжить</button>') +
-      '<button class="myday-btn fin" onclick="event.stopPropagation();mydayFinish(' + r.work_id + ')"><i class="ti ti-check"></i> Закончил</button>' +
+      (canTouch
+        ? (run
+            ? '<button class="myday-btn pause" onclick="event.stopPropagation();mydayPause(' + args + ')"><i class="ti ti-player-pause"></i> Пауза</button>'
+            : '<button class="myday-btn resume" onclick="event.stopPropagation();mydayResume(' + args + ')"><i class="ti ti-player-play"></i> Продолжить</button>') +
+          '<button class="myday-btn fin" onclick="event.stopPropagation();mydayFinish(' + args + ')"><i class="ti ti-check"></i> Закончил</button>'
+        : '') +
       '<span class="clk">' + _mydayFmtMin(mins) + '</span>' +
     '</div>';
   });
   const pct = Math.min(100, Math.round(total / 480 * 100));
-  html += '<div class="myday-dayline"><span>день:</span><div class="bar"><div class="f" style="width:' + pct + '%"></div></div>' +
+  html += '<div class="myday-dayline"><span>мой день:</span><div class="bar"><div class="f" style="width:' + pct + '%"></div></div>' +
     '<span>' + _mydayFmtMin(total) + ' из 8 ч</span></div>';
   html += '</div>';
   box.innerHTML = html;
@@ -14014,28 +14030,48 @@ async function mydayGo() {
     } else showToast((r && r.message) || 'Не удалось начать', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
-async function mydayPause(workId) {
+// v2.45.710: empId — чья строка (мастер/директор управляет чужими таймерами)
+function _mydayFindRow(workId, empId) {
+  const rows = (_myday && _myday.rows) || [];
+  if (empId != null) {
+    const r = rows.find(x => x.work_id === workId && x.employee_id === empId);
+    if (r) return r;
+  }
+  return rows.find(x => x.work_id === workId);
+}
+function _mydayTargetBody(empId) {
+  const myId = _myday && (_myday.my_employee_id || (_myday.employee && _myday.employee.id));
+  return (empId != null && empId !== myId) ? { employee_id: empId } : {};
+}
+async function mydayPause(workId, empId) {
   try {
-    const r = await apiPost('/api/production/works/' + workId + '/timer/pause', {});
+    const r = await apiPost('/api/production/works/' + workId + '/timer/pause',
+      _mydayTargetBody(empId));
     if (r && r.ok) { showToast('Пауза · записано ' + _mydayFmtMin(r.minutes || 0), 'success'); }
     else showToast((r && r.message) || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка', 'error'); }
   cache.productionKanban = null; loadProductionDashboard();
 }
-async function mydayResume(workId) {
-  const row = ((_myday && _myday.rows) || []).find(r => r.work_id === workId);
+async function mydayResume(workId, empId) {
+  const row = _mydayFindRow(workId, empId);
+  const myId = _myday && (_myday.my_employee_id || (_myday.employee && _myday.employee.id));
+  const performer = (empId != null ? empId : myId);
   try {
     const r = await apiPost('/api/production/works/' + workId + '/timer/start',
-      { note: (row && row.last_note) || '', stage_id: (row && row.last_stage_id) || null });
+      { note: (row && row.last_note) || '', stage_id: (row && row.last_stage_id) || null,
+        performer_ids: performer != null ? [performer] : null });
     if (r && r.ok) showToast('Продолжаем', 'success');
     else showToast('Не удалось', 'error');
   } catch (e) { showToast('Ошибка', 'error'); }
   cache.productionKanban = null; loadProductionDashboard();
 }
-async function mydayFinish(workId) {
-  if (!confirm('Закончил — всё сделано? Строка уйдёт из «Моего дня», время останется в журнале.')) return;
+async function mydayFinish(workId, empId) {
+  const row = _mydayFindRow(workId, empId);
+  const other = row && row.mine === false ? ' у: ' + (row.employee_name || 'сотрудника') : '';
+  if (!confirm('Закончил — всё сделано' + other + '? Строка уйдёт из «Моего дня», время останется в журнале.')) return;
   try {
-    const r = await apiPost('/api/production/works/' + workId + '/timer/finish', {});
+    const r = await apiPost('/api/production/works/' + workId + '/timer/finish',
+      _mydayTargetBody(empId));
     if (r && r.ok) {
       const m = r.stopped && r.stopped.minutes ? ' · записано ' + _mydayFmtMin(r.stopped.minutes) : '';
       showToast('Готово' + m, 'success');
@@ -14046,16 +14082,20 @@ async function mydayFinish(workId) {
 }
 
 // --------- карточка отрезков (провалиться в работу) ---------
-function openMyDaySegments(workId) {
-  const row = ((_myday && _myday.rows) || []).find(r => r.work_id === workId);
+function openMyDaySegments(workId, empId) {
+  const row = _mydayFindRow(workId, empId);
   if (!row) return;
   const run = row.status === 'run';
+  const mine = row.mine !== false;
+  const canTouch = _mydayCanTouch(row);
+  const args = _mydayRowArgs(row);
   const mins = _mydayRowMin(row);
   const stops = row.segments.length - 0;
   let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
     '<div class="myday-h4">' + escapeHtml(row.name) + '</div>' +
     '<div class="myday-msub">' + escapeHtml([row.contract_number, row.contractor_name].filter(Boolean).join(' · ')) +
     (row.last_note || row.live_note ? ' · 📝 ' + escapeHtml(row.live_note || row.last_note) : '') +
+    (mine ? '' : '<br>👤 делает: <b>' + escapeHtml(row.employee_name || '') + '</b>') +
     ((row.people || []).length ? '<br>👤 делают: ' + escapeHtml(row.people.join(', ')) : '') + '</div>' +
     '<div class="myday-clock' + (run ? '' : ' paused') + '"><div class="c">' + _mydayFmtMin(mins) + '</div>' +
     '<div class="s">' + (run ? 'идёт сейчас' : 'на паузе') + '</div></div>' +
@@ -14064,28 +14104,31 @@ function openMyDaySegments(workId) {
       '<div class="st"><div class="v">' + (row.segments.length + (run ? 1 : 0)) + '</div><div class="k">отрезков</div></div>' +
       '<div class="st"><div class="v">' + stops + '</div><div class="k">стопов</div></div>' +
     '</div>' +
-    '<div class="myday-lbl">Отрезки (✎ — поправить, если забыл нажать стоп)</div>';
+    '<div class="myday-lbl">Отрезки' + (mine ? ' (✎ — поправить, если забыл нажать стоп)' : '') + '</div>';
   row.segments.forEach((g, i) => {
     const t1 = g.started_at ? String(g.started_at).slice(11, 16) : '—';
     const t2 = g.ended_at ? String(g.ended_at).slice(11, 16) : '…';
     h += '<div class="myday-seg"><span class="no">' + (i + 1) + '</span>' +
       '<span class="rng">' + t1 + ' – ' + t2 + (g.note ? ' · ' + escapeHtml(g.note) : '') + '</span>' +
       '<span class="len">' + _mydayFmtMin(g.minutes) + '</span>' +
-      '<button class="ed" onclick="mydayEditSeg(' + g.id + ',' + g.minutes + ',' + workId + ')" title="Поправить минуты"><i class="ti ti-pencil"></i></button></div>';
+      (mine ? '<button class="ed" onclick="mydayEditSeg(' + g.id + ',' + g.minutes + ',' + args + ')" title="Поправить минуты"><i class="ti ti-pencil"></i></button>' : '') +
+      '</div>';
   });
   if (run) {
     h += '<div class="myday-seg live"><span class="no">' + (row.segments.length + 1) + '</span>' +
       '<span class="rng">идёт сейчас…</span><span class="len">' + _mydayFmtMin(mins - (row._base || 0)) + '</span></div>';
   }
-  h += '<div class="myday-actions">' +
-    (run
-      ? '<button class="myday-btn pause big" onclick="mydayPause(' + workId + ');closeMyDayModal()"><i class="ti ti-player-pause"></i> Пауза</button>'
-      : '<button class="myday-btn resume big" onclick="mydayResume(' + workId + ');closeMyDayModal()"><i class="ti ti-player-play"></i> Продолжить</button>') +
-    '<button class="myday-btn fin big" onclick="mydayFinish(' + workId + ')"><i class="ti ti-check"></i> Закончил — всё сделано</button>' +
-  '</div>';
+  if (canTouch) {
+    h += '<div class="myday-actions">' +
+      (run
+        ? '<button class="myday-btn pause big" onclick="mydayPause(' + args + ');closeMyDayModal()"><i class="ti ti-player-pause"></i> Пауза</button>'
+        : '<button class="myday-btn resume big" onclick="mydayResume(' + args + ');closeMyDayModal()"><i class="ti ti-player-play"></i> Продолжить</button>') +
+      '<button class="myday-btn fin big" onclick="mydayFinish(' + args + ')"><i class="ti ti-check"></i> Закончил — всё сделано</button>' +
+    '</div>';
+  }
   _renderMyDayModal(h);
 }
-async function mydayEditSeg(sessionId, curMinutes, workId) {
+async function mydayEditSeg(sessionId, curMinutes, workId, empId) {
   const v = prompt('Сколько минут длился этот отрезок на самом деле?', curMinutes);
   if (v == null) return;
   const m = parseInt(v, 10);
@@ -14099,6 +14142,6 @@ async function mydayEditSeg(sessionId, curMinutes, workId) {
     if (!r.ok) { showToast('Не удалось поправить', 'error'); return; }
     showToast('Поправлено: ' + _mydayFmtMin(m), 'success');
     await loadMyDayStrip();
-    openMyDaySegments(workId);
+    openMyDaySegments(workId, empId);
   } catch (e) { showToast('Ошибка', 'error'); }
 }
