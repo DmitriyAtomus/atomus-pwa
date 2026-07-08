@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.718-chat-to-contract";
+const APP_VERSION = "v2.45.719";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -14080,7 +14080,7 @@ async function mydayGo() {
       showToast('Погнали! Таймер идёт', 'success');
       cache.productionKanban = null;
       loadProductionDashboard();
-    } else showToast((r && r.message) || 'Не удалось начать', 'error');
+    } else showToast(((r && r.data) || {}).message || 'Не удалось начать', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 // v2.45.710: empId — чья строка (мастер/директор управляет чужими таймерами)
@@ -14100,8 +14100,9 @@ async function mydayPause(workId, empId) {
   try {
     const r = await apiPost('/api/production/works/' + workId + '/timer/pause',
       _mydayTargetBody(empId));
-    if (r && r.ok) { showToast('Пауза · записано ' + _mydayFmtMin(r.minutes || 0), 'success'); }
-    else showToast((r && r.message) || 'Не удалось', 'error');
+    const j = (r && r.data) || {};
+    if (r && r.ok) { showToast('Пауза · записано ' + _mydayFmtMin(j.minutes || 0), 'success'); }
+    else showToast(j.message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка', 'error'); }
   cache.productionKanban = null; loadProductionDashboard();
 }
@@ -14138,10 +14139,11 @@ async function mydayFinishGo(workId, empId) {
   try {
     const r = await apiPost('/api/production/works/' + workId + '/timer/finish',
       _mydayTargetBody(empId));
+    const j = (r && r.data) || {};
     if (r && r.ok) {
-      const m = r.stopped && r.stopped.minutes ? ' · записано ' + _mydayFmtMin(r.stopped.minutes) : '';
+      const m = j.stopped && j.stopped.minutes ? ' · записано ' + _mydayFmtMin(j.stopped.minutes) : '';
       showToast('Готово' + m, 'success');
-    } else showToast('Не удалось', 'error');
+    } else showToast(j.message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка', 'error'); }
   closeMyDayModal();
   cache.productionKanban = null; loadProductionDashboard();

@@ -6378,7 +6378,11 @@ async function loadLogisticsPickups() {
   if (!box) return;
   box.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
-    const d = await apiGet('/api/logistics/pickups');
+    // v2.45.715: параллельно тянем самовывозы и отправки СДЭК
+    const [d, cd] = await Promise.all([
+      apiGet('/api/logistics/pickups'),
+      apiGet('/api/logistics/cdek').catch(() => null),
+    ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
     html += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
@@ -6387,6 +6391,7 @@ async function loadLogisticsPickups() {
     html += '<div class="logi-sec b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span class="logi-cnt">' + transit.length + '</span></div>';
     html += transit.length ? transit.map(_logiTransitCard).join('')
       : '<div class="logi-empty"><i class="ti ti-route"></i> Ничего в пути.</div>';
+    if (cd) html += _cdekBlockHtml(cd);
     if (done.length) {
       html += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
       html += done.map(_logiDoneRow).join('');
@@ -6395,6 +6400,101 @@ async function loadLogisticsPickups() {
   } catch (e) {
     box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить</div>';
   }
+}
+
+// ============ v2.45.715: СДЭК — отправления клиентам ============
+function _cdekStatusChip(sh) {
+  const code = (sh.status_code || '').toUpperCase();
+  if (!code) return '<span class="cdek-st wait">ждём статус</span>';
+  if (code === 'DELIVERED') return '<span class="cdek-st done">✓ Вручён</span>';
+  if (code === 'NOT_DELIVERED') return '<span class="cdek-st bad">⚠ Не вручён</span>';
+  return '<span class="cdek-st run">' + escapeHtml(sh.status_name || code) + '</span>';
+}
+function _cdekBlockHtml(cd) {
+  const list = cd.shipments || [];
+  let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
+    '<i class="ti ti-plane-departure"></i> СДЭК — отправления <span class="logi-cnt">' + list.length + '</span>' +
+    '<span style="margin-left:auto;display:inline-flex;gap:6px;">' +
+      (cd.configured ? '<button class="btn btn-secondary btn-small" onclick="cdekRefresh()" title="Обновить статусы из СДЭК"><i class="ti ti-refresh"></i></button>' : '') +
+      '<button class="btn btn-primary btn-small" onclick="cdekAdd()"><i class="ti ti-plus"></i> Трек</button>' +
+    '</span></div>';
+  if (!cd.configured) {
+    h += '<div class="cdek-setup">' +
+      '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение СДЭК</div>' +
+      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Вставь ключи из личного кабинета СДЭК → Интеграция → API-ключи. После этого статусы будут обновляться сами.</div>' +
+      '<input class="form-input" id="cdek-acc" placeholder="Идентификатор клиента (account)" autocomplete="off" style="margin-bottom:6px;">' +
+      '<input class="form-input" id="cdek-pass" placeholder="Секретный ключ (secure password)" autocomplete="off" style="margin-bottom:8px;">' +
+      '<button class="btn btn-primary" onclick="cdekSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
+    '</div>';
+  }
+  if (!list.length) {
+    h += '<div class="logi-empty"><i class="ti ti-plane"></i> Отправлений пока нет — добавь трек-номер накладной.</div>';
+    return h;
+  }
+  list.forEach(sh => {
+    const delivered = !!sh.delivered_at;
+    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
+    h += '<div class="cdek-card' + (delivered ? ' done' : '') + '">' +
+      '<div class="cdek-main">' +
+        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(sh.cdek_number) +
+          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
+        '<div class="cdek-sub">' + _cdekStatusChip(sh) +
+          (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
+          (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
+          (proj ? ' · ' + escapeHtml(proj) : '') +
+          (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+      '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  return h;
+}
+function cdekAdd() {
+  const num = prompt('Номер накладной СДЭК (трек), например 1234567890:');
+  if (num == null || !num.trim()) return;
+  const title = prompt('Что везём / кому (коротко, для списка):', '') || '';
+  (async () => {
+    try {
+      const r = await apiPost('/api/logistics/cdek', { cdek_number: num.trim(), title: title.trim() });
+      const j = (r && r.data) || {};
+      if (r && r.ok) showToast(j.synced ? 'Добавлено — статус подтянут' : 'Добавлено (статус подтянется после подключения ключей)', 'success');
+      else showToast(j.message || 'Не удалось добавить', 'error');
+    } catch (e) { showToast('Ошибка соединения', 'error'); }
+    loadLogisticsPickups();
+  })();
+}
+async function cdekRefresh() {
+  showToast('Обновляем статусы СДЭК…', 'info');
+  try {
+    const r = await apiPost('/api/logistics/cdek/refresh', {});
+    const j = (r && r.data) || {};
+    if (r && r.ok) showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0), 'success');
+    else showToast(j.message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadLogisticsPickups();
+}
+async function cdekRemove(id) {
+  if (!confirm('Убрать эту накладную из списка?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    await fetch(API_BASE + '/api/logistics/cdek/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+  } catch (e) {}
+  loadLogisticsPickups();
+}
+async function cdekSaveKeys() {
+  const acc = (document.getElementById('cdek-acc') || {}).value || '';
+  const pass = (document.getElementById('cdek-pass') || {}).value || '';
+  if (!acc.trim() || !pass.trim()) { showToast('Нужны оба ключа', 'error'); return; }
+  try {
+    const r = await apiPost('/api/settings/cdek', { account: acc.trim(), password: pass.trim() });
+    const j = (r && r.data) || {};
+    showToast(j.message || (r && r.ok ? 'Подключено' : 'Не удалось'), r && r.ok ? 'success' : 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadLogisticsPickups();
 }
 function _logiSum(v) { return (v != null && v !== '') ? Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽' : ''; }
 function _logiPlural(n, one, few, many) {
@@ -14174,6 +14274,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.719',
+    date: '08.07.2026',
+    title: 'СДЭК в Логистике — трекинг отправлений',
+    features: [
+      'В Логистике появился блок <b>«СДЭК — отправления»</b>: добавь трек-номер накладной — и следи за посылкой прямо в CRM',
+      'Статусы обновляются <b>сами каждые полчаса</b>: «Принят на склад → В пути → Вручён», плюс плановая дата «придёт ~15 июля»',
+      'Для подключения нужны <b>API-ключи из ЛК СДЭК</b> (Интеграция → API-ключи) — форма прямо в блоке, вставить может директор',
+      'Кнопка ⟳ — обновить статусы вручную, ✕ — убрать накладную из списка',
+    ],
+  },
   {
     version: 'v2.45.714',
     date: '08.07.2026',

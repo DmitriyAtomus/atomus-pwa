@@ -21091,6 +21091,23 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .myday-row .sub { white-space: normal; }
 }
 
+/* ============ v2.45.715: СДЭК — отправления в Логистике ============ */
+.cdek-setup { background: var(--surface); border: 1px dashed var(--brand); border-radius: 12px; padding: 14px; margin: 0 0 10px; }
+.cdek-card { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; margin-bottom: 8px; }
+.cdek-card.done { opacity: .6; }
+.cdek-main { flex: 1; min-width: 0; }
+.cdek-num { font-weight: 800; font-size: 13.5px; color: var(--text-dark); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cdek-num .ti { color: var(--brand); }
+.cdek-title { font-weight: 600; color: var(--text-light); font-size: 12.5px; }
+.cdek-sub { font-size: 11.5px; color: var(--text-light); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
+.cdek-st { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 800; }
+.cdek-st.run { background: var(--brand-bg); color: var(--brand); }
+.cdek-st.done { background: var(--success-bg); color: var(--success); }
+.cdek-st.bad { background: #FBEAE7; color: var(--danger); }
+.cdek-st.wait { background: var(--bg); color: var(--text-light); }
+.cdek-del { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 15px; padding: 4px; }
+.cdek-del:hover { color: var(--danger); }
+
 /* ============ v2.45.708: Почта и MAX — каналы, пузыри, привязка ============ */
 .mm-filters { display: flex; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 2; }
 .mm-filter { border: 1px solid var(--border); background: var(--surface); color: var(--text-mid); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
