@@ -6088,6 +6088,7 @@ async function loadMailMessenger() {
     const d = await apiGet('/api/mail/conversations');
     state._mailConvs = d.conversations || [];
     _mailRenderList();
+    _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, c) => s2 + (c.unread || 0), 0));
   } catch (e) { list.innerHTML = '<div class="empty-block">Не удалось загрузить</div>'; }
 }
 // v2.45.708: фильтры каналов + новый список
@@ -6127,14 +6128,16 @@ function _mailConvRow(c) {
   const sup = c.supplier_name
     ? '<div class="mm-sup ok"><i class="ti ti-link"></i> ' + escapeHtml(c.supplier_name) + '</div>'
     : '<div class="mm-sup no"><i class="ti ti-alert-triangle"></i> не привязан к поставщику</div>';
-  return '<div class="mail-conv mm-row' + (sel ? ' sel' : '') + '" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))">' +
+  const unr = Number(c.unread || 0);
+  return '<div class="mail-conv mm-row' + (sel ? ' sel' : '') + (unr ? ' unr' : '') + '" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))">' +
     '<div class="mm-ava ' + _mailAvaCls(c.peer) + '">' + escapeHtml(_mailInitials(c.from_name || c.peer)) +
       '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
     '<div class="mm-t">' +
       '<div class="mm-nm">' + escapeHtml(c.from_name || c.peer) + ' <span class="mm-ch ' + (isMax ? 'max' : 'mail') + '">' + (isMax ? 'MAX' : 'ПОЧТА') + '</span></div>' +
       '<div class="mm-prev">' + escapeHtml(c.preview || '') + '</div>' + sup +
     '</div>' +
-    '<div class="mm-tm">' + escapeHtml(_mailShortTime(c.last_at)) + '</div>' +
+    '<div class="mm-meta"><span class="mm-tm">' + escapeHtml(_mailShortTime(c.last_at)) + '</span>' +
+      (unr ? '<span class="mm-unr">' + (unr > 99 ? '99+' : unr) + '</span>' : '') + '</div>' +
   '</div>';
 }
 async function openMailThread(peer) {
@@ -6179,8 +6182,37 @@ async function openMailThread(peer) {
     }
     pane.innerHTML = html;
     const m = document.getElementById('mail-thread-msgs'); if (m) m.scrollTop = m.scrollHeight;
+    // v2.45.709: открыл диалог → прочитано (кружок гаснет, бейджи пересчитываются)
+    try {
+      const cv = (state._mailConvs || []).find(c => c.peer === peer);
+      if (cv && cv.unread) {
+        apiPost('/api/mail/read', { peer: peer }).catch(() => {});
+        cv.unread = 0;
+        _mailRenderList();
+        _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, c) => s2 + (c.unread || 0), 0));
+      }
+    } catch (e2) {}
   } catch (e) { pane.innerHTML = '<div class="empty-block">Не удалось загрузить переписку</div>'; }
 }
+// v2.45.709: бейдж непрочитанных — раздел на рейле + пункт меню
+function _mailApplyUnreadTotal(n) {
+  state._mailUnreadTotal = n || 0;
+  const b = document.getElementById('mail-unread-badge');
+  if (b) {
+    if (state._mailUnreadTotal > 0) { b.textContent = state._mailUnreadTotal; b.style.display = ''; }
+    else b.style.display = 'none';
+  }
+  try { if (typeof renderSectionRail === 'function') renderSectionRail(); } catch (e) {}
+}
+async function refreshMailUnread() {
+  try {
+    const d = await apiGet('/api/mail/unread-count');
+    _mailApplyUnreadTotal(d.count || 0);
+  } catch (e) {}
+}
+// старт: через 4 сек после загрузки, дальше каждые 2 минуты
+setTimeout(function () { try { refreshMailUnread(); } catch (e) {} }, 4000);
+setInterval(function () { try { refreshMailUnread(); } catch (e) {} }, 120000);
 // v2.45.708: суть письма отдельно от цитаты/подписи (сворачиваются)
 function _mailSplitBody(body) {
   const lines = String(body || '').slice(0, 12000).split('\n');
@@ -6217,18 +6249,27 @@ function _mailMsgBubble(m) {
     fold = '<button class="mm-fold" data-lbl="подпись и цитата" onclick="_mailToggleFold(\'' + fid + '\', this)"><i class="ti ti-chevron-right"></i> подпись и цитата</button>' +
       '<div id="' + fid + '" class="mm-folded" style="display:none;">' + escapeHtml(parts.rest.slice(0, 6000)) + '</div>';
   }
-  // вложения — карточками с именем (скачивание как в ленте заказа)
+  // вложения — карточками с именем (скачивание как в ленте заказа).
+  // v2.45.7xx: для входящих файлов «на просмотр» из бота «Общение» (kind='chat')
+  // рядом кнопка «Оформить как счёт»; у уже оформленных (kind='invoice') — отметка.
   let atts = '';
   const list = m.attachments || [];
   if (list.length && !out && typeof m.id === 'number') {
+    const canProm = (m.kind === 'chat') && (typeof canManageSupply === 'function' && canManageSupply());
     atts = '<div class="mm-atts">' + list.map(function (a, i) {
       const name = (a && (a.name || a.filename)) ? (a.name || a.filename) : (typeof a === 'string' ? a : 'файл');
       const idx = (a && a.idx != null) ? a.idx : i;
       const ext = (String(name).split('.').pop() || '').toUpperCase().slice(0, 4);
-      return '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
+      const card = '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
         escapeHtml(String(name).replace(/'/g, "\\'")) + '\')"><span class="ic">' + escapeHtml(ext || '📎') + '</span>' +
         escapeHtml(name) + '</span>';
-    }).join('') + '</div>';
+      const prom = canProm
+        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:6px;" onclick="promoteChatAttachment(' + m.id + ',' + idx + ')"><i class="ti ti-file-invoice"></i> Оформить как счёт</button>'
+        : '';
+      return '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' + card + prom + '</div>';
+    }).join('') +
+      ((m.kind === 'invoice') ? '<div style="font-size:11px;color:#15803D;font-weight:600;margin-top:2px;"><i class="ti ti-check"></i> оформлен как счёт</div>' : '') +
+      '</div>';
   } else if (list.length) {
     atts = '<div class="mm-atts"><span class="mm-att"><span class="ic">📎</span>' + list.length + ' влож.</span></div>';
   }
@@ -6237,6 +6278,23 @@ function _mailMsgBubble(m) {
     '<div class="mm-body">' + escapeHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
     '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
   '</div>';
+}
+
+// v2.45.7xx: оформить файл из переписки «Почта/MAX» как входящий счёт.
+async function promoteChatAttachment(inboxId, idx) {
+  if (typeof canManageSupply === 'function' && !canManageSupply()) {
+    showToast('Доступно директору, заму, менеджеру', 'error'); return;
+  }
+  if (!confirm('Оформить этот файл как входящий счёт? Он появится в разделе «Входящие счета».')) return;
+  try {
+    const r = await apiPost('/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/to-invoice', {});
+    if (r && r.ok && r.data && r.data.ok) {
+      showToast(r.data.recognized ? 'Оформлено как счёт — реквизиты распознаны' : 'Оформлено как счёт', 'success');
+      if (state._mailPeer) openMailThread(state._mailPeer);
+    } else {
+      showToast((r && r.data && (r.data.message || r.data.error)) || 'Не удалось оформить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 async function sendMailReply() {
   const peer = state._mailPeer;

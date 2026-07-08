@@ -21114,3 +21114,8 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .mm-att { display: inline-flex; align-items: center; gap: 7px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text-mid); cursor: pointer; }
 .mm-att:hover { border-color: var(--brand); color: var(--brand); }
 .mm-att .ic { min-width: 28px; height: 24px; border-radius: 6px; background: var(--danger-bg); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; padding: 0 3px; }
+/* v2.45.709: непрочитанные в переписке */
+.mm-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.mm-unr { min-width: 18px; height: 18px; border-radius: 999px; background: #EF4444; color: #fff; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+.mm-row.unr .mm-nm { font-weight: 800; }
+.mm-row.unr .mm-prev { color: var(--text-mid); font-weight: 600; }
