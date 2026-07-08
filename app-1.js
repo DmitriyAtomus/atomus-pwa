@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.710";
+const APP_VERSION = "v2.45.711";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -14065,10 +14065,23 @@ async function mydayResume(workId, empId) {
   } catch (e) { showToast('Ошибка', 'error'); }
   cache.productionKanban = null; loadProductionDashboard();
 }
-async function mydayFinish(workId, empId) {
+// v2.45.711: подтверждение «всё сделано» — своё окно вместо системного confirm
+function mydayFinish(workId, empId) {
   const row = _mydayFindRow(workId, empId);
-  const other = row && row.mine === false ? ' у: ' + (row.employee_name || 'сотрудника') : '';
-  if (!confirm('Закончил — всё сделано' + other + '? Строка уйдёт из «Моего дня», время останется в журнале.')) return;
+  const args = workId + ',' + (empId != null ? empId : 'null');
+  let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
+    '<div class="myday-h4"><i class="ti ti-circle-check" style="color:var(--success);"></i> Закончил — всё сделано?</div>' +
+    '<div class="myday-msub">' + escapeHtml((row && row.name) || 'Работа') +
+    (row && row.mine === false ? '<br>👤 делает: <b>' + escapeHtml(row.employee_name || '') + '</b>' : '') +
+    (row ? '<br>За сегодня: <b>' + _mydayFmtMin(_mydayRowMin(row)) + '</b>' : '') + '</div>' +
+    '<div class="myday-msub" style="margin-bottom:0;">Строка уйдёт из «Моего дня», время останется в журнале.</div>' +
+    '<div class="myday-actions">' +
+      '<button class="myday-btn ghost big" onclick="closeMyDayModal()">Отмена</button>' +
+      '<button class="myday-btn fin big" onclick="mydayFinishGo(' + args + ')"><i class="ti ti-check"></i> Да, всё сделано</button>' +
+    '</div>';
+  _renderMyDayModal(h);
+}
+async function mydayFinishGo(workId, empId) {
   try {
     const r = await apiPost('/api/production/works/' + workId + '/timer/finish',
       _mydayTargetBody(empId));
