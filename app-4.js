@@ -14238,8 +14238,12 @@ async function loadTeamChats() {
   const box = document.getElementById('team-chats-content');
   if (!box) return;
   try {
-    const r = await apiGet('/api/team-chats');
+    const [r, cr] = await Promise.all([
+      apiGet('/api/team-chats'),
+      apiGet('/api/team-chats/contract-chats').catch(() => ({ chats: [] })),   // v2.45.717
+    ]);
     const chats = r.chats || [];
+    window._contractChats = (cr && cr.chats) || [];
     renderTeamChatList(chats);
     _updateTeamChatsBadge(chats);
   } catch (e) {
@@ -14322,16 +14326,18 @@ function renderTeamChatList(chats) {
   state._teamChats = chats;
   window.TC_V2 = (localStorage.getItem('tcV2') !== '0');
   const toggle = _tcToggleBar();
+  const cchHtml = _contractChatsSectionHtml();   // v2.45.717: чаты договоров
+  if (counter) counter.textContent = chats.length + ((window._contractChats || []).length);
   if (!chats.length) {
     box.innerHTML = toggle + '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
       + '<i class="ti ti-messages" style="font-size:42px;opacity:.4;"></i><br><br>'
       + 'Пока нет ни одного чата.<br>Создайте чат, пригласите монтажников и коллег — и общайтесь.<br><br>'
       + '<button class="btn btn-primary" onclick="openTeamPick(\'create\')"><i class="ti ti-plus"></i> Создать чат</button>'
-      + '</div>';
+      + '</div>' + cchHtml;
     return;
   }
   if (window.TC_V2) {
-    box.innerHTML = toggle + '<div class="tc2-list">' + chats.map(_tcRowV2).join('') + '</div>';
+    box.innerHTML = toggle + '<div class="tc2-list">' + chats.map(_tcRowV2).join('') + '</div>' + cchHtml;
     return;
   }
   let html = toggle + '<div class="tcl-list">';
@@ -14360,7 +14366,36 @@ function renderTeamChatList(chats) {
       + '</div></div>';
   });
   html += '</div>';
-  box.innerHTML = html;
+  box.innerHTML = html + cchHtml;
+}
+
+// v2.45.717: секция «Чаты по договорам» в хабе чатов
+function _contractChatsSectionHtml() {
+  const list = window._contractChats || [];
+  if (!list.length) return '';
+  let h = '<div class="cch-sec"><i class="ti ti-file-text"></i> Чаты по договорам <span class="cnt">' + list.length + '</span></div><div class="cch-list">';
+  list.forEach(c => {
+    const dt = c.last_at ? _tchatListTime(String(c.last_at).replace(' ', 'T')) : '';
+    const prev = c.last_is_system
+      ? (c.last_text || '')
+      : ((c.last_author ? c.last_author + ': ' : '') + (c.last_text || '📎 файл'));
+    const num = c.number ? ('№' + String(c.number).replace(/^№\s*/, '')) : ('#' + c.contract_id);
+    h += '<div class="cch-row" onclick="_openContractChatFromHub(' + c.contract_id + ')">' +
+      '<div class="cch-ava"><i class="ti ti-file-text"></i></div>' +
+      '<div class="cch-main">' +
+        '<div class="cch-t">' + escapeHtml(num + (c.contractor_name ? ' · ' + c.contractor_name : '')) + '</div>' +
+        '<div class="cch-sub">' + escapeHtml(_tcTrim(prev, 84)) + '</div>' +
+      '</div>' +
+      '<div class="cch-right"><span class="cch-time">' + escapeHtml(dt) + '</span>' +
+        (Number(c.unread) > 0 ? '<span class="cch-unread">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  });
+  return h + '</div>';
+}
+function _openContractChatFromHub(cid) {
+  state.currentContractId = cid;
+  if (typeof openContractChat === 'function') openContractChat();
 }
 
 // Бейдж «Чаты» есть и в Сервисе, и в Монтаже — обновляем все сразу (.team-chats-badge)
