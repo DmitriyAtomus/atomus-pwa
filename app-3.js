@@ -7663,7 +7663,7 @@ function renderSupplyShopping(d) {
         '</td>' +
         '<td class="ssp-stock" style="text-align:right;color:var(--text-light);font-size:12px;">' +
           '<span class="ssp-meta-label">остаток: </span>' +
-          escapeHtml(String(it.qty_on_stock)) +
+          escapeHtml(String(it.effective_stock != null ? it.effective_stock : it.qty_on_stock)) +
           (parseFloat(it.min_stock) > 0 ? ' <span style="color:var(--text-faint);">/ мин. ' + escapeHtml(String(it.min_stock)) + '</span>' : '') +
         '</td>' +
         qtyCell +
@@ -7689,12 +7689,26 @@ function renderSupplyShopping(d) {
       }
       const sName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
       const q = Number(it.recommended_qty) || 0;
+      // v2.45.7xx: показываем ЭФФЕКТИВНЫЙ остаток (своё + варианты + в свободных
+      // собранных узлах на складе), а не только собственный. Если есть варианты
+      // или узлы — даём разбивку, чтобы было понятно, откуда наличие.
+      const _own = Number(it.qty_on_stock || 0);
+      const _v = Number(it.variants_stock || 0);
+      const _a = Number(it.assm_stock || 0);
+      const _eff = (it.effective_stock != null ? Number(it.effective_stock) : _own);
+      let _brk = '';
+      if (_v > 0 || _a > 0) {
+        const _p = ['своё ' + _own];
+        if (_v > 0) _p.push('вариантов ' + _v);
+        if (_a > 0) _p.push('в сборках ' + _a);
+        _brk = ' <span style="color:var(--text-light);font-weight:400;font-size:11px;">(' + _p.join(', ') + ')</span>';
+      }
       return '<div class="sv2-item">' +
         '<div class="sv2-item-top">' +
           '<div class="sv2-item-body" onclick="openComponentDetail(' + it.component_id + ')">' +
             '<div class="sv2-item-name">' + crit + escapeHtml(it.component_name || '') +
               (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
-            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b></div>' +
+            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(_eff)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b>' + _brk + '</div>' +
           '</div>' +
           '<button class="sv2-item-x" title="Приход на склад (оприходовать)" style="color:#15803D;" onclick="event.stopPropagation();openComponentReceiveModal(' + it.component_id + ')"><i class="ti ti-package-import"></i></button>' +
           '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +
