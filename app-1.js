@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.715-waiting-supplier-fix";
+const APP_VERSION = "v2.45.716-queue-busy-aware";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3380,7 +3380,7 @@ function renderProductionDashboard(d) {
         html += '<div class="pkb-col-empty">' + escapeHtml(pkbEmptyText(def.key)) + '</div>';
       } else if (def.key === 'queue') {
         // v2.45.689: умная очередь — места, секции, причины, пин
-        html += _smartQueueHtml(items, works, defHrs);
+        html += _smartQueueHtml(items, works, defHrs, d.workload || {});
       } else {
         items.forEach(w => html += renderPkbWorkCard(w, def.key));
       }
@@ -3567,7 +3567,18 @@ function _sqFmtD(iso) {
   const p = String(iso).slice(0, 10).split('-');
   return p.length === 3 ? p[2] + '.' + p[1] : String(iso);
 }
-function _smartQueueData(items, works, defHrs) {
+function _smartQueueData(items, works, defHrs, workload) {
+  // v2.45.716: кто прямо сейчас работает по каждой работе (таймеры «идёт сейчас»,
+  // включая батчи) — такие работы не предлагаем «следующему свободному»
+  const busy = {};
+  (((workload || {}).workers) || []).forEach(wk => {
+    const ids = [];
+    if (wk.helping_now_work_id) ids.push(wk.helping_now_work_id);
+    (wk.helping_batch_work_ids || []).forEach(i => { if (i) ids.push(i); });
+    ids.forEach(id => {
+      (busy[id] = busy[id] || []).push(wk.short_name || wk.full_name || 'сборщик');
+    });
+  });
   const today = new Date(); today.setHours(0, 0, 0, 0);
   // Мощность цеха: сколько сборщиков реально в работе (минимум 2) × 8ч
   const act = new Set();
@@ -3603,12 +3614,13 @@ function _smartQueueData(items, works, defHrs) {
     }
     const missing = (w.missing_components || []).length;
     const pinned = Number(w.queue_pin || 0) > 0;
+    const busyBy = busy[w.id] || null;
     let section;
     if (missing > 0) section = 'wait';
     else if (slack === null) section = 'nodate';
     else if (slack <= 1) section = 'fire';
     else section = 'plan';
-    return { w, est, rem, dl, dlIsMontage, slack, missing, pinned, section };
+    return { w, est, rem, dl, dlIsMontage, slack, missing, pinned, section, busyBy };
   });
 
   const secOrder = { fire: 0, plan: 1, wait: 2, nodate: 3 };
@@ -3629,6 +3641,8 @@ function _smartQueueData(items, works, defHrs) {
     const r = [];
     const w = e.w;
     if (e.pinned) r.push('<span class="sq-w pin">📌 закреплено вручную</span>');
+    // v2.45.716: по работе уже идёт таймер — показываем кто, и не предлагаем её «свободному»
+    if (e.busyBy) r.push('<span class="sq-w info">⏱ уже в работе: ' + escapeHtml(e.busyBy.join(', ')) + '</span>');
     if (e.slack !== null) {
       if (e.slack <= 0) r.push('<span class="sq-w bad">не успеваем: дефицит ~' + Math.round(-e.slack * (cap / 8) * 8) + 'ч к ' + _sqFmtD(e.dl) + '</span>');
       else if (e.slack <= 1) r.push('<span class="sq-w bad">впритык: запас &lt;1 дн при ' + Math.round(e.rem) + 'ч работы</span>');
@@ -3666,8 +3680,8 @@ function _smartQueueData(items, works, defHrs) {
   return { entries, cap };
 }
 
-function _smartQueueHtml(items, works, defHrs) {
-  const { entries, cap } = _smartQueueData(items, works, defHrs);
+function _smartQueueHtml(items, works, defHrs, workload) {
+  const { entries, cap } = _smartQueueData(items, works, defHrs, workload);
   const SEC = {
     fire:   { cls: 'fire', t: '🔥 Горит — успеваем впритык' },
     plan:   { cls: '',     t: '📋 Дальше по плану' },
@@ -3676,7 +3690,8 @@ function _smartQueueHtml(items, works, defHrs) {
   };
   let html = '';
   // «Кому что брать»: самая горящая из готовых к сборке
-  const next = entries.find(e => e.missing === 0 && e.section !== 'nodate');
+  // v2.45.716: не предлагаем работу, по которой уже идёт таймер (её «занял» сборщик)
+  const next = entries.find(e => e.missing === 0 && e.section !== 'nodate' && !e.busyBy);
   if (next) {
     html += '<div class="sq-next">👉 Следующему свободному сборщику: <b>' +
       escapeHtml(next.w.model_name || next.w.description || ('Работа #' + next.w.id)) +
