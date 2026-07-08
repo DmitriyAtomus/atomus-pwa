@@ -21071,3 +21071,46 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .myday-row { flex-wrap: wrap; }
   .myday-row .clk { margin-left: auto; }
 }
+
+/* ============ v2.45.708: Почта и MAX — каналы, пузыри, привязка ============ */
+.mm-filters { display: flex; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 2; }
+.mm-filter { border: 1px solid var(--border); background: var(--surface); color: var(--text-mid); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.mm-filter .c { font-size: 10.5px; background: var(--bg); border-radius: 999px; padding: 0 6px; color: var(--text-light); }
+.mm-filter.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.mm-filter.on .c { background: rgba(255,255,255,.25); color: #fff; }
+.mm-row { display: flex; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--bg); cursor: pointer; }
+.mm-row:hover { background: var(--bg); }
+.mm-row.sel { background: var(--brand-bg); }
+.mm-ava { flex: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; position: relative; }
+.mm-ava.c0 { background: #D5E4F2; color: #2D5F8B; } .mm-ava.c1 { background: #FBE9D6; color: #B5710C; }
+.mm-ava.c2 { background: #E8F4ED; color: #1F7B3F; } .mm-ava.c3 { background: #F1EAFE; color: #7C3AED; }
+.mm-ava.c4 { background: #FCE8E2; color: #B5260C; }
+.mm-chb { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; border: 2px solid var(--surface); }
+.mm-chb.mail { background: #2D5F8B; color: #fff; }
+.mm-chb.max { background: #7C3AED; color: #fff; }
+.mm-t { flex: 1; min-width: 0; }
+.mm-nm { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
+.mm-ch { font-size: 9.5px; font-weight: 800; border-radius: 5px; padding: 1px 6px; letter-spacing: .03em; white-space: nowrap; flex: none; }
+.mm-ch.max { background: #F1EAFE; color: #7C3AED; }
+.mm-ch.mail { background: #EAF2FA; color: #2D5F8B; }
+.mm-prev { font-size: 12px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.mm-sup { font-size: 10.5px; margin-top: 3px; }
+.mm-sup.ok { color: var(--success); font-weight: 600; }
+.mm-sup.no { color: var(--warning); font-weight: 700; }
+.mm-tm { flex: none; font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.mm-thhead { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+.mm-bindstrip { background: var(--warning-bg); color: var(--warning); padding: 8px 14px; font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.mm-bindstrip button { margin-left: auto; border: 1px solid #E8CB93; background: #fff; color: var(--warning); border-radius: 8px; padding: 4px 12px; font-weight: 700; font-size: 12px; cursor: pointer; }
+.mm-bub { max-width: 78%; border-radius: 14px; padding: 9px 13px; font-size: 13.5px; line-height: 1.5; word-break: break-word; }
+.mm-bub.in { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 5px; }
+.mm-bub.out { align-self: flex-end; background: var(--brand-bg-strong); border-bottom-right-radius: 5px; }
+.mm-who { font-size: 11px; font-weight: 800; color: var(--text-mid); margin-bottom: 2px; }
+.mm-subj { font-size: 11px; color: var(--text-light); margin-bottom: 3px; }
+.mm-body { white-space: pre-wrap; }
+.mm-btm { font-size: 10.5px; color: var(--text-faint); text-align: right; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.mm-fold { display: inline-flex; align-items: center; gap: 4px; color: var(--brand); font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 6px; background: none; border: none; padding: 0; }
+.mm-folded { margin-top: 6px; padding: 8px 11px; border-left: 3px solid var(--border-strong); background: var(--bg); border-radius: 0 8px 8px 0; font-size: 12px; color: var(--text-light); white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+.mm-atts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.mm-att { display: inline-flex; align-items: center; gap: 7px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text-mid); cursor: pointer; }
+.mm-att:hover { border-color: var(--brand); color: var(--brand); }
+.mm-att .ic { min-width: 28px; height: 24px; border-radius: 6px; background: var(--danger-bg); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; padding: 0 3px; }
