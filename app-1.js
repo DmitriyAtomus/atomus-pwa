@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.702-order-author";
-const APP_VERSION_DATE = "07.07.2026";
+const APP_VERSION = "v2.45.714";
+const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1434,6 +1434,10 @@ function _railBadges() {
     const inbox = cache.supplyInbox || [];
     const unm = inbox.filter(m => m.status === 'unmatched').length;
     if (unm) b.supply = { n: unm, cls: 'r' };
+  } catch (e) {}
+  // v2.45.709: непрочитанные в «Почта и MAX»
+  try {
+    if (state._mailUnreadTotal) b.mail = { n: state._mailUnreadTotal, cls: 'r' };
   } catch (e) {}
   return b;
 }
@@ -3303,6 +3307,9 @@ function renderProductionDashboard(d) {
       '<button onclick="pkbResetFilter()"><i class="ti ti-x"></i> сбросить</button></div>';
   }
 
+  // v2.45.703: полоса «Мой день» — таймер работ (заполняется после рендера)
+  html += '<div id="pkb-myday"></div>';
+
   // --- v2.45.634: «кабина» — на десктопе справа тёмная панель «Сегодня»
   // (внимание/отгрузки/задачи), контент слева. На мобильном панель скрыта,
   // а «узкие места» остаются в потоке.
@@ -3393,6 +3400,8 @@ function renderProductionDashboard(d) {
   _fillPkbRail();
   // v2.45.x: подсказка «вчера не доделал — продолжить?» (вставляем сверху)
   _renderResumeBanner();
+  // v2.45.703: полоса «Мой день»
+  loadMyDayStrip();
 }
 
 // ============ v2.45.634: правая панель «Сегодня» (кабина) ============
@@ -4591,6 +4600,10 @@ function renderPkbWorkCard(w, colKey) {
     titleHtml += ' <span class="work-type-badge wt-' + w.work_type + '" style="margin-left:4px;font-size:10px;">' +
                  escapeHtml(_wtLabels[w.work_type] || w.work_type) + '</span>';
   }
+  // v2.45.712: метка изделия — различает одинаковые модели на одном заказе
+  if (w.label) {
+    titleHtml += ' <span class="pkb-wc-tag">' + escapeHtml(w.label) + '</span>';
+  }
   titleHtml += '</div>';
   html += titleHtml;
 
@@ -4655,6 +4668,11 @@ function renderPkbWorkCard(w, colKey) {
                 commentIcon +
               '</div>';
     }
+  }
+
+  // v2.45.703: быстрый старт таймера «Мой день» (очередь и в работе)
+  if (colKey === 'queue' || colKey === 'in_progress') {
+    html += '<button class="pkb-wc-startbtn" onclick="event.stopPropagation();openMyDayStart(' + w.id + ')" title="Начать работу — таймер «Мой день»"><i class="ti ti-player-play"></i> Начать</button>';
   }
 
   html += '</div>';
@@ -4799,6 +4817,7 @@ async function openProductionWorkDetail(workId) {
 
   try {
     const w = await apiGet('/api/production/works/' + workId);
+    state._pkbDetailWork = w;   // v2.45.712: для правки метки без перезапроса
     renderProductionWorkDetail(w);
   } catch (e) {
     overlay.querySelector('.modal-body').innerHTML =
@@ -4879,6 +4898,20 @@ async function showProductionWorkQr(workId) {
   }
 }
 
+// v2.45.712: метка изделия — чтобы различать два одинаковых на одном заказе
+async function editWorkLabel(workId) {
+  const w = state._pkbDetailWork && state._pkbDetailWork.id === workId ? state._pkbDetailWork : null;
+  const cur = (w && w.label) || '';
+  const v = prompt('Метка изделия — коротко, чтобы отличать одинаковые на заказе\n(например: №1, №2, левый, с рекуператором). Пусто — убрать.', cur);
+  if (v == null) return;
+  try {
+    await apiPatch('/api/production/works/' + workId, { label: v.trim() });
+    showToast(v.trim() ? 'Метка: ' + v.trim() : 'Метка убрана', 'success');
+    cache.productionKanban = null;
+    openProductionWorkDetail(workId);
+  } catch (e) { showToast('Не удалось сохранить метку', 'error'); }
+}
+
 function renderProductionWorkDetail(w) {
   const overlay = document.getElementById('pkb-detail-modal');
   if (!overlay) return;
@@ -4897,7 +4930,11 @@ function renderProductionWorkDetail(w) {
 
   let html = '';
   html += '<div class="modal-header">';
-  html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + '</h3>';
+  // v2.45.712: метка изделия — кликом можно прописать/поменять («№1», «левый»…)
+  const labelChip = w.label
+    ? '<span class="pkb-wc-tag big" onclick="editWorkLabel(' + w.id + ')" title="Изменить метку">' + escapeHtml(w.label) + ' <i class="ti ti-pencil"></i></span>'
+    : '<span class="pkb-wc-tag big empty" onclick="editWorkLabel(' + w.id + ')" title="Метка различает одинаковые изделия на одном заказе"><i class="ti ti-tag"></i> метка</span>';
+  html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + ' ' + labelChip + '</h3>';
   html +=   '<span class="pkb-status-chip ' + statusCls + '">' + escapeHtml(statusLabel) + '</span>';
   // v2.43.70: QR-код сборки прямо из карточки работы — нужен на упаковке/проверке,
   // когда изделие физически готово, а до страницы «Сборки» идти неудобно.
@@ -13801,3 +13838,349 @@ function formatNumberShort(n) {
   return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
+
+// ============ v2.45.703: «МОЙ ДЕНЬ» — таймер с паузами на канбане ============
+// Полоса над доской: каждая незакрытая работа — своя строка; паузная гаснет,
+// «Закончил» убирает строку (время остаётся в журнале сессий и на карточке).
+var _myday = null;
+var _mydayTicker = null;
+var _mds = { workId: null, stageId: null, performers: [] };   // состояние модалки старта (кто делает)
+
+async function loadMyDayStrip() {
+  const box = document.getElementById('pkb-myday');
+  if (!box) return;
+  try {
+    _myday = await apiGet('/api/production/my-day');
+    // база для живого пересчёта: minutes без live-дельты на момент загрузки
+    (_myday.rows || []).forEach(r => { r._base = (r.minutes || 0) - (r.live_minutes || 0); });
+    // v2.45.710: полоса командная — в day_total только СВОИ минуты
+    _myday._closed_extra = (_myday.day_total_minutes || 0) -
+      (_myday.rows || []).filter(r => r.mine !== false)
+        .reduce((s, r) => s + (r.minutes || 0), 0);
+    renderMyDayStrip();
+    if (!_mydayTicker) {
+      _mydayTicker = setInterval(() => {
+        if (document.getElementById('pkb-myday') && _myday &&
+            (_myday.rows || []).some(r => r.status === 'run')) renderMyDayStrip();
+      }, 30000);
+    }
+  } catch (e) { box.innerHTML = ''; }
+}
+
+function _mydayFmtMin(m) {
+  m = Math.max(0, Math.round(m));
+  const h = Math.floor(m / 60), mm = m % 60;
+  return ((h ? h + ' ч ' : '') + (mm || !h ? mm + ' мин' : '')).trim();
+}
+function _mydayRowMin(r) {
+  if (r.status !== 'run' || !r.live_started_at) return r.minutes || 0;
+  let live = 0;
+  try {
+    const start = new Date(String(r.live_started_at).replace(' ', 'T') + 'Z');
+    live = Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
+    if (typeof _calculateLunchMinutes === 'function') {
+      live = Math.max(0, live - _calculateLunchMinutes(start, new Date()));
+    }
+  } catch (e) { live = r.live_minutes || 0; }
+  return (r._base || 0) + live;
+}
+
+// 👤 кто делает работу (живые + отметившиеся сегодня)
+function _mydayPeople(r) {
+  const ppl = r.people || [];
+  if (!ppl.length) return '';
+  const shown = ppl.slice(0, 3).join(', ');
+  const more = ppl.length > 3 ? ' и ещё ' + (ppl.length - 3) : '';
+  return ' · 👤 ' + escapeHtml(shown + more);
+}
+
+// строка теперь — пара (работа, человек): мастер видит и чужие таймеры
+function _mydayRowArgs(r) {
+  return r.work_id + ',' + (r.employee_id != null ? r.employee_id : 'null');
+}
+function _mydayCanTouch(r) {
+  return r.mine !== false || !!(_myday && _myday.can_manage_others);
+}
+function renderMyDayStrip() {
+  const box = document.getElementById('pkb-myday');
+  if (!box) return;
+  if (!_myday || _myday.no_employee || !(_myday.rows || []).length) { box.innerHTML = ''; return; }
+  const rows = _myday.rows;
+  let total = _myday._closed_extra || 0;
+  let html = '<div class="myday-strip">';
+  rows.forEach(r => {
+    const run = r.status === 'run';
+    const mine = r.mine !== false;
+    const mins = _mydayRowMin(r);
+    if (mine) total += mins;
+    const canTouch = _mydayCanTouch(r);
+    const args = _mydayRowArgs(r);
+    const proj = [r.contract_number, r.contractor_name].filter(Boolean).join(' · ');
+    html += '<div class="myday-row ' + (run ? 'run' : 'pz') + (mine ? '' : ' other') + '" onclick="openMyDaySegments(' + args + ')">' +
+      '<span class="dot"></span>' +
+      '<div class="t"><div class="nm">' + escapeHtml(r.name) + '</div>' +
+      '<div class="sub">' +
+        (mine ? '' : '<span class="who">👤 ' + escapeHtml(r.employee_name || '') + '</span> · ') +
+        (run ? 'идёт сейчас' : 'на паузе') +
+        _mydayPeople(r) +
+        // v2.45.714: этап + «что именно» — мастер видит, какая работа проставлена
+        (r.stage_name ? ' · <b>' + escapeHtml(r.stage_name) + '</b>' : '') +
+        (r.last_note || r.live_note ? ' · ' + escapeHtml(r.live_note || r.last_note) : '') +
+        (proj ? ' · ' + escapeHtml(proj) : '') + '</div></div>' +
+      (canTouch
+        ? (run
+            ? '<button class="myday-btn pause" onclick="event.stopPropagation();mydayPause(' + args + ')"><i class="ti ti-player-pause"></i> Пауза</button>'
+            : '<button class="myday-btn resume" onclick="event.stopPropagation();mydayResume(' + args + ')"><i class="ti ti-player-play"></i> Продолжить</button>') +
+          '<button class="myday-btn fin" onclick="event.stopPropagation();mydayFinish(' + args + ')"><i class="ti ti-check"></i> Закончил</button>'
+        : '') +
+      '<span class="clk">' + _mydayFmtMin(mins) + '</span>' +
+    '</div>';
+  });
+  const pct = Math.min(100, Math.round(total / 480 * 100));
+  html += '<div class="myday-dayline"><span>мой день:</span><div class="bar"><div class="f" style="width:' + pct + '%"></div></div>' +
+    '<span>' + _mydayFmtMin(total) + ' из 8 ч</span></div>';
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+// --------- модалка старта: этап + напарники + «что именно» с памятью ---------
+async function openMyDayStart(workId) {
+  if (!_myday) { try { _myday = await apiGet('/api/production/my-day'); } catch (e) { _myday = null; } }
+  if (!_myday || _myday.no_employee) {
+    showToast('Твой пользователь не привязан к сотруднику — попроси директора привязать', 'error');
+    return;
+  }
+  var selfId = (_myday.employee && _myday.employee.id) || null;
+  _mds = { workId: workId, stageId: null, performers: selfId ? [selfId] : [] };
+  _renderMyDayModal(_mydayStartModalHtml());
+  setTimeout(() => { const d = document.getElementById('mds-note'); if (d) d.focus(); }, 60);
+}
+
+function _renderMyDayModal(inner) {
+  let m = document.getElementById('myday-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'myday-modal';
+    document.body.appendChild(m);
+  }
+  m.innerHTML = inner ? '<div class="myday-ovl" onclick="closeMyDayModal()">' +
+    '<div class="myday-modal" onclick="event.stopPropagation()">' + inner + '</div></div>' : '';
+}
+function closeMyDayModal() { _renderMyDayModal(''); }
+
+function _mydayStartModalHtml() {
+  const stages = _myday.stages || [];
+  const mates = _myday.mates || [];
+  let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
+    '<div class="myday-h4"><i class="ti ti-player-play"></i> Начать работу</div>';
+  if (stages.length) {
+    h += '<div class="myday-lbl">Что делаешь (этап)</div><div class="myday-chips">' +
+      stages.map(st => '<span class="myday-chip' + (_mds.stageId === st.id ? ' on' : '') + '" onclick="mdsStage(' + st.id + ')">' + escapeHtml(st.name) + '</span>').join('') + '</div>';
+  }
+  // v2.45.706: «Кто делает» — я в списке первым (по умолчанию выбран);
+  // директор может снять себя и отметить работу за сборщика
+  const selfEmp = _myday.employee && _myday.employee.id ? _myday.employee : null;
+  const people = (selfEmp ? [{ id: selfEmp.id, name: selfEmp.name, self: true }] : []).concat(mates.slice(0, 12));
+  if (people.length) {
+    h += '<div class="myday-lbl">Кто делает (время запишется каждому)</div><div class="myday-chips">' +
+      people.map(mt => '<span class="myday-chip' + (_mds.performers.indexOf(mt.id) >= 0 ? ' on' : '') + '" onclick="mdsMate(' + mt.id + ')">' +
+        (mt.self ? '⭐ Я — ' : '👥 ') + escapeHtml(mt.name) + '</span>').join('') + '</div>';
+  }
+  h += '<div class="myday-lbl">Что именно (коротко, попадёт в журнал)</div>' +
+    '<input class="myday-inp" id="mds-note" placeholder="начни печатать — подскажу из прошлых…" oninput="mdsNoteChips()">' +
+    '<div id="mds-notechips">' + _mdsNoteChipsHtml() + '</div>' +
+    '<button class="myday-go" onclick="mydayGo()"><i class="ti ti-player-play"></i> Погнали' +
+    _mdsMatesLabel(mates) + '</button>';
+  return h;
+}
+function _mdsMatesLabel(mates) {
+  // честная подпись: кто реально будет работать
+  const selfId = (_myday && _myday.employee && _myday.employee.id) || null;
+  const withSelf = selfId != null && _mds.performers.indexOf(selfId) >= 0;
+  const others = _mds.performers.filter(id => id !== selfId).map(id => {
+    const m = (mates || []).find(x => x.id === id);
+    return m ? m.name : null;
+  }).filter(Boolean);
+  if (!others.length) return '';                     // только я — без хвоста
+  const list = others.length <= 2 ? others.join(', ') : others.length + ' чел.';
+  if (withSelf) return ' · вместе с: ' + escapeHtml(list);   // я + другие
+  return ' · за: ' + escapeHtml(list);                        // отмечаю за других
+}
+
+function _mdsNoteChipsHtml() {
+  const inp = document.getElementById('mds-note');
+  const q = inp ? inp.value.trim().toLowerCase() : '';
+  let pool = (_myday.note_suggestions || []).slice();
+  if (q) pool = pool.filter(x => x.note.toLowerCase().indexOf(q) !== -1 && x.note.toLowerCase() !== q);
+  pool = pool.slice(0, 6);
+  if (!pool.length) return '';
+  return '<div class="myday-chips" style="margin-top:7px;">' + pool.map((x, i) =>
+    '<span class="myday-chip mem" onclick="mdsUseNote(' + i + ', this)">↻ ' + escapeHtml(x.note) + '</span>').join('') + '</div>';
+}
+function mdsNoteChips() { const b = document.getElementById('mds-notechips'); if (b) b.innerHTML = _mdsNoteChipsHtml(); }
+function mdsUseNote(i, elBtn) {
+  const inp = document.getElementById('mds-note');
+  const txt = elBtn ? elBtn.textContent.replace(/^↻\s*/, '') : '';
+  if (inp && txt) { inp.value = txt; inp.focus(); }
+  mdsNoteChips();
+}
+function mdsStage(id) { _mds.stageId = (_mds.stageId === id ? null : id); _mdsKeepNoteRerender(); }
+function mdsMate(id) {
+  const k = _mds.performers.indexOf(id);
+  if (k >= 0) _mds.performers.splice(k, 1); else _mds.performers.push(id);
+  _mdsKeepNoteRerender();
+}
+function _mdsKeepNoteRerender() {
+  const inp = document.getElementById('mds-note');
+  const val = inp ? inp.value : '';
+  _renderMyDayModal(_mydayStartModalHtml());
+  const inp2 = document.getElementById('mds-note');
+  if (inp2) { inp2.value = val; }
+  mdsNoteChips();
+}
+
+async function mydayGo() {
+  const inp = document.getElementById('mds-note');
+  const note = inp ? inp.value.trim() : '';
+  const workId = _mds.workId;
+  if (!_mds.performers.length) { showToast('Выбери, кто делает работу', 'error'); return; }
+  closeMyDayModal();
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/start',
+      { note: note, stage_id: _mds.stageId, performer_ids: _mds.performers });
+    if (r && r.ok) {
+      showToast('Погнали! Таймер идёт', 'success');
+      cache.productionKanban = null;
+      loadProductionDashboard();
+    } else showToast((r && r.message) || 'Не удалось начать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+// v2.45.710: empId — чья строка (мастер/директор управляет чужими таймерами)
+function _mydayFindRow(workId, empId) {
+  const rows = (_myday && _myday.rows) || [];
+  if (empId != null) {
+    const r = rows.find(x => x.work_id === workId && x.employee_id === empId);
+    if (r) return r;
+  }
+  return rows.find(x => x.work_id === workId);
+}
+function _mydayTargetBody(empId) {
+  const myId = _myday && (_myday.my_employee_id || (_myday.employee && _myday.employee.id));
+  return (empId != null && empId !== myId) ? { employee_id: empId } : {};
+}
+async function mydayPause(workId, empId) {
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/pause',
+      _mydayTargetBody(empId));
+    if (r && r.ok) { showToast('Пауза · записано ' + _mydayFmtMin(r.minutes || 0), 'success'); }
+    else showToast((r && r.message) || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  cache.productionKanban = null; loadProductionDashboard();
+}
+async function mydayResume(workId, empId) {
+  const row = _mydayFindRow(workId, empId);
+  const myId = _myday && (_myday.my_employee_id || (_myday.employee && _myday.employee.id));
+  const performer = (empId != null ? empId : myId);
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/start',
+      { note: (row && row.last_note) || '', stage_id: (row && row.last_stage_id) || null,
+        performer_ids: performer != null ? [performer] : null });
+    if (r && r.ok) showToast('Продолжаем', 'success');
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  cache.productionKanban = null; loadProductionDashboard();
+}
+// v2.45.711: подтверждение «всё сделано» — своё окно вместо системного confirm
+function mydayFinish(workId, empId) {
+  const row = _mydayFindRow(workId, empId);
+  const args = workId + ',' + (empId != null ? empId : 'null');
+  let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
+    '<div class="myday-h4"><i class="ti ti-circle-check" style="color:var(--success);"></i> Закончил — всё сделано?</div>' +
+    '<div class="myday-msub">' + escapeHtml((row && row.name) || 'Работа') +
+    (row && row.mine === false ? '<br>👤 делает: <b>' + escapeHtml(row.employee_name || '') + '</b>' : '') +
+    (row ? '<br>За сегодня: <b>' + _mydayFmtMin(_mydayRowMin(row)) + '</b>' : '') + '</div>' +
+    '<div class="myday-msub" style="margin-bottom:0;">Строка уйдёт из «Моего дня», время останется в журнале.</div>' +
+    '<div class="myday-actions">' +
+      '<button class="myday-btn ghost big" onclick="closeMyDayModal()">Отмена</button>' +
+      '<button class="myday-btn fin big" onclick="mydayFinishGo(' + args + ')"><i class="ti ti-check"></i> Да, всё сделано</button>' +
+    '</div>';
+  _renderMyDayModal(h);
+}
+async function mydayFinishGo(workId, empId) {
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/timer/finish',
+      _mydayTargetBody(empId));
+    if (r && r.ok) {
+      const m = r.stopped && r.stopped.minutes ? ' · записано ' + _mydayFmtMin(r.stopped.minutes) : '';
+      showToast('Готово' + m, 'success');
+    } else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  closeMyDayModal();
+  cache.productionKanban = null; loadProductionDashboard();
+}
+
+// --------- карточка отрезков (провалиться в работу) ---------
+function openMyDaySegments(workId, empId) {
+  const row = _mydayFindRow(workId, empId);
+  if (!row) return;
+  const run = row.status === 'run';
+  const mine = row.mine !== false;
+  const canTouch = _mydayCanTouch(row);
+  const args = _mydayRowArgs(row);
+  const mins = _mydayRowMin(row);
+  const stops = row.segments.length - 0;
+  let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
+    '<div class="myday-h4">' + escapeHtml(row.name) + '</div>' +
+    '<div class="myday-msub">' + escapeHtml([row.contract_number, row.contractor_name].filter(Boolean).join(' · ')) +
+    (row.stage_name ? ' · <b>' + escapeHtml(row.stage_name) + '</b>' : '') +
+    (row.last_note || row.live_note ? ' · 📝 ' + escapeHtml(row.live_note || row.last_note) : '') +
+    (mine ? '' : '<br>👤 делает: <b>' + escapeHtml(row.employee_name || '') + '</b>') +
+    ((row.people || []).length ? '<br>👤 делают: ' + escapeHtml(row.people.join(', ')) : '') + '</div>' +
+    '<div class="myday-clock' + (run ? '' : ' paused') + '"><div class="c">' + _mydayFmtMin(mins) + '</div>' +
+    '<div class="s">' + (run ? 'идёт сейчас' : 'на паузе') + '</div></div>' +
+    '<div class="myday-stats">' +
+      '<div class="st"><div class="v">' + _mydayFmtMin(mins) + '</div><div class="k">чистого</div></div>' +
+      '<div class="st"><div class="v">' + (row.segments.length + (run ? 1 : 0)) + '</div><div class="k">отрезков</div></div>' +
+      '<div class="st"><div class="v">' + stops + '</div><div class="k">стопов</div></div>' +
+    '</div>' +
+    '<div class="myday-lbl">Отрезки' + (mine ? ' (✎ — поправить, если забыл нажать стоп)' : '') + '</div>';
+  row.segments.forEach((g, i) => {
+    const t1 = g.started_at ? String(g.started_at).slice(11, 16) : '—';
+    const t2 = g.ended_at ? String(g.ended_at).slice(11, 16) : '…';
+    h += '<div class="myday-seg"><span class="no">' + (i + 1) + '</span>' +
+      '<span class="rng">' + t1 + ' – ' + t2 + (g.note ? ' · ' + escapeHtml(g.note) : '') + '</span>' +
+      '<span class="len">' + _mydayFmtMin(g.minutes) + '</span>' +
+      (mine ? '<button class="ed" onclick="mydayEditSeg(' + g.id + ',' + g.minutes + ',' + args + ')" title="Поправить минуты"><i class="ti ti-pencil"></i></button>' : '') +
+      '</div>';
+  });
+  if (run) {
+    h += '<div class="myday-seg live"><span class="no">' + (row.segments.length + 1) + '</span>' +
+      '<span class="rng">идёт сейчас…</span><span class="len">' + _mydayFmtMin(mins - (row._base || 0)) + '</span></div>';
+  }
+  if (canTouch) {
+    h += '<div class="myday-actions">' +
+      (run
+        ? '<button class="myday-btn pause big" onclick="mydayPause(' + args + ');closeMyDayModal()"><i class="ti ti-player-pause"></i> Пауза</button>'
+        : '<button class="myday-btn resume big" onclick="mydayResume(' + args + ');closeMyDayModal()"><i class="ti ti-player-play"></i> Продолжить</button>') +
+      '<button class="myday-btn fin big" onclick="mydayFinish(' + args + ')"><i class="ti ti-check"></i> Закончил — всё сделано</button>' +
+    '</div>';
+  }
+  _renderMyDayModal(h);
+}
+async function mydayEditSeg(sessionId, curMinutes, workId, empId) {
+  const v = prompt('Сколько минут длился этот отрезок на самом деле?', curMinutes);
+  if (v == null) return;
+  const m = parseInt(v, 10);
+  if (isNaN(m) || m < 1) { showToast('Введи число минут (≥1)', 'error'); return; }
+  try {
+    const r = await fetch(API_BASE + '/api/production/my-day/sessions/' + sessionId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY) },
+      body: JSON.stringify({ minutes: m }),
+    });
+    if (!r.ok) { showToast('Не удалось поправить', 'error'); return; }
+    showToast('Поправлено: ' + _mydayFmtMin(m), 'success');
+    await loadMyDayStrip();
+    openMyDaySegments(workId, empId);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}

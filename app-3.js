@@ -6086,26 +6086,65 @@ async function loadMailMessenger() {
   list.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
     const d = await apiGet('/api/mail/conversations');
-    const convs = d.conversations || [];
-    state._mailConvs = convs;
-    list.innerHTML = convs.length ? convs.map(_mailConvRow).join('') : '<div class="empty-block">Переписок пока нет</div>';
-    if (state._mailPeer) { const el = list.querySelector('.mail-conv[data-peer="' + (window.CSS && CSS.escape ? CSS.escape(state._mailPeer) : state._mailPeer) + '"]'); if (el) el.style.background = 'var(--brand-bg)'; }
+    state._mailConvs = d.conversations || [];
+    _mailRenderList();
+    _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, c) => s2 + (c.unread || 0), 0));
   } catch (e) { list.innerHTML = '<div class="empty-block">Не удалось загрузить</div>'; }
+}
+// v2.45.708: фильтры каналов + новый список
+function _mailSetFilter(f) { state._mailFilter = f; _mailRenderList(); }
+function _mailRenderList() {
+  const list = document.getElementById('mail-conv-list');
+  if (!list) return;
+  const convs = state._mailConvs || [];
+  const f = state._mailFilter || 'all';
+  const cMax = convs.filter(c => c.channel === 'max').length;
+  const cMail = convs.length - cMax;
+  const shown = convs.filter(c => f === 'all' || (f === 'max' ? c.channel === 'max' : c.channel !== 'max'));
+  let html = '<div class="mm-filters">' +
+    '<button class="mm-filter' + (f === 'all' ? ' on' : '') + '" onclick="_mailSetFilter(\'all\')">Все <span class="c">' + convs.length + '</span></button>' +
+    '<button class="mm-filter' + (f === 'mail' ? ' on' : '') + '" onclick="_mailSetFilter(\'mail\')"><i class="ti ti-mail"></i> Почта <span class="c">' + cMail + '</span></button>' +
+    '<button class="mm-filter' + (f === 'max' ? ' on' : '') + '" onclick="_mailSetFilter(\'max\')"><i class="ti ti-message-circle"></i> MAX <span class="c">' + cMax + '</span></button>' +
+  '</div>';
+  html += shown.length ? shown.map(_mailConvRow).join('')
+    : '<div class="empty-block">' + (convs.length ? 'В этом канале пусто' : 'Переписок пока нет') + '</div>';
+  list.innerHTML = html;
+}
+function _mailInitials(n) {
+  const p = String(n || '').replace(/["«»]/g, '').trim().split(/\s+/);
+  return ((p[0] ? p[0][0] : '') + (p[1] ? p[1][0] : (p[0] && p[0][1] ? p[0][1] : ''))).toUpperCase() || '✉';
+}
+function _mailAvaCls(peer) {
+  let h = 0; const s = String(peer || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
+  return 'c' + (h % 5);
 }
 function _mailChanIcon(ch) { return ch === 'max' ? '💬' : '📧'; }
 function _mailShortTime(iso) { if (!iso) return ''; return String(iso).slice(0, 16).replace('T', ' ').replace(/^2\d\d\d-/, ''); }
 function _mailConvRow(c) {
   const peerAttr = encodeURIComponent(c.peer);
-  return '<div class="mail-conv" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;">' +
-    '<div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _mailChanIcon(c.channel) + ' ' + escapeHtml(c.from_name || c.peer) + '</div><div style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(_mailShortTime(c.last_at)) + '</div></div>' +
-    '<div style="font-size:12.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">' + escapeHtml(c.preview || '') + '</div>' +
+  const isMax = c.channel === 'max';
+  const sel = state._mailPeer === c.peer;
+  const sup = c.supplier_name
+    ? '<div class="mm-sup ok"><i class="ti ti-link"></i> ' + escapeHtml(c.supplier_name) + '</div>'
+    : '<div class="mm-sup no"><i class="ti ti-alert-triangle"></i> не привязан к поставщику</div>';
+  const unr = Number(c.unread || 0);
+  return '<div class="mail-conv mm-row' + (sel ? ' sel' : '') + (unr ? ' unr' : '') + '" data-peer="' + escapeHtml(c.peer) + '" onclick="openMailThread(decodeURIComponent(\'' + peerAttr + '\'))">' +
+    '<div class="mm-ava ' + _mailAvaCls(c.peer) + '">' + escapeHtml(_mailInitials(c.from_name || c.peer)) +
+      '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
+    '<div class="mm-t">' +
+      '<div class="mm-nm">' + escapeHtml(c.from_name || c.peer) + ' <span class="mm-ch ' + (isMax ? 'max' : 'mail') + '">' + (isMax ? 'MAX' : 'ПОЧТА') + '</span></div>' +
+      '<div class="mm-prev">' + escapeHtml(c.preview || '') + '</div>' + sup +
+    '</div>' +
+    '<div class="mm-meta"><span class="mm-tm">' + escapeHtml(_mailShortTime(c.last_at)) + '</span>' +
+      (unr ? '<span class="mm-unr">' + (unr > 99 ? '99+' : unr) + '</span>' : '') + '</div>' +
   '</div>';
 }
 async function openMailThread(peer) {
   state._mailPeer = peer;
   const pane = document.getElementById('mail-thread-pane');
   if (!pane) return;
-  document.querySelectorAll('.mail-conv').forEach(el => { el.style.background = (el.dataset.peer === peer) ? 'var(--brand-bg)' : ''; });
+  document.querySelectorAll('.mail-conv').forEach(el => { el.classList.toggle('sel', el.dataset.peer === peer); });
   pane.innerHTML = '<div class="loading-block">Загрузка переписки…</div>';
   try {
     const d = await apiGet('/api/mail/thread?peer=' + encodeURIComponent(peer));
@@ -6114,38 +6153,148 @@ async function openMailThread(peer) {
     const canReply = (d.channel === 'email') || (d.channel === 'max');
     const rawName = conv.raw_name || conv.from_name || peer;
     const title = d.supplier_name || conv.from_name || peer;
-    const supChip = d.supplier_name
-      ? '<span style="background:#E7F5EC;color:#15803D;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap;"><i class="ti ti-building-store"></i> ' + escapeHtml(d.supplier_name) + '</span>'
-      : '<span style="color:var(--text-light);font-size:12px;font-weight:500;">не привязан к поставщику</span>';
+    const isMax = d.channel === 'max';
     const peerEnc = encodeURIComponent(peer);
     const bindBtn = '<button class="btn btn-secondary btn-small" onclick="openMailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'))"><i class="ti ti-link"></i> ' + (d.supplier_name ? 'Сменить' : 'Привязать к поставщику') + '</button>';
-    let html = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
-      '<div style="min-width:0;"><div style="font-weight:700;">' + _mailChanIcon(d.channel) + ' ' + escapeHtml(title) + '</div>' +
-      '<div style="margin-top:3px;display:flex;gap:8px;align-items:center;">' + supChip + (d.supplier_name && rawName !== title ? '<span style="font-size:11px;color:var(--text-light);">' + escapeHtml(rawName) + '</span>' : '') + '</div></div>' +
+    let html = '<div class="mm-thhead">' +
+      '<div class="mm-ava ' + _mailAvaCls(peer) + '">' + escapeHtml(_mailInitials(title)) +
+        '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
+      '<div style="min-width:0;flex:1;"><div style="font-weight:800;display:flex;gap:7px;align-items:center;">' + escapeHtml(title) +
+        ' <span class="mm-ch ' + (isMax ? 'max' : 'mail') + '">' + (isMax ? 'MAX' : 'ПОЧТА') + '</span></div>' +
+      '<div style="margin-top:2px;font-size:11.5px;color:var(--text-light);">' +
+        (d.supplier_name
+          ? '<span style="color:var(--success);font-weight:600;"><i class="ti ti-link"></i> ' + escapeHtml(d.supplier_name) + '</span>' + (rawName !== title ? ' · ' + escapeHtml(rawName) : '')
+          : escapeHtml(rawName)) + '</div></div>' +
       bindBtn + '</div>';
+    if (!d.supplier_name) {
+      html += '<div class="mm-bindstrip"><i class="ti ti-alert-triangle"></i> Не привязан к поставщику — письма не попадут в карточки заказов' +
+        '<button onclick="openMailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'))">Привязать</button></div>';
+    }
     html += '<div id="mail-thread-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg);">';
     html += msgs.length ? msgs.map(_mailMsgBubble).join('') : '<div style="color:var(--text-light);text-align:center;">Сообщений нет</div>';
     html += '</div>';
     if (canReply) {
-      html += '<div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;">' +
-        '<textarea id="mail-reply-text" rows="2" placeholder="Написать ответ…" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>' +
-        '<button class="btn btn-primary" onclick="sendMailReply()" title="Отправить" style="align-self:flex-end;"><i class="ti ti-send"></i></button>' +
+      html += '<div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">' +
+        '<span class="mm-ch ' + (isMax ? 'max' : 'mail') + '" style="align-self:center;flex:none;" title="Канал ответа">' + (isMax ? '💬 MAX' : '✉ ПОЧТА') + '</span>' +
+        '<textarea id="mail-reply-text" rows="2" placeholder="Написать ответ… (уйдёт ' + (isMax ? 'в MAX' : 'письмом') + ')" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>' +
+        '<button class="btn btn-primary" onclick="sendMailReply()" title="Отправить"><i class="ti ti-send"></i></button>' +
       '</div>';
     }
     pane.innerHTML = html;
     const m = document.getElementById('mail-thread-msgs'); if (m) m.scrollTop = m.scrollHeight;
+    // v2.45.709: открыл диалог → прочитано (кружок гаснет, бейджи пересчитываются)
+    try {
+      const cv = (state._mailConvs || []).find(c => c.peer === peer);
+      if (cv && cv.unread) {
+        apiPost('/api/mail/read', { peer: peer }).catch(() => {});
+        cv.unread = 0;
+        _mailRenderList();
+        _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, c) => s2 + (c.unread || 0), 0));
+      }
+    } catch (e2) {}
   } catch (e) { pane.innerHTML = '<div class="empty-block">Не удалось загрузить переписку</div>'; }
+}
+// v2.45.709: бейдж непрочитанных — раздел на рейле + пункт меню
+function _mailApplyUnreadTotal(n) {
+  state._mailUnreadTotal = n || 0;
+  const b = document.getElementById('mail-unread-badge');
+  if (b) {
+    if (state._mailUnreadTotal > 0) { b.textContent = state._mailUnreadTotal; b.style.display = ''; }
+    else b.style.display = 'none';
+  }
+  try { if (typeof renderSectionRail === 'function') renderSectionRail(); } catch (e) {}
+}
+async function refreshMailUnread() {
+  try {
+    const d = await apiGet('/api/mail/unread-count');
+    _mailApplyUnreadTotal(d.count || 0);
+  } catch (e) {}
+}
+// старт: через 4 сек после загрузки, дальше каждые 2 минуты
+setTimeout(function () { try { refreshMailUnread(); } catch (e) {} }, 4000);
+setInterval(function () { try { refreshMailUnread(); } catch (e) {} }, 120000);
+// v2.45.708: суть письма отдельно от цитаты/подписи (сворачиваются)
+function _mailSplitBody(body) {
+  const lines = String(body || '').slice(0, 12000).split('\n');
+  let cut = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) continue;
+    if (t.startsWith('>') ||
+        /^(От:|From:|On .+ wrote:|-{2,}\s*$)/i.test(t) ||
+        /^\d{2}\.\d{2}\.\d{4}.{0,12}(пишет|wrote)/i.test(t) ||
+        (i > 0 && /^(с уважением|best regards|подпись\s*$|--\s*$)/i.test(t))) { cut = i; break; }
+  }
+  const main = lines.slice(0, cut).join('\n').trim();
+  const rest = lines.slice(cut).join('\n').trim();
+  if (!main) return { main: rest, rest: '' };
+  return { main: main, rest: rest };
+}
+var _mailFoldSeq = 0;
+function _mailToggleFold(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (btn) btn.innerHTML = (open ? '<i class="ti ti-chevron-right"></i> ' : '<i class="ti ti-chevron-down"></i> ') + btn.dataset.lbl;
 }
 function _mailMsgBubble(m) {
   const out = m.dir === 'out';
-  const who = out ? 'Мы' : (m.from_name || '');
-  const atts = (m.attachments || []).length ? '<div style="font-size:11.5px;margin-top:4px;opacity:.8;">📎 ' + m.attachments.length + '</div>' : '';
-  const subj = (m.subject && !out) ? '<div style="font-size:11px;color:var(--text-light);margin-bottom:2px;">' + escapeHtml(m.subject) + '</div>' : '';
-  return '<div style="max-width:80%;align-self:' + (out ? 'flex-end' : 'flex-start') + ';background:' + (out ? '#DCF0FF' : 'var(--card)') + ';border:1px solid var(--border);border-radius:12px;padding:8px 12px;">' +
-    (who ? '<div style="font-size:11px;font-weight:600;color:var(--text-mid);margin-bottom:2px;">' + escapeHtml(who) + '</div>' : '') + subj +
-    '<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.4;word-break:break-word;">' + escapeHtml((m.body || '').slice(0, 4000)) + '</div>' + atts +
-    '<div style="font-size:10.5px;color:var(--text-light);text-align:right;margin-top:3px;">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
+  const who = out ? 'Ты' : (m.from_name || '');
+  const subj = (m.subject && !out) ? '<div class="mm-subj">' + escapeHtml(m.subject) + '</div>' : '';
+  const parts = _mailSplitBody(m.body || '');
+  let fold = '';
+  if (parts.rest) {
+    const fid = 'mmfold-' + (++_mailFoldSeq);
+    fold = '<button class="mm-fold" data-lbl="подпись и цитата" onclick="_mailToggleFold(\'' + fid + '\', this)"><i class="ti ti-chevron-right"></i> подпись и цитата</button>' +
+      '<div id="' + fid + '" class="mm-folded" style="display:none;">' + escapeHtml(parts.rest.slice(0, 6000)) + '</div>';
+  }
+  // вложения — карточками с именем (скачивание как в ленте заказа).
+  // v2.45.7xx: для входящих файлов «на просмотр» из бота «Общение» (kind='chat')
+  // рядом кнопка «Оформить как счёт»; у уже оформленных (kind='invoice') — отметка.
+  let atts = '';
+  const list = m.attachments || [];
+  if (list.length && !out && typeof m.id === 'number') {
+    const canProm = (m.kind === 'chat') && (typeof canManageSupply === 'function' && canManageSupply());
+    atts = '<div class="mm-atts">' + list.map(function (a, i) {
+      const name = (a && (a.name || a.filename)) ? (a.name || a.filename) : (typeof a === 'string' ? a : 'файл');
+      const idx = (a && a.idx != null) ? a.idx : i;
+      const ext = (String(name).split('.').pop() || '').toUpperCase().slice(0, 4);
+      const card = '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
+        escapeHtml(String(name).replace(/'/g, "\\'")) + '\')"><span class="ic">' + escapeHtml(ext || '📎') + '</span>' +
+        escapeHtml(name) + '</span>';
+      const prom = canProm
+        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:6px;" onclick="promoteChatAttachment(' + m.id + ',' + idx + ')"><i class="ti ti-file-invoice"></i> Оформить как счёт</button>'
+        : '';
+      return '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' + card + prom + '</div>';
+    }).join('') +
+      ((m.kind === 'invoice') ? '<div style="font-size:11px;color:#15803D;font-weight:600;margin-top:2px;"><i class="ti ti-check"></i> оформлен как счёт</div>' : '') +
+      '</div>';
+  } else if (list.length) {
+    atts = '<div class="mm-atts"><span class="mm-att"><span class="ic">📎</span>' + list.length + ' влож.</span></div>';
+  }
+  return '<div class="mm-bub ' + (out ? 'out' : 'in') + '">' +
+    (who ? '<div class="mm-who">' + escapeHtml(who) + '</div>' : '') + subj +
+    '<div class="mm-body">' + escapeHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
+    '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
   '</div>';
+}
+
+// v2.45.7xx: оформить файл из переписки «Почта/MAX» как входящий счёт.
+async function promoteChatAttachment(inboxId, idx) {
+  if (typeof canManageSupply === 'function' && !canManageSupply()) {
+    showToast('Доступно директору, заму, менеджеру', 'error'); return;
+  }
+  if (!confirm('Оформить этот файл как входящий счёт? Он появится в разделе «Входящие счета».')) return;
+  try {
+    const r = await apiPost('/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/to-invoice', {});
+    if (r && r.ok && r.data && r.data.ok) {
+      showToast(r.data.recognized ? 'Оформлено как счёт — реквизиты распознаны' : 'Оформлено как счёт', 'success');
+      if (state._mailPeer) openMailThread(state._mailPeer);
+    } else {
+      showToast((r && r.data && (r.data.message || r.data.error)) || 'Не удалось оформить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 async function sendMailReply() {
   const peer = state._mailPeer;
@@ -6211,10 +6360,10 @@ function showMaxConnectHelp() {
   ov.innerHTML = '<div style="background:var(--card);border-radius:14px;width:min(480px,94vw);max-height:86vh;overflow-y:auto;" onclick="event.stopPropagation()">' +
     '<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span><i class="ti ti-help-circle" style="color:var(--brand);"></i> Как подключить менеджера к MAX</span><button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mail-help-overlay\').remove()"><i class="ti ti-x"></i></button></div>' +
     '<div style="padding:16px;font-size:13.5px;color:var(--text-mid);line-height:1.6;">' +
-      'Бот <b>не может написать первым</b> — сначала человек должен открыть с ним диалог.' +
+      'Бот <b>не может написать первым</b> — сначала поставщик должен открыть с ним диалог.' +
       '<ol style="margin:10px 0 0;padding-left:20px;">' +
-        '<li>Менеджер находит в MAX бота <b>Atom</b> (тот, куда вы присылаете счета) и открывает чат.</li>' +
-        '<li>Пишет боту любое сообщение (можно «привет» или сразу счёт) — это авторизация.</li>' +
+        '<li>Дай поставщику ссылку на бота <b>«Атомус Групп Общение»</b>: <a href="https://max.ru/id7415103479_1_bot" target="_blank" style="color:var(--brand);">max.ru/id7415103479_1_bot</a></li>' +
+        '<li>Поставщик открывает чат и пишет любое сообщение (можно «привет» или сразу счёт) — это авторизация.</li>' +
         '<li>Он появляется в списке слева — жми на него и <b>«Привязать к поставщику»</b>.</li>' +
         '<li>После привязки переписка и его счета относятся к нужному поставщику.</li>' +
       '</ol>' +
@@ -7516,7 +7665,7 @@ function renderSupplyShopping(d) {
         '</td>' +
         '<td class="ssp-stock" style="text-align:right;color:var(--text-light);font-size:12px;">' +
           '<span class="ssp-meta-label">остаток: </span>' +
-          escapeHtml(String(it.qty_on_stock)) +
+          escapeHtml(String(it.effective_stock != null ? it.effective_stock : it.qty_on_stock)) +
           (parseFloat(it.min_stock) > 0 ? ' <span style="color:var(--text-faint);">/ мин. ' + escapeHtml(String(it.min_stock)) + '</span>' : '') +
         '</td>' +
         qtyCell +
@@ -7542,12 +7691,26 @@ function renderSupplyShopping(d) {
       }
       const sName = JSON.stringify(it.component_name || '').replace(/"/g, '&quot;');
       const q = Number(it.recommended_qty) || 0;
+      // v2.45.7xx: показываем ЭФФЕКТИВНЫЙ остаток (своё + варианты + в свободных
+      // собранных узлах на складе), а не только собственный. Если есть варианты
+      // или узлы — даём разбивку, чтобы было понятно, откуда наличие.
+      const _own = Number(it.qty_on_stock || 0);
+      const _v = Number(it.variants_stock || 0);
+      const _a = Number(it.assm_stock || 0);
+      const _eff = (it.effective_stock != null ? Number(it.effective_stock) : _own);
+      let _brk = '';
+      if (_v > 0 || _a > 0) {
+        const _p = ['своё ' + _own];
+        if (_v > 0) _p.push('вариантов ' + _v);
+        if (_a > 0) _p.push('в сборках ' + _a);
+        _brk = ' <span style="color:var(--text-light);font-weight:400;font-size:11px;">(' + _p.join(', ') + ')</span>';
+      }
       return '<div class="sv2-item">' +
         '<div class="sv2-item-top">' +
           '<div class="sv2-item-body" onclick="openComponentDetail(' + it.component_id + ')">' +
             '<div class="sv2-item-name">' + crit + escapeHtml(it.component_name || '') +
               (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
-            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(it.qty_on_stock)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b></div>' +
+            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(_eff)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b>' + _brk + '</div>' +
           '</div>' +
           '<button class="sv2-item-x" title="Приход на склад (оприходовать)" style="color:#15803D;" onclick="event.stopPropagation();openComponentReceiveModal(' + it.component_id + ')"><i class="ti ti-package-import"></i></button>' +
           '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +
@@ -8875,6 +9038,18 @@ async function doBulkAssign(supplierId) {
 
 // v2.44.34: назначить поставщика компоненту прямо из «Что закупить»
 async function assignSupplierTo(componentId) {
+  return _openSupplierPicker({ mode: 'component', targetId: componentId,
+    title: 'Назначить поставщика' });
+}
+
+// v2.45.713: тот же выбор поставщика — для перевода ЗАКАЗА на другую компанию
+// (запросил счёт у одних, а прислала другая фирма)
+async function changeOrderSupplier(orderId) {
+  return _openSupplierPicker({ mode: 'order', targetId: orderId,
+    title: 'Перевести заказ на поставщика' });
+}
+
+async function _openSupplierPicker(opts) {
   if (!cache.suppliers || !cache.suppliers.length) {
     try {
       const r = await apiGet('/api/suppliers');
@@ -8891,7 +9066,7 @@ async function assignSupplierTo(componentId) {
     modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
     modal.innerHTML = '<div class="modal" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-truck"></i> Назначить поставщика</h3>' +
+        '<h3 id="asgn-sup-title"><i class="ti ti-truck"></i> Назначить поставщика</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'assign-supplier-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="padding:14px 16px;">' +
@@ -8901,8 +9076,11 @@ async function assignSupplierTo(componentId) {
     '</div>';
     document.body.appendChild(modal);
   }
+  const ttl = document.getElementById('asgn-sup-title');
+  if (ttl) ttl.innerHTML = '<i class="ti ti-truck"></i> ' + escapeHtml(opts.title || 'Назначить поставщика');
   window._assignSupplierAll = suppliers;
-  window._assignSupplierComponentId = componentId;
+  window._assignSupplierMode = opts.mode || 'component';
+  window._assignSupplierComponentId = opts.targetId;
   filterAssignSupplierList('');
   modal.classList.add('visible');
   setTimeout(() => {
@@ -8936,15 +9114,23 @@ function filterAssignSupplierList(query) {
 async function doAssignSupplier(supplierId) {
   const cid = window._assignSupplierComponentId;
   if (!cid) return;
+  const mode = window._assignSupplierMode || 'component';
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/components/' + cid, {
+    // v2.45.713: режим 'order' — переводим заказ на другого поставщика
+    const url = mode === 'order'
+      ? API_BASE + '/api/supply-orders/' + cid
+      : API_BASE + '/api/components/' + cid;
+    const body = mode === 'order'
+      ? { supplier_id: supplierId }
+      : { default_supplier_id: supplierId };
+    const r = await fetch(url, {
       method: 'PATCH',
       headers: {
         'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ default_supplier_id: supplierId }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
@@ -8953,8 +9139,15 @@ async function doAssignSupplier(supplierId) {
     }
     const modal = document.getElementById('assign-supplier-modal');
     if (modal) modal.classList.remove('visible');
-    showToast('Поставщик назначен', 'success');
-    loadSupplyShopping();
+    if (mode === 'order') {
+      const sup = (window._assignSupplierAll || []).find(s => s.id === supplierId);
+      showToast('Заказ переведён на «' + ((sup && sup.name) || 'поставщика') + '»', 'success');
+      cache.supplyOrders = null;
+      if (typeof openSupplyOrder === 'function') openSupplyOrder(cid);
+    } else {
+      showToast('Поставщик назначен', 'success');
+      loadSupplyShopping();
+    }
   } catch (e) {
     showToast('Не удалось: ' + (e.message || e), 'error');
   }
@@ -10894,7 +11087,7 @@ async function createOrderFromInbox(inboxId) {
   }
 }
 
-async function submitAttachInboxToOrder(inboxId) {
+async function submitAttachInboxToOrder(inboxId, switchSupplier) {
   const sel = document.getElementById('inbox-attach-order-select');
   const orderId = parseInt((sel && sel.value) || '0', 10);
   if (!orderId) { showToast('Выбери заказ', 'error'); return; }
@@ -10902,14 +11095,24 @@ async function submitAttachInboxToOrder(inboxId) {
     const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/attach', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: orderId }),
+      body: JSON.stringify({ order_id: orderId, switch_supplier: !!switchSupplier }),
     });
     const j = await r.json().catch(() => ({}));
+    // v2.45.713: счёт от другой компании — CRM предлагает перевести заказ на неё
+    if (r.status === 409 && j.error === 'supplier_mismatch') {
+      const ok = confirm('Счёт пришёл от «' + (j.sender_supplier_name || '?') + '», ' +
+        'а заказ оформлен на «' + (j.order_supplier_name || '?') + '».\n\n' +
+        'Перевести заказ на «' + (j.sender_supplier_name || '?') + '» и привязать счёт?');
+      if (ok) return submitAttachInboxToOrder(inboxId, true);
+      return;
+    }
     if (!r.ok) {
       showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
       return;
     }
-    showToast('Привязано к заказу', 'success');
+    showToast(j.switched_to
+      ? 'Заказ переведён на «' + j.switched_to + '», счёт привязан'
+      : 'Привязано к заказу', 'success');
     document.getElementById('inbox-attach-modal')?.remove();
     await loadSupplyInbox();
   } catch (e) {
@@ -11724,6 +11927,10 @@ function renderSupplyOrderDetail(o) {
   html += '<div class="detail-block">' +
     '<div class="detail-block-title"><i class="ti ti-truck-loading"></i> Поставщик' +
       '<button class="btn btn-secondary btn-small" style="margin-left:auto;" onclick="openOrderThread(' + o.id + ')"><i class="ti ti-messages"></i> Переписка</button>' +
+      // v2.45.713: счёт прислала другая компания → заказ можно перевести на неё
+      (canManage && !['received', 'cancelled'].includes(o.status)
+        ? '<button class="btn btn-secondary btn-small" onclick="changeOrderSupplier(' + o.id + ')" title="Перевести заказ на другого поставщика"><i class="ti ti-switch-horizontal"></i> Сменить</button>'
+        : '') +
       (o.supplier_id ? '<button class="btn btn-secondary btn-small" onclick="openEditSupplier(' + o.supplier_id + ')" title="Карточка поставщика"><i class="ti ti-user-cog"></i></button>' : '') +
     '</div>' +
     '<div class="detail-grid">' +
@@ -13956,6 +14163,85 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.714',
+    date: '08.07.2026',
+    title: '«Мой день» — видно, какая работа проставлена',
+    features: [
+      'В строке полосы теперь виден <b>этап</b> («Сборка», «ПНР», «Электрика»…) и <b>«что именно»</b> — то, что выбрали при старте',
+      'Мастер с одного взгляда видит: кто, над чем и на каком этапе — и у живых, и у паузных строк',
+      'В карточке отрезков этап тоже показан',
+    ],
+  },
+  {
+    version: 'v2.45.713',
+    date: '08.07.2026',
+    title: 'Счёт пришёл от другой компании — заказ переезжает за ним',
+    features: [
+      'Запросил счёт у одних, а прислала другая фирма? Теперь в карточке заказа есть <b>«Сменить»</b> у блока Поставщик — заказ со всеми позициями и историей переводится на другую компанию',
+      'При привязке счёта CRM <b>сама замечает</b>, что отправитель — не тот поставщик, и предлагает перевести заказ на него одним нажатием',
+      'Если новой фирмы нет в справочнике — заведи её в «Поставщики» и меняй',
+    ],
+  },
+  {
+    version: 'v2.45.712',
+    date: '08.07.2026',
+    title: 'Метка изделия — когда на заказе два одинаковых',
+    features: [
+      'У работы появилась <b>метка</b>: «№1», «№2», «левый», «с рекуператором» — что удобно',
+      'Прописать: открой работу → рядом с названием кнопка <b>🏷 метка</b> (или клик по существующей — поменять, пусто — убрать)',
+      'Метка видна везде: <b>на карточке канбана</b> (жёлтый ярлычок), <b>на полосе «Мой день»</b> и в <b>загрузке сборщиков</b>',
+      'Теперь два Atom-BRAS-10MT на одном заказе не перепутаешь',
+    ],
+  },
+  {
+    version: 'v2.45.711',
+    date: '08.07.2026',
+    title: '«Мой день» — ровно и с подтверждением',
+    features: [
+      'Полоса выровнена по сетке: <b>кнопки и время — ровными колонками</b> во всех строках, одинаковый шрифт таймера',
+      '«Закончил» теперь спрашивает: <b>окно подтверждения</b> с работой, исполнителем и временем за сегодня — «Да, всё сделано» / «Отмена»',
+      'На телефоне кнопки встают ровной строкой под названием работы',
+    ],
+  },
+  {
+    version: 'v2.45.710',
+    date: '08.07.2026',
+    title: '«Мой день» — вся бригада на одной полосе',
+    features: [
+      'Полоса таймеров на Производстве теперь <b>командная</b>: мастер запустил работу Шевелеву — строчка видна обоим',
+      'Чужие строки подсвечены и подписаны: <b>👤 кто делает</b>',
+      'Мастер и директор управляют чужими таймерами: <b>пауза / продолжить / закончил</b> прямо с полосы',
+      'Пауза одной + запуск другой — строки копятся: старая гаснет «на паузе», новая идёт, ничего не пропадает',
+      'Прогресс «мой день … из 8 ч» считает <b>только ваше время</b> — чужие таймеры на него не влияют',
+    ],
+  },
+  {
+    version: 'v2.45.708',
+    date: '08.07.2026',
+    title: 'Почта и MAX — понятно, что откуда',
+    features: [
+      'Канал виден сразу: <b>бейдж на аватарке</b> (✉ синий — почта, 💬 фиолетовый — MAX) + чип у имени',
+      'Фильтры над списком: <b>Все · Почта · MAX</b> со счётчиками',
+      'Письмо читается как чат: наши сообщения справа, их — слева; <b>подпись и цитата свёрнуты</b> в «▸ подпись и цитата»',
+      '<b>Вложения — карточками</b> с именем файла (PDF и т.д.) — клик скачивает',
+      'Привязка к поставщику видна в списке (зелёная 🔗 / янтарная ⚠) и жёлтой полосой в переписке',
+      'У поля ответа видно, куда уйдёт сообщение: ✉ почтой или 💬 в MAX',
+    ],
+  },
+  {
+    version: 'v2.45.704',
+    date: '07.07.2026',
+    title: 'Производство: «Мой день» — таймер прямо на канбане',
+    features: [
+      'На карточках доски (В очереди / В работе) — кнопка <b>«▶ Начать»</b>: выбрал этап (ПНР, сборка…), кто с тобой, что именно — и погнали',
+      'Над доской — полоса <b>«Мой день»</b>: каждая незакрытая работа своей строкой, паузная гаснет; Пауза / Продолжить / Закончил в один тап + прогресс дня к 8 ч',
+      'Начал другую работу — текущая <b>сама встаёт на паузу</b> с записью отрезка в журнал',
+      'Клик по строке — <b>отрезки</b>: во сколько начал/стоп, чистое время, ✎ поправить, если забыл нажать стоп',
+      '«Что именно» <b>запоминается</b> и предлагается подсказками; напарникам время пишется каждому',
+      'Всё ложится в существующий журнал сессий — Сводки и часы по работам считаются как раньше',
+    ],
+  },
   {
     version: 'v2.45.701',
     date: '07.07.2026',
