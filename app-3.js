@@ -6139,13 +6139,48 @@ async function openMailThread(peer) {
 function _mailMsgBubble(m) {
   const out = m.dir === 'out';
   const who = out ? 'Мы' : (m.from_name || '');
-  const atts = (m.attachments || []).length ? '<div style="font-size:11.5px;margin-top:4px;opacity:.8;">📎 ' + m.attachments.length + '</div>' : '';
   const subj = (m.subject && !out) ? '<div style="font-size:11px;color:var(--text-light);margin-bottom:2px;">' + escapeHtml(m.subject) + '</div>' : '';
+  // v2.45.7xx: вложения переписки — кнопка скачивания + (для входящих файлов «на
+  // просмотр» из бота «Общение», kind='chat') кнопка «Оформить как счёт». После
+  // оформления (kind='invoice') кнопки нет — показываем отметку.
+  let atts = '';
+  const list = m.attachments || [];
+  if (list.length) {
+    const canProm = !out && (m.kind === 'chat') && (typeof canManageSupply === 'function' && canManageSupply());
+    const rows = list.map(function (a, i) {
+      const nm = escapeHtml(a.name || ('файл ' + (i + 1)));
+      const dl = '<button class="btn btn-secondary btn-small" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + i + ',\'' + escapeHtml(a.name || 'file') + '\')"><i class="ti ti-paperclip"></i> ' + nm + '</button>';
+      const prom = canProm
+        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="promoteChatAttachment(' + m.id + ',' + i + ')"><i class="ti ti-file-invoice"></i> Оформить как счёт</button>'
+        : '';
+      return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + dl + prom + '</div>';
+    }).join('');
+    const doneMark = (!out && m.kind === 'invoice')
+      ? '<div style="font-size:11px;color:#15803D;font-weight:600;"><i class="ti ti-check"></i> оформлен как счёт</div>' : '';
+    atts = '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">' + rows + doneMark + '</div>';
+  }
   return '<div style="max-width:80%;align-self:' + (out ? 'flex-end' : 'flex-start') + ';background:' + (out ? '#DCF0FF' : 'var(--card)') + ';border:1px solid var(--border);border-radius:12px;padding:8px 12px;">' +
     (who ? '<div style="font-size:11px;font-weight:600;color:var(--text-mid);margin-bottom:2px;">' + escapeHtml(who) + '</div>' : '') + subj +
     '<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.4;word-break:break-word;">' + escapeHtml((m.body || '').slice(0, 4000)) + '</div>' + atts +
     '<div style="font-size:10.5px;color:var(--text-light);text-align:right;margin-top:3px;">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
   '</div>';
+}
+
+// v2.45.7xx: оформить файл из переписки «Почта/MAX» как входящий счёт.
+async function promoteChatAttachment(inboxId, idx) {
+  if (typeof canManageSupply === 'function' && !canManageSupply()) {
+    showToast('Доступно директору, заму, менеджеру', 'error'); return;
+  }
+  if (!confirm('Оформить этот файл как входящий счёт? Он появится в разделе «Входящие счета».')) return;
+  try {
+    const r = await apiPost('/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/to-invoice', {});
+    if (r && r.ok && r.data && r.data.ok) {
+      showToast(r.data.recognized ? 'Оформлено как счёт — реквизиты распознаны' : 'Оформлено как счёт', 'success');
+      if (state._mailPeer) openMailThread(state._mailPeer);
+    } else {
+      showToast((r && r.data && (r.data.message || r.data.error)) || 'Не удалось оформить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
 }
 async function sendMailReply() {
   const peer = state._mailPeer;
