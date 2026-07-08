@@ -9036,6 +9036,18 @@ async function doBulkAssign(supplierId) {
 
 // v2.44.34: назначить поставщика компоненту прямо из «Что закупить»
 async function assignSupplierTo(componentId) {
+  return _openSupplierPicker({ mode: 'component', targetId: componentId,
+    title: 'Назначить поставщика' });
+}
+
+// v2.45.713: тот же выбор поставщика — для перевода ЗАКАЗА на другую компанию
+// (запросил счёт у одних, а прислала другая фирма)
+async function changeOrderSupplier(orderId) {
+  return _openSupplierPicker({ mode: 'order', targetId: orderId,
+    title: 'Перевести заказ на поставщика' });
+}
+
+async function _openSupplierPicker(opts) {
   if (!cache.suppliers || !cache.suppliers.length) {
     try {
       const r = await apiGet('/api/suppliers');
@@ -9052,7 +9064,7 @@ async function assignSupplierTo(componentId) {
     modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
     modal.innerHTML = '<div class="modal" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-truck"></i> Назначить поставщика</h3>' +
+        '<h3 id="asgn-sup-title"><i class="ti ti-truck"></i> Назначить поставщика</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'assign-supplier-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="padding:14px 16px;">' +
@@ -9062,8 +9074,11 @@ async function assignSupplierTo(componentId) {
     '</div>';
     document.body.appendChild(modal);
   }
+  const ttl = document.getElementById('asgn-sup-title');
+  if (ttl) ttl.innerHTML = '<i class="ti ti-truck"></i> ' + escapeHtml(opts.title || 'Назначить поставщика');
   window._assignSupplierAll = suppliers;
-  window._assignSupplierComponentId = componentId;
+  window._assignSupplierMode = opts.mode || 'component';
+  window._assignSupplierComponentId = opts.targetId;
   filterAssignSupplierList('');
   modal.classList.add('visible');
   setTimeout(() => {
@@ -9097,15 +9112,23 @@ function filterAssignSupplierList(query) {
 async function doAssignSupplier(supplierId) {
   const cid = window._assignSupplierComponentId;
   if (!cid) return;
+  const mode = window._assignSupplierMode || 'component';
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/components/' + cid, {
+    // v2.45.713: режим 'order' — переводим заказ на другого поставщика
+    const url = mode === 'order'
+      ? API_BASE + '/api/supply-orders/' + cid
+      : API_BASE + '/api/components/' + cid;
+    const body = mode === 'order'
+      ? { supplier_id: supplierId }
+      : { default_supplier_id: supplierId };
+    const r = await fetch(url, {
       method: 'PATCH',
       headers: {
         'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ default_supplier_id: supplierId }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
@@ -9114,8 +9137,15 @@ async function doAssignSupplier(supplierId) {
     }
     const modal = document.getElementById('assign-supplier-modal');
     if (modal) modal.classList.remove('visible');
-    showToast('Поставщик назначен', 'success');
-    loadSupplyShopping();
+    if (mode === 'order') {
+      const sup = (window._assignSupplierAll || []).find(s => s.id === supplierId);
+      showToast('Заказ переведён на «' + ((sup && sup.name) || 'поставщика') + '»', 'success');
+      cache.supplyOrders = null;
+      if (typeof openSupplyOrder === 'function') openSupplyOrder(cid);
+    } else {
+      showToast('Поставщик назначен', 'success');
+      loadSupplyShopping();
+    }
   } catch (e) {
     showToast('Не удалось: ' + (e.message || e), 'error');
   }
@@ -11055,7 +11085,7 @@ async function createOrderFromInbox(inboxId) {
   }
 }
 
-async function submitAttachInboxToOrder(inboxId) {
+async function submitAttachInboxToOrder(inboxId, switchSupplier) {
   const sel = document.getElementById('inbox-attach-order-select');
   const orderId = parseInt((sel && sel.value) || '0', 10);
   if (!orderId) { showToast('Выбери заказ', 'error'); return; }
@@ -11063,14 +11093,24 @@ async function submitAttachInboxToOrder(inboxId) {
     const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/attach', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: orderId }),
+      body: JSON.stringify({ order_id: orderId, switch_supplier: !!switchSupplier }),
     });
     const j = await r.json().catch(() => ({}));
+    // v2.45.713: счёт от другой компании — CRM предлагает перевести заказ на неё
+    if (r.status === 409 && j.error === 'supplier_mismatch') {
+      const ok = confirm('Счёт пришёл от «' + (j.sender_supplier_name || '?') + '», ' +
+        'а заказ оформлен на «' + (j.order_supplier_name || '?') + '».\n\n' +
+        'Перевести заказ на «' + (j.sender_supplier_name || '?') + '» и привязать счёт?');
+      if (ok) return submitAttachInboxToOrder(inboxId, true);
+      return;
+    }
     if (!r.ok) {
       showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
       return;
     }
-    showToast('Привязано к заказу', 'success');
+    showToast(j.switched_to
+      ? 'Заказ переведён на «' + j.switched_to + '», счёт привязан'
+      : 'Привязано к заказу', 'success');
     document.getElementById('inbox-attach-modal')?.remove();
     await loadSupplyInbox();
   } catch (e) {
@@ -11885,6 +11925,10 @@ function renderSupplyOrderDetail(o) {
   html += '<div class="detail-block">' +
     '<div class="detail-block-title"><i class="ti ti-truck-loading"></i> Поставщик' +
       '<button class="btn btn-secondary btn-small" style="margin-left:auto;" onclick="openOrderThread(' + o.id + ')"><i class="ti ti-messages"></i> Переписка</button>' +
+      // v2.45.713: счёт прислала другая компания → заказ можно перевести на неё
+      (canManage && !['received', 'cancelled'].includes(o.status)
+        ? '<button class="btn btn-secondary btn-small" onclick="changeOrderSupplier(' + o.id + ')" title="Перевести заказ на другого поставщика"><i class="ti ti-switch-horizontal"></i> Сменить</button>'
+        : '') +
       (o.supplier_id ? '<button class="btn btn-secondary btn-small" onclick="openEditSupplier(' + o.supplier_id + ')" title="Карточка поставщика"><i class="ti ti-user-cog"></i></button>' : '') +
     '</div>' +
     '<div class="detail-grid">' +
@@ -14117,6 +14161,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.713',
+    date: '08.07.2026',
+    title: 'Счёт пришёл от другой компании — заказ переезжает за ним',
+    features: [
+      'Запросил счёт у одних, а прислала другая фирма? Теперь в карточке заказа есть <b>«Сменить»</b> у блока Поставщик — заказ со всеми позициями и историей переводится на другую компанию',
+      'При привязке счёта CRM <b>сама замечает</b>, что отправитель — не тот поставщик, и предлагает перевести заказ на него одним нажатием',
+      'Если новой фирмы нет в справочнике — заведи её в «Поставщики» и меняй',
+    ],
+  },
   {
     version: 'v2.45.712',
     date: '08.07.2026',
