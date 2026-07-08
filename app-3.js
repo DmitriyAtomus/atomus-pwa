@@ -6470,8 +6470,11 @@ async function cdekRefresh() {
   try {
     const r = await apiPost('/api/logistics/cdek/refresh', {});
     const j = (r && r.data) || {};
-    if (r && r.ok) showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0), 'success');
-    else showToast(j.message || 'Не удалось', 'error');
+    if (r && r.ok) {
+      const found = (j.found || []).length;
+      showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0) +
+        (found ? ' · найдено в переписке: ' + found : ''), 'success');
+    } else showToast(j.message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
 }
@@ -14274,6 +14277,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.720',
+    date: '08.07.2026',
+    title: 'СДЭК — если нам что-то отправили, CRM увидит сама',
+    features: [
+      'Робот <b>сам вылавливает номера накладных СДЭК</b> из входящих писем и MAX от поставщиков («отправили СДЭК, накладная 12345…»)',
+      'Каждый найденный номер <b>проверяется через API СДЭК</b> — случайные числа (номера счетов и т.п.) не попадают',
+      'Пойманные отправления появляются в Логистике с подписью 📨 от кого пришёл трек',
+      'Кнопка ⟳ теперь тоже сначала ищет новые треки в переписке, потом обновляет статусы',
+    ],
+  },
   {
     version: 'v2.45.719',
     date: '08.07.2026',
