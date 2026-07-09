@@ -6433,35 +6433,76 @@ function renderSalesCalcs() {
   });
   box.innerHTML = h;
 }
-async function calcCreateOpen() {
+// v2.45.726: выбор контрагента поиском — селект на сотни позиций не годится
+var _calcCoPicked = null;
+function _calcCoComboHtml(current) {
+  _calcCoPicked = current || null;
+  return '<div class="calc-combo">' +
+    '<input id="calc-co-search" class="form-input" autocomplete="off" ' +
+      'placeholder="начни печатать название…" ' +
+      'value="' + escapeHtml((current && current.name) || '') + '" ' +
+      'oninput="calcCoFilter(this.value)" onfocus="calcCoFilter(this.value)">' +
+    '<button type="button" class="calc-combo-x" onclick="calcCoPick(null,\'\')" title="Очистить"><i class="ti ti-x"></i></button>' +
+    '<div class="calc-combo-list" id="calc-co-list" style="display:none;"></div>' +
+  '</div>';
+}
+function calcCoFilter(q) {
+  const list = document.getElementById('calc-co-list');
+  if (!list) return;
+  q = (q || '').trim().toLowerCase();
+  const all = cache.contractors || [];
+  const found = (q ? all.filter(c => (c.name || '').toLowerCase().includes(q)) : all).slice(0, 30);
+  list.innerHTML = found.length ? found.map(c =>
+    '<div class="calc-combo-row" data-id="' + c.id + '">' + escapeHtml(c.name || '') + '</div>').join('')
+    : '<div class="calc-combo-row mut">не нашлось — впиши клиента текстом ниже</div>';
+  list.querySelectorAll('.calc-combo-row[data-id]').forEach(el => {
+    el.onclick = function () { calcCoPick(parseInt(el.dataset.id, 10), el.textContent); };
+  });
+  list.style.display = 'block';
+}
+function calcCoPick(id, name) {
+  _calcCoPicked = id ? { id: id, name: name } : null;
+  const inp = document.getElementById('calc-co-search');
+  if (inp) inp.value = id ? name : '';
+  const list = document.getElementById('calc-co-list');
+  if (list) list.style.display = 'none';
+}
+async function _calcEnsureRefs() {
   if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
-  let contractors = cache.contractors;
-  if (!contractors) {
-    try { const r = await apiGet('/api/contractors'); contractors = cache.contractors = r.contractors || r || []; }
-    catch (e) { contractors = []; }
+  if (!cache.contractors) {
+    try { const r = await apiGet('/api/contractors'); cache.contractors = r.contractors || []; }
+    catch (e) { cache.contractors = []; }
   }
+}
+async function calcCreateOpen() {
+  await _calcEnsureRefs();
   const emps = (cache.activeEmployees || []);
   const empOpts = '<option value="">— потом решим —</option>' + emps.map(e =>
     '<option value="' + e.id + '">' + escapeHtml(e.short_name || e.full_name) + '</option>').join('');
-  const coOpts = '<option value="">— не привязан (можно позже) —</option>' + (contractors || []).map(co =>
-    '<option value="' + co.id + '">' + escapeHtml(co.name) + '</option>').join('');
   let ovl = document.getElementById('calc-modal');
   if (ovl) ovl.remove();
   ovl = document.createElement('div');
   ovl.id = 'calc-modal';
   ovl.className = 'modal-overlay visible';
   ovl.onclick = function (e) { if (e.target === ovl) ovl.remove(); };
-  ovl.innerHTML = '<div class="modal" style="max-width:480px;">' +
+  ovl.innerHTML = '<div class="modal calc-modal">' +
     '<div class="modal-header"><h3><i class="ti ti-calculator"></i> Новый расчёт</h3>' +
     '<button class="icon-btn" onclick="document.getElementById(\'calc-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
-    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">' +
-      '<label class="calc-lbl">Что считаем<input id="calc-title" class="form-input" placeholder="Например: чиллер 40 кВт для мясного цеха"></label>' +
-      '<label class="calc-lbl">Контрагент<select id="calc-co" class="form-input">' + coOpts + '</select></label>' +
-      '<label class="calc-lbl">Клиент текстом (если нет в справочнике)<input id="calc-client" class="form-input" placeholder="ООО Ромашка, Иван, +7…"></label>' +
-      '<label class="calc-lbl">Что нужно рассчитать / сделать — уйдёт первым сообщением в чат' +
-        '<textarea id="calc-note" class="form-input" rows="3" placeholder="Менеджер: надо посчитать то и то…"></textarea></label>' +
-      '<label class="calc-lbl">Кто считает<select id="calc-emp" class="form-input">' + empOpts + '</select></label>' +
-      '<button class="pl-btn pri" style="justify-content:center;" onclick="calcCreate()"><i class="ti ti-check"></i> Создать расчёт и открыть чат</button>' +
+    '<div class="calc-form">' +
+      '<label class="calc-lbl">Что считаем' +
+        '<input id="calc-title" class="form-input" placeholder="Чиллер 40 кВт для мясного цеха"></label>' +
+      '<label class="calc-lbl">Контрагент <span class="calc-opt">из справочника · можно позже</span>' +
+        _calcCoComboHtml(null) + '</label>' +
+      '<label class="calc-lbl">Клиент текстом <span class="calc-opt">если в справочнике ещё нет</span>' +
+        '<input id="calc-client" class="form-input" placeholder="ООО Ромашка, Иван, +7…"></label>' +
+      '<label class="calc-lbl">Что нужно рассчитать / сделать <span class="calc-opt">уйдёт первым сообщением в чат</span>' +
+        '<textarea id="calc-note" class="form-input" rows="3" placeholder="Надо посчитать то и то…"></textarea></label>' +
+      '<label class="calc-lbl">Кто считает' +
+        '<select id="calc-emp" class="form-input">' + empOpts + '</select></label>' +
+    '</div>' +
+    '<div class="calc-actions">' +
+      '<button class="pl-btn ghost2" onclick="document.getElementById(\'calc-modal\').remove()">Отмена</button>' +
+      '<button class="pl-btn pri" onclick="calcCreate()"><i class="ti ti-check"></i> Создать и открыть чат</button>' +
     '</div></div>';
   document.body.appendChild(ovl);
   setTimeout(() => { const t = document.getElementById('calc-title'); if (t) t.focus(); }, 60);
@@ -6473,7 +6514,7 @@ async function calcCreate() {
   try {
     const r = await apiPost('/api/sales/calcs', {
       title: title,
-      contractor_id: g('calc-co') ? parseInt(g('calc-co'), 10) || null : null,
+      contractor_id: _calcCoPicked ? _calcCoPicked.id : null,
       client_name: g('calc-client').trim(),
       note: g('calc-note').trim(),
       assignee_id: g('calc-emp') ? parseInt(g('calc-emp'), 10) || null : null,
@@ -6487,45 +6528,49 @@ async function calcCreate() {
     } else showToast(j.message || 'Не удалось создать', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
-function calcOpen(id) {
+async function calcOpen(id) {
   const c = ((_calcs && _calcs.calcs) || []).find(x => x.id === id);
   if (!c) return;
+  await _calcEnsureRefs();
   const emps = (cache.activeEmployees || []);
   const empOpts = '<option value="">— не назначен —</option>' + emps.map(e =>
     '<option value="' + e.id + '"' + (c.assignee_id === e.id ? ' selected' : '') + '>' +
     escapeHtml(e.short_name || e.full_name) + '</option>').join('');
-  const coOpts = '<option value="">— не привязан —</option>' + (cache.contractors || []).map(co =>
-    '<option value="' + co.id + '"' + (c.contractor_id === co.id ? ' selected' : '') + '>' +
-    escapeHtml(co.name) + '</option>').join('');
   let ovl = document.getElementById('calc-modal');
   if (ovl) ovl.remove();
   ovl = document.createElement('div');
   ovl.id = 'calc-modal';
   ovl.className = 'modal-overlay visible';
   ovl.onclick = function (e) { if (e.target === ovl) ovl.remove(); };
-  const ST = [['in_progress', '▶ Считаем'], ['done', '✓ Посчитан'], ['cancelled', '✕ Отменить']];
-  ovl.innerHTML = '<div class="modal" style="max-width:480px;">' +
-    '<div class="modal-header"><h3>Р-' + c.id + ' · ' + escapeHtml(c.title) + '</h3>' +
+  const ST = [['in_progress', '▶ Считаем'], ['done', '✓ Посчитан'], ['cancelled', '✕ Отменён']];
+  const curCo = c.contractor_id ? { id: c.contractor_id, name: c.contractor_name || '' } : null;
+  ovl.innerHTML = '<div class="modal calc-modal">' +
+    '<div class="modal-header"><h3><span class="calc-num">Р-' + c.id + '</span> ' + escapeHtml(c.title) + '</h3>' +
     '<button class="icon-btn" onclick="document.getElementById(\'calc-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
-    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">' +
-      '<div>' + _calcStatusChip(c) + (c.offer_id ? ' <b>КП №' + c.offer_id + '</b>' : '') +
-        (c.client_name && !c.contractor_id ? ' · 🏢 ' + escapeHtml(c.client_name) : '') + '</div>' +
+    '<div class="calc-form">' +
+      '<div class="calc-meta">' + _calcStatusChip(c) +
+        (c.offer_id ? ' <b>КП №' + c.offer_id + '</b>' : '') +
+        (c.client_name && !c.contractor_id ? ' · 🏢 ' + escapeHtml(c.client_name) : '') +
+        (c.created_by_name ? ' · создал: ' + escapeHtml(c.created_by_name) : '') + '</div>' +
       (c.note ? '<div class="calc-note-view">' + escapeHtml(c.note) + '</div>' : '') +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + ST.map(s =>
-        '<button class="mini' + (c.status === s[0] ? ' onst' : '') + '" onclick="calcPatch(' + c.id + ',{status:\'' + s[0] + '\'})">' + s[1] + '</button>').join('') + '</div>' +
-      '<label class="calc-lbl">Кто считает<select class="form-input" onchange="calcPatch(' + c.id + ',{assignee_id:this.value?parseInt(this.value,10):null})">' + empOpts + '</select></label>' +
-      '<label class="calc-lbl">Контрагент (нужен для КП)<select class="form-input" onchange="calcPatch(' + c.id + ',{contractor_id:this.value?parseInt(this.value,10):null})">' + coOpts + '</select></label>' +
-      '<div style="display:flex;gap:8px;">' +
-        (c.chat_id ? '<button class="pl-btn pri" style="flex:1;justify-content:center;" onclick="document.getElementById(\'calc-modal\').remove();openTeamChat(' + c.chat_id + ')"><i class="ti ti-messages"></i> Открыть чат</button>' : '') +
-        (!c.offer_id && _calcs.can_offer
-          ? '<button class="pl-btn suc" style="flex:1;justify-content:center;" onclick="calcToOffer(' + c.id + ')"><i class="ti ti-file-invoice"></i> → Создать КП</button>'
-          : (c.offer_id ? '<button class="pl-btn suc" style="flex:1;justify-content:center;" onclick="document.getElementById(\'calc-modal\').remove();state.currentOfferId=' + c.offer_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-offer-detail\')"><i class="ti ti-external-link"></i> Открыть КП №' + c.offer_id + '</button>' : '')) +
-      '</div>' +
+      '<label class="calc-lbl">Статус<div class="calc-stbtns">' + ST.map(s =>
+        '<button class="calc-stbtn' + (c.status === s[0] ? ' on' : '') + '" onclick="calcPatch(' + c.id + ',{status:\'' + s[0] + '\'})">' + s[1] + '</button>').join('') + '</div></label>' +
+      '<label class="calc-lbl">Кто считает' +
+        '<select class="form-input" onchange="calcPatch(' + c.id + ',{assignee_id:this.value?parseInt(this.value,10):null})">' + empOpts + '</select></label>' +
+      '<label class="calc-lbl">Контрагент <span class="calc-opt">нужен для КП</span>' +
+        _calcCoComboHtml(curCo) + '</label>' +
+      '<button class="pl-btn ghost2" style="align-self:flex-start;" onclick="calcSaveCo(' + c.id + ')"><i class="ti ti-check"></i> Сохранить контрагента</button>' +
+    '</div>' +
+    '<div class="calc-actions">' +
+      (c.chat_id ? '<button class="pl-btn pri grow" onclick="document.getElementById(\'calc-modal\').remove();openTeamChat(' + c.chat_id + ')"><i class="ti ti-messages"></i> Открыть чат</button>' : '') +
+      (!c.offer_id && _calcs.can_offer
+        ? '<button class="pl-btn suc grow" onclick="calcToOffer(' + c.id + ')"><i class="ti ti-file-invoice"></i> → Создать КП</button>'
+        : (c.offer_id ? '<button class="pl-btn suc grow" onclick="document.getElementById(\'calc-modal\').remove();state.currentOfferId=' + c.offer_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-offer-detail\')"><i class="ti ti-external-link"></i> Открыть КП №' + c.offer_id + '</button>' : '')) +
     '</div></div>';
   document.body.appendChild(ovl);
-  if (!cache.contractors) {
-    apiGet('/api/contractors').then(r => { cache.contractors = r.contractors || r || []; }).catch(() => {});
-  }
+}
+function calcSaveCo(id) {
+  calcPatch(id, { contractor_id: _calcCoPicked ? _calcCoPicked.id : null });
 }
 async function calcPatch(id, fields) {
   try {
@@ -14799,6 +14844,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.726',
+    date: '09.07.2026',
+    title: 'Расчёты — форма приведена в порядок',
+    features: [
+      '<b>Контрагент — поиском</b>: начни печатать название, выпадут подсказки (вместо списка на сотни позиций), ✕ — очистить',
+      'Форма выровнена: подсказки серым у полей, ровные отступы, кнопки «Отмена» и «Создать» в едином стиле',
+      'В карточке расчёта статусы — аккуратными кнопками, контрагент тем же поиском + «Сохранить контрагента»',
+    ],
+  },
   {
     version: 'v2.45.725',
     date: '09.07.2026',
