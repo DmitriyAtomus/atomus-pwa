@@ -652,6 +652,10 @@
         <button class="nav-item" data-nav="sales-offers" onclick="selectSidebarItem('sales-offers')">
           <i class="ti ti-file-invoice"></i><span>КП</span>
         </button>
+        <!-- v2.45.725: Расчёты — предверие КП, с общим чатом -->
+        <button class="nav-item" data-nav="sales-calcs" onclick="selectSidebarItem('sales-calcs')">
+          <i class="ti ti-calculator"></i><span>Расчёты</span>
+        </button>
         <!-- v2.45.223: опросные листы (анкеты клиентов) -->
         <button class="nav-item" data-nav="sales-surveys" onclick="selectSidebarItem('sales-surveys')">
           <i class="ti ti-clipboard-text"></i><span>Опросные листы</span>
@@ -1768,6 +1772,18 @@
       </div>
 
       <!-- ============ КП: СПИСОК ============ -->
+      <!-- v2.45.725: Расчёты -->
+      <div class="screen" data-screen="sales-calcs" data-section="sales">
+        <div class="page-header">
+          <div class="page-header-title">
+            <i class="ti ti-calculator"></i>
+            <h1>Расчёты</h1>
+          </div>
+          <button class="btn btn-primary" onclick="calcCreateOpen()"><i class="ti ti-plus"></i> Новый расчёт</button>
+        </div>
+        <div id="sales-calcs-content"><div class="loading-block">Загрузка…</div></div>
+      </div>
+
       <div class="screen" data-screen="sales-offers" data-section="sales">
         <div class="screen-header">
           <h2>КП</h2>

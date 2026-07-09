@@ -6373,6 +6373,189 @@ function showMaxConnectHelp() {
 }
 
 // ============ ЛОГИСТИКА: забрать / в пути (v2.45.678, дизайн v2.45.685) ============
+// ============ v2.45.725: РАСЧЁТЫ (Продажи) — с чатом, перерастают в КП ============
+var _calcs = null;
+var _calcsFilter = 'active';
+async function loadSalesCalcs() {
+  const box = document.getElementById('sales-calcs-content');
+  if (!box) return;
+  try {
+    _calcs = await apiGet('/api/sales/calcs');
+    renderSalesCalcs();
+  } catch (e) {
+    box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить</div>';
+  }
+}
+function calcSetFilter(f) { _calcsFilter = f; renderSalesCalcs(); }
+function _calcStatusChip(c) {
+  const cls = { new: 'new', in_progress: 'run', done: 'done', to_offer: 'off', cancelled: 'mut' }[c.status] || 'new';
+  return '<span class="calc-st ' + cls + '">' + escapeHtml(c.status_label || c.status) + '</span>';
+}
+function renderSalesCalcs() {
+  const box = document.getElementById('sales-calcs-content');
+  if (!box || !_calcs) return;
+  const all = _calcs.calcs || [];
+  const counts = _calcs.counts || {};
+  const active = (counts.new || 0) + (counts.in_progress || 0) + (counts.done || 0);
+  const FILTERS = [
+    ['active', 'В работе', active],
+    ['to_offer', 'Стали КП', counts.to_offer || 0],
+    ['all', 'Все', all.length],
+  ];
+  let h = '<div class="calc-filters">' + FILTERS.map(f =>
+    '<button class="mm-filter' + (_calcsFilter === f[0] ? ' on' : '') + '" onclick="calcSetFilter(\'' + f[0] + '\')">' +
+    f[1] + ' <span class="c">' + f[2] + '</span></button>').join('') + '</div>';
+  let list = all;
+  if (_calcsFilter === 'active') list = all.filter(c => ['new', 'in_progress', 'done'].indexOf(c.status) >= 0);
+  if (_calcsFilter === 'to_offer') list = all.filter(c => c.status === 'to_offer');
+  if (!list.length) {
+    h += '<div class="logi-empty"><i class="ti ti-calculator"></i> Расчётов нет — создай первый: «＋ Новый расчёт».</div>';
+    box.innerHTML = h;
+    return;
+  }
+  list.forEach(c => {
+    const client = c.contractor_name || c.client_name || '';
+    const d = String(c.created_at || '').slice(0, 10);
+    const dd = d ? d.slice(8, 10) + '.' + d.slice(5, 7) : '';
+    h += '<div class="calc-card" onclick="calcOpen(' + c.id + ')">' +
+      '<div class="calc-main">' +
+        '<div class="calc-t1"><span class="calc-num">Р-' + c.id + '</span> ' + escapeHtml(c.title) + ' ' + _calcStatusChip(c) + '</div>' +
+        '<div class="calc-t2">' +
+          (client ? '🏢 ' + escapeHtml(client) + ' · ' : '') +
+          (c.assignee_name ? 'считает: <b>' + escapeHtml(c.assignee_name) + '</b> · ' : '') +
+          (dd ? 'от ' + dd : '') +
+          (c.offer_id ? ' · КП №' + c.offer_id : '') + '</div>' +
+        (c.last_msg ? '<div class="calc-last">💬 ' + escapeHtml(String(c.last_msg).slice(0, 90)) + '</div>' : '') +
+      '</div>' +
+      (c.chat_id ? '<button class="pl-btn pri sm" onclick="event.stopPropagation();openTeamChat(' + c.chat_id + ')"><i class="ti ti-messages"></i> Чат' +
+        (c.msg_count ? ' · ' + c.msg_count : '') + '</button>' : '') +
+    '</div>';
+  });
+  box.innerHTML = h;
+}
+async function calcCreateOpen() {
+  if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
+  let contractors = cache.contractors;
+  if (!contractors) {
+    try { const r = await apiGet('/api/contractors'); contractors = cache.contractors = r.contractors || r || []; }
+    catch (e) { contractors = []; }
+  }
+  const emps = (cache.activeEmployees || []);
+  const empOpts = '<option value="">— потом решим —</option>' + emps.map(e =>
+    '<option value="' + e.id + '">' + escapeHtml(e.short_name || e.full_name) + '</option>').join('');
+  const coOpts = '<option value="">— не привязан (можно позже) —</option>' + (contractors || []).map(co =>
+    '<option value="' + co.id + '">' + escapeHtml(co.name) + '</option>').join('');
+  let ovl = document.getElementById('calc-modal');
+  if (ovl) ovl.remove();
+  ovl = document.createElement('div');
+  ovl.id = 'calc-modal';
+  ovl.className = 'modal-overlay visible';
+  ovl.onclick = function (e) { if (e.target === ovl) ovl.remove(); };
+  ovl.innerHTML = '<div class="modal" style="max-width:480px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-calculator"></i> Новый расчёт</h3>' +
+    '<button class="icon-btn" onclick="document.getElementById(\'calc-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">' +
+      '<label class="calc-lbl">Что считаем<input id="calc-title" class="form-input" placeholder="Например: чиллер 40 кВт для мясного цеха"></label>' +
+      '<label class="calc-lbl">Контрагент<select id="calc-co" class="form-input">' + coOpts + '</select></label>' +
+      '<label class="calc-lbl">Клиент текстом (если нет в справочнике)<input id="calc-client" class="form-input" placeholder="ООО Ромашка, Иван, +7…"></label>' +
+      '<label class="calc-lbl">Что нужно рассчитать / сделать — уйдёт первым сообщением в чат' +
+        '<textarea id="calc-note" class="form-input" rows="3" placeholder="Менеджер: надо посчитать то и то…"></textarea></label>' +
+      '<label class="calc-lbl">Кто считает<select id="calc-emp" class="form-input">' + empOpts + '</select></label>' +
+      '<button class="pl-btn pri" style="justify-content:center;" onclick="calcCreate()"><i class="ti ti-check"></i> Создать расчёт и открыть чат</button>' +
+    '</div></div>';
+  document.body.appendChild(ovl);
+  setTimeout(() => { const t = document.getElementById('calc-title'); if (t) t.focus(); }, 60);
+}
+async function calcCreate() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const title = g('calc-title').trim();
+  if (!title) { showToast('Назови расчёт', 'error'); return; }
+  try {
+    const r = await apiPost('/api/sales/calcs', {
+      title: title,
+      contractor_id: g('calc-co') ? parseInt(g('calc-co'), 10) || null : null,
+      client_name: g('calc-client').trim(),
+      note: g('calc-note').trim(),
+      assignee_id: g('calc-emp') ? parseInt(g('calc-emp'), 10) || null : null,
+    });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      document.getElementById('calc-modal')?.remove();
+      showToast('Расчёт Р-' + j.id + ' создан', 'success');
+      loadSalesCalcs();
+      if (j.chat_id && typeof openTeamChat === 'function') openTeamChat(j.chat_id);
+    } else showToast(j.message || 'Не удалось создать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+function calcOpen(id) {
+  const c = ((_calcs && _calcs.calcs) || []).find(x => x.id === id);
+  if (!c) return;
+  const emps = (cache.activeEmployees || []);
+  const empOpts = '<option value="">— не назначен —</option>' + emps.map(e =>
+    '<option value="' + e.id + '"' + (c.assignee_id === e.id ? ' selected' : '') + '>' +
+    escapeHtml(e.short_name || e.full_name) + '</option>').join('');
+  const coOpts = '<option value="">— не привязан —</option>' + (cache.contractors || []).map(co =>
+    '<option value="' + co.id + '"' + (c.contractor_id === co.id ? ' selected' : '') + '>' +
+    escapeHtml(co.name) + '</option>').join('');
+  let ovl = document.getElementById('calc-modal');
+  if (ovl) ovl.remove();
+  ovl = document.createElement('div');
+  ovl.id = 'calc-modal';
+  ovl.className = 'modal-overlay visible';
+  ovl.onclick = function (e) { if (e.target === ovl) ovl.remove(); };
+  const ST = [['in_progress', '▶ Считаем'], ['done', '✓ Посчитан'], ['cancelled', '✕ Отменить']];
+  ovl.innerHTML = '<div class="modal" style="max-width:480px;">' +
+    '<div class="modal-header"><h3>Р-' + c.id + ' · ' + escapeHtml(c.title) + '</h3>' +
+    '<button class="icon-btn" onclick="document.getElementById(\'calc-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">' +
+      '<div>' + _calcStatusChip(c) + (c.offer_id ? ' <b>КП №' + c.offer_id + '</b>' : '') +
+        (c.client_name && !c.contractor_id ? ' · 🏢 ' + escapeHtml(c.client_name) : '') + '</div>' +
+      (c.note ? '<div class="calc-note-view">' + escapeHtml(c.note) + '</div>' : '') +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + ST.map(s =>
+        '<button class="mini' + (c.status === s[0] ? ' onst' : '') + '" onclick="calcPatch(' + c.id + ',{status:\'' + s[0] + '\'})">' + s[1] + '</button>').join('') + '</div>' +
+      '<label class="calc-lbl">Кто считает<select class="form-input" onchange="calcPatch(' + c.id + ',{assignee_id:this.value?parseInt(this.value,10):null})">' + empOpts + '</select></label>' +
+      '<label class="calc-lbl">Контрагент (нужен для КП)<select class="form-input" onchange="calcPatch(' + c.id + ',{contractor_id:this.value?parseInt(this.value,10):null})">' + coOpts + '</select></label>' +
+      '<div style="display:flex;gap:8px;">' +
+        (c.chat_id ? '<button class="pl-btn pri" style="flex:1;justify-content:center;" onclick="document.getElementById(\'calc-modal\').remove();openTeamChat(' + c.chat_id + ')"><i class="ti ti-messages"></i> Открыть чат</button>' : '') +
+        (!c.offer_id && _calcs.can_offer
+          ? '<button class="pl-btn suc" style="flex:1;justify-content:center;" onclick="calcToOffer(' + c.id + ')"><i class="ti ti-file-invoice"></i> → Создать КП</button>'
+          : (c.offer_id ? '<button class="pl-btn suc" style="flex:1;justify-content:center;" onclick="document.getElementById(\'calc-modal\').remove();state.currentOfferId=' + c.offer_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-offer-detail\')"><i class="ti ti-external-link"></i> Открыть КП №' + c.offer_id + '</button>' : '')) +
+      '</div>' +
+    '</div></div>';
+  document.body.appendChild(ovl);
+  if (!cache.contractors) {
+    apiGet('/api/contractors').then(r => { cache.contractors = r.contractors || r || []; }).catch(() => {});
+  }
+}
+async function calcPatch(id, fields) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    await fetch(API_BASE + '/api/sales/calcs/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(fields),
+    });
+  } catch (e) {}
+  await loadSalesCalcs();
+  const m = document.getElementById('calc-modal');
+  if (m) { m.remove(); calcOpen(id); }
+}
+async function calcToOffer(id) {
+  if (!confirm('Создать КП из этого расчёта? Откроется черновик КП.')) return;
+  try {
+    const r = await apiPost('/api/sales/calcs/' + id + '/to-offer', {});
+    const j = (r && r.data) || {};
+    if (r && r.ok && j.offer_id) {
+      showToast('КП №' + j.offer_id + ' создано', 'success');
+      document.getElementById('calc-modal')?.remove();
+      state.currentOfferId = j.offer_id;
+      cache.saleOffers = null;
+      selectSection('sales');
+      selectSidebarItem('sales-offer-detail');
+    } else showToast(j.message || 'Не удалось создать КП', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
 // ============ v2.45.721: ПЛАНЁРКА — ежедневная встреча в 10:45 ============
 var _pl = null;
 async function loadPlanerka() {
@@ -14616,6 +14799,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.725',
+    date: '09.07.2026',
+    title: 'Расчёты — предверие КП, с общим чатом',
+    features: [
+      'Новый раздел <b>Продажи → Расчёты</b>: «＋ Новый расчёт» — что считаем, для кого, кто считает',
+      'У каждого расчёта <b>свой чат</b> (виден и в общих Чатах): менеджер пишет «надо рассчитать то и то», инженер отвечает, файлы и фото — всё в одном месте',
+      '«Что нужно рассчитать» уходит <b>первым сообщением в чат</b> автоматически',
+      'Статусы: Новый → Считаем → Посчитан; в карточке видно последнее сообщение чата',
+      'Посчитали — кнопка <b>«→ Создать КП»</b>: черновик КП по контрагенту создаётся из расчёта, ссылка остаётся в обе стороны',
+    ],
+  },
   {
     version: 'v2.45.724',
     date: '09.07.2026',
