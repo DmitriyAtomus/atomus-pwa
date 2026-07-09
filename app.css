@@ -21091,6 +21091,56 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .myday-row .sub { white-space: normal; }
 }
 
+/* ============ v2.45.721: Планёрка — ежедневная встреча в 10:45 ============ */
+.pl-head { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 13px 15px; margin-bottom: 10px; flex-wrap: wrap; }
+.pl-head .ttl { font-size: 16px; font-weight: 800; }
+.pl-head .sub { font-size: 12px; color: var(--text-light); }
+.pl-live { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pl-chip { border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 800; }
+.pl-chip.run { background: var(--success-bg); color: var(--success); animation: pl-pulse 2s infinite; }
+.pl-chip.fin { background: var(--bg); color: var(--text-light); }
+.pl-chip.wait { background: var(--brand-bg); color: var(--brand); }
+@keyframes pl-pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .pl-chip.run { animation: none; } }
+.pl-btn { border: none; border-radius: 10px; padding: 9px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; }
+.pl-btn.pri { background: var(--brand); color: #fff; }
+.pl-btn.suc { background: var(--success); color: #fff; }
+.avas { display: flex; }
+.ava { width: 26px; height: 26px; border-radius: 50%; background: var(--brand-bg); color: var(--brand); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--surface); margin-left: -6px; }
+.ava:first-child { margin-left: 0; }
+.pl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 6px; }
+.pl-st { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.pl-st .v { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pl-st .k { font-size: 10.5px; color: var(--text-light); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.pl-st.bad .v { color: var(--danger); } .pl-st.warn .v { color: var(--warning); }
+.pl-st.ok .v { color: var(--success); } .pl-st.inf .v { color: var(--brand); }
+@media (max-width: 620px) { .pl-stats { grid-template-columns: repeat(2, 1fr); } }
+.pl-sec { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); margin: 14px 2px 7px; }
+.pl-sec .n { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 11px; }
+.pl-emptyrow { font-size: 12px; color: var(--text-faint); padding: 2px 6px 6px; }
+.pl-item { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; margin-bottom: 7px; transition: opacity .25s; }
+.pl-item.done { opacity: .45; }
+.pl-item.done .tx .t1 { text-decoration: line-through; }
+.pl-check { flex: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--border); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; margin-top: 1px; }
+.pl-item.done .pl-check { background: var(--success); border-color: var(--success); }
+.pl-item .tx { flex: 1; min-width: 0; }
+.pl-item .t1 { font-weight: 700; font-size: 13.5px; }
+.pl-item .t2 { font-size: 11.5px; color: var(--text-light); margin-top: 1px; }
+.pl-item .t2 .who { color: var(--brand); font-weight: 700; }
+.pl-acts { flex: none; display: flex; gap: 5px; margin-top: 1px; }
+.pl-acts .mini { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 9px; font-size: 11.5px; font-weight: 800; cursor: pointer; color: var(--text-light); white-space: nowrap; font-family: inherit; }
+.pl-acts .mini:hover { border-color: var(--brand); color: var(--brand); }
+.pl-acts .mini.task { color: var(--brand); }
+.pl-q { display: flex; gap: 8px; margin-top: 12px; }
+.pl-q input { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px; background: var(--surface); color: var(--text-dark); font-family: inherit; }
+.pl-q input:focus { outline: none; border-color: var(--brand); }
+.pl-foot { display: flex; align-items: center; gap: 6px; background: var(--success-bg); border: 1px solid #BFDCC9; border-radius: 12px; padding: 11px 14px; margin-top: 12px; font-size: 12.5px; color: var(--success); font-weight: 700; flex-wrap: wrap; }
+.pl-hist { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 10px 13px; margin-bottom: 6px; font-size: 12.5px; flex-wrap: wrap; }
+.pl-hist .d { font-weight: 800; min-width: 100px; }
+.pl-hist .s { color: var(--text-light); flex: 1; }
+.pl-hist .w { color: var(--warning); font-weight: 700; }
+.pl-hist .g { color: var(--success); font-weight: 700; }
+
 /* ============ v2.45.715: СДЭК — отправления в Логистике ============ */
 .cdek-setup { background: var(--surface); border: 1px dashed var(--brand); border-radius: 12px; padding: 14px; margin: 0 0 10px; }
 .cdek-card { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; margin-bottom: 8px; }

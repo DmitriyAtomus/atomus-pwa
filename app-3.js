@@ -6373,6 +6373,198 @@ function showMaxConnectHelp() {
 }
 
 // ============ ЛОГИСТИКА: забрать / в пути (v2.45.678, дизайн v2.45.685) ============
+// ============ v2.45.721: ПЛАНЁРКА — ежедневная встреча в 10:45 ============
+var _pl = null;
+async function loadPlanerka() {
+  const box = document.getElementById('planerka-content');
+  if (!box) return;
+  try {
+    _pl = await apiGet('/api/planerka');
+    renderPlanerka();
+  } catch (e) {
+    box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить планёрку</div>';
+  }
+}
+function _plFmtDay(iso) {
+  const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const mon = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return iso;
+  return days[d.getDay()] + ', ' + d.getDate() + ' ' + mon[d.getMonth()];
+}
+function _plInitials(name) {
+  const p = String(name || '').trim().split(/\s+/);
+  return ((p[0] || '')[0] || '') + ((p[1] || '')[0] || '');
+}
+function _plMoney(v) { return Math.round(Number(v || 0)).toLocaleString('ru-RU') + ' ₽'; }
+function renderPlanerka() {
+  const box = document.getElementById('planerka-content');
+  if (!box || !_pl) return;
+  const m = _pl.meeting;
+  const running = !!(m && m.started_at && !m.finished_at);
+  const finished = !!(m && m.finished_at);
+  const items = _pl.items || [];
+  const groups = { auto: [], q: [], carry: [] };
+  items.forEach(it => { (groups[it.grp] || groups.q).push(it); });
+  let ppl = [];
+  try { ppl = JSON.parse((m && m.participants_json) || '[]'); } catch (e) { ppl = []; }
+  const st = _pl.stats || {};
+
+  let h = '';
+  // шапка
+  h += '<div class="pl-head">' +
+    '<div><div class="ttl">📋 Планёрка · ' + _plFmtDay(_pl.day) + '</div>' +
+    '<div class="sub">ежедневно в ' + escapeHtml(_pl.time || '10:45') + ' · напоминание в 10:40</div></div>' +
+    '<div class="pl-live">' +
+      (ppl.length ? '<div class="avas">' + ppl.slice(0, 8).map(p =>
+        '<span class="ava" title="' + escapeHtml(p) + '">' + escapeHtml(_plInitials(p)) + '</span>').join('') + '</div>' : '') +
+      (running ? '<span class="pl-chip run">● идёт</span>' :
+       finished ? '<span class="pl-chip fin">завершена · ' + (m.duration_min || 0) + ' мин</span>' :
+                  '<span class="pl-chip wait">сегодня в ' + escapeHtml(_pl.time || '10:45') + '</span>') +
+      (running
+        ? '<button class="pl-btn suc" onclick="plFinish()"><i class="ti ti-check"></i> Завершить</button>'
+        : (!finished ? '<button class="pl-btn pri" onclick="plStart()"><i class="ti ti-player-play"></i> Начать планёрку</button>' : '')) +
+    '</div></div>';
+  // сводка
+  h += '<div class="pl-stats">' +
+    '<div class="pl-st' + (st.prod_overdue ? ' bad' : ' ok') + '"><div class="v">' + (st.prod_overdue || 0) + '</div><div class="k">Просрочки пр-ва</div></div>' +
+    '<div class="pl-st' + (st.to_pay ? ' warn' : ' ok') + '" title="' + (st.to_pay_sum ? _plMoney(st.to_pay_sum) : '') + '"><div class="v">' + (st.to_pay || 0) + '</div><div class="k">Счета на оплату</div></div>' +
+    '<div class="pl-st inf"><div class="v">' + (st.ship_week || 0) + '</div><div class="k">Отгрузки недели</div></div>' +
+    '<div class="pl-st ok"><div class="v">' + (st.done_yesterday || 0) + '</div><div class="k">Работ закрыто вчера</div></div>' +
+  '</div>';
+  // повестка
+  const SEC = [
+    ['auto', '🔥 CRM подсветила сама'],
+    ['q', '💬 Вопросы от команды'],
+    ['carry', '⏭ Перенесено с прошлых дней'],
+  ];
+  SEC.forEach(([g, ttl]) => {
+    const list = groups[g];
+    h += '<div class="pl-sec">' + ttl + ' <span class="n">' + list.length + '</span></div>';
+    if (!list.length) {
+      h += '<div class="pl-emptyrow">— пусто —</div>';
+      return;
+    }
+    list.forEach(it => {
+      const done = it.status === 'done';
+      const sub = [];
+      if (it.subtitle) sub.push(escapeHtml(it.subtitle));
+      if (it.author_name) sub.push('<span class="who">' + escapeHtml(it.author_name) + '</span>');
+      if (g === 'carry' && it.carry_count > 1) sub.push('переносится ' + it.carry_count + '-й день');
+      if (it.task_id) sub.push('✓ задача' + (it.task_assignee ? ': ' + escapeHtml(it.task_assignee) : '') +
+        (it.task_status === 'done' ? ' (сделана)' : ''));
+      h += '<div class="pl-item' + (done ? ' done' : '') + '">' +
+        '<button class="pl-check" onclick="plDone(' + it.id + ',' + (done ? 'false' : 'true') + ')" title="Обсудили">' + (done ? '✓' : '') + '</button>' +
+        '<div class="tx"><div class="t1">' + escapeHtml(it.title) + '</div>' +
+        (sub.length ? '<div class="t2">' + sub.join(' · ') + '</div>' : '') + '</div>' +
+        (!done ? '<div class="pl-acts">' +
+          (!it.task_id && _pl.can_manage ? '<button class="mini task" onclick="plTaskOpen(' + it.id + ')">→ Задача</button>' : '') +
+          '<button class="mini" onclick="plCarry(' + it.id + ')">⏭ Завтра</button>' +
+        '</div>' : '') +
+      '</div>';
+    });
+  });
+  // вопрос
+  h += '<div class="pl-q"><input id="pl-q-inp" placeholder="＋ вопрос на планёрку — можно кидать в течение всего дня…" ' +
+    'onkeydown="if(event.key===\'Enter\')plAddQ()">' +
+    '<button class="pl-btn pri" onclick="plAddQ()">Добавить</button></div>';
+  // итог завершённой
+  if (finished) {
+    let s = {};
+    try { s = JSON.parse(m.stats_json || '{}'); } catch (e) { s = {}; }
+    h += '<div class="pl-foot">✓ Планёрка завершена за <b>' + (m.duration_min || 0) + ' мин</b> · ' +
+      'обсуждено <b>' + (s.done || 0) + '</b> из <b>' + (s.total || 0) + '</b> · задач создано <b>' + (s.tasks || 0) + '</b>' +
+      (s.carried ? ' · перенесено <b>' + s.carried + '</b>' : '') + '</div>';
+  }
+  // история
+  const hist = _pl.history || [];
+  if (hist.length) {
+    h += '<div class="pl-sec" style="margin-top:18px;">📚 История планёрок <span class="n">' + hist.length + '</span></div>';
+    hist.forEach(x => {
+      let s = {};
+      try { s = JSON.parse(x.stats_json || '{}'); } catch (e) { s = {}; }
+      h += '<div class="pl-hist"><span class="d">' + _plFmtDay(x.day) + '</span>' +
+        '<span class="s">' + (s.total || 0) + ' пунктов · ' + (s.tasks || 0) + ' задач · ' + (x.duration_min || 0) + ' мин</span>' +
+        (x.undone_tasks
+          ? '<span class="w">' + x.undone_tasks + ' ' + _logiPlural(x.undone_tasks, 'задача не сделана', 'задачи не сделаны', 'задач не сделано') + ' ⚠</span>'
+          : '<span class="g">всё выполнено ✓</span>') +
+      '</div>';
+    });
+  }
+  box.innerHTML = h;
+}
+async function plAddQ() {
+  const inp = document.getElementById('pl-q-inp');
+  const v = inp ? inp.value.trim() : '';
+  if (!v) return;
+  try {
+    const r = await apiPost('/api/planerka/questions', { text: v });
+    if (r && r.ok) showToast('Вопрос добавлен в повестку', 'success');
+    else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadPlanerka();
+}
+async function plDone(id, done) {
+  try { await apiPost('/api/planerka/items/' + id + '/done', { done: !!done }); } catch (e) {}
+  loadPlanerka();
+}
+async function plCarry(id) {
+  try {
+    const r = await apiPost('/api/planerka/items/' + id + '/carry', {});
+    if (r && r.ok) showToast('Перенесено на завтра', 'success');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  loadPlanerka();
+}
+async function plStart() {
+  try { await apiPost('/api/planerka/start', {}); } catch (e) {}
+  loadPlanerka();
+}
+async function plFinish() {
+  if (!confirm('Завершить планёрку? Итог уйдёт в историю.')) return;
+  try { await apiPost('/api/planerka/finish', {}); } catch (e) {}
+  loadPlanerka();
+}
+// «→ Задача»: мини-форма — кому и до какого срока
+async function plTaskOpen(itemId) {
+  const it = ((_pl && _pl.items) || []).find(x => x.id === itemId);
+  if (!it) return;
+  if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
+  const emps = (cache.activeEmployees || []).filter(e => e.is_active !== 0);
+  const opts = emps.map(e => '<option value="' + e.id + '">' +
+    escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</option>').join('');
+  const iso = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  let ovl = document.getElementById('pl-task-modal');
+  if (ovl) ovl.remove();
+  ovl = document.createElement('div');
+  ovl.id = 'pl-task-modal';
+  ovl.className = 'modal-overlay visible';
+  ovl.onclick = function (e) { if (e.target === ovl) ovl.remove(); };
+  ovl.innerHTML = '<div class="modal" style="max-width:440px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-checklist"></i> Задача из планёрки</h3>' +
+    '<button class="icon-btn" onclick="document.getElementById(\'pl-task-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">' +
+      '<div style="font-weight:700;font-size:13.5px;">' + escapeHtml(it.title) + '</div>' +
+      '<label style="font-size:12px;color:var(--text-light);">Кому<select id="pl-t-emp" class="form-input" style="width:100%;margin-top:3px;">' + opts + '</select></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Срок<input type="date" id="pl-t-due" class="form-input" style="width:100%;margin-top:3px;" value="' + iso + '"></label>' +
+      '<button class="pl-btn pri" style="justify-content:center;" onclick="plTaskGo(' + itemId + ')"><i class="ti ti-check"></i> Поставить задачу</button>' +
+    '</div></div>';
+  document.body.appendChild(ovl);
+}
+async function plTaskGo(itemId) {
+  const emp = document.getElementById('pl-t-emp');
+  const due = document.getElementById('pl-t-due');
+  try {
+    const r = await apiPost('/api/planerka/items/' + itemId + '/task',
+      { assignee_id: emp ? parseInt(emp.value, 10) : null, deadline: (due && due.value) || null });
+    const j = (r && r.data) || {};
+    if (r && r.ok) showToast('Задача поставлена', 'success');
+    else showToast(j.message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  const m = document.getElementById('pl-task-modal');
+  if (m) m.remove();
+  loadPlanerka();
+}
+
 async function loadLogisticsPickups() {
   const box = document.getElementById('logistics-content');
   if (!box) return;
@@ -14277,6 +14469,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.721',
+    date: '08.07.2026',
+    title: 'Планёрка — каждый день в 10:45',
+    features: [
+      'Новый раздел <b>Главная → Планёрка</b>: повестку CRM собирает сама — просрочки производства, работы без деталей, счета на оплату с суммой, что придёт по СДЭК, просроченные задачи',
+      '<b>Вопросы от команды</b>: любой сотрудник в течение дня кидает вопрос в повестку — видно, кто и когда добавил',
+      'По каждому пункту: ✔ обсудили · <b>→ Задача</b> (кому и срок — уходит в раздел Задачи) · <b>⏭ Завтра</b> (пункт переезжает и помнит, который день переносится)',
+      '<b>Протокол пишется сам</b>: длительность, сколько обсудили, сколько задач создано; история планёрок с контролем «задача с той планёрки не сделана ⚠»',
+      'Напоминание пушем всем в <b>10:40</b>; кто открыл планёрку во время встречи — отмечается участником',
+    ],
+  },
   {
     version: 'v2.45.720',
     date: '08.07.2026',

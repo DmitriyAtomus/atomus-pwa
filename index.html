@@ -231,6 +231,10 @@
         <button class="nav-item" data-nav="home-calendar" onclick="selectSidebarItem('home-calendar')">
           <i class="ti ti-calendar"></i><span>Календарь</span>
         </button>
+        <!-- v2.45.721: Планёрка — ежедневная встреча в 10:45 -->
+        <button class="nav-item" data-nav="planerka" onclick="selectSidebarItem('planerka')">
+          <i class="ti ti-clipboard-list"></i><span>Планёрка</span>
+        </button>
         <!-- v2.45.273: «На оплате» на главном сайдбаре — подсвеченная, для бухгалтера -->
         <button class="nav-item nav-pay-highlight" id="sb-home-pay" onclick="openSupplyPayList()">
           <i class="ti ti-wallet"></i><span>На оплату</span><span class="nav-badge" id="home-pay-badge" style="display:none;"></span>
@@ -764,6 +768,17 @@
       </div>
 
       <!-- ЭТАП 20: Большой календарь -->
+      <!-- v2.45.721: Планёрка -->
+      <div class="screen" data-screen="planerka" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <i class="ti ti-clipboard-list"></i>
+            <h1>Планёрка</h1>
+          </div>
+        </div>
+        <div id="planerka-content"><div class="loading-block">Загрузка…</div></div>
+      </div>
+
       <div class="screen" data-screen="home-calendar" data-section="home">
         <div class="page-header">
           <div class="page-header-title">
