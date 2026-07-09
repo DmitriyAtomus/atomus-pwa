@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.723";
+const APP_VERSION = "v2.45.724";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4848,6 +4848,7 @@ async function openProductionWorkDetail(workId) {
     const w = await apiGet('/api/production/works/' + workId);
     state._pkbDetailWork = w;   // v2.45.712: для правки метки без перезапроса
     renderProductionWorkDetail(w);
+    pwcLoad(workId);   // v2.45.724: мини-чат карточки
   } catch (e) {
     overlay.querySelector('.modal-body').innerHTML =
       '<div class="empty-block" style="padding:20px;"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e.message || e)) + '</div>';
@@ -4857,6 +4858,56 @@ async function openProductionWorkDetail(workId) {
 function closeProductionWorkDetail() {
   const m = document.getElementById('pkb-detail-modal');
   if (m) m.remove();
+}
+
+// ============ v2.45.724: мини-чат карточки работы ============
+async function pwcLoad(workId) {
+  const list = document.getElementById('pwc-list');
+  if (!list) return;
+  try {
+    const d = await apiGet('/api/production/works/' + workId + '/comments');
+    const cs = d.comments || [];
+    const cnt = document.getElementById('pwc-cnt');
+    if (cnt) cnt.textContent = cs.length ? cs.length : '';
+    list.innerHTML = cs.length ? cs.map(c => {
+      const t = String(c.created_at || '');
+      const when = t.slice(8, 10) + '.' + t.slice(5, 7) + ' ' + t.slice(11, 16);
+      const mine = d.me && c.author_chat_id === d.me;
+      return '<div class="pwc-msg' + (mine ? ' mine' : '') + '">' +
+        '<div class="h"><span class="who">' + escapeHtml(c.author_name || 'сотрудник') + '</span> · ' + when +
+        '<button class="x" onclick="pwcDel(' + c.id + ',' + workId + ')" title="Удалить"><i class="ti ti-x"></i></button></div>' +
+        '<div class="b">' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</div></div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text-faint);">Пока пусто — напиши первым.</div>';
+    list.scrollTop = list.scrollHeight;
+  } catch (e) { list.innerHTML = ''; }
+}
+async function pwcSend(workId) {
+  const inp = document.getElementById('pwc-inp');
+  const v = inp ? inp.value.trim() : '';
+  if (!v) return;
+  if (inp) inp.value = '';
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/comments', { text: v });
+    if (!(r && r.ok)) {
+      showToast(((r && r.data) || {}).message || 'Не удалось отправить', 'error');
+      if (inp) inp.value = v;
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); if (inp) inp.value = v; }
+  pwcLoad(workId);
+}
+async function pwcDel(commentId, workId) {
+  if (!confirm('Удалить комментарий?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/production/works/comments/' + commentId, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось удалить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
+  pwcLoad(workId);
 }
 
 // ============ v2.45.634: глобальный поиск на десктопе (Ctrl+K) ============
@@ -5194,6 +5245,16 @@ function renderProductionWorkDetail(w) {
   if (w.model_id) {
     html += '<div id="pwd-model-docs" data-model-id="' + w.model_id + '" style="display:none;margin:10px 0;"></div>';
   }
+
+  // v2.45.724: мини-чат карточки — обсудили на планёрке, записали здесь же
+  html += '<div class="pwc-block">' +
+    '<div class="pwc-head"><i class="ti ti-messages"></i> Комментарии <span class="pwc-cnt" id="pwc-cnt"></span></div>' +
+    '<div id="pwc-list"><div style="font-size:12px;color:var(--text-faint);">загружаем…</div></div>' +
+    '<div class="pwc-input">' +
+      '<input id="pwc-inp" placeholder="＋ комментарий — мысли, договорённости, что решили…" ' +
+        'onkeydown="if(event.key===\'Enter\')pwcSend(' + w.id + ')">' +
+      '<button class="pkb-btn" onclick="pwcSend(' + w.id + ')"><i class="ti ti-send"></i></button>' +
+    '</div></div>';
 
   // v2.43.34: журнал участия — список записей «кто, когда, что делал, сколько часов»
   {

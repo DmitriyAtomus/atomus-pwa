@@ -21140,6 +21140,23 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .pl-hist .s { color: var(--text-light); flex: 1; }
 .pl-hist .w { color: var(--warning); font-weight: 700; }
 .pl-hist .g { color: var(--success); font-weight: 700; }
+/* v2.45.724: мини-чат карточки работы */
+.pwc-block { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; margin: 12px 0; }
+.pwc-head { font-size: 12px; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.pwc-head .ti { color: var(--brand); }
+.pwc-cnt { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+#pwc-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.pwc-msg { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 7px 11px; max-width: 92%; }
+.pwc-msg.mine { align-self: flex-end; background: var(--brand-bg); border-color: #CBDDF0; }
+.pwc-msg .h { font-size: 10.5px; color: var(--text-light); display: flex; align-items: center; gap: 4px; }
+.pwc-msg .h .who { color: var(--brand); font-weight: 800; }
+.pwc-msg .h .x { margin-left: auto; border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 11px; padding: 0 0 0 8px; }
+.pwc-msg .h .x:hover { color: var(--danger); }
+.pwc-msg .b { font-size: 13px; color: var(--text-dark); margin-top: 1px; word-break: break-word; }
+.pwc-input { display: flex; gap: 7px; margin-top: 9px; }
+.pwc-input input { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; font-size: 13px; background: var(--surface); color: var(--text-dark); font-family: inherit; }
+.pwc-input input:focus { outline: none; border-color: var(--brand); }
+
 /* v2.45.723: кто был + заметки + статистика */
 .pl-hint { font-size: 10.5px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-faint); }
 .pl-attrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
