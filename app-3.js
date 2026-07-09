@@ -6412,9 +6412,11 @@ function renderPlanerka() {
 
   let h = '';
   // шапка
+  const pplNames = ppl.slice(0, 4).join(', ') + (ppl.length > 4 ? ' и ещё ' + (ppl.length - 4) : '');
   h += '<div class="pl-head">' +
     '<div><div class="ttl">📋 Планёрка · ' + _plFmtDay(_pl.day) + '</div>' +
-    '<div class="sub">ежедневно в ' + escapeHtml(_pl.time || '10:45') + ' · напоминание в 10:40</div></div>' +
+    '<div class="sub">ежедневно в ' + escapeHtml(_pl.time || '10:45') + ' · напоминание в 10:40' +
+      (ppl.length ? '<br>👥 были: <b>' + escapeHtml(pplNames) + '</b>' : '') + '</div></div>' +
     '<div class="pl-live">' +
       (ppl.length ? '<div class="avas">' + ppl.slice(0, 8).map(p =>
         '<span class="ava" title="' + escapeHtml(p) + '">' + escapeHtml(_plInitials(p)) + '</span>').join('') + '</div>' : '') +
@@ -6447,16 +6449,23 @@ function renderPlanerka() {
     }
     list.forEach(it => {
       const done = it.status === 'done';
+      const expandable = ['no_details', 'to_pay', 'task_overdue'].indexOf(it.kind) >= 0;
+      const openable = it.kind === 'prod_overdue' && it.ref_id;   // клик — карточка работы
       const sub = [];
       if (it.subtitle) sub.push(escapeHtml(it.subtitle));
       if (it.author_name) sub.push('<span class="who">' + escapeHtml(it.author_name) + '</span>');
       if (g === 'carry' && it.carry_count > 1) sub.push('переносится ' + it.carry_count + '-й день');
       if (it.task_id) sub.push('✓ задача' + (it.task_assignee ? ': ' + escapeHtml(it.task_assignee) : '') +
         (it.task_status === 'done' ? ' (сделана)' : ''));
-      h += '<div class="pl-item' + (done ? ' done' : '') + '">' +
+      const t1click = expandable ? ' onclick="plExpand(' + it.id + ',\'' + it.kind + '\')" style="cursor:pointer;"'
+        : (openable ? ' onclick="openProductionWorkDetail(' + it.ref_id + ')" style="cursor:pointer;"' : '');
+      h += '<div class="pl-item' + (done ? ' done' : '') + '" id="pl-item-' + it.id + '">' +
         '<button class="pl-check" onclick="plDone(' + it.id + ',' + (done ? 'false' : 'true') + ')" title="Обсудили">' + (done ? '✓' : '') + '</button>' +
-        '<div class="tx"><div class="t1">' + escapeHtml(it.title) + '</div>' +
-        (sub.length ? '<div class="t2">' + sub.join(' · ') + '</div>' : '') + '</div>' +
+        '<div class="tx"><div class="t1"' + t1click + '>' + escapeHtml(it.title) +
+          (expandable ? ' <span class="pl-more" id="pl-more-' + it.id + '">раскрыть ▾</span>' : '') +
+          (openable ? ' <span class="pl-more">открыть ↗</span>' : '') + '</div>' +
+        (sub.length ? '<div class="t2">' + sub.join(' · ') + '</div>' : '') +
+        '<div class="pl-detail" id="pl-detail-' + it.id + '" style="display:none;"></div></div>' +
         (!done ? '<div class="pl-acts">' +
           (!it.task_id && _pl.can_manage ? '<button class="mini task" onclick="plTaskOpen(' + it.id + ')">→ Задача</button>' : '') +
           '<button class="mini" onclick="plCarry(' + it.id + ')">⏭ Завтра</button>' +
@@ -6483,8 +6492,11 @@ function renderPlanerka() {
     hist.forEach(x => {
       let s = {};
       try { s = JSON.parse(x.stats_json || '{}'); } catch (e) { s = {}; }
+      let hp = [];
+      try { hp = JSON.parse(x.participants_json || '[]'); } catch (e) { hp = []; }
+      const hpTxt = hp.length ? ' · 👥 ' + hp.slice(0, 3).join(', ') + (hp.length > 3 ? ' +' + (hp.length - 3) : '') : '';
       h += '<div class="pl-hist"><span class="d">' + _plFmtDay(x.day) + '</span>' +
-        '<span class="s">' + (s.total || 0) + ' пунктов · ' + (s.tasks || 0) + ' задач · ' + (x.duration_min || 0) + ' мин</span>' +
+        '<span class="s">' + (s.total || 0) + ' пунктов · ' + (s.tasks || 0) + ' задач · ' + (x.duration_min || 0) + ' мин' + escapeHtml(hpTxt) + '</span>' +
         (x.undone_tasks
           ? '<span class="w">' + x.undone_tasks + ' ' + _logiPlural(x.undone_tasks, 'задача не сделана', 'задачи не сделаны', 'задач не сделано') + ' ⚠</span>'
           : '<span class="g">всё выполнено ✓</span>') +
@@ -6492,6 +6504,37 @@ function renderPlanerka() {
     });
   }
   box.innerHTML = h;
+}
+// раскрыть агрегатный пункт: о чём конкретно речь и куда смотреть
+var _plDetailCache = {};
+async function plExpand(itemId, kind) {
+  const box = document.getElementById('pl-detail-' + itemId);
+  const more = document.getElementById('pl-more-' + itemId);
+  if (!box) return;
+  if (box.style.display !== 'none') {
+    box.style.display = 'none';
+    if (more) more.textContent = 'раскрыть ▾';
+    return;
+  }
+  if (!_plDetailCache[kind]) {
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-size:11.5px;color:var(--text-faint);padding:4px 0;">загружаем…</div>';
+    try {
+      const d = await apiGet('/api/planerka/detail?kind=' + encodeURIComponent(kind));
+      _plDetailCache[kind] = d.rows || [];
+    } catch (e) { _plDetailCache[kind] = []; }
+  }
+  const rows = _plDetailCache[kind];
+  box.innerHTML = rows.length ? rows.map(r => {
+    let click = '';
+    if (r.kind === 'work') click = ' onclick="event.stopPropagation();openProductionWorkDetail(' + r.id + ')"';
+    if (r.kind === 'order') click = ' onclick="event.stopPropagation();openSupplyOrder(' + r.id + ')"';
+    if (r.kind === 'task') click = ' onclick="event.stopPropagation();openTaskDetail(' + r.id + ')"';
+    return '<div class="pl-drow"' + click + '><span class="t">' + escapeHtml(r.title) + ' <i class="ti ti-external-link"></i></span>' +
+      (r.sub ? '<span class="s">' + escapeHtml(r.sub) + '</span>' : '') + '</div>';
+  }).join('') : '<div style="font-size:11.5px;color:var(--text-faint);padding:4px 0;">подробностей нет</div>';
+  box.style.display = 'block';
+  if (more) more.textContent = 'свернуть ▴';
 }
 async function plAddQ() {
   const inp = document.getElementById('pl-q-inp');
@@ -14469,6 +14512,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.722',
+    date: '09.07.2026',
+    title: 'Планёрка — понятно, о чём речь и кто был',
+    features: [
+      'Агрегатные пункты <b>раскрываются</b>: «6 работ без деталей» → список работ с недостающими позициями, «счета ждут оплаты» → какие именно, «просроченные задачи» → какие и на ком',
+      'Каждая строка раскрытия <b>кликабельна</b> — открывает карточку работы, заказ или задачу',
+      'Пункт «Просрочка: …» тоже кликается — открывает карточку работы',
+      '<b>Участники по именам</b>: «👥 были: Подкорытов Д.С., Шевелев М.И.» в шапке и в истории планёрок',
+    ],
+  },
   {
     version: 'v2.45.721',
     date: '08.07.2026',
