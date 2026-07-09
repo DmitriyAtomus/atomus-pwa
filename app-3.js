@@ -6441,7 +6441,8 @@ function _calcCoComboHtml(current) {
     '<input id="calc-co-search" class="form-input" autocomplete="off" ' +
       'placeholder="начни печатать название…" ' +
       'value="' + escapeHtml((current && current.name) || '') + '" ' +
-      'oninput="calcCoFilter(this.value)" onfocus="calcCoFilter(this.value)">' +
+      'oninput="calcCoFilter(this.value)" onfocus="calcCoFilter(this.value)" ' +
+      'onkeydown="if(event.key===\'Escape\'){event.stopPropagation();calcCoHide();}">' +
     '<button type="button" class="calc-combo-x" onclick="calcCoPick(null,\'\')" title="Очистить"><i class="ti ti-x"></i></button>' +
     '<div class="calc-combo-list" id="calc-co-list" style="display:none;"></div>' +
   '</div>';
@@ -6464,8 +6465,17 @@ function calcCoPick(id, name) {
   _calcCoPicked = id ? { id: id, name: name } : null;
   const inp = document.getElementById('calc-co-search');
   if (inp) inp.value = id ? name : '';
+  calcCoHide();
+}
+function calcCoHide() {
   const list = document.getElementById('calc-co-list');
   if (list) list.style.display = 'none';
+}
+// клик мимо поля — список подсказок закрывается (вешается на модалку)
+function _calcComboDismiss(ovl) {
+  ovl.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest('.calc-combo')) calcCoHide();
+  });
 }
 async function _calcEnsureRefs() {
   if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
@@ -6505,6 +6515,7 @@ async function calcCreateOpen() {
       '<button class="pl-btn pri" onclick="calcCreate()"><i class="ti ti-check"></i> Создать и открыть чат</button>' +
     '</div></div>';
   document.body.appendChild(ovl);
+  _calcComboDismiss(ovl);
   setTimeout(() => { const t = document.getElementById('calc-title'); if (t) t.focus(); }, 60);
 }
 async function calcCreate() {
@@ -6568,6 +6579,7 @@ async function calcOpen(id) {
         : (c.offer_id ? '<button class="pl-btn suc grow" onclick="document.getElementById(\'calc-modal\').remove();state.currentOfferId=' + c.offer_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-offer-detail\')"><i class="ti ti-external-link"></i> Открыть КП №' + c.offer_id + '</button>' : '')) +
     '</div></div>';
   document.body.appendChild(ovl);
+  _calcComboDismiss(ovl);
 }
 function calcSaveCo(id) {
   calcPatch(id, { contractor_id: _calcCoPicked ? _calcCoPicked.id : null });
