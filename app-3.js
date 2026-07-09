@@ -6240,7 +6240,10 @@ function _mailToggleFold(id, btn) {
 }
 function _mailMsgBubble(m) {
   const out = m.dir === 'out';
-  const who = out ? 'Ты' : (m.from_name || '');
+  // v2.45.729: исходящие подписываем автором — Иванов видит, что писал директор,
+  // и наоборот; свои — «Ты» (экранируется ниже)
+  const who = out ? (m.mine === false && m.author ? m.author : 'Ты')
+                  : (m.from_name || '');
   const subj = (m.subject && !out) ? '<div class="mm-subj">' + escapeHtml(m.subject) + '</div>' : '';
   const parts = _mailSplitBody(m.body || '');
   let fold = '';
@@ -14856,6 +14859,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.729',
+    date: '09.07.2026',
+    title: 'Почта и MAX — видно, кто из наших писал',
+    features: [
+      'Исходящие подписаны автором: Иванов открыл диалог — видит «Подкорытов Д.С.» над письмом директора, а не безликое «Ты»',
+      'Свои сообщения по-прежнему подписаны «Ты»',
+      'Работает и для почты, и для MAX',
+    ],
+  },
   {
     version: 'v2.45.728',
     date: '09.07.2026',
