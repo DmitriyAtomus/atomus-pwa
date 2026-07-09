@@ -6379,6 +6379,7 @@ async function loadPlanerka() {
   const box = document.getElementById('planerka-content');
   if (!box) return;
   try {
+    if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
     _pl = await apiGet('/api/planerka');
     renderPlanerka();
   } catch (e) {
@@ -6406,8 +6407,11 @@ function renderPlanerka() {
   const items = _pl.items || [];
   const groups = { auto: [], q: [], carry: [] };
   items.forEach(it => { (groups[it.grp] || groups.q).push(it); });
-  let ppl = [];
-  try { ppl = JSON.parse((m && m.participants_json) || '[]'); } catch (e) { ppl = []; }
+  // v2.45.723: «кто был» — из таблицы посещаемости (json — фолбэк для старых дней)
+  let ppl = (_pl.attendance || []).map(a => a.name).filter(Boolean);
+  if (!ppl.length) {
+    try { ppl = JSON.parse((m && m.participants_json) || '[]'); } catch (e) { ppl = []; }
+  }
   const st = _pl.stats || {};
 
   let h = '';
@@ -6434,6 +6438,20 @@ function renderPlanerka() {
     '<div class="pl-st inf"><div class="v">' + (st.ship_week || 0) + '</div><div class="k">Отгрузки недели</div></div>' +
     '<div class="pl-st ok"><div class="v">' + (st.done_yesterday || 0) + '</div><div class="k">Работ закрыто вчера</div></div>' +
   '</div>';
+  // v2.45.723: кто был — чипы сотрудников; ведущий отмечает, авто-отметка остаётся
+  const attIds = {};
+  (_pl.attendance || []).forEach(a => { attIds[a.employee_id] = true; });
+  const emps = (cache.activeEmployees || []);
+  if (emps.length) {
+    h += '<div class="pl-sec">👥 Кто был <span class="n">' + (_pl.attendance || []).length + '</span>' +
+      (_pl.can_manage ? '<span class="pl-hint">— ткни, кто присутствует</span>' : '') + '</div>' +
+      '<div class="pl-attrow">' + emps.map(e => {
+        const on = !!attIds[e.id];
+        const click = _pl.can_manage ? ' onclick="plAtt(' + e.id + ',' + (on ? 'false' : 'true') + ')"' : '';
+        return '<span class="pl-attchip' + (on ? ' on' : '') + (_pl.can_manage ? ' cl' : '') + '"' + click + '>' +
+          (on ? '✓ ' : '') + escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</span>';
+      }).join('') + '</div>';
+  }
   // повестка
   const SEC = [
     ['auto', '🔥 CRM подсветила сама'],
@@ -6485,6 +6503,40 @@ function renderPlanerka() {
       'обсуждено <b>' + (s.done || 0) + '</b> из <b>' + (s.total || 0) + '</b> · задач создано <b>' + (s.tasks || 0) + '</b>' +
       (s.carried ? ' · перенесено <b>' + s.carried + '</b>' : '') + '</div>';
   }
+  // v2.45.723: заметки — мысли и рассуждения по ходу планёрки
+  const notes = _pl.notes || [];
+  h += '<div class="pl-sec" style="margin-top:16px;">📝 Заметки — мысли, рассуждения <span class="n">' + notes.length + '</span></div>';
+  notes.forEach(n => {
+    const t = String(n.created_at || '').slice(11, 16);
+    h += '<div class="pl-note"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span>' +
+      (t ? ' · ' + t : '') +
+      '<button class="nx" onclick="plNoteDel(' + n.id + ')" title="Удалить"><i class="ti ti-x"></i></button></div>' +
+      '<div class="nt">' + escapeHtml(n.text).replace(/\n/g, '<br>') + '</div></div>';
+  });
+  h += '<div class="pl-q"><textarea id="pl-note-inp" rows="2" placeholder="＋ записать мысль, рассуждение — останется в протоколе дня…"></textarea>' +
+    '<button class="pl-btn pri" onclick="plNoteAdd()" style="align-self:flex-end;">Записать</button></div>';
+
+  // v2.45.723: статистика за 30 дней
+  const s30 = _pl.stats30 || {};
+  if (s30.meetings || (s30.attendance || []).length) {
+    h += '<div class="pl-sec" style="margin-top:18px;">📊 Статистика за 30 дней</div>' +
+      '<div class="pl-stats">' +
+        '<div class="pl-st inf"><div class="v">' + (s30.meetings || 0) + '</div><div class="k">Планёрок</div></div>' +
+        '<div class="pl-st inf"><div class="v">' + (s30.avg_min || 0) + ' мин</div><div class="k">Средняя длительность</div></div>' +
+        '<div class="pl-st ok"><div class="v">' + (s30.tasks_created || 0) + '</div><div class="k">Задач создано</div></div>' +
+        '<div class="pl-st' + ((s30.tasks_created || 0) > (s30.tasks_done || 0) ? ' warn' : ' ok') + '"><div class="v">' + (s30.tasks_done || 0) + '</div><div class="k">Из них выполнено</div></div>' +
+      '</div>';
+    const at = s30.attendance || [];
+    if (at.length && s30.meetings) {
+      h += '<div class="pl-attstat">' + at.map(a => {
+        const pct = Math.min(100, Math.round(a.visits / s30.meetings * 100));
+        return '<div class="row"><span class="nm">' + escapeHtml(a.name) + '</span>' +
+          '<div class="bar"><div class="f" style="width:' + pct + '%"></div></div>' +
+          '<span class="vv">' + a.visits + ' из ' + s30.meetings + '</span></div>';
+      }).join('') + '</div>';
+    }
+  }
+
   // история
   const hist = _pl.history || [];
   if (hist.length) {
@@ -6492,18 +6544,70 @@ function renderPlanerka() {
     hist.forEach(x => {
       let s = {};
       try { s = JSON.parse(x.stats_json || '{}'); } catch (e) { s = {}; }
-      let hp = [];
-      try { hp = JSON.parse(x.participants_json || '[]'); } catch (e) { hp = []; }
+      let hp = x.att_names || [];
+      if (!hp.length) {
+        try { hp = JSON.parse(x.participants_json || '[]'); } catch (e) { hp = []; }
+      }
       const hpTxt = hp.length ? ' · 👥 ' + hp.slice(0, 3).join(', ') + (hp.length > 3 ? ' +' + (hp.length - 3) : '') : '';
       h += '<div class="pl-hist"><span class="d">' + _plFmtDay(x.day) + '</span>' +
-        '<span class="s">' + (s.total || 0) + ' пунктов · ' + (s.tasks || 0) + ' задач · ' + (x.duration_min || 0) + ' мин' + escapeHtml(hpTxt) + '</span>' +
+        '<span class="s">' + (s.total || 0) + ' пунктов · ' + (s.tasks || 0) + ' задач · ' + (x.duration_min || 0) + ' мин' + escapeHtml(hpTxt) +
+        (x.notes_count ? ' · <a class="pl-notelink" onclick="plHistNotes(\'' + x.day + '\')">📝 ' + x.notes_count + ' ' + _logiPlural(x.notes_count, 'заметка', 'заметки', 'заметок') + '</a>' : '') +
+        '</span>' +
         (x.undone_tasks
           ? '<span class="w">' + x.undone_tasks + ' ' + _logiPlural(x.undone_tasks, 'задача не сделана', 'задачи не сделаны', 'задач не сделано') + ' ⚠</span>'
           : '<span class="g">всё выполнено ✓</span>') +
+        '<div class="pl-histnotes" id="pl-hn-' + x.day + '" style="display:none;"></div>' +
       '</div>';
     });
   }
   box.innerHTML = h;
+}
+async function plAtt(empId, present) {
+  try {
+    const r = await apiPost('/api/planerka/attendance', { employee_id: empId, present: !!present });
+    if (!(r && r.ok)) showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка', 'error'); }
+  loadPlanerka();
+}
+async function plNoteAdd() {
+  const inp = document.getElementById('pl-note-inp');
+  const v = inp ? inp.value.trim() : '';
+  if (!v) return;
+  try {
+    const r = await apiPost('/api/planerka/notes', { text: v });
+    if (r && r.ok) showToast('Записано', 'success');
+    else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadPlanerka();
+}
+async function plNoteDel(id) {
+  if (!confirm('Удалить заметку?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/planerka/notes/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось удалить', 'error');
+    }
+  } catch (e) { showToast('Ошибка', 'error'); }
+  loadPlanerka();
+}
+async function plHistNotes(day) {
+  const box = document.getElementById('pl-hn-' + day);
+  if (!box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:11.5px;color:var(--text-faint);">загружаем…</div>';
+  try {
+    const d = await apiGet('/api/planerka/notes?day=' + encodeURIComponent(day));
+    const notes = d.notes || [];
+    box.innerHTML = notes.length ? notes.map(n =>
+      '<div class="pl-note sm"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span></div>' +
+      '<div class="nt">' + escapeHtml(n.text).replace(/\n/g, '<br>') + '</div></div>').join('')
+      : '<div style="font-size:11.5px;color:var(--text-faint);">заметок нет</div>';
+  } catch (e) { box.innerHTML = ''; }
 }
 // раскрыть агрегатный пункт: о чём конкретно речь и куда смотреть
 var _plDetailCache = {};
@@ -14512,6 +14616,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.723',
+    date: '09.07.2026',
+    title: 'Планёрка — кто был, заметки и статистика',
+    features: [
+      '<b>Кто был</b>: чипы всех сотрудников — ведущий тыкает присутствующих; кто сам открыл планёрку во время встречи, отмечается автоматически',
+      '<b>Заметки</b>: мысли и рассуждения записываются прямо на планёрке — с автором и временем, остаются в протоколе дня; в истории — «📝 3 заметки», клик раскрывает',
+      '<b>Статистика за 30 дней</b>: сколько планёрок, средняя длительность, задач создано и выполнено, и <b>посещаемость по людям</b> — кто сколько планёрок посетил',
+      'Свою заметку можно удалить; чужую — только директор',
+    ],
+  },
   {
     version: 'v2.45.722',
     date: '09.07.2026',
