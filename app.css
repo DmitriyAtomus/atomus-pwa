@@ -21138,9 +21138,13 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .pl-item .t2 { font-size: 11.5px; color: var(--text-light); margin-top: 1px; }
 .pl-item .t2 .who { color: var(--brand); font-weight: 700; }
 .pl-acts { flex: none; display: flex; gap: 5px; margin-top: 1px; }
-.pl-acts .mini { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 9px; font-size: 11.5px; font-weight: 800; cursor: pointer; color: var(--text-light); white-space: nowrap; font-family: inherit; }
-.pl-acts .mini:hover { border-color: var(--brand); color: var(--brand); }
-.pl-acts .mini.task { color: var(--brand); }
+/* v2.45.733: .mini — общий стиль мини-кнопок планёрки (повестка И заметки) */
+.pl-acts .mini, .pl-note .mini { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 10px; font-size: 11.5px; font-weight: 800; cursor: pointer; color: var(--text-light); white-space: nowrap; font-family: inherit; line-height: 1.2; }
+.pl-acts .mini:hover, .pl-note .mini:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-bg); }
+.pl-acts .mini.task, .pl-note .mini.task { color: var(--brand); border-color: #CBDDF0; background: var(--brand-bg); }
+.pl-acts .mini.task:hover, .pl-note .mini.task:hover { border-color: var(--brand); }
+.pl-note .nh .nx { border: none; background: none; width: 24px; height: 24px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; }
+.pl-note .nh .nx:hover { background: var(--surface); }
 .pl-q { display: flex; gap: 8px; margin-top: 12px; }
 .pl-q input { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px; background: var(--surface); color: var(--text-dark); font-family: inherit; }
 .pl-q input:focus { outline: none; border-color: var(--brand); }
