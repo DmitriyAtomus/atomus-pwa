@@ -6751,10 +6751,14 @@ function renderPlanerka() {
   h += '<div class="pl-sec" style="margin-top:16px;">📝 Заметки — мысли, рассуждения <span class="n">' + notes.length + '</span></div>';
   notes.forEach(n => {
     const t = String(n.created_at || '').slice(11, 16);
-    h += '<div class="pl-note"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span>' +
+    h += '<div class="pl-note" id="pl-note-' + n.id + '"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span>' +
       (t ? ' · ' + t : '') +
-      '<button class="nx" onclick="plNoteDel(' + n.id + ')" title="Удалить"><i class="ti ti-x"></i></button></div>' +
-      '<div class="nt">' + escapeHtml(n.text).replace(/\n/g, '<br>') + '</div></div>';
+      '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">' +
+        (_pl.can_manage ? '<button class="mini task" onclick="plNoteTaskOpen(' + n.id + ')" title="Перевести в задачу">→ Задача</button>' : '') +
+        '<button class="nx" onclick="plNoteEdit(' + n.id + ')" title="Редактировать"><i class="ti ti-pencil"></i></button>' +
+        '<button class="nx" onclick="plNoteDel(' + n.id + ')" title="Удалить"><i class="ti ti-x"></i></button>' +
+      '</span></div>' +
+      '<div class="nt" id="pl-note-t-' + n.id + '">' + escapeHtml(n.text).replace(/\n/g, '<br>') + '</div></div>';
   });
   h += '<div class="pl-q"><textarea id="pl-note-inp" rows="2" placeholder="＋ записать мысль, рассуждение — останется в протоколе дня…"></textarea>' +
     '<button class="pl-btn pri" onclick="plNoteAdd()" style="align-self:flex-end;">Записать</button></div>';
@@ -6835,6 +6839,79 @@ async function plNoteDel(id) {
       showToast(j.message || 'Не удалось удалить', 'error');
     }
   } catch (e) { showToast('Ошибка', 'error'); }
+  loadPlanerka();
+}
+// Редактирование заметки — инлайн-текстарея прямо в карточке
+function plNoteEdit(id) {
+  const n = ((_pl && _pl.notes) || []).find(x => x.id === id);
+  const box = document.getElementById('pl-note-t-' + id);
+  if (!n || !box) return;
+  box.innerHTML = '<textarea id="pl-note-e-' + id + '" rows="3" class="form-input" style="width:100%;">' +
+      escapeHtml(n.text || '') + '</textarea>' +
+    '<div style="display:flex;gap:8px;margin-top:6px;">' +
+      '<button class="pl-btn pri" onclick="plNoteSave(' + id + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+      '<button class="pl-btn" onclick="loadPlanerka()">Отмена</button>' +
+    '</div>';
+  const ta = document.getElementById('pl-note-e-' + id);
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+async function plNoteSave(id) {
+  const ta = document.getElementById('pl-note-e-' + id);
+  const v = ta ? ta.value.trim() : '';
+  if (!v) { showToast('Пустая заметка', 'error'); return; }
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/planerka/notes/' + id, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: v }),
+    });
+    if (r.ok) showToast('Сохранено', 'success');
+    else { const j = await r.json().catch(() => ({})); showToast(j.message || 'Не удалось сохранить', 'error'); }
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadPlanerka();
+}
+// «→ Задача» из заметки — мини-форма (текст задачи / кому / срок)
+async function plNoteTaskOpen(noteId) {
+  const n = ((_pl && _pl.notes) || []).find(x => x.id === noteId);
+  if (!n) return;
+  if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
+  const emps = (cache.activeEmployees || []).filter(e => e.is_active !== 0);
+  const opts = emps.map(e => '<option value="' + e.id + '">' +
+    escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</option>').join('');
+  const iso = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  let ovl = document.getElementById('pl-task-modal');
+  if (ovl) ovl.remove();
+  ovl = document.createElement('div');
+  ovl.id = 'pl-task-modal';
+  ovl.className = 'modal-overlay visible';
+  ovl.onclick = function (e) { if (e.target === ovl) ovl.remove(); };
+  ovl.innerHTML = '<div class="modal" style="max-width:440px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-checklist"></i> Задача из заметки</h3>' +
+    '<button class="icon-btn" onclick="document.getElementById(\'pl-task-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">' +
+      '<label style="font-size:12px;color:var(--text-light);">Задача<textarea id="pl-nt-title" class="form-input" rows="2" style="width:100%;margin-top:3px;">' + escapeHtml((n.text || '').slice(0, 200)) + '</textarea></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Кому<select id="pl-nt-emp" class="form-input" style="width:100%;margin-top:3px;">' + opts + '</select></label>' +
+      '<label style="font-size:12px;color:var(--text-light);">Срок<input type="date" id="pl-nt-due" class="form-input" style="width:100%;margin-top:3px;" value="' + iso + '"></label>' +
+      '<button class="pl-btn pri" style="justify-content:center;" onclick="plNoteTaskGo(' + noteId + ')"><i class="ti ti-check"></i> Поставить задачу</button>' +
+    '</div></div>';
+  document.body.appendChild(ovl);
+}
+async function plNoteTaskGo(noteId) {
+  const emp = document.getElementById('pl-nt-emp');
+  const due = document.getElementById('pl-nt-due');
+  const title = document.getElementById('pl-nt-title');
+  try {
+    const r = await apiPost('/api/planerka/notes/' + noteId + '/task',
+      { assignee_id: emp ? parseInt(emp.value, 10) : null,
+        deadline: (due && due.value) || null,
+        title: (title && title.value.trim()) || null });
+    const j = (r && r.data) || {};
+    if (r && r.ok) showToast('Задача поставлена', 'success');
+    else showToast(j.message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  const m = document.getElementById('pl-task-modal');
+  if (m) m.remove();
   loadPlanerka();
 }
 async function plHistNotes(day) {
