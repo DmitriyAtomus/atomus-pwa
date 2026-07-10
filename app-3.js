@@ -6681,21 +6681,31 @@ function renderPlanerka() {
     '<div class="pl-st inf"><div class="v">' + (st.ship_week || 0) + '</div><div class="k">Отгрузки недели</div></div>' +
     '<div class="pl-st ok"><div class="v">' + (st.done_yesterday || 0) + '</div><div class="k">Работ закрыто вчера</div></div>' +
   '</div>';
+  // v2.45.732: итог завершённой — сразу под сводкой, не теряется в середине
+  if (finished) {
+    let fs = {};
+    try { fs = JSON.parse(m.stats_json || '{}'); } catch (e) { fs = {}; }
+    h += '<div class="pl-foot">✓ Планёрка завершена за <b>' + (m.duration_min || 0) + ' мин</b> · ' +
+      'обсуждено <b>' + (fs.done || 0) + '</b> из <b>' + (fs.total || 0) + '</b> · задач создано <b>' + (fs.tasks || 0) + '</b>' +
+      (fs.carried ? ' · перенесено <b>' + fs.carried + '</b>' : '') + '</div>';
+  }
   // v2.45.723: кто был — чипы сотрудников; ведущий отмечает, авто-отметка остаётся
   const attIds = {};
   (_pl.attendance || []).forEach(a => { attIds[a.employee_id] = true; });
   const emps = (cache.activeEmployees || []);
   if (emps.length) {
-    h += '<div class="pl-sec">👥 Кто был <span class="n">' + (_pl.attendance || []).length + '</span>' +
+    h += '<div class="pl-card">' +
+      '<div class="pl-sec">👥 Кто был <span class="n">' + (_pl.attendance || []).length + '</span>' +
       (_pl.can_manage ? '<span class="pl-hint">— ткни, кто присутствует</span>' : '') + '</div>' +
       '<div class="pl-attrow">' + emps.map(e => {
         const on = !!attIds[e.id];
         const click = _pl.can_manage ? ' onclick="plAtt(' + e.id + ',' + (on ? 'false' : 'true') + ')"' : '';
         return '<span class="pl-attchip' + (on ? ' on' : '') + (_pl.can_manage ? ' cl' : '') + '"' + click + '>' +
           (on ? '✓ ' : '') + escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</span>';
-      }).join('') + '</div>';
+      }).join('') + '</div></div>';
   }
-  // повестка
+  // повестка — одна карточка на все три группы + поле вопроса
+  h += '<div class="pl-card">';
   const SEC = [
     ['auto', '🔥 CRM подсветила сама'],
     ['q', '💬 Вопросы от команды'],
@@ -6738,17 +6748,11 @@ function renderPlanerka() {
   h += '<div class="pl-q"><input id="pl-q-inp" placeholder="＋ вопрос на планёрку — можно кидать в течение всего дня…" ' +
     'onkeydown="if(event.key===\'Enter\')plAddQ()">' +
     '<button class="pl-btn pri" onclick="plAddQ()">Добавить</button></div>';
-  // итог завершённой
-  if (finished) {
-    let s = {};
-    try { s = JSON.parse(m.stats_json || '{}'); } catch (e) { s = {}; }
-    h += '<div class="pl-foot">✓ Планёрка завершена за <b>' + (m.duration_min || 0) + ' мин</b> · ' +
-      'обсуждено <b>' + (s.done || 0) + '</b> из <b>' + (s.total || 0) + '</b> · задач создано <b>' + (s.tasks || 0) + '</b>' +
-      (s.carried ? ' · перенесено <b>' + s.carried + '</b>' : '') + '</div>';
-  }
+  h += '</div>';   // конец карточки повестки
   // v2.45.723: заметки — мысли и рассуждения по ходу планёрки
   const notes = _pl.notes || [];
-  h += '<div class="pl-sec" style="margin-top:16px;">📝 Заметки — мысли, рассуждения <span class="n">' + notes.length + '</span></div>';
+  h += '<div class="pl-card">' +
+    '<div class="pl-sec">📝 Заметки — мысли, рассуждения <span class="n">' + notes.length + '</span></div>';
   notes.forEach(n => {
     const t = String(n.created_at || '').slice(11, 16);
     h += '<div class="pl-note" id="pl-note-' + n.id + '"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span>' +
@@ -6762,11 +6766,13 @@ function renderPlanerka() {
   });
   h += '<div class="pl-q"><textarea id="pl-note-inp" rows="2" placeholder="＋ записать мысль, рассуждение — останется в протоколе дня…"></textarea>' +
     '<button class="pl-btn pri" onclick="plNoteAdd()" style="align-self:flex-end;">Записать</button></div>';
+  h += '</div>';   // конец карточки заметок
 
   // v2.45.723: статистика за 30 дней
   const s30 = _pl.stats30 || {};
   if (s30.meetings || (s30.attendance || []).length) {
-    h += '<div class="pl-sec" style="margin-top:18px;">📊 Статистика за 30 дней</div>' +
+    h += '<div class="pl-card">' +
+      '<div class="pl-sec">📊 Статистика за 30 дней</div>' +
       '<div class="pl-stats">' +
         '<div class="pl-st inf"><div class="v">' + (s30.meetings || 0) + '</div><div class="k">Планёрок</div></div>' +
         '<div class="pl-st inf"><div class="v">' + (s30.avg_min || 0) + ' мин</div><div class="k">Средняя длительность</div></div>' +
@@ -6782,12 +6788,14 @@ function renderPlanerka() {
           '<span class="vv">' + a.visits + ' из ' + s30.meetings + '</span></div>';
       }).join('') + '</div>';
     }
+    h += '</div>';   // конец карточки статистики
   }
 
   // история
   const hist = _pl.history || [];
   if (hist.length) {
-    h += '<div class="pl-sec" style="margin-top:18px;">📚 История планёрок <span class="n">' + hist.length + '</span></div>';
+    h += '<div class="pl-card">' +
+      '<div class="pl-sec">📚 История планёрок <span class="n">' + hist.length + '</span></div>';
     hist.forEach(x => {
       let s = {};
       try { s = JSON.parse(x.stats_json || '{}'); } catch (e) { s = {}; }
@@ -6806,6 +6814,7 @@ function renderPlanerka() {
         '<div class="pl-histnotes" id="pl-hn-' + x.day + '" style="display:none;"></div>' +
       '</div>';
     });
+    h += '</div>';   // конец карточки истории
   }
   box.innerHTML = h;
 }
@@ -14936,6 +14945,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.732',
+    date: '10.07.2026',
+    title: 'Планёрка — наведён порядок в дизайне',
+    features: [
+      'Каждая секция — <b>своя карточка</b>: Кто был · Повестка · Заметки · Статистика · История',
+      'Итог «планёрка завершена за N мин» — сразу под сводкой, а не в середине страницы',
+      'Пункты, заметки и история — на едином сером фоне внутри карточек, ровные отступы',
+    ],
+  },
+
   {
     version: 'v2.45.731',
     date: '09.07.2026',

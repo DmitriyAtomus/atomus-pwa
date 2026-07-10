@@ -21108,13 +21108,23 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .avas { display: flex; }
 .ava { width: 26px; height: 26px; border-radius: 50%; background: var(--brand-bg); color: var(--brand); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--surface); margin-left: -6px; }
 .ava:first-child { margin-left: 0; }
-.pl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 6px; }
+.pl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
 .pl-st { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
 .pl-st .v { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .pl-st .k { font-size: 10.5px; color: var(--text-light); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .pl-st.bad .v { color: var(--danger); } .pl-st.warn .v { color: var(--warning); }
 .pl-st.ok .v { color: var(--success); } .pl-st.inf .v { color: var(--brand); }
 @media (max-width: 620px) { .pl-stats { grid-template-columns: repeat(2, 1fr); } }
+/* v2.45.732: секции — карточками, вложенное — на сером фоне */
+.pl-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 4px 14px rgba(27, 32, 48, .05); }
+.pl-card .pl-sec:first-child { margin-top: 0; }
+.pl-card .pl-item, .pl-card .pl-hist { background: var(--bg); border-color: transparent; }
+.pl-card .pl-note { background: var(--bg); border-color: transparent; border-left-color: var(--brand); }
+.pl-card .pl-st { background: var(--bg); border-color: transparent; }
+.pl-card .pl-attchip { background: var(--bg); }
+.pl-card .pl-attchip.on { background: var(--success-bg); }
+.pl-card .pl-q input, .pl-card .pl-q textarea { background: var(--bg); }
+.pl-card .pl-attstat { border: none; padding: 4px 0 0; margin-top: 8px; }
 .pl-sec { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); margin: 14px 2px 7px; }
 .pl-sec .n { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 11px; }
 .pl-emptyrow { font-size: 12px; color: var(--text-faint); padding: 2px 6px 6px; }
