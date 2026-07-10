@@ -4754,7 +4754,7 @@ function showAssemblyStockModal(d) {
         // ЭТАП 23: блок описания работы (для не-сборок) — крупно, заметно
         (a.work_type && a.work_type !== 'assembly' && a.description
           ? '<div style="background: #FFF4E6; border-left: 3px solid #B25E00; padding: 12px 14px; border-radius: 8px; margin-bottom: 14px;">' +
-              '<div style="font-size: 11px; color: #B25E00; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px;">Что было сделано</div>' +
+              '<div style="font-size: 11px; color: #B25E00; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px;">' + (a.work_type === 'installation' ? 'Что нужно сделать' : 'Что было сделано') + '</div>' +
               '<div style="font-size: 14px; color: var(--text); line-height: 1.5; white-space: pre-wrap;">' + escapeHtml(a.description) + '</div>' +
             '</div>'
           : '') +

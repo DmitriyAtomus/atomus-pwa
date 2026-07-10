@@ -8200,7 +8200,7 @@ async function submitAssembly() {
     if (a.model.needs_ip && !a.ipClass) { errEl.textContent = 'Укажите IP-класс'; return; }
   } else {
     if (!a.description || !a.description.trim()) {
-      errEl.textContent = 'Опишите что было сделано';
+      errEl.textContent = (a.workType === 'installation') ? 'Опишите, что нужно сделать' : 'Опишите что было сделано';
       return;
     }
   }
