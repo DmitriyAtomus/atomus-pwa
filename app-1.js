@@ -7669,6 +7669,30 @@ function renderSummary(d) {
       html += '</div>';
     }
 
+    // v2.45.7xx: По этапам — часы (в т.ч. «Упаковка») — чтобы видеть, сколько на что ушло
+    if ((sb.by_stage || []).length) {
+      const maxHs = Math.max(1, ...sb.by_stage.map(x => Number(x.hours || 0)));
+      html += '<div class="section"><h3 class="section-title"><span>По этапам — часы</span></h3></div>';
+      html += '<div class="ssn-byemp-list">';
+      sb.by_stage.forEach((x, i) => {
+        const hrs = Number(x.hours || 0);
+        const pct = (hrs / maxHs) * 100;
+        const share = totalHours > 0 ? (hrs / totalHours * 100) : 0;
+        const colorIdx = (i % 8);
+        html += '<div class="ssn-byemp-row">' +
+                  '<div class="pkb-wl-avatar ac-' + colorIdx + '" style="width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="ti ti-stack-2"></i></div>' +
+                  '<div class="ssn-byemp-mid">' +
+                    '<div class="ssn-byemp-top">' +
+                      '<span class="ssn-byemp-name">' + escapeHtml(x.stage_name || '— без этапа —') + '</span>' +
+                      '<span class="ssn-byemp-stats"><b>' + fmtH(hrs) + 'ч</b> · ' + (x.entries || 0) + ' зап. · ' + share.toFixed(0) + '%</span>' +
+                    '</div>' +
+                    '<div class="ssn-byemp-bar"><div class="ssn-byemp-bar-fill ac-fill-' + colorIdx + '" style="width:' + pct + '%;"></div></div>' +
+                  '</div>' +
+                '</div>';
+      });
+      html += '</div>';
+    }
+
     // Последние записи — с группировкой по датам
     // v2.45.636: компактные карточки — часы крупно справа, Σ за день в заголовке,
     // дубль «артикул · название» схлопнут, «[авто-стоп]» — маленький чип.
