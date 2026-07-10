@@ -4947,9 +4947,9 @@ async function _ssdRun(dryRun) {
 // Чистится при reload или logout. Чтобы заново не вводить при каждом открытии.
 state._adminToolsUnlocked = false;
 
-async // v2.45.57: модалка с полем пароля. Возвращает Promise<bool> — true если
+// v2.45.57: модалка с полем пароля. Возвращает Promise<bool> — true если
 // пароль директора верный. Используется как gate перед админ-инструментами.
-function _satPromptPassword() {
+async function _satPromptPassword() {
   return new Promise(resolve => {
     let pm = document.getElementById('sat-pwd-modal');
     if (!pm) {
