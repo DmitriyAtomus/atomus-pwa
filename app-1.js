@@ -1155,6 +1155,14 @@ function showApp() {
 
 // v2.8.2: восстановление последнего открытого экрана при F5/перезагрузке
 function _restoreLastView() {
+  // ТВ-режим (трансляция CRM на телевизор): открыть заданный раздел и
+  // не восстанавливать сохранённый вид. Раздел = ключ SECTION_CONFIG
+  // (напр. tasks — планёрка, production, warehouse, mail…).
+  if (window._tvMode) {
+    const _s = (window._tvScreen || '').trim();
+    selectSection(SECTION_CONFIG[_s] ? _s : 'home');
+    return;
+  }
   // Если есть свежий приветственный тост (т.е. только что вошли) — на главную
   if (state._loginWelcome) {
     selectSection('home');

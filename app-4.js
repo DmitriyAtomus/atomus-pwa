@@ -12846,6 +12846,21 @@ function _scheduleSharedInvoiceIntake() {
     showPublicFeedbackPage();
     return;
   }
+  // v2.45.x: ТВ-трансляция CRM на офисный телевизор.
+  // Каст-кнопка на сервере открывает …/?tvtoken=<токен>&screen=<раздел> —
+  // приложение само авторизуется по токену и открывает нужный раздел.
+  // Токен сразу убираем из видимого URL/истории.
+  try {
+    const _tvUsp = new URLSearchParams(window.location.search);
+    const _tvTok = _tvUsp.get('tvtoken');
+    if (_tvTok) {
+      localStorage.setItem(TOKEN_KEY, _tvTok);
+      window._tvMode = true;
+      window._tvScreen = (_tvUsp.get('screen') || '').trim();
+      try { document.body.classList.add('tv-mode'); } catch (_) {}
+      try { history.replaceState({}, '', window.location.pathname); } catch (_) {}
+    }
+  } catch (_) {}
   // Обычный flow
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) showApp();
