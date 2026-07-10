@@ -2308,6 +2308,15 @@
               <button class="pkb-btn" onclick="openManualSupplyInvoice()" title="Заполнить накладную вручную без фото/файла" style="background:white;color:var(--brand);border:1.5px solid var(--brand);"><i class="ti ti-edit"></i><span class="si-btn-label">Вручную</span></button>
             </div>
           </div>
+          <div class="si-search-bar" style="display:flex;gap:8px;align-items:center;margin:2px 0 12px;">
+            <div style="position:relative;flex:1;max-width:560px;">
+              <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light);"></i>
+              <input id="si-search" type="text" class="form-input" autocomplete="off"
+                     placeholder="Поиск по позиции (напр. теплообменник), № УПД или поставщику…"
+                     style="width:100%;padding-left:36px;" oninput="siSearchInput(this.value)">
+            </div>
+            <button class="btn" id="si-search-clear" onclick="siSearchClear()" style="display:none;"><i class="ti ti-x"></i> Сброс</button>
+          </div>
           <div id="si-screen-body">
             <div class="loading-block">Загружаем приёмки…</div>
           </div>

@@ -10355,14 +10355,36 @@ async function loadSupplyInvoicesList() {
   if (!body) return;
   body.innerHTML = '<div class="loading-block">Загружаем приёмки…</div>';
 
+  const q = (typeof siState !== 'undefined' && siState.searchQ) ? siState.searchQ : '';
   try {
-    const r = await apiGet('/api/supply/invoices?limit=100');
+    const r = await apiGet('/api/supply/invoices?limit=100' + (q ? '&q=' + encodeURIComponent(q) : ''));
     const items = (r && r.items) || [];
     if (counter) counter.textContent = items.length;
     renderSupplyInvoicesList(items);
   } catch (e) {
     body.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i><h3>Ошибка</h3><p>' + escapeHtml(String(e.message || e)) + '</p></div>';
   }
+}
+
+// Поиск по приёмкам УПД (по позиции / № / поставщику). Поле — в статичной шапке,
+// поэтому фокус не теряется при перерисовке списка.
+let _siSearchTimer = null;
+function siSearchInput(v) {
+  clearTimeout(_siSearchTimer);
+  const clearBtn = document.getElementById('si-search-clear');
+  if (clearBtn) clearBtn.style.display = (v && v.length) ? '' : 'none';
+  _siSearchTimer = setTimeout(function () {
+    if (typeof siState !== 'undefined') siState.searchQ = (v || '').trim();
+    loadSupplyInvoicesList();
+  }, 350);
+}
+function siSearchClear() {
+  const inp = document.getElementById('si-search');
+  if (inp) inp.value = '';
+  const clearBtn = document.getElementById('si-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (typeof siState !== 'undefined') siState.searchQ = '';
+  loadSupplyInvoicesList();
 }
 
 // Мобильная мини-шапка для экрана Приёмки УПД: 2 большие тач-кнопки сверху
@@ -10449,11 +10471,16 @@ function _updCard(inv, kind) {
   else acts = '<button class="btn" onclick="event.stopPropagation();loadSupplyInvoiceDetail(' + inv.id + ')"><span class="em">👁</span> Открыть</button>';
   acts += '<button class="btn upd-icon" title="Открыть файл" onclick="event.stopPropagation();openSupplyInvoiceFile(' + inv.id + ')"><span class="em">📎</span></button>';
   acts += _updDelBtn(inv, status);
+  const matchHtml = (inv.matched_items && inv.matched_items.length)
+    ? '<div class="upd-match" style="margin-top:3px;font-size:12px;color:var(--brand);font-weight:600;">' +
+        '<span class="em">🔎</span> ' + inv.matched_items.map(escapeHtml).join(' · ') + '</div>'
+    : '';
   return '<div class="upd ' + kind + '" onclick="loadSupplyInvoiceDetail(' + inv.id + ')">' +
     ava +
     '<div class="upd-body">' +
       '<div class="upd-top"><span class="upd-num">' + num + escapeHtml(dateStr) + '</span>' + chip + contractChip + '</div>' +
       '<div class="upd-sub">' + parts.join(' · ') + '</div>' +
+      matchHtml +
     '</div>' +
     sumHtml +
     '<div class="upd-acts">' + acts + '</div>' +
@@ -10472,6 +10499,13 @@ function renderSupplyInvoicesList(items) {
   window.UPD_V2 = localStorage.getItem('updV2') !== '0';
 
   if (!items.length) {
+    const _sq = (typeof siState !== 'undefined' && siState.searchQ) ? siState.searchQ : '';
+    if (_sq) {
+      body.innerHTML = (isMobile ? renderSiMobileHeader() : '') +
+        '<div class="empty-block"><i class="ti ti-search-off"></i><h3>Ничего не найдено</h3>' +
+        '<p>По запросу «' + escapeHtml(_sq) + '» нет ни одной УПД. Попробуй другое слово или часть названия.</p></div>';
+      return;
+    }
     if (isMobile) {
       body.innerHTML =
         renderSiMobileHeader() +
@@ -10586,6 +10620,9 @@ function _renderUpdOldList(items) {
             escapeHtml(supplier) + (pagesLine ? (' · ' + pagesLine) : '') + (itemsLine ? (' · ' + itemsLine) : '') + (createdLine ? (' · ' + createdLine) : '') +
           '</span>' +
         '</div>' +
+        ((inv.matched_items && inv.matched_items.length)
+          ? '<div style="margin-top:4px;font-size:12px;color:var(--brand);font-weight:600;">🔎 ' + inv.matched_items.map(escapeHtml).join(' · ') + '</div>'
+          : '') +
       '</div>';
   });
   return html;
