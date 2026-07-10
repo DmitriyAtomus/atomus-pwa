@@ -11962,7 +11962,7 @@ function renderOfferForm() {
 
   // Контрагент
   html += '<div class="sales-form-section">';
-  html += '<div class="sales-form-title">Контрагент <span class="req">*</span></div>';
+  html += '<div class="sales-form-title">Контрагент <span class="hint" style="font-weight:400;color:var(--text-light);font-size:11px;">(необязательно)</span></div>';
   html += '<div class="contractor-selector" onclick="openContractorModalForOffer()">';
   if (f.contractor_id) {
     html += '<div class="selected-text">' +
@@ -11970,9 +11970,12 @@ function renderOfferForm() {
             (f.contractor_inn ? '<div class="selected-meta">ИНН ' + escapeHtml(f.contractor_inn) + '</div>' : '') +
             '</div>';
   } else {
-    html += '<div class="selected-text"><div class="placeholder">Выберите контрагента…</div></div>';
+    html += '<div class="selected-text"><div class="placeholder">Выберите контрагента (можно пропустить)…</div></div>';
   }
   html += '<i class="ti ti-chevron-right chev"></i>';
+  if (f.contractor_id) {
+    html += '<button type="button" class="icon-btn" title="Убрать контрагента" onclick="event.stopPropagation();clearOfferContractor()"><i class="ti ti-x"></i></button>';
+  }
   html += '</div></div>';
 
   // Юрлицо
@@ -12147,7 +12150,7 @@ async function submitOfferForm() {
 
   const f = state.offerForm;
   if (!f.manager_id) { errEl.innerHTML = '<div class="sales-error">Выберите менеджера</div>'; return; }
-  if (!f.contractor_id) { errEl.innerHTML = '<div class="sales-error">Выберите контрагента</div>'; return; }
+  // Контрагент — необязателен: КП можно оформить без него
   if (f.items.length === 0) { errEl.innerHTML = '<div class="sales-error">Добавьте хотя бы одну позицию</div>'; return; }
   for (const it of f.items) {
     if (!(it.name || '').trim()) { errEl.innerHTML = '<div class="sales-error">У всех позиций должно быть название</div>'; return; }
@@ -12248,6 +12251,15 @@ function clearOfferCalc(e) {
 function openContractorModalForOffer() {
   state._contractorModalContext = 'offer';
   openContractorModal();
+}
+
+// Убрать выбранного контрагента (КП можно без него)
+function clearOfferContractor() {
+  if (!state.offerForm) return;
+  state.offerForm.contractor_id = null;
+  state.offerForm.contractor_name = '';
+  state.offerForm.contractor_inn = '';
+  renderOfferForm();
 }
 
 // selectContractor живёт в app-4.js (объявление перекрывает override отсюда).
