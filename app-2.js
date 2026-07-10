@@ -7257,6 +7257,18 @@ function setWorkType(wt) {
   if (workersLabel) workersLabel.textContent = isAssembly ? 'Кто собирал' : 'Кто делал';
   if (dateLabel)    dateLabel.textContent    = isAssembly ? 'Дата сборки' : 'Дата работы';
 
+  // v2.45.7xx: для МОНТАЖА поле описания — это ЗАДАЧА на объект (что нужно сделать),
+  // а не отчёт (что было сделано). Для остальных типов — как раньше.
+  const descLabelTxt = document.getElementById('na-desc-label-text');
+  const descInp = document.getElementById('na-description');
+  if (wt === 'installation') {
+    if (descLabelTxt) descLabelTxt.textContent = 'Что нужно сделать на монтаже';
+    if (descInp) descInp.placeholder = 'Например: «Смонтировать и подключить приточную установку», «Проложить кабельную трассу», «Установить щит, завести питание»';
+  } else {
+    if (descLabelTxt) descLabelTxt.textContent = 'Что было сделано';
+    if (descInp) descInp.placeholder = 'Например: «Замена сгоревшего УЗО в щите автоматики», «Запуск приточной установки», «Замеры сопротивления изоляции»';
+  }
+
   // Заголовки h1 и h2 на экране — у них нет id, ставим напрямую
   const titles = {
     assembly: 'Новая сборка', repair: 'Новый ремонт',
