@@ -3291,9 +3291,22 @@ async function ensureEmployeesLoaded() {
     const all = (d && d.employees) || [];
     cache.activeEmployees = all.filter(e => e.is_active);
     console.log('[employees] активных:', cache.activeEmployees.length);
+    if (cache.activeEmployees.length) return;
   } catch (e) {
     console.error('[employees] ошибка загрузки:', e);
     cache.activeEmployees = null;
+  }
+  // v2.45.734: полный список — только директору (403 остальным). Для выбора
+  // исполнителя всем хватает лёгкого /api/employees/active (id + имя).
+  try {
+    console.log('[employees] фолбэк: /api/employees/active…');
+    const d2 = await apiGet('/api/employees/active');
+    const act = ((d2 && d2.employees) || []).map(e =>
+      Object.assign({ is_active: 1 }, e));
+    if (act.length) cache.activeEmployees = act;
+    console.log('[employees] активных (fallback):', act.length);
+  } catch (e2) {
+    console.error('[employees] фолбэк тоже не удался:', e2);
   }
 }
 

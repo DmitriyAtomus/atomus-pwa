@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.730";
+const APP_VERSION = "v2.45.734";
 const APP_VERSION_DATE = "08.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1155,6 +1155,14 @@ function showApp() {
 
 // v2.8.2: восстановление последнего открытого экрана при F5/перезагрузке
 function _restoreLastView() {
+  // ТВ-режим (трансляция CRM на телевизор): открыть заданный раздел и
+  // не восстанавливать сохранённый вид. Раздел = ключ SECTION_CONFIG
+  // (напр. tasks — планёрка, production, warehouse, mail…).
+  if (window._tvMode) {
+    const _s = (window._tvScreen || '').trim();
+    selectSection(SECTION_CONFIG[_s] ? _s : 'home');
+    return;
+  }
   // Если есть свежий приветственный тост (т.е. только что вошли) — на главную
   if (state._loginWelcome) {
     selectSection('home');
