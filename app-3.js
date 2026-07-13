@@ -2997,7 +2997,9 @@ async function _recvLoadOrderItems(orderId) {
     (d.items || []).forEach(it => {
       it._on = it.remaining > 0;               // галочка по умолчанию — что не принято
       it._qty = it.remaining || it.qty || 1;
-      it._action = 'stock';
+      // v2.45.746: CRM нашла эту позицию в свежем УПД поставщика →
+      // по умолчанию «Уже на складе», чтобы не задвоить остаток
+      it._action = it.suggest_action === 'already' ? 'already' : 'stock';
       it._cid = it.component_id || null;
     });
     _recvOrder = d;
@@ -3074,6 +3076,7 @@ function _recvRenderOrderItems() {
         '<div class="nm">' + escapeHtml(it.name) +
           (it.received_qty ? ' <span class="got">принято ' + _bcNsafe(it.received_qty) + ' из ' + _bcNsafe(it.qty) + '</span>' : '') + '</div>' +
         '<div class="mrow">' + matchHtml + '</div>' +
+        (it.suggest_reason ? '<div class="recvb-upd">📄 ' + escapeHtml(it.suggest_reason) + '</div>' : '') +
         '<div class="recvb-actrow">' +
           '<input type="number" class="recvb-qty" min="0" step="1" value="' + it._qty + '" ' +
             'onchange="_recvOrder.items[' + i + ']._qty=parseFloat(this.value)||0"> <span class="recvb-unit">' + escapeHtml(it.unit || 'шт.') + '</span>' +
@@ -15117,6 +15120,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.746',
+    date: '13.07.2026',
+    title: 'Заказ и УПД сопоставляются сами — без задвоения',
+    features: [
+      'Открыл приёмку заказа — CRM проверяет <b>свежие УПД этого поставщика</b> (за 21 день)',
+      'Сопоставление по «подписи»: серия + полюса + ток (NXB-63S · 1P · C16); <b>6 кА и 4,5 кА считаются одной позицией</b>',
+      'Найденные в УПД строки получают по умолчанию <b>«Уже на складе»</b> и плашку «📄 оприходовано по УПД №УТ-5391» — остаток не задвоится',
+      'Перещёлкнуть действие можно всегда — это подсказка, а не запрет',
+    ],
+  },
+
   {
     version: 'v2.45.744',
     date: '13.07.2026',
