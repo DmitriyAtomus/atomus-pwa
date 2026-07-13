@@ -12021,9 +12021,9 @@ function renderOfferForm() {
 
   // Позиции
   html += '<div class="sales-form-section">';
-  html += '<div class="sales-form-title">Состав КП <span class="req">*</span></div>';
+  html += '<div class="sales-form-title">Состав КП <span class="hint" style="font-weight:400;color:var(--text-light);font-size:11px;">(необязательно)</span></div>';
   if (f.items.length === 0) {
-    html += '<div style="padding: 18px; text-align: center; color: var(--text-light); font-size: 13px;">Позиций пока нет. Добавьте хотя бы одну.</div>';
+    html += '<div style="padding: 18px; text-align: center; color: var(--text-light); font-size: 13px;">Позиций пока нет — можно оставить пустым (напр. для КП с интерактивным планом).</div>';
   } else {
     f.items.forEach((it, idx) => {
       const lineTotal = calcItemTotal(it);
@@ -12153,7 +12153,7 @@ async function submitOfferForm() {
   const f = state.offerForm;
   if (!f.manager_id) { errEl.innerHTML = '<div class="sales-error">Выберите менеджера</div>'; return; }
   // Контрагент — необязателен: КП можно оформить без него
-  if (f.items.length === 0) { errEl.innerHTML = '<div class="sales-error">Добавьте хотя бы одну позицию</div>'; return; }
+  // Позиции необязательны: КП можно создать без них (напр. как носитель интерактивного плана)
   for (const it of f.items) {
     if (!(it.name || '').trim()) { errEl.innerHTML = '<div class="sales-error">У всех позиций должно быть название</div>'; return; }
     if (Number(it.qty) <= 0) { errEl.innerHTML = '<div class="sales-error">Количество в позиции «' + escapeHtml(it.name) + '» должно быть больше 0</div>'; return; }
