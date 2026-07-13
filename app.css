@@ -21417,3 +21417,6 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .bcu-yes { flex: none; border: 1px solid var(--brand); background: var(--surface); color: var(--brand); border-radius: 8px; padding: 5px 11px; font-size: 11.5px; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; }
 .bcu-yes:hover { background: var(--brand); color: #fff; }
 .bcu-yes:disabled { opacity: .5; }
+
+/* v2.45.743: «уже на складе» в приёмке заказа */
+.recvb-act .a.alr.on { background: var(--brand-bg); border-color: var(--brand); color: var(--brand); }

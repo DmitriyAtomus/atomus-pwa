@@ -3059,11 +3059,14 @@ function _recvRenderOrderItems() {
           'onclick="_recvOrder.items[' + i + ']._action=\'stock\';_recvRenderOrderItems()">На склад</button>' +
         '<button type="button" class="a exp' + (it._action === 'expense' ? ' on' : '') + '" ' +
           'onclick="_recvOrder.items[' + i + ']._action=\'expense\';_recvRenderOrderItems()">Списать</button>' +
+        '<button type="button" class="a alr' + (it._action === 'already' ? ' on' : '') + '" ' +
+          'title="Пришло аналогом и уже оприходовано (например, через УПД) — закрыть позицию без изменения остатка" ' +
+          'onclick="_recvOrder.items[' + i + ']._action=\'already\';_recvRenderOrderItems()">Уже на складе</button>' +
       '</div>' +
     '</div>';
   });
   const n = items.filter(x => x._on).length;
-  h += '<div class="recvb-hint">Выбрано: <b>' + n + '</b> · «На склад» — остаток вырастет · «Списать» — пришло и сразу ушло в работу, на складе не осядет</div>';
+  h += '<div class="recvb-hint">Выбрано: <b>' + n + '</b> · «На склад» — остаток вырастет · «Списать» — сразу в работу · «Уже на складе» — оприходовано раньше (напр. через УПД), просто закрыть позицию</div>';
   box.innerHTML = h;
   const btn = document.getElementById('recv-batch-btn');
   if (btn) btn.innerHTML = '<i class="ti ti-check"></i> Принять выбранное (' + n + ')';
@@ -3088,6 +3091,7 @@ async function recvBatchSubmit() {
     const j = (r && r.data) || {};
     if (r && r.ok) {
       showToast('Принято: на склад ' + (j.stock || 0) + ' · списано ' + (j.expense || 0) +
+        (j.already ? ' · уже на складе ' + j.already : '') +
         (j.skipped ? ' · пропущено ' + j.skipped : ''), 'success');
       closeComponentReceiveModal();
       cache.components = null;
@@ -15088,6 +15092,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.743',
+    date: '13.07.2026',
+    title: 'Приёмка: «Уже на складе» — без задвоения',
+    features: [
+      'Заказывали 6 кА, пришли 4,5 кА и уже оприходованы через УПД? У позиции появилась третья кнопка — <b>«Уже на складе»</b>',
+      'Позиция заказа закрывается (уходит из «Ждём поставку»), а <b>остаток не задваивается</b> — движений по складу не создаётся',
+      'В тосте видно итог: «на склад 3 · списано 1 · уже на складе 5»',
+    ],
+  },
+
   {
     version: 'v2.45.742',
     date: '13.07.2026',
