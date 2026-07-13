@@ -20252,32 +20252,39 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 /* ====== Вертикальная рельса разделов (десктоп, v2.45.646) ====== */
 .section-rail { display: none; }
 .app.desktop-layout .section-rail {
-  display: flex; flex-direction: column; gap: 3px; align-items: center;
-  background: #122A47; padding: 10px 6px;
+  display: flex; flex-direction: column; gap: 5px; align-items: center;
+  background: #122A47; padding: 12px 8px;
   position: sticky; top: 64px; align-self: start;
   height: calc(100vh - 64px); overflow-y: auto; scrollbar-width: none;
 }
 .app.desktop-layout .section-rail::-webkit-scrollbar { display: none; }
 /* Сетка: рельса + сайдбар раздела + контент */
-.app.desktop-layout .body-layout { grid-template-columns: 64px 210px 1fr; }
+.app.desktop-layout .body-layout { grid-template-columns: 78px 210px 1fr; }
 .app.desktop-layout.rail-off .body-layout { grid-template-columns: 210px 1fr; }
 .app.desktop-layout.rail-off .section-rail { display: none; }
 /* Верхние табы разделов скрыты, пока рельса включена */
 .app.desktop-layout:not(.rail-off) .top-bar .section-switcher-wrap,
 .app.desktop-layout:not(.rail-off) .top-bar .section-scroll-pair { display: none; }
 
+/* v2.45.747: кнопки рельсы крупнее и с явными состояниями */
 .rail-i {
-  width: 52px; padding: 7px 2px 6px; border-radius: 12px; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  color: #7E93AC; font-size: 8.5px; font-weight: 700; text-align: center;
+  width: 62px; padding: 9px 2px 8px; border-radius: 14px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: #93A9C2; font-size: 9.5px; font-weight: 700; text-align: center;
   position: relative; flex-shrink: 0; user-select: none;
-  transition: background .12s, color .12s;
+  background: rgba(255,255,255,.04);
+  transition: background .13s, color .13s, transform .1s;
 }
-.rail-i .ti { font-size: 19px; }
-.rail-i:hover { background: rgba(255,255,255,.08); color: #C7D5E6; }
-.rail-i.on { background: #fff; color: var(--brand); }
+.rail-i .ti { font-size: 22px; }
+.rail-i:hover { background: rgba(255,255,255,.13); color: #fff; }
+.rail-i:active { transform: scale(.96); }
+.rail-i.on {
+  background: #fff; color: var(--brand); font-weight: 800;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .28);
+}
+.rail-i.on .ti { transform: scale(1.05); }
 .rail-b {
-  position: absolute; top: 1px; right: 3px; min-width: 16px; height: 16px;
+  position: absolute; top: 2px; right: 5px; min-width: 17px; height: 17px;
   border-radius: 999px; font-size: 9px; font-weight: 800;
   display: flex; align-items: center; justify-content: center; padding: 0 4px;
   border: 2px solid #122A47;
