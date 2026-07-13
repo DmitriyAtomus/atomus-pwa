@@ -4642,6 +4642,7 @@ function _renderModelCharsBlock(m) {
               '<i class="ti ti-schema" style="font-size:18px;color:#7C3AED;"></i>' +
               '<span style="flex:1;color:var(--text-dark);min-width:120px;">Принципиальная схема: ' + sname + '</span>' +
               '<button class="btn btn-secondary btn-small" onclick="downloadModelScheme(' + m.id + ')"><i class="ti ti-download"></i> Открыть</button>' +
+              (String(m.scheme_file_key || '').toLowerCase().endsWith('.pdf') ? '<button class="btn btn-secondary btn-small" onclick="printModelScheme(' + m.id + ')" title="Печать на офисный принтер"><i class="ti ti-printer"></i> Печать</button>' : '') +
               (canEdit ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);" onclick="deleteModelSchemeFile(' + m.id + ')" title="Удалить схему"><i class="ti ti-trash"></i></button>' : '') +
             '</div>';
   }
@@ -4843,6 +4844,29 @@ async function downloadModelScheme(modelId) {
       : ('Ошибка: ' + (e && e.message || e)), 'error');
   } finally {
     window._schemeLoading[modelId] = false;
+  }
+}
+
+// v2.45.736: печать схемы (PDF) на офисный принтер через шлюз документов.
+// Бумага выходит в офисе (Pantum), работает откуда угодно.
+async function printModelScheme(modelId) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) { showToast('Сессия истекла, войдите заново', 'error'); return; }
+  showToast('Отправляю на печать…', 'info');
+  try {
+    const r = await apiPost('/api/documents/print', {
+      doc_type: 'model_scheme',
+      model_id: modelId,
+      copies: 1,
+    });
+    if (r.ok) {
+      showToast('Схема отправлена на офисный принтер', 'success');
+    } else {
+      const msg = (r.data && (r.data.message || r.data.error)) || 'Не удалось отправить на печать';
+      showToast(msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
   }
 }
 
