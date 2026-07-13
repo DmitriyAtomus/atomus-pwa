@@ -2893,7 +2893,7 @@ async function openComponentDetail(componentId) {
 
 // ============ Приход ============
 
-async function openComponentReceiveModal(preselectedId) {
+async function openComponentReceiveModal(preselectedId, orderId) {
   // Каталог комплектующих мог быть не загружен (напр. открыли из «Что закупить») —
   // подгружаем на лету, чтобы модалка прихода работала из любого раздела.
   if (!cache.components || !cache.components.length) {
@@ -2919,6 +2919,7 @@ async function openComponentReceiveModal(preselectedId) {
   // не весь каталог вперемешку, а история марок выбранного компонента (чипами)
   const pre = preselectedId ? components.find(c => c.id === preselectedId) : null;
   window._recvCompId = pre ? pre.id : null;
+  window._recvOrderId = orderId || null;   // v2.45.740: приёмка заказа списком
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
       '<div class="modal-header">' +
@@ -2926,6 +2927,9 @@ async function openComponentReceiveModal(preselectedId) {
         '<button class="modal-close" onclick="closeComponentReceiveModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="padding:18px;">' +
+        (orderId ? '<div id="recv-order-block"><div class="loading-block">Загружаем позиции заказа…</div></div>' +
+          '<div class="recv-manual-cap" onclick="var b=document.getElementById(\'recv-manual\');b.style.display=b.style.display===\'none\'?\'\':\'none\';">' +
+          '＋ добавить вручную (не из заказа) ▾</div><div id="recv-manual" style="display:none;">' : '') +
         '<label class="form-label">Комплектующее *</label>' +
         '<div class="recv-comp-wrap">' +
           '<input type="text" id="recv-comp-search" class="form-input" autocomplete="off" ' +
@@ -2950,15 +2954,19 @@ async function openComponentReceiveModal(preselectedId) {
         '</select>' +
         '<label class="form-label">Комментарий</label>' +
         '<input type="text" id="recv-reason" class="form-input" placeholder="Например: Накладная №12 от 20.05" />' +
+        (orderId ? '<button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="submitComponentReceive()"><i class="ti ti-check"></i> Оприходовать вручную</button></div>' : '') +
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="btn btn-secondary" onclick="closeComponentReceiveModal()">Отмена</button>' +
-        '<button class="btn btn-primary" onclick="submitComponentReceive()"><i class="ti ti-check"></i> Оприходовать</button>' +
+        (orderId
+          ? '<button class="btn btn-primary" id="recv-batch-btn" onclick="recvBatchSubmit()"><i class="ti ti-check"></i> Принять выбранное</button>'
+          : '<button class="btn btn-primary" onclick="submitComponentReceive()"><i class="ti ti-check"></i> Оприходовать</button>') +
       '</div>' +
     '</div>';
   m.classList.add('visible');
   recvAddBrandRow();  // одна строка по умолчанию
   if (pre) _recvLoadBrands(pre.id);   // v2.45.684: история марок предвыбранного
+  if (orderId) _recvLoadOrderItems(orderId);   // v2.45.740
 
   // Подгружаем поставщиков если ещё нет
   if (!cache.suppliers) {
@@ -2977,6 +2985,115 @@ async function openComponentReceiveModal(preselectedId) {
 function closeComponentReceiveModal() {
   const m = document.getElementById('comp-receive-modal');
   if (m) m.classList.remove('visible');
+}
+
+// ============ v2.45.740: приёмка заказа списком — сопоставить и «на склад/списать» ============
+var _recvOrder = null;
+async function _recvLoadOrderItems(orderId) {
+  const box = document.getElementById('recv-order-block');
+  if (!box) return;
+  try {
+    const d = await apiGet('/api/supply-orders/' + orderId + '/receive-items');
+    (d.items || []).forEach(it => {
+      it._on = it.remaining > 0;               // галочка по умолчанию — что не принято
+      it._qty = it.remaining || it.qty || 1;
+      it._action = 'stock';
+      it._cid = it.component_id || null;
+    });
+    _recvOrder = d;
+    _recvRenderOrderItems();
+  } catch (e) {
+    box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить позиции заказа</div>';
+  }
+}
+// кандидаты сопоставления: простое пересечение слов с каталогом
+function _recvMatchCandidates(name) {
+  const toks = String(name || '').toLowerCase().split(/[^a-zа-яё0-9.-]+/).filter(t => t.length > 2);
+  const scored = [];
+  (cache.components || []).forEach(c => {
+    const cn = ((c.name || '') + ' ' + (c.sku || '')).toLowerCase();
+    let s = 0;
+    toks.forEach(t => { if (cn.indexOf(t) !== -1) s++; });
+    if (s > 0) scored.push([s, c]);
+  });
+  scored.sort((a, b) => b[0] - a[0]);
+  return scored.slice(0, 12).map(x => x[1]);
+}
+function _recvRenderOrderItems() {
+  const box = document.getElementById('recv-order-block');
+  if (!box || !_recvOrder) return;
+  const o = _recvOrder.order || {};
+  const items = _recvOrder.items || [];
+  let h = '<div class="recvb-head">📦 Что пришло по заказу <b>' + escapeHtml(o.label || '') + '</b>' +
+    (o.supplier_name ? ' · ' + escapeHtml(o.supplier_name) : '') + '</div>';
+  if (!items.length) {
+    h += '<div class="logi-empty">В заказе нет позиций — оприходуй вручную ниже.</div>';
+    box.innerHTML = h;
+    return;
+  }
+  items.forEach((it, i) => {
+    const matched = !!it._cid;
+    let matchHtml;
+    if (matched && it.component_id === it._cid && it.component_name) {
+      matchHtml = '<span class="recvb-match ok">✓ ' + escapeHtml(it.component_name) +
+        (it.component_stock != null ? ' <i>(на складе ' + _bcNsafe(it.component_stock) + ')</i>' : '') + '</span>';
+    } else {
+      const cands = _recvMatchCandidates(it.name);
+      matchHtml = '<select class="form-input recvb-sel" onchange="_recvOrder.items[' + i + ']._cid=this.value?parseInt(this.value,10):null">' +
+        '<option value="">— сопоставь с номенклатурой —</option>' +
+        cands.map(c => '<option value="' + c.id + '"' + (it._cid === c.id ? ' selected' : '') + '>' +
+          escapeHtml(c.name) + '</option>').join('') + '</select>';
+    }
+    h += '<div class="recvb-row' + (it._on ? '' : ' off') + '">' +
+      '<label class="recvb-chk"><input type="checkbox"' + (it._on ? ' checked' : '') +
+        ' onchange="_recvOrder.items[' + i + ']._on=this.checked;_recvRenderOrderItems()"></label>' +
+      '<div class="t">' +
+        '<div class="nm">' + escapeHtml(it.name) +
+          (it.received_qty ? ' <span class="got">принято ' + _bcNsafe(it.received_qty) + ' из ' + _bcNsafe(it.qty) + '</span>' : '') + '</div>' +
+        '<div class="mrow">' + matchHtml + '</div>' +
+      '</div>' +
+      '<input type="number" class="recvb-qty" min="0" step="1" value="' + it._qty + '" ' +
+        'onchange="_recvOrder.items[' + i + ']._qty=parseFloat(this.value)||0"' + (it._on ? '' : ' disabled') + '>' +
+      '<div class="recvb-act">' +
+        '<button type="button" class="a' + (it._action === 'stock' ? ' on' : '') + '" ' +
+          'onclick="_recvOrder.items[' + i + ']._action=\'stock\';_recvRenderOrderItems()">На склад</button>' +
+        '<button type="button" class="a exp' + (it._action === 'expense' ? ' on' : '') + '" ' +
+          'onclick="_recvOrder.items[' + i + ']._action=\'expense\';_recvRenderOrderItems()">Списать</button>' +
+      '</div>' +
+    '</div>';
+  });
+  const n = items.filter(x => x._on).length;
+  h += '<div class="recvb-hint">Выбрано: <b>' + n + '</b> · «На склад» — остаток вырастет · «Списать» — пришло и сразу ушло в работу, на складе не осядет</div>';
+  box.innerHTML = h;
+  const btn = document.getElementById('recv-batch-btn');
+  if (btn) btn.innerHTML = '<i class="ti ti-check"></i> Принять выбранное (' + n + ')';
+}
+function _bcNsafe(n) { n = Number(n) || 0; return (Math.round(n * 100) / 100).toString(); }
+async function recvBatchSubmit() {
+  if (!_recvOrder) return;
+  const lines = (_recvOrder.items || []).filter(it => it._on && (it._qty > 0)).map(it => ({
+    order_item_id: it.order_item_id,
+    component_id: it._cid,
+    qty: it._qty,
+    action: it._action,
+  }));
+  if (!lines.length) { showToast('Отметь хотя бы одну позицию', 'error'); return; }
+  const noMatchStock = lines.filter(l => l.action === 'stock' && !l.component_id).length;
+  if (noMatchStock) {
+    showToast('У ' + noMatchStock + ' позиций «на склад» не выбрано сопоставление', 'error');
+    return;
+  }
+  try {
+    const r = await apiPost('/api/supply-orders/' + (_recvOrder.order || {}).id + '/receive-batch', { lines: lines });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast('Принято: на склад ' + (j.stock || 0) + ' · списано ' + (j.expense || 0) +
+        (j.skipped ? ' · пропущено ' + j.skipped : ''), 'success');
+      closeComponentReceiveModal();
+      cache.components = null;
+      if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+    } else showToast(j.message || 'Не удалось принять', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 // ============ v2.45.684: поиск компонента + марки-чипы в приходе ============
@@ -7739,7 +7856,7 @@ function _cpTrackingRowHtml(it) {
       'color:#047857;background:#D1FAE5;padding:3px 10px;border-radius:999px;white-space:nowrap;">' +
       '<i class="ti ti-circle-check-filled"></i> Пришло</span>' +
       (it.component_id
-        ? '<button type="button" onclick="openComponentReceiveModal(' + it.component_id + ')" ' +
+        ? '<button type="button" onclick="openComponentReceiveModal(' + it.component_id + ',' + (it.order_id || 'null') + ')" ' +
           'title="Оприходовать на склад — остаток поднимется и позиция уйдёт из списка" ' +
           'style="display:inline-flex;align-items:center;gap:4px;background:#047857;border:none;color:#fff;border-radius:8px;' +
           'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
@@ -7747,7 +7864,7 @@ function _cpTrackingRowHtml(it) {
         : '');
   } else if (it._is_component && it.order_item_id && it.order_status !== 'draft') {
     receivedBtn = '<button type="button" onclick="shopMarkReceived(' + it.order_item_id +
-      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\', ' + (it.component_id || 'null') + ')" ' +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\', ' + (it.component_id || 'null') + ', ' + (it.order_id || 'null') + ')" ' +
       'title="Товар пришёл — нажмите, чтобы отметить позицию полученной (заказ закроется)" ' +
       'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #34D399;color:#047857;border-radius:8px;' +
       'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
@@ -7853,7 +7970,7 @@ async function saveEta(orderId, clear) {
 }
 
 // v2.45.430: убрать позицию из черновика заказа → вернуть в список «к закупке».
-async function shopMarkReceived(orderItemId, name, componentId) {
+async function shopMarkReceived(orderItemId, name, componentId, orderId) {
   if (!orderItemId) return;
   if (!confirm('Отметить «' + (name || 'позицию') + '» полученной?\n\nПозиция заказа закроется, дальше сразу откроется «Приход на склад» — оприходуй, чтобы остаток поднялся и позиция ушла из «Что закупить».')) return;
   try {
@@ -7873,7 +7990,7 @@ async function shopMarkReceived(orderItemId, name, componentId) {
     // Сразу предлагаем оприходовать: без прихода остаток не поднимется и
     // позиция так и будет висеть в «Что закупить» (низкий остаток).
     if (componentId && typeof openComponentReceiveModal === 'function') {
-      openComponentReceiveModal(componentId);
+      openComponentReceiveModal(componentId, (typeof orderId !== 'undefined' && orderId) || null);
     }
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
@@ -14971,6 +15088,19 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.740',
+    date: '13.07.2026',
+    title: 'Приход на склад — весь заказ одним списком',
+    features: [
+      'Открыл «Приход на склад» из заказа — сверху <b>список всех позиций «что пришло»</b> с галочками и количеством',
+      'Каждая позиция <b>сопоставляется с номенклатурой</b>: связанные подставляются сами (✓ зелёным), остальные — выбором из подсказок',
+      'По каждой позиции выбор: <b>«На склад»</b> (остаток вырастет) или <b>«Списать»</b> (пришло и сразу ушло в работу — на складе не осядет)',
+      'Кнопка «Принять выбранное (N)» — весь заказ одним нажатием; принятые количества отмечаются на заказе',
+      'Ручной приход одной позиции остался — «＋ добавить вручную» внизу',
+    ],
+  },
+
   {
     version: 'v2.45.739',
     date: '13.07.2026',

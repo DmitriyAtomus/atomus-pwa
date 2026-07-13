@@ -21176,6 +21176,27 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .pl-hist .s { color: var(--text-light); flex: 1; }
 .pl-hist .w { color: var(--warning); font-weight: 700; }
 .pl-hist .g { color: var(--success); font-weight: 700; }
+/* v2.45.740: приёмка заказа списком — сопоставить и «на склад/списать» */
+.recvb-head { font-size: 13px; color: var(--text-light); margin-bottom: 10px; }
+.recvb-head b { color: var(--text-dark); }
+.recvb-row { display: flex; align-items: flex-start; gap: 9px; background: var(--bg); border-radius: 10px; padding: 9px 11px; margin-bottom: 7px; }
+.recvb-row.off { opacity: .45; }
+.recvb-chk { padding-top: 3px; }
+.recvb-row .t { flex: 1; min-width: 0; }
+.recvb-row .nm { font-weight: 700; font-size: 12.5px; color: var(--text-dark); line-height: 1.3; }
+.recvb-row .nm .got { font-weight: 600; font-size: 11px; color: var(--text-faint); }
+.recvb-row .mrow { margin-top: 4px; }
+.recvb-match.ok { font-size: 11.5px; font-weight: 700; color: var(--success); }
+.recvb-match.ok i { color: var(--text-faint); font-style: normal; font-weight: 500; }
+.recvb-sel { font-size: 12px; padding: 6px 8px; width: 100%; }
+.recvb-qty { width: 64px; border: 1px solid var(--border); border-radius: 9px; padding: 7px 6px; font-size: 14px; font-weight: 700; text-align: center; background: var(--surface); color: var(--text-dark); flex: none; }
+.recvb-act { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.recvb-act .a { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 4px 10px; font-size: 11px; font-weight: 800; cursor: pointer; color: var(--text-light); font-family: inherit; white-space: nowrap; }
+.recvb-act .a.on { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+.recvb-act .a.exp.on { background: var(--warning-bg); border-color: var(--warning); color: var(--warning); }
+.recvb-hint { font-size: 11.5px; color: var(--text-faint); margin: 6px 2px 12px; }
+.recv-manual-cap { font-size: 12px; font-weight: 700; color: var(--brand); cursor: pointer; margin: 4px 0 10px; }
+
 /* v2.45.739: применяемость детали (инвентаризация по фото) */
 .bcu-low { background: var(--warning-bg); color: var(--warning); border-radius: 8px; padding: 7px 11px; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
 .bcu-sec { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); margin: 12px 2px 7px; }
