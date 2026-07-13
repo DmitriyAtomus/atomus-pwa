@@ -11499,8 +11499,9 @@ function renderOfferTracker(el, d, offerId) {
     '<div style="background:var(--bg,#f1f5f9);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;">' +
       '<div style="font-size:20px;font-weight:800;' + (brand ? 'color:var(--brand);' : '') + '">' + (v || 0) + '</div>' +
       '<div style="font-size:11px;color:var(--text-light);margin-top:2px;"><i class="ti ' + icon + '"></i> ' + l + '</div></div>';
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;margin-bottom:12px;">';
   h += stat(d.views, 'Просмотры', 'ti-eye', true);
+  h += stat(d.plan_opens, 'План', 'ti-map-2', true);
   h += stat(d.prints, 'Печати', 'ti-printer', false);
   h += stat(d.downloads, 'Скачали', 'ti-download', false);
   h += stat(d.devices, 'Устройств', 'ti-devices', false);
@@ -11537,7 +11538,8 @@ function renderOfferTracker(el, d, offerId) {
     h += '<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px;">';
     ev.forEach(e => {
       let icon = 'ti-eye', label = 'Просмотрено';
-      if (e.is_forward) { icon = 'ti-arrow-forward-up'; label = 'Открыто с нового устройства (возможно, переслали)'; }
+      if (e.event_type === 'plan') { icon = 'ti-map-2'; label = 'Открыл интерактивный план'; }
+      else if (e.is_forward) { icon = 'ti-arrow-forward-up'; label = 'Открыто с нового устройства (возможно, переслали)'; }
       else if (e.event_type === 'print') { icon = 'ti-printer'; label = 'Распечатано'; }
       else if (e.event_type === 'download') { icon = 'ti-download'; label = 'Скачан PDF'; }
       const geo = [e.city, e.country].filter(Boolean).join(', ');
