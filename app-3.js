@@ -10300,6 +10300,8 @@ function renderSupplyOrders() {
         '</div>' +
         '<div class="sup-row-meta">' +
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
+          // v2.45.737: когда оплатили — дата рядом со статусом
+          (o.paid_at ? '<span class="sup-ord-meta-num" title="Когда оплатили"><i class="ti ti-credit-card"></i>оплачен ' + _supOrdDate(o.paid_at) + '</span>' : '') +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
@@ -10322,6 +10324,18 @@ function renderSupplyOrders() {
   });
   container.innerHTML = html;
   _renderSupplyOrdersActionBar();
+}
+
+// v2.45.737: дата события заказа (UTC из базы → местное, ДД.ММ)
+function _supOrdDate(ts) {
+  const s = String(ts || '').slice(0, 19).replace(' ', 'T');
+  if (!s) return '';
+  try {
+    const d = new Date(s + 'Z');   // в базе UTC
+    if (isNaN(d.getTime())) return String(ts).slice(8, 10) + '.' + String(ts).slice(5, 7);
+    const p = n => String(n).padStart(2, '0');
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1);
+  } catch (e) { return ''; }
 }
 
 function toggleSupplyOrderSelected(id, checked) {
