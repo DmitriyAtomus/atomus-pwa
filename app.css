@@ -21405,3 +21405,8 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center;
   padding: 0 6px;
 }
+
+/* v2.45.741: привязка детали к изделию с экрана сверки */
+.bcu-linkbox { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
+.bcu-linkrow { display: flex; align-items: center; gap: 8px; }
+.bcu-linkrow label { font-size: 12px; font-weight: 700; color: var(--text-light); }

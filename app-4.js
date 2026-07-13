@@ -577,8 +577,11 @@ function _bcRenderUsage(d) {
     }
   } else {
     h += '<div class="bcu-sec">🔧 Применяется в изделиях <span class="n">0</span></div>' +
-      '<div class="bcu-empty">В составах моделей (BOM) эта деталь не числится.</div>';
+      '<div class="bcu-empty">В составах моделей (BOM) эта деталь не числится — привяжи, чтобы CRM знала, куда она относится.</div>';
   }
+  // v2.45.741: привязать к изделию прямо отсюда
+  h += '<button class="bcu-more" onclick="_bcuLinkOpen()">＋ Привязать к изделию</button>' +
+    '<div id="bcu-link-form" style="display:none;"></div>';
   const need = d.needed_now || [];
   if (need.length) {
     h += '<div class="bcu-sec">⚠ Нужно прямо сейчас <span class="n">' + need.length + '</span></div>';
@@ -597,6 +600,69 @@ function _bcUsageMore() {
   _bcUsageShowAll = true;
   const box = document.getElementById('box-check-usage');
   if (box && box._usage) _bcRenderUsage(box._usage);
+}
+
+// v2.45.741: привязка детали к изделию прямо с экрана сверки
+var _bcuModelPicked = null;
+function _bcuLinkOpen() {
+  const f = document.getElementById('bcu-link-form');
+  if (!f) return;
+  if (f.style.display !== 'none') { f.style.display = 'none'; return; }
+  _bcuModelPicked = null;
+  f.style.display = 'block';
+  f.innerHTML = '<div class="bcu-linkbox">' +
+    '<div style="position:relative;">' +
+      '<input class="form-input" id="bcu-model-q" autocomplete="off" placeholder="Название изделия — начни печатать…" ' +
+        'oninput="_bcuModelFilter(this.value)">' +
+      '<div class="calc-combo-list" id="bcu-model-dd" style="display:none;"></div>' +
+    '</div>' +
+    '<div class="bcu-linkrow">' +
+      '<label>Штук на изделие:</label>' +
+      '<input type="number" class="recvb-qty" id="bcu-link-qty" value="1" min="0.1" step="1">' +
+      '<button class="btn btn-primary btn-small" onclick="_bcuLinkGo()"><i class="ti ti-link"></i> Привязать</button>' +
+    '</div></div>';
+  setTimeout(() => { const q = document.getElementById('bcu-model-q'); if (q) q.focus(); }, 60);
+}
+async function _bcuModelFilter(q) {
+  const dd = document.getElementById('bcu-model-dd');
+  if (!dd) return;
+  q = (q || '').trim();
+  _bcuModelPicked = null;
+  if (q.length < 2) { dd.style.display = 'none'; return; }
+  try {
+    const d = await apiGet('/api/models?search=' + encodeURIComponent(q));
+    const models = (d && d.models) || [];
+    dd.innerHTML = models.length ? models.slice(0, 15).map(m =>
+      '<div class="calc-combo-row" data-id="' + m.id + '">' +
+      escapeHtml(m.name || '') + (m.article ? ' <span style="color:var(--text-faint);">' + escapeHtml(m.article) + '</span>' : '') +
+      '</div>').join('') : '<div class="calc-combo-row mut">не нашлось</div>';
+    dd.querySelectorAll('.calc-combo-row[data-id]').forEach(el => {
+      el.onclick = function () {
+        _bcuModelPicked = { id: parseInt(el.dataset.id, 10), name: el.textContent };
+        const inp = document.getElementById('bcu-model-q');
+        if (inp) inp.value = el.textContent;
+        dd.style.display = 'none';
+      };
+    });
+    dd.style.display = 'block';
+  } catch (e) { dd.style.display = 'none'; }
+}
+async function _bcuLinkGo() {
+  const box = document.getElementById('box-check-usage');
+  const compId = box && box._usage && box._usage.component && box._usage.component.id;
+  if (!compId) return;
+  if (!_bcuModelPicked) { showToast('Выбери изделие из подсказок', 'error'); return; }
+  const qty = parseFloat((document.getElementById('bcu-link-qty') || {}).value) || 1;
+  try {
+    const r = await apiPost('/api/components/' + compId + '/bom-link',
+      { model_id: _bcuModelPicked.id, qty_required: qty });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast((j.action === 'updated' ? 'Количество обновлено: ' : 'Привязано: ') +
+        (j.model_name || ''), 'success');
+      _bcLoadUsage(compId);
+    } else showToast(j.message || 'Не удалось привязать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 function _boxCheckQtyHint() {
