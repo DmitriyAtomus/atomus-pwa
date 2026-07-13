@@ -497,6 +497,8 @@ function _renderBoxCheckResult(j) {
       '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(chosen.sku || '—') +
       ' · на складе <b>' + _bcN(chosen.qty_on_stock) + '</b> ' + escapeHtml(chosen.unit || 'шт.') + '</div>' +
       '</div>';
+    // v2.45.739: применяемость — куда деталь ставится и кому её не хватает
+    h += '<div id="box-check-usage"></div>';
     h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
       '<label style="font-size:13px;">Фактически:</label>' +
       '<input type="number" inputmode="decimal" id="box-check-qty" min="0" step="1" ' +
@@ -530,6 +532,71 @@ function _renderBoxCheckResult(j) {
   res.innerHTML = h;
   const qi = document.getElementById('box-check-qty');
   if (qi) { try { qi.focus(); } catch (e) {} }
+  const _cid = chosen && (chosen.component_id || chosen.id);
+  if (_cid) _bcLoadUsage(_cid);
+}
+
+// ============ v2.45.739: применяемость детали — где стоит и кому не хватает ============
+var _bcUsageShowAll = false;
+async function _bcLoadUsage(componentId) {
+  const box = document.getElementById('box-check-usage');
+  if (!box) return;
+  _bcUsageShowAll = false;
+  try {
+    const d = await apiGet('/api/components/' + componentId + '/usage');
+    if (!d || !d.ok) { box.innerHTML = ''; return; }
+    _bcRenderUsage(d);
+  } catch (e) { box.innerHTML = ''; }
+}
+function _bcRenderUsage(d) {
+  const box = document.getElementById('box-check-usage');
+  if (!box) return;
+  const c = d.component || {};
+  let h = '';
+  // ниже минимума — жёлтая пометка
+  if (c.min_stock > 0 && c.qty_on_stock < c.min_stock) {
+    h += '<div class="bcu-low">⚠ Ниже минимума (мин. ' + _bcN(c.min_stock) + ' ' +
+      escapeHtml(c.unit || 'шт.') + ') — уже в «Что закупить»</div>';
+  }
+  const uses = d.uses || [];
+  if (uses.length) {
+    h += '<div class="bcu-sec">🔧 Применяется в изделиях <span class="n">' + uses.length + '</span></div>';
+    const shown = _bcUsageShowAll ? uses : uses.slice(0, 3);
+    shown.forEach(u => {
+      h += '<div class="bcu-row" onclick="openModelDetail(' + u.model_id + ')">' +
+        '<div class="t"><div class="nm">' + escapeHtml(u.name) + '</div>' +
+        '<div class="dir">' + escapeHtml([u.direction, u.article].filter(Boolean).join(' · ')) +
+          (u.is_critical ? ' · критичная' : '') + '</div></div>' +
+        '<span class="per">' + _bcN(u.qty_per_unit) + ' ' + escapeHtml(c.unit || 'шт.') + ' / изделие</span>' +
+        '<span class="go">↗</span></div>';
+    });
+    if (!_bcUsageShowAll && uses.length > 3) {
+      const _n = uses.length - 3;
+      const _w = (typeof _plural === 'function') ? _plural(_n, ['изделие', 'изделия', 'изделий']) : 'изделий';
+      h += '<button class="bcu-more" onclick="_bcUsageMore()">показать ещё ' + _n + ' ' + _w + ' ▾</button>';
+    }
+  } else {
+    h += '<div class="bcu-sec">🔧 Применяется в изделиях <span class="n">0</span></div>' +
+      '<div class="bcu-empty">В составах моделей (BOM) эта деталь не числится.</div>';
+  }
+  const need = d.needed_now || [];
+  if (need.length) {
+    h += '<div class="bcu-sec">⚠ Нужно прямо сейчас <span class="n">' + need.length + '</span></div>';
+    need.forEach(n => {
+      h += '<div class="bcu-need" onclick="openProductionWorkDetail(' + n.work_id + ')">' +
+        '<div class="nm">' + escapeHtml(n.name) +
+        '<span class="sub">' + escapeHtml([n.contract_number ? '№' + n.contract_number : '',
+          n.is_blocked ? 'работа заблокирована' : ''].filter(Boolean).join(' · ')) + '</span></div>' +
+        '<span class="def">не хватает ' + _bcN(n.deficit) + ' ' + escapeHtml(c.unit || 'шт.') + '</span></div>';
+    });
+  }
+  box.innerHTML = h;
+  box._usage = d;
+}
+function _bcUsageMore() {
+  _bcUsageShowAll = true;
+  const box = document.getElementById('box-check-usage');
+  if (box && box._usage) _bcRenderUsage(box._usage);
 }
 
 function _boxCheckQtyHint() {
