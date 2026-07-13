@@ -2433,6 +2433,27 @@ function canManageTasks() {
   return r.includes('director') || r.includes('zam') || r.includes('manager');
 }
 
+// Кнопка «Планёрка»: одним нажатием объявить голосом на офисном ТВ, что планёрка
+// начинается. POST /api/tv/planerka -> локальный поллер на офисном ПК кастит
+// say-planerka.html («Планёрка начинается. Прошу всех подойти»).
+async function startPlanerka() {
+  const btn = document.getElementById('tasks-planerka-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await apiPost('/api/tv/planerka', {});
+    if (res && res.ok) {
+      showToast('Объявление отправлено — ТВ позовёт на планёрку', 'success');
+    } else {
+      const msg = (res && res.data && (res.data.message || res.data.error)) || ('HTTP ' + (res && res.status));
+      showToast('Не удалось объявить: ' + msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка сети: ' + e, 'error');
+  } finally {
+    if (btn) setTimeout(() => { btn.disabled = false; }, 6000);
+  }
+}
+
 // ---- Список задач (общий рендер для трёх экранов) ----
 // v2.43.92: добавлен переключатель «Список / Доска» и счётчики в чипах.
 
@@ -2508,6 +2529,8 @@ function renderTasksScreen(d) {
   }
   const newBtnEl = document.getElementById('tasks-new-btn');
   if (newBtnEl) newBtnEl.style.display = canManageTasks() ? '' : 'none';
+  const planBtnEl = document.getElementById('tasks-planerka-btn');
+  if (planBtnEl) planBtnEl.style.display = canManageTasks() ? '' : 'none';
 
   if ((state.tasksView || 'list') === 'board') {
     renderTasksBoard(d);
