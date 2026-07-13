@@ -3031,7 +3031,25 @@ function _recvRenderOrderItems() {
     box.innerHTML = h;
     return;
   }
+  // v2.45.744: понятные состояния — принятое тонкой зелёной строкой,
+  // у снятых галочек всё спрятано, действия видны только там, где нужны
   items.forEach((it, i) => {
+    // позиция уже полностью принята — только отметка, никаких кнопок
+    if (it.remaining <= 0 && it.received_qty > 0) {
+      h += '<div class="recvb-done">✓ ' + escapeHtml(it.name) +
+        ' <span>принято ' + _bcNsafe(it.received_qty) + ' из ' + _bcNsafe(it.qty) + '</span></div>';
+      return;
+    }
+    // снятая галочка — одна строка «не принимаем сейчас»
+    if (!it._on) {
+      h += '<div class="recvb-row skip">' +
+        '<label class="recvb-chk"><input type="checkbox" ' +
+          'onchange="_recvOrder.items[' + i + ']._on=this.checked;_recvRenderOrderItems()"></label>' +
+        '<div class="t"><div class="nm mut">' + escapeHtml(it.name) + '</div>' +
+        '<div class="mrow"><span class="recvb-skiphint">не принимаем сейчас — останется в «Ждём поставку»</span></div></div>' +
+      '</div>';
+      return;
+    }
     const matched = !!it._cid;
     let matchHtml;
     if (matched && it.component_id === it._cid && it.component_name) {
@@ -3044,29 +3062,36 @@ function _recvRenderOrderItems() {
         cands.map(c => '<option value="' + c.id + '"' + (it._cid === c.id ? ' selected' : '') + '>' +
           escapeHtml(c.name) + '</option>').join('') + '</select>';
     }
-    h += '<div class="recvb-row' + (it._on ? '' : ' off') + '">' +
-      '<label class="recvb-chk"><input type="checkbox"' + (it._on ? ' checked' : '') +
-        ' onchange="_recvOrder.items[' + i + ']._on=this.checked;_recvRenderOrderItems()"></label>' +
+    const ACT_HINT = {
+      stock: 'остаток на складе вырастет на это количество',
+      expense: 'пришло и сразу ушло в работу — на складе не осядет',
+      already: 'уже оприходовано раньше (напр. через УПД) — просто закрыть позицию, остаток не изменится',
+    };
+    h += '<div class="recvb-row">' +
+      '<label class="recvb-chk"><input type="checkbox" checked ' +
+        'onchange="_recvOrder.items[' + i + ']._on=this.checked;_recvRenderOrderItems()"></label>' +
       '<div class="t">' +
         '<div class="nm">' + escapeHtml(it.name) +
           (it.received_qty ? ' <span class="got">принято ' + _bcNsafe(it.received_qty) + ' из ' + _bcNsafe(it.qty) + '</span>' : '') + '</div>' +
         '<div class="mrow">' + matchHtml + '</div>' +
-      '</div>' +
-      '<input type="number" class="recvb-qty" min="0" step="1" value="' + it._qty + '" ' +
-        'onchange="_recvOrder.items[' + i + ']._qty=parseFloat(this.value)||0"' + (it._on ? '' : ' disabled') + '>' +
-      '<div class="recvb-act">' +
-        '<button type="button" class="a' + (it._action === 'stock' ? ' on' : '') + '" ' +
-          'onclick="_recvOrder.items[' + i + ']._action=\'stock\';_recvRenderOrderItems()">На склад</button>' +
-        '<button type="button" class="a exp' + (it._action === 'expense' ? ' on' : '') + '" ' +
-          'onclick="_recvOrder.items[' + i + ']._action=\'expense\';_recvRenderOrderItems()">Списать</button>' +
-        '<button type="button" class="a alr' + (it._action === 'already' ? ' on' : '') + '" ' +
-          'title="Пришло аналогом и уже оприходовано (например, через УПД) — закрыть позицию без изменения остатка" ' +
-          'onclick="_recvOrder.items[' + i + ']._action=\'already\';_recvRenderOrderItems()">Уже на складе</button>' +
+        '<div class="recvb-actrow">' +
+          '<input type="number" class="recvb-qty" min="0" step="1" value="' + it._qty + '" ' +
+            'onchange="_recvOrder.items[' + i + ']._qty=parseFloat(this.value)||0"> <span class="recvb-unit">' + escapeHtml(it.unit || 'шт.') + '</span>' +
+          '<span class="recvb-acts">' +
+            '<button type="button" class="a' + (it._action === 'stock' ? ' on' : '') + '" ' +
+              'onclick="_recvOrder.items[' + i + ']._action=\'stock\';_recvRenderOrderItems()">На склад</button>' +
+            '<button type="button" class="a exp' + (it._action === 'expense' ? ' on' : '') + '" ' +
+              'onclick="_recvOrder.items[' + i + ']._action=\'expense\';_recvRenderOrderItems()">Списать</button>' +
+            '<button type="button" class="a alr' + (it._action === 'already' ? ' on' : '') + '" ' +
+              'onclick="_recvOrder.items[' + i + ']._action=\'already\';_recvRenderOrderItems()">Уже на складе</button>' +
+          '</span>' +
+        '</div>' +
+        '<div class="recvb-acthint">' + ACT_HINT[it._action || 'stock'] + '</div>' +
       '</div>' +
     '</div>';
   });
-  const n = items.filter(x => x._on).length;
-  h += '<div class="recvb-hint">Выбрано: <b>' + n + '</b> · «На склад» — остаток вырастет · «Списать» — сразу в работу · «Уже на складе» — оприходовано раньше (напр. через УПД), просто закрыть позицию</div>';
+  const n = items.filter(x => x._on && x.remaining > 0).length;
+  h += '<div class="recvb-hint">К приёмке отмечено: <b>' + n + '</b></div>';
   box.innerHTML = h;
   const btn = document.getElementById('recv-batch-btn');
   if (btn) btn.innerHTML = '<i class="ti ti-check"></i> Принять выбранное (' + n + ')';
@@ -3074,7 +3099,7 @@ function _recvRenderOrderItems() {
 function _bcNsafe(n) { n = Number(n) || 0; return (Math.round(n * 100) / 100).toString(); }
 async function recvBatchSubmit() {
   if (!_recvOrder) return;
-  const lines = (_recvOrder.items || []).filter(it => it._on && (it._qty > 0)).map(it => ({
+  const lines = (_recvOrder.items || []).filter(it => it._on && (it._qty > 0) && it.remaining > 0).map(it => ({
     order_item_id: it.order_item_id,
     component_id: it._cid,
     qty: it._qty,
@@ -15092,6 +15117,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.744',
+    date: '13.07.2026',
+    title: 'Приёмка заказа — теперь понятно, что происходит',
+    features: [
+      'Полностью принятые позиции — тонкой зелёной строкой «✓ принято 3 из 3», без кнопок и полей',
+      'Снял галочку — позиция сворачивается в «не принимаем сейчас — останется в Ждём поставку»',
+      'Под кнопками действия — <b>подпись, что именно произойдёт</b>: «остаток вырастет» / «сразу в работу» / «закрыть без изменения остатка»',
+      'Кнопки-действия и количество — в одну строку под позицией, ничего не наезжает',
+    ],
+  },
+
   {
     version: 'v2.45.743',
     date: '13.07.2026',
