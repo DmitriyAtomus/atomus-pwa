@@ -7637,9 +7637,19 @@ function _cpTrackingBlockHtml(ordered) {
 
 function _cpTrackingRowHtml(it) {
   const st = _CP_ORDER_STATUS_RU[it.order_status];
-  const label = st ? st[0] : 'Заказано';
-  const fg = st ? st[1] : '#78350F';
-  const bg = st ? st[2] : '#FEF3C7';
+  let label = st ? st[0] : 'Заказано';
+  let fg = st ? st[1] : '#78350F';
+  let bg = st ? st[2] : '#FEF3C7';
+  // v2.45.x: если заказ пришёл ЧАСТИЧНО — показываем состояние ИМЕННО этой строки
+  // (пришло / сколько из скольких / ещё не пришло), а не общий «Доставка частично»
+  // на всё. Так сразу видно, что пришло, а что нет.
+  if (it.order_status === 'partial') {
+    const _rq = parseFloat(it.order_item_received || 0);
+    const _q  = parseFloat(it.qty || 0);
+    if (_q > 0 && _rq >= _q)      { label = 'Пришло';                                          fg = '#047857'; bg = '#D1FAE5'; }
+    else if (_rq > 0)             { label = 'Пришло ' + _fmtQty(_rq) + ' из ' + _fmtQty(_q);   fg = '#9A3412'; bg = '#FFEDD5'; }
+    else                          { label = 'Ещё не пришло';                                   fg = '#475569'; bg = '#F1F5F9'; }
+  }
   const stBadge = '<span class="ssp-badge" style="color:' + fg + ';background:' + bg + ';">' +
     escapeHtml(label) + (it.order_label ? ' <span style="font-weight:400;opacity:0.75;">' + escapeHtml(it.order_label) + '</span>' : '') + '</span>';
   const days = _daysSince(it.ordered_at);
