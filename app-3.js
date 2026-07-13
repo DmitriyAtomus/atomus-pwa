@@ -2921,12 +2921,12 @@ async function openComponentReceiveModal(preselectedId, orderId) {
   window._recvCompId = pre ? pre.id : null;
   window._recvOrderId = orderId || null;   // v2.45.740: приёмка заказа списком
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
-      '<div class="modal-header">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;max-height:88vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header" style="flex:none;">' +
         '<h3><i class="ti ti-package-import"></i> Приход на склад</h3>' +
         '<button class="modal-close" onclick="closeComponentReceiveModal()"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div style="padding:18px;">' +
+      '<div style="padding:18px;flex:1;overflow-y:auto;min-height:0;">' +
         (orderId ? '<div id="recv-order-block"><div class="loading-block">Загружаем позиции заказа…</div></div>' +
           '<div class="recv-manual-cap" onclick="var b=document.getElementById(\'recv-manual\');b.style.display=b.style.display===\'none\'?\'\':\'none\';">' +
           '＋ добавить вручную (не из заказа) ▾</div><div id="recv-manual" style="display:none;">' : '') +
@@ -2956,7 +2956,7 @@ async function openComponentReceiveModal(preselectedId, orderId) {
         '<input type="text" id="recv-reason" class="form-input" placeholder="Например: Накладная №12 от 20.05" />' +
         (orderId ? '<button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="submitComponentReceive()"><i class="ti ti-check"></i> Оприходовать вручную</button></div>' : '') +
       '</div>' +
-      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex:none;">' +
         '<button class="btn btn-secondary" onclick="closeComponentReceiveModal()">Отмена</button>' +
         (orderId
           ? '<button class="btn btn-primary" id="recv-batch-btn" onclick="recvBatchSubmit()"><i class="ti ti-check"></i> Принять выбранное</button>'
