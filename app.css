@@ -21176,6 +21176,25 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .pl-hist .s { color: var(--text-light); flex: 1; }
 .pl-hist .w { color: var(--warning); font-weight: 700; }
 .pl-hist .g { color: var(--success); font-weight: 700; }
+/* v2.45.739: применяемость детали (инвентаризация по фото) */
+.bcu-low { background: var(--warning-bg); color: var(--warning); border-radius: 8px; padding: 7px 11px; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.bcu-sec { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); margin: 12px 2px 7px; }
+.bcu-sec .n { background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; font-size: 10.5px; }
+.bcu-row { display: flex; align-items: center; gap: 10px; background: var(--bg); border-radius: 10px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer; transition: background .15s; }
+.bcu-row:hover { background: var(--brand-bg); }
+.bcu-row .t { flex: 1; min-width: 0; }
+.bcu-row .nm { font-weight: 800; font-size: 13px; color: var(--text-dark); }
+.bcu-row .dir { font-size: 11px; color: var(--text-light); }
+.bcu-row .per { flex: none; font-size: 12px; font-weight: 800; color: var(--brand); background: var(--brand-bg); border-radius: 7px; padding: 3px 9px; white-space: nowrap; }
+.bcu-row .go { flex: none; color: var(--text-faint); font-size: 13px; }
+.bcu-more { width: 100%; border: 1px dashed var(--border); background: none; border-radius: 10px; padding: 8px; font-family: inherit; font-size: 12px; font-weight: 700; color: var(--brand); cursor: pointer; }
+.bcu-more:hover { border-color: var(--brand); }
+.bcu-empty { font-size: 12px; color: var(--text-faint); padding: 2px 4px 6px; }
+.bcu-need { display: flex; align-items: center; gap: 10px; background: #FBEAE7; border-radius: 10px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer; }
+.bcu-need .nm { flex: 1; min-width: 0; font-weight: 700; font-size: 12.5px; color: var(--text-dark); }
+.bcu-need .nm .sub { display: block; font-weight: 500; font-size: 11px; color: var(--text-light); }
+.bcu-need .def { flex: none; font-weight: 800; color: var(--danger); font-size: 13px; white-space: nowrap; }
+
 /* v2.45.725: Расчёты (Продажи) */
 .calc-filters { display: flex; gap: 6px; margin-bottom: 10px; }
 .calc-card { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
