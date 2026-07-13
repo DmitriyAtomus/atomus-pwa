@@ -2430,9 +2430,14 @@
         </div>
         <div class="page-header">
           <div><h1>Задачи</h1><div class="page-subtitle" id="tasks-list-subtitle">—</div></div>
-          <button class="btn btn-primary" id="tasks-new-btn" onclick="openNewTask()">
-            <i class="ti ti-plus"></i> Новая задача
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" id="tasks-planerka-btn" onclick="startPlanerka()" style="display:none;" title="Объявить голосом на офисном ТВ, что планёрка начинается">
+              <i class="ti ti-speakerphone"></i> Планёрка
+            </button>
+            <button class="btn btn-primary" id="tasks-new-btn" onclick="openNewTask()">
+              <i class="ti ti-plus"></i> Новая задача
+            </button>
+          </div>
         </div>
         <div class="content-inner">
           <div class="desktop-layout">
