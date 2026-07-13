@@ -5598,6 +5598,28 @@
     min-width: 0;
     flex: 1;
   }
+  /* v2.45.738: сумма — главное число строки, справа в заголовке */
+  .sup-ord-card .sup-ord-total {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: 13.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dark);
+    white-space: nowrap;
+  }
+  /* счёт привязан — тихая зелёная иконка вместо кричащей пилюли */
+  .sup-ord-card .sup-inv-ok {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    background: var(--success-bg);
+    color: var(--success);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
   .sup-ord-card .sup-row-meta {
     display: flex;
     flex-wrap: wrap;

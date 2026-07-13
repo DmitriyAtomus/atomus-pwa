@@ -10273,10 +10273,12 @@ function renderSupplyOrders() {
     } else if (entColor) {
       rowStyle = 'style="border-left:4px solid ' + entColor + ';"';
     }
+    // v2.45.738: «НОВЫЙ СЧЁТ» — громко (событие), «счёт привязан» — тихой
+    // иконкой: это норма для 90% строк, незачем кричать индиго-пилюлей
     const newPill = hasNew
       ? '<span class="sup-status-pill" style="background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:600;">📄 НОВЫЙ СЧЁТ</span>'
       : (hasInvoice
-          ? '<span class="sup-status-pill" style="background:#E0E7FF;color:#3730A3;"><i class="ti ti-file-check"></i> счёт привязан</span>'
+          ? '<span class="sup-inv-ok" title="Счёт привязан к заказу"><i class="ti ti-file-check"></i></span>'
           : '');
 
     // v2.45.616: у заказов «на оплату» своих строк нет (items_count=0), но есть
@@ -10293,28 +10295,28 @@ function renderSupplyOrders() {
     }
     html += '<div class="sup-row-icon"><i class="ti ti-file-invoice"></i></div>' +
       '<div class="sup-row-body">' +
-        // v2.45.288: ORD-N — компактным чипом слева, имя поставщика — основным заголовком
+        // v2.45.738: заголовок несёт главное — номер, поставщик, СУММА справа
         '<div class="sup-row-title">' +
           '<span class="sup-ord-label">' + escapeHtml(label) + '</span>' +
           '<span class="sup-ord-supplier">' + escapeHtml(o.supplier_name || '—') + '</span>' +
+          (total ? '<span class="sup-ord-total">' + total + '</span>' : '') +
         '</div>' +
         '<div class="sup-row-meta">' +
-          '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) + '</span>' +
-          // v2.45.737: когда оплатили — дата рядом со статусом
-          (o.paid_at ? '<span class="sup-ord-meta-num" title="Когда оплатили"><i class="ti ti-credit-card"></i>оплачен ' + _supOrdDate(o.paid_at) + '</span>' : '') +
+          // статус и дата оплаты — одной пилюлей: «ОПЛАЧЕН · 08.07»
+          '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) +
+            (o.paid_at ? ' · ' + _supOrdDate(o.paid_at) : '') + '</span>' +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
-          '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' +
-          (total ? '<span class="sup-ord-meta-num"><i class="ti ti-currency-rubel"></i>' + total + '</span>' : '') +
+          (itemsCount ? '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
-          // v2.45.699: кто оформил заказ — видно, чей это счёт
+          // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
+          (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
+          // v2.45.699: кто оформил — тихо, в конце строки
           (o.created_by_name
             ? '<span class="sup-ord-who" title="Кто оформил заказ"><span class="sup-ord-who-ava">' +
                 escapeHtml((typeof getInitials === 'function') ? getInitials(o.created_by_name) : o.created_by_name.slice(0, 2)) +
               '</span>' + escapeHtml(o.created_by_name) + '</span>'
             : '') +
-          // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
-          (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
         '</div>' +
       '</div>' +
       (canDelete
