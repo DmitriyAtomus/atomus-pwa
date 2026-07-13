@@ -579,6 +579,18 @@ function _bcRenderUsage(d) {
     h += '<div class="bcu-sec">🔧 Применяется в изделиях <span class="n">0</span></div>' +
       '<div class="bcu-empty">В составах моделей (BOM) эта деталь не числится — привяжи, чтобы CRM знала, куда она относится.</div>';
   }
+  // v2.45.742: умные подсказки — история закупок + соседи по серии
+  const sugg = d.suggestions || [];
+  if (sugg.length) {
+    h += '<div class="bcu-sec">💡 Возможно, относится к <span class="n">' + sugg.length + '</span></div>';
+    sugg.forEach(s => {
+      h += '<div class="bcu-row sug">' +
+        '<div class="t"><div class="nm">' + escapeHtml(s.name) + '</div>' +
+        '<div class="dir">' + escapeHtml([s.direction, s.reason].filter(Boolean).join(' · ')) + '</div></div>' +
+        '<button class="bcu-yes" onclick="event.stopPropagation();_bcuSuggestLink(' + s.model_id + ', this)">✓ Привязать</button>' +
+      '</div>';
+    });
+  }
   // v2.45.741: привязать к изделию прямо отсюда
   h += '<button class="bcu-more" onclick="_bcuLinkOpen()">＋ Привязать к изделию</button>' +
     '<div id="bcu-link-form" style="display:none;"></div>';
@@ -646,6 +658,27 @@ async function _bcuModelFilter(q) {
     });
     dd.style.display = 'block';
   } catch (e) { dd.style.display = 'none'; }
+}
+// подтверждение подсказки одним тапом (1 шт / изделие, потом можно поправить)
+async function _bcuSuggestLink(modelId, btn) {
+  const box = document.getElementById('box-check-usage');
+  const compId = box && box._usage && box._usage.component && box._usage.component.id;
+  if (!compId) return;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await apiPost('/api/components/' + compId + '/bom-link', { model_id: modelId, qty_required: 1 });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast('Привязано: ' + (j.model_name || ''), 'success');
+      _bcLoadUsage(compId);
+    } else {
+      showToast(j.message || 'Не удалось привязать', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✓ Привязать'; }
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Привязать'; }
+  }
 }
 async function _bcuLinkGo() {
   const box = document.getElementById('box-check-usage');
