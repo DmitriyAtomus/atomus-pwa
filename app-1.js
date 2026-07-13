@@ -11503,8 +11503,9 @@ function renderOfferTracker(el, d, offerId) {
     '<div style="background:var(--bg,#f1f5f9);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;">' +
       '<div style="font-size:20px;font-weight:800;' + (brand ? 'color:var(--brand);' : '') + '">' + (v || 0) + '</div>' +
       '<div style="font-size:11px;color:var(--text-light);margin-top:2px;"><i class="ti ' + icon + '"></i> ' + l + '</div></div>';
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;margin-bottom:12px;">';
   h += stat(d.views, 'Просмотры', 'ti-eye', true);
+  h += stat(d.plan_opens, 'План', 'ti-map-2', true);
   h += stat(d.prints, 'Печати', 'ti-printer', false);
   h += stat(d.downloads, 'Скачали', 'ti-download', false);
   h += stat(d.devices, 'Устройств', 'ti-devices', false);
@@ -11541,7 +11542,8 @@ function renderOfferTracker(el, d, offerId) {
     h += '<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px;">';
     ev.forEach(e => {
       let icon = 'ti-eye', label = 'Просмотрено';
-      if (e.is_forward) { icon = 'ti-arrow-forward-up'; label = 'Открыто с нового устройства (возможно, переслали)'; }
+      if (e.event_type === 'plan') { icon = 'ti-map-2'; label = 'Открыл интерактивный план'; }
+      else if (e.is_forward) { icon = 'ti-arrow-forward-up'; label = 'Открыто с нового устройства (возможно, переслали)'; }
       else if (e.event_type === 'print') { icon = 'ti-printer'; label = 'Распечатано'; }
       else if (e.event_type === 'download') { icon = 'ti-download'; label = 'Скачан PDF'; }
       const geo = [e.city, e.country].filter(Boolean).join(', ');
@@ -12023,9 +12025,9 @@ function renderOfferForm() {
 
   // Позиции
   html += '<div class="sales-form-section">';
-  html += '<div class="sales-form-title">Состав КП <span class="req">*</span></div>';
+  html += '<div class="sales-form-title">Состав КП <span class="hint" style="font-weight:400;color:var(--text-light);font-size:11px;">(необязательно)</span></div>';
   if (f.items.length === 0) {
-    html += '<div style="padding: 18px; text-align: center; color: var(--text-light); font-size: 13px;">Позиций пока нет. Добавьте хотя бы одну.</div>';
+    html += '<div style="padding: 18px; text-align: center; color: var(--text-light); font-size: 13px;">Позиций пока нет — можно оставить пустым (напр. для КП с интерактивным планом).</div>';
   } else {
     f.items.forEach((it, idx) => {
       const lineTotal = calcItemTotal(it);
@@ -12155,7 +12157,7 @@ async function submitOfferForm() {
   const f = state.offerForm;
   if (!f.manager_id) { errEl.innerHTML = '<div class="sales-error">Выберите менеджера</div>'; return; }
   // Контрагент — необязателен: КП можно оформить без него
-  if (f.items.length === 0) { errEl.innerHTML = '<div class="sales-error">Добавьте хотя бы одну позицию</div>'; return; }
+  // Позиции необязательны: КП можно создать без них (напр. как носитель интерактивного плана)
   for (const it of f.items) {
     if (!(it.name || '').trim()) { errEl.innerHTML = '<div class="sales-error">У всех позиций должно быть название</div>'; return; }
     if (Number(it.qty) <= 0) { errEl.innerHTML = '<div class="sales-error">Количество в позиции «' + escapeHtml(it.name) + '» должно быть больше 0</div>'; return; }
