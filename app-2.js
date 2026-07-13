@@ -4802,6 +4802,15 @@ async function downloadModelScheme(modelId) {
   if (window._schemeLoading[modelId]) { showToast('Схема уже открывается…', 'info'); return; }
   window._schemeLoading[modelId] = true;
   showToast('Открываю схему…', 'info');
+  // v2.45.733: вкладку открываем СИНХРОННО, пока держится «жест» клика — иначе
+  // window.open ПОСЛЕ await душится блокировщиком попапов, и схема «не
+  // открывается и всё» (файл на диске отдаётся байтами, не прямой R2-ссылкой).
+  let win = window.open('', '_blank');
+  const showInWin = (url) => {
+    if (win && !win.closed) { win.location = url; }
+    else { window.open(url, '_blank'); }  // попап зарезали — пробуем ещё раз
+  };
+  const closeWin = () => { try { if (win && !win.closed) win.close(); } catch (e) {} };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
@@ -4811,22 +4820,24 @@ async function downloadModelScheme(modelId) {
       signal: ctrl.signal,
     });
     clearTimeout(timer);
-    if (!r.ok) { showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
+    if (!r.ok) { closeWin(); showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
     // v2.45.645: сервер вернул прямую ссылку на R2 → открываем напрямую (быстро).
     const ct = (r.headers.get('Content-Type') || '').toLowerCase();
     if (ct.includes('application/json')) {
       const j = await r.json().catch(() => ({}));
-      if (j && j.url) { window.open(j.url, '_blank'); return; }
+      if (j && j.url) { showInWin(j.url); return; }
+      closeWin();
       showToast('Не удалось получить ссылку на схему', 'error');
       return;
     }
     // фолбэк — файл проксирован байтами (диск / без S3)
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    showInWin(url);
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     clearTimeout(timer);
+    closeWin();
     showToast(e && e.name === 'AbortError'
       ? 'Схема грузится дольше обычного — нажми ещё раз'
       : ('Ошибка: ' + (e && e.message || e)), 'error');
