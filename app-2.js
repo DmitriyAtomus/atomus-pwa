@@ -4642,6 +4642,7 @@ function _renderModelCharsBlock(m) {
               '<i class="ti ti-schema" style="font-size:18px;color:#7C3AED;"></i>' +
               '<span style="flex:1;color:var(--text-dark);min-width:120px;">Принципиальная схема: ' + sname + '</span>' +
               '<button class="btn btn-secondary btn-small" onclick="downloadModelScheme(' + m.id + ')"><i class="ti ti-download"></i> Открыть</button>' +
+              (String(m.scheme_file_key || '').toLowerCase().endsWith('.pdf') ? '<button class="btn btn-secondary btn-small" onclick="printModelScheme(' + m.id + ')" title="Печать на офисный принтер"><i class="ti ti-printer"></i> Печать</button>' : '') +
               (canEdit ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);" onclick="deleteModelSchemeFile(' + m.id + ')" title="Удалить схему"><i class="ti ti-trash"></i></button>' : '') +
             '</div>';
   }
@@ -4802,6 +4803,15 @@ async function downloadModelScheme(modelId) {
   if (window._schemeLoading[modelId]) { showToast('Схема уже открывается…', 'info'); return; }
   window._schemeLoading[modelId] = true;
   showToast('Открываю схему…', 'info');
+  // v2.45.733: вкладку открываем СИНХРОННО, пока держится «жест» клика — иначе
+  // window.open ПОСЛЕ await душится блокировщиком попапов, и схема «не
+  // открывается и всё» (файл на диске отдаётся байтами, не прямой R2-ссылкой).
+  let win = window.open('', '_blank');
+  const showInWin = (url) => {
+    if (win && !win.closed) { win.location = url; }
+    else { window.open(url, '_blank'); }  // попап зарезали — пробуем ещё раз
+  };
+  const closeWin = () => { try { if (win && !win.closed) win.close(); } catch (e) {} };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
@@ -4811,27 +4821,52 @@ async function downloadModelScheme(modelId) {
       signal: ctrl.signal,
     });
     clearTimeout(timer);
-    if (!r.ok) { showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
+    if (!r.ok) { closeWin(); showToast('Не удалось открыть схему (HTTP ' + r.status + ')', 'error'); return; }
     // v2.45.645: сервер вернул прямую ссылку на R2 → открываем напрямую (быстро).
     const ct = (r.headers.get('Content-Type') || '').toLowerCase();
     if (ct.includes('application/json')) {
       const j = await r.json().catch(() => ({}));
-      if (j && j.url) { window.open(j.url, '_blank'); return; }
+      if (j && j.url) { showInWin(j.url); return; }
+      closeWin();
       showToast('Не удалось получить ссылку на схему', 'error');
       return;
     }
     // фолбэк — файл проксирован байтами (диск / без S3)
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    showInWin(url);
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     clearTimeout(timer);
+    closeWin();
     showToast(e && e.name === 'AbortError'
       ? 'Схема грузится дольше обычного — нажми ещё раз'
       : ('Ошибка: ' + (e && e.message || e)), 'error');
   } finally {
     window._schemeLoading[modelId] = false;
+  }
+}
+
+// v2.45.736: печать схемы (PDF) на офисный принтер через шлюз документов.
+// Бумага выходит в офисе (Pantum), работает откуда угодно.
+async function printModelScheme(modelId) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) { showToast('Сессия истекла, войдите заново', 'error'); return; }
+  showToast('Отправляю на печать…', 'info');
+  try {
+    const r = await apiPost('/api/documents/print', {
+      doc_type: 'model_scheme',
+      model_id: modelId,
+      copies: 1,
+    });
+    if (r.ok) {
+      showToast('Схема отправлена на офисный принтер', 'success');
+    } else {
+      const msg = (r.data && (r.data.message || r.data.error)) || 'Не удалось отправить на печать';
+      showToast(msg, 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
   }
 }
 

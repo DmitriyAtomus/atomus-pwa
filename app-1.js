@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.734";
-const APP_VERSION_DATE = "08.07.2026";
+const APP_VERSION = "v2.45.736";
+const APP_VERSION_DATE = "13.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -5358,6 +5358,10 @@ async function _fillWorkModelDocs(modelId) {
     if (m.scheme_file_key) {
       btns.push('<button class="pkb-btn" onclick="downloadModelScheme(' + modelId + ')">' +
         '<i class="ti ti-schema" style="color:#7C3AED;"></i> Схема (PDF)</button>');
+      if (String(m.scheme_file_key).toLowerCase().endsWith('.pdf')) {
+        btns.push('<button class="pkb-btn" onclick="printModelScheme(' + modelId + ')">' +
+          '<i class="ti ti-printer" style="color:var(--brand);"></i> Печать</button>');
+      }
     }
     if (m.spec_file_key) {
       btns.push('<button class="pkb-btn" onclick="downloadModelSpec(' + modelId + ')">' +
