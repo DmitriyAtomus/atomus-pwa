@@ -10358,13 +10358,28 @@ function openContractFromSupply(contractId) {
 
 // ========== ЗАКАЗЫ (список) ==========
 
+// v2.45.x: поиск по заказам (сервер: поставщик/ИНН/№/номенклатура/примечание).
+// При непустом запросе ищем по ВСЕМ статусам, чтобы находило везде.
+let _supOrdSearchTimer = null;
+function onSupplyOrdSearch(val) {
+  state.supplyOrdSearch = (val || '').trim();
+  if (_supOrdSearchTimer) clearTimeout(_supOrdSearchTimer);
+  _supOrdSearchTimer = setTimeout(() => { loadSupplyOrders(); }, 300);
+}
+
 async function loadSupplyOrders() {
   const container = document.getElementById('sup-ord-list');
   if (!container) return;
   container.innerHTML = '<div class="loading-block">Загружаем заказы…</div>';
   try {
     const params = new URLSearchParams();
-    if (state.supplyOrdFilter !== 'all') params.set('status', state.supplyOrdFilter);
+    const search = (state.supplyOrdSearch || '').trim();
+    if (search) {
+      params.set('q', search);
+      params.set('status', 'all');   // поиск — по всем статусам
+    } else if (state.supplyOrdFilter !== 'all') {
+      params.set('status', state.supplyOrdFilter);
+    }
     const d = await apiGet('/api/supply-orders' + (params.toString() ? '?' + params.toString() : ''));
     cache.supplyOrders = d.orders || [];
     cache.supplyOrdersCounts = d.counts || {};
@@ -10676,6 +10691,10 @@ function _renderSupplyOrdDesc() {
 
 function setSupplyOrdFilter(f) {
   state.supplyOrdFilter = f;
+  // клик по статусу сбрасывает активный поиск (иначе список остаётся отфильтрован поиском)
+  state.supplyOrdSearch = '';
+  const _si = document.getElementById('sup-ord-search');
+  if (_si) _si.value = '';
   document.querySelectorAll('[data-sup-ord]').forEach(b => b.classList.toggle('active', b.dataset.supOrd === f));
   _renderSupplyOrdDesc();
   loadSupplyOrders();

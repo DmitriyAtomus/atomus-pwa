@@ -2230,6 +2230,14 @@
               </div>
             </div>
           </div>
+          <!-- v2.45.x: поиск по заказам — поставщик/ИНН/№/номенклатура/примечание -->
+          <div style="margin:8px 0 4px;position:relative;max-width:560px;">
+            <i class="ti ti-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-light);pointer-events:none;"></i>
+            <input type="search" id="sup-ord-search" autocomplete="off"
+              placeholder="Поиск: поставщик, ИНН, № заказа/счёта, номенклатура, примечание…"
+              oninput="onSupplyOrdSearch(this.value)"
+              style="width:100%;box-sizing:border-box;padding:9px 12px 9px 34px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg);">
+          </div>
           <!-- v2.45.615: пояснение к текущему статусу-разделу заказов -->
           <div class="sup-ord-desc" id="sup-ord-desc"></div>
           <div id="sup-ord-list" class="sup-list">
