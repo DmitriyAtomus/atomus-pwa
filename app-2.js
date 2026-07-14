@@ -779,6 +779,7 @@ async function loadHomeDashboard() {
   loadHomeContractsProgress(); // ЭТАП 31.4
   loadHomeDashboardExtras();   // v2.43.98: воронка / алерты / ТОП сборщиков
   loadHomeGatherings();        // v2.45.406: «Собрать к отгрузке» (запросы сборщику)
+  loadHomeWorkStatus();        // статус-лента «кто чем занят»
   // v2.8.2: лента «Последние действия» — только для директора
   if (state.user && (state.user.roles || []).includes('director')) {
     loadHomeActivity();
@@ -827,6 +828,62 @@ async function loadHomeGatherings() {
   html += '</div>';
   block.innerHTML = html;
   wrap.style.display = '';
+}
+
+// Статус-лента «кто чем занят»: последний статус на каждого + поле «чем я занят».
+function _wsFmtWhen(iso) {
+  if (!iso) return '';
+  const hhmm = String(iso).slice(11, 16);
+  const day = String(iso).slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  return day === today ? hhmm : (day.slice(8, 10) + '.' + day.slice(5, 7) + ' ' + hhmm);
+}
+async function loadHomeWorkStatus() {
+  const block = document.getElementById('home-work-status-block');
+  if (!block) return;
+  let data = null;
+  try {
+    data = await apiGet('/api/work-status');
+  } catch (e) {
+    block.innerHTML = '';   // бэк ещё не задеплоен — просто не показываем
+    return;
+  }
+  const cur = (data && data.current) || [];
+  let html = '<div class="card" style="padding:10px;">';
+  // поле ввода своего статуса
+  html += '<div style="display:flex;gap:8px;' + (cur.length ? 'margin-bottom:10px;' : '') + '">';
+  html += '<input id="ws-input" class="form-input" style="flex:1;" maxlength="500" placeholder="Чем я занят сейчас…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();postWorkStatus();}">';
+  html += '<button class="btn btn-primary" onclick="postWorkStatus()"><i class="ti ti-check"></i> Записать</button>';
+  html += '</div>';
+  if (cur.length) {
+    html += '<div style="display:flex;flex-direction:column;">';
+    cur.forEach((s, i) => {
+      const sep = i < cur.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+      html += '<div style="padding:8px 2px;' + sep + '">';
+      html += '<div style="display:flex;align-items:baseline;gap:6px;">';
+      html += '<span style="font-weight:700;font-size:13px;">' + escapeHtml(s.author_name || 'сотрудник') + '</span>';
+      html += '<span style="font-size:11px;color:var(--text-faint);margin-left:auto;">' + escapeHtml(_wsFmtWhen(s.created_at)) + '</span>';
+      html += '</div>';
+      html += '<div style="font-size:13px;color:var(--text-dark);margin-top:1px;">' + escapeHtml(s.text) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="font-size:12.5px;color:var(--text-faint);padding-top:6px;">Пока никто не отметил, чем занят.</div>';
+  }
+  html += '</div>';
+  block.innerHTML = html;
+}
+async function postWorkStatus() {
+  const inp = document.getElementById('ws-input');
+  if (!inp) return;
+  const text = (inp.value || '').trim();
+  if (!text) return;
+  try {
+    const r = await apiPost('/api/work-status', { text: text });
+    if (r && r.ok) { inp.value = ''; showToast('Записано', 'success'); loadHomeWorkStatus(); }
+    else showToast((r && r.data && r.data.message) || 'Не удалось записать', 'error');
+  } catch (e) { showToast('Ошибка сети', 'error'); }
 }
 
 function renderHomeSkeleton() {
@@ -889,6 +946,10 @@ function renderHomeSkeleton() {
   html += '<div class="home-kpi-title"><i class="ti ti-activity-heartbeat"></i>Пульс дня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
   html += '</div>';
+
+  // Статус-лента «кто чем занят» — последний статус на каждого человека
+  html += '<div class="home-kpi-title" style="margin-top:16px;"><i class="ti ti-user-bolt" style="color:var(--brand);"></i>Кто чем занят</div>';
+  html += '<div id="home-work-status-block"><div class="loading-block" style="padding:14px;">Загружаем…</div></div>';
 
   // v2.45.31: виджет «Калькулятор холода» переехал в левый сайдбар (пункт «Калькулятор холода»)
   // на главной больше не показываем.
