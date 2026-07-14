@@ -6902,12 +6902,31 @@ function renderPlanerka() {
   const notes = _pl.notes || [];
   h += '<div class="pl-card">' +
     '<div class="pl-sec">📝 Заметки — мысли, рассуждения <span class="n">' + notes.length + '</span></div>';
+  const _plTaskStatusRu = { new: 'новая', in_progress: 'в работе', done: 'выполнена', cancelled: 'отменена' };
   notes.forEach(n => {
     const t = String(n.created_at || '').slice(11, 16);
+    // если заметку уже перевели в задачу — показываем, КОМУ она поставлена (и статус),
+    // вместо кнопки «→ Задача»
+    let taskCtl;
+    if (n.task_id) {
+      const who = n.task_assignee_short || n.task_assignee_full || 'без исполнителя';
+      const stRu = _plTaskStatusRu[n.task_status] || n.task_status || '';
+      const done = n.task_status === 'done';
+      const canc = n.task_status === 'cancelled';
+      const bg = done ? '#DCFCE7' : (canc ? '#F1F5F9' : '#E0EDFF');
+      const fg = done ? '#0A5B41' : (canc ? '#64748B' : '#1E40AF');
+      const ttl = 'Задача' + (stRu ? ' · ' + stRu : '') + (n.task_deadline ? ' · срок ' + n.task_deadline : '');
+      taskCtl = '<span class="mini task-assigned" title="' + escapeHtml(ttl) + '" ' +
+        'style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;white-space:nowrap;background:' + bg + ';color:' + fg + ';">' +
+        '<i class="ti ti-user-check" style="font-size:12px;vertical-align:-1px;"></i> ' + escapeHtml(who) +
+        (stRu ? ' · ' + escapeHtml(stRu) : '') + '</span>';
+    } else {
+      taskCtl = (_pl.can_manage ? '<button class="mini task" onclick="plNoteTaskOpen(' + n.id + ')" title="Перевести в задачу">→ Задача</button>' : '');
+    }
     h += '<div class="pl-note" id="pl-note-' + n.id + '"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span>' +
       (t ? ' · ' + t : '') +
       '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">' +
-        (_pl.can_manage ? '<button class="mini task" onclick="plNoteTaskOpen(' + n.id + ')" title="Перевести в задачу">→ Задача</button>' : '') +
+        taskCtl +
         '<button class="nx" onclick="plNoteEdit(' + n.id + ')" title="Редактировать"><i class="ti ti-pencil"></i></button>' +
         '<button class="nx" onclick="plNoteDel(' + n.id + ')" title="Удалить"><i class="ti ti-x"></i></button>' +
       '</span></div>' +
