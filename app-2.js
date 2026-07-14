@@ -886,6 +886,115 @@ async function postWorkStatus() {
   } catch (e) { showToast('Ошибка сети', 'error'); }
 }
 
+// ===== Долгие задачи (проекты с таймером) =====
+function _ltFmtHours(h) {
+  const n = Number(h) || 0;
+  if (n < 1) return Math.round(n * 60) + ' мин';
+  const H = Math.floor(n);
+  const m = Math.round((n - H) * 60);
+  return H + ' ч' + (m ? ' ' + m + ' м' : '');
+}
+function _ltCanManage() {
+  return !!(state.user && (state.user.roles || []).some(r => ['director', 'zam', 'manager'].includes(r)));
+}
+async function loadLongTasks() {
+  const box = document.getElementById('long-tasks-content');
+  if (!box) return;
+  let data = null;
+  try { data = await apiGet('/api/long-tasks'); }
+  catch (e) { box.innerHTML = '<div class="empty-block">Не удалось загрузить (возможно, бэкенд ещё деплоится).</div>'; return; }
+  const tasks = (data && data.tasks) || [];
+  const canManage = _ltCanManage();
+  let html = '';
+  if (canManage) {
+    html += '<div class="card" style="padding:12px;margin-bottom:12px;">';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+    html += '<input id="lt-title" class="form-input" style="flex:2;min-width:200px;" maxlength="200" placeholder="Новая долгая задача, напр. «Разработка чиллера 3,5кВт»" onkeydown="if(event.key===\'Enter\'){event.preventDefault();createLongTask();}">';
+    html += '<select id="lt-assignee" class="form-input" style="flex:1;min-width:140px;"><option value="">— исполнитель —</option></select>';
+    html += '<button class="btn btn-primary" onclick="createLongTask()"><i class="ti ti-plus"></i> Создать</button>';
+    html += '</div></div>';
+  }
+  const active = tasks.filter(t => t.status !== 'done');
+  const done = tasks.filter(t => t.status === 'done');
+  if (!active.length && !done.length) {
+    html += '<div class="empty-block">Пока нет долгих задач.' + (canManage ? ' Создайте первую выше.' : '') + '</div>';
+  }
+  active.forEach(t => { html += _ltCard(t, false); });
+  if (done.length) {
+    html += '<div style="margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;">Завершённые (' + done.length + ')</div>';
+    done.forEach(t => { html += _ltCard(t, true); });
+  }
+  box.innerHTML = html;
+  if (canManage) {
+    try {
+      if (typeof ensureEmployeesLoaded === 'function') await ensureEmployeesLoaded();
+      const sel = document.getElementById('lt-assignee');
+      if (sel) {
+        (cache.activeEmployees || []).filter(e => e.is_active !== 0).forEach(e => {
+          const o = document.createElement('option');
+          o.value = e.id; o.textContent = e.short_name || e.full_name || ('#' + e.id);
+          sel.appendChild(o);
+        });
+      }
+    } catch (e) {}
+  }
+}
+function _ltCard(t, isDone) {
+  const who = t.assignee_short || t.assignee_full || '';
+  const hrs = _ltFmtHours(t.total_hours);
+  const running = !!t.running_who;
+  let html = '<div class="card" style="padding:12px;margin-bottom:8px;' + (running ? 'border-left:3px solid #16a34a;' : '') + (isDone ? 'opacity:.7;' : '') + '">';
+  html += '<div style="display:flex;align-items:flex-start;gap:10px;">';
+  html += '<div style="flex:1;min-width:0;">';
+  html += '<div style="font-weight:700;font-size:14px;">' + escapeHtml(t.title || '') + '</div>';
+  html += '<div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;">';
+  if (who) html += '<span><i class="ti ti-user"></i> ' + escapeHtml(who) + '</span>';
+  html += '<span><i class="ti ti-clock"></i> наработано ' + hrs + '</span>';
+  if (running) html += '<span style="color:#16a34a;font-weight:600;"><i class="ti ti-player-play"></i> сейчас: ' + escapeHtml(t.running_who) + '</span>';
+  html += '</div></div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  if (!isDone) {
+    if (running) {
+      html += '<button class="btn btn-secondary" style="color:#8C2A2A;" onclick="stopLongTask(' + t.id + ')"><i class="ti ti-player-pause"></i> Стоп</button>';
+    } else {
+      html += '<button class="btn btn-primary" style="background:#16a34a;border-color:#16a34a;" onclick="startLongTask(' + t.id + ')"><i class="ti ti-player-play"></i> Начал</button>';
+    }
+    html += '<button class="btn btn-secondary" onclick="doneLongTask(' + t.id + ')" title="Завершить"><i class="ti ti-check"></i></button>';
+  } else {
+    html += '<button class="btn btn-secondary" onclick="reopenLongTask(' + t.id + ')"><i class="ti ti-arrow-back-up"></i> Вернуть</button>';
+  }
+  html += '</div></div></div>';
+  return html;
+}
+async function createLongTask() {
+  const ti = document.getElementById('lt-title');
+  const as = document.getElementById('lt-assignee');
+  const title = ((ti && ti.value) || '').trim();
+  if (!title) { showToast('Введите название', 'error'); return; }
+  try {
+    const r = await apiPost('/api/long-tasks', { title: title, assignee_id: (as && as.value) ? parseInt(as.value, 10) : null });
+    if (r && r.ok) { showToast('Создано', 'success'); loadLongTasks(); }
+    else showToast((r && r.data && r.data.message) || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка сети', 'error'); }
+}
+async function startLongTask(id) {
+  try { const r = await apiPost('/api/long-tasks/' + id + '/start', {}); if (r && r.ok) { showToast('Таймер пошёл · статус «занят» обновлён', 'success'); loadLongTasks(); } else showToast('Не удалось', 'error'); }
+  catch (e) { showToast('Ошибка сети', 'error'); }
+}
+async function stopLongTask(id) {
+  try { const r = await apiPost('/api/long-tasks/' + id + '/stop', {}); if (r && r.ok) { showToast('Остановлено', 'success'); loadLongTasks(); } else showToast('Не удалось', 'error'); }
+  catch (e) { showToast('Ошибка сети', 'error'); }
+}
+async function doneLongTask(id) {
+  if (!confirm('Завершить задачу? Таймер остановится, задача уйдёт в «Завершённые».')) return;
+  try { const r = await apiPost('/api/long-tasks/' + id + '/status', { status: 'done' }); if (r && r.ok) { showToast('Завершено', 'success'); loadLongTasks(); } else showToast('Не удалось', 'error'); }
+  catch (e) { showToast('Ошибка сети', 'error'); }
+}
+async function reopenLongTask(id) {
+  try { const r = await apiPost('/api/long-tasks/' + id + '/status', { status: 'active' }); if (r && r.ok) { showToast('Возвращено', 'success'); loadLongTasks(); } else showToast('Не удалось', 'error'); }
+  catch (e) { showToast('Ошибка сети', 'error'); }
+}
+
 function renderHomeSkeleton() {
   // Заголовок-приветствие
   // ПРАВКА: вместо фамилии (1-е слово) — имя+отчество (2-е и 3-е слова)

@@ -1642,6 +1642,7 @@ function selectSidebarItem(screenName) {
   if (screenName === 'sales-calcs' && typeof loadSalesCalcs === 'function') loadSalesCalcs();  // v2.45.725
   // ЭТАП 16В: задачи
   if (screenName === 'tasks-list') loadTasksList();
+  if (screenName === 'long-tasks') loadLongTasks();
   if (screenName === 'tasks-mine') loadTasksMine();
   if (screenName === 'tasks-created') loadTasksCreated();
   if (screenName === 'task-detail') loadTaskDetail();
