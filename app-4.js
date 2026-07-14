@@ -14886,6 +14886,7 @@ function renderTeamSide() {
   html += '</div></div>';
   html += '<div class="tchat-side-foot">';
   if (isOwner) html += '<button class="tcm-act" onclick="renameTeamChat()"><i class="ti ti-edit"></i> Переименовать чат</button>';
+  if (isOwner) html += '<button class="tcm-act danger" onclick="deleteTeamChat()"><i class="ti ti-trash"></i> Удалить чат</button>';
   html += '<button class="tcm-act danger" onclick="leaveTeamChat()"><i class="ti ti-logout"></i> Выйти из чата</button>';
   html += '</div>';
   panel.innerHTML = html;
@@ -14905,6 +14906,25 @@ async function removeTeamMember(empId) {
     await loadTeamChatMeta(cid);
     renderTeamSide();
     _tchatLastSig = ''; loadTeamChat(cid, false);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// v2.45.x: удалить чат — только владелец. Чат пропадает у всех участников.
+async function deleteTeamChat() {
+  const meta = state._tchatMeta || {};
+  if (!meta.is_owner) { showToast('Удалить чат может только владелец', 'error'); return; }
+  const title = (meta.title || 'этот чат');
+  if (!confirm('Удалить чат «' + title + '»?\n\nОн исчезнет у всех участников. Отменить нельзя.')) return;
+  const cid = _tchatCurrentId;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/team-chats/' + cid, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showToast(e.message || 'Не удалось удалить', 'error'); return; }
+    showToast('Чат удалён', 'success');
+    closeTeamChat();
+    try { if (typeof loadTeamChatsList === 'function') loadTeamChatsList(); } catch (_) {}
+    try { if (typeof _silentRefreshTeamChats === 'function') _silentRefreshTeamChats(); } catch (_) {}
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
