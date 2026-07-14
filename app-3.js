@@ -7091,6 +7091,21 @@ async function plNoteTaskGo(noteId) {
   if (m) m.remove();
   loadPlanerka();
 }
+// чип «кому поставлена задача · выполнено/нет» для заметки (история планёрок)
+function _plNoteTaskChip(n) {
+  if (!n || !n.task_id) return '';
+  const who = n.task_assignee_short || n.task_assignee_full || 'без исполнителя';
+  const st = n.task_status;
+  const done = st === 'done';
+  const canc = st === 'cancelled';
+  const stRu = done ? 'выполнено' : (canc ? 'отменена' : (st === 'in_progress' ? 'в работе' : 'не выполнено'));
+  const bg = done ? '#DCFCE7' : (canc ? '#F1F5F9' : '#FEF3C7');
+  const fg = done ? '#0A5B41' : (canc ? '#64748B' : '#92400E');
+  const ic = done ? 'ti-checks' : (canc ? 'ti-ban' : 'ti-clock');
+  return '<span style="margin-left:auto;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:5px;white-space:nowrap;background:' + bg + ';color:' + fg + ';">' +
+    '<i class="ti ti-user" style="font-size:11px;vertical-align:-1px;"></i> ' + escapeHtml(who) +
+    ' · <i class="ti ' + ic + '" style="font-size:11px;vertical-align:-1px;"></i> ' + stRu + '</span>';
+}
 async function plHistNotes(day) {
   const box = document.getElementById('pl-hn-' + day);
   if (!box) return;
@@ -7101,7 +7116,7 @@ async function plHistNotes(day) {
     const d = await apiGet('/api/planerka/notes?day=' + encodeURIComponent(day));
     const notes = d.notes || [];
     box.innerHTML = notes.length ? notes.map(n =>
-      '<div class="pl-note sm"><div class="nh"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span></div>' +
+      '<div class="pl-note sm"><div class="nh" style="display:flex;align-items:center;gap:6px;"><span class="who">' + escapeHtml(n.author_name || 'сотрудник') + '</span>' + _plNoteTaskChip(n) + '</div>' +
       '<div class="nt">' + escapeHtml(n.text).replace(/\n/g, '<br>') + '</div></div>').join('')
       : '<div style="font-size:11.5px;color:var(--text-faint);">заметок нет</div>';
   } catch (e) { box.innerHTML = ''; }
