@@ -11281,7 +11281,8 @@ async function openInboxInvoice(inboxId) {
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
         (m.matched_order_id
-          ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + m.matched_order_id + ')"><i class="ti ti-package"></i> Открыть заказ</button>'
+          ? '<button class="btn btn-secondary" style="color:#8C2A2A;" onclick="unmatchInboxAndPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-unlink"></i> Отвязать → На оплату</button>' +
+            '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + m.matched_order_id + ')"><i class="ti ti-package"></i> Открыть заказ</button>'
           : '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>' +
             '<button class="btn" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>') +
         '<button class="btn btn-secondary" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + (di >= 0 ? di : 0) + ',\'' + escapeHtml(dlName) + '\')"><i class="ti ti-download"></i> Скачать</button>' +
@@ -11760,7 +11761,8 @@ async function openInboxMessage(inboxId) {
             '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + msg.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>'
           : '') +
         (msg.matched_order_id
-          ? '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + msg.matched_order_id + ')">Открыть заказ</button>'
+          ? '<button class="btn btn-secondary" style="color:#8C2A2A;" onclick="unmatchInboxAndPay(' + msg.id + ',\'' + overlayId + '\')"><i class="ti ti-unlink"></i> Отвязать → На оплату</button>' +
+            '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + msg.matched_order_id + ')">Открыть заказ</button>'
           : '') +
         ((msg.from_addr && String(msg.from_addr).indexOf('@') >= 0)
           ? '<button class="btn btn-primary" onclick="openInboxReply(' + msg.id + ')"><i class="ti ti-corner-up-left"></i> Ответить</button>'
@@ -11842,6 +11844,41 @@ async function sendInboxToPay(inboxId, overlayId) {
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
   }
+}
+
+// Отвязать входящий счёт от заказа и сразу отправить «На оплату».
+// Нужно, когда поставщик прислал счёт ответом в чужую цепочку (например, счёт
+// на частотники — в письмо по заказу панелей), и робот привязал его не туда.
+// Шаг 1 — /unmatch: снимает привязку и чистит поля счёта у заказа (склад/приёмку
+// НЕ трогает, принятые позиции остаются приняты). Шаг 2 — /to-pay: создаёт счёт
+// «На оплату». Если 2-й шаг не прошёл — счёт всё равно уже отвязан, можно оплатить
+// вручную из «Входящих».
+async function unmatchInboxAndPay(inboxId, overlayId) {
+  if (!confirm('Отвязать счёт от заказа и отправить «На оплату»?\n\n' +
+      '• счёт открепится от заказа, к которому его ошибочно привязали;\n' +
+      '• принятые позиции на складе НЕ трогаются;\n' +
+      '• затем счёт уйдёт «На оплату» с распознанными реквизитами, бухгалтер получит уведомление.')) return;
+  const token = localStorage.getItem(TOKEN_KEY) || '';
+  const hdrs = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  try {
+    // 1) отвязать
+    const ur = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/unmatch', { method: 'POST', headers: hdrs, body: '{}' });
+    const uj = await ur.json().catch(() => ({}));
+    if (!ur.ok) { showToast(uj.message || ('Не удалось отвязать (HTTP ' + ur.status + ')'), 'error'); return; }
+    // 2) на оплату
+    const pr = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/to-pay', { method: 'POST', headers: hdrs, body: '{}' });
+    const pj = await pr.json().catch(() => ({}));
+    if (overlayId) { const ov = document.getElementById(overlayId); if (ov) ov.remove(); }
+    if (!pr.ok) {
+      showToast('Счёт отвязан, но «На оплату» не ушло: ' + (pj.message || ('HTTP ' + pr.status)) +
+                '. Откройте его во «Входящих» и нажмите «На оплату».', 'error');
+      await loadSupplyInbox();
+      return;
+    }
+    showToast('Счёт отвязан и отправлен на оплату' + (pj.order_label ? ' · ' + pj.order_label : ''), 'success');
+    await loadSupplyInbox();
+    if (pj.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(pj.order_id);
+  } catch (e) { showToast('Сеть: ' + (e.message || e), 'error'); }
 }
 
 // v2.45.598: оплата ПРИВЯЗАННОГО счёта — переводит сам заказ в «На оплату».
