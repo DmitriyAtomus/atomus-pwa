@@ -13101,6 +13101,9 @@ function renderSupplyOrderDetail(o) {
   if (canMarkPaid)     actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'paid\',\'Отметить заказ как оплаченный?\')"><i class="ti ti-cash"></i> Оплачен</button>');
   if (canMarkReceived) actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'received\',\'Поставка получена на склад?\')"><i class="ti ti-package-import"></i> Получено</button>');
   if (canReceive) actions.push('<button class="btn btn-secondary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Приёмка</button>');
+  // v2.45.x: откат прихода по заказу (receive-batch) — вернуть склад назад. Приходы
+  // по УПД не затрагиваются (у них своя «Отменить оприходование»).
+  if (['received', 'partial'].includes(o.status)) actions.push('<button class="btn btn-secondary" style="color:#8C2A2A;" onclick="revertOrderReceipt(' + o.id + ')"><i class="ti ti-arrow-back-up"></i> Отменить приход</button>');
   // Кнопки экспорта (доступны для черновика и отправленных)
   if (['draft', 'sent', 'partial'].includes(o.status)) {
     actions.push('<button class="btn btn-secondary" onclick="downloadSupplyOrderDocx(' + o.id + ')"><i class="ti ti-file-download"></i> Скачать DOCX</button>');
@@ -13504,6 +13507,22 @@ async function downloadSupplyOrderInvoice(orderId) {
 }
 
 // ========== ПРИЁМКА ==========
+
+// v2.45.x: отменить приход по заказу (receive-batch) — вернуть склад назад
+async function revertOrderReceipt(orderId) {
+  if (!confirm('Отменить приход по заказу?\n\nОстатки, оприходованные ЭТИМ заказом, будут списаны со склада назад, приёмка снята, статус вернётся к «Оплачен». Приходы по УПД (у них своя «Отменить оприходование») не затрагиваются.')) return;
+  try {
+    const res = await apiPost('/api/supply-orders/' + orderId + '/revert-receipt', {});
+    if (res && res.ok) {
+      const r = (res.data && res.data.report) || {};
+      showToast('Приход отменён · со склада снято ' + (r.qty_reverted || 0) + ' поз.', 'success');
+      openSupplyOrder(orderId);
+    } else {
+      const msg = (res && res.data && (res.data.message || res.data.error)) || ('HTTP ' + (res && res.status));
+      showToast('Не удалось отменить приход: ' + msg, 'error');
+    }
+  } catch (e) { showToast('Ошибка: ' + (e.message || e), 'error'); }
+}
 
 async function openReceiveOrder(orderId) {
   // Загружаем заказ заново чтобы было актуальное received_qty
