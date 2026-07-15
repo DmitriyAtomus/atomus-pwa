@@ -4212,6 +4212,7 @@ function renderModels(d) {
           (canEdit && dir ?
             '<span class="dir-actions-desktop" style="display:inline-flex;gap:4px;" onclick="event.stopPropagation()">' +
               '<span role="button" tabindex="0" class="icon-btn" title="Переименовать раздел" onclick="event.stopPropagation();openEditDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-edit" style="font-size:14px;"></i></span>' +
+              '<span role="button" tabindex="0" class="icon-btn" title="Этапы работ (шаблон чек-листа)" onclick="event.stopPropagation();openDirectionStagesModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-list-check" style="font-size:14px;"></i></span>' +
               '<span role="button" tabindex="0" class="icon-btn" title="Дублировать раздел" onclick="event.stopPropagation();openDuplicateDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;"><i class="ti ti-copy" style="font-size:14px;"></i></span>' +
               '<span role="button" tabindex="0" class="icon-btn" title="Удалить раздел" onclick="event.stopPropagation();openDeleteDirectionModal(' + dir.id + ')" style="padding:4px 6px;display:inline-flex;align-items:center;cursor:pointer;border-radius:6px;color:var(--danger);"><i class="ti ti-trash" style="font-size:14px;"></i></span>' +
             '</span>' +
@@ -5594,6 +5595,135 @@ async function submitEditDirection(directionId) {
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
   }
+}
+
+// ============ v2.45.760: этапы работ направления (шаблон чек-листа) ============
+// Шаблон задаёт этапы для всех новых работ направления (чиллеры — 26 этапов).
+// «Кто обычно» и «норма, ч» — подсказки в карточке работы; правки сохраняются сразу.
+
+async function openDirectionStagesModal(directionId) {
+  const dir = ((cache.models && cache.models.directions) || []).find(d => d.id === directionId);
+  let items = [], emps = [];
+  try {
+    const r = await apiGet('/api/directions/' + directionId + '/stage-templates');
+    items = r.items || [];
+  } catch (e) {}
+  try {
+    const d = await apiGet('/api/employees/active');
+    emps = (d.items || d.employees || []).filter(e => e.is_active !== false);
+  } catch (e) {}
+  window._dst = { directionId: directionId, items: items, emps: emps, dirName: dir ? dir.name : '' };
+  _dstRender();
+}
+
+function _dstRender() {
+  const st = window._dst;
+  if (!st) return;
+  let overlay = document.getElementById('dir-stages-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'dir-stages-modal';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('visible'); };
+    document.body.appendChild(overlay);
+  }
+  const empOpts = (sel) => '<option value="">— не закреплён —</option>' +
+    st.emps.map(e => '<option value="' + e.id + '"' + (sel === e.id ? ' selected' : '') + '>' +
+      escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</option>').join('');
+  let rows = '';
+  st.items.forEach((t, i) => {
+    rows += '<div class="dst-row">' +
+      '<span class="n">' + t.position + '</span>' +
+      '<span class="nm" onclick="_dstRename(' + t.id + ')" title="Переименовать">' + escapeHtml(t.name) + '</span>' +
+      '<select onchange="_dstSetEmp(' + t.id + ', this.value)" title="Кто обычно делает этот этап">' + empOpts(t.default_employee_id) + '</select>' +
+      '<input class="nh" type="number" step="0.5" min="0" placeholder="ч" value="' + (t.norm_hours != null ? t.norm_hours : '') + '" onchange="_dstSetNorm(' + t.id + ', this.value)" title="Норма, часов — можно заполнить позже">' +
+      '<span class="dst-mv" onclick="_dstMove(' + i + ', -1)" title="Выше"><i class="ti ti-chevron-up"></i></span>' +
+      '<span class="dst-mv" onclick="_dstMove(' + i + ', 1)" title="Ниже"><i class="ti ti-chevron-down"></i></span>' +
+      '<span class="dst-del" onclick="_dstDel(' + t.id + ')" title="Убрать из шаблона"><i class="ti ti-x"></i></span>' +
+    '</div>';
+  });
+  overlay.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:660px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-list-check"></i> Этапы работ · ' + escapeHtml(st.dirName || '') + '</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'dir-stages-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' +
+        '<div class="form-hint" style="margin-bottom:8px;">' +
+          '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
+          'Шаблон применяется к новым работам направления (и к старым — при первом открытии карточки). Уже созданные чек-листы работ при правке шаблона не меняются. «Норма, ч» можно заполнить позже — появится сравнение факт/норма.' +
+        '</div>' +
+        (rows || '<div class="empty-block" style="padding:16px;"><i class="ti ti-list"></i>Этапов пока нет — добавь первый.</div>') +
+        '<button class="dst-add" onclick="_dstAdd()">＋ Добавить этап</button>' +
+      '</div>' +
+    '</div>';
+  overlay.classList.add('visible');
+}
+
+async function _dstReload() {
+  const st = window._dst;
+  if (!st) return;
+  try {
+    const r = await apiGet('/api/directions/' + st.directionId + '/stage-templates');
+    st.items = r.items || [];
+  } catch (e) {}
+  _dstRender();
+}
+
+async function _dstAdd() {
+  const name = prompt('Название этапа:', '');
+  if (name == null || !name.trim()) return;
+  try {
+    const r = await apiPost('/api/directions/' + window._dst.directionId + '/stage-templates', { name: name.trim() });
+    if (!(r && r.ok)) showToast(((r && r.data) || {}).message || 'Не удалось добавить', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  _dstReload();
+}
+
+async function _dstRename(tplId) {
+  const t = ((window._dst || {}).items || []).find(x => x.id === tplId);
+  const v = prompt('Название этапа:', (t && t.name) || '');
+  if (v == null || !v.trim()) return;
+  try { await apiPatch('/api/directions/stage-templates/' + tplId, { name: v.trim() }); }
+  catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _dstReload();
+}
+
+async function _dstSetEmp(tplId, val) {
+  try {
+    await apiPatch('/api/directions/stage-templates/' + tplId, { default_employee_id: val ? parseInt(val, 10) : null });
+    showToast('Сохранено', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _dstReload();
+}
+
+async function _dstSetNorm(tplId, val) {
+  try {
+    await apiPatch('/api/directions/stage-templates/' + tplId, { norm_hours: val ? parseFloat(val) : null });
+    showToast('Сохранено', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _dstReload();
+}
+
+async function _dstMove(idx, delta) {
+  const st = window._dst;
+  const j = idx + delta;
+  if (!st || j < 0 || j >= st.items.length) return;
+  const arr = st.items.slice();
+  const tmp = arr[idx]; arr[idx] = arr[j]; arr[j] = tmp;
+  try {
+    const r = await apiPost('/api/directions/' + st.directionId + '/stage-templates/reorder', { ids: arr.map(x => x.id) });
+    if (!(r && r.ok)) showToast('Не удалось переставить', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  _dstReload();
+}
+
+async function _dstDel(tplId) {
+  const t = ((window._dst || {}).items || []).find(x => x.id === tplId);
+  if (!confirm('Убрать этап «' + ((t && t.name) || '') + '» из шаблона?\nУже созданные чек-листы работ не изменятся.')) return;
+  try { await apiDelete('/api/directions/stage-templates/' + tplId); }
+  catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _dstReload();
 }
 
 async function openDuplicateDirectionModal(directionId) {

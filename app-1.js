@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.759";
+const APP_VERSION = "v2.45.760";
 const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5225,6 +5225,9 @@ function renderProductionWorkDetail(w) {
     html += '</div>';
   }
 
+  // v2.45.760: этапы сборки — чек-лист направления (чиллер), грузится асинхронно
+  html += '<div id="pwd-stages" style="display:none;"></div>';
+
   if (canEditWork || (w.progress != null && ['in_progress', 'review', 'packing'].includes(w.status))) {
     const curPct = Math.max(0, Math.min(100, Number(w.progress || 0)));
     html += '<div class="pwd-progress-block">';
@@ -5372,6 +5375,8 @@ function renderProductionWorkDetail(w) {
   modal.innerHTML = html;
   // v2.45.232: подгружаем документы модели (схема/файл СП/фото)
   if (w.model_id) _fillWorkModelDocs(w.model_id);
+  // v2.45.760: этапы сборки (чек-лист направления)
+  _fillWorkStages(w);
 }
 
 // v2.45.232: блок «Документы модели» в карточке работы — схема PDF, файл СП, фото
@@ -5580,11 +5585,271 @@ async function _stagePickerAddNew() {
   }
 }
 
+/* === v2.45.760: этапы сборки — чек-лист направления в карточке работы ===
+   Строки чек-листа ссылаются на work_stage_types (stage_type_id) — тот же id
+   пишет таймер в сессии журнала, поэтому факт по этапу складывается сам. */
+
+function _pwdStagesByPos(items) {
+  const m = {};
+  (items || []).forEach(s => { m[s.position] = s; });
+  return m;
+}
+
+// → массив имён этапов, которых ждём (контрольные точки), или null если открыт
+function _pwdStageLocked(st, byPos) {
+  if (!st.requires || st.is_done) return null;
+  const waits = String(st.requires).split(',')
+    .map(x => parseInt(x.trim(), 10)).filter(Boolean)
+    .filter(p => byPos[p] && !byPos[p].is_done)
+    .map(p => byPos[p].name);
+  return waits.length ? waits : null;
+}
+
+function _pwdStageFmtH(h) {
+  if (!h || h <= 0) return '—';
+  const mins = Math.round(h * 60);
+  if (mins < 60) return mins + 'м';
+  return Math.floor(mins / 60) + 'ч' + (mins % 60 ? ' ' + (mins % 60) + 'м' : '');
+}
+
+async function _fillWorkStages(w) {
+  const box = document.getElementById('pwd-stages');
+  if (!box || !w || !w.id) return;
+  let items = [];
+  try {
+    const r = await apiGet('/api/production/works/' + w.id + '/stages');
+    items = r.items || [];
+  } catch (e) { return; }
+  if (!items.length) return;
+  window._pwdStagesCache = { workId: w.id, items: items };
+  box.innerHTML = _pwdStagesHtml(items, w);
+  box.style.display = '';
+}
+
+function _pwdStagesHtml(items, w) {
+  const canAct = ['in_progress', 'review', 'packing'].includes(w.status);
+  const canManage = hasPermission('production.manage');
+  const byPos = _pwdStagesByPos(items);
+  const doneCnt = items.filter(s => s.is_done).length;
+  const totalFact = items.reduce((a, s) => a + (s.fact_hours || 0), 0);
+  const pct = items.length ? Math.round(doneCnt / items.length * 100) : 0;
+  const my = (w.active_helpers || []).find(h => h.is_me);
+  const myStageId = my ? my.stage_id : null;
+  const showDone = !!window._pwdStagesShowDone;
+  const foldDone = doneCnt > 3 && !showDone;
+
+  let html = '<div class="pwd-stg-block">';
+  html += '<div class="pwd-stg-head"><span><i class="ti ti-list-check"></i> Этапы сборки</span>' +
+    '<span class="pwd-stg-sum">готово <b>' + doneCnt + ' / ' + items.length + '</b>' +
+    (totalFact > 0 ? ' · Σ ' + _pwdStageFmtH(totalFact) : '') + '</span>' +
+    (canManage ? '<button class="pkb-btn" style="padding:2px 9px;font-size:11px;" onclick="pwdStageAdd(' + w.id + ')" title="Этап только для этой работы — шаблон направления не меняется"><i class="ti ti-plus"></i> этап</button>' : '') +
+    '</div>';
+  html += '<div class="pwd-stg-bar"><i style="width:' + pct + '%;"></i></div>';
+  if (foldDone) {
+    html += '<div class="pwd-stg-fold" onclick="pwdStagesToggleFold()"><i class="ti ti-chevron-right"></i> ' +
+      doneCnt + ' ' + plural(doneCnt, 'готовый этап свёрнут', 'готовых этапа свёрнуто', 'готовых этапов свёрнуто') + ' — показать</div>';
+  } else if (doneCnt > 3) {
+    html += '<div class="pwd-stg-fold" onclick="pwdStagesToggleFold()"><i class="ti ti-chevron-down"></i> скрыть готовые</div>';
+  }
+
+  items.forEach(st => {
+    if (st.is_done && foldDone) return;
+    const locked = _pwdStageLocked(st, byPos);
+    const running = st.running || [];
+    const isMine = myStageId && st.stage_type_id === myStageId && !st.is_done;
+    let sub = '';
+    if (st.is_done) {
+      const when = st.done_at ? (String(st.done_at).slice(8, 10) + '.' + String(st.done_at).slice(5, 7)) : '';
+      sub = '✓ ' + (st.done_by_name ? escapeHtml(st.done_by_name) : 'готово') + (when ? ' · ' + when : '');
+    } else if (running.length) {
+      sub = running.map(rn =>
+        '<span class="pwd-stg-live" data-started-at="' + escapeHtml(rn.started_at || '') + '" data-label="⏱ ' + escapeHtml(rn.name || '') + '">⏱ ' +
+        escapeHtml(rn.name || '') + (rn.started_at ? ' · ' + _formatHelpingDuration(rn.started_at) : '') + '</span>').join(' ');
+    } else if (locked) {
+      sub = '🔒 сначала: ' + escapeHtml(locked.join(', '));
+    } else if (st.default_employee_name) {
+      sub = 'обычно: ' + escapeHtml(st.default_employee_name);
+    }
+    if (st.norm_hours) sub += (sub ? ' · ' : '') + 'норма ' + st.norm_hours + 'ч';
+
+    let act = '';
+    if (canAct && !st.is_done) {
+      if (isMine) {
+        act = '<button class="pwd-stg-btn stop" onclick="pwdStageStopDone(' + w.id + ',' + st.id + ')"><i class="ti ti-player-pause"></i> Стоп + готово</button>';
+      } else if (!locked && !running.length) {
+        act = '<button class="pwd-stg-btn go" onclick="pwdStageStart(' + w.id + ',' + st.stage_type_id + ')"><i class="ti ti-player-play"></i> Начать</button>';
+      }
+    }
+    const manageBtns = canManage
+      ? '<span class="pwd-stg-edit" onclick="pwdStageRename(' + w.id + ',' + st.id + ')" title="Переименовать"><i class="ti ti-pencil"></i></span>' +
+        '<span class="pwd-stg-del" onclick="pwdStageDelete(' + w.id + ',' + st.id + ')" title="Убрать этап из этой работы"><i class="ti ti-x"></i></span>'
+      : '';
+    html += '<div class="pwd-stg-row' + (st.is_done ? ' done' : '') + (isMine ? ' mine' : '') + (locked ? ' lkd' : '') + '">' +
+      '<span class="n">' + st.position + '</span>' +
+      '<span class="chk' + (locked && !st.is_done ? ' off' : '') + '" onclick="pwdStageToggleDone(' + w.id + ',' + st.id + ',' + (st.is_done ? 'false' : 'true') + ')" title="' + (st.is_done ? 'Снять отметку' : 'Отметить готовым') + '">' + (st.is_done ? '<i class="ti ti-check"></i>' : '') + '</span>' +
+      '<span class="m"><span class="t">' + escapeHtml(st.name) + '</span>' +
+      (sub ? '<span class="sub">' + sub + '</span>' : '') + '</span>' +
+      '<span class="fact' + (st.is_done ? ' ok' : '') + '">' + _pwdStageFmtH(st.fact_hours) + '</span>' +
+      act + manageBtns +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+async function _pwdStagesRefreshCard(workId) {
+  cache.productionKanban = null;
+  try {
+    const fresh = await apiGet('/api/production/works/' + workId);
+    state._pkbDetailWork = fresh;
+    renderProductionWorkDetail(fresh);
+    pwcLoad(workId);
+  } catch (e) { /* карточку могли закрыть */ }
+}
+
+function pwdStagesToggleFold() {
+  window._pwdStagesShowDone = !window._pwdStagesShowDone;
+  const c = window._pwdStagesCache;
+  const wk = state._pkbDetailWork;
+  const box = document.getElementById('pwd-stages');
+  if (c && wk && box && c.workId === wk.id) box.innerHTML = _pwdStagesHtml(c.items, wk);
+}
+
+async function pwdStageToggleDone(workId, sid, makeDone) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.id === sid);
+  if (makeDone && st) {
+    const locked = _pwdStageLocked(st, _pwdStagesByPos(c.items));
+    if (locked) { showToast('🔒 Сначала: ' + locked.join(', '), 'error'); return; }
+  }
+  try {
+    await apiPatch('/api/production/work-stages/' + sid, { done: !!makeDone });
+    showToast(makeDone ? 'Этап готов ✅' : 'Отметка снята', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _pwdStagesRefreshCard(workId);
+}
+
+async function pwdStageStart(workId, stageTypeId) {
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/start-helping', { stage_id: stageTypeId });
+    if (r && r.ok) showToast('Часики пошли ⏱', 'success');
+    else showToast(((r && r.data) || {}).message || 'Не удалось начать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  _pwdStagesRefreshCard(workId);
+  if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') loadProductionDashboard();
+}
+
+async function pwdStageStopDone(workId, sid) {
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/stop-helping', { note: '' });
+    const mins = ((r && r.data) || {}).minutes || 0;
+    await apiPatch('/api/production/work-stages/' + sid, { done: true });
+    const fmtMin = mins < 60 ? (mins + ' мин') : (Math.floor(mins / 60) + 'ч ' + (mins % 60) + 'м');
+    showToast('Этап готов ✅' + (mins > 0 ? ' · в журнал: ' + fmtMin : ''), 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _pwdStagesRefreshCard(workId);
+  if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') loadProductionDashboard();
+}
+
+async function pwdStageAdd(workId) {
+  const name = prompt('Название этапа — добавится только в эту работу\n(шаблон направления не меняется):', '');
+  if (name == null || !name.trim()) return;
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/stages', { name: name.trim() });
+    if (r && r.ok) showToast('Этап добавлен', 'success');
+    else showToast(((r && r.data) || {}).message || 'Не удалось добавить', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  _pwdStagesRefreshCard(workId);
+}
+
+async function pwdStageRename(workId, sid) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.id === sid);
+  const v = prompt('Название этапа:', (st && st.name) || '');
+  if (v == null || !v.trim()) return;
+  try {
+    await apiPatch('/api/production/work-stages/' + sid, { name: v.trim() });
+    showToast('Переименовано', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _pwdStagesRefreshCard(workId);
+}
+
+async function pwdStageDelete(workId, sid) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.id === sid);
+  if (!confirm('Убрать этап «' + ((st && st.name) || '') + '» из этой работы?\nЧасы в журнале сохранятся.')) return;
+  try {
+    await apiDelete('/api/production/work-stages/' + sid);
+    showToast('Этап убран', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _pwdStagesRefreshCard(workId);
+}
+
+/* Умный пикер этапа: у работы с чек-листом (чиллер) — выбор из её этапов
+   с «обычно», занятостью и замками; иначе — общий каталог как раньше. */
+async function _openStagePickerSmart(workId, opts) {
+  let items = [];
+  try {
+    const r = await apiGet('/api/production/works/' + workId + '/stages');
+    items = r.items || [];
+  } catch (e) { items = []; }
+  if (!items.length) {
+    const stages = await _loadWorkStages();
+    openStagePicker({ title: opts.title, stages: stages, onPick: opts.onPick, allowSkip: opts.allowSkip });
+    return;
+  }
+  const overlayId = 'stage-picker-modal';
+  let m = document.getElementById(overlayId);
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = overlayId;
+  m.className = 'modal-overlay stage-picker-modal';
+  const byPos = _pwdStagesByPos(items);
+  const rows = items.map(st => {
+    const locked = _pwdStageLocked(st, byPos);
+    const running = st.running || [];
+    let sub = '';
+    if (st.is_done) sub = '✓ уже готов' + (st.done_by_name ? ' · ' + escapeHtml(st.done_by_name) : '');
+    else if (running.length) sub = '⏱ уже делает: ' + running.map(x => escapeHtml(x.name || '')).join(', ');
+    else if (locked) sub = '🔒 сначала: ' + escapeHtml(locked.join(', '));
+    else if (st.default_employee_name) sub = 'обычно: ' + escapeHtml(st.default_employee_name);
+    return '<button class="wsp-row' + (st.is_done ? ' done' : '') + (locked ? ' lkd' : '') + '" ' +
+      'data-stage-type="' + st.stage_type_id + '" data-locked="' + (locked ? 1 : 0) + '">' +
+      '<span class="n">' + st.position + '</span>' +
+      '<span class="m"><span class="t">' + escapeHtml(st.name) + '</span>' + (sub ? '<span class="s">' + sub + '</span>' : '') + '</span>' +
+      '</button>';
+  }).join('');
+  m.innerHTML =
+    '<div class="modal" style="max-width:520px;max-height:86vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h2><i class="ti ti-list-check"></i> ' + escapeHtml(opts.title || 'Выбери этап') + '</h2>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div class="wsp-list">' + rows + '</div>' +
+        (opts.allowSkip !== false
+          ? '<button class="dev-link-btn" style="margin-top:10px;" onclick="_stagePickerPick(null)">Пропустить — без этапа</button>'
+          : '') +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  m.classList.add('visible');
+  m.querySelector('.wsp-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.wsp-row');
+    if (!btn) return;
+    if (btn.dataset.locked === '1') {
+      showToast('🔒 Этап откроется, когда будут готовы предыдущие', 'error');
+      return;
+    }
+    _stagePickerPick(parseInt(btn.dataset.stageType, 10));
+  });
+  m._onPick = opts.onPick;
+}
+
 async function openChangeMyStage(workId) {
-  const stages = await _loadWorkStages();
-  openStagePicker({
+  _openStagePickerSmart(workId, {
     title: 'Сменить этап',
-    stages,
     onPick: async (stageId) => {
       try {
         await apiPost('/api/employees/me/helping-stage', stageId ? { stage_id: stageId } : { stage_id: null });
@@ -5598,10 +5863,8 @@ async function openChangeMyStage(workId) {
 }
 
 async function openChangeHelperStage(workId, employeeId, employeeName) {
-  const stages = await _loadWorkStages();
-  openStagePicker({
+  _openStagePickerSmart(workId, {
     title: 'Этап для «' + (employeeName || 'сотрудника') + '»',
-    stages,
     onPick: async (stageId) => {
       try {
         await apiPost(
@@ -5620,11 +5883,9 @@ async function openChangeHelperStage(workId, employeeId, employeeName) {
 async function togglePwdHelp(workId, willStart) {
   const isStart = (willStart === true || willStart === 'true');
   if (isStart) {
-    // v2.44.70: спрашиваем какой этап работы
-    const stages = await _loadWorkStages();
-    openStagePicker({
+    // v2.44.70: спрашиваем какой этап; v2.45.760: у чиллеров — из чек-листа работы
+    _openStagePickerSmart(workId, {
       title: 'Какой этап ты делаешь?',
-      stages,
       onPick: async (stageId) => {
         try {
           await apiPost('/api/production/works/' + workId + '/start-helping',
@@ -5765,13 +6026,11 @@ async function openAddHelperModal(workId) {
 
 async function addPwdHelper(workId, employeeId) {
   // v2.44.70: после выбора сотрудника просим выбрать этап
-  const stages = await _loadWorkStages();
   // Закроем модалку выбора сотрудника
   const empModal = document.getElementById('pwd-add-helper-modal');
   if (empModal) empModal.remove();
-  openStagePicker({
+  _openStagePickerSmart(workId, {
     title: 'Какой этап будет делать?',
-    stages,
     onPick: async (stageId) => {
       try {
         await apiPost('/api/production/works/' + workId + '/helpers', {
@@ -14120,7 +14379,12 @@ async function openMyDayStart(workId) {
     return;
   }
   var selfId = (_myday.employee && _myday.employee.id) || null;
-  _mds = { workId: workId, stageId: null, performers: selfId ? [selfId] : [] };
+  _mds = { workId: workId, stageId: null, performers: selfId ? [selfId] : [], workStages: null };
+  // v2.45.760: у работы с чек-листом (чиллер) этап выбирается из него
+  try {
+    const r = await apiGet('/api/production/works/' + workId + '/stages');
+    _mds.workStages = r.items || [];
+  } catch (e) { _mds.workStages = null; }
   _renderMyDayModal(_mydayStartModalHtml());
   setTimeout(() => { const d = document.getElementById('mds-note'); if (d) d.focus(); }, 60);
 }
@@ -14142,7 +14406,19 @@ function _mydayStartModalHtml() {
   const mates = _myday.mates || [];
   let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
     '<div class="myday-h4"><i class="ti ti-player-play"></i> Начать работу</div>';
-  if (stages.length) {
+  const wstgAll = (_mds && _mds.workStages) || [];
+  const wstg = wstgAll.filter(x => !x.is_done);
+  if (wstg.length) {
+    // v2.45.760: чек-лист направления (чиллер) — этап выбирается из него
+    const byPos = _pwdStagesByPos(wstgAll);
+    h += '<div class="myday-lbl">Этап работ (чек-лист)</div><div class="myday-chips myday-chips-scroll">' +
+      wstg.map(st => {
+        const locked = _pwdStageLocked(st, byPos);
+        const on = _mds.stageId === st.stage_type_id;
+        return '<span class="myday-chip' + (on ? ' on' : '') + (locked ? ' lkd' : '') + '" onclick="mdsWorkStage(' + st.id + ')">' +
+          (locked ? '🔒 ' : '') + st.position + '. ' + escapeHtml(st.name) + '</span>';
+      }).join('') + '</div>';
+  } else if (stages.length) {
     h += '<div class="myday-lbl">Что делаешь (этап)</div><div class="myday-chips">' +
       stages.map(st => '<span class="myday-chip' + (_mds.stageId === st.id ? ' on' : '') + '" onclick="mdsStage(' + st.id + ')">' + escapeHtml(st.name) + '</span>').join('') + '</div>';
   }
@@ -14194,6 +14470,16 @@ function mdsUseNote(i, elBtn) {
   mdsNoteChips();
 }
 function mdsStage(id) { _mds.stageId = (_mds.stageId === id ? null : id); _mdsKeepNoteRerender(); }
+// v2.45.760: выбор этапа из чек-листа работы (значение — stage_type_id, как у таймера)
+function mdsWorkStage(rowId) {
+  const all = (_mds && _mds.workStages) || [];
+  const st = all.find(x => x.id === rowId);
+  if (!st) return;
+  const locked = _pwdStageLocked(st, _pwdStagesByPos(all));
+  if (locked) { showToast('🔒 Сначала: ' + locked.join(', '), 'error'); return; }
+  _mds.stageId = (_mds.stageId === st.stage_type_id ? null : st.stage_type_id);
+  _mdsKeepNoteRerender();
+}
 function mdsMate(id) {
   const k = _mds.performers.indexOf(id);
   if (k >= 0) _mds.performers.splice(k, 1); else _mds.performers.push(id);

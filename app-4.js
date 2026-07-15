@@ -8422,6 +8422,7 @@ function closeSimpleMenu() {
 function openDirectionKebabMenu(anchorEl, dirId) {
   showSimpleMenu(anchorEl, [
     { label: 'Переименовать', icon: 'edit',  onclick: function () { openEditDirectionModal(dirId); } },
+    { label: 'Этапы работ',   icon: 'list-check', onclick: function () { openDirectionStagesModal(dirId); } },
     { label: 'Дублировать',   icon: 'copy',  onclick: function () { openDuplicateDirectionModal(dirId); } },
     { label: 'Удалить',       icon: 'trash', danger: true, onclick: function () { openDeleteDirectionModal(dirId); } },
   ]);
