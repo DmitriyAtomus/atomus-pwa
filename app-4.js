@@ -4010,6 +4010,85 @@ function submitPublicPassword(kind, token) {
   if (kind === 'assembly') showPublicAssembly(token);
   else if (kind === 'contract') showPublicContract(token, window._pubPendingItem || null);
   else if (kind === 'box') showPublicBox(token);
+  else if (kind === 'assembly-unit') showPublicUnit(token);
+}
+
+// ============ v2.45.757: публичная страница экземпляра (/u/{token}) ============
+// Поштучный QR: статус именно этого физического блока — «На складе» /
+// «Отгружен тогда-то по договору …» / «Списан».
+async function showPublicUnit(token) {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  const page = document.getElementById('public-page');
+  page.style.display = 'flex';
+  const body = document.getElementById('public-card-body');
+  body.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-light);">Загружаем…</div>';
+  try {
+    const res = await fetchPublicObject('assembly-unit', token);
+    if (res.needPassword) {
+      body.innerHTML = renderPublicPasswordGate('assembly-unit', token, res.badPassword);
+      const inp = document.getElementById('public-pw-input'); if (inp) inp.focus();
+      return;
+    }
+    if (!res.ok) {
+      body.innerHTML = renderPublicError(res.status);
+      return;
+    }
+    body.innerHTML = renderPublicUnitCard(res.data, token);
+  } catch (e) {
+    body.innerHTML = renderPublicError('network');
+  }
+}
+
+function renderPublicUnitCard(u, token) {
+  const fmtD = (s) => escapeHtml(String(s || '').replace('T', ' ').slice(0, 10));
+  // Крупный статус — главное, ради чего сканируют
+  let banner;
+  if (u.status === 'shipped') {
+    banner = '<div class="pu-status pu-shipped"><i class="ti ti-truck-delivery"></i>' +
+      '<div><div class="pu-status-t">Отгружен</div>' +
+      '<div class="pu-status-s">' + fmtD(u.shipped_at) +
+        (u.shipped_contract_number ? ' · договор ' + escapeHtml(u.shipped_contract_number) : '') +
+        (u.shipped_contractor_name ? ' · ' + escapeHtml(u.shipped_contractor_name) : '') +
+      '</div></div></div>';
+  } else if (u.status === 'written_off') {
+    banner = '<div class="pu-status pu-woff"><i class="ti ti-trash"></i>' +
+      '<div><div class="pu-status-t">Списан</div>' +
+      (u.status_comment ? '<div class="pu-status-s">' + escapeHtml(u.status_comment) + '</div>' : '') +
+      '</div></div>';
+  } else {
+    banner = '<div class="pu-status pu-stock"><i class="ti ti-building-warehouse"></i>' +
+      '<div><div class="pu-status-t">На складе</div>' +
+      '<div class="pu-status-s">Атомус Групп · Миасс</div></div></div>';
+  }
+
+  let rows = '';
+  const addRow = (label, value) => {
+    if (!value) return;
+    rows += '<div class="public-row"><span class="public-row-label">' + label +
+      '</span><span class="public-row-value">' + value + '</span></div>';
+  };
+  addRow('Экземпляр', '<strong>№' + u.assembly_id + '-' + u.unit_no + '</strong>' +
+    (u.units_total ? ' <span style="color:var(--text-light);">(' + u.unit_no + ' из ' + u.units_total + ')</span>' : ''));
+  addRow('Артикул', u.model_article ? '<code>' + escapeHtml(u.model_article) + '</code>' : null);
+  addRow('Исполнение', u.execution ? escapeHtml(u.execution) : null);
+  addRow('IP класс', u.ip_class ? escapeHtml(u.ip_class) : null);
+  addRow('Дата сборки', escapeHtml(u.assembly_date || ''));
+  if (u.contract_number) {
+    addRow('Резерв под договор', escapeHtml(u.contract_number) +
+      (u.contractor_name ? ' · ' + escapeHtml(u.contractor_name) : ''));
+  }
+
+  return '<div class="public-header">' +
+    '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
+    '<h1 class="public-header-title">' + escapeHtml(u.model_name || 'Изделие') + '</h1>' +
+    '<div class="public-header-sub"><i class="ti ti-box"></i> Экземпляр №' + u.assembly_id + '-' + u.unit_no + '</div>' +
+  '</div>' +
+  '<div class="public-body">' + banner + rows + '</div>' +
+  '<div class="public-footer">' +
+    'Внутренняя CRM-система ООО «Атомус Групп»<br>' +
+    '<span style="font-size:11.5px;opacity:0.85;">Нужен полный доступ? Обратитесь в Атомус Групп.</span>' +
+  '</div>';
 }
 
 async function showPublicAssembly(token) {
@@ -5004,7 +5083,7 @@ function openQrModal(opts) {
   // термопечать доступна без права labels_print — это объекты, которым клеят
   // стикер прямо на складе/упаковке (аккаунт там может быть без этого права).
   // Для прочих типов — по праву.
-  const _physQrType = ['assembly', 'box', 'contract', 'defect'].includes(opts.type);
+  const _physQrType = ['assembly', 'assembly_unit', 'box', 'contract', 'defect'].includes(opts.type);
   const showNetPrintBtn = !!opts.url &&
     (showPrintBtn || _physQrType ||
       (typeof canPrintLabels === 'function' && canPrintLabels()));
@@ -5295,6 +5374,14 @@ function _netPrintCaption(data) {
     if (data.modelName) parts.push(String(data.modelName));
     if (data.assemblyId) parts.push('#' + data.assemblyId);
     return parts.join(' · ').slice(0, 80) || 'Сборка';
+  }
+
+  // v2.45.757: экземпляр — «Модель · №112-3»
+  if (t === 'assembly_unit') {
+    const parts = [];
+    if (data.modelName) parts.push(String(data.modelName));
+    if (data.assemblyId && data.unitNo) parts.push('№' + data.assemblyId + '-' + data.unitNo);
+    return parts.join(' · ').slice(0, 80) || 'Экземпляр';
   }
 
   if (t === 'contract') {
@@ -6006,8 +6093,8 @@ async function handleQrScanResult(decodedText) {
     try { url = new URL(text); } catch (e) { url = null; }
 
     if (url) {
-      // /a/{token} | /b/{token} | /c/{token}
-      const m = url.pathname.match(/^\/[abc]\/([A-Za-z0-9_\-]+)$/);
+      // /a/{token} | /b/{token} | /c/{token} | /u/{token} (экземпляр, v2.45.757)
+      const m = url.pathname.match(/^\/[abcu]\/([A-Za-z0-9_\-]+)$/);
       if (m) {
         token = m[1];
         // v2.45.208: QR изделия — /c/{token}?item=ID → карточка позиции
@@ -6079,6 +6166,12 @@ async function routeScannedToken(token) {
     state.currentContractId = info.id;
     selectSection('sales');
     selectSidebarItem('sales-contract-detail');
+    return;
+  }
+
+  // v2.45.757: экземпляр сборки (поштучный QR) → карточка экземпляра с действиями
+  if (info.type === 'assembly_unit') {
+    openUnitScanModal(info);
     return;
   }
 
@@ -13007,6 +13100,12 @@ function _scheduleSharedInvoiceIntake() {
   const publicDefectMatch = path.match(/^\/d\/([A-Za-z0-9_\-]+)$/);
   // v2.44.48: публичная страница разработки /dev/{token}
   const publicDevMatch = path.match(/^\/dev\/([A-Za-z0-9_\-]+)$/);
+  // v2.45.757: публичная страница экземпляра /u/{token}
+  const publicUnitMatch = path.match(/^\/u\/([A-Za-z0-9_\-]+)$/);
+  if (publicUnitMatch) {
+    showPublicUnit(publicUnitMatch[1]);
+    return;
+  }
   if (publicAsmMatch) {
     showPublicAssembly(publicAsmMatch[1]);
     return;

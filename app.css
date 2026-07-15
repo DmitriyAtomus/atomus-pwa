@@ -9853,6 +9853,18 @@
   .public-status-pill.s-shipped { background: #E8F5E9; color: #15803D; }
   .public-status-pill.s-closed, .public-status-pill.s-written_off { background: var(--bg); color: var(--text-light); }
   .public-status-pill.s-in_progress { background: #FFF4E6; color: #B25E00; }
+
+  /* v2.45.757: публичная страница экземпляра (/u/) — крупный статус */
+  .pu-status {
+    display: flex; align-items: center; gap: 14px;
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 16px;
+  }
+  .pu-status i { font-size: 30px; flex-shrink: 0; }
+  .pu-status-t { font-size: 19px; font-weight: 800; letter-spacing: 0.3px; }
+  .pu-status-s { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+  .pu-status.pu-stock   { background: #E8F5E9; color: #15803D; border: 1px solid #A7D7B0; }
+  .pu-status.pu-shipped { background: #E7EEFB; color: #2C5282; border: 1px solid #A9C3E8; }
+  .pu-status.pu-woff    { background: #FFF4E6; color: #B25E00; border: 1px solid #F0C36D; }
   .public-section-title {
     font-size: 11px;
     color: var(--text-light);
@@ -19649,6 +19661,27 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .pkb-wl-legend { display: none; }
   .pkb-kpi-flt { display: none; }
 }
+
+/* ====== v2.45.757: экземпляры сборки (поштучные QR) ====== */
+.aunit-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 4px;
+}
+.aunit-row + .aunit-row { border-top: 1px solid #EEF2F6; }
+.aunit-no {
+  font-size: 13.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--text-dark); white-space: nowrap; min-width: 68px;
+}
+.aunit-mid { flex: 1; min-width: 0; }
+.aunit-sub { font-size: 11.5px; color: var(--text-light); margin-top: 3px; }
+.aunit-acts { display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.aunit-pill {
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+}
+.aunit-pill.au-in_stock    { background: #E8F5E9; color: #15803D; }
+.aunit-pill.au-shipped     { background: #E7EEFB; color: #2C5282; }
+.aunit-pill.au-written_off { background: #FFF4E6; color: #B25E00; }
 
 /* ====== Карточка работы: факт-плитки, команда, описание (v2.45.628) ====== */
 .pwd-facts {
