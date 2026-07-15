@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.761";
+const APP_VERSION = "v2.45.762";
 const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5687,9 +5687,9 @@ function _pwdStagesHtml(items, w) {
     html += '<div class="pwd-stg-row' + (st.is_done ? ' done' : '') + (isMine ? ' mine' : '') + (locked ? ' lkd' : '') + '">' +
       '<span class="n">' + st.position + '</span>' +
       '<span class="chk' + (locked && !st.is_done ? ' off' : '') + '" onclick="pwdStageToggleDone(' + w.id + ',' + st.id + ',' + (st.is_done ? 'false' : 'true') + ')" title="' + (st.is_done ? 'Снять отметку' : 'Отметить готовым') + '">' + (st.is_done ? '<i class="ti ti-check"></i>' : '') + '</span>' +
-      '<span class="m"><span class="t">' + escapeHtml(st.name) + '</span>' +
+      '<span class="m clickable" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')" title="Архив: когда и сколько делали этот этап"><span class="t">' + escapeHtml(st.name) + '</span>' +
       (sub ? '<span class="sub">' + sub + '</span>' : '') + '</span>' +
-      '<span class="fact' + (st.is_done ? ' ok' : '') + '">' + _pwdStageFmtH(st.fact_hours) + '</span>' +
+      '<span class="fact' + (st.is_done ? ' ok' : '') + '" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')" style="cursor:pointer;">' + _pwdStageFmtH(st.fact_hours) + '</span>' +
       act + manageBtns +
       '</div>';
   });
@@ -5788,6 +5788,107 @@ async function pwdStageDelete(workId, sid) {
     showToast('Этап убран', 'success');
   } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
   _pwdStagesRefreshCard(workId);
+}
+
+/* === v2.45.762: архив этапа — когда, кто и сколько делали (по дням) === */
+function _pwdStageEkbTime(ts) {
+  // 'YYYY-MM-DD HH:MM:SS' (UTC из SQLite) → 'ЧЧ:ММ' по Екатеринбургу (+5)
+  if (!ts) return '';
+  const raw = String(ts);
+  const iso = raw.includes('T') ? raw : (raw.replace(' ', 'T') + 'Z');
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const e = new Date(d.getTime() + 5 * 3600 * 1000);
+  return String(e.getUTCHours()).padStart(2, '0') + ':' + String(e.getUTCMinutes()).padStart(2, '0');
+}
+
+function _pwdStageDayLabel(dateStr) {
+  const wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const d = new Date(String(dateStr) + 'T00:00:00');
+  const w = isNaN(d.getTime()) ? '' : (' · ' + wd[d.getDay()]);
+  return formatPkbDate(dateStr) + w;
+}
+
+function pwdStageHistory(workId, sid) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.id === sid);
+  if (!st) return;
+  const w = (state._pkbDetailWork && state._pkbDetailWork.id === workId) ? state._pkbDetailWork : null;
+  const sessions = ((w && w.sessions) || []).filter(x => x.stage_id === st.stage_type_id);
+  const running = st.running || [];
+
+  // группировка по дням (сессии уже отсортированы: новые сверху)
+  const byDay = {}, order = [];
+  sessions.forEach(x => {
+    const d = x.session_date || '—';
+    if (!byDay[d]) { byDay[d] = { items: [], hours: 0 }; order.push(d); }
+    byDay[d].items.push(x);
+    byDay[d].hours += parseFloat(x.hours || 0) || 0;
+  });
+
+  let html = '';
+  // сводка: факт, заходы, дни (+ норма, если задана)
+  html += '<div class="pwsh-sum">' +
+    '<div class="pwsh-st"><div class="v">' + _pwdStageFmtH(st.fact_hours) + '</div><div class="k">факт</div></div>' +
+    '<div class="pwsh-st"><div class="v">' + sessions.length + '</div><div class="k">' + plural(sessions.length, 'заход', 'захода', 'заходов') + '</div></div>' +
+    '<div class="pwsh-st"><div class="v">' + order.length + '</div><div class="k">' + plural(order.length, 'день', 'дня', 'дней') + '</div></div>';
+  if (st.norm_hours) {
+    const diff = (st.fact_hours || 0) - st.norm_hours;
+    html += '<div class="pwsh-st"><div class="v' + (diff > 0.01 ? ' bad' : ' ok') + '">' + st.norm_hours + 'ч</div><div class="k">норма' +
+      (Math.abs(diff) > 0.01 ? (diff > 0 ? ' · +' : ' · −') + _pwdStageFmtH(Math.abs(diff)) : '') + '</div></div>';
+  }
+  html += '</div>';
+
+  if (st.is_done) {
+    html += '<div class="pwsh-done"><i class="ti ti-circle-check"></i> Готов' +
+      (st.done_by_name ? ' · ' + escapeHtml(st.done_by_name) : '') +
+      (st.done_at ? ' · ' + formatPkbDate(String(st.done_at).slice(0, 10)) + ' ' + _pwdStageEkbTime(st.done_at) : '') + '</div>';
+  }
+  if (running.length) {
+    html += running.map(rn =>
+      '<div class="pwsh-live"><i class="ti ti-player-play-filled"></i> идёт сейчас · ' + escapeHtml(rn.name || '') +
+      ' · <span data-started-at="' + escapeHtml(rn.started_at || '') + '" data-label="">' + _formatHelpingDuration(rn.started_at) + '</span></div>').join('');
+  }
+
+  if (!order.length && !running.length) {
+    html += '<div class="pwd-sessions-empty" style="margin-top:10px;">По этому этапу пока не работали. Нажми «▶ Начать» у этапа — время начнёт записываться сюда, по дням и людям.</div>';
+  }
+
+  order.forEach(d => {
+    const g = byDay[d];
+    html += '<div class="pwsh-day"><span>' + escapeHtml(_pwdStageDayLabel(d)) + '</span><b>' + _pwdStageFmtH(g.hours) + '</b></div>';
+    g.items.forEach(x => {
+      const t1 = _pwdStageEkbTime(x.started_at);
+      const t2 = _pwdStageEkbTime(x.ended_at);
+      const range = (t1 || t2) ? (t1 + '–' + t2) : '';
+      const initials = getInitials(x.employee_short_name || x.employee_full_name || '?');
+      const auto = x.is_auto ? '<span class="jrn-chip"><i class="ti ti-clock-pause"></i>авто-стоп</span>' : '';
+      const note = (x.note && !/авто-?стоп/i.test(String(x.note))) ? '<div class="pwsh-note">' + escapeHtml(x.note) + '</div>' : '';
+      html += '<div class="pwsh-row">' +
+        '<span class="pkb-wl-avatar ac-' + ((x.employee_id || 0) % 8) + '" style="width:20px;height:20px;font-size:8px;">' + escapeHtml(initials) + '</span>' +
+        '<span class="who">' + escapeHtml(x.employee_short_name || x.employee_full_name || ('#' + x.employee_id)) + '</span>' +
+        (range ? '<span class="rng">' + range + '</span>' : '') +
+        auto +
+        '<span class="len">' + _pwdStageFmtH(parseFloat(x.hours || 0)) + '</span>' +
+        '</div>' + note;
+    });
+  });
+
+  let m = document.getElementById('pwd-stage-history-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'pwd-stage-history-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;max-height:86vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3 style="font-size:14px;"><i class="ti ti-history"></i> ' + st.position + '. ' + escapeHtml(st.name) + '</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pwd-stage-history-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' + html + '</div>' +
+    '</div>';
+  document.body.appendChild(m);
 }
 
 /* Умный пикер этапа: у работы с чек-листом (чиллер) — выбор из её этапов

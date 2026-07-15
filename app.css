@@ -21547,3 +21547,22 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .dst-mv { color: #94A3B8; cursor: pointer; padding: 1px 2px; font-size: 13px; }
 .dst-del { color: #F87171; cursor: pointer; padding: 1px 2px; font-size: 13px; font-weight: 800; }
 .dst-add { width: 100%; margin-top: 10px; border: 1.5px dashed #BFDBFE; border-radius: 9px; background: #fff; color: var(--brand); font-weight: 800; font-size: 12.5px; padding: 8px; cursor: pointer; font-family: inherit; }
+
+/* ============ v2.45.762: архив этапа (провал из чек-листа) ============ */
+.pwd-stg-row .m.clickable { cursor: pointer; }
+.pwd-stg-row .m.clickable:hover .t { color: var(--brand); }
+.pwsh-sum { display: flex; gap: 8px; margin-bottom: 10px; }
+.pwsh-st { flex: 1; background: #F7FAFF; border: 1px solid var(--border); border-radius: 10px; padding: 8px 6px; text-align: center; }
+.pwsh-st .v { font-size: 15px; font-weight: 800; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.pwsh-st .v.ok { color: #15803D; }
+.pwsh-st .v.bad { color: #B45309; }
+.pwsh-st .k { font-size: 10px; color: var(--text-light); font-weight: 600; margin-top: 1px; }
+.pwsh-done { font-size: 12px; font-weight: 700; color: #15803D; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 9px; padding: 7px 10px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.pwsh-live { font-size: 12px; font-weight: 700; color: #1D4ED8; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 9px; padding: 7px 10px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.pwsh-day { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: .3px; margin: 12px 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--border); }
+.pwsh-day b { color: var(--text-dark); font-size: 12px; text-transform: none; }
+.pwsh-row { display: flex; align-items: center; gap: 7px; padding: 5px 0; font-size: 12px; }
+.pwsh-row .who { font-weight: 600; }
+.pwsh-row .rng { color: var(--text-light); font-variant-numeric: tabular-nums; }
+.pwsh-row .len { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; color: #475569; }
+.pwsh-note { font-size: 11px; color: var(--text-light); margin: -2px 0 4px 27px; }
