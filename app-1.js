@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.762";
+const APP_VERSION = "v2.45.763";
 const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5828,8 +5828,9 @@ function pwdStageHistory(workId, sid) {
 
   let html = '';
   // сводка: факт, заходы, дни (+ норма, если задана)
+  const factV = (st.fact_hours && st.fact_hours > 0) ? _pwdStageFmtH(st.fact_hours) : '0ч';
   html += '<div class="pwsh-sum">' +
-    '<div class="pwsh-st"><div class="v">' + _pwdStageFmtH(st.fact_hours) + '</div><div class="k">факт</div></div>' +
+    '<div class="pwsh-st"><div class="v">' + factV + '</div><div class="k">часов · факт</div></div>' +
     '<div class="pwsh-st"><div class="v">' + sessions.length + '</div><div class="k">' + plural(sessions.length, 'заход', 'захода', 'заходов') + '</div></div>' +
     '<div class="pwsh-st"><div class="v">' + order.length + '</div><div class="k">' + plural(order.length, 'день', 'дня', 'дней') + '</div></div>';
   if (st.norm_hours) {
