@@ -5088,6 +5088,7 @@ cache.currentSupplyOrder = null;
 
 state.supplyReqFilter = 'open';        // open | new | ordered | received | all
 state.supplyOrdFilter = 'open';        // open | draft | sent | partial | received | all
+state.supplyOrdDate = '';              // YYYY-MM-DD — фильтр по одному дню (пусто = выкл)
 state.supplyCatKindFilter = 'all';     // all | material | product
 state.supplyCatSearch = '';
 state.supplyCatSearchTimer = null;
@@ -10367,6 +10368,31 @@ function onSupplyOrdSearch(val) {
   _supOrdSearchTimer = setTimeout(() => { loadSupplyOrders(); }, 300);
 }
 
+// Фильтр по одному дню. Какая дата (оплаты/поставки/создания) — зависит от вкладки.
+function _supOrdDateField(filter) {
+  if (filter === 'paid')     return { label: 'Дата оплаты',   card: 'paid_at' };
+  if (filter === 'received') return { label: 'Дата поставки', card: 'fulfilled_at' };
+  return { label: 'Дата создания', card: 'created_at' };
+}
+function _renderSupOrdDateLabel() {
+  const el = document.getElementById('sup-ord-datelabel');
+  if (el) el.textContent = _supOrdDateField(state.supplyOrdFilter || 'open').label;
+}
+function onSupplyOrdDate(val) {
+  state.supplyOrdDate = (val || '').trim();
+  const clr = document.getElementById('sup-ord-date-clear');
+  if (clr) clr.style.display = state.supplyOrdDate ? '' : 'none';
+  loadSupplyOrders();
+}
+function clearSupplyOrdDate() {
+  state.supplyOrdDate = '';
+  const inp = document.getElementById('sup-ord-date');
+  if (inp) inp.value = '';
+  const clr = document.getElementById('sup-ord-date-clear');
+  if (clr) clr.style.display = 'none';
+  loadSupplyOrders();
+}
+
 async function loadSupplyOrders() {
   const container = document.getElementById('sup-ord-list');
   if (!container) return;
@@ -10374,11 +10400,18 @@ async function loadSupplyOrders() {
   try {
     const params = new URLSearchParams();
     const search = (state.supplyOrdSearch || '').trim();
+    const date = (state.supplyOrdDate || '').trim();
     if (search) {
       params.set('q', search);
       params.set('status', 'all');   // поиск — по всем статусам
     } else if (state.supplyOrdFilter !== 'all') {
       params.set('status', state.supplyOrdFilter);
+    }
+    if (date) {
+      params.set('date', date);
+      // Колонка даты (оплата/поставка/создание) — отдельным параметром, чтобы не
+      // конфликтовать со статусом (при поиске статус = all).
+      params.set('date_field', _supOrdDateField(state.supplyOrdFilter || 'open').card);
     }
     const d = await apiGet('/api/supply-orders' + (params.toString() ? '?' + params.toString() : ''));
     cache.supplyOrders = d.orders || [];
@@ -10510,9 +10543,10 @@ function renderSupplyOrders() {
           (total ? '<span class="sup-ord-total">' + total + '</span>' : '') +
         '</div>' +
         '<div class="sup-row-meta">' +
-          // статус и дата оплаты — одной пилюлей: «ОПЛАЧЕН · 08.07»
+          // статус и дата — одной пилюлей: «ОПЛАЧЕН · 08.07». Дата зависит от вкладки:
+          // Оплачены→оплата, Получены→поставка, иначе→создание (fallback на оплату).
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) +
-            (o.paid_at ? ' · ' + _supOrdDate(o.paid_at) : '') + '</span>' +
+            (_supOrdCardDate(o) ? ' · ' + _supOrdDate(_supOrdCardDate(o)) : '') + '</span>' +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           (itemsCount ? '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' : '') +
@@ -10534,6 +10568,13 @@ function renderSupplyOrders() {
   });
   container.innerHTML = html;
   _renderSupplyOrdersActionBar();
+}
+
+// Какую дату показать на карточке — по активной вкладке (оплата/поставка/создание),
+// с fallback на дату оплаты для оплаченных заказов вне соответствующей вкладки.
+function _supOrdCardDate(o) {
+  const field = _supOrdDateField(state.supplyOrdFilter || 'open').card;
+  return o[field] || (o.status === 'paid' ? o.paid_at : '');
 }
 
 // v2.45.737: дата события заказа (UTC из базы → местное, ДД.ММ)
@@ -10697,6 +10738,7 @@ function setSupplyOrdFilter(f) {
   if (_si) _si.value = '';
   document.querySelectorAll('[data-sup-ord]').forEach(b => b.classList.toggle('active', b.dataset.supOrd === f));
   _renderSupplyOrdDesc();
+  _renderSupOrdDateLabel();   // подпись даты зависит от вкладки (оплата/поставка/создание)
   loadSupplyOrders();
 }
 
