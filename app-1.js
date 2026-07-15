@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.755";
+const APP_VERSION = "v2.45.756";
 const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4050,8 +4050,7 @@ function renderPkbWorkload(workload) {
                 '<i class="ti ti-info-circle pkb-workload-info" title="Как считается:&#10;' +
                 '• Один прямоугольник на шкале — одна работа. Тёмный — своя сборка, светлый — помощь, красный — сверх нормы.&#10;' +
                 '• Норма — до 2 работ одновременно: 1–2 работы — «норма», 3 и больше — «перегруз», 0 — «свободен».&#10;' +
-                '• Часы справа — сумма по работам: факт из журнала, иначе «расч. часы», иначе оценка ' + defHrs + 'ч на работу.&#10;' +
-                '• Тильда (~) — значит часы оценочные. Точнее будет, если заполнить «расч. часы» в карточке работы."></i>' +
+                '• Клик по прямоугольнику открывает работу, клик по строке — фильтрует доску по сотруднику."></i>' +
               '</div>';
   html +=     '<span class="pkb-wl-legend"><span><i class="pkb-wl-sw sw-main"></i>своя сборка</span>' +
                 '<span><i class="pkb-wl-sw sw-help"></i>помощь</span>' +
@@ -4212,7 +4211,6 @@ function renderPkbWorkload(workload) {
         '</button>'
       : '';
 
-    const hrsPrefix = isEstimated ? '~' : '';
     const clickAttr = ' onclick="pkbSetFilter(\'assignee\', ' + w.employee_id + ', ' + JSON.stringify(name).replace(/"/g, '&quot;') + ')"';
     const isFiltered = _pkbFilter && _pkbFilter.type === 'assignee' && _pkbFilter.id === w.employee_id;
 
@@ -4222,11 +4220,11 @@ function renderPkbWorkload(workload) {
     html +=   '<div class="pkb-wl-body">';
     html +=     '<div class="pkb-wl-top">';
     html +=       '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + stopBtn + '</div>';
+    // v2.45.756: часы убраны — оценка «16ч на работу» + накопленный журнал
+    // давали числа вроде «~195ч», которые только путали. Загрузка читается
+    // по слотам и статусу.
     html +=       '<div class="pkb-wl-right">' +
                     '<span class="pkb-wl-cnt">' + (works ? works + ' ' + plural(works, 'работа', 'работы', 'работ') : 'нет работ') + '</span>' +
-                    (works ? '<span class="pkb-wl-hrs" title="' + (isEstimated
-                        ? 'Часы оценочные: где время не указано — считается по ' + defHrs + 'ч на работу'
-                        : 'Часы по журналу/расчёту') + '">' + hrsPrefix + formatHours(hours) + 'ч</span>' : '') +
                     '<span class="pkb-wl-status s-' + status + '" title="' + escapeHtml(statusTitle) + '">' + escapeHtml(statusLabel) + '</span>' +
                   '</div>';
     html +=     '</div>';
