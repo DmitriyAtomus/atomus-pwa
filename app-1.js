@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.753";
+const APP_VERSION = "v2.45.754";
 const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4100,29 +4100,47 @@ function renderPkbWorkload(workload) {
     const mains = worksList.filter(x => x.role !== 'help');
     const helps = worksList.filter(x => x.role === 'help');
 
-    // Строка «чем занят» — без сокращений и загадочных «+2»
+    // Строка «чем занят» — без сокращений и загадочных «+2».
+    // v2.45.754: если таймер идёт — показываем «Сейчас: <заметка или этап> —
+    // <работа>»; раньше без заметки (старт из карточки задаёт только этап)
+    // эта часть не показывалась вовсе.
+    const helpingStage = (w.helping_stage_name || '').trim();
+    const hwId = helpingNow ? w.helping_now_work_id : null;
+    const hw = hwId ? worksList.find(x => x.id === hwId) : null;
     const descParts = [];
-    if (helpingNow && helpingNote) {
-      descParts.push('🔨 Сейчас: ' + _trimTitle(helpingNote, 40) +
-        (batchIds.length > 1 ? ' — сразу на ' + batchIds.length + ' сборках' : ''));
+    if (helpingNow && (helpingNote || helpingStage || hw)) {
+      const what = helpingNote || helpingStage;
+      let nowTxt;
+      if (what) {
+        nowTxt = '🔨 Сейчас: ' + _trimTitle(what, 36);
+        if (batchIds.length > 1) nowTxt += ' — сразу на ' + batchIds.length + ' сборках';
+        else if (hw) nowTxt += ' — ' + _trimTitle(hw.title || ('Работа #' + hw.id), 34);
+      } else {
+        nowTxt = '🔨 Сейчас работает: ' + _trimTitle(hw.title || ('Работа #' + hw.id), 40) +
+          (batchIds.length > 1 ? ' и ещё ' + (batchIds.length - 1) : '');
+      }
+      descParts.push(nowTxt);
     }
-    if (mains.length) {
-      const t = _trimTitle(mains[0].title || ('Работа #' + mains[0].id), 40);
-      descParts.push('Своя сборка: ' + t +
-        (mains.length > 1 ? ' и ещё ' + (mains.length - 1) : ''));
-    } else if (mainN > 0) {
+    // Остальные работы — без той, что уже названа в «Сейчас»
+    const restMains = mains.filter(x => !hw || x.id !== hwId);
+    const restHelps = helps.filter(x => !hw || x.id !== hwId);
+    if (restMains.length) {
+      const t = _trimTitle(restMains[0].title || ('Работа #' + restMains[0].id), 40);
+      descParts.push((descParts.length ? 'ещё своя сборка: ' : 'Своя сборка: ') + t +
+        (restMains.length > 1 ? ' и ещё ' + (restMains.length - 1) : ''));
+    } else if (!worksList.length && mainN > 0) {
       descParts.push('Своих сборок: ' + mainN);
     }
-    if (helps.length) {
-      if (mains.length || mainN > 0) {
-        descParts.push('помогает ещё в ' + helps.length + ' ' +
-          plural(helps.length, 'работе', 'работах', 'работах'));
+    if (restHelps.length) {
+      if (restMains.length || descParts.length || mainN > 0) {
+        descParts.push('помогает ещё в ' + restHelps.length + ' ' +
+          plural(restHelps.length, 'работе', 'работах', 'работах'));
       } else {
-        const t = _trimTitle(helps[0].title || ('Работа #' + helps[0].id), 40);
+        const t = _trimTitle(restHelps[0].title || ('Работа #' + restHelps[0].id), 40);
         descParts.push('Помогает в сборке: ' + t +
-          (helps.length > 1 ? ' и ещё ' + (helps.length - 1) : ''));
+          (restHelps.length > 1 ? ' и ещё ' + (restHelps.length - 1) : ''));
       }
-    } else if (helpN > 0 && !mains.length && mainN === 0) {
+    } else if (!worksList.length && helpN > 0 && mainN === 0) {
       descParts.push('Помогает в ' + helpN + ' ' + plural(helpN, 'работе', 'работах', 'работах'));
     }
     const descText = (works === 0)
