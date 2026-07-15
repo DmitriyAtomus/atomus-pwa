@@ -2238,6 +2238,17 @@
               oninput="onSupplyOrdSearch(this.value)"
               style="width:100%;box-sizing:border-box;padding:9px 12px 9px 34px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg);">
           </div>
+          <!-- Фильтр по одному дню. Колонка даты — по вкладке: Оплачены→оплата,
+               Получены→поставка, иначе→создание (подпись меняется в setSupplyOrdFilter). -->
+          <div style="margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label for="sup-ord-date" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-light);cursor:pointer;">
+              <i class="ti ti-calendar-event"></i><span id="sup-ord-datelabel">Дата создания</span>
+            </label>
+            <input type="date" id="sup-ord-date" onchange="onSupplyOrdDate(this.value)"
+              style="padding:7px 10px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg);color:var(--text);">
+            <button id="sup-ord-date-clear" onclick="clearSupplyOrdDate()"
+              style="display:none;padding:6px 11px;border:1px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;font-size:13px;color:var(--text-light);"><i class="ti ti-x"></i> сброс</button>
+          </div>
           <!-- v2.45.615: пояснение к текущему статусу-разделу заказов -->
           <div class="sup-ord-desc" id="sup-ord-desc"></div>
           <div id="sup-ord-list" class="sup-list">
