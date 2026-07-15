@@ -19682,6 +19682,14 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .aunit-pill.au-in_stock    { background: #E8F5E9; color: #15803D; }
 .aunit-pill.au-shipped     { background: #E7EEFB; color: #2C5282; }
 .aunit-pill.au-written_off { background: #FFF4E6; color: #B25E00; }
+/* v2.45.758: отметка «этикетка напечатана» */
+.aunit-printed {
+  display: inline-block; margin-left: 6px;
+  font-size: 11px; font-weight: 600; color: var(--text-mid);
+  background: #F1F5F9; border-radius: 999px; padding: 2px 8px;
+  white-space: nowrap;
+}
+.aunit-printed.no { background: transparent; color: var(--text-faint); font-style: italic; padding: 2px 0; }
 
 /* ====== Карточка работы: факт-плитки, команда, описание (v2.45.628) ====== */
 .pwd-facts {

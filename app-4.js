@@ -5491,6 +5491,12 @@ async function submitNetworkPrint() {
       toastMsg += '. Напечатается когда шлюз вернётся на связь';
     }
     showToast(toastMsg, 'success');
+    // v2.45.758: печать этикетки экземпляра — отмечаем «напечатан»,
+    // чтобы в списке было видно, какие QR уже наклеены
+    if (d.type === 'assembly_unit' && d.unitId) {
+      try { await apiPost('/api/assembly-units/mark-printed', { ids: [d.unitId] }); } catch (e) {}
+      if (typeof _unitsRefreshAfterPrint === 'function') _unitsRefreshAfterPrint();
+    }
     closeNetworkPrintModal();
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');

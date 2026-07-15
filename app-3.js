@@ -5086,7 +5086,13 @@ function _renderAssemblyUnitsModal() {
 
   const rows = units.map(u => {
     const label = '№' + d.assembly_id + '-' + u.unit_no;
-    const pill = '<span class="aunit-pill au-' + u.status + '">' + escapeHtml(u.status_label || u.status) + '</span>';
+    const pill = '<span class="aunit-pill au-' + u.status + '">' + escapeHtml(u.status_label || u.status) + '</span>' +
+      // v2.45.758: видно, какая этикетка уже печаталась
+      (u.printed_at
+        ? '<span class="aunit-printed" title="Этикетка напечатана' + (u.printed_count > 1 ? ' (раз: ' + u.printed_count + ')' : '') + '">🖨 ' +
+            escapeHtml(String(u.printed_at).replace('T', ' ').slice(5, 10).split('-').reverse().join('.')) +
+            (u.printed_count > 1 ? ' ×' + u.printed_count : '') + '</span>'
+        : (u.status === 'in_stock' ? '<span class="aunit-printed no">этикетки нет</span>' : ''));
     let sub = '';
     if (u.status === 'shipped') {
       sub = 'отгружен ' + escapeHtml(String(u.shipped_at || '').replace('T', ' ').slice(0, 10)) +
@@ -5128,11 +5134,21 @@ function _renderAssemblyUnitsModal() {
               'Похоже, часть отгрузили без скана — отметь вручную, какие уехали.' +
             '</div>'
           : '') +
-        (inStock.length && (typeof canPrintLabels !== 'function' || canPrintLabels() || true)
-          ? '<button class="btn btn-secondary" style="margin-bottom:10px;" onclick="printAllUnits()">' +
-              '<i class="ti ti-printer"></i> Напечатать все складские (' + inStock.length + ')' +
-            '</button>'
-          : '') +
+        (function () {
+          if (!inStock.length) return '';
+          // v2.45.758: отдельно «новые» (без напечатанной этикетки) и «все»
+          const fresh = inStock.filter(u => !u.printed_at);
+          let b = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">';
+          if (fresh.length) {
+            b += '<button class="btn btn-primary" onclick="printAllUnits(true)">' +
+                   '<i class="ti ti-printer"></i> Напечатать новые (' + fresh.length + ')' +
+                 '</button>';
+          }
+          b += '<button class="btn btn-secondary" onclick="printAllUnits(false)">' +
+                 '<i class="ti ti-printer"></i> Все складские (' + inStock.length + ')' +
+               '</button></div>';
+          return b;
+        })() +
         (rows || '<div class="empty-block" style="padding:16px;"><i class="ti ti-box-off"></i>Экземпляров нет — на складе пусто</div>') +
       '</div>' +
     '</div>';
@@ -5154,19 +5170,23 @@ function showUnitQr(unitId) {
     data: {
       assemblyId: _unitsAsm.assembly_id,
       unitNo: u.unit_no,
+      unitId: u.id,
       modelName: _unitsAsm.model_name || '',
       token: u.public_token,
     },
   });
 }
 
-async function printAllUnits() {
+async function printAllUnits(onlyNew) {
   if (!_unitsAsm) return;
-  const inStock = (_unitsAsm.units || []).filter(u => u.status === 'in_stock');
-  if (!inStock.length) return;
-  if (!confirm('Отправить ' + inStock.length + ' QR-наклеек на термопринтер?\nПо одной на каждый складской экземпляр.')) return;
+  let list = (_unitsAsm.units || []).filter(u => u.status === 'in_stock');
+  if (onlyNew) list = list.filter(u => !u.printed_at);
+  if (!list.length) return;
+  const what = onlyNew ? 'новых (без этикетки)' : 'складских';
+  if (!confirm('Отправить ' + list.length + ' QR-наклеек на термопринтер?\nПо одной на каждый из ' + what + ' экземпляров.')) return;
   let ok = 0, failed = 0;
-  for (const u of inStock) {
+  const printedIds = [];
+  for (const u of list) {
     try {
       const caption = ((_unitsAsm.model_name || 'Сборка') + ' · №' + _unitsAsm.assembly_id + '-' + u.unit_no).slice(0, 80);
       const r = await apiPost('/api/labels/print', {
@@ -5174,10 +5194,25 @@ async function printAllUnits() {
         caption: caption,
         copies: 1,
       });
-      if (r && (r.ok || (r.data && r.data.queue_id))) ok++; else failed++;
+      if (r && (r.ok || (r.data && r.data.queue_id))) { ok++; printedIds.push(u.id); }
+      else failed++;
     } catch (e) { failed++; }
   }
+  // v2.45.758: отмечаем напечатанные — в списке появится «🖨 дата»
+  if (printedIds.length) {
+    try { await apiPost('/api/assembly-units/mark-printed', { ids: printedIds }); } catch (e) {}
+  }
   showToast('📤 В очередь печати: ' + ok + (failed ? ' · ошибок: ' + failed : ''), failed ? 'error' : 'success');
+  _unitsRefreshAfterPrint();
+}
+
+// Перечитать список экземпляров после печати (вызывается и из модалки QR)
+async function _unitsRefreshAfterPrint() {
+  if (!_unitsAsm || !document.getElementById('assembly-units-modal')) return;
+  try {
+    _unitsAsm = await apiGet('/api/assemblies/' + _unitsAsm.assembly_id + '/units');
+    _renderAssemblyUnitsModal();
+  } catch (e) {}
 }
 
 var _unitActionBusy = false;   // защита от двойного тапа (гонка = двойное движение)
@@ -15523,6 +15558,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.758',
+    date: '15.07.2026',
+    title: 'Поштучные QR: видно, что уже напечатано',
+    features: [
+      'У каждого экземпляра отметка: <b>«🖨 15.07»</b> — этикетка напечатана (с датой и счётчиком повторов), или «этикетки нет»',
+      'Кнопка <b>«Напечатать новые (N)»</b> — только блоки без этикетки, ничего не задвоится. «Все складские» — рядом, для перепечатки',
+      'Отметка ставится сама: и при массовой печати, и при печати одного QR через термопринтер',
+    ],
+  },
+
   {
     version: 'v2.45.757',
     date: '15.07.2026',
