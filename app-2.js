@@ -12235,6 +12235,23 @@ async function loadContractShipmentBlock(contractId) {
       html += '<div class="ship-progress-num">' + gDone + ' <span class="total">/ ' + gTotal + '</span></div>';
       html += '</div>';
       html += '<div class="ship-progress-bar"><div class="ship-progress-fill ' + (gComplete ? 'complete' : '') + '" style="width:' + gPct + '%"></div></div>';
+      // v2.45.759: всё уже отгружено — комплектация потеряла смысл.
+      // Вместо кнопок «Собрать по QR»/«Запросить» — спокойная пояснялка
+      // (и «снять запрос», если он ещё висит и уведомляет сборщика).
+      if (isComplete && !gComplete) {
+        html += '<div style="font-size:12.5px;color:var(--text-light);text-align:center;padding:10px 6px 4px;line-height:1.5;">' +
+                  '<i class="ti ti-check"></i> Всё уже отгружено — собирать к отгрузке больше нечего.<br>' +
+                  'Этот шаг нужен <b>до</b> отгрузки: запросил сборку → сборщик скомплектовал по QR → отгрузили.' +
+                '</div>';
+        if (req.requested && typeof canManageSales === 'function' && canManageSales()) {
+          html += '<button onclick="cancelShipmentAssembly(' + contractId + ')" ' +
+            'style="width:100%;margin-top:8px;background:none;border:1px solid var(--border);color:var(--text-mid);' +
+            'padding:9px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;' +
+            'display:flex;align-items:center;justify-content:center;gap:6px;">' +
+            '<i class="ti ti-bell-off"></i> Снять запрос сборки</button>';
+        }
+        html += '</div>';
+      } else {
       // Запрос сборщику — директору/менеджеру продаж
       if (typeof canManageSales === 'function' && canManageSales()) {
         if (req.requested) {
@@ -12269,6 +12286,7 @@ async function loadContractShipmentBlock(contractId) {
           '<i class="ti ti-arrow-back-up"></i> Откатить сборку (' + gDone + ')</button>';
       }
       html += '</div>';
+      }   // конец else (отгрузка не завершена)
     }
 
     // v2.45.312: раздел «К отгрузке» — развёрнутый список единиц отгрузки
