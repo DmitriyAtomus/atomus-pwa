@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.760";
+const APP_VERSION = "v2.45.761";
 const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5754,8 +5754,11 @@ async function pwdStageStopDone(workId, sid) {
 async function pwdStageAdd(workId) {
   const name = prompt('Название этапа — добавится только в эту работу\n(шаблон направления не меняется):', '');
   if (name == null || !name.trim()) return;
+  // v2.45.761: структура чек-листа меняется только со своим паролем
+  const password = prompt('Подтверди свой пароль:', '');
+  if (password == null || !password.trim()) return;
   try {
-    const r = await apiPost('/api/production/works/' + workId + '/stages', { name: name.trim() });
+    const r = await apiPost('/api/production/works/' + workId + '/stages', { name: name.trim(), password: password.trim() });
     if (r && r.ok) showToast('Этап добавлен', 'success');
     else showToast(((r && r.data) || {}).message || 'Не удалось добавить', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
@@ -5777,9 +5780,11 @@ async function pwdStageRename(workId, sid) {
 async function pwdStageDelete(workId, sid) {
   const c = window._pwdStagesCache || {};
   const st = (c.items || []).find(x => x.id === sid);
-  if (!confirm('Убрать этап «' + ((st && st.name) || '') + '» из этой работы?\nЧасы в журнале сохранятся.')) return;
+  // v2.45.761: убрать этап можно только подтвердив свой пароль
+  const password = prompt('Убрать этап «' + ((st && st.name) || '') + '» из этой работы?\nЧасы в журнале сохранятся.\n\nПодтверди свой пароль:', '');
+  if (password == null || !password.trim()) return;
   try {
-    await apiDelete('/api/production/work-stages/' + sid);
+    await apiDelete('/api/production/work-stages/' + sid, { password: password.trim() });
     showToast('Этап убран', 'success');
   } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
   _pwdStagesRefreshCard(workId);
