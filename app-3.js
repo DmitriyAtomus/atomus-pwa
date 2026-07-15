@@ -4890,6 +4890,12 @@ function showAssemblyStockModal(d) {
           '<button class="btn-icon-qr" onclick="showAssemblyQr(' + a.id + ', ' + qrModelName + ', ' + qrArticle + ', ' + qrDate + ')" title="QR-код сборки">' +
             '<i class="ti ti-qrcode"></i> QR' +
           '</button>' +
+          // v2.45.757: поштучные QR — у каждого физического блока свой код и статус
+          ((a.work_type === 'assembly' || !a.work_type)
+            ? '<button class="btn-icon-qr" style="background: #EEF2FF; color: #4338CA;" onclick="openAssemblyUnitsModal(' + a.id + ')" title="QR на каждую штуку — со статусом отгрузки">' +
+                '<i class="ti ti-stack-2"></i> Поштучно' +
+              '</button>'
+            : '') +
           '<button class="btn-icon-qr" style="background: #FFF4E6; color: #B25E00;" onclick="openDefectFormForAssembly(' + a.id + ')" title="Добавить замечание">' +
             '<i class="ti ti-alert-circle"></i> Доработка' +
           '</button>' +
@@ -5030,6 +5036,252 @@ async function promptWriteOff(assemblyId, currentStock) {
   } catch (e) {
     showToast('Ошибка соединения', 'error');
     return false;
+  }
+}
+
+// ============ v2.45.757: экземпляры сборки — поштучные QR ============
+// Один физический блок = один QR со своим статусом («на складе»/«отгружен»/
+// «списан»). Отгрузка экземпляра делает движение −1 — остаток сходится сам.
+
+var _unitsAsm = null;   // данные открытой модалки экземпляров
+
+async function openAssemblyUnitsModal(assemblyId) {
+  let d;
+  try {
+    d = await apiGet('/api/assemblies/' + assemblyId + '/units');
+  } catch (e) {
+    showToast('Не удалось загрузить экземпляры', 'error');
+    return;
+  }
+  _unitsAsm = d;
+  let m = document.getElementById('assembly-units-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'assembly-units-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) closeAssemblyUnitsModal(); };
+  document.body.appendChild(m);
+  _renderAssemblyUnitsModal();
+}
+
+function closeAssemblyUnitsModal() {
+  const m = document.getElementById('assembly-units-modal');
+  if (m) m.remove();
+  // обновляем карточку сборки под модалкой (остаток мог измениться)
+  if (_unitsAsm && _unitsAsm.assembly_id) {
+    cache.warehouseStock = null;
+    openAssemblyStock(_unitsAsm.assembly_id);
+  }
+  _unitsAsm = null;
+}
+
+function _renderAssemblyUnitsModal() {
+  const m = document.getElementById('assembly-units-modal');
+  if (!m || !_unitsAsm) return;
+  const d = _unitsAsm;
+  const canManage = (typeof canManageAssemblies === 'function') ? canManageAssemblies() : false;
+  const units = d.units || [];
+  const inStock = units.filter(u => u.status === 'in_stock');
+  const mismatch = d.stock_qty !== inStock.length;
+
+  const rows = units.map(u => {
+    const label = '№' + d.assembly_id + '-' + u.unit_no;
+    const pill = '<span class="aunit-pill au-' + u.status + '">' + escapeHtml(u.status_label || u.status) + '</span>';
+    let sub = '';
+    if (u.status === 'shipped') {
+      sub = 'отгружен ' + escapeHtml(String(u.shipped_at || '').replace('T', ' ').slice(0, 10)) +
+        (u.shipped_contract_number ? ' · ' + escapeHtml(u.shipped_contract_number) : '');
+    } else if (u.status === 'written_off' && u.status_comment) {
+      sub = escapeHtml(u.status_comment);
+    }
+    let acts = '<button class="btn btn-secondary btn-small" onclick="showUnitQr(' + u.id + ')" title="QR экземпляра"><i class="ti ti-qrcode"></i></button>';
+    if (canManage) {
+      if (u.status === 'in_stock') {
+        acts += '<button class="btn btn-primary btn-small" onclick="unitAction(' + u.id + ', \'ship\')"><i class="ti ti-truck-delivery"></i> Отгрузить</button>' +
+                '<button class="btn btn-secondary btn-small" onclick="unitAction(' + u.id + ', \'writeoff\')" title="Списать"><i class="ti ti-trash"></i></button>';
+      } else {
+        acts += '<button class="btn btn-secondary btn-small" onclick="unitAction(' + u.id + ', \'return\')"><i class="ti ti-arrow-back-up"></i> Вернуть</button>';
+      }
+    }
+    return '<div class="aunit-row">' +
+      '<div class="aunit-no">' + label + '</div>' +
+      '<div class="aunit-mid">' + pill + (sub ? '<div class="aunit-sub">' + sub + '</div>' : '') + '</div>' +
+      '<div class="aunit-acts">' + acts + '</div>' +
+    '</div>';
+  }).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;max-height:86vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-stack-2"></i> Поштучные QR · ' + escapeHtml(d.model_name || ('Сборка #' + d.assembly_id)) + '</h3>' +
+        '<button class="modal-close" onclick="closeAssemblyUnitsModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content" style="overflow-y:auto;">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;line-height:1.5;">' +
+          'У каждого блока свой QR: наклей — и по скану всегда видно, этот экземпляр ' +
+          '<b>на складе</b> или уже <b>отгружен</b> (когда и по какому договору). ' +
+          'Отгрузка экземпляра снимает 1 шт с остатка.' +
+        '</div>' +
+        (mismatch
+          ? '<div style="background:#FFF4E6;border:1px solid #F0C36D;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12.5px;color:#8a6d3b;">' +
+              '<i class="ti ti-alert-triangle"></i> Остаток сборки — <b>' + d.stock_qty + ' шт.</b>, а экземпляров «на складе» — <b>' + inStock.length + '</b>. ' +
+              'Похоже, часть отгрузили без скана — отметь вручную, какие уехали.' +
+            '</div>'
+          : '') +
+        (inStock.length && (typeof canPrintLabels !== 'function' || canPrintLabels() || true)
+          ? '<button class="btn btn-secondary" style="margin-bottom:10px;" onclick="printAllUnits()">' +
+              '<i class="ti ti-printer"></i> Напечатать все складские (' + inStock.length + ')' +
+            '</button>'
+          : '') +
+        (rows || '<div class="empty-block" style="padding:16px;"><i class="ti ti-box-off"></i>Экземпляров нет — на складе пусто</div>') +
+      '</div>' +
+    '</div>';
+}
+
+function _unitByIdLocal(unitId) {
+  return ((_unitsAsm && _unitsAsm.units) || []).find(u => u.id === unitId);
+}
+
+function showUnitQr(unitId) {
+  const u = _unitByIdLocal(unitId);
+  if (!u || !_unitsAsm) return;
+  const url = window.location.origin + '/u/' + u.public_token;
+  openQrModal({
+    title: 'QR · ' + (_unitsAsm.model_name || 'Сборка #' + _unitsAsm.assembly_id) + ' · №' + _unitsAsm.assembly_id + '-' + u.unit_no,
+    subtitle: 'Экземпляр ' + u.unit_no + ' из ' + (_unitsAsm.units || []).length + ' · скан покажет: на складе или отгружен',
+    url: url,
+    type: 'assembly_unit',
+    data: {
+      assemblyId: _unitsAsm.assembly_id,
+      unitNo: u.unit_no,
+      modelName: _unitsAsm.model_name || '',
+      token: u.public_token,
+    },
+  });
+}
+
+async function printAllUnits() {
+  if (!_unitsAsm) return;
+  const inStock = (_unitsAsm.units || []).filter(u => u.status === 'in_stock');
+  if (!inStock.length) return;
+  if (!confirm('Отправить ' + inStock.length + ' QR-наклеек на термопринтер?\nПо одной на каждый складской экземпляр.')) return;
+  let ok = 0, failed = 0;
+  for (const u of inStock) {
+    try {
+      const caption = ((_unitsAsm.model_name || 'Сборка') + ' · №' + _unitsAsm.assembly_id + '-' + u.unit_no).slice(0, 80);
+      const r = await apiPost('/api/labels/print', {
+        qr_url: window.location.origin + '/u/' + u.public_token,
+        caption: caption,
+        copies: 1,
+      });
+      if (r && (r.ok || (r.data && r.data.queue_id))) ok++; else failed++;
+    } catch (e) { failed++; }
+  }
+  showToast('📤 В очередь печати: ' + ok + (failed ? ' · ошибок: ' + failed : ''), failed ? 'error' : 'success');
+}
+
+var _unitActionBusy = false;   // защита от двойного тапа (гонка = двойное движение)
+
+async function unitAction(unitId, action) {
+  if (_unitActionBusy) return;
+  const u = _unitByIdLocal(unitId);
+  const label = _unitsAsm ? ('№' + _unitsAsm.assembly_id + '-' + (u ? u.unit_no : '?')) : '';
+  let comment = null;
+  if (action === 'ship' && !confirm('Отгрузить экземпляр ' + label + '? С остатка спишется 1 шт.')) return;
+  if (action === 'writeoff') {
+    comment = prompt('Причина списания экземпляра ' + label + ':');
+    if (comment === null) return;
+    if (!comment.trim()) { showToast('Без причины списать нельзя', 'error'); return; }
+  }
+  if (action === 'return' && !confirm('Вернуть экземпляр ' + label + ' на склад? Остаток +1 шт.')) return;
+  _unitActionBusy = true;
+  try {
+    const r = await apiPost('/api/assembly-units/' + unitId + '/action',
+      Object.assign({ action: action }, comment ? { comment: comment.trim() } : {}));
+    const data = (r && r.data) || r || {};
+    if (r && r.ok === false) {
+      showToast(data.message || 'Не получилось', 'error');
+      return;
+    }
+    showToast(action === 'ship' ? 'Отгружен · остаток ' + data.stock_qty + ' шт.'
+      : action === 'writeoff' ? 'Списан · остаток ' + data.stock_qty + ' шт.'
+      : 'Вернулся на склад · остаток ' + data.stock_qty + ' шт.', 'success');
+    cache.warehouseStock = null;
+    cache.warehouseMovements = null;
+    // перечитываем список экземпляров на месте
+    try {
+      _unitsAsm = await apiGet('/api/assemblies/' + _unitsAsm.assembly_id + '/units');
+      _renderAssemblyUnitsModal();
+    } catch (e) { closeAssemblyUnitsModal(); }
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  } finally {
+    _unitActionBusy = false;
+  }
+}
+
+// Карточка экземпляра после скана (сотрудник сканирует наклейку на блоке)
+function openUnitScanModal(info) {
+  let m = document.getElementById('unit-scan-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'unit-scan-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const canManage = (typeof canManageAssemblies === 'function') ? canManageAssemblies() : false;
+  const pill = '<span class="aunit-pill au-' + info.status + '" style="font-size:14px;padding:6px 14px;">' + escapeHtml(info.status_label || info.status) + '</span>';
+  const shippedLine = info.status === 'shipped'
+    ? '<div style="font-size:13px;color:var(--text-mid);margin-top:8px;">Отгружен ' +
+        escapeHtml(String(info.shipped_at || '').replace('T', ' ').slice(0, 10)) +
+        (info.shipped_contract_number ? ' · договор ' + escapeHtml(info.shipped_contract_number) : '') + '</div>'
+    : '';
+  let acts = '';
+  if (canManage) {
+    if (info.status === 'in_stock') {
+      acts += '<button class="btn btn-primary" onclick="unitScanAction(' + info.id + ', \'ship\', ' + info.assembly_id + ')"><i class="ti ti-truck-delivery"></i> Отгрузить этот блок</button>';
+    } else {
+      acts += '<button class="btn btn-secondary" onclick="unitScanAction(' + info.id + ', \'return\', ' + info.assembly_id + ')"><i class="ti ti-arrow-back-up"></i> Вернуть на склад</button>';
+    }
+  }
+  acts += '<button class="btn btn-secondary" onclick="document.getElementById(\'unit-scan-modal\').remove();selectSection(\'warehouse\');selectSidebarItem(\'warehouse-stock\');setTimeout(() => openAssemblyStock(' + info.assembly_id + '), 200)"><i class="ti ti-package"></i> Открыть сборку</button>';
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-box"></i> ' + escapeHtml(info.name || 'Экземпляр') + '</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'unit-scan-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div style="text-align:center;padding:10px 0 4px;">' + pill + shippedLine + '</div>' +
+        (info.contract_number
+          ? '<div style="font-size:13px;color:var(--text-mid);text-align:center;margin-top:4px;">Резерв: ' + escapeHtml(info.contract_number) + (info.contractor_name ? ' · ' + escapeHtml(info.contractor_name) : '') + '</div>'
+          : '') +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px;">' + acts + '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+async function unitScanAction(unitId, action, assemblyId) {
+  if (_unitActionBusy) return;
+  if (action === 'ship' && !confirm('Отгрузить этот блок? С остатка спишется 1 шт.')) return;
+  if (action === 'return' && !confirm('Вернуть блок на склад? Остаток +1 шт.')) return;
+  _unitActionBusy = true;
+  try {
+    const r = await apiPost('/api/assembly-units/' + unitId + '/action', { action: action });
+    const data = (r && r.data) || r || {};
+    if (r && r.ok === false) {
+      showToast(data.message || 'Не получилось', 'error');
+      return;
+    }
+    showToast((action === 'ship' ? '📦 Отгружен' : '↩️ На складе') + ' · остаток ' + data.stock_qty + ' шт.', 'success');
+    const m = document.getElementById('unit-scan-modal');
+    if (m) m.remove();
+    cache.warehouseStock = null;
+    cache.warehouseMovements = null;
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка', 'error');
+  } finally {
+    _unitActionBusy = false;
   }
 }
 
@@ -15229,6 +15481,19 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.757',
+    date: '15.07.2026',
+    title: 'Поштучные QR на готовую продукцию',
+    features: [
+      'В карточке сборки (Склад → Готовая продукция) — кнопка <b>«Поштучно»</b>: у каждого физического блока свой QR-код №112-1, №112-2… Печать по одному или всех сразу',
+      'Скан наклейки честно говорит: <b>«НА СКЛАДЕ»</b> или <b>«ОТГРУЖЕН 20.07 · №12АГ/05.26»</b> — больше не спутаешь, какой из четырёх блоков уехал',
+      'Отгрузка сканом: мастер сканирует конкретный блок → «Отгрузить этот блок» → с остатка списывается ровно 1 шт. Списание и возврат — так же',
+      'Остаток сходится сам: каждое действие с экземпляром — обычное движение в журнале склада',
+      'Публичная страница экземпляра (/u/…) — с тем же паролем, что у сборки; для сервиса и рекламаций по коду на блоке видно договор и дату отгрузки',
+    ],
+  },
+
   {
     version: 'v2.45.756',
     date: '15.07.2026',
