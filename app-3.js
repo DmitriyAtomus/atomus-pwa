@@ -5180,7 +5180,10 @@ async function printAllUnits() {
   showToast('📤 В очередь печати: ' + ok + (failed ? ' · ошибок: ' + failed : ''), failed ? 'error' : 'success');
 }
 
+var _unitActionBusy = false;   // защита от двойного тапа (гонка = двойное движение)
+
 async function unitAction(unitId, action) {
+  if (_unitActionBusy) return;
   const u = _unitByIdLocal(unitId);
   const label = _unitsAsm ? ('№' + _unitsAsm.assembly_id + '-' + (u ? u.unit_no : '?')) : '';
   let comment = null;
@@ -5191,6 +5194,7 @@ async function unitAction(unitId, action) {
     if (!comment.trim()) { showToast('Без причины списать нельзя', 'error'); return; }
   }
   if (action === 'return' && !confirm('Вернуть экземпляр ' + label + ' на склад? Остаток +1 шт.')) return;
+  _unitActionBusy = true;
   try {
     const r = await apiPost('/api/assembly-units/' + unitId + '/action',
       Object.assign({ action: action }, comment ? { comment: comment.trim() } : {}));
@@ -5211,6 +5215,8 @@ async function unitAction(unitId, action) {
     } catch (e) { closeAssemblyUnitsModal(); }
   } catch (e) {
     showToast((e && e.message) || 'Ошибка', 'error');
+  } finally {
+    _unitActionBusy = false;
   }
 }
 
@@ -5256,8 +5262,10 @@ function openUnitScanModal(info) {
 }
 
 async function unitScanAction(unitId, action, assemblyId) {
+  if (_unitActionBusy) return;
   if (action === 'ship' && !confirm('Отгрузить этот блок? С остатка спишется 1 шт.')) return;
   if (action === 'return' && !confirm('Вернуть блок на склад? Остаток +1 шт.')) return;
+  _unitActionBusy = true;
   try {
     const r = await apiPost('/api/assembly-units/' + unitId + '/action', { action: action });
     const data = (r && r.data) || r || {};
@@ -5272,6 +5280,8 @@ async function unitScanAction(unitId, action, assemblyId) {
     cache.warehouseMovements = null;
   } catch (e) {
     showToast((e && e.message) || 'Ошибка', 'error');
+  } finally {
+    _unitActionBusy = false;
   }
 }
 
@@ -15471,6 +15481,19 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.757',
+    date: '15.07.2026',
+    title: 'Поштучные QR на готовую продукцию',
+    features: [
+      'В карточке сборки (Склад → Готовая продукция) — кнопка <b>«Поштучно»</b>: у каждого физического блока свой QR-код №112-1, №112-2… Печать по одному или всех сразу',
+      'Скан наклейки честно говорит: <b>«НА СКЛАДЕ»</b> или <b>«ОТГРУЖЕН 20.07 · №12АГ/05.26»</b> — больше не спутаешь, какой из четырёх блоков уехал',
+      'Отгрузка сканом: мастер сканирует конкретный блок → «Отгрузить этот блок» → с остатка списывается ровно 1 шт. Списание и возврат — так же',
+      'Остаток сходится сам: каждое действие с экземпляром — обычное движение в журнале склада',
+      'Публичная страница экземпляра (/u/…) — с тем же паролем, что у сборки; для сервиса и рекламаций по коду на блоке видно договор и дату отгрузки',
+    ],
+  },
+
   {
     version: 'v2.45.756',
     date: '15.07.2026',
