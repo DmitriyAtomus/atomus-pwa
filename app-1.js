@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.747";
-const APP_VERSION_DATE = "13.07.2026";
+const APP_VERSION = "v2.45.753";
+const APP_VERSION_DATE = "15.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -4048,17 +4048,17 @@ function renderPkbWorkload(workload) {
   html +=   '<div class="pkb-workload-head">';
   html +=     '<div class="pkb-workload-title">Загрузка сборщиков ' +
                 '<i class="ti ti-info-circle pkb-workload-info" title="Как считается:&#10;' +
-                '• Главные работы (сотрудник — assignee) + работы где он соисполнитель.&#10;' +
-                '• Часы из поля «расч. часы» каждой работы.&#10;' +
-                '• Если «расч. часы» не указаны — берётся оценка по ' + defHrs + 'ч на работу.&#10;' +
-                '• Тильда (~) рядом со значением означает что часы оценочные.&#10;' +
-                '• Норма ' + norm + 'ч/неделю. Чтобы получить точные часы — заполните «расч. часы» в карточке работы."></i>' +
+                '• Один прямоугольник на шкале — одна работа. Тёмный — своя сборка, светлый — помощь, красный — сверх нормы.&#10;' +
+                '• Норма — до 2 работ одновременно: 1–2 работы — «норма», 3 и больше — «перегруз», 0 — «свободен».&#10;' +
+                '• Часы справа — сумма по работам: факт из журнала, иначе «расч. часы», иначе оценка ' + defHrs + 'ч на работу.&#10;' +
+                '• Тильда (~) — значит часы оценочные. Точнее будет, если заполнить «расч. часы» в карточке работы."></i>' +
               '</div>';
-  html +=     '<span class="pkb-wl-legend"><span><i class="pkb-wl-sw sw-main"></i>основная</span>' +
+  html +=     '<span class="pkb-wl-legend"><span><i class="pkb-wl-sw sw-main"></i>своя сборка</span>' +
                 '<span><i class="pkb-wl-sw sw-help"></i>помощь</span>' +
-                '<span><i class="pkb-wl-sw sw-over"></i>сверх нормы</span></span>';
-  html +=     '<div class="pkb-workload-norm" title="Норма ' + norm + 'ч в неделю. Работы без указанных часов считаются по ' + defHrs + 'ч.">' +
-                'норма ' + norm + 'ч / неделю' +
+                '<span><i class="pkb-wl-sw sw-over"></i>сверх нормы</span>' +
+                '<span><i class="pkb-wl-sw sw-free"></i>свободный слот</span></span>';
+  html +=     '<div class="pkb-workload-norm" title="1–2 работы одновременно — норма, 3 и больше — перегруз. Часы (~' + norm + 'ч/нед) — справочно.">' +
+                'норма — до 2 работ' +
               '</div>';
   // v2.45.84: запуск «батч-помощи» (один сотрудник одной операцией на N работ)
   html +=     '<button class="btn btn-secondary btn-small" onclick="openHelperBatchModal()" ' +
@@ -4085,67 +4085,93 @@ function renderPkbWorkload(workload) {
       (status === 'normal')     ? 'норма'    :
       (works === 0)             ? 'свободен' : 'недогруз';
 
-    // v2.43.91: вместо «помогает 1 работа» показываем чем именно занят —
-    // название первой работы (helping_now вперёд по сортировке с бэка) + счётчик
-    // остальных. Полный список с ролями уходит в title для всплывающей подсказки.
-    // v2.43.97: часы из подписи убраны — они теперь на самих карточках канбана.
+    // v2.45.748: редизайн строки — раньше внутри полоски был сокращённый текст
+    // («помогает: Модель +2») поверх сегментов со штриховкой, это путало.
+    // Теперь: шкала = «слоты работ» (один прямоугольник — одна работа: тёмный —
+    // своя сборка, светлый — помощь, красный — сверх нормы, т.е. 3-я и дальше),
+    // а «чем занят» — отдельной строкой обычными словами.
     const worksList = w.works || [];
-    const primary = worksList[0];
-    const restCount = Math.max(0, worksList.length - 1);
     function _trimTitle(s, n) {
       s = String(s || '').trim();
       return s.length > n ? s.slice(0, n - 1) + '…' : s;
     }
-    let barText;
-    // v2.45.87: если сотрудник помечен «помогает сейчас» и есть описание
-    // операции (helping_note), показываем сначала «🔨 что делает»
     const helpingNote = (w.helping_note || '').trim();
     const batchIds = w.helping_batch_work_ids || [];
-    if (works === 0) {
-      barText = 'нет работ';
-    } else if (helpingNow && helpingNote) {
-      // Шапка с операцией + сколько сборок в батче (если батч)
-      const bSuffix = batchIds.length > 1 ? ' ×' + batchIds.length : '';
-      const tailModel = primary ? (' · ' + _trimTitle(primary.title || '', 18)) : '';
-      barText = '🔨 ' + _trimTitle(helpingNote, 24) + bSuffix + tailModel;
-    } else if (primary && primary.title) {
-      const prefix = (primary.role === 'help' && mainN === 0) ? 'помогает: ' : '';
-      const tail = restCount > 0 ? ' +' + restCount : '';
-      barText = prefix + _trimTitle(primary.title, 28) + tail;
-    } else if (helpN > 0 && mainN > 0) {
-      barText = mainN + ' гл. + ' + helpN + ' пом.';
-    } else if (helpN > 0) {
-      barText = 'помогает ' + helpN + ' ' + plural(helpN, 'работа', 'работы', 'работ');
-    } else {
-      barText = mainN + ' ' + plural(mainN, 'работа', 'работы', 'работ');
+    const mains = worksList.filter(x => x.role !== 'help');
+    const helps = worksList.filter(x => x.role === 'help');
+
+    // Строка «чем занят» — без сокращений и загадочных «+2»
+    const descParts = [];
+    if (helpingNow && helpingNote) {
+      descParts.push('🔨 Сейчас: ' + _trimTitle(helpingNote, 40) +
+        (batchIds.length > 1 ? ' — сразу на ' + batchIds.length + ' сборках' : ''));
     }
-    // Tooltip с полным списком работ
-    let barTooltip;
-    if (works === 0) {
-      barTooltip = 'Активных работ нет';
-    } else if (worksList.length) {
-      const lines = worksList.map(x => {
-        const role = x.role === 'help' ? '(помощь) ' : '';
-        return '• ' + role + (x.title || ('Работа #' + x.id));
-      });
-      const opLine = helpingNote
-        ? 'Прямо сейчас: ' + helpingNote +
-          (batchIds.length > 1 ? ' (батч ×' + batchIds.length + ')' : '') + '\n'
-        : '';
-      barTooltip = opLine + lines.join('\n') + (isEstimated
-        ? '\nЧасы оценочные: ' + defHrs + 'ч на работу без указанного времени.'
-        : '');
-    } else {
-      const parts = [];
-      if (mainN > 0) parts.push('Главный по ' + mainN + ' ' + plural(mainN, 'работе', 'работам', 'работам'));
-      if (helpN > 0) parts.push('Помогает ещё ' + helpN);
-      barTooltip = parts.join('. ') + (isEstimated
-        ? '. Часы оценочные: ' + defHrs + 'ч на работу без указанного времени.'
-        : '');
+    if (mains.length) {
+      const t = _trimTitle(mains[0].title || ('Работа #' + mains[0].id), 40);
+      descParts.push('Своя сборка: ' + t +
+        (mains.length > 1 ? ' и ещё ' + (mains.length - 1) : ''));
+    } else if (mainN > 0) {
+      descParts.push('Своих сборок: ' + mainN);
+    }
+    if (helps.length) {
+      if (mains.length || mainN > 0) {
+        descParts.push('помогает ещё в ' + helps.length + ' ' +
+          plural(helps.length, 'работе', 'работах', 'работах'));
+      } else {
+        const t = _trimTitle(helps[0].title || ('Работа #' + helps[0].id), 40);
+        descParts.push('Помогает в сборке: ' + t +
+          (helps.length > 1 ? ' и ещё ' + (helps.length - 1) : ''));
+      }
+    } else if (helpN > 0 && !mains.length && mainN === 0) {
+      descParts.push('Помогает в ' + helpN + ' ' + plural(helpN, 'работе', 'работах', 'работах'));
+    }
+    const descText = (works === 0)
+      ? 'Активных работ нет'
+      : (descParts.join(' · ') || (works + ' ' + plural(works, 'работа', 'работы', 'работ')));
+
+    // Слоты работ: до нормы (2 работы) и сверх неё. Если бэк не прислал список
+    // работ — строим слоты по счётчикам mainN/helpN.
+    const NORM_WORKS = 2;
+    const MAX_SLOTS = 6;
+    let slotWorks = worksList.slice();
+    if (!slotWorks.length && works > 0) {
+      for (let i = 0; i < mainN; i++) slotWorks.push({ role: 'main' });
+      for (let i = 0; i < helpN; i++) slotWorks.push({ role: 'help' });
+    }
+    const shownSlots = Math.min(slotWorks.length, MAX_SLOTS);
+    let slotsHtml = '';
+    for (let i = 0; i < shownSlots; i++) {
+      const x = slotWorks[i];
+      const isOver = i >= NORM_WORKS;
+      const cls = isOver ? 'over' : (x.role === 'help' ? 'help' : 'main');
+      const roleTxt = (x.role === 'help' ? 'помощь' : 'своя сборка') +
+        (isOver ? ' · сверх нормы' : '');
+      const tt = (x.title || ('Работа #' + (x.id || (i + 1)))) + ' — ' + roleTxt +
+        (x.id ? '. Нажми, чтобы открыть.' : '');
+      slotsHtml += '<span class="pkb-wl-slot ' + cls + '" title="' + escapeHtml(tt) + '"' +
+        (x.id ? ' onclick="event.stopPropagation();openProductionWorkDetail(' + x.id + ')"' : '') +
+        '></span>';
+      if (i === NORM_WORKS - 1) {
+        slotsHtml += '<span class="pkb-wl-slot-norm" title="Норма — до ' + NORM_WORKS + ' работ одновременно"></span>';
+      }
+    }
+    if (slotWorks.length > shownSlots) {
+      slotsHtml += '<span class="pkb-wl-slot over more" title="И ещё ' + (slotWorks.length - shownSlots) +
+        ' сверх нормы">+' + (slotWorks.length - shownSlots) + '</span>';
+    }
+    // Пустые слоты до нормы — видно, сколько работ человеку ещё можно дать
+    for (let i = shownSlots; i < NORM_WORKS; i++) {
+      slotsHtml += '<span class="pkb-wl-slot free" title="Свободный слот — можно дать работу"></span>';
+      if (i === NORM_WORKS - 1) {
+        slotsHtml += '<span class="pkb-wl-slot-norm" title="Норма — до ' + NORM_WORKS + ' работ одновременно"></span>';
+      }
     }
 
-    const fillWidth = Math.min(100, pct);
-    const barEmptyCls = (works === 0) ? ' empty' : '';
+    const statusTitle =
+      (status === 'overloaded') ? 'Перегруз: больше ' + NORM_WORKS + ' работ одновременно (сейчас ' + works + ')' :
+      (status === 'normal')     ? 'Норма: 1–' + NORM_WORKS + ' работы одновременно' :
+      (works === 0)             ? 'Нет активных работ — можно дать сборку' :
+                                  'Загружен меньше нормы — можно догрузить';
     const avatarColorIdx = ((w.employee_id || 0) % 8);
     // v2.43.47: бейдж «сейчас» если сотрудник помечен helping_now_work_id
     // v2.43.51: бейдж кликабельный — открывает текущую работу
@@ -4168,19 +4194,6 @@ function renderPkbWorkload(workload) {
         '</button>'
       : '';
 
-    // v2.45.627: сегментная шкала — тёмное «основная», светлое «помощь» (по долям
-    // работ), штриховка — сверх нормы. Шкала до 130% нормы, риска нормы на 100%.
-    const SCALE = 130;
-    const clamped = Math.min(pct, SCALE);
-    const withinNorm = Math.min(clamped, 100);
-    const overPart = Math.max(0, clamped - 100);
-    const mainShare = works > 0 ? (mainN / works) : 1;
-    const wMain = (withinNorm * mainShare) / SCALE * 100;
-    const wHelp = (withinNorm * (1 - mainShare)) / SCALE * 100;
-    const wOver = overPart / SCALE * 100;
-    const normPos = 100 / SCALE * 100;
-    // Свободные часы до нормы — кому отдать работу из очереди
-    const freeHrs = Math.max(0, norm - hours);
     const hrsPrefix = isEstimated ? '~' : '';
     const clickAttr = ' onclick="pkbSetFilter(\'assignee\', ' + w.employee_id + ', ' + JSON.stringify(name).replace(/"/g, '&quot;') + ')"';
     const isFiltered = _pkbFilter && _pkbFilter.type === 'assignee' && _pkbFilter.id === w.employee_id;
@@ -4188,23 +4201,20 @@ function renderPkbWorkload(workload) {
     html += '<div class="pkb-wl-row' + (isFiltered ? ' pkb-wl-row-active' : '') + '" data-employee-id="' + w.employee_id + '"' + clickAttr +
       ' style="cursor:pointer;" title="' + escapeHtml((w.full_name || name) + ' — нажми, чтобы показать на доске только его работы') + '">';
     html +=   '<div class="pkb-wl-avatar ac-' + avatarColorIdx + '">' + escapeHtml(initials) + '</div>';
-    html +=   '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + stopBtn + '</div>';
-    html +=   '<div class="pkb-wl-bar' + barEmptyCls + '" title="' + escapeHtml(barTooltip) + '">';
-    if (works > 0) {
-      html += '<div class="pkb-wl-seg pkb-wl-seg-main" style="left:0;width:' + wMain.toFixed(1) + '%;"></div>';
-      if (wHelp > 0.5) html += '<div class="pkb-wl-seg pkb-wl-seg-help" style="left:' + wMain.toFixed(1) + '%;width:' + wHelp.toFixed(1) + '%;"></div>';
-      if (wOver > 0.5) html += '<div class="pkb-wl-seg pkb-wl-seg-over" style="left:' + (wMain + wHelp).toFixed(1) + '%;width:' + wOver.toFixed(1) + '%;"></div>';
-    }
-    html +=   '<div class="pkb-wl-norm-line" style="left:' + normPos.toFixed(1) + '%;" title="Норма загрузки (2 работы / ' + norm + 'ч в неделю)"></div>';
-    html +=   '<div class="pkb-wl-bar-text">' + escapeHtml(barText) + '</div>';
+    html +=   '<div class="pkb-wl-body">';
+    html +=     '<div class="pkb-wl-top">';
+    html +=       '<div class="pkb-wl-name"><span class="pkb-wl-name-text">' + escapeHtml(name) + '</span>' + nowBadge + stopBtn + '</div>';
+    html +=       '<div class="pkb-wl-right">' +
+                    '<span class="pkb-wl-cnt">' + (works ? works + ' ' + plural(works, 'работа', 'работы', 'работ') : 'нет работ') + '</span>' +
+                    (works ? '<span class="pkb-wl-hrs" title="' + (isEstimated
+                        ? 'Часы оценочные: где время не указано — считается по ' + defHrs + 'ч на работу'
+                        : 'Часы по журналу/расчёту') + '">' + hrsPrefix + formatHours(hours) + 'ч</span>' : '') +
+                    '<span class="pkb-wl-status s-' + status + '" title="' + escapeHtml(statusTitle) + '">' + escapeHtml(statusLabel) + '</span>' +
+                  '</div>';
+    html +=     '</div>';
+    html +=     '<div class="pkb-wl-slots">' + slotsHtml + '</div>';
+    html +=     '<div class="pkb-wl-desc">' + escapeHtml(descText) + '</div>';
     html +=   '</div>';
-    html +=   '<div class="pkb-wl-right">' +
-                '<span class="pkb-wl-hrs" title="' + (isEstimated ? 'Часы оценочные' : 'Часы по журналу/расчёту') + '">' + hrsPrefix + formatHours(hours) + 'ч</span>' +
-                '<span class="pkb-wl-status s-' + status + '">' + escapeHtml(statusLabel) + '</span>' +
-                ((status === 'undersized' && works >= 0 && freeHrs > 0)
-                  ? '<span class="pkb-wl-free" title="Сколько часов можно догрузить до нормы">свободен ~' + formatHours(freeHrs) + 'ч</span>'
-                  : '') +
-              '</div>';
     html += '</div>';
   });
 
