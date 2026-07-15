@@ -4710,7 +4710,8 @@ function renderPkbWorkCard(w, colKey) {
   }
 
   // v2.45.703: быстрый старт таймера «Мой день» (очередь и в работе)
-  if (colKey === 'queue' || colKey === 'in_progress') {
+  // v2.45.748: + упаковка — кнопка «Начать» и на карточках упаковки
+  if (colKey === 'queue' || colKey === 'in_progress' || colKey === 'packing') {
     html += '<button class="pkb-wc-startbtn" onclick="event.stopPropagation();openMyDayStart(' + w.id + ')" title="Начать работу — таймер «Мой день»"><i class="ti ti-player-play"></i> Начать</button>';
   }
 
