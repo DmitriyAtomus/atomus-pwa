@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.763";
-const APP_VERSION_DATE = "15.07.2026";
+const APP_VERSION = "v2.45.764";
+const APP_VERSION_DATE = "17.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1390,6 +1390,21 @@ function canSeeMoney() {
       || r.includes('accountant') || r.includes('engineer');
 }
 
+// v2.45.764: «чистый» монтажник — есть installation.view и ни одного офисного
+// права. Ему доступен только раздел «Монтаж» (+ Помощь): рельса, табы и
+// selectSection это учитывают.
+const _INSTALLER_OFFICE_PERMS = [
+  'home.view_activity', 'home.view_finance_kpi',
+  'production.view', 'sales.view', 'warehouse.view', 'logistics.view',
+  'supply.view', 'defects.view', 'tasks.view_all',
+  'hr.view_vacations', 'hr.create_vacations', 'hr.manage_employees',
+  'hr.manage_positions', 'hr.manage_access',
+];
+function _isPureInstaller() {
+  if (!state.user) return false;
+  return hasPermission('installation.view') && !_INSTALLER_OFFICE_PERMS.some(p => hasPermission(p));
+}
+
 // ============ ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ ============
 
 // ============ v2.45.646: вертикальная рельса разделов (десктоп) ============
@@ -1475,8 +1490,15 @@ function renderSectionRail() {
   if (rb) rb.remove();
   const badges = _railBadges();
   const cur = state.currentSection || 'home';
+  // v2.45.764: монтажнику — только «Монтаж» и «Помощь»; Шевелёву — как в табах
+  let sections = RAIL_SECTIONS;
+  if (_isPureInstaller()) {
+    sections = RAIL_SECTIONS.filter(x => x.code === 'installation' || x.code === 'help');
+  } else if (typeof _isShevelevMaster === 'function' && state.user && _isShevelevMaster()) {
+    sections = RAIL_SECTIONS.filter(x => ['home', 'production', 'help'].includes(x.code));
+  }
   let html = '';
-  RAIL_SECTIONS.forEach(s => {
+  sections.forEach(s => {
     const bd = badges[s.code];
     html += '<div class="rail-i' + (s.code === cur ? ' on' : '') + '" onclick="selectSection(\'' + s.code + '\')" title="' + escapeHtml(s.label) + '">' +
       '<i class="ti ' + s.icon + '"></i><span>' + s.label + '</span>' +
@@ -1490,6 +1512,10 @@ function renderSectionRail() {
 }
 
 function selectSection(sectionName) {
+  // v2.45.764: чистого монтажника не пускаем в чужие разделы никаким путём
+  if (_isPureInstaller() && sectionName !== 'installation' && sectionName !== 'help') {
+    sectionName = 'installation';
+  }
   const config = SECTION_CONFIG[sectionName];
   if (!config) return;
 
@@ -8812,15 +8838,10 @@ function applyPermissionsToUI() {
   // v2.45.350: «чистый» монтажник — есть installation.view и нет ни одного
   // «офисного» права. Ему показываем ТОЛЬКО раздел «Монтаж»: прячем остальные
   // вкладки, кнопку «Фото УПД» и сразу открываем монтаж.
-  const OFFICE_PERMS = [
-    'home.view_activity', 'home.view_finance_kpi',
-    'production.view', 'sales.view', 'warehouse.view', 'logistics.view',
-    'supply.view', 'defects.view', 'tasks.view_all',
-    'hr.view_vacations', 'hr.create_vacations', 'hr.manage_employees',
-    'hr.manage_positions', 'hr.manage_access',
-  ];
-  const installerOnly = canSeeInstall && !OFFICE_PERMS.some(p => hasPermission(p));
+  const installerOnly = _isPureInstaller();
   if (installerOnly) {
+    // v2.45.764: и десктопная рельса разделов тоже (в ней свой рендер)
+    try { renderSectionRail(); } catch (_) {}
     document.querySelectorAll('.section-tab, .m-section-tabs button').forEach(t => {
       t.style.display = (t.dataset.section === 'installation') ? '' : 'none';
     });
