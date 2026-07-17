@@ -8158,14 +8158,22 @@ function _drwInjectExtras(sidebar) {
   // Верх: лента разделов + поиск
   const top = document.createElement('div');
   top.className = 'drw-x drw-top';
+  // v2.45.766: лента разделов фильтруется по роли — как рельса на десктопе
+  let drwSecs = DRW_SECTIONS;
+  const _pureInst = (typeof _isPureInstaller === 'function' && _isPureInstaller());
+  if (_pureInst) {
+    drwSecs = DRW_SECTIONS.filter(x => x.code === 'installation' || x.code === 'help');
+  } else if (typeof _isShevelevMaster === 'function' && state.user && _isShevelevMaster()) {
+    drwSecs = DRW_SECTIONS.filter(x => ['home', 'production', 'help'].includes(x.code));
+  }
   let strip = '<div class="drw-secs">';
-  DRW_SECTIONS.forEach(s => {
+  drwSecs.forEach(s => {
     strip += '<div class="drw-sec' + (s.code === sec ? ' on' : '') + '" onclick="_drwGoSection(\'' + s.code + '\')">' +
       '<i class="ti ' + s.icon + '"></i><span>' + s.label + '</span></div>';
   });
   strip += '</div>';
   top.innerHTML = strip +
-    '<div class="drw-search" onclick="_drwOpenSearch()"><i class="ti ti-search"></i> Договор, сборка, деталь…</div>';
+    (_pureInst ? '' : '<div class="drw-search" onclick="_drwOpenSearch()"><i class="ti ti-search"></i> Договор, сборка, деталь…</div>');
   sidebar.insertBefore(top, sidebar.firstChild);
 
   // Низ: «Сегодня» перед футером профиля
