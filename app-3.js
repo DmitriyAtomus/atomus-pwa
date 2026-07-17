@@ -8080,6 +8080,9 @@ function _cpSupplierMailHref(g) {
   };
   const items = g.items || [];
   const lines = items.map(it => {
+    // в номенклатуре хвост «, шт.» часто уже зашит в само название — иначе в письме
+    // выходит «...6 кА, шт., 2 шт.»
+    const name = String(it.item_name || '').replace(/[,;]?\s*шт\.?\s*$/i, '').trim();
     const qty = (it.qty != null && it.qty !== '' ? it.qty : '') + (it.unit ? ' ' + it.unit : '');
     let ref = '';
     if (it.order_invoice_number) {
@@ -8088,7 +8091,7 @@ function _cpSupplierMailHref(g) {
     } else if (it.order_label_short) {
       ref = 'наш заказ ' + it.order_label_short;
     }
-    return '— ' + (it.item_name || '') + (qty ? ', ' + qty : '') + (ref ? ' (' + ref + ')' : '');
+    return '— ' + name + (qty ? ', ' + qty : '') + (ref ? ' (' + ref + ')' : '');
   });
   const invoices = [];
   items.forEach(it => {
