@@ -18411,6 +18411,14 @@
 .ir-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ir-chip button { background: none; border: none; cursor: pointer; color: var(--text-light, #94A3B8); padding: 2px; display: inline-flex; flex-shrink: 0; }
 .ir-chip button:hover { color: #DC2626; }
+
+/* v2.45.757: перетаскивание файлов в отчёт с поля и в чат по договору.
+   Подсветка через outline — не двигает вёрстку, в отличие от border. */
+.imd-drop-on { outline: 2px dashed var(--brand); outline-offset: 4px; border-radius: 10px; background: rgba(45, 95, 139, .04); }
+.imd-drop-hint { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; color: var(--text-light, #94A3B8); }
+.imd-drop-hint i { font-size: 14px; }
+/* На тач-устройствах перетаскивать нечем — подсказка только мешает */
+@media (hover: none) { .imd-drop-hint { display: none; } }
 .ir-send { margin-top: 12px; width: 100%; }
 .ir-thumb { display: inline-block; }
 .ir-thumb img { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border, #E2E8F0); display: block; }
