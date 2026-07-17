@@ -13711,6 +13711,7 @@ function _renderInstallationDetail(d) {
         '<label class="ir-attach-btn"><i class="ti ti-paperclip"></i> Файл' +
           '<input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" multiple style="display:none;" onchange="onInstallReportFiles(this)"></label>' +
       '</div>' +
+      '<div class="imd-drop-hint"><i class="ti ti-drag-drop"></i> Можно перетащить файлы сюда мышью</div>' +
       '<div id="install-report-files" class="ir-files"></div>' +
       '<button class="btn btn-primary ir-send" onclick="submitInstallationReport(' + d.id + ')"><i class="ti ti-check"></i> Отправить отчёт</button>' +
     '</div>' : '';
@@ -13777,6 +13778,7 @@ function _renderInstallationDetail(d) {
         '<span id="imc-chat-files" class="imc-chat-files"></span>' +
         '<button class="btn btn-primary imc-chat-send" onclick="sendMontageChat(' + d.contract_id + ')"><i class="ti ti-send"></i> Отправить</button>' +
       '</div>' +
+      '<div class="imd-drop-hint"><i class="ti ti-drag-drop"></i> Можно перетащить файлы сюда мышью</div>' +
     '</div>'
   ) : '';
 
@@ -13819,6 +13821,13 @@ function _renderInstallationDetail(d) {
       '</div>' +
     '</div>';
   m.classList.add('visible');
+  // v2.45.757: файлы можно перетащить мышью — отдельно в отчёт, отдельно в чат
+  _imdWireDrop(m.querySelector('.ir-form'), function (files) {
+    _imdPushFiles(_installReportFiles, files, renderInstallReportFiles);
+  });
+  _imdWireDrop(m.querySelector('.imc-chat'), function (files) {
+    _imdPushFiles(_montageChatFiles, files, _renderMontageChatFiles);
+  });
   // v2.45.448: подгрузить встроенный чат по договору
   if (d.contract_id) loadMontageChat(d.contract_id);
 }
@@ -13892,12 +13901,63 @@ async function assignInstallationInstaller(installationId, empId) {
   }
 }
 
-function onInstallReportFiles(input) {
-  Array.prototype.slice.call(input.files || []).forEach(function (f) {
-    if (_installReportFiles.length < 5) _installReportFiles.push(f);
+// v2.45.757: общий лимит вложений — 5 за раз, и для кнопки, и для перетаскивания
+var _IMD_MAX_FILES = 5;
+
+// Кладёт файлы в список, уважая лимит, и говорит, если что-то не влезло.
+function _imdPushFiles(list, files, render) {
+  var free = _IMD_MAX_FILES - list.length;
+  if (free <= 0) {
+    if (typeof showToast === 'function') showToast('Уже 5 файлов — больше за раз нельзя', 'error');
+    return;
+  }
+  files.slice(0, free).forEach(function (f) { list.push(f); });
+  if (files.length > free && typeof showToast === 'function') {
+    showToast('Добавили ' + free + ' — больше 5 файлов за раз нельзя', 'error');
+  }
+  render();
+}
+
+// Делает элемент зоной, куда можно бросить файлы мышью.
+// dragenter/dragleave считаем глубиной: они стреляют и на дочерних узлах,
+// иначе подсветка мигает при проходе над кнопками внутри зоны.
+function _imdWireDrop(el, addFiles) {
+  if (!el || el._imdDropWired) return;
+  el._imdDropWired = true;
+  var depth = 0;
+  function isFileDrag(e) {
+    var t = e.dataTransfer && e.dataTransfer.types;
+    return !!t && Array.prototype.indexOf.call(t, 'Files') !== -1;
+  }
+  function off() { depth = 0; el.classList.remove('imd-drop-on'); }
+  el.addEventListener('dragenter', function (e) {
+    if (!isFileDrag(e)) return;
+    e.preventDefault(); e.stopPropagation();
+    depth++; el.classList.add('imd-drop-on');
   });
+  el.addEventListener('dragover', function (e) {
+    if (!isFileDrag(e)) return;
+    e.preventDefault(); e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  el.addEventListener('dragleave', function (e) {
+    if (!isFileDrag(e)) return;
+    e.stopPropagation();
+    depth = Math.max(0, depth - 1);
+    if (!depth) el.classList.remove('imd-drop-on');
+  });
+  el.addEventListener('drop', function (e) {
+    if (!isFileDrag(e)) return;
+    e.preventDefault(); e.stopPropagation();
+    off();
+    var files = Array.prototype.slice.call(e.dataTransfer.files || []);
+    if (files.length) addFiles(files);
+  });
+}
+
+function onInstallReportFiles(input) {
+  _imdPushFiles(_installReportFiles, Array.prototype.slice.call(input.files || []), renderInstallReportFiles);
   input.value = '';
-  renderInstallReportFiles();
 }
 
 function renderInstallReportFiles() {
@@ -13971,11 +14031,8 @@ function _renderMontageChatMsgs(r) {
 }
 
 function onMontageChatFiles(input) {
-  Array.prototype.slice.call(input.files || []).forEach(function (f) {
-    if (_montageChatFiles.length < 5) _montageChatFiles.push(f);
-  });
+  _imdPushFiles(_montageChatFiles, Array.prototype.slice.call(input.files || []), _renderMontageChatFiles);
   input.value = '';
-  _renderMontageChatFiles();
 }
 
 function _renderMontageChatFiles() {
