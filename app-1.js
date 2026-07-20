@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.769";
+const APP_VERSION = "v2.45.771";
 const APP_VERSION_DATE = "20.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -505,6 +505,7 @@ async function deepReloadConfirm() {
   try {
     // 1) Останавливаем уведомления и фоновые задачи
     if (typeof stopNotifPolling === 'function') stopNotifPolling();
+    if (typeof stopAutoRefresh === 'function') stopAutoRefresh();   // v1.8.763
     // 2) Снимаем регистрацию service worker
     if ('serviceWorker' in navigator) {
       try {
@@ -572,6 +573,7 @@ function logout() {
   setStatus('');
   // v2.19.0: останавливаем polling уведомлений
   stopNotifPolling();
+  stopAutoRefresh();   // v1.8.763
 }
 
 // ============ TOAST ============
@@ -1140,6 +1142,7 @@ function showApp() {
       _restoreLastView();
       _showWelcomeIfFresh();
       startNotifPolling();  // v2.19.0
+      startAutoRefresh();   // v1.8.763
       setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
     })
       .catch(() => logout());
@@ -1149,6 +1152,7 @@ function showApp() {
     _restoreLastView();
     _showWelcomeIfFresh();
     startNotifPolling();  // v2.19.0
+    startAutoRefresh();   // v1.8.763
     setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
   }
 }
@@ -1272,6 +1276,10 @@ function renderProfile() {
   // v2.42.5: запускаем поллинг уведомлений
   if (typeof startNotifPolling === 'function') {
     try { startNotifPolling(); } catch (_) {}
+  }
+  // v1.8.763: и автообновление данных
+  if (typeof startAutoRefresh === 'function') {
+    try { startAutoRefresh(); } catch (_) {}
   }
 
   // Дашборд
@@ -1656,6 +1664,13 @@ function selectSidebarItem(screenName) {
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 
+  runScreenLoader(screenName);
+}
+
+// v1.8.763: загрузка данных экрана, вынесенная из selectSidebarItem.
+// Нужна отдельно для автообновления: selectSidebarItem попутно прячет/показывает
+// .screen и делает scrollTo(0) — в фоне это дёргало бы прокрутку под руками.
+function runScreenLoader(screenName) {
   // Загрузка данных под экран
   // v2.45.325: AtomCAD «Атом Электрика» — ленивая загрузка iframe при первом открытии
   if (screenName === 'atom-electrica') {
@@ -1993,6 +2008,130 @@ function refreshCurrentScreen() {
   if (s === 'sales-offers') { cache.offers = null; cache.offersCounts = null; }
   selectSidebarItem(s);
 }
+
+// ============ v1.8.763: АВТООБНОВЛЕНИЕ ДАННЫХ ============
+// Раньше чужие правки не появлялись НИКОГДА, пока не нажмёшь «Обновить»:
+// кэш сбрасывался только вручную либо собственной мутацией. Теперь фронт
+// раз в 30 сек спрашивает у /api/changes, что поменялось, и тихо перезагружает
+// текущий экран — но только если человек в этот момент ничего не заполняет.
+const AUTO_REFRESH_INTERVAL = 30000;
+let _autoRefreshTimer = null;
+let _changeCursor = null;          // null = курсор ещё не получен
+let _autoRefreshPending = false;   // изменения пришли, но человек занят — ждём
+
+// Экраны, которые НЕ трогаем автоматически: формы (там незаполненные данные),
+// живые экраны со своим опросом и чаты (перерисовка сбросит поле ввода).
+const AUTO_REFRESH_SKIP = [
+  'employee-form', 'task-form', 'contract-form', 'sales-contract-form',
+  'sale-offer-form', 'sales-offer-form', 'sale-product-form', 'defect-form',
+  'model-form', 'vacation-form', 'new-assembly', 'sales-contractor-form',
+  'wh-ship-qr', 'security', 'atom-electrica',
+  'defects-detail', 'defects-chats', 'developments', 'inventory',
+  'mail-messenger',
+];
+
+// «Человек занят» — обновление отложить. Дешёвые синхронные проверки.
+function _userIsBusy() {
+  try {
+    // Открыта модалка (.modal-overlay.visible — см. app.css)
+    if (document.querySelector('.modal-overlay.visible')) return true;
+    // Курсор в поле ввода
+    const ae = document.activeElement;
+    if (ae) {
+      const tag = (ae.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (ae.isContentEditable) return true;
+    }
+    // Идёт правка позиции спецификации — state._specByContract хранит
+    // состояние редактирования вместе с данными, перезагрузка его сотрёт.
+    const sp = state._specByContract || {};
+    for (const k in sp) {
+      if (sp[k] && (sp[k].addingMode || sp[k].editingId)) return true;
+    }
+  } catch (e) { /* при любой неожиданности считаем, что не занят */ }
+  return false;
+}
+
+// Тихо перезагрузить текущий экран, сохранив прокрутку.
+function softRefreshCurrentScreen() {
+  const s = state.currentScreen;
+  if (!s || AUTO_REFRESH_SKIP.includes(s)) return;
+  if (_userIsBusy()) { _autoRefreshPending = true; return; }
+  _autoRefreshPending = false;
+  const y = window.scrollY;
+  try {
+    refreshCurrentScreenCachesOnly(s);
+    runScreenLoader(s);
+    // Загрузчики асинхронные — прокрутку возвращаем после перерисовки.
+    setTimeout(() => { try { window.scrollTo({ top: y, behavior: 'instant' }); } catch (e) {} }, 60);
+  } catch (e) { /* не мешаем работе из-за фонового обновления */ }
+}
+
+// Сброс кэшей текущего экрана БЕЗ перерисовки (тело старого refreshCurrentScreen).
+function refreshCurrentScreenCachesOnly(s) {
+  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; cache.upcomingShipments = null; cache.recentActivity = null; }
+  if (s === 'dashboard') cache.dashboard = null;
+  if (s === 'history') cache.history = {};
+  if (s === 'summary') cache.summary = {};
+  if (s === 'employees') cache.employees = null;
+  if (s === 'models') cache.models = null;
+  if (s === 'tasks-list' || s === 'tasks-mine' || s === 'tasks-created') cache.tasks = {};
+  if (s === 'sales-dashboard' || s === 'sales-contracts') { cache.contracts = null; cache.contractsCounts = null; }
+  if (s === 'sales-contractors') cache.contractors = null;
+  if (s === 'sale-products') { cache.saleProducts = null; cache.saleCategories = null; }
+  if (s === 'sale-categories') cache.saleCategories = null;
+  if (s === 'catalog') { cache.catalogCategories = null; cache.catalogProducts = null; }
+  if (s === 'sales-offers') { cache.offers = null; cache.offersCounts = null; }
+  // Карточка договора: спецификация кэшируется отдельно от общего cache.
+  if (s === 'sales-contract-detail' && state.currentContractId) {
+    try { delete state._specByContract[state.currentContractId]; } catch (e) {}
+  }
+}
+
+async function checkForChanges() {
+  if (!localStorage.getItem(TOKEN_KEY)) return;
+  try {
+    const qs = (_changeCursor === null) ? '' : ('?since=' + encodeURIComponent(_changeCursor));
+    const d = await apiGet('/api/changes' + qs);
+    if (!d) return;
+    const first = (_changeCursor === null);
+    _changeCursor = (typeof d.cursor === 'number') ? d.cursor : _changeCursor;
+    if (first) return;   // первый заход только запомнил курсор
+    if (d.reset || (d.entities && d.entities.length)) {
+      softRefreshCurrentScreen();
+      return;
+    }
+    // Изменений нет, но прошлое обновление было отложено (человек печатал) —
+    // пробуем снова. Без этого отложенное обновление могло зависнуть навсегда:
+    // курсор-то мы уже сдвинули, и следующий тик «новых изменений» не увидит.
+    // focusout делает применение мгновенным, а этот тик — надёжной страховкой
+    // на случай, когда события фокуса не приходят (модалку закрыли мышью).
+    if (_autoRefreshPending) softRefreshCurrentScreen();
+  } catch (e) { /* сеть моргнула — попробуем на следующем тике */ }
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  checkForChanges();
+  _autoRefreshTimer = setInterval(checkForChanges, AUTO_REFRESH_INTERVAL);
+}
+
+function stopAutoRefresh() {
+  if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
+}
+
+// Вернулись на вкладку/в окно — проверяем сразу, не дожидаясь тика.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForChanges();
+});
+window.addEventListener('focus', () => { checkForChanges(); });
+
+// Человек освободился (закрыл модалку / ушёл из поля), а обновление ждало —
+// применяем. Слушаем на всплытии, чтобы не мешать обработчикам самих полей.
+document.addEventListener('focusout', () => {
+  if (!_autoRefreshPending) return;
+  setTimeout(() => { if (_autoRefreshPending) softRefreshCurrentScreen(); }, 400);
+});
 
 // ============ ДАШБОРД ============
 
