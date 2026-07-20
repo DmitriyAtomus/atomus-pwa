@@ -8405,6 +8405,24 @@ function _cpTrackingRowHtml(it) {
 // чтобы заказ не утверждал, будто приехало именно заказанное.
 // Подсказка для поиска: из «Выключатель автоматический CHINT NXB-63S 1P C25 6 кА»
 // берём код модели (NXB-63S) — по нему сразу видно все родственные карточки.
+// Значимые слова названия: кириллица приводится к латинице (А/A, В/B, С/C…),
+// «4,5» к «4.5» — иначе «4,5кА» и «4.5kA» считались бы разными.
+function _substTokens(name) {
+  const map = { 'а':'a','в':'b','е':'e','к':'k','м':'m','н':'h','о':'o','р':'p','с':'c','т':'t','у':'y','х':'x' };
+  let s = String(name || '').toLowerCase().replace(/[а-я]/g, ch => map[ch] || ch);
+  s = s.replace(/(?<=\d),(?=\d)/g, '.').replace(/[^\w.\-]+/g, ' ');
+  const out = new Set();
+  s.split(/\s+/).forEach(t => { t = t.replace(/^[-.]+|[-.]+$/g, ''); if (t.length >= 2) out.add(t); });
+  return out;
+}
+
+function _substScore(wantSet, name) {
+  const has = _substTokens(name);
+  let n = 0;
+  has.forEach(t => { if (wantSet.has(t)) n++; });
+  return n;
+}
+
 function _substGuess(name) {
   const words = String(name || '').split(/[\s,;]+/);
   const code = words.find(w => /[A-Za-zА-Яа-я]/.test(w) && /\d/.test(w) && w.length >= 5);
@@ -8465,8 +8483,16 @@ function _substFilter() {
   const term = ((document.getElementById('subst-search') || {}).value || '').trim().toLowerCase();
   let list = ctx.all || [];
   if (term) list = list.filter(c => String(c.name || '').toLowerCase().includes(term));
-  // сначала то, что есть на складе — обычно заменой приходит то, что уже лежит
-  list = list.slice().sort((a, b) => (parseFloat(b.qty_on_stock) || 0) - (parseFloat(a.qty_on_stock) || 0));
+  // v1.8.773: сортировка ТОЛЬКО по остатку прятала нужное. Для заказа
+  // «NXB-63S 3P C25» сверху вставали однополюсные с большими остатками, а
+  // искомый «3P 25А» (1 шт) уезжал вниз. Сначала похожесть на заказанное
+  // (число общих слов и цифр), и лишь при равной похожести — остаток.
+  const want = _substTokens(ctx.name);
+  list = list.slice().sort((a, b) => {
+    const sa = _substScore(want, a.name), sb = _substScore(want, b.name);
+    if (sa !== sb) return sb - sa;
+    return (parseFloat(b.qty_on_stock) || 0) - (parseFloat(a.qty_on_stock) || 0);
+  });
   const shown = list.slice(0, 60);
   if (!shown.length) {
     box.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Ничего не нашлось</div>';
