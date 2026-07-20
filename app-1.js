@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.766";
-const APP_VERSION_DATE = "17.07.2026";
+const APP_VERSION = "v2.45.767";
+const APP_VERSION_DATE = "20.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -3662,7 +3662,8 @@ function _smartQueueData(items, works, defHrs, workload) {
       const d = new Date(String(dl).slice(0, 10) + 'T00:00:00');
       if (!isNaN(d.getTime())) slack = Math.round((d - today) / 86400000) - rem / cap;
     }
-    const missing = (w.missing_components || []).length;
+    // v2.45.767: частично начатая работа не простаивает — из «ждёт деталей» уходит
+    const missing = w.partial_started ? 0 : (w.missing_components || []).length;
     const pinned = Number(w.queue_pin || 0) > 0;
     const busyBy = busy[w.id] || null;
     let section;
@@ -4601,7 +4602,7 @@ function renderPkbWorkCard(w, colKey) {
     : '';
 
   // v2.24.0: класс is-blocked для красного border-left если BOM-дефицит
-  const blockedCls = (w.is_blocked && colKey !== 'done') ? ' is-blocked' : '';
+  const blockedCls = (w.is_blocked && !w.partial_started && colKey !== 'done') ? ' is-blocked' : '';
 
   // v2.43.33: класс градации по прогрессу — для in_progress карточек,
   // чтобы фон/border становился насыщеннее по мере приближения к 100%
@@ -4669,9 +4670,16 @@ function renderPkbWorkCard(w, colKey) {
       ? 'Не хватает:\n' + _miss.map(mc => '• ' + (mc.name || mc.component_name || mc) +
           (mc.shortage ? ' — ' + mc.shortage : '')).join('\n')
       : 'Не хватает критичных компонентов';
-    badgesHtml += '<div class="pkb-wc-blocked" title="' + escapeHtml(_missTitle) + '">' +
-                    '<i class="ti ti-lock"></i>Нет деталей' + (_miss.length ? ' · ' + _miss.length : '') +
-                  '</div>';
+    // v2.45.767: частично начатая — жёлтая «ждём детали», а не красный замок
+    if (w.partial_started) {
+      badgesHtml += '<div class="pkb-wc-partial" title="' + escapeHtml('Запущена частично.\n' + _missTitle) + '">' +
+                      '<i class="ti ti-hourglass"></i>частично · ' + (_miss.length || '') + ' в пути' +
+                    '</div>';
+    } else {
+      badgesHtml += '<div class="pkb-wc-blocked" title="' + escapeHtml(_missTitle) + '">' +
+                      '<i class="ti ti-lock"></i>Нет деталей' + (_miss.length ? ' · ' + _miss.length : '') +
+                    '</div>';
+    }
   }
 
   if (badgesHtml) {
@@ -5079,6 +5087,11 @@ function renderProductionWorkDetail(w) {
     : '<span class="pkb-wc-tag big empty" onclick="editWorkLabel(' + w.id + ')" title="Метка различает одинаковые изделия на одном заказе"><i class="ti ti-tag"></i> метка</span>';
   html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + ' ' + labelChip + '</h3>';
   html +=   '<span class="pkb-status-chip ' + statusCls + '">' + escapeHtml(statusLabel) + '</span>';
+  // v2.45.767: частичный запуск — ждём детали
+  if (w.partial_started && w.is_blocked) {
+    const _pn = (w.missing_components || []).length;
+    html += '<span class="pkb-partial-chip" title="Работа запущена частично — детали в пути">⚠ частично' + (_pn ? ' · ждём ' + _pn : '') + '</span>';
+  }
   // v2.43.70: QR-код сборки прямо из карточки работы — нужен на упаковке/проверке,
   // когда изделие физически готово, а до страницы «Сборки» идти неудобно.
   // v2.43.71: кнопка отображается всегда; если у работы ещё нет связанной сборки
@@ -5621,13 +5634,18 @@ function _pwdStagesByPos(items) {
   return m;
 }
 
-// → массив имён этапов, которых ждём (контрольные точки), или null если открыт
+// → массив причин, почему этап заперт (контрольные точки + недостающие детали),
+// или null если открыт. v2.45.767: parts_wait — детали, привязанные к этапу.
 function _pwdStageLocked(st, byPos) {
-  if (!st.requires || st.is_done) return null;
-  const waits = String(st.requires).split(',')
-    .map(x => parseInt(x.trim(), 10)).filter(Boolean)
-    .filter(p => byPos[p] && !byPos[p].is_done)
-    .map(p => byPos[p].name);
+  if (st.is_done) return null;
+  const waits = [];
+  if (st.requires) {
+    String(st.requires).split(',')
+      .map(x => parseInt(x.trim(), 10)).filter(Boolean)
+      .filter(p => byPos[p] && !byPos[p].is_done)
+      .forEach(p => waits.push('«' + byPos[p].name + '»'));
+  }
+  (st.parts_wait || []).forEach(n => waits.push('деталь: ' + n));
   return waits.length ? waits : null;
 }
 
@@ -5692,7 +5710,7 @@ function _pwdStagesHtml(items, w) {
         '<span class="pwd-stg-live" data-started-at="' + escapeHtml(rn.started_at || '') + '" data-label="⏱ ' + escapeHtml(rn.name || '') + '">⏱ ' +
         escapeHtml(rn.name || '') + (rn.started_at ? ' · ' + _formatHelpingDuration(rn.started_at) : '') + '</span>').join(' ');
     } else if (locked) {
-      sub = '🔒 сначала: ' + escapeHtml(locked.join(', '));
+      sub = '🔒 ждём: ' + escapeHtml(locked.join(', '));
     } else if (st.default_employee_name) {
       sub = 'обычно: ' + escapeHtml(st.default_employee_name);
     }
@@ -5746,7 +5764,7 @@ async function pwdStageToggleDone(workId, sid, makeDone) {
   const st = (c.items || []).find(x => x.id === sid);
   if (makeDone && st) {
     const locked = _pwdStageLocked(st, _pwdStagesByPos(c.items));
-    if (locked) { showToast('🔒 Сначала: ' + locked.join(', '), 'error'); return; }
+    if (locked) { showToast('🔒 Ждём: ' + locked.join(', '), 'error'); return; }
   }
   try {
     await apiPatch('/api/production/work-stages/' + sid, { done: !!makeDone });
@@ -5944,7 +5962,7 @@ async function _openStagePickerSmart(workId, opts) {
     let sub = '';
     if (st.is_done) sub = '✓ уже готов' + (st.done_by_name ? ' · ' + escapeHtml(st.done_by_name) : '');
     else if (running.length) sub = '⏱ уже делает: ' + running.map(x => escapeHtml(x.name || '')).join(', ');
-    else if (locked) sub = '🔒 сначала: ' + escapeHtml(locked.join(', '));
+    else if (locked) sub = '🔒 ждём: ' + escapeHtml(locked.join(', '));
     else if (st.default_employee_name) sub = 'обычно: ' + escapeHtml(st.default_employee_name);
     return '<button class="wsp-row' + (st.is_done ? ' done' : '') + (locked ? ' lkd' : '') + '" ' +
       'data-stage-type="' + st.stage_type_id + '" data-locked="' + (locked ? 1 : 0) + '">' +
@@ -6696,15 +6714,17 @@ function renderPkbBomBlock(w) {
 
   // Есть дефицит — выводим список
   const hasCritical = missing.some(m => m.is_critical);
-  const titleIcon = hasCritical ? 'ti-alert-triangle' : 'ti-info-circle';
-  const titleColor = hasCritical ? '#8C2A2A' : '#854F0B';
-  const titleText = hasCritical
-    ? 'Дефицит — работа заблокирована'
-    : 'Дефицит некритичных компонентов';
+  // v2.45.767: частичный запуск — работа идёт, дефицит жёлтый «ждём детали»
+  const isPartial = !!w.partial_started;
+  const titleIcon = isPartial ? 'ti-hourglass' : (hasCritical ? 'ti-alert-triangle' : 'ti-info-circle');
+  const titleColor = isPartial ? '#B45309' : (hasCritical ? '#8C2A2A' : '#854F0B');
+  const titleText = isPartial
+    ? 'Ждём детали — работа идёт частично'
+    : (hasCritical ? 'Дефицит — работа заблокирована' : 'Дефицит некритичных компонентов');
   // v2.45.628: сводка «N позиций · −M шт» + переход в «Что закупить»
   const totalDef = missing.reduce((s, m) => s + (parseFloat(m.deficit) || 0), 0);
 
-  let html = '<div class="pkb-bom-block">';
+  let html = '<div class="pkb-bom-block' + (isPartial ? ' partial' : '') + '">';
   html +=   '<div class="pkb-bom-title" style="color:' + titleColor + ';display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
   html +=     '<i class="ti ' + titleIcon + '"></i>' + escapeHtml(titleText);
   html +=     '<span style="font-weight:600;color:var(--text-light);font-size:11.5px;">· ' + missing.length + ' ' + plural(missing.length, 'позиция', 'позиции', 'позиций') + ' · −' + pkbFmtQty(totalDef) + ' шт.</span>';
@@ -6724,6 +6744,10 @@ function renderPkbBomBlock(w) {
     const critCls = m.is_critical ? ' crit' : '';
     html += '<div class="pkb-bom-item">';
     html +=   '<span class="pkb-bom-item-name' + critCls + '">' + escapeHtml(m.component_name || '?') + '</span>';
+    if (m.stage_name) {
+      html += '<span class="pkb-bom-item-stg" title="Деталь нужна на этом этапе — он под замком, пока деталь не придёт">' +
+                (m.is_critical ? '🔒 ' : '') + escapeHtml(m.stage_name) + '</span>';
+    }
     html +=   '<span class="pkb-bom-item-qty">нужно ' + need + ' / есть ' + have + ' ' + escapeHtml(unit) + '</span>';
     html +=   '<span class="pkb-bom-item-deficit">−' + def + '</span>';
     if (canMan && m.bom_id) {
@@ -6734,11 +6758,38 @@ function renderPkbBomBlock(w) {
     html += '</div>';
   });
   html +=   '</div>';
-  if (hasCritical) {
+  if (hasCritical && !isPartial) {
     html += '<div style="font-size:11px;color:var(--text-light);margin-top:8px;">! — критичный компонент. Работа считается заблокированной пока их нет на складе.</div>';
+    // v2.45.767: осознанный частичный запуск — мастер/директор
+    if (w.status === 'queue' && hasPermission('production.manage')) {
+      html += '<button class="pkb-partial-btn" onclick="pwdStartPartial(' + w.id + ')">' +
+                '<i class="ti ti-player-play"></i> Начать частично — без этих деталей</button>';
+      html += '<div style="font-size:11px;color:var(--text-light);margin-top:5px;">Работа пойдёт «В работе», дефицит останется на виду жёлтым. Этапы, которым нужны эти детали, будут под замком до прихода на склад.</div>';
+    }
+  }
+  if (isPartial) {
+    html += '<div style="font-size:11px;color:#92703B;margin-top:8px;">Работа запущена частично: собирайте то, для чего детали есть. Когда недостающее придёт на склад — замки с этапов снимутся сами, ответственному придёт пуш.</div>';
   }
   html += '</div>';
   return html;
+}
+
+// v2.45.767: частичный запуск при дефиците
+async function pwdStartPartial(workId) {
+  if (!confirm('Взять работу «В работу» без недостающих деталей?\n\nДефицит останется на виду (жёлтым), а этапы, которым нужны эти детали, будут под замком до прихода на склад.')) return;
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/start-partial', {});
+    if (r && r.ok) showToast('Работа запущена частично — ждём детали ⏳', 'success');
+    else showToast(((r && r.data) || {}).message || 'Не удалось запустить', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  cache.productionKanban = null;
+  try {
+    const fresh = await apiGet('/api/production/works/' + workId);
+    state._pkbDetailWork = fresh;
+    renderProductionWorkDetail(fresh);
+    pwcLoad(workId);
+  } catch (e) {}
+  if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') loadProductionDashboard();
 }
 
 function pkbFmtQty(n) {
@@ -14604,7 +14655,7 @@ function mdsWorkStage(rowId) {
   const st = all.find(x => x.id === rowId);
   if (!st) return;
   const locked = _pwdStageLocked(st, _pwdStagesByPos(all));
-  if (locked) { showToast('🔒 Сначала: ' + locked.join(', '), 'error'); return; }
+  if (locked) { showToast('🔒 Ждём: ' + locked.join(', '), 'error'); return; }
   _mds.stageId = (_mds.stageId === st.stage_type_id ? null : st.stage_type_id);
   _mdsKeepNoteRerender();
 }
