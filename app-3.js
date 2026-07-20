@@ -8365,7 +8365,24 @@ function _cpTrackingRowHtml(it) {
       'title="Товар пришёл — нажмите, чтобы отметить позицию полученной (заказ закроется)" ' +
       'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #34D399;color:#047857;border-radius:8px;' +
       'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
-      '<i class="ti ti-circle-check"></i> Отметить, что пришло</button>';
+      '<i class="ti ti-circle-check"></i> Отметить, что пришло</button>' +
+      // v1.8.771: поставщик регулярно шлёт замену (заказали автомат 6 кА —
+      // привезли 4,5 кА). Раньше выбор был плохой: соврать «пришло заказанное»
+      // или удалить строку и потерять след. Теперь закрываем заменой.
+      ' <button type="button" onclick="shopMarkSubstituted(' + it.order_item_id +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      'title="Поставщик прислал другую позицию — закрыть строку заменой" ' +
+      'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #FBBF24;color:#92400E;' +
+      'border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-replace"></i> Пришло другое</button>';
+  }
+  // Уже закрыта заменой — показываем, чем именно
+  let substNote = '';
+  if (it.subst_component_name) {
+    substNote = '<div style="margin-top:6px;font-size:11.5px;color:#92400E;">' +
+      '<i class="ti ti-replace"></i> вместо заказанного пришло: <b>' +
+      escapeHtml(it.subst_component_name) + '</b>' +
+      (it.subst_note ? ' — ' + escapeHtml(it.subst_note) : '') + '</div>';
   }
   return '<div class="sup-track-row" style="padding:11px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
@@ -8377,8 +8394,56 @@ function _cpTrackingRowHtml(it) {
       receivedBtn +
       returnBtn +
     '</div>' +
+    substNote +
     _supDeliveryStepperHtml(_itemReceived ? 'received' : it.order_status) +
   '</div>';
+}
+
+// v1.8.771: «Пришло другое» — закрыть строку заказа заменой.
+// Склад этим не двигаем: остаток приходит из приёмки УПД, там позицию и
+// сопоставляют с нужной карточкой. Здесь только фиксируем факт замены,
+// чтобы заказ не утверждал, будто приехало именно заказанное.
+async function shopMarkSubstituted(orderItemId, name) {
+  const q = prompt(
+    'Что пришло вместо «' + (name || '') + '»?\n\n' +
+    'Введите часть названия — покажу подходящие карточки склада.', '');
+  if (q === null) return;
+  const term = String(q).trim();
+  if (term.length < 2) { showToast('Нужно хотя бы 2 символа', 'error'); return; }
+  let list = [];
+  try {
+    const d = await apiGet('/api/components?limit=2000');
+    const all = (d && d.components) || [];
+    const low = term.toLowerCase();
+    list = all.filter(c => String(c.name || '').toLowerCase().includes(low)).slice(0, 15);
+  } catch (e) {
+    showToast('Не удалось загрузить справочник', 'error');
+    return;
+  }
+  if (!list.length) { showToast('Ничего не нашлось по «' + term + '»', 'error'); return; }
+  const menu = list.map((c, i) =>
+    (i + 1) + ') ' + c.name + ' — ' + (c.qty_on_stock || 0) + ' шт').join('\n');
+  const pick = prompt('Выберите номер:\n\n' + menu, '1');
+  if (pick === null) return;
+  const idx = parseInt(pick, 10) - 1;
+  if (!(idx >= 0 && idx < list.length)) { showToast('Неверный номер', 'error'); return; }
+  const chosen = list[idx];
+  const note = prompt('Комментарий (необязательно) — почему замена:', '') || '';
+  try {
+    const r = await apiPost('/api/supply-orders/items/' + orderItemId + '/received', {
+      received_component_id: chosen.id,
+      substitution_note: note,
+    });
+    const d = (r && r.data) || {};
+    if (r && r.ok && d.ok) {
+      showToast('Закрыто заменой: ' + chosen.name, 'success');
+      loadSupplyShopping();
+    } else {
+      showToast(d.message || 'Не удалось отметить', 'error');
+    }
+  } catch (e) {
+    showToast((e && e.message) ? e.message : 'Ошибка', 'error');
+  }
 }
 
 // v2.45.433: «15 июл» из ISO YYYY-MM-DD (короткий русский формат для чипа).
