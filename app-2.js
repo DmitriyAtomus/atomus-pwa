@@ -9499,6 +9499,30 @@ function renderContractDetail(c) {
   html += '<div>' + statusBadgeHtml(c.status, c.status_label) + '</div>';
   html += '</div>';
 
+  // v1.8.762: баннер готовности. Пока «Принято» не нажали — ТВ в цехе повторяет
+  // объявление каждые 30 минут, поэтому кнопка гасит именно повтор, а не статус.
+  // Два независимых сигнала: наше производство закрыто / договор укомплектован.
+  const rd = c.readiness;
+  if (rd) {
+    if (rd.full_ready && !rd.full_ready_ack_at) {
+      html += '<div class="ready-ack-block ready-ack-full">';
+      html += '<div class="pcb-text">';
+      html += '<div class="pcb-title"><i class="ti ti-package"></i> Договор укомплектован — можно отгружать</div>';
+      html += '<div class="pcb-desc">Закрыта вся спецификация, включая покупные позиции. Пока не нажмёте «Принято», табло в цехе будет повторять объявление.</div>';
+      html += '</div>';
+      html += '<button class="ready-ack-btn" onclick="ackContractReady(' + c.id + ', \'full\')"><i class="ti ti-check"></i>Принято</button>';
+      html += '</div>';
+    } else if (rd.prod_ready && !rd.prod_ready_ack_at) {
+      html += '<div class="ready-ack-block ready-ack-prod">';
+      html += '<div class="pcb-text">';
+      html += '<div class="pcb-title"><i class="ti ti-checks"></i> Производство закончено</div>';
+      html += '<div class="pcb-desc">Все позиции, которые делаем сами, готовы. Покупное может ещё ехать. Пока не нажмёте «Принято», табло в цехе будет повторять объявление.</div>';
+      html += '</div>';
+      html += '<button class="ready-ack-btn" onclick="ackContractReady(' + c.id + ', \'prod\')"><i class="ti ti-check"></i>Принято</button>';
+      html += '</div>';
+    }
+  }
+
   // v2.19.0: блок «Опубликовать договор» для draft + скрываем status-changer пока draft
   const isDraft = (c.status === 'draft');
   if (isDraft && canEdit) {
