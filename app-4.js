@@ -2436,6 +2436,32 @@ async function publishContract(contractId) {
   }
 }
 
+// v1.8.762: «Принято» по готовности договора — гасит повтор объявления на ТВ.
+// kind: 'prod' (наше производство закрыто) | 'full' (договор укомплектован).
+// Статус договора НЕ меняет: это именно квитанция «услышал», а не переход FSM.
+async function ackContractReady(contractId, kind) {
+  if (!contractId) return;
+  const btn = document.querySelector('.ready-ack-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i>Принимаем…'; }
+  try {
+    const r = await apiPost('/api/contracts/' + contractId + '/ready-ack', { kind: kind || 'prod' });
+    const body = (r && r.data) || {};
+    if (r && r.ok && body.ok) {
+      showToast(kind === 'full' ? 'Принято — табло замолчит' : 'Принято', 'success');
+      // Перерисовываем карточку: баннер должен исчезнуть.
+      // NB: loadContractDetail в проекте не существует (см. publishContract выше),
+      // актуальная функция — loadCurrentContract().
+      loadCurrentContract();
+    } else {
+      showToast(body.message || 'Не удалось отметить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i>Принято'; }
+    }
+  } catch (e) {
+    showToast((e && e.message) ? e.message : 'Ошибка', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i>Принято'; }
+  }
+}
+
 // ============ ЭТАП 42.2 (v2.20.0): РУЧНАЯ ПЕРЕСБОРКА РЕЗЕРВОВ ============
 async function rebuildReservations() {
   if (!confirm('Пересобрать резервы по всем активным договорам?\n\nЭто откатит лишние резервы и попробует привязать свободные сборки к открытым договорам.')) {

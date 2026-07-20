@@ -8064,7 +8064,50 @@ function _componentToTracking(it, group) {
     order_expected: it.order_expected || null,
     order_place: it.order_place || null,
     order_label_short: it.order_label,
+    // v2.45.757: счёт поставщика — для письма «когда отправите?»
+    order_invoice_number: it.order_invoice_number || null,
+    order_invoice_date: it.order_invoice_date || null,
   };
+}
+
+// v2.45.757: «Написать» поставщику — письмо уже готово, руками добивать не надо.
+// В переписке ссылаются на номер ИХ счёта (наш ORD-N поставщику ничего не говорит),
+// поэтому счёт — главный ориентир, заказ — запасной.
+function _cpSupplierMailHref(g) {
+  const dot = iso => {
+    const p = String(iso || '').slice(0, 10).split('-');
+    return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '';
+  };
+  const items = g.items || [];
+  const lines = items.map(it => {
+    // в номенклатуре хвост «, шт.» часто уже зашит в само название — иначе в письме
+    // выходит «...6 кА, шт., 2 шт.»
+    const name = String(it.item_name || '').replace(/[,;]?\s*шт\.?\s*$/i, '').trim();
+    const qty = (it.qty != null && it.qty !== '' ? it.qty : '') + (it.unit ? ' ' + it.unit : '');
+    let ref = '';
+    if (it.order_invoice_number) {
+      const d = dot(it.order_invoice_date);
+      ref = 'счёт № ' + it.order_invoice_number + (d ? ' от ' + d : '');
+    } else if (it.order_label_short) {
+      ref = 'наш заказ ' + it.order_label_short;
+    }
+    return '— ' + name + (qty ? ', ' + qty : '') + (ref ? ' (' + ref + ')' : '');
+  });
+  const invoices = [];
+  items.forEach(it => {
+    if (it.order_invoice_number && invoices.indexOf(it.order_invoice_number) === -1) invoices.push(it.order_invoice_number);
+  });
+  const subject = invoices.length
+    ? 'Отправка по счёту № ' + invoices.join(', № ')
+    : 'Уточнение по отправке заказа';
+  const body = 'Добрый день!\n\n' +
+    'Подскажите, пожалуйста, по отправке:\n\n' +
+    lines.join('\n') + '\n\n' +
+    'Когда планируется отгрузка?\n\n' +
+    'С уважением,\nООО «Атомус Групп»';
+  return 'mailto:' + encodeURIComponent(g.email) +
+    '?subject=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(body);
 }
 
 // v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
@@ -8089,7 +8132,7 @@ function _cpTrackingBlockHtml(ordered) {
   keys.forEach(k => {
     const g = bySup[k];
     const contactBtns = [];
-    if (g.email) contactBtns.push('<a href="mailto:' + escapeHtml(g.email) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;"><i class="ti ti-mail"></i> Написать</a>');
+    if (g.email) contactBtns.push('<a href="' + escapeHtml(_cpSupplierMailHref(g)) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Письмо про отправку — текст уже подставлен"><i class="ti ti-mail"></i> Написать</a>');
     // v2.45.429: вместо tel: — показываем сам номер, тап открывает карточку поставщика
     if (g.phone) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
       (g.id ? 'onclick="openEditSupplier(' + g.id + ')" title="Открыть карточку поставщика"' : 'disabled') +

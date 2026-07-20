@@ -15613,6 +15613,46 @@
   .publish-contract-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
   .publish-contract-btn .ti { font-size: 18px; }
 
+  /* --- v1.8.762: баннер готовности договора + «Принято» --- */
+  /* Зелёный, в отличие от жёлтого черновика: там «надо сделать», тут «сделано». */
+  .ready-ack-block {
+    margin: 16px 0;
+    padding: 16px 18px;
+    border-radius: 14px;
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .ready-ack-prod {
+    background: linear-gradient(135deg, #DCFCE7 0%, #F0FDF4 100%);
+    border: 1.5px solid #4ADE80;
+  }
+  .ready-ack-full {
+    background: linear-gradient(135deg, #CFFAFE 0%, #ECFEFF 100%);
+    border: 1.5px solid #22D3EE;
+  }
+  .ready-ack-block .pcb-text { flex: 1; min-width: 200px; }
+  .ready-ack-block .pcb-title {
+    font-weight: 600; font-size: 14px; color: #14532D;
+    margin-bottom: 3px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ready-ack-full .pcb-title { color: #0E4F5C; }
+  .ready-ack-block .pcb-desc { font-size: 12.5px; color: #3F6212; line-height: 1.4; }
+  .ready-ack-full .pcb-desc { color: #155E75; }
+  .ready-ack-btn {
+    background: #16A34A; color: white;
+    border: none; padding: 11px 22px;
+    border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.15s;
+    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+  }
+  .ready-ack-btn:hover { background: #15803D; transform: translateY(-1px); }
+  .ready-ack-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+  .ready-ack-btn .ti { font-size: 18px; }
+
   /* --- Виджет "На сборку" на главной Производства --- */
   .prod-queue-block { padding: 0 18px; }
   .prod-queue-empty {
