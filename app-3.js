@@ -6585,6 +6585,9 @@ async function openMailThread(peer) {
   pane.innerHTML = '<div class="loading-block">Загрузка переписки…</div>';
   try {
     const d = await apiGet('/api/mail/thread?peer=' + encodeURIComponent(peer));
+    // v2.45.772: до какого времени собеседник видел диалог (MAX) — для ✓/✓✓
+    state._mailThreadChannel = d.channel || '';
+    state._mailSeenUntil = d.seen_until || '';
     const msgs = d.messages || [];
     const conv = (state._mailConvs || []).find(c => c.peer === peer) || {};
     const canReply = (d.channel === 'email') || (d.channel === 'max');
@@ -6713,10 +6716,25 @@ function _mailMsgBubble(m) {
   } else if (list.length) {
     atts = '<div class="mm-atts"><span class="mm-att"><span class="ic">📎</span>' + list.length + ' влож.</span></div>';
   }
+  // v2.45.772: статус доставки у исходящих. MAX: ✓ отправлено / ✓✓ прочитано
+  // (собеседник заходил в диалог или ответил). Почта: только ✓ отправлено —
+  // e-mail не сообщает о прочтении.
+  let ticks = '';
+  if (out) {
+    if (state._mailThreadChannel === 'max') {
+      const seen = state._mailSeenUntil || '';
+      const rd = seen && m.at && String(m.at) <= seen;
+      ticks = rd
+        ? '<span class="mm-ticks rd" title="Прочитано — собеседник открывал диалог">✓✓</span>'
+        : '<span class="mm-ticks" title="Отправлено — ещё не прочитано">✓</span>';
+    } else {
+      ticks = '<span class="mm-ticks" title="Отправлено (почта не сообщает о прочтении)">✓</span>';
+    }
+  }
   return '<div class="mm-bub ' + (out ? 'out' : 'in') + '">' +
     (who ? '<div class="mm-who">' + escapeHtml(who) + '</div>' : '') + subj +
     '<div class="mm-body">' + escapeHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
-    '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + '</div>' +
+    '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + ticks + '</div>' +
   '</div>';
 }
 

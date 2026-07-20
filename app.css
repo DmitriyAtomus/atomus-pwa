@@ -21622,3 +21622,7 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .pkb-partial-btn:hover { background: #FEF3C7; }
 .pkb-partial-chip { font-size: 10.5px; font-weight: 800; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 99px; padding: 3px 9px; white-space: nowrap; }
 .pkb-wc-partial { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 2px 7px; }
+
+/* ============ v2.45.772: галочки прочтения в переписке ============ */
+.mm-ticks { margin-left: 5px; font-weight: 800; font-size: 11px; color: #94A3B8; letter-spacing: -1px; }
+.mm-ticks.rd { color: #2563EB; }
