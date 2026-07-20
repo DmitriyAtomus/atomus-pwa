@@ -8156,7 +8156,13 @@ function openSupplierMailModal(supplierId) {
         '<div class="form-group"><label class="form-label">Текст</label>' +
           '<textarea class="form-input" id="sm-body" rows="12" style="font-family:inherit;">' +
           escapeHtml(m.body) + '</textarea></div>' +
-        '<div style="font-size:12px;color:var(--text-light);">Подпись подставится автоматически. Письмо сохранится в разделе «Почта и MAX».</div>' +
+        // v1.8.770: подпись добавляет сервер при отправке — без показа было
+        // непонятно, чем письмо подписывается, и казалось, что подписи нет вовсе.
+        '<div class="form-group"><label class="form-label">Подпись (добавится автоматически)</label>' +
+          '<pre id="sm-signature" style="margin:0;padding:10px 12px;background:var(--bg-soft,#F5F7FA);' +
+          'border:1px dashed var(--border);border-radius:8px;font:inherit;font-size:13px;' +
+          'white-space:pre-wrap;color:var(--text-light);">загружаю…</pre></div>' +
+        '<div style="font-size:12px;color:var(--text-light);">Письмо сохранится в разделе «Почта и MAX».</div>' +
       '</div>' +
       '<div class="modal-footer">' +
         '<button class="btn btn-secondary" onclick="document.getElementById(\'supplier-mail-modal\').remove()">Отмена</button>' +
@@ -8164,6 +8170,14 @@ function openSupplierMailModal(supplierId) {
       '</div>' +
     '</div>';
   document.body.appendChild(el);
+  // Подтягиваем реальную подпись — ту же, что сервер добавит при отправке.
+  apiGet('/api/mail/signature').then(d => {
+    const box = document.getElementById('sm-signature');
+    if (box) box.textContent = (d && d.signature) || '—';
+  }).catch(() => {
+    const box = document.getElementById('sm-signature');
+    if (box) box.textContent = 'не удалось загрузить';
+  });
 }
 
 async function sendSupplierMail() {
