@@ -8403,46 +8403,126 @@ function _cpTrackingRowHtml(it) {
 // Склад этим не двигаем: остаток приходит из приёмки УПД, там позицию и
 // сопоставляют с нужной карточкой. Здесь только фиксируем факт замены,
 // чтобы заказ не утверждал, будто приехало именно заказанное.
+// Подсказка для поиска: из «Выключатель автоматический CHINT NXB-63S 1P C25 6 кА»
+// берём код модели (NXB-63S) — по нему сразу видно все родственные карточки.
+function _substGuess(name) {
+  const words = String(name || '').split(/[\s,;]+/);
+  const code = words.find(w => /[A-Za-zА-Яа-я]/.test(w) && /\d/.test(w) && w.length >= 5);
+  if (code) return code.replace(/[^\w\-]/g, '');
+  return words.filter(w => w.length > 3).slice(0, 1).join(' ');
+}
+
 async function shopMarkSubstituted(orderItemId, name) {
-  const q = prompt(
-    'Что пришло вместо «' + (name || '') + '»?\n\n' +
-    'Введите часть названия — покажу подходящие карточки склада.', '');
-  if (q === null) return;
-  const term = String(q).trim();
-  if (term.length < 2) { showToast('Нужно хотя бы 2 символа', 'error'); return; }
-  let list = [];
+  state._substCtx = { orderItemId: orderItemId, name: name, chosen: null, all: [] };
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'subst-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:640px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-replace"></i> Пришло другое</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'subst-modal\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">' +
+          'Заказано: <b>' + escapeHtml(String(name || '')) + '</b>' +
+        '</div>' +
+        '<div class="form-group"><label class="form-label">Что пришло вместо этого</label>' +
+          '<input class="form-input" id="subst-search" placeholder="начните вводить название…" ' +
+          'oninput="_substFilter()" autocomplete="off"></div>' +
+        '<div id="subst-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);' +
+          'border-radius:10px;">загружаю справочник…</div>' +
+        '<div class="form-group" style="margin-top:12px;"><label class="form-label">Комментарий (необязательно)</label>' +
+          '<input class="form-input" id="subst-note" placeholder="например: поставщик прислал 4,5 кА вместо 6 кА"></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'subst-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="subst-ok" disabled onclick="_substSubmit()">' +
+          '<i class="ti ti-check"></i> Закрыть заменой</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+
   try {
     const d = await apiGet('/api/components?limit=2000');
-    const all = (d && d.components) || [];
-    const low = term.toLowerCase();
-    list = all.filter(c => String(c.name || '').toLowerCase().includes(low)).slice(0, 15);
+    state._substCtx.all = (d && d.components) || [];
   } catch (e) {
-    showToast('Не удалось загрузить справочник', 'error');
+    const box = document.getElementById('subst-list');
+    if (box) box.innerHTML = '<div style="padding:14px;color:#B91C1C;">Не удалось загрузить справочник</div>';
     return;
   }
-  if (!list.length) { showToast('Ничего не нашлось по «' + term + '»', 'error'); return; }
-  const menu = list.map((c, i) =>
-    (i + 1) + ') ' + c.name + ' — ' + (c.qty_on_stock || 0) + ' шт').join('\n');
-  const pick = prompt('Выберите номер:\n\n' + menu, '1');
-  if (pick === null) return;
-  const idx = parseInt(pick, 10) - 1;
-  if (!(idx >= 0 && idx < list.length)) { showToast('Неверный номер', 'error'); return; }
-  const chosen = list[idx];
-  const note = prompt('Комментарий (необязательно) — почему замена:', '') || '';
+  const inp = document.getElementById('subst-search');
+  if (inp) { inp.value = _substGuess(name); }
+  _substFilter();
+  if (inp) inp.focus();
+}
+
+function _substFilter() {
+  const ctx = state._substCtx || {};
+  const box = document.getElementById('subst-list');
+  if (!box) return;
+  const term = ((document.getElementById('subst-search') || {}).value || '').trim().toLowerCase();
+  let list = ctx.all || [];
+  if (term) list = list.filter(c => String(c.name || '').toLowerCase().includes(term));
+  // сначала то, что есть на складе — обычно заменой приходит то, что уже лежит
+  list = list.slice().sort((a, b) => (parseFloat(b.qty_on_stock) || 0) - (parseFloat(a.qty_on_stock) || 0));
+  const shown = list.slice(0, 60);
+  if (!shown.length) {
+    box.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Ничего не нашлось</div>';
+    return;
+  }
+  box.innerHTML = shown.map(c => {
+    const sel = ctx.chosen && ctx.chosen.id === c.id;
+    const qty = parseFloat(c.qty_on_stock) || 0;
+    return '<div onclick="_substPick(' + c.id + ')" style="display:flex;align-items:center;gap:10px;' +
+      'padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);' +
+      (sel ? 'background:#ECFDF5;' : '') + '">' +
+        '<div style="flex:1;min-width:0;font-size:13px;' + (sel ? 'font-weight:700;' : '') + '">' +
+          escapeHtml(c.name || '') + '</div>' +
+        '<div style="font-size:12px;font-weight:700;white-space:nowrap;' +
+          'color:' + (qty > 0 ? '#047857' : 'var(--text-light)') + ';">' + qty + ' шт</div>' +
+        (sel ? '<i class="ti ti-circle-check" style="color:#16A34A;font-size:18px;"></i>' : '') +
+      '</div>';
+  }).join('') +
+    (list.length > shown.length
+      ? '<div style="padding:9px 12px;font-size:12px;color:var(--text-light);">…ещё ' +
+        (list.length - shown.length) + ' — уточните поиск</div>'
+      : '');
+}
+
+function _substPick(componentId) {
+  const ctx = state._substCtx || {};
+  ctx.chosen = (ctx.all || []).find(c => c.id === componentId) || null;
+  const ok = document.getElementById('subst-ok');
+  if (ok) ok.disabled = !ctx.chosen;
+  _substFilter();
+}
+
+async function _substSubmit() {
+  const ctx = state._substCtx || {};
+  if (!ctx.chosen) { showToast('Выберите, что пришло', 'error'); return; }
+  const note = ((document.getElementById('subst-note') || {}).value || '').trim();
+  const btn = document.getElementById('subst-ok');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
   try {
-    const r = await apiPost('/api/supply-orders/items/' + orderItemId + '/received', {
-      received_component_id: chosen.id,
+    const r = await apiPost('/api/supply-orders/items/' + ctx.orderItemId + '/received', {
+      received_component_id: ctx.chosen.id,
       substitution_note: note,
     });
     const d = (r && r.data) || {};
     if (r && r.ok && d.ok) {
-      showToast('Закрыто заменой: ' + chosen.name, 'success');
+      showToast('Закрыто заменой: ' + ctx.chosen.name, 'success');
+      const m = document.getElementById('subst-modal');
+      if (m) m.remove();
       loadSupplyShopping();
     } else {
       showToast(d.message || 'Не удалось отметить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Закрыть заменой'; }
     }
   } catch (e) {
     showToast((e && e.message) ? e.message : 'Ошибка', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Закрыть заменой'; }
   }
 }
 
