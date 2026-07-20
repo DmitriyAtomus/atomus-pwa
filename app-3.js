@@ -8370,7 +8370,8 @@ function _cpTrackingRowHtml(it) {
       // привезли 4,5 кА). Раньше выбор был плохой: соврать «пришло заказанное»
       // или удалить строку и потерять след. Теперь закрываем заменой.
       ' <button type="button" onclick="shopMarkSubstituted(' + it.order_item_id +
-      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\')" ' +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\', ' +
+      (it.component_id || 'null') + ')" ' +
       'title="Поставщик прислал другую позицию — закрыть строку заменой" ' +
       'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #FBBF24;color:#92400E;' +
       'border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
@@ -8416,8 +8417,25 @@ function _substTokens(name) {
   return out;
 }
 
+// v1.8.774: считаем ТОЛЬКО по токенам с цифрами — коду модели и номиналам.
+// Общие слова («выключатель автоматический chint») есть у всей группы и
+// перевешивали суть: наверх лезли пустые карточки того же семейства, а нужный
+// «3P 25А» с одной штукой не показывался вовсе.
+// Плюс к каждому токену добавляем голое число: «c25», «25a» и «25» — про один
+// номинал, записанный по-разному.
+function _substKeys(name) {
+  const out = new Set();
+  _substTokens(name).forEach(t => {
+    if (!/\d/.test(t)) return;          // слова без цифр ничего не различают
+    out.add(t);
+    const core = t.replace(/[^\d.]/g, '');
+    if (core && core !== t) out.add(core);
+  });
+  return out;
+}
+
 function _substScore(wantSet, name) {
-  const has = _substTokens(name);
+  const has = _substKeys(name);
   let n = 0;
   has.forEach(t => { if (wantSet.has(t)) n++; });
   return n;
@@ -8430,8 +8448,8 @@ function _substGuess(name) {
   return words.filter(w => w.length > 3).slice(0, 1).join(' ');
 }
 
-async function shopMarkSubstituted(orderItemId, name) {
-  state._substCtx = { orderItemId: orderItemId, name: name, chosen: null, all: [] };
+async function shopMarkSubstituted(orderItemId, name, componentId) {
+  state._substCtx = { orderItemId: orderItemId, name: name, componentId: componentId || null, chosen: null, all: [] };
   const el = document.createElement('div');
   el.className = 'modal-overlay visible';
   el.id = 'subst-modal';
@@ -8482,12 +8500,14 @@ function _substFilter() {
   if (!box) return;
   const term = ((document.getElementById('subst-search') || {}).value || '').trim().toLowerCase();
   let list = ctx.all || [];
+  // саму заказанную карточку в кандидаты не предлагаем — заменять её на себя нечем
+  if (ctx.componentId) list = list.filter(c => c.id !== ctx.componentId);
   if (term) list = list.filter(c => String(c.name || '').toLowerCase().includes(term));
   // v1.8.773: сортировка ТОЛЬКО по остатку прятала нужное. Для заказа
   // «NXB-63S 3P C25» сверху вставали однополюсные с большими остатками, а
   // искомый «3P 25А» (1 шт) уезжал вниз. Сначала похожесть на заказанное
   // (число общих слов и цифр), и лишь при равной похожести — остаток.
-  const want = _substTokens(ctx.name);
+  const want = _substKeys(ctx.name);
   list = list.slice().sort((a, b) => {
     const sa = _substScore(want, a.name), sb = _substScore(want, b.name);
     if (sa !== sb) return sb - sa;
