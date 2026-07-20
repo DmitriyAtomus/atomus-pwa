@@ -8091,7 +8091,7 @@ function _componentToTracking(it, group) {
 // v2.45.757: «Написать» поставщику — письмо уже готово, руками добивать не надо.
 // В переписке ссылаются на номер ИХ счёта (наш ORD-N поставщику ничего не говорит),
 // поэтому счёт — главный ориентир, заказ — запасной.
-function _cpSupplierMailHref(g) {
+function _cpSupplierMailDraft(g) {
   const dot = iso => {
     const p = String(iso || '').slice(0, 10).split('-');
     return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '';
@@ -8123,9 +8123,68 @@ function _cpSupplierMailHref(g) {
     lines.join('\n') + '\n\n' +
     'Когда планируется отгрузка?\n\n' +
     'С уважением,\nООО «Атомус Групп»';
-  return 'mailto:' + encodeURIComponent(g.email) +
-    '?subject=' + encodeURIComponent(subject) +
-    '&body=' + encodeURIComponent(body);
+  return { to: g.email, subject: subject, body: body };
+}
+
+// v1.8.766: письмо поставщику прямо из CRM.
+// Раньше кнопка «Написать» отдавала mailto: — Windows спрашивал, каким
+// приложением открыть ссылку, а отправленное письмо оставалось вне CRM
+// (в разделе «Почта и MAX» его было не найти). Теперь текст показывается
+// в окне, его можно поправить, и уходит он через наш же почтовый канал.
+function openSupplierMailModal(supplierId) {
+  const g = (state._cpMailGroups || {})[supplierId] || (state._cpMailGroups || {})[String(supplierId)];
+  if (!g || !g.email) { showToast('У поставщика не указан e-mail', 'error'); return; }
+  const m = _cpSupplierMailDraft(g);
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'supplier-mail-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:640px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-mail"></i> Письмо поставщику</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'supplier-mail-modal\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Кому</label>' +
+          '<input class="form-input" id="sm-to" value="' + escapeHtml(m.to) + '"></div>' +
+        '<div class="form-group"><label class="form-label">Тема</label>' +
+          '<input class="form-input" id="sm-subject" value="' + escapeHtml(m.subject) + '"></div>' +
+        '<div class="form-group"><label class="form-label">Текст</label>' +
+          '<textarea class="form-input" id="sm-body" rows="12" style="font-family:inherit;">' +
+          escapeHtml(m.body) + '</textarea></div>' +
+        '<div style="font-size:12px;color:var(--text-light);">Подпись подставится автоматически. Письмо сохранится в разделе «Почта и MAX».</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'supplier-mail-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="sm-send" onclick="sendSupplierMail()"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+}
+
+async function sendSupplierMail() {
+  const to = (document.getElementById('sm-to') || {}).value || '';
+  const subject = (document.getElementById('sm-subject') || {}).value || '';
+  const body = (document.getElementById('sm-body') || {}).value || '';
+  if (!to.trim() || !body.trim()) { showToast('Заполните адрес и текст', 'error'); return; }
+  const btn = document.getElementById('sm-send');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await apiPost('/api/mail/compose', { to: to.trim(), subject: subject.trim(), body: body });
+    const d = (r && r.data) || {};
+    if (r && r.ok && d.ok) {
+      showToast('Письмо отправлено', 'success');
+      const el = document.getElementById('supplier-mail-modal');
+      if (el) el.remove();
+    } else {
+      showToast(d.message || 'Не удалось отправить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+    }
+  } catch (e) {
+    showToast((e && e.message) ? e.message : 'Ошибка отправки', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+  }
 }
 
 // v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
@@ -8146,11 +8205,17 @@ function _cpTrackingBlockHtml(ordered) {
       '</div>' +
     '</div>' +
     '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Уже заказано/оплачено — едет. К закупке больше не предлагается. Долго нет поставки — свяжись с поставщиком.</div>';
+  // v1.8.766: держим группы под рукой — модалка письма собирает текст из них
+  state._cpMailGroups = bySup;
   const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? 1 : b === '0' ? -1 : 0));
   keys.forEach(k => {
     const g = bySup[k];
     const contactBtns = [];
-    if (g.email) contactBtns.push('<a href="' + escapeHtml(_cpSupplierMailHref(g)) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Письмо про отправку — текст уже подставлен"><i class="ti ti-mail"></i> Написать</a>');
+    // v1.8.766: было mailto: — Windows спрашивал, чем открыть, и письмо уходило
+    // мимо CRM (в переписке его потом не найти). Теперь открываем своё окно.
+    if (g.email) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
+      'onclick="openSupplierMailModal(' + (g.id || 0) + ')" ' +
+      'title="Письмо про отправку — текст уже подставлен"><i class="ti ti-mail"></i> Написать</button>');
     // v2.45.429: вместо tel: — показываем сам номер, тап открывает карточку поставщика
     if (g.phone) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
       (g.id ? 'onclick="openEditSupplier(' + g.id + ')" title="Открыть карточку поставщика"' : 'disabled') +
