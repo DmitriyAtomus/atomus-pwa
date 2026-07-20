@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.768";
+const APP_VERSION = "v2.45.769";
 const APP_VERSION_DATE = "20.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -6760,11 +6760,16 @@ function renderPkbBomBlock(w) {
   html +=   '</div>';
   if (hasCritical && !isPartial) {
     html += '<div style="font-size:11px;color:var(--text-light);margin-top:8px;">! — критичный компонент. Работа считается заблокированной пока их нет на складе.</div>';
-    // v2.45.767: осознанный частичный запуск — мастер/директор
-    if (w.status === 'queue' && hasPermission('production.manage')) {
-      html += '<button class="pkb-partial-btn" onclick="pwdStartPartial(' + w.id + ')">' +
-                '<i class="ti ti-player-play"></i> Начать частично — без этих деталей</button>';
-      html += '<div style="font-size:11px;color:var(--text-light);margin-top:5px;">Работа пойдёт «В работе», дефицит останется на виду жёлтым. Этапы, которым нужны эти детали, будут под замком до прихода на склад.</div>';
+    // v2.45.767: осознанный частичный запуск — мастер/директор.
+    // v2.45.769: доступен и для уже идущей работы (взяли в работу до дефицита).
+    if (['queue', 'in_progress', 'review', 'packing'].includes(w.status) && hasPermission('production.manage')) {
+      const _pbLabel = w.status === 'queue'
+        ? '<i class="ti ti-player-play"></i> Начать частично — без этих деталей'
+        : '<i class="ti ti-hourglass"></i> Работаем частично — детали в пути';
+      html += '<button class="pkb-partial-btn" onclick="pwdStartPartial(' + w.id + ')">' + _pbLabel + '</button>';
+      html += '<div style="font-size:11px;color:var(--text-light);margin-top:5px;">' +
+        (w.status === 'queue' ? 'Работа пойдёт «В работе», дефицит' : 'Красный замок станет жёлтым «ждём детали», дефицит') +
+        ' останется на виду. Этапы, которым нужны эти детали, — под замком до прихода на склад.</div>';
     }
   }
   if (isPartial) {
