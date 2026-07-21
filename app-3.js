@@ -7536,9 +7536,11 @@ async function loadLogisticsPickups() {
   box.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
     // v2.45.715: параллельно тянем самовывозы и отправки СДЭК
-    const [d, cd] = await Promise.all([
+    // v1.8.775: + накладные Деловых линий
+    const [d, cd, dl] = await Promise.all([
       apiGet('/api/logistics/pickups'),
       apiGet('/api/logistics/cdek').catch(() => null),
+      apiGet('/api/logistics/dellin').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
@@ -7549,6 +7551,7 @@ async function loadLogisticsPickups() {
     html += transit.length ? transit.map(_logiTransitCard).join('')
       : '<div class="logi-empty"><i class="ti ti-route"></i> Ничего в пути.</div>';
     if (cd) html += _cdekBlockHtml(cd);
+    if (dl) html += _dellinBlockHtml(dl);
     if (done.length) {
       html += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
       html += done.map(_logiDoneRow).join('');
@@ -7656,6 +7659,153 @@ async function cdekSaveKeys() {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
 }
+
+// ============ v1.8.775: ДЕЛОВЫЕ ЛИНИИ — накладные (пока без API) ============
+// Статус ведём вручную, кнопка «Отследить» открывает трекер ДЛ и копирует
+// номер в буфер (прямой deep-ссылки с номером у dellin.ru нет).
+function _dellinBlockHtml(dl) {
+  const list = dl.shipments || [];
+  let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
+    '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + list.length + '</span>' +
+    '<span style="margin-left:auto;">' +
+      '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
+    '</span></div>';
+  if (!list.length) {
+    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет — добавь номер накладной Деловых линий.</div>';
+    return h;
+  }
+  list.forEach(sh => {
+    const delivered = !!sh.delivered_at;
+    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
+    const num = String(sh.dellin_number || '');
+    h += '<div class="cdek-card' + (delivered ? ' done' : '') + '">' +
+      '<div class="cdek-main">' +
+        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(num) +
+          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
+        '<div class="cdek-sub">' +
+          (delivered
+            ? '<span class="cdek-st done">✓ Вручён</span>'
+            : (sh.status_note
+                ? '<span class="cdek-st run">' + escapeHtml(sh.status_note) + '</span>'
+                : '<span class="cdek-st wait">статус вручную</span>')) +
+          (proj ? ' · ' + escapeHtml(proj) : '') +
+        '</div>' +
+        '<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' +
+            num.replace(/'/g, '') + '\')" title="Открыть трекер Деловых линий (номер скопируется)">' +
+            '<i class="ti ti-external-link"></i> Отследить</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')">' +
+            '<i class="ti ti-edit"></i> Статус</button>' +
+          (delivered
+            ? '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',false)">↩ вернуть в путь</button>'
+            : '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',true)"><i class="ti ti-check"></i> вручён</button>') +
+        '</div>' +
+      '</div>' +
+      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+      '<button class="cdek-del" onclick="dellinRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  return h;
+}
+
+function dellinTrack(num) {
+  try {
+    if (navigator.clipboard && num) {
+      navigator.clipboard.writeText(num).then(
+        () => showToast('Номер скопирован — вставьте в поле трекера', 'success'),
+        () => {});
+    }
+  } catch (e) {}
+  window.open('https://www.dellin.ru/tracker/', '_blank', 'noopener');
+}
+
+function dellinAdd() {
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'dellin-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-truck"></i> Накладная Деловых линий</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'dellin-modal\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Номер накладной</label>' +
+          '<input class="form-input" id="dl-num" placeholder="например 17-00012345678" autocomplete="off"></div>' +
+        '<div class="form-group"><label class="form-label">Что везём / кому (для списка)</label>' +
+          '<input class="form-input" id="dl-title" placeholder="например: щит, Гринвуд"></div>' +
+        '<div class="form-group"><label class="form-label">Ожидаемая дата (необязательно)</label>' +
+          '<input class="form-input" id="dl-date" type="date"></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'dellin-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="dl-ok" onclick="dellinSubmit()"><i class="ti ti-plus"></i> Добавить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  const inp = document.getElementById('dl-num'); if (inp) inp.focus();
+}
+
+async function dellinSubmit() {
+  const num = ((document.getElementById('dl-num') || {}).value || '').trim();
+  const title = ((document.getElementById('dl-title') || {}).value || '').trim();
+  const date = ((document.getElementById('dl-date') || {}).value || '').trim();
+  if (!num) { showToast('Укажите номер накладной', 'error'); return; }
+  const btn = document.getElementById('dl-ok');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Добавляем…'; }
+  try {
+    const r = await apiPost('/api/logistics/dellin', {
+      dellin_number: num, title: title, planned_date: date });
+    const j = (r && r.data) || {};
+    if (r && r.ok && j.ok) {
+      showToast('Добавлено', 'success');
+      const m = document.getElementById('dellin-modal'); if (m) m.remove();
+      loadLogisticsPickups();
+    } else {
+      showToast(j.message || 'Не удалось добавить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-plus"></i> Добавить'; }
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-plus"></i> Добавить'; }
+  }
+}
+
+async function dellinSetStatus(id) {
+  const note = prompt('Статус (свободный текст, например «В пути · Новосибирск»):', '');
+  if (note === null) return;
+  await _dellinPatch(id, { status_note: note.trim() });
+}
+
+async function dellinDelivered(id, val) {
+  await _dellinPatch(id, { delivered: !!val });
+}
+
+async function _dellinPatch(id, body) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/logistics/dellin/' + id, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) { showToast('Не удалось сохранить', 'error'); return; }
+  } catch (e) { showToast('Ошибка соединения', 'error'); return; }
+  loadLogisticsPickups();
+}
+
+async function dellinRemove(id) {
+  if (!confirm('Убрать эту накладную из списка?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    await fetch(API_BASE + '/api/logistics/dellin/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+  } catch (e) {}
+  loadLogisticsPickups();
+}
+
 function _logiSum(v) { return (v != null && v !== '') ? Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽' : ''; }
 function _logiPlural(n, one, few, many) {
   const m10 = n % 10, m100 = n % 100;
@@ -8091,7 +8241,7 @@ function _componentToTracking(it, group) {
 // v2.45.757: «Написать» поставщику — письмо уже готово, руками добивать не надо.
 // В переписке ссылаются на номер ИХ счёта (наш ORD-N поставщику ничего не говорит),
 // поэтому счёт — главный ориентир, заказ — запасной.
-function _cpSupplierMailHref(g) {
+function _cpSupplierMailDraft(g) {
   const dot = iso => {
     const p = String(iso || '').slice(0, 10).split('-');
     return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '';
@@ -8118,14 +8268,90 @@ function _cpSupplierMailHref(g) {
   const subject = invoices.length
     ? 'Отправка по счёту № ' + invoices.join(', № ')
     : 'Уточнение по отправке заказа';
+  // v1.8.768: подпись НЕ добавляем — её ставит бэкенд (send_supplier_reply),
+  // причём полнее: имя отправителя, должность, компания, телефон. Раньше
+  // текст уходил в mailto: без всякой обработки, поэтому подпись писали здесь;
+  // теперь письмо идёт через наш почтовый канал и подписей вышло бы две.
   const body = 'Добрый день!\n\n' +
     'Подскажите, пожалуйста, по отправке:\n\n' +
     lines.join('\n') + '\n\n' +
-    'Когда планируется отгрузка?\n\n' +
-    'С уважением,\nООО «Атомус Групп»';
-  return 'mailto:' + encodeURIComponent(g.email) +
-    '?subject=' + encodeURIComponent(subject) +
-    '&body=' + encodeURIComponent(body);
+    'Когда планируется отгрузка?';
+  return { to: g.email, subject: subject, body: body };
+}
+
+// v1.8.766: письмо поставщику прямо из CRM.
+// Раньше кнопка «Написать» отдавала mailto: — Windows спрашивал, каким
+// приложением открыть ссылку, а отправленное письмо оставалось вне CRM
+// (в разделе «Почта и MAX» его было не найти). Теперь текст показывается
+// в окне, его можно поправить, и уходит он через наш же почтовый канал.
+function openSupplierMailModal(supplierId) {
+  const g = (state._cpMailGroups || {})[supplierId] || (state._cpMailGroups || {})[String(supplierId)];
+  if (!g || !g.email) { showToast('У поставщика не указан e-mail', 'error'); return; }
+  const m = _cpSupplierMailDraft(g);
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'supplier-mail-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:640px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-mail"></i> Письмо поставщику</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'supplier-mail-modal\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Кому</label>' +
+          '<input class="form-input" id="sm-to" value="' + escapeHtml(m.to) + '"></div>' +
+        '<div class="form-group"><label class="form-label">Тема</label>' +
+          '<input class="form-input" id="sm-subject" value="' + escapeHtml(m.subject) + '"></div>' +
+        '<div class="form-group"><label class="form-label">Текст</label>' +
+          '<textarea class="form-input" id="sm-body" rows="12" style="font-family:inherit;">' +
+          escapeHtml(m.body) + '</textarea></div>' +
+        // v1.8.770: подпись добавляет сервер при отправке — без показа было
+        // непонятно, чем письмо подписывается, и казалось, что подписи нет вовсе.
+        '<div class="form-group"><label class="form-label">Подпись (добавится автоматически)</label>' +
+          '<pre id="sm-signature" style="margin:0;padding:10px 12px;background:var(--bg-soft,#F5F7FA);' +
+          'border:1px dashed var(--border);border-radius:8px;font:inherit;font-size:13px;' +
+          'white-space:pre-wrap;color:var(--text-light);">загружаю…</pre></div>' +
+        '<div style="font-size:12px;color:var(--text-light);">Письмо сохранится в разделе «Почта и MAX».</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'supplier-mail-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="sm-send" onclick="sendSupplierMail()"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  // Подтягиваем реальную подпись — ту же, что сервер добавит при отправке.
+  apiGet('/api/mail/signature').then(d => {
+    const box = document.getElementById('sm-signature');
+    if (box) box.textContent = (d && d.signature) || '—';
+  }).catch(() => {
+    const box = document.getElementById('sm-signature');
+    if (box) box.textContent = 'не удалось загрузить';
+  });
+}
+
+async function sendSupplierMail() {
+  const to = (document.getElementById('sm-to') || {}).value || '';
+  const subject = (document.getElementById('sm-subject') || {}).value || '';
+  const body = (document.getElementById('sm-body') || {}).value || '';
+  if (!to.trim() || !body.trim()) { showToast('Заполните адрес и текст', 'error'); return; }
+  const btn = document.getElementById('sm-send');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await apiPost('/api/mail/compose', { to: to.trim(), subject: subject.trim(), body: body });
+    const d = (r && r.data) || {};
+    if (r && r.ok && d.ok) {
+      showToast('Письмо отправлено', 'success');
+      const el = document.getElementById('supplier-mail-modal');
+      if (el) el.remove();
+    } else {
+      showToast(d.message || 'Не удалось отправить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+    }
+  } catch (e) {
+    showToast((e && e.message) ? e.message : 'Ошибка отправки', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+  }
 }
 
 // v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
@@ -8146,11 +8372,17 @@ function _cpTrackingBlockHtml(ordered) {
       '</div>' +
     '</div>' +
     '<div style="font-size:12px;color:var(--text-light);padding:0 14px 8px;">Уже заказано/оплачено — едет. К закупке больше не предлагается. Долго нет поставки — свяжись с поставщиком.</div>';
+  // v1.8.766: держим группы под рукой — модалка письма собирает текст из них
+  state._cpMailGroups = bySup;
   const keys = Object.keys(bySup).sort((a, b) => (a === '0' ? 1 : b === '0' ? -1 : 0));
   keys.forEach(k => {
     const g = bySup[k];
     const contactBtns = [];
-    if (g.email) contactBtns.push('<a href="' + escapeHtml(_cpSupplierMailHref(g)) + '" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Письмо про отправку — текст уже подставлен"><i class="ti ti-mail"></i> Написать</a>');
+    // v1.8.766: было mailto: — Windows спрашивал, чем открыть, и письмо уходило
+    // мимо CRM (в переписке его потом не найти). Теперь открываем своё окно.
+    if (g.email) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
+      'onclick="openSupplierMailModal(' + (g.id || 0) + ')" ' +
+      'title="Письмо про отправку — текст уже подставлен"><i class="ti ti-mail"></i> Написать</button>');
     // v2.45.429: вместо tel: — показываем сам номер, тап открывает карточку поставщика
     if (g.phone) contactBtns.push('<button type="button" class="btn btn-secondary btn-sm" ' +
       (g.id ? 'onclick="openEditSupplier(' + g.id + ')" title="Открыть карточку поставщика"' : 'disabled') +
@@ -8283,7 +8515,25 @@ function _cpTrackingRowHtml(it) {
       'title="Товар пришёл — нажмите, чтобы отметить позицию полученной (заказ закроется)" ' +
       'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #34D399;color:#047857;border-radius:8px;' +
       'padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
-      '<i class="ti ti-circle-check"></i> Отметить, что пришло</button>';
+      '<i class="ti ti-circle-check"></i> Отметить, что пришло</button>' +
+      // v1.8.771: поставщик регулярно шлёт замену (заказали автомат 6 кА —
+      // привезли 4,5 кА). Раньше выбор был плохой: соврать «пришло заказанное»
+      // или удалить строку и потерять след. Теперь закрываем заменой.
+      ' <button type="button" onclick="shopMarkSubstituted(' + it.order_item_id +
+      ', \'' + escapeHtml(String(it.item_name || '')).replace(/'/g, '&#39;') + '\', ' +
+      (it.component_id || 'null') + ')" ' +
+      'title="Поставщик прислал другую позицию — закрыть строку заменой" ' +
+      'style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #FBBF24;color:#92400E;' +
+      'border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+      '<i class="ti ti-replace"></i> Пришло другое</button>';
+  }
+  // Уже закрыта заменой — показываем, чем именно
+  let substNote = '';
+  if (it.subst_component_name) {
+    substNote = '<div style="margin-top:6px;font-size:11.5px;color:#92400E;">' +
+      '<i class="ti ti-replace"></i> вместо заказанного пришло: <b>' +
+      escapeHtml(it.subst_component_name) + '</b>' +
+      (it.subst_note ? ' — ' + escapeHtml(it.subst_note) : '') + '</div>';
   }
   return '<div class="sup-track-row" style="padding:11px 14px;border-bottom:1px dashed var(--border);">' +
     nameCell +
@@ -8295,8 +8545,181 @@ function _cpTrackingRowHtml(it) {
       receivedBtn +
       returnBtn +
     '</div>' +
+    substNote +
     _supDeliveryStepperHtml(_itemReceived ? 'received' : it.order_status) +
   '</div>';
+}
+
+// v1.8.771: «Пришло другое» — закрыть строку заказа заменой.
+// Склад этим не двигаем: остаток приходит из приёмки УПД, там позицию и
+// сопоставляют с нужной карточкой. Здесь только фиксируем факт замены,
+// чтобы заказ не утверждал, будто приехало именно заказанное.
+// Подсказка для поиска: из «Выключатель автоматический CHINT NXB-63S 1P C25 6 кА»
+// берём код модели (NXB-63S) — по нему сразу видно все родственные карточки.
+// Значимые слова названия: кириллица приводится к латинице (А/A, В/B, С/C…),
+// «4,5» к «4.5» — иначе «4,5кА» и «4.5kA» считались бы разными.
+function _substTokens(name) {
+  const map = { 'а':'a','в':'b','е':'e','к':'k','м':'m','н':'h','о':'o','р':'p','с':'c','т':'t','у':'y','х':'x' };
+  let s = String(name || '').toLowerCase().replace(/[а-я]/g, ch => map[ch] || ch);
+  s = s.replace(/(?<=\d),(?=\d)/g, '.').replace(/[^\w.\-]+/g, ' ');
+  const out = new Set();
+  s.split(/\s+/).forEach(t => { t = t.replace(/^[-.]+|[-.]+$/g, ''); if (t.length >= 2) out.add(t); });
+  return out;
+}
+
+// v1.8.774: считаем ТОЛЬКО по токенам с цифрами — коду модели и номиналам.
+// Общие слова («выключатель автоматический chint») есть у всей группы и
+// перевешивали суть: наверх лезли пустые карточки того же семейства, а нужный
+// «3P 25А» с одной штукой не показывался вовсе.
+// Плюс к каждому токену добавляем голое число: «c25», «25a» и «25» — про один
+// номинал, записанный по-разному.
+function _substKeys(name) {
+  const out = new Set();
+  _substTokens(name).forEach(t => {
+    if (!/\d/.test(t)) return;          // слова без цифр ничего не различают
+    out.add(t);
+    const core = t.replace(/[^\d.]/g, '');
+    if (core && core !== t) out.add(core);
+  });
+  return out;
+}
+
+function _substScore(wantSet, name) {
+  const has = _substKeys(name);
+  let n = 0;
+  has.forEach(t => { if (wantSet.has(t)) n++; });
+  return n;
+}
+
+function _substGuess(name) {
+  const words = String(name || '').split(/[\s,;]+/);
+  const code = words.find(w => /[A-Za-zА-Яа-я]/.test(w) && /\d/.test(w) && w.length >= 5);
+  if (code) return code.replace(/[^\w\-]/g, '');
+  return words.filter(w => w.length > 3).slice(0, 1).join(' ');
+}
+
+async function shopMarkSubstituted(orderItemId, name, componentId) {
+  state._substCtx = { orderItemId: orderItemId, name: name, componentId: componentId || null, chosen: null, all: [] };
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'subst-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:640px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-replace"></i> Пришло другое</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'subst-modal\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:10px;">' +
+          'Заказано: <b>' + escapeHtml(String(name || '')) + '</b>' +
+        '</div>' +
+        '<div class="form-group"><label class="form-label">Что пришло вместо этого</label>' +
+          '<input class="form-input" id="subst-search" placeholder="начните вводить название…" ' +
+          'oninput="_substFilter()" autocomplete="off"></div>' +
+        '<div id="subst-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);' +
+          'border-radius:10px;">загружаю справочник…</div>' +
+        '<div class="form-group" style="margin-top:12px;"><label class="form-label">Комментарий (необязательно)</label>' +
+          '<input class="form-input" id="subst-note" placeholder="например: поставщик прислал 4,5 кА вместо 6 кА"></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'subst-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="subst-ok" disabled onclick="_substSubmit()">' +
+          '<i class="ti ti-check"></i> Закрыть заменой</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+
+  try {
+    const d = await apiGet('/api/components?limit=2000');
+    state._substCtx.all = (d && d.components) || [];
+  } catch (e) {
+    const box = document.getElementById('subst-list');
+    if (box) box.innerHTML = '<div style="padding:14px;color:#B91C1C;">Не удалось загрузить справочник</div>';
+    return;
+  }
+  const inp = document.getElementById('subst-search');
+  if (inp) { inp.value = _substGuess(name); }
+  _substFilter();
+  if (inp) inp.focus();
+}
+
+function _substFilter() {
+  const ctx = state._substCtx || {};
+  const box = document.getElementById('subst-list');
+  if (!box) return;
+  const term = ((document.getElementById('subst-search') || {}).value || '').trim().toLowerCase();
+  let list = ctx.all || [];
+  // саму заказанную карточку в кандидаты не предлагаем — заменять её на себя нечем
+  if (ctx.componentId) list = list.filter(c => c.id !== ctx.componentId);
+  if (term) list = list.filter(c => String(c.name || '').toLowerCase().includes(term));
+  // v1.8.773: сортировка ТОЛЬКО по остатку прятала нужное. Для заказа
+  // «NXB-63S 3P C25» сверху вставали однополюсные с большими остатками, а
+  // искомый «3P 25А» (1 шт) уезжал вниз. Сначала похожесть на заказанное
+  // (число общих слов и цифр), и лишь при равной похожести — остаток.
+  const want = _substKeys(ctx.name);
+  list = list.slice().sort((a, b) => {
+    const sa = _substScore(want, a.name), sb = _substScore(want, b.name);
+    if (sa !== sb) return sb - sa;
+    return (parseFloat(b.qty_on_stock) || 0) - (parseFloat(a.qty_on_stock) || 0);
+  });
+  const shown = list.slice(0, 60);
+  if (!shown.length) {
+    box.innerHTML = '<div style="padding:14px;color:var(--text-light);font-size:13px;">Ничего не нашлось</div>';
+    return;
+  }
+  box.innerHTML = shown.map(c => {
+    const sel = ctx.chosen && ctx.chosen.id === c.id;
+    const qty = parseFloat(c.qty_on_stock) || 0;
+    return '<div onclick="_substPick(' + c.id + ')" style="display:flex;align-items:center;gap:10px;' +
+      'padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);' +
+      (sel ? 'background:#ECFDF5;' : '') + '">' +
+        '<div style="flex:1;min-width:0;font-size:13px;' + (sel ? 'font-weight:700;' : '') + '">' +
+          escapeHtml(c.name || '') + '</div>' +
+        '<div style="font-size:12px;font-weight:700;white-space:nowrap;' +
+          'color:' + (qty > 0 ? '#047857' : 'var(--text-light)') + ';">' + qty + ' шт</div>' +
+        (sel ? '<i class="ti ti-circle-check" style="color:#16A34A;font-size:18px;"></i>' : '') +
+      '</div>';
+  }).join('') +
+    (list.length > shown.length
+      ? '<div style="padding:9px 12px;font-size:12px;color:var(--text-light);">…ещё ' +
+        (list.length - shown.length) + ' — уточните поиск</div>'
+      : '');
+}
+
+function _substPick(componentId) {
+  const ctx = state._substCtx || {};
+  ctx.chosen = (ctx.all || []).find(c => c.id === componentId) || null;
+  const ok = document.getElementById('subst-ok');
+  if (ok) ok.disabled = !ctx.chosen;
+  _substFilter();
+}
+
+async function _substSubmit() {
+  const ctx = state._substCtx || {};
+  if (!ctx.chosen) { showToast('Выберите, что пришло', 'error'); return; }
+  const note = ((document.getElementById('subst-note') || {}).value || '').trim();
+  const btn = document.getElementById('subst-ok');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
+  try {
+    const r = await apiPost('/api/supply-orders/items/' + ctx.orderItemId + '/received', {
+      received_component_id: ctx.chosen.id,
+      substitution_note: note,
+    });
+    const d = (r && r.data) || {};
+    if (r && r.ok && d.ok) {
+      showToast('Закрыто заменой: ' + ctx.chosen.name, 'success');
+      const m = document.getElementById('subst-modal');
+      if (m) m.remove();
+      loadSupplyShopping();
+    } else {
+      showToast(d.message || 'Не удалось отметить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Закрыть заменой'; }
+    }
+  } catch (e) {
+    showToast((e && e.message) ? e.message : 'Ошибка', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Закрыть заменой'; }
+  }
 }
 
 // v2.45.433: «15 июл» из ISO YYYY-MM-DD (короткий русский формат для чипа).
