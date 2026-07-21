@@ -11278,6 +11278,7 @@ async function loadCompanyCards() {
           '<div style="font-size:11.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(c.filename || '') +
             (when ? ' · ' + when : '') + (c.uploaded_by_name ? ' · ' + escapeHtml(c.uploaded_by_name) : '') + '</div>' +
         '</div>' +
+        '<button class="btn btn-primary btn-small" onclick="entCardSendOpen(' + c.id + ')" title="Отправить письмом или в MAX"><i class="ti ti-send"></i> Отправить</button>' +
         '<button class="btn btn-secondary btn-small" onclick="entCardDownload(' + c.id + ')" title="Скачать / открыть"><i class="ti ti-download"></i> Скачать</button>' +
         (isDir ? '<button class="icon-btn" style="color:var(--danger);" onclick="entCardDelete(' + c.id + ',\'' + escapeHtml(String(c.name || '').replace(/'/g, '')) + '\')" title="Удалить"><i class="ti ti-trash"></i></button>' : '') +
       '</div>';
@@ -11325,6 +11326,79 @@ async function entCardDownload(id) {
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+// v2.45.791: отправить карточку — письмом (вложение) или файлом в MAX
+async function entCardSendOpen(id) {
+  let convs = [];
+  try {
+    const d = await apiGet('/api/mail/conversations');
+    convs = d.items || d.conversations || [];
+  } catch (e) {}
+  const card = null;
+  const opts = convs.map(c => {
+    const isMax = String(c.peer || '').startsWith('max');
+    const label = (c.from_name || c.peer) + (c.supplier_name && c.supplier_name !== c.from_name ? ' · ' + c.supplier_name : '') + (isMax ? ' — MAX' : ' — почта');
+    return '<option value="' + escapeHtml(String(c.peer)) + '">' + escapeHtml(label) + '</option>';
+  }).join('');
+  let m = document.getElementById('entcard-send-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'entcard-send-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-send"></i> Отправить карточку</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'entcard-send-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group">' +
+          '<label>Кому — из переписки (почта или MAX)</label>' +
+          '<select id="entcard-send-peer"><option value="">— выбери диалог —</option>' + opts + '</select>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>…или email вручную</label>' +
+          '<input type="email" id="entcard-send-email" placeholder="supplier@example.ru">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Сообщение</label>' +
+          '<textarea id="entcard-send-note" rows="3" style="width:100%;">Добрый день! Направляем карточку предприятия (реквизиты) во вложении.</textarea>' +
+        '</div>' +
+        '<div class="form-hint"><i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
+          'Почта — письмо с вложением; MAX — файл в диалог. Отправка появится в «Переписке» с твоим именем.</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'entcard-send-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="entcard-send-go" onclick="entCardSendGo(' + id + ')"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+
+async function entCardSendGo(id) {
+  const manual = (document.getElementById('entcard-send-email') || {}).value || '';
+  const peer = (document.getElementById('entcard-send-peer') || {}).value || '';
+  const note = (document.getElementById('entcard-send-note') || {}).value || '';
+  const to = manual.trim() || peer;
+  if (!to) { showToast('Выбери диалог или укажи email', 'error'); return; }
+  const btn = document.getElementById('entcard-send-go');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Отправляем…'; }
+  try {
+    const r = await apiPost('/api/company-cards/' + id + '/send', { to: to, note: note.trim() });
+    if (r && r.ok) {
+      showToast('Карточка отправлена ✉️', 'success');
+      const m = document.getElementById('entcard-send-modal');
+      if (m) m.remove();
+    } else {
+      showToast(((r && r.data) || {}).message || 'Не удалось отправить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+  }
 }
 
 async function entCardDelete(id, name) {
