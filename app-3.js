@@ -11271,16 +11271,18 @@ async function loadCompanyCards() {
     box.innerHTML = '<div class="card" style="padding:4px 14px;">' + items.map(c => {
       const ext = (String(c.filename || '').split('.').pop() || '').toUpperCase().slice(0, 4);
       const when = c.created_at ? String(c.created_at).slice(8, 10) + '.' + String(c.created_at).slice(5, 7) + '.' + String(c.created_at).slice(0, 4) : '';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border);">' +
-        '<div style="width:40px;height:40px;border-radius:10px;background:#EFF6FF;color:#1D4ED8;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">' + escapeHtml(ext || 'DOC') + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:14px;font-weight:700;">' + escapeHtml(c.name || '') + '</div>' +
-          '<div style="font-size:11.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(c.filename || '') +
+      return '<div class="entcard-row">' +
+        '<div class="entcard-ic">' + escapeHtml(ext || 'DOC') + '</div>' +
+        '<div class="entcard-main">' +
+          '<div class="entcard-nm">' + escapeHtml(c.name || '') + '</div>' +
+          '<div class="entcard-sub">' + escapeHtml(c.filename || '') +
             (when ? ' · ' + when : '') + (c.uploaded_by_name ? ' · ' + escapeHtml(c.uploaded_by_name) : '') + '</div>' +
         '</div>' +
-        '<button class="btn btn-primary btn-small" onclick="entCardSendOpen(' + c.id + ')" title="Отправить письмом или в MAX"><i class="ti ti-send"></i> Отправить</button>' +
-        '<button class="btn btn-secondary btn-small" onclick="entCardDownload(' + c.id + ')" title="Скачать / открыть"><i class="ti ti-download"></i> Скачать</button>' +
-        (isDir ? '<button class="icon-btn" style="color:var(--danger);" onclick="entCardDelete(' + c.id + ',\'' + escapeHtml(String(c.name || '').replace(/'/g, '')) + '\')" title="Удалить"><i class="ti ti-trash"></i></button>' : '') +
+        '<div class="entcard-acts">' +
+          '<button class="btn btn-primary btn-small" onclick="entCardSendOpen(' + c.id + ')" title="Отправить письмом или в MAX"><i class="ti ti-send"></i> Отправить</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="entCardDownload(' + c.id + ')" title="Скачать / открыть"><i class="ti ti-download"></i> Скачать</button>' +
+          (isDir ? '<button class="icon-btn" style="color:var(--danger);" onclick="entCardDelete(' + c.id + ',\'' + escapeHtml(String(c.name || '').replace(/'/g, '')) + '\')" title="Удалить"><i class="ti ti-trash"></i></button>' : '') +
+        '</div>' +
       '</div>';
     }).join('') + '</div>';
   } catch (e) {
