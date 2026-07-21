@@ -14162,13 +14162,27 @@ function renderSupplyOrderDetail(o) {
         ? '<span class="oi-received">принято ' + oi.received_qty + ' из ' + oi.qty + '</span>'
         : '';
       // v2.45.314: сверка «запрошено vs в счёте» (кол-во из распознанного счёта)
+      // v1.8.779: если единицы РАЗНЫЕ (заказ в шт, счёт в метрах) — числа
+      // напрямую не сравнить. Кабель канал: заказано 15 шт (по 2 м), в счёте
+      // 30 м — раньше показывало ложное «+15». Теперь при разных ед.изм. просто
+      // показываем «в счёте 30 м» без расхождения.
       let _invQtyTag = '';
       if (oi.invoice_qty !== null && oi.invoice_qty !== undefined) {
-        const diff = Number(oi.invoice_qty) - Number(oi.qty);
-        if (Math.abs(diff) < 0.001) {
-          _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> в счёте ' + _fmtQty(oi.invoice_qty) + '</span>';
+        const _u = function (x) { return String(x || '').toLowerCase().replace(/\.$/, '').trim(); };
+        const ordUnit = _u(oi.item_unit);
+        const invUnit = _u(oi.invoice_unit);
+        const sameUnit = !invUnit || !ordUnit || invUnit === ordUnit;
+        const invTxt = _fmtQty(oi.invoice_qty) + (oi.invoice_unit ? ' ' + oi.invoice_unit : '');
+        if (!sameUnit) {
+          // Разные единицы — показываем найденное количество нейтрально, без ±.
+          _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;" title="Единицы отличаются от заказа — проверьте пересчёт"><i class="ti ti-check" style="font-size:11px;"></i> в счёте ' + invTxt + '</span>';
         } else {
-          _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#9A3412;background:#FEE2E2;padding:1px 8px;border-radius:6px;white-space:nowrap;" title="Расхождение с запрошенным">⚠ в счёте ' + _fmtQty(oi.invoice_qty) + ' (' + (diff > 0 ? '+' : '') + _fmtQty(diff) + ')</span>';
+          const diff = Number(oi.invoice_qty) - Number(oi.qty);
+          if (Math.abs(diff) < 0.001) {
+            _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#15803D;background:#DCFCE7;padding:1px 8px;border-radius:6px;white-space:nowrap;"><i class="ti ti-check" style="font-size:11px;"></i> в счёте ' + _fmtQty(oi.invoice_qty) + '</span>';
+          } else {
+            _invQtyTag = '<span style="font-size:11px;font-weight:700;color:#9A3412;background:#FEE2E2;padding:1px 8px;border-radius:6px;white-space:nowrap;" title="Расхождение с запрошенным">⚠ в счёте ' + _fmtQty(oi.invoice_qty) + ' (' + (diff > 0 ? '+' : '') + _fmtQty(diff) + ')</span>';
+          }
         }
       }
       html += '<div class="oi-row">' +
