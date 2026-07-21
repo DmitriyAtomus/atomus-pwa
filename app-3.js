@@ -7536,9 +7536,11 @@ async function loadLogisticsPickups() {
   box.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
     // v2.45.715: параллельно тянем самовывозы и отправки СДЭК
-    const [d, cd] = await Promise.all([
+    // v1.8.775: + накладные Деловых линий
+    const [d, cd, dl] = await Promise.all([
       apiGet('/api/logistics/pickups'),
       apiGet('/api/logistics/cdek').catch(() => null),
+      apiGet('/api/logistics/dellin').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
@@ -7549,6 +7551,7 @@ async function loadLogisticsPickups() {
     html += transit.length ? transit.map(_logiTransitCard).join('')
       : '<div class="logi-empty"><i class="ti ti-route"></i> Ничего в пути.</div>';
     if (cd) html += _cdekBlockHtml(cd);
+    if (dl) html += _dellinBlockHtml(dl);
     if (done.length) {
       html += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
       html += done.map(_logiDoneRow).join('');
@@ -7656,6 +7659,153 @@ async function cdekSaveKeys() {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
 }
+
+// ============ v1.8.775: ДЕЛОВЫЕ ЛИНИИ — накладные (пока без API) ============
+// Статус ведём вручную, кнопка «Отследить» открывает трекер ДЛ и копирует
+// номер в буфер (прямой deep-ссылки с номером у dellin.ru нет).
+function _dellinBlockHtml(dl) {
+  const list = dl.shipments || [];
+  let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
+    '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + list.length + '</span>' +
+    '<span style="margin-left:auto;">' +
+      '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
+    '</span></div>';
+  if (!list.length) {
+    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет — добавь номер накладной Деловых линий.</div>';
+    return h;
+  }
+  list.forEach(sh => {
+    const delivered = !!sh.delivered_at;
+    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
+    const num = String(sh.dellin_number || '');
+    h += '<div class="cdek-card' + (delivered ? ' done' : '') + '">' +
+      '<div class="cdek-main">' +
+        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(num) +
+          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
+        '<div class="cdek-sub">' +
+          (delivered
+            ? '<span class="cdek-st done">✓ Вручён</span>'
+            : (sh.status_note
+                ? '<span class="cdek-st run">' + escapeHtml(sh.status_note) + '</span>'
+                : '<span class="cdek-st wait">статус вручную</span>')) +
+          (proj ? ' · ' + escapeHtml(proj) : '') +
+        '</div>' +
+        '<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' +
+            num.replace(/'/g, '') + '\')" title="Открыть трекер Деловых линий (номер скопируется)">' +
+            '<i class="ti ti-external-link"></i> Отследить</button>' +
+          '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')">' +
+            '<i class="ti ti-edit"></i> Статус</button>' +
+          (delivered
+            ? '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',false)">↩ вернуть в путь</button>'
+            : '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',true)"><i class="ti ti-check"></i> вручён</button>') +
+        '</div>' +
+      '</div>' +
+      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+      '<button class="cdek-del" onclick="dellinRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  });
+  return h;
+}
+
+function dellinTrack(num) {
+  try {
+    if (navigator.clipboard && num) {
+      navigator.clipboard.writeText(num).then(
+        () => showToast('Номер скопирован — вставьте в поле трекера', 'success'),
+        () => {});
+    }
+  } catch (e) {}
+  window.open('https://www.dellin.ru/tracker/', '_blank', 'noopener');
+}
+
+function dellinAdd() {
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'dellin-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-truck"></i> Накладная Деловых линий</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'dellin-modal\').remove()">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Номер накладной</label>' +
+          '<input class="form-input" id="dl-num" placeholder="например 17-00012345678" autocomplete="off"></div>' +
+        '<div class="form-group"><label class="form-label">Что везём / кому (для списка)</label>' +
+          '<input class="form-input" id="dl-title" placeholder="например: щит, Гринвуд"></div>' +
+        '<div class="form-group"><label class="form-label">Ожидаемая дата (необязательно)</label>' +
+          '<input class="form-input" id="dl-date" type="date"></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'dellin-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="dl-ok" onclick="dellinSubmit()"><i class="ti ti-plus"></i> Добавить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  const inp = document.getElementById('dl-num'); if (inp) inp.focus();
+}
+
+async function dellinSubmit() {
+  const num = ((document.getElementById('dl-num') || {}).value || '').trim();
+  const title = ((document.getElementById('dl-title') || {}).value || '').trim();
+  const date = ((document.getElementById('dl-date') || {}).value || '').trim();
+  if (!num) { showToast('Укажите номер накладной', 'error'); return; }
+  const btn = document.getElementById('dl-ok');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Добавляем…'; }
+  try {
+    const r = await apiPost('/api/logistics/dellin', {
+      dellin_number: num, title: title, planned_date: date });
+    const j = (r && r.data) || {};
+    if (r && r.ok && j.ok) {
+      showToast('Добавлено', 'success');
+      const m = document.getElementById('dellin-modal'); if (m) m.remove();
+      loadLogisticsPickups();
+    } else {
+      showToast(j.message || 'Не удалось добавить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-plus"></i> Добавить'; }
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-plus"></i> Добавить'; }
+  }
+}
+
+async function dellinSetStatus(id) {
+  const note = prompt('Статус (свободный текст, например «В пути · Новосибирск»):', '');
+  if (note === null) return;
+  await _dellinPatch(id, { status_note: note.trim() });
+}
+
+async function dellinDelivered(id, val) {
+  await _dellinPatch(id, { delivered: !!val });
+}
+
+async function _dellinPatch(id, body) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/logistics/dellin/' + id, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) { showToast('Не удалось сохранить', 'error'); return; }
+  } catch (e) { showToast('Ошибка соединения', 'error'); return; }
+  loadLogisticsPickups();
+}
+
+async function dellinRemove(id) {
+  if (!confirm('Убрать эту накладную из списка?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    await fetch(API_BASE + '/api/logistics/dellin/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+  } catch (e) {}
+  loadLogisticsPickups();
+}
+
 function _logiSum(v) { return (v != null && v !== '') ? Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽' : ''; }
 function _logiPlural(n, one, few, many) {
   const m10 = n % 10, m100 = n % 100;
