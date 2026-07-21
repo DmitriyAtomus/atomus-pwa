@@ -438,6 +438,10 @@
         <button class="nav-item" data-nav="supply-suppliers" onclick="selectSidebarItem('supply-suppliers')">
           <i class="ti ti-truck-loading"></i><span>Поставщики</span>
         </button>
+        <!-- v2.45.788: карточки предприятия — реквизиты наших юрлиц файлами -->
+        <button class="nav-item" data-nav="supply-company-cards" onclick="selectSidebarItem('supply-company-cards')">
+          <i class="ti ti-id"></i><span>Карточка предприятия</span>
+        </button>
         <!-- v2.45.171: «Каталог» в Снабжении временно скрыт по просьбе директора
              (пока не решено что с ним делать). Чтобы вернуть — убрать display:none. -->
         <button class="nav-item" data-nav="supply-catalog" onclick="selectSidebarItem('supply-catalog')" style="display:none;">
@@ -2358,6 +2362,27 @@
       </div>
 
       <!-- ПОСТАВЩИКИ -->
+      <!-- v2.45.788: карточки предприятия -->
+      <div class="screen" data-screen="supply-company-cards" data-section="supply">
+        <div class="content-inner" style="max-width: 860px;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-id"></i>
+              <h1>Карточка предприятия</h1>
+              <span class="page-counter" id="entcard-counter">0</span>
+            </div>
+            <button class="btn btn-primary" id="entcard-add-btn" onclick="entCardPick()">
+              <i class="ti ti-upload"></i> Загрузить карточку
+            </button>
+          </div>
+          <div style="font-size:13px;color:var(--text-light);margin:-6px 0 14px;">
+            Реквизиты наших юрлиц одним файлом (PDF/Word) — чтобы быстро скачать и отправить поставщику или заказчику.
+          </div>
+          <input type="file" id="entcard-file" style="display:none;" accept=".pdf,.doc,.docx,.rtf,.jpg,.jpeg,.png,.xlsx" onchange="entCardUpload(this)">
+          <div id="entcard-list"><div class="loading-block">Загружаем…</div></div>
+        </div>
+      </div>
+
       <div class="screen" data-screen="supply-suppliers" data-section="supply">
         <div class="content-inner" style="max-width: 100%;">
           <div class="page-header">

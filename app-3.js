@@ -11217,6 +11217,92 @@ function _renderSupplyOrdTabCounts() {
   });
 }
 
+/* ====== v2.45.788: карточки предприятия — реквизиты наших юрлиц файлами ====== */
+
+async function loadCompanyCards() {
+  const box = document.getElementById('entcard-list');
+  if (!box) return;
+  const isDir = state.user && (state.user.roles || []).includes('director');
+  const addBtn = document.getElementById('entcard-add-btn');
+  if (addBtn) addBtn.style.display = isDir ? '' : 'none';
+  try {
+    const d = await apiGet('/api/company-cards');
+    const items = d.items || [];
+    const cnt = document.getElementById('entcard-counter');
+    if (cnt) cnt.textContent = items.length;
+    if (!items.length) {
+      box.innerHTML = '<div class="empty-block"><i class="ti ti-id"></i>Карточек пока нет' +
+        (isDir ? '<br><br><span style="font-size:12.5px;color:var(--text-light);">Нажми «Загрузить карточку» — файл с реквизитами юрлица (PDF или Word).</span>' : '') + '</div>';
+      return;
+    }
+    box.innerHTML = '<div class="card" style="padding:4px 14px;">' + items.map(c => {
+      const ext = (String(c.filename || '').split('.').pop() || '').toUpperCase().slice(0, 4);
+      const when = c.created_at ? String(c.created_at).slice(8, 10) + '.' + String(c.created_at).slice(5, 7) + '.' + String(c.created_at).slice(0, 4) : '';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border);">' +
+        '<div style="width:40px;height:40px;border-radius:10px;background:#EFF6FF;color:#1D4ED8;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">' + escapeHtml(ext || 'DOC') + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:14px;font-weight:700;">' + escapeHtml(c.name || '') + '</div>' +
+          '<div style="font-size:11.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(c.filename || '') +
+            (when ? ' · ' + when : '') + (c.uploaded_by_name ? ' · ' + escapeHtml(c.uploaded_by_name) : '') + '</div>' +
+        '</div>' +
+        '<button class="btn btn-secondary btn-small" onclick="entCardDownload(' + c.id + ')" title="Скачать / открыть"><i class="ti ti-download"></i> Скачать</button>' +
+        (isDir ? '<button class="icon-btn" style="color:var(--danger);" onclick="entCardDelete(' + c.id + ',\'' + escapeHtml(String(c.name || '').replace(/'/g, '')) + '\')" title="Удалить"><i class="ti ti-trash"></i></button>' : '') +
+      '</div>';
+    }).join('') + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить</div>';
+  }
+}
+
+function entCardPick() {
+  const inp = document.getElementById('entcard-file');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+
+async function entCardUpload(inp) {
+  const f = inp && inp.files && inp.files[0];
+  if (!f) return;
+  const defName = f.name.replace(/\.[^.]+$/, '');
+  const name = prompt('Название юрлица (как показывать в списке):', defName);
+  if (name == null) return;
+  const fd = new FormData();
+  fd.append('name', (name || defName).trim());
+  fd.append('file', f, f.name);
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/company-cards', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) showToast('Карточка загружена', 'success');
+    else showToast(j.message || 'Не удалось загрузить', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadCompanyCards();
+}
+
+async function entCardDownload(id) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/company-cards/' + id + '/file', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Файл не найден', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
+async function entCardDelete(id, name) {
+  if (!confirm('Удалить карточку «' + (name || '') + '»?')) return;
+  try {
+    await apiDelete('/api/company-cards/' + id);
+    showToast('Удалено', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  loadCompanyCards();
+}
+
 function renderSupplyOrders() {
   const container = document.getElementById('sup-ord-list');
   const list = cache.supplyOrders || [];
