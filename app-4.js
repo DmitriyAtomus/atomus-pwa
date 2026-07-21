@@ -3989,10 +3989,14 @@ async function fetchPublicObject(kind, token, itemId) {
   if (pw) _qs.push('pw=' + encodeURIComponent(pw));
   if (itemId) _qs.push('item=' + encodeURIComponent(itemId));  // v2.45.208: карточка позиции
   if (_qs.length) url += '?' + _qs.join('&');
-  // v2.45.420: публичная страница QR НЕ шлёт токен сессии — пароль спрашивается
-  // всегда (в т.ч. у залогиненного сотрудника). Внутренние сценарии открытия
-  // карточки (openAssemblyByPublicToken и т.п.) шлют токен отдельно.
+  // v2.45.795: залогиненный сотрудник проходит БЕЗ пароля — шлём токен сессии,
+  // сервер пускает по ней (решение директора; раньше пароль спрашивался у всех).
+  // У заказчика сессии нет — для него пароль остаётся, как раньше.
   const opts = { cache: 'no-store' };
+  try {
+    const _tok = localStorage.getItem(TOKEN_KEY);
+    if (_tok) opts.headers = { 'Authorization': 'Bearer ' + _tok };
+  } catch (e) {}
   const r = await fetch(url, opts);
   let data = null;
   try { data = await r.json(); } catch (e) {}
