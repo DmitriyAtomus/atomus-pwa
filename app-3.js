@@ -10901,6 +10901,8 @@ function renderSupplyOrders() {
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
           // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
           (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
+          // v2.45.773: назначение счёта («Реклама», «Инструмент»…) — видно из списка
+          (o.purpose ? '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;font-weight:700;" title="Назначение счёта"><i class="ti ti-tag"></i> ' + escapeHtml(o.purpose) + '</span>' : '') +
           // v2.45.699: кто оформил — тихо, в конце строки
           (o.created_by_name
             ? '<span class="sup-ord-who" title="Кто оформил заказ"><span class="sup-ord-who-ava">' +
