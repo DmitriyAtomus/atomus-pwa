@@ -6682,7 +6682,9 @@ function _mailMsgBubble(m) {
   const out = m.dir === 'out';
   // v2.45.729: исходящие подписываем автором — Иванов видит, что писал директор,
   // и наоборот; свои — «Ты» (экранируется ниже)
-  const who = out ? (m.mine === false && m.author ? m.author : 'Ты')
+  // v2.45.789: чужие исходящие НИКОГДА не подписываем «Ты» — если имя автора
+  // не нашлось, честное «Сотрудник» вместо ложного «Ты»
+  const who = out ? (m.mine ? 'Ты' : (m.author || 'Сотрудник'))
                   : (m.from_name || '');
   const subj = (m.subject && !out) ? '<div class="mm-subj">' + escapeHtml(m.subject) + '</div>' : '';
   const parts = _mailSplitBody(m.body || '');
