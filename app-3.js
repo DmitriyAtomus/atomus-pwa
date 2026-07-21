@@ -6708,8 +6708,12 @@ function _mailMsgBubble(m) {
       const card = '<span class="mm-att" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
         escapeHtml(String(name).replace(/'/g, "\\'")) + '\')"><span class="ic">' + escapeHtml(ext || '📎') + '</span>' +
         escapeHtml(name) + '</span>';
+      // v1.8.776: две кнопки. «На оплату» — распознать и сразу в оплату (то, что
+      // чаще всего нужно). «Во Входящие» — оформить как счёт для разбора, если
+      // сначала хочется проверить (или это не на оплату, а к сопоставлению).
       const prom = canProm
-        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:6px;" onclick="promoteChatAttachment(' + m.id + ',' + idx + ')"><i class="ti ti-file-invoice"></i> Оформить как счёт</button>'
+        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:6px;" onclick="chatFileToPay(' + m.id + ',' + idx + ')"><i class="ti ti-cash"></i> На оплату</button>' +
+          '<button class="btn btn-small btn-secondary" style="margin-left:4px;" onclick="promoteChatAttachment(' + m.id + ',' + idx + ')" title="Оформить как счёт для разбора во «Входящих счетах»"><i class="ti ti-file-invoice"></i> Во входящие</button>'
         : '';
       return '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' + card + prom + '</div>';
     }).join('') +
@@ -6756,6 +6760,33 @@ async function promoteChatAttachment(inboxId, idx) {
     }
   } catch (e) { showToast('Ошибка', 'error'); }
 }
+// v1.8.776: файл из чата → сразу «На оплату». Сначала распознаём и оформляем
+// как счёт (to-invoice), затем отправляем в оплату (to-pay). Два шага, потому
+// что to-pay нужны распознанные реквизиты, а их даёт оформление.
+async function chatFileToPay(inboxId, idx) {
+  if (typeof canManageSupply === 'function' && !canManageSupply()) {
+    showToast('Доступно директору, заму, менеджеру, бухгалтеру', 'error'); return;
+  }
+  if (!confirm('Отправить этот счёт «На оплату»?\nСоздастся заказ поставщику, отдел оплаты получит уведомление.')) return;
+  try {
+    // 1) распознать + оформить как счёт (переводит kind='chat' → 'invoice')
+    const r1 = await apiPost('/api/supply-inbox/' + inboxId + '/attachments/' + idx + '/to-invoice', {});
+    if (!(r1 && r1.ok && r1.data && r1.data.ok)) {
+      showToast((r1 && r1.data && (r1.data.message || r1.data.error)) || 'Не удалось оформить счёт', 'error');
+      return;
+    }
+    // 2) отправить в оплату
+    const r2 = await apiPost('/api/supply-inbox/' + inboxId + '/to-pay', {});
+    if (r2 && r2.ok && r2.data && r2.data.ok) {
+      showToast('Отправлено на оплату', 'success');
+    } else {
+      showToast((r2 && r2.data && (r2.data.message || r2.data.error)) ||
+        'Оформлено как счёт, но в оплату не ушло — проверьте «Входящие счета»', 'error');
+    }
+    if (state._mailPeer) openMailThread(state._mailPeer);
+  } catch (e) { showToast('Ошибка', 'error'); }
+}
+
 async function sendMailReply() {
   const peer = state._mailPeer;
   const ta = document.getElementById('mail-reply-text');
