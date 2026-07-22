@@ -21680,3 +21680,11 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 @media (max-width: 640px) {
   .logi-hero { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ============ v2.45.797: логистика — две колонки на широком экране ============ */
+.logi-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; align-items: start; }
+.logi-col { min-width: 0; }
+.logi-col .logi-sec:first-child { margin-top: 2px; }
+@media (max-width: 1000px) {
+  .logi-cols { grid-template-columns: 1fr; }
+}

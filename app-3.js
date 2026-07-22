@@ -7594,19 +7594,23 @@ async function loadLogisticsPickups() {
       _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК', 'v') +
       _logiHeroTile('ti-truck', _dlN, 'Деловые линии', 'o') +
     '</div>';
-    html += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
-    html += ready.length ? ready.map(_logiReadyCard).join('')
+    // v2.45.797: две колонки на широком экране — слева самовывозы, справа перевозчики
+    let colL = '', colR = '';
+    colL += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
+    colL += ready.length ? ready.map(_logiReadyCard).join('')
       : '<div class="logi-empty"><i class="ti ti-circle-check"></i> Нечего забирать — всё принято.</div>';
-    html += '<div class="logi-sec b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span class="logi-cnt">' + transit.length + '</span></div>';
-    html += transit.length ? transit.map(_logiTransitCard).join('')
+    colL += '<div class="logi-sec b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span class="logi-cnt">' + transit.length + '</span></div>';
+    colL += transit.length ? transit.map(_logiTransitCard).join('')
       : '<div class="logi-empty"><i class="ti ti-route"></i> Ничего в пути.</div>';
-    if (cd) html += _cdekBlockHtml(cd);
-    if (dl) html += _dellinBlockHtml(dl);
     if (done.length) {
-      html += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
-      html += done.map(_logiDoneRow).join('');
+      colL += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
+      colL += done.map(_logiDoneRow).join('');
     }
-    box.innerHTML = html;
+    if (cd) colR += _cdekBlockHtml(cd);
+    if (dl) colR += _dellinBlockHtml(dl);
+    box.innerHTML = html +
+      '<div class="logi-cols"><div class="logi-col">' + colL + '</div>' +
+      (colR ? '<div class="logi-col">' + colR + '</div>' : '') + '</div>';
   } catch (e) {
     box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить</div>';
   }
