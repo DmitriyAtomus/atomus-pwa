@@ -10496,11 +10496,19 @@ function _renderReservationBadge(item) {
     const qty = Number(item.qty) || 0;
     const reserved = Number(item.qty_reserved || 0);
     const inProd = Number(item.qty_in_production || 0);
+    const shipped = Number(item.qty_shipped || 0);
     if (qty <= 0) return '';
     let cls = 'r-none';
     let icon = 'ti-circle';
     let txt = '';
-    if (reserved >= qty) {
+    if (shipped >= qty) {
+      // v2.45.799: покупная позиция уже отгружена (при отгрузке резерв гасится,
+      // qty_reserved=0). Без этой ветки бейдж ошибочно откатывался на «К закупке»
+      // у уже закрытых/отгруженных договоров. qty_shipped приходит из list_contract_items.
+      cls = 'r-full';
+      icon = 'ti-truck-delivery';
+      txt = 'Отгружено';
+    } else if (reserved >= qty) {
       cls = 'r-full';
       icon = 'ti-circle-check';
       txt = 'В резерве';
