@@ -21638,3 +21638,45 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 @media (max-width: 640px) {
   .entcard-acts { width: 100%; margin-left: 52px; justify-content: flex-start; }
 }
+
+/* ============ v2.45.796: Логистика — освежённый вид ============ */
+.logi-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 2px 0 20px; }
+.logi-hs { display: flex; align-items: center; gap: 11px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.logi-hs .ic { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex: none; }
+.logi-hs .n { font-size: 21px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.logi-hs .k { font-size: 10.5px; color: var(--text-light); font-weight: 700; margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+.logi-hs.g .ic { background: var(--success-bg); color: var(--success); } .logi-hs.g .n { color: var(--success); }
+.logi-hs.b .ic { background: var(--brand-bg); color: var(--brand); }   .logi-hs.b .n { color: var(--brand); }
+.logi-hs.v .ic { background: #E7F8EC; color: #00A03C; }                .logi-hs.v .n { color: #008A31; }
+.logi-hs.o .ic { background: #FFF1E7; color: #EA580C; }                .logi-hs.o .n { color: #C2410C; }
+.logi-hs.dim { opacity: .55; }
+.logi-hs.dim .n { color: var(--text-faint); }
+
+.logi-sec { margin: 26px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); position: relative; }
+.logi-sec::after { content: ''; position: absolute; left: 0; bottom: -1px; width: 64px; height: 3px; border-radius: 3px; background: currentColor; opacity: .85; }
+.logi-sec > i:first-child { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg); font-size: 16px; }
+.logi-sec.g > i:first-child { background: var(--success-bg); }
+.logi-sec.b > i:first-child { background: var(--brand-bg); }
+.logi-sec.mut::after { display: none; }
+
+.logi-card, .cdek-card { border-radius: 16px; box-shadow: 0 1px 3px rgba(15,23,42,.06); transition: box-shadow .15s ease, transform .15s ease; }
+.logi-card:hover, .cdek-card:hover { box-shadow: 0 8px 22px rgba(15,23,42,.10); transform: translateY(-1px); }
+.cdek-card { border-left: 4px solid #00B33C; }
+.cdek-card.dl { border-left-color: #EA580C; }
+.cdek-card.done { border-left-color: #CBD5E1; opacity: .72; }
+.cdek-card.done:hover { opacity: 1; }
+
+.logi-eta { background: #fff; border: 1.5px solid var(--brand); box-shadow: 0 2px 6px rgba(37,99,235,.14); }
+.logi-eta.today { border-color: var(--success); box-shadow: 0 2px 6px rgba(22,163,74,.16); }
+.logi-eta.late { border-color: var(--danger); box-shadow: 0 2px 6px rgba(220,38,38,.16); }
+.logi-eta .val { font-size: 14px; }
+
+.logi-empty { border-radius: 14px; padding: 18px; background: linear-gradient(135deg, #F8FAFF, #F6FBF8); border: 1px dashed #D6DEEA; }
+.logi-empty i { font-size: 20px; color: #A9B6C9; }
+
+.logi-done { transition: background .12s ease; }
+.logi-done:hover { background: #F3F6FB; }
+
+@media (max-width: 640px) {
+  .logi-hero { grid-template-columns: repeat(2, 1fr); }
+}

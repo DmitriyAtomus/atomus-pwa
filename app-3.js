@@ -7563,6 +7563,14 @@ async function plTaskGo(itemId) {
   loadPlanerka();
 }
 
+// v2.45.796: плитка сводки логистики
+function _logiHeroTile(icon, n, label, cls) {
+  return '<div class="logi-hs ' + cls + (n ? '' : ' dim') + '">' +
+    '<div class="ic"><i class="ti ' + icon + '"></i></div>' +
+    '<div><div class="n">' + n + '</div><div class="k">' + label + '</div></div>' +
+  '</div>';
+}
+
 async function loadLogisticsPickups() {
   const box = document.getElementById('logistics-content');
   if (!box) return;
@@ -7577,6 +7585,15 @@ async function loadLogisticsPickups() {
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
+    // v2.45.796: сводка по логистике — четыре плитки сверху
+    const _cdN = (cd && cd.shipments) ? cd.shipments.filter(x => !x.delivered_at).length : 0;
+    const _dlN = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at).length : 0;
+    html += '<div class="logi-hero">' +
+      _logiHeroTile('ti-package-import', ready.length, 'забрать сейчас', 'g') +
+      _logiHeroTile('ti-truck-delivery', transit.length, 'в пути', 'b') +
+      _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК', 'v') +
+      _logiHeroTile('ti-truck', _dlN, 'Деловые линии', 'o') +
+    '</div>';
     html += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
     html += ready.length ? ready.map(_logiReadyCard).join('')
       : '<div class="logi-empty"><i class="ti ti-circle-check"></i> Нечего забирать — всё принято.</div>';
@@ -7711,7 +7728,7 @@ function _dellinBlockHtml(dl) {
     const delivered = !!sh.delivered_at;
     const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
     const num = String(sh.dellin_number || '');
-    h += '<div class="cdek-card' + (delivered ? ' done' : '') + '">' +
+    h += '<div class="cdek-card dl' + (delivered ? ' done' : '') + '">' +
       '<div class="cdek-main">' +
         '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(num) +
           (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
