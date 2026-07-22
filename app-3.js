@@ -7594,19 +7594,23 @@ async function loadLogisticsPickups() {
       _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК', 'v') +
       _logiHeroTile('ti-truck', _dlN, 'Деловые линии', 'o') +
     '</div>';
-    html += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
-    html += ready.length ? ready.map(_logiReadyCard).join('')
+    // v2.45.797: две колонки на широком экране — слева самовывозы, справа перевозчики
+    let colL = '', colR = '';
+    colL += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
+    colL += ready.length ? ready.map(_logiReadyCard).join('')
       : '<div class="logi-empty"><i class="ti ti-circle-check"></i> Нечего забирать — всё принято.</div>';
-    html += '<div class="logi-sec b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span class="logi-cnt">' + transit.length + '</span></div>';
-    html += transit.length ? transit.map(_logiTransitCard).join('')
+    colL += '<div class="logi-sec b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span class="logi-cnt">' + transit.length + '</span></div>';
+    colL += transit.length ? transit.map(_logiTransitCard).join('')
       : '<div class="logi-empty"><i class="ti ti-route"></i> Ничего в пути.</div>';
-    if (cd) html += _cdekBlockHtml(cd);
-    if (dl) html += _dellinBlockHtml(dl);
     if (done.length) {
-      html += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
-      html += done.map(_logiDoneRow).join('');
+      colL += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
+      colL += done.map(_logiDoneRow).join('');
     }
-    box.innerHTML = html;
+    if (cd) colR += _cdekBlockHtml(cd);
+    if (dl) colR += _dellinBlockHtml(dl);
+    box.innerHTML = html +
+      '<div class="logi-cols"><div class="logi-col">' + colL + '</div>' +
+      (colR ? '<div class="logi-col">' + colR + '</div>' : '') + '</div>';
   } catch (e) {
     box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить</div>';
   }
@@ -7710,6 +7714,30 @@ async function cdekSaveKeys() {
   loadLogisticsPickups();
 }
 
+// v2.45.798: API Деловых линий — ключи и ручное обновление
+async function dellinSaveKeys() {
+  const appkey = (document.getElementById('dl-appkey') || {}).value || '';
+  const login = (document.getElementById('dl-login') || {}).value || '';
+  const pass = (document.getElementById('dl-pass') || {}).value || '';
+  if (!appkey.trim() || !login.trim() || !pass.trim()) { showToast('Нужны appkey, логин и пароль', 'error'); return; }
+  try {
+    const r = await apiPost('/api/settings/dellin', { appkey: appkey.trim(), login: login.trim(), password: pass.trim() });
+    const j = (r && r.data) || {};
+    showToast(j.message || (r && r.ok ? 'Подключено' : 'Не удалось'), r && r.ok ? 'success' : 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadLogisticsPickups();
+}
+async function dellinRefresh() {
+  showToast('Обновляем статусы Деловых линий…', 'info');
+  try {
+    const r = await apiPost('/api/logistics/dellin/refresh', {});
+    const j = (r && r.data) || {};
+    if (r && r.ok) showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0), 'success');
+    else showToast(j.message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadLogisticsPickups();
+}
+
 // ============ v1.8.775: ДЕЛОВЫЕ ЛИНИИ — накладные (пока без API) ============
 // Статус ведём вручную, кнопка «Отследить» открывает трекер ДЛ и копирует
 // номер в буфер (прямой deep-ссылки с номером у dellin.ru нет).
@@ -7717,9 +7745,21 @@ function _dellinBlockHtml(dl) {
   const list = dl.shipments || [];
   let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
     '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + list.length + '</span>' +
-    '<span style="margin-left:auto;">' +
+    '<span style="margin-left:auto;display:inline-flex;gap:6px;">' +
+      (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinRefresh()" title="Обновить статусы из ЛК Деловых линий"><i class="ti ti-refresh"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
     '</span></div>';
+  // v2.45.798: подключение API ДЛ — статусы, отправитель и дата сами
+  if (!dl.configured) {
+    h += '<div class="cdek-setup">' +
+      '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение Деловых линий</div>' +
+      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны: <b>appkey</b> (бесплатно на dev.dellin.ru → «Получить ключ») и логин/пароль от личного кабинета dellin.ru. После подключения по каждой накладной само подтянется: статус, отправитель, груз и дата прибытия.</div>' +
+      '<input class="form-input" id="dl-appkey" placeholder="Ключ API (appkey)" autocomplete="off" style="margin-bottom:6px;">' +
+      '<input class="form-input" id="dl-login" placeholder="Логин личного кабинета" autocomplete="off" style="margin-bottom:6px;">' +
+      '<input class="form-input" id="dl-pass" type="password" placeholder="Пароль личного кабинета" autocomplete="off" style="margin-bottom:8px;">' +
+      '<button class="btn btn-primary" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
+    '</div>';
+  }
   if (!list.length) {
     h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет — добавь номер накладной Деловых линий.</div>';
     return h;
@@ -7735,10 +7775,15 @@ function _dellinBlockHtml(dl) {
         '<div class="cdek-sub">' +
           (delivered
             ? '<span class="cdek-st done">✓ Вручён</span>'
-            : (sh.status_note
-                ? '<span class="cdek-st run">' + escapeHtml(sh.status_note) + '</span>'
-                : '<span class="cdek-st wait">статус вручную</span>')) +
+            : (sh.auto_status
+                ? '<span class="cdek-st run">' + escapeHtml(sh.auto_status) + '</span>'
+                : (sh.status_note
+                    ? '<span class="cdek-st run">' + escapeHtml(sh.status_note) + '</span>'
+                    : '<span class="cdek-st wait">' + (dl.configured ? 'ждём статус' : 'статус вручную') + '</span>'))) +
+          (sh.auto_from ? ' · от: <b>' + escapeHtml(sh.auto_from) + '</b>' : '') +
+          (sh.auto_cargo ? ' · ' + escapeHtml(sh.auto_cargo) : '') +
           (proj ? ' · ' + escapeHtml(proj) : '') +
+          (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
         '</div>' +
         '<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;">' +
           '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' +
