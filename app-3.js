@@ -6520,6 +6520,7 @@ async function deleteSupplyItem(itemId) {
 async function loadMailMessenger() {
   const list = document.getElementById('mail-conv-list');
   if (!list) return;
+  _startMailPolling();  // v2.45.803: живые обновления, пока экран открыт
   list.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
     const d = await apiGet('/api/mail/conversations');
@@ -6577,8 +6578,48 @@ function _mailConvRow(c) {
       (unr ? '<span class="mm-unr">' + (unr > 99 ? '99+' : unr) + '</span>' : '') + '</div>' +
   '</div>';
 }
+// v2.45.803: живое обновление переписки — новые сообщения приходят сами,
+// без кнопки «Обновить». Каждые 10 сек: тред (если открыт) + список диалогов.
+let _mailPollTimer = null;
+let _mailLastMsgKey = '';
+function _startMailPolling() {
+  if (_mailPollTimer) return;
+  _mailPollTimer = setInterval(_mailPollTick, 10000);
+}
+function _stopMailPolling() {
+  if (_mailPollTimer) { clearInterval(_mailPollTimer); _mailPollTimer = null; }
+}
+async function _mailPollTick() {
+  if (state.currentScreen !== 'mail-messenger') { _stopMailPolling(); return; }
+  if (document.hidden) return;  // вкладка в фоне — не дёргаем сервер
+  const peer = state._mailPeer;
+  try {
+    if (peer) {
+      const d = await apiGet('/api/mail/thread?peer=' + encodeURIComponent(peer));
+      const msgs = d.messages || [];
+      const key = msgs.length + ':' + (msgs.length ? String(msgs[msgs.length - 1].id) + '|' + (msgs[msgs.length - 1].at || '') : '') + ':' + (d.seen_until || '');
+      if (key !== _mailLastMsgKey) {
+        // сохраняем набранный ответ, перерисовываем, возвращаем текст
+        const inp = document.getElementById('mail-reply-text');
+        const draft = inp ? inp.value : '';
+        const focused = inp && document.activeElement === inp;
+        await openMailThread(peer);
+        const inp2 = document.getElementById('mail-reply-text');
+        if (inp2 && draft) inp2.value = draft;
+        if (inp2 && focused) inp2.focus();
+      }
+    }
+    // список диалогов — тихо, без «Загрузка…»
+    const c = await apiGet('/api/mail/conversations');
+    state._mailConvs = c.conversations || [];
+    _mailRenderList();
+    _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, x) => s2 + (x.unread || 0), 0));
+  } catch (e) { /* сеть мигнула — попробуем в следующий тик */ }
+}
+
 async function openMailThread(peer) {
   state._mailPeer = peer;
+  _startMailPolling();
   const pane = document.getElementById('mail-thread-pane');
   if (!pane) return;
   document.querySelectorAll('.mail-conv').forEach(el => { el.classList.toggle('sel', el.dataset.peer === peer); });
@@ -6589,6 +6630,8 @@ async function openMailThread(peer) {
     state._mailThreadChannel = d.channel || '';
     state._mailSeenUntil = d.seen_until || '';
     const msgs = d.messages || [];
+    // v2.45.803: запоминаем «отпечаток» ленты — поллинг перерисует только при изменении
+    _mailLastMsgKey = msgs.length + ':' + (msgs.length ? String(msgs[msgs.length - 1].id) + '|' + (msgs[msgs.length - 1].at || '') : '') + ':' + (d.seen_until || '');
     const conv = (state._mailConvs || []).find(c => c.peer === peer) || {};
     const canReply = (d.channel === 'email') || (d.channel === 'max');
     const rawName = conv.raw_name || conv.from_name || peer;
