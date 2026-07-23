@@ -7775,18 +7775,40 @@ async function cdekSaveKeys() {
   loadLogisticsPickups();
 }
 
-// v2.45.798: API Деловых линий — ключи и ручное обновление
+// v2.45.800: API Деловых линий — PAT вместо логина/пароля.
+// По официальному API PAT обменивается вместе с appkey на sessionID на сервере.
+// Секрет не сохраняем в браузере и очищаем поле сразу после запроса.
+function _redactDellinPat(value) {
+  return String(value || '').replace(/dl-api-[A-Za-z0-9_-]+/gi, '[PAT скрыт]');
+}
 async function dellinSaveKeys() {
-  const appkey = (document.getElementById('dl-appkey') || {}).value || '';
-  const login = (document.getElementById('dl-login') || {}).value || '';
-  const pass = (document.getElementById('dl-pass') || {}).value || '';
-  if (!appkey.trim() || !login.trim() || !pass.trim()) { showToast('Нужны appkey, логин и пароль', 'error'); return; }
+  const appkeyEl = document.getElementById('dl-appkey');
+  const patEl = document.getElementById('dl-pat');
+  const saveBtn = document.getElementById('dl-save-keys');
+  const appkey = String((appkeyEl || {}).value || '').trim();
+  const pat = String((patEl || {}).value || '').trim();
+  if (!appkey || !pat) { showToast('Нужны appkey и PAT-токен', 'error'); return; }
+  if (!/^dl-api-[A-Za-z0-9_-]{20,}$/i.test(pat)) {
+    showToast('PAT-токен должен начинаться с dl-api-', 'error');
+    return;
+  }
+  if (saveBtn) saveBtn.disabled = true;
+  let saved = false;
   try {
-    const r = await apiPost('/api/settings/dellin', { appkey: appkey.trim(), login: login.trim(), password: pass.trim() });
+    const r = await apiPost('/api/settings/dellin', { appkey: appkey, pat: pat });
     const j = (r && r.data) || {};
-    showToast(j.message || (r && r.ok ? 'Подключено' : 'Не удалось'), r && r.ok ? 'success' : 'error');
-  } catch (e) { showToast('Ошибка соединения', 'error'); }
-  loadLogisticsPickups();
+    saved = !!(r && r.ok);
+    showToast(
+      _redactDellinPat(j.message || (saved ? 'Деловые линии подключены' : 'Не удалось проверить appkey и PAT')),
+      saved ? 'success' : 'error'
+    );
+  } catch (e) {
+    showToast('Ошибка соединения с CRM', 'error');
+  } finally {
+    if (patEl) patEl.value = '';
+    if (saveBtn) saveBtn.disabled = false;
+  }
+  if (saved) loadLogisticsPickups();
 }
 async function dellinRefresh() {
   showToast('Обновляем статусы Деловых линий…', 'info');
@@ -7794,14 +7816,12 @@ async function dellinRefresh() {
     const r = await apiPost('/api/logistics/dellin/refresh', {});
     const j = (r && r.data) || {};
     if (r && r.ok) showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0), 'success');
-    else showToast(j.message || 'Не удалось', 'error');
+    else showToast(_redactDellinPat(j.message || 'Не удалось обновить статусы'), 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
 }
 
-// ============ v1.8.775: ДЕЛОВЫЕ ЛИНИИ — накладные (пока без API) ============
-// Статус ведём вручную, кнопка «Отследить» открывает трекер ДЛ и копирует
-// номер в буфер (прямой deep-ссылки с номером у dellin.ru нет).
+// ============ ДЕЛОВЫЕ ЛИНИИ — накладные и синхронизация API ============
 function _dellinBlockHtml(dl) {
   const list = dl.shipments || [];
   let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
@@ -7810,15 +7830,15 @@ function _dellinBlockHtml(dl) {
       (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinRefresh()" title="Обновить статусы из ЛК Деловых линий"><i class="ti ti-refresh"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
     '</span></div>';
-  // v2.45.798: подключение API ДЛ — статусы, отправитель и дата сами
+  // v2.45.800: безопасное подключение через appkey + PAT.
   if (!dl.configured) {
     h += '<div class="cdek-setup">' +
       '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение Деловых линий</div>' +
-      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны: <b>appkey</b> (бесплатно на dev.dellin.ru → «Получить ключ») и логин/пароль от личного кабинета dellin.ru. После подключения по каждой накладной само подтянется: статус, отправитель, груз и дата прибытия.</div>' +
-      '<input class="form-input" id="dl-appkey" placeholder="Ключ API (appkey)" autocomplete="off" style="margin-bottom:6px;">' +
-      '<input class="form-input" id="dl-login" placeholder="Логин личного кабинета" autocomplete="off" style="margin-bottom:6px;">' +
-      '<input class="form-input" id="dl-pass" type="password" placeholder="Пароль личного кабинета" autocomplete="off" style="margin-bottom:8px;">' +
-      '<button class="btn btn-primary" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
+      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны <b>appkey</b> приложения и <b>PAT-токен</b> личного кабинета. Логин и пароль передавать не нужно. После подключения по накладным автоматически подтянутся статус, отправитель, груз и дата прибытия.</div>' +
+      '<input class="form-input" id="dl-appkey" placeholder="Ключ приложения (appkey)" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
+      '<input class="form-input" id="dl-pat" type="password" placeholder="PAT-токен (dl-api-…)" autocomplete="new-password" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
+      '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;"><i class="ti ti-shield-lock"></i> PAT не сохраняется в браузере и после проверки очищается из поля.</div>' +
+      '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
     '</div>';
   }
   if (!list.length) {
