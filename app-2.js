@@ -8537,10 +8537,13 @@ function setAssemblyStatusToggle(status) {
   state.newAssembly.initialStatus = status;
   const r = document.getElementById('status-toggle-ready');
   const p = document.getElementById('status-toggle-in-progress');
+  const q = document.getElementById('status-toggle-queue');
   const lbl = document.getElementById('submit-assembly-label');
   if (r) r.classList.toggle('active', status === 'ready');
   if (p) p.classList.toggle('active', status === 'in_progress');
-  if (lbl) lbl.textContent = status === 'in_progress' ? 'Взять в работу' : 'Записать как готово';
+  if (q) q.classList.toggle('active', status === 'queue');
+  if (lbl) lbl.textContent = status === 'in_progress' ? 'Взять в работу'
+    : (status === 'queue' ? 'Поставить в очередь' : 'Записать как готово');
 }
 
 async function submitAssembly() {
@@ -8551,7 +8554,9 @@ async function submitAssembly() {
   const a = state.newAssembly;
   const isAssembly = (a.workType || 'assembly') === 'assembly';
   // v2.43.78: in_progress теперь допустим для всех типов работ (карточка в канбане).
-  const initialStatus = (a.initialStatus === 'in_progress') ? 'in_progress' : 'ready';
+  // v2.45.800: + 'queue' — план на склад, карточка сразу в «Очередь» канбана
+  const initialStatus = (a.initialStatus === 'in_progress') ? 'in_progress'
+    : (a.initialStatus === 'queue' ? 'queue' : 'ready');
   if (isAssembly) {
     if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
     if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
@@ -8563,6 +8568,44 @@ async function submitAssembly() {
     }
   }
   if (!a.quantity || a.quantity < 1) { errEl.textContent = 'Укажите количество'; return; }
+
+  // v2.45.800: «Очередь на склад» — создаём работу в очереди канбана,
+  // БЕЗ записи сборки: исполнители и дата не нужны, компоненты не списываются.
+  if (initialStatus === 'queue') {
+    if (!isAssembly || !a.model) { errEl.textContent = 'В очередь можно поставить только сборку с моделью'; return; }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader"></i> Ставим в очередь…';
+    try {
+      const r = await apiPost('/api/production/works', {
+        model_id: a.model.id,
+        qty: a.quantity || 1,
+        contract_id: a.contractId || null,
+        execution_type: (a.model.exec_mode === 'choice' ? a.execution : null) || null,
+        ip_rating: (a.model.needs_ip ? a.ipClass : null) || null,
+        description: a.comment || null,
+      });
+      if (!(r && r.ok)) {
+        errEl.textContent = ((r && r.data) || {}).message || 'Не удалось поставить в очередь';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ti ti-check"></i> Поставить в очередь';
+        return;
+      }
+      showToast('В очереди канбана 📋 ' + (a.model.name || ''), 'success');
+      cache.productionKanban = null;
+      cache.dashboard = null;
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ti ti-check"></i> Взять в работу';
+        selectSidebarItem('dashboard');
+      }, 600);
+    } catch (e) {
+      errEl.textContent = 'Ошибка соединения: ' + String(e);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-check"></i> Поставить в очередь';
+    }
+    return;
+  }
+
   if (a.workerIds.length === 0) { errEl.textContent = 'Выберите хотя бы одного исполнителя'; return; }
 
   let assemblyDate;

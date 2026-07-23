@@ -1447,6 +1447,10 @@
               <button type="button" class="status-toggle-btn" id="status-toggle-ready" onclick="setAssemblyStatusToggle('ready')">
                 <i class="ti ti-check"></i> Готово, на склад
               </button>
+              <!-- v2.45.800: план на склад — карточка сразу в «Очередь» канбана -->
+              <button type="button" class="status-toggle-btn" id="status-toggle-queue" onclick="setAssemblyStatusToggle('queue')">
+                <i class="ti ti-list-numbers"></i> Очередь на склад
+              </button>
             </div>
             <button class="btn btn-primary btn-full" id="submit-assembly-btn" onclick="submitAssembly()">
               <i class="ti ti-check"></i> <span id="submit-assembly-label">Взять в работу</span>
