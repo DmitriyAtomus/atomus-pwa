@@ -8143,7 +8143,15 @@ async function _doBomPreview() {
     section.style.display = 'block';
     const ok = data.ok_critical;
     let html = '';
-    if (!ok) {
+    const _qMode = (state.newAssembly && state.newAssembly.initialStatus) === 'queue';
+    if (!ok && _qMode) {
+      // v2.45.801: в очередь можно и без деталей — предупреждаем мягко
+      const critMissing = (data.shortage || []).filter(s => s.is_critical);
+      html += '<div class="bom-preview-warn"><i class="ti ti-hourglass"></i> ' +
+        'Деталей пока не хватает: ' +
+        critMissing.map(s => escapeHtml(s.component_name) + ' (' + _fmtQty(s.missing) + ')').join(', ') +
+        '. В очередь поставим — на канбане карточка будет с пометкой «нет деталей», пока детали не придут.</div>';
+    } else if (!ok) {
       const critMissing = (data.shortage || []).filter(s => s.is_critical);
       html += '<div class="bom-preview-alert"><i class="ti ti-alert-triangle"></i> ' +
         'Не хватает критичных позиций: ' +
@@ -8177,10 +8185,13 @@ async function _doBomPreview() {
     html += '</div>';
     content.innerHTML = html;
 
-    // Блокируем кнопку «Сохранить» если не хватает критичных
+    // Блокируем кнопку «Сохранить» если не хватает критичных.
+    // v2.45.801: режим «Очередь на склад» дефицит НЕ блокирует — постановка в
+    // план ничего не списывает, а в канбане карточка сама покажет «нет деталей».
+    const _isQueueMode = (state.newAssembly && state.newAssembly.initialStatus) === 'queue';
     const saveBtn = document.querySelector('button[onclick="submitAssembly()"], #submit-assembly-btn, .btn-save-assembly');
     if (saveBtn) {
-      if (!ok) {
+      if (!ok && !_isQueueMode) {
         saveBtn.disabled = true;
         saveBtn.style.opacity = '0.5';
         saveBtn.style.cursor = 'not-allowed';
@@ -8544,6 +8555,8 @@ function setAssemblyStatusToggle(status) {
   if (q) q.classList.toggle('active', status === 'queue');
   if (lbl) lbl.textContent = status === 'in_progress' ? 'Взять в работу'
     : (status === 'queue' ? 'Поставить в очередь' : 'Записать как готово');
+  // v2.45.801: смена режима меняет и блокировку по дефициту — обновляем превью
+  try { if (typeof refreshBomPreview === 'function') refreshBomPreview(); } catch (e) {}
 }
 
 async function submitAssembly() {
