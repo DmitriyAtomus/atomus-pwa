@@ -629,10 +629,15 @@ function renderContractAssembliesBlock(c) {
     let labelParts = [];
     if (readyCount > 0) labelParts.push(readyCount + ' сбор.');
     if (_reservedQtySum > 0) labelParts.push(_reservedQtySum + ' компл.');
-    html += '<div style="margin-bottom: 14px;">' +
+    html += '<div style="margin-bottom: 14px; display:flex; flex-direction:column; gap:6px;">' +
       '<button class="btn btn-secondary" onclick="batchPrintContractQrs(' + c.id + ')" ' +
         'style="width:100%;justify-content:center;border-color:#0C4A6E;color:#0C4A6E;background:#F0F9FF;">' +
         '<i class="ti ti-printer"></i> 🖨 Печать QR на все (' + totalQrCount + ': ' + labelParts.join(' · ') + ')' +
+      '</button>' +
+      // v2.45.809: те же этикетки в браузерную печать — обычный/сервисный принтер или PDF
+      '<button class="btn btn-secondary" onclick="batchPrintContractQrsPdf(' + c.id + ')" ' +
+        'style="width:100%;justify-content:center;">' +
+        '<i class="ti ti-file-type-pdf"></i> Печать PDF — на обычный принтер' +
       '</button>' +
       '</div>';
   }
@@ -10467,8 +10472,11 @@ async function printComponentItemQr(contractId, itemId) {
   const it = items.find(x => Number(x.id) === Number(itemId));
   if (!it) { showToast('Позиция не найдена', 'error'); return; }
   // v2.45.104: имя для любого типа позиции (model/component/sale/freeform)
-  const itName = it.component_name || it.model_name || it.sale_product_name ||
-                 it.name || ('Поз. #' + it.id);
+  // v2.45.809: имя позиции как в спецификации — модель/продажное/своё; складское
+  // component_name (зарезервированный бренд-вариант, напр. XIGMA) — последним:
+  // на этикетке должно быть «Наружный блок №18», а не имя варианта со склада
+  const itName = it.model_name || it.sale_product_name || it.name ||
+                 it.component_name || ('Поз. #' + it.id);
   const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
   const unit = _ccUnitLabel(it);
   const contractNum = (c && c.contract_number) || ('#' + contractId);

@@ -4890,6 +4890,83 @@ function _confirmBatchPrintModal(readyList, compList, boxList) {
   });
 }
 
+// v2.45.809: те же этикетки, но через браузерную печать (окно с наклейками
+// 58×60 → системный диалог печати: обычный/сервисный принтер или «Сохранить PDF»)
+async function batchPrintContractQrsPdf(contractId) {
+  const c = state.lastLoadedContract || {};
+  if (!c || c.id !== contractId) { showToast('Открой карточку договора заново', 'error'); return; }
+  const ready = (c.assemblies || []).filter(a => a.status === 'ready');
+  let items = [];
+  try {
+    const fresh = await apiGet('/api/contracts/' + contractId + '/items?_=' + Date.now());
+    items = fresh.items || [];
+  } catch (e) {
+    const spec = (state._specByContract && state._specByContract[contractId]) || {};
+    items = (spec.items && spec.items.length) ? spec.items : (c.items || []);
+  }
+  const compItems = items.filter(it => it && it.component_id && !it.model_id && Number(it.qty_reserved || 0) > 0);
+  let boxes = [], packed = new Set();
+  try {
+    const bm = await apiGet('/api/contracts/' + contractId + '/box-map');
+    boxes = (bm && bm.boxes) || [];
+    packed = new Set((bm && bm.packed_assembly_ids) || []);
+  } catch (e) {}
+  const readyUnpacked = ready.filter(a => !packed.has(a.id));
+  if (!readyUnpacked.length && !compItems.length && !boxes.length) {
+    showToast('Нет готовых сборок, коробок и компонентов в резерве для печати', 'error');
+    return;
+  }
+  const _sel = await _confirmBatchPrintModal(readyUnpacked, compItems, boxes);
+  if (!_sel) return;
+  showToast('Готовим этикетки…', 'info');
+  const labels = [];
+  for (const a of (_sel.ready || [])) {
+    try {
+      const tok = await apiGet('/api/assemblies/' + a.id + '/public-token');
+      labels.push({
+        kind: 'assembly', token: tok.public_token,
+        modelName: a.model_name || '', modelArticle: a.model_article || '',
+        assemblyDate: a.assembly_date || '',
+        contractNumber: c.contract_number || '',
+        contractorName: (c.contractor && c.contractor.name) || '',
+      });
+    } catch (e) {}
+  }
+  for (const b of (_sel.boxes || [])) {
+    const btok = b.public_token || b.token;
+    if (!btok) continue;
+    labels.push({
+      kind: 'box', token: btok,
+      boxName: b.name || b.box_name || 'Коробка',
+      contractNumber: c.contract_number || '',
+      contractorName: (c.contractor && c.contractor.name) || '',
+    });
+  }
+  if ((_sel.comp || []).length) {
+    try {
+      const ct = await apiGet('/api/contracts/' + contractId + '/public-token');
+      const contractUrl = window.location.origin + '/c/' + ct.public_token;
+      for (const it of (_sel.comp || [])) {
+        const itName = it.name || it.component_name || ('Поз. #' + it.id);
+        const typeName = (typeof _ccItemTypeName === 'function') ? _ccItemTypeName(it) : '';
+        const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
+        for (let k = 0; k < qty; k++) {
+          labels.push({
+            kind: 'assembly',
+            url: contractUrl + '?item=' + it.id,
+            modelName: itName, modelArticle: typeName,
+            assemblyDate: '',
+            contractNumber: c.contract_number || '', contractorName: '',
+          });
+        }
+      }
+    } catch (e) {}
+  }
+  if (!labels.length) { showToast('Не удалось подготовить этикетки', 'error'); return; }
+  state._labelsToPrint = labels;
+  renderLabelsForPrint();
+}
+
 async function batchPrintContractQrs(contractId) {
   // Берём договор из текущего экрана — assemblies уже подгружены при рендере карточки
   const c = state.lastLoadedContract || {};
@@ -4993,7 +5070,8 @@ async function batchPrintContractQrs(contractId) {
       const contractUrl = window.location.origin + '/c/' + ct.public_token;
       const contractNum = c.contract_number || ('#' + c.id);
       for (const it of selComp) {
-        const itName = it.component_name || it.name || ('Поз. #' + it.id);
+        // v2.45.809: имя позиции спецификации важнее складского варианта
+        const itName = it.name || it.component_name || ('Поз. #' + it.id);
         const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
         const unit = _ccUnitLabel(it);
         // v2.45.808: + «что это такое» (подгруппа номенклатуры) на этикетке
@@ -5626,7 +5704,8 @@ function renderLabelsForPrint() {
     const prefix = kind === 'box' ? '/b/' : '/a/';
     return {
       kind: kind,
-      url: window.location.origin + prefix + item.token,
+      // v2.45.809: готовый url (QR договора с ?item=) имеет приоритет над токеном
+      url: item.url || (window.location.origin + prefix + item.token),
       modelName: item.modelName || '',
       modelArticle: item.modelArticle || '',
       assemblyDate: item.assemblyDate || '',
