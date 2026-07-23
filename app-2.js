@@ -10869,12 +10869,15 @@ function renderContractItemsBlock(contractId) {
         // с явной галочкой, клик переключает без открытия формы
         let _shipAloneChip = '';
         if (canEdit) {
+          // v2.45.815: подробная подсказка при наведении — что это значит
           _shipAloneChip = ' <button class="ship-alone-mini' + (it.ship_standalone ? ' on' : '') + '" ' +
             'onclick="event.stopPropagation();specToggleShipStandalone(' + contractId + ',' + it.id + ')" ' +
-            'title="Отгружать отдельной позицией: свой QR в «К отгрузке», без упаковки в коробку">' +
+            'data-tip="' + (it.ship_standalone
+              ? 'Включено: эта позиция отгружается ОТДЕЛЬНО — у неё свой QR в списке «К отгрузке», в коробку её не упаковывают, в прогрессе отгрузки она считается своей единицей. Клик — выключить.'
+              : 'Отгружать отдельной позицией — для крупного покупного (приточки, чиллеры-моноблоки): позиция получит свой QR в «К отгрузке» и будет отгружаться сама по себе, без упаковки в коробку. Клик — включить.') + '">' +
             '<span class="chk"><i class="ti ti-check"></i></span>отдельной позицией</button>';
         } else if (it.ship_standalone) {
-          _shipAloneChip = ' <span class="ship-alone-mini on static"><span class="chk"><i class="ti ti-check"></i></span>отдельной позицией</span>';
+          _shipAloneChip = ' <span class="ship-alone-mini on static" data-tip="Эта позиция отгружается отдельно: свой QR в «К отгрузке», без упаковки в коробку."><span class="chk"><i class="ti ti-check"></i></span>отдельной позицией</span>';
         }
         _sysChip += _shipAloneChip;
         // v2.45.198: пометка «закуп в другом городе, отгрузка сразу на объекте»
