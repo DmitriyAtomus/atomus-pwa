@@ -636,9 +636,9 @@ function renderContractAssembliesBlock(c) {
       '</button>' +
       // v2.45.811: PDF здесь — это СПЕЦИФИКАЦИЯ договора (на обычный принтер),
       // а не этикетки: открывает тот же документ, что кнопка «PDF» в спецификации
-      '<button class="btn btn-secondary" onclick="downloadContractSpecPdf(' + c.id + ')" ' +
+      '<button class="btn btn-secondary" onclick="printContractSpecPdf(' + c.id + ')" ' +
         'style="width:100%;justify-content:center;">' +
-        '<i class="ti ti-file-type-pdf"></i> Печать PDF — спецификация (обычный принтер)' +
+        '<i class="ti ti-printer"></i> Печать спецификации (обычный принтер)' +
       '</button>' +
       '</div>';
   }
@@ -11717,6 +11717,50 @@ async function downloadContractSpecDocx(contractId) {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Ошибка соединения: ' + String(e), 'error');
+  }
+}
+
+// v2.45.812: «Печать PDF» — сразу диалог печати: PDF грузится в скрытый iframe
+// и вызывается print(). Никаких промежуточных вкладок и ручного Ctrl+P.
+async function printContractSpecPdf(contractId) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) { showToast('Сессия истекла, войдите заново', 'error'); return; }
+  showToast('Готовим спецификацию к печати…', 'info');
+  try {
+    const r = await fetch(API_BASE + '/api/contracts/' + contractId + '/spec/pdf?base=' + encodeURIComponent(window.location.origin), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = 'Не удалось получить PDF';
+      try { const d = await r.json(); msg = d.message || msg; } catch (e) {}
+      showToast(msg, 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    // старый iframe от прошлой печати убираем
+    const prev = document.getElementById('spec-print-frame');
+    if (prev) prev.remove();
+    const fr = document.createElement('iframe');
+    fr.id = 'spec-print-frame';
+    fr.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;visibility:hidden;';
+    fr.src = url;
+    fr.onload = function () {
+      setTimeout(function () {
+        try {
+          fr.contentWindow.focus();
+          fr.contentWindow.print();
+        } catch (e) {
+          // фолбэк: не дал печатать из iframe — откроем вкладку как раньше
+          window.open(url, '_blank');
+        }
+      }, 300);
+    };
+    document.body.appendChild(fr);
+    // blob-URL живёт долго: пока открыт диалог печати, отзывать нельзя
+    setTimeout(() => { try { URL.revokeObjectURL(url); const f = document.getElementById('spec-print-frame'); if (f) f.remove(); } catch (e) {} }, 10 * 60000);
   } catch (e) {
     showToast('Ошибка соединения: ' + String(e), 'error');
   }
