@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.804";
+const APP_VERSION = "v2.45.805";
 const APP_VERSION_DATE = "22.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -558,6 +558,7 @@ async function testAlerts() {
 function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem('atomus_last_view');  // v2.8.2
+  try { sessionStorage.removeItem('atomus_last_view'); } catch (e) {}  // v2.45.805
   // v2.45.117: при выходе сбрасываем кеш пароля
   if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
   state.user = null;
@@ -1174,7 +1175,9 @@ function _restoreLastView() {
   }
   let last = null;
   try {
-    const raw = localStorage.getItem('atomus_last_view');
+    // v2.45.805: приоритет — память ЭТОЙ вкладки (sessionStorage): F5 возвращает
+    // туда, где была именно она. localStorage — фолбэк для новой вкладки.
+    const raw = sessionStorage.getItem('atomus_last_view') || localStorage.getItem('atomus_last_view');
     if (raw) last = JSON.parse(raw);
   } catch (e) {}
   // Срок жизни — сутки. Дальше — на главную, иначе странно если открыл через 2 недели
@@ -1613,12 +1616,16 @@ function selectSidebarItem(screenName) {
       if (state.currentEmployeeId)     ctx.employeeId     = state.currentEmployeeId;
       if (state.currentSaleProductId)  ctx.saleProductId  = state.currentSaleProductId;
       if (state.currentSupplyOrderId)  ctx.supplyOrderId  = state.currentSupplyOrderId;
-      localStorage.setItem('atomus_last_view', JSON.stringify({
+      const _lastViewPayload = JSON.stringify({
         section: state.currentSection || 'home',
         screen: screenName,
         ctx: ctx,
         ts: Date.now(),
-      }));
+      });
+      localStorage.setItem('atomus_last_view', _lastViewPayload);
+      // v2.45.805: у каждой ВКЛАДКИ своя память (sessionStorage) — F5 во второй
+      // вкладке больше не уводит на экран, где работали в первой
+      try { sessionStorage.setItem('atomus_last_view', _lastViewPayload); } catch (e2) {}
     }
   } catch (e) { /* localStorage может быть отключён — игнор */ }
 
