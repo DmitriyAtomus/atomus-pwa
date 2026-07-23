@@ -21699,3 +21699,10 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   #mail-messenger-root.thread-open #mail-thread-pane { display: flex !important; }
   .mm-back { display: inline-flex; }
 }
+
+/* ============ v2.45.813: кнопка «Отгружать отдельной позицией» ============ */
+.ship-alone-btn { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--border-strong, #CBD5E1); background: #fff; color: var(--text-mid); border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .12s ease; }
+.ship-alone-btn .chk { width: 20px; height: 20px; border-radius: 6px; border: 2px solid #CBD5E1; display: inline-flex; align-items: center; justify-content: center; flex: none; color: transparent; font-size: 13px; transition: all .12s ease; }
+.ship-alone-btn:hover { border-color: var(--brand); color: var(--brand); }
+.ship-alone-btn.on { border-color: #16A34A; background: #F0FDF4; color: #15803D; }
+.ship-alone-btn.on .chk { background: #16A34A; border-color: #16A34A; color: #fff; }

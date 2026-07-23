@@ -11200,6 +11200,20 @@ function renderSpecForm(contractId, existing) {
     '<datalist id="spec-system-tags">' +
     _existingSysTags.map(t => '<option value="' + escapeHtml(t) + '">').join('') +
     '</datalist></div>';
+  // v2.45.813: «Отгружать отдельной позицией» — заметная кнопка-переключатель
+  // рядом с основными полями, с явной галочкой состояния (директор просил
+  // видеть, поставлена она или нет). Скрытый checkbox — для submitSpecForm.
+  const shipStandaloneOn = !!e.ship_standalone;
+  html += '<div style="grid-column: 1 / -1; margin-top: 2px;">' +
+    '<input type="checkbox" id="spec-form-ship-standalone"' + (shipStandaloneOn ? ' checked' : '') + ' style="display:none;">' +
+    '<button type="button" id="spec-form-ship-standalone-btn" onclick="_toggleShipStandaloneBtn()" ' +
+      'class="ship-alone-btn' + (shipStandaloneOn ? ' on' : '') + '">' +
+      '<span class="chk"><i class="ti ti-check"></i></span>' +
+      '<i class="ti ti-shopping-cart"></i> Отгружать отдельной позицией' +
+    '</button>' +
+    '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;line-height:1.45;">' +
+      'Для крупного покупного (приточки, чиллеры-моноблоки): встанет в «К отгрузке» отдельной единицей со своим QR и учётом в прогрессе — без упаковки в коробку.</div>' +
+  '</div>';
   // ЭТАП 37: контейнер для условных полей Исполнение/IP
   html += '<div id="spec-form-conditional" style="grid-column: 1 / -1;">';
   html += _renderSpecConditionalFieldsHTML(e);
@@ -11229,18 +11243,7 @@ function renderSpecForm(contractId, existing) {
   }
   html += '</div>';
   html += '</div>';
-  // v2.45.325: отгружать крупное покупное отдельной позицией (свой QR в «К отгрузке»)
-  const shipStandaloneOn = !!e.ship_standalone;
-  html += '<div style="grid-column: 1 / -1; margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 10px;">';
-  // v2.45.329: клик по всей строке надёжно ставит/снимает галочку (тап по тексту тоже)
-  html += '<div onclick="if(event.target.tagName!==\'INPUT\'){var _cb=document.getElementById(\'spec-form-ship-standalone\');_cb.checked=!_cb.checked;}" ' +
-    'style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--text-dark); user-select:none; -webkit-user-select:none;">' +
-    '<input type="checkbox" id="spec-form-ship-standalone"' + (shipStandaloneOn ? ' checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--brand);">' +
-    '<span><i class="ti ti-shopping-cart" style="vertical-align:-2px;color:var(--brand);"></i> Отгружать отдельной позицией</span>' +
-    '</div>';
-  html += '<div style="font-size:11.5px;color:var(--text-light);margin-top:4px;line-height:1.45;">' +
-    'Для крупного покупного (приточки, чиллеры-моноблоки): встанет в «К отгрузке» отдельной единицей со своим QR и учётом в прогрессе — без упаковки в коробку.</div>';
-  html += '</div>';
+
   html += '</div>';
   // Кнопки
   html += '<div class="spec-form-row-2">';
@@ -11720,6 +11723,15 @@ async function downloadContractSpecDocx(contractId) {
   } catch (e) {
     showToast('Ошибка соединения: ' + String(e), 'error');
   }
+}
+
+// v2.45.813: переключатель «Отгружать отдельной позицией» в форме позиции
+function _toggleShipStandaloneBtn() {
+  const cb = document.getElementById('spec-form-ship-standalone');
+  const btn = document.getElementById('spec-form-ship-standalone-btn');
+  if (!cb || !btn) return;
+  cb.checked = !cb.checked;
+  btn.classList.toggle('on', cb.checked);
 }
 
 // v2.45.812: «Печать PDF» — сразу диалог печати: PDF грузится в скрытый iframe
