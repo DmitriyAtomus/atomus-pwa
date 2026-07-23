@@ -4996,7 +4996,10 @@ async function batchPrintContractQrs(contractId) {
         const itName = it.component_name || it.name || ('Поз. #' + it.id);
         const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
         const unit = _ccUnitLabel(it);
-        const caption = ('Дог.' + contractNum + ' · ' + itName + ' · 1 ' + unit).slice(0, 80);
+        // v2.45.808: + «что это такое» (подгруппа номенклатуры) на этикетке
+        const typeName = (typeof _ccItemTypeName === 'function') ? _ccItemTypeName(it) : '';
+        const caption = ('Дог.' + contractNum + ' · ' + itName +
+          (typeName ? ' · ' + typeName : '') + ' · 1 ' + unit).slice(0, 120);
         // v2.45.x: QR покупной позиции = /c/{токен}?item=ID — скан отгружает
         // именно эту позицию (а не «вообще договор»).
         const itemUrl = contractUrl + '?item=' + it.id;

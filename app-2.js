@@ -10442,6 +10442,13 @@ async function _pickManualComponent(contractId, itemId, componentId) {
 // v2.45.97/100: печать QR-наклеек для одной component-позиции.
 // Печатает по одной этикетке на каждую единицу — copies = qty.
 // На каждой этикетке подпись «Дог.№X · Имя позиции · 1 {unit}».
+// v2.45.808: «что это такое» для этикетки — подгруппа/группа продажной
+// номенклатуры («Воздушные клапаны для прямоугольных воздуховодов ZSSK»)
+function _ccItemTypeName(it) {
+  const t = (it && (it.sale_product_subgroup_name || it.sale_product_group_name ||
+                    it.sale_product_category_name) || '').trim();
+  return (t && t !== '(без подгруппы)') ? t : '';
+}
 function _ccUnitLabel(it) {
   // Выбор формы единицы — учитываем «(комплект)» в имени и поле unit
   const name = (it && (it.component_name || it.name) || '').toLowerCase();
@@ -10465,7 +10472,10 @@ async function printComponentItemQr(contractId, itemId) {
   const qty = Math.max(1, Math.floor(Number(it.qty || it.qty_reserved || 1)));
   const unit = _ccUnitLabel(it);
   const contractNum = (c && c.contract_number) || ('#' + contractId);
-  const caption = ('Дог.' + contractNum + ' · ' + itName + ' · 1 ' + unit).slice(0, 80);
+  // v2.45.808: на этикетке видно, ЧТО это такое, а не только артикул
+  const typeName = _ccItemTypeName(it);
+  const caption = ('Дог.' + contractNum + ' · ' + itName +
+    (typeName ? ' · ' + typeName : '') + ' · 1 ' + unit).slice(0, 120);
   if (!confirm('Отправить на термопринтер ' + qty + ' этикет' +
                (qty === 1 ? 'ку' : (qty < 5 ? 'ки' : 'ок')) + '?\n\n' +
                'На каждой: ' + caption)) return;
