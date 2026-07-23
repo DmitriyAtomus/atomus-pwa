@@ -21706,3 +21706,11 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .ship-alone-btn:hover { border-color: var(--brand); color: var(--brand); }
 .ship-alone-btn.on { border-color: #16A34A; background: #F0FDF4; color: #15803D; }
 .ship-alone-btn.on .chk { background: #16A34A; border-color: #16A34A; color: #fff; }
+
+/* ============ v2.45.814: мини-переключатель «отдельной позицией» в строке ============ */
+.ship-alone-mini { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; border: 1px solid #CBD5E1; background: #fff; color: #64748B; border-radius: 999px; padding: 2px 9px 2px 4px; margin-left: 4px; vertical-align: middle; cursor: pointer; font-family: inherit; transition: all .12s ease; }
+.ship-alone-mini .chk { width: 14px; height: 14px; border-radius: 5px; border: 1.5px solid #CBD5E1; display: inline-flex; align-items: center; justify-content: center; color: transparent; font-size: 10px; flex: none; }
+.ship-alone-mini:hover { border-color: var(--brand); color: var(--brand); }
+.ship-alone-mini.on { border-color: #16A34A; background: #F0FDF4; color: #15803D; }
+.ship-alone-mini.on .chk { background: #16A34A; border-color: #16A34A; color: #fff; }
+.ship-alone-mini.static { cursor: default; }

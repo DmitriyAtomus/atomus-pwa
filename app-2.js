@@ -10865,6 +10865,18 @@ function renderContractItemsBlock(contractId) {
         if (it.system_tag) {
           _sysChip = ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#0E7490;background:rgba(14,116,144,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;" title="Относится к системе / объекту"><i class="ti ti-layout-grid" style="font-size:10px;vertical-align:-1px;"></i> ' + escapeHtml(it.system_tag) + '</span>';
         }
+        // v2.45.814: переключатель «Отгружать отдельной позицией» прямо в строке —
+        // с явной галочкой, клик переключает без открытия формы
+        let _shipAloneChip = '';
+        if (canEdit) {
+          _shipAloneChip = ' <button class="ship-alone-mini' + (it.ship_standalone ? ' on' : '') + '" ' +
+            'onclick="event.stopPropagation();specToggleShipStandalone(' + contractId + ',' + it.id + ')" ' +
+            'title="Отгружать отдельной позицией: свой QR в «К отгрузке», без упаковки в коробку">' +
+            '<span class="chk"><i class="ti ti-check"></i></span>отдельной позицией</button>';
+        } else if (it.ship_standalone) {
+          _shipAloneChip = ' <span class="ship-alone-mini on static"><span class="chk"><i class="ti ti-check"></i></span>отдельной позицией</span>';
+        }
+        _sysChip += _shipAloneChip;
         // v2.45.198: пометка «закуп в другом городе, отгрузка сразу на объекте»
         let _altBadge = '', _altLine = '';
         if (it.alt_supply) {
@@ -11723,6 +11735,24 @@ async function downloadContractSpecDocx(contractId) {
   } catch (e) {
     showToast('Ошибка соединения: ' + String(e), 'error');
   }
+}
+
+// v2.45.814: быстрый переключатель «Отгружать отдельной позицией» в строке спецификации
+async function specToggleShipStandalone(contractId, itemId) {
+  const spec = (state._specByContract && state._specByContract[contractId]) || {};
+  const items = (spec.items && spec.items.length) ? spec.items
+    : ((state.lastLoadedContract && state.lastLoadedContract.items) || []);
+  const it = items.find(x => Number(x.id) === Number(itemId));
+  const newVal = (it && it.ship_standalone) ? 0 : 1;
+  try {
+    await apiPatch('/api/contracts/items/' + itemId + '/ship-standalone', { value: newVal });
+    if (it) it.ship_standalone = newVal;
+    showToast(newVal ? 'Отгружаем отдельной позицией ✓' : 'Отдельная отгрузка снята', 'success');
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось сохранить', 'error');
+  }
+  // мгновенно обновляем чип, без полной перезагрузки карточки
+  try { renderContractItemsBlock(contractId); } catch (e) {}
 }
 
 // v2.45.813: переключатель «Отгружать отдельной позицией» в форме позиции
