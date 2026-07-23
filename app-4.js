@@ -8079,6 +8079,7 @@ const DRW_SECTIONS = [
   { code: 'tasks',        icon: 'ti-checklist',          label: 'Задачи' },
   { code: 'warehouse',    icon: 'ti-building-warehouse', label: 'Склад' },
   { code: 'supply',       icon: 'ti-shopping-cart',      label: 'Снабжен.' },
+  { code: 'mail',         icon: 'ti-mail',               label: 'Почта/MAX' },
   { code: 'defects',      icon: 'ti-alert-circle',       label: 'Сервис' },
   { code: 'installation', icon: 'ti-tools',              label: 'Монтаж' },
   { code: 'hr',           icon: 'ti-id-badge',           label: 'Кадры' },

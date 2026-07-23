@@ -21688,3 +21688,14 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 @media (max-width: 1000px) {
   .logi-cols { grid-template-columns: 1fr; }
 }
+
+/* ============ v2.45.807: Почта/MAX на мобильном ============ */
+.mm-back { display: none; border: none; background: var(--bg); border-radius: 8px; width: 34px; height: 34px; font-size: 17px; cursor: pointer; flex: none; align-items: center; justify-content: center; color: var(--text-dark); }
+@media (max-width: 768px) {
+  #mail-messenger-root { height: calc(100vh - 175px) !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; }
+  #mail-conv-list { width: 100% !important; min-width: 0 !important; border-right: none !important; }
+  #mail-thread-pane { display: none !important; }
+  #mail-messenger-root.thread-open #mail-conv-list { display: none !important; }
+  #mail-messenger-root.thread-open #mail-thread-pane { display: flex !important; }
+  .mm-back { display: inline-flex; }
+}

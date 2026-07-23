@@ -6617,9 +6617,19 @@ async function _mailPollTick() {
   } catch (e) { /* сеть мигнула — попробуем в следующий тик */ }
 }
 
+// v2.45.807: мобильный режим — назад из треда к списку диалогов
+function mailBackToList() {
+  state._mailPeer = null;
+  const root = document.getElementById('mail-messenger-root');
+  if (root) root.classList.remove('thread-open');
+}
+
 async function openMailThread(peer) {
   state._mailPeer = peer;
   _startMailPolling();
+  // v2.45.807: на телефоне показываем тред на весь экран (список прячется)
+  const _mmRoot = document.getElementById('mail-messenger-root');
+  if (_mmRoot) _mmRoot.classList.add('thread-open');
   const pane = document.getElementById('mail-thread-pane');
   if (!pane) return;
   document.querySelectorAll('.mail-conv').forEach(el => { el.classList.toggle('sel', el.dataset.peer === peer); });
@@ -6640,6 +6650,7 @@ async function openMailThread(peer) {
     const peerEnc = encodeURIComponent(peer);
     const bindBtn = '<button class="btn btn-secondary btn-small" onclick="openMailBindSupplier(decodeURIComponent(\'' + peerEnc + '\'))"><i class="ti ti-link"></i> ' + (d.supplier_name ? 'Сменить' : 'Привязать к поставщику') + '</button>';
     let html = '<div class="mm-thhead">' +
+      '<button class="mm-back" onclick="mailBackToList()" title="К списку диалогов"><i class="ti ti-arrow-left"></i></button>' +
       '<div class="mm-ava ' + _mailAvaCls(peer) + '">' + escapeHtml(_mailInitials(title)) +
         '<span class="mm-chb ' + (isMax ? 'max' : 'mail') + '"><i class="ti ' + (isMax ? 'ti-message-circle' : 'ti-mail') + '"></i></span></div>' +
       '<div style="min-width:0;flex:1;"><div style="font-weight:800;display:flex;gap:7px;align-items:center;">' + escapeHtml(title) +
