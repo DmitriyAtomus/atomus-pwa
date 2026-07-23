@@ -634,10 +634,11 @@ function renderContractAssembliesBlock(c) {
         'style="width:100%;justify-content:center;border-color:#0C4A6E;color:#0C4A6E;background:#F0F9FF;">' +
         '<i class="ti ti-printer"></i> 🖨 Печать QR на все (' + totalQrCount + ': ' + labelParts.join(' · ') + ')' +
       '</button>' +
-      // v2.45.809: те же этикетки в браузерную печать — обычный/сервисный принтер или PDF
-      '<button class="btn btn-secondary" onclick="batchPrintContractQrsPdf(' + c.id + ')" ' +
+      // v2.45.811: PDF здесь — это СПЕЦИФИКАЦИЯ договора (на обычный принтер),
+      // а не этикетки: открывает тот же документ, что кнопка «PDF» в спецификации
+      '<button class="btn btn-secondary" onclick="downloadContractSpecPdf(' + c.id + ')" ' +
         'style="width:100%;justify-content:center;">' +
-        '<i class="ti ti-file-type-pdf"></i> Печать PDF — на обычный принтер' +
+        '<i class="ti ti-file-type-pdf"></i> Печать PDF — спецификация (обычный принтер)' +
       '</button>' +
       '</div>';
   }
