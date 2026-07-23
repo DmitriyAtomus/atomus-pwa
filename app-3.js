@@ -6579,12 +6579,12 @@ function _mailConvRow(c) {
   '</div>';
 }
 // v2.45.803: живое обновление переписки — новые сообщения приходят сами,
-// без кнопки «Обновить». Каждые 10 сек: тред (если открыт) + список диалогов.
+// без кнопки «Обновить». Каждые 3 сек: тред (если открыт) + список диалогов.
 let _mailPollTimer = null;
 let _mailLastMsgKey = '';
 function _startMailPolling() {
   if (_mailPollTimer) return;
-  _mailPollTimer = setInterval(_mailPollTick, 10000);
+  _mailPollTimer = setInterval(_mailPollTick, 3000);
 }
 function _stopMailPolling() {
   if (_mailPollTimer) { clearInterval(_mailPollTimer); _mailPollTimer = null; }
