@@ -6711,10 +6711,17 @@ function _mailMsgBubble(m) {
       // v1.8.776: две кнопки. «На оплату» — распознать и сразу в оплату (то, что
       // чаще всего нужно). «Во Входящие» — оформить как счёт для разбора, если
       // сначала хочется проверить (или это не на оплату, а к сопоставлению).
+      // v2.45.802: «Открыть» — файл, который НЕ счёт (фото, документ, карточка):
+      // просто посмотреть/скачать, никакого оформления
+      const openBtn = '<button class="btn btn-small btn-secondary" style="margin-left:6px;" ' +
+        'onclick="downloadInboxAttachmentDirect(' + m.id + ',' + idx + ',\'' +
+        escapeHtml(String(name).replace(/'/g, "\\'")) + '\')" ' +
+        'title="Это не счёт — просто открыть или скачать файл"><i class="ti ti-eye"></i> Открыть</button>';
       const prom = canProm
-        ? '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:6px;" onclick="chatFileToPay(' + m.id + ',' + idx + ')"><i class="ti ti-cash"></i> На оплату</button>' +
+        ? openBtn +
+          '<button class="btn btn-small" style="background:#16a34a;border-color:#16a34a;color:#fff;margin-left:4px;" onclick="chatFileToPay(' + m.id + ',' + idx + ')"><i class="ti ti-cash"></i> На оплату</button>' +
           '<button class="btn btn-small btn-secondary" style="margin-left:4px;" onclick="promoteChatAttachment(' + m.id + ',' + idx + ')" title="Оформить как счёт для разбора во «Входящих счетах»"><i class="ti ti-file-invoice"></i> Во входящие</button>'
-        : '';
+        : openBtn;
       return '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' + card + prom + '</div>';
     }).join('') +
       ((m.kind === 'invoice') ? '<div style="font-size:11px;color:#15803D;font-weight:600;margin-top:2px;"><i class="ti ti-check"></i> оформлен как счёт</div>' : '') +
