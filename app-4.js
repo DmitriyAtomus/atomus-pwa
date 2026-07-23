@@ -4918,6 +4918,14 @@ async function batchPrintContractQrsPdf(contractId) {
   }
   const _sel = await _confirmBatchPrintModal(readyUnpacked, compItems, boxes);
   if (!_sel) return;
+  // v2.45.810: окно открываем НЕМЕДЛЕННО (пока жив клик по кнопке модалки) —
+  // иначе браузер блокирует его как всплывашку после сетевых запросов
+  const _pw = window.open('', '_blank');
+  if (_pw) {
+    try {
+      _pw.document.write('<title>Этикетки…</title><p style="font-family:sans-serif;padding:30px;color:#555;">Готовим этикетки…</p>');
+    } catch (e) {}
+  }
   showToast('Готовим этикетки…', 'info');
   const labels = [];
   for (const a of (_sel.ready || [])) {
@@ -4962,9 +4970,13 @@ async function batchPrintContractQrsPdf(contractId) {
       }
     } catch (e) {}
   }
-  if (!labels.length) { showToast('Не удалось подготовить этикетки', 'error'); return; }
+  if (!labels.length) {
+    showToast('Не удалось подготовить этикетки', 'error');
+    try { if (_pw) _pw.close(); } catch (e) {}
+    return;
+  }
   state._labelsToPrint = labels;
-  renderLabelsForPrint();
+  renderLabelsForPrint(_pw);
 }
 
 async function batchPrintContractQrs(contractId) {
@@ -5690,12 +5702,18 @@ function printSelectedLabels() {
   });
 }
 
-function renderLabelsForPrint() {
+function renderLabelsForPrint(preWin) {
   const items = state._labelsToPrint || [];
-  if (!items.length) { showToast('Нечего печатать', 'error'); return; }
+  if (!items.length) {
+    showToast('Нечего печатать', 'error');
+    try { if (preWin) preWin.close(); } catch (e) {}
+    return;
+  }
 
   // ЭТАП 31.8: открываем в новом окне с автопечатью (вместо перекрытия UI)
-  const w = window.open('', '_blank');
+  // v2.45.810: preWin — окно, открытое СРАЗУ по клику (иначе браузер блокирует
+  // window.open после долгих запросов к серверу)
+  const w = preWin || window.open('', '_blank');
   if (!w) { showToast('Разрешите всплывающие окна в браузере', 'error'); return; }
 
   // Собираем массив URL'ов
