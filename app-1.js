@@ -1,7 +1,7 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.805";
+const APP_VERSION = "v2.45.806";
 const APP_VERSION_DATE = "22.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1180,6 +1180,34 @@ function _restoreLastView() {
     const raw = sessionStorage.getItem('atomus_last_view') || localStorage.getItem('atomus_last_view');
     if (raw) last = JSON.parse(raw);
   } catch (e) {}
+
+  // v2.45.806: страховка — в момент закрытия/обновления вкладки фиксируем её
+  // ТЕКУЩИЙ экран в sessionStorage. Иначе после обновления кода вкладка, в
+  // которой ещё не ходили по разделам, восстанавливалась по общей памяти
+  // (экран другой вкладки). Формы-черновики не фиксируем.
+  if (!window._lastViewUnloadHooked) {
+    window._lastViewUnloadHooked = true;
+    window.addEventListener('beforeunload', function () {
+      try {
+        const scr = state.currentScreen, sec = state.currentSection;
+        if (!scr || !sec) return;
+        const TRANSIENT = ['employee-form', 'task-form', 'contract-form', 'sale-offer-form',
+          'sale-product-form', 'defect-form', 'model-form', 'vacation-form', 'wh-ship-qr'];
+        if (TRANSIENT.indexOf(scr) !== -1) return;
+        const ctx = {};
+        if (state.currentContractId)    ctx.contractId    = state.currentContractId;
+        if (state.currentContractorId)  ctx.contractorId  = state.currentContractorId;
+        if (state.currentTaskId)        ctx.taskId        = state.currentTaskId;
+        if (state.currentOfferId)       ctx.offerId       = state.currentOfferId;
+        if (state.currentEmployeeId)    ctx.employeeId    = state.currentEmployeeId;
+        if (state.currentSaleProductId) ctx.saleProductId = state.currentSaleProductId;
+        if (state.currentSupplyOrderId) ctx.supplyOrderId = state.currentSupplyOrderId;
+        sessionStorage.setItem('atomus_last_view', JSON.stringify({
+          section: sec, screen: scr, ctx: ctx, ts: Date.now(),
+        }));
+      } catch (e) {}
+    });
+  }
   // Срок жизни — сутки. Дальше — на главную, иначе странно если открыл через 2 недели
   const MAX_AGE = 24 * 3600 * 1000;
   if (!last || !last.section || !last.screen || (Date.now() - (last.ts || 0)) > MAX_AGE) {
