@@ -10868,7 +10868,11 @@ function renderContractItemsBlock(contractId) {
         // v2.45.814: переключатель «Отгружать отдельной позицией» прямо в строке —
         // с явной галочкой, клик переключает без открытия формы
         let _shipAloneChip = '';
-        if (canEdit) {
+        // v2.45.816: у НАШИХ сборок (model_id) чип не показываем — каждая сборка
+        // и так отгружается отдельно со своим QR; настройка нужна только покупному
+        if (it.model_id) {
+          // ничего
+        } else if (canEdit) {
           // v2.45.815: подробная подсказка при наведении — что это значит
           _shipAloneChip = ' <button class="ship-alone-mini' + (it.ship_standalone ? ' on' : '') + '" ' +
             'onclick="event.stopPropagation();specToggleShipStandalone(' + contractId + ',' + it.id + ')" ' +
