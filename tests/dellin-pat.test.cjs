@@ -97,6 +97,44 @@ test('PAT скрыт в форме и очищается после запрос
   assert.doesNotMatch(html, /id="dl-pass"/);
 });
 
+test('ручное обновление показывает число автоматически добавленных грузов', async () => {
+  const toasts = [];
+  const requests = [];
+  let reloads = 0;
+  const context = {
+    showToast(message, type) {
+      toasts.push({ message, type });
+    },
+    async apiPost(url, body) {
+      requests.push({ url, body });
+      return { ok: true, data: { synced: 3, total: 4, added: 2 } };
+    },
+    _redactDellinPat(value) {
+      return value;
+    },
+    loadLogisticsPickups() {
+      reloads += 1;
+    },
+  };
+  const code = section(
+    'async function dellinRefresh()',
+    '// ============ ДЕЛОВЫЕ ЛИНИИ'
+  );
+  vm.runInNewContext(`${code}\nthis.refresh = dellinRefresh;`, context);
+
+  await context.refresh();
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(requests)),
+    [{ url: '/api/logistics/dellin/refresh', body: {} }]
+  );
+  assert.deepEqual(toasts, [
+    { message: 'Ищем новые грузы и обновляем статусы Деловых линий…', type: 'info' },
+    { message: 'Обновлено: 3 из 4 · новых грузов: 2', type: 'success' },
+  ]);
+  assert.equal(reloads, 1);
+});
+
 test('PAT не может попасть в сообщение интерфейса', () => {
   const redactor = section(
     'function _redactDellinPat(value)',

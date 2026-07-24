@@ -7811,11 +7811,20 @@ async function dellinSaveKeys() {
   if (saved) loadLogisticsPickups();
 }
 async function dellinRefresh() {
-  showToast('Обновляем статусы Деловых линий…', 'info');
+  showToast('Ищем новые грузы и обновляем статусы Деловых линий…', 'info');
   try {
     const r = await apiPost('/api/logistics/dellin/refresh', {});
     const j = (r && r.data) || {};
-    if (r && r.ok) showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0), 'success');
+    if (r && r.ok) {
+      const added = Number(j.added || 0);
+      const discoveryError = _redactDellinPat(j.discovery_error || '');
+      showToast(
+        'Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0) +
+          (added ? ' · новых грузов: ' + added : '') +
+          (discoveryError ? ' · новые грузы не получены: ' + discoveryError : ''),
+        discoveryError ? 'error' : 'success'
+      );
+    }
     else showToast(_redactDellinPat(j.message || 'Не удалось обновить статусы'), 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
@@ -7830,11 +7839,11 @@ function _dellinBlockHtml(dl) {
       (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinRefresh()" title="Обновить статусы из ЛК Деловых линий"><i class="ti ti-refresh"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
     '</span></div>';
-  // v2.45.800: безопасное подключение через appkey + PAT.
+  // v2.45.800+: безопасное подключение через appkey + PAT и автоподхват грузов.
   if (!dl.configured) {
     h += '<div class="cdek-setup">' +
       '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение Деловых линий</div>' +
-      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны <b>appkey</b> приложения и <b>PAT-токен</b> личного кабинета. Логин и пароль передавать не нужно. После подключения по накладным автоматически подтянутся статус, отправитель, груз и дата прибытия.</div>' +
+      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны <b>appkey</b> приложения и <b>PAT-токен</b> личного кабинета. Логин и пароль передавать не нужно. После подключения новые активные грузы автоматически появятся здесь, а по ним подтянутся статус, отправитель, груз и дата прибытия.</div>' +
       '<input class="form-input" id="dl-appkey" placeholder="Ключ приложения (appkey)" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
       '<input class="form-input" id="dl-pat" type="password" placeholder="PAT-токен (dl-api-…)" autocomplete="new-password" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
       '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;"><i class="ti ti-shield-lock"></i> PAT не сохраняется в браузере и после проверки очищается из поля.</div>' +
@@ -7842,7 +7851,9 @@ function _dellinBlockHtml(dl) {
     '</div>';
   }
   if (!list.length) {
-    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет — добавь номер накладной Деловых линий.</div>';
+    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет' +
+      (dl.configured ? ' — новые активные грузы появятся автоматически.' : ' — добавь номер накладной Деловых линий.') +
+      '</div>';
     return h;
   }
   list.forEach(sh => {
