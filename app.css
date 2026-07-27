@@ -19512,6 +19512,27 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .owz2-sign-t{font-size:13px;color:var(--text-mid);}
 .owz2-sign-t b{color:var(--text-dark);}
 .owz2-sign-sub{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
+.owz2-card-attach{margin-top:12px;}
+.owz2-card-add{display:inline-flex;align-items:center;gap:7px;border:1px dashed #9EBBDB;background:#F7FAFE;color:var(--brand);border-radius:10px;padding:9px 13px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+.owz2-card-add:hover{background:var(--brand-bg);border-color:var(--brand-light);}
+.owz2-card-add:disabled{cursor:default;color:var(--text-faint);border-color:var(--border);background:var(--bg);}
+.owz2-card-help,.owz2-card-empty{font-size:11.5px;color:var(--text-faint);margin-top:5px;}
+.owz2-card-selected{display:flex;align-items:center;gap:10px;border:1px solid #BFD8C7;background:#F4FBF6;border-radius:11px;padding:9px 11px;}
+.owz2-card-file{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#DDF2E3;color:#237A3B;font-size:18px;flex-shrink:0;}
+.owz2-card-main{flex:1;min-width:0;}
+.owz2-card-name{font-size:13px;font-weight:750;color:var(--text-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.owz2-card-filename{font-size:11.5px;color:var(--text-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.owz2-card-change{border:0;background:transparent;color:var(--brand);font-size:12px;font-weight:650;cursor:pointer;padding:5px;}
+.owz2-card-remove{border:0;background:transparent;color:var(--text-light);font-size:16px;cursor:pointer;padding:5px;display:flex;}
+.owz2-card-picker{display:grid;gap:6px;margin-top:7px;padding:7px;border:1px solid var(--border);background:#fff;border-radius:11px;max-height:190px;overflow:auto;box-shadow:0 8px 22px rgba(24,54,87,.08);}
+.owz2-card-option{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:1px solid transparent;background:#fff;border-radius:9px;padding:8px 10px;cursor:pointer;color:var(--text-dark);}
+.owz2-card-option:hover{background:var(--bg);}
+.owz2-card-option.active{border-color:#BFD8C7;background:#F4FBF6;}
+.owz2-card-option>span:nth-child(2){display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
+.owz2-card-option b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.owz2-card-option small{font-size:11px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.owz2-card-option-ic{width:29px;height:29px;border-radius:8px;background:var(--brand-bg);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.op-attachment.op-company-card{background:#F4FBF6;border-color:#BFD8C7;color:#236B36;}
 .owz2-foot{display:flex;gap:10px;justify-content:flex-end;padding:13px 20px;border-top:1px solid var(--border);background:#FBFCFE;flex-shrink:0;flex-wrap:wrap;}
 
 /* ====== Номенклатура оборудования: табличные строки (v2.45.x) ======

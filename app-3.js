@@ -10196,6 +10196,7 @@ function _renderOrderPreviewModal(draft) {
   _opCurrentDraft = draft;
   _opBodyDirty = false;
   _opSubjectDirty = false;
+  const companyCard = draft.company_card || null;
   const overlayId = 'order-preview-modal';
   let m = document.getElementById(overlayId);
   if (m) m.remove();
@@ -10233,6 +10234,17 @@ function _renderOrderPreviewModal(draft) {
           '<span>Вложение: <b>order_' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '.docx</b> · <span id="op-items-count">' + draft.items_count + '</span> позиций</span>' +
           '<button type="button" class="op-attachment-link" onclick="downloadOrderDraftDocx(' + draft.id + ',\'' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '\')">Открыть для проверки</button>' +
         '</div>' +
+        (companyCard
+          ? '<div class="op-attachment op-company-card">' +
+              '<i class="ti ti-id"></i>' +
+              '<span>Карточка предприятия: <b>' + escapeHtml(companyCard.name || companyCard.filename || 'Файл с реквизитами') + '</b>' +
+                (companyCard.filename && companyCard.name !== companyCard.filename
+                  ? ' · ' + escapeHtml(companyCard.filename)
+                  : '') +
+              '</span>' +
+              '<button type="button" class="op-attachment-link" onclick="entCardDownload(' + Number(companyCard.id) + ')">Открыть для проверки</button>' +
+            '</div>'
+          : '') +
         '<div id="op-status" class="op-status" style="display:none;"></div>' +
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
@@ -13845,11 +13857,12 @@ function _owzSnapshot() {
   return {
     supplierId: _owz.supplierId || null, supplierName: _owz.supplierName || '',
     supplierEmail: _owz.supplierEmail || '', supplierPhone: _owz.supplierPhone || '',
+    companyCardId: _owz.companyCardId || null,
     list: (_owz.list || []).map(x => ({ name: x.name, unit: x.unit, qty: x.qty, id: x.id || null })),
     expected: g('owz-expected'), phone: g('owz-phone'), comment: g('owz-comment'), at: Date.now(),
   };
 }
-function _owzHasContent(s) { return !!(s && ((s.list && s.list.length) || s.supplierId || (s.comment || '').trim())); }
+function _owzHasContent(s) { return !!(s && ((s.list && s.list.length) || s.supplierId || s.companyCardId || (s.comment || '').trim())); }
 function _owzSaveDraft() { try { const s = _owzSnapshot(); if (_owzHasContent(s)) localStorage.setItem(OWZ_DRAFT_KEY, JSON.stringify(s)); } catch (e) {} }
 function _owzClearDraft() { try { localStorage.removeItem(OWZ_DRAFT_KEY); } catch (e) {} if (_owzAutosaveTimer) { clearInterval(_owzAutosaveTimer); _owzAutosaveTimer = null; } }
 function _owzStartAutosave() {
@@ -13869,6 +13882,11 @@ function _owzMaybeRestoreDraft() {
   setV('owz-expected', s.expected); setV('owz-phone', s.phone); setV('owz-comment', s.comment);
   if (s.supplierId && (cache.suppliers || []).find(x => x.id === s.supplierId)) _owzSupPick(s.supplierId);
   else if (s.supplierName) { _owz.supplierName = s.supplierName; _owz.supplierEmail = s.supplierEmail || ''; _owz.supplierPhone = s.supplierPhone || ''; }
+  const restoredCardId = Number(s.companyCardId || 0);
+  _owz.companyCardId = (_owz.companyCards || []).some(c => Number(c.id) === restoredCardId)
+    ? restoredCardId
+    : null;
+  _owzRenderCompanyCard();
   _owzRenderCart();
   if (typeof showToast === 'function') showToast('Черновик восстановлен', 'success');
 }
@@ -13876,13 +13894,14 @@ function _owzMaybeRestoreDraft() {
 async function openNewSupplyOrder() {
   if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
   // Грузим параллельно: поставщиков, каталог комплектующих (как на производстве),
-  // профиль (для телефона/подписи).
-  const [supRes, compRes, meRes] = await Promise.all([
+  // профиль (для телефона/подписи) и готовые карточки наших юрлиц.
+  const [supRes, compRes, meRes, cardsRes] = await Promise.all([
     (cache.suppliers ? Promise.resolve({ suppliers: cache.suppliers })
                      : apiGet('/api/suppliers').catch(() => ({ suppliers: [] }))),
     (cache.components ? Promise.resolve({ components: cache.components })
                       : apiGet('/api/components').catch(() => ({ components: [] }))),
     (cache.me ? Promise.resolve(cache.me) : apiGet('/api/me').catch(() => null)),
+    apiGet('/api/company-cards').catch(() => ({ items: [] })),
   ]);
   cache.suppliers = supRes.suppliers || [];
   cache.components = compRes.components || [];
@@ -13890,7 +13909,8 @@ async function openNewSupplyOrder() {
   if (!cache.suppliers.length) { showToast('Сначала добавьте хотя бы одного поставщика', 'error'); return; }
 
   _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0,
-           supplierId: null, supplierEmail: '', supplierPhone: '', supplierName: '' };
+           supplierId: null, supplierEmail: '', supplierPhone: '', supplierName: '',
+           companyCards: cardsRes.items || [], companyCardId: null, companyCardPickerOpen: false };
   const me = _owz.me;
   const signName = (me.full_name || me.short_name || '').trim();
   const signPos = (me.position || '').trim();
@@ -13934,6 +13954,8 @@ async function openNewSupplyOrder() {
           '<div class="form-group" style="margin:0;"><label>Телефон для связи</label><input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …" class="owz2-inp"></div>' +
         '</div>' +
         '<div class="form-group" style="margin-top:12px;"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно" class="owz2-inp"></textarea></div>' +
+        // Карточка предприятия — необязательное второе вложение к письму поставщику
+        '<div class="owz2-card-attach" id="owz-company-card"></div>' +
         // Подпись
         '<div class="owz2-sign">' +
           '<i class="ti ti-signature owz2-sign-ic"></i>' +
@@ -13951,6 +13973,7 @@ async function openNewSupplyOrder() {
   m.classList.add('visible');
   _owzRenderCatalog('');
   _owzRenderCart();
+  _owzRenderCompanyCard();
   _owzMaybeRestoreDraft();   // v2.45.694: предложить продолжить незавершённый черновик
   _owzStartAutosave();       // и авто-сохранять по мере заполнения
 }
@@ -14056,6 +14079,77 @@ function _owzSupKey(e) {
   const matches = (cache.suppliers || []).filter(x =>
     (x.name || '').toLowerCase().includes(s) || (x.email || '').toLowerCase().includes(s));
   if (matches.length === 1) _owzSupPick(matches[0].id);
+}
+
+// v2.45.823: выбрать одну из загруженных карточек предприятия и приложить
+// её к письму вместе с документом заказа.
+function _owzRenderCompanyCard() {
+  const box = document.getElementById('owz-company-card');
+  if (!box) return;
+  const cards = _owz.companyCards || [];
+  const selected = cards.find(c => Number(c.id) === Number(_owz.companyCardId));
+  if (!cards.length) {
+    box.innerHTML =
+      '<button type="button" class="owz2-card-add" disabled>' +
+        '<i class="ti ti-paperclip"></i> Прикрепить карточку предприятия' +
+      '</button>' +
+      '<div class="owz2-card-empty">Карточек пока нет. Их можно загрузить в «Снабжение → Карточка предприятия».</div>';
+    return;
+  }
+
+  let html = '';
+  if (selected) {
+    html +=
+      '<div class="owz2-card-selected">' +
+        '<div class="owz2-card-file"><i class="ti ti-id"></i></div>' +
+        '<div class="owz2-card-main">' +
+          '<div class="owz2-card-name">' + escapeHtml(selected.name || selected.filename || 'Карточка предприятия') + '</div>' +
+          '<div class="owz2-card-filename">' + escapeHtml(selected.filename || 'Файл с реквизитами') + ' · будет приложен к письму</div>' +
+        '</div>' +
+        '<button type="button" class="owz2-card-change" onclick="_owzToggleCompanyCards()">Сменить</button>' +
+        '<button type="button" class="owz2-card-remove" onclick="_owzClearCompanyCard()" title="Не прикладывать"><i class="ti ti-x"></i></button>' +
+      '</div>';
+  } else {
+    html +=
+      '<button type="button" class="owz2-card-add" onclick="_owzToggleCompanyCards()">' +
+        '<i class="ti ti-paperclip"></i> Прикрепить карточку предприятия' +
+      '</button>' +
+      '<div class="owz2-card-help">Для нового поставщика можно сразу отправить реквизиты нужного юрлица.</div>';
+  }
+
+  if (_owz.companyCardPickerOpen) {
+    html += '<div class="owz2-card-picker">' + cards.map(c => {
+      const active = selected && Number(selected.id) === Number(c.id);
+      return '<button type="button" class="owz2-card-option' + (active ? ' active' : '') + '" onclick="_owzSelectCompanyCard(' + Number(c.id) + ')">' +
+        '<span class="owz2-card-option-ic"><i class="ti ti-file-description"></i></span>' +
+        '<span><b>' + escapeHtml(c.name || c.filename || 'Карточка предприятия') + '</b>' +
+          '<small>' + escapeHtml(c.filename || '') + '</small></span>' +
+        (active ? '<i class="ti ti-check"></i>' : '') +
+      '</button>';
+    }).join('') + '</div>';
+  }
+  box.innerHTML = html;
+}
+
+function _owzToggleCompanyCards() {
+  _owz.companyCardPickerOpen = !_owz.companyCardPickerOpen;
+  _owzRenderCompanyCard();
+}
+
+function _owzSelectCompanyCard(id) {
+  const cardId = Number(id);
+  if (!(_owz.companyCards || []).some(c => Number(c.id) === cardId)) return;
+  _owz.companyCardId = cardId;
+  _owz.companyCardPickerOpen = false;
+  _owzRenderCompanyCard();
+  _owzSaveDraft();
+}
+
+function _owzClearCompanyCard() {
+  _owz.companyCardId = null;
+  _owz.companyCardPickerOpen = false;
+  _owzRenderCompanyCard();
+  _owzSaveDraft();
 }
 
 // Каталог комплектующих — как на производстве: группы по категориям,
@@ -14249,6 +14343,7 @@ async function submitOrderWizard(send) {
     expected_date: document.getElementById('owz-expected').value || null,
     comment: document.getElementById('owz-comment').value.trim(),
     contact_phone: document.getElementById('owz-phone').value.trim(),
+    company_card_id: _owz.companyCardId || null,
     items,
   };
   if (send) {
@@ -16776,6 +16871,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.823',
+    date: '27.07.2026',
+    title: 'Карточка предприятия во вложении к заказу',
+    features: [
+      'В форме <b>«Оформить заказ»</b> появилась кнопка выбора одной из загруженных карточек предприятия',
+      'Выбранная карточка сохраняется вместе с заказом, видна в превью письма и отправляется поставщику вторым вложением вместе с DOCX-заявкой',
+    ],
+  },
   {
     version: 'v2.45.821',
     date: '27.07.2026',
