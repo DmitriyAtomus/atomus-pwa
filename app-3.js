@@ -7649,13 +7649,19 @@ async function loadLogisticsPickups() {
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
     // v2.45.796: сводка по логистике — четыре плитки сверху
-    const _cdN = (cd && cd.shipments) ? cd.shipments.filter(x => !x.delivered_at).length : 0;
-    const _dlN = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at).length : 0;
+    const _cdActive = (cd && cd.shipments) ? cd.shipments.filter(x => !x.delivered_at) : [];
+    const _cdN = _cdActive.length;
+    const _cdIn = _cdActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
+    const _cdOut = _cdActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
+    const _dlActive = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at && !x.is_closed) : [];
+    const _dlN = _dlActive.length;
+    const _dlIn = _dlActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
+    const _dlOut = _dlActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
     html += '<div class="logi-hero">' +
       _logiHeroTile('ti-package-import', ready.length, 'забрать сейчас', 'g') +
       _logiHeroTile('ti-truck-delivery', transit.length, 'в пути', 'b') +
-      _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК', 'v') +
-      _logiHeroTile('ti-truck', _dlN, 'Деловые линии', 'o') +
+      _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК · к нам ' + _cdIn + ' / от нас ' + _cdOut, 'v') +
+      _logiHeroTile('ti-truck', _dlN, 'ДЛ · к нам ' + _dlIn + ' / от нас ' + _dlOut, 'o') +
     '</div>';
     // v2.45.797: две колонки на широком экране — слева самовывозы, справа перевозчики
     let colL = '', colR = '';
@@ -7687,10 +7693,64 @@ function _cdekStatusChip(sh) {
   if (code === 'NOT_DELIVERED') return '<span class="cdek-st bad">⚠ Не вручён</span>';
   return '<span class="cdek-st run">' + escapeHtml(sh.status_name || code) + '</span>';
 }
+function _cdekDirection(sh) {
+  return ['incoming', 'outgoing'].includes(sh.direction) ? sh.direction : 'unknown';
+}
+function _cdekDirectionChip(sh) {
+  const dir = _cdekDirection(sh);
+  const label = dir === 'incoming' ? 'К нам' : (dir === 'outgoing' ? 'От нас' : 'Уточнить');
+  const icon = dir === 'incoming' ? 'ti-package-import' : (dir === 'outgoing' ? 'ti-package-export' : 'ti-arrows-exchange');
+  return '<button class="cdek-dir ' + dir + '" onclick="cdekChangeDirection(' + sh.id + ',\'' + dir + '\')" ' +
+    'title="Нажмите, чтобы изменить направление"><i class="ti ' + icon + '"></i> ' + label + '</button>';
+}
+function _cdekRoute(sh) {
+  const sender = sh.sender_name || sh.from_city || '';
+  const recipient = sh.recipient_name || sh.to_city || '';
+  if (sender && recipient) {
+    return '<div class="cdek-route"><span>' + escapeHtml(sender) + '</span><i class="ti ti-arrow-right"></i><span>' +
+      escapeHtml(recipient) + '</span></div>';
+  }
+  if (sender || recipient) {
+    return '<div class="cdek-route"><span>' + escapeHtml(sender || recipient) + '</span></div>';
+  }
+  return '';
+}
+function _cdekCardHtml(sh) {
+  const delivered = !!sh.delivered_at;
+  const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
+  return '<div class="cdek-card ' + _cdekDirection(sh) + (delivered ? ' done' : '') + '">' +
+    '<div class="cdek-main">' +
+      '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(sh.cdek_number) +
+        _cdekDirectionChip(sh) +
+        (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
+      _cdekRoute(sh) +
+      '<div class="cdek-sub">' + _cdekStatusChip(sh) +
+        (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
+        (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
+        (proj ? ' · ' + escapeHtml(proj) : '') +
+        (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+    '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+  '</div>';
+}
+function _cdekGroupHtml(list, direction) {
+  if (!list.length) return '';
+  const incoming = direction === 'incoming';
+  const unknown = direction === 'unknown';
+  const icon = incoming ? 'ti-package-import' : (unknown ? 'ti-help-circle' : 'ti-package-export');
+  const title = incoming ? 'К нам' : (unknown ? 'Направление не определено' : 'От нас');
+  return '<div class="cdek-group-head ' + direction + '"><i class="ti ' + icon + '"></i> ' + title +
+    '<span class="logi-cnt">' + list.length + '</span></div>' + list.map(_cdekCardHtml).join('');
+}
 function _cdekBlockHtml(cd) {
   const list = cd.shipments || [];
+  const incoming = list.filter(sh => _cdekDirection(sh) === 'incoming');
+  const outgoing = list.filter(sh => _cdekDirection(sh) === 'outgoing');
+  const unknown = list.filter(sh => _cdekDirection(sh) === 'unknown');
   let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
-    '<i class="ti ti-plane-departure"></i> СДЭК — отправления <span class="logi-cnt">' + list.length + '</span>' +
+    '<i class="ti ti-plane-departure"></i> СДЭК <span class="logi-cnt">' + list.length + '</span>' +
     '<span style="margin-left:auto;display:inline-flex;gap:6px;">' +
       (cd.configured ? '<button class="btn btn-secondary btn-small" onclick="cdekRefresh()" title="Обновить статусы из СДЭК"><i class="ti ti-refresh"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="cdekAdd()"><i class="ti ti-plus"></i> Трек</button>' +
@@ -7705,42 +7765,86 @@ function _cdekBlockHtml(cd) {
     '</div>';
   }
   if (!list.length) {
-    h += '<div class="logi-empty"><i class="ti ti-plane"></i> Отправлений пока нет — добавь трек-номер накладной.</div>';
+    h += '<div class="logi-empty"><i class="ti ti-plane"></i> Отправлений пока нет. Новые треки из писем и MAX появятся здесь автоматически.</div>';
     return h;
   }
-  list.forEach(sh => {
-    const delivered = !!sh.delivered_at;
-    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
-    h += '<div class="cdek-card' + (delivered ? ' done' : '') + '">' +
-      '<div class="cdek-main">' +
-        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(sh.cdek_number) +
-          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
-        '<div class="cdek-sub">' + _cdekStatusChip(sh) +
-          (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
-          (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
-          (proj ? ' · ' + escapeHtml(proj) : '') +
-          (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
-        '</div>' +
-      '</div>' +
-      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
-      '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
-    '</div>';
-  });
-  return h;
+  return h + _cdekGroupHtml(incoming, 'incoming') +
+    _cdekGroupHtml(outgoing, 'outgoing') +
+    _cdekGroupHtml(unknown, 'unknown');
 }
 function cdekAdd() {
-  const num = prompt('Номер накладной СДЭК (трек), например 1234567890:');
-  if (num == null || !num.trim()) return;
-  const title = prompt('Что везём / кому (коротко, для списка):', '') || '';
-  (async () => {
-    try {
-      const r = await apiPost('/api/logistics/cdek', { cdek_number: num.trim(), title: title.trim() });
-      const j = (r && r.data) || {};
-      if (r && r.ok) showToast(j.synced ? 'Добавлено — статус подтянут' : 'Добавлено (статус подтянется после подключения ключей)', 'success');
-      else showToast(j.message || 'Не удалось добавить', 'error');
-    } catch (e) { showToast('Ошибка соединения', 'error'); }
-    loadLogisticsPickups();
-  })();
+  const old = document.getElementById('cdek-modal');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'cdek-modal';
+  el.className = 'modal-overlay active';
+  el.innerHTML = '<div class="modal-box" style="max-width:440px;">' +
+    '<div class="modal-header"><h2><i class="ti ti-plane-departure"></i> Добавить СДЭК</h2>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'cdek-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body">' +
+      '<label class="form-label">Направление</label>' +
+      '<div class="cdek-direction-choice">' +
+        '<label><input type="radio" name="cdek-dir" value="incoming" checked><span><i class="ti ti-package-import"></i> К нам</span></label>' +
+        '<label><input type="radio" name="cdek-dir" value="outgoing"><span><i class="ti ti-package-export"></i> От нас</span></label>' +
+      '</div>' +
+      '<label class="form-label">Номер накладной</label>' +
+      '<input class="form-input" id="cdek-num-input" inputmode="numeric" placeholder="Например, 12345678901" autocomplete="off">' +
+      '<label class="form-label" style="margin-top:12px;">Что везут / кому</label>' +
+      '<input class="form-input" id="cdek-title-input" placeholder="Необязательно" autocomplete="off">' +
+      '<div class="form-hint">Треки из писем и MAX CRM добавляет сама. Эта форма нужна, если номер сообщили иначе.</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'cdek-modal\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="cdek-submit" onclick="cdekSubmit()"><i class="ti ti-plus"></i> Добавить</button>' +
+    '</div></div>';
+  document.body.appendChild(el);
+  setTimeout(() => { const input = document.getElementById('cdek-num-input'); if (input) input.focus(); }, 50);
+}
+async function cdekSubmit() {
+  const numEl = document.getElementById('cdek-num-input');
+  const titleEl = document.getElementById('cdek-title-input');
+  const directionEl = document.querySelector('input[name="cdek-dir"]:checked');
+  const submit = document.getElementById('cdek-submit');
+  const num = String((numEl || {}).value || '').trim();
+  const title = String((titleEl || {}).value || '').trim();
+  const direction = String((directionEl || {}).value || 'incoming');
+  if (!/^\d{10,20}$/.test(num)) {
+    showToast('Номер СДЭК — от 10 до 20 цифр', 'error');
+    if (numEl) numEl.focus();
+    return;
+  }
+  if (submit) submit.disabled = true;
+  try {
+    const r = await apiPost('/api/logistics/cdek', {
+      cdek_number: num, title: title, direction: direction,
+    });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast(j.synced ? 'Добавлено — статус и направление проверены' : 'Добавлено — статус подтянется автоматически', 'success');
+      const modal = document.getElementById('cdek-modal');
+      if (modal) modal.remove();
+    } else {
+      showToast(j.message || 'Не удалось добавить', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+  loadLogisticsPickups();
+}
+async function cdekChangeDirection(id, current) {
+  const next = current === 'incoming' ? 'outgoing' : 'incoming';
+  const label = next === 'incoming' ? '«К нам»' : '«От нас»';
+  if (!confirm('Перенести отправление в ' + label + '?')) return;
+  try {
+    const r = await apiPatch('/api/logistics/cdek/' + id, { direction: next });
+    const j = (r && r.data) || {};
+    if (!r || !r.ok) showToast(j.message || 'Не удалось изменить направление', 'error');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+  loadLogisticsPickups();
 }
 async function cdekRefresh() {
   showToast('Обновляем статусы СДЭК…', 'info');
@@ -7749,8 +7853,10 @@ async function cdekRefresh() {
     const j = (r && r.data) || {};
     if (r && r.ok) {
       const found = (j.found || []).length;
+      const incomingFound = (j.incoming_found || []).length;
+      const outgoingFound = (j.outgoing_found || []).length;
       showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0) +
-        (found ? ' · найдено в переписке: ' + found : ''), 'success');
+        (found ? ' · новых: ' + found + ' (к нам ' + incomingFound + ', от нас ' + outgoingFound + ')' : ''), 'success');
     } else showToast(j.message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
@@ -7789,7 +7895,7 @@ async function dellinSaveKeys() {
   const saveBtn = document.getElementById('dl-save-keys');
   const appkey = String((appkeyEl || {}).value || '').trim();
   const pat = String((patEl || {}).value || '').trim();
-  if (!appkey || !pat) { showToast('Нужны appkey и PAT-токен', 'error'); return; }
+  if (!pat) { showToast('Нужен PAT-токен', 'error'); return; }
   if (!/^dl-api-[A-Za-z0-9_-]{20,}$/i.test(pat)) {
     showToast('PAT-токен должен начинаться с dl-api-', 'error');
     return;
@@ -7810,20 +7916,27 @@ async function dellinSaveKeys() {
     if (patEl) patEl.value = '';
     if (saveBtn) saveBtn.disabled = false;
   }
-  if (saved) loadLogisticsPickups();
+  if (saved) {
+    const modal = document.getElementById('dellin-settings-modal');
+    if (modal) modal.remove();
+    await dellinRefresh();
+  }
 }
+
 async function dellinRefresh() {
-  showToast('Ищем новые грузы и обновляем статусы Деловых линий…', 'info');
+  showToast('Синхронизируем журнал Деловых линий…', 'info');
   try {
     const r = await apiPost('/api/logistics/dellin/refresh', {});
     const j = (r && r.data) || {};
     if (r && r.ok) {
       const added = Number(j.added || 0);
+      const visible = Number(j.visible || 0);
       const discoveryError = _redactDellinPat(j.discovery_error || '');
       showToast(
-        'Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0) +
-          (added ? ' · новых грузов: ' + added : '') +
-          (discoveryError ? ' · новые грузы не получены: ' + discoveryError : ''),
+        discoveryError
+          ? 'Журнал не получен: ' + discoveryError
+          : 'Журнал обновлён: доступно ' + visible +
+              (added ? ' · новых заказов: ' + added : ''),
         discoveryError ? 'error' : 'success'
       );
     }
@@ -7832,68 +7945,186 @@ async function dellinRefresh() {
   loadLogisticsPickups();
 }
 
-// ============ ДЕЛОВЫЕ ЛИНИИ — накладные и синхронизация API ============
+function _dellinCredentialsHtml(configured) {
+  return '<div class="dl-connect-note">' +
+      '<i class="ti ti-info-circle"></i><div>' +
+        '<b>' + (configured ? 'Подключить другой профиль кабинета' : 'Подключить личный кабинет') + '</b>' +
+        '<div>PAT должен быть создан у пользователя, который видит нужные заказы и имеет полный доступ к контрагентам. Тогда CRM покажет тот же журнал автоматически.</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Ключ приложения (appkey)</label>' +
+      '<input class="form-input" id="dl-appkey" placeholder="' +
+        (configured ? 'Можно оставить пустым — используем сохранённый' : 'Обязателен при первом подключении') +
+        '" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
+    '<div class="form-group"><label class="form-label">PAT нужного пользователя кабинета</label>' +
+      '<input class="form-input" id="dl-pat" type="password" placeholder="dl-api-…" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
+    '<div class="dl-secret-note"><i class="ti ti-shield-lock"></i> PAT не сохраняется в браузере и очищается сразу после проверки.</div>';
+}
+
+function dellinSettings() {
+  const old = document.getElementById('dellin-settings-modal');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'dellin-settings-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:560px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-plug-connected"></i> Кабинет Деловых линий</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'dellin-settings-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' + _dellinCredentialsHtml(true) + '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'dellin-settings-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-refresh"></i> Переподключить и загрузить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  const pat = document.getElementById('dl-pat'); if (pat) pat.focus();
+}
+
+function _dellinShortDate(value) {
+  const date = String(value || '').slice(0, 10);
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[3] + '.' + m[2] + '.' + m[1] : date;
+}
+
+function _dellinMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  return number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+}
+
+function _dellinOrdersWord(value) {
+  const n = Math.abs(Number(value) || 0);
+  const tail = n % 100;
+  if (tail >= 11 && tail <= 14) return 'заказов';
+  if (n % 10 === 1) return 'заказ';
+  if (n % 10 >= 2 && n % 10 <= 4) return 'заказа';
+  return 'заказов';
+}
+
+function _dellinDirectionChip(direction) {
+  const map = {
+    incoming: ['in', 'ti-package-import', 'к нам'],
+    outgoing: ['out', 'ti-package-export', 'от нас'],
+    payer: ['pay', 'ti-credit-card', 'мы платим'],
+    unknown: ['unk', 'ti-help-circle', 'другое'],
+  };
+  const item = map[direction] || map.unknown;
+  return '<span class="dl-dir ' + item[0] + '"><i class="ti ' + item[1] + '"></i> ' + item[2] + '</span>';
+}
+
+function _dellinOrderCard(sh) {
+  const closed = !!sh.is_closed || !!sh.delivered_at;
+  const orderId = String(sh.order_id || '').trim();
+  const waybill = String(sh.dellin_number || '').trim();
+  const mainNumber = orderId || waybill;
+  const status = String(sh.auto_status || sh.status_note || (closed ? 'Заказ завершён' : 'Ждём статус'));
+  const detailed = String(sh.detailed_status || '');
+  const progressRaw = Number(sh.progress_percent);
+  const progress = Number.isFinite(progressRaw) ? Math.max(0, Math.min(100, progressRaw)) : (closed ? 100 : null);
+  const route = [sh.from_city, sh.to_city].filter(Boolean);
+  const sender = String(sh.sender_name || sh.auto_from || '');
+  const receiver = String(sh.receiver_name || '');
+  const partyLine = [sender, receiver].filter(Boolean);
+  const paidKnown = sh.is_paid !== null && sh.is_paid !== undefined;
+  const paid = sh.is_paid === true || Number(sh.is_paid) === 1;
+  const title = String(sh.title || '').startsWith('Авто из ЛК') ? '' : String(sh.title || '');
+  let h = '<div class="dl-order' + (closed ? ' done' : '') + '">' +
+    '<div class="dl-order-top">' +
+      '<div class="dl-order-id"><i class="ti ti-receipt-2"></i> ' + escapeHtml(mainNumber) +
+        (orderId && waybill && orderId !== waybill ? '<small>накладная ' + escapeHtml(waybill) + '</small>' : '') +
+      '</div>' +
+      '<div class="dl-order-tags">' +
+        _dellinDirectionChip(sh.direction || 'unknown') +
+        (sh.ordered_at ? '<span class="dl-date">' + escapeHtml(_dellinShortDate(sh.ordered_at)) + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  if (route.length || partyLine.length) {
+    h += '<div class="dl-route">' +
+      (route.length ? '<b>' + escapeHtml(route[0] || '—') + '</b><i class="ti ti-arrow-right"></i><b>' + escapeHtml(route[1] || '—') + '</b>' : '') +
+      (partyLine.length ? '<span>' + escapeHtml(partyLine[0] || '—') + (partyLine.length > 1 ? ' → ' + escapeHtml(partyLine[1]) : '') + '</span>' : '') +
+    '</div>';
+  }
+  if (title || sh.auto_cargo) {
+    h += '<div class="dl-cargo"><i class="ti ti-box"></i> ' + escapeHtml(title || sh.auto_cargo) + '</div>';
+  }
+  h += '<div class="dl-order-bottom">' +
+    '<div class="dl-status">' +
+      '<b>' + escapeHtml(status) + '</b>' +
+      (detailed && detailed !== status ? '<span>' + escapeHtml(detailed) + '</span>' : '') +
+      (!closed && sh.planned_date ? '<span><i class="ti ti-calendar-due"></i> ожидается ' + escapeHtml(_dellinShortDate(sh.planned_date)) + '</span>' : '') +
+      (sh.sync_error ? '<span class="err">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+    '</div>' +
+    '<div class="dl-finance">' +
+      (sh.total_sum !== null && sh.total_sum !== undefined ? '<b>' + escapeHtml(_dellinMoney(sh.total_sum)) + '</b>' : '') +
+      (paidKnown ? '<span class="' + (paid ? 'paid' : 'unpaid') + '">' + (paid ? 'оплачен' : 'не оплачен') + '</span>' : '') +
+    '</div>' +
+  '</div>';
+  if (progress !== null) {
+    h += '<div class="dl-progress"><i style="width:' + progress + '%"></i></div>';
+  }
+  h += '<div class="dl-actions">' +
+      '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' + waybill.replace(/'/g, '') + '\')"><i class="ti ti-external-link"></i> Отследить</button>' +
+      (sh.source === 'journal' ? '' :
+        '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')"><i class="ti ti-edit"></i> Статус</button>') +
+      '<button class="dl-hide" onclick="dellinRemove(' + sh.id + ')" title="Скрыть из CRM"><i class="ti ti-eye-off"></i></button>' +
+    '</div>' +
+  '</div>';
+  return h;
+}
+
+// ============ ДЕЛОВЫЕ ЛИНИИ — полный журнал личного кабинета ============
 function _dellinBlockHtml(dl) {
   const list = dl.shipments || [];
-  let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
-    '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + list.length + '</span>' +
+  const summary = dl.summary || {};
+  const journal = dl.journal || {};
+  const active = list.filter(sh => !sh.is_closed && !sh.delivered_at);
+  const completed = list.filter(sh => !!sh.is_closed || !!sh.delivered_at);
+  let h = '<div class="logi-sec o" style="display:flex;align-items:center;gap:8px;">' +
+    '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + active.length + ' в работе</span>' +
     '<span style="margin-left:auto;display:inline-flex;gap:6px;">' +
       (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinRefresh()" title="Обновить статусы из ЛК Деловых линий"><i class="ti ti-refresh"></i></button>' : '') +
+      (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinSettings()" title="Сменить кабинет или PAT"><i class="ti ti-settings"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
     '</span></div>';
-  // v2.45.800+: безопасное подключение через appkey + PAT и автоподхват грузов.
+
   if (!dl.configured) {
-    h += '<div class="cdek-setup">' +
-      '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение Деловых линий</div>' +
-      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны <b>appkey</b> приложения и <b>PAT-токен</b> личного кабинета. Логин и пароль передавать не нужно. После подключения новые активные грузы автоматически появятся здесь, а по ним подтянутся статус, отправитель, груз и дата прибытия.</div>' +
-      '<input class="form-input" id="dl-appkey" placeholder="Ключ приложения (appkey)" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
-      '<input class="form-input" id="dl-pat" type="password" placeholder="PAT-токен (dl-api-…)" autocomplete="new-password" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
-      '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;"><i class="ti ti-shield-lock"></i> PAT не сохраняется в браузере и после проверки очищается из поля.</div>' +
-      '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
+    h += '<div class="cdek-setup">' + _dellinCredentialsHtml(false) +
+      '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Подключить и загрузить журнал</button>' +
     '</div>';
-  }
-  if (!list.length) {
-    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет' +
-      (dl.configured ? ' — новые активные грузы появятся автоматически.' : ' — добавь номер накладной Деловых линий.') +
-      '</div>';
-    return h;
-  }
-  list.forEach(sh => {
-    const delivered = !!sh.delivered_at;
-    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
-    const num = String(sh.dellin_number || '');
-    h += '<div class="cdek-card dl' + (delivered ? ' done' : '') + '">' +
-      '<div class="cdek-main">' +
-        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(num) +
-          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
-        '<div class="cdek-sub">' +
-          (delivered
-            ? '<span class="cdek-st done">✓ Вручён</span>'
-            : (sh.auto_status
-                ? '<span class="cdek-st run">' + escapeHtml(sh.auto_status) + '</span>'
-                : (sh.status_note
-                    ? '<span class="cdek-st run">' + escapeHtml(sh.status_note) + '</span>'
-                    : '<span class="cdek-st wait">' + (dl.configured ? 'ждём статус' : 'статус вручную') + '</span>'))) +
-          (sh.auto_from ? ' · от: <b>' + escapeHtml(sh.auto_from) + '</b>' : '') +
-          (sh.auto_cargo ? ' · ' + escapeHtml(sh.auto_cargo) : '') +
-          (proj ? ' · ' + escapeHtml(proj) : '') +
-          (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
-        '</div>' +
-        '<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' +
-            num.replace(/'/g, '') + '\')" title="Открыть трекер Деловых линий (номер скопируется)">' +
-            '<i class="ti ti-external-link"></i> Отследить</button>' +
-          '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')">' +
-            '<i class="ti ti-edit"></i> Статус</button>' +
-          (delivered
-            ? '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',false)">↩ вернуть в путь</button>'
-            : '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',true)"><i class="ti ti-check"></i> вручён</button>') +
-        '</div>' +
+  } else {
+    const visible = Number(journal.visible_count || 0);
+    const warn = visible <= 1;
+    h += '<div class="dl-sync-banner' + (warn ? ' warn' : '') + '">' +
+      '<i class="ti ' + (warn ? 'ti-alert-triangle' : 'ti-cloud-check') + '"></i><div>' +
+        '<b>API кабинета видит ' + visible + ' ' + _dellinOrdersWord(visible) + ' за ' + (journal.days || 90) + ' дней</b>' +
+        (journal.last_sync_at ? '<span>Синхронизация: ' + escapeHtml(_dellinShortDate(journal.last_sync_at)) + '</span>' : '') +
+        (warn ? '<span>Если в личном кабинете заказов больше — нажмите <b>⚙</b> и вставьте PAT пользователя с полным доступом.</span>' : '') +
+        (journal.error ? '<span class="err">' + escapeHtml(journal.error) + '</span>' : '') +
       '</div>' +
-      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
-      '<button class="cdek-del" onclick="dellinRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div class="dl-summary">' +
+      '<span><b>' + Number(summary.incoming || 0) + '</b> к нам</span>' +
+      '<span><b>' + Number(summary.outgoing || 0) + '</b> от нас</span>' +
+      '<span><b>' + Number(summary.payer || 0) + '</b> мы платим</span>' +
     '</div>';
-  });
+  }
+
+  if (!active.length) {
+    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет' +
+      (dl.configured ? ' — журнал будет обновляться автоматически.' : ' — подключите кабинет или добавьте номер вручную.') +
+      '</div>';
+  } else {
+    h += '<div class="dl-subhead">Активные заказы <span>' + active.length + '</span></div>' +
+      active.map(_dellinOrderCard).join('');
+  }
+
+  if (completed.length) {
+    h += '<details class="dl-archive"><summary><i class="ti ti-circle-check"></i> Завершённые заказы <span>' + completed.length + '</span></summary>' +
+      '<div class="dl-archive-list">' + completed.map(_dellinOrderCard).join('') + '</div></details>';
+  }
   return h;
 }
 
@@ -9967,6 +10198,7 @@ function _renderOrderPreviewModal(draft) {
   _opCurrentDraft = draft;
   _opBodyDirty = false;
   _opSubjectDirty = false;
+  const companyCard = draft.company_card || null;
   const overlayId = 'order-preview-modal';
   let m = document.getElementById(overlayId);
   if (m) m.remove();
@@ -10004,6 +10236,17 @@ function _renderOrderPreviewModal(draft) {
           '<span>Вложение: <b>order_' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '.docx</b> · <span id="op-items-count">' + draft.items_count + '</span> позиций</span>' +
           '<button type="button" class="op-attachment-link" onclick="downloadOrderDraftDocx(' + draft.id + ',\'' + escapeHtml(draft.order_label || ('ORD-' + draft.id)) + '\')">Открыть для проверки</button>' +
         '</div>' +
+        (companyCard
+          ? '<div class="op-attachment op-company-card">' +
+              '<i class="ti ti-id"></i>' +
+              '<span>Карточка предприятия: <b>' + escapeHtml(companyCard.name || companyCard.filename || 'Файл с реквизитами') + '</b>' +
+                (companyCard.filename && companyCard.name !== companyCard.filename
+                  ? ' · ' + escapeHtml(companyCard.filename)
+                  : '') +
+              '</span>' +
+              '<button type="button" class="op-attachment-link" onclick="entCardDownload(' + Number(companyCard.id) + ')">Открыть для проверки</button>' +
+            '</div>'
+          : '') +
         '<div id="op-status" class="op-status" style="display:none;"></div>' +
       '</div>' +
       '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);">' +
@@ -13616,11 +13859,12 @@ function _owzSnapshot() {
   return {
     supplierId: _owz.supplierId || null, supplierName: _owz.supplierName || '',
     supplierEmail: _owz.supplierEmail || '', supplierPhone: _owz.supplierPhone || '',
+    companyCardId: _owz.companyCardId || null,
     list: (_owz.list || []).map(x => ({ name: x.name, unit: x.unit, qty: x.qty, id: x.id || null })),
     expected: g('owz-expected'), phone: g('owz-phone'), comment: g('owz-comment'), at: Date.now(),
   };
 }
-function _owzHasContent(s) { return !!(s && ((s.list && s.list.length) || s.supplierId || (s.comment || '').trim())); }
+function _owzHasContent(s) { return !!(s && ((s.list && s.list.length) || s.supplierId || s.companyCardId || (s.comment || '').trim())); }
 function _owzSaveDraft() { try { const s = _owzSnapshot(); if (_owzHasContent(s)) localStorage.setItem(OWZ_DRAFT_KEY, JSON.stringify(s)); } catch (e) {} }
 function _owzClearDraft() { try { localStorage.removeItem(OWZ_DRAFT_KEY); } catch (e) {} if (_owzAutosaveTimer) { clearInterval(_owzAutosaveTimer); _owzAutosaveTimer = null; } }
 function _owzStartAutosave() {
@@ -13640,6 +13884,11 @@ function _owzMaybeRestoreDraft() {
   setV('owz-expected', s.expected); setV('owz-phone', s.phone); setV('owz-comment', s.comment);
   if (s.supplierId && (cache.suppliers || []).find(x => x.id === s.supplierId)) _owzSupPick(s.supplierId);
   else if (s.supplierName) { _owz.supplierName = s.supplierName; _owz.supplierEmail = s.supplierEmail || ''; _owz.supplierPhone = s.supplierPhone || ''; }
+  const restoredCardId = Number(s.companyCardId || 0);
+  _owz.companyCardId = (_owz.companyCards || []).some(c => Number(c.id) === restoredCardId)
+    ? restoredCardId
+    : null;
+  _owzRenderCompanyCard();
   _owzRenderCart();
   if (typeof showToast === 'function') showToast('Черновик восстановлен', 'success');
 }
@@ -13647,13 +13896,14 @@ function _owzMaybeRestoreDraft() {
 async function openNewSupplyOrder() {
   if (!canManageSupply()) { showToast('Доступно директору, заму, менеджеру', 'error'); return; }
   // Грузим параллельно: поставщиков, каталог комплектующих (как на производстве),
-  // профиль (для телефона/подписи).
-  const [supRes, compRes, meRes] = await Promise.all([
+  // профиль (для телефона/подписи) и готовые карточки наших юрлиц.
+  const [supRes, compRes, meRes, cardsRes] = await Promise.all([
     (cache.suppliers ? Promise.resolve({ suppliers: cache.suppliers })
                      : apiGet('/api/suppliers').catch(() => ({ suppliers: [] }))),
     (cache.components ? Promise.resolve({ components: cache.components })
                       : apiGet('/api/components').catch(() => ({ components: [] }))),
     (cache.me ? Promise.resolve(cache.me) : apiGet('/api/me').catch(() => null)),
+    apiGet('/api/company-cards').catch(() => ({ items: [] })),
   ]);
   cache.suppliers = supRes.suppliers || [];
   cache.components = compRes.components || [];
@@ -13661,7 +13911,8 @@ async function openNewSupplyOrder() {
   if (!cache.suppliers.length) { showToast('Сначала добавьте хотя бы одного поставщика', 'error'); return; }
 
   _owz = { list: [], me: cache.me || {}, openCats: {}, custom: 0,
-           supplierId: null, supplierEmail: '', supplierPhone: '', supplierName: '' };
+           supplierId: null, supplierEmail: '', supplierPhone: '', supplierName: '',
+           companyCards: cardsRes.items || [], companyCardId: null, companyCardPickerOpen: false };
   const me = _owz.me;
   const signName = (me.full_name || me.short_name || '').trim();
   const signPos = (me.position || '').trim();
@@ -13705,6 +13956,8 @@ async function openNewSupplyOrder() {
           '<div class="form-group" style="margin:0;"><label>Телефон для связи</label><input id="owz-phone" type="tel" value="' + escapeHtml(phone) + '" placeholder="+7 …" class="owz2-inp"></div>' +
         '</div>' +
         '<div class="form-group" style="margin-top:12px;"><label>Комментарий поставщику</label><textarea id="owz-comment" rows="2" placeholder="Необязательно" class="owz2-inp"></textarea></div>' +
+        // Карточка предприятия — необязательное второе вложение к письму поставщику
+        '<div class="owz2-card-attach" id="owz-company-card"></div>' +
         // Подпись
         '<div class="owz2-sign">' +
           '<i class="ti ti-signature owz2-sign-ic"></i>' +
@@ -13722,6 +13975,7 @@ async function openNewSupplyOrder() {
   m.classList.add('visible');
   _owzRenderCatalog('');
   _owzRenderCart();
+  _owzRenderCompanyCard();
   _owzMaybeRestoreDraft();   // v2.45.694: предложить продолжить незавершённый черновик
   _owzStartAutosave();       // и авто-сохранять по мере заполнения
 }
@@ -13827,6 +14081,77 @@ function _owzSupKey(e) {
   const matches = (cache.suppliers || []).filter(x =>
     (x.name || '').toLowerCase().includes(s) || (x.email || '').toLowerCase().includes(s));
   if (matches.length === 1) _owzSupPick(matches[0].id);
+}
+
+// v2.45.823: выбрать одну из загруженных карточек предприятия и приложить
+// её к письму вместе с документом заказа.
+function _owzRenderCompanyCard() {
+  const box = document.getElementById('owz-company-card');
+  if (!box) return;
+  const cards = _owz.companyCards || [];
+  const selected = cards.find(c => Number(c.id) === Number(_owz.companyCardId));
+  if (!cards.length) {
+    box.innerHTML =
+      '<button type="button" class="owz2-card-add" disabled>' +
+        '<i class="ti ti-paperclip"></i> Прикрепить карточку предприятия' +
+      '</button>' +
+      '<div class="owz2-card-empty">Карточек пока нет. Их можно загрузить в «Снабжение → Карточка предприятия».</div>';
+    return;
+  }
+
+  let html = '';
+  if (selected) {
+    html +=
+      '<div class="owz2-card-selected">' +
+        '<div class="owz2-card-file"><i class="ti ti-id"></i></div>' +
+        '<div class="owz2-card-main">' +
+          '<div class="owz2-card-name">' + escapeHtml(selected.name || selected.filename || 'Карточка предприятия') + '</div>' +
+          '<div class="owz2-card-filename">' + escapeHtml(selected.filename || 'Файл с реквизитами') + ' · будет приложен к письму</div>' +
+        '</div>' +
+        '<button type="button" class="owz2-card-change" onclick="_owzToggleCompanyCards()">Сменить</button>' +
+        '<button type="button" class="owz2-card-remove" onclick="_owzClearCompanyCard()" title="Не прикладывать"><i class="ti ti-x"></i></button>' +
+      '</div>';
+  } else {
+    html +=
+      '<button type="button" class="owz2-card-add" onclick="_owzToggleCompanyCards()">' +
+        '<i class="ti ti-paperclip"></i> Прикрепить карточку предприятия' +
+      '</button>' +
+      '<div class="owz2-card-help">Для нового поставщика можно сразу отправить реквизиты нужного юрлица.</div>';
+  }
+
+  if (_owz.companyCardPickerOpen) {
+    html += '<div class="owz2-card-picker">' + cards.map(c => {
+      const active = selected && Number(selected.id) === Number(c.id);
+      return '<button type="button" class="owz2-card-option' + (active ? ' active' : '') + '" onclick="_owzSelectCompanyCard(' + Number(c.id) + ')">' +
+        '<span class="owz2-card-option-ic"><i class="ti ti-file-description"></i></span>' +
+        '<span><b>' + escapeHtml(c.name || c.filename || 'Карточка предприятия') + '</b>' +
+          '<small>' + escapeHtml(c.filename || '') + '</small></span>' +
+        (active ? '<i class="ti ti-check"></i>' : '') +
+      '</button>';
+    }).join('') + '</div>';
+  }
+  box.innerHTML = html;
+}
+
+function _owzToggleCompanyCards() {
+  _owz.companyCardPickerOpen = !_owz.companyCardPickerOpen;
+  _owzRenderCompanyCard();
+}
+
+function _owzSelectCompanyCard(id) {
+  const cardId = Number(id);
+  if (!(_owz.companyCards || []).some(c => Number(c.id) === cardId)) return;
+  _owz.companyCardId = cardId;
+  _owz.companyCardPickerOpen = false;
+  _owzRenderCompanyCard();
+  _owzSaveDraft();
+}
+
+function _owzClearCompanyCard() {
+  _owz.companyCardId = null;
+  _owz.companyCardPickerOpen = false;
+  _owzRenderCompanyCard();
+  _owzSaveDraft();
 }
 
 // Каталог комплектующих — как на производстве: группы по категориям,
@@ -14020,6 +14345,7 @@ async function submitOrderWizard(send) {
     expected_date: document.getElementById('owz-expected').value || null,
     comment: document.getElementById('owz-comment').value.trim(),
     contact_phone: document.getElementById('owz-phone').value.trim(),
+    company_card_id: _owz.companyCardId || null,
     items,
   };
   if (send) {
@@ -16547,6 +16873,35 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.823',
+    date: '27.07.2026',
+    title: 'Карточка предприятия во вложении к заказу',
+    features: [
+      'В форме <b>«Оформить заказ»</b> появилась кнопка выбора одной из загруженных карточек предприятия',
+      'Выбранная карточка сохраняется вместе с заказом, видна в превью письма и отправляется поставщику вторым вложением вместе с DOCX-заявкой',
+    ],
+  },
+  {
+    version: 'v2.45.821',
+    date: '27.07.2026',
+    title: 'Деловые линии: журнал как в личном кабинете',
+    features: [
+      'CRM автоматически загружает <b>весь журнал за 90 дней</b>, а не только вручную добавленные накладные',
+      'В карточке видны номер заказа и накладной, направление, маршрут, отправитель/получатель, груз, сумма, оплата, прогресс и актуальный статус',
+      'Добавлено безопасное переподключение PAT: можно выбрать пользователя кабинета с полным доступом ко всем нужным контрагентам',
+    ],
+  },
+  {
+    version: 'v2.45.820',
+    date: '27.07.2026',
+    title: 'СДЭК: отдельно «К нам» и «От нас»',
+    features: [
+      'Отправления СДЭК разделены на <b>«К нам»</b> и <b>«От нас»</b>; на карточке видны отправитель, получатель и маршрут',
+      'CRM автоматически определяет направление по реквизитам наших юрлиц и подхватывает проверенные треки из входящих и исходящих писем/MAX',
+      'При ручном добавлении направление выбирается сразу; у существующей карточки его можно исправить нажатием на чип',
+    ],
+  },
   {
     version: 'v2.45.792',
     date: '21.07.2026',

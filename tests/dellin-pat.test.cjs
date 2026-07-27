@@ -58,6 +58,9 @@ test('сохранение отправляет точный контракт и
     loadLogisticsPickups() {
       reloads += 1;
     },
+    async dellinRefresh() {
+      reloads += 1;
+    },
   };
   const code = section(
     'function _redactDellinPat(value)',
@@ -86,8 +89,8 @@ test('PAT скрыт в форме и очищается после запрос
     'async function dellinRefresh()'
   );
   const html = section(
-    'function _dellinBlockHtml(dl)',
-    'function dellinTrack('
+    'function _dellinCredentialsHtml(configured)',
+    'function dellinSettings()'
   );
 
   assert.match(html, /id="dl-pat"\s+type="password"/);
@@ -107,7 +110,7 @@ test('ручное обновление показывает число авто
     },
     async apiPost(url, body) {
       requests.push({ url, body });
-      return { ok: true, data: { synced: 3, total: 4, added: 2 } };
+      return { ok: true, data: { synced: 3, total: 4, added: 2, visible: 9 } };
     },
     _redactDellinPat(value) {
       return value;
@@ -129,8 +132,8 @@ test('ручное обновление показывает число авто
     [{ url: '/api/logistics/dellin/refresh', body: {} }]
   );
   assert.deepEqual(toasts, [
-    { message: 'Ищем новые грузы и обновляем статусы Деловых линий…', type: 'info' },
-    { message: 'Обновлено: 3 из 4 · новых грузов: 2', type: 'success' },
+    { message: 'Синхронизируем журнал Деловых линий…', type: 'info' },
+    { message: 'Журнал обновлён: доступно 9 · новых заказов: 2', type: 'success' },
   ]);
   assert.equal(reloads, 1);
 });
@@ -143,4 +146,68 @@ test('PAT не может попасть в сообщение интерфей�
 
   assert.match(redactor, /replace\(\/dl-api-/);
   assert.match(source, /_redactDellinPat\(j\.message/);
+});
+
+test('журнал показывает стороны, маршрут, деньги, статус и направления', () => {
+  const context = {
+    escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    },
+  };
+  const code = section(
+    'function _dellinCredentialsHtml(configured)',
+    'function dellinTrack('
+  );
+  vm.runInNewContext(`${code}\nthis.render = _dellinBlockHtml;`, context);
+
+  const html = context.render({
+    configured: true,
+    summary: { active: 1, total: 2, incoming: 1, outgoing: 0, payer: 0 },
+    journal: { days: 90, visible_count: 2, last_sync_at: '2026-07-27 12:00:00' },
+    shipments: [
+      {
+        id: 1,
+        order_id: '64606845',
+        dellin_number: '26-02731011431',
+        source: 'journal',
+        direction: 'incoming',
+        ordered_at: '2026-07-23 12:00:00',
+        sender_name: 'ООО ОЛИД',
+        receiver_name: 'ООО АТОМУС ГРУПП',
+        from_city: 'Химки',
+        to_city: 'Миасс',
+        auto_cargo: 'Оборудование · 19 кг',
+        total_sum: 3808,
+        is_paid: 0,
+        auto_status: 'Груз в пути',
+        progress_percent: 64,
+      },
+      {
+        id: 2,
+        order_id: '64389849',
+        dellin_number: '26-02000000002',
+        source: 'journal',
+        direction: 'outgoing',
+        auto_status: 'Заказ завершён',
+        is_closed: 1,
+        total_sum: 2064,
+        is_paid: 1,
+      },
+    ],
+  });
+
+  assert.match(html, /API кабинета видит 2 заказа/);
+  assert.match(html, /64606845/);
+  assert.match(html, /Химки/);
+  assert.match(html, /Миасс/);
+  assert.match(html, /ООО ОЛИД/);
+  assert.match(html, /ООО АТОМУС ГРУПП/);
+  assert.match(html, /3[\s\u00a0]?808 ₽/);
+  assert.match(html, /не оплачен/);
+  assert.match(html, /к нам/);
+  assert.match(html, /Завершённые заказы/);
+  assert.match(html, /dellinSettings\(\)/);
 });
