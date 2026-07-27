@@ -21813,3 +21813,79 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   opacity: 0; visibility: hidden; transition: opacity .12s ease; z-index: 61;
 }
 .ship-alone-mini:hover::after, .ship-alone-mini:hover::before { opacity: 1; visibility: visible; }
+
+/* ============ v2.45.821: Деловые линии — журнал личного кабинета ============ */
+.logi-sec.o { color: #C2410C; }
+.logi-sec.o .logi-cnt { background: #FFF7ED; color: #C2410C; }
+.logi-sec.o > i:first-child { background: #FFF7ED; }
+
+.dl-connect-note, .dl-sync-banner {
+  display: flex; align-items: flex-start; gap: 10px; border-radius: 13px;
+  padding: 12px 13px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.45;
+}
+.dl-connect-note { color: #7C2D12; background: #FFF7ED; border: 1px solid #FED7AA; }
+.dl-connect-note > i, .dl-sync-banner > i { font-size: 19px; flex: none; margin-top: 1px; }
+.dl-connect-note b, .dl-sync-banner b { display: block; margin-bottom: 2px; font-size: 13px; }
+.dl-secret-note { display: flex; align-items: center; gap: 6px; color: var(--text-light); font-size: 11.5px; margin: -3px 0 12px; }
+
+.dl-sync-banner { color: #166534; background: #F0FDF4; border: 1px solid #BBF7D0; }
+.dl-sync-banner.warn { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+.dl-sync-banner span { display: block; margin-top: 2px; color: inherit; opacity: .84; }
+.dl-sync-banner .err { color: #B91C1C; opacity: 1; }
+.dl-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: -3px 0 13px; }
+.dl-summary span { text-align: center; padding: 7px 5px; border-radius: 10px; background: var(--bg); color: var(--text-light); font-size: 10.5px; }
+.dl-summary b { display: block; color: var(--text-dark); font-size: 16px; line-height: 1.05; }
+.dl-subhead { display: flex; align-items: center; gap: 6px; color: var(--text-mid); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 7px 0 8px; }
+.dl-subhead span, .dl-archive summary span { color: #C2410C; background: #FFF7ED; border-radius: 999px; padding: 2px 7px; font-size: 10px; }
+
+.dl-order { position: relative; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #F97316; border-radius: 15px; padding: 12px 13px 10px; margin-bottom: 9px; box-shadow: 0 1px 3px rgba(15,23,42,.055); transition: box-shadow .15s ease, transform .15s ease; }
+.dl-order:hover { box-shadow: 0 7px 20px rgba(15,23,42,.09); transform: translateY(-1px); }
+.dl-order.done { border-left-color: #CBD5E1; background: #FAFBFC; }
+.dl-order-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.dl-order-id { min-width: 0; font-size: 14px; font-weight: 850; color: var(--text-dark); }
+.dl-order-id > i { color: #EA580C; margin-right: 3px; }
+.dl-order-id small { display: block; color: var(--text-light); font-size: 10.5px; font-weight: 550; margin: 2px 0 0 22px; }
+.dl-order-tags { display: flex; align-items: center; justify-content: flex-end; gap: 5px; flex-wrap: wrap; }
+.dl-dir { display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; padding: 3px 7px; font-size: 9.5px; font-weight: 800; white-space: nowrap; }
+.dl-dir.in { color: #047857; background: #ECFDF5; }
+.dl-dir.out { color: #1D4ED8; background: #EFF6FF; }
+.dl-dir.pay { color: #A16207; background: #FEFCE8; }
+.dl-dir.unk { color: #64748B; background: #F1F5F9; }
+.dl-date { color: var(--text-light); font-size: 10px; white-space: nowrap; }
+
+.dl-route { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 9px; color: var(--text-dark); font-size: 11.5px; }
+.dl-route > i { color: #94A3B8; }
+.dl-route > span { width: 100%; color: var(--text-light); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl-cargo { display: flex; align-items: center; gap: 5px; color: var(--text-mid); font-size: 10.5px; margin-top: 6px; }
+.dl-cargo i { color: #94A3B8; }
+.dl-order-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.dl-status { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; color: var(--text-light); }
+.dl-status b { color: var(--text-dark); font-size: 12.5px; line-height: 1.25; }
+.dl-status .err { color: var(--danger); }
+.dl-finance { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.dl-finance b { color: var(--text-dark); font-size: 12.5px; white-space: nowrap; }
+.dl-finance span { font-size: 9.5px; font-weight: 750; }
+.dl-finance .paid { color: #15803D; }
+.dl-finance .unpaid { color: #B91C1C; }
+.dl-progress { height: 3px; background: #E2E8F0; border-radius: 999px; overflow: hidden; margin-top: 9px; }
+.dl-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #F97316, #22C55E); }
+.dl-order.done .dl-progress i { background: #94A3B8; }
+.dl-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.dl-actions .btn { min-height: 27px; padding: 4px 8px; font-size: 10px; }
+.dl-hide { margin-left: auto; border: 0; background: transparent; color: #94A3B8; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; }
+.dl-hide:hover { color: var(--danger); background: var(--danger-bg); }
+
+.dl-archive { margin-top: 15px; }
+.dl-archive > summary { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text-light); font-weight: 750; font-size: 12px; list-style: none; padding: 8px 2px; }
+.dl-archive > summary::-webkit-details-marker { display: none; }
+.dl-archive > summary::after { content: '›'; margin-left: auto; font-size: 18px; transition: transform .15s ease; }
+.dl-archive[open] > summary::after { transform: rotate(90deg); }
+.dl-archive-list { padding-top: 3px; }
+
+@media (max-width: 520px) {
+  .dl-summary { gap: 4px; }
+  .dl-order-top, .dl-order-bottom { align-items: flex-start; }
+  .dl-order-top { flex-direction: column; gap: 6px; }
+  .dl-order-tags { justify-content: flex-start; }
+  .dl-route > span { white-space: normal; }
+}
