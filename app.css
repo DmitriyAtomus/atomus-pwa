@@ -21432,6 +21432,85 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .cdek-del { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 15px; padding: 4px; }
 .cdek-del:hover { color: var(--danger); }
 
+/* ============ v2.45.820: СДЭК — направления «К нам / От нас» ============ */
+.cdek-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 11px 0 7px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.cdek-group-head.incoming { color: #047857; background: #ECFDF5; }
+.cdek-group-head.outgoing { color: #1D4ED8; background: #EFF6FF; }
+.cdek-group-head.unknown { color: #92400E; background: #FFFBEB; }
+.cdek-group-head .logi-cnt { margin-left: 2px; }
+.cdek-card.incoming { border-left-color: #10B981; }
+.cdek-card.outgoing { border-left-color: #3B82F6; }
+.cdek-card.unknown { border-left-color: #F59E0B; }
+.cdek-dir {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.cdek-dir.incoming { color: #047857; background: #D1FAE5; }
+.cdek-dir.outgoing { color: #1D4ED8; background: #DBEAFE; }
+.cdek-dir.unknown { color: #92400E; background: #FEF3C7; }
+.cdek-dir:hover { filter: brightness(.97); box-shadow: 0 0 0 2px rgba(45,95,139,.12); }
+.cdek-route {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 3px;
+  color: var(--text-mid);
+  font-size: 11.5px;
+}
+.cdek-route span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cdek-route .ti { flex: none; color: var(--text-faint); }
+.cdek-direction-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.cdek-direction-choice label { cursor: pointer; }
+.cdek-direction-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.cdek-direction-choice span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text-mid);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 800;
+}
+.cdek-direction-choice input:checked + span {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  box-shadow: 0 0 0 2px rgba(45,95,139,.10);
+}
+@media (max-width: 520px) {
+  .cdek-card { align-items: flex-start; gap: 8px; }
+  .cdek-route { flex-wrap: wrap; }
+  .cdek-title { flex-basis: 100%; }
+}
+
 /* ============ v2.45.708: Почта и MAX — каналы, пузыри, привязка ============ */
 .mm-filters { display: flex; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 2; }
 .mm-filter { border: 1px solid var(--border); background: var(--surface); color: var(--text-mid); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }

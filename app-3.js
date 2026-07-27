@@ -7647,12 +7647,15 @@ async function loadLogisticsPickups() {
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     let html = '';
     // v2.45.796: сводка по логистике — четыре плитки сверху
-    const _cdN = (cd && cd.shipments) ? cd.shipments.filter(x => !x.delivered_at).length : 0;
+    const _cdActive = (cd && cd.shipments) ? cd.shipments.filter(x => !x.delivered_at) : [];
+    const _cdN = _cdActive.length;
+    const _cdIn = _cdActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
+    const _cdOut = _cdActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
     const _dlN = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at).length : 0;
     html += '<div class="logi-hero">' +
       _logiHeroTile('ti-package-import', ready.length, 'забрать сейчас', 'g') +
       _logiHeroTile('ti-truck-delivery', transit.length, 'в пути', 'b') +
-      _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК', 'v') +
+      _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК · к нам ' + _cdIn + ' / от нас ' + _cdOut, 'v') +
       _logiHeroTile('ti-truck', _dlN, 'Деловые линии', 'o') +
     '</div>';
     // v2.45.797: две колонки на широком экране — слева самовывозы, справа перевозчики
@@ -7685,10 +7688,64 @@ function _cdekStatusChip(sh) {
   if (code === 'NOT_DELIVERED') return '<span class="cdek-st bad">⚠ Не вручён</span>';
   return '<span class="cdek-st run">' + escapeHtml(sh.status_name || code) + '</span>';
 }
+function _cdekDirection(sh) {
+  return ['incoming', 'outgoing'].includes(sh.direction) ? sh.direction : 'unknown';
+}
+function _cdekDirectionChip(sh) {
+  const dir = _cdekDirection(sh);
+  const label = dir === 'incoming' ? 'К нам' : (dir === 'outgoing' ? 'От нас' : 'Уточнить');
+  const icon = dir === 'incoming' ? 'ti-package-import' : (dir === 'outgoing' ? 'ti-package-export' : 'ti-arrows-exchange');
+  return '<button class="cdek-dir ' + dir + '" onclick="cdekChangeDirection(' + sh.id + ',\'' + dir + '\')" ' +
+    'title="Нажмите, чтобы изменить направление"><i class="ti ' + icon + '"></i> ' + label + '</button>';
+}
+function _cdekRoute(sh) {
+  const sender = sh.sender_name || sh.from_city || '';
+  const recipient = sh.recipient_name || sh.to_city || '';
+  if (sender && recipient) {
+    return '<div class="cdek-route"><span>' + escapeHtml(sender) + '</span><i class="ti ti-arrow-right"></i><span>' +
+      escapeHtml(recipient) + '</span></div>';
+  }
+  if (sender || recipient) {
+    return '<div class="cdek-route"><span>' + escapeHtml(sender || recipient) + '</span></div>';
+  }
+  return '';
+}
+function _cdekCardHtml(sh) {
+  const delivered = !!sh.delivered_at;
+  const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
+  return '<div class="cdek-card ' + _cdekDirection(sh) + (delivered ? ' done' : '') + '">' +
+    '<div class="cdek-main">' +
+      '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(sh.cdek_number) +
+        _cdekDirectionChip(sh) +
+        (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
+      _cdekRoute(sh) +
+      '<div class="cdek-sub">' + _cdekStatusChip(sh) +
+        (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
+        (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
+        (proj ? ' · ' + escapeHtml(proj) : '') +
+        (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+    '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+  '</div>';
+}
+function _cdekGroupHtml(list, direction) {
+  if (!list.length) return '';
+  const incoming = direction === 'incoming';
+  const unknown = direction === 'unknown';
+  const icon = incoming ? 'ti-package-import' : (unknown ? 'ti-help-circle' : 'ti-package-export');
+  const title = incoming ? 'К нам' : (unknown ? 'Направление не определено' : 'От нас');
+  return '<div class="cdek-group-head ' + direction + '"><i class="ti ' + icon + '"></i> ' + title +
+    '<span class="logi-cnt">' + list.length + '</span></div>' + list.map(_cdekCardHtml).join('');
+}
 function _cdekBlockHtml(cd) {
   const list = cd.shipments || [];
+  const incoming = list.filter(sh => _cdekDirection(sh) === 'incoming');
+  const outgoing = list.filter(sh => _cdekDirection(sh) === 'outgoing');
+  const unknown = list.filter(sh => _cdekDirection(sh) === 'unknown');
   let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
-    '<i class="ti ti-plane-departure"></i> СДЭК — отправления <span class="logi-cnt">' + list.length + '</span>' +
+    '<i class="ti ti-plane-departure"></i> СДЭК <span class="logi-cnt">' + list.length + '</span>' +
     '<span style="margin-left:auto;display:inline-flex;gap:6px;">' +
       (cd.configured ? '<button class="btn btn-secondary btn-small" onclick="cdekRefresh()" title="Обновить статусы из СДЭК"><i class="ti ti-refresh"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="cdekAdd()"><i class="ti ti-plus"></i> Трек</button>' +
@@ -7703,42 +7760,86 @@ function _cdekBlockHtml(cd) {
     '</div>';
   }
   if (!list.length) {
-    h += '<div class="logi-empty"><i class="ti ti-plane"></i> Отправлений пока нет — добавь трек-номер накладной.</div>';
+    h += '<div class="logi-empty"><i class="ti ti-plane"></i> Отправлений пока нет. Новые треки из писем и MAX появятся здесь автоматически.</div>';
     return h;
   }
-  list.forEach(sh => {
-    const delivered = !!sh.delivered_at;
-    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
-    h += '<div class="cdek-card' + (delivered ? ' done' : '') + '">' +
-      '<div class="cdek-main">' +
-        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(sh.cdek_number) +
-          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
-        '<div class="cdek-sub">' + _cdekStatusChip(sh) +
-          (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
-          (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
-          (proj ? ' · ' + escapeHtml(proj) : '') +
-          (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
-        '</div>' +
-      '</div>' +
-      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
-      '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
-    '</div>';
-  });
-  return h;
+  return h + _cdekGroupHtml(incoming, 'incoming') +
+    _cdekGroupHtml(outgoing, 'outgoing') +
+    _cdekGroupHtml(unknown, 'unknown');
 }
 function cdekAdd() {
-  const num = prompt('Номер накладной СДЭК (трек), например 1234567890:');
-  if (num == null || !num.trim()) return;
-  const title = prompt('Что везём / кому (коротко, для списка):', '') || '';
-  (async () => {
-    try {
-      const r = await apiPost('/api/logistics/cdek', { cdek_number: num.trim(), title: title.trim() });
-      const j = (r && r.data) || {};
-      if (r && r.ok) showToast(j.synced ? 'Добавлено — статус подтянут' : 'Добавлено (статус подтянется после подключения ключей)', 'success');
-      else showToast(j.message || 'Не удалось добавить', 'error');
-    } catch (e) { showToast('Ошибка соединения', 'error'); }
-    loadLogisticsPickups();
-  })();
+  const old = document.getElementById('cdek-modal');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'cdek-modal';
+  el.className = 'modal-overlay active';
+  el.innerHTML = '<div class="modal-box" style="max-width:440px;">' +
+    '<div class="modal-header"><h2><i class="ti ti-plane-departure"></i> Добавить СДЭК</h2>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'cdek-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body">' +
+      '<label class="form-label">Направление</label>' +
+      '<div class="cdek-direction-choice">' +
+        '<label><input type="radio" name="cdek-dir" value="incoming" checked><span><i class="ti ti-package-import"></i> К нам</span></label>' +
+        '<label><input type="radio" name="cdek-dir" value="outgoing"><span><i class="ti ti-package-export"></i> От нас</span></label>' +
+      '</div>' +
+      '<label class="form-label">Номер накладной</label>' +
+      '<input class="form-input" id="cdek-num-input" inputmode="numeric" placeholder="Например, 12345678901" autocomplete="off">' +
+      '<label class="form-label" style="margin-top:12px;">Что везут / кому</label>' +
+      '<input class="form-input" id="cdek-title-input" placeholder="Необязательно" autocomplete="off">' +
+      '<div class="form-hint">Треки из писем и MAX CRM добавляет сама. Эта форма нужна, если номер сообщили иначе.</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'cdek-modal\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="cdek-submit" onclick="cdekSubmit()"><i class="ti ti-plus"></i> Добавить</button>' +
+    '</div></div>';
+  document.body.appendChild(el);
+  setTimeout(() => { const input = document.getElementById('cdek-num-input'); if (input) input.focus(); }, 50);
+}
+async function cdekSubmit() {
+  const numEl = document.getElementById('cdek-num-input');
+  const titleEl = document.getElementById('cdek-title-input');
+  const directionEl = document.querySelector('input[name="cdek-dir"]:checked');
+  const submit = document.getElementById('cdek-submit');
+  const num = String((numEl || {}).value || '').trim();
+  const title = String((titleEl || {}).value || '').trim();
+  const direction = String((directionEl || {}).value || 'incoming');
+  if (!/^\d{10,20}$/.test(num)) {
+    showToast('Номер СДЭК — от 10 до 20 цифр', 'error');
+    if (numEl) numEl.focus();
+    return;
+  }
+  if (submit) submit.disabled = true;
+  try {
+    const r = await apiPost('/api/logistics/cdek', {
+      cdek_number: num, title: title, direction: direction,
+    });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast(j.synced ? 'Добавлено — статус и направление проверены' : 'Добавлено — статус подтянется автоматически', 'success');
+      const modal = document.getElementById('cdek-modal');
+      if (modal) modal.remove();
+    } else {
+      showToast(j.message || 'Не удалось добавить', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+  loadLogisticsPickups();
+}
+async function cdekChangeDirection(id, current) {
+  const next = current === 'incoming' ? 'outgoing' : 'incoming';
+  const label = next === 'incoming' ? '«К нам»' : '«От нас»';
+  if (!confirm('Перенести отправление в ' + label + '?')) return;
+  try {
+    const r = await apiPatch('/api/logistics/cdek/' + id, { direction: next });
+    const j = (r && r.data) || {};
+    if (!r || !r.ok) showToast(j.message || 'Не удалось изменить направление', 'error');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+  loadLogisticsPickups();
 }
 async function cdekRefresh() {
   showToast('Обновляем статусы СДЭК…', 'info');
@@ -7747,8 +7848,10 @@ async function cdekRefresh() {
     const j = (r && r.data) || {};
     if (r && r.ok) {
       const found = (j.found || []).length;
+      const incomingFound = (j.incoming_found || []).length;
+      const outgoingFound = (j.outgoing_found || []).length;
       showToast('Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0) +
-        (found ? ' · найдено в переписке: ' + found : ''), 'success');
+        (found ? ' · новых: ' + found + ' (к нам ' + incomingFound + ', от нас ' + outgoingFound + ')' : ''), 'success');
     } else showToast(j.message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadLogisticsPickups();
@@ -16545,6 +16648,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.820',
+    date: '27.07.2026',
+    title: 'СДЭК: отдельно «К нам» и «От нас»',
+    features: [
+      'Отправления СДЭК разделены на <b>«К нам»</b> и <b>«От нас»</b>; на карточке видны отправитель, получатель и маршрут',
+      'CRM автоматически определяет направление по реквизитам наших юрлиц и подхватывает проверенные треки из входящих и исходящих писем/MAX',
+      'При ручном добавлении направление выбирается сразу; у существующей карточки его можно исправить нажатием на чип',
+    ],
+  },
   {
     version: 'v2.45.792',
     date: '21.07.2026',
