@@ -1600,16 +1600,18 @@ function renderHomeFunnel() {
     el.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-info-circle"></i>Пока нет активных работ</div>';
     return;
   }
-  // v2.45.631: одна цветная полоса — ширина сегмента пропорциональна количеству.
-  // Нулевые стадии остаются узкими метками, чтобы воронка читалась целиком.
+  // v2.45.817: √-масштаб + минимальная ширина — маленькие стадии больше не
+  // сплющиваются в нечитаемые полоски рядом с «готово 48». Нулевые стадии
+  // в полосу не идут (они видны в легенде).
   const colors = { queue: '#94A3B8', in_progress: '#2D5F8B', review: '#F59E0B', packing: '#8B5CF6', done: '#10B981' };
+  const nonZero = stages.filter(s => (s.count || 0) > 0);
   let bar = '<div class="home-fun-bar">';
-  stages.forEach(s => {
+  (nonZero.length ? nonZero : stages).forEach(s => {
     const n = s.count || 0;
-    const flex = Math.max(n, 0.55);
+    const flex = Math.max(Math.sqrt(n), 0.8);
     bar += '<div class="home-fun-seg" style="flex:' + flex + ';background:' + (colors[s.status] || '#94A3B8') + ';" ' +
       'onclick="homeFunnelClick(\'' + escapeText(s.status) + '\')" title="' + escapeText(s.label) + ': ' + n + '">' +
-      n + (n > 0 ? ' <small>' + escapeText(String(s.label || '').toLowerCase()) + '</small>' : '') +
+      '<b>' + n + '</b><small>' + escapeText(String(s.label || '').toLowerCase()) + '</small>' +
     '</div>';
   });
   bar += '</div>';
