@@ -6969,9 +6969,11 @@ function renderSalesCalcs() {
     const client = c.contractor_name || c.client_name || '';
     const d = String(c.created_at || '').slice(0, 10);
     const dd = d ? d.slice(8, 10) + '.' + d.slice(5, 7) : '';
+    // v2.45.820: номер — квадратной плашкой слева, воздух в карточке
     h += '<div class="calc-card" onclick="calcOpen(' + c.id + ')">' +
+      '<div class="calc-ava">Р-' + c.id + '</div>' +
       '<div class="calc-main">' +
-        '<div class="calc-t1"><span class="calc-num">Р-' + c.id + '</span> ' + escapeHtml(c.title) + ' ' + _calcStatusChip(c) + '</div>' +
+        '<div class="calc-t1">' + escapeHtml(c.title) + ' ' + _calcStatusChip(c) + '</div>' +
         '<div class="calc-t2">' +
           (client ? '🏢 ' + escapeHtml(client) + ' · ' : '') +
           (c.assignee_name ? 'считает: <b>' + escapeHtml(c.assignee_name) + '</b> · ' : '') +
