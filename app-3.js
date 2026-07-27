@@ -7651,12 +7651,15 @@ async function loadLogisticsPickups() {
     const _cdN = _cdActive.length;
     const _cdIn = _cdActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
     const _cdOut = _cdActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
-    const _dlN = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at).length : 0;
+    const _dlActive = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at && !x.is_closed) : [];
+    const _dlN = _dlActive.length;
+    const _dlIn = _dlActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
+    const _dlOut = _dlActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
     html += '<div class="logi-hero">' +
       _logiHeroTile('ti-package-import', ready.length, 'забрать сейчас', 'g') +
       _logiHeroTile('ti-truck-delivery', transit.length, 'в пути', 'b') +
       _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК · к нам ' + _cdIn + ' / от нас ' + _cdOut, 'v') +
-      _logiHeroTile('ti-truck', _dlN, 'Деловые линии', 'o') +
+      _logiHeroTile('ti-truck', _dlN, 'ДЛ · к нам ' + _dlIn + ' / от нас ' + _dlOut, 'o') +
     '</div>';
     // v2.45.797: две колонки на широком экране — слева самовывозы, справа перевозчики
     let colL = '', colR = '';
@@ -7890,7 +7893,7 @@ async function dellinSaveKeys() {
   const saveBtn = document.getElementById('dl-save-keys');
   const appkey = String((appkeyEl || {}).value || '').trim();
   const pat = String((patEl || {}).value || '').trim();
-  if (!appkey || !pat) { showToast('Нужны appkey и PAT-токен', 'error'); return; }
+  if (!pat) { showToast('Нужен PAT-токен', 'error'); return; }
   if (!/^dl-api-[A-Za-z0-9_-]{20,}$/i.test(pat)) {
     showToast('PAT-токен должен начинаться с dl-api-', 'error');
     return;
@@ -7911,20 +7914,27 @@ async function dellinSaveKeys() {
     if (patEl) patEl.value = '';
     if (saveBtn) saveBtn.disabled = false;
   }
-  if (saved) loadLogisticsPickups();
+  if (saved) {
+    const modal = document.getElementById('dellin-settings-modal');
+    if (modal) modal.remove();
+    await dellinRefresh();
+  }
 }
+
 async function dellinRefresh() {
-  showToast('Ищем новые грузы и обновляем статусы Деловых линий…', 'info');
+  showToast('Синхронизируем журнал Деловых линий…', 'info');
   try {
     const r = await apiPost('/api/logistics/dellin/refresh', {});
     const j = (r && r.data) || {};
     if (r && r.ok) {
       const added = Number(j.added || 0);
+      const visible = Number(j.visible || 0);
       const discoveryError = _redactDellinPat(j.discovery_error || '');
       showToast(
-        'Обновлено: ' + (j.synced || 0) + ' из ' + (j.total || 0) +
-          (added ? ' · новых грузов: ' + added : '') +
-          (discoveryError ? ' · новые грузы не получены: ' + discoveryError : ''),
+        discoveryError
+          ? 'Журнал не получен: ' + discoveryError
+          : 'Журнал обновлён: доступно ' + visible +
+              (added ? ' · новых заказов: ' + added : ''),
         discoveryError ? 'error' : 'success'
       );
     }
@@ -7933,68 +7943,186 @@ async function dellinRefresh() {
   loadLogisticsPickups();
 }
 
-// ============ ДЕЛОВЫЕ ЛИНИИ — накладные и синхронизация API ============
+function _dellinCredentialsHtml(configured) {
+  return '<div class="dl-connect-note">' +
+      '<i class="ti ti-info-circle"></i><div>' +
+        '<b>' + (configured ? 'Подключить другой профиль кабинета' : 'Подключить личный кабинет') + '</b>' +
+        '<div>PAT должен быть создан у пользователя, который видит нужные заказы и имеет полный доступ к контрагентам. Тогда CRM покажет тот же журнал автоматически.</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Ключ приложения (appkey)</label>' +
+      '<input class="form-input" id="dl-appkey" placeholder="' +
+        (configured ? 'Можно оставить пустым — используем сохранённый' : 'Обязателен при первом подключении') +
+        '" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
+    '<div class="form-group"><label class="form-label">PAT нужного пользователя кабинета</label>' +
+      '<input class="form-input" id="dl-pat" type="password" placeholder="dl-api-…" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
+    '<div class="dl-secret-note"><i class="ti ti-shield-lock"></i> PAT не сохраняется в браузере и очищается сразу после проверки.</div>';
+}
+
+function dellinSettings() {
+  const old = document.getElementById('dellin-settings-modal');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'dellin-settings-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:560px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-plug-connected"></i> Кабинет Деловых линий</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'dellin-settings-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' + _dellinCredentialsHtml(true) + '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'dellin-settings-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-refresh"></i> Переподключить и загрузить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  const pat = document.getElementById('dl-pat'); if (pat) pat.focus();
+}
+
+function _dellinShortDate(value) {
+  const date = String(value || '').slice(0, 10);
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[3] + '.' + m[2] + '.' + m[1] : date;
+}
+
+function _dellinMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  return number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+}
+
+function _dellinOrdersWord(value) {
+  const n = Math.abs(Number(value) || 0);
+  const tail = n % 100;
+  if (tail >= 11 && tail <= 14) return 'заказов';
+  if (n % 10 === 1) return 'заказ';
+  if (n % 10 >= 2 && n % 10 <= 4) return 'заказа';
+  return 'заказов';
+}
+
+function _dellinDirectionChip(direction) {
+  const map = {
+    incoming: ['in', 'ti-package-import', 'к нам'],
+    outgoing: ['out', 'ti-package-export', 'от нас'],
+    payer: ['pay', 'ti-credit-card', 'мы платим'],
+    unknown: ['unk', 'ti-help-circle', 'другое'],
+  };
+  const item = map[direction] || map.unknown;
+  return '<span class="dl-dir ' + item[0] + '"><i class="ti ' + item[1] + '"></i> ' + item[2] + '</span>';
+}
+
+function _dellinOrderCard(sh) {
+  const closed = !!sh.is_closed || !!sh.delivered_at;
+  const orderId = String(sh.order_id || '').trim();
+  const waybill = String(sh.dellin_number || '').trim();
+  const mainNumber = orderId || waybill;
+  const status = String(sh.auto_status || sh.status_note || (closed ? 'Заказ завершён' : 'Ждём статус'));
+  const detailed = String(sh.detailed_status || '');
+  const progressRaw = Number(sh.progress_percent);
+  const progress = Number.isFinite(progressRaw) ? Math.max(0, Math.min(100, progressRaw)) : (closed ? 100 : null);
+  const route = [sh.from_city, sh.to_city].filter(Boolean);
+  const sender = String(sh.sender_name || sh.auto_from || '');
+  const receiver = String(sh.receiver_name || '');
+  const partyLine = [sender, receiver].filter(Boolean);
+  const paidKnown = sh.is_paid !== null && sh.is_paid !== undefined;
+  const paid = sh.is_paid === true || Number(sh.is_paid) === 1;
+  const title = String(sh.title || '').startsWith('Авто из ЛК') ? '' : String(sh.title || '');
+  let h = '<div class="dl-order' + (closed ? ' done' : '') + '">' +
+    '<div class="dl-order-top">' +
+      '<div class="dl-order-id"><i class="ti ti-receipt-2"></i> ' + escapeHtml(mainNumber) +
+        (orderId && waybill && orderId !== waybill ? '<small>накладная ' + escapeHtml(waybill) + '</small>' : '') +
+      '</div>' +
+      '<div class="dl-order-tags">' +
+        _dellinDirectionChip(sh.direction || 'unknown') +
+        (sh.ordered_at ? '<span class="dl-date">' + escapeHtml(_dellinShortDate(sh.ordered_at)) + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  if (route.length || partyLine.length) {
+    h += '<div class="dl-route">' +
+      (route.length ? '<b>' + escapeHtml(route[0] || '—') + '</b><i class="ti ti-arrow-right"></i><b>' + escapeHtml(route[1] || '—') + '</b>' : '') +
+      (partyLine.length ? '<span>' + escapeHtml(partyLine[0] || '—') + (partyLine.length > 1 ? ' → ' + escapeHtml(partyLine[1]) : '') + '</span>' : '') +
+    '</div>';
+  }
+  if (title || sh.auto_cargo) {
+    h += '<div class="dl-cargo"><i class="ti ti-box"></i> ' + escapeHtml(title || sh.auto_cargo) + '</div>';
+  }
+  h += '<div class="dl-order-bottom">' +
+    '<div class="dl-status">' +
+      '<b>' + escapeHtml(status) + '</b>' +
+      (detailed && detailed !== status ? '<span>' + escapeHtml(detailed) + '</span>' : '') +
+      (!closed && sh.planned_date ? '<span><i class="ti ti-calendar-due"></i> ожидается ' + escapeHtml(_dellinShortDate(sh.planned_date)) + '</span>' : '') +
+      (sh.sync_error ? '<span class="err">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+    '</div>' +
+    '<div class="dl-finance">' +
+      (sh.total_sum !== null && sh.total_sum !== undefined ? '<b>' + escapeHtml(_dellinMoney(sh.total_sum)) + '</b>' : '') +
+      (paidKnown ? '<span class="' + (paid ? 'paid' : 'unpaid') + '">' + (paid ? 'оплачен' : 'не оплачен') + '</span>' : '') +
+    '</div>' +
+  '</div>';
+  if (progress !== null) {
+    h += '<div class="dl-progress"><i style="width:' + progress + '%"></i></div>';
+  }
+  h += '<div class="dl-actions">' +
+      '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' + waybill.replace(/'/g, '') + '\')"><i class="ti ti-external-link"></i> Отследить</button>' +
+      (sh.source === 'journal' ? '' :
+        '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')"><i class="ti ti-edit"></i> Статус</button>') +
+      '<button class="dl-hide" onclick="dellinRemove(' + sh.id + ')" title="Скрыть из CRM"><i class="ti ti-eye-off"></i></button>' +
+    '</div>' +
+  '</div>';
+  return h;
+}
+
+// ============ ДЕЛОВЫЕ ЛИНИИ — полный журнал личного кабинета ============
 function _dellinBlockHtml(dl) {
   const list = dl.shipments || [];
-  let h = '<div class="logi-sec b" style="display:flex;align-items:center;gap:8px;">' +
-    '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + list.length + '</span>' +
+  const summary = dl.summary || {};
+  const journal = dl.journal || {};
+  const active = list.filter(sh => !sh.is_closed && !sh.delivered_at);
+  const completed = list.filter(sh => !!sh.is_closed || !!sh.delivered_at);
+  let h = '<div class="logi-sec o" style="display:flex;align-items:center;gap:8px;">' +
+    '<i class="ti ti-truck"></i> Деловые линии <span class="logi-cnt">' + active.length + ' в работе</span>' +
     '<span style="margin-left:auto;display:inline-flex;gap:6px;">' +
       (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinRefresh()" title="Обновить статусы из ЛК Деловых линий"><i class="ti ti-refresh"></i></button>' : '') +
+      (dl.configured ? '<button class="btn btn-secondary btn-small" onclick="dellinSettings()" title="Сменить кабинет или PAT"><i class="ti ti-settings"></i></button>' : '') +
       '<button class="btn btn-primary btn-small" onclick="dellinAdd()"><i class="ti ti-plus"></i> Накладная</button>' +
     '</span></div>';
-  // v2.45.800+: безопасное подключение через appkey + PAT и автоподхват грузов.
+
   if (!dl.configured) {
-    h += '<div class="cdek-setup">' +
-      '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение Деловых линий</div>' +
-      '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Нужны <b>appkey</b> приложения и <b>PAT-токен</b> личного кабинета. Логин и пароль передавать не нужно. После подключения новые активные грузы автоматически появятся здесь, а по ним подтянутся статус, отправитель, груз и дата прибытия.</div>' +
-      '<input class="form-input" id="dl-appkey" placeholder="Ключ приложения (appkey)" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
-      '<input class="form-input" id="dl-pat" type="password" placeholder="PAT-токен (dl-api-…)" autocomplete="new-password" autocapitalize="none" spellcheck="false" style="margin-bottom:6px;">' +
-      '<div style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;"><i class="ti ti-shield-lock"></i> PAT не сохраняется в браузере и после проверки очищается из поля.</div>' +
-      '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
+    h += '<div class="cdek-setup">' + _dellinCredentialsHtml(false) +
+      '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Подключить и загрузить журнал</button>' +
     '</div>';
-  }
-  if (!list.length) {
-    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет' +
-      (dl.configured ? ' — новые активные грузы появятся автоматически.' : ' — добавь номер накладной Деловых линий.') +
-      '</div>';
-    return h;
-  }
-  list.forEach(sh => {
-    const delivered = !!sh.delivered_at;
-    const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
-    const num = String(sh.dellin_number || '');
-    h += '<div class="cdek-card dl' + (delivered ? ' done' : '') + '">' +
-      '<div class="cdek-main">' +
-        '<div class="cdek-num"><i class="ti ti-barcode"></i> ' + escapeHtml(num) +
-          (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
-        '<div class="cdek-sub">' +
-          (delivered
-            ? '<span class="cdek-st done">✓ Вручён</span>'
-            : (sh.auto_status
-                ? '<span class="cdek-st run">' + escapeHtml(sh.auto_status) + '</span>'
-                : (sh.status_note
-                    ? '<span class="cdek-st run">' + escapeHtml(sh.status_note) + '</span>'
-                    : '<span class="cdek-st wait">' + (dl.configured ? 'ждём статус' : 'статус вручную') + '</span>'))) +
-          (sh.auto_from ? ' · от: <b>' + escapeHtml(sh.auto_from) + '</b>' : '') +
-          (sh.auto_cargo ? ' · ' + escapeHtml(sh.auto_cargo) : '') +
-          (proj ? ' · ' + escapeHtml(proj) : '') +
-          (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
-        '</div>' +
-        '<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' +
-            num.replace(/'/g, '') + '\')" title="Открыть трекер Деловых линий (номер скопируется)">' +
-            '<i class="ti ti-external-link"></i> Отследить</button>' +
-          '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')">' +
-            '<i class="ti ti-edit"></i> Статус</button>' +
-          (delivered
-            ? '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',false)">↩ вернуть в путь</button>'
-            : '<button class="btn btn-secondary btn-small" onclick="dellinDelivered(' + sh.id + ',true)"><i class="ti ti-check"></i> вручён</button>') +
-        '</div>' +
+  } else {
+    const visible = Number(journal.visible_count || 0);
+    const warn = visible <= 1;
+    h += '<div class="dl-sync-banner' + (warn ? ' warn' : '') + '">' +
+      '<i class="ti ' + (warn ? 'ti-alert-triangle' : 'ti-cloud-check') + '"></i><div>' +
+        '<b>API кабинета видит ' + visible + ' ' + _dellinOrdersWord(visible) + ' за ' + (journal.days || 90) + ' дней</b>' +
+        (journal.last_sync_at ? '<span>Синхронизация: ' + escapeHtml(_dellinShortDate(journal.last_sync_at)) + '</span>' : '') +
+        (warn ? '<span>Если в личном кабинете заказов больше — нажмите <b>⚙</b> и вставьте PAT пользователя с полным доступом.</span>' : '') +
+        (journal.error ? '<span class="err">' + escapeHtml(journal.error) + '</span>' : '') +
       '</div>' +
-      (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
-      '<button class="cdek-del" onclick="dellinRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div class="dl-summary">' +
+      '<span><b>' + Number(summary.incoming || 0) + '</b> к нам</span>' +
+      '<span><b>' + Number(summary.outgoing || 0) + '</b> от нас</span>' +
+      '<span><b>' + Number(summary.payer || 0) + '</b> мы платим</span>' +
     '</div>';
-  });
+  }
+
+  if (!active.length) {
+    h += '<div class="logi-empty"><i class="ti ti-truck"></i> Отправлений пока нет' +
+      (dl.configured ? ' — журнал будет обновляться автоматически.' : ' — подключите кабинет или добавьте номер вручную.') +
+      '</div>';
+  } else {
+    h += '<div class="dl-subhead">Активные заказы <span>' + active.length + '</span></div>' +
+      active.map(_dellinOrderCard).join('');
+  }
+
+  if (completed.length) {
+    h += '<details class="dl-archive"><summary><i class="ti ti-circle-check"></i> Завершённые заказы <span>' + completed.length + '</span></summary>' +
+      '<div class="dl-archive-list">' + completed.map(_dellinOrderCard).join('') + '</div></details>';
+  }
   return h;
 }
 
@@ -16648,6 +16776,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.821',
+    date: '27.07.2026',
+    title: 'Деловые линии: журнал как в личном кабинете',
+    features: [
+      'CRM автоматически загружает <b>весь журнал за 90 дней</b>, а не только вручную добавленные накладные',
+      'В карточке видны номер заказа и накладной, направление, маршрут, отправитель/получатель, груз, сумма, оплата, прогресс и актуальный статус',
+      'Добавлено безопасное переподключение PAT: можно выбрать пользователя кабинета с полным доступом ко всем нужным контрагентам',
+    ],
+  },
   {
     version: 'v2.45.820',
     date: '27.07.2026',
