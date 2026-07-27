@@ -21927,3 +21927,74 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .dl-order-tags { justify-content: flex-start; }
   .dl-route > span { white-space: normal; }
 }
+
+
+/* ============ v2.45.825: Расчёты — тикеты с чатом и «мячом» 🏓 ============ */
+.calcs-desk { display: grid; grid-template-columns: 400px 1fr; gap: 0; background: #fff; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; height: calc(100vh - 215px); min-height: 460px; }
+.calcs-list { border-right: 1px solid var(--border); background: #FAFBFD; display: flex; flex-direction: column; min-width: 0; }
+.calcs-list .calc-filters { padding: 12px 12px 8px; margin-bottom: 0; flex-wrap: wrap; }
+.calcs-rows { overflow-y: auto; flex: 1; }
+.calc-grp { font-size: 10px; font-weight: 800; letter-spacing: .5px; color: #94A3B8; padding: 10px 14px 4px; text-transform: uppercase; }
+.calc-grp.mine { color: #1D4ED8; }
+.calc-trow { display: flex; gap: 10px; padding: 11px 12px 11px 14px; cursor: pointer; border-left: 4px solid transparent; }
+.calc-trow:hover { background: #F1F5FB; }
+.calc-trow.mine { border-left-color: #2563EB; background: linear-gradient(90deg, rgba(37,99,235,.07), transparent 65%); }
+.calc-trow.sel { background: #fff; box-shadow: inset 0 -1px 0 var(--border), inset 0 1px 0 var(--border); }
+.calc-tav { width: 38px; height: 38px; border-radius: 11px; color: #fff; font-weight: 800; font-size: 11px; display: flex; align-items: center; justify-content: center; flex: none; }
+.cb-0 { background: linear-gradient(135deg,#60A5FA,#2563EB); }
+.cb-1 { background: linear-gradient(135deg,#F472B6,#DB2777); }
+.cb-2 { background: linear-gradient(135deg,#34D399,#059669); }
+.cb-3 { background: linear-gradient(135deg,#FBBF24,#D97706); }
+.cb-4 { background: linear-gradient(135deg,#A78BFA,#7C3AED); }
+.cb-5 { background: linear-gradient(135deg,#2DD4BF,#0D9488); }
+.calc-trow .m { flex: 1; min-width: 0; }
+.calc-trow .t1 { display: flex; align-items: center; gap: 6px; }
+.calc-trow .t1 b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calc-trow .tm { margin-left: auto; font-size: 10px; color: #94A3B8; flex: none; }
+.calc-trow .prev { font-size: 11px; color: #8A94A6; margin-top: 3px; display: flex; align-items: center; gap: 5px; min-width: 0; }
+.calc-trow .prev .pv { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.calc-trow .prev .mc { flex: none; font-size: 10px; color: #94A3B8; }
+.calc-ball { display: inline-flex; align-items: center; gap: 3px; border-radius: 99px; font-size: 9.5px; font-weight: 800; padding: 2px 8px; flex: none; white-space: nowrap; }
+.calc-ball.me { background: #2563EB; color: #fff; }
+.calc-ball.other { background: #F8FAFC; border: 1px solid var(--border); color: #475569; }
+.calc-ball.other.cb-0 { color: #1D4ED8; border-color: #BFDBFE; background: #EFF6FF; }
+.calc-ball.other.cb-1 { color: #BE185D; border-color: #FBCFE8; background: #FDF2F8; }
+.calc-ball.other.cb-2 { color: #047857; border-color: #A7F3D0; background: #ECFDF5; }
+.calc-ball.other.cb-3 { color: #B45309; border-color: #FDE68A; background: #FFFBEB; }
+.calc-ball.other.cb-4 { color: #6D28D9; border-color: #DDD6FE; background: #F5F3FF; }
+.calc-ball.other.cb-5 { color: #0F766E; border-color: #99F6E4; background: #F0FDFA; }
+.calc-hot { font-size: 9.5px; font-weight: 800; color: #DC2626; flex: none; }
+
+.calcs-pane { display: flex; flex-direction: column; min-width: 0; }
+.calc-ph { padding: 14px 18px 12px; border-bottom: 1px solid var(--border); }
+.calc-ph .row1 { display: flex; align-items: center; gap: 10px; }
+.calc-ph h3 { font-size: 15px; margin: 0; }
+.calc-ph .sub { font-size: 12px; color: var(--text-light); margin-top: 3px; }
+.calc-ph .ta { font-size: 11px; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; background: #fff; color: #475569; cursor: pointer; font-family: inherit; }
+.calc-ballbar { margin-top: 11px; display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 10px 14px; }
+.calc-ballbar.me { background: linear-gradient(135deg,#EFF6FF,#E0EAFF); border: 1.5px solid #BFDBFE; }
+.calc-ballbar.other { background: #F8FAFC; border: 1.5px solid var(--border); }
+.calc-ballbar .big { font-size: 22px; }
+.calc-ballbar .t { flex: 1; min-width: 0; }
+.calc-ballbar .t b { font-size: 13.5px; color: #1D4ED8; display: block; }
+.calc-ballbar.other .t b { color: var(--text-dark); }
+.calc-ballbar .t span { font-size: 11px; color: #64748B; }
+.calc-passbtn { background: #2563EB; color: #fff; border: none; border-radius: 10px; padding: 9px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap; font-family: inherit; }
+.calc-passbtn.ghost { background: #fff; color: #475569; border: 1.5px solid var(--border); }
+.calc-chat { flex: 1; background: #F4F7FB; padding: 14px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.calc-bub { max-width: 72%; align-self: flex-start; background: #fff; border-radius: 12px 12px 12px 4px; padding: 8px 12px; font-size: 12.5px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.calc-bub .w { font-size: 10px; font-weight: 800; color: #7C3AED; margin-bottom: 2px; }
+.calc-bub .tm { font-size: 9px; color: #B6BFCC; margin-top: 3px; text-align: right; }
+.calc-bub.me { align-self: flex-end; background: #DBEAFE; border-radius: 12px 12px 4px 12px; }
+.calc-bub.me .w { color: #1D4ED8; }
+.calc-sys { align-self: center; background: #fff; border: 1px dashed #CBD5E1; color: #64748B; border-radius: 99px; padding: 4px 14px; font-size: 11px; font-weight: 700; text-align: center; }
+.calc-in { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.calc-in input { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+.calc-in button { background: var(--brand); color: #fff; border: none; border-radius: 10px; width: 42px; cursor: pointer; font-size: 15px; }
+.calc-pass-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.calc-pass-row:hover { background: #F7FAFF; }
+@media (max-width: 900px) {
+  .calcs-desk { grid-template-columns: 1fr; height: auto; border: none; background: transparent; }
+  .calcs-list { border: 1px solid var(--border); border-radius: 14px; background: #fff; }
+  .calcs-pane { display: none; }
+}

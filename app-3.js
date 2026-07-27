@@ -6948,45 +6948,245 @@ function renderSalesCalcs() {
   if (!box || !_calcs) return;
   const all = _calcs.calcs || [];
   const counts = _calcs.counts || {};
-  const active = (counts.new || 0) + (counts.in_progress || 0) + (counts.done || 0);
+  const mineN = all.filter(c => c.ball_mine && ['new', 'in_progress', 'done'].indexOf(c.status) >= 0).length;
+  const activeN = (counts.new || 0) + (counts.in_progress || 0) + (counts.done || 0);
   const FILTERS = [
-    ['active', 'В работе', active],
+    ['mine', '🏓 На мне', mineN],
+    ['active', 'В работе', activeN],
     ['to_offer', 'Стали КП', counts.to_offer || 0],
     ['all', 'Все', all.length],
   ];
-  let h = '<div class="calc-filters">' + FILTERS.map(f =>
-    '<button class="mm-filter' + (_calcsFilter === f[0] ? ' on' : '') + '" onclick="calcSetFilter(\'' + f[0] + '\')">' +
-    f[1] + ' <span class="c">' + f[2] + '</span></button>').join('') + '</div>';
   let list = all;
+  if (_calcsFilter === 'mine') list = all.filter(c => c.ball_mine && ['new', 'in_progress', 'done'].indexOf(c.status) >= 0);
   if (_calcsFilter === 'active') list = all.filter(c => ['new', 'in_progress', 'done'].indexOf(c.status) >= 0);
   if (_calcsFilter === 'to_offer') list = all.filter(c => c.status === 'to_offer');
+
+  // v2.45.825: мои (мяч у меня) — всегда сверху
+  const mine = list.filter(c => c.ball_mine);
+  const theirs = list.filter(c => !c.ball_mine);
+
+  let lh = '<div class="calc-filters">' + FILTERS.map(f =>
+    '<button class="mm-filter' + (_calcsFilter === f[0] ? ' on' : '') + '" onclick="calcSetFilter(\'' + f[0] + '\')">' +
+    f[1] + ' <span class="c">' + f[2] + '</span></button>').join('') + '</div>';
+
   if (!list.length) {
-    h += '<div class="logi-empty"><i class="ti ti-calculator"></i> Расчётов нет — создай первый: «＋ Новый расчёт».</div>';
-    box.innerHTML = h;
+    box.innerHTML = lh + '<div class="logi-empty"><i class="ti ti-calculator"></i> Расчётов нет — создай первый: «＋ Новый расчёт».</div>';
     return;
   }
-  list.forEach(c => {
-    const client = c.contractor_name || c.client_name || '';
-    const d = String(c.created_at || '').slice(0, 10);
-    const dd = d ? d.slice(8, 10) + '.' + d.slice(5, 7) : '';
-    // v2.45.820: номер — квадратной плашкой слева, воздух в карточке
-    h += '<div class="calc-card" onclick="calcOpen(' + c.id + ')">' +
-      '<div class="calc-ava">Р-' + c.id + '</div>' +
-      '<div class="calc-main">' +
-        '<div class="calc-t1">' + escapeHtml(c.title) + ' ' + _calcStatusChip(c) + '</div>' +
-        '<div class="calc-t2">' +
-          (client ? '🏢 ' + escapeHtml(client) + ' · ' : '') +
-          (c.assignee_name ? 'считает: <b>' + escapeHtml(c.assignee_name) + '</b> · ' : '') +
-          (dd ? 'от ' + dd : '') +
-          (c.offer_id ? ' · КП №' + c.offer_id : '') + '</div>' +
-        (c.last_msg ? '<div class="calc-last">💬 ' + escapeHtml(String(c.last_msg).slice(0, 90)) + '</div>' : '') +
-      '</div>' +
-      (c.chat_id ? '<button class="pl-btn pri sm" onclick="event.stopPropagation();openTeamChat(' + c.chat_id + ')"><i class="ti ti-messages"></i> Чат' +
-        (c.msg_count ? ' · ' + c.msg_count : '') + '</button>' : '') +
+
+  let rows = '';
+  const _rowsOf = (arr) => arr.map(c => _calcRowHtml(c)).join('');
+  if (mine.length) rows += '<div class="calc-grp mine">🏓 Мяч у тебя — ждут твоего шага</div>' + _rowsOf(mine);
+  if (theirs.length) rows += (mine.length ? '<div class="calc-grp">У других</div>' : '') + _rowsOf(theirs);
+
+  // выбранный расчёт: сохранённый или первый «мой», или первый
+  if (!state._calcSel || !list.some(c => c.id === state._calcSel)) {
+    state._calcSel = (mine[0] || theirs[0] || list[0]).id;
+  }
+
+  box.innerHTML =
+    '<div class="calcs-desk">' +
+      '<div class="calcs-list">' + lh + '<div class="calcs-rows">' + rows + '</div></div>' +
+      '<div class="calcs-pane" id="calcs-pane"><div class="loading-block">Загрузка…</div></div>' +
     '</div>';
-  });
-  box.innerHTML = h;
+  renderCalcPane(state._calcSel);
 }
+
+// цвет участника по имени — стабильный
+function _calcColorIdx(name) {
+  let h = 0; const s2 = String(name || '');
+  for (let i = 0; i < s2.length; i++) h = (h * 31 + s2.charCodeAt(i)) & 0xffff;
+  return h % 6;
+}
+function _calcInitials(name) {
+  return String(name || '?').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+}
+
+function _calcRowHtml(c) {
+  const client = c.contractor_name || c.client_name || '';
+  const d = String(c.created_at || '').slice(0, 10);
+  const dd = d ? d.slice(8, 10) + '.' + d.slice(5, 7) : '';
+  const sel = state._calcSel === c.id;
+  const days = Number(c.ball_days || 0);
+  const hot = days >= 3;
+  let ballChip = '';
+  if (c.ball_mine) {
+    ballChip = '<span class="calc-ball me">🏓 на тебе' + (days > 0 ? ' · ' + days + ' д.' : '') + '</span>';
+  } else if (c.ball_holder_name) {
+    ballChip = '<span class="calc-ball other cb-' + _calcColorIdx(c.ball_holder_name) + '">🏓 у ' +
+      escapeHtml(c.ball_holder_name) + (days > 0 ? ' · ' + days + ' д.' : '') + '</span>';
+  }
+  const prev = c.last_msg ? escapeHtml(String(c.last_msg).slice(0, 60)) : (client ? '🏢 ' + escapeHtml(client) : '');
+  return '<div class="calc-trow' + (c.ball_mine ? ' mine' : '') + (sel ? ' sel' : '') + '" onclick="calcSelect(' + c.id + ')">' +
+    '<span class="calc-tav cb-' + _calcColorIdx(client || c.title) + '">' + escapeHtml(_calcInitials(client || c.title)) + '</span>' +
+    '<div class="m">' +
+      '<div class="t1"><b>Р-' + c.id + ' · ' + escapeHtml(c.title) + '</b>' +
+        '<span class="tm">' + dd + '</span></div>' +
+      '<div class="prev">' + ballChip + (hot ? '<span class="calc-hot">завис ⚠</span>' : '') +
+        '<span class="pv">' + prev + '</span>' +
+        (c.msg_count ? '<span class="mc">💬 ' + c.msg_count + '</span>' : '') + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function calcSelect(id) {
+  state._calcSel = id;
+  // на телефоне открываем привычную карточку-модалку (панель скрыта CSS'ом)
+  if (window.innerWidth <= 900) { calcOpen(id); return; }
+  document.querySelectorAll('.calc-trow').forEach(el => el.classList.remove('sel'));
+  renderSalesCalcs();
+}
+
+// ---------- правая панель: мяч + чат ----------
+async function renderCalcPane(calcId) {
+  const pane = document.getElementById('calcs-pane');
+  if (!pane) return;
+  const c = (_calcs && _calcs.calcs || []).find(x => x.id === calcId);
+  if (!c) { pane.innerHTML = '<div class="empty-block">Выбери расчёт слева</div>'; return; }
+  const days = Number(c.ball_days || 0);
+  let ballbar;
+  if (c.ball_mine) {
+    ballbar = '<div class="calc-ballbar me"><span class="big">🏓</span>' +
+      '<div class="t"><b>Мяч у тебя' + (days > 0 ? ' — ' + days + ' ' + _plural(days, ['день', 'дня', 'дней']) : '') + '</b>' +
+      '<span>' + (c.ball_note ? 'передали со словами: «' + escapeHtml(c.ball_note) + '»' : 'твой ход — сделай шаг и передай дальше') + '</span></div>' +
+      '<div class="calc-passwrap" id="calc-passwrap-' + c.id + '"><button class="calc-passbtn" onclick="calcPassOpen(' + c.id + ')">🏓 Передать мяч</button></div></div>';
+  } else if (c.ball_holder_name) {
+    ballbar = '<div class="calc-ballbar other"><span class="big">🏓</span>' +
+      '<div class="t"><b>Мяч у ' + escapeHtml(c.ball_holder_name) +
+      (days > 0 ? ' — уже ' + days + ' ' + _plural(days, ['день', 'дня', 'дней']) : '') + '</b>' +
+      '<span>' + (c.ball_note ? '«' + escapeHtml(c.ball_note) + '»' : 'ждём его шага') + '</span></div>' +
+      '<div class="calc-passwrap" id="calc-passwrap-' + c.id + '"><button class="calc-passbtn ghost" onclick="calcPassOpen(' + c.id + ')">Забрать / передать</button></div></div>';
+  } else {
+    ballbar = '<div class="calc-ballbar other"><span class="big">🏓</span>' +
+      '<div class="t"><b>Мяч ничей</b><span>назначь, чей сейчас ход</span></div>' +
+      '<div class="calc-passwrap" id="calc-passwrap-' + c.id + '"><button class="calc-passbtn" onclick="calcPassOpen(' + c.id + ')">🏓 Назначить</button></div></div>';
+  }
+  pane.innerHTML =
+    '<div class="calc-ph">' +
+      '<div class="row1"><h3>Р-' + c.id + ' · ' + escapeHtml(c.title) + '</h3>' +
+        '<span style="margin-left:auto;display:flex;gap:6px;">' +
+        '<button class="ta" onclick="calcOpen(' + c.id + ')"><i class="ti ti-id"></i> Карточка</button></span></div>' +
+      ((c.contractor_name || c.client_name) ? '<div class="sub">🏢 ' + escapeHtml(c.contractor_name || c.client_name) +
+        (c.assignee_name ? ' · считает: <b>' + escapeHtml(c.assignee_name) + '</b>' : '') + '</div>' : '') +
+      ballbar +
+    '</div>' +
+    '<div class="calc-chat" id="calc-chat-' + c.id + '"><div class="loading-block">Чат…</div></div>' +
+    '<div class="calc-in">' +
+      '<input id="calc-chat-inp" placeholder="Написать в чат расчёта…" ' +
+        'onkeydown="if(event.key===\'Enter\')calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')">' +
+      '<button onclick="calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')"><i class="ti ti-send"></i></button>' +
+    '</div>';
+  _calcChatLoad(c.id, c.chat_id);
+  _calcStartPolling();
+}
+
+async function _calcChatLoad(calcId, chatId) {
+  const boxEl = document.getElementById('calc-chat-' + calcId);
+  if (!boxEl) return;
+  if (!chatId) { boxEl.innerHTML = '<div class="empty-block">У расчёта нет чата</div>'; return; }
+  try {
+    const d = await apiGet('/api/team-chats/' + chatId + '/messages');
+    const msgs = d.messages || [];
+    const me = d.my_chat_id;
+    const key = msgs.length + ':' + (msgs.length ? msgs[msgs.length - 1].id : 0);
+    if (boxEl.dataset.key === key) return;   // без изменений — не дёргаем DOM
+    boxEl.dataset.key = key;
+    boxEl.innerHTML = msgs.length ? msgs.map(m => {
+      if (m.is_system) {
+        return '<div class="calc-sys">' + escapeHtml(m.text) + '</div>';
+      }
+      const mine = m.author_chat_id === me;
+      const t = String(m.created_at || '');
+      const tm = t.slice(8, 10) + '.' + t.slice(5, 7) + ' ' + t.slice(11, 16);
+      return '<div class="calc-bub' + (mine ? ' me' : '') + '">' +
+        '<div class="w">' + escapeHtml(mine ? 'Ты' : (m.author_name || '')) + '</div>' +
+        escapeHtml(m.text).replace(/\n/g, '<br>') +
+        '<div class="tm">' + tm + '</div></div>';
+    }).join('') : '<div style="text-align:center;color:var(--text-faint);font-size:12px;padding:16px;">Сообщений пока нет</div>';
+    boxEl.scrollTop = boxEl.scrollHeight;
+  } catch (e) {
+    boxEl.innerHTML = '<div class="empty-block" style="font-size:12px;">Чат доступен участникам расчёта.<br>Передай себе мяч — и ты в чате.</div>';
+  }
+}
+
+async function calcChatSend(calcId, chatId) {
+  if (!chatId) return;
+  const inp = document.getElementById('calc-chat-inp');
+  const v = inp ? inp.value.trim() : '';
+  if (!v) return;
+  if (inp) inp.value = '';
+  try {
+    const r = await apiPost('/api/team-chats/' + chatId + '/messages', { text: v });
+    if (!(r && r.ok)) {
+      showToast(((r && r.data) || {}).message || 'Не отправилось', 'error');
+      if (inp) inp.value = v;
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); if (inp) inp.value = v; }
+  const boxEl = document.getElementById('calc-chat-' + calcId);
+  if (boxEl) boxEl.dataset.key = '';
+  _calcChatLoad(calcId, chatId);
+}
+
+// ---------- передача мяча ----------
+async function calcPassOpen(calcId) {
+  let members = [];
+  try {
+    const d = await apiGet('/api/sales/calcs/' + calcId + '/members');
+    members = d.members || [];
+  } catch (e) {}
+  const myId = _calcs && _calcs.my_employee_id;
+  const chatFirst = members.filter(m => !m.extra && m.id !== null);
+  const others = members.filter(m => m.extra);
+  let m = document.getElementById('calc-pass-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'calc-pass-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const rowHtml = (x) => '<div class="calc-pass-row" onclick="calcPassGo(' + calcId + ',' + x.id + ',\'' +
+      escapeHtml(String(x.name || '').replace(/'/g, '')) + '\')">' +
+    '<span class="calc-tav cb-' + _calcColorIdx(x.name) + '" style="width:30px;height:30px;font-size:10px;">' + escapeHtml(_calcInitials(x.name)) + '</span>' +
+    '<b>' + escapeHtml(x.name) + '</b>' + (x.id === myId ? ' <span style="color:var(--brand);font-size:11px;">(себе)</span>' : '') +
+    '<i class="ti ti-chevron-right" style="margin-left:auto;color:var(--text-faint);"></i></div>';
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3>🏓 Кому передать мяч?</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'calc-pass-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="overflow-y:auto;">' +
+        '<div class="form-group"><label>Комментарий — что сделать (пойдёт в чат и пуш)</label>' +
+        '<input id="calc-pass-note" placeholder="напр.: посчитал, покажи заказчику" maxlength="200"></div>' +
+        (chatFirst.length ? '<div style="font-size:11px;font-weight:800;color:var(--text-light);margin:6px 0 4px;">УЧАСТНИКИ РАСЧЁТА</div>' + chatFirst.map(rowHtml).join('') : '') +
+        (others.length ? '<div style="font-size:11px;font-weight:800;color:var(--text-light);margin:10px 0 4px;">ОСТАЛЬНЫЕ</div>' + others.map(rowHtml).join('') : '') +
+      '</div></div>';
+  document.body.appendChild(m);
+}
+
+async function calcPassGo(calcId, toId, toName) {
+  const note = (document.getElementById('calc-pass-note') || {}).value || '';
+  const m = document.getElementById('calc-pass-modal');
+  if (m) m.remove();
+  try {
+    const r = await apiPost('/api/sales/calcs/' + calcId + '/ball', { to_employee_id: toId, note: note.trim() });
+    if (r && r.ok) showToast('🏓 Мяч у ' + toName, 'success');
+    else showToast(((r && r.data) || {}).message || 'Не удалось передать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  loadSalesCalcs();
+}
+
+// ---------- живое обновление, пока открыт экран ----------
+let _calcPollTimer = null;
+function _calcStartPolling() {
+  if (_calcPollTimer) return;
+  _calcPollTimer = setInterval(async () => {
+    if (state.currentScreen !== 'sales-calcs') {
+      clearInterval(_calcPollTimer); _calcPollTimer = null; return;
+    }
+    if (document.hidden) return;
+    const c = (_calcs && _calcs.calcs || []).find(x => x.id === state._calcSel);
+    if (c && c.chat_id) _calcChatLoad(c.id, c.chat_id);
+  }, 5000);
+}
+
 // v2.45.726: выбор контрагента поиском — селект на сотни позиций не годится
 var _calcCoPicked = null;
 function _calcCoComboHtml(current) {
