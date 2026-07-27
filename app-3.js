@@ -6985,7 +6985,7 @@ function renderSalesCalcs() {
   }
 
   box.innerHTML =
-    '<div class="calcs-desk">' +
+    '<div class="calcs-desk' + (state._calcPaneOpen ? ' pane-open' : '') + '">' +
       '<div class="calcs-list">' + lh + '<div class="calcs-rows">' + rows + '</div></div>' +
       '<div class="calcs-pane" id="calcs-pane"><div class="loading-block">Загрузка…</div></div>' +
     '</div>';
@@ -7031,9 +7031,13 @@ function _calcRowHtml(c) {
 
 function calcSelect(id) {
   state._calcSel = id;
-  // на телефоне открываем привычную карточку-модалку (панель скрыта CSS'ом)
-  if (window.innerWidth <= 900) { calcOpen(id); return; }
-  document.querySelectorAll('.calc-trow').forEach(el => el.classList.remove('sel'));
+  // на телефоне список и тред — два экрана: тап открывает тред, «назад» возвращает
+  if (window.innerWidth <= 900) state._calcPaneOpen = true;
+  renderSalesCalcs();
+}
+
+function calcBack() {
+  state._calcPaneOpen = false;
   renderSalesCalcs();
 }
 
@@ -7063,7 +7067,9 @@ async function renderCalcPane(calcId) {
   }
   pane.innerHTML =
     '<div class="calc-ph">' +
-      '<div class="row1"><h3>Р-' + c.id + ' · ' + escapeHtml(c.title) + '</h3>' +
+      '<div class="row1">' +
+        '<button class="calc-back" onclick="calcBack()"><i class="ti ti-chevron-left"></i></button>' +
+        '<h3>Р-' + c.id + ' · ' + escapeHtml(c.title) + '</h3>' +
         '<span style="margin-left:auto;display:flex;gap:6px;">' +
         '<button class="ta" onclick="calcOpen(' + c.id + ')"><i class="ti ti-id"></i> Карточка</button></span></div>' +
       ((c.contractor_name || c.client_name) ? '<div class="sub">🏢 ' + escapeHtml(c.contractor_name || c.client_name) +

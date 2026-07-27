@@ -21993,8 +21993,23 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .calc-in button { background: var(--brand); color: #fff; border: none; border-radius: 10px; width: 42px; cursor: pointer; font-size: 15px; }
 .calc-pass-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
 .calc-pass-row:hover { background: #F7FAFF; }
+.calc-back { display: none; }
 @media (max-width: 900px) {
-  .calcs-desk { grid-template-columns: 1fr; height: auto; border: none; background: transparent; }
+  /* два экрана: список ↔ тред (как в переписке) */
+  .calcs-desk { display: block; height: auto; min-height: 0; border: none; background: transparent; overflow: visible; }
   .calcs-list { border: 1px solid var(--border); border-radius: 14px; background: #fff; }
   .calcs-pane { display: none; }
+  .calcs-desk.pane-open .calcs-list { display: none; }
+  .calcs-desk.pane-open .calcs-pane { display: flex; border: 1px solid var(--border); border-radius: 14px; background: #fff; overflow: hidden; height: calc(100vh - 185px); height: calc(100dvh - 185px); min-height: 420px; }
+  .calc-back { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: #475569; cursor: pointer; font-size: 16px; }
+  .calc-ph { padding: 12px 12px 10px; }
+  .calc-ph h3 { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .calc-ballbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .calc-ballbar .t { flex: 1 1 60%; }
+  .calc-passwrap { flex: 1 1 100%; }
+  .calc-passwrap .calc-passbtn { width: 100%; }
+  .calc-chat { padding: 12px; }
+  .calc-bub { max-width: 86%; }
+  .calc-in { padding: 10px 12px; }
+  .calc-in input { font-size: 16px; }   /* iOS: меньше 16px — зум при фокусе */
 }
