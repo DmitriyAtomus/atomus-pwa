@@ -1,8 +1,8 @@
 const API_BASE = "https://worker-production-9b70.up.railway.app";
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.826";
-const APP_VERSION_DATE = "27.07.2026";
+const APP_VERSION = "v2.45.829";
+const APP_VERSION_DATE = "28.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1480,12 +1480,23 @@ function _railBadges() {
     if (over) b.production = { n: over, cls: 'r' };
   } catch (e) {}
   try {
-    const cwp = cache.contractsWithProgress || [];
-    if (cwp.length) {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const over = cwp.filter(c => c.delivery_date && c.status !== 'shipped' && c.status !== 'closed' &&
-        (new Date(c.delivery_date + 'T00:00:00') < today)).length;
-      if (over) b.sales = { n: over, cls: 'r' };
+    // Счётчик продаж должен совпадать с «Просроченными договорами» на главной.
+    // contracts-with-progress не содержит часть частично отгруженных договоров,
+    // из-за чего рельса показывала 3, а блок внимания — 4.
+    const alertsReady = !!(cache.homeExtras && Array.isArray(cache.homeExtras.alerts));
+    if (alertsReady) {
+      const overdue = cache.homeExtras.alerts.find(a => a.kind === 'overdue' && a.link === 'contracts');
+      const n = Number(overdue && overdue.count) || 0;
+      if (n) b.sales = { n: n, cls: 'r' };
+    } else {
+      // Фолбэк до первой загрузки главной.
+      const cwp = cache.contractsWithProgress || [];
+      if (cwp.length) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const over = cwp.filter(c => c.delivery_date && c.status !== 'shipped' && c.status !== 'closed' &&
+          (new Date(c.delivery_date + 'T00:00:00') < today)).length;
+        if (over) b.sales = { n: over, cls: 'r' };
+      }
     }
   } catch (e) {}
   try {

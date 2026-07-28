@@ -1582,6 +1582,9 @@ async function loadHomeDashboardExtras() {
     renderHomeTopAssemblers();
     // v2.45.631: плитка «производство» в Пульсе показывает очередь из воронки
     if (cache.homeKpi) renderHomeKpi();
+    // Счётчики разделов используют те же алерты; обновляем рельсу сразу,
+    // чтобы «Продажи» совпадали с блоком «Требует внимания».
+    if (typeof renderSectionRail === 'function') renderSectionRail();
   } catch (e) {
     const f = document.getElementById('home-funnel-block');
     if (f) f.innerHTML = '<div class="empty-block" style="margin: 0 14px;"><i class="ti ti-alert-triangle"></i>Не удалось загрузить воронку</div>';
