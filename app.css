@@ -20384,33 +20384,39 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .app.desktop-layout:not(.rail-off) .top-bar .section-switcher-wrap,
 .app.desktop-layout:not(.rail-off) .top-bar .section-scroll-pair { display: none; }
 
-/* v2.45.747: кнопки рельсы крупнее и с явными состояниями */
+/* v2.45.827: рельса — круглые кнопки со свечением + иконки «по смыслу» */
 .rail-i {
-  width: 62px; padding: 9px 2px 8px; border-radius: 14px; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 66px; padding: 4px 0 5px; border-radius: 12px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   color: #93A9C2; font-size: 9.5px; font-weight: 700; text-align: center;
   position: relative; flex-shrink: 0; user-select: none;
-  background: rgba(255,255,255,.04);
-  transition: background .13s, color .13s, transform .1s;
+  transition: color .13s, transform .1s;
 }
-.rail-i .ti { font-size: 22px; }
-.rail-i:hover { background: rgba(255,255,255,.13); color: #fff; }
+.rail-i .ti {
+  width: 40px; height: 40px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; border: 1.5px solid transparent;
+  transition: background .13s, box-shadow .13s, border-color .13s;
+}
+.rail-i:hover { color: #E7EEF7; }
+.rail-i:hover .ti { background: rgba(255, 255, 255, .09); }
 .rail-i:active { transform: scale(.96); }
-.rail-i.on {
-  background: #fff; color: var(--brand); font-weight: 800;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, .28);
+.rail-i.on { color: #fff; font-weight: 800; }
+.rail-i.on .ti {
+  background: radial-gradient(circle at 32% 28%, rgba(124, 184, 255, .4), rgba(37, 99, 235, .15));
+  border-color: #5FA5FF; color: #9CCBFF;
+  box-shadow: 0 0 0 3px rgba(76, 154, 255, .18), 0 0 16px rgba(59, 130, 246, .4);
 }
-.rail-i.on .ti { transform: scale(1.05); }
 .rail-b {
-  position: absolute; top: 2px; right: 5px; min-width: 17px; height: 17px;
+  position: absolute; top: 0; right: 8px; min-width: 17px; height: 17px;
   border-radius: 999px; font-size: 9px; font-weight: 800;
   display: flex; align-items: center; justify-content: center; padding: 0 4px;
-  border: 2px solid #122A47;
+  border: 2px solid #122A47; z-index: 2;
 }
 .rail-b.r { background: #EF4444; color: #fff; }
 .rail-b.y { background: #F59E0B; color: #431407; }
 .rail-sp { flex: 1; }
-.rail-toggle { opacity: .6; }
+.rail-toggle { opacity: .45; }
 .rail-toggle:hover { opacity: 1; }
 
 /* Кнопка «вернуть рельсу», когда включены верхние табы */
@@ -22070,3 +22076,16 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .calc-in { padding: 10px 12px; }
   .calc-in input { font-size: 16px; }   /* iOS: меньше 16px — зум при фокусе */
 }
+
+/* ============ v2.45.827: мобильные табы разделов — в стиле рельсы ============ */
+.m-section-tabs button { padding: 5px 12px 5px 6px; border-radius: 99px; gap: 6px; }
+.m-section-tabs button i {
+  font-size: 14px; width: 26px; height: 26px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: #EEF3FA; color: #5B6B80; transition: background .13s, color .13s;
+}
+.m-section-tabs button.active {
+  background: linear-gradient(135deg, #3B82F6, #2563EB); color: #fff;
+  font-weight: 700; box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
+}
+.m-section-tabs button.active i { background: rgba(255, 255, 255, .22); color: #fff; }

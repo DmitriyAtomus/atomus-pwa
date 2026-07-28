@@ -8173,16 +8173,16 @@ async function chooseContractForDefect(contractId) {
  */
 // ===== v2.45.638: динамические блоки шторки — лента разделов, поиск, «Сегодня» =====
 const DRW_SECTIONS = [
-  { code: 'home',         icon: 'ti-home',               label: 'Главная' },
-  { code: 'production',   icon: 'ti-tool',               label: 'Производ.' },
-  { code: 'sales',        icon: 'ti-briefcase',          label: 'Продажи' },
-  { code: 'tasks',        icon: 'ti-checklist',          label: 'Задачи' },
-  { code: 'warehouse',    icon: 'ti-building-warehouse', label: 'Склад' },
-  { code: 'supply',       icon: 'ti-shopping-cart',      label: 'Снабжен.' },
-  { code: 'mail',         icon: 'ti-mail',               label: 'Почта/MAX' },
-  { code: 'defects',      icon: 'ti-alert-circle',       label: 'Сервис' },
-  { code: 'installation', icon: 'ti-tools',              label: 'Монтаж' },
-  { code: 'hr',           icon: 'ti-id-badge',           label: 'Кадры' },
+  { code: 'home',         icon: 'ti-smart-home',         label: 'Главная' },
+  { code: 'production',   icon: 'ti-building-factory-2', label: 'Производ.' },
+  { code: 'sales',        icon: 'ti-report-money',       label: 'Продажи' },
+  { code: 'tasks',        icon: 'ti-list-check',         label: 'Задачи' },
+  { code: 'warehouse',    icon: 'ti-packages',           label: 'Склад' },
+  { code: 'supply',       icon: 'ti-basket',             label: 'Снабжен.' },
+  { code: 'mail',         icon: 'ti-messages',           label: 'Почта/MAX' },
+  { code: 'defects',      icon: 'ti-lifebuoy',           label: 'Сервис' },
+  { code: 'installation', icon: 'ti-crane',              label: 'Монтаж' },
+  { code: 'hr',           icon: 'ti-users-group',        label: 'Кадры' },
   { code: 'help',         icon: 'ti-help-circle',        label: 'Помощь' },
 ];
 
