@@ -14631,7 +14631,26 @@ async function loadSupplyOrderDetail() {
 
 function _fmtSupOrdTs(s) {
   if (!s) return '';
-  return String(s).replace('T', ' ').substring(0, 16);
+  const raw = String(s).trim();
+  const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  // SQLite datetime('now') пишет UTC без суффикса. Явно трактуем такие
+  // значения как UTC и показываем единое рабочее время Екатеринбурга.
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+  const d = new Date(hasTimezone ? iso : iso + 'Z');
+  if (isNaN(d.getTime())) return raw.replace('T', ' ').substring(0, 16);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Yekaterinburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return parts.year + '-' + parts.month + '-' + parts.day + ' ' + parts.hour + ':' + parts.minute;
 }
 
 function renderSupplyOrderDetail(o) {
