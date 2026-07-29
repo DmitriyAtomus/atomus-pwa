@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/api/:path*", "destination": "https://worker-production-9b70.up.railway.app/api/:path*" },
+    { "source": "/static/:path*", "destination": "https://worker-production-9b70.up.railway.app/static/:path*" },
     { "source": "/kp/:path*", "destination": "https://worker-production-9b70.up.railway.app/kp/:path*" },
     { "source": "/a/:token", "destination": "/" },
     { "source": "/c/:token", "destination": "/" },

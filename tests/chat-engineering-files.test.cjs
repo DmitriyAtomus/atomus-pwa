@@ -29,10 +29,10 @@ test('чаты позволяют выбрать инженерные и арх�
   }
 });
 
-test('версия интерфейса обновлена вместе с возможностями чата', () => {
-  assert.match(app, /const APP_VERSION = "v2\.45\.831"/);
+test('версия интерфейса обновлена вместе с API-прокси', () => {
+  assert.match(app, /const APP_VERSION = "v2\.45\.832"/);
   assert.match(app, /const APP_VERSION_DATE = "29\.07\.2026"/);
-  assert.match(serviceWorker, /atomus-v1\.8\.831/);
-  assert.equal(version.version, 'v2.45.831');
-  assert.match(version.label, /DWG/);
+  assert.match(serviceWorker, /atomus-v1\.8\.833/);
+  assert.equal(version.version, 'v2.45.832');
+  assert.match(version.label, /API-прокси/);
 });
