@@ -394,6 +394,8 @@ function getContractUrgencyClass(c) {
   if (!c) return 'urg-nodate';
   const status = c.status || '';
   if (status === 'shipped' || status === 'closed') return 'urg-done';
+  // v2.45.833: ждём по просьбе заказчика — это не просрочка нашего срока
+  if (c.on_storage) return 'urg-done';
   if (!c.delivery_date) return 'urg-nodate';
   try {
     const today = new Date();
@@ -8849,6 +8851,16 @@ function statusBadgeHtml(status, label) {
   return '<span class="status-badge status-' + status + '">' + escapeHtml(label || '—') + '</span>';
 }
 
+// v2.45.833: бейдж договора с учётом ответственного хранения. Статус под ним
+// остаётся прежним («Готов к отгрузке»), но в глаза должно бросаться хранение —
+// иначе договор читается как «надо отгружать», а он ждёт по просьбе заказчика.
+function contractBadgeHtml(c) {
+  if (c && c.on_storage) {
+    return '<span class="status-badge status-storage">На ответственном хранении</span>';
+  }
+  return statusBadgeHtml(c.status, c.status_label);
+}
+
 function legalEntityShort(code) {
   if (code === 'ooo_atomus') return 'ООО «Атомус Групп» (с НДС)';
   if (code === 'ooo_td_atomus') return 'ООО ТД «Атомус Групп» (без НДС)';
@@ -9191,7 +9203,7 @@ function renderContractRowInline(c) {
       '</div>' +
     '</div>' +
     '<div style="display: flex; align-items: center;">' +
-      statusBadgeHtml(c.status, c.status_label) +
+      contractBadgeHtml(c) +
     '</div></div>';
 }
 
@@ -9247,10 +9259,13 @@ function renderContractsList() {
     const k = chip.dataset.scf;
     const baseLabels = {
       'all': 'Все', 'production': 'В производстве', 'ready': 'Готов к отгрузке',
+      'storage': 'На хранении',
       'shipped': 'Отгружен', 'closed': 'Закрыт',
     };
     let count = 0;
     if (k === 'all') count = counts.total || 0;
+    // v2.45.833: хранение — отметка, а не статус, поэтому считаем по списку
+    else if (k === 'storage') count = (cache.contracts || []).filter(x => x.on_storage).length;
     else count = counts[k] || 0;
     chip.textContent = baseLabels[k] + (count ? ' · ' + count : '');
     chip.classList.toggle('active', k === filter);
@@ -9265,7 +9280,9 @@ function renderContractsList() {
 
   // Фильтрация
   let list = cache.contracts || [];
-  if (filter !== 'all') {
+  if (filter === 'storage') {
+    list = list.filter(c => c.on_storage);
+  } else if (filter !== 'all') {
     list = list.filter(c => c.status === filter);
   }
   if (search) {
@@ -9340,7 +9357,7 @@ function renderContractsList() {
         '<div class="ct-number">' + escapeHtml(c.number || '—') + '</div>' +
         '<div class="ct-name">' + escapeHtml(c.contractor_name || '—') +
           '<small>' + escapeHtml(desc.join(' · ')) + '</small></div>' +
-        '<div class="ct-status">' + statusBadgeHtml(c.status, c.status_label) + urgPill + '</div>' +
+        '<div class="ct-status">' + contractBadgeHtml(c) + urgPill + '</div>' +
         '<div class="ct-date">' + (c.sign_date ? formatDate(c.sign_date) + '.' + (c.sign_date.split('-')[0].slice(2)) : '—') + '</div>' +
         '<div class="' + deliveryCls + '">' + (c.delivery_date ? formatDate(c.delivery_date) : '—') + '</div>' +
         '<div class="ct-sum">' + (canSeeMoney() ? formatMoney(c.sum_amount) : '') + '</div>' +
@@ -9358,7 +9375,7 @@ function renderContractsList() {
       html += '<div class="contract-card ' + urgCls + '" onclick="openContract(' + c.id + ')">' +
         '<div class="cc-top">' +
           '<span class="cc-num">' + escapeHtml(c.number || '—') + '</span>' +
-          statusBadgeHtml(c.status, c.status_label) +
+          contractBadgeHtml(c) +
         '</div>' +
         '<div class="cc-name">' + escapeHtml(c.contractor_name || '—') + '</div>' +
         '<div class="cc-meta">' +
@@ -9563,7 +9580,7 @@ function renderContractDetail(c) {
   if (c.contractor_contact_person) meta.push(escapeHtml(c.contractor_contact_person));
   if (meta.length) html += '<div class="ch-contractor-meta">' + meta.join(' · ') + '</div>';
   html += '</div>';
-  html += '<div>' + statusBadgeHtml(c.status, c.status_label) + '</div>';
+  html += '<div>' + contractBadgeHtml(c) + '</div>';
   html += '</div>';
 
   // v1.8.762: баннер готовности. Пока «Принято» не нажали — ТВ в цехе повторяет
@@ -9630,8 +9647,28 @@ function renderContractDetail(c) {
         : '';
       html += '<button class="' + cls + '" onclick="changeContractStatus(' + c.id + ', \'' + s.code + '\')"' + titleAttr + '>' +
         escapeHtml(s.label) + '</button>';
+      // v2.45.833: «На ответственном хранении» — не статус, а отметка поверх
+      // «Готов к отгрузке»: всё сделано, но заказчик попросил подождать.
+      // Статус не трогаем специально — иначе поехали бы резервы и планы.
+      if (s.code === 'ready') {
+        let scls = 'status-step s-storage';
+        if (c.on_storage) scls += ' current';
+        html += '<button class="' + scls + '" onclick="toggleContractStorage(' + c.id + ')"' +
+          ' title="' + (c.on_storage
+            ? 'Снять с хранения — договор снова ждёт отгрузки'
+            : 'Всё готово, но заказчик просит подождать — товар остаётся у нас') + '">' +
+          '<i class="ti ti-building-warehouse"></i> На хранении</button>';
+      }
     });
     html += '</div>';
+    if (c.on_storage) {
+      const parts = [];
+      if (c.storage_until) parts.push('до ' + formatDateLong(c.storage_until));
+      if (c.storage_note) parts.push(escapeHtml(c.storage_note));
+      html += '<div class="storage-hint"><i class="ti ti-building-warehouse"></i> ' +
+        'Товар готов и лежит у нас на ответственном хранении' +
+        (parts.length ? ' · ' + parts.join(' · ') : '') + '</div>';
+    }
     // Подсказка про блокеры (краткая)
     if (showLock && readiness.blockers && readiness.blockers.length) {
       const ready = readiness.items_ready || 0;

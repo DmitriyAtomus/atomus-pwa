@@ -2893,6 +2893,9 @@
   /* ЭТАП 40 (v2.20.0): статус «Отгружен частично» — тёплый оранжевый */
   .status-partially_shipped { background: #FEF3C7; color: #B45309; }
   .status-partially_shipped::before { background: #F59E0B; }
+  /* v2.45.833: ответственное хранение — готов, но ждём по просьбе заказчика */
+  .status-storage { background: #E0F2F1; color: #0F766E; }
+  .status-storage::before { background: #0F766E; }
 
   /* Таблица договоров (десктоп) */
   .contracts-table {
@@ -3180,6 +3183,33 @@
     background: #fef3c7;
     border-color: #f59e0b;
     color: #b45309;
+  }
+
+  /* v2.45.833: «На хранении» — отметка поверх статуса, не шаг маршрута.
+     Пунктирная граница отделяет её от статусов, цвет — бирюзовый склад. */
+  .status-step.s-storage {
+    border-style: dashed;
+    color: #0F766E;
+    border-color: #99C9C4;
+  }
+  .status-step.s-storage i { margin-right: 4px; }
+  .status-step.s-storage:hover:not(.current):not(:disabled) {
+    background: #E0F2F1;
+    border-color: #0F766E;
+    color: #0F766E;
+  }
+  .status-step.s-storage.current {
+    background: #0F766E;
+    color: white;
+    border-style: solid;
+    border-color: #0F766E;
+    box-shadow: 0 2px 6px rgba(15, 118, 110, 0.28);
+    cursor: pointer;
+  }
+  .storage-hint {
+    display: flex; align-items: center; gap: 6px;
+    margin: -4px 0 8px 4px;
+    font-size: 12px; color: #0F766E;
   }
   /* Замок 🔒 на «Отгружен» когда не все позиции готовы — кликабельна, но визуально маркируется */
   .status-step.locked {
