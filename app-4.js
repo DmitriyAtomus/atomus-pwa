@@ -2462,6 +2462,51 @@ async function ackContractReady(contractId, kind) {
   }
 }
 
+// ============ v2.45.833: ОТВЕТСТВЕННОЕ ХРАНЕНИЕ ============
+// Всё сделано и готово, но заказчик попросил подождать — товар остаётся у нас.
+// Это ОТМЕТКА, а не статус: договор остаётся «Готов к отгрузке», сборки числятся
+// зарезервированными за ним, дефицит и планы считаются как раньше.
+async function toggleContractStorage(contractId) {
+  if (!contractId) return;
+  const c = state.lastLoadedContract;
+  const on = !(c && c.on_storage);
+  let until = null, note = '';
+  if (on) {
+    const ans = prompt(
+      'Оставляем товар у себя на ответственном хранении.\n\n' +
+      'До какой даты (ГГГГ-ММ-ДД)? Можно оставить пустым.',
+      ''
+    );
+    if (ans === null) return;   // отмена
+    until = (ans || '').trim();
+    if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+      showToast('Дата в формате ГГГГ-ММ-ДД, например 2026-08-20', 'error');
+      return;
+    }
+    const n = prompt('Комментарий (по чьей просьбе, договорённость) — не обязательно:', '');
+    if (n === null) return;
+    note = (n || '').trim();
+  } else {
+    if (!confirm('Снять договор с ответственного хранения?\n\nОн снова будет числиться как ожидающий отгрузки.')) return;
+  }
+  try {
+    const r = await apiPost('/api/contracts/' + contractId + '/storage', {
+      on: on, until: until || null, note: note,
+    });
+    const body = (r && r.data) || {};
+    if (r && r.ok && body.ok) {
+      showToast(on ? 'Договор на ответственном хранении' : 'Снят с хранения', 'success');
+      cache.contracts = null;
+      cache.contractsCounts = null;
+      loadCurrentContract();
+    } else {
+      showToast(body.message || 'Не удалось изменить', 'error');
+    }
+  } catch (e) {
+    showToast((e && e.message) ? e.message : 'Ошибка', 'error');
+  }
+}
+
 // ============ ЭТАП 42.2 (v2.20.0): РУЧНАЯ ПЕРЕСБОРКА РЕЗЕРВОВ ============
 async function rebuildReservations() {
   if (!confirm('Пересобрать резервы по всем активным договорам?\n\nЭто откатит лишние резервы и попробует привязать свободные сборки к открытым договорам.')) {
