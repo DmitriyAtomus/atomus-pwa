@@ -15,6 +15,17 @@ test('все браузерные модули используют same-origin 
   assert.match(read('atomcad/wizard.html'), /var ATOMCAD_API=window\.location\.origin/);
 });
 
+test('CRM повторяет API-запрос напрямую при HTML 403 от Vercel VPN-защиты', () => {
+  const app = read('app-1.js');
+  assert.match(
+    app,
+    /const API_DIRECT_FALLBACK = 'https:\/\/worker-production-9b70\.up\.railway\.app'/
+  );
+  assert.match(app, /response\.status !== 403/);
+  assert.match(app, /!contentType\.includes\('text\/html'\)/);
+  assert.match(app, /_atomusNativeFetch\(fallbackUrl, init\)/);
+});
+
 test('Vercel проксирует API и серверные файлы в Railway', () => {
   const config = JSON.parse(read('vercel.json'));
   const rewrites = new Map(config.rewrites.map((rule) => [rule.source, rule.destination]));
