@@ -2466,44 +2466,126 @@ async function ackContractReady(contractId, kind) {
 // Всё сделано и готово, но заказчик попросил подождать — товар остаётся у нас.
 // Это ОТМЕТКА, а не статус: договор остаётся «Готов к отгрузке», сборки числятся
 // зарезервированными за ним, дефицит и планы считаются как раньше.
-async function toggleContractStorage(contractId) {
+// v2.45.835: вместо системных prompt() — своя модалка с календарём.
+// Срок ставится либо кнопкой («+2 недели»), либо выбором в календаре.
+function toggleContractStorage(contractId) {
   if (!contractId) return;
-  const c = state.lastLoadedContract;
-  const on = !(c && c.on_storage);
-  let until = null, note = '';
-  if (on) {
-    const ans = prompt(
-      'Оставляем товар у себя на ответственном хранении.\n\n' +
-      'До какой даты (ГГГГ-ММ-ДД)? Можно оставить пустым.',
-      ''
-    );
-    if (ans === null) return;   // отмена
-    until = (ans || '').trim();
-    if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
-      showToast('Дата в формате ГГГГ-ММ-ДД, например 2026-08-20', 'error');
-      return;
-    }
-    const n = prompt('Комментарий (по чьей просьбе, договорённость) — не обязательно:', '');
-    if (n === null) return;
-    note = (n || '').trim();
-  } else {
-    if (!confirm('Снять договор с ответственного хранения?\n\nОн снова будет числиться как ожидающий отгрузки.')) return;
+  const c = state.lastLoadedContract || {};
+  const isOn = !!c.on_storage;
+
+  let m = document.getElementById('storage-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'storage-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeStorageModal(); };
+    document.body.appendChild(m);
   }
+
+  const today = new Date();
+  const todayStr = _storageDateStr(today);
+  const quick = [
+    { label: '+1 неделя',  days: 7 },
+    { label: '+2 недели',  days: 14 },
+    { label: '+3 недели',  days: 21 },
+    { label: '+1 месяц',   days: 30 },
+  ];
+  const quickHtml = quick.map(q =>
+    '<button type="button" class="storage-quick" onclick="_storageSetDate(' + q.days + ')">' +
+    q.label + '</button>').join('') +
+    '<button type="button" class="storage-quick" onclick="_storageSetDate(null)">Без срока</button>';
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-building-warehouse"></i> Ответственное хранение</h3>' +
+        '<button class="modal-close" onclick="closeStorageModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="storage-lead">' +
+          (isOn
+            ? 'Товар по договору лежит у нас. Можно продлить срок или снять с хранения.'
+            : 'Всё готово к отгрузке, но заказчик просит подождать — товар остаётся у нас. ' +
+              'Статус договора и резервы на складе не меняются.') +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Хранить до</label>' +
+          '<input type="date" id="storage-until" min="' + todayStr + '" value="' +
+            _storageAttr(c.storage_until) + '">' +
+          '<div class="storage-quick-row">' + quickHtml + '</div>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>Комментарий</label>' +
+          '<input type="text" id="storage-note" maxlength="200" ' +
+            'placeholder="По чьей просьбе, договорённость" value="' +
+            _storageAttr(c.storage_note) + '">' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          (isOn
+            ? '<button class="btn btn-secondary storage-off-btn" onclick="_storageSubmit(' + contractId + ', false)">' +
+              '<i class="ti ti-truck"></i> Снять с хранения</button>'
+            : '') +
+          '<button class="btn btn-secondary" onclick="closeStorageModal()">Отмена</button>' +
+          '<button class="btn btn-primary" id="storage-save-btn" onclick="_storageSubmit(' + contractId + ', true)">' +
+            '<i class="ti ti-check"></i> ' + (isOn ? 'Сохранить' : 'Оставить на хранении') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeStorageModal() {
+  const m = document.getElementById('storage-modal');
+  if (m) m.classList.remove('visible');
+}
+
+// value="" в атрибуте: escapeHtml кавычки не трогает, поэтому свой экранировщик
+function _storageAttr(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _storageDateStr(d) {
+  const p = (n) => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+// Быстрый срок: days=null очищает поле («без срока»)
+function _storageSetDate(days) {
+  const inp = document.getElementById('storage-until');
+  if (!inp) return;
+  if (days === null) { inp.value = ''; return; }
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  inp.value = _storageDateStr(d);
+}
+
+async function _storageSubmit(contractId, on) {
+  const untilEl = document.getElementById('storage-until');
+  const noteEl = document.getElementById('storage-note');
+  const until = on ? ((untilEl && untilEl.value) || '') : '';
+  const note = on ? ((noteEl && noteEl.value) || '').trim() : '';
+  const btn = document.getElementById('storage-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
   try {
     const r = await apiPost('/api/contracts/' + contractId + '/storage', {
       on: on, until: until || null, note: note,
     });
     const body = (r && r.data) || {};
     if (r && r.ok && body.ok) {
+      closeStorageModal();
       showToast(on ? 'Договор на ответственном хранении' : 'Снят с хранения', 'success');
       cache.contracts = null;
       cache.contractsCounts = null;
       loadCurrentContract();
     } else {
       showToast(body.message || 'Не удалось изменить', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Сохранить'; }
     }
   } catch (e) {
     showToast((e && e.message) ? e.message : 'Ошибка', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Сохранить'; }
   }
 }
 
