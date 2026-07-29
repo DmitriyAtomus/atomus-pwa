@@ -3211,6 +3211,27 @@
     margin: -4px 0 8px 4px;
     font-size: 12px; color: #0F766E;
   }
+
+  /* v2.45.835: модалка хранения — календарь вместо системного prompt */
+  .storage-lead {
+    font-size: 13px; line-height: 1.5; color: var(--text-mid);
+    background: #E0F2F1; border-left: 3px solid #0F766E;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 14px;
+  }
+  .storage-quick-row {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  }
+  .storage-quick {
+    padding: 6px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: white;
+    font-size: 12px; color: var(--text-mid); cursor: pointer;
+    transition: all 0.12s;
+  }
+  .storage-quick:hover {
+    border-color: #0F766E; color: #0F766E; background: #E0F2F1;
+  }
+  .storage-off-btn { margin-right: auto; }
+  .storage-off-btn:hover { border-color: #0F766E; color: #0F766E; }
   /* Замок 🔒 на «Отгружен» когда не все позиции готовы — кликабельна, но визуально маркируется */
   .status-step.locked {
     position: relative;
