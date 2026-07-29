@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.832';
+const CACHE_VERSION = 'atomus-v1.8.833';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -103,8 +103,15 @@ self.addEventListener('fetch', (event) => {
   // Только GET запросы кэшируем
   if (req.method !== 'GET') return;
 
-  // API запросы (на Railway) — стратегия network-first
-  if (url.hostname.includes('railway.app')) {
+  // Запросы к backend: прямой Railway (старые вкладки) или same-origin proxy
+  // через Vercel (текущая версия) — стратегия network-first.
+  const isBackendProxyRequest =
+    url.origin === self.location.origin &&
+    (url.pathname === '/api' ||
+     url.pathname.startsWith('/api/') ||
+     url.pathname === '/static' ||
+     url.pathname.startsWith('/static/'));
+  if (url.hostname.includes('railway.app') || isBackendProxyRequest) {
     event.respondWith(networkFirst(req));
     return;
   }

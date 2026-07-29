@@ -1,7 +1,9 @@
-const API_BASE = "https://worker-production-9b70.up.railway.app";
+// Backend requests go through the Vercel origin. This keeps CRM available on
+// networks where Railway's public edge IPs are unreachable.
+const API_BASE = window.location.origin;
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.831";
+const APP_VERSION = "v2.45.832";
 const APP_VERSION_DATE = "29.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============

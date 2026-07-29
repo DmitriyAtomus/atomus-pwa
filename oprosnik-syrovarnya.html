@@ -532,7 +532,7 @@ input:focus, textarea:focus, select:focus{ outline:none; border-color:var(--cyan
 const CONFIG = {
   email: 'info@atomus-group.ru',   // куда приходят ответы (fallback, если API недоступен)
   // v2.45.223: ответы летят прямо в Atom CRM → Продажи → Опросные листы
-  endpoint: 'https://worker-production-9b70.up.railway.app/api/public/survey/submit'
+  endpoint: window.location.origin + '/api/public/survey/submit'
 };
 
 /* ---------- динамические строки ---------- */

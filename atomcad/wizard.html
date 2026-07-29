@@ -1770,7 +1770,7 @@ function pSpec(){
 }
 
 /* ---- сохранение проектов: сервер (общая библиотека) + localStorage-фолбэк ---- */
-var ATOMCAD_API='https://worker-production-9b70.up.railway.app';
+var ATOMCAD_API=window.location.origin;
 function tok(){try{return localStorage.getItem('atomus_token')||''}catch(_){return ''}}
 function srvOn(){return !!tok()}  /* внутри PWA есть токен → работаем с сервером */
 async function apiReq(method,path,body){
