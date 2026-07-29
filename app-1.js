@@ -2216,6 +2216,9 @@ function renderDashboard(d) {
   // v2.42.2: блок «Сейчас в работе» — заполняется отдельным запросом
   html += '<div id="active-works-block" class="active-works-section"></div>';
 
+  // Блок «В отпуске сейчас» — кто в отпуске сегодня (заполняется отдельным запросом)
+  html += '<div id="on-vacation-block" class="active-works-section"></div>';
+
   // ============ ЭТАП 25.1: МОБИЛЬНЫЕ БЛОКИ ============
   html += '<div class="m25-mobile-only">';
 
@@ -2359,6 +2362,7 @@ function renderDashboard(d) {
   // v2.42.2: подтягиваем активные работы (status='in_progress')
   if (typeof loadActiveWorksBlock === 'function') {
     try { loadActiveWorksBlock(); } catch (_) {}
+    try { loadOnVacationBlock(); } catch (_) {}
   }
   // v2.45.271: «На оплате» — бухгалтеру и директору
   try { _fillPayDueBlock(); } catch (_) {}
@@ -2766,14 +2770,18 @@ function _truncate(s, n) {
 
 function _chatPrettyTime(iso) {
   if (!iso) return '';
-  const dt = (iso || '').replace('T', ' ');
-  const today = new Date().toISOString().slice(0, 10);
-  const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const date = dt.slice(0, 10);
-  const time = dt.slice(11, 16);
-  if (date === today) return time;
-  if (date === yest) return 'вчера ' + time;
-  return date.split('-').reverse().join('.') + ' ' + time;
+  // SQLite отдаёт 'YYYY-MM-DD HH:MM:SS' в UTC — парсим как UTC, показываем МЕСТНОЕ.
+  const s = String(iso);
+  const d = (s.includes('T') || s.endsWith('Z')) ? new Date(s) : new Date(s.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) { const dt = s.replace('T', ' '); return dt.slice(11, 16); }
+  const p = n => String(n).padStart(2, '0');
+  const time = p(d.getHours()) + ':' + p(d.getMinutes());
+  const now = new Date();
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, now)) return time;
+  const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (sameDay(d, yest)) return 'вчера ' + time;
+  return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + time;
 }
 
 function onNotifItemClick(contractId) {
@@ -3153,6 +3161,48 @@ async function loadActiveWorksBlock() {
         '</div>' +
         '<div class="aw-qty">' + (w.quantity || 1) + ' шт.</div>' +
         finishBtn +
+      '</div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+  } catch (e) {
+    wrap.innerHTML = '';
+  }
+}
+
+// «В отпуске сейчас» — рендер блока на главной (кто в отпуске сегодня).
+// Тянем /api/vacations и фильтруем по местной дате (start_date ≤ сегодня ≤ end_date).
+async function loadOnVacationBlock() {
+  const wrap = document.getElementById('on-vacation-block');
+  if (!wrap) return;
+  try {
+    const r = await apiGet('/api/vacations');
+    const all = (r && r.vacations) || [];
+    const now = new Date();
+    const today = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    const onVac = all.filter(v => v.start_date && v.end_date &&
+      v.start_date <= today && today <= v.end_date &&
+      v.status !== 'cancelled' && v.status !== 'rejected');
+    if (!onVac.length) { wrap.innerHTML = ''; return; }
+    let html = '<div class="aw-head">' +
+      '<i class="ti ti-beach"></i>' +
+      '<span class="aw-title">В отпуске сейчас</span>' +
+      '<span class="aw-count">' + onVac.length + '</span>' +
+    '</div><div class="aw-list">';
+    onVac.forEach(v => {
+      const name = v.employee_full_name || '—';
+      const initials = name.split(' ').map(w => (w[0] || '').toUpperCase()).slice(0, 2).join('') || '?';
+      const pos = v.employee_position ? ' · ' + v.employee_position : '';
+      const until = v.end_date ? v.end_date.split('-').reverse().join('.') : '';
+      html += '<div class="aw-row">' +
+        '<div class="aw-av">' + escapeHtml(initials) + '</div>' +
+        '<div class="aw-body">' +
+          '<div class="aw-model">' + escapeHtml(name) + '</div>' +
+          '<div class="aw-meta">🏖 в отпуске' + escapeHtml(pos) +
+            (until ? ' · до ' + escapeHtml(until) : '') + '</div>' +
+        '</div>' +
       '</div>';
     });
     html += '</div>';
@@ -5480,33 +5530,8 @@ function renderProductionWorkDetail(w) {
     html += '</div>';
   }
 
-  // v2.43.31: комментарий сборщика
-  if (canEditWork || w.comment) {
-    const safeComment = escapeHtml(w.comment || '');
-    html += '<div class="pwd-comment-block">';
-    html +=   '<div class="pwd-comment-head"><i class="ti ti-message-circle"></i> Комментарий</div>';
-    if (canEditWork) {
-      html += '<textarea class="pwd-comment-textarea" id="pwd-comment-textarea" rows="3" ' +
-                'placeholder="Заметки по работе: где остановился, что ждёт, на что обратить внимание…" ' +
-                'oninput="document.getElementById(\'pwd-comment-save\').disabled = (this.value === ' + JSON.stringify(w.comment || '') + ');">' +
-              safeComment + '</textarea>';
-      html += '<div class="pwd-comment-actions">';
-      if (w.comment_updated_at) {
-        html += '<span class="pwd-comment-meta">обновлено ' + escapeHtml(formatPkbDateTime(w.comment_updated_at)) + '</span>';
-      } else {
-        html += '<span></span>';
-      }
-      html += '<button class="pkb-btn primary" id="pwd-comment-save" disabled onclick="savePwdComment(' + w.id + ')">' +
-                '<i class="ti ti-device-floppy"></i> Сохранить</button>';
-      html += '</div>';
-    } else {
-      html += '<div class="pwd-comment-text">' + safeComment.replace(/\n/g, '<br>') + '</div>';
-      if (w.comment_updated_at) {
-        html += '<div class="pwd-comment-meta">обновлено ' + escapeHtml(formatPkbDateTime(w.comment_updated_at)) + '</div>';
-      }
-    }
-    html += '</div>';
-  }
+  // Блок «Комментарий» (заметки сборщика) убран, чтобы не было путаницы с единой
+  // лентой «КОММЕНТАРИИ» ниже. Поле w.comment в БД сохраняется, просто не показываем.
 
   // v2.45.232: документы модели (схема PDF / файл СП / фото) — чтобы сборщик
   // мог открыть прямо из карточки работы. Заполняется асинхронно.
