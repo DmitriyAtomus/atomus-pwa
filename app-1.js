@@ -1,9 +1,35 @@
 // Backend requests go through the Vercel origin. This keeps CRM available on
 // networks where Railway's public edge IPs are unreachable.
 const API_BASE = window.location.origin;
+const API_DIRECT_FALLBACK = 'https://worker-production-9b70.up.railway.app';
+const _atomusNativeFetch = window.fetch.bind(window);
+
+// v2.45.836: Vercel Security Checkpoint может отвечать HTML 403 на API-запросы,
+// когда компьютер работает через VPN. В этом единственном случае повторяем
+// запрос напрямую в Railway. Без VPN основной same-origin прокси остаётся
+// приоритетным, поэтому офисные сети с недоступным Railway продолжают работать.
+window.fetch = async function atomusApiFetch(input, init) {
+  const requestUrl = new URL(
+    typeof input === 'string' ? input : input.url,
+    window.location.origin
+  );
+  const isProxiedApi =
+    requestUrl.origin === window.location.origin &&
+    requestUrl.pathname.startsWith('/api/');
+
+  const response = await _atomusNativeFetch(input, init);
+  const contentType = response.headers.get('content-type') || '';
+  if (!isProxiedApi || response.status !== 403 || !contentType.includes('text/html')) {
+    return response;
+  }
+
+  const fallbackUrl =
+    API_DIRECT_FALLBACK + requestUrl.pathname + requestUrl.search;
+  return _atomusNativeFetch(fallbackUrl, init);
+};
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.835";
+const APP_VERSION = "v2.45.836";
 const APP_VERSION_DATE = "29.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
