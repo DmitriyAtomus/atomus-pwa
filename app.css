@@ -22154,3 +22154,49 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   font-weight: 700; box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
 }
 .m-section-tabs button.active i { background: rgba(255, 255, 255, .22); color: #fff; }
+
+/* ============ v2.45.831: Логистика — карточки перевозчиков ============ */
+.lg-sum { display: flex; gap: 16px; align-items: center; font-size: 12.5px; color: var(--text-light); font-weight: 600; margin-bottom: 12px; flex-wrap: wrap; }
+.lg-sum b { color: var(--text-dark); font-size: 14px; }
+.lg-sum .hot, .lg-sum .hot b { color: #DC2626; }
+.lg-fire { background: linear-gradient(120deg, #7F1D1D, #B91C1C); border-radius: 14px; color: #fff; padding: 5px 16px; margin-bottom: 14px; }
+.lg-fire-i { display: flex; align-items: center; gap: 13px; padding: 9px 0; }
+.lg-fire-i + .lg-fire-i { border-top: 1px solid rgba(255, 255, 255, .18); }
+.lg-fire-i .ic { font-size: 20px; flex: none; }
+.lg-fire-i .t { flex: 1; font-size: 13px; font-weight: 800; min-width: 0; }
+.lg-fire-i .t small { display: block; font-size: 11.5px; font-weight: 600; opacity: .9; margin-top: 1px; }
+.lg-fire-btn { background: #fff; color: #B91C1C; border: none; border-radius: 9px; font-weight: 800; font-size: 12px; padding: 7px 13px; cursor: pointer; font-family: inherit; flex: none; }
+.lg-fire-btn:hover { filter: brightness(.95); }
+.lg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; align-items: start; }
+.lgc { background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(15, 30, 60, .05); display: flex; flex-direction: column; }
+.lgc-hd { display: flex; align-items: center; gap: 9px; padding: 12px 15px; font-size: 13.5px; font-weight: 800; color: #fff; }
+.lgc-hd .cnt { font-size: 11px; background: rgba(255, 255, 255, .25); border-radius: 99px; padding: 2px 9px; }
+.lgc-hd .act { margin-left: auto; display: flex; gap: 6px; }
+.lgc-hd .abtn { width: 27px; height: 27px; border-radius: 8px; background: rgba(255, 255, 255, .2); border: none; color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+.lgc-hd .abtn:hover { background: rgba(255, 255, 255, .32); }
+.lgc-oz .lgc-hd { background: linear-gradient(120deg, #0B5ED7, #2380F0); }
+.lgc-cd .lgc-hd { background: linear-gradient(120deg, #047857, #10B981); }
+.lgc-dl .lgc-hd { background: linear-gradient(120deg, #C2410C, #F97316); }
+.lgc-pk .lgc-hd { background: linear-gradient(120deg, #4338CA, #6D28D9); }
+.lgc-lu .lgc-hd { background: linear-gradient(120deg, #0E7490, #06B6D4); }
+.lgc-bd { padding: 12px 14px; flex: 1; }
+.lgc-ft { border-top: 1px solid var(--border); padding: 9px 15px; font-size: 11.5px; color: var(--text-light); display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.lgc-ft b { color: var(--text-dark); }
+.lgc-ft .lnk { margin-left: auto; color: var(--brand); font-weight: 700; cursor: pointer; white-space: nowrap; }
+.lgc-empty { font-size: 12px; color: var(--text-faint); text-align: center; padding: 18px 10px; line-height: 1.55; }
+.lgc-empty .ti { font-size: 20px; display: block; margin: 0 auto 6px; }
+.lgc-sub { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; letter-spacing: .4px; color: var(--text-light); text-transform: uppercase; margin: 4px 0 8px; }
+.lgc-sub span { background: #EDF1F7; border-radius: 99px; padding: 1px 8px; font-size: 10px; }
+.lgc-sub.g { color: #047857; }
+.lgc-sub.b { color: #1D4ED8; }
+.lgc-chev { display: none; }
+.lg-done-wrap { margin-top: 16px; }
+@media (max-width: 900px) {
+  .lg-grid { grid-template-columns: 1fr; }
+  .lgc.empty .lgc-hd { cursor: pointer; }
+  .lgc.empty .lgc-chev { display: inline-block; transition: transform .15s; }
+  .lgc.empty:not(.open) .lgc-bd, .lgc.empty:not(.open) .lgc-ft { display: none; }
+  .lgc.empty.open .lgc-chev { transform: rotate(180deg); }
+  .lg-fire-i { flex-wrap: wrap; }
+  .lg-fire-i .t { flex: 1 1 70%; }
+}

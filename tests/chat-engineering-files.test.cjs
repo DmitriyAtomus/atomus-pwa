@@ -29,10 +29,13 @@ test('чаты позволяют выбрать инженерные и арх�
   }
 });
 
-test('версия интерфейса обновлена вместе с VPN-fallback', () => {
-  assert.match(app, /const APP_VERSION = "v2\.45\.836"/);
-  assert.match(app, /const APP_VERSION_DATE = "29\.07\.2026"/);
-  assert.match(serviceWorker, /atomus-v1\.8\.836/);
-  assert.equal(version.version, 'v2.45.836');
-  assert.match(version.label, /VPN/);
+// v2.45.838: не пиним конкретный номер (ломался при каждом релизе) —
+// проверяем согласованность версий между app-1.js, sw.js и version.json.
+test('версия интерфейса согласована между app, sw и version.json', () => {
+  const appVer = (app.match(/const APP_VERSION = "v(\d+\.\d+\.\d+)"/) || [])[1];
+  const swVer = (serviceWorker.match(/atomus-v\d+\.\d+\.(\d+)/) || [])[1];
+  assert.ok(appVer, 'APP_VERSION найден в app-1.js');
+  assert.equal(version.version, 'v' + appVer);
+  assert.equal(swVer, appVer.split('.').pop(), 'sw.js CACHE_VERSION совпадает с APP_VERSION');
+  assert.match(app, /const APP_VERSION_DATE = "\d{2}\.\d{2}\.\d{4}"/);
 });

@@ -32,8 +32,9 @@ test('логистика загружает Ozon вместе с перевоз�
   );
 
   assert.match(load, /apiGet\('\/api\/logistics\/ozon'\)/);
-  assert.match(load, /_ozonBlockHtml\(oz\)/);
-  assert.match(load, /Ozon · к нам/);
+  // v2.45.831: карточки перевозчиков — заказы Ozon рендерятся в карточку lgc-oz
+  assert.match(load, /_ozonCardHtml/);
+  assert.match(load, /'lgc-oz'/);
 });
 
 test('карточка Ozon показывает заказ, статус, срок и действия', () => {

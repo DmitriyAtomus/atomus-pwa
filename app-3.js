@@ -7832,12 +7832,37 @@ async function plTaskGo(itemId) {
   loadPlanerka();
 }
 
-// v2.45.796: плитка сводки логистики
-function _logiHeroTile(icon, n, label, cls) {
-  return '<div class="logi-hs ' + cls + (n ? '' : ' dim') + '">' +
-    '<div class="ic"><i class="ti ' + icon + '"></i></div>' +
-    '<div><div class="n">' + n + '</div><div class="k">' + label + '</div></div>' +
+// ============ v2.45.831: Логистика — карточки перевозчиков ============
+// Ozon с истёкшим сроком хранения — «горит»
+function _ozonLate(sh) {
+  const m = String(sh.deadline_at || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!m) return false;
+  const t = new Date(m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] + ':00+05:00');
+  return !_ozonIsCompleted(sh) && !isNaN(t.getTime()) && t.getTime() < Date.now();
+}
+
+// Обёртка карточки перевозчика: цветная шапка, тело, подвал со счётчиками
+function _lgCardHtml(cls, icon, title, cntTxt, actions, body, foot, isEmpty) {
+  return '<div class="lgc ' + cls + (isEmpty ? ' empty' : '') + '">' +
+    '<div class="lgc-hd" onclick="lgcToggle(this)">' +
+      '<i class="ti ' + icon + '"></i> ' + title +
+      '<span class="cnt">' + cntTxt + '</span>' +
+      (actions ? '<span class="act" onclick="event.stopPropagation()">' + actions + '</span>' : '') +
+      '<i class="ti ti-chevron-down lgc-chev"></i>' +
+    '</div>' +
+    '<div class="lgc-bd">' + body + '</div>' +
+    (foot ? '<div class="lgc-ft">' + foot + '</div>' : '') +
   '</div>';
+}
+// На телефоне пустые карточки складываются в строку-аккордеон
+function lgcToggle(hd) {
+  const c = hd.parentNode;
+  if (!c.classList.contains('empty') || window.innerWidth > 900) return;
+  c.classList.toggle('open');
+}
+function lgScrollDone() {
+  const el = document.getElementById('lg-done');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function loadLogisticsPickups() {
@@ -7854,50 +7879,205 @@ async function loadLogisticsPickups() {
       apiGet('/api/logistics/dellin').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
-    let html = '';
-    // v2.45.796: сводка по логистике — четыре плитки сверху
-    const _cdActive = (cd && cd.shipments) ? cd.shipments.filter(x => !x.delivered_at) : [];
-    const _cdN = _cdActive.length;
-    const _cdIn = _cdActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
-    const _cdOut = _cdActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
-    const _dlActive = (dl && dl.shipments) ? dl.shipments.filter(x => !x.delivered_at && !x.is_closed) : [];
-    const _dlN = _dlActive.length;
-    const _dlIn = _dlActive.filter(x => (x.direction || 'unknown') === 'incoming').length;
-    const _dlOut = _dlActive.filter(x => (x.direction || 'unknown') === 'outgoing').length;
-    const _ozCompletedCodes = ['received', 'delivered', 'cancelled'];
-    const _ozActive = (oz && oz.shipments)
-      ? oz.shipments.filter(x => !x.manual_done && !_ozCompletedCodes.includes(x.status_code))
-      : [];
-    const _luActive = (lu && lu.shipments)
-      ? lu.shipments.filter(x => !x.manual_done && !_ozCompletedCodes.includes(x.status_code))
-      : [];
-    html += '<div class="logi-hero">' +
-      _logiHeroTile('ti-package-import', ready.length, 'забрать сейчас', 'g') +
-      _logiHeroTile('ti-truck-delivery', transit.length, 'в пути', 'b') +
-      _logiHeroTile('ti-building-warehouse', _luActive.length, 'Луч · к нам', 'l') +
-      _logiHeroTile('ti-shopping-bag', _ozActive.length, 'Ozon · к нам', 'z') +
-      _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК · к нам ' + _cdIn + ' / от нас ' + _cdOut, 'v') +
-      _logiHeroTile('ti-truck', _dlN, 'ДЛ · к нам ' + _dlIn + ' / от нас ' + _dlOut, 'o') +
-    '</div>';
-    // v2.45.797: две колонки на широком экране — слева самовывозы, справа перевозчики
-    let colL = '', colR = '';
-    colL += '<div class="logi-sec g"><i class="ti ti-package-import"></i> Забрать сейчас <span class="logi-cnt">' + ready.length + '</span></div>';
-    colL += ready.length ? ready.map(_logiReadyCard).join('')
-      : '<div class="logi-empty"><i class="ti ti-circle-check"></i> Нечего забирать — всё принято.</div>';
-    colL += '<div class="logi-sec b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span class="logi-cnt">' + transit.length + '</span></div>';
-    colL += transit.length ? transit.map(_logiTransitCard).join('')
-      : '<div class="logi-empty"><i class="ti ti-route"></i> Ничего в пути.</div>';
-    if (done.length) {
-      colL += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
-      colL += done.map(_logiDoneRow).join('');
+    const ozList = (oz && oz.shipments) || [];
+    const ozActive = ozList.filter(sh => !_ozonIsCompleted(sh));
+    const ozDone = ozList.filter(_ozonIsCompleted);
+    const luList = (lu && lu.shipments) || [];
+    const luActive = luList.filter(sh => !_luchIsCompleted(sh));
+    const luDone = luList.filter(_luchIsCompleted);
+    const cdList = (cd && cd.shipments) || [];
+    const cdActive = cdList.filter(x => !x.delivered_at);
+    const dlList = (dl && dl.shipments) || [];
+    const dlActive = dlList.filter(sh => !sh.is_closed && !sh.delivered_at);
+    const dlDone = dlList.filter(sh => !!sh.is_closed || !!sh.delivered_at);
+
+    // ---- 🔥 «горит»: истёкший Ozon и самовывоз с горящим сроком хранения
+    let fireOz = 0, firePk = 0;
+    const fire = [];
+    ozActive.forEach(sh => {
+      if (!_ozonLate(sh)) return;
+      fireOz++;
+      fire.push('<div class="lg-fire-i"><span class="ic">🔥</span>' +
+        '<div class="t">Ozon: заказ ' + escapeHtml(sh.order_number || '') + ' ждёт в пункте выдачи — срок истёк' +
+        '<small>ещё день-два — и отправят обратно. Кто едет мимо — пусть заберёт.</small></div>' +
+        '<button class="lg-fire-btn" onclick="ozonMarkDone(' + Number(sh.id) + ')">✓ Забрали</button></div>');
+    });
+    ready.forEach(it => {
+      const days = _logiDaysFromToday(it.reserve);
+      if (days === null || days > 0) return;
+      firePk++;
+      fire.push('<div class="lg-fire-i"><span class="ic">🔥</span>' +
+        '<div class="t">Забрать у ' + escapeHtml(it.supplier_name || 'поставщика') +
+        (days < 0 ? ' — срок хранения истёк' : ' — храним до сегодня') +
+        '<small>№ ' + escapeHtml(String(it.invoice_number || it.order_label || it.order_id)) +
+        (it.pickup_place ? ' · ' + escapeHtml(it.pickup_place) : '') + '</small></div>' +
+        '<button class="lg-fire-btn" onclick="logiPickupDone(' + it.order_id + ')">✓ Забрал</button></div>');
+    });
+
+    // ---- карточка Ozon
+    let ozCard = '';
+    if (oz) {
+      const body = ozActive.length ? ozActive.map(_ozonCardHtml).join('')
+        : '<div class="lgc-empty"><i class="ti ti-mail-forward"></i>Новых заказов нет.<br>Статусы появятся сами из писем Ozon.</div>';
+      ozCard = _lgCardHtml('lgc-oz', 'ti-shopping-bag', 'Ozon',
+        ozActive.length ? ozActive.length + ' активно' : 'пусто',
+        '<button class="abtn" onclick="ozonRefresh()" title="Перечитать письма Ozon"><i class="ti ti-refresh"></i></button>',
+        body,
+        '<span>к нам <b>' + ozActive.length + '</b></span>' +
+          (ozDone.length ? '<span class="lnk" onclick="lgScrollDone()">получено: ' + ozDone.length + ' →</span>' : ''),
+        !ozActive.length);
     }
-    if (lu) colR += _luchBlockHtml(lu);
-    if (oz) colR += _ozonBlockHtml(oz);
-    if (cd) colR += _cdekBlockHtml(cd);
-    if (dl) colR += _dellinBlockHtml(dl);
-    box.innerHTML = html +
-      '<div class="logi-cols"><div class="logi-col">' + colL + '</div>' +
-      (colR ? '<div class="logi-col">' + colR + '</div>' : '') + '</div>';
+
+    // ---- карточка ТК-Луч (v2.45.837 коллеги, вписан в карточную сетку)
+    let luCard = '';
+    if (lu) {
+      const body = luActive.length ? luActive.map(_luchCardHtml).join('')
+        : '<div class="lgc-empty"><i class="ti ti-mail-forward"></i>Новых грузов нет.<br>Прибытие появится само из писем ТК-Луч.</div>';
+      luCard = _lgCardHtml('lgc-lu', 'ti-building-warehouse', 'ТК-Луч',
+        luActive.length ? luActive.length + ' активно' : 'пусто',
+        '<button class="abtn" onclick="luchRefresh()" title="Перечитать письма ТК-Луч"><i class="ti ti-refresh"></i></button>',
+        body,
+        '<span>к нам <b>' + luActive.length + '</b></span>' +
+          (luDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + luDone.length + ' →</span>' : ''),
+        !luActive.length);
+    }
+
+    // ---- карточка Деловых линий
+    let dlCard = '';
+    if (dl) {
+      const summary = dl.summary || {};
+      const journal = dl.journal || {};
+      let body = '';
+      if (!dl.configured) {
+        body = '<div class="cdek-setup">' + _dellinCredentialsHtml(false) +
+          '<button class="btn btn-primary" id="dl-save-keys" onclick="dellinSaveKeys()"><i class="ti ti-check"></i> Подключить и загрузить журнал</button></div>';
+      } else {
+        const visible = Number(journal.visible_count || 0);
+        const warn = visible <= 1;
+        body += '<div class="dl-sync-banner' + (warn ? ' warn' : '') + '">' +
+          '<i class="ti ' + (warn ? 'ti-alert-triangle' : 'ti-cloud-check') + '"></i><div>' +
+            '<b>API кабинета видит ' + visible + ' ' + _dellinOrdersWord(visible) + ' за ' + (journal.days || 90) + ' дней</b>' +
+            (journal.last_sync_at ? '<span>Синхронизация: ' + escapeHtml(_dellinShortDate(journal.last_sync_at)) + '</span>' : '') +
+            (warn ? '<span>Если в личном кабинете заказов больше — нажмите <b>⚙</b> и вставьте PAT пользователя с полным доступом.</span>' : '') +
+            (journal.error ? '<span class="err">' + escapeHtml(journal.error) + '</span>' : '') +
+          '</div></div>';
+        body += dlActive.length ? dlActive.map(_dellinOrderCard).join('')
+          : '<div class="lgc-empty"><i class="ti ti-truck"></i>Активных перевозок нет — журнал обновляется сам.</div>';
+      }
+      const unpaid = dlActive.reduce((acc, sh) => {
+        const known = sh.is_paid !== null && sh.is_paid !== undefined;
+        const paid = sh.is_paid === true || Number(sh.is_paid) === 1;
+        const v = Number(sh.total_sum);
+        return (known && !paid && Number.isFinite(v)) ? acc + v : acc;
+      }, 0);
+      dlCard = _lgCardHtml('lgc-dl', 'ti-truck-delivery', 'Деловые линии',
+        dlActive.length ? dlActive.length + ' в работе' : 'пусто',
+        (dl.configured
+          ? '<button class="abtn" onclick="dellinRefresh()" title="Обновить из ЛК"><i class="ti ti-refresh"></i></button>' +
+            '<button class="abtn" onclick="dellinSettings()" title="Сменить кабинет или PAT"><i class="ti ti-settings"></i></button>'
+          : '') +
+        '<button class="abtn" onclick="dellinAdd()" title="Добавить накладную"><i class="ti ti-plus"></i></button>',
+        body,
+        '<span>к нам <b>' + Number(summary.incoming || 0) + '</b></span>' +
+        '<span>от нас <b>' + Number(summary.outgoing || 0) + '</b></span>' +
+        (unpaid > 0 ? '<span>платить <b style="color:var(--danger);">' + _logiSum(unpaid) + '</b></span>' : '') +
+        (dlDone.length ? '<span class="lnk" onclick="lgScrollDone()">завершённых: ' + dlDone.length + ' →</span>' : ''),
+        dl.configured && !dlActive.length);
+    }
+
+    // ---- карточка СДЭК
+    let cdCard = '';
+    if (cd) {
+      let body = '';
+      if (!cd.configured) {
+        body += '<div class="cdek-setup">' +
+          '<div style="font-weight:800;margin-bottom:4px;"><i class="ti ti-plug"></i> Подключение СДЭК</div>' +
+          '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:8px;">Вставь ключи из личного кабинета СДЭК → Интеграция → API-ключи. После этого статусы будут обновляться сами.</div>' +
+          '<input class="form-input" id="cdek-acc" placeholder="Идентификатор клиента (account)" autocomplete="off" style="margin-bottom:6px;">' +
+          '<input class="form-input" id="cdek-pass" placeholder="Секретный ключ (secure password)" autocomplete="off" style="margin-bottom:8px;">' +
+          '<button class="btn btn-primary" onclick="cdekSaveKeys()"><i class="ti ti-check"></i> Сохранить и проверить</button>' +
+        '</div>';
+      }
+      if (cdList.length) {
+        body += _cdekGroupHtml(cdList.filter(sh => _cdekDirection(sh) === 'incoming'), 'incoming') +
+          _cdekGroupHtml(cdList.filter(sh => _cdekDirection(sh) === 'outgoing'), 'outgoing') +
+          _cdekGroupHtml(cdList.filter(sh => _cdekDirection(sh) === 'unknown'), 'unknown');
+      } else if (cd.configured) {
+        body += '<div class="lgc-empty"><i class="ti ti-mailbox"></i>Отправлений нет.<br>Треки из писем и MAX подтянутся сюда сами.</div>';
+      }
+      const cdIn = cdActive.filter(x => _cdekDirection(x) === 'incoming').length;
+      const cdOut = cdActive.filter(x => _cdekDirection(x) === 'outgoing').length;
+      cdCard = _lgCardHtml('lgc-cd', 'ti-package', 'СДЭК',
+        cdActive.length ? cdActive.length + ' активно' : 'пусто',
+        (cd.configured ? '<button class="abtn" onclick="cdekRefresh()" title="Обновить статусы из СДЭК"><i class="ti ti-refresh"></i></button>' : '') +
+        '<button class="abtn" onclick="cdekAdd()" title="Добавить трек"><i class="ti ti-plus"></i></button>',
+        body,
+        '<span>к нам <b>' + cdIn + '</b></span><span>от нас <b>' + cdOut + '</b></span>',
+        cd.configured && !cdList.length);
+    }
+
+    // ---- карточка «Самовывоз» (покупки у поставщиков)
+    let pkBody = '';
+    if (!ready.length && !transit.length) {
+      pkBody = '<div class="lgc-empty"><i class="ti ti-circle-check" style="color:var(--success);"></i>Нечего забирать — всё принято.<br>Появится, когда снабжение отметит заказ «забрать самим».</div>';
+    } else {
+      if (ready.length) {
+        pkBody += '<div class="lgc-sub g"><i class="ti ti-package-import"></i> Забрать сейчас <span>' + ready.length + '</span></div>' +
+          ready.map(_logiReadyCard).join('');
+      }
+      if (transit.length) {
+        pkBody += '<div class="lgc-sub b"><i class="ti ti-truck-delivery"></i> В пути / ожидается <span>' + transit.length + '</span></div>' +
+          transit.map(_logiTransitCard).join('');
+      }
+    }
+    const pkDoneN = d.done_count || done.length || 0;
+    const pkCard = _lgCardHtml('lgc-pk', 'ti-basket', 'Самовывоз',
+      (ready.length + transit.length) ? (ready.length + transit.length) + ' активно' : 'пусто',
+      '',
+      pkBody,
+      '<span>забрать <b>' + ready.length + '</b></span><span>в пути <b>' + transit.length + '</b></span>' +
+        (pkDoneN ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + pkDoneN + ' →</span>' : ''),
+      !ready.length && !transit.length);
+
+    // ---- порядок карточек: сначала «горящие», потом с активными, пустые в конце
+    const cards = [];
+    if (oz) cards.push({ hot: fireOz ? 1 : 0, act: ozActive.length ? 1 : 0, html: ozCard });
+    if (lu) cards.push({ hot: 0, act: luActive.length ? 1 : 0, html: luCard });
+    if (dl) cards.push({ hot: 0, act: dlActive.length ? 1 : 0, html: dlCard });
+    if (cd) cards.push({ hot: 0, act: cdActive.length ? 1 : 0, html: cdCard });
+    cards.push({ hot: firePk ? 1 : 0, act: (ready.length + transit.length) ? 1 : 0, html: pkCard });
+    cards.sort((a, b) => (b.hot - a.hot) || (b.act - a.act));
+
+    // ---- сводка и завершённые
+    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length;
+    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length;
+    let html = '<div class="lg-sum">' +
+      (fire.length ? '<span class="hot">горит <b>' + fire.length + '</b></span>' : '') +
+      '<span>активных <b>' + activeTotal + '</b></span>' +
+      '<span>завершённых <b>' + doneTotal + '</b></span>' +
+    '</div>';
+    if (fire.length) html += '<div class="lg-fire">' + fire.join('') + '</div>';
+    html += '<div class="lg-grid">' + cards.map(c => c.html).join('') + '</div>';
+
+    if (done.length || ozDone.length || luDone.length || dlDone.length) {
+      html += '<div class="lg-done-wrap" id="lg-done">' +
+        '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Завершённые <span class="logi-cnt">' + doneTotal + '</span></div>' +
+        done.map(_logiDoneRow).join('') +
+        (ozDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-shopping-bag"></i> Ozon — полученные <span>' + ozDone.length + '</span></summary>' +
+            '<div>' + ozDone.map(_ozonCardHtml).join('') + '</div></details>'
+          : '') +
+        (luDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-building-warehouse"></i> ТК-Луч — забранные <span>' + luDone.length + '</span></summary>' +
+            '<div>' + luDone.map(_luchCardHtml).join('') + '</div></details>'
+          : '') +
+        (dlDone.length
+          ? '<details class="dl-archive"><summary><i class="ti ti-truck-delivery"></i> Деловые линии — завершённые <span>' + dlDone.length + '</span></summary>' +
+            '<div class="dl-archive-list">' + dlDone.map(_dellinOrderCard).join('') + '</div></details>'
+          : '') +
+      '</div>';
+    }
+    box.innerHTML = html;
   } catch (e) {
     box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить</div>';
   }
