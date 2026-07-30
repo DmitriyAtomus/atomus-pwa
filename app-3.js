@@ -7845,10 +7845,11 @@ async function loadLogisticsPickups() {
   if (!box) return;
   box.innerHTML = '<div class="loading-block">Загрузка…</div>';
   try {
-    // Параллельно тянем самовывозы, Ozon и транспортные компании.
-    const [d, oz, cd, dl] = await Promise.all([
+    // Параллельно тянем самовывозы, почтовые статусы и транспортные компании.
+    const [d, oz, lu, cd, dl] = await Promise.all([
       apiGet('/api/logistics/pickups'),
       apiGet('/api/logistics/ozon').catch(() => null),
+      apiGet('/api/logistics/luch').catch(() => null),
       apiGet('/api/logistics/cdek').catch(() => null),
       apiGet('/api/logistics/dellin').catch(() => null),
     ]);
@@ -7867,9 +7868,13 @@ async function loadLogisticsPickups() {
     const _ozActive = (oz && oz.shipments)
       ? oz.shipments.filter(x => !x.manual_done && !_ozCompletedCodes.includes(x.status_code))
       : [];
+    const _luActive = (lu && lu.shipments)
+      ? lu.shipments.filter(x => !x.manual_done && !_ozCompletedCodes.includes(x.status_code))
+      : [];
     html += '<div class="logi-hero">' +
       _logiHeroTile('ti-package-import', ready.length, 'забрать сейчас', 'g') +
       _logiHeroTile('ti-truck-delivery', transit.length, 'в пути', 'b') +
+      _logiHeroTile('ti-building-warehouse', _luActive.length, 'Луч · к нам', 'l') +
       _logiHeroTile('ti-shopping-bag', _ozActive.length, 'Ozon · к нам', 'z') +
       _logiHeroTile('ti-plane-departure', _cdN, 'СДЭК · к нам ' + _cdIn + ' / от нас ' + _cdOut, 'v') +
       _logiHeroTile('ti-truck', _dlN, 'ДЛ · к нам ' + _dlIn + ' / от нас ' + _dlOut, 'o') +
@@ -7886,6 +7891,7 @@ async function loadLogisticsPickups() {
       colL += '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Выдано / завершено <span class="logi-cnt">' + (d.done_count || done.length) + '</span></div>';
       colL += done.map(_logiDoneRow).join('');
     }
+    if (lu) colR += _luchBlockHtml(lu);
     if (oz) colR += _ozonBlockHtml(oz);
     if (cd) colR += _cdekBlockHtml(cd);
     if (dl) colR += _dellinBlockHtml(dl);
@@ -7894,6 +7900,99 @@ async function loadLogisticsPickups() {
       (colR ? '<div class="logi-col">' + colR + '</div>' : '') + '</div>';
   } catch (e) {
     box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить</div>';
+  }
+}
+
+// ============ v2.45.837: ТК-Луч — прибытие грузов из почты ============
+function _luchIsCompleted(sh) {
+  return !!sh.manual_done || ['received', 'delivered', 'cancelled'].includes(sh.status_code);
+}
+
+function _luchStatusChip(sh) {
+  const code = sh.status_code || 'updated';
+  let cls = 'run', icon = 'ti-clock';
+  if (code === 'ready_for_pickup') { cls = 'ready'; icon = 'ti-package-import'; }
+  else if (code === 'processing') { cls = 'wait'; icon = 'ti-box'; }
+  else if (code === 'cancelled') { cls = 'bad'; icon = 'ti-x'; }
+  else if (_luchIsCompleted(sh)) { cls = 'done'; icon = 'ti-check'; }
+  return '<span class="ozon-status ' + cls + '"><i class="ti ' + icon + '"></i> ' +
+    escapeHtml(sh.status_label || 'Статус обновлён') + '</span>';
+}
+
+function _luchDate(value) {
+  const raw = String(value || '');
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? match[3] + '.' + match[2] + '.' + match[1] : raw;
+}
+
+function _luchCardHtml(sh) {
+  const completed = _luchIsCompleted(sh);
+  return '<div class="ozon-card luch-card' + (completed ? ' done' : '') + '">' +
+    '<div class="ozon-top">' +
+      '<div class="ozon-logo luch-logo">Л</div>' +
+      '<div class="ozon-title"><b>Перевозка ' + escapeHtml(sh.transport_number || 'ТК-Луч') + '</b>' +
+        (sh.cargo_number ? '<small>Груз №' + escapeHtml(sh.cargo_number) + '</small>' : '') +
+      '</div>' +
+      _luchStatusChip(sh) +
+    '</div>' +
+    (sh.notification_title ? '<div class="ozon-note luch-note">' + escapeHtml(sh.notification_title) + '</div>' : '') +
+    '<div class="ozon-meta">' +
+      (sh.terminal_address ? '<span><i class="ti ti-map-pin"></i> ' + escapeHtml(sh.terminal_address) + '</span>' : '') +
+      (sh.transport_created_at ? '<span><i class="ti ti-calendar"></i> Создана ' + escapeHtml(_luchDate(sh.transport_created_at)) + '</span>' : '') +
+    '</div>' +
+    '<div class="ozon-actions">' +
+      (!completed ? '<button class="btn btn-primary btn-small luch-done-btn" onclick="luchMarkDone(' + Number(sh.id) + ')"><i class="ti ti-check"></i> Забрали</button>' : '') +
+    '</div>' +
+  '</div>';
+}
+
+function _luchBlockHtml(lu) {
+  const list = lu.shipments || [];
+  const active = list.filter(sh => !_luchIsCompleted(sh));
+  const completed = list.filter(_luchIsCompleted);
+  let h = '<div class="logi-sec l" style="display:flex;align-items:center;gap:8px;">' +
+    '<i class="ti ti-building-warehouse"></i> ТК-Луч <span class="logi-cnt">' + active.length + ' активно</span>' +
+    '<button class="btn btn-secondary btn-small" onclick="luchRefresh()" style="margin-left:auto;" title="Перечитать письма ТК-Луч"><i class="ti ti-refresh"></i></button>' +
+  '</div>';
+  if (!active.length) {
+    h += '<div class="logi-empty luch-empty"><i class="ti ti-mail-forward"></i> Новых грузов нет. Прибытие появится автоматически из письма ТК-Луч.</div>';
+  } else {
+    h += active.map(_luchCardHtml).join('');
+  }
+  if (completed.length) {
+    h += '<details class="ozon-archive luch-archive"><summary><i class="ti ti-circle-check"></i> Забранные грузы <span>' + completed.length + '</span></summary>' +
+      '<div>' + completed.map(_luchCardHtml).join('') + '</div></details>';
+  }
+  return h;
+}
+
+async function luchRefresh() {
+  showToast('Перечитываем письма ТК-Луч…', 'info');
+  try {
+    const r = await apiPost('/api/logistics/luch/refresh', {});
+    if (r && r.ok) {
+      const j = r.data || {};
+      showToast('ТК-Луч обновлён: найдено писем ' + Number(j.found || 0), 'success');
+      loadLogisticsPickups();
+    } else {
+      showToast((r && r.data && r.data.message) || 'Не удалось прочитать почту', 'error');
+    }
+  } catch (e) {
+    showToast('Не удалось прочитать почту ТК-Луч', 'error');
+  }
+}
+
+async function luchMarkDone(id) {
+  try {
+    const r = await apiPost('/api/logistics/luch/' + Number(id) + '/done', { done: true });
+    if (r && r.ok) {
+      showToast('Груз ТК-Луч отмечен полученным', 'success');
+      loadLogisticsPickups();
+    } else {
+      showToast('Не удалось обновить груз ТК-Луч', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
   }
 }
 
@@ -17208,6 +17307,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.837',
+    date: '30.07.2026',
+    title: 'ТК-Луч в Логистике',
+    features: [
+      'Письма <b>ТК-Луч</b> о прибытии груза теперь автоматически создают карточку в разделе <b>«Логистика»</b>',
+      'В карточке видны номер перевозки и груза, статус <b>«Готов к выдаче»</b>, адрес терминала и дата создания перевозки',
+      'Кнопка <b>«Забрали»</b> переносит полученный груз в архив; кнопка обновления перечитывает свежие уведомления из почты',
+    ],
+  },
   {
     version: 'v2.45.835',
     date: '29.07.2026',

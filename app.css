@@ -21805,6 +21805,7 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .logi-hs .k { font-size: 10.5px; color: var(--text-light); font-weight: 700; margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
 .logi-hs.g .ic { background: var(--success-bg); color: var(--success); } .logi-hs.g .n { color: var(--success); }
 .logi-hs.b .ic { background: var(--brand-bg); color: var(--brand); }   .logi-hs.b .n { color: var(--brand); }
+.logi-hs.l .ic { background: #FFF0F1; color: #C92535; }                .logi-hs.l .n { color: #B91C2C; }
 .logi-hs.z .ic { background: #EAF1FF; color: #005BFF; }                .logi-hs.z .n { color: #005BFF; }
 .logi-hs.v .ic { background: #E7F8EC; color: #00A03C; }                .logi-hs.v .n { color: #008A31; }
 .logi-hs.o .ic { background: #FFF1E7; color: #EA580C; }                .logi-hs.o .n { color: #C2410C; }
@@ -21897,6 +21898,19 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 .ozon-archive > summary::-webkit-details-marker { display: none; }
 .ozon-archive > summary span { margin-left: 4px; color: #005BFF; background: #EAF1FF; border-radius: 999px; padding: 2px 7px; }
+
+/* ============ v2.45.837: ТК-Луч — грузы из почтовых уведомлений ============ */
+.logi-sec.l { color: #B91C2C; }
+.logi-sec.l .logi-cnt { background: #FFF0F1; color: #B91C2C; }
+.logi-sec.l > i:first-child { background: #FFF0F1; }
+.luch-card { border-color: #F4D3D7; border-left-color: #C92535; box-shadow: 0 1px 3px rgba(185,28,44,.07); }
+.luch-card:hover { box-shadow: 0 8px 22px rgba(185,28,44,.12); }
+.luch-logo { background: #C92535; font-size: 15px; }
+.luch-note { background: #FFF6F7; color: #7F1D2D; }
+.luch-done-btn { background: #B91C2C !important; border-color: #B91C2C !important; }
+.luch-empty { background: linear-gradient(135deg, #FFFAFA, #FFF4F5); border-color: #F2CDD2; }
+.luch-archive > summary span { color: #B91C2C; background: #FFF0F1; }
+
 @media (max-width: 520px) {
   .ozon-top { flex-wrap: wrap; }
   .ozon-status { margin-left: 40px; }
