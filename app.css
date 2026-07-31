@@ -22269,3 +22269,4 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .pd-qty { width: 62px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
   .pd-ral { width: 96px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
   .pd-note { font-size: 12px; color: var(--text-light); padding: 0 4px 20px; }
+  .paint-ral-hint { font-size: 12px; color: var(--text-light); margin-top: 8px; line-height: 1.45; }

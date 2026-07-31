@@ -15574,20 +15574,113 @@ function renderPaintCalcList() {
   box.innerHTML = h;
 }
 
-async function openNewPaintCalc() {
-  const title = prompt('Название расчёта (например «Блок нагревателя AG-10, партия 6 шт»):', '');
-  if (title === null) return;
+// Цвет спрашиваем сразу при создании: ведомость без RAL цеху бесполезна,
+// а дописывать его потом все забывают.
+const PAINT_RAL_PRESETS = ['RAL 9016', 'RAL 9003', 'RAL 7035', 'RAL 9005', 'RAL 5015'];
+
+function openNewPaintCalc() {
+  _paintOpenCalcModal({ mode: 'create' });
+}
+
+function editPaintCalcRal(calcId) {
+  const c = state.currentPaintCalc || {};
+  _paintOpenCalcModal({ mode: 'ral', calcId: calcId, ral: c.ral || '', title: c.title || '' });
+}
+
+function _paintOpenCalcModal(opts) {
+  const isCreate = opts.mode === 'create';
+  let m = document.getElementById('paint-calc-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'paint-calc-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closePaintCalcModal(); };
+    document.body.appendChild(m);
+  }
+  const chips = PAINT_RAL_PRESETS.map(r =>
+    '<button type="button" class="storage-quick" onclick="_paintSetRal(&quot;' + r + '&quot;)">' + r + '</button>'
+  ).join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-spray"></i> ' + (isCreate ? 'Новый расчёт окраски' : 'Цвет покрытия') + '</h3>' +
+        '<button class="modal-close" onclick="closePaintCalcModal()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        (isCreate
+          ? '<div class="form-group"><label>Название</label>' +
+            '<input type="text" id="paint-title" maxlength="200" ' +
+            'placeholder="Блок нагревателя AG-10, партия 6 шт" value=""></div>'
+          : '') +
+        '<div class="form-group">' +
+          '<label>Цвет по ТЗ (RAL)</label>' +
+          '<input type="text" id="paint-ral" maxlength="60" placeholder="RAL 9016" value="' +
+            escapeHtml(opts.ral || '') + '">' +
+          '<div class="storage-quick-row">' + chips + '</div>' +
+          '<div class="paint-ral-hint">Цех считает по цвету: другой RAL — другая загрузка и другой ценник. ' +
+            'Если цвет ещё не согласован, оставьте пустым — в ведомости будет видно, что он не указан.</div>' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-secondary" onclick="closePaintCalcModal()">Отмена</button>' +
+          '<button class="btn btn-primary" id="paint-save-btn" onclick="_paintSubmitCalcModal(' +
+            (isCreate ? 'null' : opts.calcId) + ')">' +
+            '<i class="ti ti-check"></i> ' + (isCreate ? 'Создать' : 'Сохранить') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => {
+    const f = document.getElementById(isCreate ? 'paint-title' : 'paint-ral');
+    if (f) f.focus();
+  }, 60);
+}
+
+function closePaintCalcModal() {
+  const m = document.getElementById('paint-calc-modal');
+  if (m) m.classList.remove('visible');
+}
+
+function _paintSetRal(v) {
+  const i = document.getElementById('paint-ral');
+  if (i) i.value = v;
+}
+
+async function _paintSubmitCalcModal(calcId) {
+  const titleEl = document.getElementById('paint-title');
+  const ralEl = document.getElementById('paint-ral');
+  const ral = ((ralEl && ralEl.value) || '').trim();
+  const btn = document.getElementById('paint-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
   try {
-    const r = await apiPost('/api/paint-calcs', { title: (title || '').trim() || 'Расчёт окраски' });
-    const body = (r && r.data) || {};
-    if (r && r.ok && body.id) {
+    if (calcId) {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ ral: ral }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
+      closePaintCalcModal();
+      state.currentPaintCalc = d;
+      renderPaintCalcDetail(d);
+    } else {
+      const title = ((titleEl && titleEl.value) || '').trim() || 'Расчёт окраски';
+      const r = await apiPost('/api/paint-calcs', { title: title, ral: ral });
+      const body = (r && r.data) || {};
+      if (!(r && r.ok && body.id)) {
+        showToast(body.message || 'Не удалось создать расчёт', 'error');
+        return;
+      }
+      closePaintCalcModal();
       state.paintCalcs = null;
       openPaintCalc(body.id);
-    } else {
-      showToast(body.message || 'Не удалось создать расчёт', 'error');
     }
   } catch (e) {
     showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Сохранить'; }
   }
 }
 
@@ -15619,7 +15712,7 @@ function renderPaintCalcDetail(c) {
     '<div class="pd-title">' + escapeHtml(c.title || '') + '</div>' +
     '<div class="pd-head-actions">' +
       '<button class="btn btn-secondary btn-small" onclick="editPaintCalcRal(' + c.id + ')">' +
-        '<i class="ti ti-palette"></i> RAL' + (c.ral ? ': ' + escapeHtml(c.ral) : '') + '</button>' +
+        '<i class="ti ti-palette"></i> ' + (c.ral ? escapeHtml(c.ral) : 'Цвет не указан') + '</button>' +
       '<button class="btn btn-secondary btn-small" onclick="deletePaintCalc(' + c.id + ')">' +
         '<i class="ti ti-trash"></i></button>' +
     '</div>' +
@@ -15806,26 +15899,6 @@ async function removePaintItem(calcId, itemId) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { showToast('Не удалось убрать', 'error'); return; }
-    state.currentPaintCalc = d;
-    renderPaintCalcDetail(d);
-  } catch (e) {
-    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
-  }
-}
-
-async function editPaintCalcRal(calcId) {
-  const cur = (state.currentPaintCalc && state.currentPaintCalc.ral) || '';
-  const ral = prompt('Цвет по ТЗ (например RAL 9016). Проставится позициям без своего цвета:', cur);
-  if (ral === null) return;
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ ral: (ral || '').trim() }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
     state.currentPaintCalc = d;
     renderPaintCalcDetail(d);
   } catch (e) {
