@@ -305,6 +305,9 @@
         <button class="nav-item" data-nav="developments" onclick="selectSidebarItem('developments')">
           <i class="ti ti-bulb"></i><span>Разработка оборудования</span>
         </button>
+        <button class="nav-item" data-nav="paint-calc" onclick="selectSidebarItem('paint-calc')">
+          <i class="ti ti-spray"></i><span>Расчёт окраски</span>
+        </button>
         <button class="nav-item" data-nav="schemas-3d" onclick="selectSidebarItem('schemas-3d')">
           <i class="ti ti-3d-cube-sphere"></i><span>3D-схемы</span>
         </button>
@@ -1112,6 +1115,30 @@
               </div>
             </section>
           </div>
+        </div>
+      </div>
+
+      <!-- ============ РАСЧЁТ ОКРАСКИ (v2.45.836) ============ -->
+      <div class="screen" data-screen="paint-calc" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Расчёт окраски</h2>
+          <button class="icon-btn" onclick="loadPaintCalcs()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Расчёт окраски</h1>
+            <div class="page-subtitle">Площадь под порошок по файлам раскроя и чертежам</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadPaintCalcs()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" onclick="openNewPaintCalc()">
+              <i class="ti ti-plus"></i> <span>Новый расчёт</span>
+            </button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="paint-calc-content"><div class="loading-block">Загружаем расчёты…</div></div>
         </div>
       </div>
 
