@@ -15693,10 +15693,80 @@ async function openPaintCalc(id) {
     const c = await apiGet('/api/paint-calcs/' + id);
     state.currentPaintCalc = c;
     renderPaintCalcDetail(c);
+    // v2.45.845: старые расчёты посчитаны до мини-чертежей — дорисуем в фоне
+    const needSvg = (c.items || []).some(it => !it.svg && (it.source_file || '').trim());
+    if (!state._paintPrevAsked) state._paintPrevAsked = {};
+    if (needSvg && !state._paintPrevAsked[c.id]) {
+      state._paintPrevAsked[c.id] = 1;
+      apiPost('/api/paint-calcs/' + id + '/previews', {}).then(r => {
+        if (r && r.ok && r.data && Number(r.data.previews_rendered || 0) > 0 &&
+            state.currentPaintCalc && state.currentPaintCalc.id === id) {
+          state.currentPaintCalc = r.data;
+          renderPaintCalcDetail(r.data);
+        }
+      }).catch(() => {});
+    }
   } catch (e) {
     showToast('Не удалось открыть расчёт', 'error');
     loadPaintCalcs();
   }
+}
+
+// ============ v2.45.844: выбор партии, плитки с чертежами, своя деталь ============
+function _paintSelMap(c) {
+  if (!state._paintSel || state._paintSelCalc !== c.id) {
+    state._paintSel = {};
+    state._paintSelCalc = c.id;
+  }
+  return state._paintSel;
+}
+function _paintView() {
+  try { return localStorage.getItem('paintView') || 'table'; } catch (e) { return 'table'; }
+}
+function paintSetView(v) {
+  try { localStorage.setItem('paintView', v); } catch (e) {}
+  renderPaintCalcDetail(state.currentPaintCalc);
+}
+function paintToggleSel(id) {
+  const c = state.currentPaintCalc;
+  if (!c) return;
+  const sel = _paintSelMap(c);
+  if (sel[id]) delete sel[id]; else sel[id] = true;
+  renderPaintCalcDetail(c);
+}
+// mode: all | none | notpainted | mat:<имя материала>
+function paintSelectGroup(mode) {
+  const c = state.currentPaintCalc;
+  if (!c) return;
+  const sel = _paintSelMap(c);
+  Object.keys(sel).forEach(k => delete sel[k]);
+  (c.items || []).forEach(it => {
+    if (mode === 'all') sel[it.id] = true;
+    else if (mode === 'notpainted' && it.paint_status !== 'painted' && it.paint_status !== 'sent') sel[it.id] = true;
+    else if (mode.indexOf('mat:') === 0 && _paintMatName(it) === mode.slice(4)) sel[it.id] = true;
+  });
+  renderPaintCalcDetail(c);
+}
+function _paintMatName(it) {
+  return (it.data && it.data.material_info && it.data.material_info.name) || it.material || '—';
+}
+function _paintStatusChip(it) {
+  const dt = String(it.paint_status_at || '').slice(0, 10);
+  const dd = dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '';
+  if (it.paint_status === 'sent') {
+    return '<span class="pdx-st sent" title="Нажми, когда деталь привезли покрашенной" ' +
+      'onclick="event.stopPropagation();paintItemsStatus(' + it.calc_id + ',[' + it.id + '],\'painted\')">' +
+      '🚚 в покраске' + (dd ? ' · ' + dd : '') + '</span>';
+  }
+  if (it.paint_status === 'painted') {
+    return '<span class="pdx-st done" title="Нажми, чтобы снять отметку" ' +
+      'onclick="event.stopPropagation();paintItemsStatus(' + it.calc_id + ',[' + it.id + '],null)">' +
+      '✓ покрашено</span>';
+  }
+  return '';
+}
+function _paintManualTag(it) {
+  return it.source === 'manual' ? '<span class="pdx-manual">своя</span>' : '';
 }
 
 function renderPaintCalcDetail(c) {
@@ -15704,6 +15774,8 @@ function renderPaintCalcDetail(c) {
   if (!box || !c) return;
   const items = c.items || [];
   const t = c.totals || {};
+  const sel = _paintSelMap(c);
+  const view = _paintView();
 
   let h = '<div class="paint-detail">';
 
@@ -15718,6 +15790,14 @@ function renderPaintCalcDetail(c) {
         c.id + ')"><i class="ti ti-pencil"></i></button>' +
     '</div>' +
     '<div class="pd-head-actions">' +
+      (items.length
+        ? '<span class="pdx-view">' +
+          '<button class="' + (view === 'table' ? 'on' : '') + '" onclick="paintSetView(\'table\')"><i class="ti ti-list"></i> Таблица</button>' +
+          '<button class="' + (view === 'tiles' ? 'on' : '') + '" onclick="paintSetView(\'tiles\')"><i class="ti ti-layout-grid"></i> Плитки</button>' +
+          '</span>'
+        : '') +
+      '<button class="btn btn-secondary btn-small" onclick="paintManualOpen(' + c.id + ')">' +
+        '<i class="ti ti-plus"></i> Своя деталь</button>' +
       '<button class="btn btn-secondary btn-small" onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
         escapeHtml(c.ral || '') + '&quot;)">' +
         (c.ral ? '<span class="ral-dot" style="background:' + (_ralHex(c.ral) || '#CBD5E1') + '"></span>' +
@@ -15797,21 +15877,47 @@ function renderPaintCalcDetail(c) {
     h += '</div>';
   }
 
-  // позиции
+  // быстрый выбор партии
   if (items.length) {
+    const notPainted = items.filter(it => it.paint_status !== 'painted' && it.paint_status !== 'sent').length;
+    const matCounts = {};
+    items.forEach(it => {
+      const m = _paintMatName(it);
+      matCounts[m] = (matCounts[m] || 0) + 1;
+    });
+    h += '<div class="pdx-chips">Выбрать:' +
+      '<button class="pdx-chip" onclick="paintSelectGroup(\'all\')">все · ' + items.length + '</button>' +
+      Object.keys(matCounts).slice(0, 4).map(m =>
+        '<button class="pdx-chip" onclick="paintSelectGroup(\'mat:' + escapeHtml(m).replace(/'/g, '') + '\')">' +
+        escapeHtml(m) + ' · ' + matCounts[m] + '</button>').join('') +
+      (notPainted < items.length
+        ? '<button class="pdx-chip" onclick="paintSelectGroup(\'notpainted\')">ещё не крашеные · ' + notPainted + '</button>'
+        : '') +
+      '<button class="pdx-chip" onclick="paintSelectGroup(\'none\')">снять выбор</button>' +
+    '</div>';
+  }
+
+  // позиции: таблица или плитки
+  if (items.length && view === 'tiles') {
+    h += '<div class="pdx-grid">' + items.map(it => _paintTileHtml(it, !!sel[it.id])).join('') + '</div>';
+  } else if (items.length) {
     h += '<div class="pd-table-wrap"><table class="pd-table">' +
       '<thead><tr>' +
-        '<th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
+        '<th></th><th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
         '<th>Материал</th><th>RAL</th><th>S нетто, м²</th><th>S окраски 1 дет</th>' +
         '<th>S всего</th><th>Масса: расчёт / штамп</th><th></th>' +
       '</tr></thead><tbody>';
     items.forEach(it => {
       const dev = it.mass_dev_pct;
       const devBad = dev !== null && dev !== undefined && Math.abs(Number(dev)) > 1;
-      h += '<tr>' +
+      const isSel = !!sel[it.id];
+      h += '<tr class="' + (isSel ? 'pdx-sel' : '') + '">' +
+        '<td class="pdx-cbc" onclick="paintToggleSel(' + it.id + ')">' +
+          '<span class="pdx-cb' + (isSel ? ' on' : '') + '">' + (isSel ? '✓' : '') + '</span></td>' +
         '<td class="pd-desig">' + escapeHtml(it.designation || '—') + '</td>' +
-        '<td>' + escapeHtml(it.name || '—') +
-          (it.holes_count ? '<small> · вырезов ' + it.holes_count + '</small>' : '') + '</td>' +
+        '<td>' + escapeHtml(it.name || '—') + _paintManualTag(it) +
+          (it.holes_count ? '<small> · вырезов ' + it.holes_count + '</small>' : '') +
+          (_paintStatusChip(it) ? '<div style="margin-top:2px;">' + _paintStatusChip(it) + '</div>' : '') + '</td>' +
         '<td><input type="number" min="1" class="pd-qty" value="' + (it.qty || 1) + '" ' +
           'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})"></td>' +
         '<td>' + (it.thickness_mm ? it.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +
@@ -15837,12 +15943,249 @@ function renderPaintCalcDetail(c) {
       '</tr>';
     });
     h += '</tbody></table></div>';
+  }
+  if (items.length) {
     h += '<div class="pd-note">Площадь окраски = 2 × площадь развёртки + периметр реза × толщина. ' +
       'Контроль: расчётная масса против массы в основной надписи, допуск 1 %.</div>';
   }
 
+  // липкая панель партии
+  const selItems = items.filter(it => sel[it.id]);
+  if (selItems.length) {
+    const area = selItems.reduce((a, it) => a + Number(it.paint_total_m2 || 0), 0);
+    const rals = Array.from(new Set(selItems.map(it => (it.ral || '').trim()).filter(Boolean)));
+    h += '<div class="pdx-batch">' +
+      '<span style="font-size:20px;">🚚</span>' +
+      '<div><div class="n">В покраску сейчас: ' + selItems.length + ' ' +
+        _plural(selItems.length, ['деталь', 'детали', 'деталей']) + '</div>' +
+        '<div class="m">площадь <b>' + area.toFixed(2) + ' м²</b> · порошок <b>' +
+        (area * 0.15).toFixed(1) + '…' + (area * 0.2).toFixed(1) + ' кг</b>' +
+        (rals.length ? ' · ' + rals.map(escapeHtml).join(', ') : '') + '</div></div>' +
+      '<span class="sp">' +
+        '<button class="wh" onclick="paintBatchPdf(' + c.id + ')"><i class="ti ti-file-type-pdf"></i> Ведомость на партию</button>' +
+        '<button class="out" onclick="paintItemsStatus(' + c.id + ', null, \'sent\')"><i class="ti ti-truck"></i> Увезли в покраску</button>' +
+        '<button class="out" onclick="paintItemsStatus(' + c.id + ', null, \'painted\')"><i class="ti ti-check"></i> Покрашено</button>' +
+        '<button class="out" onclick="paintSelectGroup(\'none\')">✕</button>' +
+      '</span>' +
+    '</div>';
+  }
+
   h += '</div>';
   box.innerHTML = h;
+}
+
+function _paintTileHtml(it, isSel) {
+  const svg = it.svg ||
+    '<svg viewBox="0 0 170 110" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect x="30" y="20" width="110" height="70" rx="8" fill="none" stroke="#D8B4FE" ' +
+    'stroke-width="1.6" stroke-dasharray="7 5"/>' +
+    '<text x="85" y="52" text-anchor="middle" font-size="11" fill="#A855F7" font-weight="700">без чертежа</text>' +
+    (it.source === 'manual'
+      ? '<text x="85" y="68" text-anchor="middle" font-size="10" fill="#C084FC">добавлена вручную</text>' : '') +
+    '</svg>';
+  const matShort = _paintMatName(it);
+  return '<div class="pdx-tile' + (isSel ? ' sel' : '') + '" onclick="paintToggleSel(' + it.id + ')">' +
+    '<span class="pdx-cb tile' + (isSel ? ' on' : '') + '">' + (isSel ? '✓' : '') + '</span>' +
+    (it.svg ? '<span class="pdx-zoom" title="Открыть крупно" ' +
+      'onclick="event.stopPropagation();paintZoom(' + it.id + ')"><i class="ti ti-zoom-in"></i></span>' : '') +
+    '<div class="pdx-draw">' + svg + '</div>' +
+    '<span class="pdx-qty">×' + (it.qty || 1) + '</span>' +
+    '<div class="pdx-info">' +
+      '<div class="d">' + escapeHtml(it.designation || '—') + '</div>' +
+      '<div class="n">' + escapeHtml(it.name || '—') + _paintManualTag(it) + '</div>' +
+      '<div class="m"><b>' + Number(it.paint_total_m2 || 0).toFixed(2) + ' м²</b>' +
+        (it.thickness_mm ? ' · ' + it.thickness_mm + ' мм' : '') +
+        ' · ' + escapeHtml(String(matShort).slice(0, 14)) +
+        (_paintStatusChip(it) ? '<div style="margin-top:3px;">' + _paintStatusChip(it) + '</div>' : '') +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function paintZoom(itemId) {
+  const c = state.currentPaintCalc;
+  const it = c && (c.items || []).find(x => x.id === itemId);
+  if (!it || !it.svg) return;
+  let m = document.getElementById('paint-zoom-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'paint-zoom-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = () => m.remove();
+  m.innerHTML = '<div class="pdx-zoom-box" onclick="event.stopPropagation()">' +
+    '<div class="hd"><b>' + escapeHtml(it.designation || '') + '</b> ' + escapeHtml(it.name || '') +
+      '<span style="margin-left:auto;color:var(--text-light);font-size:12px;">' +
+        Number(it.paint_total_m2 || 0).toFixed(4) + ' м²</span>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'paint-zoom-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="bd">' + it.svg + '</div></div>';
+  document.body.appendChild(m);
+}
+
+// статус партии; ids === null → берём выбранные галочками
+async function paintItemsStatus(calcId, ids, status) {
+  const c = state.currentPaintCalc;
+  if (!ids) {
+    const sel = c ? _paintSelMap(c) : {};
+    ids = Object.keys(sel).map(Number);
+  }
+  if (!ids.length) { showToast('Не выбраны детали', 'error'); return; }
+  try {
+    const r = await apiPost('/api/paint-calcs/' + calcId + '/items/status',
+      { item_ids: ids, status: status });
+    if (r && r.ok) {
+      state.currentPaintCalc = r.data;
+      if (status === 'sent') showToast('🚚 Партия отмечена: в покраске', 'success');
+      else if (status === 'painted') showToast('✓ Отмечено покрашенным', 'success');
+      renderPaintCalcDetail(r.data);
+    } else {
+      showToast(((r && r.data) || {}).message || 'Не удалось сохранить', 'error');
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+function paintBatchPdf(calcId) {
+  const c = state.currentPaintCalc;
+  const sel = c ? _paintSelMap(c) : {};
+  const ids = Object.keys(sel).map(Number);
+  if (!ids.length) { showToast('Не выбраны детали', 'error'); return; }
+  const token = localStorage.getItem(TOKEN_KEY);
+  showToast('Собираем ведомость на партию…', 'info');
+  fetch(API_BASE + '/api/paint-calcs/' + calcId + '/vedomost.pdf?items=' + ids.join(','), {
+    headers: { 'Authorization': 'Bearer ' + token },
+  }).then(async r => {
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось собрать ведомость', 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }).catch(e => showToast('Ошибка: ' + String((e && e.message) || e), 'error'));
+}
+
+// ---------- «Своя деталь» ----------
+async function paintManualOpen(calcId) {
+  let mats = [];
+  try {
+    if (!state._paintMats) {
+      const d = await apiGet('/api/paint-calcs/catalogs');
+      state._paintMats = d.materials || [];
+    }
+    mats = state._paintMats;
+  } catch (e) {}
+  let m = document.getElementById('paint-manual-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'paint-manual-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-plus"></i> Своя деталь в расчёт</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'paint-manual-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">' +
+      '<div style="display:flex;gap:10px;">' +
+        '<div class="form-group" style="flex:1;margin:0;"><label class="form-label">Обозначение (необязательно)</label>' +
+          '<input class="form-input" id="pm-desig" placeholder="напр. РУЧ-001"></div>' +
+        '<div class="form-group" style="width:90px;margin:0;"><label class="form-label">Кол-во</label>' +
+          '<input class="form-input" id="pm-qty" type="number" min="1" value="1" oninput="paintManualHint()"></div>' +
+      '</div>' +
+      '<div class="form-group" style="margin:0;"><label class="form-label">Наименование / описание</label>' +
+        '<input class="form-input" id="pm-name" placeholder="напр. Кожух вентилятора, гнутый"></div>' +
+      '<div class="form-group" style="margin:0;"><label class="form-label">Площадь окраски</label>' +
+        '<div class="pdx-mode">' +
+          '<button type="button" class="on" id="pm-mode-m2" onclick="paintManualMode(\'m2\')">м² развёртки</button>' +
+          '<button type="button" id="pm-mode-dim" onclick="paintManualMode(\'dim\')">по габаритам Д × Ш</button>' +
+        '</div>' +
+        '<div id="pm-area-m2"><input class="form-input" id="pm-m2" inputmode="decimal" ' +
+          'placeholder="площадь одной стороны, м²" oninput="paintManualHint()"></div>' +
+        '<div id="pm-area-dim" style="display:none;gap:8px;">' +
+          '<input class="form-input" id="pm-len" inputmode="numeric" placeholder="длина, мм" oninput="paintManualHint()">' +
+          '<input class="form-input" id="pm-wid" inputmode="numeric" placeholder="ширина, мм" oninput="paintManualHint()">' +
+        '</div>' +
+        '<div class="pdx-hint" id="pm-hint" style="display:none;"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<div class="form-group" style="flex:1;margin:0;"><label class="form-label">Материал</label>' +
+          '<input class="form-input" id="pm-mat" list="pm-mat-list" placeholder="напр. оцинковка">' +
+          '<datalist id="pm-mat-list">' + mats.map(x =>
+            '<option value="' + escapeHtml(x.value) + '">' + escapeHtml(x.label) + '</option>').join('') +
+          '</datalist></div>' +
+        '<div class="form-group" style="flex:1;margin:0;"><label class="form-label">Цвет RAL</label>' +
+          '<input class="form-input" id="pm-ral" placeholder="напр. RAL 9016"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'paint-manual-modal\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="pm-save" onclick="paintManualSave(' + calcId + ')"><i class="ti ti-check"></i> Добавить в расчёт</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  const inp = document.getElementById('pm-name');
+  if (inp) inp.focus();
+}
+function paintManualMode(mode) {
+  const b1 = document.getElementById('pm-mode-m2');
+  const b2 = document.getElementById('pm-mode-dim');
+  const a1 = document.getElementById('pm-area-m2');
+  const a2 = document.getElementById('pm-area-dim');
+  const isM2 = mode === 'm2';
+  if (b1) b1.className = isM2 ? 'on' : '';
+  if (b2) b2.className = isM2 ? '' : 'on';
+  if (a1) a1.style.display = isM2 ? 'block' : 'none';
+  if (a2) a2.style.display = isM2 ? 'none' : 'flex';
+  paintManualHint();
+}
+function _paintManualPer() {
+  const isM2 = (document.getElementById('pm-mode-m2') || {}).className === 'on';
+  if (isM2) {
+    const v = parseFloat(String((document.getElementById('pm-m2') || {}).value || '').replace(',', '.'));
+    return (isFinite(v) && v > 0) ? { side: v, per: v * 2 } : null;
+  }
+  const L = parseFloat(String((document.getElementById('pm-len') || {}).value || '').replace(',', '.'));
+  const W = parseFloat(String((document.getElementById('pm-wid') || {}).value || '').replace(',', '.'));
+  if (!isFinite(L) || !isFinite(W) || L <= 0 || W <= 0) return null;
+  const side = L * W / 1e6;
+  return { side: side, per: side * 2 };
+}
+function paintManualHint() {
+  const el = document.getElementById('pm-hint');
+  if (!el) return;
+  const p = _paintManualPer();
+  const qty = Math.max(parseInt((document.getElementById('pm-qty') || {}).value, 10) || 1, 1);
+  if (!p) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<i class="ti ti-calculator"></i> Окраска с двух сторон: ' +
+    p.side.toFixed(3) + ' × 2 = <b>' + p.per.toFixed(3) + ' м²</b> на деталь' +
+    (qty > 1 ? ' · всего <b>' + (p.per * qty).toFixed(3) + ' м²</b>' : '');
+}
+async function paintManualSave(calcId) {
+  const name = ((document.getElementById('pm-name') || {}).value || '').trim();
+  if (!name) { showToast('Нужно наименование детали', 'error'); return; }
+  const p = _paintManualPer();
+  if (!p) { showToast('Укажи площадь или габариты', 'error'); return; }
+  const btn = document.getElementById('pm-save');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiPost('/api/paint-calcs/' + calcId + '/items', {
+      name: name,
+      designation: ((document.getElementById('pm-desig') || {}).value || '').trim(),
+      qty: Math.max(parseInt((document.getElementById('pm-qty') || {}).value, 10) || 1, 1),
+      paint_per_part_m2: p.per,
+      material: ((document.getElementById('pm-mat') || {}).value || '').trim(),
+      ral: ((document.getElementById('pm-ral') || {}).value || '').trim(),
+    });
+    if (r && r.ok) {
+      showToast('Деталь добавлена в расчёт', 'success');
+      const m = document.getElementById('paint-manual-modal');
+      if (m) m.remove();
+      state.currentPaintCalc = r.data;
+      renderPaintCalcDetail(r.data);
+    } else {
+      showToast(((r && r.data) || {}).message || 'Не удалось добавить', 'error');
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  if (btn) btn.disabled = false;
 }
 
 function paintDropFiles(ev, calcId) {
