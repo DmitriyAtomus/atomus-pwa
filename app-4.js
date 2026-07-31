@@ -15711,8 +15711,13 @@ function renderPaintCalcDetail(c) {
       '<i class="ti ti-arrow-left"></i> К списку</button>' +
     '<div class="pd-title">' + escapeHtml(c.title || '') + '</div>' +
     '<div class="pd-head-actions">' +
-      '<button class="btn btn-secondary btn-small" onclick="editPaintCalcRal(' + c.id + ')">' +
-        '<i class="ti ti-palette"></i> ' + (c.ral ? escapeHtml(c.ral) : 'Цвет не указан') + '</button>' +
+      '<button class="btn btn-secondary btn-small" onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
+        escapeHtml(c.ral || '') + '&quot;)">' +
+        (c.ral ? '<span class="ral-dot" style="background:' + (_ralHex(c.ral) || '#CBD5E1') + '"></span>' +
+                 escapeHtml(c.ral)
+               : '<i class="ti ti-palette"></i> Цвет не указан') + '</button>' +
+      '<button class="btn btn-primary btn-small" onclick="openPaintVedomost(' + c.id + ')">' +
+        '<i class="ti ti-file-type-pdf"></i> Ведомость PDF</button>' +
       '<button class="btn btn-secondary btn-small" onclick="deletePaintCalc(' + c.id + ')">' +
         '<i class="ti ti-trash"></i></button>' +
     '</div>' +
@@ -15803,9 +15808,14 @@ function renderPaintCalcDetail(c) {
         '<td><input type="number" min="1" class="pd-qty" value="' + (it.qty || 1) + '" ' +
           'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})"></td>' +
         '<td>' + (it.thickness_mm ? it.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +
-        '<td class="pd-mat-cell">' + escapeHtml(it.material || '—') + '</td>' +
-        '<td><input type="text" class="pd-ral" value="' + escapeHtml(it.ral || '') + '" ' +
-          'placeholder="RAL" onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{ral:this.value})"></td>' +
+        '<td class="pd-mat-cell"><button class="pd-mat-btn" onclick="openPaintMaterialPicker(' +
+          it.calc_id + ',' + it.id + ',&quot;' + escapeHtml(it.material || '') + '&quot;)">' +
+          escapeHtml(it.material || 'указать') + '</button></td>' +
+        '<td><button class="pd-ral-btn" onclick="openPaintRalPicker(' + it.calc_id + ',' + it.id + ',&quot;' +
+          escapeHtml(it.ral || '') + '&quot;)">' +
+          (it.ral ? '<span class="ral-dot" style="background:' + (_ralHex(it.ral) || '#CBD5E1') + '"></span>' +
+                    escapeHtml(it.ral)
+                  : '<span class="pd-dim">выбрать</span>') + '</button></td>' +
         '<td>' + Number(it.net_area_m2 || 0).toFixed(4) + '</td>' +
         '<td>' + Number(it.paint_per_part_m2 || 0).toFixed(4) + '</td>' +
         '<td class="pd-strong">' + Number(it.paint_total_m2 || 0).toFixed(4) + '</td>' +
@@ -15919,4 +15929,212 @@ async function deletePaintCalc(calcId) {
   } catch (e) {
     showToast('Ошибка: ' + String((e && e.message) || e), 'error');
   }
+}
+
+// ============ v2.45.841: КАТАЛОГ RAL И ВЫБОР МАТЕРИАЛА ============
+// Цех красит по цвету и по циклу подготовки, поэтому и то и другое должно
+// выбираться из списка, а не набиваться руками с опечатками.
+
+const RAL_CATALOG = [
+  { c: 'RAL 1013', h: '#E3D9C6', n: 'жемчужно-белый' },
+  { c: 'RAL 1014', h: '#DDC49A', n: 'слоновая кость' },
+  { c: 'RAL 1015', h: '#E6D2B5', n: 'светлая слоновая кость' },
+  { c: 'RAL 1018', h: '#F3E03B', n: 'цинково-жёлтый' },
+  { c: 'RAL 2004', h: '#E75B12', n: 'оранжевый' },
+  { c: 'RAL 3000', h: '#AB2524', n: 'огненно-красный' },
+  { c: 'RAL 3020', h: '#CC0605', n: 'транспортный красный' },
+  { c: 'RAL 5005', h: '#1E2460', n: 'сигнальный синий' },
+  { c: 'RAL 5012', h: '#0B71B4', n: 'голубой' },
+  { c: 'RAL 5015', h: '#1761AB', n: 'небесно-синий' },
+  { c: 'RAL 5017', h: '#063971', n: 'транспортный синий' },
+  { c: 'RAL 6018', h: '#57A639', n: 'жёлто-зелёный' },
+  { c: 'RAL 6029', h: '#00874A', n: 'мятно-зелёный' },
+  { c: 'RAL 7004', h: '#969992', n: 'сигнальный серый' },
+  { c: 'RAL 7016', h: '#293133', n: 'антрацитово-серый' },
+  { c: 'RAL 7024', h: '#474A51', n: 'графитовый серый' },
+  { c: 'RAL 7035', h: '#D7D7D7', n: 'светло-серый' },
+  { c: 'RAL 7040', h: '#9DA1AA', n: 'серое окно' },
+  { c: 'RAL 7042', h: '#8D948D', n: 'серый транспорт A' },
+  { c: 'RAL 8017', h: '#442F29', n: 'шоколадно-коричневый' },
+  { c: 'RAL 9001', h: '#E9E0D2', n: 'кремово-белый' },
+  { c: 'RAL 9003', h: '#F4F4F4', n: 'сигнальный белый' },
+  { c: 'RAL 9005', h: '#0A0A0A', n: 'чёрный янтарь' },
+  { c: 'RAL 9006', h: '#A5A5A5', n: 'бело-алюминиевый' },
+  { c: 'RAL 9007', h: '#8F8F8F', n: 'тёмный алюминий' },
+  { c: 'RAL 9010', h: '#F1ECE1', n: 'чисто-белый' },
+  { c: 'RAL 9011', h: '#27292B', n: 'графитово-чёрный' },
+  { c: 'RAL 9016', h: '#F6F6F6', n: 'транспортный белый' },
+  { c: 'RAL 9017', h: '#1E1E1E', n: 'транспортный чёрный' },
+  { c: 'RAL 9018', h: '#C5C7C4', n: 'папирусно-белый' },
+];
+
+function _ralHex(code) {
+  const r = RAL_CATALOG.find(x => x.c === (code || '').trim());
+  return r ? r.h : null;
+}
+
+// Марки материалов приходят с бэкенда: плотность и цикл подготовки по марке
+// считает он же, двум спискам расходиться нельзя.
+async function _loadPaintCatalogs() {
+  if (state._paintMaterials) return state._paintMaterials;
+  try {
+    const r = await apiGet('/api/paint-calcs/catalogs');
+    state._paintMaterials = (r && r.materials) || [];
+  } catch (e) {
+    state._paintMaterials = [];
+  }
+  return state._paintMaterials;
+}
+
+function openPaintRalPicker(calcId, itemId, current) {
+  let m = document.getElementById('ral-picker-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ral-picker-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeRalPicker(); };
+    document.body.appendChild(m);
+  }
+  const cells = RAL_CATALOG.map(r =>
+    '<button type="button" class="ral-cell' + (r.c === current ? ' active' : '') + '" ' +
+      'onclick="_pickRal(' + calcId + ',' + (itemId || 'null') + ',&quot;' + r.c + '&quot;)">' +
+      '<span class="ral-swatch" style="background:' + r.h + '"></span>' +
+      '<span class="ral-code">' + r.c + '</span>' +
+      '<span class="ral-name">' + escapeHtml(r.n) + '</span>' +
+    '</button>').join('');
+
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-palette"></i> Цвет покрытия' +
+          (itemId ? '' : ' — на весь расчёт') + '</h3>' +
+        '<button class="modal-close" onclick="closeRalPicker()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="ral-grid">' + cells + '</div>' +
+        '<div class="form-group" style="margin-top:14px;">' +
+          '<label>Или впишите код вручную</label>' +
+          '<input type="text" id="ral-manual" maxlength="60" placeholder="RAL 7038" value="' +
+            escapeHtml(current || '') + '">' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          (current ? '<button class="btn btn-secondary storage-off-btn" onclick="_pickRal(' +
+            calcId + ',' + (itemId || 'null') + ',&quot;&quot;)">Убрать цвет</button>' : '') +
+          '<button class="btn btn-secondary" onclick="closeRalPicker()">Отмена</button>' +
+          '<button class="btn btn-primary" onclick="_pickRal(' + calcId + ',' +
+            (itemId || 'null') + ', null)">Применить</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+}
+
+function closeRalPicker() {
+  const m = document.getElementById('ral-picker-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function _pickRal(calcId, itemId, code) {
+  let ral = code;
+  if (ral === null) {
+    const f = document.getElementById('ral-manual');
+    ral = ((f && f.value) || '').trim();
+  }
+  closeRalPicker();
+  if (itemId) {
+    await savePaintItem(calcId, itemId, { ral: ral });
+  } else {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ral: ral }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { state.currentPaintCalc = d; renderPaintCalcDetail(d); }
+  }
+}
+
+function openPaintMaterialPicker(calcId, itemId, current) {
+  _loadPaintCatalogs().then(mats => {
+    let m = document.getElementById('mat-picker-modal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'mat-picker-modal';
+      m.className = 'modal-overlay';
+      m.onclick = (e) => { if (e.target === m) closeMatPicker(); };
+      document.body.appendChild(m);
+    }
+    const opts = (mats || []).map(x =>
+      '<button type="button" class="mat-row" onclick="_pickMaterial(' + calcId + ',' + itemId +
+        ',&quot;' + x.value.replace(/"/g, '') + '&quot;)">' +
+        '<b>' + escapeHtml(x.label) + '</b><small>' + escapeHtml(x.value) + '</small></button>').join('');
+    m.innerHTML =
+      '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+        '<div class="modal-header">' +
+          '<h3><i class="ti ti-layers-intersect"></i> Материал детали</h3>' +
+          '<button class="modal-close" onclick="closeMatPicker()"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div class="modal-content">' +
+          '<div class="mat-lead">Марка определяет плотность (по ней идёт контроль массы) ' +
+            'и цикл подготовки в цехе. Сейчас: <b>' + escapeHtml(current || 'не указан') + '</b></div>' +
+          '<div class="mat-list">' + opts + '</div>' +
+          '<div class="form-group" style="margin-top:12px;">' +
+            '<label>Или впишите марку вручную</label>' +
+            '<input type="text" id="mat-manual" maxlength="120" value="' +
+              escapeHtml(current || '') + '">' +
+          '</div>' +
+          '<div class="modal-actions">' +
+            '<button class="btn btn-secondary" onclick="closeMatPicker()">Отмена</button>' +
+            '<button class="btn btn-primary" onclick="_pickMaterial(' + calcId + ',' + itemId +
+              ', null)">Применить</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    m.classList.add('visible');
+  });
+}
+
+function closeMatPicker() {
+  const m = document.getElementById('mat-picker-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function _pickMaterial(calcId, itemId, value) {
+  let mat = value;
+  if (mat === null) {
+    const f = document.getElementById('mat-manual');
+    mat = ((f && f.value) || '').trim();
+  }
+  closeMatPicker();
+  await savePaintItem(calcId, itemId, { material: mat });
+}
+
+function openPaintVedomost(calcId) {
+  const c = state.currentPaintCalc;
+  if (c && !(c.items || []).length) {
+    showToast('Сначала загрузите файлы раскроя', 'error');
+    return;
+  }
+  // Ведомость уходит в цех — цвет в ней обязателен
+  if (c && !(c.ral || '').trim() && !(c.items || []).some(i => (i.ral || '').trim())) {
+    if (!confirm('RAL не указан ни у одной позиции.\n\nВ ведомости будет написано, что ' +
+                 'цвет не согласован и красить нельзя. Всё равно собрать?')) return;
+  }
+  const token = localStorage.getItem(TOKEN_KEY);
+  // pdf отдаётся с авторизацией, поэтому качаем через fetch и открываем blob
+  showToast('Собираем ведомость…', 'info');
+  fetch(API_BASE + '/api/paint-calcs/' + calcId + '/vedomost.pdf', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  }).then(async r => {
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Не удалось собрать ведомость', 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }).catch(e => showToast('Ошибка: ' + String((e && e.message) || e), 'error'));
 }
