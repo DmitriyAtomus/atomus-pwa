@@ -15693,6 +15693,19 @@ async function openPaintCalc(id) {
     const c = await apiGet('/api/paint-calcs/' + id);
     state.currentPaintCalc = c;
     renderPaintCalcDetail(c);
+    // v2.45.845: старые расчёты посчитаны до мини-чертежей — дорисуем в фоне
+    const needSvg = (c.items || []).some(it => !it.svg && (it.source_file || '').trim());
+    if (!state._paintPrevAsked) state._paintPrevAsked = {};
+    if (needSvg && !state._paintPrevAsked[c.id]) {
+      state._paintPrevAsked[c.id] = 1;
+      apiPost('/api/paint-calcs/' + id + '/previews', {}).then(r => {
+        if (r && r.ok && r.data && Number(r.data.previews_rendered || 0) > 0 &&
+            state.currentPaintCalc && state.currentPaintCalc.id === id) {
+          state.currentPaintCalc = r.data;
+          renderPaintCalcDetail(r.data);
+        }
+      }).catch(() => {});
+    }
   } catch (e) {
     showToast('Не удалось открыть расчёт', 'error');
     loadPaintCalcs();
