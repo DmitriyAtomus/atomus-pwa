@@ -15511,3 +15511,339 @@ document.addEventListener('DOMContentLoaded', () => {
     inp.style.height = Math.min(inp.scrollHeight, 140) + 'px';
   });
 });
+
+
+// ============================================================================
+// v2.45.836: РАСЧЁТ ОКРАСКИ — развёртки листовых деталей
+// ============================================================================
+// Грузим DXF раскроя и чертежи, получаем площадь под порошок. Геометрию считает
+// сервер детерминированно; здесь только показ и правки количества/цвета.
+
+state.paintCalcs = null;
+state.currentPaintCalc = null;
+
+async function loadPaintCalcs() {
+  const box = document.getElementById('paint-calc-content');
+  if (!box) return;
+  try {
+    const r = await apiGet('/api/paint-calcs');
+    state.paintCalcs = (r && r.items) || [];
+    state.currentPaintCalc = null;
+    renderPaintCalcList();
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Не удалось загрузить: ' +
+      escapeHtml(String((e && e.message) || e)) + '</div>';
+  }
+}
+
+function renderPaintCalcList() {
+  const box = document.getElementById('paint-calc-content');
+  if (!box) return;
+  const list = state.paintCalcs || [];
+  if (!list.length) {
+    box.innerHTML =
+      '<div class="empty-block">' +
+        '<i class="ti ti-spray" style="font-size:32px;opacity:.4"></i>' +
+        '<div style="margin-top:8px;">Расчётов пока нет</div>' +
+        '<div style="font-size:13px;color:var(--text-light);margin-top:4px;">' +
+          'Создайте расчёт и перетащите папку с раскроем — DXF и чертежи' +
+        '</div>' +
+        '<button class="btn btn-primary" style="margin-top:14px;" onclick="openNewPaintCalc()">' +
+          '<i class="ti ti-plus"></i> Новый расчёт</button>' +
+      '</div>';
+    return;
+  }
+  let h = '<div class="paint-list">';
+  list.forEach(c => {
+    const area = Number(c.total_paint_m2 || 0);
+    h += '<div class="paint-card" onclick="openPaintCalc(' + c.id + ')">' +
+      '<div class="pc-main">' +
+        '<div class="pc-title">' + escapeHtml(c.title || 'Без названия') + '</div>' +
+        '<div class="pc-meta">' +
+          (c.contract_number ? '<span><i class="ti ti-file-text"></i> ' + escapeHtml(c.contract_number) + '</span>' : '') +
+          '<span><i class="ti ti-list"></i> позиций ' + (c.items_count || 0) + '</span>' +
+          (c.ral ? '<span><i class="ti ti-palette"></i> ' + escapeHtml(c.ral) + '</span>' : '') +
+          '<span><i class="ti ti-calendar"></i> ' + escapeHtml((c.created_at || '').slice(0, 10)) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="pc-area">' + (area ? area.toFixed(2) + ' м²' : '—') + '</div>' +
+      '<div class="pc-arrow"><i class="ti ti-chevron-right"></i></div>' +
+    '</div>';
+  });
+  h += '</div>';
+  box.innerHTML = h;
+}
+
+async function openNewPaintCalc() {
+  const title = prompt('Название расчёта (например «Блок нагревателя AG-10, партия 6 шт»):', '');
+  if (title === null) return;
+  try {
+    const r = await apiPost('/api/paint-calcs', { title: (title || '').trim() || 'Расчёт окраски' });
+    const body = (r && r.data) || {};
+    if (r && r.ok && body.id) {
+      state.paintCalcs = null;
+      openPaintCalc(body.id);
+    } else {
+      showToast(body.message || 'Не удалось создать расчёт', 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+async function openPaintCalc(id) {
+  const box = document.getElementById('paint-calc-content');
+  if (box) box.innerHTML = '<div class="loading-block">Открываем расчёт…</div>';
+  try {
+    const c = await apiGet('/api/paint-calcs/' + id);
+    state.currentPaintCalc = c;
+    renderPaintCalcDetail(c);
+  } catch (e) {
+    showToast('Не удалось открыть расчёт', 'error');
+    loadPaintCalcs();
+  }
+}
+
+function renderPaintCalcDetail(c) {
+  const box = document.getElementById('paint-calc-content');
+  if (!box || !c) return;
+  const items = c.items || [];
+  const t = c.totals || {};
+
+  let h = '<div class="paint-detail">';
+
+  // шапка
+  h += '<div class="pd-head">' +
+    '<button class="btn btn-secondary btn-small" onclick="loadPaintCalcs()">' +
+      '<i class="ti ti-arrow-left"></i> К списку</button>' +
+    '<div class="pd-title">' + escapeHtml(c.title || '') + '</div>' +
+    '<div class="pd-head-actions">' +
+      '<button class="btn btn-secondary btn-small" onclick="editPaintCalcRal(' + c.id + ')">' +
+        '<i class="ti ti-palette"></i> RAL' + (c.ral ? ': ' + escapeHtml(c.ral) : '') + '</button>' +
+      '<button class="btn btn-secondary btn-small" onclick="deletePaintCalc(' + c.id + ')">' +
+        '<i class="ti ti-trash"></i></button>' +
+    '</div>' +
+  '</div>';
+
+  // загрузка файлов
+  h += '<div class="pd-drop" id="pd-drop" ' +
+        'ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
+        'ondragleave="this.classList.remove(\'over\')" ' +
+        'ondrop="paintDropFiles(event, ' + c.id + ')">' +
+      '<i class="ti ti-cloud-upload"></i>' +
+      '<div class="pd-drop-title">Перетащите сюда папку с раскроем или архив</div>' +
+      '<div class="pd-drop-sub">DXF лазерного раскроя — геометрия, PDF чертежей — масса и материал из штампа. ' +
+        'ZIP распаковывается на сервере; RAR лучше распаковать у себя и перетащить папку</div>' +
+      '<input type="file" id="pd-file-input" multiple webkitdirectory style="display:none" ' +
+        'onchange="paintUploadFiles(' + c.id + ', this.files)">' +
+      '<input type="file" id="pd-file-input2" multiple style="display:none" ' +
+        'onchange="paintUploadFiles(' + c.id + ', this.files)">' +
+      '<div class="pd-drop-btns">' +
+        '<button class="btn btn-primary btn-small" onclick="document.getElementById(\'pd-file-input2\').click()">' +
+          '<i class="ti ti-file-plus"></i> Выбрать файлы</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'pd-file-input\').click()">' +
+          '<i class="ti ti-folder"></i> Выбрать папку</button>' +
+      '</div>' +
+    '</div>';
+
+  // итоги
+  if (items.length) {
+    const powder = t.powder || {};
+    h += '<div class="pd-totals">' +
+      '<div class="pd-total-main">' +
+        '<div class="pd-total-label">ПЛОЩАДЬ ОКРАСКИ ВСЕГО</div>' +
+        '<div class="pd-total-value">' + Number(c.total_paint_m2 || 0).toFixed(2) + ' м²</div>' +
+      '</div>' +
+      '<div class="pd-total-side">' +
+        '<div><b>Порошок:</b> ' + (powder.min_kg || 0) + '…' + (powder.max_kg || 0) + ' кг ' +
+          '<span class="pd-dim">при слое 60…80 мкм</span></div>' +
+        (t.ral_list && t.ral_list.length
+          ? '<div><b>Цвет:</b> ' + t.ral_list.map(escapeHtml).join(', ') + '</div>' : '') +
+      '</div>' +
+    '</div>';
+
+    // разбивка по материалу — цех красит по циклам подготовки, а не по деталям
+    const bm = t.by_material || {};
+    const mats = Object.keys(bm);
+    if (mats.length) {
+      h += '<div class="pd-materials">';
+      mats.forEach(m => {
+        const b = bm[m] || {};
+        h += '<div class="pd-mat">' +
+          '<div class="pd-mat-head"><b>' + escapeHtml(m) + '</b> · ' +
+            Number(b.area_m2 || 0).toFixed(2) + ' м² · деталей ' + (b.parts || 0) +
+            (b.thickness && b.thickness.length ? ' · толщина ' + b.thickness.join('/') + ' мм' : '') +
+          '</div>' +
+          '<div class="pd-mat-prep"><i class="ti ti-brush"></i> ' + escapeHtml(b.prep || '') + '</div>' +
+        '</div>';
+      });
+      h += '</div>';
+    }
+  }
+
+  // предупреждения и провалы контроля по массе
+  const warns = (c.warnings || []).concat(t.mass_control_failed || []);
+  if (t.ral_note) warns.push(t.ral_note);
+  if (warns.length) {
+    h += '<div class="pd-warns">';
+    warns.forEach(w => {
+      h += '<div class="pd-warn"><i class="ti ti-alert-triangle"></i> ' + escapeHtml(String(w)) + '</div>';
+    });
+    h += '</div>';
+  }
+
+  // позиции
+  if (items.length) {
+    h += '<div class="pd-table-wrap"><table class="pd-table">' +
+      '<thead><tr>' +
+        '<th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
+        '<th>Материал</th><th>RAL</th><th>S нетто, м²</th><th>S окраски 1 дет</th>' +
+        '<th>S всего</th><th>Масса: расчёт / штамп</th><th></th>' +
+      '</tr></thead><tbody>';
+    items.forEach(it => {
+      const dev = it.mass_dev_pct;
+      const devBad = dev !== null && dev !== undefined && Math.abs(Number(dev)) > 1;
+      h += '<tr>' +
+        '<td class="pd-desig">' + escapeHtml(it.designation || '—') + '</td>' +
+        '<td>' + escapeHtml(it.name || '—') +
+          (it.holes_count ? '<small> · вырезов ' + it.holes_count + '</small>' : '') + '</td>' +
+        '<td><input type="number" min="1" class="pd-qty" value="' + (it.qty || 1) + '" ' +
+          'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})"></td>' +
+        '<td>' + (it.thickness_mm ? it.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +
+        '<td class="pd-mat-cell">' + escapeHtml(it.material || '—') + '</td>' +
+        '<td><input type="text" class="pd-ral" value="' + escapeHtml(it.ral || '') + '" ' +
+          'placeholder="RAL" onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{ral:this.value})"></td>' +
+        '<td>' + Number(it.net_area_m2 || 0).toFixed(4) + '</td>' +
+        '<td>' + Number(it.paint_per_part_m2 || 0).toFixed(4) + '</td>' +
+        '<td class="pd-strong">' + Number(it.paint_total_m2 || 0).toFixed(4) + '</td>' +
+        '<td class="' + (devBad ? 'pd-bad' : '') + '">' +
+          (it.mass_calc_kg ? Number(it.mass_calc_kg).toFixed(3) : '—') + ' / ' +
+          (it.mass_stamp_kg ? Number(it.mass_stamp_kg).toFixed(3) : '—') +
+          (dev !== null && dev !== undefined
+            ? ' <small>(' + (Number(dev) > 0 ? '+' : '') + Number(dev).toFixed(2) + ' %)</small>' : '') +
+        '</td>' +
+        '<td><button class="icon-btn" title="Убрать позицию" ' +
+          'onclick="removePaintItem(' + it.calc_id + ',' + it.id + ')"><i class="ti ti-x"></i></button></td>' +
+      '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div class="pd-note">Площадь окраски = 2 × площадь развёртки + периметр реза × толщина. ' +
+      'Контроль: расчётная масса против массы в основной надписи, допуск 1 %.</div>';
+  }
+
+  h += '</div>';
+  box.innerHTML = h;
+}
+
+function paintDropFiles(ev, calcId) {
+  ev.preventDefault();
+  const el = document.getElementById('pd-drop');
+  if (el) el.classList.remove('over');
+  const files = (ev.dataTransfer && ev.dataTransfer.files) || [];
+  if (files.length) paintUploadFiles(calcId, files);
+}
+
+async function paintUploadFiles(calcId, fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  // на сервер шлём только то, что он умеет считать — остальное лишний трафик
+  const ok = files.filter(f => /\.(dxf|pdf|zip|rar|7z)$/i.test(f.name));
+  if (!ok.length) {
+    showToast('Не нашёл ни DXF, ни PDF, ни архива', 'error');
+    return;
+  }
+  const box = document.getElementById('paint-calc-content');
+  if (box) box.innerHTML = '<div class="loading-block">Считаем ' + ok.length +
+    ' файл(ов) — геометрия, штампы, контроль по массе…</div>';
+
+  const fd = new FormData();
+  ok.forEach(f => fd.append('files', f, f.name));
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId + '/files', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showToast(d.message || 'Не удалось посчитать', 'error');
+      openPaintCalc(calcId);
+      return;
+    }
+    state.currentPaintCalc = d;
+    renderPaintCalcDetail(d);
+    showToast('Посчитано: ' + Number(d.total_paint_m2 || 0).toFixed(2) + ' м²', 'success');
+  } catch (e) {
+    showToast('Ошибка загрузки: ' + String((e && e.message) || e), 'error');
+    openPaintCalc(calcId);
+  }
+}
+
+async function savePaintItem(calcId, itemId, patch) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId + '/items/' + itemId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(patch || {}),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+    state.currentPaintCalc = d;
+    renderPaintCalcDetail(d);
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+async function removePaintItem(calcId, itemId) {
+  if (!confirm('Убрать позицию из расчёта?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId + '/items/' + itemId, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast('Не удалось убрать', 'error'); return; }
+    state.currentPaintCalc = d;
+    renderPaintCalcDetail(d);
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+async function editPaintCalcRal(calcId) {
+  const cur = (state.currentPaintCalc && state.currentPaintCalc.ral) || '';
+  const ral = prompt('Цвет по ТЗ (например RAL 9016). Проставится позициям без своего цвета:', cur);
+  if (ral === null) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ral: (ral || '').trim() }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
+    state.currentPaintCalc = d;
+    renderPaintCalcDetail(d);
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+async function deletePaintCalc(calcId) {
+  if (!confirm('Удалить расчёт целиком?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+    showToast('Расчёт удалён', 'success');
+    loadPaintCalcs();
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
