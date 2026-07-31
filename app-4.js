@@ -15995,9 +15995,14 @@ function openPaintRalPicker(calcId, itemId, current) {
     m.onclick = (e) => { if (e.target === m) closeRalPicker(); };
     document.body.appendChild(m);
   }
+  // Для позиции клик по цвету применяет сразу — правка одна. Для всего расчёта
+  // клик только выбирает: применить ко всем или только к пустым — решает кнопка.
+  const onCell = itemId
+    ? (code) => '_pickRal(' + calcId + ',' + itemId + ',&quot;' + code + '&quot;)'
+    : (code) => '_ralSelect(&quot;' + code + '&quot;)';
   const cells = RAL_CATALOG.map(r =>
     '<button type="button" class="ral-cell' + (r.c === current ? ' active' : '') + '" ' +
-      'onclick="_pickRal(' + calcId + ',' + (itemId || 'null') + ',&quot;' + r.c + '&quot;)">' +
+      'data-ral="' + r.c + '" onclick="' + onCell(r.c) + '">' +
       '<span class="ral-swatch" style="background:' + r.h + '"></span>' +
       '<span class="ral-code">' + r.c + '</span>' +
       '<span class="ral-name">' + escapeHtml(r.n) + '</span>' +
@@ -16011,6 +16016,10 @@ function openPaintRalPicker(calcId, itemId, current) {
         '<button class="modal-close" onclick="closeRalPicker()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
+        (itemId ? '' :
+          '<div class="mat-lead">Выберите цвет партии и нажмите «Применить ко всем» — ' +
+          'он ляжет на все позиции. Отдельные детали потом можно перекрасить поштучно ' +
+          'в своей строке.</div>') +
         '<div class="ral-grid">' + cells + '</div>' +
         '<div class="form-group" style="margin-top:14px;">' +
           '<label>Или впишите код вручную</label>' +
@@ -16021,8 +16030,14 @@ function openPaintRalPicker(calcId, itemId, current) {
           (current ? '<button class="btn btn-secondary storage-off-btn" onclick="_pickRal(' +
             calcId + ',' + (itemId || 'null') + ',&quot;&quot;)">Убрать цвет</button>' : '') +
           '<button class="btn btn-secondary" onclick="closeRalPicker()">Отмена</button>' +
-          '<button class="btn btn-primary" onclick="_pickRal(' + calcId + ',' +
-            (itemId || 'null') + ', null)">Применить</button>' +
+          (itemId
+            ? '<button class="btn btn-primary" onclick="_pickRal(' + calcId + ',' + itemId +
+              ', null)">Применить</button>'
+            : '<button class="btn btn-secondary" onclick="_pickRal(' + calcId +
+                ', null, null, false)" title="Не трогать позиции, где цвет уже выбран">' +
+                'Только пустым</button>' +
+              '<button class="btn btn-primary" onclick="_pickRal(' + calcId +
+                ', null, null, true)">Применить ко всем</button>') +
         '</div>' +
       '</div>' +
     '</div>';
@@ -16034,25 +16049,38 @@ function closeRalPicker() {
   if (m) m.classList.remove('visible');
 }
 
-async function _pickRal(calcId, itemId, code) {
+// Клик по цвету в режиме «на весь расчёт»: только запоминаем выбор
+function _ralSelect(code) {
+  const f = document.getElementById('ral-manual');
+  if (f) f.value = code;
+  document.querySelectorAll('#ral-picker-modal .ral-cell').forEach(el => {
+    el.classList.toggle('active', el.dataset.ral === code);
+  });
+}
+
+async function _pickRal(calcId, itemId, code, applyAll) {
   let ral = code;
-  if (ral === null) {
+  if (ral === null || ral === undefined) {
     const f = document.getElementById('ral-manual');
     ral = ((f && f.value) || '').trim();
   }
   closeRalPicker();
   if (itemId) {
     await savePaintItem(calcId, itemId, { ral: ral });
-  } else {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ ral: ral }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok) { state.currentPaintCalc = d; renderPaintCalcDetail(d); }
+    return;
   }
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ ral: ral, apply_to_all: !!applyAll }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
+  state.currentPaintCalc = d;
+  renderPaintCalcDetail(d);
+  const n = (d.items || []).filter(i => (i.ral || '').trim() === ral).length;
+  showToast(ral ? ('Цвет ' + ral + ' — на ' + n + ' позициях') : 'Цвет убран', 'success');
 }
 
 function openPaintMaterialPicker(calcId, itemId, current) {
