@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.843";
+const APP_VERSION = "v2.45.844";
 const APP_VERSION_DATE = "31.07.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1783,6 +1783,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'catalog') loadCatalog();                   // ЭТАП 47 (v2.44.0)
   if (screenName === 'developments') loadDevelopments();         // ЭТАП 48 (v2.44.46)
   if (screenName === 'paint-calc') loadPaintCalcs();              // v2.45.836
+  if (screenName === 'mfg') loadMfg();                            // v2.45.844
   if (screenName === 'inventory') loadInventory();               // ЭТАП 49 (v2.44.56)
   // КП (14Б)
   if (screenName === 'sales-offers') loadOffers();
@@ -2103,7 +2104,7 @@ const AUTO_REFRESH_SKIP = [
   'sale-offer-form', 'sales-offer-form', 'sale-product-form', 'defect-form',
   'model-form', 'vacation-form', 'new-assembly', 'sales-contractor-form',
   'wh-ship-qr', 'security', 'atom-electrica',
-  'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc',
+  'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc', 'mfg',
   'mail-messenger',
 ];
 

@@ -22312,3 +22312,41 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
     padding: 2px 4px; margin-left: 6px; font-size: 15px; vertical-align: -1px;
   }
   .pd-edit-btn:hover { color: var(--brand); }
+
+  /* v2.45.844: база изготовления корпусов */
+  .mfg-layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; padding-top: 12px;
+                align-items: start; }
+  .mfg-tree { background: white; border: 1px solid var(--border); border-radius: 12px;
+              overflow: hidden; }
+  .mfg-tree-head { display: flex; align-items: center; justify-content: space-between;
+                   padding: 10px 12px; font-weight: 600; font-size: 13px;
+                   border-bottom: 1px solid var(--border); background: var(--bg); }
+  .mfg-empty-tree { padding: 16px 12px; font-size: 12.5px; color: var(--text-light); line-height: 1.5; }
+  .mfg-node { display: flex; align-items: center; gap: 7px; padding: 8px 10px; cursor: pointer;
+              font-size: 13.5px; border-bottom: 1px solid var(--border); }
+  .mfg-node:hover { background: var(--brand-bg); }
+  .mfg-node.active { background: var(--brand-bg); color: var(--brand); font-weight: 600; }
+  .mfg-node-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mfg-node-count { font-size: 11px; background: var(--bg); border-radius: 999px;
+                    padding: 1px 7px; color: var(--text-light); }
+  .mfg-node-actions { display: none; gap: 2px; }
+  .mfg-node:hover .mfg-node-actions { display: flex; }
+  .mfg-main { background: white; border: 1px solid var(--border); border-radius: 12px;
+              padding: 14px 16px; min-height: 320px; }
+  .mfg-main-head { display: flex; align-items: center; justify-content: space-between;
+                   gap: 12px; margin-bottom: 12px; }
+  .mfg-main-head h3 { margin: 0; font-size: 17px; }
+  .mfg-sub { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  .mfg-items { display: flex; flex-direction: column; gap: 8px; }
+  .mfg-item-card { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border);
+                   border-radius: 10px; padding: 11px 13px; cursor: pointer; transition: all .12s; }
+  .mfg-item-card:hover { border-color: var(--brand); background: var(--brand-bg); }
+  .mfg-item-main { flex: 1; min-width: 0; }
+  .mfg-item-title { font-weight: 600; font-size: 14px; }
+  .mfg-item-title small { color: var(--text-light); font-weight: 400; }
+  .mfg-item-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px;
+                   font-size: 12px; color: var(--text-light); }
+  .mfg-item-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .mfg-item-h-title { flex: 1; font-size: 16px; font-weight: 600; }
+  .mfg-item-h-actions { display: flex; gap: 8px; }
+  @media (max-width: 900px) { .mfg-layout { grid-template-columns: 1fr; } }
