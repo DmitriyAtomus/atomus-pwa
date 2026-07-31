@@ -22270,3 +22270,34 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .pd-ral { width: 96px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
   .pd-note { font-size: 12px; color: var(--text-light); padding: 0 4px 20px; }
   .paint-ral-hint { font-size: 12px; color: var(--text-light); margin-top: 8px; line-height: 1.45; }
+
+  /* v2.45.841: каталог RAL и выбор материала */
+  .ral-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+              gap: 6px; max-height: 340px; overflow-y: auto; }
+  .ral-cell { display: flex; align-items: center; gap: 7px; padding: 6px 8px;
+              border: 1px solid var(--border); border-radius: 8px; background: white;
+              cursor: pointer; text-align: left; font-size: 12px; transition: all .12s; }
+  .ral-cell:hover { border-color: var(--brand); background: var(--brand-bg); }
+  .ral-cell.active { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(45,95,139,.18); }
+  .ral-swatch { width: 20px; height: 20px; border-radius: 5px; flex: none;
+                border: 1px solid rgba(0,0,0,.15); }
+  .ral-code { font-weight: 600; white-space: nowrap; }
+  .ral-name { color: var(--text-light); font-size: 11px; overflow: hidden;
+              text-overflow: ellipsis; white-space: nowrap; }
+  .ral-dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+             margin-right: 5px; vertical-align: -1px; border: 1px solid rgba(0,0,0,.18); }
+  .pd-ral-btn, .pd-mat-btn {
+    background: white; border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 8px; font-size: 12px; cursor: pointer; font-family: inherit;
+    max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-align: left; color: var(--text);
+  }
+  .pd-ral-btn:hover, .pd-mat-btn:hover { border-color: var(--brand); color: var(--brand); }
+  .mat-lead { font-size: 12.5px; color: var(--text-mid); background: var(--bg);
+              border-radius: 8px; padding: 9px 11px; margin-bottom: 12px; line-height: 1.5; }
+  .mat-list { display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto; }
+  .mat-row { display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; background: white;
+             border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+             text-align: left; font-family: inherit; font-size: 13px; }
+  .mat-row:hover { border-color: var(--brand); background: var(--brand-bg); }
+  .mat-row small { color: var(--text-light); font-size: 11px; }
