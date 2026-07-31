@@ -16583,3 +16583,382 @@ function openPaintVedomost(calcId) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }).catch(e => showToast('Ошибка: ' + String((e && e.message) || e), 'error'));
 }
+
+
+// ============================================================================
+// v2.45.844: БАЗА ИЗГОТОВЛЕНИЯ КОРПУСОВ
+// ============================================================================
+// Разделы и подразделы (Чиллеры, Донагреватели, …) заводим сами, внутрь грузим
+// папку изделия. Состав разбирается тем же движком, что и расчёт окраски.
+
+state.mfgSections = null;
+state.mfgCurrentSection = null;
+state.mfgCurrentItem = null;
+
+async function loadMfg() {
+  const box = document.getElementById('mfg-content');
+  if (!box) return;
+  try {
+    const r = await apiGet('/api/mfg/sections');
+    state.mfgSections = (r && r.sections) || [];
+    state.mfgCurrentItem = null;
+    renderMfg();
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Не удалось загрузить: ' +
+      escapeHtml(String((e && e.message) || e)) + '</div>';
+  }
+}
+
+function _mfgTree() {
+  const all = state.mfgSections || [];
+  const byParent = {};
+  all.forEach(s => {
+    const k = s.parent_id || 0;
+    (byParent[k] = byParent[k] || []).push(s);
+  });
+  return byParent;
+}
+
+function renderMfg() {
+  const box = document.getElementById('mfg-content');
+  if (!box) return;
+  const byParent = _mfgTree();
+  const roots = byParent[0] || [];
+
+  let tree = '<div class="mfg-tree">' +
+    '<div class="mfg-tree-head">Разделы' +
+      '<button class="icon-btn" title="Новый раздел" onclick="openMfgSectionForm(null)">' +
+        '<i class="ti ti-plus"></i></button>' +
+    '</div>';
+  if (!roots.length) {
+    tree += '<div class="mfg-empty-tree">Разделов пока нет.<br>Создайте, например, ' +
+      '«Чиллеры» или «Донагреватели».</div>';
+  }
+  const renderNode = (s, depth) => {
+    const kids = byParent[s.id] || [];
+    const active = state.mfgCurrentSection === s.id ? ' active' : '';
+    let h = '<div class="mfg-node' + active + '" style="padding-left:' + (10 + depth * 14) + 'px" ' +
+      'onclick="selectMfgSection(' + s.id + ')">' +
+      '<i class="ti ' + (kids.length ? 'ti-folders' : 'ti-folder') + '"></i>' +
+      '<span class="mfg-node-name">' + escapeHtml(s.name) + '</span>' +
+      (s.items_count ? '<span class="mfg-node-count">' + s.items_count + '</span>' : '') +
+      '<span class="mfg-node-actions">' +
+        '<button class="icon-btn" title="Подраздел" onclick="event.stopPropagation();openMfgSectionForm(' + s.id + ')">' +
+          '<i class="ti ti-plus"></i></button>' +
+        '<button class="icon-btn" title="Переименовать" onclick="event.stopPropagation();renameMfgSection(' + s.id + ')">' +
+          '<i class="ti ti-pencil"></i></button>' +
+        '<button class="icon-btn" title="Удалить" onclick="event.stopPropagation();deleteMfgSection(' + s.id + ')">' +
+          '<i class="ti ti-trash"></i></button>' +
+      '</span>' +
+    '</div>';
+    kids.forEach(k => { h += renderNode(k, depth + 1); });
+    return h;
+  };
+  roots.forEach(s => { tree += renderNode(s, 0); });
+  tree += '</div>';
+
+  box.innerHTML = '<div class="mfg-layout">' + tree +
+    '<div class="mfg-main" id="mfg-main"><div class="loading-block">Выберите раздел</div></div>' +
+    '</div>';
+  if (state.mfgCurrentSection) loadMfgItems(state.mfgCurrentSection);
+}
+
+async function selectMfgSection(id) {
+  state.mfgCurrentSection = id;
+  state.mfgCurrentItem = null;
+  renderMfg();
+}
+
+async function loadMfgItems(sectionId) {
+  const main = document.getElementById('mfg-main');
+  if (!main) return;
+  const sec = (state.mfgSections || []).find(s => s.id === sectionId) || {};
+  try {
+    const r = await apiGet('/api/mfg/items?section_id=' + sectionId);
+    const items = (r && r.items) || [];
+    let h = '<div class="mfg-main-head">' +
+      '<div><h3>' + escapeHtml(sec.name || '') + '</h3>' +
+        '<div class="mfg-sub">Изделий: ' + items.length + '</div></div>' +
+      '<button class="btn btn-primary btn-small" onclick="openMfgItemForm(' + sectionId + ')">' +
+        '<i class="ti ti-plus"></i> Новое изделие</button>' +
+    '</div>';
+    if (!items.length) {
+      h += '<div class="empty-block">В разделе пока нет изделий</div>';
+    } else {
+      h += '<div class="mfg-items">';
+      items.forEach(it => {
+        h += '<div class="mfg-item-card" onclick="openMfgItem(' + it.id + ')">' +
+          '<div class="mfg-item-main">' +
+            '<div class="mfg-item-title">' +
+              (it.designation ? '<span class="pd-docnum">' + escapeHtml(it.designation) + '</span>' : '') +
+              escapeHtml(it.name || '') +
+              (it.variant ? ' <small>· ' + escapeHtml(it.variant) + '</small>' : '') +
+            '</div>' +
+            '<div class="mfg-item-meta">' +
+              '<span><i class="ti ti-list"></i> деталей ' + (it.parts_count || 0) + '</span>' +
+              (it.total_mass_kg ? '<span><i class="ti ti-weight"></i> ' +
+                Number(it.total_mass_kg).toFixed(1) + ' кг</span>' : '') +
+              (it.paint_area_m2 ? '<span><i class="ti ti-spray"></i> ' +
+                Number(it.paint_area_m2).toFixed(2) + ' м²</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="pc-arrow"><i class="ti ti-chevron-right"></i></div>' +
+        '</div>';
+      });
+      h += '</div>';
+    }
+    main.innerHTML = h;
+  } catch (e) {
+    main.innerHTML = '<div class="empty-block">Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+async function openMfgItem(id) {
+  const main = document.getElementById('mfg-main');
+  if (main) main.innerHTML = '<div class="loading-block">Открываем изделие…</div>';
+  try {
+    const it = await apiGet('/api/mfg/items/' + id);
+    state.mfgCurrentItem = it;
+    renderMfgItem(it);
+  } catch (e) {
+    showToast('Не удалось открыть изделие', 'error');
+  }
+}
+
+function renderMfgItem(it) {
+  const main = document.getElementById('mfg-main');
+  if (!main || !it) return;
+  const parts = it.parts || [];
+  const totalBends = parts.reduce((s, p) => s + (Number(p.bends) || 0) * (p.qty || 1), 0);
+
+  let h = '<div class="mfg-item-head">' +
+    '<button class="btn btn-secondary btn-small" onclick="loadMfgItems(' + it.section_id + ')">' +
+      '<i class="ti ti-arrow-left"></i> К разделу</button>' +
+    '<div class="mfg-item-h-title">' +
+      (it.designation ? '<span class="pd-docnum">' + escapeHtml(it.designation) + '</span>' : '') +
+      escapeHtml(it.name || '') +
+      '<button class="pd-edit-btn" onclick="renameMfgItem(' + it.id + ')" title="Изменить">' +
+        '<i class="ti ti-pencil"></i></button>' +
+    '</div>' +
+    '<div class="mfg-item-h-actions">' +
+      '<button class="btn btn-secondary btn-small" onclick="mfgMakePaintCalc(' + it.id + ')">' +
+        '<i class="ti ti-spray"></i> Посчитать окраску</button>' +
+      '<button class="btn btn-secondary btn-small" onclick="deleteMfgItem(' + it.id + ')">' +
+        '<i class="ti ti-trash"></i></button>' +
+    '</div>' +
+  '</div>';
+
+  h += '<div class="pd-drop" ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
+      'ondragleave="this.classList.remove(\'over\')" ondrop="mfgDropFiles(event,' + it.id + ')">' +
+    '<i class="ti ti-cloud-upload"></i>' +
+    '<div class="pd-drop-title">Перетащите папку изделия или архив</div>' +
+    '<div class="pd-drop-sub">Раскрой DXF — геометрия, чертежи PDF — масса, материал и гибы, ' +
+      'ведомость деталей XLS — количество на изделие</div>' +
+    '<input type="file" id="mfg-file-input" multiple webkitdirectory style="display:none" ' +
+      'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
+    '<input type="file" id="mfg-file-input2" multiple style="display:none" ' +
+      'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
+    '<div class="pd-drop-btns">' +
+      '<button class="btn btn-primary btn-small" onclick="document.getElementById(\'mfg-file-input2\').click()">' +
+        '<i class="ti ti-file-plus"></i> Выбрать файлы</button>' +
+      '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mfg-file-input\').click()">' +
+        '<i class="ti ti-folder"></i> Выбрать папку</button>' +
+    '</div>' +
+  '</div>';
+
+  if (parts.length) {
+    h += '<div class="pd-totals">' +
+      '<div class="pd-total-main">' +
+        '<div class="pd-total-label">ДЕТАЛЕЙ В ИЗДЕЛИИ</div>' +
+        '<div class="pd-total-value">' + parts.reduce((s, p) => s + (p.qty || 1), 0) + '</div>' +
+      '</div>' +
+      '<div class="pd-total-side">' +
+        '<div><b>Масса комплекта:</b> ' + Number(it.total_mass_kg || 0).toFixed(2) + ' кг</div>' +
+        '<div><b>Гибов всего:</b> ' + totalBends + ' <span class="pd-dim">(оценка по чертежам, правится вручную)</span></div>' +
+        (it.paint_area_m2 ? '<div><b>Площадь окраски:</b> ' +
+          Number(it.paint_area_m2).toFixed(3) + ' м²</div>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  (it.warnings || []).forEach(w => {
+    h += '<div class="pd-warn"><i class="ti ti-alert-triangle"></i> ' + escapeHtml(String(w)) + '</div>';
+  });
+
+  if (parts.length) {
+    h += '<div class="pd-table-wrap"><table class="pd-table"><thead><tr>' +
+      '<th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
+      '<th>Материал</th><th>Гибов</th><th>S развёртки, м²</th><th>Масса, кг</th><th></th>' +
+      '</tr></thead><tbody>';
+    parts.forEach(p => {
+      h += '<tr>' +
+        '<td class="pd-desig">' + escapeHtml(p.designation || '—') + '</td>' +
+        '<td>' + escapeHtml(p.name || '—') + '</td>' +
+        '<td><input type="number" min="1" class="pd-qty" value="' + (p.qty || 1) + '" ' +
+          'onchange="saveMfgPart(' + it.id + ',' + p.id + ',{qty:this.value})"></td>' +
+        '<td>' + (p.thickness_mm ? p.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +
+        '<td class="pd-mat-cell">' + escapeHtml(p.material || '—') + '</td>' +
+        '<td><input type="number" min="0" class="pd-qty" value="' + (p.bends || 0) + '" ' +
+          'onchange="saveMfgPart(' + it.id + ',' + p.id + ',{bends:this.value})"></td>' +
+        '<td>' + Number(p.net_area_m2 || 0).toFixed(4) + '</td>' +
+        '<td>' + (p.mass_kg ? Number(p.mass_kg).toFixed(3) : '—') + '</td>' +
+        '<td></td>' +
+      '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div class="pd-note">Количество берётся из ведомости деталей, гибы — из пометок ' +
+      '«ВВЕРХ/ВНИЗ» на чертеже. И то и другое можно поправить руками.</div>';
+  }
+
+  main.innerHTML = h;
+}
+
+function mfgDropFiles(ev, itemId) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('over');
+  const files = (ev.dataTransfer && ev.dataTransfer.files) || [];
+  if (files.length) mfgUploadFiles(itemId, files);
+}
+
+async function mfgUploadFiles(itemId, fileList) {
+  const files = Array.from(fileList || []).filter(f => /\.(dxf|pdf|zip|rar|7z|xls|xlsx)$/i.test(f.name));
+  if (!files.length) { showToast('Не нашёл ни DXF, ни чертежей, ни ведомости', 'error'); return; }
+  const main = document.getElementById('mfg-main');
+  if (main) main.innerHTML = '<div class="loading-block">Разбираем ' + files.length +
+    ' файл(ов): геометрия, штампы, ведомость…</div>';
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f, f.name));
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/items/' + itemId + '/files',
+      { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не удалось разобрать', 'error'); openMfgItem(itemId); return; }
+    state.mfgCurrentItem = d;
+    renderMfgItem(d);
+    showToast('Разобрано: деталей ' + (d.parts || []).length, 'success');
+  } catch (e) {
+    showToast('Ошибка загрузки: ' + String((e && e.message) || e), 'error');
+    openMfgItem(itemId);
+  }
+}
+
+async function saveMfgPart(itemId, partId, patch) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/items/' + itemId + '/parts/' + partId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(patch || {}),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
+    state.mfgCurrentItem = d;
+    renderMfgItem(d);
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+async function mfgMakePaintCalc(itemId) {
+  showToast('Считаем окраску по файлам изделия…', 'info');
+  try {
+    const r = await apiPost('/api/mfg/items/' + itemId + '/paint-calc', {});
+    const body = (r && r.data) || {};
+    if (!(r && r.ok && body.paint_calc_id)) {
+      showToast(body.message || 'Не удалось посчитать', 'error');
+      return;
+    }
+    showToast('Расчёт окраски создан', 'success');
+    selectSidebarItem('paint-calc');
+    setTimeout(() => openPaintCalc(body.paint_calc_id), 400);
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+function openMfgSectionForm(parentId) {
+  const name = prompt(parentId ? 'Название подраздела:' : 'Название раздела (например «Чиллеры»):', '');
+  if (name === null) return;
+  if (!name.trim()) return;
+  apiPost('/api/mfg/sections', { name: name.trim(), parent_id: parentId })
+    .then(r => {
+      const body = (r && r.data) || {};
+      if (r && r.ok) { state.mfgSections = body.sections || []; renderMfg(); }
+      else showToast(body.message || 'Не удалось создать', 'error');
+    })
+    .catch(e => showToast('Ошибка: ' + String(e), 'error'));
+}
+
+async function renameMfgSection(id) {
+  const s = (state.mfgSections || []).find(x => x.id === id) || {};
+  const name = prompt('Новое название раздела:', s.name || '');
+  if (name === null || !name.trim()) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + '/api/mfg/sections/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ name: name.trim() }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) { state.mfgSections = d.sections || []; renderMfg(); }
+  else showToast(d.message || 'Не сохранилось', 'error');
+}
+
+async function deleteMfgSection(id) {
+  if (!confirm('Удалить раздел?')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + '/api/mfg/sections/' + id, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) {
+    state.mfgSections = d.sections || [];
+    if (state.mfgCurrentSection === id) state.mfgCurrentSection = null;
+    renderMfg();
+  } else {
+    showToast(d.message || 'Не удалось удалить', 'error');
+  }
+}
+
+function openMfgItemForm(sectionId) {
+  const desig = prompt('Обозначение изделия (например AG-10.000.000СБ). Можно пусто:', '');
+  if (desig === null) return;
+  const name = prompt('Название изделия:', '');
+  if (name === null || !name.trim()) return;
+  apiPost('/api/mfg/items', {
+    section_id: sectionId, designation: (desig || '').trim(), name: name.trim(),
+  }).then(r => {
+    const body = (r && r.data) || {};
+    if (r && r.ok && body.id) { state.mfgCurrentItem = body; renderMfgItem(body); }
+    else showToast(body.message || 'Не удалось создать', 'error');
+  }).catch(e => showToast('Ошибка: ' + String(e), 'error'));
+}
+
+async function renameMfgItem(id) {
+  const it = state.mfgCurrentItem || {};
+  const name = prompt('Название изделия:', it.name || '');
+  if (name === null || !name.trim()) return;
+  const desig = prompt('Обозначение:', it.designation || '');
+  if (desig === null) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + '/api/mfg/items/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ name: name.trim(), designation: (desig || '').trim() }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) { state.mfgCurrentItem = d; renderMfgItem(d); }
+  else showToast('Не сохранилось', 'error');
+}
+
+async function deleteMfgItem(id) {
+  if (!confirm('Удалить изделие из базы?')) return;
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + '/api/mfg/items/' + id, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+  });
+  if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+  showToast('Удалено', 'success');
+  loadMfgItems(state.mfgCurrentSection);
+}

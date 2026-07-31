@@ -305,6 +305,9 @@
         <button class="nav-item" data-nav="developments" onclick="selectSidebarItem('developments')">
           <i class="ti ti-bulb"></i><span>Разработка оборудования</span>
         </button>
+        <button class="nav-item" data-nav="mfg" onclick="selectSidebarItem('mfg')">
+          <i class="ti ti-box-multiple"></i><span>Изготовление корпусов</span>
+        </button>
         <button class="nav-item" data-nav="paint-calc" onclick="selectSidebarItem('paint-calc')">
           <i class="ti ti-spray"></i><span>Расчёт окраски</span>
         </button>
@@ -1115,6 +1118,27 @@
               </div>
             </section>
           </div>
+        </div>
+      </div>
+
+      <!-- ============ БАЗА ИЗГОТОВЛЕНИЯ КОРПУСОВ (v2.45.844) ============ -->
+      <div class="screen" data-screen="mfg" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Изготовление корпусов</h2>
+          <button class="icon-btn" onclick="loadMfg()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Изготовление корпусов</h1>
+            <div class="page-subtitle">База изделий по разделам: состав, раскрой, гибка</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadMfg()" title="Обновить"><i class="ti ti-refresh"></i></button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="mfg-content"><div class="loading-block">Загружаем базу…</div></div>
         </div>
       </div>
 
