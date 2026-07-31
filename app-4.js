@@ -15558,7 +15558,9 @@ function renderPaintCalcList() {
     const area = Number(c.total_paint_m2 || 0);
     h += '<div class="paint-card" onclick="openPaintCalc(' + c.id + ')">' +
       '<div class="pc-main">' +
-        '<div class="pc-title">' + escapeHtml(c.title || 'Без названия') + '</div>' +
+        '<div class="pc-title">' +
+          (c.doc_number ? '<span class="pd-docnum">' + escapeHtml(c.doc_number) + '</span>' : '') +
+          escapeHtml(c.title || 'Без названия') + '</div>' +
         '<div class="pc-meta">' +
           (c.contract_number ? '<span><i class="ti ti-file-text"></i> ' + escapeHtml(c.contract_number) + '</span>' : '') +
           '<span><i class="ti ti-list"></i> позиций ' + (c.items_count || 0) + '</span>' +
@@ -15709,7 +15711,12 @@ function renderPaintCalcDetail(c) {
   h += '<div class="pd-head">' +
     '<button class="btn btn-secondary btn-small" onclick="loadPaintCalcs()">' +
       '<i class="ti ti-arrow-left"></i> К списку</button>' +
-    '<div class="pd-title">' + escapeHtml(c.title || '') + '</div>' +
+    '<div class="pd-title">' +
+      (c.doc_number ? '<span class="pd-docnum">' + escapeHtml(c.doc_number) + '</span>' : '') +
+      escapeHtml(c.title || '') +
+      '<button class="pd-edit-btn" title="Переименовать расчёт" onclick="openPaintRename(' +
+        c.id + ')"><i class="ti ti-pencil"></i></button>' +
+    '</div>' +
     '<div class="pd-head-actions">' +
       '<button class="btn btn-secondary btn-small" onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
         escapeHtml(c.ral || '') + '&quot;)">' +
@@ -16136,6 +16143,73 @@ async function _pickMaterial(calcId, itemId, value) {
   }
   closeMatPicker();
   await savePaintItem(calcId, itemId, { material: mat });
+}
+
+function openPaintRename(calcId) {
+  const c = state.currentPaintCalc || {};
+  let m = document.getElementById('paint-rename-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'paint-rename-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closePaintRename(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-pencil"></i> Расчёт окраски</h3>' +
+        '<button class="modal-close" onclick="closePaintRename()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' +
+        '<div class="form-group"><label>Название</label>' +
+          '<input type="text" id="paint-rename-title" maxlength="200" value="' +
+            escapeHtml(c.title || '') + '"></div>' +
+        '<div class="form-group"><label>Номер документа</label>' +
+          '<input type="text" id="paint-rename-num" maxlength="40" value="' +
+            escapeHtml(c.doc_number || '') + '">' +
+          '<div class="paint-ral-hint">Присваивается автоматически при создании расчёта ' +
+            '(сквозной в году) и попадает в основную надпись ведомости. ' +
+            'Менять — только если нужен свой номер.</div></div>' +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-secondary" onclick="closePaintRename()">Отмена</button>' +
+          '<button class="btn btn-primary" onclick="_paintRenameSave(' + calcId + ')">' +
+            '<i class="ti ti-check"></i> Сохранить</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  setTimeout(() => { const f = document.getElementById('paint-rename-title'); if (f) f.focus(); }, 60);
+}
+
+function closePaintRename() {
+  const m = document.getElementById('paint-rename-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function _paintRenameSave(calcId) {
+  const t = document.getElementById('paint-rename-title');
+  const n = document.getElementById('paint-rename-num');
+  const body = { title: ((t && t.value) || '').trim() || 'Расчёт окраски' };
+  const num = ((n && n.value) || '').trim();
+  if (num) body.doc_number = num;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+    closePaintRename();
+    state.currentPaintCalc = d;
+    state.paintCalcs = null;
+    renderPaintCalcDetail(d);
+    showToast('Сохранено', 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
 }
 
 function openPaintVedomost(calcId) {

@@ -22301,3 +22301,14 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
              text-align: left; font-family: inherit; font-size: 13px; }
   .mat-row:hover { border-color: var(--brand); background: var(--brand-bg); }
   .mat-row small { color: var(--text-light); font-size: 11px; }
+
+  .pd-docnum {
+    display: inline-block; font-family: ui-monospace, monospace; font-size: 12px;
+    background: var(--brand-bg); color: var(--brand); border-radius: 6px;
+    padding: 2px 7px; margin-right: 8px; vertical-align: 1px; font-weight: 600;
+  }
+  .pd-edit-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    padding: 2px 4px; margin-left: 6px; font-size: 15px; vertical-align: -1px;
+  }
+  .pd-edit-btn:hover { color: var(--brand); }
