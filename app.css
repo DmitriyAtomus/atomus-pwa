@@ -22406,8 +22406,28 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .pdx-zoom-box .bd svg { width: 100%; height: auto; max-height: 64vh; }
 
 @media (max-width: 700px) {
-  .pdx-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .pdx-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 9px; }
   .pdx-batch { bottom: 8px; padding: 10px 12px; }
   .pdx-batch .sp { margin-left: 0; width: 100%; }
   .pdx-batch .sp button { flex: 1 1 45%; justify-content: center; }
+
+  /* v2.45.846: мобильная шапка расчёта — кнопки рядами на всю ширину */
+  .pd-head { gap: 8px; }
+  .pd-title { font-size: 15.5px; min-width: 0; }
+  .pd-head-actions { width: 100%; flex-wrap: wrap; }
+  .pd-head-actions .btn { flex: 1 1 40%; justify-content: center; }
+  .pdx-view { flex: 1 1 100%; }
+  .pdx-view button { flex: 1; justify-content: center; }
+
+  /* зона загрузки — узкая полоса: тянуть на телефоне нечего */
+  .pd-drop { padding: 10px 12px; }
+  .pd-drop i.ti-cloud-upload, .pd-drop-sub, .pd-drop-title { display: none; }
+  .pd-drop-btns { margin-top: 0; }
+  .pd-drop-btns .btn { flex: 1; justify-content: center; }
+  .pd-drop-btns .btn:nth-child(2) { display: none; }  /* выбор папки на Android не работает */
+
+  .pd-totals { padding: 12px 14px; gap: 8px 18px; }
+  .pd-total-value { font-size: 22px; }
+  .pdx-chips { gap: 6px; }
+  .pdx-tile .pdx-cb.tile { width: 26px; height: 26px; }  /* пальцем попасть */
 }

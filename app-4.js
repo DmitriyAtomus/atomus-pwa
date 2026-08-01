@@ -15721,7 +15721,13 @@ function _paintSelMap(c) {
   return state._paintSel;
 }
 function _paintView() {
-  try { return localStorage.getItem('paintView') || 'table'; } catch (e) { return 'table'; }
+  // на телефоне таблица в 11 колонок нечитаема — по умолчанию плитки;
+  // явный выбор пользователя (localStorage) уважаем на любом экране
+  try {
+    const v = localStorage.getItem('paintView');
+    if (v) return v;
+  } catch (e) {}
+  return window.innerWidth <= 700 ? 'tiles' : 'table';
 }
 function paintSetView(v) {
   try { localStorage.setItem('paintView', v); } catch (e) {}
