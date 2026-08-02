@@ -1830,6 +1830,7 @@ const RADIO_STATIONS = [
   { id: 'soloviev',      name: 'Соловьёв LIVE',    url: 'https://solovievfm.hostingradio.ru/solovievfm128.aacp' },
   { id: 'sputnik',       name: 'Спутник',          url: 'https://icecast-rian.cdnvideo.ru/voicerus' },
   // Шансон / поп
+  { id: 'chanson',       name: 'Радио Шансон',     url: 'https://chanson.hostingradio.ru:8041/chanson128.mp3' },
   { id: 'vanya',         name: 'Радио Ваня',       url: 'https://icecast-radiovanya.cdnvideo.ru/radiovanya' },
 ];
 
