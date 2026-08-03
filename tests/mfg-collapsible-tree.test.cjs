@@ -18,3 +18,10 @@ test('свёрнутые разделы сохраняются после обн
   assert.match(app, /localStorage\.getItem\('mfgCollapsedSections'\)/);
   assert.match(app, /localStorage\.setItem\('mfgCollapsedSections'/);
 });
+
+test('длинные названия разделов показываются полностью', () => {
+  assert.match(css, /grid-template-columns:\s*minmax\(420px, 44%\)/);
+  assert.match(css, /\.mfg-node-name\s*\{[^}]*white-space:\s*normal/s);
+  assert.match(css, /\.mfg-node-name\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+  assert.doesNotMatch(css, /\.mfg-node-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
+});
