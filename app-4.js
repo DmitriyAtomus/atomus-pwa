@@ -16853,6 +16853,7 @@ async function mfgOrderOpen(itemId) {
   } catch (e) { state._mfgSups = state._mfgSups || []; }
   const sups = state._mfgSups;
   const pieces = chosen.reduce((a, p) => a + (p.qty || 1), 0);
+  state._mfgSupSel = null;
   let m = document.getElementById('mfg-order-modal');
   if (m) m.remove();
   m = document.createElement('div');
@@ -16882,14 +16883,14 @@ async function mfgOrderOpen(itemId) {
         'В архив: <b>DXF</b> (лазер) + <b>PDF</b> (гибка) выбранных деталей + <b>ведомость XLSX</b> ' +
         'с количествами из заказа. Сборочные СБ не кладутся.</div>' +
       '<div><div class="mo-sec">ПОСТАВЩИК</div>' +
-        '<input class="form-input" id="mo-sup-search" placeholder="🔍 Найти поставщика…" ' +
-          'oninput="mfgSupSearch(this)" style="margin-bottom:6px;">' +
         '<div style="display:flex;gap:8px;">' +
-          '<select id="mo-sup" class="form-input" style="flex:1;">' +
-            '<option value="">— без поставщика (только скачать) —</option>' +
-            sups.map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) +
-              (x.email ? ' · ' + escapeHtml(x.email) : ' · почты нет') + '</option>').join('') +
-          '</select>' +
+          '<div class="mo-combo" style="flex:1;">' +
+            '<input class="form-input" id="mo-sup-inp" autocomplete="off" ' +
+              'placeholder="🔍 Начни вводить название — или оставь пустым, чтобы просто скачать" ' +
+              'oninput="mfgSupDD(this.value)" onfocus="mfgSupDD(this.value)" ' +
+              'onblur="setTimeout(() => { const d = document.getElementById(\'mo-sup-dd\'); if (d) d.style.display = \'none\'; }, 180)">' +
+            '<div class="mo-dd" id="mo-sup-dd" style="display:none;"></div>' +
+          '</div>' +
           '<button class="btn btn-secondary" onclick="mfgSupsOpen()" title="Справочник поставщиков"><i class="ti ti-settings"></i></button>' +
         '</div></div>' +
       '<div class="form-group" style="margin:0;"><label class="form-label">Тема письма</label>' +
@@ -16913,6 +16914,46 @@ async function mfgOrderOpen(itemId) {
   });
 }
 
+function mfgSupDD(q) {
+  const dd = document.getElementById('mo-sup-dd');
+  if (!dd) return;
+  const query = String(q || '').trim().toLowerCase();
+  // напечатал заново — прежний выбор снят
+  if (state._mfgSupSel && query !== String(state._mfgSupSel.name || '').toLowerCase()) {
+    state._mfgSupSel = null;
+    const inp = document.getElementById('mo-sup-inp');
+    if (inp) inp.classList.remove('ok');
+  }
+  let list = state._mfgSups || [];
+  if (query) {
+    list = list.filter(x =>
+      (String(x.name || '') + ' ' + String(x.email || '') + ' ' + String(x.comment || ''))
+        .toLowerCase().indexOf(query) >= 0);
+  }
+  list = list.slice(0, 30);
+  dd.innerHTML = list.length ? list.map(x =>
+    '<div class="it' + (x.email ? '' : ' noml') + '" onmousedown="mfgSupPick(' + x.id + ')">' +
+      '<b>' + escapeHtml(x.name) + '</b>' +
+      '<small>' + (x.email ? escapeHtml(x.email) : 'почты нет — только скачать архив') +
+        (x.comment ? ' · ' + escapeHtml(String(x.comment).slice(0, 60)) : '') + '</small>' +
+    '</div>').join('')
+    : '<div class="it" style="cursor:default;color:var(--text-faint);">Ничего не нашлось' +
+      ' — добавь через шестерёнку</div>';
+  dd.style.display = 'block';
+}
+function mfgSupPick(id) {
+  const x = (state._mfgSups || []).find(v => v.id === id);
+  if (!x) return;
+  state._mfgSupSel = x;
+  const inp = document.getElementById('mo-sup-inp');
+  if (inp) {
+    inp.value = x.name + (x.email ? ' · ' + x.email : '');
+    inp.classList.add('ok');
+  }
+  const dd = document.getElementById('mo-sup-dd');
+  if (dd) dd.style.display = 'none';
+}
+
 async function mfgOrderGo(itemId, send) {
   const rows = Array.from(document.querySelectorAll('#mfg-order-modal .mo-row'));
   const positions = rows.map(r => ({
@@ -16920,8 +16961,13 @@ async function mfgOrderGo(itemId, send) {
     qty: Math.max(parseInt((r.querySelector('.mo-qty') || {}).value, 10) || 1, 1),
   }));
   if (!positions.length) { showToast('Заказ пуст', 'error'); return; }
-  const supId = parseInt((document.getElementById('mo-sup') || {}).value, 10) || null;
-  if (send && !supId) { showToast('Выбери поставщика с почтой', 'error'); return; }
+  const supSel = state._mfgSupSel || null;
+  const supId = supSel ? supSel.id : null;
+  if (send && !supId) { showToast('Выбери поставщика из списка', 'error'); return; }
+  if (send && !(supSel.email || '').trim()) {
+    showToast('У поставщика не заполнена почта — заполни в справочнике', 'error');
+    return;
+  }
   const b1 = document.getElementById('mo-dl');
   const b2 = document.getElementById('mo-send');
   if (b1) b1.disabled = true;
@@ -17044,35 +17090,6 @@ function _mfgSupsRender() {
       : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">' +
         (q ? 'Ничего не нашлось по «' + escapeHtml(q) + '»' : 'Пока пусто — добавь первого') + '</div>';
   }
-  // обновляем селект в открытой модалке заказа (полный список, без фильтра)
-  _mfgSupSelectFill(all);
-}
-function _mfgSupSelectFill(all, q) {
-  const sel = document.getElementById('mo-sup');
-  if (!sel) return;
-  const cur = sel.value;
-  let list = all || state._mfgSups || [];
-  if (q) {
-    list = list.filter(x =>
-      (String(x.name || '') + ' ' + String(x.email || '') + ' ' + String(x.comment || ''))
-        .toLowerCase().indexOf(q) >= 0);
-  }
-  sel.innerHTML = '<option value="">— без поставщика (только скачать) —</option>' +
-    list.map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) +
-      (x.email ? ' · ' + escapeHtml(x.email) : ' · почты нет') + '</option>').join('');
-  sel.value = cur;
-  // если выбранный отфильтровался — не теряем его
-  if (cur && sel.value !== cur) {
-    const kept = (state._mfgSups || []).find(x => String(x.id) === cur);
-    if (kept) {
-      sel.insertAdjacentHTML('afterbegin',
-        '<option value="' + kept.id + '">' + escapeHtml(kept.name) + '</option>');
-      sel.value = cur;
-    }
-  }
-}
-function mfgSupSearch(inp) {
-  _mfgSupSelectFill(null, (inp.value || '').trim().toLowerCase());
 }
 async function mfgSupAdd() {
   const name = ((document.getElementById('ms-name') || {}).value || '').trim();

@@ -22531,3 +22531,14 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mo-hist .dl { color: #CBD5E1; cursor: pointer; flex: none; }
 .mo-hist .dl:hover { color: var(--brand); }
 .pdx-st.work { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+
+/* ============ v2.45.865: комбо выбора поставщика в заказе ============ */
+.mo-combo { position: relative; }
+.mo-combo #mo-sup-inp.ok { border-color: #34D399; background: #F0FDF4; }
+.mo-dd { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; background: #fff; border: 1.5px solid var(--border); border-radius: 11px; box-shadow: 0 14px 34px rgba(15, 30, 60, .18); max-height: 260px; overflow-y: auto; }
+.mo-dd .it { padding: 8px 13px; cursor: pointer; border-bottom: 1px solid #F1F5FA; }
+.mo-dd .it:last-child { border-bottom: none; }
+.mo-dd .it:hover { background: #F0F6FF; }
+.mo-dd .it b { display: block; font-size: 12.5px; }
+.mo-dd .it small { font-size: 10.5px; color: var(--text-faint); }
+.mo-dd .it.noml b { color: var(--text-mid); }
