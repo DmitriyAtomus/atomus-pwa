@@ -16655,7 +16655,8 @@ function renderMfg() {
     const kids = byParent[s.id] || [];
     const collapsed = !!state.mfgCollapsedSections[String(s.id)];
     const active = state.mfgCurrentSection === s.id ? ' active' : '';
-    let h = '<div class="mfg-node' + active + '" style="padding-left:' + (10 + depth * 14) + 'px" ' +
+    let h = '<div class="mfg-node' + active + (depth === 0 ? ' root' : '') +
+      '" style="padding-left:' + (10 + depth * 14) + 'px" ' +
       'onclick="selectMfgSection(' + s.id + ')">' +
       (kids.length
         ? '<button class="mfg-node-toggle" title="' + (collapsed ? 'Развернуть' : 'Свернуть') +
@@ -16663,7 +16664,7 @@ function renderMfg() {
           '" onclick="toggleMfgSection(' + s.id + ', event)"><i class="ti ti-chevron-' +
           (collapsed ? 'right' : 'down') + '"></i></button>'
         : '<span class="mfg-node-toggle-spacer"></span>') +
-      '<i class="ti ' + (kids.length ? 'ti-folders' : 'ti-folder') + '"></i>' +
+      '<i class="ti ' + (kids.length ? 'ti-folders' : 'ti-box') + ' nico"></i>' +
       '<span class="mfg-node-name">' + escapeHtml(s.name) + '</span>' +
       (s.items_count ? '<span class="mfg-node-count">' + s.items_count + '</span>' : '') +
       '<span class="mfg-node-actions">' +
