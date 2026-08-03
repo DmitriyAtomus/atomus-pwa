@@ -22551,3 +22551,49 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mp-head small { color: var(--text-faint); margin-left: 6px; }
 .mp-zip { display: inline-flex; align-items: center; gap: 6px; background: #FFF7ED; border: 1px solid #FED7AA; color: #B45309; border-radius: 8px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; }
 .mp-body { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; font-size: 13px; line-height: 1.65; background: #fff; white-space: normal; }
+
+/* ============ v2.45.869: корпуса — красота: карточки с превью, компактная загрузка ============ */
+.mfgb-crumbs { font-size: 11.5px; color: var(--text-faint); margin: 2px 0 6px; }
+.mfgb-crumbs b { color: var(--brand); }
+.mfgb-stats { display: flex; gap: 14px; font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
+.mfgb-stats b { color: var(--text-dark); font-size: 13px; }
+
+.mfgu { display: flex; align-items: center; gap: 13px; border: 1.5px dashed #B9C8DE; border-radius: 13px; padding: 10px 16px; background: #fff; transition: all .15s; }
+.mfgu.over { border-color: var(--brand); background: var(--brand-bg); }
+.mfgu .ic { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #EFF6FF, #DBEAFE); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 19px; flex: none; }
+.mfgu .t { flex: 1; min-width: 0; }
+.mfgu .t b { display: block; font-size: 12.5px; }
+.mfgu .t small { font-size: 11px; color: var(--text-faint); }
+.mfgu .ub { border: 1.5px solid var(--border); background: #fff; color: var(--text-mid); border-radius: 9px; padding: 7px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; font-family: inherit; flex: none; }
+.mfgu .ub:hover { border-color: #93C5FD; color: var(--brand); }
+
+.mfgb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.mfgb-card { background: #fff; border: 1.5px solid var(--border); border-radius: 16px; cursor: pointer; transition: all .13s; overflow: hidden; position: relative; }
+.mfgb-card:hover { border-color: #93C5FD; box-shadow: 0 8px 22px rgba(37, 99, 235, .13); transform: translateY(-1px); }
+.mfgb-card .go { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 8px; background: #fff; border: 1px solid #EDF1F7; color: #B6BFCC; display: flex; align-items: center; justify-content: center; font-size: 13px; z-index: 2; }
+.mfgb-card:hover .go { color: var(--brand); border-color: #93C5FD; }
+.mfgb-card .strip { display: flex; gap: 6px; padding: 12px 14px 10px; background: linear-gradient(180deg, #FAFCFF, #fff); border-bottom: 1px solid #F1F5FA; }
+.mfgb-card .th { flex: 1; height: 62px; background: #F6F9FE; border: 1px solid #EDF1F7; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 5px; min-width: 0; }
+.mfgb-card .th svg { max-width: 100%; max-height: 100%; }
+.mfgb-card .th.more { flex: 0 0 44px; font-size: 10.5px; font-weight: 800; color: var(--text-faint); }
+.mfgb-card .inf { padding: 11px 14px 12px; }
+.mfgb-card .tt { display: flex; align-items: flex-start; gap: 8px; padding-right: 26px; }
+.mfgb-card .nm { font-size: 13px; font-weight: 700; line-height: 1.35; }
+.mfgb-card .nm small { color: var(--text-faint); font-weight: 600; }
+.mfgb-card .mt { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+.mfgb-card .chip { display: inline-flex; align-items: center; gap: 4px; background: #F6F8FC; border: 1px solid #EDF1F7; border-radius: 8px; padding: 3px 9px; font-size: 10.5px; font-weight: 700; color: var(--text-mid); }
+.mfgb-card .chip .ti { font-size: 12px; color: var(--text-faint); }
+.mfgb-card .chip b { color: var(--text-dark); }
+.mfgb-card .chip.o-sent { background: #EFF6FF; border-color: #BFDBFE; color: #1D4ED8; }
+.mfgb-card .chip.o-work { background: #FFF7ED; border-color: #FED7AA; color: #C2410C; }
+.mfgb-card .chip.o-done { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
+
+/* итоги изделия — чуть наряднее */
+.mfg-main .pd-totals { border-left-width: 5px; box-shadow: 0 2px 10px rgba(15, 30, 60, .05); }
+@media (max-width: 700px) {
+  .mfgu { flex-wrap: wrap; }
+  .mfgu .t { flex: 1 1 60%; }
+  .mfgu .ub { flex: 1; justify-content: center; }
+  .mfgu .ub:nth-of-type(2) { display: none; }  /* папка на Android не работает */
+  .mfgb-grid { grid-template-columns: 1fr; }
+}

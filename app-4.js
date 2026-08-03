@@ -16726,51 +16726,69 @@ async function loadMfgItems(sectionId) {
   try {
     const r = await apiGet('/api/mfg/items?section_id=' + sectionId);
     const items = (r && r.items) || [];
-    let h = '<div class="mfg-main-head">' +
+    // хлебные крошки: родительский раздел, если есть
+    const parent = (state.mfgSections || []).find(x => x.id === sec.parent_id);
+    const totMass = items.reduce((a, x) => a + (Number(x.total_mass_kg) || 0), 0);
+    const totParts = items.reduce((a, x) => a + (Number(x.parts_count) || 0), 0);
+    let h = '<div class="mfgb-crumbs">Изготовление корпусов' +
+      (parent ? ' · ' + escapeHtml(parent.name) : '') +
+      ' · <b>' + escapeHtml(sec.name || '') + '</b></div>' +
+    '<div class="mfg-main-head">' +
       '<div><h3>' + escapeHtml(sec.name || '') + '</h3>' +
-        '<div class="mfg-sub">Изделий: ' + items.length + '</div></div>' +
+        '<div class="mfgb-stats"><span>изделий <b>' + items.length + '</b></span>' +
+          (totParts ? '<span>деталей <b>' + totParts + '</b></span>' : '') +
+          (totMass ? '<span>масса <b>' + totMass.toFixed(1) + ' кг</b></span>' : '') +
+        '</div></div>' +
       '<button class="btn btn-primary btn-small" onclick="openMfgItemForm(' + sectionId + ')">' +
         '<i class="ti ti-plus"></i> Новое изделие</button>' +
     '</div>';
     // v2.45.868: чертежи можно закинуть прямо в раздел — изделие создастся само
-    h += '<div class="pd-drop" ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
+    h += '<div class="mfgu" ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
         'ondragleave="this.classList.remove(\'over\')" ondrop="mfgQuickDrop(event,' + sectionId + ')">' +
-      '<i class="ti ti-cloud-upload"></i>' +
-      '<div class="pd-drop-title">Закинь чертежи сюда — изделие создастся само</div>' +
-      '<div class="pd-drop-sub">Папка изделия или архив: DXF, PDF, ведомость XLS. ' +
-        'Обозначение возьмём из файлов, название потом можно поправить</div>' +
+      '<span class="ic"><i class="ti ti-cloud-upload"></i></span>' +
+      '<span class="t"><b>Закинь чертежи — изделие создастся само</b>' +
+        '<small>папка или архив: DXF, PDF, ведомость XLS · обозначение возьмём из файлов</small></span>' +
       '<input type="file" id="mfg-quick-input" multiple style="display:none" ' +
         'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
       '<input type="file" id="mfg-quick-input2" multiple webkitdirectory style="display:none" ' +
         'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
-      '<div class="pd-drop-btns">' +
-        '<button class="btn btn-primary btn-small" onclick="document.getElementById(\'mfg-quick-input\').click()">' +
-          '<i class="ti ti-file-plus"></i> Выбрать файлы</button>' +
-        '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mfg-quick-input2\').click()">' +
-          '<i class="ti ti-folder"></i> Выбрать папку</button>' +
-      '</div>' +
+      '<button class="ub" onclick="document.getElementById(\'mfg-quick-input\').click()">' +
+        '<i class="ti ti-file-plus"></i> Файлы</button>' +
+      '<button class="ub" onclick="document.getElementById(\'mfg-quick-input2\').click()">' +
+        '<i class="ti ti-folder"></i> Папка</button>' +
     '</div>';
     if (!items.length) {
       h += '<div class="empty-block">В разделе пока нет изделий</div>';
     } else {
-      h += '<div class="mfg-items">';
+      h += '<div class="mfgb-grid">';
       items.forEach(it => {
-        h += '<div class="mfg-item-card" onclick="openMfgItem(' + it.id + ')">' +
-          '<div class="mfg-item-main">' +
-            '<div class="mfg-item-title">' +
+        const thumbs = it.thumbs || [];
+        const extra = Math.max((it.parts_count || 0) - thumbs.length, 0);
+        const lo = it.last_order;
+        h += '<div class="mfgb-card" onclick="openMfgItem(' + it.id + ')">' +
+          '<span class="go"><i class="ti ti-chevron-right"></i></span>' +
+          (thumbs.length
+            ? '<div class="strip">' + thumbs.map(t => '<span class="th">' + t + '</span>').join('') +
+              (extra ? '<span class="th more">+' + extra + '</span>' : '') + '</div>'
+            : '') +
+          '<div class="inf">' +
+            '<div class="tt">' +
               (it.designation ? '<span class="pd-docnum">' + escapeHtml(it.designation) + '</span>' : '') +
-              escapeHtml(it.name || '') +
-              (it.variant ? ' <small>· ' + escapeHtml(it.variant) + '</small>' : '') +
+              '<span class="nm">' + escapeHtml(it.name || '') +
+                (it.variant ? ' <small>· ' + escapeHtml(it.variant) + '</small>' : '') + '</span>' +
             '</div>' +
-            '<div class="mfg-item-meta">' +
-              '<span><i class="ti ti-list"></i> деталей ' + (it.parts_count || 0) + '</span>' +
-              (it.total_mass_kg ? '<span><i class="ti ti-weight"></i> ' +
-                Number(it.total_mass_kg).toFixed(1) + ' кг</span>' : '') +
-              (it.paint_area_m2 ? '<span><i class="ti ti-spray"></i> ' +
-                Number(it.paint_area_m2).toFixed(2) + ' м²</span>' : '') +
+            '<div class="mt">' +
+              '<span class="chip"><i class="ti ti-list"></i> <b>' + (it.parts_count || 0) + '</b> дет</span>' +
+              (it.total_mass_kg ? '<span class="chip"><i class="ti ti-weight"></i> <b>' +
+                Number(it.total_mass_kg).toFixed(1) + '</b> кг</span>' : '') +
+              (it.paint_area_m2 ? '<span class="chip"><i class="ti ti-spray"></i> <b>' +
+                Number(it.paint_area_m2).toFixed(2) + '</b> м²</span>' : '') +
+              (lo ? '<span class="chip o-' + (lo.status || 'sent') + '"><i class="ti ti-' +
+                (lo.status === 'done' ? 'check' : 'truck') + '"></i> ' + escapeHtml(lo.doc_number || '') + ' ' +
+                (lo.status === 'done' ? 'получен' : (lo.status === 'work' ? 'в работе' : 'отправлен')) +
+              '</span>' : '') +
             '</div>' +
           '</div>' +
-          '<div class="pc-arrow"><i class="ti ti-chevron-right"></i></div>' +
         '</div>';
       });
       h += '</div>';
@@ -17278,22 +17296,19 @@ function renderMfgItem(it) {
     '</div>' +
   '</div>';
 
-  h += '<div class="pd-drop" ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
+  h += '<div class="mfgu" ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
       'ondragleave="this.classList.remove(\'over\')" ondrop="mfgDropFiles(event,' + it.id + ')">' +
-    '<i class="ti ti-cloud-upload"></i>' +
-    '<div class="pd-drop-title">Перетащите папку изделия или архив</div>' +
-    '<div class="pd-drop-sub">Раскрой DXF — геометрия, чертежи PDF — масса, материал и гибы, ' +
-      'ведомость деталей XLS — количество на изделие</div>' +
+    '<span class="ic"><i class="ti ti-cloud-upload"></i></span>' +
+    '<span class="t"><b>Перетащи сюда папку изделия или архив</b>' +
+      '<small>DXF — раскрой · PDF — чертежи, масса, гибы · XLS — ведомость деталей</small></span>' +
     '<input type="file" id="mfg-file-input" multiple webkitdirectory style="display:none" ' +
       'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
     '<input type="file" id="mfg-file-input2" multiple style="display:none" ' +
       'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
-    '<div class="pd-drop-btns">' +
-      '<button class="btn btn-primary btn-small" onclick="document.getElementById(\'mfg-file-input2\').click()">' +
-        '<i class="ti ti-file-plus"></i> Выбрать файлы</button>' +
-      '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mfg-file-input\').click()">' +
-        '<i class="ti ti-folder"></i> Выбрать папку</button>' +
-    '</div>' +
+    '<button class="ub" onclick="document.getElementById(\'mfg-file-input2\').click()">' +
+      '<i class="ti ti-file-plus"></i> Файлы</button>' +
+    '<button class="ub" onclick="document.getElementById(\'mfg-file-input\').click()">' +
+      '<i class="ti ti-folder"></i> Папка</button>' +
   '</div>';
 
   // ---- лента файлов изделия: PDF открываются тут, остальное скачивается
