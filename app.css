@@ -22438,3 +22438,44 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .pdx-chips { gap: 6px; }
   .pdx-tile .pdx-cb.tile { width: 26px; height: 26px; }  /* пальцем попасть */
 }
+
+/* ============ v2.45.853: корпуса — файлы изделия, плитки, PDF-просмотрщик ============ */
+.mfgf-sec { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--text-light); text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.mfgf-sec .ln { flex: 1; height: 1px; background: var(--border); }
+.mfgf-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.mfgf-row .mfgf-rest { display: none; }
+.mfgf-row.open .mfgf-rest { display: contents; }
+.mfgf { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); border-radius: 11px; padding: 7px 11px; font-size: 12px; cursor: pointer; background: #fff; transition: border-color .12s, box-shadow .12s; max-width: 300px; }
+.mfgf:hover { border-color: #93C5FD; box-shadow: 0 3px 10px rgba(37, 99, 235, .12); }
+.mfgf .fic { min-width: 34px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9.5px; font-weight: 800; flex: none; padding: 0 4px; }
+.mfgf.pdf .fic { background: #DC2626; }
+.mfgf.dxf .fic { background: #64748B; }
+.mfgf.xls .fic { background: #059669; }
+.mfgf.oth .fic { background: #94A3B8; }
+.mfgf .fn { min-width: 0; }
+.mfgf .fn b { display: block; font-size: 11.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
+.mfgf .fn small { font-size: 10px; color: var(--text-faint); }
+.mfgf .dl { color: #B6BFCC; font-size: 13px; }
+.mfgf:hover .dl { color: var(--brand); }
+.mfgf.more { border-style: dashed; color: var(--text-faint); font-weight: 700; font-size: 11.5px; }
+
+.mfg-eye { width: 30px; height: 30px; border-radius: 9px; border: 1.5px solid var(--border); background: #fff; color: #64748B; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+.mfg-eye:hover { border-color: #93C5FD; color: var(--brand); }
+.mfg-eye.dis { opacity: .35; cursor: default; }
+.mfg-pdfbtn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #FCA5A5; background: #FEF2F2; color: #B91C1C; border-radius: 8px; padding: 3px 8px; font-size: 10px; font-weight: 800; cursor: pointer; font-family: inherit; }
+.mfg-pdfbtn:hover { background: #FEE2E2; }
+
+.mfg-pdf-overlay { position: fixed; inset: 0; background: rgba(10, 22, 40, .72); z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.mfg-pdf-box { width: min(1100px, 96vw); height: min(92vh, 900px); background: #3E4756; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
+.mfg-pdf-hd { display: flex; align-items: center; gap: 10px; background: #0F2A4A; color: #fff; padding: 10px 14px; flex: none; }
+.mfg-pdf-hd .t { font-size: 13px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.mfg-pdf-hd .t small { opacity: .7; font-weight: 600; margin-left: 8px; }
+.mfg-pdf-hd .nav { display: flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, .1); border-radius: 8px; padding: 3px; }
+.mfg-pdf-hd .nav button { background: transparent; border: none; color: #fff; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.mfg-pdf-hd .nav button:hover { background: rgba(255, 255, 255, .18); }
+.mfg-pdf-hd .nav span { font-size: 11px; opacity: .85; padding: 0 6px; white-space: nowrap; }
+.mfg-pdf-hd .vb { background: rgba(255, 255, 255, .14); border: none; color: #fff; border-radius: 8px; padding: 7px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; white-space: nowrap; }
+.mfg-pdf-hd .vb:hover { background: rgba(255, 255, 255, .24); }
+.mfg-pdf-bd { flex: 1; position: relative; }
+.mfg-pdf-bd iframe { width: 100%; height: 100%; border: none; background: #3E4756; transition: opacity .15s; }
+.mfg-pdf-bd .loading-block { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; }

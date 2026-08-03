@@ -16751,16 +16751,55 @@ async function openMfgItem(id) {
     const it = await apiGet('/api/mfg/items/' + id);
     state.mfgCurrentItem = it;
     renderMfgItem(it);
+    // v2.45.853: изделия, загруженные до превью, дорисовываются в фоне
+    const needSvg = (it.parts || []).some(p => !p.svg && (p.source_file || '').trim());
+    if (!state._mfgPrevAsked) state._mfgPrevAsked = {};
+    if (needSvg && !state._mfgPrevAsked[it.id]) {
+      state._mfgPrevAsked[it.id] = 1;
+      apiPost('/api/mfg/items/' + id + '/previews', {}).then(r => {
+        if (r && r.ok && r.data && Number(r.data.previews_rendered || 0) > 0 &&
+            state.mfgCurrentItem && state.mfgCurrentItem.id === id) {
+          state.mfgCurrentItem = r.data;
+          renderMfgItem(r.data);
+        }
+      }).catch(() => {});
+    }
   } catch (e) {
     showToast('Не удалось открыть изделие', 'error');
   }
+}
+
+// PDF детали ищем по обозначению в имени файла (чертёж «AG-02.000.001 Кожух.pdf»)
+function _mfgPartPdf(it, p) {
+  const d = String(p.designation || '').trim().toLowerCase();
+  if (!d) return null;
+  return (it.files || []).find(f => f.kind === 'pdf' &&
+    String(f.file_name || '').toLowerCase().indexOf(d) >= 0) || null;
+}
+function _mfgView() {
+  try {
+    const v = localStorage.getItem('mfgView');
+    if (v) return v;
+  } catch (e) {}
+  return window.innerWidth <= 700 ? 'tiles' : 'table';
+}
+function mfgSetView(v) {
+  try { localStorage.setItem('mfgView', v); } catch (e) {}
+  renderMfgItem(state.mfgCurrentItem);
+}
+function _mfgFileSize(b) {
+  b = Number(b || 0);
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + ' МБ';
+  return Math.max(1, Math.round(b / 1024)) + ' КБ';
 }
 
 function renderMfgItem(it) {
   const main = document.getElementById('mfg-main');
   if (!main || !it) return;
   const parts = it.parts || [];
+  const files = it.files || [];
   const totalBends = parts.reduce((s, p) => s + (Number(p.bends) || 0) * (p.qty || 1), 0);
+  const view = _mfgView();
 
   let h = '<div class="mfg-item-head">' +
     '<button class="btn btn-secondary btn-small" onclick="loadMfgItems(' + it.section_id + ')">' +
@@ -16772,6 +16811,12 @@ function renderMfgItem(it) {
         '<i class="ti ti-pencil"></i></button>' +
     '</div>' +
     '<div class="mfg-item-h-actions">' +
+      (parts.length
+        ? '<span class="pdx-view">' +
+          '<button class="' + (view === 'table' ? 'on' : '') + '" onclick="mfgSetView(\'table\')"><i class="ti ti-list"></i> Таблица</button>' +
+          '<button class="' + (view === 'tiles' ? 'on' : '') + '" onclick="mfgSetView(\'tiles\')"><i class="ti ti-layout-grid"></i> Плитки</button>' +
+          '</span>'
+        : '') +
       '<button class="btn btn-secondary btn-small" onclick="mfgMakePaintCalc(' + it.id + ')">' +
         '<i class="ti ti-spray"></i> Посчитать окраску</button>' +
       '<button class="btn btn-secondary btn-small" onclick="deleteMfgItem(' + it.id + ')">' +
@@ -16797,6 +16842,34 @@ function renderMfgItem(it) {
     '</div>' +
   '</div>';
 
+  // ---- лента файлов изделия: PDF открываются тут, остальное скачивается
+  if (files.length) {
+    const order = { pdf: 0, dxf: 1, sheet: 2, archive: 3, other: 4 };
+    const sorted = files.slice().sort((a, b) =>
+      (order[a.kind] ?? 9) - (order[b.kind] ?? 9) || String(a.file_name).localeCompare(String(b.file_name), 'ru'));
+    const chip = (f) => {
+      const isPdf = f.kind === 'pdf';
+      const cls = isPdf ? 'pdf' : (f.kind === 'dxf' ? 'dxf' : (f.kind === 'sheet' ? 'xls' : 'oth'));
+      const act = isPdf ? 'mfgOpenPdf(' + it.id + ',' + f.id + ')'
+                        : 'mfgDownloadFile(' + f.id + ')';
+      return '<div class="mfgf ' + cls + '" onclick="' + act + '" title="' +
+        escapeHtml(f.file_name || '') + (isPdf ? ' — открыть' : ' — скачать') + '">' +
+        '<span class="fic">' + (isPdf ? 'PDF' : (f.kind === 'dxf' ? 'DXF' : (f.kind === 'sheet' ? 'XLS' : 'ФАЙЛ'))) + '</span>' +
+        '<span class="fn"><b>' + escapeHtml(f.file_name || '') + '</b>' +
+          '<small>' + _mfgFileSize(f.size_bytes) + (isPdf ? ' · открыть тут' : ' · скачать') + '</small></span>' +
+        '<i class="ti ' + (isPdf ? 'ti-eye' : 'ti-download') + ' dl"></i></div>';
+    };
+    const MAXV = 8;
+    h += '<div class="mfgf-sec">ФАЙЛЫ ИЗДЕЛИЯ · ' + files.length + '<span class="ln"></span></div>' +
+      '<div class="mfgf-row">' + sorted.slice(0, MAXV).map(chip).join('') +
+      (sorted.length > MAXV
+        ? '<div class="mfgf more" onclick="this.parentNode.classList.add(\'open\');this.remove()">' +
+          '<i class="ti ti-chevron-down"></i> ещё ' + (sorted.length - MAXV) + '…</div>' +
+          '<span class="mfgf-rest">' + sorted.slice(MAXV).map(chip).join('') + '</span>'
+        : '') +
+      '</div>';
+  }
+
   if (parts.length) {
     h += '<div class="pd-totals">' +
       '<div class="pd-total-main">' +
@@ -16816,12 +16889,40 @@ function renderMfgItem(it) {
     h += '<div class="pd-warn"><i class="ti ti-alert-triangle"></i> ' + escapeHtml(String(w)) + '</div>';
   });
 
-  if (parts.length) {
+  if (parts.length && view === 'tiles') {
+    h += '<div class="pdx-grid">' + parts.map(p => {
+      const pdf = _mfgPartPdf(it, p);
+      const svg = p.svg ||
+        '<svg viewBox="0 0 170 110" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect x="30" y="20" width="110" height="70" rx="8" fill="none" stroke="#CBD5E1" ' +
+        'stroke-width="1.6" stroke-dasharray="7 5"/>' +
+        '<text x="85" y="58" text-anchor="middle" font-size="11" fill="#94A3B8" font-weight="700">без чертежа</text></svg>';
+      return '<div class="pdx-tile" onclick="' +
+          (p.svg ? 'mfgZoomPart(' + p.id + ')' : (pdf ? 'mfgOpenPdf(' + it.id + ',' + pdf.id + ')' : '')) + '">' +
+        (p.svg ? '<span class="pdx-zoom" title="Развёртка крупно" ' +
+          'onclick="event.stopPropagation();mfgZoomPart(' + p.id + ')"><i class="ti ti-zoom-in"></i></span>' : '') +
+        '<div class="pdx-draw">' + svg + '</div>' +
+        '<span class="pdx-qty">×' + (p.qty || 1) + '</span>' +
+        '<div class="pdx-info">' +
+          '<div class="d">' + escapeHtml(p.designation || '—') + '</div>' +
+          '<div class="n">' + escapeHtml(p.name || '—') + '</div>' +
+          '<div class="m" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+            '<span>' + (p.thickness_mm ? p.thickness_mm + ' мм' : '') +
+              (p.mass_kg ? ' · ' + Number(p.mass_kg).toFixed(2) + ' кг' : '') + '</span>' +
+            (pdf ? '<button class="mfg-pdfbtn" title="Открыть чертёж PDF" ' +
+              'onclick="event.stopPropagation();mfgOpenPdf(' + it.id + ',' + pdf.id + ')">' +
+              '<i class="ti ti-file-type-pdf"></i> PDF</button>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  } else if (parts.length) {
     h += '<div class="pd-table-wrap"><table class="pd-table"><thead><tr>' +
       '<th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
-      '<th>Материал</th><th>Гибов</th><th>S развёртки, м²</th><th>Масса, кг</th><th></th>' +
+      '<th>Материал</th><th>Гибов</th><th>S развёртки, м²</th><th>Масса, кг</th><th>Чертёж</th>' +
       '</tr></thead><tbody>';
     parts.forEach(p => {
+      const pdf = _mfgPartPdf(it, p);
       h += '<tr>' +
         '<td class="pd-desig">' + escapeHtml(p.designation || '—') + '</td>' +
         '<td>' + escapeHtml(p.name || '—') + '</td>' +
@@ -16833,7 +16934,11 @@ function renderMfgItem(it) {
           'onchange="saveMfgPart(' + it.id + ',' + p.id + ',{bends:this.value})"></td>' +
         '<td>' + Number(p.net_area_m2 || 0).toFixed(4) + '</td>' +
         '<td>' + (p.mass_kg ? Number(p.mass_kg).toFixed(3) : '—') + '</td>' +
-        '<td></td>' +
+        '<td>' + (pdf
+          ? '<button class="mfg-eye" title="Открыть чертёж PDF" onclick="mfgOpenPdf(' +
+            it.id + ',' + pdf.id + ')"><i class="ti ti-eye"></i></button>'
+          : '<span class="mfg-eye dis" title="Чертёж не загружен"><i class="ti ti-eye-off"></i></span>') +
+        '</td>' +
       '</tr>';
     });
     h += '</tbody></table></div>';
@@ -16842,6 +16947,127 @@ function renderMfgItem(it) {
   }
 
   main.innerHTML = h;
+}
+
+// развёртка крупно (svg, без PDF)
+function mfgZoomPart(partId) {
+  const it = state.mfgCurrentItem;
+  const p = it && (it.parts || []).find(x => x.id === partId);
+  if (!p || !p.svg) return;
+  let m = document.getElementById('paint-zoom-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'paint-zoom-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = () => m.remove();
+  const pdf = _mfgPartPdf(it, p);
+  m.innerHTML = '<div class="pdx-zoom-box" onclick="event.stopPropagation()">' +
+    '<div class="hd"><b>' + escapeHtml(p.designation || '') + '</b> ' + escapeHtml(p.name || '') +
+      '<span style="margin-left:auto;display:flex;gap:8px;align-items:center;">' +
+      (pdf ? '<button class="btn btn-primary btn-small" onclick="document.getElementById(\'paint-zoom-modal\').remove();mfgOpenPdf(' +
+        it.id + ',' + pdf.id + ')"><i class="ti ti-file-type-pdf"></i> Открыть PDF</button>' : '') +
+      '<button class="icon-btn" onclick="document.getElementById(\'paint-zoom-modal\').remove()"><i class="ti ti-x"></i></button></span></div>' +
+    '<div class="bd">' + p.svg + '</div></div>';
+  document.body.appendChild(m);
+}
+
+// ---------- просмотрщик PDF ----------
+function mfgOpenPdf(itemId, fileId) {
+  const it = state.mfgCurrentItem || {};
+  const pdfs = (it.files || []).filter(f => f.kind === 'pdf');
+  if (!pdfs.length) return;
+  let idx = pdfs.findIndex(f => f.id === fileId);
+  if (idx < 0) idx = 0;
+  state._mfgPdfList = pdfs;
+  state._mfgPdfIdx = idx;
+  // мобильный Chrome не показывает PDF в iframe — открываем нативно
+  if (window.innerWidth <= 700) { mfgDownloadFile(pdfs[idx].id, true); return; }
+  let m = document.getElementById('mfg-pdf-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'mfg-pdf-modal';
+  m.className = 'mfg-pdf-overlay';
+  m.onclick = (e) => { if (e.target === m) mfgPdfClose(); };
+  m.innerHTML =
+    '<div class="mfg-pdf-box">' +
+      '<div class="mfg-pdf-hd">' +
+        '<i class="ti ti-file-type-pdf" style="color:#FF8787;font-size:17px;"></i>' +
+        '<div class="t" id="mfg-pdf-title">…</div>' +
+        (pdfs.length > 1
+          ? '<span class="nav">' +
+            '<button onclick="mfgPdfNav(-1)" title="Предыдущий чертёж"><i class="ti ti-chevron-left"></i></button>' +
+            '<span id="mfg-pdf-cnt"></span>' +
+            '<button onclick="mfgPdfNav(1)" title="Следующий чертёж"><i class="ti ti-chevron-right"></i></button></span>'
+          : '') +
+        '<button class="vb" onclick="mfgDownloadFile(state._mfgPdfList[state._mfgPdfIdx].id)"><i class="ti ti-download"></i> Скачать</button>' +
+        '<button class="vb" onclick="mfgDownloadFile(state._mfgPdfList[state._mfgPdfIdx].id, true)"><i class="ti ti-external-link"></i> В новой вкладке</button>' +
+        '<button class="vb x" onclick="mfgPdfClose()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="mfg-pdf-bd"><iframe id="mfg-pdf-frame" title="Чертёж"></iframe>' +
+        '<div class="loading-block" id="mfg-pdf-load">Открываем чертёж…</div></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  _mfgPdfLoad();
+}
+function mfgPdfClose() {
+  const m = document.getElementById('mfg-pdf-modal');
+  if (m) m.remove();
+  if (state._mfgPdfUrl) { try { URL.revokeObjectURL(state._mfgPdfUrl); } catch (e) {} }
+  state._mfgPdfUrl = null;
+}
+function mfgPdfNav(d) {
+  const n = (state._mfgPdfList || []).length;
+  if (!n) return;
+  state._mfgPdfIdx = (state._mfgPdfIdx + d + n) % n;
+  _mfgPdfLoad();
+}
+async function _mfgPdfLoad() {
+  const f = (state._mfgPdfList || [])[state._mfgPdfIdx];
+  if (!f) return;
+  const t = document.getElementById('mfg-pdf-title');
+  const cnt = document.getElementById('mfg-pdf-cnt');
+  const frame = document.getElementById('mfg-pdf-frame');
+  const load = document.getElementById('mfg-pdf-load');
+  if (t) t.innerHTML = escapeHtml(f.file_name || '') + '<small>' + _mfgFileSize(f.size_bytes) + '</small>';
+  if (cnt) cnt.textContent = (state._mfgPdfIdx + 1) + ' из ' + state._mfgPdfList.length;
+  if (load) load.style.display = 'flex';
+  if (frame) frame.style.opacity = '0';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/files/' + f.id + '/download',
+      { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const blob = await r.blob();
+    if (state._mfgPdfUrl) { try { URL.revokeObjectURL(state._mfgPdfUrl); } catch (e) {} }
+    state._mfgPdfUrl = URL.createObjectURL(blob);
+    if (frame) { frame.src = state._mfgPdfUrl; frame.style.opacity = '1'; }
+    if (load) load.style.display = 'none';
+  } catch (e) {
+    if (load) load.textContent = 'Не удалось открыть чертёж';
+  }
+}
+async function mfgDownloadFile(fileId, openTab) {
+  const it = state.mfgCurrentItem || {};
+  const f = (it.files || []).find(x => x.id === fileId) || {};
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/files/' + fileId + '/download',
+      { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Файл не читается', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    if (openTab) {
+      window.open(url, '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = f.file_name || 'file';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 function mfgDropFiles(ev, itemId) {
