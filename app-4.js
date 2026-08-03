@@ -17126,8 +17126,10 @@ async function mfgOrderGo(itemId, send) {
     if (j.missing && j.missing.length) {
       showToast('Внимание: ' + j.missing.join('; '), 'error');
     }
-    showToast(send ? ('✉ ' + j.doc_number + ' отправлен поставщику')
-                   : (j.doc_number + ' сформирован — качаем архив'), 'success');
+    showToast(send ? ('✉ ' + j.doc_number + ' отправлен поставщику' +
+                     (j.supply_order_id ? ' и передан в снабжение' : ''))
+                   : (j.doc_number + ' сформирован — качаем архив' +
+                     (j.supply_order_id ? ' · заказ заведён в снабжении' : '')), 'success');
     if (!send) mfgOrderArchive(j.order_id, j.zip_name);
     state._mfgPreview = null;
     const mp = document.getElementById('mfg-preview-modal');
