@@ -22544,3 +22544,10 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mo-dd .it.noml b { color: var(--text-mid); }
 .mo-row.pick { cursor: pointer; transition: border-color .12s, background .12s; }
 .mo-row.pick:hover { border-color: #93C5FD; background: #F7FAFF; }
+
+/* ============ v2.45.867: предпросмотр письма заказа ============ */
+.mp-head { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #FAFBFE; font-size: 13px; margin-bottom: 12px; }
+.mp-head .k { display: inline-block; width: 84px; font-size: 10.5px; font-weight: 800; letter-spacing: .4px; color: var(--text-light); text-transform: uppercase; }
+.mp-head small { color: var(--text-faint); margin-left: 6px; }
+.mp-zip { display: inline-flex; align-items: center; gap: 6px; background: #FFF7ED; border: 1px solid #FED7AA; color: #B45309; border-radius: 8px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; }
+.mp-body { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; font-size: 13px; line-height: 1.65; background: #fff; white-space: normal; }

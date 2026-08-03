@@ -16902,7 +16902,7 @@ async function mfgOrderOpen(itemId) {
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" id="mo-dl" onclick="mfgOrderGo(' + it.id + ', false)"><i class="ti ti-download"></i> Скачать архив</button>' +
-      '<button class="btn btn-primary" id="mo-send" onclick="mfgOrderGo(' + it.id + ', true)"><i class="ti ti-send"></i> Отправить письмом</button>' +
+      '<button class="btn btn-primary" id="mo-send" onclick="mfgOrderPreview(' + it.id + ')"><i class="ti ti-eye"></i> Посмотреть и отправить</button>' +
     '</div></div>';
   document.body.appendChild(m);
   const matBox = document.getElementById('mo-mat');
@@ -16954,12 +16954,73 @@ function mfgSupPick(id) {
   if (dd) dd.style.display = 'none';
 }
 
-async function mfgOrderGo(itemId, send) {
+function _mfgOrderForm() {
   const rows = Array.from(document.querySelectorAll('#mfg-order-modal .mo-row'));
   const positions = rows.map(r => ({
     part_id: parseInt(r.dataset.part, 10),
     qty: Math.max(parseInt((r.querySelector('.mo-qty') || {}).value, 10) || 1, 1),
-  }));
+  })).filter(p => p.part_id);
+  const matBtn = document.querySelector('#mo-mat button.on');
+  const supSel = state._mfgSupSel || null;
+  return {
+    positions: positions,
+    supplier_id: supSel ? supSel.id : null,
+    material: (matBtn && matBtn.dataset.mat) || '',
+    subject: (document.getElementById('mo-subject') || {}).value || '',
+    body: (document.getElementById('mo-body') || {}).value || '',
+  };
+}
+
+// предпросмотр: письмо ровно в том виде, в каком уйдёт
+async function mfgOrderPreview(itemId) {
+  const f = _mfgOrderForm();
+  if (!f.positions.length) { showToast('Заказ пуст', 'error'); return; }
+  const supSel = state._mfgSupSel || null;
+  if (!supSel) { showToast('Выбери поставщика из списка', 'error'); return; }
+  if (!(supSel.email || '').trim()) {
+    showToast('У поставщика не заполнена почта — заполни в справочнике', 'error');
+    return;
+  }
+  let d = null;
+  try {
+    const r = await apiPost('/api/mfg/items/' + itemId + '/order/preview', f);
+    if (r && r.ok && r.data && r.data.ok) d = r.data;
+  } catch (e) {}
+  if (!d) { showToast('Не удалось собрать предпросмотр', 'error'); return; }
+  let m = document.getElementById('mfg-preview-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'mfg-preview-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '1310';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:600px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-mail"></i> Проверь письмо перед отправкой</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'mfg-preview-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' +
+      '<div class="mp-head">' +
+        '<div><span class="k">От кого</span><b>Атомус Групп</b> <small>' + escapeHtml(d.from_addr || '') + '</small></div>' +
+        '<div><span class="k">Кому</span><b>' + escapeHtml(d.to_name || '') + '</b> <small>' + escapeHtml(d.to_addr || '') + '</small></div>' +
+        '<div><span class="k">Тема</span><b>' + escapeHtml(d.subject || '') + '</b></div>' +
+        '<div><span class="k">Вложение</span><span class="mp-zip"><i class="ti ti-file-zip"></i> ZIP: DXF + PDF + ведомость · ' +
+          d.parts_count + ' поз., ' + d.pieces_count + ' шт</span></div>' +
+      '</div>' +
+      '<div class="mp-body">' + escapeHtml(d.body || '').replace(/\n/g, '<br>') + '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'mfg-preview-modal\').remove()"><i class="ti ti-pencil"></i> Править</button>' +
+      '<button class="btn btn-primary" id="mp-go" onclick="mfgOrderGo(' + itemId + ', true, ' +
+        '\'' + escapeHtml(String(d.subject || '').replace(/'/g, '’')) + '\')">' +
+        '<i class="ti ti-send"></i> Отправить</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  // финальные тему/текст передаём как есть — что видел, то и уйдёт
+  state._mfgPreview = { subject: d.subject, body: d.body };
+}
+
+async function mfgOrderGo(itemId, send) {
+  const f = _mfgOrderForm();
+  const positions = f.positions;
   if (!positions.length) { showToast('Заказ пуст', 'error'); return; }
   const supSel = state._mfgSupSel || null;
   const supId = supSel ? supSel.id : null;
@@ -16968,17 +17029,21 @@ async function mfgOrderGo(itemId, send) {
     showToast('У поставщика не заполнена почта — заполни в справочнике', 'error');
     return;
   }
+  // после предпросмотра шлём ровно то, что человек видел
+  if (send && state._mfgPreview) {
+    f.subject = state._mfgPreview.subject;
+    f.body = state._mfgPreview.body;
+  }
+  const mpGo = document.getElementById('mp-go');
+  if (mpGo) { mpGo.disabled = true; mpGo.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
   const b1 = document.getElementById('mo-dl');
   const b2 = document.getElementById('mo-send');
   if (b1) b1.disabled = true;
   if (b2) { b2.disabled = true; if (send) b2.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
   try {
-    const matBtn = document.querySelector('#mo-mat button.on');
     const r = await apiPost('/api/mfg/items/' + itemId + '/order', {
       positions: positions, supplier_id: supId, send: !!send,
-      material: (matBtn && matBtn.dataset.mat) || '',
-      subject: (document.getElementById('mo-subject') || {}).value || '',
-      body: (document.getElementById('mo-body') || {}).value || '',
+      material: f.material, subject: f.subject, body: f.body,
     });
     const j = (r && r.data) || {};
     if (!(r && r.ok && j.ok)) {
@@ -16993,6 +17058,9 @@ async function mfgOrderGo(itemId, send) {
     showToast(send ? ('✉ ' + j.doc_number + ' отправлен поставщику')
                    : (j.doc_number + ' сформирован — качаем архив'), 'success');
     if (!send) mfgOrderArchive(j.order_id, j.zip_name);
+    state._mfgPreview = null;
+    const mp = document.getElementById('mfg-preview-modal');
+    if (mp) mp.remove();
     const m = document.getElementById('mfg-order-modal');
     if (m) m.remove();
     if (state.mfgCurrentItem && state.mfgCurrentItem.id === itemId) {
