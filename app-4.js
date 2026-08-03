@@ -16777,7 +16777,9 @@ async function openMfgItem(id) {
     if (needSvg && !state._mfgPrevAsked[it.id]) {
       state._mfgPrevAsked[it.id] = 1;
       apiPost('/api/mfg/items/' + id + '/previews', {}).then(r => {
-        if (r && r.ok && r.data && Number(r.data.previews_rendered || 0) > 0 &&
+        // перерисовываем всегда: доводчик мог обновить не только превью,
+        // но и количество или диагностику в предупреждениях
+        if (r && r.ok && r.data &&
             state.mfgCurrentItem && state.mfgCurrentItem.id === id) {
           state.mfgCurrentItem = r.data;
           renderMfgItem(r.data);
