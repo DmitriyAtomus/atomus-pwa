@@ -16934,7 +16934,8 @@ function renderMfgItem(it) {
           '<div class="d">' + escapeHtml(p.designation || '—') + '</div>' +
           '<div class="n">' + escapeHtml(p.name || '—') + '</div>' +
           '<div class="m" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
-            '<span>' + (p.thickness_mm ? p.thickness_mm + ' мм' : '') +
+            '<span><b>' + (p.qty || 1) + ' шт</b>' +
+              (p.thickness_mm ? ' · ' + p.thickness_mm + ' мм' : '') +
               (p.mass_kg ? ' · ' + Number(p.mass_kg).toFixed(2) + ' кг' : '') + '</span>' +
             (pdf ? '<button class="mfg-pdfbtn" title="Открыть чертёж PDF" ' +
               'onclick="event.stopPropagation();mfgOpenPdf(' + it.id + ',' + pdf.id + ')">' +
