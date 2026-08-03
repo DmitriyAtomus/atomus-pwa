@@ -16894,7 +16894,7 @@ async function mfgOrderOpen(itemId) {
         escapeHtml('Атомус Групп — заказ на изготовление ' + (it.designation || '') +
           ' (' + chosen.length + ' поз., ' + pieces + ' шт)') + '"></div>' +
       '<div class="form-group" style="margin:0;"><label class="form-label">Текст письма</label>' +
-        '<textarea class="form-input" id="mo-body" rows="4">Добрый день! Просим изготовить детали по вложению: раскрой DXF, гибка по PDF, количество в ведомости. Материал и толщина указаны в ведомости. О сроках сообщите ответным письмом.\n\nС уважением, Атомус Групп</textarea></div>' +
+        '<textarea class="form-input" id="mo-body" rows="4">Добрый день! Просим изготовить детали по вложению: раскрой DXF, гибка по PDF, количество в ведомости. Материал и толщина указаны в ведомости. О сроках сообщите ответным письмом.</textarea></div>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" id="mo-dl" onclick="mfgOrderGo(' + it.id + ', false)"><i class="ti ti-download"></i> Скачать архив</button>' +
