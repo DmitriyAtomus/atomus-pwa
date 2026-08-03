@@ -16933,7 +16933,13 @@ function renderMfgItem(it) {
       const pdf = _mfgPartPdf(it, p);
       h += '<tr>' +
         '<td class="pd-desig">' + escapeHtml(p.designation || '—') + '</td>' +
-        '<td>' + escapeHtml(p.name || '—') + '</td>' +
+        '<td>' + escapeHtml(p.name || '—') +
+          // на телефоне тех. колонки скрыты — их значения мелкой строкой тут
+          '<small class="mfg-sub">' +
+            [(p.thickness_mm ? p.thickness_mm + ' мм' : ''),
+             String(p.material || '').split('ГОСТ')[0].trim(),
+             (p.mass_kg ? Number(p.mass_kg).toFixed(2) + ' кг' : '')]
+            .filter(Boolean).join(' · ') + '</small></td>' +
         '<td><input type="number" min="1" class="pd-qty" value="' + (p.qty || 1) + '" ' +
           'onchange="saveMfgPart(' + it.id + ',' + p.id + ',{qty:this.value})"></td>' +
         '<td>' + (p.thickness_mm ? p.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +

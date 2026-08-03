@@ -22481,3 +22481,17 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mfg-pdf-bd { flex: 1; position: relative; }
 .mfg-pdf-bd iframe { width: 100%; height: 100%; border: none; background: #3E4756; transition: opacity .15s; }
 .mfg-pdf-bd .loading-block { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
+
+/* v2.45.855: таблица деталей изделия влезает в телефон без горизонтального листания */
+.mfg-sub { display: none; }
+@media (max-width: 700px) {
+  /* прячем толщину, материал, S развёртки и массу — они мелкой строкой под названием */
+  .mfg-main .pd-table th:nth-child(4), .mfg-main .pd-table td:nth-child(4),
+  .mfg-main .pd-table th:nth-child(5), .mfg-main .pd-table td:nth-child(5),
+  .mfg-main .pd-table th:nth-child(7), .mfg-main .pd-table td:nth-child(7),
+  .mfg-main .pd-table th:nth-child(8), .mfg-main .pd-table td:nth-child(8) { display: none; }
+  .mfg-main .mfg-sub { display: block; font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  .mfg-main .pd-table th, .mfg-main .pd-table td { padding: 8px 7px; }
+  .mfg-main .pd-desig { font-size: 10.5px; white-space: normal; word-break: break-all; }
+  .mfg-main .pd-qty { width: 48px; padding: 5px 6px; }
+}
