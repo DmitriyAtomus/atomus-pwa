@@ -22482,6 +22482,23 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mfg-pdf-bd iframe { width: 100%; height: 100%; border: none; background: #3E4756; transition: opacity .15s; }
 .mfg-pdf-bd .loading-block { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
 
+/* v2.45.856: дерево разделов сворачивается — карточка изделия во всю ширину */
+.mfg-restore { display: none; }
+.mfg-layout.tree-off .mfg-tree { display: none; }
+.mfg-layout.tree-off { grid-template-columns: auto minmax(0, 1fr) !important; }
+.mfg-layout.tree-off .mfg-restore {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: #fff; border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 14px 7px; cursor: pointer; color: var(--text-mid);
+  font-size: 10px; font-weight: 800; height: fit-content; position: sticky; top: 80px;
+}
+.mfg-layout.tree-off .mfg-restore:hover { color: var(--brand); border-color: #93C5FD; }
+.mfg-layout.tree-off .mfg-restore span { writing-mode: vertical-rl; letter-spacing: .5px; }
+@media (max-width: 900px) {
+  .mfg-layout.tree-off .mfg-restore { flex-direction: row; position: static; padding: 8px 12px; }
+  .mfg-layout.tree-off .mfg-restore span { writing-mode: horizontal-tb; }
+}
+
 /* v2.45.855: таблица деталей изделия влезает в телефон без горизонтального листания */
 .mfg-sub { display: none; }
 @media (max-width: 700px) {

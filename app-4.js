@@ -16640,8 +16640,12 @@ function renderMfg() {
 
   let tree = '<div class="mfg-tree">' +
     '<div class="mfg-tree-head">Разделы' +
+      '<span style="display:inline-flex;gap:2px;">' +
       '<button class="icon-btn" title="Новый раздел" onclick="openMfgSectionForm(null)">' +
         '<i class="ti ti-plus"></i></button>' +
+      '<button class="icon-btn" title="Свернуть разделы — карточка на всю ширину" onclick="mfgToggleTree()">' +
+        '<i class="ti ti-layout-sidebar-left-collapse"></i></button>' +
+      '</span>' +
     '</div>';
   if (!roots.length) {
     tree += '<div class="mfg-empty-tree">Разделов пока нет.<br>Создайте, например, ' +
@@ -16677,10 +16681,25 @@ function renderMfg() {
   roots.forEach(s => { tree += renderNode(s, 0); });
   tree += '</div>';
 
-  box.innerHTML = '<div class="mfg-layout">' + tree +
+  // v2.45.856: дерево можно свернуть — карточка изделия во всю ширину
+  let treeOff = false;
+  try { treeOff = localStorage.getItem('mfgTreeOff') === '1'; } catch (e) {}
+  box.innerHTML = '<div class="mfg-layout' + (treeOff ? ' tree-off' : '') + '">' + tree +
+    '<div class="mfg-restore" onclick="mfgToggleTree()" title="Показать разделы">' +
+      '<i class="ti ti-layout-sidebar-left-expand"></i><span>Разделы</span></div>' +
     '<div class="mfg-main" id="mfg-main"><div class="loading-block">Выберите раздел</div></div>' +
     '</div>';
   if (state.mfgCurrentSection) loadMfgItems(state.mfgCurrentSection);
+}
+
+function mfgToggleTree() {
+  let off = false;
+  try {
+    off = localStorage.getItem('mfgTreeOff') !== '1';
+    localStorage.setItem('mfgTreeOff', off ? '1' : '0');
+  } catch (e) {}
+  const lay = document.querySelector('#mfg-content .mfg-layout');
+  if (lay) lay.classList.toggle('tree-off', off);
 }
 
 function toggleMfgSection(id, event) {
