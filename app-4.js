@@ -16815,6 +16815,252 @@ function _mfgFileSize(b) {
   return Math.max(1, Math.round(b / 1024)) + ' КБ';
 }
 
+// ---------- заказ на изготовление: выбор деталей ----------
+function _mfgSelMap(it) {
+  if (!state._mfgSel || state._mfgSelItem !== it.id) {
+    state._mfgSel = {};
+    state._mfgSelItem = it.id;
+  }
+  return state._mfgSel;
+}
+function mfgTogglePart(partId) {
+  const it = state.mfgCurrentItem;
+  if (!it) return;
+  const sel = _mfgSelMap(it);
+  if (sel[partId]) delete sel[partId]; else sel[partId] = true;
+  renderMfgItem(it);
+}
+function mfgSelParts(mode) {
+  const it = state.mfgCurrentItem;
+  if (!it) return;
+  const sel = _mfgSelMap(it);
+  Object.keys(sel).forEach(k => delete sel[k]);
+  if (mode === 'all') (it.parts || []).forEach(p => { sel[p.id] = true; });
+  renderMfgItem(it);
+}
+
+// ---------- модалка заказа ----------
+async function mfgOrderOpen(itemId) {
+  const it = state.mfgCurrentItem;
+  if (!it || it.id !== itemId) return;
+  const sel = _mfgSelMap(it);
+  const chosen = (it.parts || []).filter(p => sel[p.id]);
+  if (!chosen.length) { showToast('Отметь галками, что заказываем', 'error'); return; }
+  try {
+    const d = await apiGet('/api/mfg/suppliers');
+    state._mfgSups = d.suppliers || [];
+  } catch (e) { state._mfgSups = state._mfgSups || []; }
+  const sups = state._mfgSups;
+  const pieces = chosen.reduce((a, p) => a + (p.qty || 1), 0);
+  let m = document.getElementById('mfg-order-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'mfg-order-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:640px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-package-export"></i> Заказ на изготовление — ' +
+      escapeHtml(it.designation || it.name || '') + '</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'mfg-order-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:12px;">' +
+      '<div><div class="mo-sec">СОСТАВ ЗАКАЗА — ШТУКИ МОЖНО ПОПРАВИТЬ</div>' +
+        chosen.map(p => '<div class="mo-row" data-part="' + p.id + '">' +
+          '<span class="ds">' + escapeHtml(p.designation || '—') + '</span>' +
+          '<span class="nm">' + escapeHtml(p.name || '') + '</span>' +
+          '<input type="number" min="1" value="' + (p.qty || 1) + '" class="mo-qty">' +
+          '<span class="un">шт</span>' +
+          '<i class="ti ti-x rm" title="Убрать из заказа" onclick="this.parentNode.remove()"></i>' +
+        '</div>').join('') + '</div>' +
+      '<div class="mo-zip"><i class="ti ti-file-zip" style="color:#B45309;"></i> ' +
+        'В архив: <b>DXF</b> (лазер) + <b>PDF</b> (гибка) выбранных деталей + <b>ведомость XLSX</b> ' +
+        'с количествами из заказа. Сборочные СБ не кладутся.</div>' +
+      '<div><div class="mo-sec">ПОСТАВЩИК</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<select id="mo-sup" class="form-input" style="flex:1;">' +
+            '<option value="">— без поставщика (только скачать) —</option>' +
+            sups.map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) +
+              (x.email ? ' · ' + escapeHtml(x.email) : ' · почты нет') + '</option>').join('') +
+          '</select>' +
+          '<button class="btn btn-secondary" onclick="mfgSupsOpen()" title="Справочник поставщиков"><i class="ti ti-settings"></i></button>' +
+        '</div></div>' +
+      '<div class="form-group" style="margin:0;"><label class="form-label">Тема письма</label>' +
+        '<input class="form-input" id="mo-subject" value="' +
+        escapeHtml('Атомус Групп — заказ на изготовление ' + (it.designation || '') +
+          ' (' + chosen.length + ' поз., ' + pieces + ' шт)') + '"></div>' +
+      '<div class="form-group" style="margin:0;"><label class="form-label">Текст письма</label>' +
+        '<textarea class="form-input" id="mo-body" rows="4">Добрый день! Просим изготовить детали по вложению: раскрой DXF, гибка по PDF, количество в ведомости. Материал и толщина указаны в ведомости. О сроках сообщите ответным письмом.\n\nС уважением, Атомус Групп</textarea></div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" id="mo-dl" onclick="mfgOrderGo(' + it.id + ', false)"><i class="ti ti-download"></i> Скачать архив</button>' +
+      '<button class="btn btn-primary" id="mo-send" onclick="mfgOrderGo(' + it.id + ', true)"><i class="ti ti-send"></i> Отправить письмом</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+}
+
+async function mfgOrderGo(itemId, send) {
+  const rows = Array.from(document.querySelectorAll('#mfg-order-modal .mo-row'));
+  const positions = rows.map(r => ({
+    part_id: parseInt(r.dataset.part, 10),
+    qty: Math.max(parseInt((r.querySelector('.mo-qty') || {}).value, 10) || 1, 1),
+  }));
+  if (!positions.length) { showToast('Заказ пуст', 'error'); return; }
+  const supId = parseInt((document.getElementById('mo-sup') || {}).value, 10) || null;
+  if (send && !supId) { showToast('Выбери поставщика с почтой', 'error'); return; }
+  const b1 = document.getElementById('mo-dl');
+  const b2 = document.getElementById('mo-send');
+  if (b1) b1.disabled = true;
+  if (b2) { b2.disabled = true; if (send) b2.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await apiPost('/api/mfg/items/' + itemId + '/order', {
+      positions: positions, supplier_id: supId, send: !!send,
+      subject: (document.getElementById('mo-subject') || {}).value || '',
+      body: (document.getElementById('mo-body') || {}).value || '',
+    });
+    const j = (r && r.data) || {};
+    if (!(r && r.ok && j.ok)) {
+      showToast(j.message || 'Не удалось сформировать заказ', 'error');
+      if (b1) b1.disabled = false;
+      if (b2) { b2.disabled = false; b2.innerHTML = '<i class="ti ti-send"></i> Отправить письмом'; }
+      return;
+    }
+    if (j.missing && j.missing.length) {
+      showToast('Внимание: ' + j.missing.join('; '), 'error');
+    }
+    showToast(send ? ('✉ ' + j.doc_number + ' отправлен поставщику')
+                   : (j.doc_number + ' сформирован — качаем архив'), 'success');
+    if (!send) mfgOrderArchive(j.order_id, j.zip_name);
+    const m = document.getElementById('mfg-order-modal');
+    if (m) m.remove();
+    if (state.mfgCurrentItem && state.mfgCurrentItem.id === itemId) {
+      state.mfgCurrentItem.orders = j.orders || [];
+      mfgSelParts('none');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (b1) b1.disabled = false;
+    if (b2) { b2.disabled = false; b2.innerHTML = '<i class="ti ti-send"></i> Отправить письмом'; }
+  }
+}
+
+async function mfgOrderArchive(orderId, name) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/orders/' + orderId + '/archive',
+      { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Архив не читается', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name || 'order.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function mfgOrderStatus(orderId, cur) {
+  const next = cur === 'sent' ? 'work' : (cur === 'work' ? 'done' : 'sent');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/orders/' + orderId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    });
+    if (r && r.ok) {
+      const d = await r.json();
+      if (state.mfgCurrentItem) {
+        state.mfgCurrentItem.orders = d.orders || [];
+        renderMfgItem(state.mfgCurrentItem);
+      }
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ---------- справочник поставщиков ----------
+async function mfgSupsOpen() {
+  try {
+    const d = await apiGet('/api/mfg/suppliers');
+    state._mfgSups = d.suppliers || [];
+  } catch (e) {}
+  let m = document.getElementById('mfg-sups-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'mfg-sups-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '1300';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-building-factory-2"></i> Поставщики изготовления</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'mfg-sups-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="display:flex;flex-direction:column;gap:8px;">' +
+      '<div id="mfg-sups-list"></div>' +
+      '<div class="mo-sec" style="margin-top:4px;">ДОБАВИТЬ</div>' +
+      '<input class="form-input" id="ms-name" placeholder="Название (напр. УТМ)">' +
+      '<input class="form-input" id="ms-email" placeholder="Почта для заказов">' +
+      '<input class="form-input" id="ms-note" placeholder="Примечание: лазер, гибка, город…">' +
+      '<button class="btn btn-primary" onclick="mfgSupAdd()"><i class="ti ti-plus"></i> Добавить поставщика</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  _mfgSupsRender();
+}
+function _mfgSupsRender() {
+  const box = document.getElementById('mfg-sups-list');
+  if (!box) return;
+  const sups = state._mfgSups || [];
+  box.innerHTML = sups.length ? sups.map(x =>
+    '<div class="mo-row"><span class="nm"><b>' + escapeHtml(x.name) + '</b>' +
+      '<small style="display:block;color:var(--text-faint);">' +
+      escapeHtml(x.email || 'почты нет') + (x.note ? ' · ' + escapeHtml(x.note) : '') + '</small></span>' +
+      '<i class="ti ti-trash rm" title="Удалить" onclick="mfgSupDel(' + x.id + ')"></i></div>').join('')
+    : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">Пока пусто — добавь первого</div>';
+  // обновляем селект в открытой модалке заказа
+  const sel = document.getElementById('mo-sup');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— без поставщика (только скачать) —</option>' +
+      sups.map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) +
+        (x.email ? ' · ' + escapeHtml(x.email) : ' · почты нет') + '</option>').join('');
+    sel.value = cur;
+  }
+}
+async function mfgSupAdd() {
+  const name = ((document.getElementById('ms-name') || {}).value || '').trim();
+  if (!name) { showToast('Нужно название', 'error'); return; }
+  try {
+    const r = await apiPost('/api/mfg/suppliers', {
+      name: name,
+      email: ((document.getElementById('ms-email') || {}).value || '').trim(),
+      note: ((document.getElementById('ms-note') || {}).value || '').trim(),
+    });
+    if (r && r.ok) {
+      state._mfgSups = (r.data || {}).suppliers || [];
+      ['ms-name', 'ms-email', 'ms-note'].forEach(i => {
+        const el = document.getElementById(i);
+        if (el) el.value = '';
+      });
+      _mfgSupsRender();
+      showToast('Поставщик добавлен', 'success');
+    } else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+async function mfgSupDel(id) {
+  if (!confirm('Убрать поставщика из справочника?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/suppliers/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (r.ok) {
+      const d = await r.json();
+      state._mfgSups = d.suppliers || [];
+      _mfgSupsRender();
+    }
+  } catch (e) {}
+}
+
 function renderMfgItem(it) {
   const main = document.getElementById('mfg-main');
   if (!main || !it) return;
@@ -16919,6 +17165,38 @@ function renderMfgItem(it) {
     h += '<div class="pd-warn"><i class="ti ti-alert-triangle"></i> ' + escapeHtml(String(w)) + '</div>';
   });
 
+  // чипы быстрого выбора для заказа
+  if (parts.length) {
+    h += '<div class="pdx-chips">В заказ:' +
+      '<button class="pdx-chip" onclick="mfgSelParts(\'all\')">все · ' + parts.length + '</button>' +
+      '<button class="pdx-chip" onclick="mfgSelParts(\'none\')">снять выбор</button>' +
+      '<button class="pdx-chip" onclick="mfgSupsOpen()" style="margin-left:auto;">' +
+        '<i class="ti ti-building-factory-2"></i> поставщики</button>' +
+    '</div>';
+  }
+
+  // история заказов на изготовление
+  const orders = it.orders || [];
+  if (orders.length) {
+    h += '<div class="mfgf-sec" style="margin-top:2px;">ЗАКАЗЫ НА ИЗГОТОВЛЕНИЕ · ' + orders.length +
+      '<span class="ln"></span></div>';
+    orders.forEach(o => {
+      const st = o.status === 'done' ? ['done', '✓ получен']
+        : (o.status === 'work' ? ['work', 'в работе'] : ['sent', 'отправлен']);
+      const dt = String(o.created_at || '').slice(0, 10);
+      h += '<div class="mo-hist">' +
+        '<span class="num">' + escapeHtml(o.doc_number || ('З-' + o.id)) + '</span>' +
+        '<span class="who">' + escapeHtml(o.supplier_name || 'без поставщика') +
+          ' · ' + o.parts_count + ' поз. · ' + o.pieces_count + ' шт</span>' +
+        '<span class="pdx-st ' + st[0] + '" title="Нажми, чтобы сменить статус" ' +
+          'onclick="mfgOrderStatus(' + o.id + ',\'' + o.status + '\')">' + st[1] + '</span>' +
+        '<span class="dt">' + (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '') + '</span>' +
+        '<i class="ti ti-download dl" title="Скачать архив заказа" ' +
+          'onclick="mfgOrderArchive(' + o.id + ',\'' + escapeHtml(String(o.zip_name || '').replace(/'/g, '')) + '\')"></i>' +
+      '</div>';
+    });
+  }
+
   if (parts.length && view === 'tiles') {
     h += '<div class="pdx-grid">' + parts.map(p => {
       const pdf = _mfgPartPdf(it, p);
@@ -16927,8 +17205,11 @@ function renderMfgItem(it) {
         '<rect x="30" y="20" width="110" height="70" rx="8" fill="none" stroke="#CBD5E1" ' +
         'stroke-width="1.6" stroke-dasharray="7 5"/>' +
         '<text x="85" y="58" text-anchor="middle" font-size="11" fill="#94A3B8" font-weight="700">без чертежа</text></svg>';
-      return '<div class="pdx-tile" onclick="' +
+      const isSel = !!_mfgSelMap(it)[p.id];
+      return '<div class="pdx-tile' + (isSel ? ' sel' : '') + '" onclick="' +
           (p.svg ? 'mfgZoomPart(' + p.id + ')' : (pdf ? 'mfgOpenPdf(' + it.id + ',' + pdf.id + ')' : '')) + '">' +
+        '<span class="pdx-cb tile' + (isSel ? ' on' : '') + '" title="В заказ на изготовление" ' +
+          'onclick="event.stopPropagation();mfgTogglePart(' + p.id + ')">' + (isSel ? '✓' : '') + '</span>' +
         (p.svg ? '<span class="pdx-zoom" title="Развёртка крупно" ' +
           'onclick="event.stopPropagation();mfgZoomPart(' + p.id + ')"><i class="ti ti-zoom-in"></i></span>' : '') +
         '<div class="pdx-draw">' + svg + '</div>' +
@@ -16949,12 +17230,15 @@ function renderMfgItem(it) {
     }).join('') + '</div>';
   } else if (parts.length) {
     h += '<div class="pd-table-wrap"><table class="pd-table"><thead><tr>' +
-      '<th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
+      '<th></th><th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
       '<th>Материал</th><th>Гибов</th><th>S развёртки, м²</th><th>Масса, кг</th><th>Чертёж</th>' +
       '</tr></thead><tbody>';
     parts.forEach(p => {
       const pdf = _mfgPartPdf(it, p);
-      h += '<tr>' +
+      const isSel = !!_mfgSelMap(it)[p.id];
+      h += '<tr class="' + (isSel ? 'pdx-sel' : '') + '">' +
+        '<td class="pdx-cbc" onclick="mfgTogglePart(' + p.id + ')">' +
+          '<span class="pdx-cb' + (isSel ? ' on' : '') + '">' + (isSel ? '✓' : '') + '</span></td>' +
         '<td class="pd-desig">' + escapeHtml(p.designation || '—') + '</td>' +
         '<td>' + escapeHtml(p.name || '—') +
           // на телефоне тех. колонки скрыты — их значения мелкой строкой тут
@@ -16981,6 +17265,23 @@ function renderMfgItem(it) {
     h += '</tbody></table></div>';
     h += '<div class="pd-note">Количество берётся из ведомости деталей, гибы — из пометок ' +
       '«ВВЕРХ/ВНИЗ» на чертеже. И то и другое можно поправить руками.</div>';
+  }
+
+  // липкая панель заказа
+  const selParts = parts.filter(p => _mfgSelMap(it)[p.id]);
+  if (selParts.length) {
+    const pieces = selParts.reduce((a, p) => a + (p.qty || 1), 0);
+    const mass = selParts.reduce((a, p) => a + (p.mass_kg || 0) * (p.qty || 1), 0);
+    h += '<div class="pdx-batch">' +
+      '<span style="font-size:20px;">🏭</span>' +
+      '<div><div class="n">Заказ на изготовление: ' + selParts.length + ' ' +
+        _plural(selParts.length, ['позиция', 'позиции', 'позиций']) + ' · ' + pieces + ' шт</div>' +
+        '<div class="m">масса <b>' + mass.toFixed(1) + ' кг</b> · в архив: DXF + PDF + ведомость XLSX</div></div>' +
+      '<span class="sp">' +
+        '<button class="wh" onclick="mfgOrderOpen(' + it.id + ')"><i class="ti ti-package-export"></i> Сформировать заказ</button>' +
+        '<button class="out" onclick="mfgSelParts(\'none\')">✕</button>' +
+      '</span>' +
+    '</div>';
   }
 
   main.innerHTML = h;

@@ -22504,12 +22504,30 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mfg-sub { display: none; }
 @media (max-width: 700px) {
   /* прячем толщину, материал, S развёртки и массу — они мелкой строкой под названием */
-  .mfg-main .pd-table th:nth-child(4), .mfg-main .pd-table td:nth-child(4),
   .mfg-main .pd-table th:nth-child(5), .mfg-main .pd-table td:nth-child(5),
-  .mfg-main .pd-table th:nth-child(7), .mfg-main .pd-table td:nth-child(7),
-  .mfg-main .pd-table th:nth-child(8), .mfg-main .pd-table td:nth-child(8) { display: none; }
+  .mfg-main .pd-table th:nth-child(6), .mfg-main .pd-table td:nth-child(6),
+  .mfg-main .pd-table th:nth-child(8), .mfg-main .pd-table td:nth-child(8),
+  .mfg-main .pd-table th:nth-child(9), .mfg-main .pd-table td:nth-child(9) { display: none; }
   .mfg-main .mfg-sub { display: block; font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
   .mfg-main .pd-table th, .mfg-main .pd-table td { padding: 8px 7px; }
   .mfg-main .pd-desig { font-size: 10.5px; white-space: normal; word-break: break-all; }
   .mfg-main .pd-qty { width: 48px; padding: 5px 6px; }
 }
+
+/* ============ v2.45.860: заказ на изготовление ============ */
+.mo-sec { font-size: 10.5px; font-weight: 800; letter-spacing: .6px; color: var(--text-light); margin-bottom: 6px; }
+.mo-row { display: flex; align-items: center; gap: 10px; border: 1px solid #EDF1F7; border-radius: 10px; padding: 7px 11px; font-size: 12.5px; margin-bottom: 6px; }
+.mo-row .ds { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #64748B; width: 118px; flex: none; }
+.mo-row .nm { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mo-row .mo-qty { width: 62px; border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 12.5px; text-align: center; font-family: inherit; }
+.mo-row .un { font-size: 11px; color: var(--text-faint); }
+.mo-row .rm { color: #CBD5E1; cursor: pointer; }
+.mo-row .rm:hover { color: var(--danger); }
+.mo-zip { background: #F6F8FC; border: 1px dashed #C9D4E4; border-radius: 11px; padding: 9px 13px; font-size: 12px; color: var(--text-mid); line-height: 1.5; }
+.mo-hist { display: flex; align-items: center; gap: 10px; border: 1px solid #EDF1F7; border-radius: 11px; padding: 9px 13px; font-size: 12.5px; margin-bottom: 6px; background: #fff; }
+.mo-hist .num { font-weight: 800; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; flex: none; }
+.mo-hist .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mo-hist .dt { color: var(--text-faint); font-size: 11px; flex: none; }
+.mo-hist .dl { color: #CBD5E1; cursor: pointer; flex: none; }
+.mo-hist .dl:hover { color: var(--brand); }
+.pdx-st.work { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
