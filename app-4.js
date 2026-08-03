@@ -16871,6 +16871,12 @@ async function mfgOrderOpen(itemId) {
           '<span class="un">шт</span>' +
           '<i class="ti ti-x rm" title="Убрать из заказа" onclick="this.parentNode.remove()"></i>' +
         '</div>').join('') + '</div>' +
+      '<div><div class="mo-sec">МАТЕРИАЛ ЗАКАЗА</div>' +
+        '<div class="pdx-mode" id="mo-mat">' +
+          '<button type="button" class="on" data-mat="">Как в чертежах</button>' +
+          '<button type="button" data-mat="Нержавеющая сталь 08Х18Н10">Нержавейка</button>' +
+          '<button type="button" data-mat="Сталь углеродистая Ст3">Углеродка</button>' +
+        '</div></div>' +
       '<div class="mo-zip"><i class="ti ti-file-zip" style="color:#B45309;"></i> ' +
         'В архив: <b>DXF</b> (лазер) + <b>PDF</b> (гибка) выбранных деталей + <b>ведомость XLSX</b> ' +
         'с количествами из заказа. Сборочные СБ не кладутся.</div>' +
@@ -16895,6 +16901,13 @@ async function mfgOrderOpen(itemId) {
       '<button class="btn btn-primary" id="mo-send" onclick="mfgOrderGo(' + it.id + ', true)"><i class="ti ti-send"></i> Отправить письмом</button>' +
     '</div></div>';
   document.body.appendChild(m);
+  const matBox = document.getElementById('mo-mat');
+  if (matBox) matBox.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      matBox.querySelectorAll('button').forEach(x => x.className = '');
+      b.className = 'on';
+    };
+  });
 }
 
 async function mfgOrderGo(itemId, send) {
@@ -16911,8 +16924,10 @@ async function mfgOrderGo(itemId, send) {
   if (b1) b1.disabled = true;
   if (b2) { b2.disabled = true; if (send) b2.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
   try {
+    const matBtn = document.querySelector('#mo-mat button.on');
     const r = await apiPost('/api/mfg/items/' + itemId + '/order', {
       positions: positions, supplier_id: supId, send: !!send,
+      material: (matBtn && matBtn.dataset.mat) || '',
       subject: (document.getElementById('mo-subject') || {}).value || '',
       body: (document.getElementById('mo-body') || {}).value || '',
     });
