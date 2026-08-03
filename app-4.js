@@ -16732,6 +16732,24 @@ async function loadMfgItems(sectionId) {
       '<button class="btn btn-primary btn-small" onclick="openMfgItemForm(' + sectionId + ')">' +
         '<i class="ti ti-plus"></i> Новое изделие</button>' +
     '</div>';
+    // v2.45.868: чертежи можно закинуть прямо в раздел — изделие создастся само
+    h += '<div class="pd-drop" ondragover="event.preventDefault();this.classList.add(\'over\')" ' +
+        'ondragleave="this.classList.remove(\'over\')" ondrop="mfgQuickDrop(event,' + sectionId + ')">' +
+      '<i class="ti ti-cloud-upload"></i>' +
+      '<div class="pd-drop-title">Закинь чертежи сюда — изделие создастся само</div>' +
+      '<div class="pd-drop-sub">Папка изделия или архив: DXF, PDF, ведомость XLS. ' +
+        'Обозначение возьмём из файлов, название потом можно поправить</div>' +
+      '<input type="file" id="mfg-quick-input" multiple style="display:none" ' +
+        'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
+      '<input type="file" id="mfg-quick-input2" multiple webkitdirectory style="display:none" ' +
+        'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
+      '<div class="pd-drop-btns">' +
+        '<button class="btn btn-primary btn-small" onclick="document.getElementById(\'mfg-quick-input\').click()">' +
+          '<i class="ti ti-file-plus"></i> Выбрать файлы</button>' +
+        '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'mfg-quick-input2\').click()">' +
+          '<i class="ti ti-folder"></i> Выбрать папку</button>' +
+      '</div>' +
+    '</div>';
     if (!items.length) {
       h += '<div class="empty-block">В разделе пока нет изделий</div>';
     } else {
@@ -16761,6 +16779,40 @@ async function loadMfgItems(sectionId) {
   } catch (e) {
     main.innerHTML = '<div class="empty-block">Ошибка: ' + escapeHtml(String(e)) + '</div>';
   }
+}
+
+function mfgQuickDrop(ev, sectionId) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('over');
+  const files = (ev.dataTransfer && ev.dataTransfer.files) || [];
+  if (files.length) mfgQuickFiles(sectionId, files);
+}
+
+// файлы прямо в раздел: создаём изделие и заливаем их в него
+async function mfgQuickFiles(sectionId, fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  // обозначение — из СБ-файла или первого файла с похожим номером
+  const re = /([A-Za-zА-Яа-я]{1,4}[-\s]?\d{2,3}[.\-]\d{3}[.\-]\d{3}(?:СБ)?)/;
+  const sb = files.find(f => /СБ/i.test(f.name || '')) || files[0] || {};
+  const m2 = re.exec(sb.name || '');
+  const desig = m2 ? m2[1] : '';
+  const sec = (state.mfgSections || []).find(s => s.id === sectionId) || {};
+  try {
+    const r = await apiPost('/api/mfg/items', {
+      section_id: sectionId, designation: desig,
+      name: sec.name || 'Изделие',
+    });
+    const body = (r && r.data) || {};
+    if (!(r && r.ok && body.id)) {
+      showToast(body.message || 'Не удалось создать изделие', 'error');
+      return;
+    }
+    state.mfgCurrentItem = body;
+    renderMfgItem(body);
+    showToast('Изделие создано — считаем файлы…', 'info');
+    mfgUploadFiles(body.id, files);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 async function openMfgItem(id) {
