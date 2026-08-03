@@ -16770,8 +16770,9 @@ async function openMfgItem(id) {
     const it = await apiGet('/api/mfg/items/' + id);
     state.mfgCurrentItem = it;
     renderMfgItem(it);
-    // v2.45.853: изделия, загруженные до превью, дорисовываются в фоне
-    const needSvg = (it.parts || []).some(p => !p.svg && (p.source_file || '').trim());
+    // v2.45.858: фоновый доводчик — дорисовывает превью и досверяет
+    // количество из ведомости (раз за сессию на изделие)
+    const needSvg = (it.parts || []).length > 0;
     if (!state._mfgPrevAsked) state._mfgPrevAsked = {};
     if (needSvg && !state._mfgPrevAsked[it.id]) {
       state._mfgPrevAsked[it.id] = 1;
