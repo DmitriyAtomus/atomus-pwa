@@ -16847,7 +16847,8 @@ async function mfgOrderOpen(itemId) {
   const chosen = (it.parts || []).filter(p => sel[p.id]);
   if (!chosen.length) { showToast('Отметь галками, что заказываем', 'error'); return; }
   try {
-    const d = await apiGet('/api/mfg/suppliers');
+    // общий справочник поставщиков (тот же, что в снабжении)
+    const d = await apiGet('/api/suppliers');
     state._mfgSups = d.suppliers || [];
   } catch (e) { state._mfgSups = state._mfgSups || []; }
   const sups = state._mfgSups;
@@ -16994,10 +16995,10 @@ async function mfgOrderStatus(orderId, cur) {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
-// ---------- справочник поставщиков ----------
+// ---------- поставщики: общий справочник снабжения ----------
 async function mfgSupsOpen() {
   try {
-    const d = await apiGet('/api/mfg/suppliers');
+    const d = await apiGet('/api/suppliers');
     state._mfgSups = d.suppliers || [];
   } catch (e) {}
   let m = document.getElementById('mfg-sups-modal');
@@ -17007,30 +17008,33 @@ async function mfgSupsOpen() {
   m.className = 'modal-overlay visible';
   m.style.zIndex = '1300';
   m.onclick = (e) => { if (e.target === m) m.remove(); };
-  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">' +
-    '<div class="modal-header"><h3><i class="ti ti-building-factory-2"></i> Поставщики изготовления</h3>' +
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:500px;max-height:86vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-building-factory-2"></i> Наши поставщики</h3>' +
       '<button class="icon-btn" onclick="document.getElementById(\'mfg-sups-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
-    '<div class="modal-body" style="display:flex;flex-direction:column;gap:8px;">' +
+    '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;">' +
+      '<div style="font-size:11.5px;color:var(--text-faint);">Это общий справочник — тот же, что в Снабжении. ' +
+        'Для отправки заказа у поставщика должна быть заполнена почта.</div>' +
       '<div id="mfg-sups-list"></div>' +
-      '<div class="mo-sec" style="margin-top:4px;">ДОБАВИТЬ</div>' +
+      '<div class="mo-sec" style="margin-top:4px;">ДОБАВИТЬ ПОСТАВЩИКА</div>' +
       '<input class="form-input" id="ms-name" placeholder="Название (напр. УТМ)">' +
       '<input class="form-input" id="ms-email" placeholder="Почта для заказов">' +
-      '<input class="form-input" id="ms-note" placeholder="Примечание: лазер, гибка, город…">' +
-      '<button class="btn btn-primary" onclick="mfgSupAdd()"><i class="ti ti-plus"></i> Добавить поставщика</button>' +
+      '<input class="form-input" id="ms-note" placeholder="Комментарий: лазер, гибка, город…">' +
+      '<button class="btn btn-primary" onclick="mfgSupAdd()"><i class="ti ti-plus"></i> Добавить</button>' +
     '</div></div>';
   document.body.appendChild(m);
   _mfgSupsRender();
 }
 function _mfgSupsRender() {
   const box = document.getElementById('mfg-sups-list');
-  if (!box) return;
   const sups = state._mfgSups || [];
-  box.innerHTML = sups.length ? sups.map(x =>
-    '<div class="mo-row"><span class="nm"><b>' + escapeHtml(x.name) + '</b>' +
-      '<small style="display:block;color:var(--text-faint);">' +
-      escapeHtml(x.email || 'почты нет') + (x.note ? ' · ' + escapeHtml(x.note) : '') + '</small></span>' +
-      '<i class="ti ti-trash rm" title="Удалить" onclick="mfgSupDel(' + x.id + ')"></i></div>').join('')
-    : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">Пока пусто — добавь первого</div>';
+  if (box) {
+    box.innerHTML = sups.length ? sups.map(x =>
+      '<div class="mo-row"><span class="nm"><b>' + escapeHtml(x.name) + '</b>' +
+        '<small style="display:block;color:var(--text-faint);">' +
+        escapeHtml(x.email || 'почты нет — заказ не отправить') +
+        (x.comment ? ' · ' + escapeHtml(x.comment) : '') + '</small></span></div>').join('')
+      : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">Пока пусто — добавь первого</div>';
+  }
   // обновляем селект в открытой модалке заказа
   const sel = document.getElementById('mo-sup');
   if (sel) {
@@ -17045,13 +17049,14 @@ async function mfgSupAdd() {
   const name = ((document.getElementById('ms-name') || {}).value || '').trim();
   if (!name) { showToast('Нужно название', 'error'); return; }
   try {
-    const r = await apiPost('/api/mfg/suppliers', {
+    const r = await apiPost('/api/suppliers', {
       name: name,
       email: ((document.getElementById('ms-email') || {}).value || '').trim(),
-      note: ((document.getElementById('ms-note') || {}).value || '').trim(),
+      comment: ((document.getElementById('ms-note') || {}).value || '').trim(),
     });
     if (r && r.ok) {
-      state._mfgSups = (r.data || {}).suppliers || [];
+      const d = await apiGet('/api/suppliers');
+      state._mfgSups = d.suppliers || [];
       ['ms-name', 'ms-email', 'ms-note'].forEach(i => {
         const el = document.getElementById(i);
         if (el) el.value = '';
@@ -17060,20 +17065,6 @@ async function mfgSupAdd() {
       showToast('Поставщик добавлен', 'success');
     } else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
-}
-async function mfgSupDel(id) {
-  if (!confirm('Убрать поставщика из справочника?')) return;
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/mfg/suppliers/' + id, {
-      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
-    });
-    if (r.ok) {
-      const d = await r.json();
-      state._mfgSups = d.suppliers || [];
-      _mfgSupsRender();
-    }
-  } catch (e) {}
 }
 
 function renderMfgItem(it) {
