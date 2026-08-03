@@ -16882,6 +16882,8 @@ async function mfgOrderOpen(itemId) {
         'В архив: <b>DXF</b> (лазер) + <b>PDF</b> (гибка) выбранных деталей + <b>ведомость XLSX</b> ' +
         'с количествами из заказа. Сборочные СБ не кладутся.</div>' +
       '<div><div class="mo-sec">ПОСТАВЩИК</div>' +
+        '<input class="form-input" id="mo-sup-search" placeholder="🔍 Найти поставщика…" ' +
+          'oninput="mfgSupSearch(this)" style="margin-bottom:6px;">' +
         '<div style="display:flex;gap:8px;">' +
           '<select id="mo-sup" class="form-input" style="flex:1;">' +
             '<option value="">— без поставщика (только скачать) —</option>' +
@@ -17014,6 +17016,8 @@ async function mfgSupsOpen() {
     '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;">' +
       '<div style="font-size:11.5px;color:var(--text-faint);">Это общий справочник — тот же, что в Снабжении. ' +
         'Для отправки заказа у поставщика должна быть заполнена почта.</div>' +
+      '<input class="form-input" id="ms-search" placeholder="🔍 Поиск: название, почта, продукция…" ' +
+        'oninput="_mfgSupsRender()">' +
       '<div id="mfg-sups-list"></div>' +
       '<div class="mo-sec" style="margin-top:4px;">ДОБАВИТЬ ПОСТАВЩИКА</div>' +
       '<input class="form-input" id="ms-name" placeholder="Название (напр. УТМ)">' +
@@ -17026,24 +17030,49 @@ async function mfgSupsOpen() {
 }
 function _mfgSupsRender() {
   const box = document.getElementById('mfg-sups-list');
-  const sups = state._mfgSups || [];
+  const all = state._mfgSups || [];
+  const q = ((document.getElementById('ms-search') || {}).value || '').trim().toLowerCase();
+  const sups = q ? all.filter(x =>
+    (String(x.name || '') + ' ' + String(x.email || '') + ' ' + String(x.comment || ''))
+      .toLowerCase().indexOf(q) >= 0) : all;
   if (box) {
     box.innerHTML = sups.length ? sups.map(x =>
       '<div class="mo-row"><span class="nm"><b>' + escapeHtml(x.name) + '</b>' +
         '<small style="display:block;color:var(--text-faint);">' +
         escapeHtml(x.email || 'почты нет — заказ не отправить') +
         (x.comment ? ' · ' + escapeHtml(x.comment) : '') + '</small></span></div>').join('')
-      : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">Пока пусто — добавь первого</div>';
+      : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">' +
+        (q ? 'Ничего не нашлось по «' + escapeHtml(q) + '»' : 'Пока пусто — добавь первого') + '</div>';
   }
-  // обновляем селект в открытой модалке заказа
+  // обновляем селект в открытой модалке заказа (полный список, без фильтра)
+  _mfgSupSelectFill(all);
+}
+function _mfgSupSelectFill(all, q) {
   const sel = document.getElementById('mo-sup');
-  if (sel) {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">— без поставщика (только скачать) —</option>' +
-      sups.map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) +
-        (x.email ? ' · ' + escapeHtml(x.email) : ' · почты нет') + '</option>').join('');
-    sel.value = cur;
+  if (!sel) return;
+  const cur = sel.value;
+  let list = all || state._mfgSups || [];
+  if (q) {
+    list = list.filter(x =>
+      (String(x.name || '') + ' ' + String(x.email || '') + ' ' + String(x.comment || ''))
+        .toLowerCase().indexOf(q) >= 0);
   }
+  sel.innerHTML = '<option value="">— без поставщика (только скачать) —</option>' +
+    list.map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) +
+      (x.email ? ' · ' + escapeHtml(x.email) : ' · почты нет') + '</option>').join('');
+  sel.value = cur;
+  // если выбранный отфильтровался — не теряем его
+  if (cur && sel.value !== cur) {
+    const kept = (state._mfgSups || []).find(x => String(x.id) === cur);
+    if (kept) {
+      sel.insertAdjacentHTML('afterbegin',
+        '<option value="' + kept.id + '">' + escapeHtml(kept.name) + '</option>');
+      sel.value = cur;
+    }
+  }
+}
+function mfgSupSearch(inp) {
+  _mfgSupSelectFill(null, (inp.value || '').trim().toLowerCase());
 }
 async function mfgSupAdd() {
   const name = ((document.getElementById('ms-name') || {}).value || '').trim();
