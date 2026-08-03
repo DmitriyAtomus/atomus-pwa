@@ -17703,10 +17703,14 @@ async function renameMfgSection(id) {
 }
 
 async function deleteMfgSection(id) {
-  if (!confirm('Удалить раздел?')) return;
+  // v2.45.871: удаление только со своим паролем
+  const password = prompt('Удалить раздел?\n\nПодтверди свой пароль:', '');
+  if (password == null || !password.trim()) return;
   const token = localStorage.getItem(TOKEN_KEY);
   const r = await fetch(API_BASE + '/api/mfg/sections/' + id, {
-    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: password.trim() }),
   });
   const d = await r.json().catch(() => ({}));
   if (r.ok) {
@@ -17750,12 +17754,17 @@ async function renameMfgItem(id) {
 }
 
 async function deleteMfgItem(id) {
-  if (!confirm('Удалить изделие из базы?')) return;
+  // v2.45.871: изделие с чертежами и заказами — удаление только со своим паролем
+  const password = prompt('Удалить изделие из базы?\nЧертежи и история заказов станут недоступны.\n\nПодтверди свой пароль:', '');
+  if (password == null || !password.trim()) return;
   const token = localStorage.getItem(TOKEN_KEY);
   const r = await fetch(API_BASE + '/api/mfg/items/' + id, {
-    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: password.trim() }),
   });
-  if (!r.ok) { showToast('Не удалось удалить', 'error'); return; }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { showToast(d.message || 'Не удалось удалить', 'error'); return; }
   showToast('Удалено', 'success');
   loadMfgItems(state.mfgCurrentSection);
 }
