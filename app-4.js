@@ -17555,8 +17555,9 @@ function mfgOpenPdf(itemId, fileId) {
         '<div class="mfg-pdf-cwrap" id="mfg-pdf-cwrap"><canvas id="mfg-pdf-canvas"></canvas></div>' +
         '<div class="loading-block" id="mfg-pdf-load">Открываем чертёж…</div></div>' +
     '</div>';
-  _mfgPdfBindPanZoom();
   document.body.appendChild(m);
+  // навешивать до appendChild нельзя — элементов ещё нет в DOM
+  _mfgPdfBindPanZoom();
   _mfgPdfLoad();
 }
 function mfgPdfClose() {
