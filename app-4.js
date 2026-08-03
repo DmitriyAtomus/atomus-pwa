@@ -17081,16 +17081,30 @@ function _mfgSupsRender() {
   const sups = q ? all.filter(x =>
     (String(x.name || '') + ' ' + String(x.email || '') + ' ' + String(x.comment || ''))
       .toLowerCase().indexOf(q) >= 0) : all;
+  // если открыта модалка заказа — клик по строке выбирает поставщика в заказ
+  const canPick = !!document.getElementById('mo-sup-inp');
   if (box) {
     box.innerHTML = sups.length ? sups.map(x =>
-      '<div class="mo-row"><span class="nm"><b>' + escapeHtml(x.name) + '</b>' +
+      '<div class="mo-row' + (canPick ? ' pick' : '') + '"' +
+        (canPick ? ' onclick="mfgSupChoose(' + x.id + ')" title="Выбрать в заказ"' : '') + '>' +
+        '<span class="nm"><b>' + escapeHtml(x.name) + '</b>' +
         '<small style="display:block;color:var(--text-faint);">' +
         escapeHtml(x.email || 'почты нет — заказ не отправить') +
-        (x.comment ? ' · ' + escapeHtml(x.comment) : '') + '</small></span></div>').join('')
+        (x.comment ? ' · ' + escapeHtml(x.comment) : '') + '</small></span>' +
+        (canPick ? '<i class="ti ti-chevron-right" style="color:#CBD5E1;"></i>' : '') +
+      '</div>').join('')
       : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:8px;">' +
         (q ? 'Ничего не нашлось по «' + escapeHtml(q) + '»' : 'Пока пусто — добавь первого') + '</div>';
   }
 }
+function mfgSupChoose(id) {
+  if (!document.getElementById('mo-sup-inp')) return;
+  mfgSupPick(id);
+  const m = document.getElementById('mfg-sups-modal');
+  if (m) m.remove();
+  showToast('Поставщик выбран в заказ', 'success');
+}
+
 async function mfgSupAdd() {
   const name = ((document.getElementById('ms-name') || {}).value || '').trim();
   if (!name) { showToast('Нужно название', 'error'); return; }
