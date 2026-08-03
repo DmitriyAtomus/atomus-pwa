@@ -7106,7 +7106,8 @@ async function _calcChatLoad(calcId, chatId) {
       const tm = t.slice(8, 10) + '.' + t.slice(5, 7) + ' ' + t.slice(11, 16);
       return '<div class="calc-bub' + (mine ? ' me' : '') + '">' +
         '<div class="w">' + escapeHtml(mine ? 'Ты' : (m.author_name || '')) + '</div>' +
-        escapeHtml(m.text).replace(/\n/g, '<br>') +
+        (m.text ? escapeHtml(m.text).replace(/\n/g, '<br>') : '') +
+        _renderTeamMessageFiles(m.files || []) +
         '<div class="tm">' + tm + '</div></div>';
     }).join('') : '<div style="text-align:center;color:var(--text-faint);font-size:12px;padding:16px;">Сообщений пока нет</div>';
     boxEl.scrollTop = boxEl.scrollHeight;

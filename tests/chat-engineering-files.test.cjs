@@ -5,6 +5,7 @@ const test = require('node:test');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(__dirname, '..', 'app-1.js'), 'utf8');
+const app3 = fs.readFileSync(path.join(__dirname, '..', 'app-3.js'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
 const version = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8')
@@ -27,6 +28,13 @@ test('чаты позволяют выбрать инженерные и арх�
       assert.ok(accept.has(extension), `${id} не принимает ${extension}`);
     }
   }
+});
+
+test('чат расчёта показывает прикреплённые файлы', () => {
+  const start = app3.indexOf('async function _calcChatLoad');
+  const end = app3.indexOf('async function calcChatSend', start);
+  assert.ok(start >= 0 && end > start, 'Найден загрузчик чата расчёта');
+  assert.match(app3.slice(start, end), /_renderTeamMessageFiles\(m\.files \|\| \[\]\)/);
 });
 
 // v2.45.838: не пиним конкретный номер (ломался при каждом релизе) —
