@@ -22442,22 +22442,24 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 /* ============ v2.45.853: корпуса — файлы изделия, плитки, PDF-просмотрщик ============ */
 .mfgf-sec { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--text-light); text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
 .mfgf-sec .ln { flex: 1; height: 1px; background: var(--border); }
-.mfgf-row { display: flex; gap: 8px; flex-wrap: wrap; }
+/* v2.45.854: ровная сетка одинаковых плиток вместо рваной ленты */
+.mfgf-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 8px; }
 .mfgf-row .mfgf-rest { display: none; }
 .mfgf-row.open .mfgf-rest { display: contents; }
-.mfgf { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); border-radius: 11px; padding: 7px 11px; font-size: 12px; cursor: pointer; background: #fff; transition: border-color .12s, box-shadow .12s; max-width: 300px; }
+.mfgf { display: flex; align-items: center; gap: 9px; border: 1.5px solid var(--border); border-radius: 11px; padding: 8px 11px; font-size: 12px; cursor: pointer; background: #fff; transition: border-color .12s, box-shadow .12s; min-width: 0; }
 .mfgf:hover { border-color: #93C5FD; box-shadow: 0 3px 10px rgba(37, 99, 235, .12); }
-.mfgf .fic { min-width: 34px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9.5px; font-weight: 800; flex: none; padding: 0 4px; }
+.mfgf .fic { min-width: 36px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9.5px; font-weight: 800; flex: none; padding: 0 4px; }
 .mfgf.pdf .fic { background: #DC2626; }
 .mfgf.dxf .fic { background: #64748B; }
 .mfgf.xls .fic { background: #059669; }
 .mfgf.oth .fic { background: #94A3B8; }
-.mfgf .fn { min-width: 0; }
-.mfgf .fn b { display: block; font-size: 11.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
-.mfgf .fn small { font-size: 10px; color: var(--text-faint); }
-.mfgf .dl { color: #B6BFCC; font-size: 13px; }
+.mfgf .fn { min-width: 0; flex: 1; }
+.mfgf .fn b { display: block; font-size: 11.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mfgf .fn small { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
+.mfgf .dl { color: #B6BFCC; font-size: 13px; flex: none; }
 .mfgf:hover .dl { color: var(--brand); }
-.mfgf.more { border-style: dashed; color: var(--text-faint); font-weight: 700; font-size: 11.5px; }
+.mfgf.more { border-style: dashed; color: var(--text-faint); font-weight: 700; font-size: 11.5px; justify-content: center; }
+.mfgf.more:hover { color: var(--brand); }
 
 .mfg-eye { width: 30px; height: 30px; border-radius: 9px; border: 1.5px solid var(--border); background: #fff; color: #64748B; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
 .mfg-eye:hover { border-color: #93C5FD; color: var(--brand); }

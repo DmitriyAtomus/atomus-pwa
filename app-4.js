@@ -16860,7 +16860,15 @@ function renderMfgItem(it) {
         '<i class="ti ' + (isPdf ? 'ti-eye' : 'ti-download') + ' dl"></i></div>';
     };
     const MAXV = 8;
-    h += '<div class="mfgf-sec">ФАЙЛЫ ИЗДЕЛИЯ · ' + files.length + '<span class="ln"></span></div>' +
+    const nPdf = files.filter(f => f.kind === 'pdf').length;
+    const nDxf = files.filter(f => f.kind === 'dxf').length;
+    const nXls = files.filter(f => f.kind === 'sheet').length;
+    h += '<div class="mfgf-sec">ФАЙЛЫ ИЗДЕЛИЯ · ' + files.length +
+      '<span style="font-weight:700;color:#B6BFCC;">' +
+      (nPdf ? ' · <span style="color:#DC2626;">PDF ' + nPdf + '</span>' : '') +
+      (nDxf ? ' · DXF ' + nDxf : '') +
+      (nXls ? ' · <span style="color:#059669;">XLS ' + nXls + '</span>' : '') +
+      '</span><span class="ln"></span></div>' +
       '<div class="mfgf-row">' + sorted.slice(0, MAXV).map(chip).join('') +
       (sorted.length > MAXV
         ? '<div class="mfgf more" onclick="this.parentNode.classList.add(\'open\');this.remove()">' +
