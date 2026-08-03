@@ -16643,6 +16643,8 @@ function renderMfg() {
       '<span style="display:inline-flex;gap:2px;">' +
       '<button class="icon-btn" title="Новый раздел" onclick="openMfgSectionForm(null)">' +
         '<i class="ti ti-plus"></i></button>' +
+      '<button class="icon-btn" title="Журнал заказов на изготовление" onclick="mfgOrdersJournal()">' +
+        '<i class="ti ti-package-export"></i></button>' +
       '<button class="icon-btn" title="Свернуть разделы — карточка на всю ширину" onclick="mfgToggleTree()">' +
         '<i class="ti ti-layout-sidebar-left-collapse"></i></button>' +
       '</span>' +
@@ -16831,6 +16833,100 @@ async function mfgQuickFiles(sectionId, fileList) {
     renderMfgItem(body);
     showToast('Изделие создано — считаем файлы…', 'info');
     mfgUploadFiles(body.id, files);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// журнал всех заказов на изготовление
+async function mfgOrdersJournal() {
+  const main = document.getElementById('mfg-main');
+  if (!main) return;
+  state.mfgCurrentSection = null;
+  main.innerHTML = '<div class="loading-block">Загружаем журнал заказов…</div>';
+  let orders = [];
+  try {
+    const d = await apiGet('/api/mfg/orders');
+    orders = d.orders || [];
+  } catch (e) {
+    main.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
+    return;
+  }
+  state._mfgJournal = orders;
+  _mfgJournalRender();
+}
+function _mfgJournalRender(filter) {
+  const main = document.getElementById('mfg-main');
+  if (!main) return;
+  state._mfgJournalFilter = filter || state._mfgJournalFilter || 'all';
+  const f = state._mfgJournalFilter;
+  const all = state._mfgJournal || [];
+  const list = f === 'all' ? all : all.filter(o => o.status === f);
+  const cnt = (st) => all.filter(o => o.status === st).length;
+  const F = [['all', 'Все', all.length], ['sent', 'Отправлены', cnt('sent')],
+             ['work', 'В работе', cnt('work')], ['done', 'Получены', cnt('done')]];
+  let h = '<div class="mfgb-crumbs">Изготовление корпусов · <b>Журнал заказов</b></div>' +
+    '<div class="mfg-main-head"><div><h3>Заказы на изготовление</h3>' +
+      '<div class="mfgb-stats"><span>всего <b>' + all.length + '</b></span>' +
+        '<span>в работе <b>' + cnt('work') + '</b></span></div></div></div>' +
+    '<div class="pdx-chips">' + F.map(x =>
+      '<button class="pdx-chip' + (f === x[0] ? ' on' : '') + '" onclick="_mfgJournalRender(\'' + x[0] + '\')">' +
+      x[1] + ' · ' + x[2] + '</button>').join('') + '</div>';
+  if (!list.length) {
+    h += '<div class="empty-block">Заказов пока нет</div>';
+  } else {
+    list.forEach(o => {
+      const st = o.status === 'done' ? ['done', '✓ получен']
+        : (o.status === 'work' ? ['work', 'в работе'] : ['sent', 'отправлен']);
+      const dt = String(o.created_at || '').slice(0, 10);
+      h += '<div class="mo-hist">' +
+        '<span class="num">' + escapeHtml(o.doc_number || ('З-' + o.id)) + '</span>' +
+        '<span class="who"><b style="cursor:pointer;color:var(--brand);" ' +
+          'onclick="openMfgItem(' + o.item_id + ')">' +
+          escapeHtml((o.item_designation ? o.item_designation + ' ' : '') + (o.item_name || '')) + '</b>' +
+          '<small style="display:block;color:var(--text-faint);">' +
+          escapeHtml(o.supplier_name || 'без поставщика') + ' · ' + o.parts_count + ' поз. · ' +
+          o.pieces_count + ' шт' + (o.sent_via === 'mail' ? ' · ✉ письмом' : '') + '</small></span>' +
+        '<span class="pdx-st ' + st[0] + '" title="Нажми, чтобы сменить статус" ' +
+          'onclick="mfgJournalStatus(' + o.id + ',\'' + o.status + '\')">' + st[1] + '</span>' +
+        '<span class="dt">' + (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '') + '</span>' +
+        '<i class="ti ti-download dl" title="Скачать архив заказа" ' +
+          'onclick="mfgJournalArchive(' + o.id + ',\'' +
+          escapeHtml(String(o.zip_name || '').replace(/'/g, '')) + '\')"></i>' +
+      '</div>';
+    });
+  }
+  main.innerHTML = h;
+}
+async function mfgJournalStatus(orderId, cur) {
+  const next = cur === 'sent' ? 'work' : (cur === 'work' ? 'done' : 'sent');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/orders/' + orderId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    });
+    if (r.ok) {
+      const o = (state._mfgJournal || []).find(x => x.id === orderId);
+      if (o) o.status = next;
+      _mfgJournalRender();
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+async function mfgJournalArchive(orderId, name) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/orders/' + orderId + '/archive',
+      { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Архив не читается', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name || 'order.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
