@@ -16600,6 +16600,13 @@ function openPaintVedomost(calcId) {
 state.mfgSections = null;
 state.mfgCurrentSection = null;
 state.mfgCurrentItem = null;
+state.mfgCollapsedSections = {};
+try {
+  const savedMfgCollapsed = JSON.parse(localStorage.getItem('mfgCollapsedSections') || '[]');
+  if (Array.isArray(savedMfgCollapsed)) {
+    savedMfgCollapsed.forEach(id => { state.mfgCollapsedSections[String(id)] = true; });
+  }
+} catch (e) {}
 
 async function loadMfg() {
   const box = document.getElementById('mfg-content');
@@ -16642,9 +16649,16 @@ function renderMfg() {
   }
   const renderNode = (s, depth) => {
     const kids = byParent[s.id] || [];
+    const collapsed = !!state.mfgCollapsedSections[String(s.id)];
     const active = state.mfgCurrentSection === s.id ? ' active' : '';
     let h = '<div class="mfg-node' + active + '" style="padding-left:' + (10 + depth * 14) + 'px" ' +
       'onclick="selectMfgSection(' + s.id + ')">' +
+      (kids.length
+        ? '<button class="mfg-node-toggle" title="' + (collapsed ? 'Развернуть' : 'Свернуть') +
+          '" aria-label="' + (collapsed ? 'Развернуть' : 'Свернуть') +
+          '" onclick="toggleMfgSection(' + s.id + ', event)"><i class="ti ti-chevron-' +
+          (collapsed ? 'right' : 'down') + '"></i></button>'
+        : '<span class="mfg-node-toggle-spacer"></span>') +
       '<i class="ti ' + (kids.length ? 'ti-folders' : 'ti-folder') + '"></i>' +
       '<span class="mfg-node-name">' + escapeHtml(s.name) + '</span>' +
       (s.items_count ? '<span class="mfg-node-count">' + s.items_count + '</span>' : '') +
@@ -16657,7 +16671,7 @@ function renderMfg() {
           '<i class="ti ti-trash"></i></button>' +
       '</span>' +
     '</div>';
-    kids.forEach(k => { h += renderNode(k, depth + 1); });
+    if (!collapsed) kids.forEach(k => { h += renderNode(k, depth + 1); });
     return h;
   };
   roots.forEach(s => { tree += renderNode(s, 0); });
@@ -16667,6 +16681,17 @@ function renderMfg() {
     '<div class="mfg-main" id="mfg-main"><div class="loading-block">Выберите раздел</div></div>' +
     '</div>';
   if (state.mfgCurrentSection) loadMfgItems(state.mfgCurrentSection);
+}
+
+function toggleMfgSection(id, event) {
+  if (event) event.stopPropagation();
+  const key = String(id);
+  if (state.mfgCollapsedSections[key]) delete state.mfgCollapsedSections[key];
+  else state.mfgCollapsedSections[key] = true;
+  try {
+    localStorage.setItem('mfgCollapsedSections', JSON.stringify(Object.keys(state.mfgCollapsedSections)));
+  } catch (e) {}
+  renderMfg();
 }
 
 async function selectMfgSection(id) {
