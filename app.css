@@ -22093,7 +22093,7 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .calc-ball.other.cb-5 { color: #0F766E; border-color: #99F6E4; background: #F0FDFA; }
 .calc-hot { font-size: 9.5px; font-weight: 800; color: #DC2626; flex: none; }
 
-.calcs-pane { display: flex; flex-direction: column; min-width: 0; }
+.calcs-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .calc-ph { padding: 14px 18px 12px; border-bottom: 1px solid var(--border); }
 .calc-ph .row1 { display: flex; align-items: center; gap: 10px; }
 .calc-ph h3 { font-size: 15px; margin: 0; }
@@ -22109,7 +22109,7 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .calc-ballbar .t span { font-size: 11px; color: #64748B; }
 .calc-passbtn { background: #2563EB; color: #fff; border: none; border-radius: 10px; padding: 9px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap; font-family: inherit; }
 .calc-passbtn.ghost { background: #fff; color: #475569; border: 1.5px solid var(--border); }
-.calc-chat { flex: 1; background: #F4F7FB; padding: 14px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.calc-chat { flex: 1; min-height: 0; background: #F4F7FB; padding: 14px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .calc-bub { max-width: 72%; align-self: flex-start; background: #fff; border-radius: 12px 12px 12px 4px; padding: 8px 12px; font-size: 12.5px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
 .calc-bub .w { font-size: 10px; font-weight: 800; color: #7C3AED; margin-bottom: 2px; }
 .calc-bub .tm { font-size: 9px; color: #B6BFCC; margin-top: 3px; text-align: right; }
