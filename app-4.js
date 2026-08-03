@@ -17541,13 +17541,21 @@ function mfgOpenPdf(itemId, fileId) {
             '<span id="mfg-pdf-cnt"></span>' +
             '<button onclick="mfgPdfNav(1)" title="Следующий чертёж"><i class="ti ti-chevron-right"></i></button></span>'
           : '') +
+        '<span class="nav zoo">' +
+          '<button onclick="mfgPdfZoom(0.8)" title="Отдалить"><i class="ti ti-minus"></i></button>' +
+          '<span id="mfg-pdf-pct">100%</span>' +
+          '<button onclick="mfgPdfZoom(1.25)" title="Приблизить"><i class="ti ti-plus"></i></button>' +
+          '<button onclick="mfgPdfFit()" title="Вписать в окно"><i class="ti ti-arrows-maximize"></i></button>' +
+        '</span>' +
         '<button class="vb" onclick="mfgDownloadFile(state._mfgPdfList[state._mfgPdfIdx].id)"><i class="ti ti-download"></i> Скачать</button>' +
         '<button class="vb" onclick="mfgDownloadFile(state._mfgPdfList[state._mfgPdfIdx].id, true)"><i class="ti ti-external-link"></i> В новой вкладке</button>' +
         '<button class="vb x" onclick="mfgPdfClose()"><i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<div class="mfg-pdf-bd"><iframe id="mfg-pdf-frame" title="Чертёж"></iframe>' +
+      '<div class="mfg-pdf-bd">' +
+        '<div class="mfg-pdf-cwrap" id="mfg-pdf-cwrap"><canvas id="mfg-pdf-canvas"></canvas></div>' +
         '<div class="loading-block" id="mfg-pdf-load">Открываем чертёж…</div></div>' +
     '</div>';
+  _mfgPdfBindPanZoom();
   document.body.appendChild(m);
   _mfgPdfLoad();
 }
@@ -17556,6 +17564,8 @@ function mfgPdfClose() {
   if (m) m.remove();
   if (state._mfgPdfUrl) { try { URL.revokeObjectURL(state._mfgPdfUrl); } catch (e) {} }
   state._mfgPdfUrl = null;
+  if (state._mfgPdfDoc) { try { state._mfgPdfDoc.destroy(); } catch (e) {} }
+  state._mfgPdfDoc = null;
 }
 function mfgPdfNav(d) {
   const n = (state._mfgPdfList || []).length;
@@ -17563,30 +17573,118 @@ function mfgPdfNav(d) {
   state._mfgPdfIdx = (state._mfgPdfIdx + d + n) % n;
   _mfgPdfLoad();
 }
+// pdf.js подгружается лениво с того же CDN, что иконки
+function _ensurePdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  if (window._pdfjsLoading) return window._pdfjsLoading;
+  window._pdfjsLoading = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    sc.onload = () => {
+      try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      } catch (e) {}
+      res();
+    };
+    sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+  return window._pdfjsLoading;
+}
+
 async function _mfgPdfLoad() {
   const f = (state._mfgPdfList || [])[state._mfgPdfIdx];
   if (!f) return;
   const t = document.getElementById('mfg-pdf-title');
   const cnt = document.getElementById('mfg-pdf-cnt');
-  const frame = document.getElementById('mfg-pdf-frame');
   const load = document.getElementById('mfg-pdf-load');
   if (t) t.innerHTML = escapeHtml(f.file_name || '') + '<small>' + _mfgFileSize(f.size_bytes) + '</small>';
   if (cnt) cnt.textContent = (state._mfgPdfIdx + 1) + ' из ' + state._mfgPdfList.length;
-  if (load) load.style.display = 'flex';
-  if (frame) frame.style.opacity = '0';
+  if (load) { load.style.display = 'flex'; load.textContent = 'Открываем чертёж…'; }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/mfg/files/' + f.id + '/download',
       { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) throw new Error('http ' + r.status);
-    const blob = await r.blob();
-    if (state._mfgPdfUrl) { try { URL.revokeObjectURL(state._mfgPdfUrl); } catch (e) {} }
-    state._mfgPdfUrl = URL.createObjectURL(blob);
-    if (frame) { frame.src = state._mfgPdfUrl; frame.style.opacity = '1'; }
+    const buf = await r.arrayBuffer();
+    await _ensurePdfJs();
+    if (state._mfgPdfDoc) { try { state._mfgPdfDoc.destroy(); } catch (e) {} }
+    state._mfgPdfDoc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    state._mfgPdfScale = null;   // null = вписать в окно
+    await _mfgPdfRender();
     if (load) load.style.display = 'none';
   } catch (e) {
     if (load) load.textContent = 'Не удалось открыть чертёж';
   }
+}
+
+async function _mfgPdfRender() {
+  const doc = state._mfgPdfDoc;
+  const wrap = document.getElementById('mfg-pdf-cwrap');
+  const canvas = document.getElementById('mfg-pdf-canvas');
+  if (!doc || !wrap || !canvas) return;
+  const page = await doc.getPage(1);
+  if (state._mfgPdfScale == null) {
+    const v1 = page.getViewport({ scale: 1 });
+    state._mfgPdfScale = Math.max(0.2,
+      Math.min((wrap.clientWidth - 28) / v1.width, (wrap.clientHeight - 28) / v1.height));
+  }
+  const scale = state._mfgPdfScale;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const vp = page.getViewport({ scale: scale * dpr });
+  canvas.width = Math.floor(vp.width);
+  canvas.height = Math.floor(vp.height);
+  canvas.style.width = Math.floor(vp.width / dpr) + 'px';
+  canvas.style.height = Math.floor(vp.height / dpr) + 'px';
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  const pct = document.getElementById('mfg-pdf-pct');
+  if (pct) pct.textContent = Math.round(scale * 100) + '%';
+}
+
+function mfgPdfZoom(factor) {
+  if (!state._mfgPdfDoc) return;
+  state._mfgPdfScale = Math.max(0.15, Math.min(8, (state._mfgPdfScale || 1) * factor));
+  _mfgPdfRender();
+}
+function mfgPdfFit() {
+  if (!state._mfgPdfDoc) return;
+  state._mfgPdfScale = null;
+  _mfgPdfRender();
+}
+
+// таскание мышкой + зум колёсиком вокруг курсора
+function _mfgPdfBindPanZoom() {
+  const wrap = document.getElementById('mfg-pdf-cwrap');
+  if (!wrap) return;
+  let drag = null;
+  wrap.addEventListener('mousedown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
+    wrap.classList.add('grabbing');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    wrap.scrollLeft = drag.sl - (e.clientX - drag.x);
+    wrap.scrollTop = drag.st - (e.clientY - drag.y);
+  });
+  window.addEventListener('mouseup', () => { drag = null; wrap.classList.remove('grabbing'); });
+  wrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (!state._mfgPdfDoc) return;
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    // точка под курсором остаётся на месте
+    const rect = wrap.getBoundingClientRect();
+    const px = (wrap.scrollLeft + (e.clientX - rect.left));
+    const py = (wrap.scrollTop + (e.clientY - rect.top));
+    const oldScale = state._mfgPdfScale || 1;
+    state._mfgPdfScale = Math.max(0.15, Math.min(8, oldScale * factor));
+    const k = state._mfgPdfScale / oldScale;
+    _mfgPdfRender().then(() => {
+      wrap.scrollLeft = px * k - (e.clientX - rect.left);
+      wrap.scrollTop = py * k - (e.clientY - rect.top);
+    });
+  }, { passive: false });
 }
 async function mfgDownloadFile(fileId, openTab) {
   const it = state.mfgCurrentItem || {};

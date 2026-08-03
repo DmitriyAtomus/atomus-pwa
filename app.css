@@ -22481,6 +22481,10 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mfg-pdf-hd .vb:hover { background: rgba(255, 255, 255, .24); }
 .mfg-pdf-bd { flex: 1; position: relative; }
 .mfg-pdf-bd iframe { width: 100%; height: 100%; border: none; background: #3E4756; transition: opacity .15s; }
+.mfg-pdf-cwrap { position: absolute; inset: 0; overflow: auto; cursor: grab; }
+.mfg-pdf-cwrap.grabbing { cursor: grabbing; }
+.mfg-pdf-cwrap canvas { display: block; margin: 14px auto; background: #fff; box-shadow: 0 8px 30px rgba(0, 0, 0, .45); border-radius: 3px; }
+.mfg-pdf-hd .nav.zoo span { min-width: 44px; text-align: center; }
 .mfg-pdf-bd .loading-block { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
 
 /* v2.45.856: дерево разделов сворачивается — карточка изделия во всю ширину */
