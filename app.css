@@ -22066,6 +22066,12 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .dl-hide { margin-left: auto; border: 0; background: transparent; color: #94A3B8; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; }
 .dl-hide:hover { color: var(--danger); background: var(--danger-bg); }
 
+/* v2.45.879: печатные формы ДЛ (счёт/счёт-фактура/накладная) внутри карточки */
+.dl-doc { margin-top: 9px; border-top: 1px dashed var(--border); padding-top: 9px; }
+.dl-doc-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.dl-doc-tabs .btn { min-height: 27px; padding: 4px 8px; font-size: 10px; }
+.dl-doc-tabs .btn:last-child { margin-left: auto; }
+
 .dl-archive { margin-top: 15px; }
 .dl-archive > summary { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text-light); font-weight: 750; font-size: 12px; list-style: none; padding: 8px 2px; }
 .dl-archive > summary::-webkit-details-marker { display: none; }

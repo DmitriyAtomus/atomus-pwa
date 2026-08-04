@@ -8611,7 +8611,7 @@ function _dellinDirectionChip(direction) {
   return '<span class="dl-dir ' + item[0] + '"><i class="ti ' + item[1] + '"></i> ' + item[2] + '</span>';
 }
 
-function _dellinOrderCard(sh) {
+function _dellinOrderCard(sh, configured) {
   const closed = !!sh.is_closed || !!sh.delivered_at;
   const orderId = String(sh.order_id || '').trim();
   const waybill = String(sh.dellin_number || '').trim();
@@ -8661,14 +8661,124 @@ function _dellinOrderCard(sh) {
   if (progress !== null) {
     h += '<div class="dl-progress"><i style="width:' + progress + '%"></i></div>';
   }
+  // v2.45.879: счёт ДЛ за перевозку — печатная форма прямо из кабинета.
+  // Пока кабинет не подключён, тянуть нечего, поэтому кнопки нет.
+  const canBill = configured !== false;
   h += '<div class="dl-actions">' +
       '<button class="btn btn-secondary btn-small" onclick="dellinTrack(\'' + waybill.replace(/'/g, '') + '\')"><i class="ti ti-external-link"></i> Отследить</button>' +
+      (canBill ? '<button class="btn ' + (paidKnown && !paid ? 'btn-primary' : 'btn-secondary') + ' btn-small" id="dl-doc-btn-' + sh.id + '" onclick="dellinDoc(' + sh.id + ')"><i class="ti ti-file-invoice"></i> Счёт</button>' : '') +
       (sh.source === 'journal' ? '' :
         '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')"><i class="ti ti-edit"></i> Статус</button>') +
       '<button class="dl-hide" onclick="dellinRemove(' + sh.id + ')" title="Скрыть из CRM"><i class="ti ti-eye-off"></i></button>' +
     '</div>' +
+    (canBill ? '<div class="dl-doc" id="dl-doc-' + sh.id + '" data-open="0" style="display:none;"></div>' : '') +
   '</div>';
   return h;
+}
+
+// ============ ПЕЧАТНЫЕ ФОРМЫ ДЛ (счёт, счёт-фактура, накладная) ============
+// Документы не храним у себя: каждый раз берём свежие из личного кабинета
+// через /api/logistics/dellin/{id}/printable — ДЛ отдают PDF в base64.
+const DELLIN_DOC_MODES = [
+  { mode: 'bill',    label: 'Счёт',          icon: 'ti-file-invoice' },
+  { mode: 'invoice', label: 'Счёт-фактура',  icon: 'ti-file-text' },
+  { mode: 'order',   label: 'Накладная',     icon: 'ti-file-description' },
+];
+
+function _dellinDocClose(cont) {
+  const node = cont.querySelector('[data-blob-url]');
+  if (node && node.dataset.blobUrl) URL.revokeObjectURL(node.dataset.blobUrl);
+  cont.innerHTML = '';
+  cont.style.display = 'none';
+  cont.dataset.open = '0';
+}
+
+async function dellinDoc(id, mode) {
+  mode = mode || 'bill';
+  const cont = document.getElementById('dl-doc-' + id);
+  const btn  = document.getElementById('dl-doc-btn-' + id);
+  if (!cont) return;
+  // Повторный клик по той же форме — закрываем; по другой — перезагружаем.
+  if (cont.dataset.open === '1' && cont.dataset.mode === mode) {
+    _dellinDocClose(cont);
+    if (btn) btn.innerHTML = '<i class="ti ti-file-invoice"></i> Счёт';
+    return;
+  }
+  _dellinDocClose(cont);
+  cont.style.display = 'block';
+  cont.dataset.open = '1';
+  cont.dataset.mode = mode;
+  cont.innerHTML = '<div style="padding:14px;color:var(--text-light);text-align:center;font-size:13px;">Запрашиваем в кабинете ДЛ…</div>';
+  if (btn && mode === 'bill') btn.innerHTML = '<i class="ti ti-eye-off"></i> Скрыть';
+  const tabs = DELLIN_DOC_MODES.map(m =>
+    '<button class="btn ' + (m.mode === mode ? 'btn-primary' : 'btn-secondary') + ' btn-small" onclick="dellinDoc(' + id + ',\'' + m.mode + '\')"><i class="ti ' + m.icon + '"></i> ' + m.label + '</button>'
+  ).join('');
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/logistics/dellin/' + id + '/printable?mode=' + mode, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      let msg = '';
+      try { const d = await r.json(); msg = d.message || d.error || ''; } catch (e) {}
+      cont.innerHTML =
+        '<div class="dl-doc-tabs">' + tabs + '</div>' +
+        '<div style="padding:12px 14px;color:var(--danger);font-size:13px;line-height:1.5;">' +
+          '<b>Документ не пришёл (HTTP ' + r.status + ').</b>' +
+          (msg ? '<br><span style="color:var(--text-mid);">' + escapeHtml(msg) + '</span>' : '') +
+          (mode === 'invoice' ? '<br><span style="color:var(--text-light);">Счёт-фактуру ДЛ отдают только плательщику по накладной.</span>' : '') +
+        '</div>';
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const label = (DELLIN_DOC_MODES.find(m => m.mode === mode) || {}).label || 'Документ';
+    const viewer = (state && state.isDesktop)
+      ? '<iframe data-blob-url="' + url + '" src="' + url + '#view=FitH" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>'
+      : '<div data-blob-url="' + url + '" style="padding:18px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;">' +
+          '<i class="ti ti-file-type-pdf" style="font-size:42px;color:#C0392B;"></i>' +
+          '<div style="margin:8px 0 14px;font-size:13px;color:var(--text-mid);">' + escapeHtml(label) + ' Деловых линий</div>' +
+          '<button class="btn btn-primary" onclick="window.open(\'' + url + '\',\'_blank\')"><i class="ti ti-external-link"></i> Открыть PDF</button>' +
+        '</div>';
+    cont.innerHTML =
+      '<div class="dl-doc-tabs">' + tabs +
+        '<button class="btn btn-secondary btn-small" onclick="dellinDocDownload(' + id + ',\'' + mode + '\')"><i class="ti ti-download"></i> Скачать</button>' +
+      '</div>' + viewer;
+  } catch (e) {
+    cont.innerHTML = '<div style="padding:14px;color:var(--danger);font-size:13px;">Сеть: не удалось получить документ.</div>';
+  }
+}
+
+async function dellinDocDownload(id, mode) {
+  mode = mode || 'bill';
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/logistics/dellin/' + id + '/printable?mode=' + mode, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast(d.message || 'Документ недоступен', 'error');
+      return;
+    }
+    const cd = r.headers.get('Content-Disposition') || '';
+    let filename = 'dellin_' + mode + '_' + id + '.pdf';
+    const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    const plain = cd.match(/filename="?([^";]+)"?/i);
+    if (star) { try { filename = decodeURIComponent(star[1]); } catch (e) {} }
+    else if (plain) filename = plain[1];
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    showToast('Сеть: не удалось скачать', 'error');
+  }
 }
 
 // ============ ДЕЛОВЫЕ ЛИНИИ — полный журнал личного кабинета ============
@@ -8714,12 +8824,12 @@ function _dellinBlockHtml(dl) {
       '</div>';
   } else {
     h += '<div class="dl-subhead">Активные заказы <span>' + active.length + '</span></div>' +
-      active.map(_dellinOrderCard).join('');
+      active.map(sh => _dellinOrderCard(sh, dl.configured)).join('');
   }
 
   if (completed.length) {
     h += '<details class="dl-archive"><summary><i class="ti ti-circle-check"></i> Завершённые заказы <span>' + completed.length + '</span></summary>' +
-      '<div class="dl-archive-list">' + completed.map(_dellinOrderCard).join('') + '</div></details>';
+      '<div class="dl-archive-list">' + completed.map(sh => _dellinOrderCard(sh, dl.configured)).join('') + '</div></details>';
   }
   return h;
 }
@@ -17488,6 +17598,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.879',
+    date: '04.08.2026',
+    title: 'Счета Деловых линий прямо в карточке',
+    features: [
+      'В карточке заказа <b>Деловых линий</b> появилась кнопка <b>«Счёт»</b> — печатная форма берётся из личного кабинета ДЛ и открывается прямо в разделе «Логистика»',
+      'У неоплаченных перевозок кнопка выделена синим — видно, за что ещё нужно заплатить, и счёт не приходится искать в кабинете',
+      'Рядом переключаются <b>счёт-фактура</b> и <b>накладная</b>, есть кнопка «Скачать» (PDF). Счёт-фактуру ДЛ отдают только плательщику по накладной',
+      'Документы нигде не хранятся: каждый раз запрашиваем свежие у ДЛ по номеру накладной',
+    ],
+  },
   {
     version: 'v2.45.878',
     date: '04.08.2026',
