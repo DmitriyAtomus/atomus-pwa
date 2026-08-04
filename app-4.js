@@ -17043,8 +17043,8 @@ async function mfgOrderOpen(itemId) {
       '<div><div class="mo-sec">МАТЕРИАЛ ЗАКАЗА</div>' +
         '<div class="pdx-mode" id="mo-mat">' +
           '<button type="button" class="on" data-mat="">Как в чертежах</button>' +
-          '<button type="button" data-mat="Нержавеющая сталь 08Х18Н10">Нержавейка</button>' +
-          '<button type="button" data-mat="Сталь углеродистая Ст3">Углеродка</button>' +
+          '<button type="button" data-mat="AISI 304">AISI 304</button>' +
+          '<button type="button" data-mat="Черная сталь">Черная сталь</button>' +
         '</div></div>' +
       '<div class="mo-zip"><i class="ti ti-file-zip" style="color:#B45309;"></i> ' +
         'В архив: <b>DXF</b> (лазер) + <b>PDF</b> (гибка) выбранных деталей + <b>ведомость XLSX</b> ' +
