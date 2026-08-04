@@ -22411,7 +22411,14 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .pdx-tile.sel .pdx-draw { background: #F3F8FF; }
 .pdx-draw svg { max-width: 100%; max-height: 100%; }
 /* v2.45.857: количество штук — заметный синий бейдж на чертеже */
-.pdx-qty { position: absolute; top: 100px; right: 8px; background: var(--brand); color: #fff; border-radius: 99px; font-size: 11px; font-weight: 800; padding: 2px 9px; z-index: 2; box-shadow: 0 2px 6px rgba(37, 99, 235, .35); }
+/* v2.45.878: бейдж стал счётчиком — штуки проставляются прямо на плитке */
+.pdx-qty { position: absolute; top: 96px; right: 8px; display: inline-flex; align-items: center; gap: 1px; background: var(--brand); color: #fff; border-radius: 99px; padding: 2px 3px; z-index: 3; box-shadow: 0 2px 6px rgba(37, 99, 235, .35); cursor: default; }
+.pdx-qty .s { width: 20px; height: 20px; flex: none; padding: 0; border: 0; border-radius: 99px; background: rgba(255, 255, 255, .18); color: #fff; font-size: 14px; font-weight: 800; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.pdx-qty .s:hover { background: rgba(255, 255, 255, .34); }
+.pdx-qty .v { width: 32px; border: 0; border-radius: 6px; background: transparent; color: #fff; font-size: 11.5px; font-weight: 800; text-align: center; padding: 1px 0; appearance: textfield; -moz-appearance: textfield; }
+.pdx-qty .v:focus { outline: none; background: rgba(255, 255, 255, .24); }
+.pdx-qty .v::-webkit-outer-spin-button,
+.pdx-qty .v::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .pdx-info { padding: 8px 11px 10px; }
 .pdx-info .d { font-family: ui-monospace, Consolas, monospace; font-size: 10px; color: #64748B; }
 .pdx-info .n { font-size: 12px; font-weight: 700; line-height: 1.3; margin: 2px 0 5px; min-height: 31px; }
@@ -22464,6 +22471,8 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .pd-total-value { font-size: 22px; }
   .pdx-chips { gap: 6px; }
   .pdx-tile .pdx-cb.tile { width: 26px; height: 26px; }  /* пальцем попасть */
+  .pdx-qty .s { width: 26px; height: 26px; font-size: 16px; }
+  .pdx-qty .v { width: 36px; font-size: 12.5px; }
 }
 
 /* ============ v2.45.853: корпуса — файлы изделия, плитки, PDF-просмотрщик ============ */

@@ -15952,7 +15952,9 @@ function renderPaintCalcDetail(c) {
   }
   if (items.length) {
     h += '<div class="pd-note">Площадь окраски = 2 × площадь развёртки + периметр реза × толщина. ' +
-      'Контроль: расчётная масса против массы в основной надписи, допуск 1 %.</div>';
+      'Контроль: расчётная масса против массы в основной надписи, допуск 1 %.<br>' +
+      'Количество штук ставится прямо на плитке кнопками <b>−</b> / <b>+</b> ' +
+      '(или числом в поле), в таблице — в колонке «Кол-во». Площадь и порошок пересчитываются сразу.</div>';
   }
 
   // липкая панель партии
@@ -15995,7 +15997,17 @@ function _paintTileHtml(it, isSel) {
     (it.svg ? '<span class="pdx-zoom" title="Открыть крупно" ' +
       'onclick="event.stopPropagation();paintZoom(' + it.id + ')"><i class="ti ti-zoom-in"></i></span>' : '') +
     '<div class="pdx-draw">' + svg + '</div>' +
-    '<span class="pdx-qty">×' + (it.qty || 1) + '</span>' +
+    // v2.45.878: количество прямо на плитке — чертёж без ведомости приходит
+    // «по 1 шт.», и штуки надо проставить, не уходя в таблицу.
+    '<span class="pdx-qty" id="pdx-qty-' + it.id + '" onclick="event.stopPropagation()">' +
+      '<button class="s" onclick="event.stopPropagation();paintQtyStep(' + it.calc_id + ',' + it.id + ',-1)" title="Меньше">−</button>' +
+      '<input class="v" type="number" min="1" step="1" inputmode="numeric" value="' + (it.qty || 1) + '" ' +
+        'onclick="event.stopPropagation()" ' +
+        'oninput="paintQtyTyped(' + it.calc_id + ',' + it.id + ',this.value)" ' +
+        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" ' +
+        'onblur="paintQtyFlush(' + it.calc_id + ',' + it.id + ')">' +
+      '<button class="s" onclick="event.stopPropagation();paintQtyStep(' + it.calc_id + ',' + it.id + ',1)" title="Больше">+</button>' +
+    '</span>' +
     '<div class="pdx-info">' +
       '<div class="d">' + escapeHtml(it.designation || '—') + '</div>' +
       '<div class="n">' + escapeHtml(it.name || '—') + _paintManualTag(it) + '</div>' +
@@ -16006,6 +16018,63 @@ function _paintTileHtml(it, isSel) {
       '</div>' +
     '</div>' +
   '</div>';
+}
+
+// ============ v2.45.878: КОЛИЧЕСТВО ШТУК ПРЯМО НА ПЛИТКЕ ============
+// Чертёж без ведомости деталей приходит «по 1 шт.» — штуки проставляет
+// человек. Клики по ±  копим и шлём одним PATCH: каждый пересчитывает
+// весь расчёт на сервере, дёргать его на каждую единицу незачем.
+const _paintQtyTimers = {};
+
+function _paintQtyInput(itemId) {
+  const host = document.getElementById('pdx-qty-' + itemId);
+  return host ? host.querySelector('input.v') : null;
+}
+
+function _paintQtyCurrent(itemId) {
+  const c = state.currentPaintCalc;
+  const it = c && (c.items || []).find(x => x.id === itemId);
+  return it ? (Number(it.qty) || 1) : 1;
+}
+
+async function _paintQtySave(calcId, itemId, qty) {
+  clearTimeout(_paintQtyTimers[itemId]);
+  delete _paintQtyTimers[itemId];
+  if (qty === _paintQtyCurrent(itemId)) return;
+  // Перерисовка расчёта пересоздаёт плитку — если человек стоял в поле,
+  // возвращаем его туда же, чтобы можно было допечатать.
+  const wasFocused = document.activeElement === _paintQtyInput(itemId);
+  await savePaintItem(calcId, itemId, { qty: qty });
+  if (wasFocused) {
+    const el = _paintQtyInput(itemId);
+    if (el) { el.focus(); el.select(); }
+  }
+}
+
+function paintQtyStep(calcId, itemId, delta) {
+  const inp = _paintQtyInput(itemId);
+  if (!inp) return;
+  const next = Math.max(1, (parseInt(inp.value, 10) || _paintQtyCurrent(itemId)) + delta);
+  inp.value = next;
+  clearTimeout(_paintQtyTimers[itemId]);
+  _paintQtyTimers[itemId] = setTimeout(() => _paintQtySave(calcId, itemId, next), 700);
+}
+
+// Ввод с клавиатуры не сохраняем на каждый символ: «12» иначе успело бы
+// уехать как «1». Пишем по Enter или когда человек уходит из поля.
+function paintQtyTyped(calcId, itemId, value) {
+  const clean = String(value || '').replace(/\D/g, '');
+  const inp = _paintQtyInput(itemId);
+  if (inp && clean !== String(value)) inp.value = clean;
+  clearTimeout(_paintQtyTimers[itemId]);
+}
+
+function paintQtyFlush(calcId, itemId) {
+  const inp = _paintQtyInput(itemId);
+  if (!inp) return;
+  const qty = parseInt(inp.value, 10);
+  if (!qty || qty < 1) { inp.value = _paintQtyCurrent(itemId); return; }
+  _paintQtySave(calcId, itemId, qty);
 }
 
 function paintZoom(itemId) {
