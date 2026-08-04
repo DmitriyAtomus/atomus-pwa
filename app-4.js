@@ -15994,8 +15994,12 @@ function _paintTileHtml(it, isSel) {
   const matShort = _paintMatName(it);
   return '<div class="pdx-tile' + (isSel ? ' sel' : '') + '" onclick="paintToggleSel(' + it.id + ')">' +
     '<span class="pdx-cb tile' + (isSel ? ' on' : '') + '">' + (isSel ? '✓' : '') + '</span>' +
-    (it.svg ? '<span class="pdx-zoom" title="Открыть крупно" ' +
+    (it.svg ? '<span class="pdx-zoom' + (it.drawing_file_id ? ' shift' : '') + '" title="Открыть крупно" ' +
       'onclick="event.stopPropagation();paintZoom(' + it.id + ')"><i class="ti ti-zoom-in"></i></span>' : '') +
+    // v2.45.880: тот самый PDF, который загружали — чертёж открывается из плитки
+    (it.drawing_file_id ? '<span class="pdx-pdf" title="Открыть чертёж, из которого посчитана деталь" ' +
+      'onclick="event.stopPropagation();paintOpenDrawing(' + it.id + ')">' +
+      '<i class="ti ti-file-type-pdf"></i></span>' : '') +
     '<div class="pdx-draw">' + svg + '</div>' +
     // v2.45.878: количество прямо на плитке — чертёж без ведомости приходит
     // «по 1 шт.», и штуки надо проставить, не уходя в таблицу.
@@ -16075,6 +16079,18 @@ function paintQtyFlush(calcId, itemId) {
   const qty = parseInt(inp.value, 10);
   if (!qty || qty < 1) { inp.value = _paintQtyCurrent(itemId); return; }
   _paintQtySave(calcId, itemId, qty);
+}
+
+// v2.45.880: открыть исходный чертёж детали — тот PDF, который загружали.
+// Список для стрелок «предыдущий/следующий» — все чертежи этого расчёта.
+function paintOpenDrawing(itemId) {
+  const c = state.currentPaintCalc;
+  const it = c && (c.items || []).find(x => x.id === itemId);
+  if (!it || !it.drawing_file_id) {
+    showToast('Чертёж этой детали среди загруженных файлов не нашёлся', 'error');
+    return;
+  }
+  mfgOpenPdf(null, it.drawing_file_id, 'paint');
 }
 
 function paintZoom(itemId) {
@@ -17679,9 +17695,25 @@ function mfgZoomPart(partId) {
 }
 
 // ---------- просмотрщик PDF ----------
-function mfgOpenPdf(itemId, fileId) {
-  const it = state.mfgCurrentItem || {};
-  const pdfs = (it.files || []).filter(f => f.kind === 'pdf');
+// v2.45.880: просмотрщик PDF общий для корпусов и расчёта окраски. Отличаются
+// только адрес файла и список, из которого он берётся, — их и переключаем.
+function _pdfSource() {
+  if (state._pdfSrc === 'paint') {
+    const c = state.currentPaintCalc || {};
+    return {
+      files: (c.files || []),
+      url: (id) => '/api/paint-calcs/' + c.id + '/files/' + id + '/download',
+    };
+  }
+  return {
+    files: ((state.mfgCurrentItem || {}).files || []),
+    url: (id) => '/api/mfg/files/' + id + '/download',
+  };
+}
+
+function mfgOpenPdf(itemId, fileId, src) {
+  state._pdfSrc = src || 'mfg';
+  const pdfs = _pdfSource().files.filter(f => f.kind === 'pdf');
   if (!pdfs.length) return;
   let idx = pdfs.findIndex(f => f.id === fileId);
   if (idx < 0) idx = 0;
@@ -17770,7 +17802,7 @@ async function _mfgPdfLoad() {
   if (load) { load.style.display = 'flex'; load.textContent = 'Открываем чертёж…'; }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/mfg/files/' + f.id + '/download',
+    const r = await fetch(API_BASE + _pdfSource().url(f.id),
       { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) throw new Error('http ' + r.status);
     const buf = await r.arrayBuffer();
@@ -17853,11 +17885,11 @@ function _mfgPdfBindPanZoom() {
   }, { passive: false });
 }
 async function mfgDownloadFile(fileId, openTab) {
-  const it = state.mfgCurrentItem || {};
-  const f = (it.files || []).find(x => x.id === fileId) || {};
+  const src = _pdfSource();
+  const f = src.files.find(x => x.id === fileId) || {};
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/mfg/files/' + fileId + '/download',
+    const r = await fetch(API_BASE + src.url(fileId),
       { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) { showToast('Файл не читается', 'error'); return; }
     const blob = await r.blob();
