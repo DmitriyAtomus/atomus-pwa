@@ -16790,18 +16790,32 @@ function mfgToggleTree() {
   if (lay) lay.classList.toggle('tree-off', off);
 }
 
+function _mfgPersistCollapsed() {
+  try {
+    localStorage.setItem('mfgCollapsedSections', JSON.stringify(Object.keys(state.mfgCollapsedSections)));
+  } catch (e) {}
+}
+
 function toggleMfgSection(id, event) {
   if (event) event.stopPropagation();
   const key = String(id);
   if (state.mfgCollapsedSections[key]) delete state.mfgCollapsedSections[key];
   else state.mfgCollapsedSections[key] = true;
-  try {
-    localStorage.setItem('mfgCollapsedSections', JSON.stringify(Object.keys(state.mfgCollapsedSections)));
-  } catch (e) {}
+  _mfgPersistCollapsed();
   renderMfg();
 }
 
+// v2.45.881: клик по разделу не только открывает его карточку, но и раскрывает
+// подразделы — целиться в маленький шеврон больше не нужно. Повторный клик по
+// уже открытому разделу сворачивает его обратно.
 async function selectMfgSection(id) {
+  const kids = (_mfgTree()[id] || []).length;
+  if (kids) {
+    const key = String(id);
+    if (state.mfgCollapsedSections[key]) delete state.mfgCollapsedSections[key];
+    else if (state.mfgCurrentSection === id) state.mfgCollapsedSections[key] = true;
+    _mfgPersistCollapsed();
+  }
   state.mfgCurrentSection = id;
   state.mfgCurrentItem = null;
   renderMfg();
