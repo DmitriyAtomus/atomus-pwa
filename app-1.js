@@ -29,8 +29,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.876";
-const APP_VERSION_DATE = "03.08.2026";
+const APP_VERSION = "v2.45.877";
+const APP_VERSION_DATE = "04.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1399,6 +1399,14 @@ function renderProfile() {
   const navSec = document.getElementById('sb-security');
   if (navSec) {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
+  }
+
+  // Прямой эфир окна CRM на офисном ТВ — только директору и не на самом ТВ.
+  const tvCastBtn = document.getElementById('tv-cast-top-btn');
+  const canCastTv = !!(state.user.roles && state.user.roles.includes('director') && !window._tvMode);
+  if (tvCastBtn) tvCastBtn.style.display = canCastTv ? '' : 'none';
+  if (canCastTv && typeof startTvScreenCastPolling === 'function') {
+    try { startTvScreenCastPolling(); } catch (_) {}
   }
 
   // Условный показ «Новая сборка»
