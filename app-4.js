@@ -17965,3 +17965,108 @@ async function deleteMfgItem(id) {
   showToast('Удалено', 'success');
   loadMfgItems(state.mfgCurrentSection);
 }
+
+
+// ============================================================
+// ============ v2.45.877: ЭКРАН CRM НА ОФИСНОМ ТВ =============
+// ============================================================
+// Backend хранит желаемое состояние, а локальный агент серверного ПК
+// захватывает только окно CRM и переключает Chromecast. Здесь кнопка всегда
+// показывает подтверждённый агентом статус, а не только отправленную команду.
+let _tvScreenCastState = null;
+let _tvScreenCastBusy = false;
+let _tvScreenCastTimer = null;
+let _tvScreenCastLastErrorKey = '';
+
+function _canControlTvScreenCast() {
+  return !!(state.user && Array.isArray(state.user.roles) &&
+    state.user.roles.includes('director') && !window._tvMode);
+}
+
+function _renderTvScreenCastButton() {
+  const btn = document.getElementById('tv-cast-top-btn');
+  if (!btn) return;
+  if (!_canControlTvScreenCast()) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  const st = _tvScreenCastState || {};
+  const status = String(st.status || 'idle');
+  const active = st.action === 'start' && status === 'active';
+  const waiting = _tvScreenCastBusy || status === 'starting' || status === 'stopping';
+  const failed = status === 'error';
+  btn.classList.toggle('is-active', active);
+  btn.classList.toggle('is-busy', waiting);
+  btn.classList.toggle('is-error', failed);
+  btn.disabled = !!_tvScreenCastBusy;
+  const icon = btn.querySelector('i');
+  const label = btn.querySelector('.tv-cast-label');
+  if (icon) {
+    icon.className = 'ti ' + (waiting ? 'ti-loader-2' : failed ? 'ti-alert-triangle' : active ? 'ti-broadcast' : 'ti-device-tv');
+  }
+  if (label) label.textContent = waiting ? (status === 'stopping' ? 'Возврат…' : 'Запуск…') : failed ? 'Повторить' : active ? 'В эфире' : 'Экран на ТВ';
+  btn.title = active
+    ? 'Остановить прямой эфир и вернуть обычное табло'
+    : failed
+      ? ((st.action === 'stop' ? 'Не удалось вернуть табло' : 'Не удалось включить эфир') +
+        (st.message ? ': ' + st.message : '') + '. Нажмите, чтобы повторить')
+      : 'Показать окно CRM серверного компьютера на офисном телевизоре';
+  btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
+
+async function refreshTvScreenCastState() {
+  if (!_canControlTvScreenCast()) return;
+  try {
+    _tvScreenCastState = await apiGet('/api/tv/screen');
+    _renderTvScreenCastButton();
+    if (_tvScreenCastState.status === 'error') {
+      const key = String(_tvScreenCastState.seq || '') + '|' + String(_tvScreenCastState.message || '');
+      if (key !== _tvScreenCastLastErrorKey) {
+        _tvScreenCastLastErrorKey = key;
+        showToast(_tvScreenCastState.message || 'Серверный компьютер не смог включить трансляцию', 'error');
+      }
+    }
+  } catch (_) {
+    // Во время обновления backend кнопка остаётся доступной; следующий опрос
+    // восстановит статус без лишних уведомлений пользователю.
+  }
+}
+
+function startTvScreenCastPolling() {
+  if (!_canControlTvScreenCast()) return;
+  _renderTvScreenCastButton();
+  refreshTvScreenCastState();
+  if (_tvScreenCastTimer) return;
+  _tvScreenCastTimer = setInterval(refreshTvScreenCastState, 4000);
+}
+
+async function toggleTvScreenCast() {
+  if (!_canControlTvScreenCast() || _tvScreenCastBusy) return;
+  const st = _tvScreenCastState || {};
+  const shouldStop = st.action === 'start' && (st.status === 'active' || st.status === 'starting');
+  // При ошибке повторяем именно незавершённое действие: если агент не смог
+  // остановить эфир, «Повторить» снова отправляет stop, а не включает его заново.
+  const action = st.status === 'error'
+    ? (st.action === 'stop' ? 'stop' : 'start')
+    : (shouldStop ? 'stop' : 'start');
+  _tvScreenCastBusy = true;
+  _tvScreenCastState = Object.assign({}, st, {
+    action: action,
+    status: action === 'start' ? 'starting' : 'stopping',
+  });
+  _renderTvScreenCastButton();
+  try {
+    const res = await apiPost('/api/tv/screen', { action: action });
+    if (!res.ok) throw new Error((res.data && (res.data.message || res.data.error)) || ('HTTP ' + res.status));
+    _tvScreenCastState = res.data || _tvScreenCastState;
+    showToast(action === 'start' ? 'Включаю экран CRM на телевизоре…' : 'Возвращаю обычное табло…', 'info');
+  } catch (e) {
+    _tvScreenCastState = Object.assign({}, st, { status: 'error', message: String(e && e.message || e) });
+    showToast('Не удалось отправить команду на телевизор', 'error');
+  } finally {
+    _tvScreenCastBusy = false;
+    _renderTvScreenCastButton();
+    setTimeout(refreshTvScreenCastState, 800);
+  }
+}

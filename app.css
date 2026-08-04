@@ -9697,6 +9697,31 @@
   }
   .scan-btn--qr i { color: #BAE6FD; }
 
+  .scan-btn--tv {
+    background: rgba(168, 85, 247, 0.20);
+    border-color: rgba(216, 180, 254, 0.48);
+  }
+  .scan-btn--tv:hover {
+    background: rgba(168, 85, 247, 0.34);
+    border-color: rgba(216, 180, 254, 0.72);
+  }
+  .scan-btn--tv i { color: #E9D5FF; }
+  .scan-btn--tv.is-active {
+    background: linear-gradient(180deg, #EF4444, #B91C1C) !important;
+    border-color: rgba(254, 202, 202, 0.9) !important;
+    box-shadow: 0 0 0 3px rgba(239,68,68,.18), 0 2px 10px rgba(127,29,29,.35) !important;
+  }
+  .scan-btn--tv.is-active i { color: #fff; animation: tvCastPulse 1.25s ease-in-out infinite; }
+  .scan-btn--tv.is-busy i { animation: tvCastSpin .9s linear infinite; }
+  .scan-btn--tv.is-error {
+    background: rgba(245, 158, 11, 0.30) !important;
+    border-color: rgba(253, 230, 138, 0.75) !important;
+  }
+  .scan-btn--tv:disabled { cursor: wait; opacity: .82; }
+  @keyframes tvCastPulse { 50% { transform: scale(1.16); opacity: .72; } }
+  @keyframes tvCastSpin { to { transform: rotate(360deg); } }
+  body.tv-mode #tv-cast-top-btn { display: none !important; }
+
   @media (max-width: 1100px) {
     .scan-btn-text { display: none; }
     .scan-btn { padding: 6px 8px; }
