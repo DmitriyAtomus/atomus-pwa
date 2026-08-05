@@ -22680,3 +22680,28 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mfg-node:hover .mfg-node-actions { opacity: 1; }
 .mfg-node-actions .icon-btn { width: 22px; height: 22px; font-size: 11px; border-radius: 6px; color: #94A3B8; }
 .mfg-node-actions .icon-btn:hover { color: var(--brand); background: #EFF6FF; }
+
+/* ============ v2.45.877: курсы ЦБ — нарядные карточки ============ */
+.cbr2-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.cbr2-head .src { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; color: var(--text-light); letter-spacing: .3px; }
+.cbr2-head .dt { font-size: 11px; color: var(--text-faint); background: #F1F5F9; border-radius: 99px; padding: 2px 10px; font-weight: 600; }
+.cbr2-head .dt.stale { background: #FEF3C7; color: #92400E; }
+.cbr2-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.cbr2-card { display: flex; align-items: center; gap: 11px; border-radius: 14px; padding: 12px 13px; border: 1.5px solid; position: relative; transition: transform .12s, box-shadow .12s; }
+.cbr2-card:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(15, 30, 60, .1); }
+.cbr2-card.usd { background: linear-gradient(135deg, #F0FDF4, #fff 70%); border-color: #BBF7D0; }
+.cbr2-card.eur { background: linear-gradient(135deg, #EFF6FF, #fff 70%); border-color: #BFDBFE; }
+.cbr2-card.cny { background: linear-gradient(135deg, #FFFBEB, #fff 70%); border-color: #FDE68A; }
+.cbr2-card .orb { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: #fff; flex: none; }
+.cbr2-card.usd .orb { background: linear-gradient(135deg, #34D399, #059669); box-shadow: 0 4px 10px rgba(5, 150, 105, .35); }
+.cbr2-card.eur .orb { background: linear-gradient(135deg, #60A5FA, #2563EB); box-shadow: 0 4px 10px rgba(37, 99, 235, .35); }
+.cbr2-card.cny .orb { background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 4px 10px rgba(217, 119, 6, .35); }
+.cbr2-card .inf { flex: 1; min-width: 0; }
+.cbr2-card .code { font-size: 10.5px; font-weight: 800; color: var(--text-light); letter-spacing: .4px; }
+.cbr2-card .code small { font-weight: 600; color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+.cbr2-card .val { font-size: 19px; font-weight: 800; color: var(--text-dark); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.cbr2-card .val small { font-size: 13px; color: var(--text-light); font-weight: 700; }
+.cbr2-card .pill { position: absolute; top: 9px; right: 10px; font-size: 9.5px; font-weight: 800; border-radius: 99px; padding: 2px 7px; }
+.cbr2-card .pill.up { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.cbr2-card .pill.down { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.cbr2-card .pill.zero { background: #F1F5F9; color: #94A3B8; border: 1px solid #E2E8F0; }

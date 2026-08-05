@@ -1759,36 +1759,37 @@ function renderCbrRates() {
     el.innerHTML = '<div class="empty-block"><i class="ti ti-info-circle"></i>Курс валют недоступен</div>';
     return;
   }
+  // v2.45.877: нарядные карточки валют — символ в цветном круге, крупный курс,
+  // изменение пилюлей (рост курса = закупки дороже, поэтому рост красный)
   const isStale = !!d.is_stale;
   const dateText = d.date ? formatCbrDate(d.date) : '';
-  const flagBySymbol = { 'USD': '$', 'EUR': '€', 'CNY': '¥' };
-  const colorBySymbol = { 'USD': 'green', 'EUR': 'blue', 'CNY': 'amber' };
-  let html = '<div class="cbr-widget">';
-  if (dateText) {
-    html += '<div class="cbr-date-line' + (isStale ? ' stale' : '') + '">' +
-            (isStale ? '⚠ ' : '') +
-            escapeText(dateText) +
-            (isStale ? ' (офлайн)' : '') +
-            '</div>';
-  }
-  html += '<div class="cbr-grid">';
-  ['USD','EUR','CNY'].forEach(code => {
+  const META = {
+    'USD': { sym: '$', name: 'Доллар США', cls: 'usd' },
+    'EUR': { sym: '€', name: 'Евро', cls: 'eur' },
+    'CNY': { sym: '¥', name: 'Юань', cls: 'cny' },
+  };
+  let html = '<div class="cbr2">' +
+    '<div class="cbr2-head"><span class="src"><i class="ti ti-building-bank"></i> ЦБ РФ</span>' +
+      (dateText ? '<span class="dt' + (isStale ? ' stale' : '') + '">' +
+        (isStale ? '⚠ офлайн · ' : 'на ') + escapeText(dateText) + '</span>' : '') +
+    '</div><div class="cbr2-grid">';
+  ['USD', 'EUR', 'CNY'].forEach(code => {
     const r = d.rates[code];
     if (!r) return;
+    const m2 = META[code];
     const diff = Number(r.diff) || 0;
     const cls = diff > 0.001 ? 'up' : (diff < -0.001 ? 'down' : 'zero');
-    const arrow = diff > 0.001 ? '↑' : (diff < -0.001 ? '↓' : '·');
+    const arrow = diff > 0.001 ? '▲' : (diff < -0.001 ? '▼' : '—');
     const absDiff = Math.abs(diff);
-    html += '<div class="cbr-cell cbr-' + colorBySymbol[code] + '">' +
-      '<div class="cbr-symbol">' + flagBySymbol[code] + '</div>' +
-      '<div class="cbr-info">' +
-        '<div class="cbr-code">' + code + '</div>' +
-        '<div class="cbr-value">' + formatCbrValue(r.value) + ' ₽</div>' +
-        '<div class="cbr-diff ' + cls + '">' + arrow + ' ' +
-          (cls === 'zero' ? '0,00' : absDiff.toFixed(2).replace('.', ',')) +
-        '</div>' +
+    html += '<div class="cbr2-card ' + m2.cls + '">' +
+      '<span class="orb">' + m2.sym + '</span>' +
+      '<div class="inf">' +
+        '<div class="code">' + code + ' <small>' + m2.name + '</small></div>' +
+        '<div class="val">' + formatCbrValue(r.value) + ' <small>₽</small></div>' +
       '</div>' +
-      '</div>';
+      '<span class="pill ' + cls + '" title="Изменение к прошлому курсу">' + arrow + ' ' +
+        (cls === 'zero' ? '0,00' : absDiff.toFixed(2).replace('.', ',')) + '</span>' +
+    '</div>';
   });
   html += '</div></div>';
   el.innerHTML = html;
