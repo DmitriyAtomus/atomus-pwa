@@ -14462,6 +14462,14 @@ function _mpToday() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
+// v2.45.887: чем отвечали — видно в базе, если придётся разбирать вопросы
+function _mpDevice() {
+  try {
+    if (state && state.isDesktop === false) return 'телефон/планшет';
+    return 'компьютер';
+  } catch (e) { return ''; }
+}
+
 function _mpLoadStore() { try { return JSON.parse(localStorage.getItem(MORNING_PROGRESS_KEY) || '{}'); } catch (e) { return {}; } }
 function _mpSaveStore(o) { try { localStorage.setItem(MORNING_PROGRESS_KEY, JSON.stringify(o)); } catch (e) {} }
 
@@ -14480,7 +14488,15 @@ async function _maybeMorningProgress() {
     // v2.45.680: показываем максимум ОДИН раз за день. Раньше окно всплывало при
     // каждом открытии/перезагрузке, пока % не подтверждён — теперь, если сегодня уже
     // показывали, больше не дёргаем (даже если мастер закрыл без «Начать смену»).
-    try { const _s0 = _mpLoadStore(); if (_s0[_mpToday()] && _s0[_mpToday()]._shown) return; } catch (e) {}
+    // v2.45.887: «уже спрашивали сегодня» знает сервер, а не браузер устройства.
+    // Мастер отвечал с планшета и получал те же вопросы на компьютере — теперь нет.
+    let _ci = null;
+    try { _ci = await apiGet('/api/production/morning-checkin'); } catch (e) { _ci = null; }
+    if (_ci && (_ci.submitted || _ci.shown)) return;
+    // Сервер недоступен — работаем по старой памяти устройства, но не молчим совсем
+    if (!_ci) {
+      try { const _s0 = _mpLoadStore(); if (_s0[_mpToday()] && _s0[_mpToday()]._shown) return; } catch (e) {}
+    }
     // v2.45.364: только то, что «В работе» в производстве (production works status=in_progress),
     // и сразу подставляем текущий % готовности с карточки канбана
     let active = [];
@@ -14497,6 +14513,8 @@ async function _maybeMorningProgress() {
     if (!pctPending && !gaps) return;                      // ни %, ни вопросов — не мешаем
     // v2.45.680: отмечаем, что сегодня окно уже показали — повторно не всплывёт
     try { const _s = _mpLoadStore(); const _t = _mpToday(); _s[_t] = _s[_t] || {}; _s[_t]._shown = true; _mpSaveStore(_s); } catch (e) {}
+    // v2.45.887: и на сервере — чтобы на другом устройстве окно не открылось снова
+    try { apiPost('/api/production/morning-checkin', { event: 'shown', device: _mpDevice() }); } catch (e) {}
     _renderMorningProgress(active, gaps);
   } catch (e) { /* окно не должно ломать вход в приложение */ }
 }
@@ -14837,6 +14855,8 @@ function _mpSubmit() {
       }).catch(function () {});
     }
   } catch (e) {}
+  // v2.45.887: смена начата — на любом другом устройстве вопросы сегодня не повторятся
+  try { apiPost('/api/production/morning-checkin', { event: 'submitted', device: _mpDevice() }); } catch (e) {}
   const ov = document.getElementById('morning-progress-overlay');
   if (ov) ov.remove();
   document.body.style.overflow = '';
