@@ -16896,9 +16896,47 @@ async function loadMfgItems(sectionId) {
       h += '</div>';
     }
     main.innerHTML = h;
+    // v2.45.882: файл принимает вся панель раздела — раньше мимо узкой
+    // полосы «Закинь чертежи» бросок улетал в никуда и молча пропадал.
+    _mfgWireDropHost(main, (files) => mfgQuickFiles(sectionId, files));
   } catch (e) {
     main.innerHTML = '<div class="empty-block">Ошибка: ' + escapeHtml(String(e)) + '</div>';
   }
+}
+
+// Подсветка и приём файлов на всей области. dragenter/dragleave считаем
+// глубиной: они стреляют и на дочерних элементах, иначе рамка мигает.
+function _mfgWireDropHost(host, onFiles) {
+  if (!host) return;
+  let depth = 0;
+  const isFiles = (e) => {
+    const t = e.dataTransfer && e.dataTransfer.types;
+    return !!t && Array.prototype.indexOf.call(t, 'Files') !== -1;
+  };
+  const off = () => { depth = 0; host.classList.remove('mfg-drop-on'); };
+  host.addEventListener('dragenter', (e) => {
+    if (!isFiles(e)) return;
+    e.preventDefault();
+    depth++; host.classList.add('mfg-drop-on');
+  });
+  host.addEventListener('dragover', (e) => {
+    if (!isFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  host.addEventListener('dragleave', (e) => {
+    if (!isFiles(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (!depth) host.classList.remove('mfg-drop-on');
+  });
+  host.addEventListener('drop', (e) => {
+    if (!isFiles(e)) return;
+    e.preventDefault();
+    off();
+    const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+    if (files.length) onFiles(files);
+    else showToast('Файлов в перетаскивании не оказалось — тащите папку изделия или архив', 'error');
+  });
 }
 
 function mfgQuickDrop(ev, sectionId) {
@@ -16908,13 +16946,36 @@ function mfgQuickDrop(ev, sectionId) {
   if (files.length) mfgQuickFiles(sectionId, files);
 }
 
+// v2.45.882: что именно взяли в работу. Раньше в раздел уходило всё подряд,
+// изделие создавалось до проверки, и при неподходящих файлах оставалась пустая
+// карточка, а человек видел «ничего не произошло».
+const MFG_FILE_RE = /\.(dxf|pdf|zip|rar|7z|xls|xlsx)$/i;
+
+function _mfgSortFiles(files) {
+  const ok = files.filter(f => MFG_FILE_RE.test(f.name || ''));
+  const skippedExt = Array.from(new Set(
+    files.filter(f => !MFG_FILE_RE.test(f.name || ''))
+      .map(f => ((f.name || '').match(/\.[^.]+$/) || ['без расширения'])[0].toLowerCase())
+  ));
+  return { ok, skippedExt };
+}
+
 // файлы прямо в раздел: создаём изделие и заливаем их в него
 async function mfgQuickFiles(sectionId, fileList) {
   const files = Array.from(fileList || []);
   if (!files.length) return;
+  const { ok, skippedExt } = _mfgSortFiles(files);
+  if (!ok.length) {
+    showToast('Тут нечего разбирать: нужен DXF, PDF, ведомость XLS или архив. ' +
+      'Пришло: ' + skippedExt.join(', '), 'error');
+    return;   // пустое изделие не создаём
+  }
+  if (skippedExt.length) {
+    showToast('Беру ' + ok.length + ' файл(ов), пропускаю ' + skippedExt.join(', '), 'info');
+  }
   // обозначение — из СБ-файла или первого файла с похожим номером
   const re = /([A-Za-zА-Яа-я]{1,4}[-\s]?\d{2,3}[.\-]\d{3}[.\-]\d{3}(?:СБ)?)/;
-  const sb = files.find(f => /СБ/i.test(f.name || '')) || files[0] || {};
+  const sb = ok.find(f => /СБ/i.test(f.name || '')) || ok[0] || {};
   const m2 = re.exec(sb.name || '');
   const desig = m2 ? m2[1] : '';
   const sec = (state.mfgSections || []).find(s => s.id === sectionId) || {};
@@ -16931,8 +16992,10 @@ async function mfgQuickFiles(sectionId, fileList) {
     state.mfgCurrentItem = body;
     renderMfgItem(body);
     showToast('Изделие создано — считаем файлы…', 'info');
-    mfgUploadFiles(body.id, files);
-  } catch (e) { showToast('Ошибка соединения', 'error'); }
+    mfgUploadFiles(body.id, ok);
+  } catch (e) {
+    showToast('Не дошло до сервера: ' + String((e && e.message) || e), 'error');
+  }
 }
 
 // журнал всех заказов на изготовление
@@ -17684,6 +17747,8 @@ function renderMfgItem(it) {
   }
 
   main.innerHTML = h;
+  // v2.45.882: карточка изделия принимает файл всей площадью, а не только полосой
+  _mfgWireDropHost(main, (files) => mfgUploadFiles(it.id, files));
 }
 
 // развёртка крупно (svg, без PDF)
@@ -17930,8 +17995,16 @@ function mfgDropFiles(ev, itemId) {
 }
 
 async function mfgUploadFiles(itemId, fileList) {
-  const files = Array.from(fileList || []).filter(f => /\.(dxf|pdf|zip|rar|7z|xls|xlsx)$/i.test(f.name));
-  if (!files.length) { showToast('Не нашёл ни DXF, ни чертежей, ни ведомости', 'error'); return; }
+  const all = Array.from(fileList || []);
+  const { ok: files, skippedExt } = _mfgSortFiles(all);
+  if (!files.length) {
+    showToast('Не нашёл ни DXF, ни чертежей, ни ведомости' +
+      (skippedExt.length ? ' — пришло: ' + skippedExt.join(', ') : ''), 'error');
+    return;
+  }
+  if (skippedExt.length) {
+    showToast('Беру ' + files.length + ' файл(ов), пропускаю ' + skippedExt.join(', '), 'info');
+  }
   const main = document.getElementById('mfg-main');
   if (main) main.innerHTML = '<div class="loading-block">Разбираем ' + files.length +
     ' файл(ов): геометрия, штампы, ведомость…</div>';
