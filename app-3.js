@@ -9146,6 +9146,14 @@ async function loadSupplyShopping() {
       const cp = await apiGet('/api/supply/contract-purchases');
       d._contract_purchases = (cp && cp.items) || [];
     } catch (e2) { d._contract_purchases = []; }
+    // v2.45.885: заказы, которые уже отправлены поставщику. Позиции, набранные
+    // вручную, ни к складу, ни к договору не привязаны — без этого запроса
+    // отправленный запрос счёта нигде на экране не виден.
+    try {
+      const so = await apiGet('/api/supply-orders?limit=400&status=' +
+        SUP_WAITING_STATUSES.join(','));
+      d._active_orders = (so && so.orders) || [];
+    } catch (e3) { d._active_orders = []; }
     const counter = document.getElementById('sup-shop-counter');
     if (counter) counter.textContent = (d.items_count || 0) + (d._contract_purchases.length || 0);
     renderSupplyShopping(d);
@@ -9494,6 +9502,124 @@ async function sendSupplierMail() {
     showToast((e && e.message) ? e.message : 'Ошибка отправки', 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
   }
+}
+
+// ============ v2.45.885: ЗАКАЗЫ, КОТОРЫЕ ЖДЁМ, В «ЧТО ЗАКУПИТЬ» ============
+// Раньше вкладка «Ждём поставку» собиралась только из позиций склада и
+// договоров. Заказ, набранный вручную (запрос счёта поставщику), позиций не
+// имеет — и отправленный запрос нигде на экране не появлялся, а счётчик
+// показывал ноль. Теперь такие заказы показываются карточками.
+const SUP_WAITING_STATUSES = ['sent', 'awaiting_invoice', 'invoice_received',
+                              'to_pay', 'paid', 'partial'];
+// Оплаченные заказы вручную никто не закрывает, их копятся сотни — свежие
+// показываем, остальные прячем в сворачиваемый хвост, чтобы не топить экран.
+const SUP_PAID_FRESH_DAYS = 21;
+
+function _supOrderWaitDate(o) {
+  return o.sent_at || o.paid_at || o.to_pay_at || o.awaiting_invoice_at || o.created_at || null;
+}
+
+// Заказы, которые уже видны позициями, второй раз не рисуем.
+function _supOrdersWaiting(orders, waitingItems) {
+  const shown = new Set();
+  (waitingItems || []).forEach(it => {
+    const oid = it.order_id || it.supply_order_id;
+    if (oid) shown.add(Number(oid));
+  });
+  const fresh = [], stale = [];
+  (orders || []).forEach(o => {
+    if (SUP_WAITING_STATUSES.indexOf(o.status) === -1) return;
+    if (shown.has(Number(o.id))) return;
+    const days = _daysSince(_supOrderWaitDate(o));
+    const item = Object.assign({}, o, { _days: days });
+    if (o.status === 'paid' && days !== null && days > SUP_PAID_FRESH_DAYS) stale.push(item);
+    else fresh.push(item);
+  });
+  const key = (o) => String(_supOrderWaitDate(o) || '');
+  fresh.sort((a, b) => key(b).localeCompare(key(a)));
+  stale.sort((a, b) => key(b).localeCompare(key(a)));
+  return { fresh: fresh, stale: stale };
+}
+
+function _supOrderCardHtml(o) {
+  const label = o.order_label || ('Заказ #' + o.id);
+  const st = _CP_ORDER_STATUS_RU[o.status];
+  const stLabel = o.status_label || (st ? st[0] : 'В работе');
+  const waited = o._days === null || o._days === undefined ? ''
+    : (o._days === 0 ? 'сегодня' : 'ждём ' + o._days + ' ' + _plural(o._days, ['день', 'дня', 'дней']));
+  const cnt = Number(o.items_count || 0);
+  const sum = Number(o.total_amount || o.invoice_total || 0);
+  return '<div class="sup-ord' + (o._days !== null && o._days >= 14 ? ' late' : '') + '" id="sup-ord-' + o.id + '">' +
+    '<div class="sup-ord-head" onclick="openSupplyOrder(' + o.id + ')" title="Открыть заказ">' +
+      '<i class="ti ti-truck-delivery"></i>' +
+      '<b>' + escapeHtml(label) + '</b>' +
+      '<span class="s">' + escapeHtml(o.supplier_name || o.invoice_org || 'поставщик не указан') + '</span>' +
+      '<span class="badge">' + escapeHtml(stLabel) + '</span>' +
+    '</div>' +
+    _supDeliveryStepperHtml(o.status) +
+    '<div class="sup-ord-meta">' +
+      (waited ? '<span><i class="ti ti-clock"></i> ' + escapeHtml(waited) + '</span>' : '') +
+      (o.expected_date ? '<span><i class="ti ti-calendar-due"></i> ждём ' +
+        escapeHtml(_fmtDateRu(o.expected_date)) + '</span>' : '') +
+      (o.invoice_number ? '<span><i class="ti ti-file-invoice"></i> счёт ' +
+        escapeHtml(o.invoice_number) + '</span>' : '') +
+      (sum ? '<span><i class="ti ti-cash"></i> ' + _fmtMoney(sum) + ' ₽</span>' : '') +
+    '</div>' +
+    (cnt
+      ? '<button type="button" class="sup-ord-items-btn" onclick="supOrderToggleItems(' + o.id + ')">' +
+          '<i class="ti ti-chevron-right"></i> ' + cnt + ' ' +
+          _plural(cnt, ['позиция', 'позиции', 'позиций']) + '</button>' +
+        '<div class="sup-ord-items" id="sup-ord-items-' + o.id + '" hidden></div>'
+      : '') +
+  '</div>';
+}
+
+// Состав заказа тянем только когда его развернули: в списке заказов позиций нет.
+async function supOrderToggleItems(orderId) {
+  const box = document.getElementById('sup-ord-items-' + orderId);
+  if (!box) return;
+  const btn = box.previousElementSibling;
+  if (!box.hidden) {
+    box.hidden = true;
+    if (btn) btn.querySelector('i').className = 'ti ti-chevron-right';
+    return;
+  }
+  box.hidden = false;
+  if (btn) btn.querySelector('i').className = 'ti ti-chevron-down';
+  if (box.dataset.loaded === '1') return;
+  box.innerHTML = '<div class="sup-ord-item">Загружаем состав…</div>';
+  try {
+    const d = await apiGet('/api/supply-orders/' + orderId);
+    const items = (d && (d.items || (d.order && d.order.items))) || [];
+    box.dataset.loaded = '1';
+    box.innerHTML = items.length
+      ? items.map(it =>
+          '<div class="sup-ord-item"><span>' + escapeHtml(it.name || it.item_name || '—') + '</span>' +
+          '<b>' + _fmtQty(it.qty || it.ordered_qty || 0) + ' ' + escapeHtml(it.unit || 'шт.') + '</b></div>'
+        ).join('')
+      : '<div class="sup-ord-item">Позиции не заведены — состав в письме и счёте</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="sup-ord-item">Не удалось загрузить состав</div>';
+  }
+}
+
+function _supOrdersBlockHtml(orders, stale) {
+  let h = '';
+  if (orders.length) {
+    h += '<div class="sup-shop-group" style="margin-top:14px;">' +
+      '<div class="sup-shop-group-head"><div class="sup-shop-group-name">' +
+        '<i class="ti ti-mail-forward"></i> Отправлено поставщикам' +
+        '<span class="sup-shop-badge">' + orders.length + '</span></div></div>' +
+      '<div class="sup-ord-list">' + orders.map(_supOrderCardHtml).join('') + '</div>' +
+    '</div>';
+  }
+  if (stale && stale.length) {
+    h += '<details class="sup-ord-stale"><summary>' +
+      'Оплачено больше ' + SUP_PAID_FRESH_DAYS + ' дней назад, получение не отмечено — ' +
+      stale.length + ' ' + _plural(stale.length, ['заказ', 'заказа', 'заказов']) +
+      '</summary><div class="sup-ord-list">' + stale.map(_supOrderCardHtml).join('') + '</div></details>';
+  }
+  return h;
 }
 
 // v2.45.427: «Ждём поставку» — трекинг уже заказанных/оплаченных покупных позиций.
@@ -10315,11 +10441,22 @@ function _supRenderWaitPane() {
         '<button type="button" class="btn btn-secondary btn-sm" onclick="supKpiClick(\'wait\')"><i class="ti ti-x"></i> показать все</button>' +
       '</div>'
     : '';
-  const inner = items.length
-    ? _cpTrackingBlockHtml(items)
-    : '<div class="empty-block" style="padding:28px 16px;"><i class="ti ti-mood-smile" style="color:#16A34A;font-size:26px;"></i>' +
-      '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Здесь пусто — ничего под этот фильтр.</div></div>';
-  pane.innerHTML = banner + inner;
+  // v2.45.885: заказы фильтруем теми же правилами, что и позиции
+  let orders = window._supWaitingOrders || [];
+  let stale = window._supStaleOrders || [];
+  if (filter === 'long') {
+    orders = orders.filter(o => o._days !== null && o._days >= 14);
+    stale = stale.filter(o => o._days !== null && o._days >= 14);
+  } else if (filter === 'today') {
+    const byDate = (o) => o.expected_date && String(o.expected_date).slice(0, 10) === today;
+    orders = orders.filter(byDate);
+    stale = stale.filter(byDate);
+  }
+  const ordersHtml = _supOrdersBlockHtml(orders, filter === 'all' ? stale : []);
+  const inner = (items.length ? _cpTrackingBlockHtml(items) : '') + ordersHtml;
+  pane.innerHTML = banner + (inner ||
+    '<div class="empty-block" style="padding:28px 16px;"><i class="ti ti-mood-smile" style="color:#16A34A;font-size:26px;"></i>' +
+    '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Здесь пусто — ничего под этот фильтр.</div></div>');
 }
 // Степпер доставки: Заказан → Оплачен → В пути → На складе (по статусу заказа)
 function _supDeliveryStepperHtml(orderStatus) {
@@ -10382,13 +10519,20 @@ function renderSupplyShopping(d) {
   const _pendCp = cpItems.filter(x => x.purchase_status !== 'ordered').length;
   const _lowCnt = visibleGroups.reduce((s, g) => s + (g.items_count || 0), 0);
   const buyCount = _pendCp + _lowCnt;
-  const waitCount = waitingItems.length;
   const _today = new Date().toISOString().slice(0, 10);
-  const longWait = waitingItems.filter(it => { const dd = _daysSince(it.ordered_at); return dd !== null && dd >= 14; }).length;
-  const arriveToday = waitingItems.filter(it => it.order_expected && String(it.order_expected).slice(0, 10) === _today).length;
+  // v2.45.885: заказы, отправленные поставщику, — такая же часть ожидания, как
+  // и позиции. Без них вкладка и счётчики показывали ноль сразу после отправки.
+  const _ordWait = _supOrdersWaiting((d && d._active_orders) || [], waitingItems);
+  const waitCount = waitingItems.length + _ordWait.fresh.length;
+  const longWait = waitingItems.filter(it => { const dd = _daysSince(it.ordered_at); return dd !== null && dd >= 14; }).length +
+    _ordWait.fresh.filter(o => o._days !== null && o._days >= 14).length;
+  const arriveToday = waitingItems.filter(it => it.order_expected && String(it.order_expected).slice(0, 10) === _today).length +
+    _ordWait.fresh.filter(o => o.expected_date && String(o.expected_date).slice(0, 10) === _today).length;
   // v2.45.x: запоминаем список «ждём поставку», чтобы перерисовывать вкладку по
   // клику на карточку-счётчик (Долго ждём / Сегодня на складе).
   window._supWaitingItems = waitingItems;
+  window._supWaitingOrders = _ordWait.fresh;
+  window._supStaleOrders = _ordWait.stale;
   const kpiStrip = '<div class="sup-kpis">' +
     _supKpiCard('shopping-cart', 'brand', buyCount, 'К закупке', "supKpiClick('buy')") +
     _supKpiCard('truck-delivery', 'blue', waitCount, 'Ждём поставку', "supKpiClick('wait')") +
@@ -10694,7 +10838,8 @@ function renderSupplyShopping(d) {
   const buyInner = (cpBlock + groupsHtml + hiddenToolbar) ||
     '<div class="empty-block" style="padding:32px 16px;"><i class="ti ti-check" style="color:#16A34A;font-size:28px;"></i>' +
     '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Всё в норме — закупать нечего.</div></div>';
-  const waitInner = waitingBlock ||
+  // v2.45.885: к позициям добавляем карточки отправленных заказов
+  const waitInner = (waitingBlock + _supOrdersBlockHtml(_ordWait.fresh, _ordWait.stale)) ||
     '<div class="empty-block" style="padding:32px 16px;"><i class="ti ti-truck-off" style="color:var(--text-faint);font-size:28px;"></i>' +
     '<div style="margin-top:8px;font-size:14px;color:var(--text-mid);">Пока ничего не ждём — заказы поедут сюда.</div></div>';
   const buyPane  = '<div class="sup-pane" data-pane="buy"'  + (tab === 'buy'  ? '' : ' hidden') + '>' + buyInner  + '</div>';
@@ -17614,6 +17759,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.885',
+    date: '05.08.2026',
+    title: 'Снабжение: отправленные заказы видно прямо в «Что закупить»',
+    features: [
+      'Во вкладке <b>«Ждём поставку»</b> появились карточки заказов, отправленных поставщикам, — включая набранные вручную, без привязки к складу и договорам. Раньше такой запрос счёта нигде на этом экране не появлялся',
+      'В карточке: номер заказа, поставщик, статус, полоса <b>Заказан → Оплачен → В пути → На складе</b>, сколько дней ждём, номер счёта и сумма. Клик открывает заказ, стрелка разворачивает состав',
+      'Счётчики сверху перестали врать нулём: <b>«Ждём поставку»</b>, <b>«Долго ждём»</b> и <b>«Сегодня на складе»</b> считают и позиции, и заказы',
+      'Заказы, которые ждём дольше двух недель, помечены красным — сразу видно, кому пора напомнить',
+      'Оплаченные больше 21 дня назад, у которых никто не отметил получение, собраны в отдельную сворачиваемую строку внизу — чтобы не топить экран',
+    ],
+  },
   {
     version: 'v2.45.884',
     date: '05.08.2026',
