@@ -18969,6 +18969,24 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .sup-ava.warn{background:linear-gradient(135deg,#E0A02A,#C9870F);}
 .sup-shop-group-name .sup-ava{margin-right:4px;}
 
+/* v2.45.885: карточки отправленных заказов во вкладке «Ждём поставку» */
+.sup-ord-list{display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;}
+.sup-ord{border:1px solid var(--border);border-left:3px solid #2563EB;border-radius:12px;padding:10px 12px;background:#fff;}
+.sup-ord.late{border-left-color:#DC2626;}
+.sup-ord-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;}
+.sup-ord-head > i{color:#2563EB;}
+.sup-ord-head b{font-size:13px;color:var(--text-dark);}
+.sup-ord-head .s{flex:1;min-width:0;font-size:12px;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sup-ord-head .badge{font-size:10.5px;font-weight:700;color:#92400E;background:#FEF3C7;border-radius:999px;padding:2px 8px;white-space:nowrap;}
+.sup-ord.late .sup-ord-head .badge{color:#991B1B;background:#FEE2E2;}
+.sup-ord-meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:7px;font-size:11.5px;color:var(--text-light);}
+.sup-ord-meta i{margin-right:3px;}
+.sup-ord-items-btn{margin-top:8px;border:0;background:none;padding:0;cursor:pointer;font-size:12px;font-weight:600;color:var(--brand);display:inline-flex;align-items:center;gap:5px;}
+.sup-ord-items{margin-top:6px;border-top:1px dashed var(--border);padding-top:6px;}
+.sup-ord-item{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-mid);padding:3px 0;}
+.sup-ord-item b{color:var(--text-dark);white-space:nowrap;}
+.sup-ord-stale{margin:10px 12px 4px;}
+.sup-ord-stale > summary{cursor:pointer;font-size:12px;color:var(--text-light);padding:6px 2px;}
 .sup-steps{display:flex;align-items:center;gap:0;margin-top:9px;flex-wrap:wrap;}
 .sup-step{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--text-faint);}
 .sup-step .dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--border-strong);background:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;}
