@@ -22611,6 +22611,9 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 
 .mfgu { display: flex; align-items: center; gap: 13px; border: 1.5px dashed #B9C8DE; border-radius: 13px; padding: 10px 16px; background: #fff; transition: all .15s; }
 .mfgu.over { border-color: var(--brand); background: var(--brand-bg); }
+/* v2.45.882: файл принимает вся панель раздела и карточка изделия — видно, куда бросаешь */
+.mfg-main.mfg-drop-on { position: relative; outline: 2px dashed var(--brand); outline-offset: -6px; border-radius: 14px; background: var(--brand-bg); }
+.mfg-main.mfg-drop-on .mfgu { border-color: var(--brand); background: #fff; }
 .mfgu .ic { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #EFF6FF, #DBEAFE); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 19px; flex: none; }
 .mfgu .t { flex: 1; min-width: 0; }
 .mfgu .t b { display: block; font-size: 12.5px; }
