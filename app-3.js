@@ -13604,13 +13604,13 @@ function _ibxInvoiceCard(m, isMatched) {
     const _payable = m.matched_order_id &&
       ['to_pay', 'paid', 'received', 'partial', 'cancelled'].indexOf(m.matched_order_status || '') < 0;
     acts = (_payable
-        ? '<button class="ibx-b paysolid" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\')"><span class="em">💳</span> Оплатить</button>'
+        ? '<button class="ibx-b paysolid" onclick="payInboxOrderToPay(' + m.matched_order_id + ',\'' + escapeHtml(m.matched_order_label || '').replace(/'/g, "\\'") + '\',' + m.id + ',' + JSON.stringify(m.user_comment || '').replace(/"/g, '&quot;') + ')"><span class="em">💳</span> Оплатить</button>'
         : '') +
       (m.matched_order_id ? '<button class="ibx-b" onclick="openSupplyOrder(' + m.matched_order_id + ')"><span class="em">📦</span> Заказ</button>' : '') +
       '<button class="ibx-ic" title="Письмо" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span></button>';
   } else {
     acts = '<button class="ibx-b link" onclick="openAttachInboxToOrder(' + m.id + ')"><span class="em">🔗</span> Привязать</button>' +
-      (di >= 0 ? '<button class="ibx-b pay" onclick="sendInboxToPay(' + m.id + ',null)"><span class="em">💳</span> На оплату</button>' : '') +
+      (di >= 0 ? '<button class="ibx-b pay" onclick="sendInboxToPay(' + m.id + ',null,' + JSON.stringify(m.user_comment || '').replace(/"/g, '&quot;') + ')"><span class="em">💳</span> На оплату</button>' : '') +
       '<button class="ibx-ic" title="Письмо" onclick="openInboxMessage(' + m.id + ')"><span class="em">✉</span></button>' +
       ((state.user && (state.user.roles || []).includes('director'))
         ? '<button class="ibx-ic" title="Удалить письмо" onclick="deleteInboxMessage(' + m.id + ')"><span class="em">🗑</span></button>'
@@ -14005,8 +14005,88 @@ async function forcePollSupplyInbox() {
 
 // Счёт из входящих (MAX/почта) — сразу «На оплату»: создаёт заказ в статусе
 // to_pay из распознанных реквизитов и уведомляет бухгалтера.
-async function sendInboxToPay(inboxId, overlayId) {
-  if (!confirm('Отправить счёт на оплату?\nБудет создана позиция в разделе «На оплату» с распознанными реквизитами (поставщик, сумма, № счёта), бухгалтер получит уведомление.')) return;
+// ============ v2.45.888: «НА ЧТО ЭТОТ СЧЁТ» ПРИ ОТПРАВКЕ В ОПЛАТУ ============
+// Бот MAX спрашивает назначение сообщением («ТО Машины»), и бухгалтер видит его
+// в «На оплату». Из CRM счета уходили в оплату молча — теперь тот же вопрос.
+// Возвращает строку назначения или null, если человек передумал.
+const INVOICE_PURPOSE_HINTS = ['ТО Машины', 'Ремонт компрессора', 'Хозработы',
+                               'Материалы на объект', 'Запчасти на склад'];
+
+function askInvoicePurpose(opts) {
+  const o = opts || {};
+  return new Promise(resolve => {
+    const old = document.getElementById('inv-purpose-modal');
+    if (old) old.remove();
+    const el = document.createElement('div');
+    el.className = 'modal-overlay visible';
+    el.id = 'inv-purpose-modal';
+    const done = (val) => { el.remove(); resolve(val); };
+    el.onclick = (e) => { if (e.target === el) done(null); };
+    window._invPurposeDone = done;
+    el.innerHTML =
+      '<div class="modal" style="max-width:460px;" onclick="event.stopPropagation()">' +
+        '<div class="modal-header">' +
+          '<h3><i class="ti ti-receipt-2"></i> ' + escapeHtml(o.title || 'Отправить счёт на оплату') + '</h3>' +
+          '<button class="icon-btn" onclick="window._invPurposeDone(null)"><i class="ti ti-x"></i></button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          (o.subtitle ? '<div style="font-size:13px;color:var(--text-mid);margin-bottom:12px;">' +
+            escapeHtml(o.subtitle) + '</div>' : '') +
+          '<label class="form-label">На что этот счёт?</label>' +
+          '<input class="form-input" id="inv-purpose-input" maxlength="500" ' +
+            'placeholder="например: ТО Машины" value="' + escapeHtml(o.current || '') + '">' +
+          '<div class="inv-purpose-hints">' +
+            INVOICE_PURPOSE_HINTS.map(h =>
+              '<button type="button" onclick="_invPurposeSet(' + JSON.stringify(h).replace(/"/g, '&quot;') + ')">' +
+              escapeHtml(h) + '</button>').join('') +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text-light);margin-top:10px;">' +
+            'Бухгалтер увидит это в «На оплату». Можно не заполнять — тогда отправим как есть.</div>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button class="btn btn-secondary" onclick="window._invPurposeDone(null)">Отмена</button>' +
+          '<button class="btn btn-primary" onclick="_invPurposeSubmit()">' +
+            '<i class="ti ti-cash"></i> На оплату</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    const inp = document.getElementById('inv-purpose-input');
+    if (inp) {
+      inp.focus();
+      inp.onkeydown = (e) => { if (e.key === 'Enter') done((inp.value || '').trim()); };
+    }
+  });
+}
+
+function _invPurposeSubmit() {
+  const inp = document.getElementById('inv-purpose-input');
+  if (window._invPurposeDone) window._invPurposeDone(((inp && inp.value) || '').trim());
+}
+
+function _invPurposeSet(text) {
+  const inp = document.getElementById('inv-purpose-input');
+  if (inp) { inp.value = text; inp.focus(); }
+}
+
+// Назначение живёт на письме (и переносится в заказ) — так же, как из MAX.
+async function saveInvoicePurpose(inboxId, purpose) {
+  if (!inboxId) return;
+  try {
+    await apiPost('/api/supply-inbox/' + inboxId + '/comment', { comment: purpose || '' });
+  } catch (e) { /* назначение не должно мешать оплате */ }
+}
+
+async function sendInboxToPay(inboxId, overlayId, currentPurpose) {
+  // v2.45.888: назначение сохраняем ДО создания заказа — бэкенд перенесёт его
+  // в заказ вместе с распознанными реквизитами.
+  const purpose = await askInvoicePurpose({
+    title: 'Отправить счёт на оплату',
+    subtitle: 'Создадим позицию в «На оплату» с распознанными реквизитами ' +
+      '(поставщик, сумма, № счёта), бухгалтер получит уведомление.',
+    current: currentPurpose || '',
+  });
+  if (purpose === null) return;
+  await saveInvoicePurpose(inboxId, purpose);
   try {
     const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/to-pay', {
       method: 'POST',
@@ -14068,10 +14148,17 @@ async function unmatchInboxAndPay(inboxId, overlayId) {
 // v2.45.598: оплата ПРИВЯЗАННОГО счёта — переводит сам заказ в «На оплату».
 // Счёт уже привязан к этому заказу, поэтому задвоения нет: бухгалтер платит,
 // а пришедшая позже УПД закроет именно этот заказ.
-async function payInboxOrderToPay(orderId, orderLabel) {
+async function payInboxOrderToPay(orderId, orderLabel, inboxId, currentPurpose) {
   if (!orderId) return;
-  if (!confirm('Передать счёт на оплату?\nЗаказ ' + (orderLabel || ('#' + orderId)) +
-      ' перейдёт в раздел «На оплату», бухгалтер получит уведомление.')) return;
+  // v2.45.888: спрашиваем назначение — тот же вопрос, что бот MAX задаёт в чате
+  const purpose = await askInvoicePurpose({
+    title: 'Передать счёт на оплату',
+    subtitle: 'Заказ ' + (orderLabel || ('#' + orderId)) +
+      ' перейдёт в «На оплату», бухгалтер получит уведомление.',
+    current: currentPurpose || '',
+  });
+  if (purpose === null) return;
+  await saveInvoicePurpose(inboxId, purpose);
   try {
     // supplyOrderTransitionConfirmed (app-1.js) при необходимости спросит пароль.
     const res = await supplyOrderTransitionConfirmed(orderId, 'to_pay');
@@ -17614,6 +17701,18 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.888',
+    date: '05.08.2026',
+    title: 'Счёт на оплату из CRM спрашивает «на что это»',
+    features: [
+      'Кнопки <b>«Оплатить»</b> и <b>«На оплату»</b> во входящих счетах теперь спрашивают <b>назначение</b> — тот же вопрос, что бот MAX задаёт в чате («На что этот счёт?»)',
+      'Есть быстрые подсказки: <i>ТО Машины</i>, <i>Ремонт компрессора</i>, <i>Хозработы</i>, <i>Материалы на объект</i>, <i>Запчасти на склад</i> — или впишите своё',
+      'Назначение сохраняется на письме и на заказе, <b>бухгалтер видит его в «На оплату»</b> — как и когда счёт приходит через MAX',
+      'Если счёт уже с назначением (например, пришёл из MAX), оно подставляется в поле — можно уточнить или оставить',
+      'Поле необязательное: пустое — отправим как есть; «Отмена» ничего не отправляет',
+    ],
+  },
   {
     version: 'v2.45.887',
     date: '05.08.2026',
