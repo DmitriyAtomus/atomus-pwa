@@ -14492,11 +14492,13 @@ async function _maybeMorningProgress() {
     // Мастер отвечал с планшета и получал те же вопросы на компьютере — теперь нет.
     let _ci = null;
     try { _ci = await apiGet('/api/production/morning-checkin'); } catch (e) { _ci = null; }
-    if (_ci && (_ci.submitted || _ci.shown)) return;
-    // Сервер недоступен — работаем по старой памяти устройства, но не молчим совсем
-    if (!_ci) {
-      try { const _s0 = _mpLoadStore(); if (_s0[_mpToday()] && _s0[_mpToday()]._shown) return; } catch (e) {}
-    }
+    // v2.45.889: на все устройства глушим только по «смену начал». Если окно на
+    // планшете открыли и закрыли не заполнив, на компьютере обязаны спросить —
+    // иначе за день не останется ни процентов, ни ответов по людям.
+    if (_ci && _ci.submitted) return;
+    // «Показывали» держим в пределах устройства, как и раньше: чтобы окно не
+    // всплывало на каждой перезагрузке этого же браузера.
+    try { const _s0 = _mpLoadStore(); if (_s0[_mpToday()] && _s0[_mpToday()]._shown) return; } catch (e) {}
     // v2.45.364: только то, что «В работе» в производстве (production works status=in_progress),
     // и сразу подставляем текущий % готовности с карточки канбана
     let active = [];
