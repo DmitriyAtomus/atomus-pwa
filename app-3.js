@@ -750,6 +750,15 @@ async function openComponentForm(componentId) {
   }
   const isEdit = !!componentId;
   const c = isEdit ? (cache.components || []).find(x => x.id === componentId) : null;
+  // v2.45.884: форму открывают и из «Что закупить», и из подсказки о нехватке —
+  // там справочник категорий ещё не загружен, селект оказывался пустым, а без
+  // категории форма не сохраняется («Выбери категорию»). Тянем как поставщиков.
+  if (!(cache.componentCategories || []).length) {
+    try {
+      const rc = await apiGet('/api/components/categories');
+      cache.componentCategories = rc.categories || [];
+    } catch (e) { cache.componentCategories = cache.componentCategories || []; }
+  }
   const cats = cache.componentCategories || [];
 
   // ЭТАП 33: подгружаем поставщиков если ещё нет
@@ -769,10 +778,17 @@ async function openComponentForm(componentId) {
     m.onclick = (e) => { if (e.target === m) closeComponentForm(); };
     document.body.appendChild(m);
   }
-  const catOptions = cats.map(cat =>
-    '<option value="' + cat.id + '"' + (c && c.category_id === cat.id ? ' selected' : '') + '>' +
-    escapeHtml(cat.name) + '</option>'
-  ).join('');
+  const curCatKnown = !c || !c.category_id || cats.some(cat => cat.id === c.category_id);
+  const catOptions =
+    // Категория позиции пропала из справочника — показываем её отдельной строкой,
+    // иначе выбралась бы первая по списку и при сохранении подменила бы категорию.
+    (curCatKnown ? '' :
+      '<option value="' + c.category_id + '" selected>' +
+      escapeHtml(c.category_name || ('категория #' + c.category_id)) + ' (нет в справочнике)</option>') +
+    cats.map(cat =>
+      '<option value="' + cat.id + '"' + (c && c.category_id === cat.id ? ' selected' : '') + '>' +
+      escapeHtml(cat.name) + '</option>'
+    ).join('');
   // v2.43.87: поиск поставщика через <datalist> — нативный браузерный autocomplete.
   // В datalist хранятся имена; скрытое поле cf-supplier держит id (как и раньше).
   const supDatalist = suppliers.map(s =>
