@@ -58,8 +58,24 @@ test('ответил с планшета — на компьютере окно 
   assert.ok(c.gets.includes('/api/production/morning-checkin'), 'состояние спрошено у сервера');
 });
 
-test('окно уже открывали сегодня на другом устройстве — второй раз не показываем', async () => {
+test('открыли на планшете, но не заполнили — на компьютере спросим снова', async () => {
+  // иначе за день не останется ни процентов, ни ответов по людям
   const c = ctx({ checkin: { submitted: false, shown: true }, works: [WORK] });
+
+  await c.maybe();
+
+  assert.ok(c.rendered, 'вопросы всё же заданы');
+});
+
+test('на том же устройстве окно не всплывает при каждой перезагрузке', async () => {
+  const day = new Date();
+  const key = day.getFullYear() + '-' + String(day.getMonth() + 1).padStart(2, '0') +
+    '-' + String(day.getDate()).padStart(2, '0');
+  const store = {}; store[key] = { _shown: true };
+  const c = ctx({
+    checkin: { submitted: false, shown: true }, works: [WORK],
+    local: { atomus_morning_progress_v1: JSON.stringify(store) },
+  });
 
   await c.maybe();
 
