@@ -16849,15 +16849,16 @@ async function loadMfgItems(sectionId) {
         'ondragleave="this.classList.remove(\'over\')" ondrop="mfgQuickDrop(event,' + sectionId + ')">' +
       '<span class="ic"><i class="ti ti-cloud-upload"></i></span>' +
       '<span class="t"><b>Закинь чертежи — изделие создастся само</b>' +
-        '<small>папка или архив: DXF, PDF, ведомость XLS · обозначение возьмём из файлов</small></span>' +
+        '<small>DXF, PDF, ведомость XLS · обозначение возьмём из файлов<br>' +
+        '<b>ZIP/RAR берите кнопкой «Файлы и архив»</b> — в окне выбора папки архивы не показываются</small></span>' +
       '<input type="file" id="mfg-quick-input" multiple style="display:none" ' +
         'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
       '<input type="file" id="mfg-quick-input2" multiple webkitdirectory style="display:none" ' +
         'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
       '<button class="ub" onclick="document.getElementById(\'mfg-quick-input\').click()">' +
-        '<i class="ti ti-file-plus"></i> Файлы</button>' +
+        '<i class="ti ti-file-plus"></i> Файлы и архив</button>' +
       '<button class="ub" onclick="document.getElementById(\'mfg-quick-input2\').click()">' +
-        '<i class="ti ti-folder"></i> Папка</button>' +
+        '<i class="ti ti-folder"></i> Папка целиком</button>' +
     '</div>';
     if (!items.length) {
       h += '<div class="empty-block">В разделе пока нет изделий</div>';
@@ -17561,15 +17562,16 @@ function renderMfgItem(it) {
       'ondragleave="this.classList.remove(\'over\')" ondrop="mfgDropFiles(event,' + it.id + ')">' +
     '<span class="ic"><i class="ti ti-cloud-upload"></i></span>' +
     '<span class="t"><b>Перетащи сюда папку изделия или архив</b>' +
-      '<small>DXF — раскрой · PDF — чертежи, масса, гибы · XLS — ведомость деталей</small></span>' +
+      '<small>DXF — раскрой · PDF — чертежи, масса, гибы · XLS — ведомость деталей<br>' +
+      '<b>ZIP/RAR берите кнопкой «Файлы и архив»</b> — в окне выбора папки архивы не показываются</small></span>' +
     '<input type="file" id="mfg-file-input" multiple webkitdirectory style="display:none" ' +
       'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
     '<input type="file" id="mfg-file-input2" multiple style="display:none" ' +
       'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
     '<button class="ub" onclick="document.getElementById(\'mfg-file-input2\').click()">' +
-      '<i class="ti ti-file-plus"></i> Файлы</button>' +
+      '<i class="ti ti-file-plus"></i> Файлы и архив</button>' +
     '<button class="ub" onclick="document.getElementById(\'mfg-file-input\').click()">' +
-      '<i class="ti ti-folder"></i> Папка</button>' +
+      '<i class="ti ti-folder"></i> Папка целиком</button>' +
   '</div>';
 
   // ---- лента файлов изделия: PDF открываются тут, остальное скачивается
