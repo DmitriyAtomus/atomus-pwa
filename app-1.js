@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.890";
+const APP_VERSION = "v2.45.891";
 const APP_VERSION_DATE = "04.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2806,6 +2806,29 @@ function _truncate(s, n) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
+// v2.45.892: время отрезков и комментариев приходит из SQLite в UTC без
+// суффикса. Раньше его резали строкой — и работа с 09:04 до 18:00
+// выглядела как «04:04 – 13:00», будто человек работал ночью.
+// Показываем единое рабочее время Екатеринбурга, как в снабжении.
+function _fmtWorkTime(ts, withDate) {
+  const raw = String(ts || "").trim();
+  if (!raw) return "";
+  const iso = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+  const d = new Date(hasTz ? iso : iso + "Z");
+  // не разобрали — отдаём хвост «ЧЧ:ММ» только если это вообще похоже на дату
+  if (isNaN(d.getTime())) return /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(11, 16) : "";
+  const p = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Yekaterinburg", hour: "2-digit", minute: "2-digit",
+    day: "2-digit", month: "2-digit", hourCycle: "h23",
+  }).formatToParts(d).reduce((acc, part) => {
+    if (part.type !== "literal") acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const time = p.hour + ":" + p.minute;
+  return withDate ? (p.day + "." + p.month + " " + time) : time;
+}
+
 function _chatPrettyTime(iso) {
   if (!iso) return '';
   // SQLite отдаёт 'YYYY-MM-DD HH:MM:SS' в UTC — парсим как UTC, показываем МЕСТНОЕ.
@@ -5219,7 +5242,7 @@ async function pwcLoad(workId) {
     if (cnt) cnt.textContent = cs.length ? cs.length : '';
     list.innerHTML = cs.length ? cs.map(c => {
       const t = String(c.created_at || '');
-      const when = t.slice(8, 10) + '.' + t.slice(5, 7) + ' ' + t.slice(11, 16);
+      const when = _fmtWorkTime(t, true);
       const mine = d.me && c.author_chat_id === d.me;
       return '<div class="pwc-msg' + (mine ? ' mine' : '') + '">' +
         '<div class="h"><span class="who">' + escapeHtml(c.author_name || 'сотрудник') + '</span> · ' + when +
@@ -15038,8 +15061,8 @@ function openMyDaySegments(workId, empId) {
     '</div>' +
     '<div class="myday-lbl">Отрезки' + (mine ? ' (✎ — поправить, если забыл нажать стоп)' : '') + '</div>';
   row.segments.forEach((g, i) => {
-    const t1 = g.started_at ? String(g.started_at).slice(11, 16) : '—';
-    const t2 = g.ended_at ? String(g.ended_at).slice(11, 16) : '…';
+    const t1 = g.started_at ? _fmtWorkTime(g.started_at) : '—';
+    const t2 = g.ended_at ? _fmtWorkTime(g.ended_at) : '…';
     h += '<div class="myday-seg"><span class="no">' + (i + 1) + '</span>' +
       '<span class="rng">' + t1 + ' – ' + t2 + (g.note ? ' · ' + escapeHtml(g.note) : '') + '</span>' +
       '<span class="len">' + _mydayFmtMin(g.minutes) + '</span>' +
