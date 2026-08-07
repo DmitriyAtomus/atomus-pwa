@@ -22705,3 +22705,16 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .cbr2-card .pill.up { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
 .cbr2-card .pill.down { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
 .cbr2-card .pill.zero { background: #F1F5F9; color: #94A3B8; border: 1px solid #E2E8F0; }
+
+/* ============ v2.45.890: журнал участия — итого по людям ============ */
+.jrn-tot { background: #F8FAFD; border: 1px solid var(--border); border-radius: 12px; padding: 10px 13px; margin-bottom: 10px; }
+.jrn-tot-head { font-size: 10.5px; font-weight: 800; letter-spacing: .5px; color: var(--text-light); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.jrn-tot-head .ti { color: var(--brand); }
+.jrn-tot-row { display: flex; align-items: center; gap: 9px; padding: 4px 0; font-size: 12.5px; }
+.jrn-tot-row .av { width: 26px; height: 26px; font-size: 10px; flex: none; }
+.jrn-tot-row .nm { flex: 0 0 auto; font-weight: 700; min-width: 110px; }
+.jrn-tot-row .bar { flex: 1; height: 7px; background: #E8EEF6; border-radius: 99px; overflow: hidden; }
+.jrn-tot-row .bar i { display: block; height: 100%; background: linear-gradient(90deg, #60A5FA, #2563EB); border-radius: 99px; }
+.jrn-tot-row b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jrn-tot-row b small { color: var(--text-light); font-weight: 700; }
+.jrn-tot-row .dn2 { color: var(--text-faint); font-size: 10.5px; white-space: nowrap; }

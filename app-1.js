@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.891";
+const APP_VERSION = "v2.45.892";
 const APP_VERSION_DATE = "04.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5620,6 +5620,38 @@ function renderProductionWorkDetail(w) {
       html +=   '<button class="pkb-btn" onclick="openAddSessionForm(' + w.id + ')"><i class="ti ti-plus"></i> Добавить запись</button>';
     }
     html +=   '</div>';
+    // v2.45.890: итого по людям — кто и сколько наработал на этой работе
+    if (sessions.length) {
+      const tot = {};
+      sessions.forEach(s => {
+        const key = String(s.employee_id || s.employee_short_name || '?');
+        if (!tot[key]) {
+          tot[key] = { name: s.employee_short_name || s.employee_full_name || ('#' + s.employee_id),
+                       id: s.employee_id || 0, hours: 0, days: {}, main: false };
+        }
+        tot[key].hours += parseFloat(s.hours) || 0;
+        if (s.session_date) tot[key].days[s.session_date] = 1;
+        if (s.role === 'main') tot[key].main = true;
+      });
+      const rows = Object.values(tot).sort((a, b) => b.hours - a.hours);
+      const totalH = rows.reduce((a, x) => a + x.hours, 0);
+      html += '<div class="jrn-tot">' +
+        '<div class="jrn-tot-head"><i class="ti ti-sum"></i> ИТОГО СОБИРАЛИ' +
+          (totalH > 0 ? ' · ' + formatHours(totalH) + ' ч' : '') + '</div>' +
+        rows.map(x => {
+          const dn = Object.keys(x.days).length;
+          return '<div class="jrn-tot-row">' +
+            '<div class="pkb-wl-avatar ac-' + (x.id % 8) + ' av">' + escapeHtml(getInitials(x.name)) + '</div>' +
+            '<span class="nm">' + escapeHtml(x.name) +
+              (x.main ? ' <span class="jrn-role mn">главный</span>' : '') + '</span>' +
+            '<span class="bar"><i style="width:' +
+              Math.max(6, Math.round(x.hours / Math.max(totalH, 0.001) * 100)) + '%"></i></span>' +
+            '<b>' + formatHours(x.hours) + '<small> ч</small></b>' +
+            '<small class="dn2">' + dn + ' ' + plural(dn, 'день', 'дня', 'дней') + '</small>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
     if (!sessions.length) {
       html += '<div class="pwd-sessions-empty">Записей пока нет. Добавь запись чтобы зафиксировать кто и что делал в конкретный день.</div>';
     } else {
