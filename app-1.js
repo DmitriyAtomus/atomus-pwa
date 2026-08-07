@@ -3703,7 +3703,9 @@ function renderProductionDashboard(d) {
     const colCollapsedCls = collapsed ? ' is-collapsed' : '';
     const headClickAttr = isDoneCol ? ' onclick="pkbToggleDoneColumn()" style="cursor:pointer"' : '';
     const chevron = isDoneCol
-      ? '<i class="ti ' + (collapsed ? 'ti-chevron-down' : 'ti-chevron-up') + '" style="margin-left:auto;font-size:14px;color:var(--text-light);"></i>'
+      ? '<button class="prod-arch-btn" title="Архив собранного — вся история" ' +
+          'onclick="event.stopPropagation();openProdArchive()"><i class="ti ti-archive"></i></button>' +
+        '<i class="ti ' + (collapsed ? 'ti-chevron-down' : 'ti-chevron-up') + '" style="font-size:14px;color:var(--text-light);"></i>'
       : '';
     // v2.45.627: Σ часов колонки — ёмкость видна без открытия карточек.
     // Очередь — расчётные часы (или дефолт), «В работе» — фактические из журнала.
@@ -5192,6 +5194,60 @@ async function submitAssignProductionWorker(workId) {
     openProductionWorkDetail(workId);
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// ---------- v2.45.893: архив собранного ----------
+async function openProdArchive(q) {
+  let m = document.getElementById('prod-arch-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'prod-arch-modal';
+    m.className = 'modal-overlay visible';
+    m.onclick = (e) => { if (e.target === m) m.remove(); };
+    m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+      'style="max-width:680px;max-height:92vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-archive"></i> Архив собранного</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'prod-arch-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;">' +
+        '<input class="form-input" id="prod-arch-q" placeholder="🔍 Модель, договор, заказчик…" ' +
+          'oninput="clearTimeout(window._paT);window._paT=setTimeout(() => openProdArchive(this.value), 350)">' +
+        '<div id="prod-arch-list"><div class="loading-block">Загружаем архив…</div></div>' +
+      '</div></div>';
+    document.body.appendChild(m);
+    setTimeout(() => { const i2 = document.getElementById('prod-arch-q'); if (i2) i2.focus(); }, 60);
+  }
+  const box = document.getElementById('prod-arch-list');
+  try {
+    const d = await apiGet('/api/production/archive?limit=200' +
+      (q ? '&q=' + encodeURIComponent(q) : ''));
+    const items = d.items || [];
+    if (!box) return;
+    if (!items.length) {
+      box.innerHTML = '<div class="empty-block">' + (q ? 'Ничего не нашлось' : 'Пока пусто') + '</div>';
+      return;
+    }
+    box.innerHTML = items.map(w => {
+      const dt = String(w.done_at || w.finished_at || '').slice(0, 10);
+      const dd = dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) + '.' + dt.slice(2, 4) : '—';
+      const title = (w.model_name || w.description || 'Работа') +
+        (w.qty > 1 ? ' × ' + w.qty : '');
+      const sub = [w.contract_number ? '№' + w.contract_number : '', w.contractor_name]
+        .filter(Boolean).join(' · ');
+      const people = (w.people || []).map(x =>
+        escapeHtml(x.name) + ' <b>' + formatHours(x.hours) + 'ч</b>').join(' · ');
+      return '<div class="pa-row" onclick="document.getElementById(\'prod-arch-modal\').remove();openProductionWorkDetail(' + w.id + ')">' +
+        '<div class="dt">' + dd + '</div>' +
+        '<div class="mid"><b>' + escapeHtml(title) + '</b>' +
+          (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') +
+          (people ? '<span class="ppl"><i class="ti ti-users"></i> ' + people + '</span>' : '') +
+        '</div>' +
+        '<div class="hrs">' + (w.total_hours ? formatHours(w.total_hours) + '<small> ч</small>' : '—') + '</div>' +
+        '<i class="ti ti-chevron-right arr"></i>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    if (box) box.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
   }
 }
 
