@@ -7851,6 +7851,67 @@ function getPeriodRange(filter) {
   return [toDate, toDate];
 }
 
+// v2.45.895: клик по сборщику в сводке — что он собирал за период
+async function openEmpWorks(empId, empName) {
+  if (!empId) return;
+  const range = _summaryDateRange();
+  let m = document.getElementById('emp-works-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'emp-works-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:600px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-tool"></i> ' + escapeHtml(empName) +
+      ' — что собирал</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'emp-works-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;" id="emp-works-body">' +
+      '<div class="loading-block">Загружаем…</div></div></div>';
+  document.body.appendChild(m);
+  const box = document.getElementById('emp-works-body');
+  try {
+    const d = await apiGet('/api/production/employee-works?employee_id=' + empId +
+      '&from=' + range.from + '&to=' + range.to);
+    const works = d.works || [];
+    if (!works.length) {
+      box.innerHTML = '<div class="empty-block">За период записей нет</div>';
+      return;
+    }
+    const totalH = works.reduce((a, w) => a + Number(w.hours || 0), 0);
+    const maxH = Math.max(1, ...works.map(w => Number(w.hours || 0)));
+    const fmtH = (h) => (h % 1 === 0 ? h : Number(h).toFixed(1));
+    const stMap = { done: ['done', '✓ готово'], in_progress: ['work', 'в работе'],
+                    review: ['work', 'на проверке'], packing: ['work', 'упаковка'],
+                    queue: ['sent', 'в очереди'] };
+    let h = '<div style="font-size:12px;color:var(--text-light);margin-bottom:10px;">' +
+      summaryPeriodLabel() + ' · работ: <b>' + works.length + '</b> · всего <b>' +
+      fmtH(totalH) + ' ч</b></div>';
+    works.forEach(w => {
+      const title = (w.model_name || w.description || 'Работа') + (w.qty > 1 ? ' × ' + w.qty : '');
+      const sub = [w.contract_number ? '№' + w.contract_number : '', w.contractor_name]
+        .filter(Boolean).join(' · ');
+      const st = stMap[w.status] || ['sent', w.status || ''];
+      const d1 = String(w.first_date || '').slice(5, 10).split('-').reverse().join('.');
+      const d2 = String(w.last_date || '').slice(5, 10).split('-').reverse().join('.');
+      h += '<div class="ew-row" onclick="document.getElementById(\'emp-works-modal\').remove();openProductionWorkDetail(' + w.work_id + ')">' +
+        '<div class="mid"><b>' + escapeHtml(title) + '</b>' +
+          (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') +
+          '<div class="bar"><i style="width:' + Math.max(6, Math.round(Number(w.hours || 0) / maxH * 100)) + '%"></i></div>' +
+          '<small class="dts">' + w.entries + ' ' + plural(w.entries, 'запись', 'записи', 'записей') +
+            ' · ' + (d1 === d2 ? d1 : d1 + ' – ' + d2) + '</small>' +
+        '</div>' +
+        '<div class="hrs">' + fmtH(w.hours || 0) + '<small> ч</small>' +
+          '<span class="pdx-st ' + st[0] + '" style="cursor:default;">' + st[1] + '</span></div>' +
+        '<i class="ti ti-chevron-right arr"></i>' +
+      '</div>';
+    });
+    box.innerHTML = h;
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
+  }
+}
+
 async function loadHistory() {
   const filter = state.historyFilter;
   const container = document.getElementById('history-content');
@@ -8498,7 +8559,9 @@ function renderSummary(d) {
         const colorIdx = ((e.employee_id || 0) % 8);
         const pct = (hrs / maxH) * 100;
         const share = totalHours > 0 ? (hrs / totalHours * 100) : 0;
-        html += '<div class="ssn-byemp-row">' +
+        const empName = (e.short_name || e.full_name || ('#' + e.employee_id)).replace(/'/g, '’');
+        html += '<div class="ssn-byemp-row ssn-clickable" title="Что собирал — по работам" ' +
+                  'onclick="openEmpWorks(' + (e.employee_id || 0) + ',\'' + escapeHtml(empName) + '\')">' +
                   '<div class="pkb-wl-avatar ac-' + colorIdx + '" style="width:32px;height:32px;font-size:11px;flex-shrink:0;">' + escapeHtml(initials) + '</div>' +
                   '<div class="ssn-byemp-mid">' +
                     '<div class="ssn-byemp-top">' +

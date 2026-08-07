@@ -22733,3 +22733,17 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .pa-row .hrs { font-size: 14px; font-weight: 800; color: var(--brand); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pa-row .hrs small { color: var(--text-light); font-weight: 700; }
 .pa-row .arr { color: #CBD5E1; flex: none; }
+
+/* ============ v2.45.895: сводки — что собирал сборщик ============ */
+.ssn-clickable { cursor: pointer; border-radius: 10px; transition: background .12s; }
+.ssn-clickable:hover { background: #F0F6FF; }
+.ew-row { display: flex; align-items: center; gap: 12px; border: 1px solid #EDF1F7; border-radius: 12px; padding: 10px 13px; margin-bottom: 7px; cursor: pointer; transition: all .12s; background: #fff; }
+.ew-row:hover { border-color: #93C5FD; box-shadow: 0 4px 12px rgba(37, 99, 235, .1); }
+.ew-row .mid { flex: 1; min-width: 0; font-size: 13px; }
+.ew-row .mid small { display: block; color: var(--text-faint); font-size: 11px; margin-top: 1px; }
+.ew-row .mid .bar { height: 6px; background: #E8EEF6; border-radius: 99px; overflow: hidden; margin: 6px 0 4px; }
+.ew-row .mid .bar i { display: block; height: 100%; background: linear-gradient(90deg, #60A5FA, #2563EB); border-radius: 99px; }
+.ew-row .mid .dts { color: var(--text-light); }
+.ew-row .hrs { text-align: right; font-size: 15px; font-weight: 800; color: var(--brand); white-space: nowrap; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ew-row .hrs small { color: var(--text-light); font-weight: 700; }
+.ew-row .arr { color: #CBD5E1; flex: none; }
