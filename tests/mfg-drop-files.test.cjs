@@ -22,7 +22,7 @@ function file(name) {
 
 function quickContext() {
   const context = {
-    state: { mfgSections: [{ id: 52, name: 'ФЛАНЕЦ' }] },
+    state: { mfgSections: [{ id: 52, name: 'ФЛАНЕЦ' }], mfgItems: [] },
     toasts: [],
     showToast(msg, type) { context.toasts.push({ msg, type }); },
     renderMfgItem() {},
@@ -30,6 +30,10 @@ function quickContext() {
     async apiPost(url, body) {
       context.posted = { url, body };
       return { ok: true, data: { id: 99 } };
+    },
+    async apiGet(url) {
+      context.got = url;
+      return { id: 42, designation: 'AG-39.000.000СБ', parts: [], files: [] };
     },
   };
   const code = section('// v2.45.882: что именно взяли в работу', '// журнал всех заказов на изготовление');
@@ -84,6 +88,19 @@ test('STEP уходит в изделие вместе с архивом', async
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.uploaded.names)),
     ['AG-39.000.000СБ Кронштейн.zip', 'модель.step']);
   assert.doesNotMatch(ctx.toasts.map(t => t.msg).join(' | '), /пропускаю \.step/);
+});
+
+test('повторный STEP добавляется в существующее изделие, а не создаёт дубль', async () => {
+  const ctx = quickContext();
+  ctx.state.mfgItems = [
+    { id: 42, designation: 'AG-39.000.000СБ', parts_count: 18 },
+  ];
+
+  await ctx.quick(52, [file('AG-39.000.000СБ Корпус.step')]);
+
+  assert.equal(ctx.posted, undefined);
+  assert.equal(ctx.got, '/api/mfg/items/42');
+  assert.equal(ctx.uploaded.itemId, 42);
 });
 
 test('сорванный запрос виден человеку, а не только в консоли', async () => {

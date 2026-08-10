@@ -69,6 +69,7 @@ test('большой просмотрщик умеет вращение, мас�
 
 test('деталь STEP подсвечивается и открывает свой PDF по C + ЛКМ', () => {
   const viewer = section('// ============ STEP / STP', 'function mfgDropFiles');
+  assert.match(viewer, /function _mfgStepDrawingContext\(item\)/);
   assert.match(viewer, /function _mfg3dMeshNames\(result\)/);
   assert.match(viewer, /node\.meshes/);
   assert.match(viewer, /function _mfg3dPartMeta/);
@@ -83,15 +84,53 @@ test('деталь STEP подсвечивается и открывает св�
   assert.match(css, /\.mfg3d-guide\s*\{/);
 });
 
-test('имя узла STEP сопоставляется с деталью AG и её PDF', () => {
-  const helpers = section('function _mfg3dMeshNames', 'function _mfg3dGroup');
+test('STEP без своих чертежей берёт PDF из основной карточки того же изделия', async () => {
   const context = {
+    state: {
+      mfgItems: [
+        { id: 48, designation: 'AG-04.000.000СБ', parts_count: 0 },
+        { id: 47, designation: 'AG-04.000.000СБ', parts_count: 24 },
+      ],
+    },
+    _mfgDesignationKey: value => String(value || '').toUpperCase().replace(/[^A-ZА-Я0-9]/g, ''),
+    async apiGet(url) {
+      assert.equal(url, '/api/mfg/items/47');
+      return {
+        id: 47,
+        parts: [{ id: 286, designation: 'AG-04.000.003', name: 'Крышка' }],
+        files: [{ id: 913, kind: 'pdf', file_name: 'AG-04.000.003 Крышка (D380).pdf' }],
+      };
+    },
+  };
+  const code = section('async function _mfgStepDrawingContext', 'async function _mfgStepResult');
+  vm.runInNewContext(code + ';this.drawingContext=_mfgStepDrawingContext;', context);
+  const stepOnly = {
+    id: 48,
+    designation: 'AG-04.000.000СБ',
+    parts: [],
+    files: [{ id: 999, kind: 'step', file_name: 'AG-04.000.000СБ.step' }],
+  };
+  context.state.mfgCurrentItem = stepOnly;
+
+  const resolved = await context.drawingContext(stepOnly);
+
+  assert.equal(resolved.drawing_source_item_id, 47);
+  assert.equal(resolved.parts[0].designation, 'AG-04.000.003');
+  assert.equal(resolved.files.find(file => file.kind === 'pdf').id, 913);
+  assert.equal(context.state.mfgCurrentItem.files.length, 2);
+});
+
+test('имя узла STEP сопоставляется с деталью AG и её PDF', () => {
+  const helpers = section('function _mfg3dDecodeStepName', 'function _mfg3dGroup');
+  const context = {
+    TextDecoder,
     _mfgPartPdf: (item, part) => (item.files || []).find(file =>
       file.kind === 'pdf' && file.file_name.toLowerCase().includes(part.designation.toLowerCase())) || null,
   };
   vm.createContext(context);
   vm.runInContext(helpers +
-    ';this.meshNames=_mfg3dMeshNames;this.nameKey=_mfg3dNameKey;this.partMeta=_mfg3dPartMeta;', context);
+    ';this.decodeStepName=_mfg3dDecodeStepName;this.meshNames=_mfg3dMeshNames;' +
+    'this.nameKey=_mfg3dNameKey;this.partMeta=_mfg3dPartMeta;', context);
 
   const result = {
     meshes: [{ name: 'Solid_1' }],
@@ -113,6 +152,24 @@ test('имя узла STEP сопоставляется с деталью AG и 
   assert.equal(meta.name, 'Стойка');
   assert.equal(meta.pdfId, 77);
   assert.equal(context.nameKey('АГ-04.000.001'), 'AG04000001');
+  assert.equal(context.decodeStepName('AG-04.000.005 Ïàíåëü ëåâàÿ'),
+    'AG-04.000.005 Панель левая');
+
+  const legacyResult = {
+    meshes: [{ name: 'Solid_5' }],
+    root: { name: '', meshes: [], children: [
+      { name: 'AG-04.000.005 Ïàíåëü ëåâàÿ', meshes: [0], children: [] },
+    ] },
+  };
+  const legacyItem = {
+    parts: [{ designation: 'AG-04.000.005', name: 'Ïàíåëü ëåâàÿ' }],
+    files: [{ id: 88, kind: 'pdf', file_name: 'AG-04.000.005 Панель левая.pdf' }],
+  };
+  const legacyNames = context.meshNames(legacyResult);
+  const legacyMeta = context.partMeta(legacyResult.meshes[0], 0, legacyNames, legacyItem);
+  assert.deepEqual(Array.from(legacyNames[0]), ['AG-04.000.005 Панель левая']);
+  assert.equal(legacyMeta.name, 'Панель левая');
+  assert.equal(legacyMeta.pdfId, 88);
 });
 
 test('Three.js и OrbitControls используют одну закреплённую версию', () => {

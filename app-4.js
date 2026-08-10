@@ -16705,6 +16705,7 @@ function openPaintVedomost(calcId) {
 // папку изделия. Состав разбирается тем же движком, что и расчёт окраски.
 
 state.mfgSections = null;
+state.mfgItems = [];
 state.mfgCurrentSection = null;
 state.mfgCurrentItem = null;
 state.mfgCollapsedSections = {};
@@ -16850,6 +16851,7 @@ async function loadMfgItems(sectionId) {
   try {
     const r = await apiGet('/api/mfg/items?section_id=' + sectionId);
     const items = (r && r.items) || [];
+    state.mfgItems = items;
     // хлебные крошки: родительский раздел, если есть
     const parent = (state.mfgSections || []).find(x => x.id === sec.parent_id);
     const totMass = items.reduce((a, x) => a + (Number(x.total_mass_kg) || 0), 0);
@@ -16983,6 +16985,10 @@ function _mfgSortFiles(files) {
   return { ok, skippedExt };
 }
 
+function _mfgDesignationKey(value) {
+  return String(value || '').normalize('NFKC').toUpperCase().replace(/[^A-ZА-ЯЁ0-9]/g, '');
+}
+
 // файлы прямо в раздел: создаём изделие и заливаем их в него
 async function mfgQuickFiles(sectionId, fileList) {
   const files = Array.from(fileList || []);
@@ -17003,6 +17009,22 @@ async function mfgQuickFiles(sectionId, fileList) {
   const desig = m2 ? m2[1] : '';
   const sec = (state.mfgSections || []).find(s => s.id === sectionId) || {};
   try {
+    // Дополнительный STEP/PDF того же изделия добавляем в существующую
+    // карточку. Иначе получалась вторая карточка только с 3D, в которой
+    // просмотрщик закономерно не видел уже загруженные PDF-чертежи.
+    const desigKey = _mfgDesignationKey(desig);
+    const existing = (state.mfgItems || []).filter(it =>
+      desigKey && _mfgDesignationKey(it.designation) === desigKey)
+      .sort((a, b) => (Number(b.parts_count) || 0) - (Number(a.parts_count) || 0) ||
+        (Number(b.id) || 0) - (Number(a.id) || 0))[0];
+    if (existing) {
+      const detail = await apiGet('/api/mfg/items/' + existing.id);
+      state.mfgCurrentItem = detail;
+      renderMfgItem(detail);
+      showToast('Добавляем файлы в существующее изделие ' + (existing.designation || ''), 'info');
+      await mfgUploadFiles(existing.id, ok);
+      return;
+    }
     const r = await apiPost('/api/mfg/items', {
       section_id: sectionId, designation: desig,
       name: sec.name || 'Изделие',
@@ -18081,6 +18103,40 @@ function _mfgStepFile(fileId) {
   return (((state.mfgCurrentItem || {}).files) || []).find(f => f.id === Number(fileId));
 }
 
+async function _mfgStepDrawingContext(item) {
+  if (!item) return item;
+  const ownFiles = item.files || [];
+  const ownParts = item.parts || [];
+  if (ownParts.length && ownFiles.some(file => file.kind === 'pdf')) return item;
+
+  const key = _mfgDesignationKey(item.designation);
+  if (!key) return item;
+  const candidates = (state.mfgItems || []).filter(other =>
+    Number(other.id) !== Number(item.id) &&
+    _mfgDesignationKey(other.designation) === key)
+    .sort((a, b) => (Number(b.parts_count) || 0) - (Number(a.parts_count) || 0) ||
+      (Number(b.id) || 0) - (Number(a.id) || 0));
+
+  for (const candidate of candidates) {
+    try {
+      const related = await apiGet('/api/mfg/items/' + candidate.id);
+      const relatedPdfs = (related.files || []).filter(file => file.kind === 'pdf');
+      if (!relatedPdfs.length) continue;
+      const knownIds = new Set(ownFiles.map(file => Number(file.id)));
+      const merged = Object.assign({}, item, {
+        parts: ownParts.length ? ownParts : (related.parts || []),
+        files: ownFiles.concat(relatedPdfs.filter(file => !knownIds.has(Number(file.id)))),
+        drawing_source_item_id: related.id,
+      });
+      if (state.mfgCurrentItem && Number(state.mfgCurrentItem.id) === Number(item.id)) {
+        state.mfgCurrentItem = merged;
+      }
+      return merged;
+    } catch (_) {}
+  }
+  return item;
+}
+
 async function _mfgStepResult(file) {
   if (!window._mfgStepResultCache) window._mfgStepResultCache = new Map();
   if (window._mfgStepResultCache.has(file.id)) return window._mfgStepResultCache.get(file.id);
@@ -18126,11 +18182,33 @@ function _mfg3dMaterial(THREE, color) {
 // дерева лежат индексы meshes, а в name — обозначение, которое дал конструктор.
 // Собираем все имена для каждого mesh: это позволяет связать геометрию с
 // позицией ведомости и её PDF, даже если у самой сетки имя вроде Solid_1.
+function _mfg3dDecodeStepName(value) {
+  const original = String(value || '');
+  // Некоторые CAD-системы записывают русские имена в STEP как Windows-1251,
+  // а OpenCascade возвращает эти байты как Latin-1: «Панель» становится
+  // «Ïàíåëü». Исправляем строку только когда декодирование действительно
+  // увеличивает количество кириллических букв, чтобы не портить обычные имена.
+  if (!/[\u0080-\u00FF]/.test(original) || typeof TextDecoder === 'undefined') {
+    return original;
+  }
+  const chars = Array.from(original);
+  if (chars.some(ch => ch.charCodeAt(0) > 255)) return original;
+  try {
+    const bytes = Uint8Array.from(chars, ch => ch.charCodeAt(0));
+    const repaired = new TextDecoder('windows-1251').decode(bytes);
+    const before = (original.match(/[А-ЯЁа-яё]/g) || []).length;
+    const after = (repaired.match(/[А-ЯЁа-яё]/g) || []).length;
+    return after >= 2 && after > before ? repaired : original;
+  } catch (_) {
+    return original;
+  }
+}
+
 function _mfg3dMeshNames(result) {
   const names = (result.meshes || []).map(() => []);
   const walk = (node, parents) => {
     if (!node) return;
-    const own = String(node.name || '').trim();
+    const own = _mfg3dDecodeStepName(node.name).trim();
     const path = own ? parents.concat(own) : parents;
     (node.meshes || []).forEach(index => {
       if (!names[index]) return;
@@ -18149,14 +18227,14 @@ function _mfg3dNameKey(value) {
     'А': 'A', 'В': 'B', 'Е': 'E', 'Г': 'G', 'К': 'K', 'М': 'M',
     'Н': 'H', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'У': 'Y', 'Х': 'X',
   };
-  return String(value || '').normalize('NFKC').toUpperCase()
+  return _mfg3dDecodeStepName(value).normalize('NFKC').toUpperCase()
     .replace(/[АВЕГКМНОРСТУХ]/g, ch => lookalikes[ch] || ch)
     .replace(/[^A-Z0-9]/g, '');
 }
 
 function _mfg3dPartMeta(resultMesh, meshIndex, meshNames, item) {
   const candidates = [resultMesh.name].concat(meshNames[meshIndex] || [])
-    .map(value => String(value || '').trim()).filter(Boolean)
+    .map(value => _mfg3dDecodeStepName(value).trim()).filter(Boolean)
     .filter((value, index, all) => all.indexOf(value) === index);
   const candidateKeys = candidates.map(_mfg3dNameKey).filter(Boolean);
   const parts = (item && item.parts || []).map(part => {
@@ -18173,8 +18251,8 @@ function _mfg3dPartMeta(resultMesh, meshIndex, meshNames, item) {
   if (matched) {
     const pdf = _mfgPartPdf(item, matched.part);
     return {
-      designation: String(matched.part.designation || '').trim(),
-      name: String(matched.part.name || '').trim(),
+      designation: _mfg3dDecodeStepName(matched.part.designation).trim(),
+      name: _mfg3dDecodeStepName(matched.part.name).trim(),
       pdfId: pdf ? pdf.id : null,
       rawName: candidates[0] || '',
     };
@@ -18593,7 +18671,7 @@ async function mfgOpenStep(fileId) {
     const payload = await _mfgStepResult(file);
     const stage = document.getElementById('mfg3d-stage');
     if (!stage) return;
-    const item = state.mfgCurrentItem;
+    const item = await _mfgStepDrawingContext(state.mfgCurrentItem);
     state._mfg3dViewer = _mfg3dViewer(stage, payload, {
       thumbnail: false,
       item: item,
