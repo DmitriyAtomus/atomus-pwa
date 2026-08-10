@@ -46,6 +46,11 @@ test('перетаскивание ловится всей панелью раз
   assert.match(source, /_mfgWireDropHost\(main, \(files\) => mfgUploadFiles\(it\.id, files\)\)/);
   // подсветка показывает, куда именно упадёт файл
   assert.match(css, /\.mfg-main\.mfg-drop-on\s*\{/);
+  const wire = section('function _mfgWireDropHost(host, onFiles)', 'function mfgQuickDrop(');
+  assert.match(wire, /host\._mfgDropCleanup/);
+  assert.match(wire, /removeEventListener\('drop', onDrop\)/);
+  const quickDrop = section('function mfgQuickDrop', '// v2.45.882: что именно');
+  assert.match(quickDrop, /ev\.stopPropagation\(\)/);
 });
 
 test('бросок без файлов объясняет, что случилось', () => {
@@ -101,6 +106,26 @@ test('повторный STEP добавляется в существующее
   assert.equal(ctx.posted, undefined);
   assert.equal(ctx.got, '/api/mfg/items/42');
   assert.equal(ctx.uploaded.itemId, 42);
+});
+
+test('двойное событие drop не запускает второе создание параллельно', async () => {
+  const ctx = quickContext();
+  let release;
+  let posts = 0;
+  ctx.apiPost = async (url, body) => {
+    posts += 1;
+    ctx.posted = { url, body };
+    return await new Promise(resolve => { release = resolve; });
+  };
+
+  const first = ctx.quick(52, [file('AG-39.000.000СБ Корпус.rar')]);
+  await Promise.resolve();
+  await ctx.quick(52, [file('AG-39.000.000СБ Корпус.rar')]);
+  release({ ok: true, data: { id: 99 } });
+  await first;
+
+  assert.equal(posts, 1);
+  assert.match(ctx.toasts.map(t => t.msg).join(' | '), /уже загружаются/);
 });
 
 test('сорванный запрос виден человеку, а не только в консоли', async () => {
