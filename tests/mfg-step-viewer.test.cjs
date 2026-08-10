@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'app-4.js'), 'utf8');
@@ -64,6 +65,54 @@ test('большой просмотрщик умеет вращение, мас�
   assert.match(viewer, /mfgStepDownload\(/);
   assert.match(css, /\.mfg3d-overlay\s*\{/);
   assert.match(css, /\.mfg3d-box:fullscreen/);
+});
+
+test('деталь STEP подсвечивается и открывает свой PDF по C + ЛКМ', () => {
+  const viewer = section('// ============ STEP / STP', 'function mfgDropFiles');
+  assert.match(viewer, /function _mfg3dMeshNames\(result\)/);
+  assert.match(viewer, /node\.meshes/);
+  assert.match(viewer, /function _mfg3dPartMeta/);
+  assert.match(viewer, /new THREE\.Raycaster\(\)/);
+  assert.match(viewer, /intersectObjects\(built\.pickMeshes, false\)/);
+  assert.match(viewer, /material\.emissive\.setHex/);
+  assert.match(viewer, /event\.code !== 'KeyC'/);
+  assert.match(viewer, /event\.button !== 0 \|\| !cPressed/);
+  assert.match(viewer, /opts\.onOpenPdf\(info\.pdfId, info\)/);
+  assert.match(viewer, /C \+ ЛКМ — PDF/);
+  assert.match(css, /\.mfg3d-tooltip\s*\{/);
+  assert.match(css, /\.mfg3d-guide\s*\{/);
+});
+
+test('имя узла STEP сопоставляется с деталью AG и её PDF', () => {
+  const helpers = section('function _mfg3dMeshNames', 'function _mfg3dGroup');
+  const context = {
+    _mfgPartPdf: (item, part) => (item.files || []).find(file =>
+      file.kind === 'pdf' && file.file_name.toLowerCase().includes(part.designation.toLowerCase())) || null,
+  };
+  vm.createContext(context);
+  vm.runInContext(helpers +
+    ';this.meshNames=_mfg3dMeshNames;this.nameKey=_mfg3dNameKey;this.partMeta=_mfg3dPartMeta;', context);
+
+  const result = {
+    meshes: [{ name: 'Solid_1' }],
+    root: {
+      name: 'AG-04.000.000 Корпус', meshes: [], children: [
+        { name: 'AG-04.000.001 Стойка', meshes: [0], children: [] },
+      ],
+    },
+  };
+  const item = {
+    parts: [{ designation: 'AG-04.000.001', name: 'Стойка' }],
+    files: [{ id: 77, kind: 'pdf', file_name: 'AG-04.000.001 Стойка.pdf' }],
+  };
+  const names = context.meshNames(result);
+  const meta = context.partMeta(result.meshes[0], 0, names, item);
+
+  assert.deepEqual(Array.from(names[0]), ['AG-04.000.001 Стойка', 'AG-04.000.000 Корпус']);
+  assert.equal(meta.designation, 'AG-04.000.001');
+  assert.equal(meta.name, 'Стойка');
+  assert.equal(meta.pdfId, 77);
+  assert.equal(context.nameKey('АГ-04.000.001'), 'AG04000001');
 });
 
 test('Three.js и OrbitControls используют одну закреплённую версию', () => {

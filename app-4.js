@@ -17848,6 +17848,9 @@ function mfgOpenPdf(itemId, fileId, src) {
   m = document.createElement('div');
   m.id = 'mfg-pdf-modal';
   m.className = 'mfg-pdf-overlay';
+  // Если PDF открыт из STEP-просмотра, он должен лечь поверх 3D, чтобы после
+  // закрытия чертежа пользователь вернулся к тому же ракурсу модели.
+  if (document.getElementById('mfg3d-modal')) m.style.zIndex = '1350';
   m.onclick = (e) => { if (e.target === m) mfgPdfClose(); };
   m.innerHTML =
     '<div class="mfg-pdf-box">' +
@@ -18119,8 +18122,72 @@ function _mfg3dMaterial(THREE, color) {
   });
 }
 
-function _mfg3dGroup(THREE, result) {
+// STEP хранит не только треугольники, но и дерево сборки. У листовых узлов
+// дерева лежат индексы meshes, а в name — обозначение, которое дал конструктор.
+// Собираем все имена для каждого mesh: это позволяет связать геометрию с
+// позицией ведомости и её PDF, даже если у самой сетки имя вроде Solid_1.
+function _mfg3dMeshNames(result) {
+  const names = (result.meshes || []).map(() => []);
+  const walk = (node, parents) => {
+    if (!node) return;
+    const own = String(node.name || '').trim();
+    const path = own ? parents.concat(own) : parents;
+    (node.meshes || []).forEach(index => {
+      if (!names[index]) return;
+      path.slice().reverse().forEach(name => {
+        if (name && names[index].indexOf(name) < 0) names[index].push(name);
+      });
+    });
+    (node.children || []).forEach(child => walk(child, path));
+  };
+  walk(result.root, []);
+  return names;
+}
+
+function _mfg3dNameKey(value) {
+  const lookalikes = {
+    'А': 'A', 'В': 'B', 'Е': 'E', 'Г': 'G', 'К': 'K', 'М': 'M',
+    'Н': 'H', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'У': 'Y', 'Х': 'X',
+  };
+  return String(value || '').normalize('NFKC').toUpperCase()
+    .replace(/[АВЕГКМНОРСТУХ]/g, ch => lookalikes[ch] || ch)
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+function _mfg3dPartMeta(resultMesh, meshIndex, meshNames, item) {
+  const candidates = [resultMesh.name].concat(meshNames[meshIndex] || [])
+    .map(value => String(value || '').trim()).filter(Boolean)
+    .filter((value, index, all) => all.indexOf(value) === index);
+  const candidateKeys = candidates.map(_mfg3dNameKey).filter(Boolean);
+  const parts = (item && item.parts || []).map(part => {
+    const key = _mfg3dNameKey(part.designation);
+    return { part, key, shortKey: key.indexOf('AG') === 0 ? key.slice(2) : key };
+  }).filter(row => row.key.length >= 5)
+    .sort((a, b) => b.key.length - a.key.length);
+  let matched = null;
+  for (const candidateKey of candidateKeys) {
+    matched = parts.find(row => candidateKey.indexOf(row.key) >= 0 ||
+      (row.shortKey.length >= 6 && candidateKey.indexOf(row.shortKey) >= 0));
+    if (matched) break;
+  }
+  if (matched) {
+    const pdf = _mfgPartPdf(item, matched.part);
+    return {
+      designation: String(matched.part.designation || '').trim(),
+      name: String(matched.part.name || '').trim(),
+      pdfId: pdf ? pdf.id : null,
+      rawName: candidates[0] || '',
+    };
+  }
+  const rawName = candidates.find(name =>
+    !/^(solid|shape|body|compound|part|mesh)[\s_.-]*\d*$/i.test(name)) || candidates[0] || '';
+  return { designation: '', name: rawName || 'Деталь без обозначения', pdfId: null, rawName };
+}
+
+function _mfg3dGroup(THREE, result, item) {
   const root = new THREE.Group();
+  const pickMeshes = [];
+  const meshNames = _mfg3dMeshNames(result);
   const triangleCount = result.meshes.reduce(
     (sum, part) => sum + ((((part.index || {}).array || []).length / 3) || 0), 0);
   const showEdges = triangleCount <= 300000;
@@ -18128,7 +18195,7 @@ function _mfg3dGroup(THREE, result) {
     ? new THREE.LineBasicMaterial({ color: 0x1E3A5F, transparent: true, opacity: 0.24 })
     : null;
 
-  result.meshes.forEach(part => {
+  result.meshes.forEach((part, meshIndex) => {
     if (!part.attributes || !part.attributes.position || !part.index) return;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.attributes.position.array, 3));
@@ -18188,19 +18255,21 @@ function _mfg3dGroup(THREE, result) {
     }
     const mesh = new THREE.Mesh(geometry, materials.length > 1 ? materials : materials[0]);
     mesh.name = part.name || '';
+    mesh.userData.mfgPart = _mfg3dPartMeta(part, meshIndex, meshNames, item);
     root.add(mesh);
+    pickMeshes.push(mesh);
     if (edgeMaterial) {
       const edges = new THREE.EdgesGeometry(geometry, 32);
       root.add(new THREE.LineSegments(edges, edgeMaterial));
     }
   });
-  return { root, triangleCount };
+  return { root, pickMeshes, triangleCount };
 }
 
 function _mfg3dViewer(container, payload, options) {
   const opts = options || {};
   const { THREE, OrbitControls } = payload.deps;
-  const built = _mfg3dGroup(THREE, payload.result);
+  const built = _mfg3dGroup(THREE, payload.result, opts.item);
   if (!built.root.children.length) throw new Error('Модель пустая');
 
   const scene = new THREE.Scene();
@@ -18260,6 +18329,142 @@ function _mfg3dViewer(container, payload, options) {
   controls.maxDistance = maxSize * 30;
   controls.update();
 
+  let hoveredMesh = null;
+  let cPressed = false;
+  let hoverRaf = 0;
+  let pendingPointer = null;
+  let tooltip = null;
+  let guide = null;
+  const highlightedMaterials = new WeakMap();
+  const raycaster = !opts.thumbnail ? new THREE.Raycaster() : null;
+  const pointer = !opts.thumbnail ? new THREE.Vector2() : null;
+
+  const setMeshHighlight = (mesh, on) => {
+    if (!mesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    materials.forEach(material => {
+      if (!material || !material.emissive) return;
+      if (on) {
+        if (!highlightedMaterials.has(material)) {
+          highlightedMaterials.set(material, {
+            emissive: material.emissive.clone(),
+            intensity: material.emissiveIntensity,
+          });
+        }
+        material.emissive.setHex(0x168DCC);
+        material.emissiveIntensity = 0.78;
+      } else {
+        const saved = highlightedMaterials.get(material);
+        if (!saved) return;
+        material.emissive.copy(saved.emissive);
+        material.emissiveIntensity = saved.intensity;
+        highlightedMaterials.delete(material);
+      }
+    });
+  };
+
+  const setCursor = () => {
+    if (!renderer.domElement) return;
+    renderer.domElement.style.cursor = hoveredMesh ? (cPressed ? 'pointer' : 'crosshair') : '';
+  };
+
+  const hideHover = () => {
+    if (hoveredMesh) setMeshHighlight(hoveredMesh, false);
+    hoveredMesh = null;
+    if (tooltip) tooltip.hidden = true;
+    setCursor();
+  };
+
+  const showTooltip = (event, info) => {
+    if (!tooltip) return;
+    tooltip.innerHTML = '';
+    const title = document.createElement('b');
+    title.textContent = [info.designation, info.name].filter(Boolean).join(' · ') || 'Деталь';
+    const hint = document.createElement('small');
+    hint.textContent = info.pdfId
+      ? 'C + ЛКМ — открыть чертёж PDF'
+      : 'Чертёж PDF для этой детали не найден';
+    tooltip.appendChild(title);
+    tooltip.appendChild(hint);
+    tooltip.hidden = false;
+    const rect = container.getBoundingClientRect();
+    let left = event.clientX - rect.left + 16;
+    let top = event.clientY - rect.top + 16;
+    left = Math.min(left, Math.max(8, rect.width - tooltip.offsetWidth - 10));
+    top = Math.min(top, Math.max(8, rect.height - tooltip.offsetHeight - 10));
+    tooltip.style.left = Math.max(8, left) + 'px';
+    tooltip.style.top = Math.max(8, top) + 'px';
+  };
+
+  const updateHover = (event) => {
+    if (!raycaster || !built.pickMeshes.length) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects(built.pickMeshes, false)[0];
+    const next = hit ? hit.object : null;
+    if (next !== hoveredMesh) {
+      if (hoveredMesh) setMeshHighlight(hoveredMesh, false);
+      hoveredMesh = next;
+      if (hoveredMesh) setMeshHighlight(hoveredMesh, true);
+    }
+    if (hoveredMesh) showTooltip(event, hoveredMesh.userData.mfgPart || {});
+    else if (tooltip) tooltip.hidden = true;
+    setCursor();
+    return hoveredMesh;
+  };
+
+  // Raycast проходит по треугольникам модели, поэтому не запускаем его чаще
+  // одного раза за кадр даже на мышах с высокой частотой опроса.
+  const onPointerMove = (event) => {
+    pendingPointer = { clientX: event.clientX, clientY: event.clientY };
+    if (hoverRaf) return;
+    hoverRaf = requestAnimationFrame(() => {
+      hoverRaf = 0;
+      if (pendingPointer) updateHover(pendingPointer);
+    });
+  };
+  const onPointerLeave = () => hideHover();
+  const onPointerDown = (event) => {
+    if (event.button !== 0 || !cPressed) return;
+    const mesh = updateHover(event);
+    if (!mesh) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const info = mesh.userData.mfgPart || {};
+    if (info.pdfId && typeof opts.onOpenPdf === 'function') opts.onOpenPdf(info.pdfId, info);
+    else if (typeof opts.onMissingPdf === 'function') opts.onMissingPdf(info);
+  };
+  const onKeyDown = (event) => {
+    if (event.code !== 'KeyC') return;
+    cPressed = true;
+    setCursor();
+  };
+  const onKeyUp = (event) => {
+    if (event.code !== 'KeyC') return;
+    cPressed = false;
+    setCursor();
+  };
+  const onWindowBlur = () => { cPressed = false; setCursor(); };
+
+  if (!opts.thumbnail) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'mfg3d-tooltip';
+    tooltip.hidden = true;
+    container.appendChild(tooltip);
+    guide = document.createElement('div');
+    guide.className = 'mfg3d-guide';
+    guide.innerHTML = '<i class="ti ti-pointer"></i> Наведите — код детали <b>C + ЛКМ — PDF</b>';
+    container.appendChild(guide);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.addEventListener('pointerleave', onPointerLeave);
+    renderer.domElement.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onWindowBlur);
+  }
+
   const resize = () => {
     if (!container.isConnected) return;
     const width = Math.max(container.clientWidth, 120);
@@ -18304,10 +18509,18 @@ function _mfg3dViewer(container, payload, options) {
     },
     dispose() {
       stopped = true;
+      hideHover();
+      if (hoverRaf) cancelAnimationFrame(hoverRaf);
       if (raf) cancelAnimationFrame(raf);
       if (observer) observer.disconnect();
       else window.removeEventListener('resize', resize);
       controls.dispose();
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
+      renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onWindowBlur);
       scene.traverse(obj => {
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) {
@@ -18372,13 +18585,22 @@ async function mfgOpenStep(fileId) {
     '</div>' +
   '</div>';
   document.body.appendChild(modal);
-  state._mfg3dEsc = (event) => { if (event.key === 'Escape') mfgStepClose(); };
+  state._mfg3dEsc = (event) => {
+    if (event.key === 'Escape' && !document.getElementById('mfg-pdf-modal')) mfgStepClose();
+  };
   document.addEventListener('keydown', state._mfg3dEsc);
   try {
     const payload = await _mfgStepResult(file);
     const stage = document.getElementById('mfg3d-stage');
     if (!stage) return;
-    state._mfg3dViewer = _mfg3dViewer(stage, payload, { thumbnail: false });
+    const item = state.mfgCurrentItem;
+    state._mfg3dViewer = _mfg3dViewer(stage, payload, {
+      thumbnail: false,
+      item: item,
+      onOpenPdf: (pdfId) => mfgOpenPdf((item || {}).id, pdfId),
+      onMissingPdf: (info) => showToast('Для детали ' +
+        (info.designation || info.name || '') + ' не найден PDF-чертёж', 'info'),
+    });
   } catch (e) {
     const stage = document.getElementById('mfg3d-stage');
     if (stage) stage.innerHTML = '<div class="mfg3d-wait err"><i class="ti ti-alert-triangle"></i>' +
