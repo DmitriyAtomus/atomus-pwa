@@ -55,10 +55,10 @@ test('годные файлы отбираются, лишние перечис�
   const ctx = quickContext();
 
   const res = ctx.sort([file('AG-39.000.000СБ.dxf'), file('чертёж.pdf'),
-    file('модель.sldprt'), file('фото.JPG')]);
+    file('модель.step'), file('сборка.STP'), file('модель.sldprt'), file('фото.JPG')]);
 
   assert.deepEqual(JSON.parse(JSON.stringify(res.ok.map(f => f.name))),
-    ['AG-39.000.000СБ.dxf', 'чертёж.pdf']);
+    ['AG-39.000.000СБ.dxf', 'чертёж.pdf', 'модель.step', 'сборка.STP']);
   assert.deepEqual(JSON.parse(JSON.stringify(res.skippedExt)), ['.sldprt', '.jpg']);
 });
 
@@ -73,7 +73,7 @@ test('когда разбирать нечего — изделие не соз�
   assert.equal(ctx.toasts[0].type, 'error');
 });
 
-test('в изделие уходят только годные файлы, о пропущенных сказано', async () => {
+test('STEP уходит в изделие вместе с архивом', async () => {
   const ctx = quickContext();
 
   await ctx.quick(52, [file('AG-39.000.000СБ Кронштейн.zip'), file('модель.step')]);
@@ -82,8 +82,8 @@ test('в изделие уходят только годные файлы, о п
   assert.equal(ctx.posted.body.section_id, 52);
   assert.equal(ctx.posted.body.designation, 'AG-39.000.000СБ');
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.uploaded.names)),
-    ['AG-39.000.000СБ Кронштейн.zip']);
-  assert.match(ctx.toasts.map(t => t.msg).join(' | '), /пропускаю \.step/);
+    ['AG-39.000.000СБ Кронштейн.zip', 'модель.step']);
+  assert.doesNotMatch(ctx.toasts.map(t => t.msg).join(' | '), /пропускаю \.step/);
 });
 
 test('сорванный запрос виден человеку, а не только в консоли', async () => {

@@ -7390,7 +7390,7 @@ async function calcToOffer(id) {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
-// ============ v2.45.721: ПЛАНЁРКА — ежедневная встреча в 10:45 ============
+// ============ ПЛАНЁРКА — ежедневная встреча с настраиваемым временем ============
 var _pl = null;
 async function loadPlanerka() {
   const box = document.getElementById('planerka-content');
@@ -7415,6 +7415,18 @@ function _plInitials(name) {
   return ((p[0] || '')[0] || '') + ((p[1] || '')[0] || '');
 }
 function _plMoney(v) { return Math.round(Number(v || 0)).toLocaleString('ru-RU') + ' ₽'; }
+function _plReminderTime(value) {
+  const m = /^(\d{2}):(\d{2})$/.exec(String(value || ''));
+  if (!m) return '11:10';
+  const total = (Number(m[1]) * 60 + Number(m[2]) - 5 + 1440) % 1440;
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+function plPreviewReminder(value) {
+  const el = document.getElementById('pl-reminder-time');
+  if (el) el.textContent = _plReminderTime(value);
+  const klava = document.getElementById('pl-klava-time');
+  if (klava) klava.textContent = value || '11:15';
+}
 function renderPlanerka() {
   const box = document.getElementById('planerka-content');
   if (!box || !_pl) return;
@@ -7430,20 +7442,27 @@ function renderPlanerka() {
     try { ppl = JSON.parse((m && m.participants_json) || '[]'); } catch (e) { ppl = []; }
   }
   const st = _pl.stats || {};
+  const meetingTime = _pl.time || '11:15';
+  const reminderTime = _pl.reminder_time || _plReminderTime(meetingTime);
+  const scheduleControl = _pl.can_manage
+    ? '<span class="pl-time-edit"><input id="pl-time-input" type="time" value="' + escapeHtml(meetingTime) + '" oninput="plPreviewReminder(this.value)" aria-label="Время планёрки">' +
+      '<button type="button" onclick="plSaveTime(this)"><i class="ti ti-device-floppy"></i> Сохранить</button></span>'
+    : '<b>' + escapeHtml(meetingTime) + '</b>';
 
   let h = '';
   // шапка
   const pplNames = ppl.slice(0, 4).join(', ') + (ppl.length > 4 ? ' и ещё ' + (ppl.length - 4) : '');
   h += '<div class="pl-head">' +
     '<div><div class="ttl">📋 Планёрка · ' + _plFmtDay(_pl.day) + '</div>' +
-    '<div class="sub">ежедневно в ' + escapeHtml(_pl.time || '10:45') + ' · напоминание в 10:40' +
+    '<div class="sub pl-schedule">ежедневно в ' + scheduleControl + ' · напоминание в <b id="pl-reminder-time">' + escapeHtml(reminderTime) + '</b>' +
+      ' · Клава позовёт в <b id="pl-klava-time">' + escapeHtml(meetingTime) + '</b>' +
       (ppl.length ? '<br>👥 были: <b>' + escapeHtml(pplNames) + '</b>' : '') + '</div></div>' +
     '<div class="pl-live">' +
       (ppl.length ? '<div class="avas">' + ppl.slice(0, 8).map(p =>
         '<span class="ava" title="' + escapeHtml(p) + '">' + escapeHtml(_plInitials(p)) + '</span>').join('') + '</div>' : '') +
       (running ? '<span class="pl-chip run">● идёт</span>' :
        finished ? '<span class="pl-chip fin">завершена · ' + (m.duration_min || 0) + ' мин</span>' :
-                  '<span class="pl-chip wait">сегодня в ' + escapeHtml(_pl.time || '10:45') + '</span>') +
+                  '<span class="pl-chip wait">сегодня в ' + escapeHtml(meetingTime) + '</span>') +
       (running
         ? '<button class="pl-btn suc" onclick="plFinish()"><i class="ti ti-check"></i> Завершить</button>'
         : (!finished ? '<button class="pl-btn pri" onclick="plStart()"><i class="ti ti-player-play"></i> Начать планёрку</button>' : '')) +
@@ -7787,6 +7806,30 @@ async function plAddQ() {
     else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadPlanerka();
+}
+async function plSaveTime(btn) {
+  const inp = document.getElementById('pl-time-input');
+  const v = inp ? inp.value : '';
+  if (!/^\d{2}:\d{2}$/.test(v)) {
+    showToast('Укажите время планёрки', 'error');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiPost('/api/planerka/settings', { time: v });
+    if (!r || !r.ok) {
+      showToast(((r && r.data) || {}).message || 'Не удалось сохранить время', 'error');
+      return;
+    }
+    _pl.time = r.data.time;
+    _pl.reminder_time = r.data.reminder_time;
+    renderPlanerka();
+    showToast('Планёрка теперь в ' + r.data.time + ', напоминание в ' + r.data.reminder_time, 'success');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (btn && btn.isConnected) btn.disabled = false;
+  }
 }
 async function plDone(id, done) {
   try { await apiPost('/api/planerka/items/' + id + '/done', { done: !!done }); } catch (e) {}
@@ -17701,6 +17744,27 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.897',
+    date: '10.08.2026',
+    title: 'STEP-модель изделия теперь открывается прямо в CRM',
+    features: [
+      'В изделие можно положить файл <b>STEP/STP</b> напрямую, вместе с папкой или внутри архива — исходник останется в защищённом хранилище CRM',
+      'В карточке появится настоящее <b>3D-превью</b>: нажал на картинку — модель открылась в большом окне',
+      'Модель можно <b>вращать, приближать, двигать, открыть на весь экран</b>, вернуть исходный вид и скачать оригинальный STEP',
+      'Геометрия строится локально в браузере: конструкторский файл не отправляется во внешний онлайн-конвертер',
+    ],
+  },
+  {
+    version: 'v2.45.896',
+    date: '10.08.2026',
+    title: 'Время планёрки теперь можно менять самим',
+    features: [
+      'В шапке планёрки у руководителя появилось поле времени и кнопка <b>«Сохранить»</b>',
+      'Сейчас планёрка установлена на <b>11:15</b>: в <b>11:10</b> Клава напишет сотрудникам и пришлёт CRM-пуш, а в <b>11:15</b> позовёт всех голосом через офисный телевизор',
+      'Новое расписание применяется сразу для всех и не требует перезапуска сервера',
+    ],
+  },
   {
     version: 'v2.45.891',
     date: '06.08.2026',
