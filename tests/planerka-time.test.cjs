@@ -29,6 +29,7 @@ test('руководитель сохраняет выбранное время 
 
   assert.match(render, /_pl\.can_manage[\s\S]*id="pl-time-input" type="time"/);
   assert.match(render, /id="pl-reminder-time"/);
+  assert.match(render, /Клава позовёт в <b id="pl-klava-time">/);
   assert.match(save, /apiPost\('\/api\/planerka\/settings',\s*\{\s*time:\s*v\s*\}\)/);
   assert.match(save, /_pl\.time\s*=\s*r\.data\.time/);
 });

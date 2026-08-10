@@ -7424,6 +7424,8 @@ function _plReminderTime(value) {
 function plPreviewReminder(value) {
   const el = document.getElementById('pl-reminder-time');
   if (el) el.textContent = _plReminderTime(value);
+  const klava = document.getElementById('pl-klava-time');
+  if (klava) klava.textContent = value || '11:15';
 }
 function renderPlanerka() {
   const box = document.getElementById('planerka-content');
@@ -7453,6 +7455,7 @@ function renderPlanerka() {
   h += '<div class="pl-head">' +
     '<div><div class="ttl">📋 Планёрка · ' + _plFmtDay(_pl.day) + '</div>' +
     '<div class="sub pl-schedule">ежедневно в ' + scheduleControl + ' · напоминание в <b id="pl-reminder-time">' + escapeHtml(reminderTime) + '</b>' +
+      ' · Клава позовёт в <b id="pl-klava-time">' + escapeHtml(meetingTime) + '</b>' +
       (ppl.length ? '<br>👥 были: <b>' + escapeHtml(pplNames) + '</b>' : '') + '</div></div>' +
     '<div class="pl-live">' +
       (ppl.length ? '<div class="avas">' + ppl.slice(0, 8).map(p =>
@@ -17747,7 +17750,7 @@ const HELP_CHANGELOG = [
     title: 'Время планёрки теперь можно менять самим',
     features: [
       'В шапке планёрки у руководителя появилось поле времени и кнопка <b>«Сохранить»</b>',
-      'Сейчас планёрка установлена на <b>11:15</b>, напоминание автоматически придёт за 5 минут — в <b>11:10</b>',
+      'Сейчас планёрка установлена на <b>11:15</b>: в <b>11:10</b> Клава напишет сотрудникам и пришлёт CRM-пуш, а в <b>11:15</b> позовёт всех голосом через офисный телевизор',
       'Новое расписание применяется сразу для всех и не требует перезапуска сервера',
     ],
   },
