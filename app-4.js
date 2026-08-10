@@ -16933,39 +16933,55 @@ async function loadMfgItems(sectionId) {
 // глубиной: они стреляют и на дочерних элементах, иначе рамка мигает.
 function _mfgWireDropHost(host, onFiles) {
   if (!host) return;
+  // mfg-main живёт постоянно, а содержимое раздела перерисовывается. Раньше
+  // при каждом открытии раздела на него навешивался ещё один комплект
+  // обработчиков, и одно перетаскивание могло создать 2–3 одинаковых изделия.
+  if (typeof host._mfgDropCleanup === 'function') host._mfgDropCleanup();
   let depth = 0;
   const isFiles = (e) => {
     const t = e.dataTransfer && e.dataTransfer.types;
     return !!t && Array.prototype.indexOf.call(t, 'Files') !== -1;
   };
   const off = () => { depth = 0; host.classList.remove('mfg-drop-on'); };
-  host.addEventListener('dragenter', (e) => {
+  const onDragEnter = (e) => {
     if (!isFiles(e)) return;
     e.preventDefault();
     depth++; host.classList.add('mfg-drop-on');
-  });
-  host.addEventListener('dragover', (e) => {
+  };
+  const onDragOver = (e) => {
     if (!isFiles(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-  });
-  host.addEventListener('dragleave', (e) => {
+  };
+  const onDragLeave = (e) => {
     if (!isFiles(e)) return;
     depth = Math.max(0, depth - 1);
     if (!depth) host.classList.remove('mfg-drop-on');
-  });
-  host.addEventListener('drop', (e) => {
+  };
+  const onDrop = (e) => {
     if (!isFiles(e)) return;
     e.preventDefault();
     off();
     const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
     if (files.length) onFiles(files);
     else showToast('Файлов в перетаскивании не оказалось — тащите папку изделия или архив', 'error');
-  });
+  };
+  host.addEventListener('dragenter', onDragEnter);
+  host.addEventListener('dragover', onDragOver);
+  host.addEventListener('dragleave', onDragLeave);
+  host.addEventListener('drop', onDrop);
+  host._mfgDropCleanup = () => {
+    host.removeEventListener('dragenter', onDragEnter);
+    host.removeEventListener('dragover', onDragOver);
+    host.removeEventListener('dragleave', onDragLeave);
+    host.removeEventListener('drop', onDrop);
+    off();
+  };
 }
 
 function mfgQuickDrop(ev, sectionId) {
   ev.preventDefault();
+  ev.stopPropagation();
   ev.currentTarget.classList.remove('over');
   const files = (ev.dataTransfer && ev.dataTransfer.files) || [];
   if (files.length) mfgQuickFiles(sectionId, files);
@@ -17002,6 +17018,11 @@ async function mfgQuickFiles(sectionId, fileList) {
   if (skippedExt.length) {
     showToast('Беру ' + ok.length + ' файл(ов), пропускаю ' + skippedExt.join(', '), 'info');
   }
+  if (state._mfgQuickBusy) {
+    showToast('Эти файлы уже загружаются — дождитесь окончания', 'info');
+    return;
+  }
+  state._mfgQuickBusy = true;
   // обозначение — из СБ-файла или первого файла с похожим номером
   const re = /([A-Za-zА-Яа-я]{1,4}[-\s]?\d{2,3}[.\-]\d{3}[.\-]\d{3}(?:СБ)?)/;
   const sb = ok.find(f => /СБ/i.test(f.name || '')) || ok[0] || {};
@@ -17023,6 +17044,8 @@ async function mfgQuickFiles(sectionId, fileList) {
       renderMfgItem(detail);
       showToast('Добавляем файлы в существующее изделие ' + (existing.designation || ''), 'info');
       await mfgUploadFiles(existing.id, ok);
+      state.mfgItems = (state.mfgItems || []).map(it =>
+        Number(it.id) === Number(existing.id) ? (state.mfgCurrentItem || it) : it);
       return;
     }
     const r = await apiPost('/api/mfg/items', {
@@ -17037,9 +17060,15 @@ async function mfgQuickFiles(sectionId, fileList) {
     state.mfgCurrentItem = body;
     renderMfgItem(body);
     showToast('Изделие создано — считаем файлы…', 'info');
-    mfgUploadFiles(body.id, ok);
+    await mfgUploadFiles(body.id, ok);
+    const created = state.mfgCurrentItem || body;
+    if (!(state.mfgItems || []).some(it => Number(it.id) === Number(created.id))) {
+      state.mfgItems = (state.mfgItems || []).concat(created);
+    }
   } catch (e) {
     showToast('Не дошло до сервера: ' + String((e && e.message) || e), 'error');
+  } finally {
+    state._mfgQuickBusy = false;
   }
 }
 
