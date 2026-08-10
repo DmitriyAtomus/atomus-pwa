@@ -18239,8 +18239,9 @@ function _mfg3dViewer(container, payload, options) {
   container.innerHTML = '';
   container.appendChild(renderer.domElement);
 
+  let grid = null;
   if (!opts.thumbnail) {
-    const grid = new THREE.GridHelper(maxSize * 2.4, 20, 0x9AAEC3, 0xC8D4E0);
+    grid = new THREE.GridHelper(maxSize * 2.4, 20, 0x9AAEC3, 0xC8D4E0);
     grid.rotation.x = Math.PI / 2;
     grid.position.z = box.min.z;
     grid.material.transparent = true;
@@ -18282,8 +18283,21 @@ function _mfg3dViewer(container, payload, options) {
   };
   animate();
 
+  let flipped = false;
+  const setFlipped = (value) => {
+    flipped = !!value;
+    built.root.rotation.x = flipped ? Math.PI : 0;
+    built.root.updateMatrixWorld(true);
+    if (grid) grid.position.z = new THREE.Box3().setFromObject(built.root).min.z;
+  };
+
   return {
+    flip() {
+      setFlipped(!flipped);
+      return flipped;
+    },
     reset() {
+      setFlipped(false);
       camera.position.copy(initialPosition);
       controls.target.set(0, 0, 0);
       controls.update();
@@ -18346,6 +18360,7 @@ async function mfgOpenStep(fileId) {
       '<div class="t"><b>' + escapeHtml(file.file_name || 'STEP-модель') + '</b>' +
         '<small>' + _mfgFileSize(file.size_bytes) + ' · STEP</small></div>' +
       '<span class="hint">ЛКМ — вращать · колёсико — масштаб · ПКМ — двигать</span>' +
+      '<button onclick="mfgStepFlip()" title="Перевернуть модель на 180 градусов"><i class="ti ti-flip-vertical"></i> Перевернуть</button>' +
       '<button onclick="mfgStepReset()" title="Вернуть исходный вид"><i class="ti ti-focus-centered"></i> Вернуть вид</button>' +
       '<button onclick="mfgStepFullscreen()" title="На весь экран"><i class="ti ti-maximize"></i></button>' +
       '<button onclick="mfgStepDownload(' + file.id + ')" title="Скачать исходный STEP"><i class="ti ti-download"></i></button>' +
@@ -18373,6 +18388,10 @@ async function mfgOpenStep(fileId) {
 
 function mfgStepReset() {
   if (state._mfg3dViewer) state._mfg3dViewer.reset();
+}
+
+function mfgStepFlip() {
+  if (state._mfg3dViewer) state._mfg3dViewer.flip();
 }
 
 function mfgStepFullscreen() {
