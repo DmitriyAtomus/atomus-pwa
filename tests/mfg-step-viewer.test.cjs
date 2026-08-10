@@ -51,10 +51,15 @@ test('STEP читается с авторизацией и преобразуе�
 
 test('большой просмотрщик умеет вращение, масштаб, панораму и полный экран', () => {
   const viewer = section('async function mfgOpenStep', 'function mfgDropFiles');
+  const viewerCore = section('function _mfg3dViewer', 'function _mfgDisposeStepThumbs');
   assert.match(viewer, /ЛКМ — вращать/);
   assert.match(viewer, /колёсико — масштаб/);
   assert.match(viewer, /ПКМ — двигать/);
   assert.match(viewer, /mfgStepReset\(\)/);
+  assert.match(viewer, /mfgStepFlip\(\)/);
+  assert.match(viewer, /Перевернуть модель на 180 градусов/);
+  assert.match(viewerCore, /\.rotation\.x = flipped \? Math\.PI : 0/);
+  assert.match(viewerCore, /flip\(\) \{/);
   assert.match(viewer, /requestFullscreen/);
   assert.match(viewer, /mfgStepDownload\(/);
   assert.match(css, /\.mfg3d-overlay\s*\{/);
