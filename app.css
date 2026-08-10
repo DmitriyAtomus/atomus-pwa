@@ -21324,10 +21324,17 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .myday-row .sub { white-space: normal; }
 }
 
-/* ============ v2.45.721: Планёрка — ежедневная встреча в 10:45 ============ */
+/* ============ Планёрка — ежедневная встреча с настраиваемым временем ============ */
 .pl-head { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 13px 15px; margin-bottom: 10px; flex-wrap: wrap; }
 .pl-head .ttl { font-size: 16px; font-weight: 800; }
 .pl-head .sub { font-size: 12px; color: var(--text-light); }
+.pl-schedule { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 3px; }
+.pl-schedule br { flex-basis: 100%; width: 0; }
+.pl-time-edit { display: inline-flex; align-items: center; gap: 4px; }
+.pl-time-edit input { width: 76px; border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; background: var(--bg); color: var(--text-dark); font: 700 12px/1.2 inherit; }
+.pl-time-edit input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-bg); }
+.pl-time-edit button { border: 1px solid var(--brand); border-radius: 8px; padding: 5px 8px; background: var(--brand-bg); color: var(--brand); font: 700 11px/1.2 inherit; cursor: pointer; }
+.pl-time-edit button:disabled { opacity: .55; cursor: wait; }
 .pl-live { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pl-chip { border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 800; }
 .pl-chip.run { background: var(--success-bg); color: var(--success); animation: pl-pulse 2s infinite; }
