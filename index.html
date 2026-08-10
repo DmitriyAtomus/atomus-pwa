@@ -19,6 +19,17 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/app.css">
 
+<!-- Three.js грузится только при открытии STEP-модели. Import map нужен
+     OrbitControls: основной модуль и дополнения обязаны быть одной версии. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+  }
+}
+</script>
+
 <!-- QRCode generation library (small, ~9KB) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- html5-qrcode (~150KB) грузится лениво, только при первом нажатии «Скан». -->

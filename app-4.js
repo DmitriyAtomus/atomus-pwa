@@ -16871,7 +16871,7 @@ async function loadMfgItems(sectionId) {
         'ondragleave="this.classList.remove(\'over\')" ondrop="mfgQuickDrop(event,' + sectionId + ')">' +
       '<span class="ic"><i class="ti ti-cloud-upload"></i></span>' +
       '<span class="t"><b>Закинь чертежи — изделие создастся само</b>' +
-        '<small>DXF, PDF, ведомость XLS · обозначение возьмём из файлов<br>' +
+        '<small>DXF, PDF, ведомость XLS · STEP/STP — объёмная модель · обозначение возьмём из файлов<br>' +
         '<b>ZIP/RAR берите кнопкой «Файлы и архив»</b> — в окне выбора папки архивы не показываются</small></span>' +
       '<input type="file" id="mfg-quick-input" multiple style="display:none" ' +
         'onchange="mfgQuickFiles(' + sectionId + ', this.files)">' +
@@ -16972,7 +16972,7 @@ function mfgQuickDrop(ev, sectionId) {
 // v2.45.882: что именно взяли в работу. Раньше в раздел уходило всё подряд,
 // изделие создавалось до проверки, и при неподходящих файлах оставалась пустая
 // карточка, а человек видел «ничего не произошло».
-const MFG_FILE_RE = /\.(dxf|pdf|zip|rar|7z|xls|xlsx)$/i;
+const MFG_FILE_RE = /\.(dxf|pdf|step|stp|zip|rar|7z|xls|xlsx)$/i;
 
 function _mfgSortFiles(files) {
   const ok = files.filter(f => MFG_FILE_RE.test(f.name || ''));
@@ -16989,7 +16989,7 @@ async function mfgQuickFiles(sectionId, fileList) {
   if (!files.length) return;
   const { ok, skippedExt } = _mfgSortFiles(files);
   if (!ok.length) {
-    showToast('Тут нечего разбирать: нужен DXF, PDF, ведомость XLS или архив. ' +
+    showToast('Тут нечего разбирать: нужен DXF, PDF, STEP, ведомость XLS или архив. ' +
       'Пришло: ' + skippedExt.join(', '), 'error');
     return;   // пустое изделие не создаём
   }
@@ -17552,6 +17552,7 @@ async function mfgSupAdd() {
 function renderMfgItem(it) {
   const main = document.getElementById('mfg-main');
   if (!main || !it) return;
+  _mfgDisposeStepThumbs();
   const parts = it.parts || [];
   const files = it.files || [];
   const totalBends = parts.reduce((s, p) => s + (Number(p.bends) || 0) * (p.qty || 1), 0);
@@ -17584,7 +17585,7 @@ function renderMfgItem(it) {
       'ondragleave="this.classList.remove(\'over\')" ondrop="mfgDropFiles(event,' + it.id + ')">' +
     '<span class="ic"><i class="ti ti-cloud-upload"></i></span>' +
     '<span class="t"><b>Перетащи сюда папку изделия или архив</b>' +
-      '<small>DXF — раскрой · PDF — чертежи, масса, гибы · XLS — ведомость деталей<br>' +
+      '<small>DXF — раскрой · PDF — чертежи · XLS — ведомость · STEP/STP — 3D-модель<br>' +
       '<b>ZIP/RAR берите кнопкой «Файлы и архив»</b> — в окне выбора папки архивы не показываются</small></span>' +
     '<input type="file" id="mfg-file-input" multiple webkitdirectory style="display:none" ' +
       'onchange="mfgUploadFiles(' + it.id + ', this.files)">' +
@@ -17598,8 +17599,9 @@ function renderMfgItem(it) {
 
   // ---- лента файлов изделия: PDF открываются тут, остальное скачивается
   if (files.length) {
+    const stepFiles = files.filter(f => f.kind === 'step');
     const order = { pdf: 0, dxf: 1, sheet: 2, archive: 3, other: 4 };
-    const sorted = files.slice().sort((a, b) =>
+    const sorted = files.filter(f => f.kind !== 'step').sort((a, b) =>
       (order[a.kind] ?? 9) - (order[b.kind] ?? 9) || String(a.file_name).localeCompare(String(b.file_name), 'ru'));
     const chip = (f) => {
       const isPdf = f.kind === 'pdf';
@@ -17617,19 +17619,35 @@ function renderMfgItem(it) {
     const nPdf = files.filter(f => f.kind === 'pdf').length;
     const nDxf = files.filter(f => f.kind === 'dxf').length;
     const nXls = files.filter(f => f.kind === 'sheet').length;
+    const nStep = stepFiles.length;
     h += '<div class="mfgf-sec">ФАЙЛЫ ИЗДЕЛИЯ · ' + files.length +
       '<span style="font-weight:700;color:#B6BFCC;">' +
+      (nStep ? ' · <span style="color:#2563EB;">3D ' + nStep + '</span>' : '') +
       (nPdf ? ' · <span style="color:#DC2626;">PDF ' + nPdf + '</span>' : '') +
       (nDxf ? ' · DXF ' + nDxf : '') +
       (nXls ? ' · <span style="color:#059669;">XLS ' + nXls + '</span>' : '') +
-      '</span><span class="ln"></span></div>' +
-      '<div class="mfgf-row">' + sorted.slice(0, MAXV).map(chip).join('') +
-      (sorted.length > MAXV
+      '</span><span class="ln"></span></div>';
+    if (stepFiles.length) {
+      h += '<div class="mfg3d-row">' + stepFiles.map(f =>
+        '<button type="button" class="mfg3d-card" onclick="mfgOpenStep(' + f.id + ')">' +
+          '<span class="mfg3d-thumb" id="mfg3d-thumb-' + f.id + '">' +
+            '<span class="mfg3d-loading"><i class="ti ti-loader-2"></i> Строим 3D-превью…</span>' +
+          '</span>' +
+          '<span class="mfg3d-info"><span class="mfg3d-name">' + escapeHtml(f.file_name || 'STEP-модель') + '</span>' +
+            '<span class="mfg3d-meta"><b>3D</b> · ' + _mfgFileSize(f.size_bytes) +
+              ' · нажмите, чтобы покрутить</span></span>' +
+          '<span class="mfg3d-open"><i class="ti ti-box"></i></span>' +
+        '</button>'
+      ).join('') + '</div>';
+    }
+    if (sorted.length) {
+      h += '<div class="mfgf-row">' + sorted.slice(0, MAXV).map(chip).join('') +
+        (sorted.length > MAXV
         ? '<div class="mfgf more" onclick="this.parentNode.classList.add(\'open\');this.remove()">' +
           '<i class="ti ti-chevron-down"></i> ещё ' + (sorted.length - MAXV) + '…</div>' +
           '<span class="mfgf-rest">' + sorted.slice(MAXV).map(chip).join('') + '</span>'
-        : '') +
-      '</div>';
+        : '') + '</div>';
+    }
   }
 
   if (parts.length) {
@@ -17771,6 +17789,7 @@ function renderMfgItem(it) {
   }
 
   main.innerHTML = h;
+  _mfgInitStepThumbs(it);
   // v2.45.882: карточка изделия принимает файл всей площадью, а не только полосой
   _mfgWireDropHost(main, (files) => mfgUploadFiles(it.id, files));
 }
@@ -18011,6 +18030,374 @@ async function mfgDownloadFile(fileId, openTab) {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
+// ============ STEP / STP — 3D-просмотр изделия прямо в браузере ============
+// OpenCascade (WASM) получает байты из нашего защищённого API и строит сетку
+// локально. Исходный конструкторский файл не уходит во внешний конвертер.
+const MFG_OCCT_BASE = 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/';
+
+function _mfgLoadExternalScript(src) {
+  if (!window._mfgExternalScripts) window._mfgExternalScripts = {};
+  if (window._mfgExternalScripts[src]) return window._mfgExternalScripts[src];
+  window._mfgExternalScripts[src] = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Не загрузился модуль 3D'));
+    document.head.appendChild(script);
+  });
+  return window._mfgExternalScripts[src];
+}
+
+async function _mfg3dDeps() {
+  if (window._mfg3dDepsPromise) return window._mfg3dDepsPromise;
+  window._mfg3dDepsPromise = (async () => {
+    const [THREE, controlsModule] = await Promise.all([
+      import('three'),
+      import('three/addons/controls/OrbitControls.js'),
+      _mfgLoadExternalScript(MFG_OCCT_BASE + 'occt-import-js.js'),
+    ]);
+    if (typeof window.occtimportjs !== 'function') throw new Error('OpenCascade не запустился');
+    if (!window._mfgOcctPromise) {
+      window._mfgOcctPromise = window.occtimportjs({
+        locateFile: (name) => MFG_OCCT_BASE + name,
+      });
+    }
+    const occt = await window._mfgOcctPromise;
+    return { THREE, OrbitControls: controlsModule.OrbitControls, occt };
+  })();
+  try {
+    return await window._mfg3dDepsPromise;
+  } catch (e) {
+    window._mfg3dDepsPromise = null;
+    throw e;
+  }
+}
+
+function _mfgStepFile(fileId) {
+  return (((state.mfgCurrentItem || {}).files) || []).find(f => f.id === Number(fileId));
+}
+
+async function _mfgStepResult(file) {
+  if (!window._mfgStepResultCache) window._mfgStepResultCache = new Map();
+  if (window._mfgStepResultCache.has(file.id)) return window._mfgStepResultCache.get(file.id);
+  const promise = (async () => {
+    const deps = await _mfg3dDeps();
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/mfg/files/' + file.id + '/download', {
+      headers: { 'Authorization': 'Bearer ' + token },
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error('STEP не читается: HTTP ' + response.status);
+    const buffer = await response.arrayBuffer();
+    const result = deps.occt.ReadStepFile(new Uint8Array(buffer), {
+      linearUnit: 'millimeter',
+      linearDeflectionType: 'bounding_box_ratio',
+      linearDeflection: 0.001,
+      angularDeflection: 0.5,
+    });
+    if (!result || !Array.isArray(result.meshes) || !result.meshes.length) {
+      throw new Error('В STEP не нашлось объёмной геометрии');
+    }
+    return { deps, result, bytes: buffer.byteLength };
+  })();
+  window._mfgStepResultCache.set(file.id, promise);
+  try {
+    return await promise;
+  } catch (e) {
+    window._mfgStepResultCache.delete(file.id);
+    throw e;
+  }
+}
+
+function _mfg3dMaterial(THREE, color) {
+  return new THREE.MeshStandardMaterial({
+    color: color ? new THREE.Color(color[0], color[1], color[2]) : new THREE.Color(0x9DB4CC),
+    roughness: 0.62,
+    metalness: 0.08,
+    side: THREE.DoubleSide,
+  });
+}
+
+function _mfg3dGroup(THREE, result) {
+  const root = new THREE.Group();
+  const triangleCount = result.meshes.reduce(
+    (sum, part) => sum + ((((part.index || {}).array || []).length / 3) || 0), 0);
+  const showEdges = triangleCount <= 300000;
+  const edgeMaterial = showEdges
+    ? new THREE.LineBasicMaterial({ color: 0x1E3A5F, transparent: true, opacity: 0.24 })
+    : null;
+
+  result.meshes.forEach(part => {
+    if (!part.attributes || !part.attributes.position || !part.index) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.attributes.position.array, 3));
+    if (part.attributes.normal && part.attributes.normal.array) {
+      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(part.attributes.normal.array, 3));
+    } else {
+      geometry.computeVertexNormals();
+    }
+    const index = Uint32Array.from(part.index.array || []);
+    geometry.setIndex(new THREE.BufferAttribute(index, 1));
+    geometry.name = part.name || '';
+
+    const materials = [_mfg3dMaterial(THREE, part.color)];
+    const faces = Array.isArray(part.brep_faces) ? part.brep_faces : [];
+    // В сборке тысячи граней часто имеют один и тот же цвет. Не создаём для
+    // каждой отдельный WebGL-материал — переиспользуем материал по RGB.
+    const materialByColor = new Map();
+    const colorKey = (color) => color && Array.from(color).slice(0, 3)
+      .map(v => Number(v).toFixed(6)).join(',');
+    const baseColorKey = colorKey(part.color);
+    if (baseColorKey) materialByColor.set(baseColorKey, 0);
+    const faceMaterialIndices = faces.map(face => {
+      if (!face.color) return 0;
+      const key = colorKey(face.color);
+      if (materialByColor.has(key)) return materialByColor.get(key);
+      const materialIndex = materials.length;
+      materials.push(_mfg3dMaterial(THREE, face.color));
+      materialByColor.set(key, materialIndex);
+      return materialIndex;
+    });
+    if (faces.length && materials.length > 1) {
+      const triangles = index.length / 3;
+      let triangle = 0;
+      let faceIndex = 0;
+      while (triangle < triangles) {
+        let last;
+        let materialIndex;
+        const face = faces[faceIndex];
+        if (!face) {
+          last = triangles;
+          materialIndex = 0;
+        } else if (triangle < face.first) {
+          last = Math.min(triangles, face.first);
+          materialIndex = 0;
+        } else {
+          last = Math.min(triangles, face.last + 1);
+          materialIndex = faceMaterialIndices[faceIndex] || 0;
+          faceIndex += 1;
+        }
+        if (!Number.isFinite(last) || last <= triangle) {
+          faceIndex += 1;
+          continue;
+        }
+        geometry.addGroup(triangle * 3, (last - triangle) * 3, materialIndex);
+        triangle = last;
+      }
+    }
+    const mesh = new THREE.Mesh(geometry, materials.length > 1 ? materials : materials[0]);
+    mesh.name = part.name || '';
+    root.add(mesh);
+    if (edgeMaterial) {
+      const edges = new THREE.EdgesGeometry(geometry, 32);
+      root.add(new THREE.LineSegments(edges, edgeMaterial));
+    }
+  });
+  return { root, triangleCount };
+}
+
+function _mfg3dViewer(container, payload, options) {
+  const opts = options || {};
+  const { THREE, OrbitControls } = payload.deps;
+  const built = _mfg3dGroup(THREE, payload.result);
+  if (!built.root.children.length) throw new Error('Модель пустая');
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(opts.thumbnail ? 0xEEF4FA : 0xE8EEF5);
+  scene.add(new THREE.HemisphereLight(0xFFFFFF, 0x60758B, 2.2));
+  const keyLight = new THREE.DirectionalLight(0xFFFFFF, 3.2);
+  keyLight.position.set(3, -4, 6);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0xBBD7FF, 1.5);
+  fillLight.position.set(-4, 2, 1);
+  scene.add(fillLight);
+  scene.add(built.root);
+
+  let box = new THREE.Box3().setFromObject(built.root);
+  const center = box.getCenter(new THREE.Vector3());
+  built.root.position.sub(center);
+  box = new THREE.Box3().setFromObject(built.root);
+  const size = box.getSize(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z, 1);
+
+  const camera = new THREE.PerspectiveCamera(38, 1, Math.max(maxSize / 2000, 0.01), maxSize * 100);
+  camera.up.set(0, 0, 1);
+  // Вписываем всю диагональ модели, а не только её самую длинную сторону:
+  // на широких мониторах высокая сборка иначе могла обрезаться снизу.
+  const radius = Math.max(size.length() / 2, maxSize / 2);
+  const fitDistance = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.18;
+  const initialPosition = new THREE.Vector3(1.25, -1.55, 1.0)
+    .normalize().multiplyScalar(fitDistance);
+  camera.position.copy(initialPosition);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.thumbnail ? 1.25 : 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  container.innerHTML = '';
+  container.appendChild(renderer.domElement);
+
+  if (!opts.thumbnail) {
+    const grid = new THREE.GridHelper(maxSize * 2.4, 20, 0x9AAEC3, 0xC8D4E0);
+    grid.rotation.x = Math.PI / 2;
+    grid.position.z = box.min.z;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.38;
+    scene.add(grid);
+  }
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.enablePan = !opts.thumbnail;
+  controls.autoRotate = !!opts.thumbnail;
+  controls.autoRotateSpeed = 0.75;
+  controls.minDistance = maxSize * 0.05;
+  controls.maxDistance = maxSize * 30;
+  controls.update();
+
+  const resize = () => {
+    if (!container.isConnected) return;
+    const width = Math.max(container.clientWidth, 120);
+    const height = Math.max(container.clientHeight, 100);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height, false);
+  };
+  resize();
+  const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+  if (observer) observer.observe(container);
+  else window.addEventListener('resize', resize);
+
+  let stopped = false;
+  let raf = 0;
+  const animate = () => {
+    if (stopped) return;
+    controls.update();
+    renderer.render(scene, camera);
+    raf = requestAnimationFrame(animate);
+  };
+  animate();
+
+  return {
+    reset() {
+      camera.position.copy(initialPosition);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    },
+    dispose() {
+      stopped = true;
+      if (raf) cancelAnimationFrame(raf);
+      if (observer) observer.disconnect();
+      else window.removeEventListener('resize', resize);
+      controls.dispose();
+      scene.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          (Array.isArray(obj.material) ? obj.material : [obj.material]).forEach(m => m.dispose());
+        }
+      });
+      renderer.dispose();
+      if (renderer.forceContextLoss) renderer.forceContextLoss();
+    },
+    triangles: built.triangleCount,
+  };
+}
+
+function _mfgDisposeStepThumbs() {
+  (state._mfg3dThumbs || []).forEach(viewer => { try { viewer.dispose(); } catch (e) {} });
+  state._mfg3dThumbs = [];
+}
+
+async function _mfgInitStepThumbs(it) {
+  const stepFiles = (it.files || []).filter(f => f.kind === 'step');
+  if (!stepFiles.length) return;
+  state._mfg3dThumbs = state._mfg3dThumbs || [];
+  for (const file of stepFiles) {
+    const host = document.getElementById('mfg3d-thumb-' + file.id);
+    if (!host) continue;
+    try {
+      const payload = await _mfgStepResult(file);
+      if (!host.isConnected || state.mfgCurrentItem !== it) continue;
+      const viewer = _mfg3dViewer(host, payload, { thumbnail: true });
+      state._mfg3dThumbs.push(viewer);
+    } catch (e) {
+      if (host.isConnected) {
+        host.innerHTML = '<span class="mfg3d-loading err"><i class="ti ti-alert-triangle"></i> ' +
+          escapeHtml(String((e && e.message) || e)) + '</span>';
+      }
+    }
+  }
+}
+
+async function mfgOpenStep(fileId) {
+  const file = _mfgStepFile(fileId);
+  if (!file) return;
+  mfgStepClose();
+  let modal = document.createElement('div');
+  modal.id = 'mfg3d-modal';
+  modal.className = 'mfg3d-overlay';
+  modal.onclick = (event) => { if (event.target === modal) mfgStepClose(); };
+  modal.innerHTML = '<div class="mfg3d-box">' +
+    '<div class="mfg3d-hd"><i class="ti ti-cube-3d-sphere"></i>' +
+      '<div class="t"><b>' + escapeHtml(file.file_name || 'STEP-модель') + '</b>' +
+        '<small>' + _mfgFileSize(file.size_bytes) + ' · STEP</small></div>' +
+      '<span class="hint">ЛКМ — вращать · колёсико — масштаб · ПКМ — двигать</span>' +
+      '<button onclick="mfgStepReset()" title="Вернуть исходный вид"><i class="ti ti-focus-centered"></i> Вернуть вид</button>' +
+      '<button onclick="mfgStepFullscreen()" title="На весь экран"><i class="ti ti-maximize"></i></button>' +
+      '<button onclick="mfgStepDownload(' + file.id + ')" title="Скачать исходный STEP"><i class="ti ti-download"></i></button>' +
+      '<button class="x" onclick="mfgStepClose()" title="Закрыть"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    '<div class="mfg3d-stage" id="mfg3d-stage">' +
+      '<div class="mfg3d-wait"><i class="ti ti-loader-2"></i><b>Открываем STEP-модель…</b>' +
+        '<span>Первый запуск может занять несколько секунд</span></div>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(modal);
+  state._mfg3dEsc = (event) => { if (event.key === 'Escape') mfgStepClose(); };
+  document.addEventListener('keydown', state._mfg3dEsc);
+  try {
+    const payload = await _mfgStepResult(file);
+    const stage = document.getElementById('mfg3d-stage');
+    if (!stage) return;
+    state._mfg3dViewer = _mfg3dViewer(stage, payload, { thumbnail: false });
+  } catch (e) {
+    const stage = document.getElementById('mfg3d-stage');
+    if (stage) stage.innerHTML = '<div class="mfg3d-wait err"><i class="ti ti-alert-triangle"></i>' +
+      '<b>Не удалось открыть 3D</b><span>' + escapeHtml(String((e && e.message) || e)) + '</span></div>';
+  }
+}
+
+function mfgStepReset() {
+  if (state._mfg3dViewer) state._mfg3dViewer.reset();
+}
+
+function mfgStepFullscreen() {
+  const box = document.querySelector('#mfg3d-modal .mfg3d-box');
+  if (!box) return;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (box.requestFullscreen) box.requestFullscreen().catch(() => {});
+}
+
+function mfgStepDownload(fileId) {
+  state._pdfSrc = 'mfg';
+  mfgDownloadFile(fileId);
+}
+
+function mfgStepClose() {
+  if (state._mfg3dViewer) {
+    try { state._mfg3dViewer.dispose(); } catch (e) {}
+  }
+  state._mfg3dViewer = null;
+  if (state._mfg3dEsc) document.removeEventListener('keydown', state._mfg3dEsc);
+  state._mfg3dEsc = null;
+  const modal = document.getElementById('mfg3d-modal');
+  if (modal) modal.remove();
+}
+
 function mfgDropFiles(ev, itemId) {
   ev.preventDefault();
   ev.currentTarget.classList.remove('over');
@@ -18022,7 +18409,7 @@ async function mfgUploadFiles(itemId, fileList) {
   const all = Array.from(fileList || []);
   const { ok: files, skippedExt } = _mfgSortFiles(all);
   if (!files.length) {
-    showToast('Не нашёл ни DXF, ни чертежей, ни ведомости' +
+    showToast('Не нашёл ни DXF, ни PDF, ни STEP, ни ведомости' +
       (skippedExt.length ? ' — пришло: ' + skippedExt.join(', ') : ''), 'error');
     return;
   }
@@ -18031,7 +18418,7 @@ async function mfgUploadFiles(itemId, fileList) {
   }
   const main = document.getElementById('mfg-main');
   if (main) main.innerHTML = '<div class="loading-block">Разбираем ' + files.length +
-    ' файл(ов): геометрия, штампы, ведомость…</div>';
+    ' файл(ов): геометрия, штампы, ведомость и 3D…</div>';
   const fd = new FormData();
   files.forEach(f => fd.append('files', f, f.name));
   try {
@@ -18042,7 +18429,9 @@ async function mfgUploadFiles(itemId, fileList) {
     if (!r.ok) { showToast(d.message || 'Не удалось разобрать', 'error'); openMfgItem(itemId); return; }
     state.mfgCurrentItem = d;
     renderMfgItem(d);
-    showToast('Разобрано: деталей ' + (d.parts || []).length, 'success');
+    const stepCount = (d.files || []).filter(f => f.kind === 'step').length;
+    showToast((stepCount ? '3D-модель загружена · ' : 'Разобрано · ') +
+      'деталей ' + (d.parts || []).length, 'success');
   } catch (e) {
     showToast('Ошибка загрузки: ' + String((e && e.message) || e), 'error');
     openMfgItem(itemId);
