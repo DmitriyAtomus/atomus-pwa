@@ -8296,6 +8296,16 @@ function _ozonDeadline(sh) {
     (late ? 'Срок истёк · ' : 'Забрать до ') + text + '</span>';
 }
 
+function _ozonExpectedDelivery(sh) {
+  const raw = String(sh.expected_at || '');
+  if (!raw) return '';
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '<span class="ozon-deadline"><i class="ti ti-truck-delivery"></i> Доставка ' +
+    escapeHtml(raw) + '</span>';
+  return '<span class="ozon-deadline"><i class="ti ti-truck-delivery"></i> Доставка ' +
+    match[3] + '.' + match[2] + '</span>';
+}
+
 function _ozonCardHtml(sh) {
   const completed = _ozonIsCompleted(sh);
   const url = String(sh.details_url || '');
@@ -8311,6 +8321,7 @@ function _ozonCardHtml(sh) {
     (sh.notification_title ? '<div class="ozon-note">' + escapeHtml(sh.notification_title) + '</div>' : '') +
     '<div class="ozon-meta">' +
       (sh.delivery_method ? '<span><i class="ti ti-map-pin"></i> ' + escapeHtml(sh.delivery_method) + '</span>' : '') +
+      _ozonExpectedDelivery(sh) +
       _ozonDeadline(sh) +
     '</div>' +
     '<div class="ozon-actions">' +
@@ -17775,7 +17786,7 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.45.909',
+    version: 'v2.45.910',
     date: '11.08.2026',
     title: 'Письма читаются, а не рассыпаются лесенкой',
     items: [
