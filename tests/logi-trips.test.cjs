@@ -95,6 +95,62 @@ test('карточка рейса рисует карту и умеет опти
   assert.ok(app3.includes('router.project-osrm.org/trip/v1/driving'), 'нет вызова OSRM /trip');
 });
 
+// ETA: время в пути +25% на город, 7 минут стоянки на каждой точке.
+// Стоянка добавляется ПОСЛЕ прибытия — иначе первая точка «уезжает» на 7 минут.
+test('ETA по точкам: прибытие без стоянки, стоянка перед следующим плечом', () => {
+  const context = {};
+  vm.runInNewContext(
+    section('function _ltEtaChain(coordIds, legs, startMs)', 'function _ltStatsHtml') +
+      '\nthis.f = _ltEtaChain;',
+    context
+  );
+  // старт 10:00, плечи по 8 минут (480 с): 480*1.25 = 10 минут езды
+  const start = new Date(2026, 7, 11, 10, 0, 0).getTime();
+  const etas = context.f([1, 2, 3], [{ duration: 480 }, { duration: 480 }], start);
+  assert.equal(etas[2], '10:10');            // 10 мин езды, без стоянки
+  assert.equal(etas[3], '10:27');            // +7 стоянка +10 езды
+  assert.equal(etas[1], undefined);          // старт — прибытия нет
+});
+
+// Аналитика считается из списка рейсов: рейсы старше 30 дней не в счёт,
+// длительность — от отправки курьеру до закрытия.
+test('сводка за 30 дней: свежие рейсы в счёте, старые нет', () => {
+  const context = { plural: (n, a, b, c) => a, escapeHtml: (s) => s };
+  vm.runInNewContext(
+    section('function _ltStatsHtml(trips, nowMs)', 'async function ltPtAddOpen') +
+      '\nthis.f = _ltStatsHtml;',
+    context
+  );
+  const now = new Date(2026, 7, 11, 12, 0, 0).getTime();
+  const html = context.f([
+    { trip_date: '2026-08-10', status: 'done', points_count: 4, done_count: 4,
+      problem_count: 0, driver_name: 'Иванов',
+      sent_at: '2026-08-10 09:00:00', done_at: '2026-08-10 11:00:00' },
+    { trip_date: '2026-08-05', status: 'done', points_count: 3, done_count: 2,
+      problem_count: 1, driver_name: 'Иванов',
+      sent_at: '2026-08-05 09:00:00', done_at: '2026-08-05 10:00:00' },
+    { trip_date: '2026-05-01', status: 'done', points_count: 99, done_count: 99,
+      problem_count: 9, driver_name: 'Старый' }, // старше 30 дней — мимо
+  ], now);
+  assert.match(html, /за 30 дней <b>2 рейс<\/b>/);
+  assert.match(html, /точек <b>7<\/b>/);
+  assert.match(html, /забрано <b>6<\/b>/);
+  assert.match(html, /проблем <b>1<\/b>/);
+  assert.match(html, /1 ч 30 м/);            // (120 + 60) / 2 минут
+  assert.match(html, /Иванов<\/b> \(2\)/);
+  assert.ok(!html.includes('Старый'));
+});
+
+test('допланирование не предлагает то, что уже в рейсе', () => {
+  const add = section('async function ltPtAddOpen()', 'async function ltPtAddGo');
+  assert.match(add, /inTrip/, 'нет фильтра уже добавленных грузов');
+  assert.match(add, /pickup-pool/, 'пул не запрашивается');
+  const goStart = app3.indexOf('async function ltPtAddGo()');
+  assert.notEqual(goStart, -1, 'нет функции ltPtAddGo');
+  const go = app3.slice(goStart);
+  assert.match(go, /Отправить ещё раз/, 'нет напоминания перепослать чек-лист');
+});
+
 test('стили рейсов на месте', () => {
   for (const cls of ['.lg-tabs', '.lg-tab.on', '.lt-card', '.lt-prog-fill',
                      '.lt-pool-i', '.lt-pt.done .n', '.lt-dir-form']) {

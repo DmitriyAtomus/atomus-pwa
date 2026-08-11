@@ -22943,3 +22943,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .lt-map-ico { background: transparent; border: none; }
 .lt-map-ico span { display: flex; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 12px; align-items: center; justify-content: center; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
 @media (max-width: 700px) { #lt-map { height: 200px; } }
+
+/* ============ v2.45.906: Рейсы — ETA, аналитика ============ */
+.lt-eta { flex: none; font-size: 11.5px; font-weight: 800; color: #2563EB; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lt-stats { margin-bottom: 12px; }

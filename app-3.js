@@ -25330,6 +25330,7 @@ async function loadLogiTrips() {
       '<button class="btn btn-primary" onclick="logiTripNew()"><i class="ti ti-plus"></i> Новый рейс</button>' +
       '<button class="btn btn-secondary" onclick="logiPointsDir()"><i class="ti ti-map-pin"></i> Справочник точек</button>' +
     '</div>';
+    if (trips.length) html += _ltStatsHtml(trips, Date.now());
     if (!trips.length) {
       html += '<div class="lt-hello"><div class="ic">🚐</div>' +
         '<b>Рейсов ещё не было</b>' +
@@ -25529,6 +25530,8 @@ function _ltTripRender(trip) {
       '<span class="tx"><b>' + escapeHtml(p.title || '') + '</b>' +
         '<small>' + escapeHtml(p.address || '—') +
         (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small></span>' +
+      // v2.45.906: ETA — заполняется, когда OSRM посчитает маршрут
+      (st === 'pending' ? '<span class="lt-eta" id="lt-eta-' + p.id + '"></span>' : '') +
       (activeSt
         ? '<span class="ops">' +
           (i > 0 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',-1)" title="Выше"><i class="ti ti-arrow-up"></i></button>' : '') +
@@ -25549,6 +25552,7 @@ function _ltTripRender(trip) {
       (links.ya ? '<a class="btn btn-secondary" href="' + links.ya + '" target="_blank" rel="noopener">🧭 Яндекс</a>' : '') +
       (pts.length >= 3 && pts.every(p => p.lat != null && p.lon != null)
         ? '<button class="btn btn-secondary" onclick="ltTripOptimize()"><i class="ti ti-route"></i> Оптимизировать</button>' : '') +
+      '<button class="btn btn-secondary" onclick="ltPtAddOpen()"><i class="ti ti-map-pin-plus"></i> Добавить точку</button>' +
       '<button class="btn btn-secondary" onclick="ltTripSetStatus(\'done\')"><i class="ti ti-flag-check"></i> Завершить</button>' +
       '<button class="btn btn-secondary danger" onclick="ltTripSetStatus(\'cancelled\')"><i class="ti ti-x"></i> Отменить</button>' +
     '</div>';
@@ -25783,6 +25787,12 @@ async function _ltTripMap(trip) {
     const min = Math.round(route.duration / 60 * 1.25); // +25% на город и парковки
     if (sum) sum.innerHTML = 'По дорогам: <b>' + km + ' км · ~' + min + ' мин</b>' +
       (pts.length < (trip.points || []).length ? ' · точки без координат — не на карте' : '');
+    // v2.45.906: ETA по точкам — «если выехать сейчас», +7 мин на каждой точке
+    const etas = _ltEtaChain(pts.map(p => p.id), route.legs || [], Date.now());
+    Object.keys(etas).forEach(pid => {
+      const eEl = document.getElementById('lt-eta-' + pid);
+      if (eEl) eEl.textContent = '≈' + etas[pid];
+    });
   } catch (e) {
     if (sum) sum.textContent = 'Маршрут по дорогам сейчас не посчитался — точки на карте, ссылки в навигатор работают.';
   }
@@ -25825,5 +25835,153 @@ async function ltTripOptimize() {
     } else showToast('Не удалось сохранить порядок', 'error');
   } catch (e) {
     showToast('Оптимизатор сейчас недоступен, попробуй позже', 'error');
+  }
+}
+
+// ---------- v2.45.906: ETA, аналитика, допланирование ----------
+// Цепочка прибытий: время в пути с запасом +25% и 7 минут на каждой точке.
+// coordIds — id точек с координатами по порядку, legs — плечи OSRM между ними.
+function _ltEtaChain(coordIds, legs, startMs) {
+  const out = {};
+  let t = startMs;
+  for (let j = 0; j < legs.length && j + 1 < coordIds.length; j++) {
+    t += (Number(legs[j].duration) || 0) * 1000 * 1.25;
+    const d = new Date(t);
+    out[coordIds[j + 1]] = String(d.getHours()).padStart(2, '0') + ':' +
+      String(d.getMinutes()).padStart(2, '0');
+    t += 7 * 60000; // стоянка на точке: погрузка, документы
+  }
+  return out;
+}
+
+// Сводка по рейсам за 30 дней — считается из уже загруженного списка
+function _ltStatsHtml(trips, nowMs) {
+  const from = nowMs - 30 * 86400000;
+  const recent = trips.filter(t => {
+    const m = String(t.trip_date || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return false;
+    return new Date(+m[1], +m[2] - 1, +m[3]).getTime() >= from;
+  });
+  if (!recent.length) return '';
+  const doneTrips = recent.filter(t => t.status === 'done');
+  const points = recent.reduce((a, t) => a + Number(t.points_count || 0), 0);
+  const picked = recent.reduce((a, t) => a + Number(t.done_count || 0), 0);
+  const probs = recent.reduce((a, t) => a + Number(t.problem_count || 0), 0);
+  // средняя длительность: отправили курьеру → рейс закрыт
+  const durs = doneTrips
+    .map(t => {
+      const a = Date.parse(String(t.sent_at || '').replace(' ', 'T'));
+      const b = Date.parse(String(t.done_at || '').replace(' ', 'T'));
+      return (isFinite(a) && isFinite(b) && b > a) ? (b - a) / 60000 : null;
+    })
+    .filter(v => v !== null && v < 16 * 60);
+  let durTxt = '';
+  if (durs.length) {
+    const avg = Math.round(durs.reduce((a, v) => a + v, 0) / durs.length);
+    durTxt = avg >= 60 ? Math.floor(avg / 60) + ' ч ' + (avg % 60) + ' м' : avg + ' мин';
+  }
+  // кто ездит чаще всех
+  const byDrv = {};
+  recent.forEach(t => {
+    const n = (t.driver_name || '').trim();
+    if (n) byDrv[n] = (byDrv[n] || 0) + 1;
+  });
+  const top = Object.entries(byDrv).sort((a, b) => b[1] - a[1])[0];
+  return '<div class="lg-sum lt-stats">' +
+    '<span>за 30 дней <b>' + recent.length + ' ' + plural(recent.length, 'рейс', 'рейса', 'рейсов') + '</b></span>' +
+    '<span>точек <b>' + points + '</b></span>' +
+    '<span>забрано <b>' + picked + '</b></span>' +
+    (probs ? '<span class="hot">проблем <b>' + probs + '</b></span>' : '') +
+    (durTxt ? '<span>средний рейс <b>' + durTxt + '</b></span>' : '') +
+    (top ? '<span>чаще ездит <b>' + escapeHtml(top[0]) + '</b> (' + top[1] + ')</span>' : '') +
+  '</div>';
+}
+
+// Допланирование: добавить в активный рейс груз из пула или свою точку
+async function ltPtAddOpen() {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  let m = document.getElementById('lt-add-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-add-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:560px;max-height:90vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-map-pin-plus"></i> Добавить в ' +
+      escapeHtml(trip.doc_number || 'рейс') + '</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-add-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' +
+      '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Из ожидающих забора</div>' +
+      '<div id="lt-add-pool"><div class="loading-block">Смотрим, что ждёт…</div></div>' +
+      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Своя точка</div>' +
+      '<div class="lt-custom-row">' +
+        '<input class="form-input" id="lt-add-title" placeholder="Что забрать / у кого">' +
+        '<input class="form-input" id="lt-add-addr" placeholder="Адрес">' +
+        '<span></span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-add-modal\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="lt-add-go" onclick="ltPtAddGo()"><i class="ti ti-check"></i> Добавить в рейс</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  try {
+    const d = await apiGet('/api/logistics/pickup-pool');
+    // то, что уже в этом рейсе, второй раз не предлагаем
+    const inTrip = new Set((trip.points || [])
+      .map(p => (p.source_kind || '') + ':' + (p.source_id || '')));
+    window._ltAddPool = (d.pool || []).filter(p =>
+      !inTrip.has((p.source_kind || '') + ':' + (p.source_id || '')));
+    const box = document.getElementById('lt-add-pool');
+    if (!box) return;
+    box.innerHTML = window._ltAddPool.length
+      ? window._ltAddPool.map((p, i) =>
+          '<label class="lt-pool-i' + (p.hot ? ' hot' : '') + '">' +
+          '<input type="checkbox" data-pool="' + i + '">' +
+          '<span class="tx"><b>' + (p.hot ? '🔥 ' : '') + escapeHtml(p.title || '') + '</b>' +
+          '<small>' + escapeHtml(p.address || 'адрес из справочника точек') +
+          (p.sub ? ' · ' + escapeHtml(p.sub) : '') + '</small></span></label>').join('')
+      : '<div class="lgc-empty" style="padding:12px;">Всё, что ждёт забора, уже в рейсах.</div>';
+  } catch (e) {
+    const box = document.getElementById('lt-add-pool');
+    if (box) box.innerHTML = '<div class="logi-empty">Не удалось собрать пул</div>';
+  }
+}
+
+async function ltPtAddGo() {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const points = [];
+  document.querySelectorAll('#lt-add-pool input[data-pool]:checked').forEach(ch => {
+    const p = (window._ltAddPool || [])[parseInt(ch.dataset.pool, 10)];
+    if (p) points.push({ title: p.title, address: p.address, lat: p.lat, lon: p.lon,
+      source_kind: p.source_kind, source_id: p.source_id, note: p.sub || '' });
+  });
+  const t = ((document.getElementById('lt-add-title') || {}).value || '').trim();
+  const a = ((document.getElementById('lt-add-addr') || {}).value || '').trim();
+  if (t) points.push({ title: t, address: a, source_kind: 'custom' });
+  if (!points.length) { showToast('Отметь груз или впиши свою точку', 'error'); return; }
+  const btn = document.getElementById('lt-add-go');
+  if (btn) btn.disabled = true;
+  try {
+    let fresh = null;
+    for (const pt of points) {
+      const r = await apiPost('/api/logistics/trips/' + trip.id + '/points', pt);
+      if (r && r.ok) fresh = r.data;
+    }
+    const mm = document.getElementById('lt-add-modal');
+    if (mm) mm.remove();
+    if (fresh) {
+      _ltTripRender(fresh);
+      showToast(trip.status === 'draft'
+        ? 'Добавлено: ' + points.length
+        : 'Добавлено: ' + points.length + '. Не забудь «Отправить ещё раз» — у курьера старый чек-лист',
+        'success');
+    } else showToast('Не удалось добавить', 'error');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (btn) btn.disabled = false;
   }
 }
