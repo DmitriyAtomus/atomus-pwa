@@ -6723,6 +6723,34 @@ async function refreshMailUnread() {
 // старт: через 4 сек после загрузки, дальше каждые 2 минуты
 setTimeout(function () { try { refreshMailUnread(); } catch (e) {} }, 4000);
 setInterval(function () { try { refreshMailUnread(); } catch (e) {} }, 120000);
+// v2.45.909: письма из рассылок (Ozon, маркетплейсы) свёрстаны отступами и
+// пустыми строками — при выводе «как есть» текст рассыпается лесенкой с дырами
+// в пол-экрана. Приводим в человеческий вид: убираем отступы в начале строк,
+// схлопываем пустоту, выкидываем линейки из чёрточек и невидимые пробелы.
+function _mailPrettyText(body) {
+  let s = String(body || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ ​‌‍﻿]/g, ' ');
+  s = s.split('\n')
+    .map(function (line) {
+      const t = line.replace(/[ \t]+$/g, '').replace(/^[ \t]+/, '');
+      // «=====», «-----», «*****» — вёрстка письма, а не смысл
+      return (t.length >= 3 && /^[-=_*·•\s]+$/.test(t)) ? '' : t;
+    })
+    .join('\n');
+  return s.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// Ссылки в письме должны открываться, а не лежать текстом. Экранируем ВСЁ,
+// и только потом подменяем адреса на ссылки — иначе получим дыру для чужого html.
+function _mailBodyHtml(text) {
+  const safe = escapeHtml(_mailPrettyText(text));
+  return safe.replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]}"'])/g, function (url) {
+    const short = url.length > 60 ? url.slice(0, 57) + '…' : url;
+    return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + short + '</a>';
+  });
+}
+
 // v2.45.708: суть письма отдельно от цитаты/подписи (сворачиваются)
 function _mailSplitBody(body) {
   const lines = String(body || '').slice(0, 12000).split('\n');
@@ -6757,12 +6785,12 @@ function _mailMsgBubble(m) {
   const who = out ? (m.mine ? 'Ты' : (m.author || 'Сотрудник'))
                   : (m.from_name || '');
   const subj = (m.subject && !out) ? '<div class="mm-subj">' + escapeHtml(m.subject) + '</div>' : '';
-  const parts = _mailSplitBody(m.body || '');
+  const parts = _mailSplitBody(_mailPrettyText(m.body || ''));
   let fold = '';
   if (parts.rest) {
     const fid = 'mmfold-' + (++_mailFoldSeq);
     fold = '<button class="mm-fold" data-lbl="подпись и цитата" onclick="_mailToggleFold(\'' + fid + '\', this)"><i class="ti ti-chevron-right"></i> подпись и цитата</button>' +
-      '<div id="' + fid + '" class="mm-folded" style="display:none;">' + escapeHtml(parts.rest.slice(0, 6000)) + '</div>';
+      '<div id="' + fid + '" class="mm-folded" style="display:none;">' + _mailBodyHtml(parts.rest.slice(0, 6000)) + '</div>';
   }
   // вложения — карточками с именем (скачивание как в ленте заказа).
   // v2.45.7xx: для входящих файлов «на просмотр» из бота «Общение» (kind='chat')
@@ -6816,7 +6844,7 @@ function _mailMsgBubble(m) {
   }
   return '<div class="mm-bub ' + (out ? 'out' : 'in') + '">' +
     (who ? '<div class="mm-who">' + escapeHtml(who) + '</div>' : '') + subj +
-    '<div class="mm-body">' + escapeHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
+    '<div class="mm-body">' + _mailBodyHtml(parts.main.slice(0, 4000)) + '</div>' + fold + atts +
     '<div class="mm-btm">' + escapeHtml(_mailShortTime(m.at)) + ticks + '</div>' +
   '</div>';
 }
@@ -17746,6 +17774,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.909',
+    date: '11.08.2026',
+    title: 'Письма читаются, а не рассыпаются лесенкой',
+    items: [
+      'Рассылки (Ozon, маркетплейсы) больше не растягиваются на пол-экрана: отступы и пустые строки схлопываются, линейки из чёрточек убираются.',
+      'Ссылки в письмах стали кликабельными — длинные показываются коротко.',
+    ],
+  },
   {
     version: 'v2.45.899',
     date: '10.08.2026',
