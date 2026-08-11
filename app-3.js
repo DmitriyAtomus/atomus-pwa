@@ -7928,7 +7928,9 @@ function lgScrollDone() {
 async function loadLogisticsPickups() {
   const box = document.getElementById('logistics-content');
   if (!box) return;
-  box.innerHTML = '<div class="loading-block">Загрузка…</div>';
+  // v2.45.904: внутри Логистики два вида — «Грузы» и «Рейсы»
+  if (state._logiView === 'trips') { loadLogiTrips(); return; }
+  box.innerHTML = _logiTabsHtml('pickups') + '<div class="loading-block">Загрузка…</div>';
   try {
     // Параллельно тянем самовывозы, почтовые статусы и транспортные компании.
     const [d, oz, lu, cd, dl] = await Promise.all([
@@ -8111,7 +8113,7 @@ async function loadLogisticsPickups() {
     // ---- сводка и завершённые
     const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length;
     const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length;
-    let html = '<div class="lg-sum">' +
+    let html = _logiTabsHtml('pickups') + '<div class="lg-sum">' +
       (fire.length ? '<span class="hot">горит <b>' + fire.length + '</b></span>' : '') +
       '<span>активных <b>' + activeTotal + '</b></span>' +
       '<span>завершённых <b>' + doneTotal + '</b></span>' +
@@ -25273,3 +25275,435 @@ async function downloadInventoryBlank() {
   }
 }
 
+
+// ============ v2.45.904: Рейсы — маршруты забора грузов (этап 1) ============
+// Переключатель видов внутри Логистики: «Грузы» (перевозчики) и «Рейсы»
+function _logiTabsHtml(act) {
+  return '<div class="lg-tabs">' +
+    '<button class="lg-tab' + (act === 'pickups' ? ' on' : '') + '" onclick="logiViewSwitch(\'pickups\')">' +
+      '<i class="ti ti-packages"></i> Грузы</button>' +
+    '<button class="lg-tab' + (act === 'trips' ? ' on' : '') + '" onclick="logiViewSwitch(\'trips\')">' +
+      '<i class="ti ti-steering-wheel"></i> Рейсы</button>' +
+  '</div>';
+}
+function logiViewSwitch(v) {
+  state._logiView = v;
+  loadLogisticsPickups();
+}
+
+const _LT_STATUS = {
+  draft:       { t: 'Черновик',          cls: 'wait', ic: 'ti-pencil' },
+  sent:        { t: 'Отправлен курьеру', cls: 'run',  ic: 'ti-send' },
+  in_progress: { t: 'В пути',            cls: 'run',  ic: 'ti-truck' },
+  done:        { t: 'Завершён',          cls: 'done', ic: 'ti-check' },
+  cancelled:   { t: 'Отменён',           cls: 'bad',  ic: 'ti-x' },
+};
+function _ltStatusChip(st) {
+  const s = _LT_STATUS[st] || _LT_STATUS.draft;
+  return '<span class="ozon-status ' + s.cls + '"><i class="ti ' + s.ic + '"></i> ' + s.t + '</span>';
+}
+function _ltDate(v) {
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v || '');
+}
+// Ссылки в навигаторы считаем прямо тут — те же, что бэкенд шлёт курьеру
+function _ltNavLinks(points) {
+  const pts = (points || []).filter(p => p.lat != null && p.lon != null);
+  if (pts.length < 2) return { gis: '', ya: '' };
+  return {
+    gis: 'https://2gis.ru/directions/points/' + pts.map(p => p.lon + ',' + p.lat).join(';'),
+    ya: 'https://yandex.ru/maps/?rtext=' + pts.map(p => p.lat + ',' + p.lon).join('~') + '&rtt=auto',
+  };
+}
+
+async function loadLogiTrips() {
+  const box = document.getElementById('logistics-content');
+  if (!box) return;
+  box.innerHTML = _logiTabsHtml('trips') + '<div class="loading-block">Загрузка…</div>';
+  try {
+    const d = await apiGet('/api/logistics/trips');
+    const trips = d.trips || [];
+    const active = trips.filter(t => ['draft', 'sent', 'in_progress'].includes(t.status));
+    const finished = trips.filter(t => !['draft', 'sent', 'in_progress'].includes(t.status));
+    let html = _logiTabsHtml('trips');
+    html += '<div class="lt-bar">' +
+      '<button class="btn btn-primary" onclick="logiTripNew()"><i class="ti ti-plus"></i> Новый рейс</button>' +
+      '<button class="btn btn-secondary" onclick="logiPointsDir()"><i class="ti ti-map-pin"></i> Справочник точек</button>' +
+    '</div>';
+    if (!trips.length) {
+      html += '<div class="lt-hello"><div class="ic">🚐</div>' +
+        '<b>Рейсов ещё не было</b>' +
+        '<p>Рейс — это маршрут забора грузов на день: Ozon, терминалы ТК, самовывозы у поставщиков. ' +
+        'Собираешь точки, отправляешь курьеру чек-лист в MAX со ссылкой на 2ГИС — ' +
+        'он едет и отвечает «2 забрал», а СРМ сама закрывает грузы.</p></div>';
+    } else {
+      if (active.length) html += '<div class="lt-list">' + active.map(_ltTripCard).join('') + '</div>';
+      else html += '<div class="lgc-empty" style="margin-top:10px;"><i class="ti ti-circle-check" style="color:var(--success);"></i>Активных рейсов нет.</div>';
+      if (finished.length) {
+        html += '<details class="ozon-archive" style="margin-top:12px;"><summary><i class="ti ti-archive"></i> Прошлые рейсы <span>' + finished.length + '</span></summary>' +
+          '<div class="lt-list">' + finished.map(_ltTripCard).join('') + '</div></details>';
+      }
+    }
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = _logiTabsHtml('trips') + '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить рейсы</div>';
+  }
+}
+
+function _ltTripCard(t) {
+  const total = Number(t.points_count || 0), done = Number(t.done_count || 0), prob = Number(t.problem_count || 0);
+  const pct = total ? Math.round(done / total * 100) : 0;
+  return '<div class="lt-card" onclick="logiTripOpen(' + Number(t.id) + ')">' +
+    '<div class="lt-card-top"><b>' + escapeHtml(t.doc_number || ('Рейс #' + t.id)) + '</b>' +
+      '<span class="dt">' + _ltDate(t.trip_date) + '</span>' + _ltStatusChip(t.status) + '</div>' +
+    '<div class="lt-card-mid">' +
+      '<span><i class="ti ti-user"></i> ' + escapeHtml(t.driver_name || 'исполнитель не назначен') + '</span>' +
+      '<span><i class="ti ti-map-pin"></i> ' + total + ' ' + plural(total, 'точка', 'точки', 'точек') + '</span>' +
+      (prob ? '<span class="prob"><i class="ti ti-alert-triangle"></i> ' + prob + '</span>' : '') +
+    '</div>' +
+    (total ? '<div class="lt-prog"><div class="lt-prog-fill" style="width:' + pct + '%;"></div>' +
+      '<span>' + done + ' / ' + total + '</span></div>' : '') +
+  '</div>';
+}
+
+// ---------- Новый рейс ----------
+async function logiTripNew() {
+  await ensureEmployeesLoaded();
+  const emps = (cache.activeEmployees || []);
+  const today = new Date();
+  const iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  let m = document.getElementById('lt-new-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-new-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:640px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-steering-wheel"></i> Новый рейс</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-new-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' +
+      '<div class="lt-new-row">' +
+        '<label>Дата<input type="date" class="form-input" id="lt-new-date" value="' + iso + '"></label>' +
+        '<label>Кто едет<select class="form-input" id="lt-new-drv"><option value="">— выбрать —</option>' +
+          emps.map(e => '<option value="' + e.id + '">' + escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</option>').join('') +
+        '</select></label>' +
+      '</div>' +
+      '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Что сейчас ждёт забора <span id="lt-pool-cnt"></span></div>' +
+      '<div id="lt-pool"><div class="loading-block">Собираем со всех перевозчиков…</div></div>' +
+      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки</div>' +
+      '<div id="lt-custom"></div>' +
+      '<button class="btn btn-secondary btn-sm" onclick="ltCustomAdd()"><i class="ti ti-plus"></i> Добавить точку</button>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-new-modal\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="lt-new-go" onclick="logiTripCreate()"><i class="ti ti-check"></i> Собрать рейс</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  try {
+    const d = await apiGet('/api/logistics/pickup-pool');
+    window._ltPool = d.pool || [];
+    const boxP = document.getElementById('lt-pool');
+    const cnt = document.getElementById('lt-pool-cnt');
+    if (cnt) cnt.textContent = window._ltPool.length ? '· ' + window._ltPool.length : '';
+    if (!boxP) return;
+    boxP.innerHTML = window._ltPool.length
+      ? window._ltPool.map((p, i) =>
+          '<label class="lt-pool-i' + (p.hot ? ' hot' : '') + '">' +
+          '<input type="checkbox" checked data-pool="' + i + '">' +
+          '<span class="tx"><b>' + (p.hot ? '🔥 ' : '') + escapeHtml(p.title || '') + '</b>' +
+          '<small>' + escapeHtml(p.address || 'адрес из справочника точек') +
+          (p.sub ? ' · ' + escapeHtml(p.sub) : '') + '</small></span></label>').join('')
+      : '<div class="lgc-empty" style="padding:14px;"><i class="ti ti-circle-check" style="color:var(--success);"></i>Сейчас забирать нечего — добавь свои точки ниже.</div>';
+  } catch (e) {
+    const boxP = document.getElementById('lt-pool');
+    if (boxP) boxP.innerHTML = '<div class="logi-empty">Не удалось собрать пул грузов</div>';
+  }
+}
+
+function ltCustomAdd() {
+  const box = document.getElementById('lt-custom');
+  if (!box) return;
+  const row = document.createElement('div');
+  row.className = 'lt-custom-row';
+  row.innerHTML = '<input class="form-input" placeholder="Что забрать / у кого" data-f="title">' +
+    '<input class="form-input" placeholder="Адрес" data-f="address">' +
+    '<button class="icon-btn" onclick="this.parentNode.remove()" title="Убрать"><i class="ti ti-x"></i></button>';
+  box.appendChild(row);
+  const inp = row.querySelector('input');
+  if (inp) inp.focus();
+}
+
+async function logiTripCreate() {
+  const btn = document.getElementById('lt-new-go');
+  const date = (document.getElementById('lt-new-date') || {}).value || '';
+  const drvSel = document.getElementById('lt-new-drv');
+  const drvId = drvSel && drvSel.value ? parseInt(drvSel.value, 10) : null;
+  const drvName = drvSel && drvSel.value ? drvSel.options[drvSel.selectedIndex].text : '';
+  const points = [];
+  document.querySelectorAll('#lt-pool input[data-pool]:checked').forEach(ch => {
+    const p = (window._ltPool || [])[parseInt(ch.dataset.pool, 10)];
+    if (p) points.push({ title: p.title, address: p.address, lat: p.lat, lon: p.lon,
+      source_kind: p.source_kind, source_id: p.source_id, note: p.sub || '' });
+  });
+  document.querySelectorAll('#lt-custom .lt-custom-row').forEach(row => {
+    const t = (row.querySelector('[data-f="title"]') || {}).value || '';
+    const a = (row.querySelector('[data-f="address"]') || {}).value || '';
+    if (t.trim()) points.push({ title: t.trim(), address: a.trim(), source_kind: 'custom' });
+  });
+  if (!points.length) { showToast('Отметь хотя бы одну точку', 'error'); return; }
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Собираем…'; }
+  try {
+    const r = await apiPost('/api/logistics/trips',
+      { trip_date: date, driver_employee_id: drvId, driver_name: drvName, points });
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      const mm = document.getElementById('lt-new-modal');
+      if (mm) mm.remove();
+      showToast('Рейс ' + (j.doc_number || '') + ' собран', 'success');
+      state._logiView = 'trips';
+      loadLogisticsPickups();
+      logiTripOpen(j.id);
+    } else {
+      showToast(j.message || 'Не удалось собрать рейс', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Собрать рейс'; }
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Собрать рейс'; }
+  }
+}
+
+// ---------- Карточка рейса ----------
+async function logiTripOpen(id) {
+  let m = document.getElementById('lt-trip-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-trip-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:640px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-body" id="lt-trip-body" style="overflow-y:auto;"><div class="loading-block">Загрузка…</div></div></div>';
+  document.body.appendChild(m);
+  try {
+    const trip = await apiGet('/api/logistics/trips/' + id);
+    _ltTripRender(trip);
+  } catch (e) {
+    const b = document.getElementById('lt-trip-body');
+    if (b) b.innerHTML = '<div class="logi-empty">Не удалось открыть рейс</div>';
+  }
+}
+
+function _ltTripRender(trip) {
+  const b = document.getElementById('lt-trip-body');
+  if (!b || !trip || !trip.id) return;
+  window._ltTrip = trip;
+  const pts = trip.points || [];
+  const links = _ltNavLinks(pts);
+  const activeSt = ['draft', 'sent', 'in_progress'].includes(trip.status);
+  const doneN = pts.filter(p => p.status === 'done').length;
+  let html = '<div class="lt-trip-hd">' +
+    '<h3><i class="ti ti-steering-wheel"></i> ' + escapeHtml(trip.doc_number || ('Рейс #' + trip.id)) + '</h3>' +
+    _ltStatusChip(trip.status) +
+    '<button class="icon-btn" onclick="document.getElementById(\'lt-trip-modal\').remove()" style="margin-left:auto;"><i class="ti ti-x"></i></button>' +
+  '</div>' +
+  '<div class="lt-trip-meta">' +
+    '<span><i class="ti ti-calendar"></i> ' + _ltDate(trip.trip_date) + '</span>' +
+    '<span><i class="ti ti-user"></i> ' + escapeHtml(trip.driver_name || 'исполнитель не назначен') + '</span>' +
+    '<span><i class="ti ti-map-pin"></i> ' + doneN + ' из ' + pts.length + '</span>' +
+  '</div>';
+  html += '<div class="lt-pts">' + pts.map((p, i) => {
+    const st = p.status || 'pending';
+    const ic = st === 'done' ? '<i class="ti ti-check"></i>' : (st === 'problem' ? '<i class="ti ti-alert-triangle"></i>' : (i + 1));
+    return '<div class="lt-pt ' + st + '">' +
+      '<span class="n">' + ic + '</span>' +
+      '<span class="tx"><b>' + escapeHtml(p.title || '') + '</b>' +
+        '<small>' + escapeHtml(p.address || '—') +
+        (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small></span>' +
+      (activeSt
+        ? '<span class="ops">' +
+          (i > 0 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',-1)" title="Выше"><i class="ti ti-arrow-up"></i></button>' : '') +
+          (i < pts.length - 1 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',1)" title="Ниже"><i class="ti ti-arrow-down"></i></button>' : '') +
+          (st !== 'done' ? '<button class="icon-btn ok" onclick="ltPtStatus(' + p.id + ',\'done\')" title="Забрал"><i class="ti ti-check"></i></button>' : '') +
+          (st === 'pending' ? '<button class="icon-btn warn" onclick="ltPtStatus(' + p.id + ',\'problem\')" title="Проблема"><i class="ti ti-alert-triangle"></i></button>' : '') +
+          (st !== 'pending' ? '<button class="icon-btn" onclick="ltPtStatus(' + p.id + ',\'pending\')" title="Вернуть в ожидание"><i class="ti ti-rotate"></i></button>' : '') +
+          (trip.status === 'draft' ? '<button class="icon-btn" onclick="ltPtDel(' + p.id + ')" title="Убрать из рейса"><i class="ti ti-x"></i></button>' : '') +
+        '</span>' : '') +
+    '</div>';
+  }).join('') + '</div>';
+  if (!pts.length) html += '<div class="lgc-empty" style="padding:14px;">Точек нет.</div>';
+  if (activeSt) {
+    html += '<div class="lt-trip-btns">' +
+      '<button class="btn btn-primary" onclick="ltTripSend()"><i class="ti ti-send"></i> ' +
+        (trip.status === 'draft' ? 'Отправить курьеру в MAX' : 'Отправить ещё раз') + '</button>' +
+      (links.gis ? '<a class="btn btn-secondary" href="' + links.gis + '" target="_blank" rel="noopener">📍 2ГИС</a>' : '') +
+      (links.ya ? '<a class="btn btn-secondary" href="' + links.ya + '" target="_blank" rel="noopener">🧭 Яндекс</a>' : '') +
+      '<button class="btn btn-secondary" onclick="ltTripSetStatus(\'done\')"><i class="ti ti-flag-check"></i> Завершить</button>' +
+      '<button class="btn btn-secondary danger" onclick="ltTripSetStatus(\'cancelled\')"><i class="ti ti-x"></i> Отменить</button>' +
+    '</div>';
+    if (!links.gis && pts.length >= 2) {
+      html += '<div class="lt-hint"><i class="ti ti-info-circle"></i> Ссылки на навигатор появятся, когда у точек будут координаты — заполни их в «Справочнике точек».</div>';
+    }
+  }
+  b.innerHTML = html;
+}
+
+async function ltPtMove(pid, dir) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const ids = (trip.points || []).map(p => p.id);
+  const i = ids.indexOf(pid);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ids.length) return;
+  ids.splice(i, 1);
+  ids.splice(j, 0, pid);
+  try {
+    const r = await apiPost('/api/logistics/trips/' + trip.id + '/reorder', { point_ids: ids });
+    if (r && r.ok) _ltTripRender(r.data);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function ltPtStatus(pid, st) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  let note = '';
+  if (st === 'problem') {
+    note = prompt('Что случилось на точке? (например: закрыто, груз не готов)') || '';
+    if (!note.trim()) return;
+  }
+  try {
+    const r = await apiPost('/api/logistics/trips/' + trip.id + '/points/' + pid + '/status', { status: st, note });
+    if (r && r.ok) { _ltTripRender(r.data); loadLogisticsPickups(); }
+    else showToast('Не удалось обновить точку', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function ltPtDel(pid) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  try {
+    const d = await apiDelete('/api/logistics/trips/' + trip.id + '/points/' + pid);
+    _ltTripRender(d);
+  } catch (e) { showToast('Не удалось убрать точку', 'error'); }
+}
+
+async function ltTripSend() {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  try {
+    const r = await apiPost('/api/logistics/trips/' + trip.id + '/send', {});
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast('Чек-лист улетел курьеру в MAX', 'success');
+      _ltTripRender(j);
+      loadLogisticsPickups();
+    } else {
+      showToast(j.send_message || 'Не удалось отправить в MAX', 'error');
+      if (j && j.id) _ltTripRender(j);
+    }
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function ltTripSetStatus(st) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  if (st === 'cancelled' && !confirm('Отменить рейс ' + (trip.doc_number || '') + '?')) return;
+  try {
+    const d = await apiPatch('/api/logistics/trips/' + trip.id, { status: st });
+    _ltTripRender(d);
+    loadLogisticsPickups();
+  } catch (e) { showToast('Не удалось: ' + (e.message || ''), 'error'); }
+}
+
+// ---------- Справочник точек ----------
+const _LT_KINDS = [
+  ['ozon_pvz', 'ПВЗ Ozon'], ['luch_terminal', 'Терминал ТК-Луч'],
+  ['dl_terminal', 'Терминал Деловых линий'], ['vi_store', 'ВсеИнструменты'],
+  ['supplier', 'Поставщик'], ['custom', 'Другое'],
+];
+function _ltKindName(k) {
+  const f = _LT_KINDS.find(x => x[0] === k);
+  return f ? f[1] : (k || 'Другое');
+}
+
+async function logiPointsDir() {
+  let m = document.getElementById('lt-dir-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-dir-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:620px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-map-pin"></i> Справочник точек</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-dir-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' +
+      '<div class="lt-hint" style="margin:0 0 10px;"><i class="ti ti-info-circle"></i> Постоянные адреса: терминалы ТК, ПВЗ Ozon, магазины. ' +
+        'Координаты вбей один раз (правый клик в 2ГИС/Яндекс → «Что здесь») — и у грузов из этих мест появятся ссылки на навигатор.</div>' +
+      '<div id="lt-dir-list"><div class="loading-block">Загрузка…</div></div>' +
+      '<div class="lt-new-sec"><i class="ti ti-plus"></i> Новая точка</div>' +
+      '<div class="lt-dir-form">' +
+        '<input class="form-input" id="lt-dir-name" placeholder="Название (например: Терминал ДЛ Миасс)">' +
+        '<select class="form-input" id="lt-dir-kind">' +
+          _LT_KINDS.map(k => '<option value="' + k[0] + '">' + k[1] + '</option>').join('') + '</select>' +
+        '<input class="form-input" id="lt-dir-addr" placeholder="Адрес">' +
+        '<div class="lt-dir-coords">' +
+          '<input class="form-input" id="lt-dir-lat" placeholder="Широта (55.04…)" inputmode="decimal">' +
+          '<input class="form-input" id="lt-dir-lon" placeholder="Долгота (60.10…)" inputmode="decimal">' +
+        '</div>' +
+        '<button class="btn btn-primary" onclick="ltDirAdd()"><i class="ti ti-check"></i> Добавить</button>' +
+      '</div>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  ltDirReload();
+}
+
+async function ltDirReload() {
+  const box = document.getElementById('lt-dir-list');
+  if (!box) return;
+  try {
+    const d = await apiGet('/api/logistics/points');
+    const pts = d.points || [];
+    box.innerHTML = pts.length
+      ? pts.map(p => '<div class="lt-dir-i">' +
+          '<span class="tx"><b>' + escapeHtml(p.name || '') + '</b>' +
+          '<small>' + _ltKindName(p.kind) + (p.address ? ' · ' + escapeHtml(p.address) : '') +
+          (p.lat != null && p.lon != null ? ' · 📍' : ' · <span style="color:var(--warning);">нет координат</span>') +
+          '</small></span>' +
+          '<button class="icon-btn" onclick="ltDirDel(' + Number(p.id) + ')" title="Удалить"><i class="ti ti-trash"></i></button>' +
+        '</div>').join('')
+      : '<div class="lgc-empty" style="padding:14px;">Точек пока нет — добавь первую ниже.</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="logi-empty">Не удалось загрузить</div>';
+  }
+}
+
+async function ltDirAdd() {
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const name = v('lt-dir-name').trim();
+  if (!name) { showToast('Нужно название точки', 'error'); return; }
+  try {
+    const r = await apiPost('/api/logistics/points', {
+      name, kind: v('lt-dir-kind'), address: v('lt-dir-addr').trim(),
+      lat: v('lt-dir-lat').replace(',', '.').trim() || null,
+      lon: v('lt-dir-lon').replace(',', '.').trim() || null,
+    });
+    if (r && r.ok) {
+      ['lt-dir-name', 'lt-dir-addr', 'lt-dir-lat', 'lt-dir-lon'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      showToast('Точка добавлена', 'success');
+      ltDirReload();
+    } else showToast(((r || {}).data || {}).message || 'Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function ltDirDel(id) {
+  if (!confirm('Удалить точку из справочника?')) return;
+  try {
+    await apiDelete('/api/logistics/points/' + id);
+    ltDirReload();
+  } catch (e) { showToast('Не удалось удалить', 'error'); }
+}
