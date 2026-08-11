@@ -151,6 +151,18 @@ test('допланирование не предлагает то, что уже
   assert.match(go, /Отправить ещё раз/, 'нет напоминания перепослать чек-лист');
 });
 
+// Геокодер: адрес в справочнике → координаты сами. Ответ, пришедший после
+// того как адрес поменяли, применять нельзя — заполнит чужие координаты.
+test('справочник точек сам ищет координаты по адресу', () => {
+  const geoStart = app3.indexOf('async function ltDirGeo()');
+  assert.notEqual(geoStart, -1, 'нет функции ltDirGeo');
+  const geo = app3.slice(geoStart);
+  assert.match(geo, /\/api\/logistics\/geocode\?q=/, 'не зовёт эндпоинт геокодера');
+  assert.match(geo, /curAddr !== addr/, 'нет защиты от устаревшего ответа');
+  const dir = section('async function logiPointsDir()', 'async function ltDirReload');
+  assert.match(dir, /ltDirGeo/, 'поле адреса не подключено к геокодеру');
+});
+
 test('стили рейсов на месте', () => {
   for (const cls of ['.lg-tabs', '.lg-tab.on', '.lt-card', '.lt-prog-fill',
                      '.lt-pool-i', '.lt-pt.done .n', '.lt-dir-form']) {

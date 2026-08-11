@@ -25431,7 +25431,7 @@ function ltCustomAdd() {
   const row = document.createElement('div');
   row.className = 'lt-custom-row';
   row.innerHTML = '<input class="form-input" placeholder="Что забрать / у кого" data-f="title">' +
-    '<input class="form-input" placeholder="Адрес" data-f="address">' +
+    '<input class="form-input" placeholder="Адрес — на карту встанет сам" data-f="address">' +
     '<button class="icon-btn" onclick="this.parentNode.remove()" title="Убрать"><i class="ti ti-x"></i></button>';
   box.appendChild(row);
   const inp = row.querySelector('input');
@@ -25656,17 +25656,19 @@ async function logiPointsDir() {
       '<button class="icon-btn" onclick="document.getElementById(\'lt-dir-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
     '<div class="modal-body" style="overflow-y:auto;">' +
       '<div class="lt-hint" style="margin:0 0 10px;"><i class="ti ti-info-circle"></i> Постоянные адреса: терминалы ТК, ПВЗ Ozon, магазины. ' +
-        'Координаты вбей один раз (правый клик в 2ГИС/Яндекс → «Что здесь») — и у грузов из этих мест появятся ссылки на навигатор.</div>' +
+        'Впиши адрес — <b>координаты найдутся сами</b>. Если геокодер промахнётся, поправь их вручную (правый клик в 2ГИС → «Что здесь»).</div>' +
       '<div id="lt-dir-list"><div class="loading-block">Загрузка…</div></div>' +
       '<div class="lt-new-sec"><i class="ti ti-plus"></i> Новая точка</div>' +
       '<div class="lt-dir-form">' +
         '<input class="form-input" id="lt-dir-name" placeholder="Название (например: Терминал ДЛ Миасс)">' +
         '<select class="form-input" id="lt-dir-kind">' +
           _LT_KINDS.map(k => '<option value="' + k[0] + '">' + k[1] + '</option>').join('') + '</select>' +
-        '<input class="form-input" id="lt-dir-addr" placeholder="Адрес">' +
+        '<input class="form-input" id="lt-dir-addr" placeholder="Адрес (г. Миасс, Романенко 19)" ' +
+          'onblur="ltDirGeo()" oninput="clearTimeout(window._ltGeoT);window._ltGeoT=setTimeout(ltDirGeo, 900)">' +
+        '<div class="lt-geo-status" id="lt-dir-geo"></div>' +
         '<div class="lt-dir-coords">' +
-          '<input class="form-input" id="lt-dir-lat" placeholder="Широта (55.04…)" inputmode="decimal">' +
-          '<input class="form-input" id="lt-dir-lon" placeholder="Долгота (60.10…)" inputmode="decimal">' +
+          '<input class="form-input" id="lt-dir-lat" placeholder="Широта — найдётся сама" inputmode="decimal">' +
+          '<input class="form-input" id="lt-dir-lon" placeholder="Долгота — найдётся сама" inputmode="decimal">' +
         '</div>' +
         '<button class="btn btn-primary" onclick="ltDirAdd()"><i class="ti ti-check"></i> Добавить</button>' +
       '</div>' +
@@ -25918,7 +25920,7 @@ async function ltPtAddOpen() {
       '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Своя точка</div>' +
       '<div class="lt-custom-row">' +
         '<input class="form-input" id="lt-add-title" placeholder="Что забрать / у кого">' +
-        '<input class="form-input" id="lt-add-addr" placeholder="Адрес">' +
+        '<input class="form-input" id="lt-add-addr" placeholder="Адрес — на карту встанет сам">' +
         '<span></span>' +
       '</div>' +
     '</div>' +
@@ -25983,5 +25985,34 @@ async function ltPtAddGo() {
   } catch (e) {
     showToast('Ошибка соединения', 'error');
     if (btn) btn.disabled = false;
+  }
+}
+
+// ---------- v2.45.907: геокодер в справочнике точек ----------
+// Адрес вписан — координаты ищутся сами (бэкенд спрашивает OpenStreetMap)
+async function ltDirGeo() {
+  const addr = ((document.getElementById('lt-dir-addr') || {}).value || '').trim();
+  const st = document.getElementById('lt-dir-geo');
+  if (addr.length < 4) { if (st) st.innerHTML = ''; return; }
+  if (window._ltGeoLast === addr) return; // тот же адрес — не дёргаем повторно
+  window._ltGeoLast = addr;
+  if (st) st.innerHTML = '<i class="ti ti-loader-2"></i> Ищем на карте…';
+  try {
+    const d = await apiGet('/api/logistics/geocode?q=' + encodeURIComponent(addr));
+    const g = d && d.result;
+    const curAddr = ((document.getElementById('lt-dir-addr') || {}).value || '').trim();
+    if (curAddr !== addr) return; // адрес уже поменяли — ответ устарел
+    if (g) {
+      const la = document.getElementById('lt-dir-lat');
+      const lo = document.getElementById('lt-dir-lon');
+      if (la) la.value = g.lat;
+      if (lo) lo.value = g.lon;
+      if (st) st.innerHTML = '✅ ' + escapeHtml(g.name || '');
+    } else if (st) {
+      st.innerHTML = '⚠️ Не нашли по этому адресу — уточни или вбей координаты вручную';
+    }
+  } catch (e) {
+    if (st) st.innerHTML = '';
+    window._ltGeoLast = null;
   }
 }
