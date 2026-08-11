@@ -22935,3 +22935,11 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .lt-trip-btns .btn { flex: 1 1 44%; justify-content: center; }
   .lt-pt .ops .icon-btn { width: 32px; height: 32px; }
 }
+
+/* ============ v2.45.905: Рейсы — карта и оптимизация ============ */
+.lt-map-wrap { margin: 2px 0 12px; }
+#lt-map { height: 240px; border-radius: 12px; border: 1px solid var(--border); z-index: 0; }
+.lt-map-sum { font-size: 12px; color: var(--text-light); font-weight: 700; margin-top: 6px; }
+.lt-map-ico { background: transparent; border: none; }
+.lt-map-ico span { display: flex; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 12px; align-items: center; justify-content: center; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+@media (max-width: 700px) { #lt-map { height: 200px; } }

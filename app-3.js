@@ -25386,9 +25386,12 @@ async function logiTripNew() {
       '<div class="lt-new-row">' +
         '<label>Дата<input type="date" class="form-input" id="lt-new-date" value="' + iso + '"></label>' +
         '<label>Кто едет<select class="form-input" id="lt-new-drv"><option value="">— выбрать —</option>' +
-          emps.map(e => '<option value="' + e.id + '">' + escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</option>').join('') +
+          emps.map(e => '<option value="' + e.id + '">' + escapeHtml(e.short_name || e.full_name || ('#' + e.id)) +
+            (e.max_bound ? ' — ✓ MAX' : '') + '</option>').join('') +
         '</select></label>' +
       '</div>' +
+      '<div class="lt-hint" style="margin-top:6px;"><i class="ti ti-info-circle"></i> «✓ MAX» — чек-лист придёт курьеру лично. ' +
+        'Привязка: курьер один раз пишет нашему боту в MAX «я курьер Фамилия».</div>' +
       '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Что сейчас ждёт забора <span id="lt-pool-cnt"></span></div>' +
       '<div id="lt-pool"><div class="loading-block">Собираем со всех перевозчиков…</div></div>' +
       '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки</div>' +
@@ -25439,7 +25442,9 @@ async function logiTripCreate() {
   const date = (document.getElementById('lt-new-date') || {}).value || '';
   const drvSel = document.getElementById('lt-new-drv');
   const drvId = drvSel && drvSel.value ? parseInt(drvSel.value, 10) : null;
-  const drvName = drvSel && drvSel.value ? drvSel.options[drvSel.selectedIndex].text : '';
+  // имя берём из кэша, а не из текста option — там пометка «✓ MAX»
+  const drvEmp = drvId ? (cache.activeEmployees || []).find(e => e.id === drvId) : null;
+  const drvName = drvEmp ? (drvEmp.short_name || drvEmp.full_name || '') : '';
   const points = [];
   document.querySelectorAll('#lt-pool input[data-pool]:checked').forEach(ch => {
     const p = (window._ltPool || [])[parseInt(ch.dataset.pool, 10)];
@@ -25513,6 +25518,9 @@ function _ltTripRender(trip) {
     '<span><i class="ti ti-user"></i> ' + escapeHtml(trip.driver_name || 'исполнитель не назначен') + '</span>' +
     '<span><i class="ti ti-map-pin"></i> ' + doneN + ' из ' + pts.length + '</span>' +
   '</div>';
+  // v2.45.905: живая карта рейса — появляется, если у точек есть координаты
+  html += '<div class="lt-map-wrap" id="lt-map-wrap" style="display:none;">' +
+    '<div id="lt-map"></div><div class="lt-map-sum" id="lt-map-sum"></div></div>';
   html += '<div class="lt-pts">' + pts.map((p, i) => {
     const st = p.status || 'pending';
     const ic = st === 'done' ? '<i class="ti ti-check"></i>' : (st === 'problem' ? '<i class="ti ti-alert-triangle"></i>' : (i + 1));
@@ -25539,6 +25547,8 @@ function _ltTripRender(trip) {
         (trip.status === 'draft' ? 'Отправить курьеру в MAX' : 'Отправить ещё раз') + '</button>' +
       (links.gis ? '<a class="btn btn-secondary" href="' + links.gis + '" target="_blank" rel="noopener">📍 2ГИС</a>' : '') +
       (links.ya ? '<a class="btn btn-secondary" href="' + links.ya + '" target="_blank" rel="noopener">🧭 Яндекс</a>' : '') +
+      (pts.length >= 3 && pts.every(p => p.lat != null && p.lon != null)
+        ? '<button class="btn btn-secondary" onclick="ltTripOptimize()"><i class="ti ti-route"></i> Оптимизировать</button>' : '') +
       '<button class="btn btn-secondary" onclick="ltTripSetStatus(\'done\')"><i class="ti ti-flag-check"></i> Завершить</button>' +
       '<button class="btn btn-secondary danger" onclick="ltTripSetStatus(\'cancelled\')"><i class="ti ti-x"></i> Отменить</button>' +
     '</div>';
@@ -25547,6 +25557,7 @@ function _ltTripRender(trip) {
     }
   }
   b.innerHTML = html;
+  _ltTripMap(trip);
 }
 
 async function ltPtMove(pid, dir) {
@@ -25595,7 +25606,8 @@ async function ltTripSend() {
     const r = await apiPost('/api/logistics/trips/' + trip.id + '/send', {});
     const j = (r && r.data) || {};
     if (r && r.ok) {
-      showToast('Чек-лист улетел курьеру в MAX', 'success');
+      // бэкенд говорит, кому именно ушло: курьеру лично или директору
+      showToast(j.send_message || 'Чек-лист улетел курьеру в MAX', 'success');
       _ltTripRender(j);
       loadLogisticsPickups();
     } else {
@@ -25706,4 +25718,112 @@ async function ltDirDel(id) {
     await apiDelete('/api/logistics/points/' + id);
     ltDirReload();
   } catch (e) { showToast('Не удалось удалить', 'error'); }
+}
+
+// ---------- v2.45.905: этап 2 — карта рейса и оптимизация порядка ----------
+// Leaflet + OpenStreetMap, лениво с CDN (как pdf.js у корпусов)
+let _ltLeafletP = null;
+function _ltEnsureLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (_ltLeafletP) return _ltLeafletP;
+  _ltLeafletP = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(css);
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    s.onload = resolve;
+    s.onerror = () => { _ltLeafletP = null; reject(new Error('leaflet')); };
+    document.head.appendChild(s);
+  });
+  return _ltLeafletP;
+}
+
+async function _ltTripMap(trip) {
+  const wrap = document.getElementById('lt-map-wrap');
+  if (!wrap) return;
+  const pts = (trip.points || []).filter(p => p.lat != null && p.lon != null);
+  if (!pts.length) return; // координат нет — карту не показываем
+  try { await _ltEnsureLeaflet(); } catch (e) { return; }
+  const el = document.getElementById('lt-map');
+  if (!el || window._ltTrip !== trip) return; // модалку уже перерисовали
+  wrap.style.display = '';
+  if (window._ltMap) { try { window._ltMap.remove(); } catch (e) {} }
+  const map = L.map('lt-map', { scrollWheelZoom: false });
+  window._ltMap = map;
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+  const bounds = [];
+  (trip.points || []).forEach((p, i) => {
+    if (p.lat == null || p.lon == null) return;
+    const color = p.status === 'done' ? '#059669'
+      : (p.status === 'problem' ? '#B5260C' : '#2D5F8B');
+    L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'lt-map-ico',
+      iconSize: [26, 26], iconAnchor: [13, 13],
+      html: '<span style="background:' + color + '">' + (i + 1) + '</span>' }) })
+      .addTo(map)
+      .bindPopup('<b>' + escapeHtml(p.title || '') + '</b><br>' + escapeHtml(p.address || ''));
+    bounds.push([p.lat, p.lon]);
+  });
+  map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  const sum = document.getElementById('lt-map-sum');
+  if (pts.length < 2) { if (sum) sum.textContent = ''; return; }
+  if (sum) sum.textContent = 'Считаем маршрут по дорогам…';
+  try {
+    const coords = pts.map(p => p.lon + ',' + p.lat).join(';');
+    const r = await fetch('https://router.project-osrm.org/route/v1/driving/' +
+      coords + '?overview=full&geometries=geojson');
+    const d = await r.json();
+    const route = d.routes && d.routes[0];
+    if (!route) throw new Error('no route');
+    if (window._ltMap !== map) return; // пока считали — карту пересоздали
+    L.geoJSON(route.geometry, { style: { color: '#2563EB', weight: 5, opacity: .75 } }).addTo(map);
+    const km = (route.distance / 1000).toFixed(1);
+    const min = Math.round(route.duration / 60 * 1.25); // +25% на город и парковки
+    if (sum) sum.innerHTML = 'По дорогам: <b>' + km + ' км · ~' + min + ' мин</b>' +
+      (pts.length < (trip.points || []).length ? ' · точки без координат — не на карте' : '');
+  } catch (e) {
+    if (sum) sum.textContent = 'Маршрут по дорогам сейчас не посчитался — точки на карте, ссылки в навигатор работают.';
+  }
+}
+
+// Новый порядок id точек по ответу OSRM /trip: waypoint_index — место
+// исходной точки в оптимальном объезде
+function _ltOptimizedIds(points, waypoints) {
+  return waypoints
+    .map((w, i) => ({ i, wi: Number(w.waypoint_index) }))
+    .sort((a, b) => a.wi - b.wi)
+    .map(x => points[x.i].id);
+}
+
+async function ltTripOptimize() {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const pts = trip.points || [];
+  if (pts.length < 3) return;
+  if (!pts.every(p => p.lat != null && p.lon != null)) {
+    showToast('У части точек нет координат — заполни их в справочнике', 'error');
+    return;
+  }
+  showToast('Считаем оптимальный объезд…', 'info');
+  try {
+    // задача коммивояжёра: старт — первая точка, дальше как короче
+    const coords = pts.map(p => p.lon + ',' + p.lat).join(';');
+    const r = await fetch('https://router.project-osrm.org/trip/v1/driving/' +
+      coords + '?source=first&roundtrip=false');
+    const d = await r.json();
+    if (d.code !== 'Ok' || !d.waypoints || d.waypoints.length !== pts.length) {
+      throw new Error('no trip');
+    }
+    const ids = _ltOptimizedIds(pts, d.waypoints);
+    const same = ids.every((id, i) => id === pts[i].id);
+    const rr = await apiPost('/api/logistics/trips/' + trip.id + '/reorder', { point_ids: ids });
+    if (rr && rr.ok) {
+      showToast(same ? 'Порядок уже оптимальный' : 'Порядок оптимизирован — маршрут короче', 'success');
+      _ltTripRender(rr.data);
+    } else showToast('Не удалось сохранить порядок', 'error');
+  } catch (e) {
+    showToast('Оптимизатор сейчас недоступен, попробуй позже', 'error');
+  }
 }
