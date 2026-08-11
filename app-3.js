@@ -25674,6 +25674,7 @@ async function logiPointsDir() {
       '</div>' +
     '</div></div>';
   document.body.appendChild(m);
+  window._ltGeoLast = null; // открыли заново — можно искать тот же адрес снова
   ltDirReload();
 }
 
@@ -26009,7 +26010,8 @@ async function ltDirGeo() {
       if (lo) lo.value = g.lon;
       if (st) st.innerHTML = '✅ ' + escapeHtml(g.name || '');
     } else if (st) {
-      st.innerHTML = '⚠️ Не нашли по этому адресу — уточни или вбей координаты вручную';
+      st.innerHTML = '⚠️ Не нашли по этому адресу — уточни, вбей координаты вручную ' +
+        'или <span class="lnk" onclick="window._ltGeoLast=null;ltDirGeo()">попробуй ещё раз</span>';
     }
   } catch (e) {
     if (st) st.innerHTML = '';
