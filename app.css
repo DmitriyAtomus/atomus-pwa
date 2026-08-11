@@ -22958,3 +22958,9 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 
 /* v2.45.908: повтор поиска в геокодере */
 .lt-geo-status .lnk { color: var(--brand); text-decoration: underline; cursor: pointer; font-weight: 800; }
+
+/* ============ v2.45.911: Рейсы — пробный прогон ============ */
+.lt-test-btns { margin-left: auto; display: inline-flex; gap: 6px; }
+.lt-test-btns .btn { opacity: .75; }
+.lt-test-btns .btn:hover { opacity: 1; }
+@media (max-width: 700px) { .lt-test-btns { margin-left: 0; width: 100%; } .lt-test-btns .btn { flex: 1; } }

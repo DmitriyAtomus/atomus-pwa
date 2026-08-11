@@ -25377,6 +25377,11 @@ async function loadLogiTrips() {
     html += '<div class="lt-bar">' +
       '<button class="btn btn-primary" onclick="logiTripNew()"><i class="ti ti-plus"></i> Новый рейс</button>' +
       '<button class="btn btn-secondary" onclick="logiPointsDir()"><i class="ti ti-map-pin"></i> Справочник точек</button>' +
+      (((state.user && state.user.roles) || []).some(r => r === 'director' || r === 'master')
+        ? '<span class="lt-test-btns">' +
+          '<button class="btn btn-secondary btn-sm" onclick="ltTestSeed()" title="Создать пробные грузы от всех перевозчиков">🧪 Пробные грузы</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="ltTestCleanup()" title="Убрать пробные грузы и рейсы из них">🧹 Убрать</button>' +
+          '</span>' : '') +
     '</div>';
     if (trips.length) html += _ltStatsHtml(trips, Date.now());
     if (!trips.length) {
@@ -26065,4 +26070,31 @@ async function ltDirGeo() {
     if (st) st.innerHTML = '';
     window._ltGeoLast = null;
   }
+}
+
+// ---------- v2.45.911: пробный прогон рейсов ----------
+// Тестовые грузы от всех источников — прогнать цикл, не дожидаясь писем
+async function ltTestSeed() {
+  if (!confirm('Создать пробные грузы от Ozon, ТК-Луч, ДЛ и поставщика?\n' +
+      'Они помечены «ТЕСТ» и убираются кнопкой «Убрать».')) return;
+  try {
+    const r = await apiPost('/api/logistics/test-seed', {});
+    if (r && r.ok) {
+      showToast('Пробные грузы созданы: ' + (((r.data || {}).created) || []).join(', ') +
+        '. Жми «Новый рейс» — они в пуле.', 'success');
+      loadLogisticsPickups();
+    } else showToast('Не удалось создать пробные грузы', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function ltTestCleanup() {
+  if (!confirm('Убрать все пробные грузы и рейсы, собранные из них?')) return;
+  try {
+    const r = await apiPost('/api/logistics/test-cleanup', {});
+    if (r && r.ok) {
+      const n = Number(((r.data || {}).trips_hidden) || 0);
+      showToast('Пробные грузы убраны' + (n ? ', тестовых рейсов скрыто: ' + n : ''), 'success');
+      loadLogisticsPickups();
+    } else showToast('Не удалось убрать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
