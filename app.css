@@ -22792,15 +22792,66 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .prod-arch-btn:hover { color: var(--brand); border-color: #93C5FD; }
 .pa-row { display: flex; align-items: center; gap: 12px; border: 1px solid #EDF1F7; border-radius: 12px; padding: 10px 13px; cursor: pointer; transition: all .12s; background: #fff; }
 .pa-row:hover { border-color: #93C5FD; box-shadow: 0 4px 12px rgba(37, 99, 235, .1); }
-.pa-row .dt { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--text-light); flex: none; width: 62px; }
+.pa-row .dt { font-size: 11px; color: var(--text-light); flex: none; width: 54px; text-align: center; }
+.pa-row .dt b { display: block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--text-mid); }
+.pa-row .dt small { display: block; margin-top: 2px; color: var(--text-faint); font-size: 9px; text-transform: uppercase; letter-spacing: .03em; }
 .pa-row .mid { flex: 1; min-width: 0; font-size: 13px; }
+.pa-row .mid > b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pa-row .mid small { display: block; color: var(--text-faint); font-size: 11px; margin-top: 1px; }
+.pa-row .mid .period { display: block; font-size: 10.5px; color: var(--text-light); margin-top: 5px; font-variant-numeric: tabular-nums; }
+.pa-row .mid .period .ti { font-size: 11px; color: var(--brand); }
 .pa-row .mid .ppl { display: block; font-size: 11px; color: var(--text-mid); margin-top: 4px; }
 .pa-row .mid .ppl .ti { font-size: 11px; color: var(--text-faint); }
 .pa-row .mid .ppl b { color: var(--text-dark); font-variant-numeric: tabular-nums; }
-.pa-row .hrs { font-size: 14px; font-weight: 800; color: var(--brand); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pa-row .hrs small { color: var(--text-light); font-weight: 700; }
+.pa-row .hrs { font-size: 17px; font-weight: 800; color: var(--brand); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.pa-row .hrs small { display: block; color: var(--text-faint); font-size: 9px; font-weight: 800; line-height: 1.1; text-transform: uppercase; letter-spacing: .05em; }
+.pa-row .hrs em { color: var(--text-light); font-size: 11px; font-style: normal; font-weight: 700; }
+.pa-row .hrs span { display: block; max-width: 60px; color: var(--text-faint); font-size: 9.5px; line-height: 1.1; white-space: normal; }
 .pa-row .arr { color: #CBD5E1; flex: none; }
+#prod-arch-list { display: flex; flex-direction: column; gap: 7px; }
+.pa-modal-summary { min-height: 28px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text-light); }
+.pa-modal-summary span { background: #F1F6FC; border-radius: 999px; padding: 4px 9px; }
+.pa-modal-summary span b { color: var(--brand); }
+.pa-modal-summary small { margin-left: auto; color: var(--text-faint); }
+
+/* v2.45.902: архив всегда виден под доской производства */
+.pkb-archive-inline { margin-top: 16px; padding: 15px; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(15,23,42,.04); }
+.pkb-archive-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.pkb-archive-title { display: flex; align-items: center; gap: 10px; min-width: 235px; }
+.pkb-archive-title .ic { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex: none; color: #166534; background: #EAF7EF; font-size: 19px; }
+.pkb-archive-title h2 { margin: 0; color: var(--text-dark); font-size: 15px; line-height: 1.2; }
+.pkb-archive-title p { margin: 3px 0 0; color: var(--text-faint); font-size: 10.5px; line-height: 1.25; }
+.pkb-archive-summary { display: flex; align-items: stretch; gap: 7px; margin-left: auto; }
+.pkb-archive-summary > span { min-width: 82px; padding: 6px 10px; border: 1px solid #E5EAF1; border-radius: 10px; background: #F8FAFC; text-align: center; }
+.pkb-archive-summary > span.hours { min-width: 112px; background: #EFF6FF; border-color: #DBEAFE; }
+.pkb-archive-summary b { display: block; color: var(--text-dark); font-size: 16px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.pkb-archive-summary .hours b { color: var(--brand); }
+.pkb-archive-summary small { display: block; margin-top: 2px; color: var(--text-faint); font-size: 8.5px; line-height: 1.1; text-transform: uppercase; }
+.pkb-archive-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pkb-archive-more { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; margin-top: 9px; border: none; background: #F7FAFD; color: var(--brand); border-radius: 9px; padding: 8px; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 700; }
+.pkb-archive-more:hover { background: #EEF5FC; }
+.pkb-archive-note { display: flex; align-items: center; gap: 5px; margin-top: 10px; color: var(--text-faint); font-size: 10px; }
+.pkb-archive-note .ti { color: var(--brand); }
+.pkb-archive-empty { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 80px; border: 1px dashed var(--border); border-radius: 11px; color: var(--text-light); }
+.pkb-archive-empty > i { font-size: 24px; color: #86A995; }
+.pkb-archive-empty b, .pkb-archive-empty small { display: block; }
+.pkb-archive-empty small { margin-top: 3px; color: var(--text-faint); font-size: 10.5px; }
+@media (max-width: 1050px) {
+  .pkb-archive-head { align-items: flex-start; flex-wrap: wrap; }
+  .pkb-archive-summary { order: 3; width: 100%; margin-left: 0; }
+  .pkb-archive-summary > span { flex: 1; }
+}
+@media (max-width: 760px) {
+  .pkb-archive-inline { margin: 14px; padding: 12px; }
+  .pkb-archive-title { min-width: 0; flex: 1; }
+  .pkb-archive-head > .pkb-btn { width: auto; padding: 0 10px; }
+  .pkb-archive-list { grid-template-columns: 1fr; }
+  .pa-row { gap: 8px; padding: 10px; }
+  .pa-row .dt { width: 43px; }
+  .pa-row .hrs { font-size: 15px; }
+  .pa-row .arr { display: none; }
+  .pa-modal-summary small { width: 100%; margin-left: 0; }
+}
 
 /* ============ v2.45.895: сводки — что собирал сборщик ============ */
 .ssn-clickable { cursor: pointer; border-radius: 10px; transition: background .12s; }

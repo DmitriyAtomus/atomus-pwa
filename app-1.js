@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.901";
+const APP_VERSION = "v2.45.902";
 const APP_VERSION_DATE = "10.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3514,17 +3514,19 @@ async function loadProductionDashboard() {
 }
 
 async function fetchProductionKanban() {
-  // Грузим параллельно: KPI, список работ, workload сборщиков.
-  // workload — необязательный (если упадёт, виджет просто скроется).
-  const [kpiRes, worksRes, workloadRes] = await Promise.all([
+  // Грузим параллельно: KPI, список работ, workload и архив собранного.
+  // Дополнительные виджеты необязательны: при ошибке сама доска продолжит работать.
+  const [kpiRes, worksRes, workloadRes, archiveRes] = await Promise.all([
     apiGet('/api/production/kpi'),
     apiGet('/api/production/works'),
     apiGet('/api/production/workload').catch(() => null),
+    apiGet('/api/production/archive?limit=200&days=30').catch(() => null),
   ]);
   return {
     kpi: kpiRes || {},
     works: (worksRes && worksRes.works) || [],
     workload: workloadRes || { workers: [], norm_hours: 40 },
+    archive: archiveRes || { items: [], summary: {} },
     fetchedAt: new Date(),
   };
 }
@@ -3746,6 +3748,9 @@ function renderProductionDashboard(d) {
   html += '</div>';
   html += _pkbRailHtml(_activeAll, _queueAll, railOn);
   html += '</div>';   // конец .pkb-cockpit
+
+  // v2.45.902: заметный архив завершённых сборок с фактическими часами.
+  html += renderProdArchiveInline(d.archive || {});
 
   container.innerHTML = html;
   container.classList.toggle('pkb-v2', !!window.PKB_V2);
@@ -5197,7 +5202,88 @@ async function submitAssignProductionWorker(workId) {
   }
 }
 
-// ---------- v2.45.893: архив собранного ----------
+// ---------- v2.45.902: архив собранного ----------
+function _prodArchiveTitle(w) {
+  const main = w.model_name || w.description || 'Работа';
+  const label = String(w.label || '').trim();
+  const title = label && label.toLowerCase() !== String(main).trim().toLowerCase()
+    ? label + ' · ' + main
+    : main;
+  return title + (Number(w.qty || 0) > 1 ? ' × ' + w.qty : '');
+}
+
+function _prodArchiveRowHtml(w, closeModal) {
+  const finished = w.finished_at || w.actual_finished_at || '';
+  const finishedLocal = _fmtWorkTime(finished, true);
+  const sub = [w.contract_number ? '№' + w.contract_number : '', w.contractor_name]
+    .filter(Boolean).join(' · ');
+  const people = (w.people || []).map(x =>
+    escapeHtml(x.name) + ' <b>' + formatHours(x.hours) + ' ч</b>').join(' · ');
+  const startAt = w.actual_started_at || w.started_at;
+  const finishAt = w.actual_finished_at || w.finished_at;
+  const timing = startAt && finishAt
+    ? _fmtWorkTime(startAt, true) + ' → ' + _fmtWorkTime(finishAt, true)
+    : '';
+  const hours = parseFloat(w.total_hours || 0);
+  const click = (closeModal ?
+    "document.getElementById('prod-arch-modal').remove();" : '') +
+    'openProductionWorkDetail(' + Number(w.id || 0) + ')';
+  return '<div class="pa-row" onclick="' + click + '">' +
+    '<div class="dt"><b>' + escapeHtml(finishedLocal ? finishedLocal.slice(0, 5) : '—') + '</b>' +
+      '<small>готово</small></div>' +
+    '<div class="mid"><b>' + escapeHtml(_prodArchiveTitle(w)) + '</b>' +
+      (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') +
+      (timing ? '<span class="period"><i class="ti ti-clock"></i> ' + escapeHtml(timing) + '</span>' : '') +
+      (people ? '<span class="ppl"><i class="ti ti-users"></i> ' + people + '</span>' : '') +
+    '</div>' +
+    '<div class="hrs"><small>факт</small>' +
+      (hours > 0 ? formatHours(hours) + '<em> ч</em>' : '<span>нет записи</span>') + '</div>' +
+    '<i class="ti ti-chevron-right arr"></i>' +
+  '</div>';
+}
+
+function renderProdArchiveInline(data) {
+  const allItems = (data && data.items) || [];
+  const items = allItems.slice(0, 6);
+  const summary = (data && data.summary) || {};
+  const worksCount = summary.works_count != null ? summary.works_count : allItems.length;
+  const totalHours = summary.total_hours != null
+    ? Number(summary.total_hours || 0)
+    : allItems.reduce((sum, w) => sum + parseFloat(w.total_hours || 0), 0);
+  const peopleCount = summary.people_count != null
+    ? summary.people_count
+    : new Set(allItems.flatMap(w => (w.people || []).map(p => p.name))).size;
+
+  let html = '<section class="pkb-archive-inline" id="pkb-archive-inline">';
+  html += '<div class="pkb-archive-head">' +
+    '<div class="pkb-archive-title"><span class="ic"><i class="ti ti-archive"></i></span>' +
+      '<div><h2>Архив собранного</h2>' +
+      '<p>Фактическое время по журналу сборщиков · последние 30 дней</p></div></div>' +
+    '<div class="pkb-archive-summary">' +
+      '<span><b>' + worksCount + '</b><small>сборок</small></span>' +
+      '<span class="hours"><b>' + formatHours(totalHours) + '</b><small>часов потрачено</small></span>' +
+      '<span><b>' + peopleCount + '</b><small>сотрудников</small></span>' +
+    '</div>' +
+    '<button class="pkb-btn" onclick="openProdArchive()"><i class="ti ti-list-search"></i>Весь архив</button>' +
+  '</div>';
+  if (items.length) {
+    html += '<div class="pkb-archive-list">' +
+      items.map(w => _prodArchiveRowHtml(w, false)).join('') + '</div>';
+    if (allItems.length > items.length) {
+      html += '<button class="pkb-archive-more" onclick="openProdArchive()">Показать ещё ' +
+        (allItems.length - items.length) + ' <i class="ti ti-arrow-right"></i></button>';
+    }
+  } else {
+    html += '<div class="pkb-archive-empty"><i class="ti ti-clock-check"></i>' +
+      '<span><b>За 30 дней завершённых сборок нет</b>' +
+      '<small>Когда работа перейдёт в «Готово», она появится здесь вместе с фактическими часами.</small></span></div>';
+  }
+  html += '<div class="pkb-archive-note"><i class="ti ti-info-circle"></i>' +
+    'Время считается по записям журнала каждого сотрудника, поэтому совместная работа суммируется.</div>';
+  html += '</section>';
+  return html;
+}
+
 async function openProdArchive(q) {
   let m = document.getElementById('prod-arch-modal');
   if (!m) {
@@ -5206,46 +5292,39 @@ async function openProdArchive(q) {
     m.className = 'modal-overlay visible';
     m.onclick = (e) => { if (e.target === m) m.remove(); };
     m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
-      'style="max-width:680px;max-height:92vh;display:flex;flex-direction:column;">' +
+      'style="max-width:780px;max-height:92vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header"><h3><i class="ti ti-archive"></i> Архив собранного</h3>' +
         '<button class="icon-btn" onclick="document.getElementById(\'prod-arch-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
       '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;">' +
-        '<input class="form-input" id="prod-arch-q" placeholder="🔍 Модель, договор, заказчик…" ' +
+        '<input class="form-input" id="prod-arch-q" placeholder="Поиск: модель, договор, заказчик или сотрудник…" ' +
           'oninput="clearTimeout(window._paT);window._paT=setTimeout(() => openProdArchive(this.value), 350)">' +
+        '<div class="pa-modal-summary" id="prod-arch-summary"></div>' +
         '<div id="prod-arch-list"><div class="loading-block">Загружаем архив…</div></div>' +
       '</div></div>';
     document.body.appendChild(m);
     setTimeout(() => { const i2 = document.getElementById('prod-arch-q'); if (i2) i2.focus(); }, 60);
   }
   const box = document.getElementById('prod-arch-list');
+  const summaryBox = document.getElementById('prod-arch-summary');
   try {
     const d = await apiGet('/api/production/archive?limit=200' +
       (q ? '&q=' + encodeURIComponent(q) : ''));
     const items = d.items || [];
     if (!box) return;
+    const summary = d.summary || {};
+    const totalHours = summary.total_hours != null
+      ? Number(summary.total_hours || 0)
+      : items.reduce((sum, w) => sum + parseFloat(w.total_hours || 0), 0);
+    if (summaryBox) {
+      summaryBox.innerHTML = '<span><b>' + items.length + '</b> сборок</span>' +
+        '<span><b>' + formatHours(totalHours) + ' ч</b> фактически</span>' +
+        '<small>нажмите строку, чтобы открыть работу</small>';
+    }
     if (!items.length) {
       box.innerHTML = '<div class="empty-block">' + (q ? 'Ничего не нашлось' : 'Пока пусто') + '</div>';
       return;
     }
-    box.innerHTML = items.map(w => {
-      const dt = String(w.done_at || w.finished_at || '').slice(0, 10);
-      const dd = dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) + '.' + dt.slice(2, 4) : '—';
-      const title = (w.model_name || w.description || 'Работа') +
-        (w.qty > 1 ? ' × ' + w.qty : '');
-      const sub = [w.contract_number ? '№' + w.contract_number : '', w.contractor_name]
-        .filter(Boolean).join(' · ');
-      const people = (w.people || []).map(x =>
-        escapeHtml(x.name) + ' <b>' + formatHours(x.hours) + 'ч</b>').join(' · ');
-      return '<div class="pa-row" onclick="document.getElementById(\'prod-arch-modal\').remove();openProductionWorkDetail(' + w.id + ')">' +
-        '<div class="dt">' + dd + '</div>' +
-        '<div class="mid"><b>' + escapeHtml(title) + '</b>' +
-          (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') +
-          (people ? '<span class="ppl"><i class="ti ti-users"></i> ' + people + '</span>' : '') +
-        '</div>' +
-        '<div class="hrs">' + (w.total_hours ? formatHours(w.total_hours) + '<small> ч</small>' : '—') + '</div>' +
-        '<i class="ti ti-chevron-right arr"></i>' +
-      '</div>';
-    }).join('');
+    box.innerHTML = items.map(w => _prodArchiveRowHtml(w, true)).join('');
   } catch (e) {
     if (box) box.innerHTML = '<div class="empty-block">Не удалось загрузить</div>';
   }
