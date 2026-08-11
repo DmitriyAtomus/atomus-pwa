@@ -10623,27 +10623,33 @@ function _shipScanEndpoint() {
   return _shipModeIsGather() ? '/api/gatherings/scan' : '/api/shipments/scan';
 }
 
+function _parseShipmentQr(decodedText) {
+  let token = decodedText;
+  let itemId = null;
+  try {
+    // Второй аргумент позволяет разобрать не только полную ссылку, но и
+    // относительный QR вида /c/TOKEN?item=73, который возвращают некоторые
+    // Android-сканеры/старые закэшированные версии PWA.
+    const url = new URL(String(decodedText || '').trim(), window.location.origin);
+    // /a/ (сборка), /b/ (коробка), /c/ (договор), /u/ (универсальная ссылка)
+    const m = url.pathname.match(/\/[abcu]\/([A-Za-z0-9_\-]+)/);
+    if (m) token = m[1];
+    const it = url.searchParams.get('item');
+    if (it && /^\d+$/.test(it)) itemId = Number(it);
+  } catch (e) { /* не URL — оставляем как есть */ }
+  return { token: String(token || '').trim(), itemId: itemId };
+}
+
 // v2.45.137: скан → ПРОВЕРКА (dry_run, без списания) → показываем «Совпадает
 // по договору» + кнопку «Отгрузить». Реальная отгрузка — только по нажатию.
 async function handleContinuousShipmentScan(decodedText) {
   if (!state._shipContractId) return;
   // Пока висит неподтверждённая позиция — игнорируем новые сканы
   if (state._shipPendingConfirm) return;
-  // Извлекаем токен из URL если это полная ссылка
-  let token = decodedText;
-  let itemId = null;
-  try {
-    const url = new URL(decodedText);
-    // ЭТАП 26.3: /a/ (сборка), /b/ (коробка), /c/ (договор)
-    const m = url.pathname.match(/\/[abc]\/([A-Za-z0-9_\-]+)/);
-    if (m) token = m[1];
-    // v2.45.385: этикетка покупной позиции = /c/{токен договора}?item=ID.
-    // Токен в ней — договорный (для просмотра карточки), а отгружать надо саму
-    // позицию по её id. Достаём item и шлём его как contract_item_id.
-    const it = url.searchParams.get('item');
-    if (it && /^\d+$/.test(it)) itemId = Number(it);
-  } catch (e) { /* не URL — оставляем как есть */ }
-  token = String(token || '').trim();
+  // Извлекаем токен и id позиции из полной или относительной ссылки QR.
+  const parsedQr = _parseShipmentQr(decodedText);
+  const token = parsedQr.token;
+  const itemId = parsedQr.itemId;
   if (!token) return;
 
   let resp;
@@ -10684,14 +10690,14 @@ async function handleContinuousShipmentScan(decodedText) {
     state._shipPendingConfirm = { token: token, itemId: itemId, item: d.item || {} };
     _showShipConfirm(d.item || {});
   } else if (d.reason === 'already_shipped' && d.shipment_id && !_shipModeIsGather()) {
-    // Позицию уже пометили отгруженной (напр. через «Отгрузить по договору»).
-    // Даём отгрузить её заново по скану: подтверждение снимет старую отметку и
-    // проведёт отгрузку по коду.
-    flashScanner('success');
-    playBeep('success');
-    vibrate(40);
-    state._shipPendingConfirm = { token: token, itemId: itemId, item: d.item || {}, reship: true, shipmentId: d.shipment_id };
-    _showShipConfirm(d.item || {}, true);
+    // Камера продолжает видеть тот же QR сразу после успешной отгрузки. Раньше
+    // повторное чтение тут же показывало «Отгрузить заново», а после нажатия QR
+    // считывался ещё раз — получался бесконечный круг подтверждений. Просто
+    // сообщаем, что единица уже учтена; откат доступен из карточки отгрузки.
+    flashScanner('error');
+    playBeep('error');
+    vibrate([80, 40, 80]);
+    showShipLast('error', 'Уже отгружено', (d.item && d.item.name) || '');
   } else if (d.reason === 'in_production') {
     // v2.45.x: изделие ещё в производстве — отгрузка запрещена
     flashScanner('error');
