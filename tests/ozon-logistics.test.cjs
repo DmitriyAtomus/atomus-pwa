@@ -54,6 +54,7 @@ test('карточка Ozon показывает заказ, статус, ср�
       status_label: 'Готово к выдаче',
       notification_title: 'Заберите ваши товары',
       delivery_method: 'Пункт выдачи',
+      expected_at: '2099-07-21',
       deadline_at: '2099-07-27 21:00:00',
       details_url: 'https://www.ozon.ru/my/orderdetails/?order=0208297309-0043&shipment_id=41792027517',
     }],
@@ -62,6 +63,7 @@ test('карточка Ozon показывает заказ, статус, ср�
   assert.match(html, /Заказ 0208297309-0043/);
   assert.match(html, /Отправление 41792027517/);
   assert.match(html, /Готово к выдаче/);
+  assert.match(html, /Доставка 21\.07/);
   assert.match(html, /Забрать до 27\.07 · 21:00/);
   assert.match(html, /Открыть в Ozon/);
   assert.match(html, /ozonMarkDone\(8\)/);
