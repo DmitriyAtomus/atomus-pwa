@@ -21659,7 +21659,11 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .mm-bub.out { align-self: flex-end; background: var(--brand-bg-strong); border-bottom-right-radius: 5px; }
 .mm-who { font-size: 11px; font-weight: 800; color: var(--text-mid); margin-bottom: 2px; }
 .mm-subj { font-size: 11px; color: var(--text-light); margin-bottom: 3px; }
-.mm-body { white-space: pre-wrap; }
+/* v2.45.909: письмо читается абзацами, а не «лесенкой» из рассылки:
+   переносы сохраняем, пустоту схлопывает скрипт, ссылки кликабельны. */
+.mm-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.mm-body a, .mm-folded a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.mm-body a:hover, .mm-folded a:hover { text-decoration-thickness: 2px; }
 .mm-btm { font-size: 10.5px; color: var(--text-faint); text-align: right; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .mm-fold { display: inline-flex; align-items: center; gap: 4px; color: var(--brand); font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 6px; background: none; border: none; padding: 0; }
 .mm-folded { margin-top: 6px; padding: 8px 11px; border-left: 3px solid var(--border-strong); background: var(--bg); border-radius: 0 8px 8px 0; font-size: 12px; color: var(--text-light); white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
