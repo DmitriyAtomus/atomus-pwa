@@ -6205,6 +6205,11 @@ async function loadModelBom(modelId) {
       const categoryPart = isModel
         ? '<span class="comp-cat-badge" style="background:#EAF4EE;color:#0A5B41;">Подсборка</span>'
         : (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '');
+      const selectionChip = it.selection_group_id
+        ? '<span class="bom-selection-chip"><i class="ti ti-adjustments-horizontal"></i>' +
+            escapeHtml(it.selection_group_name || 'Выбираемая позиция') + ' · ' +
+            (it.selection_options_count || 0) + ' вар.</span>'
+        : '';
       // v2.45.28: открываем редактор по bom_id — данные тянем из state, без эскейпинга
       const editCall = 'openBomEditItemById(' + it.id + ')';
       // v2.45.x: чип этапа прямо в строке — клик задаёт/меняет/создаёт этап
@@ -6222,7 +6227,7 @@ async function loadModelBom(modelId) {
             stockBadge +
           '</div>' +
           '<div class="bom-meta">' +
-            categoryPart + stageChip +
+            categoryPart + stageChip + selectionChip +
             (it.comment ? ' · ' + escapeHtml(it.comment) : '') +
           '</div>' +
         '</div>' +
@@ -6235,8 +6240,9 @@ async function loadModelBom(modelId) {
             // v2.45.633: «Сопоставить со складом» — подобрать похожую складскую
             // позицию и привязать (тогда остаток/наличие синхронизируются). Для
             // компонентов, не для подсборок.
-            (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomRelink(' + it.id + ', ' + JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ', ' + modelId + ')" title="Сопоставить со складом (выбрать похожую позицию)"><i class="ti ti-arrows-exchange"></i></button>' : '') +
-            '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' +
+            (!isModel && !it.selection_group_id ? '<button class="btn btn-secondary btn-small" onclick="openBomRelink(' + it.id + ', ' + JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ', ' + modelId + ')" title="Сопоставить со складом (выбрать похожую позицию)"><i class="ti ti-arrows-exchange"></i></button>' : '') +
+            (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomVariantEditor(' + it.id + ')" title="Настроить выбираемые ТЭНы / варианты"><i class="ti ti-adjustments-horizontal"></i></button>' : '') +
+            (!it.selection_group_id ? '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' : '') +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
           '</div>' : '<div></div>') +
       '</div>';
@@ -6307,6 +6313,208 @@ async function bulkDeleteBomItems(modelId) {
   }
   showToast('Удалено: ' + ok + (fail ? ' · не удалось: ' + fail : ''), fail ? 'error' : 'success');
   loadModelBom(modelId);
+}
+
+// v2.45.912: настройка одной BOM-строки как обязательного выбора из нескольких
+// точных складских артикулов (основной сценарий — ТЭНы разной мощности).
+async function openBomVariantEditor(bomId) {
+  if (!cache.components) {
+    try { const r = await apiGet('/api/components'); cache.components = r.components || []; }
+    catch (e) { cache.components = []; }
+  }
+  let data;
+  try {
+    data = await apiGet('/api/bom/' + bomId + '/selection-group');
+  } catch (e) {
+    showToast('Не удалось загрузить варианты', 'error');
+    return;
+  }
+  const bom = data.bom || {};
+  const group = data.group || null;
+  const baseComponent = (cache.components || []).find(c => c.id === bom.component_id) || {};
+  const baseOption = {
+    id: null,
+    component_id: bom.component_id,
+    component_name: bom.component_name || baseComponent.name || '—',
+    component_sku: bom.component_sku || baseComponent.sku || '',
+    label: bom.component_name || baseComponent.name || '',
+    qty_required: Number(bom.qty_required || 1),
+    power_kw: null,
+    voltage_v: null,
+    phases: null,
+    is_default: true,
+  };
+  state._bomVariantEditor = {
+    bomId: bomId,
+    modelId: bom.model_id,
+    hasGroup: !!group,
+    name: group ? group.name : 'ТЭН',
+    is_required: group ? !!group.is_required : true,
+    options: group ? (group.options || []).map(o => Object.assign({}, o)) : [baseOption],
+  };
+  renderBomVariantEditor();
+}
+
+function renderBomVariantEditor() {
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  let m = document.getElementById('bom-variant-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bom-variant-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '10000';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const rows = (st.options || []).map((o, i) => {
+    return '<div class="bom-variant-editor-row">' +
+      '<div class="bom-variant-editor-head">' +
+        '<div><b>' + escapeHtml(o.component_name || '—') + '</b>' +
+          (o.component_sku ? '<div class="comp-sku">' + escapeHtml(o.component_sku) + '</div>' : '') + '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bom-variant-default" ' + (o.is_default ? 'checked ' : '') + 'onchange="setBomVariantDefault(' + i + ')"> стандарт</label>' +
+          '<button type="button" class="icon-btn" onclick="removeBomVariantOption(' + i + ')" title="Убрать вариант" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bom-variant-editor-grid">' +
+        '<div><label>Подпись для выбора</label><input data-vindex="' + i + '" data-vfield="label" value="' + escapeHtml(o.label || '') + '" placeholder="1,0 кВт / 220 В"></div>' +
+        '<div><label>Кол-во</label><input type="number" min="0.01" step="0.01" data-vindex="' + i + '" data-vfield="qty_required" value="' + Number(o.qty_required || 1) + '"></div>' +
+        '<div><label>Мощность, кВт</label><input type="number" min="0" step="0.01" data-vindex="' + i + '" data-vfield="power_kw" value="' + (o.power_kw == null ? '' : Number(o.power_kw)) + '"></div>' +
+        '<div><label>Напряжение, В</label><input type="number" min="1" step="1" data-vindex="' + i + '" data-vfield="voltage_v" value="' + (o.voltage_v || '') + '"></div>' +
+        '<div><label>Фазы</label><input type="number" min="1" max="3" step="1" data-vindex="' + i + '" data-vfield="phases" value="' + (o.phases || '') + '"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:820px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-adjustments-horizontal"></i> Выбираемая позиция BOM</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'bom-variant-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:16px 18px;overflow:auto;">' +
+        '<div class="form-hint" style="margin-bottom:12px;">В производстве выберут один точный артикул. Стандартный вариант остаётся в базовой техкарте и используется в плановых расчётах.</div>' +
+        '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:14px;">' +
+          '<div><label class="form-label">Название группы *</label><input id="bom-variant-group-name" class="form-input" value="' + escapeHtml(st.name || '') + '" placeholder="ТЭН"></div>' +
+          '<label style="display:flex;align-items:center;gap:7px;padding:10px 0;cursor:pointer;"><input id="bom-variant-required" type="checkbox" ' + (st.is_required ? 'checked' : '') + '> обязательный выбор</label>' +
+        '</div>' +
+        '<div id="bom-variant-rows">' + rows + '</div>' +
+        '<button type="button" class="btn btn-secondary" onclick="addBomVariantOption()"><i class="ti ti-plus"></i> Добавить другой ТЭН</button>' +
+      '</div>' +
+      '<div class="modal-footer" style="justify-content:space-between;">' +
+        '<div>' + (st.hasGroup ? '<button class="btn btn-secondary" onclick="deleteBomVariantConfiguration()" style="color:var(--danger);"><i class="ti ti-unlink"></i> Убрать выбор вариантов</button>' : '') + '</div>' +
+        '<div style="display:flex;gap:8px;"><button class="btn btn-secondary" onclick="document.getElementById(\'bom-variant-modal\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="saveBomVariantConfiguration()"><i class="ti ti-check"></i> Сохранить варианты</button></div>' +
+      '</div></div>';
+  m.classList.add('visible');
+}
+
+function _captureBomVariantInputs() {
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  document.querySelectorAll('#bom-variant-rows [data-vindex]').forEach(input => {
+    const index = parseInt(input.dataset.vindex);
+    const field = input.dataset.vfield;
+    if (!st.options[index]) return;
+    st.options[index][field] = input.value;
+  });
+  const name = document.getElementById('bom-variant-group-name');
+  const required = document.getElementById('bom-variant-required');
+  if (name) st.name = name.value;
+  if (required) st.is_required = required.checked;
+}
+
+function setBomVariantDefault(index) {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  st.options.forEach((o, i) => { o.is_default = (i === index); });
+  renderBomVariantEditor();
+}
+
+function removeBomVariantOption(index) {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  const wasDefault = !!(st.options[index] || {}).is_default;
+  st.options.splice(index, 1);
+  if (wasDefault && st.options.length) st.options[0].is_default = true;
+  renderBomVariantEditor();
+}
+
+function addBomVariantOption() {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  state._bomPickerSelectHandler = function(component) {
+    if ((st.options || []).some(o => o.component_id === component.id)) {
+      showToast('Этот артикул уже добавлен', 'error');
+      return;
+    }
+    const first = st.options[0] || {};
+    st.options.push({
+      id: null,
+      component_id: component.id,
+      component_name: component.name || '—',
+      component_sku: component.sku || '',
+      label: component.name || '',
+      qty_required: Number(first.qty_required || 1),
+      power_kw: null,
+      voltage_v: first.voltage_v || null,
+      phases: first.phases || null,
+      is_default: !st.options.length,
+    });
+    renderBomVariantEditor();
+  };
+  openBomComponentPicker(st.modelId);
+}
+
+async function saveBomVariantConfiguration() {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  if (!(st.name || '').trim()) { showToast('Укажите название группы', 'error'); return; }
+  if ((st.options || []).length < 2) { showToast('Добавьте минимум два варианта', 'error'); return; }
+  const payload = {
+    name: (st.name || '').trim(),
+    is_required: !!st.is_required,
+    options: st.options.map(o => ({
+      component_id: o.component_id,
+      label: (o.label || '').trim(),
+      qty_required: o.qty_required,
+      power_kw: o.power_kw,
+      voltage_v: o.voltage_v,
+      phases: o.phases,
+      is_default: !!o.is_default,
+    })),
+  };
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/bom/' + st.bomId + '/selection-group', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { showToast(body.message || 'Не удалось сохранить варианты', 'error'); return; }
+    showToast('Варианты комплектации сохранены', 'success');
+    document.getElementById('bom-variant-modal').classList.remove('visible');
+    cache.models = null;
+    await loadModelBom(st.modelId);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function deleteBomVariantConfiguration() {
+  const st = state._bomVariantEditor;
+  if (!st || !confirm('Убрать выбор вариантов? В техкарте останется стандартный артикул.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/bom/' + st.bomId + '/selection-group', {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!response.ok) { showToast('Не удалось убрать варианты', 'error'); return; }
+    showToast('Оставлен стандартный артикул', 'success');
+    document.getElementById('bom-variant-modal').classList.remove('visible');
+    await loadModelBom(st.modelId);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
 async function openBomAddItem(modelId) {
@@ -6494,6 +6702,7 @@ function openBomComponentPicker(modelId) {
 function closeBomComponentPicker() {
   const m = document.getElementById('bom-comp-picker-modal');
   if (m) m.classList.remove('visible');
+  state._bomPickerSelectHandler = null;
 }
 
 function renderBomComponentPicker() {
@@ -6557,6 +6766,14 @@ function toggleBomPickerGroup(cat) {
 function selectBomComponent(componentId) {
   const c = (cache.components || []).find(x => x.id === componentId);
   if (!c) return;
+  if (typeof state._bomPickerSelectHandler === 'function') {
+    const handler = state._bomPickerSelectHandler;
+    state._bomPickerSelectHandler = null;
+    const picker = document.getElementById('bom-comp-picker-modal');
+    if (picker) picker.classList.remove('visible');
+    handler(c);
+    return;
+  }
   state._bomSelectedComponentId = componentId;
   // Обновляем кнопку-picker в форме
   const btn = document.getElementById('bom-component-btn');
@@ -7491,6 +7708,7 @@ function cancelNewAssembly() {
 function initNewAssemblyForm() {
   state.newAssembly = {
     model: null, execution: null, ipClass: null,
+    bomSelections: {}, bomConfigGroups: [],
     quantity: 1, workerIds: [], dateMode: 'today', customDate: null, comment: '',
     contractId: null,            // ЭТАП 15: ID договора (NULL = на склад)
     contractLabel: '',           // короткое описание для UI: «№12-Д · ООО Иванов»
@@ -7512,6 +7730,8 @@ function initNewAssemblyForm() {
   document.getElementById('date-input').value = '';
   document.getElementById('execution-section').style.display = 'none';
   document.getElementById('ip-section').style.display = 'none';
+  const bomOptionsSection = document.getElementById('bom-options-section');
+  if (bomOptionsSection) bomOptionsSection.style.display = 'none';
 
   document.getElementById('selected-model-display').innerHTML =
     '<div class="placeholder">Выберите модель…</div>';
@@ -7602,11 +7822,16 @@ function setWorkType(wt) {
   const execSec    = document.getElementById('execution-section');
   const ipSec      = document.getElementById('ip-section');
   const qtySec     = document.getElementById('quantity-section');
+  const bomOptionsSec = document.getElementById('bom-options-section');
   if (modelSec) modelSec.style.display = isAssembly ? '' : 'none';
   if (descSec)  descSec.style.display  = isAssembly ? 'none' : '';
   if (locSec)   locSec.style.display   = isAssembly ? 'none' : '';
   if (hoursSec) hoursSec.style.display = isAssembly ? 'none' : '';
   if (qtySec)   qtySec.style.display   = isAssembly ? '' : 'none';
+  if (bomOptionsSec) {
+    const hasGroups = !!(state.newAssembly.bomConfigGroups || []).length;
+    bomOptionsSec.style.display = (isAssembly && hasGroups) ? '' : 'none';
+  }
   // Для не-сборок прячем исполнение/IP даже если ранее выбраны
   if (!isAssembly) {
     if (execSec) execSec.style.display = 'none';
@@ -8091,6 +8316,8 @@ function selectModel(modelId) {
   state.newAssembly.model = model;
   state.newAssembly.execution = null;
   state.newAssembly.ipClass = null;
+  state.newAssembly.bomSelections = {};
+  state.newAssembly.bomConfigGroups = [];
 
   const title = model.name + (model.extra ? ' · ' + model.extra : '');
   const dirName = (cache.models.directions.find(d => d.id === model.direction_id) || {}).name || '';
@@ -8127,7 +8354,101 @@ function selectModel(modelId) {
   document.querySelectorAll('#ip-section .chip-option').forEach(c => c.classList.remove('selected'));
 
   closeModelModal();
-  refreshBomPreview();  // ЭТАП 32: предпросмотр списания
+  loadAssemblyBomConfiguration(model.id); // v2.45.912: ТЭН/варианты
+}
+
+async function loadAssemblyBomConfiguration(modelId) {
+  const section = document.getElementById('bom-options-section');
+  const content = document.getElementById('bom-options-content');
+  if (!section || !content || !state.newAssembly || !state.newAssembly.model || state.newAssembly.model.id !== modelId) return;
+  section.style.display = 'none';
+  content.innerHTML = '<div class="loading-block" style="padding:12px;">Загружаем варианты…</div>';
+  try {
+    const data = await apiGet('/api/models/' + modelId + '/bom-configuration');
+    if (!state.newAssembly || !state.newAssembly.model || state.newAssembly.model.id !== modelId) return;
+    const groups = data.groups || [];
+    state.newAssembly.bomConfigGroups = groups;
+    state.newAssembly.bomSelections = {};
+    // Необязательная группа честно показывает в UI тот же default,
+    // который возьмёт backend, если пользователь его не менял.
+    groups.forEach(group => {
+      if (group.is_required) return;
+      const defaultOption = (group.options || []).find(option => option.is_default);
+      if (defaultOption) state.newAssembly.bomSelections[group.id] = defaultOption.id;
+    });
+    if (!groups.length) {
+      section.style.display = 'none';
+      refreshBomPreview();
+      return;
+    }
+    section.style.display = '';
+    renderAssemblyBomConfiguration();
+    const previewSection = document.getElementById('bom-preview-section');
+    if (previewSection) previewSection.style.display = 'none';
+  } catch (e) {
+    section.style.display = '';
+    content.innerHTML = '<div class="bom-config-missing"><i class="ti ti-alert-triangle"></i> Не удалось загрузить варианты комплектации. Обновите страницу.</div>';
+  }
+}
+
+function _assemblyBomConfigurationComplete() {
+  const a = state.newAssembly || {};
+  const groups = a.bomConfigGroups || [];
+  return groups.every(g => !g.is_required || !!(a.bomSelections || {})[g.id]);
+}
+
+function selectAssemblyBomOption(groupId, optionId) {
+  if (!state.newAssembly) return;
+  state.newAssembly.bomSelections = state.newAssembly.bomSelections || {};
+  state.newAssembly.bomSelections[groupId] = optionId;
+  renderAssemblyBomConfiguration();
+  refreshBomPreview();
+}
+
+function renderAssemblyBomConfiguration() {
+  const content = document.getElementById('bom-options-content');
+  if (!content || !state.newAssembly) return;
+  const groups = state.newAssembly.bomConfigGroups || [];
+  const selections = state.newAssembly.bomSelections || {};
+  const assemblyQty = parseInt((document.getElementById('qty-input') || {}).value || 1) || 1;
+  let productPower = 0;
+  let selectedCount = 0;
+  let html = '';
+  groups.forEach(group => {
+    const selectedId = parseInt(selections[group.id] || 0);
+    html += '<div class="bom-config-group">' +
+      '<div class="bom-config-title"><span>' + escapeHtml(group.name || 'Вариант комплектации') + '</span>' +
+      (group.is_required ? '<span class="bom-config-required">нужно выбрать</span>' : '') + '</div>' +
+      '<div class="bom-config-options">';
+    (group.options || []).forEach(option => {
+      const selected = selectedId === option.id;
+      if (selected) {
+        selectedCount++;
+        if (option.power_kw != null) productPower += Number(option.power_kw || 0) * Number(option.qty_required || 0);
+      }
+      const facts = [];
+      if (option.power_kw != null) facts.push('<span class="bco-fact">' + _fmtQty(option.power_kw) + ' кВт</span>');
+      if (option.voltage_v) facts.push('<span class="bco-fact">' + option.voltage_v + ' В</span>');
+      if (option.phases) facts.push('<span class="bco-fact">' + option.phases + ' ф.</span>');
+      if (Number(option.qty_required || 1) !== 1) facts.push('<span class="bco-fact">' + _fmtQty(option.qty_required) + ' шт.</span>');
+      if (option.is_default) facts.push('<span class="bco-fact bco-default">стандарт</span>');
+      html += '<button type="button" class="bom-config-option' + (selected ? ' selected' : '') + '" onclick="selectAssemblyBomOption(' + group.id + ',' + option.id + ')">' +
+        '<span class="bco-radio"></span><span class="bco-main">' +
+          '<span class="bco-label">' + escapeHtml(option.label || option.component_name || '—') + '</span>' +
+          '<span class="bco-component">' + escapeHtml(option.component_name || '') +
+            (option.component_sku ? ' · ' + escapeHtml(option.component_sku) : '') +
+            ' · на складе ' + _fmtQty(option.component_qty || 0) + ' ' + escapeHtml(option.component_unit || 'шт.') + '</span>' +
+        '</span><span class="bco-facts">' + facts.join('') + '</span></button>';
+    });
+    html += '</div></div>';
+  });
+  if (selectedCount < groups.filter(g => g.is_required).length) {
+    html += '<div class="bom-config-missing"><i class="ti ti-hand-click"></i> Выберите вариант в каждой обязательной группе.</div>';
+  } else if (productPower > 0) {
+    html += '<div class="bom-config-summary"><b>Мощность на изделие: ' + _fmtQty(productPower) + ' кВт</b>' +
+      (assemblyQty > 1 ? '<br>На партию ' + assemblyQty + ' шт.: ' + _fmtQty(productPower * assemblyQty) + ' кВт' : '') + '</div>';
+  }
+  content.innerHTML = html;
 }
 
 // ЭТАП 32: предпросмотр автосписания со склада
@@ -8144,12 +8465,20 @@ async function _doBomPreview() {
 
   const model = state.newAssembly && state.newAssembly.model;
   if (!model) { section.style.display = 'none'; return; }
+  if ((state.newAssembly.bomConfigGroups || []).length && !_assemblyBomConfigurationComplete()) {
+    section.style.display = 'none';
+    return;
+  }
   const qtyInput = document.getElementById('qty-input');
   const quantity = parseInt((qtyInput && qtyInput.value) || 1);
   if (!quantity || quantity < 1) { section.style.display = 'none'; return; }
 
   try {
-    const data = await apiGet('/api/assemblies/preview-writeoff?model_id=' + model.id + '&quantity=' + quantity);
+    let previewUrl = '/api/assemblies/preview-writeoff?model_id=' + model.id + '&quantity=' + quantity;
+    if ((state.newAssembly.bomConfigGroups || []).length) {
+      previewUrl += '&bom_selections=' + encodeURIComponent(JSON.stringify(state.newAssembly.bomSelections || {}));
+    }
+    const data = await apiGet(previewUrl);
     state._lastBomPreview = data;
     if (!data.items || !data.items.length) {
       section.style.display = 'none';
@@ -8183,7 +8512,7 @@ async function _doBomPreview() {
       const shortCls = !it.enough ? (it.is_critical ? ' shortage-critical' : ' shortage-warn') : '';
       // Дефицитную складскую позицию (компонент) можно сопоставить вручную —
       // когда авто-матч указал не на ту складскую позицию (дубль/иная привязка).
-      const relinkBtn = (it.kind === 'component' && !it.enough && it.bom_id)
+      const relinkBtn = (it.kind === 'component' && !it.enough && it.bom_id && !it.selection_group_id)
         ? '<button class="bom-relink-btn" onclick="openBomRelink(' + it.bom_id + ', ' +
             JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ')">' +
             '<i class="ti ti-arrows-exchange"></i> Сопоставить со складом</button>'
@@ -8481,7 +8810,9 @@ async function copyBomFrom(sourceId, sourceName) {
     const resp = await apiPost('/api/models/' + st.targetId + '/bom/copy-from', { source_model_id: sourceId });
     if (resp && resp.ok) {
       const c = resp.data || {};
-      showToast('Добавлено позиций: ' + (c.copied || 0) + (c.skipped ? ' (дублей пропущено: ' + c.skipped + ')' : ''), 'success');
+      showToast('Добавлено позиций: ' + (c.copied || 0) +
+        (c.groups_copied ? ' · групп вариантов: ' + c.groups_copied : '') +
+        (c.skipped ? ' (дублей пропущено: ' + c.skipped + ')' : ''), 'success');
       closeBomCopy();
       if (typeof loadModelBom === 'function') loadModelBom(st.targetId);
     } else {
@@ -8514,6 +8845,7 @@ function changeQty(delta) {
   input.value = v;
   state.newAssembly.quantity = v;
   document.getElementById('qty-minus').disabled = v <= 1;
+  renderAssemblyBomConfiguration();
   refreshBomPreview();
 }
 
@@ -8522,6 +8854,8 @@ document.getElementById('qty-input').addEventListener('input', function() {
   if (isNaN(v) || v < 1) v = 1;
   if (v > 1000) v = 1000;
   state.newAssembly.quantity = v;
+  renderAssemblyBomConfiguration();
+  refreshBomPreview();
 });
 
 document.getElementById('qty-input').addEventListener('blur', function() {
@@ -8589,6 +8923,12 @@ async function submitAssembly() {
     if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
     if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
     if (a.model.needs_ip && !a.ipClass) { errEl.textContent = 'Укажите IP-класс'; return; }
+    if ((a.bomConfigGroups || []).length && !_assemblyBomConfigurationComplete()) {
+      errEl.textContent = 'Выберите ТЭН / вариант комплектации';
+      const configSection = document.getElementById('bom-options-section');
+      if (configSection) configSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
   } else {
     if (!a.description || !a.description.trim()) {
       errEl.textContent = (a.workType === 'installation') ? 'Опишите, что нужно сделать' : 'Опишите что было сделано';
@@ -8608,9 +8948,11 @@ async function submitAssembly() {
         model_id: a.model.id,
         qty: a.quantity || 1,
         contract_id: a.contractId || null,
-        execution_type: (a.model.exec_mode === 'choice' ? a.execution : null) || null,
+        execution_type: a.model.exec_mode === 'choice'
+          ? (a.execution === 'ne' ? 'stainless' : 'standard') : null,
         ip_rating: (a.model.needs_ip ? a.ipClass : null) || null,
         description: a.comment || null,
+        bom_selections: a.bomSelections || {},
       });
       if (!(r && r.ok)) {
         errEl.textContent = ((r && r.data) || {}).message || 'Не удалось поставить в очередь';
@@ -8658,6 +9000,7 @@ async function submitAssembly() {
     location: a.location || null,
     hours_spent: a.hours_spent || null,
     initial_status: initialStatus,
+    bom_selections: a.bomSelections || {},
   };
 
   btn.disabled = true;

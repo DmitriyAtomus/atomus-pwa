@@ -29,8 +29,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.911";
-const APP_VERSION_DATE = "11.08.2026";
+const APP_VERSION = "v2.45.912";
+const APP_VERSION_DATE = "12.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -5584,6 +5584,27 @@ function renderProductionWorkDetail(w) {
   if (w.started_at)  html += '<div class="pwd-fact"><div class="pwd-fact-l">Начато</div><div class="pwd-fact-v pwd-fact-sm">' + escapeHtml(formatPkbDateTime(w.started_at)) + '</div></div>';
   if (w.finished_at) html += '<div class="pwd-fact"><div class="pwd-fact-l">Завершено</div><div class="pwd-fact-v pwd-fact-sm">' + escapeHtml(formatPkbDateTime(w.finished_at)) + '</div></div>';
   html += '</div>';
+
+  // v2.45.912: зафиксированный при постановке в производство точный ТЭН/SKU.
+  const bomConfigGroups = ((w.bom_configuration || {}).groups || []);
+  if (bomConfigGroups.length) {
+    html += '<div class="pwd-bom-config"><div class="pwd-bom-config-title"><i class="ti ti-adjustments-horizontal"></i> Комплектация изделия</div>';
+    bomConfigGroups.forEach(g => {
+      const facts = [];
+      if (g.power_kw != null) facts.push(_fmtQty(g.power_kw) + ' кВт');
+      if (g.voltage_v) facts.push(g.voltage_v + ' В');
+      if (g.phases) facts.push(g.phases + ' ф.');
+      if (Number(g.qty_required || 1) !== 1) facts.push(_fmtQty(g.qty_required) + ' шт.');
+      html += '<div class="pwd-bom-config-row"><span><b>' + escapeHtml(g.group_name || 'Вариант') + '</b><br>' +
+        escapeHtml(g.option_label || g.component_name || '—') +
+        (g.component_sku ? ' · <span class="comp-sku">' + escapeHtml(g.component_sku) + '</span>' : '') +
+        '</span><span style="text-align:right;white-space:nowrap;">' + escapeHtml(facts.join(' · ')) + '</span></div>';
+    });
+    if (w.configured_power_kw != null && Number(w.configured_power_kw) > 0) {
+      html += '<div class="pwd-bom-config-row"><span><b>Общая мощность</b></span><span><b>' + _fmtQty(w.configured_power_kw) + ' кВт</b></span></div>';
+    }
+    html += '</div>';
+  }
 
   // Команда: ответственный + соисполнители — единый блок с аватарами
   {

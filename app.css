@@ -22964,3 +22964,39 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .lt-test-btns .btn { opacity: .75; }
 .lt-test-btns .btn:hover { opacity: 1; }
 @media (max-width: 700px) { .lt-test-btns { margin-left: 0; width: 100%; } .lt-test-btns .btn { flex: 1; } }
+/* v2.45.912 — выбираемые позиции BOM (ТЭНы/комплектация) */
+.bom-config-group { border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background:var(--card,#fff); }
+.bom-config-group:last-child { margin-bottom:0; }
+.bom-config-title { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:700; margin-bottom:9px; }
+.bom-config-required { font-size:11px; color:#9a5f12; background:#fff4dc; padding:3px 7px; border-radius:999px; }
+.bom-config-options { display:grid; gap:7px; }
+.bom-config-option { width:100%; display:flex; align-items:center; gap:10px; text-align:left; border:1.5px solid var(--border); background:var(--card,#fff); border-radius:10px; padding:10px 11px; cursor:pointer; color:var(--text); }
+.bom-config-option:hover { border-color:var(--brand); }
+.bom-config-option.selected { border-color:var(--brand); background:rgba(21,96,189,.07); box-shadow:0 0 0 1px var(--brand); }
+.bom-config-option .bco-radio { width:18px; height:18px; flex:0 0 18px; border:2px solid var(--border); border-radius:50%; display:grid; place-items:center; }
+.bom-config-option.selected .bco-radio { border-color:var(--brand); }
+.bom-config-option.selected .bco-radio:after { content:''; width:8px; height:8px; border-radius:50%; background:var(--brand); }
+.bom-config-option .bco-main { min-width:0; flex:1; }
+.bom-config-option .bco-label { font-weight:700; font-size:13px; }
+.bom-config-option .bco-component { margin-top:2px; font-size:11.5px; color:var(--text-light); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bom-config-option .bco-facts { display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+.bom-config-option .bco-fact { font-size:11px; color:var(--text-mid); background:var(--bg); border-radius:6px; padding:3px 6px; white-space:nowrap; }
+.bom-config-option .bco-default { color:#0a6b4d; background:#e7f6ef; }
+.bom-config-summary { margin-top:9px; padding:9px 11px; border-radius:9px; background:#eaf3ff; color:#164b83; font-size:12.5px; line-height:1.45; }
+.bom-config-missing { padding:9px 11px; border-radius:9px; background:#fff4dc; color:#80520e; font-size:12.5px; }
+.bom-selection-chip { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:3px 7px; background:#eaf3ff; color:#165b9c; font-size:11px; font-weight:700; }
+.bom-variant-editor-row { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:8px; background:var(--card,#fff); }
+.bom-variant-editor-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.bom-variant-editor-grid { display:grid; grid-template-columns:1.4fr .7fr .7fr .6fr .55fr; gap:7px; }
+.bom-variant-editor-grid label { font-size:10.5px; color:var(--text-light); display:block; margin-bottom:3px; }
+.bom-variant-editor-grid input { width:100%; box-sizing:border-box; padding:7px 8px; border:1px solid var(--border); border-radius:7px; background:var(--card,#fff); color:var(--text); }
+.pwd-bom-config { margin:14px 0; border:1px solid #bcd7f3; background:#f4f9ff; border-radius:12px; padding:12px 14px; }
+.pwd-bom-config-title { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:#35658f; font-weight:800; margin-bottom:7px; }
+.pwd-bom-config-row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-top:1px solid rgba(53,101,143,.12); font-size:12.5px; }
+.pwd-bom-config-row:first-of-type { border-top:0; }
+
+@media (max-width:700px) {
+  .bom-variant-editor-grid { grid-template-columns:1fr 1fr; }
+  .bom-config-option { align-items:flex-start; }
+  .bom-config-option .bco-facts { justify-content:flex-start; }
+}
