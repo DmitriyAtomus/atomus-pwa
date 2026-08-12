@@ -16730,10 +16730,54 @@ async function loadMfg() {
     state.mfgSections = (r && r.sections) || [];
     state.mfgCurrentItem = null;
     renderMfg();
+    // Переход из дефицита производственной работы: после загрузки дерева
+    // открываем точное изделие и выделяем весь недостающий комплект.
+    const pending = state._mfgPendingOpen;
+    if (pending) {
+      state._mfgPendingOpen = null;
+      await _mfgOpenProductionSelection(pending);
+    }
   } catch (e) {
     box.innerHTML = '<div class="empty-block">Не удалось загрузить: ' +
       escapeHtml(String((e && e.message) || e)) + '</div>';
   }
+}
+
+// v2.45.919: прямой маршрут «работа → комплект корпуса».
+function openMfgFromProduction(itemId, encodedParts) {
+  let parts = [];
+  try { parts = JSON.parse(decodeURIComponent(encodedParts || '')) || []; } catch (e) {}
+  if (!itemId || !parts.length) {
+    showToast('Не удалось определить состав корпуса', 'error');
+    return;
+  }
+  state._mfgPendingOpen = { itemId: Number(itemId), parts: parts };
+  if (typeof closeProductionWorkDetail === 'function') closeProductionWorkDetail();
+  selectSection('production');
+  selectSidebarItem('mfg');
+}
+
+async function _mfgOpenProductionSelection(pending) {
+  await openMfgItem(Number(pending.itemId));
+  const it = state.mfgCurrentItem;
+  if (!it || Number(it.id) !== Number(pending.itemId)) return;
+  state.mfgCurrentSection = it.section_id || state.mfgCurrentSection;
+  const known = new Set((it.parts || []).map(p => Number(p.id)));
+  const sel = _mfgSelMap(it);
+  Object.keys(sel).forEach(k => delete sel[k]);
+  const qtyByPart = {};
+  (pending.parts || []).forEach(row => {
+    const pid = Number(row.part_id);
+    if (!known.has(pid)) return;
+    sel[pid] = true;
+    qtyByPart[pid] = Math.max(Number(row.qty) || 1, 1);
+  });
+  state._mfgOrderPrefill = { itemId: Number(it.id), qtyByPart: qtyByPart };
+  renderMfgItem(it);
+  const count = Object.keys(qtyByPart).length;
+  showToast('Корпус открыт: выделено ' + count + ' ' +
+    (count === 1 ? 'позиция' : (count < 5 ? 'позиции' : 'позиций')) +
+    ' — сформируйте один заказ', 'success');
 }
 
 function _mfgTree() {
@@ -17232,6 +17276,14 @@ function _mfgSelMap(it) {
   }
   return state._mfgSel;
 }
+function _mfgOrderPartQty(it, part) {
+  const prefill = state._mfgOrderPrefill;
+  if (prefill && Number(prefill.itemId) === Number(it.id) &&
+      prefill.qtyByPart && prefill.qtyByPart[part.id] != null) {
+    return Math.max(Number(prefill.qtyByPart[part.id]) || 1, 1);
+  }
+  return Math.max(Number(part.qty) || 1, 1);
+}
 function mfgTogglePart(partId) {
   const it = state.mfgCurrentItem;
   if (!it) return;
@@ -17244,6 +17296,7 @@ function mfgSelParts(mode) {
   if (!it) return;
   const sel = _mfgSelMap(it);
   Object.keys(sel).forEach(k => delete sel[k]);
+  if (mode === 'none') state._mfgOrderPrefill = null;
   if (mode === 'all') (it.parts || []).forEach(p => { sel[p.id] = true; });
   renderMfgItem(it);
 }
@@ -17261,7 +17314,7 @@ async function mfgOrderOpen(itemId) {
     state._mfgSups = d.suppliers || [];
   } catch (e) { state._mfgSups = state._mfgSups || []; }
   const sups = state._mfgSups;
-  const pieces = chosen.reduce((a, p) => a + (p.qty || 1), 0);
+  const pieces = chosen.reduce((a, p) => a + _mfgOrderPartQty(it, p), 0);
   state._mfgSupSel = null;
   let m = document.getElementById('mfg-order-modal');
   if (m) m.remove();
@@ -17278,7 +17331,7 @@ async function mfgOrderOpen(itemId) {
         chosen.map(p => '<div class="mo-row" data-part="' + p.id + '">' +
           '<span class="ds">' + escapeHtml(p.designation || '—') + '</span>' +
           '<span class="nm">' + escapeHtml(p.name || '') + '</span>' +
-          '<input type="number" min="1" value="' + (p.qty || 1) + '" class="mo-qty">' +
+          '<input type="number" min="1" value="' + _mfgOrderPartQty(it, p) + '" class="mo-qty">' +
           '<span class="un">шт</span>' +
           '<i class="ti ti-x rm" title="Убрать из заказа" onclick="this.parentNode.remove()"></i>' +
         '</div>').join('') + '</div>' +
@@ -17831,8 +17884,8 @@ function renderMfgItem(it) {
   // липкая панель заказа
   const selParts = parts.filter(p => _mfgSelMap(it)[p.id]);
   if (selParts.length) {
-    const pieces = selParts.reduce((a, p) => a + (p.qty || 1), 0);
-    const mass = selParts.reduce((a, p) => a + (p.mass_kg || 0) * (p.qty || 1), 0);
+    const pieces = selParts.reduce((a, p) => a + _mfgOrderPartQty(it, p), 0);
+    const mass = selParts.reduce((a, p) => a + (p.mass_kg || 0) * _mfgOrderPartQty(it, p), 0);
     h += '<div class="pdx-batch">' +
       '<span style="font-size:20px;">🏭</span>' +
       '<div><div class="n">Заказ на изготовление: ' + selParts.length + ' ' +
