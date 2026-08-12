@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.917";
+const APP_VERSION = "v2.45.918";
 const APP_VERSION_DATE = "12.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7171,7 +7171,7 @@ function renderPkbBomBlock(w) {
   // BOM есть и нет дефицита — всё хорошо
   if (missing.length === 0) {
     return '<div class="pkb-bom-block no-deficit">' +
-             '<div class="pkb-bom-title" style="color:#0A5B41;"><i class="ti ti-circle-check"></i>Все компоненты на складе</div>' +
+             '<div class="pkb-bom-title" style="color:#0A5B41;"><i class="ti ti-circle-check"></i>По внесённой техкарте всё есть</div>' +
            '</div>';
   }
 
