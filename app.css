@@ -3407,6 +3407,61 @@
     min-height: 70px; resize: vertical; font-family: inherit;
   }
 
+  /* v2.45.917: несколько исполнителей в одной задаче */
+  .task-assignee-picker {
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--card, #fff); overflow: hidden;
+  }
+  .task-assignee-selected {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    padding: 9px 10px; border-bottom: 1px solid var(--border);
+    background: var(--brand-bg, #eef5ff);
+  }
+  .task-assignee-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid rgba(37, 99, 235, .2); border-radius: 999px;
+    padding: 4px 8px; background: #fff; color: var(--brand);
+    font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }
+  .task-assignee-chip:hover { border-color: var(--danger); color: var(--danger); }
+  .task-assignee-chip .ti-x { font-size: 11px; opacity: .75; }
+  .task-assignee-clear { margin-left: auto; }
+  .task-assignee-empty {
+    display: flex; align-items: center; gap: 7px; padding: 9px 10px;
+    color: var(--text-light); font-size: 12.5px;
+  }
+  .task-assignee-options {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px; padding: 8px; max-height: 210px; overflow: auto;
+  }
+  .task-assignee-option {
+    display: flex; align-items: center; gap: 8px; min-width: 0;
+    padding: 8px 9px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card, #fff); color: var(--text); font: inherit;
+    font-size: 12.5px; text-align: left; cursor: pointer;
+  }
+  .task-assignee-option > span:last-child {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .task-assignee-option:hover { border-color: var(--brand); }
+  .task-assignee-option.selected {
+    border-color: var(--brand); background: var(--brand-bg, #eef5ff);
+    color: var(--brand); font-weight: 650;
+  }
+  .task-assignee-check {
+    flex: 0 0 22px; width: 22px; height: 22px; border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--bg); color: var(--text-light);
+  }
+  .task-assignee-option.selected .task-assignee-check {
+    background: var(--brand); color: #fff;
+  }
+  .task-assignee-avatars { display: inline-flex; align-items: center; padding-left: 4px; }
+  .task-assignee-avatars .tkr-ava { margin-left: -5px; border: 2px solid var(--card, #fff); }
+  @media (max-width: 560px) {
+    .task-assignee-options { grid-template-columns: 1fr; max-height: 250px; }
+  }
+
   /* Радио-чипсы (тип, юрлицо) */
   .radio-chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .radio-chips button {
