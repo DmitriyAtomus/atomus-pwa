@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.918";
+const APP_VERSION = "v2.45.919";
 const APP_VERSION_DATE = "12.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7158,6 +7158,7 @@ async function setProductionWorkKitStatus(workId, kitStatus) {
 
 function renderPkbBomBlock(w) {
   const missing = w.missing_components || [];
+  const mfgMatches = w.mfg_matches || [];
   const hasBom = w.has_bom;
 
   // Нет BOM у модели — выводим информационное сообщение
@@ -7195,6 +7196,27 @@ function renderPkbBomBlock(w) {
                 'onclick="closeProductionWorkDetail();selectSection(\'supply\');selectSidebarItem(\'supply-shopping\')" ' +
                 'title="Открыть Снабжение → Что закупить"><i class="ti ti-shopping-cart" style="font-size:12px;"></i> Что закупить</button>';
   html +=   '</div>';
+  // v2.45.919: несколько гибочных деталей могут быть составом одного корпуса.
+  // Показываем не шесть разрозненных закупок, а найденное изделие базы корпусов
+  // и передаём туда только дефицитные позиции с нужными количествами.
+  mfgMatches.forEach(match => {
+    const partsEncoded = encodeURIComponent(JSON.stringify(match.parts || []));
+    const positions = Number(match.matched_count || 0);
+    const pieces = Number(match.pieces_count || 0);
+    const lastOrder = match.last_order_number
+      ? '<span class="pkb-mfg-last"><i class="ti ti-history"></i> последний заказ ' +
+        escapeHtml(match.last_order_number) + '</span>'
+      : '';
+    html += '<div class="pkb-mfg-match">' +
+      '<span class="pkb-mfg-ico"><i class="ti ti-building-factory-2"></i></span>' +
+      '<span class="pkb-mfg-copy"><b>' + escapeHtml(match.item_designation || match.item_name || 'Корпус') + '</b>' +
+        '<small>' + positions + ' ' + plural(positions, 'позиция', 'позиции', 'позиций') +
+        ' · ' + pkbFmtQty(pieces) + ' шт. — оформить одним комплектом</small>' + lastOrder + '</span>' +
+      '<button class="pkb-mfg-go" onclick="event.stopPropagation();openMfgFromProduction(' +
+        Number(match.item_id) + ',\'' + partsEncoded + '\')">' +
+        '<i class="ti ti-arrow-right"></i> Открыть комплект</button>' +
+    '</div>';
+  });
   html +=   '<div class="pkb-bom-list">';
   // v2.43.81: кнопка «Сопоставить со склада» — закрыть BOM-строку ручным списанием
   // компонента с другим названием (поставщики иногда называют чуть иначе).
