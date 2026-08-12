@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.919";
+const APP_VERSION = "v2.45.920";
 const APP_VERSION_DATE = "12.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7169,10 +7169,13 @@ function renderPkbBomBlock(w) {
            '</div>';
   }
 
-  // BOM есть и нет дефицита — всё хорошо
+  // BOM есть и нет дефицита. Это означает только наличие внесённых в техкарту
+  // деталей, а не наличие самого готового изделия: активная карточка работы как
+  // раз и появилась потому, что готовой сборкой потребность не закрыта.
   if (missing.length === 0) {
     return '<div class="pkb-bom-block no-deficit">' +
-             '<div class="pkb-bom-title" style="color:#0A5B41;"><i class="ti ti-circle-check"></i>По внесённой техкарте всё есть</div>' +
+             '<div class="pkb-bom-title" style="color:#9A5F12;"><i class="ti ti-building-factory-2"></i>Готового изделия на складе нет — нужно изготовить</div>' +
+             '<div style="font-size:11.5px;color:var(--text-light);margin-top:5px;"><i class="ti ti-circle-check" style="color:#0A5B41;"></i> Детали по внесённой техкарте есть на складе.</div>' +
            '</div>';
   }
 
