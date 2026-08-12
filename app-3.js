@@ -10350,6 +10350,46 @@ function _shopIsWaitingStatus(status) {
   return !!status && status !== 'draft';
 }
 
+function _shopMfgMatches(group) {
+  if (!group || group.supplier_id) return [];
+  const visibleIds = new Set((group.items || []).map(it => Number(it.component_id)));
+  return (group.mfg_matches || []).map(match => {
+    const parts = (match.parts || []).filter(p => visibleIds.has(Number(p.component_id)));
+    const bundleQty = parts.reduce((maxQty, p) => {
+      const perBody = Math.max(Number(p.part_qty) || 1, 1);
+      return Math.max(maxQty, Math.ceil((Number(p.qty) || 0) / perBody));
+    }, 1);
+    return Object.assign({}, match, {
+      parts: parts,
+      matched_count: parts.length,
+      pieces_count: parts.reduce((sum, p) => sum + (Number(p.qty) || 0), 0),
+      bundle_qty: bundleQty,
+    });
+  }).filter(match => match.matched_count >= 2);
+}
+
+function _shopMfgBundledIds(group) {
+  const ids = new Set();
+  _shopMfgMatches(group).forEach(match => {
+    (match.parts || []).forEach(p => ids.add(Number(p.component_id)));
+  });
+  return ids;
+}
+
+function _shopDisplayedItemsCount(group) {
+  const bundled = _shopMfgBundledIds(group).size;
+  const bundles = _shopMfgMatches(group).length;
+  return Math.max(0, (group.items || []).length - bundled + bundles);
+}
+
+function _shopProjectGroupKey(planContracts) {
+  if (!Array.isArray(planContracts) || !planContracts.length) return 'на склад';
+  return String(planContracts[0])
+    .replace(/^\s*Договор\s*№\s*/i, '')
+    .replace(/^\s*№\s*/, '')
+    .trim() || 'на склад';
+}
+
 // Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount, hiddenItems}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
@@ -10493,7 +10533,7 @@ function renderSupplyShopping(d) {
     : '';
   // v2.45.x: KPI-строка одним взглядом
   const _pendCp = cpItems.filter(x => x.purchase_status !== 'ordered').length;
-  const _lowCnt = visibleGroups.reduce((s, g) => s + (g.items_count || 0), 0);
+  const _lowCnt = visibleGroups.reduce((s, g) => s + _shopDisplayedItemsCount(g), 0);
   const buyCount = _pendCp + _lowCnt;
   const waitCount = waitingItems.length;
   const _today = new Date().toISOString().slice(0, 10);
@@ -10528,7 +10568,12 @@ function renderSupplyShopping(d) {
   // Чистим невалидные id (если строка ушла после прошлого назначения)
   const allNoSupIds = new Set();
   visibleGroups.forEach(g => {
-    if (!g.supplier_id) (g.items || []).forEach(it => allNoSupIds.add(it.component_id));
+    if (!g.supplier_id) {
+      const bundledIds = _shopMfgBundledIds(g);
+      (g.items || []).forEach(it => {
+        if (!bundledIds.has(Number(it.component_id))) allNoSupIds.add(it.component_id);
+      });
+    }
   });
   Array.from(window._noSupSelected).forEach(id => {
     if (!allNoSupIds.has(id)) window._noSupSelected.delete(id);
@@ -10537,6 +10582,9 @@ function renderSupplyShopping(d) {
   visibleGroups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
+    const mfgMatches = _shopMfgMatches(g);
+    const mfgBundledIds = _shopMfgBundledIds(g);
+    const displayedItemsCount = _shopDisplayedItemsCount(g);
     const draftItems = (g.items || []).filter(it => it.order_status === 'draft' && it.order_id);
     const draftOrderId = draftItems.length
       ? Math.max.apply(null, draftItems.map(it => Number(it.order_id) || 0))
@@ -10550,15 +10598,30 @@ function renderSupplyShopping(d) {
     if (noSupplier) {
       const nsGroups = {};
       orderedItems.forEach(it => {
-        const key = (Array.isArray(it.plan_contracts) && it.plan_contracts.length)
-          ? ('№' + String(it.plan_contracts[0]).replace(/^№\s*/, ''))
-          : 'на склад';
+        const key = _shopProjectGroupKey(it.plan_contracts);
+        if (mfgBundledIds.has(Number(it.component_id))) return;
         (nsGroups[key] = nsGroups[key] || []).push(it);
       });
+      const bundlesByProject = {};
+      mfgMatches.forEach(match => {
+        const key = _shopProjectGroupKey(match.plan_contracts);
+        (bundlesByProject[key] = bundlesByProject[key] || []).push(match);
+      });
       orderedItems = [];
-      Object.keys(nsGroups).sort((a, b) => nsGroups[b].length - nsGroups[a].length).forEach(k => {
-        orderedItems.push({ _nsHead: k, _ids: nsGroups[k].map(x => x.component_id), _n: nsGroups[k].length });
-        orderedItems = orderedItems.concat(nsGroups[k]);
+      const projectKeys = Array.from(new Set(Object.keys(nsGroups).concat(Object.keys(bundlesByProject))));
+      projectKeys.sort((a, b) =>
+        ((nsGroups[b] || []).length + (bundlesByProject[b] || []).length) -
+        ((nsGroups[a] || []).length + (bundlesByProject[a] || []).length)
+      ).forEach(k => {
+        const rows = nsGroups[k] || [];
+        const bundles = bundlesByProject[k] || [];
+        orderedItems.push({
+          _nsHead: k,
+          _ids: rows.map(x => x.component_id),
+          _n: rows.length + bundles.length,
+        });
+        bundles.forEach(match => orderedItems.push({ _mfgBundle: match }));
+        orderedItems = orderedItems.concat(rows);
       });
     }
     const itemRows = orderedItems.map(it => {
@@ -10578,6 +10641,28 @@ function renderSupplyShopping(d) {
             '<button class="btn btn-secondary btn-sm" data-ids="' + idsJson + '" onclick="nsAssignGroup(this)" ' +
               'title="Выбрать группу и назначить одного поставщика на все её позиции">' +
               '<i class="ti ti-truck"></i>Поставщик на группу</button></td>' +
+        '</tr>';
+      }
+      if (it._mfgBundle) {
+        const match = it._mfgBundle;
+        const partsEncoded = encodeURIComponent(JSON.stringify(match.parts || []));
+        const bundles = Number(match.bundle_qty || 1);
+        const positions = Number(match.matched_count || 0);
+        const pieces = Number(match.pieces_count || 0);
+        return '<tr class="nsg-mfg-bundle">' +
+          '<td class="ns-check-cell"><span class="nsg-mfg-icon"><i class="ti ti-building-factory-2"></i></span></td>' +
+          '<td colspan="3"><div class="nsg-mfg-title">' +
+            '<b>' + escapeHtml(match.item_designation || match.item_name || 'Корпус') + '</b>' +
+            '<span>' + escapeHtml(match.item_name || '') + '</span></div>' +
+            '<div class="nsg-mfg-meta">' + bundles + ' ' +
+              _plural(bundles, ['комплект', 'комплекта', 'комплектов']) +
+              ' · ' + positions + ' ' + _plural(positions, ['позиция', 'позиции', 'позиций']) +
+              ' · ' + pieces + ' деталей — оформить одним заказом</div></td>' +
+          '<td colspan="2" style="text-align:right;">' +
+            '<button class="btn btn-primary btn-sm" onclick="openMfgFromProduction(' +
+              Number(match.item_id) + ',\'' + partsEncoded + '\')" ' +
+              'title="Открыть комплект в разделе изготовления корпусов">' +
+              '<i class="ti ti-package-export"></i>Открыть комплект</button></td>' +
         '</tr>';
       }
       // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
@@ -10728,8 +10813,8 @@ function renderSupplyShopping(d) {
       '<div class="sup-shop-group-head">' +
         '<div class="sup-shop-group-name">' +
           _supAvatarHtml(supName, noSupplier) + escapeHtml(supName) +
-          '<span class="sup-shop-group-count">' + (g.items_count || 0) + ' ' +
-            (g.items_count === 1 ? 'позиция' : (g.items_count < 5 ? 'позиции' : 'позиций')) +
+          '<span class="sup-shop-group-count">' + displayedItemsCount + ' ' +
+            _plural(displayedItemsCount, ['позиция', 'позиции', 'позиций']) +
           '</span>' +
         '</div>' +
         '<div class="sup-shop-group-actions">' +
