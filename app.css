@@ -23007,3 +23007,9 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .bom-config-option { align-items:flex-start; }
   .bom-config-option .bco-facts { justify-content:flex-start; }
 }
+
+/* ============ v2.45.916: Экспресс-Авто ============ */
+.lgc-ea .lgc-hd { background: linear-gradient(120deg, #B45309, #F59E0B); }
+.ea-card { border-color: #FDE4C0; border-left-color: #D97706; box-shadow: 0 1px 3px rgba(180,83,9,.07); }
+.ea-card:hover { box-shadow: 0 8px 22px rgba(180,83,9,.12); }
+.ea-logo { background: #D97706; font-size: 13px; }

@@ -7961,12 +7961,13 @@ async function loadLogisticsPickups() {
   box.innerHTML = _logiTabsHtml('pickups') + '<div class="loading-block">Загрузка…</div>';
   try {
     // Параллельно тянем самовывозы, почтовые статусы и транспортные компании.
-    const [d, oz, lu, cd, dl] = await Promise.all([
+    const [d, oz, lu, cd, dl, ea] = await Promise.all([
       apiGet('/api/logistics/pickups'),
       apiGet('/api/logistics/ozon').catch(() => null),
       apiGet('/api/logistics/luch').catch(() => null),
       apiGet('/api/logistics/cdek').catch(() => null),
       apiGet('/api/logistics/dellin').catch(() => null),
+      apiGet('/api/logistics/express').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     const ozList = (oz && oz.shipments) || [];
@@ -7980,6 +7981,9 @@ async function loadLogisticsPickups() {
     const dlList = (dl && dl.shipments) || [];
     const dlActive = dlList.filter(sh => !sh.is_closed && !sh.delivered_at);
     const dlDone = dlList.filter(sh => !!sh.is_closed || !!sh.delivered_at);
+    const eaList = (ea && ea.shipments) || [];
+    const eaActive = eaList.filter(sh => !sh.manual_done);
+    const eaDone = eaList.filter(sh => !!sh.manual_done);
 
     // ---- 🔥 «горит»: истёкший Ozon и самовывоз с горящим сроком хранения
     let fireOz = 0, firePk = 0;
@@ -8030,6 +8034,20 @@ async function loadLogisticsPickups() {
         '<span>к нам <b>' + luActive.length + '</b></span>' +
           (luDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + luDone.length + ' →</span>' : ''),
         !luActive.length);
+    }
+
+    // ---- карточка Экспресс-Авто (v2.45.916)
+    let eaCard = '';
+    if (ea) {
+      const body = eaActive.length ? eaActive.map(_expressCardHtml).join('')
+        : '<div class="lgc-empty"><i class="ti ti-mail-forward"></i>Грузов на складе нет.<br>Прибытия появятся сами из писем Экспресс-Авто.</div>';
+      eaCard = _lgCardHtml('lgc-ea', 'ti-truck-loading', 'Экспресс-Авто',
+        eaActive.length ? eaActive.length + ' на складе' : 'пусто',
+        '<button class="abtn" onclick="expressRefresh()" title="Перечитать письма Экспресс-Авто"><i class="ti ti-refresh"></i></button>',
+        body,
+        '<span>забрать <b>' + eaActive.length + '</b></span>' +
+          (eaDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + eaDone.length + ' →</span>' : ''),
+        !eaActive.length);
     }
 
     // ---- карточка Деловых линий
@@ -8133,14 +8151,15 @@ async function loadLogisticsPickups() {
     const cards = [];
     if (oz) cards.push({ hot: fireOz ? 1 : 0, act: ozActive.length ? 1 : 0, html: ozCard });
     if (lu) cards.push({ hot: 0, act: luActive.length ? 1 : 0, html: luCard });
+    if (ea) cards.push({ hot: 0, act: eaActive.length ? 1 : 0, html: eaCard });
     if (dl) cards.push({ hot: 0, act: dlActive.length ? 1 : 0, html: dlCard });
     if (cd) cards.push({ hot: 0, act: cdActive.length ? 1 : 0, html: cdCard });
     cards.push({ hot: firePk ? 1 : 0, act: (ready.length + transit.length) ? 1 : 0, html: pkCard });
     cards.sort((a, b) => (b.hot - a.hot) || (b.act - a.act));
 
     // ---- сводка и завершённые
-    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length;
-    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length;
+    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length + eaActive.length;
+    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length + eaDone.length;
     let html = _logiTabsHtml('pickups') + '<div class="lg-sum">' +
       (fire.length ? '<span class="hot">горит <b>' + fire.length + '</b></span>' : '') +
       '<span>активных <b>' + activeTotal + '</b></span>' +
@@ -8149,7 +8168,7 @@ async function loadLogisticsPickups() {
     if (fire.length) html += '<div class="lg-fire">' + fire.join('') + '</div>';
     html += '<div class="lg-grid">' + cards.map(c => c.html).join('') + '</div>';
 
-    if (done.length || ozDone.length || luDone.length || dlDone.length) {
+    if (done.length || ozDone.length || luDone.length || dlDone.length || eaDone.length) {
       html += '<div class="lg-done-wrap" id="lg-done">' +
         '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Завершённые <span class="logi-cnt">' + doneTotal + '</span></div>' +
         done.map(_logiDoneRow).join('') +
@@ -8160,6 +8179,10 @@ async function loadLogisticsPickups() {
         (luDone.length
           ? '<details class="ozon-archive"><summary><i class="ti ti-building-warehouse"></i> ТК-Луч — забранные <span>' + luDone.length + '</span></summary>' +
             '<div>' + luDone.map(_luchCardHtml).join('') + '</div></details>'
+          : '') +
+        (eaDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-truck-loading"></i> Экспресс-Авто — забранные <span>' + eaDone.length + '</span></summary>' +
+            '<div>' + eaDone.map(_expressCardHtml).join('') + '</div></details>'
           : '') +
         (dlDone.length
           ? '<details class="dl-archive"><summary><i class="ti ti-truck-delivery"></i> Деловые линии — завершённые <span>' + dlDone.length + '</span></summary>' +
@@ -25687,6 +25710,7 @@ async function ltTripSetStatus(st) {
 // ---------- Справочник точек ----------
 const _LT_KINDS = [
   ['ozon_pvz', 'ПВЗ Ozon'], ['luch_terminal', 'Терминал ТК-Луч'],
+  ['express_terminal', 'Склад Экспресс-Авто'],
   ['dl_terminal', 'Терминал Деловых линий'], ['vi_store', 'ВсеИнструменты'],
   ['supplier', 'Поставщик'], ['custom', 'Другое'],
 ];
@@ -26095,5 +26119,60 @@ async function ltTestCleanup() {
       showToast('Пробные грузы убраны' + (n ? ', тестовых рейсов скрыто: ' + n : ''), 'success');
       loadLogisticsPickups();
     } else showToast('Не удалось убрать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ============ v2.45.916: ТК «Экспресс-Авто» — прибытия из почты ============
+function _expressDate(v) {
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v || '');
+}
+
+function _expressCardHtml(sh) {
+  const completed = !!sh.manual_done;
+  const meta = [];
+  if (sh.arrived_date) meta.push('<span><i class="ti ti-calendar"></i> Прибыл ' + _expressDate(sh.arrived_date) + '</span>');
+  const sz = [];
+  if (sh.places) sz.push(sh.places + ' ' + plural(Number(sh.places), 'место', 'места', 'мест'));
+  if (sh.weight_kg) sz.push(Number(sh.weight_kg) + ' кг');
+  if (sh.volume_m3) sz.push(Number(sh.volume_m3) + ' м³');
+  if (sz.length) meta.push('<span><i class="ti ti-package"></i> ' + sz.join(' · ') + '</span>');
+  if (sh.warehouse_address) meta.push('<span><i class="ti ti-map-pin"></i> ' + escapeHtml(sh.warehouse_address) + '</span>');
+  return '<div class="ozon-card ea-card' + (completed ? ' done' : '') + '">' +
+    '<div class="ozon-top">' +
+      '<div class="ozon-logo ea-logo">ЭА</div>' +
+      '<div class="ozon-title"><b>Расписка ' + escapeHtml(sh.receipt_number || '') + '</b>' +
+        (sh.sender_name ? '<small>От: ' + escapeHtml(sh.sender_name) + '</small>' : '') +
+      '</div>' +
+      '<span class="ozon-status ' + (completed ? 'done' : 'ready') + '">' +
+        '<i class="ti ' + (completed ? 'ti-check' : 'ti-package-import') + '"></i> ' +
+        escapeHtml(sh.status_label || 'Груз на складе') + '</span>' +
+    '</div>' +
+    (meta.length ? '<div class="ozon-meta">' + meta.join('') + '</div>' : '') +
+    '<div class="ozon-actions">' +
+      (!completed ? '<button class="btn btn-primary btn-small" onclick="expressMarkDone(' + Number(sh.id) + ')"><i class="ti ti-check"></i> Забрали</button>'
+                  : '<button class="btn btn-secondary btn-small" onclick="expressMarkDone(' + Number(sh.id) + ', true)"><i class="ti ti-rotate"></i> Вернуть</button>') +
+    '</div>' +
+  '</div>';
+}
+
+async function expressMarkDone(id, undo) {
+  try {
+    const r = await apiPost('/api/logistics/express/' + id + '/done', { done: !undo });
+    if (r && r.ok) { showToast(undo ? 'Вернул на склад' : 'Отмечено: забрали', 'success'); loadLogisticsPickups(); }
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function expressRefresh() {
+  showToast('Перечитываем письма Экспресс-Авто…', 'info');
+  try {
+    const r = await apiPost('/api/logistics/express/refresh', {});
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast('Найдено прибытий: ' + Number(j.found || 0) +
+        (j.created ? ', новых: ' + j.created : ''), 'success');
+      loadLogisticsPickups();
+    } else showToast('Почта сейчас недоступна', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
