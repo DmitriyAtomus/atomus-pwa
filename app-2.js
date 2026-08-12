@@ -5409,7 +5409,9 @@ async function openEditModelModal(modelId) {
           '<select id="em-work-type">' +
             '<option value="full_build"' + ((m.work_type || 'full_build') === 'full_build' ? ' selected' : '') + '>Полная сборка из материалов</option>' +
             '<option value="modify_purchased"' + (m.work_type === 'modify_purchased' ? ' selected' : '') + '>Модификация покупного товара</option>' +
+            '<option value="purchase_only"' + (m.work_type === 'purchase_only' ? ' selected' : '') + '>Заказываем готовым — без производства</option>' +
           '</select>' +
+          '<div class="form-hint">Для гибки и изготовления на стороне: склад резервируется по единственной позиции техкарты, а работа в цех не создаётся.</div>' +
         '</div>' +
       '</div>' +
       '<div class="modal-footer">' +
@@ -7365,6 +7367,7 @@ function openNewModelForm() {
         '<select id="nm-work-type" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;font-family:inherit;">' +
           '<option value="full_build">Полная сборка из материалов</option>' +
           '<option value="modify_purchased">Модификация покупного товара</option>' +
+          '<option value="purchase_only">Заказываем готовым — без производства</option>' +
         '</select>' +
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);">' +
