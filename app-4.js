@@ -17246,10 +17246,13 @@ async function openMfgItem(id) {
 
 // PDF детали ищем по обозначению в имени файла (чертёж «AG-02.000.001 Кожух.pdf»)
 function _mfgPartPdf(it, p) {
-  const d = String(p.designation || '').trim().toLowerCase();
+  // В CAD, ведомости и имени PDF одно обозначение часто записано по-разному:
+  // КИД-10.000.001 / КИД10.000.001 / КИД 10-000-001. Сравнение исходных
+  // строк давало ложное «чертёж не найден», хотя PDF лежал в той же карточке.
+  const d = _mfgDesignationKey(p.designation);
   if (!d) return null;
   return (it.files || []).find(f => f.kind === 'pdf' &&
-    String(f.file_name || '').toLowerCase().indexOf(d) >= 0) || null;
+    _mfgDesignationKey(f.file_name).indexOf(d) >= 0) || null;
 }
 function _mfgView() {
   try {
@@ -18193,6 +18196,23 @@ function _mfgStepFile(fileId) {
 
 async function _mfgStepDrawingContext(item) {
   if (!item) return item;
+
+  // STEP нередко догружают в уже открытую карточку. Перед созданием 3D-сцены
+  // перечитываем изделие, иначе просмотрщик остаётся со старым массивом files и
+  // не видит PDF, которые на сервере уже есть.
+  try {
+    const fresh = await apiGet('/api/mfg/items/' + item.id);
+    if (fresh && Number(fresh.id) === Number(item.id)) {
+      item = fresh;
+      if (state.mfgCurrentItem &&
+          Number(state.mfgCurrentItem.id) === Number(fresh.id)) {
+        state.mfgCurrentItem = fresh;
+      }
+    }
+  } catch (_) {
+    // 3D продолжит работать с текущими данными даже при кратком обрыве сети.
+  }
+
   const ownFiles = item.files || [];
   const ownParts = item.parts || [];
   if (ownParts.length && ownFiles.some(file => file.kind === 'pdf')) return item;

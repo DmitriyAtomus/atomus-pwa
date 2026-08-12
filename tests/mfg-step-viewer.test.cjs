@@ -94,6 +94,14 @@ test('STEP без своих чертежей берёт PDF из основно
     },
     _mfgDesignationKey: value => String(value || '').toUpperCase().replace(/[^A-ZА-Я0-9]/g, ''),
     async apiGet(url) {
+      if (url === '/api/mfg/items/48') {
+        return {
+          id: 48,
+          designation: 'AG-04.000.000СБ',
+          parts: [],
+          files: [{ id: 999, kind: 'step', file_name: 'AG-04.000.000СБ.step' }],
+        };
+      }
       assert.equal(url, '/api/mfg/items/47');
       return {
         id: 47,
@@ -118,6 +126,40 @@ test('STEP без своих чертежей берёт PDF из основно
   assert.equal(resolved.parts[0].designation, 'AG-04.000.003');
   assert.equal(resolved.files.find(file => file.kind === 'pdf').id, 913);
   assert.equal(context.state.mfgCurrentItem.files.length, 2);
+});
+
+test('STEP перечитывает карточку и находит PDF КИД с разными разделителями', async () => {
+  const stale = {
+    id: 52,
+    designation: 'КИД10.000.000',
+    parts: [{ id: 369, designation: 'КИД-10.000.001', name: 'Основание' }],
+    files: [{ id: 1093, kind: 'step', file_name: 'КИД10.000.000 Кронштейн сборка.stp' }],
+  };
+  const fresh = {
+    ...stale,
+    files: stale.files.concat([
+      { id: 1075, kind: 'pdf', file_name: 'КИД10-000-001 Основание.pdf' },
+    ]),
+  };
+  const context = {
+    state: { mfgItems: [], mfgCurrentItem: stale },
+    _mfgDesignationKey: value => String(value || '').toUpperCase().replace(/[^A-ZА-ЯЁ0-9]/g, ''),
+    async apiGet(url) {
+      assert.equal(url, '/api/mfg/items/52');
+      return fresh;
+    },
+  };
+  const partPdfCode = section('function _mfgPartPdf', 'function _mfgView');
+  const drawingCode = section('async function _mfgStepDrawingContext', 'async function _mfgStepResult');
+  vm.runInNewContext(partPdfCode + drawingCode +
+    ';this.partPdf=_mfgPartPdf;this.drawingContext=_mfgStepDrawingContext;', context);
+
+  const resolved = await context.drawingContext(stale);
+  const pdf = context.partPdf(resolved, resolved.parts[0]);
+
+  assert.equal(resolved.files.length, 2);
+  assert.equal(context.state.mfgCurrentItem.files.length, 2);
+  assert.equal(pdf.id, 1075);
 });
 
 test('имя узла STEP сопоставляется с деталью AG и её PDF', () => {
