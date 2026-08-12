@@ -10344,6 +10344,12 @@ function toggleSupplyShopV2() {
   localStorage.setItem('supplyShopV2', cur ? '0' : '1');
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
+// Черновик ещё не отправлен поставщику: он остаётся «К закупке» и его можно
+// продолжить. В ожидание поставки позиция уезжает только после отправки/оформления.
+function _shopIsWaitingStatus(status) {
+  return !!status && status !== 'draft';
+}
+
 // Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount, hiddenItems}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
@@ -10353,7 +10359,7 @@ function _shopApplyLocal(items) {
   const out = (items || []).filter(it => {
     // v2.45.428: уже заказанные/оплаченные — не «к закупке», а «ждём поставку».
     // Исключаем из групп и из формирования заказа (чтобы не заказывать повторно).
-    if (it.order_status) return false;
+    if (_shopIsWaitingStatus(it.order_status)) return false;
     if (hidden.has(it.component_id)) { hiddenCount++; hiddenItems.push(it); return false; }
     return true;
   }).map(it => {
@@ -10465,7 +10471,7 @@ function renderSupplyShopping(d) {
   groups.forEach(g => {
     // заказанные комплектующие → в «Ждём поставку» (из исходных, до фильтра)
     (g.items || []).forEach(it => {
-      if (it.order_status) waitingItems.push(_componentToTracking(it, g));
+      if (_shopIsWaitingStatus(it.order_status)) waitingItems.push(_componentToTracking(it, g));
     });
     const r = _shopApplyLocal(g.items);   // исключает заказанные + скрытые
     r.hiddenItems.forEach(it => hiddenAcc.push(Object.assign({ _sup_name: g.supplier_name || '' }, it)));
@@ -10531,6 +10537,13 @@ function renderSupplyShopping(d) {
   visibleGroups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
+    const draftItems = (g.items || []).filter(it => it.order_status === 'draft' && it.order_id);
+    const draftOrderId = draftItems.length
+      ? Math.max.apply(null, draftItems.map(it => Number(it.order_id) || 0))
+      : 0;
+    const draftOrderLabel = draftItems.length
+      ? (draftItems.find(it => Number(it.order_id) === draftOrderId) || {}).order_label
+      : '';
     // v2.45.642: у «не назначен» позиции группируются по проекту (первому
     // договору из plan_contracts) — вместо колонки «Причина» с 50 повторами.
     let orderedItems = g.items || [];
@@ -10728,10 +10741,14 @@ function renderSupplyShopping(d) {
                 // Сформировать заказ — превью письма + отправка
                 ' <button class="btn btn-primary btn-sm" ' +
                   (g.supplier_email
-                    ? 'onclick="openCreateOrderPreview(' + g.supplier_id + ')" title="Создать заказ и отправить письмо поставщику"'
+                    ? 'onclick="openCreateOrderPreview(' + g.supplier_id + ')" title="' +
+                      (draftOrderId ? 'Продолжить черновик и отправить письмо поставщику' : 'Создать заказ и отправить письмо поставщику') + '"'
                     : 'disabled title="У поставщика не указан email — заполни его в карточке поставщика"'
                   ) + '>' +
-                  '<i class="ti ti-mail-send"></i>Сформировать заказ</button>' +
+                  '<i class="ti ti-mail-send"></i>' +
+                  (draftOrderId
+                    ? ('Продолжить ' + escapeHtml(draftOrderLabel || ('ORD-' + draftOrderId)))
+                    : 'Сформировать заказ') + '</button>' +
                 // v2.45.337: оформить вручную — заказ уже сделан/оплачен по телефону, без письма
                 ' <button class="btn btn-secondary btn-sm" onclick="openManualOrderDialog(' + g.supplier_id + ')" ' +
                   'title="Уже заказал/оплатил по телефону — записать заказ без письма и сразу поставить статус">' +
@@ -10868,7 +10885,27 @@ async function downloadShoppingGroupDocx(supplierId) {
   }
 }
 
-// «Сформировать заказ» — создаём черновик, открываем модалку превью письма
+async function openExistingShoppingDraft(orderId) {
+  if (!orderId) return false;
+  try {
+    const resp = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/preview', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось открыть черновик', 'error');
+      return false;
+    }
+    _renderOrderPreviewModal(await resp.json());
+    return true;
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    return false;
+  }
+}
+
+// «Сформировать заказ» — продолжаем уже созданный черновик либо создаём новый,
+// затем открываем модалку превью письма.
 async function openCreateOrderPreview(supplierId) {
   const d = await apiGet('/api/supply/shopping-list');
   const group = (d.groups || []).find(g => g.supplier_id === supplierId);
@@ -10880,6 +10917,16 @@ async function openCreateOrderPreview(supplierId) {
   }
   if (!group.supplier_email) {
     showToast('У поставщика не указан email', 'error');
+    return;
+  }
+  // Закрыли превью или обновили страницу — не плодим ORD-дубли. Открываем самый
+  // свежий черновик этого поставщика, позиции которого уже видны в группе.
+  const draftIds = (group.items || [])
+    .filter(it => it.order_status === 'draft' && it.order_id)
+    .map(it => Number(it.order_id))
+    .filter(Boolean);
+  if (draftIds.length) {
+    await openExistingShoppingDraft(Math.max.apply(null, draftIds));
     return;
   }
   // Создаём draft + получаем превью
