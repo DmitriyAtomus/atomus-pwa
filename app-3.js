@@ -25354,12 +25354,14 @@ function _ltDate(v) {
   const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v || '');
 }
-// Ссылки в навигаторы считаем прямо тут — те же, что бэкенд шлёт курьеру
+// Ссылки в навигаторы считаем прямо тут — те же, что бэкенд шлёт курьеру.
+// 2ГИС: формат «Поделиться маршрутом» — /tab/car и кодированные %2C/%3B,
+// иначе мобильное приложение открывает пустой маршрут (v2.45.912)
 function _ltNavLinks(points) {
   const pts = (points || []).filter(p => p.lat != null && p.lon != null);
   if (pts.length < 2) return { gis: '', ya: '' };
   return {
-    gis: 'https://2gis.ru/directions/points/' + pts.map(p => p.lon + ',' + p.lat).join(';'),
+    gis: 'https://2gis.ru/directions/tab/car/points/' + pts.map(p => p.lon + '%2C' + p.lat).join('%3B'),
     ya: 'https://yandex.ru/maps/?rtext=' + pts.map(p => p.lat + ',' + p.lon).join('~') + '&rtt=auto',
   };
 }
