@@ -25354,14 +25354,12 @@ function _ltDate(v) {
   const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v || '');
 }
-// Ссылки в навигаторы считаем прямо тут — те же, что бэкенд шлёт курьеру.
-// 2ГИС: формат «Поделиться маршрутом» — /tab/car и кодированные %2C/%3B,
-// иначе мобильное приложение открывает пустой маршрут (v2.45.912)
+// Ссылка в навигатор — та же, что бэкенд шлёт курьеру. Только Яндекс:
+// 2ГИС на прогоне 12.08.2026 собирал маршрут из ссылки криво (v2.45.915)
 function _ltNavLinks(points) {
   const pts = (points || []).filter(p => p.lat != null && p.lon != null);
-  if (pts.length < 2) return { gis: '', ya: '' };
+  if (pts.length < 2) return { ya: '' };
   return {
-    gis: 'https://2gis.ru/directions/tab/car/points/' + pts.map(p => p.lon + '%2C' + p.lat).join('%3B'),
     ya: 'https://yandex.ru/maps/?rtext=' + pts.map(p => p.lat + ',' + p.lon).join('~') + '&rtt=auto',
   };
 }
@@ -25390,7 +25388,7 @@ async function loadLogiTrips() {
       html += '<div class="lt-hello"><div class="ic">🚐</div>' +
         '<b>Рейсов ещё не было</b>' +
         '<p>Рейс — это маршрут забора грузов на день: Ozon, терминалы ТК, самовывозы у поставщиков. ' +
-        'Собираешь точки, отправляешь курьеру чек-лист в MAX со ссылкой на 2ГИС — ' +
+        'Собираешь точки, отправляешь курьеру чек-лист в MAX со ссылкой на Яндекс-маршрут — ' +
         'он едет и отвечает «2 забрал», а СРМ сама закрывает грузы.</p></div>';
     } else {
       if (active.length) html += '<div class="lt-list">' + active.map(_ltTripCard).join('') + '</div>';
@@ -25603,7 +25601,6 @@ function _ltTripRender(trip) {
     html += '<div class="lt-trip-btns">' +
       '<button class="btn btn-primary" onclick="ltTripSend()"><i class="ti ti-send"></i> ' +
         (trip.status === 'draft' ? 'Отправить курьеру в MAX' : 'Отправить ещё раз') + '</button>' +
-      (links.gis ? '<a class="btn btn-secondary" href="' + links.gis + '" target="_blank" rel="noopener">📍 2ГИС</a>' : '') +
       (links.ya ? '<a class="btn btn-secondary" href="' + links.ya + '" target="_blank" rel="noopener">🧭 Яндекс</a>' : '') +
       (pts.length >= 3 && pts.every(p => p.lat != null && p.lon != null)
         ? '<button class="btn btn-secondary" onclick="ltTripOptimize()"><i class="ti ti-route"></i> Оптимизировать</button>' : '') +
@@ -25611,7 +25608,7 @@ function _ltTripRender(trip) {
       '<button class="btn btn-secondary" onclick="ltTripSetStatus(\'done\')"><i class="ti ti-flag-check"></i> Завершить</button>' +
       '<button class="btn btn-secondary danger" onclick="ltTripSetStatus(\'cancelled\')"><i class="ti ti-x"></i> Отменить</button>' +
     '</div>';
-    if (!links.gis && pts.length >= 2) {
+    if (!links.ya && pts.length >= 2) {
       html += '<div class="lt-hint"><i class="ti ti-info-circle"></i> Ссылки на навигатор появятся, когда у точек будут координаты — заполни их в «Справочнике точек».</div>';
     }
   }
