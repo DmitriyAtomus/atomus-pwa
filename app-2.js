@@ -2584,8 +2584,7 @@ state.taskFormMode = 'new';
 state.taskForm = {
   title: '',
   description: '',
-  assignee_id: null,
-  assignee_name: '',
+  assignee_ids: [],
   deadline: '',
   priority: 'normal',
   source: '',
@@ -2784,10 +2783,13 @@ function renderTasksList(d) {
   const byWho = {};
   let noAss = 0;
   open.forEach(t => {
-    if (!t.assignee_id) { noAss++; return; }
-    const k = t.assignee_id;
-    if (!byWho[k]) byWho[k] = { id: k, name: t.assignee_name || ('#' + k), n: 0 };
-    byWho[k].n++;
+    const assignees = getTaskAssignees(t);
+    if (!assignees.length) { noAss++; return; }
+    assignees.forEach(emp => {
+      const k = Number(emp.id);
+      if (!byWho[k]) byWho[k] = { id: k, name: emp.name || emp.short_name || emp.full_name || ('#' + k), n: 0 };
+      byWho[k].n++;
+    });
   });
   const whoList = Object.values(byWho).sort((a, b) => b.n - a.n);
   if (whoList.length > 1 || noAss > 0) {
@@ -2807,8 +2809,9 @@ function renderTasksList(d) {
 
   // Фильтр по исполнителю
   let list = tasks;
-  if (state.tasksWho === 'none') list = tasks.filter(t => !t.assignee_id);
-  else if (state.tasksWho) list = tasks.filter(t => t.assignee_id === state.tasksWho);
+  if (state.tasksWho === 'none') list = tasks.filter(t => !getTaskAssignees(t).length);
+  else if (state.tasksWho) list = tasks.filter(t =>
+    getTaskAssignees(t).some(emp => Number(emp.id) === Number(state.tasksWho)));
 
   // Группировка по сроку
   const groups = { late: [], today: [], tomorrow: [], week: [], later: [], nodate: [], done: [] };
@@ -2879,7 +2882,8 @@ function renderTasksBoard(d) {
 function _renderTaskBoardCard(t) {
   const pri = t.priority || 'normal';
   const meta = [];
-  if (t.assignee_name) meta.push('<span><i class="ti ti-user"></i>' + escapeHtml(t.assignee_name) + '</span>');
+  const names = getTaskAssignees(t).map(emp => emp.name || emp.short_name || emp.full_name || '—');
+  if (names.length) meta.push('<span><i class="ti ti-users"></i>' + escapeHtml(names.join(', ')) + '</span>');
   if (t.deadline) {
     let cls = '';
     try {
@@ -2952,6 +2956,14 @@ async function _tasksQuickDone(ev, taskId) {
 
 // v2.45.661: строка задачи — вся суть в две-три строчки (статус, исполнитель,
 // срок с дельтой, источник, договор, возраст, кто поставил)
+function getTaskAssignees(t) {
+  if (t && Array.isArray(t.assignees) && t.assignees.length) return t.assignees;
+  if (t && t.assignee_id) {
+    return [{ id: t.assignee_id, name: t.assignee_name || '' }];
+  }
+  return [];
+}
+
 function renderTaskRow(t) {
   const isDone = t.status === 'done' || t.status === 'cancelled';
   const diff = _taskDayDiff(t.deadline);
@@ -2973,11 +2985,17 @@ function renderTaskRow(t) {
 
   // Строка 1: исполнитель + срок
   let line1 = '';
-  if (t.assignee_name) {
-    const colorIdx = (t.assignee_id || 0) % 8;
-    const initials = (typeof getInitials === 'function') ? getInitials(t.assignee_name) : '?';
-    line1 += '<span class="pkb-wl-avatar ac-' + colorIdx + ' tkr-ava">' + escapeHtml(initials) + '</span>' +
-      '<span class="tkr-nm">' + escapeHtml(t.assignee_name) + '</span>';
+  const taskAssignees = getTaskAssignees(t);
+  if (taskAssignees.length) {
+    const visible = taskAssignees.slice(0, 3);
+    line1 += '<span class="task-assignee-avatars">';
+    visible.forEach(emp => {
+      const colorIdx = (emp.id || 0) % 8;
+      const name = emp.name || emp.short_name || emp.full_name || '—';
+      const initials = (typeof getInitials === 'function') ? getInitials(name) : '?';
+      line1 += '<span class="pkb-wl-avatar ac-' + colorIdx + ' tkr-ava" title="' + escapeHtml(name) + '">' + escapeHtml(initials) + '</span>';
+    });
+    line1 += '</span><span class="tkr-nm">' + escapeHtml(taskAssignees.map(emp => emp.name || emp.short_name || emp.full_name || '—').join(', ')) + '</span>';
   } else if (!isDone) {
     line1 += '<span class="tkr-noass">исполнитель не назначен</span>';
   }
@@ -3135,7 +3153,9 @@ function renderTaskDetail(t) {
   document.getElementById('task-detail-title').textContent = t.title || '—';
   document.getElementById('task-detail-mob-title').textContent = t.title || 'Задача';
   const sub = [];
-  if (t.assignee_name) sub.push('Исполнитель: ' + t.assignee_name);
+  const taskAssignees = getTaskAssignees(t);
+  const assigneeNames = taskAssignees.map(emp => emp.name || emp.short_name || emp.full_name || '—');
+  if (assigneeNames.length) sub.push((assigneeNames.length > 1 ? 'Исполнители: ' : 'Исполнитель: ') + assigneeNames.join(', '));
   if (t.priority === 'urgent') sub.push('🔥 срочно');
   document.getElementById('task-detail-subtitle').textContent = sub.join(' · ') || '—';
 
@@ -3144,7 +3164,7 @@ function renderTaskDetail(t) {
   const myChatId = state.user && state.user.chat_id;
   const myEmpId = state.user && state.user.employee_id;
   const isCreator = t.creator_chat_id === myChatId;
-  const isAssignee = t.assignee_id === myEmpId;
+  const isAssignee = taskAssignees.some(emp => Number(emp.id) === Number(myEmpId));
   const canChangeStatus = canEdit || isCreator || isAssignee;
   const canEditFully = canEdit || isCreator;
 
@@ -3220,13 +3240,13 @@ function renderTaskDetail(t) {
 
   // Карточки-факты
   html += '<div class="task-facts-grid">';
-  // Исполнитель
+  // Исполнители
   html += '<div class="task-fact">' +
-            '<div class="task-fact-icon c-violet"><i class="ti ti-user"></i></div>' +
+            '<div class="task-fact-icon c-violet"><i class="ti ti-users"></i></div>' +
             '<div class="task-fact-body">' +
-              '<div class="task-fact-label">Исполнитель</div>' +
-              '<div class="task-fact-value' + (t.assignee_name ? '' : ' muted') + '">' +
-                escapeHtml(t.assignee_name || 'не назначен') + '</div>' +
+              '<div class="task-fact-label">Исполнители</div>' +
+              '<div class="task-fact-value' + (assigneeNames.length ? '' : ' muted') + '">' +
+                escapeHtml(assigneeNames.length ? assigneeNames.join(', ') : 'не назначены') + '</div>' +
             '</div></div>';
   // Дедлайн
   html += '<div class="task-fact">' +
@@ -3370,11 +3390,11 @@ function _saveTaskDraft() {
     if (state.taskFormMode === 'edit') return;  // черновики только для новой задачи
     const f = state.taskForm || {};
     const hasContent = (f.title && f.title.trim()) || (f.description && f.description.trim()) ||
-      f.assignee_id || f.deadline || (f.source && f.source.trim()) || f.contract_id;
+      (f.assignee_ids && f.assignee_ids.length) || f.deadline || (f.source && f.source.trim()) || f.contract_id;
     if (!hasContent) { localStorage.removeItem(TASK_DRAFT_KEY); return; }
     localStorage.setItem(TASK_DRAFT_KEY, JSON.stringify({
       title: f.title || '', description: f.description || '',
-      assignee_id: f.assignee_id || null, assignee_name: f.assignee_name || '',
+      assignee_ids: f.assignee_ids || [],
       deadline: f.deadline || '', priority: f.priority || 'normal',
       source: f.source || '', contract_id: f.contract_id || null,
       contract_label: f.contract_label || '', _ts: Date.now(),
@@ -3399,7 +3419,7 @@ function clearTaskDraft() {
 function discardTaskDraft() {
   clearTaskDraft();
   state.taskForm = {
-    title: '', description: '', assignee_id: null, assignee_name: '',
+    title: '', description: '', assignee_ids: [],
     deadline: '', priority: 'normal', source: '',
     contract_id: null, contract_label: '',
   };
@@ -3420,7 +3440,7 @@ function openNewTask() {
   state.taskFromContractId = null;
   state.taskFromContractLabel = '';
   state.taskForm = {
-    title: '', description: '', assignee_id: null, assignee_name: '',
+    title: '', description: '', assignee_ids: [],
     deadline: '', priority: 'normal', source: '',
     contract_id: preContractId, contract_label: preContractLabel,
   };
@@ -3431,7 +3451,9 @@ function openNewTask() {
     if (draft) {
       state.taskForm = {
         title: draft.title || '', description: draft.description || '',
-        assignee_id: draft.assignee_id || null, assignee_name: draft.assignee_name || '',
+        assignee_ids: Array.isArray(draft.assignee_ids)
+          ? draft.assignee_ids.map(Number).filter(Boolean)
+          : (draft.assignee_id ? [Number(draft.assignee_id)] : []),
         deadline: draft.deadline || '', priority: draft.priority || 'normal',
         source: draft.source || '',
         contract_id: draft.contract_id || null, contract_label: draft.contract_label || '',
@@ -3454,8 +3476,7 @@ async function openEditTask() {
     state.taskForm = {
       title: t.title || '',
       description: t.description || '',
-      assignee_id: t.assignee_id,
-      assignee_name: t.assignee_name || '',
+      assignee_ids: getTaskAssignees(t).map(emp => Number(emp.id)).filter(Boolean),
       deadline: t.deadline || '',
       priority: t.priority || 'normal',
       source: t.source || '',
@@ -3554,10 +3575,11 @@ function renderTaskForm() {
           '</div></div>';
   html += '</div>';
 
-  // Исполнитель + дедлайн
+  // Исполнители + дедлайн
   html += '<div class="sales-form-section">';
   html += '<div class="sales-form-row">';
-  html += '<div><label>Исполнитель</label>' + renderAssigneeSelect(f.assignee_id) + '</div>';
+  html += '<div><label>Исполнители <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(можно выбрать нескольких)</span></label>' +
+          '<div id="tf-assignees-picker">' + renderTaskAssigneePicker() + '</div></div>';
   html += '<div><label>Дедлайн <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
           '<input type="date" id="tf-deadline" value="' + escapeHtml(f.deadline) + '"></div>';
   html += '</div>';
@@ -3617,16 +3639,6 @@ function renderTaskForm() {
   document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; _saveTaskDraft(); });
   document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; _saveTaskDraft(); });
   document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; _saveTaskDraft(); });
-  const assigneeSel = document.getElementById('tf-assignee');
-  if (assigneeSel) {
-    assigneeSel.addEventListener('change', e => {
-      const v = e.target.value;
-      state.taskForm.assignee_id = v ? parseInt(v) : null;
-      const opt = assigneeSel.selectedOptions[0];
-      state.taskForm.assignee_name = opt ? opt.textContent : '';
-      _saveTaskDraft();
-    });
-  }
 }
 
 // v2.45.80: голосовой ввод текста в произвольное поле через Web Speech API.
@@ -3695,15 +3707,59 @@ function _voiceToField(fieldId, stateKey) {
   }
 }
 
-function renderAssigneeSelect(currentId) {
+function renderTaskAssigneePicker() {
   const list = cache.activeEmployees || [];
-  let html = '<select id="tf-assignee"><option value="">— не назначен —</option>';
+  const selectedIds = (state.taskForm && state.taskForm.assignee_ids || []).map(Number);
+  const selected = list.filter(emp => selectedIds.indexOf(Number(emp.id)) >= 0);
+  let html = '<div class="task-assignee-picker">';
+  if (selected.length) {
+    html += '<div class="task-assignee-selected">';
+    selected.forEach(emp => {
+      const name = emp.short_name || emp.full_name || '—';
+      html += '<button type="button" class="task-assignee-chip" onclick="toggleTaskAssignee(' + Number(emp.id) + ')" title="Убрать исполнителя">' +
+        '<i class="ti ti-user-check"></i>' + escapeHtml(name) + '<i class="ti ti-x"></i></button>';
+    });
+    html += '<button type="button" class="btn-link task-assignee-clear" onclick="clearTaskAssignees()">Очистить</button></div>';
+  } else {
+    html += '<div class="task-assignee-empty"><i class="ti ti-users"></i> Исполнители пока не выбраны</div>';
+  }
+  html += '<div class="task-assignee-options">';
   list.forEach(e => {
-    const sel = (e.id === currentId) ? ' selected' : '';
-    html += '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.short_name || e.full_name || '—') + '</option>';
+    const id = Number(e.id);
+    const isSelected = selectedIds.indexOf(id) >= 0;
+    const name = e.short_name || e.full_name || '—';
+    html += '<button type="button" class="task-assignee-option' + (isSelected ? ' selected' : '') + '" ' +
+      'role="checkbox" aria-checked="' + (isSelected ? 'true' : 'false') + '" onclick="toggleTaskAssignee(' + id + ')">' +
+      '<span class="task-assignee-check"><i class="ti ' + (isSelected ? 'ti-check' : 'ti-user-plus') + '"></i></span>' +
+      '<span>' + escapeHtml(name) + '</span></button>';
   });
-  html += '</select>';
+  if (!list.length) html += '<div class="task-assignee-empty">Активные сотрудники не найдены</div>';
+  html += '</div></div>';
   return html;
+}
+
+function refreshTaskAssigneePicker() {
+  const el = document.getElementById('tf-assignees-picker');
+  if (el) el.innerHTML = renderTaskAssigneePicker();
+}
+
+function toggleTaskAssignee(employeeId) {
+  if (!state.taskForm) return;
+  const id = Number(employeeId);
+  const ids = (state.taskForm.assignee_ids || []).map(Number).filter(Boolean);
+  const index = ids.indexOf(id);
+  if (index >= 0) ids.splice(index, 1);
+  else ids.push(id);
+  state.taskForm.assignee_ids = ids;
+  _saveTaskDraft();
+  refreshTaskAssigneePicker();
+}
+
+function clearTaskAssignees() {
+  if (!state.taskForm) return;
+  state.taskForm.assignee_ids = [];
+  _saveTaskDraft();
+  refreshTaskAssigneePicker();
 }
 
 function setTaskPriority(p) {
@@ -3733,7 +3789,7 @@ async function submitTaskForm() {
   const payload = {
     title: f.title.trim(),
     description: f.description.trim(),
-    assignee_id: f.assignee_id || null,
+    assignee_ids: (f.assignee_ids || []).map(Number).filter(Boolean),
     deadline: f.deadline || null,
     priority: f.priority || 'normal',
     source: f.source.trim(),
