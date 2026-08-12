@@ -25585,15 +25585,19 @@ function _ltTripRender(trip) {
   const links = _ltNavLinks(pts);
   const activeSt = ['draft', 'sent', 'in_progress'].includes(trip.status);
   const doneN = pts.filter(p => p.status === 'done').length;
-  let html = '<div class="lt-trip-hd">' +
-    '<h3><i class="ti ti-steering-wheel"></i> ' + escapeHtml(trip.doc_number || ('Рейс #' + trip.id)) + '</h3>' +
-    _ltStatusChip(trip.status) +
-    '<button class="icon-btn" onclick="document.getElementById(\'lt-trip-modal\').remove()" style="margin-left:auto;"><i class="ti ti-x"></i></button>' +
-  '</div>' +
-  '<div class="lt-trip-meta">' +
-    '<span><i class="ti ti-calendar"></i> ' + _ltDate(trip.trip_date) + '</span>' +
-    '<span><i class="ti ti-user"></i> ' + escapeHtml(trip.driver_name || 'исполнитель не назначен') + '</span>' +
-    '<span><i class="ti ti-map-pin"></i> ' + doneN + ' из ' + pts.length + '</span>' +
+  // v2.45.921: герой-шапка — номер, статус, прогресс одной плашкой
+  const pct = pts.length ? Math.round(doneN / pts.length * 100) : 0;
+  let html = '<div class="lt-hero">' +
+    '<div class="lt-hero-row">' +
+      '<span class="lt-hero-badge"><i class="ti ti-steering-wheel"></i></span>' +
+      '<div class="lt-hero-tt"><b>' + escapeHtml(trip.doc_number || ('Рейс #' + trip.id)) + '</b>' +
+        '<small>' + _ltDate(trip.trip_date) + ' · ' +
+        escapeHtml(trip.driver_name || 'исполнитель не назначен') + '</small></div>' +
+      _ltStatusChip(trip.status) +
+      '<button class="icon-btn lt-hero-x" onclick="document.getElementById(\'lt-trip-modal\').remove()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    (pts.length ? '<div class="lt-hero-prog"><i style="width:' + pct + '%;"></i>' +
+      '<span>' + doneN + ' из ' + pts.length + '</span></div>' : '') +
   '</div>';
   // v2.45.905: живая карта рейса — появляется, если у точек есть координаты
   html += '<div class="lt-map-wrap" id="lt-map-wrap" style="display:none;">' +

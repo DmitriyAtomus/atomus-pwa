@@ -23098,3 +23098,85 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .ea-card { border-color: #FDE4C0; border-left-color: #D97706; box-shadow: 0 1px 3px rgba(180,83,9,.07); }
 .ea-card:hover { box-shadow: 0 8px 22px rgba(180,83,9,.12); }
 .ea-logo { background: #D97706; font-size: 13px; }
+
+/* ============ v2.45.921: Рейсы — обновлённый дизайн ============ */
+/* Вкладки — сегмент-контрол */
+.lg-tabs { display: inline-flex; gap: 4px; background: #E9EEF6; border-radius: 12px; padding: 4px; margin-bottom: 14px; }
+.lg-tab { border: none; background: transparent; color: #5B6B80; border-radius: 9px; padding: 8px 18px; font-size: 13px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-family: inherit; transition: all .15s; }
+.lg-tab:hover { color: var(--brand); }
+.lg-tab.on { background: #fff; border: none; color: var(--brand); box-shadow: 0 2px 8px rgba(15,30,60,.12); }
+.lg-tab .ti { font-size: 16px; }
+
+/* Список рейсов */
+.lt-list { gap: 10px; }
+.lt-card { border: none; border-radius: 16px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(15,30,60,.06), 0 8px 24px rgba(15,30,60,.05); position: relative; overflow: hidden; }
+.lt-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #60A5FA, var(--brand)); }
+.lt-card:hover { box-shadow: 0 4px 12px rgba(15,30,60,.10), 0 14px 34px rgba(15,30,60,.10); transform: translateY(-2px); }
+.lt-card-top b { font-size: 15px; letter-spacing: .2px; }
+.lt-prog { height: 18px; background: #EEF2F8; }
+.lt-prog-fill { background: linear-gradient(90deg, #6EE7B7, #10B981); }
+
+/* Герой-шапка карточки рейса */
+.lt-hero { background: linear-gradient(135deg, #2D5F8B 0%, #1B3B5C 100%); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; color: #fff; box-shadow: 0 10px 28px rgba(27,59,92,.35); }
+.lt-hero-row { display: flex; align-items: center; gap: 12px; }
+.lt-hero-badge { width: 40px; height: 40px; border-radius: 13px; background: rgba(255,255,255,.14); display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none; }
+.lt-hero-tt { flex: 1; min-width: 0; }
+.lt-hero-tt b { display: block; font-size: 17px; letter-spacing: .3px; }
+.lt-hero-tt small { font-size: 12px; opacity: .75; font-weight: 700; }
+.lt-hero .ozon-status { background: rgba(255,255,255,.16); color: #fff; border: none; }
+.lt-hero-x { color: rgba(255,255,255,.7); flex: none; }
+.lt-hero-x:hover { color: #fff; background: rgba(255,255,255,.12); }
+.lt-hero-prog { position: relative; height: 18px; background: rgba(255,255,255,.18); border-radius: 99px; margin-top: 12px; overflow: hidden; }
+.lt-hero-prog i { display: block; height: 100%; background: linear-gradient(90deg, #6EE7B7, #34D399); border-radius: 99px; transition: width .3s; }
+.lt-hero-prog span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+
+/* Карта: плашка км/минут поверх карты */
+.lt-map-wrap { position: relative; margin: 0 0 14px; }
+#lt-map { height: 250px; border-radius: 14px; border: none; box-shadow: inset 0 0 0 1px rgba(15,30,60,.08); }
+.lt-map-sum { position: absolute; left: 10px; bottom: 10px; z-index: 800; margin: 0; background: rgba(255,255,255,.94); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 7px 13px; border-radius: 99px; box-shadow: 0 4px 14px rgba(15,30,60,.18); font-size: 12px; color: #33415A; }
+.lt-map-sum:empty { display: none; }
+
+/* Точки — таймлайн */
+.lt-pts { position: relative; padding: 2px 0; }
+.lt-pts::before { content: ''; position: absolute; left: 17px; top: 22px; bottom: 22px; width: 2px; background: linear-gradient(180deg, #DBEAFE, #E6EBF3); }
+.lt-pt { border-bottom: none; padding: 10px 4px; }
+.lt-pt .n { width: 30px; height: 30px; font-size: 12.5px; box-shadow: 0 0 0 3px var(--card), 0 2px 6px rgba(15,30,60,.18); position: relative; z-index: 1; background: linear-gradient(135deg, #3D77A8, var(--brand)); }
+.lt-pt.done .n { background: linear-gradient(135deg, #34D399, #059669); }
+.lt-pt.problem .n { background: linear-gradient(135deg, #F87171, #B5260C); }
+.lt-pt .tx b { font-size: 13.5px; }
+.lt-eta { background: #EFF6FF; border: 1px solid #DBEAFE; padding: 3px 10px; border-radius: 99px; }
+.lt-pt .ops { gap: 3px; }
+.lt-pt .ops .icon-btn { width: 30px; height: 30px; border-radius: 9px; opacity: .55; transition: all .12s; }
+.lt-pt:hover .ops .icon-btn { opacity: 1; }
+.lt-pt .ops .icon-btn:hover { background: #EFF4FA; }
+.lt-pt .ops .icon-btn.ok:hover { background: #ECFDF5; }
+.lt-pt .ops .icon-btn.warn:hover { background: #FFFBEB; }
+
+/* Кнопки действий */
+.lt-trip-btns { gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #EDF1F7; }
+.lt-trip-btns .btn { border-radius: 11px; font-weight: 800; }
+.lt-trip-btns .btn.btn-primary { background: linear-gradient(135deg, #2D5F8B, #234C71); border: none; box-shadow: 0 6px 16px rgba(45,95,139,.35); }
+.lt-trip-btns .btn.btn-primary:hover { box-shadow: 0 8px 20px rgba(45,95,139,.45); transform: translateY(-1px); }
+.lt-trip-btns .btn.btn-secondary { background: #F3F6FB; border: none; color: #33415A; }
+.lt-trip-btns .btn.btn-secondary:hover { background: #E9EEF6; }
+.lt-trip-btns .btn.danger { color: var(--danger); background: #FEF2F2; }
+.lt-trip-btns .btn.danger:hover { background: #FEE2E2; }
+
+/* Панель действий и пустое состояние */
+.lt-bar .btn { border-radius: 11px; }
+.lt-hello { border: none; box-shadow: 0 8px 28px rgba(15,30,60,.08); }
+.lt-hello .ic { font-size: 44px; }
+
+/* Модалка нового рейса — пул как карточки-чипы */
+.lt-pool-i { border-radius: 12px; transition: all .12s; }
+.lt-pool-i:hover { border-color: #B6D4F5; }
+.lt-pool-i:has(input:checked) { border-color: #7EB3E8; background: linear-gradient(0deg, #F5FAFF, #F5FAFF); box-shadow: 0 2px 8px rgba(45,95,139,.10); }
+
+@media (max-width: 700px) {
+  .lg-tabs { width: 100%; }
+  .lg-tab { flex: 1; justify-content: center; }
+  .lt-hero-tt b { font-size: 15px; }
+  .lt-hero .ozon-status { display: none; }
+  #lt-map { height: 200px; }
+  .lt-pt .ops .icon-btn { opacity: 1; }
+}
