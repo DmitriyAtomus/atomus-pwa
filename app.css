@@ -7947,6 +7947,13 @@
     background: var(--brand-bg);
     border-color: var(--brand-soft);
   }
+  .sp-tree-category {
+    margin-left: 22px;
+  }
+  .sp-tree-toggle.category {
+    background: #F8FAFC;
+    font-size: 12.5px;
+  }
 
   .sp-tree-chev {
     transition: transform 0.2s;

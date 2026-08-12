@@ -12298,6 +12298,7 @@ async function loadNomTab(tab) {
         state._nomPicker.productionData = {
           models: (d && d.models) || [],
           directions: (d && d.directions) || [],
+          categories: (d && d.categories) || [],
         };
       } catch (e) {
         body.innerHTML = '<div class="nom-empty">Ошибка загрузки: ' + escapeHtml(String(e)) + '</div>';
@@ -12387,7 +12388,9 @@ function renderProductionTree() {
     if (!filter) return true;
     return (m.name || '').toLowerCase().includes(filter) ||
            (m.article || '').toLowerCase().includes(filter) ||
-           (m.extra || '').toLowerCase().includes(filter);
+           (m.extra || '').toLowerCase().includes(filter) ||
+           (m.subgroup_name || '').toLowerCase().includes(filter) ||
+           (m.category_name || '').toLowerCase().includes(filter);
   });
   if (!list.length) {
     body.innerHTML = '<div class="nom-empty"><i class="ti ti-search-off" style="font-size:24px; display:block; margin-bottom:6px;"></i>' +
@@ -12420,46 +12423,60 @@ function renderProductionTree() {
           bySg[s].items.push(m);
         } else noSg.push(m);
       });
-      // v2.45.681/684: длинные списки разбиваем на авто-серии по артикулу
-      // (ЩУ-001-…, ЩУ-002-…) — раскрываешь «001», потом «002», а не листаешь всё
-      function _seriesHtml(items, keyPrefix) {
+      // v2.45.913: внутри подгруппы показываем реальные категории
+      // из справочника. Раньше пикер сам выдумывал «Серию» из артикула,
+      // поэтому ЩУ-005.003 оказывался не в своей категории «ЩУ-005.000 АСУ».
+      function _categoryHtml(items, keyPrefix) {
         let out = '';
-        const bySer = {};
-        if (items.length > 15) {
-          items.forEach(m => {
-            const a = String(m.article || m.name || '').trim();
-            const seg = a.split(/[-–\s]+/).filter(Boolean);
-            const ser = seg.length >= 2 ? (seg[0] + '-' + seg[1]) : (seg[0] || 'Прочее');
-            (bySer[ser] = bySer[ser] || []).push(m);
-          });
+        const byCategory = {};
+        const withoutCategory = [];
+        items.forEach(m => {
+          if (!m.category_id) {
+            withoutCategory.push(m);
+            return;
+          }
+          const categoryId = String(m.category_id);
+          if (!byCategory[categoryId]) {
+            const fromDirectory = (d.categories || []).find(c => Number(c.id) === Number(m.category_id));
+            byCategory[categoryId] = {
+              id: m.category_id,
+              name: m.category_name || (fromDirectory && fromDirectory.name) || ('Категория #' + categoryId),
+              items: [],
+            };
+          }
+          byCategory[categoryId].items.push(m);
+        });
+        if (withoutCategory.length) {
+          out += '<div class="sp-tree-items">';
+          withoutCategory.forEach(m => { out += _prodPickItem(m, dirName); });
+          out += '</div>';
         }
-        const serNames = Object.keys(bySer).sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
-        if (serNames.length > 1) {
-          serNames.forEach(ser => {
-            const sKey = keyPrefix + ':' + ser;
-            const sOpen = autoOpen || !!og[sKey];
-            out += '<div class="sp-tree-subgroup">' +
-              '<button type="button" class="sp-tree-toggle subgroup' + (sOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + sKey.replace(/'/g, "\\'") + '\')">' +
+        Object.keys(byCategory)
+          .sort((a, b) => (byCategory[a].name || '').localeCompare(byCategory[b].name || '', 'ru', { numeric: true }))
+          .forEach(categoryId => {
+            const category = byCategory[categoryId];
+            const cKey = keyPrefix + ':cat:' + categoryId;
+            const cOpen = autoOpen || !!og[cKey];
+            out += '<div class="sp-tree-subgroup sp-tree-category">' +
+              '<button type="button" class="sp-tree-toggle subgroup category' + (cOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + cKey + '\')">' +
                 '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
-                '<span>Серия ' + escapeHtml(ser) + '</span>' +
-                '<span class="sp-tree-count subgroup">' + bySer[ser].length + '</span>' +
+                '<i class="ti ti-folder" style="font-size:14px;opacity:.65;"></i>' +
+                '<span>' + escapeHtml(category.name) + '</span>' +
+                '<span class="sp-tree-count subgroup">' + category.items.length + '</span>' +
               '</button>';
-            if (sOpen) {
+            if (cOpen) {
               out += '<div class="sp-tree-items">';
-              bySer[ser].forEach(m => { out += _prodPickItem(m, dirName); });
+              category.items.forEach(m => { out += _prodPickItem(m, dirName); });
               out += '</div>';
             }
             out += '</div>';
           });
-        } else {
-          out += '<div class="sp-tree-items">';
-          items.forEach(m => { out += _prodPickItem(m, dirName); });
-          out += '</div>';
-        }
         return out;
       }
       if (noSg.length) {
-        h += _seriesHtml(noSg, 'pser:' + dirId);
+        h += '<div class="sp-tree-items">';
+        noSg.forEach(m => { h += _prodPickItem(m, dirName); });
+        h += '</div>';
       }
       Object.keys(bySg).sort((a, b) => (bySg[a].name || '').localeCompare(bySg[b].name || '', 'ru')).forEach(s => {
         const sg = bySg[s];
@@ -12472,8 +12489,7 @@ function renderProductionTree() {
             '<span class="sp-tree-count subgroup">' + sg.items.length + '</span>' +
           '</button>';
         if (sOpen) {
-          // v2.45.684: серии и внутри подгруппы («Стандартные» → ЩУ-001, ЩУ-002…)
-          h += _seriesHtml(sg.items, 'pser:' + dirId + ':' + s);
+          h += _categoryHtml(sg.items, 'pcat:' + dirId + ':' + s);
         }
         h += '</div>';
       });
