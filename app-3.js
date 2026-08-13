@@ -6555,7 +6555,10 @@ function _mailRenderList() {
   const cMax = convs.filter(c => c.channel === 'max').length;
   const cMail = convs.length - cMax;
   const shown = convs.filter(c => f === 'all' || (f === 'max' ? c.channel === 'max' : c.channel !== 'max'));
-  let html = '<div class="mm-filters">' +
+  let html = '<div class="mm-composebar">' +
+    '<button class="btn btn-primary" onclick="openNewMailComposer()"><i class="ti ti-pencil"></i> Написать письмо</button>' +
+  '</div>' +
+  '<div class="mm-filters">' +
     '<button class="mm-filter' + (f === 'all' ? ' on' : '') + '" onclick="_mailSetFilter(\'all\')">Все <span class="c">' + convs.length + '</span></button>' +
     '<button class="mm-filter' + (f === 'mail' ? ' on' : '') + '" onclick="_mailSetFilter(\'mail\')"><i class="ti ti-mail"></i> Почта <span class="c">' + cMail + '</span></button>' +
     '<button class="mm-filter' + (f === 'max' ? ' on' : '') + '" onclick="_mailSetFilter(\'max\')"><i class="ti ti-message-circle"></i> MAX <span class="c">' + cMax + '</span></button>' +
@@ -6563,6 +6566,102 @@ function _mailRenderList() {
   html += shown.length ? shown.map(_mailConvRow).join('')
     : '<div class="empty-block">' + (convs.length ? 'В этом канале пусто' : 'Переписок пока нет') + '</div>';
   list.innerHTML = html;
+}
+
+// v2.45.930: новое письмо прямо из «Почта и MAX». Раньше здесь можно было
+// только отвечать на уже существующий диалог, хотя сервер умеет отправлять
+// письмо первым. Поставщик подставляет адрес из справочника; адрес остаётся
+// редактируемым на случай дополнительной почты.
+async function openNewMailComposer() {
+  if (!cache.suppliers) {
+    try {
+      const d = await apiGet('/api/suppliers');
+      cache.suppliers = d.suppliers || [];
+    } catch (e) {
+      cache.suppliers = [];
+    }
+  }
+  const suppliers = (cache.suppliers || [])
+    .filter(s => s.is_active !== 0)
+    .slice()
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+  const options = suppliers.map(s =>
+    '<option value="' + Number(s.id) + '" data-email="' + escapeHtml(s.email || '') + '">' +
+      escapeHtml(s.name || ('Поставщик #' + s.id)) + (s.email ? ' — ' + escapeHtml(s.email) : ' — нет почты') +
+    '</option>'
+  ).join('');
+
+  document.getElementById('mail-compose-modal')?.remove();
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'mail-compose-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:680px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-mail-plus"></i> Новое письмо</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'mail-compose-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Поставщик</label>' +
+          '<select class="form-input" id="mail-compose-supplier" onchange="mailComposeSupplierChanged()">' +
+            '<option value="">Выберите поставщика или укажите адрес вручную</option>' + options +
+          '</select></div>' +
+        '<div class="form-group"><label class="form-label">Кому</label>' +
+          '<input type="email" class="form-input" id="mail-compose-to" placeholder="supplier@example.ru"></div>' +
+        '<div class="form-group"><label class="form-label">Тема</label>' +
+          '<input class="form-input" id="mail-compose-subject" placeholder="Тема письма"></div>' +
+        '<div class="form-group"><label class="form-label">Текст</label>' +
+          '<textarea class="form-input" id="mail-compose-body" rows="11" style="font-family:inherit;" placeholder="Добрый день!\n\nНапишите сообщение…"></textarea></div>' +
+        '<div class="form-group"><label class="form-label">Подпись (добавится автоматически)</label>' +
+          '<pre id="mail-compose-signature" style="margin:0;padding:10px 12px;background:var(--bg-soft,#F5F7FA);border:1px dashed var(--border);border-radius:8px;font:inherit;font-size:13px;white-space:pre-wrap;color:var(--text-light);">загружаю…</pre></div>' +
+        '<div style="font-size:12px;color:var(--text-light);">После отправки письмо появится в этой переписке.</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'mail-compose-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="mail-compose-send" onclick="sendNewMail()"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  apiGet('/api/mail/signature').then(d => {
+    const box = document.getElementById('mail-compose-signature');
+    if (box) box.textContent = (d && d.signature) || '—';
+  }).catch(() => {
+    const box = document.getElementById('mail-compose-signature');
+    if (box) box.textContent = 'не удалось загрузить';
+  });
+  setTimeout(() => document.getElementById('mail-compose-supplier')?.focus(), 50);
+}
+
+function mailComposeSupplierChanged() {
+  const select = document.getElementById('mail-compose-supplier');
+  const input = document.getElementById('mail-compose-to');
+  if (!select || !input) return;
+  const option = select.options[select.selectedIndex];
+  input.value = option ? (option.getAttribute('data-email') || '') : '';
+  if (!input.value) input.focus();
+}
+
+async function sendNewMail() {
+  const to = ((document.getElementById('mail-compose-to') || {}).value || '').trim();
+  const subject = ((document.getElementById('mail-compose-subject') || {}).value || '').trim();
+  const body = ((document.getElementById('mail-compose-body') || {}).value || '').trim();
+  if (!to || !to.includes('@')) { showToast('Укажите правильный e-mail получателя', 'error'); return; }
+  if (!body) { showToast('Напишите текст письма', 'error'); return; }
+  const btn = document.getElementById('mail-compose-send');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await apiPost('/api/mail/compose', { to: to, subject: subject, body: body });
+    const d = (r && r.data) || {};
+    if (!r || !r.ok || !d.ok) throw new Error(d.message || 'Не удалось отправить');
+    document.getElementById('mail-compose-modal')?.remove();
+    showToast('Письмо отправлено', 'success');
+    state._mailFilter = 'mail';
+    await loadMailMessenger();
+    await openMailThread(to);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка отправки', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+  }
 }
 function _mailInitials(n) {
   const p = String(n || '').replace(/["«»]/g, '').trim().split(/\s+/);
@@ -17940,6 +18039,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.930',
+    date: '13.08.2026',
+    title: 'Новое письмо поставщику из переписки',
+    items: [
+      'В разделе «Почта и MAX → Переписка» появилась кнопка «Написать письмо».',
+      'Можно выбрать поставщика, автоматически подставить его e-mail и начать новую переписку первым.',
+    ],
+  },
   {
     version: 'v2.45.929',
     date: '13.08.2026',

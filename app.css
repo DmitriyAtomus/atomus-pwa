@@ -22082,6 +22082,8 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 }
 
 /* ============ v2.45.807: Почта/MAX на мобильном ============ */
+.mm-composebar { padding: 10px 10px 0; background: var(--bg); }
+.mm-composebar .btn { width: 100%; justify-content: center; }
 .mm-back { display: none; border: none; background: var(--bg); border-radius: 8px; width: 34px; height: 34px; font-size: 17px; cursor: pointer; flex: none; align-items: center; justify-content: center; color: var(--text-dark); }
 @media (max-width: 768px) {
   #mail-messenger-root { height: calc(100vh - 175px) !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; }
