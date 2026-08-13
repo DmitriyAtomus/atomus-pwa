@@ -12,7 +12,7 @@ const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 test('форма производства содержит обязательный блок комплектации', () => {
   assert.match(html, /id="bom-options-section"/);
   assert.match(html, /Комплектация нагревателя/);
-  assert.match(app2, /loadAssemblyBomConfiguration\(model\.id\)/);
+  assert.match(app2, /loadAssemblyBomConfiguration\(model\.id, presetBomSelections\)/);
   assert.match(app2, /Выберите ТЭН \/ вариант комплектации/);
   assert.match(css, /\.bom-config-option\.selected/);
 });
@@ -29,12 +29,21 @@ test('редактор BOM управляет точными артикулам�
   assert.match(app2, /async function openBomVariantEditor\(bomId\)/);
   assert.match(app2, /Добавить другой ТЭН/);
   assert.match(app2, /bom-variant-default-btn/);
-  assert.match(app2, /Сделать стандартным/);
+  assert.match(app2, /Сделать стандартом модели/);
   assert.match(app2, /st\.options\.filter\(o => !!o\.is_default\)\.length !== 1/);
   assert.match(css, /\.bom-variant-editor-row\.is-default/);
   assert.match(app2, /method: 'PUT'/);
   assert.match(app2, /\/selection-group/);
   assert.match(app2, /!it\.selection_group_id/);
+});
+
+test('вариант ТЭНа можно сохранить только для позиции договора', () => {
+  assert.match(app2, /function openContractBomSelection\(itemId, modelId\)/);
+  assert.match(app2, /\/api\/contracts\/items\/.*\/bom-selection/);
+  assert.match(app2, /Сохранить для заказа/);
+  assert.match(app2, /Стандарт модели не изменится/);
+  assert.match(app2, /contract_item_id:\s*a\.contractItemId \|\| null/g);
+  assert.match(app2, /await selectModel\(pf\.model_id, orderBomSelections\)/);
 });
 
 test('карточка работы показывает зафиксированную комплектацию', () => {

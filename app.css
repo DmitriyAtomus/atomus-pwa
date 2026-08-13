@@ -23134,6 +23134,23 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .bom-variant-default-btn.selected:disabled {
   border-color:#7BA7CC; background:var(--brand-bg); color:var(--brand); opacity:1; cursor:default;
 }
+.order-bom-context {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;
+  padding:12px 14px; background:#EFF6FF; border:1px solid #93C5FD; border-radius:10px;
+}
+.order-bom-context-icon {
+  width:36px; height:36px; border-radius:9px; flex:0 0 auto; display:flex;
+  align-items:center; justify-content:center; background:#DBEAFE; color:#1D4ED8; font-size:20px;
+}
+.order-bom-context-main { flex:1; min-width:220px; display:flex; flex-direction:column; gap:2px; }
+.order-bom-context-main b { font-size:13px; color:#1E3A8A; }
+.order-bom-context-main span { font-size:12.5px; color:var(--text); }
+.order-bom-context-main small { font-size:11px; color:var(--text-light); }
+.spec-order-bom-chip {
+  display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:2px 8px;
+  border-radius:7px; vertical-align:middle; background:#DBEAFE; color:#1D4ED8;
+  font-size:10px; font-weight:700;
+}
 .bom-variant-editor-grid { display:grid; grid-template-columns:1.4fr .7fr .7fr .6fr .55fr; gap:7px; }
 .bom-variant-editor-grid label { font-size:10.5px; color:var(--text-light); display:block; margin-bottom:3px; }
 .bom-variant-editor-grid input { width:100%; box-sizing:border-box; padding:7px 8px; border:1px solid var(--border); border-radius:7px; background:var(--card,#fff); color:var(--text); }

@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.926";
+const APP_VERSION = "v2.45.927";
 const APP_VERSION_DATE = "13.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7839,7 +7839,7 @@ function renderProductionQueue(contracts) {
         : ('Нужно <span class="pqc-need">' + _fmtQty(item.qty) + '</span>');
       html += '<div class="pqc-item-qty">' + qtyText + '</div>';
       if (canCreateAssembly()) {
-        html += '<button class="pqc-take-btn" onclick="takeForAssembly(' + c.contract_id + ', ' + (item.model_id || 'null') + ', \'' + escapeHtml(String(item.execution_type || '')) + '\', \'' + escapeHtml(String(item.ip_rating || '')) + '\')"><i class="ti ti-tool"></i> Взять в работу</button>';
+        html += '<button class="pqc-take-btn" onclick="takeForAssembly(' + c.contract_id + ', ' + (item.model_id || 'null') + ', \'' + escapeHtml(String(item.execution_type || '')) + '\', \'' + escapeHtml(String(item.ip_rating || '')) + '\', ' + (item.item_id || 'null') + ')"><i class="ti ti-tool"></i> Взять в работу</button>';
       }
       html += '</div>';
     });
@@ -7885,13 +7885,14 @@ function canCreateAssembly() {
 }
 
 // «Взять в работу» — открывает форму создания сборки с предзаполненной моделью и contract_id
-function takeForAssembly(contractId, modelId, executionType, ipRating) {
+function takeForAssembly(contractId, modelId, executionType, ipRating, contractItemId) {
   // state._prefillAssembly будет прочитан при инициализации формы новой сборки
   state._prefillAssembly = {
     contract_id: contractId,
     model_id: modelId || null,
     execution: executionType || null,
     ip_class: ipRating || null,
+    contract_item_id: contractItemId || null,
   };
   // Открываем форму
   if (typeof openNewAssembly === 'function') {
