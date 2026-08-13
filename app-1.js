@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.927";
+const APP_VERSION = "v2.45.928";
 const APP_VERSION_DATE = "13.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2873,6 +2873,7 @@ async function openContractChat() {
     return;
   }
   document.getElementById('contract-chat-modal').classList.add('visible');
+  _wireContractChatFileDrop();
   await loadContractChat(cid);
   // Автообновление каждые 7 сек
   if (_cchatRefreshTimer) clearInterval(_cchatRefreshTimer);
@@ -2893,6 +2894,11 @@ async function openContractChat() {
 
 function closeContractChat() {
   document.getElementById('contract-chat-modal').classList.remove('visible');
+  const dropZone = document.getElementById('cchat-drop-zone');
+  if (dropZone) {
+    dropZone._contractFileDragDepth = 0;
+    dropZone.classList.remove('is-file-dragging');
+  }
   if (_cchatRefreshTimer) { clearInterval(_cchatRefreshTimer); _cchatRefreshTimer = null; }
   _cchatPendingFiles = [];
   _renderChatAttachPreview();
@@ -3015,6 +3021,51 @@ function _escapeChatText(t) {
 
 // v2.42.3.1: прикреплённые файлы
 let _cchatPendingFiles = [];
+
+function _wireContractChatFileDrop() {
+  const zone = document.getElementById('cchat-drop-zone');
+  if (!zone || zone.dataset.fileDropWired === '1') return;
+  zone.dataset.fileDropWired = '1';
+  zone._contractFileDragDepth = 0;
+  const isFileDrag = (e) => {
+    const types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+  };
+  const clearDragState = () => {
+    zone._contractFileDragDepth = 0;
+    zone.classList.remove('is-file-dragging');
+  };
+  zone.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    zone._contractFileDragDepth += 1;
+    zone.classList.add('is-file-dragging');
+  });
+  zone.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  zone.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    zone._contractFileDragDepth = Math.max(0, zone._contractFileDragDepth - 1);
+    if (!zone._contractFileDragDepth) zone.classList.remove('is-file-dragging');
+  });
+  zone.addEventListener('drop', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearDragState();
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    onContractChatFilesSelected(files);
+    showToast('Файлы добавлены — нажмите «Отправить»', 'success');
+  });
+}
 
 function onContractChatFilesSelected(files) {
   if (!files || !files.length) return;

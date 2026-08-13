@@ -49,6 +49,14 @@ test('в командный чат можно перетащить файлы м
   assert.match(css, /\.tchat-main\.is-file-dragging \.tchat-drop-overlay/);
 });
 
+test('в чат договора можно перетащить файлы мышью', () => {
+  assert.match(html, /id="cchat-drop-zone"/);
+  assert.match(html, /id="cchat-drop-overlay"/);
+  assert.match(app, /function _wireContractChatFileDrop\(\)/);
+  assert.match(app, /onContractChatFilesSelected\(files\)/);
+  assert.match(css, /\.contract-chat-modal\.is-file-dragging \.tchat-drop-overlay/);
+});
+
 test('длинный чат расчёта прокручивается внутри панели', () => {
   assert.match(css, /\.calcs-pane\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/);
   assert.match(css, /\.calc-chat\s*\{[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/);

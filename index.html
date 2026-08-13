@@ -3071,7 +3071,12 @@
 
 <!-- ============ v2.42.3: МОДАЛКА ЧАТА ПО ДОГОВОРУ ============ -->
 <div class="modal-overlay" id="contract-chat-modal" onclick="if(event.target===this) closeContractChat()">
-  <div class="modal contract-chat-modal" onclick="event.stopPropagation()">
+  <div class="modal contract-chat-modal" id="cchat-drop-zone" onclick="event.stopPropagation()">
+    <div class="tchat-drop-overlay" id="cchat-drop-overlay" aria-hidden="true">
+      <i class="ti ti-file-upload"></i>
+      <b>Отпустите файлы здесь</b>
+      <span>Они добавятся к сообщению · до 5 файлов</span>
+    </div>
     <div class="modal-header">
       <div>
         <h3><i class="ti ti-message-circle"></i> <span id="cchat-title">Чат по договору</span></h3>
