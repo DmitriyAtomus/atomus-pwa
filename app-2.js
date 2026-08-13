@@ -1812,6 +1812,7 @@ const RADIO_STATIONS = [
   // Хиты / поп
   { id: 'hits',          name: 'Хит ФМ',           url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
   { id: 'maximum',       name: 'Радио Maximum',    url: 'https://maximum.hostingradio.ru/maximum128.mp3' },
+  { id: 'retro_fm',      name: 'Ретро FM',         url: 'https://retro.hostingradio.ru:8014/retro320.mp3' },
   // Record
   { id: 'record',        name: 'Radio Record',     url: 'https://radiorecord.hostingradio.ru/rr_main96.aacp' },
   { id: 'record_teo',    name: 'Record · TEO',     url: 'https://radiorecord.hostingradio.ru/teo96.aacp' },
