@@ -32,6 +32,10 @@ header{grid-column:1/3;display:flex;align-items:center;gap:18px;padding:0 18px;
 .search svg{position:absolute;left:11px;top:9px;opacity:.5}
 .hcount{margin-left:auto;font-size:12px;color:var(--dim);text-align:right;line-height:1.35}
 .hcount b{color:var(--cyan);font-weight:600}
+.fsbtn{margin-left:14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  background:rgba(255,255,255,.055);border:1px solid var(--line2);color:#C6D5E6;
+  font:inherit;font-size:12px;padding:6px 11px;border-radius:8px;cursor:pointer}
+.fsbtn:hover{border-color:var(--cyan);color:#fff;background:rgba(27,159,216,.10)}
 
 /* ---------- сайдбар ---------- */
 aside{background:#08182D;border-right:1px solid var(--line);overflow-y:auto;padding:14px 0 24px}
@@ -200,6 +204,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
 @media (max-width:420px){
   .grid{grid-template-columns:repeat(2,1fr);gap:9px}
   .hcount{display:none}
+  .fsbtn{margin-left:auto;padding:6px 9px}
+  #fsTxt{display:none}
 }
 </style></head><body>
 
@@ -213,6 +219,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
       <input id="q" placeholder="Поиск по обозначению, производителю, хладагенту…">
     </div>
     <div class="hcount"><b id="cReady">0</b> моделей выпущено<br><span id="cAll">0</span> позиций в базе</div>
+    <button id="fsBtn" class="fsbtn" onclick="toggleFS()"
+            title="Развернуть на весь экран (Esc — выйти)"><span id="fsIco">⛶</span> <span id="fsTxt">Во весь экран</span></button>
   </header>
 
   <aside>
@@ -409,6 +417,24 @@ addEventListener('resize',()=>{if(!isMob())closeNav();});
 
 $('#cAll').textContent = DATA.length;
 $('#cReady').textContent = DATA.filter(d=>d.ready).length;
+/* Разворот на весь экран — как в «Атом Электрика»: разворачиваем документ
+   модуля целиком. Родительский iframe в CRM отдан с allow="fullscreen". */
+function toggleFS(){
+  try{
+    if(document.fullscreenElement){ document.exitFullscreen(); return; }
+    const p = document.documentElement.requestFullscreen();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+}
+document.addEventListener('fullscreenchange', ()=>{
+  const on = !!document.fullscreenElement;
+  const t = document.getElementById('fsTxt'), i = document.getElementById('fsIco');
+  if(t) t.textContent = on ? 'Свернуть' : 'Во весь экран';
+  if(i) i.textContent = on ? '✕' : '⛶';
+  if(typeof onResize === 'function') setTimeout(onResize, 120);
+});
+addEventListener('keydown', e=>{ if(e.key==='F11'){ e.preventDefault(); toggleFS(); } });
+
 async function boot(){
   const r = await fetch(U.index(), {cache:'default', headers:AUTH});
   if(!r.ok){ document.getElementById('grid').innerHTML =
