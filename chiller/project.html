@@ -132,6 +132,7 @@ footer .save{margin-left:auto;color:var(--faint)}
   <footer>
     <span id="fCnt" class="m">0 деталей</span>
     <span id="fDims" class="m"></span>
+    <span id="fColl" class="m"></span>
     <span>прототип: проект хранится в этом браузере</span>
     <span class="save" id="fSave"></span>
   </footer>
@@ -266,7 +267,7 @@ function bindCtl(cv){
       const fp=floorPoint(e);if(!fp)return;
       sel.obj.position.x=snap(fp.x+dragOff.x);
       sel.obj.position.y=snap(fp.y+dragOff.y);
-      save();
+      checkCollisions();save();
     }
   });
   const off=()=>{mode=null;cv.classList.remove('drag');};
@@ -309,15 +310,39 @@ async function addItem(d,at,rot){
   return it;
 }
 function select(it){
-  if(sel)sel.obj.material.emissive.setHex(0x000000);
+  const prev=sel;
   sel=it;
-  if(sel){sel.obj.material.emissive.setHex(0x1B9FD8);
-    sel.obj.material.emissiveIntensity=.33;
+  if(prev)applyTint(prev);
+  if(sel){applyTint(sel);
     $('#selNm').textContent=sel.d.brand+' '+sel.d.name;}
   $('#selbar').classList.toggle('on',!!sel);
   refreshSpecSel();
 }
-function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;save();}
+
+/* ═══ пересечения: детали, которые наезжают друг на друга, светятся красным ═══ */
+let collSet=new Set();
+function applyTint(p){
+  const m=p.obj.material;
+  if(collSet.has(p.uid)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.5;}
+  else if(sel===p){m.emissive.setHex(0x1B9FD8);m.emissiveIntensity=.33;}
+  else{m.emissive.setHex(0x000000);m.emissiveIntensity=0;}
+}
+function checkCollisions(){
+  collSet=new Set();
+  // AABB с усадкой 4 мм: касание — не пересечение
+  const boxes=placed.map(p=>new THREE.Box3().setFromObject(p.obj).expandByScalar(-4));
+  for(let i=0;i<placed.length;i++)
+    for(let j=i+1;j<placed.length;j++)
+      if(boxes[i].intersectsBox(boxes[j])){
+        collSet.add(placed[i].uid);collSet.add(placed[j].uid);}
+  placed.forEach(applyTint);
+  const el=$('#fColl');
+  if(!placed.length){el.textContent='';return;}
+  const n=collSet.size;
+  el.textContent=n?('⚠ пересекаются: '+n+' дет.'):'✓ пересечений нет';
+  el.style.color=n?'#f0a9a0':'var(--ok)';
+}
+function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;checkCollisions();save();}
 function delSel(){if(!sel)return;
   scene.remove(sel.obj);placed.splice(placed.indexOf(sel),1);
   select(null);refresh();save();}
@@ -353,6 +378,7 @@ function refresh(){
     $('#fDims').textContent='габарит '+Math.round(s.x)+' × '+Math.round(s.y)+' × '+Math.round(s.z)+' мм';
   } else $('#fDims').textContent='';
   $('#empty').style.display=placed.length?'none':'flex';
+  checkCollisions();
   refreshSpecSel();
 }
 function refreshSpecSel(){
