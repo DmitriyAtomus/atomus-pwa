@@ -334,6 +334,9 @@
         <button class="nav-item" data-nav="atom-electrica" onclick="selectSidebarItem('atom-electrica')">
           <i class="ti ti-bolt"></i><span>Атом Электрика</span>
         </button>
+        <button class="nav-item" data-nav="atom-chiller" onclick="selectSidebarItem('atom-chiller')">
+          <i class="ti ti-snowflake"></i><span>Атом Чиллер</span>
+        </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
           <button class="nav-item" data-nav="models" onclick="selectSidebarItem('models')">
@@ -1220,6 +1223,15 @@
           <h2>Атом Электрика</h2>
         </div>
         <iframe id="atomcad-frame" class="atomcad-frame" title="Атом Электрика — проектирование щитов" allow="fullscreen" allowfullscreen data-src="/atomcad/index.html"></iframe>
+      </div>
+
+      <!-- ============ АТОМ ЧИЛЛЕР (база 3D и компоновка) ============ -->
+      <div class="screen atomcad-screen" data-screen="atom-chiller" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Атом Чиллер</h2>
+        </div>
+        <iframe id="chiller-frame" class="atomcad-frame" title="Атом Чиллер — база 3D и компоновка" allow="fullscreen" allowfullscreen data-src="/chiller/index.html"></iframe>
       </div>
 
       <!-- ============ МОДЕЛИ ============ -->

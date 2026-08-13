@@ -137,6 +137,12 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(networkFirst(req));
       return;
     }
+    // /chiller/* — модуль «Атом Чиллер», тоже в активной доработке: оболочка
+    // должна приезжать свежей, иначе после выкатки останется старая.
+    if (url.pathname.startsWith('/chiller/')) {
+      event.respondWith(networkFirst(req));
+      return;
+    }
     // version.json — всегда свежий (показывает какая версия доступна к установке)
     if (url.pathname === '/version.json') {
       event.respondWith(networkFirst(req));

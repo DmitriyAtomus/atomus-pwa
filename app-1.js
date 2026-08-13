@@ -1759,6 +1759,11 @@ function runScreenLoader(screenName) {
     const _acf = document.getElementById('atomcad-frame');
     if (_acf && !_acf.getAttribute('src') && _acf.dataset.src) _acf.setAttribute('src', _acf.dataset.src);
   }
+  // «Атом Чиллер» — та же ленивая загрузка: 3D-оболочку тянем при первом открытии
+  if (screenName === 'atom-chiller') {
+    const _chf = document.getElementById('chiller-frame');
+    if (_chf && !_chf.getAttribute('src') && _chf.dataset.src) _chf.setAttribute('src', _chf.dataset.src);
+  }
   if (screenName === 'home-dashboard') loadHomeDashboard();  // ЭТАП 16Б
   if (screenName === 'dashboard') loadDashboard();
   if (screenName === 'planerka' && typeof loadPlanerka === 'function') loadPlanerka();  // v2.45.721
@@ -2111,7 +2116,7 @@ const AUTO_REFRESH_SKIP = [
   'employee-form', 'task-form', 'contract-form', 'sales-contract-form',
   'sale-offer-form', 'sales-offer-form', 'sale-product-form', 'defect-form',
   'model-form', 'vacation-form', 'new-assembly', 'sales-contractor-form',
-  'wh-ship-qr', 'security', 'atom-electrica',
+  'wh-ship-qr', 'security', 'atom-electrica', 'atom-chiller',
   'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc', 'mfg',
   'mail-messenger',
 ];
