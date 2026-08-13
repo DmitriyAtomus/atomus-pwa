@@ -503,11 +503,10 @@ let theta=-0.95, phi=1.18, dist=1500, dMin=300, dMax=5000,
     spin=true, showPorts=true, target=new THREE.Vector3();
 const C_BODY=0x8d959d, C_DIS=0xd94f3d, C_SUC=0x3d8fd9, C_PPK=0xC9A227,
       C_EQ=0x4FBF8B;
-/* палитра покраски: первый цвет - исходная сталь, он же «сброс» */
+/* палитра покраски деталей: первый цвет - исходная сталь, он же «сброс» */
 const PAL=[0x8d959d,0x39424E,0xE8EDF2,0xD9534F,0xE2892F,0xE0BE38,0x4FA85B,
            0x2FB6A8,0x1B9FD8,0x3B5BD9,0x8E5BD0,0xB4703A];
 const hx=c=>'#'+c.toString(16).padStart(6,'0');
-let bodyCol=C_BODY;                       // текущий цвет корпуса покупной позиции
 
 function initGL(){
   if(renderer) return;
@@ -684,61 +683,40 @@ function bindCtl(cv){
   tg('bBox', v=>boxH&&(boxH.visible=v));
   tg('bSpin',v=>spin=v);
   tg('bParts',v=>$('#partsBox').classList.toggle('open',v));
-  tg('bPort',v=>{showPorts=v; mats[1].color.setHex(v?C_DIS:bodyCol);
-                 mats[2].color.setHex(v?C_SUC:bodyCol);
-                 mats[3].color.setHex(v?C_PPK:bodyCol);
-                 mats[4].color.setHex(v?C_EQ:bodyCol);});
+  tg('bPort',v=>{showPorts=v; mats[1].color.setHex(v?C_DIS:C_BODY);
+                 mats[2].color.setHex(v?C_SUC:C_BODY);
+                 mats[3].color.setHex(v?C_PPK:C_BODY);
+                 mats[4].color.setHex(v?C_EQ:C_BODY);});
 }
 function setSpin(v){spin=v; $('#bSpin').classList.toggle('on',v);}
 
 /* Панель деталей: одинаковые детали (одно обозначение) собираются в строку и
    гасятся вместе — скрыть «Панель боковую» логично сразу обе, а не по одной.
    Каждую строку можно ещё и покрасить: квадратик рядом открывает палитру.
-   У покупных позиций деталей нет — там одна строка на всю модель, только цвет. */
+   Всё это только для наших сборок - корпусов и рам; покупные позиции идут
+   одним телом, красить их незачем, и панель для них не показывается. */
 function paint(g,c){
-  if(g.whole){                       // покупная позиция: корпус и, если зоны
-    bodyCol=c;                       // патрубков выключены, вся модель разом
-    mats[0].color.setHex(c);
-    if(!showPorts) for(let i=1;i<5;i++) mats[i].color.setHex(c);
-  } else g.idx.forEach(i=>{ if(partMats[i]) partMats[i].color.setHex(c); });
+  g.idx.forEach(i=>{ if(partMats[i]) partMats[i].color.setHex(c); });
 }
 function buildParts(){
-  const btn=$('#bParts');
+  const box=$('#partsBox'), btn=$('#bParts');
   hidden=new Set();
-  bodyCol=C_BODY;                    // материалы общие для всех позиций, сбрасываем
-  if(mats){
-    mats[0].color.setHex(C_BODY);
-    mats[1].color.setHex(showPorts?C_DIS:C_BODY);
-    mats[2].color.setHex(showPorts?C_SUC:C_BODY);
-    mats[3].color.setHex(showPorts?C_PPK:C_BODY);
-    mats[4].color.setHex(showPorts?C_EQ:C_BODY);
-  }
-  const whole=!PARTS;
-  let groups;
-  if(whole) groups=[{des:'',name:'Модель целиком',idx:[],whole:true}];
-  else{
-    const by=new Map();
-    PARTS.forEach((p,i)=>{
-      const k=p.des+'|'+p.name;
-      if(!by.has(k)) by.set(k,{des:p.des,name:p.name,idx:[]});
-      by.get(k).idx.push(i);
-    });
-    groups=[...by.values()];
-  }
+  if(!PARTS){ box.classList.remove('open'); btn.style.display='none'; return; }
   btn.style.display='';
-  btn.textContent=whole?'Цвет':'Детали';
-  $('#pTitle').textContent=whole?'Цвет модели':'Детали сборки';
-  $('#pAll').style.display=whole?'none':'';
-  $('#pCount').textContent=whole?'палитра'
-    :PARTS.length+' шт · '+groups.length+' наименований';
+  const by=new Map();
+  PARTS.forEach((p,i)=>{
+    const k=p.des+'|'+p.name;
+    if(!by.has(k)) by.set(k,{des:p.des,name:p.name,idx:[]});
+    by.get(k).idx.push(i);
+  });
+  const groups=[...by.values()];
+  $('#pCount').textContent=PARTS.length+' шт · '+groups.length+' наименований';
   $('#pList').innerHTML=groups.map((g,i)=>
-    `<div class="prow" data-g="${i}">`+
-    (g.des?`<span class="d">${g.des}</span>`:'')+
+    `<div class="prow" data-g="${i}"><span class="d">${g.des}</span>`+
     `<span class="n" title="${g.name}">${g.name}</span>`+
     `<span class="q">${g.idx.length>1?'×'+g.idx.length:''}</span>`+
     `<button class="sw" title="цвет" style="background:${hx(PAL[0])}"></button>`+
-    (g.whole?'':`<button class="b">скрыть</button>`)+
-    `</div><div class="pal" data-p="${i}">`+
+    `<button class="b">скрыть</button></div><div class="pal" data-p="${i}">`+
     PAL.map(c=>`<i data-c="${c}" style="background:${hx(c)}"></i>`).join('')+
     `</div>`).join('');
   const apply=(g,off)=>{ g.idx.forEach(i=>{ if(partMats[i]) partMats[i].visible=!off; }); };
@@ -757,7 +735,6 @@ function buildParts(){
         paint(g,c); sw.style.background=hx(c); pal.classList.remove('open');
       };
     });
-    if(g.whole) return;
     row.querySelector('.b').onclick=()=>{
       const off=!row.classList.contains('off');
       row.classList.toggle('off',off);
