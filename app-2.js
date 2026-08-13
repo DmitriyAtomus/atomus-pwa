@@ -6402,13 +6402,17 @@ async function openBomVariantEditor(bomId) {
     phases: null,
     is_default: true,
   };
+  const variantOptions = group ? (group.options || []).map(o => Object.assign({}, o)) : [baseOption];
+  let defaultIndex = variantOptions.findIndex(o => !!o.is_default);
+  if (defaultIndex < 0 && variantOptions.length) defaultIndex = 0;
+  variantOptions.forEach((o, i) => { o.is_default = (i === defaultIndex); });
   state._bomVariantEditor = {
     bomId: bomId,
     modelId: bom.model_id,
     hasGroup: !!group,
     name: group ? group.name : 'ТЭН',
     is_required: group ? !!group.is_required : true,
-    options: group ? (group.options || []).map(o => Object.assign({}, o)) : [baseOption],
+    options: variantOptions,
   };
   renderBomVariantEditor();
 }
@@ -6426,12 +6430,17 @@ function renderBomVariantEditor() {
     document.body.appendChild(m);
   }
   const rows = (st.options || []).map((o, i) => {
-    return '<div class="bom-variant-editor-row">' +
+    const defaultControl = o.is_default
+      ? '<button type="button" class="bom-variant-default-btn selected" aria-pressed="true" disabled>' +
+          '<i class="ti ti-circle-check-filled"></i> Стандартный</button>'
+      : '<button type="button" class="bom-variant-default-btn" aria-pressed="false" ' +
+          'onclick="setBomVariantDefault(' + i + ')"><i class="ti ti-circle"></i> Сделать стандартным</button>';
+    return '<div class="bom-variant-editor-row' + (o.is_default ? ' is-default' : '') + '">' +
       '<div class="bom-variant-editor-head">' +
         '<div><b>' + escapeHtml(o.component_name || '—') + '</b>' +
           (o.component_sku ? '<div class="comp-sku">' + escapeHtml(o.component_sku) + '</div>' : '') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bom-variant-default" ' + (o.is_default ? 'checked ' : '') + 'onchange="setBomVariantDefault(' + i + ')"> стандарт</label>' +
+          defaultControl +
           '<button type="button" class="icon-btn" onclick="removeBomVariantOption(' + i + ')" title="Убрать вариант" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
         '</div>' +
       '</div>' +
@@ -6531,6 +6540,10 @@ async function saveBomVariantConfiguration() {
   if (!st) return;
   if (!(st.name || '').trim()) { showToast('Укажите название группы', 'error'); return; }
   if ((st.options || []).length < 2) { showToast('Добавьте минимум два варианта', 'error'); return; }
+  if (st.options.filter(o => !!o.is_default).length !== 1) {
+    showToast('Выберите один стандартный вариант', 'error');
+    return;
+  }
   const payload = {
     name: (st.name || '').trim(),
     is_required: !!st.is_required,

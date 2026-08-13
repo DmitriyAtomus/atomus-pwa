@@ -28,7 +28,10 @@ test('выбор уходит и в очередь, и в прямое созд�
 test('редактор BOM управляет точными артикулами и стандартным вариантом', () => {
   assert.match(app2, /async function openBomVariantEditor\(bomId\)/);
   assert.match(app2, /Добавить другой ТЭН/);
-  assert.match(app2, /name="bom-variant-default"/);
+  assert.match(app2, /bom-variant-default-btn/);
+  assert.match(app2, /Сделать стандартным/);
+  assert.match(app2, /st\.options\.filter\(o => !!o\.is_default\)\.length !== 1/);
+  assert.match(css, /\.bom-variant-editor-row\.is-default/);
   assert.match(app2, /method: 'PUT'/);
   assert.match(app2, /\/selection-group/);
   assert.match(app2, /!it\.selection_group_id/);
