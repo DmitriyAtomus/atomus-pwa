@@ -22752,6 +22752,17 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 
 /* ============ v2.45.860: заказ на изготовление ============ */
 .mo-sec { font-size: 10.5px; font-weight: 800; letter-spacing: .6px; color: var(--text-light); margin-bottom: 6px; }
+.mo-kitbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 11px 13px; border: 1px solid #BFDBFE; border-radius: 12px; background: #EFF6FF; }
+.mo-kit-copy { display: flex; flex-direction: column; min-width: 0; }
+.mo-kit-copy b { color: #173B68; font-size: 13px; }
+.mo-kit-copy span { margin-top: 2px; color: #64748B; font-size: 10.5px; }
+.mo-kit-stepper { display: flex; align-items: center; overflow: hidden; border: 1.5px solid #93C5FD; border-radius: 9px; background: #fff; }
+.mo-kit-stepper button { width: 32px; height: 32px; padding: 0; border: 0; background: #E0ECFF; color: #1D4ED8; font-size: 19px; font-weight: 800; cursor: pointer; }
+.mo-kit-stepper button:hover { background: #CFE1FF; }
+.mo-kit-stepper input { width: 48px; height: 32px; padding: 0 4px; border: 0; border-left: 1px solid #BFDBFE; border-right: 1px solid #BFDBFE; outline: 0; text-align: center; font-family: inherit; font-size: 14px; font-weight: 800; color: #173B68; }
+.mo-kit-total { display: flex; flex-direction: column; min-width: 78px; text-align: right; }
+.mo-kit-total b { color: #173B68; font-size: 12px; white-space: nowrap; }
+.mo-kit-total span:last-child { color: #64748B; font-size: 10.5px; }
 .mo-row { display: flex; align-items: center; gap: 10px; border: 1px solid #EDF1F7; border-radius: 10px; padding: 7px 11px; font-size: 12.5px; margin-bottom: 6px; }
 .mo-row .ds { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #64748B; width: 118px; flex: none; }
 .mo-row .nm { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -22780,6 +22791,10 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mo-dd .it.noml b { color: var(--text-mid); }
 .mo-row.pick { cursor: pointer; transition: border-color .12s, background .12s; }
 .mo-row.pick:hover { border-color: #93C5FD; background: #F7FAFF; }
+@media (max-width: 620px) {
+  .mo-kitbar { grid-template-columns: 1fr auto; }
+  .mo-kit-total { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; text-align: left; }
+}
 
 /* ============ v2.45.867: предпросмотр письма заказа ============ */
 .mp-head { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #FAFBFE; font-size: 13px; margin-bottom: 12px; }

@@ -17287,6 +17287,66 @@ function _mfgOrderPartQty(it, part) {
   }
   return Math.max(Number(part.qty) || 1, 1);
 }
+function _mfgOrderKitCount(it, parts) {
+  const prefill = state._mfgOrderPrefill;
+  if (!prefill || Number(prefill.itemId) !== Number(it.id) || !prefill.qtyByPart) return 1;
+  const ratios = (parts || []).map(p => {
+    const total = Number(prefill.qtyByPart[p.id]);
+    const perKit = Math.max(Number(p.qty) || 1, 1);
+    return Number.isFinite(total) && total > 0 ? total / perKit : NaN;
+  });
+  if (!ratios.length || ratios.some(x => !Number.isFinite(x))) return 1;
+  const kits = Math.round(ratios[0]);
+  return kits >= 1 && ratios.every(x => Math.abs(x - kits) < 0.001) ? kits : 1;
+}
+function _mfgOrderAutoSubject(it, positions, pieces) {
+  return 'Атомус Групп — заказ на изготовление ' + (it.designation || '') +
+    ' (' + positions + ' поз., ' + pieces + ' шт)';
+}
+function _mfgOrderRefreshSummary(updateSubject) {
+  const rows = Array.from(document.querySelectorAll('#mfg-order-modal .mo-row'));
+  const pieces = rows.reduce((sum, row) => {
+    const input = row.querySelector('.mo-qty');
+    return sum + Math.max(parseInt((input || {}).value, 10) || 1, 1);
+  }, 0);
+  const positionsBox = document.getElementById('mo-total-positions');
+  const piecesBox = document.getElementById('mo-total-pieces');
+  if (positionsBox) positionsBox.textContent = String(rows.length);
+  if (piecesBox) piecesBox.textContent = String(pieces);
+  if (updateSubject) {
+    const subject = document.getElementById('mo-subject');
+    const it = state.mfgCurrentItem || {};
+    if (subject) {
+      const previousAuto = subject.dataset.autoSubject || '';
+      const nextAuto = _mfgOrderAutoSubject(it, rows.length, pieces);
+      if (!subject.value || subject.value === previousAuto) subject.value = nextAuto;
+      subject.dataset.autoSubject = nextAuto;
+    }
+  }
+}
+function mfgOrderSetKits(value) {
+  const kits = Math.min(Math.max(parseInt(value, 10) || 1, 1), 999);
+  const kitInput = document.getElementById('mo-kit-count');
+  if (kitInput) kitInput.value = String(kits);
+  document.querySelectorAll('#mfg-order-modal .mo-row').forEach(row => {
+    const perKit = Math.max(Number(row.dataset.unitQty) || 1, 1);
+    const qty = row.querySelector('.mo-qty');
+    if (qty) qty.value = String(Math.max(Math.round(perKit * kits), 1));
+  });
+  _mfgOrderRefreshSummary(true);
+}
+function mfgOrderKitStep(delta) {
+  const input = document.getElementById('mo-kit-count');
+  mfgOrderSetKits((parseInt((input || {}).value, 10) || 1) + Number(delta || 0));
+}
+function mfgOrderQtyChanged() {
+  _mfgOrderRefreshSummary(true);
+}
+function mfgOrderRemovePart(icon) {
+  const row = icon && icon.closest ? icon.closest('.mo-row') : null;
+  if (row) row.remove();
+  _mfgOrderRefreshSummary(true);
+}
 function mfgTogglePart(partId) {
   const it = state.mfgCurrentItem;
   if (!it) return;
@@ -17318,6 +17378,8 @@ async function mfgOrderOpen(itemId) {
   } catch (e) { state._mfgSups = state._mfgSups || []; }
   const sups = state._mfgSups;
   const pieces = chosen.reduce((a, p) => a + _mfgOrderPartQty(it, p), 0);
+  const kitCount = _mfgOrderKitCount(it, chosen);
+  const autoSubject = _mfgOrderAutoSubject(it, chosen.length, pieces);
   state._mfgSupSel = null;
   let m = document.getElementById('mfg-order-modal');
   if (m) m.remove();
@@ -17330,13 +17392,27 @@ async function mfgOrderOpen(itemId) {
       escapeHtml(it.designation || it.name || '') + '</h3>' +
       '<button class="icon-btn" onclick="document.getElementById(\'mfg-order-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
     '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:12px;">' +
+      '<div class="mo-kitbar">' +
+        '<div class="mo-kit-copy"><b>Количество комплектов</b>' +
+          '<span>Нормы каждой выбранной детали умножатся автоматически</span></div>' +
+        '<div class="mo-kit-stepper">' +
+          '<button type="button" onclick="mfgOrderKitStep(-1)" title="Уменьшить">−</button>' +
+          '<input type="number" min="1" max="999" id="mo-kit-count" value="' + kitCount + '" ' +
+            'oninput="mfgOrderSetKits(this.value)" aria-label="Количество комплектов">' +
+          '<button type="button" onclick="mfgOrderKitStep(1)" title="Увеличить">+</button>' +
+        '</div>' +
+        '<div class="mo-kit-total"><b><span id="mo-total-positions">' + chosen.length + '</span> поз. · ' +
+          '<span id="mo-total-pieces">' + pieces + '</span> шт.</b><span>в заказе</span></div>' +
+      '</div>' +
       '<div><div class="mo-sec">СОСТАВ ЗАКАЗА — ШТУКИ МОЖНО ПОПРАВИТЬ</div>' +
-        chosen.map(p => '<div class="mo-row" data-part="' + p.id + '">' +
+        chosen.map(p => '<div class="mo-row" data-part="' + p.id + '" data-unit-qty="' +
+          Math.max(Number(p.qty) || 1, 1) + '">' +
           '<span class="ds">' + escapeHtml(p.designation || '—') + '</span>' +
           '<span class="nm">' + escapeHtml(p.name || '') + '</span>' +
-          '<input type="number" min="1" value="' + _mfgOrderPartQty(it, p) + '" class="mo-qty">' +
+          '<input type="number" min="1" value="' + _mfgOrderPartQty(it, p) + '" class="mo-qty" ' +
+            'oninput="mfgOrderQtyChanged()">' +
           '<span class="un">шт</span>' +
-          '<i class="ti ti-x rm" title="Убрать из заказа" onclick="this.parentNode.remove()"></i>' +
+          '<i class="ti ti-x rm" title="Убрать из заказа" onclick="mfgOrderRemovePart(this)"></i>' +
         '</div>').join('') + '</div>' +
       '<div><div class="mo-sec">МАТЕРИАЛ ЗАКАЗА</div>' +
         '<div class="pdx-mode" id="mo-mat">' +
@@ -17359,9 +17435,8 @@ async function mfgOrderOpen(itemId) {
           '<button class="btn btn-secondary" onclick="mfgSupsOpen()" title="Справочник поставщиков"><i class="ti ti-settings"></i></button>' +
         '</div></div>' +
       '<div class="form-group" style="margin:0;"><label class="form-label">Тема письма</label>' +
-        '<input class="form-input" id="mo-subject" value="' +
-        escapeHtml('Атомус Групп — заказ на изготовление ' + (it.designation || '') +
-          ' (' + chosen.length + ' поз., ' + pieces + ' шт)') + '"></div>' +
+        '<input class="form-input" id="mo-subject" data-auto-subject="' + escapeHtml(autoSubject) +
+          '" value="' + escapeHtml(autoSubject) + '"></div>' +
       '<div class="form-group" style="margin:0;"><label class="form-label">Текст письма</label>' +
         '<textarea class="form-input" id="mo-body" rows="4">Добрый день! Просим изготовить детали по вложению: раскрой DXF, гибка по PDF, количество в ведомости. Материал и толщина указаны в ведомости. О сроках сообщите ответным письмом.</textarea></div>' +
     '</div>' +
