@@ -280,7 +280,7 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
       <canvas id="cv"></canvas>
       <div class="vbar" id="vbar">
         <button data-v="iso">Изометрия</button><button data-v="front">Спереди</button>
-        <button data-v="side">Слева</button><button data-v="top">Сверху</button>
+        <button data-v="side">Слева</button><button data-v="top">Сверху</button><button data-v="bottom">Снизу</button>
         <button id="bPort" class="on">Патрубки</button>
         <button id="bWire">Каркас</button><button id="bBox">Габарит</button>
         <button id="bSpin" class="on">Вращение</button>
@@ -315,10 +315,15 @@ const BASE = (window.ATOMUS3D_BASE || './pack/').replace(/\/?$/,'/');
 const API  = window.ATOMUS3D_API || (location.pathname.indexOf('/chiller')===0 ? '/api/3d' : null);
 const TOKEN = (()=>{ try { return localStorage.getItem('atomus_token'); } catch(e){ return null; } })();
 const AUTH = TOKEN ? {'Authorization':'Bearer '+TOKEN} : {};
+/* Меши и превью отдаются с «неизменяемым» кешем — это правильно, но имя файла
+   при пересборке базы не меняется, и браузер показывал бы старую модель.
+   Поэтому к адресу добавляем версию пакета: сменилась база — сменился адрес. */
+let VER = '';
+const vq = u => VER ? (u + (u.indexOf('?') < 0 ? '?' : '&') + 'v=' + VER) : u;
 const U = {
   index: ()   => API ? API+'/index'  : BASE+'index.json',
-  mesh:  f    => API ? API+'/mesh/'+encodeURIComponent(f)  : BASE+'mesh/'+f+'.json.gz',
-  thumb: f    => API ? API+'/thumb/'+encodeURIComponent(f) : BASE+'thumb/'+f+'.webp',
+  mesh:  f    => vq(API ? API+'/mesh/'+encodeURIComponent(f)  : BASE+'mesh/'+f+'.json.gz'),
+  thumb: f    => vq(API ? API+'/thumb/'+encodeURIComponent(f) : BASE+'thumb/'+f+'.webp'),
   step:  f    => API ? API+'/step/'+encodeURIComponent(f)  : BASE+'step/'+encodeURIComponent(f),
 };
 let DATA = [], GEOMS = {}, SECTIONS = [], VERSION = '';
@@ -468,6 +473,7 @@ async function boot(){
     'Если это CRM — проверьте, что пакет базы залит в хранилище.</div>'; return; }
   const ix = await r.json();
   DATA = ix.items; GEOMS = ix.geoms; SECTIONS = ix.sections; VERSION = ix.built;
+  VER = (ix.version || ix.built || '').replace(/[^0-9a-zA-Z]/g,'');
   draw();
   const c=document.querySelector('.hcount');
   if(c) c.innerHTML = '<b>'+ix.count.ready+'</b> моделей выпущено<br>'+
@@ -649,7 +655,8 @@ function bindCtl(cv){
   cv.addEventListener('wheel',e=>{e.preventDefault();
     dist=Math.max(dMin,Math.min(dMax,dist*(1+Math.sign(e.deltaY)*0.11)));},{passive:false});
 
-  const V={iso:[-0.95,1.18],front:[-1.5708,1.5708],side:[0,1.5708],top:[-1.5708,0.05]};
+  const V={iso:[-0.95,1.18],front:[-1.5708,1.5708],side:[0,1.5708],
+           top:[-1.5708,0.05],bottom:[-1.5708,Math.PI-0.05]};
   document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
     const v=V[b.dataset.v]; theta=v[0]; phi=v[1]; setSpin(false);});
   const tg=(id,fn)=>{const b=$('#'+id);
