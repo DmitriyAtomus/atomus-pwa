@@ -108,14 +108,16 @@ button{background:rgba(255,255,255,.06);border:1px solid var(--line2);color:#C6D
 button:hover{background:rgba(255,255,255,.13);color:#fff}
 button.on{background:var(--cyan);border-color:#4FBBEC;color:#04121F;font-weight:600}
 .vbar button{font-size:11px;padding:5px 8px}
-.parts{position:absolute;left:14px;top:14px;width:272px;max-height:calc(100% - 90px);
+.parts{position:absolute;left:14px;top:14px;width:314px;max-height:calc(100% - 90px);
   display:none;flex-direction:column;background:rgba(8,20,36,.92);backdrop-filter:blur(8px);
   border:1px solid var(--line2);border-radius:10px;overflow:hidden;z-index:3}
 .parts.open{display:flex}
-.parts .ph2{display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)}
+.parts .ph2{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;
+  padding:9px 11px;border-bottom:1px solid var(--line)}
 .parts .ph2 b{font-size:12px;color:#fff;font-weight:600}
 .parts .ph2 span{font-size:11px;color:var(--dim2)}
 .parts .ph2 button{margin-left:auto;font-size:10.5px;padding:3px 8px}
+.parts .ph2 button+button{margin-left:5px}
 .parts .list{overflow-y:auto;padding:4px 0}
 .prow{display:flex;align-items:center;gap:8px;padding:5px 11px;font-size:12px;cursor:default}
 .prow:hover{background:rgba(255,255,255,.05)}
@@ -126,6 +128,14 @@ button.on{background:var(--cyan);border-color:#4FBBEC;color:#04121F;font-weight:
   font:inherit;font-size:10.5px;padding:2px 7px;border-radius:5px;cursor:pointer}
 .prow .b:hover{border-color:var(--cyan);color:#fff}
 .prow.off .n,.prow.off .d{opacity:.45;text-decoration:line-through}
+.prow .sw{flex:0 0 auto;width:16px;height:16px;padding:0;border-radius:5px;
+  border:1px solid rgba(255,255,255,.38);cursor:pointer}
+.prow .sw:hover{border-color:#fff}
+.pal{display:none;gap:5px;flex-wrap:wrap;padding:3px 11px 9px 11px}
+.pal.open{display:flex}
+.pal i{width:17px;height:17px;border-radius:5px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.22)}
+.pal i:hover{border-color:#fff}
 .psec{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim2);
   padding:8px 11px 3px}
 .lbl{position:fixed;font-size:11px;color:#8FD3F4;background:rgba(6,16,32,.82);padding:1px 6px;
@@ -287,7 +297,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
         <button id="bParts">Детали</button>
       </div>
       <div class="parts" id="partsBox">
-        <div class="ph2"><b>Детали сборки</b><span id="pCount"></span>
+        <div class="ph2"><b id="pTitle">Детали сборки</b><span id="pCount"></span>
+          <button id="pClr">Сброс цвета</button>
           <button id="pAll">Показать все</button></div>
         <div class="list" id="pList"></div>
       </div>
@@ -489,6 +500,11 @@ let theta=-0.95, phi=1.18, dist=1500, dMin=300, dMax=5000,
     spin=true, showPorts=true, target=new THREE.Vector3();
 const C_BODY=0x8d959d, C_DIS=0xd94f3d, C_SUC=0x3d8fd9, C_PPK=0xC9A227,
       C_EQ=0x4FBF8B;
+/* палитра покраски: первый цвет - исходная сталь, он же «сброс» */
+const PAL=[0x8d959d,0x39424E,0xE8EDF2,0xD9534F,0xE2892F,0xE0BE38,0x4FA85B,
+           0x2FB6A8,0x1B9FD8,0x3B5BD9,0x8E5BD0,0xB4703A];
+const hx=c=>'#'+c.toString(16).padStart(6,'0');
+let bodyCol=C_BODY;                       // текущий цвет корпуса покупной позиции
 
 function initGL(){
   if(renderer) return;
@@ -665,36 +681,80 @@ function bindCtl(cv){
   tg('bBox', v=>boxH&&(boxH.visible=v));
   tg('bSpin',v=>spin=v);
   tg('bParts',v=>$('#partsBox').classList.toggle('open',v));
-  tg('bPort',v=>{showPorts=v; mats[1].color.setHex(v?C_DIS:C_BODY);
-                 mats[2].color.setHex(v?C_SUC:C_BODY);
-                 mats[3].color.setHex(v?C_PPK:C_BODY);
-                 mats[4].color.setHex(v?C_EQ:C_BODY);});
+  tg('bPort',v=>{showPorts=v; mats[1].color.setHex(v?C_DIS:bodyCol);
+                 mats[2].color.setHex(v?C_SUC:bodyCol);
+                 mats[3].color.setHex(v?C_PPK:bodyCol);
+                 mats[4].color.setHex(v?C_EQ:bodyCol);});
 }
 function setSpin(v){spin=v; $('#bSpin').classList.toggle('on',v);}
 
 /* Панель деталей: одинаковые детали (одно обозначение) собираются в строку и
-   гасятся вместе — скрыть «Панель боковую» логично сразу обе, а не по одной. */
+   гасятся вместе — скрыть «Панель боковую» логично сразу обе, а не по одной.
+   Каждую строку можно ещё и покрасить: квадратик рядом открывает палитру.
+   У покупных позиций деталей нет — там одна строка на всю модель, только цвет. */
+function paint(g,c){
+  if(g.whole){                       // покупная позиция: корпус и, если зоны
+    bodyCol=c;                       // патрубков выключены, вся модель разом
+    mats[0].color.setHex(c);
+    if(!showPorts) for(let i=1;i<5;i++) mats[i].color.setHex(c);
+  } else g.idx.forEach(i=>{ if(partMats[i]) partMats[i].color.setHex(c); });
+}
 function buildParts(){
-  const box=$('#partsBox'), btn=$('#bParts');
+  const btn=$('#bParts');
   hidden=new Set();
-  if(!PARTS){ box.classList.remove('open'); btn.style.display='none'; return; }
+  bodyCol=C_BODY;                    // материалы общие для всех позиций, сбрасываем
+  if(mats){
+    mats[0].color.setHex(C_BODY);
+    mats[1].color.setHex(showPorts?C_DIS:C_BODY);
+    mats[2].color.setHex(showPorts?C_SUC:C_BODY);
+    mats[3].color.setHex(showPorts?C_PPK:C_BODY);
+    mats[4].color.setHex(showPorts?C_EQ:C_BODY);
+  }
+  const whole=!PARTS;
+  let groups;
+  if(whole) groups=[{des:'',name:'Модель целиком',idx:[],whole:true}];
+  else{
+    const by=new Map();
+    PARTS.forEach((p,i)=>{
+      const k=p.des+'|'+p.name;
+      if(!by.has(k)) by.set(k,{des:p.des,name:p.name,idx:[]});
+      by.get(k).idx.push(i);
+    });
+    groups=[...by.values()];
+  }
   btn.style.display='';
-  const by=new Map();
-  PARTS.forEach((p,i)=>{
-    const k=p.des+'|'+p.name;
-    if(!by.has(k)) by.set(k,{des:p.des,name:p.name,idx:[]});
-    by.get(k).idx.push(i);
-  });
-  const groups=[...by.values()];
-  $('#pCount').textContent=PARTS.length+' шт · '+groups.length+' наименований';
+  btn.textContent=whole?'Цвет':'Детали';
+  $('#pTitle').textContent=whole?'Цвет модели':'Детали сборки';
+  $('#pAll').style.display=whole?'none':'';
+  $('#pCount').textContent=whole?'палитра'
+    :PARTS.length+' шт · '+groups.length+' наименований';
   $('#pList').innerHTML=groups.map((g,i)=>
-    `<div class="prow" data-g="${i}"><span class="d">${g.des}</span>`+
+    `<div class="prow" data-g="${i}">`+
+    (g.des?`<span class="d">${g.des}</span>`:'')+
     `<span class="n" title="${g.name}">${g.name}</span>`+
     `<span class="q">${g.idx.length>1?'×'+g.idx.length:''}</span>`+
-    `<button class="b">скрыть</button></div>`).join('');
+    `<button class="sw" title="цвет" style="background:${hx(PAL[0])}"></button>`+
+    (g.whole?'':`<button class="b">скрыть</button>`)+
+    `</div><div class="pal" data-p="${i}">`+
+    PAL.map(c=>`<i data-c="${c}" style="background:${hx(c)}"></i>`).join('')+
+    `</div>`).join('');
   const apply=(g,off)=>{ g.idx.forEach(i=>{ if(partMats[i]) partMats[i].visible=!off; }); };
   $('#pList').querySelectorAll('.prow').forEach(row=>{
-    const g=groups[+row.dataset.g];
+    const g=groups[+row.dataset.g], i=+row.dataset.g;
+    const pal=$('#pList').querySelector('.pal[data-p="'+i+'"]');
+    const sw=row.querySelector('.sw');
+    sw.onclick=()=>{
+      const op=!pal.classList.contains('open');
+      $('#pList').querySelectorAll('.pal').forEach(p=>p.classList.remove('open'));
+      pal.classList.toggle('open',op);
+    };
+    pal.querySelectorAll('i').forEach(chip=>{
+      chip.onclick=()=>{
+        const c=+chip.dataset.c;
+        paint(g,c); sw.style.background=hx(c); pal.classList.remove('open');
+      };
+    });
+    if(g.whole) return;
     row.querySelector('.b').onclick=()=>{
       const off=!row.classList.contains('off');
       row.classList.toggle('off',off);
@@ -709,8 +769,14 @@ function buildParts(){
     hidden.clear();
     if(partMats) partMats.forEach(m=>m.visible=true);
     $('#pList').querySelectorAll('.prow').forEach(r=>{
-      r.classList.remove('off'); r.querySelector('.b').textContent='скрыть'; });
+      r.classList.remove('off');
+      const b=r.querySelector('.b'); if(b) b.textContent='скрыть'; });
     $('#pAll').textContent='Показать все';
+  };
+  $('#pClr').onclick=()=>{
+    groups.forEach(g=>paint(g,PAL[0]));
+    $('#pList').querySelectorAll('.pal').forEach(p=>p.classList.remove('open'));
+    $('#pList').querySelectorAll('.sw').forEach(s=>s.style.background=hx(PAL[0]));
   };
 }
 
