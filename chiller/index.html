@@ -444,7 +444,10 @@ function bindThumbs(){
 function draw(){drawTree();drawBrands();drawCards();bindThumbs();
   $('#fState').querySelectorAll('.chip').forEach(e=>e.classList.toggle('on',f.st===e.dataset.st));}
 
-$('#q').oninput = e => {f.q = e.target.value.trim().toLowerCase(); drawCards();};
+/* после поиска список другой, а превью в нём ещё пустые: без bindThumbs они
+   подтягивались только после первой прокрутки, и найденное выглядело пустым */
+$('#q').oninput = e => {f.q = e.target.value.trim().toLowerCase();
+                        drawCards(); bindThumbs();};
 $('#fState').querySelectorAll('.chip').forEach(e=>e.onclick=()=>{
   f.st = f.st===e.dataset.st?null:e.dataset.st; draw();});
 const NAV=document.querySelector('aside');
