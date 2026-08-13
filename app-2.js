@@ -11843,12 +11843,21 @@ function renderSpecForm(contractId, existing) {
   html += '<div id="spec-search-results" class="spec-search-results" style="display:none;"></div>';
   html += '</div>';
   html += '</div>';
-  // Кол-во + ед.изм.
+  // Кол-во + ед.изм. Для счётных единиц нельзя получить 0,99 шт. стрелкой поля.
+  const qtyUnit = e.unit || 'шт.';
+  const qtyIsWhole = _specUnitRequiresWholeQty(qtyUnit);
+  const rawQty = Number(e.qty ?? 1);
+  const qtyValue = qtyIsWhole && Number.isFinite(rawQty)
+    ? Math.max(1, Math.round(rawQty))
+    : (e.qty ?? 1);
   html += '<div class="spec-form-field"><label>Кол-во *</label>' +
-          '<input type="number" id="spec-form-qty" value="' + (e.qty || 1) + '" min="0" step="0.01">' +
+          '<input type="number" id="spec-form-qty" value="' + qtyValue + '" min="' + (qtyIsWhole ? '1' : '0.01') +
+          '" step="' + (qtyIsWhole ? '1' : '0.01') + '" inputmode="' + (qtyIsWhole ? 'numeric' : 'decimal') +
+          '" onblur="_syncSpecQtyRules(true)">' +
           '</div>';
   html += '<div class="spec-form-field" style="grid-column: 2 / -1;"><label>Ед.изм.</label>' +
-          '<input type="text" id="spec-form-unit" value="' + escapeHtml(e.unit || 'шт.') + '" maxlength="30" list="spec-units">' +
+          '<input type="text" id="spec-form-unit" value="' + escapeHtml(qtyUnit) +
+          '" maxlength="30" list="spec-units" oninput="_syncSpecQtyRules(false)" onchange="_syncSpecQtyRules(true)">' +
           '<datalist id="spec-units">' +
             '<option value="шт.">' +
             '<option value="м">' +
@@ -12095,6 +12104,38 @@ function _specSearchSourceBadge(source) {
   return '';
 }
 
+// Счётные единицы в спецификации договора всегда целые. Дроби остаются
+// доступными для метров, площади, массы и объёма.
+function _specUnitRequiresWholeQty(unit) {
+  const normalized = String(unit || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.\s]/g, '');
+  return [
+    'шт', 'штука', 'штуки', 'штук',
+    'компл', 'комплект', 'комплекта', 'комплектов',
+    'упак', 'упаковка', 'упаковки', 'упаковок',
+  ].includes(normalized);
+}
+
+function _syncSpecQtyRules(normalizeValue) {
+  const qtyInput = document.getElementById('spec-form-qty');
+  const unitInput = document.getElementById('spec-form-unit');
+  if (!qtyInput || !unitInput) return;
+
+  const whole = _specUnitRequiresWholeQty(unitInput.value);
+  qtyInput.min = whole ? '1' : '0.01';
+  qtyInput.step = whole ? '1' : '0.01';
+  qtyInput.inputMode = whole ? 'numeric' : 'decimal';
+
+  if (whole && normalizeValue) {
+    const value = Number(qtyInput.value);
+    if (Number.isFinite(value)) {
+      qtyInput.value = String(Math.max(1, Math.round(value)));
+    }
+  }
+}
+
 // v2.20.0: универсальный обработчик выбора из унифицированного поиска
 function selectUnifiedSpec(payloadStr) {
   let p;
@@ -12137,6 +12178,7 @@ function selectUnifiedSpec(payloadStr) {
   if (nm) nm.value = p.label || '';
   if (input) input.value = p.label || '';
   if (unitInput && p.unit && !unitInput.value) unitInput.value = p.unit;
+  _syncSpecQtyRules(false);
 
   if (results) results.style.display = 'none';
 
@@ -12204,6 +12246,20 @@ async function submitSpecForm(contractId, itemId) {
     showToast('Выберите позицию из каталога или впишите название вручную', 'error');
     return;
   }
+  const qtyInput = document.getElementById('spec-form-qty');
+  const unit = (document.getElementById('spec-form-unit').value || 'шт.').trim() || 'шт.';
+  const qty = Number(qtyInput && qtyInput.value);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    showToast('Количество должно быть больше нуля', 'error');
+    if (qtyInput) qtyInput.focus();
+    return;
+  }
+  if (_specUnitRequiresWholeQty(unit) && !Number.isInteger(qty)) {
+    showToast('Для «' + unit + '» укажите целое количество: 1, 2, 3…', 'error');
+    if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+    return;
+  }
+
   // ЭТАП 37: условные поля
   const execEl = document.getElementById('spec-form-execution-type');
   const ipEl = document.getElementById('spec-form-ip-rating');
@@ -12212,8 +12268,8 @@ async function submitSpecForm(contractId, itemId) {
     component_id: componentId,
     sale_product_id: saleProductId,
     name: name,
-    qty: parseFloat(document.getElementById('spec-form-qty').value) || 0,
-    unit: (document.getElementById('spec-form-unit').value || 'шт.').trim() || 'шт.',
+    qty: qty,
+    unit: unit,
     // execution_type / ip_rating — отправляем всегда, чтобы PATCH мог очистить
     execution_type: execEl ? (execEl.value || '') : '',
     ip_rating: ipEl ? (ipEl.value || '') : '',
@@ -12955,6 +13011,7 @@ function pickNomSaleProduct(label, unit, saleProductId, categoryName) {
   if (nm) nm.value = label;
   if (search) search.value = label;
   if (unitEl && unit) unitEl.value = unit;
+  _syncSpecQtyRules(false);
   // ЭТАП 37: сохранить category для условного рендера полей
   state._specFormCtx = {
     kind: 'sale',
@@ -12983,6 +13040,7 @@ function pickNomComponent(componentId, label, unit, categoryName) {
   if (nm) nm.value = label;
   if (search) search.value = label;
   if (unitEl && unit) unitEl.value = unit;
+  _syncSpecQtyRules(false);
   // Контекст: для комплектующих категория из component_categories
   // (Воздухоохладители — единственная пересекающаяся с условным рендером)
   state._specFormCtx = {
