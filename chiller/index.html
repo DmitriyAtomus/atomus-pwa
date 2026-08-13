@@ -335,6 +335,7 @@ let VER = '';
 const vq = u => VER ? (u + (u.indexOf('?') < 0 ? '?' : '&') + 'v=' + VER) : u;
 const U = {
   index: ()   => API ? API+'/index'  : BASE+'index.json',
+  version: () => API ? API+'/version': BASE+'version.json',
   mesh:  f    => vq(API ? API+'/mesh/'+encodeURIComponent(f)  : BASE+'mesh/'+f+'.json.gz'),
   thumb: f    => vq(API ? API+'/thumb/'+encodeURIComponent(f) : BASE+'thumb/'+f+'.webp'),
   step:  f    => API ? API+'/step/'+encodeURIComponent(f)  : BASE+'step/'+encodeURIComponent(f),
@@ -483,7 +484,16 @@ document.addEventListener('fullscreenchange', ()=>{
 addEventListener('keydown', e=>{ if(e.key==='F11'){ e.preventDefault(); toggleFS(); } });
 
 async function boot(){
-  const r = await fetch(U.index(), {cache:'default', headers:AUTH});
+  /* Индекс кешируется на 5 минут, и после заливки базы рубрикатор с позициями
+     ещё столько же оставался старым. Версия пакета отдаётся без кеша — берём
+     её первой и подставляем в адрес индекса: залили базу — адрес другой. */
+  let vq0 = '';
+  try{
+    const rv = await fetch(U.version(), {cache:'no-store', headers:AUTH});
+    if(rv.ok){ const v = await rv.json();
+               vq0 = '?v=' + String(v.version || v.built || '').replace(/[^0-9a-zA-Z]/g,''); }
+  }catch(e){}
+  const r = await fetch(U.index() + vq0, {cache:'default', headers:AUTH});
   if(!r.ok){ document.getElementById('grid').innerHTML =
     '<div style="padding:30px;color:#7C93AE">База не отвечает ('+r.status+'). '+
     'Если это CRM — проверьте, что пакет базы залит в хранилище.</div>'; return; }
