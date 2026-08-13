@@ -85,13 +85,69 @@ footer .m{font-family:var(--mono)}
 footer .save{margin-left:auto;color:var(--faint)}
 #toast{position:fixed;left:50%;bottom:46px;transform:translateX(-50%);background:#102138;color:var(--ink);
   border:1px solid var(--line2);border-radius:9px;padding:8px 16px;font-size:12.5px;display:none;z-index:9}
+/* вкладки режимов */
+.mtabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:3px}
+.mtab{padding:5px 14px;border-radius:7px;font-size:12.5px;color:var(--dim);cursor:pointer;user-select:none}
+.mtab.on{background:#183355;color:var(--ice)}
+#projName{cursor:pointer;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#projName b{color:var(--ink)}
+#projName:hover b{color:var(--ice)}
+button.back{background:none;font:inherit}
+/* оверлей «Проекты» */
+#pov{position:fixed;inset:0;background:rgba(3,8,16,.72);z-index:20;display:none;align-items:center;justify-content:center}
+#pov.on{display:flex}
+.pov-card{width:min(520px,92vw);max-height:80vh;display:flex;flex-direction:column;background:var(--panel);
+  border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+.pov-h{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);font-weight:700}
+.pov-h .x{margin-left:auto;cursor:pointer;color:var(--dim);font-size:16px;padding:2px 6px}
+.pov-list{flex:1;overflow-y:auto;padding:8px}
+.pov-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:9px;cursor:pointer}
+.pov-row:hover{background:var(--panel2)}
+.pov-row .t{flex:1;min-width:0}
+.pov-row b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pov-row span{font-size:11px;color:var(--faint)}
+.pov-row .del{color:#f0a9a0;font-size:13px;padding:4px 7px;border-radius:6px}
+.pov-row .del:hover{background:#3a1c1c}
+.pov-new{margin:8px;padding:11px;border:1px dashed var(--line2);border-radius:9px;color:var(--ice);
+  text-align:center;cursor:pointer;font-size:13px}
+.pov-new:hover{background:var(--panel2)}
+.pov-empty{padding:22px 16px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.6}
+/* схема */
+#swrap{position:absolute;inset:0;background:#081426;z-index:4;display:none;overflow:auto}
+#swrap.on{display:block}
+#schSvg{display:block;margin:0 auto;max-width:1080px;width:100%;height:auto}
+.sch-note{position:sticky;bottom:0;padding:7px 14px;font-size:11.5px;color:var(--faint);
+  background:rgba(8,20,38,.9);border-top:1px solid var(--line)}
+svg .sl{stroke:#7FB4D8;stroke-width:.9;fill:none}
+svg .sw{stroke:#4bb583;stroke-width:.9;fill:none;stroke-dasharray:3 2}
+svg .si{stroke:#5D7390;stroke-width:.45;fill:none;stroke-dasharray:1.2 1.2}
+svg .sg{stroke:#8FD3F4;stroke-width:.8;fill:#0B1728}
+svg .sg2{stroke:#8FD3F4;stroke-width:.8;fill:none}
+svg .st{font:600 3.6px 'Segoe UI',sans-serif;fill:#D9E5F2}
+svg .sa{font:3.2px 'Segoe UI',sans-serif;fill:#4FBF8B}
+svg .su{font:3.2px 'Segoe UI',sans-serif;fill:#C9A227}
+svg g.sn{cursor:pointer}
+svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
+/* модалка назначения модели узлу */
+#asg{position:fixed;inset:0;background:rgba(3,8,16,.72);z-index:21;display:none;align-items:center;justify-content:center}
+#asg.on{display:flex}
+.asg-card{width:min(460px,92vw);max-height:78vh;display:flex;flex-direction:column;background:var(--panel);
+  border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+.asg-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:6px}
+.asg-unset{margin:0 8px 10px;padding:9px;border:1px solid #6b3a34;color:#f0a9a0;border-radius:8px;
+  text-align:center;cursor:pointer;font-size:12.5px}
 </style></head><body>
 <div id="app">
   <header>
-    <div class="logo"><b>АТОМУС</b><span>Атом Чиллер · Проект</span></div>
-    <div class="pname">сборка из моделей базы · <b id="hCnt">0 деталей</b></div>
-    <div class="proto">прототип</div>
-    <a class="back" href="index.html">← База 3D</a>
+    <div class="logo"><b>АТОМУС</b><span>Атом Чиллер</span></div>
+    <div class="mtabs">
+      <div class="mtab on" id="tab3d">Компоновка</div>
+      <div class="mtab" id="tabSch">Схема</div>
+    </div>
+    <div class="pname" id="projName" title="Переименовать проект"><b>…</b></div>
+    <div class="pname">· <b id="hCnt">0 деталей</b></div>
+    <button class="back" id="bProjects" style="margin-left:auto">⛁ Проекты</button>
+    <a class="back" href="index.html" style="margin-left:8px">← База 3D</a>
   </header>
 
   <div id="mid">
@@ -112,6 +168,11 @@ footer .save{margin-left:auto;color:var(--faint)}
       </div>
       <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот · Del — убрать</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на пол.<br>Начни с корпуса или компрессора.</div></div>
+      <div id="swrap">
+        <svg id="schSvg" viewBox="26 6 212 214"></svg>
+        <div class="sch-note">Типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3). Клик по элементу — назначить модель из базы.
+          Зелёным — назначено, жёлтым «назначить» — ждёт. Назначения хранятся в проекте.</div>
+      </div>
       <div id="selbar"><span class="nm" id="selNm"></span>
         <button id="bRot" title="R">⟳ 90°</button>
         <button id="bDup">⧉ Дублировать</button>
@@ -133,11 +194,22 @@ footer .save{margin-left:auto;color:var(--faint)}
     <span id="fCnt" class="m">0 деталей</span>
     <span id="fDims" class="m"></span>
     <span id="fColl" class="m"></span>
-    <span>прототип: проект хранится в этом браузере</span>
+    <span id="fMode"></span>
     <span class="save" id="fSave"></span>
   </footer>
 </div>
 <div id="toast"></div>
+<div id="pov"><div class="pov-card">
+  <div class="pov-h">⛁ Проекты Атом Чиллер <span class="x" id="povX">✕</span></div>
+  <div class="pov-list" id="povList"></div>
+  <div class="pov-new" id="povNew">+ Новый проект</div>
+</div></div>
+<div id="asg"><div class="asg-card">
+  <div class="pov-h" id="asgTitle">Назначить модель <span class="x" id="asgX">✕</span></div>
+  <div class="search" style="margin:10px 10px 6px"><span style="color:var(--faint)">⌕</span><input id="asgQ" placeholder="поиск по базе…"></div>
+  <div class="asg-unset" id="asgUnset" style="display:none">✕ Убрать назначение</div>
+  <div class="asg-list" id="asgList"></div>
+</div></div>
 
 <script src="three.min.js"></script>
 <script>
@@ -388,19 +460,119 @@ function refreshSpecSel(){
 const plural=n=>{const m=n%10,h=n%100;
   return m===1&&h!==11?'деталь':(m>=2&&m<=4&&(h<10||h>=20)?'детали':'деталей');};
 
-/* ═══ автосохранение (прототип: localStorage) ═══ */
+/* ═══ проект: сохранение в CRM (или localStorage, если открыт без CRM) ═══ */
 const LS='chiller_project_proto';
-let saveT=null;
-function save(){
-  clearTimeout(saveT);
-  saveT=setTimeout(()=>{
-    try{localStorage.setItem(LS,JSON.stringify(placed.map(p=>({
-      id:p.id,x:p.obj.position.x,y:p.obj.position.y,r:p.obj.rotation.z}))));
-      $('#fSave').textContent='сохранено · '+new Date().toLocaleTimeString().slice(0,5);
-    }catch(e){}
-  },400);
+const PAPI=API?'/api/chiller/projects':null;   // проекты живут в CRM рядом с /api/3d
+const PROJ={id:null,name:''};
+let schemaData={};        // назначения узлов схемы: {key:{id,name}}
+let saveT=null,_loading=false;
+
+async function capi(path,method,body){
+  const r=await fetch(path,{method:method||'GET',
+    headers:Object.assign({'Content-Type':'application/json'},AUTH),
+    body:body?JSON.stringify(body):undefined});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
 }
-async function restore(){
+function projPayload(){
+  return {items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,r:p.obj.rotation.z})),
+          schema:schemaData};
+}
+function save(){
+  if(_loading)return;
+  clearTimeout(saveT);
+  saveT=setTimeout(async()=>{
+    const stamp=()=>{$('#fSave').textContent='сохранено · '+new Date().toLocaleTimeString().slice(0,5);};
+    if(PAPI&&PROJ.id){
+      try{await capi(PAPI+'/'+PROJ.id,'PATCH',{data:projPayload()});stamp();}
+      catch(e){$('#fSave').textContent='⚠ не сохранилось: '+(e.message||e);}
+    }else{
+      try{localStorage.setItem(LS,JSON.stringify(projPayload().items));stamp();}catch(e){}
+    }
+  },500);
+}
+function setProjName(n){
+  PROJ.name=n||'Без названия';
+  $('#projName').innerHTML='<b>'+esc(PROJ.name)+'</b>';
+  document.title='Атом Чиллер · '+PROJ.name;
+}
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function clearScene(){
+  placed.forEach(p=>scene.remove(p.obj));placed.length=0;select(null);
+}
+async function loadProjectData(data){
+  _loading=true;
+  clearScene();
+  schemaData=(data&&data.schema)||{};
+  const arr=(data&&data.items)||[];
+  for(const s of arr){
+    const d=DATA.find(x=>x.id===s.id&&x.ready);
+    if(d)await addItem(d,{x:s.x,y:s.y},s.r);
+  }
+  _loading=false;
+  select(null);refresh();renderSchema();
+}
+async function openProject(id){
+  try{
+    const p=await capi(PAPI+'/'+id);
+    PROJ.id=p.id;setProjName(p.name);
+    try{history.replaceState(null,'', '?p='+p.id);}catch(e){}
+    await loadProjectData(p.data);
+    closeProjects();
+  }catch(e){toast('Проект не открылся: '+(e.message||e));
+    if(!PROJ.id)openProjectsOverlay();}
+}
+async function createProject(){
+  const name=prompt('Название проекта:','Чиллер ');
+  if(name===null)return;
+  // старый прототипный проект из браузера подхватываем в первый CRM-проект
+  let init={};
+  try{
+    const old=JSON.parse(localStorage.getItem(LS)||'null');
+    if(Array.isArray(old)&&old.length&&
+       confirm('Забрать в этот проект '+old.length+' дет. из старого чернового проекта (он хранился в браузере)?')){
+      init={items:old,schema:{}};localStorage.removeItem(LS);
+    }
+  }catch(e){}
+  try{
+    const r=await capi(PAPI,'POST',{name:name.trim()||'Без названия',data:init});
+    await openProject(r.id);
+  }catch(e){toast('Не создался: '+(e.message||e));}
+}
+async function openProjectsOverlay(){
+  let items=[];
+  try{items=(await capi(PAPI)).items||[];}
+  catch(e){toast('Список проектов не отдался: '+(e.message||e));return;}
+  const fmt=t=>String(t||'').replace('T',' ').slice(0,16);
+  $('#povList').innerHTML=items.length?items.map(p=>
+    '<div class="pov-row" data-id="'+p.id+'"><div class="t"><b>'+esc(p.name)+'</b>'+
+    '<span>'+p.items_count+' дет. · обновлён '+fmt(p.updated_at)+'</span></div>'+
+    '<span class="del" data-del="'+p.id+'" title="Удалить">✕</span></div>').join('')
+    :'<div class="pov-empty">Проектов ещё нет.<br>Создай первый — например «Чиллер 3,5 кВт».</div>';
+  $('#povList').querySelectorAll('.pov-row').forEach(row=>{
+    row.onclick=e=>{
+      if(e.target.dataset.del)return;
+      openProject(+row.dataset.id);};
+  });
+  $('#povList').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Удалить проект «'+b.closest('.pov-row').querySelector('b').textContent+'»?'))return;
+    try{await capi(PAPI+'/'+b.dataset.del,'DELETE');openProjectsOverlay();}
+    catch(e){toast('Не удалился: '+(e.message||e));}
+  });
+  $('#pov').classList.add('on');
+}
+function closeProjects(){$('#pov').classList.remove('on');}
+$('#povX').onclick=()=>{if(PROJ.id||!PAPI)closeProjects();};
+$('#povNew').onclick=createProject;
+$('#bProjects').onclick=()=>{if(PAPI)openProjectsOverlay();};
+$('#projName').onclick=async()=>{
+  if(!PAPI||!PROJ.id)return;
+  const n=prompt('Название проекта:',PROJ.name);
+  if(n===null||!n.trim())return;
+  try{await capi(PAPI+'/'+PROJ.id,'PATCH',{name:n.trim()});setProjName(n.trim());}
+  catch(e){toast('Не переименовался: '+(e.message||e));}
+};
+async function restoreLegacy(){
   let arr=null;
   try{arr=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
   if(!Array.isArray(arr)||!arr.length)return;
@@ -410,6 +582,143 @@ async function restore(){
   }
   select(null);
 }
+
+/* ═══ вкладка «Схема»: типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3) ═══ */
+// Узлы: k — ключ назначения, глиф по kind, hint — подсказка поиска по базе
+const SCH_NODES=[
+ {k:'KM1', t:'КМ1', n:'Компрессор',        kind:'comp',  x:58, y:176, hint:'компрессор'},
+ {k:'EK1', t:'ЕК1', n:'Нагреватель картера',kind:'heat', x:58, y:191, hint:'нагреватель'},
+ {k:'KO1', t:'КО1', n:'Обратный клапан',   kind:'check', x:76, y:110, hint:'обратный'},
+ {k:'AVO1',t:'АВО1',n:'Конденсатор',       kind:'cond',  x:120,y:38,  hint:'конденсатор'},
+ {k:'M1',  t:'М1',  n:'Вентилятор',        kind:'fan',   x:139,y:38,  hint:'вентилятор'},
+ {k:'RD3', t:'РД3', n:'Реле давл. (вент.)',kind:'psw',   x:160,y:22,  hint:'реле давления'},
+ {k:'KD1', t:'КД1', n:'Клапан NRD',        kind:'spring',x:146,y:62,  hint:'nrd'},
+ {k:'KR1', t:'КР1', n:'Регулятор KVR',     kind:'spring',x:186,y:56,  hint:'kvr'},
+ {k:'RS1', t:'РС1', n:'Ресивер',           kind:'recv',  x:186,y:85,  hint:'ресивер'},
+ {k:'VN1', t:'ВН1', n:'Запорный клапан',   kind:'valve', x:214,y:118, hint:'запорный'},
+ {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель',  kind:'filt',  x:214,y:134, hint:'фильтр'},
+ {k:'SI1', t:'СИ1', n:'Смотровое стекло',  kind:'sight', x:214,y:148, hint:'стекло'},
+ {k:'UA1', t:'УА1', n:'Соленоид жидк.',    kind:'sol',   x:214,y:162, hint:'соленоид'},
+ {k:'TRV1',t:'ТРВ1',n:'ТРВ',               kind:'trv',   x:152,y:184, hint:'трв'},
+ {k:'I1',  t:'И1',  n:'Испаритель ПТО',    kind:'evap',  x:120,y:184, hint:'теплообменник'},
+ {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.',  kind:'accum', x:84, y:152, hint:'отделитель'},
+ {k:'UA2', t:'УА2', n:'Соленоид байпаса',  kind:'sol',   x:46, y:118, hint:'соленоид'},
+ {k:'KO2', t:'КО2', n:'Обратный клапан',   kind:'check', x:46, y:156, hint:'обратный'},
+ {k:'RD1', t:'РД1', n:'Реле давления НД',  kind:'psw',   x:62, y:112, hint:'реле давления'},
+ {k:'MN1', t:'МН1', n:'Манометр НД',       kind:'gauge', x:70, y:122, hint:'манометр'},
+ {k:'RD2', t:'РД2', n:'Реле давления ВД',  kind:'psw',   x:93, y:94,  hint:'реле давления'},
+ {k:'MN2', t:'МН2', n:'Манометр ВД',       kind:'gauge', x:93, y:78,  hint:'манометр'},
+ {k:'N1',  t:'Н1',  n:'Насос',             kind:'pump',  x:188,y:200, hint:'насос'},
+ {k:'RP1', t:'РП1', n:'Реле потока',       kind:'fsw',   x:154,y:208, hint:'реле потока'},
+];
+const SCH_LINES=[
+ {c:'sl',p:[[68,176],[76,176],[76,40],[104,40]]},          // нагнетание
+ {c:'sl',p:[[136,40],[186,40],[186,74]]},                  // конденсатор → КР1 → ресивер
+ {c:'sl',p:[[76,62],[186,62]]},                            // НРД: нагнетание → ресивер
+ {c:'sl',p:[[192,92],[198,92],[198,104],[214,104],[214,178],[168,178]]}, // жидкостная
+ {c:'sl',p:[[136,178],[104,178]]},                         // ТРВ → И1 (внутри ряда)
+ {c:'sl',p:[[104,180],[84,180],[84,163]]},                 // всас И1 → ОЖ1
+ {c:'sl',p:[[84,141],[84,128],[58,128],[58,166]]},         // ОЖ1 → КМ1
+ {c:'sl',p:[[76,74],[46,74],[46,196],[84,196],[84,180]]},  // байпас
+ {c:'si',p:[[76,94],[89,94]]},{c:'si',p:[[76,78],[89,78]]},// импульсники ВД
+ {c:'si',p:[[62,128],[62,116]]},{c:'si',p:[[70,128],[70,126]]},
+ {c:'si',p:[[152,180],[152,171],[96,171],[96,127],[90,127]]}, // капилляр ТРВ
+ {c:'si',p:[[160,26],[160,40]]},                           // РД3 → вентилятор
+ {c:'sw',p:[[182,200],[128,200],[128,192]]},               // вода: насос → И1
+ {c:'sw',p:[[194,200],[210,200]]},
+ {c:'sw',p:[[114,192],[114,208],[148,208]]},               // И1 → РП1 → потребителю
+ {c:'sw',p:[[160,208],[210,208]]},
+];
+function _g(kind,x,y){  // глиф узла, ~8×8 в координатах схемы
+  const P=(d)=>'<path class="sg2" d="'+d+'"/>';
+  switch(kind){
+   case 'comp': return '<circle class="sg" cx="'+x+'" cy="'+y+'" r="9"/>'+P('M'+(x-6)+' '+(y+6)+' L'+x+' '+(y-3)+' L'+(x+6)+' '+(y+6));
+   case 'cond': return '<rect class="sg" x="'+(x-16)+'" y="'+(y-12)+'" width="32" height="24"/>'+P('M'+(x-12)+' '+(y+8)+' L'+(x-4)+' '+(y-8))+P('M'+(x-7)+' '+(y+8)+' L'+(x+1)+' '+(y-8));
+   case 'fan':  return '<circle class="sg2" cx="'+x+'" cy="'+y+'" r="5"/>'+P('M'+x+' '+(y-4.4)+' L'+x+' '+y)+P('M'+(x-3.8)+' '+(y+2.2)+' L'+x+' '+y)+P('M'+(x+3.8)+' '+(y+2.2)+' L'+x+' '+y);
+   case 'evap': return '<rect class="sg" x="'+(x-14)+'" y="'+(y-11)+'" width="28" height="22"/>'+P('M'+(x-7)+' '+(y-11)+' L'+(x-7)+' '+(y+11))+P('M'+x+' '+(y-11)+' L'+x+' '+(y+11))+P('M'+(x+7)+' '+(y-11)+' L'+(x+7)+' '+(y+11));
+   case 'recv': return '<rect class="sg" x="'+(x-13)+'" y="'+(y-6)+'" width="26" height="12" rx="5.5"/>';
+   case 'accum':return '<rect class="sg" x="'+(x-5)+'" y="'+(y-11)+'" width="10" height="22" rx="4.5"/>';
+   case 'valve':return P('M'+(x-4)+' '+(y-3)+' L'+x+' '+y+' L'+(x-4)+' '+(y+3)+' Z')+P('M'+(x+4)+' '+(y-3)+' L'+x+' '+y+' L'+(x+4)+' '+(y+3)+' Z');
+   case 'check':return _g('valve',x,y)+P('M'+(x-3)+' '+(y+3.4)+' L'+(x+3)+' '+(y-3.4));
+   case 'sol':  return _g('valve',x,y)+'<rect class="sg2" x="'+(x-2.4)+'" y="'+(y-8.6)+'" width="4.8" height="4.4"/>'+P('M'+x+' '+(y-4.2)+' L'+x+' '+y);
+   case 'spring':return _g('valve',x,y)+P('M'+x+' '+(y-3)+' l1.2 -1.4 l-2.4 -1.2 l2.4 -1.2 l-1.2 -1.4');
+   case 'trv':  return _g('valve',x,y)+'<circle class="sg2" cx="'+x+'" cy="'+(y-7)+'" r="3"/>'+P('M'+x+' '+(y-4)+' L'+x+' '+y);
+   case 'filt': return '<rect class="sg" x="'+(x-3)+'" y="'+(y-6)+'" width="6" height="12"/>'+P('M'+(x-3)+' '+(y-2)+' L'+(x+3)+' '+(y-6))+P('M'+(x-3)+' '+(y+3)+' L'+(x+3)+' '+(y-1));
+   case 'sight':return '<circle class="sg" cx="'+x+'" cy="'+y+'" r="3"/>'+'<circle class="sg2" cx="'+x+'" cy="'+y+'" r="1.2"/>';
+   case 'psw':  return '<rect class="sg" x="'+(x-3.4)+'" y="'+(y-3.4)+'" width="6.8" height="6.8"/>'+'<text class="st" x="'+x+'" y="'+(y+1.3)+'" text-anchor="middle">P</text>';
+   case 'fsw':  return '<rect class="sg" x="'+(x-3.4)+'" y="'+(y-3.4)+'" width="6.8" height="6.8"/>'+'<text class="st" x="'+x+'" y="'+(y+1.3)+'" text-anchor="middle">F</text>';
+   case 'gauge':return '<circle class="sg" cx="'+x+'" cy="'+y+'" r="3.4"/>'+P('M'+x+' '+y+' L'+(x+2.2)+' '+(y-2.2));
+   case 'pump': return '<circle class="sg" cx="'+x+'" cy="'+y+'" r="5.5"/>'+P('M'+(x-3.4)+' '+(y-3.4)+' L'+(x-3.4)+' '+(y+3.4)+' L'+(x+4.2)+' '+y+' Z');
+   case 'heat': return P('M'+(x-5)+' '+y+' L'+(x+5)+' '+y);
+   default:     return '<circle class="sg2" cx="'+x+'" cy="'+y+'" r="3"/>';
+  }
+}
+function renderSchema(){
+  const svg=$('#schSvg');
+  if(!svg)return;
+  let h='';
+  SCH_LINES.forEach(l=>{
+    h+='<polyline class="'+l.c+'" points="'+l.p.map(p=>p.join(',')).join(' ')+'"/>';
+  });
+  SCH_NODES.forEach(nd=>{
+    const asg=schemaData[nd.k];
+    h+='<g class="sn" data-k="'+nd.k+'">'+_g(nd.kind,nd.x,nd.y);
+    const ly=nd.y+(nd.kind==='cond'||nd.kind==='evap'?16:(nd.kind==='comp'?13:(nd.kind==='recv'?10:8)));
+    h+='<text class="st" x="'+nd.x+'" y="'+ly+'" text-anchor="middle">'+nd.t+'</text>';
+    h+=asg
+      ?'<text class="sa" x="'+nd.x+'" y="'+(ly+4)+'" text-anchor="middle">'+esc(String(asg.name).slice(0,22))+'</text>'
+      :'<text class="su" x="'+nd.x+'" y="'+(ly+4)+'" text-anchor="middle">назначить</text>';
+    h+='</g>';
+  });
+  const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
+  h+='<text class="st" x="30" y="12">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
+  svg.innerHTML=h;
+  svg.querySelectorAll('g.sn').forEach(g=>g.onclick=()=>openAssign(g.dataset.k));
+}
+let asgKey=null;
+function openAssign(key){
+  asgKey=key;
+  const nd=SCH_NODES.find(n=>n.k===key);
+  $('#asgTitle').innerHTML=esc(nd.t+' · '+nd.n)+' <span class="x" id="asgX">✕</span>';
+  $('#asgTitle').querySelector('#asgX').onclick=()=>$('#asg').classList.remove('on');
+  $('#asgQ').value=nd.hint||'';
+  $('#asgUnset').style.display=schemaData[key]?'block':'none';
+  $('#asgUnset').onclick=()=>{delete schemaData[key];$('#asg').classList.remove('on');renderSchema();save();};
+  drawAsgList();
+  $('#asg').classList.add('on');
+  setTimeout(()=>$('#asgQ').focus(),50);
+}
+function drawAsgList(){
+  const q=($('#asgQ').value||'').trim().toLowerCase();
+  const list=DATA.filter(d=>d.ready)
+    .filter(d=>!q||(d.brand+' '+d.name+' '+(d.kind||'')).toLowerCase().includes(q))
+    .slice(0,40);
+  $('#asgList').innerHTML=list.map(d=>
+    '<div class="ci" data-id="'+d.id+'">'+
+    '<img loading="lazy" data-th="'+GEOMS[d.g].f+'">'+
+    '<div class="t"><b>'+esc(d.name)+'</b><span>'+esc(d.brand)+'</span></div>'+
+    '<span class="add">→</span></div>').join('')||
+    '<div class="pov-empty">Ничего не нашлось — измени запрос.</div>';
+  $('#asgList').querySelectorAll('.ci').forEach(el=>el.onclick=()=>{
+    const d=DATA.find(x=>x.id===el.dataset.id);
+    schemaData[asgKey]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
+    $('#asg').classList.remove('on');
+    renderSchema();save();
+    toast('Назначено: '+d.name+' → '+SCH_NODES.find(n=>n.k===asgKey).t);
+  });
+  fillThumbsIn('#asgList');
+}
+$('#asgQ')&&$('#asgQ').addEventListener('input',drawAsgList);
+
+/* переключение вкладок Компоновка/Схема */
+function setMode(m){
+  $('#tab3d').classList.toggle('on',m==='3d');
+  $('#tabSch').classList.toggle('on',m==='sch');
+  $('#swrap').classList.toggle('on',m==='sch');
+  if(m==='sch')renderSchema();
+}
+$('#tab3d').onclick=()=>setMode('3d');
+$('#tabSch').onclick=()=>setMode('sch');
 
 /* ═══ каталог ═══ */
 let fSec=null,fQ='';
@@ -431,8 +740,9 @@ function drawCat(){
   fillThumbs();
 }
 const THUMBS=new Map();
-async function fillThumbs(){
-  for(const img of document.querySelectorAll('#cat img[data-th]')){
+async function fillThumbs(){return fillThumbsIn('#cat');}
+async function fillThumbsIn(sel){
+  for(const img of document.querySelectorAll(sel+' img[data-th]')){
     const f=img.dataset.th;
     if(img.src||img.dataset.busy)continue;
     if(THUMBS.has(f)){img.src=THUMBS.get(f);continue;}
@@ -464,7 +774,22 @@ $('#q').addEventListener('input',e=>{fQ=e.target.value.trim().toLowerCase();draw
     $('#secs').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
     ch.classList.add('on');fSec=ch.dataset.s||null;drawCat();});
   drawCat();
-  await restore();
+  if(PAPI){
+    $('#fMode').textContent='проект в CRM · автосохранение';
+    const pid=new URLSearchParams(location.search).get('p');
+    if(pid){await openProject(+pid);}
+    else{
+      // один проект — открываем сразу; иначе даём выбрать
+      let items=[];
+      try{items=(await capi(PAPI)).items||[];}catch(e){}
+      if(items.length===1)await openProject(items[0].id);
+      else await openProjectsOverlay();
+    }
+  }else{
+    $('#fMode').textContent='без CRM: черновик в этом браузере';
+    setProjName('Черновик');
+    await restoreLegacy();
+  }
   refresh();
 })();
 </script></body></html>
