@@ -461,8 +461,16 @@ async function gunzip(s){
 async function meshOf(G){
   if(!G._mesh){
     const r = await fetch(U.mesh(G.f), {cache:'default', headers:AUTH});
-    const ds = new DecompressionStream('gzip');
-    const buf = await new Response(r.body.pipeThrough(ds)).arrayBuffer();
+    if(!r.ok) throw new Error('меш не отдался: '+r.status);
+    let buf = await r.arrayBuffer();
+    /* Локально файл лежит .json.gz и распаковывать надо самим; из CRM тот же
+       файл приходит с Content-Encoding: gzip и браузер уже распаковал его.
+       Отличаем по сигнатуре, иначе распаковали бы дважды. */
+    const b = new Uint8Array(buf);
+    if(b.length > 2 && b[0] === 0x1f && b[1] === 0x8b){
+      const ds = new DecompressionStream('gzip');
+      buf = await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
+    }
     G._mesh = JSON.parse(new TextDecoder('utf-8').decode(buf));
   }
   return G._mesh;
