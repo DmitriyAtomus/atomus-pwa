@@ -1,0 +1,444 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Атом Чиллер · Проект (прототип)</title>
+<style>
+/* Прототип «Проекты»: сборка машины из настоящих моделей базы 3D.
+   Стиль и движок — те же, что в самой базе (index.html). */
+:root{--bg:#061020;--panel:#0B1728;--panel2:#102138;--line:#1B2B3D;--line2:#2C4058;
+  --ink:#D9E5F2;--dim:#8FA8C2;--faint:#5D7390;--ice:#8FD3F4;--ice2:#1B9FD8;
+  --ok:#4FBF8B;--warn:#C9A227;--bad:#d94f3d;
+  --mono:'Cascadia Mono',Consolas,'Courier New',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:13.5px/1.45 'Segoe UI',system-ui,sans-serif;overflow:hidden}
+#app{display:grid;grid-template-rows:52px 1fr 30px;height:100%}
+header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:#081426}
+.logo{font-weight:800;letter-spacing:.1em;font-size:14px;white-space:nowrap}
+.logo span{color:var(--ice);font-weight:400;letter-spacing:.02em;font-size:11.5px;margin-left:7px}
+.pname{font-size:13px;color:var(--dim)}
+.pname b{color:var(--ink)}
+.proto{font-size:10.5px;color:var(--warn);border:1px dashed #5c4a1a;padding:3px 9px;border-radius:14px;white-space:nowrap}
+.back{margin-left:auto;color:var(--ice);text-decoration:none;font-size:12.5px;border:1px solid var(--line2);
+  padding:6px 12px;border-radius:8px;white-space:nowrap}
+.back:hover{background:var(--panel2)}
+#mid{display:grid;grid-template-columns:272px 1fr 264px;min-height:0}
+@media(max-width:900px){#mid{grid-template-columns:220px 1fr}}
+@media(max-width:900px){#right{display:none}}
+.col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+#right{border-right:0;border-left:1px solid var(--line)}
+.ph{padding:9px 12px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:700;
+  letter-spacing:.1em;color:var(--dim);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.ph .m{margin-left:auto;font-family:var(--mono);font-weight:400;letter-spacing:0;color:var(--faint)}
+.search{margin:10px 10px 8px;display:flex;align-items:center;gap:7px;background:var(--panel2);
+  border:1px solid var(--line2);border-radius:8px;padding:6px 10px}
+.search input{flex:1;background:none;border:0;outline:none;color:var(--ink);font-size:12.5px}
+.chips{display:flex;gap:5px;flex-wrap:wrap;padding:0 10px 8px}
+.chip{font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:14px;
+  padding:2px 9px;cursor:pointer;user-select:none}
+.chip.on{color:var(--ice);border-color:var(--ice2);background:rgba(27,159,216,.10)}
+#cat{flex:1;overflow-y:auto;padding:0 10px 12px;display:flex;flex-direction:column;gap:7px}
+.ci{display:flex;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);
+  border-radius:9px;padding:7px;cursor:pointer}
+.ci:hover{border-color:var(--ice2)}
+.ci img{width:52px;height:40px;object-fit:contain;border-radius:5px;background:#0D1B30;flex-shrink:0}
+.ci .t{min-width:0}
+.ci b{display:block;font-size:11.5px;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci span{font-size:10px;color:var(--faint)}
+.ci .add{margin-left:auto;color:var(--ice);font-size:16px;flex-shrink:0;padding:0 4px}
+.note{padding:8px 12px;font-size:10.5px;color:var(--faint);border-top:1px solid var(--line);line-height:1.5}
+#vwrap{position:relative;min-width:0;background:#061020}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#cv.drag{cursor:grabbing}
+.vbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;z-index:3;flex-wrap:wrap}
+.vb{font-size:11px;color:var(--dim);background:rgba(6,16,32,.8);border:1px solid var(--line2);
+  padding:4px 10px;border-radius:7px;cursor:pointer;user-select:none}
+.vb.on{color:var(--ice);border-color:var(--ice2)}
+#selbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;display:none;
+  align-items:center;gap:8px;background:rgba(6,16,32,.85);border:1px solid var(--ice2);
+  border-radius:10px;padding:7px 10px}
+#selbar.on{display:flex}
+#selbar .nm{font-size:12px;color:var(--ice);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#selbar button{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:7px;
+  padding:5px 10px;font-size:11.5px;cursor:pointer}
+#selbar button:hover{border-color:var(--ice2)}
+#selbar button.del{color:#f0a9a0;border-color:#6b3a34}
+#hint{position:absolute;right:12px;top:10px;z-index:3;font-size:11px;color:var(--faint);
+  background:rgba(6,16,32,.7);padding:4px 10px;border-radius:7px;max-width:280px;text-align:right}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none}
+#empty .in{text-align:center;color:var(--dim);font-size:13px;line-height:1.6;background:rgba(6,16,32,.6);
+  padding:18px 26px;border-radius:12px;border:1px dashed var(--line2)}
+#spec{flex:1;overflow-y:auto}
+.sr{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+.sr:hover{background:var(--panel2)}
+.sr.on{background:var(--panel2);box-shadow:inset 2px 0 0 var(--ice2)}
+.sr .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr .n{font-family:var(--mono);font-size:11.5px}
+.sr .u{font-size:10px;color:var(--faint)}
+.acts{display:flex;flex-direction:column;gap:7px;padding:10px 12px;border-top:1px solid var(--line)}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px;border-radius:8px;
+  font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--line2);color:var(--ink);background:var(--panel2)}
+.btn.pri{background:linear-gradient(180deg,#1E5F86,#174A6B);border-color:var(--ice2);color:#EAF6FD}
+.btn.ghost{color:var(--dim)}
+footer{display:flex;align-items:center;gap:16px;padding:0 14px;border-top:1px solid var(--line);
+  font-size:11px;color:var(--dim);background:#081426}
+footer .m{font-family:var(--mono)}
+footer .save{margin-left:auto;color:var(--faint)}
+#toast{position:fixed;left:50%;bottom:46px;transform:translateX(-50%);background:#102138;color:var(--ink);
+  border:1px solid var(--line2);border-radius:9px;padding:8px 16px;font-size:12.5px;display:none;z-index:9}
+</style></head><body>
+<div id="app">
+  <header>
+    <div class="logo"><b>АТОМУС</b><span>Атом Чиллер · Проект</span></div>
+    <div class="pname">сборка из моделей базы · <b id="hCnt">0 деталей</b></div>
+    <div class="proto">прототип</div>
+    <a class="back" href="index.html">← База 3D</a>
+  </header>
+
+  <div id="mid">
+    <div class="col">
+      <div class="ph">База 3D <span class="m" id="catCnt"></span></div>
+      <div class="search"><span style="color:var(--faint)">⌕</span><input id="q" placeholder="компрессор, отвод, ПТО…"></div>
+      <div class="chips" id="secs"></div>
+      <div id="cat"></div>
+      <div class="note">Клик или «+» — деталь встаёт в сцену. Это те же модели, что в базе.</div>
+    </div>
+
+    <div id="vwrap">
+      <canvas id="cv"></canvas>
+      <div class="vbar">
+        <div class="vb" data-v="iso">Изометрия</div><div class="vb" data-v="front">Спереди</div>
+        <div class="vb" data-v="top">Сверху</div>
+        <div class="vb" id="bGrid">Сетка 100 мм</div>
+      </div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот · Del — убрать</div>
+      <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на пол.<br>Начни с корпуса или компрессора.</div></div>
+      <div id="selbar"><span class="nm" id="selNm"></span>
+        <button id="bRot" title="R">⟳ 90°</button>
+        <button id="bDup">⧉ Дублировать</button>
+        <button id="bDel" class="del" title="Delete">✕ Убрать</button>
+      </div>
+    </div>
+
+    <div class="col" id="right">
+      <div class="ph">Спецификация <span class="m">сама из сцены</span></div>
+      <div id="spec"></div>
+      <div class="acts">
+        <div class="btn pri" id="bBom">→ BOM · чертёж сборки</div>
+        <div class="btn ghost" id="bClear">Очистить сцену</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="fCnt" class="m">0 деталей</span>
+    <span id="fDims" class="m"></span>
+    <span>прототип: проект хранится в этом браузере</span>
+    <span class="save" id="fSave"></span>
+  </footer>
+</div>
+<div id="toast"></div>
+
+<script src="three.min.js"></script>
+<script>
+/* ═══ данные: тот же контракт, что у базы (index.html) ═══ */
+const BASE=(window.ATOMUS3D_BASE||'./pack/').replace(/\/?$/,'/');
+const API=window.ATOMUS3D_API||(location.pathname.indexOf('/chiller')===0?'/api/3d':null);
+const TOKEN=(()=>{try{return localStorage.getItem('atomus_token')}catch(e){return null}})();
+const AUTH=TOKEN?{'Authorization':'Bearer '+TOKEN}:{};
+let VER='';
+const vq=u=>VER?(u+(u.indexOf('?')<0?'?':'&')+'v='+VER):u;
+const U={index:()=>API?API+'/index':BASE+'index.json',
+  mesh:f=>vq(API?API+'/mesh/'+encodeURIComponent(f):BASE+'mesh/'+f+'.json.gz'),
+  thumb:f=>vq(API?API+'/thumb/'+encodeURIComponent(f):BASE+'thumb/'+f+'.webp')};
+const $=s=>document.querySelector(s);
+let DATA=[],GEOMS={},SECTIONS=[];
+
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';
+  clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',2600);}
+
+function b64(s){const b=atob(s),a=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
+async function meshOf(G){
+  if(!G._mesh){
+    const r=await fetch(U.mesh(G.f),{cache:'default',headers:AUTH});
+    if(!r.ok)throw new Error('меш не отдался: '+r.status);
+    let buf=await r.arrayBuffer();
+    const b=new Uint8Array(buf);
+    if(b.length>2&&b[0]===0x1f&&b[1]===0x8b){
+      const ds=new DecompressionStream('gzip');
+      buf=await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
+    }
+    G._mesh=JSON.parse(new TextDecoder('utf-8').decode(buf));
+  }
+  return G._mesh;
+}
+/* геометрия из квантованного меша — как loadMesh в базе, но без зон/лап */
+const GEO_CACHE=new Map();
+async function geoOf(d){
+  const key=d.g;
+  if(GEO_CACHE.has(key))return GEO_CACHE.get(key);
+  const MS=await meshOf(GEOMS[key]);
+  const p16=new Uint16Array(b64(MS.pos).buffer);
+  const ib=b64(MS.idx).buffer,i16=MS.i32?new Uint32Array(ib):new Uint16Array(ib);
+  const pos=new Float32Array(p16.length);
+  for(let i=0;i<p16.length;i+=3){
+    pos[i]=MS.lo[0]+p16[i]*MS.scale[0];
+    pos[i+1]=MS.lo[1]+p16[i+1]*MS.scale[1];
+    pos[i+2]=MS.lo[2]+p16[i+2]*MS.scale[2];}
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setIndex(new THREE.BufferAttribute(i16,1));
+  geo.computeVertexNormals();geo.computeBoundingBox();
+  GEO_CACHE.set(key,geo);return geo;
+}
+
+/* ═══ сцена: z вверх, как в базе ═══ */
+const C_BODY=0x8d959d;
+let renderer,scene,camera,grid;
+let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=400,dMax=12000;
+const placed=[];   // {uid,id,obj,d}
+let sel=null,uidSeq=1;
+
+function initGL(){
+  const cv=$('#cv');
+  renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x061020);
+  scene.fog=new THREE.Fog(0x061020,4200,12000);
+  camera=new THREE.PerspectiveCamera(35,1,5,20000);camera.up.set(0,0,1);
+  scene.add(new THREE.HemisphereLight(0xcfdcea,0x121a26,.55));
+  const a=new THREE.DirectionalLight(0xffffff,.78);a.position.set(600,-900,1100);scene.add(a);
+  const b=new THREE.DirectionalLight(0x9fbcd8,.30);b.position.set(-800,500,300);scene.add(b);
+  const c=new THREE.DirectionalLight(0xffffff,.22);c.position.set(300,900,-500);scene.add(c);
+  grid=new THREE.GridHelper(6000,60,0x2c4058,0x16263a);grid.rotation.x=Math.PI/2;scene.add(grid);
+  bindCtl(cv);tick();
+}
+function tick(){
+  requestAnimationFrame(tick);
+  const cv=$('#cv'),w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==Math.round(w*renderer.getPixelRatio())){
+    renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+  camera.position.set(target.x+dist*Math.sin(phi)*Math.cos(theta),
+                      target.y+dist*Math.sin(phi)*Math.sin(theta),
+                      target.z+dist*Math.cos(phi));
+  camera.lookAt(target);
+  renderer.render(scene,camera);
+}
+
+/* ═══ управление: вращение/панорама/зум + перетаскивание деталей ═══ */
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),
+      floor=new THREE.Plane(new THREE.Vector3(0,0,1),0);
+function toNDC(e){const r=$('#cv').getBoundingClientRect();
+  ndc.x=((e.clientX-r.left)/r.width)*2-1;ndc.y=-((e.clientY-r.top)/r.height)*2+1;}
+function pickItem(e){
+  toNDC(e);ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects(placed.map(p=>p.obj));
+  return hits.length?placed.find(p=>p.obj===hits[0].object):null;
+}
+function floorPoint(e){toNDC(e);ray.setFromCamera(ndc,camera);
+  const v=new THREE.Vector3();return ray.ray.intersectPlane(floor,v)?v:null;}
+const SNAP=10;
+const snap=v=>Math.round(v/SNAP)*SNAP;
+function pan(dx,dy){
+  const rt=new THREE.Vector3().subVectors(camera.position,target).cross(camera.up).normalize();
+  const up=new THREE.Vector3().crossVectors(rt,
+    new THREE.Vector3().subVectors(camera.position,target)).normalize();
+  target.addScaledVector(rt,-dx*dist*0.0012).addScaledVector(up,-dy*dist*0.0012);
+}
+function bindCtl(cv){
+  let mode=null,last=null,dragOff=null;
+  cv.addEventListener('pointerdown',e=>{
+    cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
+    if(e.button===2){mode='pan';return;}
+    const hit=pickItem(e);
+    if(hit){select(hit);mode='item';cv.classList.add('drag');
+      const fp=floorPoint(e);
+      dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};}
+    else{mode='orbit';}
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(!mode)return;
+    const dx=e.clientX-last.x,dy=e.clientY-last.y;last={x:e.clientX,y:e.clientY};
+    if(mode==='orbit'){theta-=dx*0.007;phi=Math.max(0.04,Math.min(Math.PI-0.04,phi-dy*0.007));}
+    else if(mode==='pan'){pan(dx,dy);}
+    else if(mode==='item'&&sel){
+      const fp=floorPoint(e);if(!fp)return;
+      sel.obj.position.x=snap(fp.x+dragOff.x);
+      sel.obj.position.y=snap(fp.y+dragOff.y);
+      save();
+    }
+  });
+  const off=()=>{mode=null;cv.classList.remove('drag');};
+  cv.addEventListener('pointerup',off);cv.addEventListener('pointercancel',off);
+  cv.addEventListener('contextmenu',e=>e.preventDefault());
+  cv.addEventListener('wheel',e=>{e.preventDefault();
+    dist=Math.max(dMin,Math.min(dMax,dist*(1+Math.sign(e.deltaY)*0.11)));},{passive:false});
+  const V={iso:[-0.95,1.15],front:[-1.5708,1.5708],top:[-1.5708,0.05]};
+  document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
+    const v=V[b.dataset.v];theta=v[0];phi=v[1];});
+  $('#bGrid').onclick=()=>{grid.visible=!grid.visible;
+    $('#bGrid').classList.toggle('on',grid.visible);};
+  $('#bGrid').classList.add('on');
+  addEventListener('keydown',e=>{
+    if(e.key==='Escape')select(null);
+    if(!sel)return;
+    if(e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')rotSel();
+    if(e.key==='Delete'||e.key==='Backspace')delSel();
+  });
+}
+
+/* ═══ детали ═══ */
+async function addItem(d,at,rot){
+  let geo;
+  try{geo=await geoOf(d);}
+  catch(err){toast('Модель не загрузилась: '+err.message);return null;}
+  const mat=new THREE.MeshStandardMaterial({color:C_BODY,metalness:.55,roughness:.48,flatShading:true});
+  const obj=new THREE.Mesh(geo,mat);
+  const bb=geo.boundingBox;
+  obj.position.z=-bb.min.z;                      // низ детали — на пол
+  if(at){obj.position.x=at.x;obj.position.y=at.y;}
+  else{ // свободное место правее уже стоящих
+    let x=0;placed.forEach(p=>{const pb=p.obj.geometry.boundingBox;
+      x=Math.max(x,p.obj.position.x+pb.max.x+220);});
+    obj.position.x=snap(x-Math.min(0,bb.min.x));obj.position.y=0;}
+  if(rot)obj.rotation.z=rot;
+  scene.add(obj);
+  const it={uid:uidSeq++,id:d.id,obj,d};
+  placed.push(it);select(it);refresh();save();
+  return it;
+}
+function select(it){
+  if(sel)sel.obj.material.emissive.setHex(0x000000);
+  sel=it;
+  if(sel){sel.obj.material.emissive.setHex(0x1B9FD8);
+    sel.obj.material.emissiveIntensity=.33;
+    $('#selNm').textContent=sel.d.brand+' '+sel.d.name;}
+  $('#selbar').classList.toggle('on',!!sel);
+  refreshSpecSel();
+}
+function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;save();}
+function delSel(){if(!sel)return;
+  scene.remove(sel.obj);placed.splice(placed.indexOf(sel),1);
+  select(null);refresh();save();}
+$('#bRot').onclick=rotSel;
+$('#bDel').onclick=delSel;
+$('#bDup').onclick=async()=>{if(!sel)return;
+  const p=sel.obj.position,r=sel.obj.rotation.z;
+  await addItem(sel.d,{x:p.x+200,y:p.y+200},r);};
+$('#bClear').onclick=()=>{if(!placed.length)return;
+  if(!confirm('Убрать все детали со сцены?'))return;
+  placed.forEach(p=>scene.remove(p.obj));placed.length=0;select(null);refresh();save();};
+$('#bBom').onclick=()=>toast('Следующий шаг: спецификация → BOM модели ЧИЛ и чертёж сборки');
+
+/* ═══ спецификация + габарит ═══ */
+function refresh(){
+  const by=new Map();
+  placed.forEach(p=>{const k=p.id;
+    if(!by.has(k))by.set(k,{d:p.d,n:0});by.get(k).n++;});
+  const rows=[...by.values()];
+  $('#spec').innerHTML=rows.length?rows.map(r=>
+    `<div class="sr" data-id="${r.d.id}"><span class="nm">${r.d.brand} ${r.d.name}</span>`+
+    `<span class="n">${r.n}</span><span class="u">шт</span></div>`).join('')
+    :'<div style="padding:14px 12px;font-size:12px;color:var(--faint)">Пока пусто — добавь детали из базы слева.</div>';
+  $('#spec').querySelectorAll('.sr').forEach(row=>row.onclick=()=>{
+    const it=placed.find(p=>p.id===row.dataset.id&&p!==sel)||placed.find(p=>p.id===row.dataset.id);
+    if(it)select(it);});
+  $('#hCnt').textContent=placed.length+' '+plural(placed.length);
+  $('#fCnt').textContent=placed.length+' '+plural(placed.length)+' · '+rows.length+' наим.';
+  // общий габарит по сцене
+  if(placed.length){
+    const bb=new THREE.Box3();placed.forEach(p=>bb.expandByObject(p.obj));
+    const s=new THREE.Vector3();bb.getSize(s);
+    $('#fDims').textContent='габарит '+Math.round(s.x)+' × '+Math.round(s.y)+' × '+Math.round(s.z)+' мм';
+  } else $('#fDims').textContent='';
+  $('#empty').style.display=placed.length?'none':'flex';
+  refreshSpecSel();
+}
+function refreshSpecSel(){
+  $('#spec').querySelectorAll('.sr').forEach(r=>
+    r.classList.toggle('on',!!sel&&r.dataset.id===sel.id));
+}
+const plural=n=>{const m=n%10,h=n%100;
+  return m===1&&h!==11?'деталь':(m>=2&&m<=4&&(h<10||h>=20)?'детали':'деталей');};
+
+/* ═══ автосохранение (прототип: localStorage) ═══ */
+const LS='chiller_project_proto';
+let saveT=null;
+function save(){
+  clearTimeout(saveT);
+  saveT=setTimeout(()=>{
+    try{localStorage.setItem(LS,JSON.stringify(placed.map(p=>({
+      id:p.id,x:p.obj.position.x,y:p.obj.position.y,r:p.obj.rotation.z}))));
+      $('#fSave').textContent='сохранено · '+new Date().toLocaleTimeString().slice(0,5);
+    }catch(e){}
+  },400);
+}
+async function restore(){
+  let arr=null;
+  try{arr=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
+  if(!Array.isArray(arr)||!arr.length)return;
+  for(const s of arr){
+    const d=DATA.find(x=>x.id===s.id&&x.ready);
+    if(d)await addItem(d,{x:s.x,y:s.y},s.r);
+  }
+  select(null);
+}
+
+/* ═══ каталог ═══ */
+let fSec=null,fQ='';
+function drawCat(){
+  const list=DATA.filter(d=>d.ready)
+    .filter(d=>!fSec||d.section===fSec)
+    .filter(d=>!fQ||(d.brand+' '+d.name+' '+(d.kind||'')).toLowerCase().includes(fQ));
+  $('#catCnt').textContent=list.length;
+  $('#cat').innerHTML=list.slice(0,80).map(d=>
+    `<div class="ci" data-id="${d.id}">`+
+    `<img loading="lazy" data-th="${GEOMS[d.g].f}">`+
+    `<div class="t"><b>${d.name}</b><span>${d.brand}${d.kind?' · '+d.kind:''}</span></div>`+
+    `<span class="add">+</span></div>`).join('')+
+    (list.length>80?`<div style="font-size:11px;color:var(--faint);text-align:center;padding:6px">…и ещё ${list.length-80} — уточни поиск</div>`:'');
+  $('#cat').querySelectorAll('.ci').forEach(el=>el.onclick=()=>{
+    const d=DATA.find(x=>x.id===el.dataset.id);
+    if(d)addItem(d);
+  });
+  fillThumbs();
+}
+const THUMBS=new Map();
+async function fillThumbs(){
+  for(const img of document.querySelectorAll('#cat img[data-th]')){
+    const f=img.dataset.th;
+    if(img.src||img.dataset.busy)continue;
+    if(THUMBS.has(f)){img.src=THUMBS.get(f);continue;}
+    img.dataset.busy='1';
+    try{const r=await fetch(U.thumb(f),{cache:'default',headers:AUTH});
+      if(r.ok){const u=URL.createObjectURL(await r.blob());THUMBS.set(f,u);img.src=u;}}catch(e){}
+    delete img.dataset.busy;
+  }
+}
+$('#q').addEventListener('input',e=>{fQ=e.target.value.trim().toLowerCase();drawCat();});
+
+/* ═══ старт ═══ */
+(async function(){
+  initGL();
+  let ix;
+  try{
+    const r=await fetch(U.index(),{cache:'no-store',headers:AUTH});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    ix=await r.json();
+  }catch(e){
+    $('#cat').innerHTML='<div style="padding:14px 6px;font-size:12px;color:var(--bad)">База не отдалась ('+e.message+').<br>Открой прототип из CRM (Производство → Атом Чиллер), чтобы был токен.</div>';
+    return;
+  }
+  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;
+  VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
+  $('#secs').innerHTML='<div class="chip on" data-s="">Все</div>'+
+    SECTIONS.map(s=>`<div class="chip" data-s="${s[0]}">${s[1]}</div>`).join('');
+  $('#secs').querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+    $('#secs').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+    ch.classList.add('on');fSec=ch.dataset.s||null;drawCat();});
+  drawCat();
+  await restore();
+  refresh();
+})();
+</script></body></html>
