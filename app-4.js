@@ -15105,6 +15105,7 @@ async function openTeamChat(cid) {
   if (side) side.innerHTML = '';
   document.getElementById('tchat-messages').innerHTML = '<div class="loading-block">Загружаем…</div>';
   document.getElementById('team-chat-modal').classList.add('visible');
+  _wireTeamChatFileDrop();
   await loadTeamChatMeta(cid);
   renderTeamSide();
   await loadTeamChat(cid);
@@ -15119,6 +15120,8 @@ async function openTeamChat(cid) {
 
 function closeTeamChat() {
   document.getElementById('team-chat-modal').classList.remove('visible');
+  const dropZone = document.getElementById('tchat-drop-zone');
+  if (dropZone) dropZone.classList.remove('is-file-dragging');
   if (_tchatRefreshTimer) { clearInterval(_tchatRefreshTimer); _tchatRefreshTimer = null; }
   _tchatCurrentId = null;
   _tchatPendingFiles = [];
@@ -15222,6 +15225,51 @@ function _renderTeamMessageFiles(files) {
 }
 
 // ---------- Файлы к сообщению ----------
+function _wireTeamChatFileDrop() {
+  const zone = document.getElementById('tchat-drop-zone');
+  if (!zone || zone.dataset.fileDropWired === '1') return;
+  zone.dataset.fileDropWired = '1';
+  let dragDepth = 0;
+  const isFileDrag = (e) => {
+    const types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+  };
+  const clearDragState = () => {
+    dragDepth = 0;
+    zone.classList.remove('is-file-dragging');
+  };
+  zone.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth += 1;
+    zone.classList.add('is-file-dragging');
+  });
+  zone.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  zone.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) zone.classList.remove('is-file-dragging');
+  });
+  zone.addEventListener('drop', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearDragState();
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    onTeamChatFilesSelected(files);
+    showToast('Файлы добавлены — нажмите «Отправить»', 'success');
+  });
+}
+
 function onTeamChatFilesSelected(files) {
   if (!files || !files.length) return;
   for (let i = 0; i < files.length; i++) {

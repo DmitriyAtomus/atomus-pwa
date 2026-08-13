@@ -4499,7 +4499,34 @@ function _renderModelRow(m) {
 
 // ============ ЭТАП 32: Карточка модели с тех. картой ============
 
-async function openModelDetail(modelId) {
+function _contractBomSummary(configuration) {
+  const groups = ((configuration || {}).groups || []);
+  if (!groups.length) return '';
+  return groups.map(group => {
+    const facts = [];
+    if (group.power_kw != null) facts.push(_fmtQty(group.power_kw) + ' кВт');
+    if (group.voltage_v) facts.push(group.voltage_v + ' В');
+    if (group.phases) facts.push(group.phases + ' ф.');
+    return (group.group_name ? group.group_name + ': ' : '') +
+      (group.option_label || group.component_name || '—') +
+      (facts.length ? ' · ' + facts.join(' · ') : '');
+  }).join('; ');
+}
+
+function _renderOrderBomContext(context) {
+  if (!context || !context.itemId) return '';
+  const summary = _contractBomSummary(context.bom_configuration);
+  return '<div class="order-bom-context">' +
+    '<div class="order-bom-context-icon"><i class="ti ti-shopping-cart-check"></i></div>' +
+    '<div class="order-bom-context-main"><b>Комплектация именно этого заказа</b>' +
+      '<span>' + (summary ? escapeHtml(summary) : 'Вариант ещё не выбран') + '</span>' +
+      '<small>Стандарт модели при этом не изменяется.</small></div>' +
+    '<button class="btn btn-primary btn-small" onclick="openContractBomSelection(' + context.itemId + ',' + context.modelId + ')">' +
+      '<i class="ti ti-adjustments-horizontal"></i> ' + (summary ? 'Изменить для заказа' : 'Выбрать для заказа') + '</button>' +
+  '</div>';
+}
+
+async function openModelDetail(modelId, orderContext) {
   // ЭТАП 45 (v2.33.0): нужны актуальные поля модели (specs_json, image_path, prices, nc_code).
   // Грузим деталь напрямую через GET /api/models/{id}/bom — он только BOM, поля модели в нём нет.
   // Поэтому возьмём из cache.models, но если кэш устарел или нет поля — освежим.
@@ -4523,6 +4550,9 @@ async function openModelDetail(modelId) {
   // Пока что: используем поля что есть в m (m.specs_json, m.image_path, m.base_price...)
   // которых может не быть, и для отображения берём пусто.
   state._currentBomModelId = modelId;
+  state._modelOrderContext = orderContext || null;
+  const isOrderContext = !!state._modelOrderContext;
+  const canManageModel = canManageSales() && !isOrderContext;
 
   let overlay = document.getElementById('model-detail-modal');
   if (!overlay) {
@@ -4629,17 +4659,17 @@ async function openModelDetail(modelId) {
 
   // v2.43.86: кнопка «Изменить модель» теперь в шапке рядом с названием —
   // раньше она лежала среди BOM-кнопок и многие думали что это редактирование BOM.
-  const editBtn = canManageSales()
+  const editBtn = canManageModel
     ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')" title="Изменить название, описание, исполнение"><i class="ti ti-edit"></i> Изменить модель</button>'
     : '';
   // v2.41.13: кнопка «Раздвоить» для choice-моделей (только директор/зам)
-  const splitBtn = (canManageSales() && m.exec_mode === 'choice')
+  const splitBtn = (canManageModel && m.exec_mode === 'choice')
     ? '<button class="btn btn-secondary btn-small" onclick="splitModelExecution(' + modelId + ')" title="Создать вторую модель — копию с пометкой AISI">' +
         '<i class="ti ti-arrows-split-2"></i> Раздвоить' +
       '</button>'
     : '';
   // v2.45.72: кнопка «Удалить модель» (soft-delete) — директор/зам
-  const deleteBtn = canManageSales()
+  const deleteBtn = canManageModel
     ? '<button class="btn btn-danger btn-small" onclick="confirmDeleteModel(' + modelId + ')" title="Деактивировать модель (старые сборки сохраняются)">' +
         '<i class="ti ti-trash"></i> Удалить модель' +
       '</button>'
@@ -4658,6 +4688,7 @@ async function openModelDetail(modelId) {
         '<button class="modal-close" onclick="closeModelDetail()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="overflow-y:auto;flex:1;padding:18px;">' +
+        _renderOrderBomContext(state._modelOrderContext) +
         sourceBadge +
         imgHtml +
         pricesHtml +
@@ -4667,15 +4698,15 @@ async function openModelDetail(modelId) {
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-top:1px solid var(--border);padding-top:14px;">' +
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-            (canManageSales() ?
+            (canManageModel ?
               '<button class="btn btn-secondary btn-small" onclick="openBomCopyFrom(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Скопировать тех.карту из другой модели">' +
                 '<i class="ti ti-copy"></i> Взять BOM' +
               '</button>' : '') +
-            (canManageSales() ?
+            (canManageModel ?
               '<button class="btn btn-secondary btn-small" onclick="openBomImportFromText(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Вставить BOM из Excel/текста">' +
                 '<i class="ti ti-clipboard-data"></i> Импорт BOM' +
               '</button>' : '') +
-            (canManageSales() ?
+            (canManageModel ?
               '<button class="btn btn-primary btn-small" onclick="openBomAddItem(' + modelId + ')">' +
                 '<i class="ti ti-plus"></i> Позиция' +
               '</button>' : '') +
@@ -4803,6 +4834,7 @@ function closeModelDetail() {
   const o = document.getElementById('model-detail-modal');
   if (o) o.classList.remove('visible');
   state._currentBomModelId = null;
+  state._modelOrderContext = null;
 }
 
 // ============================================================
@@ -6205,6 +6237,8 @@ async function openBomStagePicker(bomId) {
 async function loadModelBom(modelId) {
   const container = document.getElementById('bom-list');
   if (!container) return;
+  const orderContext = state._modelOrderContext || null;
+  const canManageModel = canManageSales() && !orderContext;
   try {
     await _ensureWorkStages();  // чтобы редактор BOM сразу показал список этапов
     const r = await apiGet('/api/models/' + modelId + '/bom');
@@ -6224,7 +6258,7 @@ async function loadModelBom(modelId) {
     state._currentBomModelId = modelId;
     // v2.45.229: панель массового выбора/удаления позиций BOM
     let html = '';
-    if (canManageSales()) {
+    if (canManageModel) {
       html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 2px 10px;flex-wrap:wrap;">' +
         '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-light);cursor:pointer;">' +
           '<input type="checkbox" id="bom-check-all" onchange="_bomToggleAll(this)" style="width:auto;"> выбрать все' +
@@ -6271,7 +6305,7 @@ async function loadModelBom(modelId) {
       // v2.45.28: открываем редактор по bom_id — данные тянем из state, без эскейпинга
       const editCall = 'openBomEditItemById(' + it.id + ')';
       // v2.45.x: чип этапа прямо в строке — клик задаёт/меняет/создаёт этап
-      const stageChip = canManageSales()
+      const stageChip = canManageModel
         ? '<button class="bom-stage-chip' + (it.stage_id ? ' set' : '') + '" onclick="openBomStagePicker(' + it.id + ')" title="Этап производства — нажми, чтобы выбрать или создать">' +
             '<i class="ti ti-arrow-badge-right"></i>' + (it.stage_id ? escapeHtml(it.stage_name || 'этап') : 'этап') +
           '</button>'
@@ -6279,7 +6313,7 @@ async function loadModelBom(modelId) {
       return '<div class="bom-row">' +
         '<div class="bom-row-main">' +
           '<div class="bom-name">' +
-            (canManageSales() ? '<input type="checkbox" class="bom-check" data-bomid="' + it.id + '" onchange="_bomBulkUpdate()" style="width:auto;margin-right:8px;vertical-align:-2px;cursor:pointer;">' : '') +
+            (canManageModel ? '<input type="checkbox" class="bom-check" data-bomid="' + it.id + '" onchange="_bomBulkUpdate()" style="width:auto;margin-right:8px;vertical-align:-2px;cursor:pointer;">' : '') +
             displayName + skuPart +
             (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
             stockBadge +
@@ -6293,7 +6327,9 @@ async function loadModelBom(modelId) {
           '<div class="bom-qty-lbl">' + escapeHtml(unitLbl) + ' / ед.</div></div>' +
         '<div class="bom-stock' + (lowFlag ? ' low' : '') + '"><div class="bom-stock-num">' + _fmtQty(have) + '</div>' +
           '<div class="bom-qty-lbl">в наличии</div></div>' +
-        (canManageSales() ?
+        (orderContext && it.selection_group_id ?
+          '<div class="bom-actions"><button class="btn btn-primary btn-small" onclick="openContractBomSelection(' + orderContext.itemId + ',' + modelId + ')" title="Выбрать этот ТЭН только для текущего заказа"><i class="ti ti-hand-click"></i> Для заказа</button></div>' :
+        (canManageModel ?
           '<div class="bom-actions">' +
             // v2.45.633: «Сопоставить со складом» — подобрать похожую складскую
             // позицию и привязать (тогда остаток/наличие синхронизируются). Для
@@ -6302,7 +6338,7 @@ async function loadModelBom(modelId) {
             (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomVariantEditor(' + it.id + ')" title="Настроить выбираемые ТЭНы / варианты"><i class="ti ti-adjustments-horizontal"></i></button>' : '') +
             (!it.selection_group_id ? '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' : '') +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
-          '</div>' : '<div></div>') +
+          '</div>' : '<div></div>')) +
       '</div>';
     };
 
@@ -6402,13 +6438,17 @@ async function openBomVariantEditor(bomId) {
     phases: null,
     is_default: true,
   };
+  const variantOptions = group ? (group.options || []).map(o => Object.assign({}, o)) : [baseOption];
+  let defaultIndex = variantOptions.findIndex(o => !!o.is_default);
+  if (defaultIndex < 0 && variantOptions.length) defaultIndex = 0;
+  variantOptions.forEach((o, i) => { o.is_default = (i === defaultIndex); });
   state._bomVariantEditor = {
     bomId: bomId,
     modelId: bom.model_id,
     hasGroup: !!group,
     name: group ? group.name : 'ТЭН',
     is_required: group ? !!group.is_required : true,
-    options: group ? (group.options || []).map(o => Object.assign({}, o)) : [baseOption],
+    options: variantOptions,
   };
   renderBomVariantEditor();
 }
@@ -6426,12 +6466,17 @@ function renderBomVariantEditor() {
     document.body.appendChild(m);
   }
   const rows = (st.options || []).map((o, i) => {
-    return '<div class="bom-variant-editor-row">' +
+    const defaultControl = o.is_default
+      ? '<button type="button" class="bom-variant-default-btn selected" aria-pressed="true" disabled>' +
+          '<i class="ti ti-circle-check-filled"></i> Стандарт модели</button>'
+      : '<button type="button" class="bom-variant-default-btn" aria-pressed="false" ' +
+          'onclick="setBomVariantDefault(' + i + ')"><i class="ti ti-circle"></i> Сделать стандартом модели</button>';
+    return '<div class="bom-variant-editor-row' + (o.is_default ? ' is-default' : '') + '">' +
       '<div class="bom-variant-editor-head">' +
         '<div><b>' + escapeHtml(o.component_name || '—') + '</b>' +
           (o.component_sku ? '<div class="comp-sku">' + escapeHtml(o.component_sku) + '</div>' : '') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bom-variant-default" ' + (o.is_default ? 'checked ' : '') + 'onchange="setBomVariantDefault(' + i + ')"> стандарт</label>' +
+          defaultControl +
           '<button type="button" class="icon-btn" onclick="removeBomVariantOption(' + i + ')" title="Убрать вариант" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
         '</div>' +
       '</div>' +
@@ -6449,7 +6494,7 @@ function renderBomVariantEditor() {
       '<div class="modal-header"><h3><i class="ti ti-adjustments-horizontal"></i> Выбираемая позиция BOM</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'bom-variant-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:16px 18px;overflow:auto;">' +
-        '<div class="form-hint" style="margin-bottom:12px;">В производстве выберут один точный артикул. Стандартный вариант остаётся в базовой техкарте и используется в плановых расчётах.</div>' +
+        '<div class="form-hint" style="margin-bottom:12px;"><b>Это настройка модели, а не текущего заказа.</b> Здесь задаются допустимые варианты и стандарт модели для плановых расчётов. Конкретный ТЭН заказа выбирается из позиции договора.</div>' +
         '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:14px;">' +
           '<div><label class="form-label">Название группы *</label><input id="bom-variant-group-name" class="form-input" value="' + escapeHtml(st.name || '') + '" placeholder="ТЭН"></div>' +
           '<label style="display:flex;align-items:center;gap:7px;padding:10px 0;cursor:pointer;"><input id="bom-variant-required" type="checkbox" ' + (st.is_required ? 'checked' : '') + '> обязательный выбор</label>' +
@@ -6531,6 +6576,10 @@ async function saveBomVariantConfiguration() {
   if (!st) return;
   if (!(st.name || '').trim()) { showToast('Укажите название группы', 'error'); return; }
   if ((st.options || []).length < 2) { showToast('Добавьте минимум два варианта', 'error'); return; }
+  if (st.options.filter(o => !!o.is_default).length !== 1) {
+    showToast('Выберите один стандартный вариант', 'error');
+    return;
+  }
   const payload = {
     name: (st.name || '').trim(),
     is_required: !!st.is_required,
@@ -6573,6 +6622,133 @@ async function deleteBomVariantConfiguration() {
     document.getElementById('bom-variant-modal').classList.remove('visible');
     await loadModelBom(st.modelId);
   } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// Точный ТЭН для одной позиции договора. В отличие от редактора выше это не
+// меняет стандарт модели: сохраняется неизменяемый снимок только в заказе.
+async function openContractBomSelection(itemId, modelId) {
+  let data;
+  try {
+    data = await apiGet('/api/contracts/items/' + itemId + '/bom-selection');
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось загрузить комплектацию заказа', 'error');
+    return;
+  }
+  const groups = data.groups || [];
+  if (!groups.length) {
+    showToast('У этой модели нет выбираемых вариантов ТЭНа', 'info');
+    return;
+  }
+  const selections = Object.assign({}, data.bom_selections || {});
+  groups.forEach(group => {
+    const savedId = Number(selections[group.id] || selections[String(group.id)] || 0);
+    if (savedId && (group.options || []).some(option => Number(option.id) === savedId)) {
+      selections[group.id] = savedId;
+      return;
+    }
+    delete selections[String(group.id)];
+    const standard = (group.options || []).find(option => option.is_default);
+    if (standard) selections[group.id] = standard.id;
+  });
+  state._contractBomSelector = {
+    itemId: itemId,
+    modelId: modelId,
+    contractId: data.contract_id,
+    groups: groups,
+    selections: selections,
+  };
+  renderContractBomSelection();
+}
+
+function selectContractBomOption(groupId, optionId) {
+  const st = state._contractBomSelector;
+  if (!st) return;
+  st.selections[groupId] = optionId;
+  renderContractBomSelection();
+}
+
+function renderContractBomSelection() {
+  const st = state._contractBomSelector;
+  if (!st) return;
+  let modal = document.getElementById('contract-bom-selection-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'contract-bom-selection-modal';
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '10020';
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+    document.body.appendChild(modal);
+  }
+  let content = '';
+  let complete = true;
+  let totalPower = 0;
+  st.groups.forEach(group => {
+    const selectedId = Number(st.selections[group.id] || st.selections[String(group.id)] || 0);
+    if (group.is_required && !selectedId) complete = false;
+    content += '<div class="bom-config-group"><div class="bom-config-title"><span>' + escapeHtml(group.name || 'Вариант') + '</span>' +
+      (group.is_required ? '<span class="bom-config-required">выбор для заказа</span>' : '') + '</div><div class="bom-config-options">';
+    (group.options || []).forEach(option => {
+      const selected = Number(option.id) === selectedId;
+      if (selected && option.power_kw != null) totalPower += Number(option.power_kw || 0) * Number(option.qty_required || 0);
+      const facts = [];
+      if (option.power_kw != null) facts.push('<span class="bco-fact">' + _fmtQty(option.power_kw) + ' кВт</span>');
+      if (option.voltage_v) facts.push('<span class="bco-fact">' + option.voltage_v + ' В</span>');
+      if (option.phases) facts.push('<span class="bco-fact">' + option.phases + ' ф.</span>');
+      if (Number(option.qty_required || 1) !== 1) facts.push('<span class="bco-fact">' + _fmtQty(option.qty_required) + ' шт.</span>');
+      if (option.is_default) facts.push('<span class="bco-fact bco-default">стандарт модели</span>');
+      content += '<button type="button" class="bom-config-option' + (selected ? ' selected' : '') + '" onclick="selectContractBomOption(' + group.id + ',' + option.id + ')">' +
+        '<span class="bco-radio"></span><span class="bco-main"><span class="bco-label">' + escapeHtml(option.label || option.component_name || '—') + '</span>' +
+        '<span class="bco-component">' + escapeHtml(option.component_name || '') +
+          (option.component_sku ? ' · ' + escapeHtml(option.component_sku) : '') + '</span></span>' +
+        '<span class="bco-facts">' + facts.join('') + '</span></button>';
+    });
+    content += '</div></div>';
+  });
+  if (!complete) content += '<div class="bom-config-missing"><i class="ti ti-hand-click"></i> Выберите вариант в каждой обязательной группе.</div>';
+  else if (totalPower > 0) content += '<div class="bom-config-summary"><b>Итоговая мощность на изделие: ' + _fmtQty(totalPower) + ' кВт</b></div>';
+
+  modal.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><div><h3 style="margin:0;"><i class="ti ti-adjustments-horizontal"></i> ТЭН для этого заказа</h3>' +
+      '<div class="form-hint" style="margin-top:5px;">Выбор сохранится только в позиции договора. Стандарт модели не изменится.</div></div>' +
+      '<button class="modal-close" onclick="document.getElementById(\'contract-bom-selection-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+    '<div style="padding:16px 18px;overflow:auto;">' + content + '</div>' +
+    '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'contract-bom-selection-modal\').classList.remove(\'visible\')">Отмена</button>' +
+      '<button class="btn btn-primary" onclick="saveContractBomSelection()"' + (complete ? '' : ' disabled') + '><i class="ti ti-check"></i> Сохранить для заказа</button></div></div>';
+  modal.classList.add('visible');
+}
+
+async function saveContractBomSelection() {
+  const st = state._contractBomSelector;
+  if (!st) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/contracts/items/' + st.itemId + '/bom-selection', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ bom_selections: st.selections }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(body.message || 'Не удалось сохранить выбор для заказа', 'error');
+      return;
+    }
+    const modal = document.getElementById('contract-bom-selection-modal');
+    if (modal) modal.classList.remove('visible');
+    const context = {
+      itemId: st.itemId,
+      modelId: st.modelId,
+      contractId: st.contractId,
+      bom_configuration: body.bom_configuration || {},
+    };
+    const spec = state._specByContract && state._specByContract[st.contractId];
+    const item = spec && (spec.items || []).find(entry => entry.id === st.itemId);
+    if (item) item.bom_configuration = context.bom_configuration;
+    showToast('ТЭН сохранён только для этого заказа', 'success');
+    await openModelDetail(st.modelId, context);
+    if (st.contractId) loadContractItemsBlock(st.contractId);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка соединения', 'error');
+  }
 }
 
 async function openBomAddItem(modelId) {
@@ -7770,6 +7946,7 @@ function initNewAssemblyForm() {
     bomSelections: {}, bomConfigGroups: [],
     quantity: 1, workerIds: [], dateMode: 'today', customDate: null, comment: '',
     contractId: null,            // ЭТАП 15: ID договора (NULL = на склад)
+    contractItemId: null,        // точная позиция договора с выбранной комплектацией
     contractLabel: '',           // короткое описание для UI: «№12-Д · ООО Иванов»
     // ЭТАП 23: универсальные работы
     workType: 'assembly',        // assembly | repair | commissioning | installation | diagnostics | design | maintenance | other
@@ -7825,11 +8002,21 @@ async function _applyAssemblyPrefillIfAny() {
     if (!cache.models) {
       try { await ensureModelsLoaded(); } catch (e) {}
     }
+    let orderBomSelections = null;
+    if (pf.contract_item_id) {
+      try {
+        const orderBom = await apiGet('/api/contracts/items/' + pf.contract_item_id + '/bom-selection');
+        orderBomSelections = orderBom.bom_selections || null;
+        state.newAssembly.contractItemId = pf.contract_item_id;
+      } catch (e) {
+        // Вариант можно выбрать вручную в форме, если заказ ещё не настроен.
+      }
+    }
     // 1. Модель — если есть в кэше
     if (pf.model_id && cache.models && cache.models.models) {
       const model = cache.models.models.find(m => m.id === pf.model_id);
       if (model) {
-        selectModel(pf.model_id);
+        await selectModel(pf.model_id, orderBomSelections);
         // 2. Исполнение
         if (pf.execution) {
           setTimeout(() => {
@@ -8368,10 +8555,13 @@ function toggleModelPickerGroup(dirId) {
   localStorage.setItem('modelpicker_groups_open', JSON.stringify(openMap));
 }
 
-function selectModel(modelId) {
+async function selectModel(modelId, presetBomSelections) {
   if (!cache.models) return;
   const model = cache.models.models.find(m => m.id === modelId);
   if (!model) return;
+  if (state.newAssembly.model && state.newAssembly.model.id !== modelId && typeof presetBomSelections === 'undefined') {
+    state.newAssembly.contractItemId = null;
+  }
   state.newAssembly.model = model;
   state.newAssembly.execution = null;
   state.newAssembly.ipClass = null;
@@ -8413,10 +8603,10 @@ function selectModel(modelId) {
   document.querySelectorAll('#ip-section .chip-option').forEach(c => c.classList.remove('selected'));
 
   closeModelModal();
-  loadAssemblyBomConfiguration(model.id); // v2.45.912: ТЭН/варианты
+  await loadAssemblyBomConfiguration(model.id, presetBomSelections); // ТЭН/варианты
 }
 
-async function loadAssemblyBomConfiguration(modelId) {
+async function loadAssemblyBomConfiguration(modelId, presetBomSelections) {
   const section = document.getElementById('bom-options-section');
   const content = document.getElementById('bom-options-content');
   if (!section || !content || !state.newAssembly || !state.newAssembly.model || state.newAssembly.model.id !== modelId) return;
@@ -8431,6 +8621,11 @@ async function loadAssemblyBomConfiguration(modelId) {
     // Необязательная группа честно показывает в UI тот же default,
     // который возьмёт backend, если пользователь его не менял.
     groups.forEach(group => {
+      const presetId = Number((presetBomSelections || {})[group.id] || (presetBomSelections || {})[String(group.id)] || 0);
+      if (presetId && (group.options || []).some(option => Number(option.id) === presetId)) {
+        state.newAssembly.bomSelections[group.id] = presetId;
+        return;
+      }
       if (group.is_required) return;
       const defaultOption = (group.options || []).find(option => option.is_default);
       if (defaultOption) state.newAssembly.bomSelections[group.id] = defaultOption.id;
@@ -9007,6 +9202,7 @@ async function submitAssembly() {
         model_id: a.model.id,
         qty: a.quantity || 1,
         contract_id: a.contractId || null,
+        contract_item_id: a.contractItemId || null,
         execution_type: a.model.exec_mode === 'choice'
           ? (a.execution === 'ne' ? 'stainless' : 'standard') : null,
         ip_rating: (a.model.needs_ip ? a.ipClass : null) || null,
@@ -9055,6 +9251,7 @@ async function submitAssembly() {
     ip_class: isAssembly && a.model && a.model.needs_ip ? a.ipClass : null,
     comment: a.comment || '',
     contract_id: a.contractId || null,
+    contract_item_id: a.contractItemId || null,
     description: a.description || null,
     location: a.location || null,
     hours_spent: a.hours_spent || null,
@@ -11127,11 +11324,15 @@ function _openSaleProductFromSpec(productId, contractId) {
     contractId: contractId,
   });
 }
-function _openModelFromSpec(modelId, contractId) {
-  // openModelDetail — модалка, закрытие возвращает в текущий экран (договор)
-  // автоматически. Контекст пока не нужен, но оставляем функцию-обёртку
-  // на будущее (если придётся добавлять кнопку «Редактировать» с переходом).
-  openModelDetail(modelId);
+function _openModelFromSpec(modelId, contractId, itemId) {
+  const spec = state._specByContract && state._specByContract[contractId];
+  const item = spec && (spec.items || []).find(entry => entry.id === itemId);
+  openModelDetail(modelId, {
+    modelId: modelId,
+    contractId: contractId,
+    itemId: itemId,
+    bom_configuration: (item && item.bom_configuration) || {},
+  });
 }
 function _openComponentFromSpec(componentId, contractId) {
   if (typeof openComponentDetail === 'function') openComponentDetail(componentId);
@@ -11296,7 +11497,7 @@ function renderContractItemsBlock(contractId) {
           nameClickHandler = ' onclick="_openSaleProductFromSpec(' + it.sale_product_id + ',' + contractId + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (it.model_id) {
-          nameClickHandler = ' onclick="_openModelFromSpec(' + it.model_id + ',' + contractId + ')"';
+          nameClickHandler = ' onclick="_openModelFromSpec(' + it.model_id + ',' + contractId + ',' + it.id + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (it.component_id) {
           nameClickHandler = ' onclick="_openComponentFromSpec(' + it.component_id + ',' + contractId + ')"';
@@ -11310,6 +11511,10 @@ function renderContractItemsBlock(contractId) {
         let _sysChip = '';
         if (it.system_tag) {
           _sysChip = ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#0E7490;background:rgba(14,116,144,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;" title="Относится к системе / объекту"><i class="ti ti-layout-grid" style="font-size:10px;vertical-align:-1px;"></i> ' + escapeHtml(it.system_tag) + '</span>';
+        }
+        const _orderBomSummary = _contractBomSummary(it.bom_configuration);
+        if (_orderBomSummary) {
+          _sysChip += ' <span class="spec-order-bom-chip" title="Точный вариант зафиксирован только для этой позиции договора"><i class="ti ti-bolt"></i> ' + escapeHtml(_orderBomSummary) + '</span>';
         }
         // v2.45.814: переключатель «Отгружать отдельной позицией» прямо в строке —
         // с явной галочкой, клик переключает без открытия формы
