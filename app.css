@@ -23729,3 +23729,92 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
 /* Композер: кнопки камеры и скрепки плотнее, поле дышит */
 .app.mobile-layout .dchat-box { padding: 6px; }
 .app.mobile-layout .dchat-input { font-size: 15px; }
+
+/* ============ v2.45.957: Клод — чат как мессенджер (append-only) ============ */
+
+/* --- 1. Мобильный экран: чат занимает телефон целиком, как мессенджер ---
+   Раньше высота ленты считалась вычитанием фиксированных 174px: под ней
+   подразумевались верхняя панель CRM, строка разделов и таб-бар. Любое
+   изменение любой из трёх (перенос строки, другой шрифт) — и композер уезжал
+   под нижнюю панель, а страница начинала скроллиться целиком. Теперь экран
+   чата прибит к вьюпорту: сверху донизу, до таб-бара. Верхняя панель CRM под
+   ним — выход по «назад» в шапке чата, разделы остаются в таб-баре. */
+.app.mobile-layout .screen.active[data-screen="devchat"] {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 460px; z-index: 60;
+  /* запас под таб-бар и выступающую круглую кнопку «плюс» в его центре */
+  bottom: calc(74px + max(8px, env(safe-area-inset-bottom)));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg);
+}
+.app.mobile-layout [data-screen="devchat"] .page-header { flex: none; }
+.app.mobile-layout [data-screen="devchat"] .dchat { height: auto; flex: 1; min-height: 0; }
+
+/* --- 2. Компактная шапка на телефоне ---
+   Заголовок 18px + пилюля статуса съедали почти сантиметр экрана. */
+.app.mobile-layout [data-screen="devchat"] .page-header { padding: 8px 12px; gap: 9px; }
+.app.mobile-layout [data-screen="devchat"] .page-header h1 { font-size: 16.5px; }
+.app.mobile-layout [data-screen="devchat"] .page-header-title { gap: 9px; min-width: 0; }
+.app.mobile-layout [data-screen="devchat"] .page-header-title > .ti-message-code {
+  width: 30px; height: 30px; font-size: 16px; border-radius: 9px;
+}
+.app.mobile-layout [data-screen="devchat"] .page-header .back-btn { width: 30px; height: 30px; }
+.app.mobile-layout [data-screen="devchat"] .dchat-status {
+  padding: 4px 10px; font-size: 11.5px; font-weight: 600; max-width: 42vw;
+}
+
+/* --- 3. Лента: своя подложка, чтобы белые ответы читались как карточки --- */
+.dchat-feed {
+  background: radial-gradient(900px 300px at 50% -6%, rgba(139,123,240,.09), transparent) #F4F7FB;
+  border-radius: 14px; padding: 10px 10px 12px;
+}
+.app.mobile-layout [data-screen="devchat"] .dchat { padding: 8px 10px 0; }
+
+/* --- 4. Сообщения: аватар у начала реплики, группировка подряд идущих --- */
+.dchat-row { align-items: flex-start; margin: 10px 0; }
+.dchat-ava { margin-top: 1px; margin-bottom: 0; }
+.dchat-row.is-cont { margin-top: 3px; }
+.dchat-row.is-cont .dchat-ava { visibility: hidden; }
+.dchat-row.is-cont .dchat-bubble { border-top-left-radius: 6px; }
+.dchat-row.is-cont.is-mine .dchat-bubble { border-top-left-radius: 16px; border-top-right-radius: 6px; }
+
+/* Мета — тише и ближе к тексту: время не должно спорить с самим сообщением */
+.dchat-meta { margin-top: 4px; font-size: 10.5px; opacity: .62; }
+.dchat-row.is-mine .dchat-meta { opacity: .78; }
+.dchat-chip { padding: 1px 7px; font-size: 10px; font-weight: 600; background: rgba(255,255,255,.18); }
+
+/* Кнопка «скопировать ответ» в мета-строке Клода */
+.dchat-act {
+  margin-left: 2px; width: 22px; height: 22px; border-radius: 7px; border: none; cursor: pointer;
+  background: none; color: var(--text-faint); font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s ease, background .15s ease, color .15s ease;
+}
+.dchat-row:hover .dchat-act { opacity: 1; }
+.dchat-act:hover { background: rgba(15,30,60,.06); color: var(--brand); }
+.dchat-act.ok { opacity: 1; color: var(--success); }
+/* на телефоне наведения нет — кнопка видна всегда, но приглушённой */
+.app.mobile-layout .dchat-act { opacity: .55; }
+
+/* --- 5. Блок кода: кнопка копирования в углу --- */
+.dchat-pre { position: relative; }
+.dchat-copy {
+  position: absolute; right: 8px; top: 8px; z-index: 2;
+  width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(148,163,184,.22); background: rgba(15,23,42,.72); color: #C8D6EA;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+  transition: background .15s ease, color .15s ease;
+}
+.dchat-copy:hover { background: #1E293B; color: #fff; }
+.dchat-copy.ok { color: #4ADE80; }
+
+/* --- 6. Композер: ниже подсказка, безопасная зона снизу, чипы прячутся при вводе --- */
+.dchat-chips.is-hidden { display: none; }
+.dchat-chips button { display: inline-flex; align-items: center; gap: 6px; }
+.dchat-chips button i { font-size: 14px; opacity: .8; }
+.app.mobile-layout .dchat-composer { padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+.dchat-send { width: 40px; height: 40px; }
+.app.mobile-layout .dchat-input { line-height: 1.4; }
+
+/* Фото в ленте открывается на весь экран */
+.dchat-img { cursor: zoom-in; }
