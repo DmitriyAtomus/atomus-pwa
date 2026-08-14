@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.949";
+const APP_VERSION = "v2.45.950";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2293,6 +2293,75 @@ function devChatPickFiles(files) {
   _devChatDrawFiles();
 }
 
+// Скрепка выбирает набор заново, а Ctrl+V докладывает к уже набранному:
+// скриншот не должен стирать выбранный до него файл.
+function devChatAddFiles(files) {
+  const list = Array.prototype.slice.call(files || []);
+  if (!list.length) return;
+  const free = 5 - _devChatFiles.length;
+  if (free <= 0) {
+    showToast('Больше 5 файлов за раз не отправить', 'error');
+    return;
+  }
+  list.slice(0, free).forEach(function (f) { _devChatFiles.push(_devChatNamed(f)); });
+  if (list.length > free) showToast('Взял только ' + free + ': больше 5 файлов за раз не отправить', 'error');
+  _devChatDrawFiles();
+}
+
+// У картинки из буфера имя пустое или всегда одно и то же («image.png»):
+// два вставленных скриншота в плитке было бы не отличить друг от друга.
+function _devChatNamed(f) {
+  const name = f && f.name || '';
+  if (name && name !== 'image.png' && name !== 'blob') return f;
+  const ext = ((f.type || 'image/png').split('/')[1] || 'png').split('+')[0];
+  const t = new Date();
+  const pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  const nice = 'screenshot-' + pad(t.getHours()) + pad(t.getMinutes()) + pad(t.getSeconds()) + '.' + ext;
+  try {
+    return new File([f], nice, { type: f.type || 'image/png' });
+  } catch (e) {
+    return f;   // старый WebView без конструктора File — уйдёт с исходным именем
+  }
+}
+
+// Ctrl+V: скопированную картинку сразу прикрепляем, без сохранения на диск.
+function devChatPaste(e) {
+  const dt = e && e.clipboardData;
+  if (!dt) return;
+  const picked = [];
+  Array.prototype.slice.call(dt.items || []).forEach(function (it) {
+    if (it.kind !== 'file') return;
+    const f = it.getAsFile();
+    if (f) picked.push(f);
+  });
+  // Safari/старые WebView не заполняют items — там файлы лежат только в files
+  if (!picked.length) picked.push.apply(picked, Array.prototype.slice.call(dt.files || []));
+  if (!picked.length) return;   // обычный текст вставляется как обычно
+  e.preventDefault();
+  devChatAddFiles(picked);
+  showToast(picked.length > 1 ? 'Прикрепил ' + picked.length + ' файла' : 'Картинка прикреплена', 'success');
+}
+
+// Ctrl+V мимо поля ввода (фокус на ленте, на кнопке) — тот же случай, но ловить
+// его можно только пока чат открыт, иначе перехватим вставку в других разделах.
+let _devChatPasteBound = false;
+function _devChatBindPaste() {
+  if (_devChatPasteBound) return;
+  _devChatPasteBound = true;
+  document.addEventListener('paste', function (e) {
+    const drawer = document.getElementById('devchat-drawer');
+    const drawerOpen = drawer && drawer.style.display === 'flex';
+    if (!drawerOpen && state.currentScreen !== 'devchat') return;
+    const t = e.target;
+    const tag = (t && t.tagName || '').toLowerCase();
+    const id = t && t.id || '';
+    // чужое поле ввода на экране обрабатывает вставку само
+    if ((tag === 'input' || tag === 'textarea' || (t && t.isContentEditable)) && id.indexOf('devchat-') !== 0) return;
+    if (id.indexOf('devchat-') === 0 && tag === 'textarea') return;   // там висит onpaste
+    devChatPaste(e);
+  });
+}
+
 // Вложения показываем плиткой: у картинок — миниатюра, у любого файла — крестик,
 // чтобы ошибочно выбранное не пришлось отменять вместе со всем набором.
 function _devChatDrawFiles() {
@@ -2384,6 +2453,7 @@ function loadDevChat(host) {
   const input = _devChatEl('input');
   if (input) devChatGrow(input);
   _devChatDrawFiles();
+  _devChatBindPaste();
   _devChatTick();
   _devChatTimer = setInterval(_devChatTick, 3000);
 }

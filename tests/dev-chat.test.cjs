@@ -115,6 +115,19 @@ test('поле ввода растёт под текст, а вложение м
   assert.match(app, /const btn = _devChatEl\('send'\)/);
 });
 
+test('скриншот из буфера прикрепляется по Ctrl+V', () => {
+  // оба поля ввода ловят вставку, картинка докладывается к уже выбранным
+  // файлам (а не затирает их), обычный текст вставляется как обычно
+  assert.match(html, /id="devchat-input"[\s\S]{0,300}onpaste="devChatPaste\(event\)"/);
+  assert.match(html, /id="devchat-drawer-input"[\s\S]{0,300}onpaste="devChatPaste\(event\)"/);
+  const fn = app.slice(app.indexOf('function devChatPaste'), app.indexOf('let _devChatPasteBound'));
+  assert.match(fn, /it\.kind !== 'file'/);
+  assert.match(fn, /if \(!picked\.length\) return;/, 'текстовая вставка должна проходить насквозь');
+  assert.match(fn, /devChatAddFiles\(picked\)/);
+  assert.match(app, /_devChatFiles\.push\(_devChatNamed\(f\)\)/, 'вставка затирает уже выбранные файлы');
+  assert.match(app, /_devChatBindPaste\(\);/, 'вставка мимо поля ввода не ловится');
+});
+
 test('шторка гасит фон и закрывается по Esc', () => {
   assert.match(html, /id="devchat-backdrop"/);
   assert.match(app, /backdrop\.classList\.add\('show'\)/);
