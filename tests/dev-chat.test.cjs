@@ -78,7 +78,53 @@ test('лента не рисует сообщение дважды при одн
 
 test('ответ показывается оформленным, но текст экранируется', () => {
   const fn = app.slice(app.indexOf('function _devChatFormat'), app.indexOf('function _devChatTime'));
-  assert.match(fn, /escapeHtml\(text \|\| ''\)/, 'экранирование должно идти первым');
+  // разметку накладываем ТОЛЬКО на уже экранированный текст, иначе теги из
+  // ответа доедут до ленты; блоки ``` вынимаются заранее и тоже экранируются
+  assert.match(fn, /escapeHtml\(src \|\| ''\)/, 'экранирование должно идти первым');
+  assert.match(fn, /escapeHtml\(blocks\[Number\(i\)\]\)/, 'блок кода тоже экранируется');
   assert.match(fn, /<code>\$1<\/code>/);
   assert.match(fn, /<b>\$1<\/b>/);
+});
+
+test('лента оформлена классами, а не инлайновыми стилями', () => {
+  const render = app.slice(app.indexOf('function _devChatRender'), app.indexOf('function _devChatDayRow'));
+  assert.match(render, /wrap\.className = 'dchat-row'/);
+  assert.match(render, /bubble\.className = 'dchat-bubble'/);
+  assert.match(render, /dchat-chip is-/, 'статус задачи рисуется чипом');
+  assert.doesNotMatch(render, /cssText/, 'стили переехали в app.css');
+});
+
+test('разделители дней, «Клод работает» и пустая лента с подсказками', () => {
+  assert.match(app, /function _devChatDay\(ts\)/);
+  assert.match(app, /label = 'Сегодня'/);
+  assert.match(app, /function _devChatTyping\(feed, on\)/);
+  assert.match(app, /function _devChatEmptyHtml\(\)/);
+  assert.match(app, /function devChatQuick\(btn\)/);
+  assert.match(html, /class="dchat-feed"/, 'экран не переведён на новую ленту');
+  assert.match(html, /id="devchat-status-text"/, 'нет строки статуса с индикатором');
+});
+
+test('поле ввода растёт под текст, а вложение можно убрать по одному', () => {
+  assert.match(app, /function devChatGrow\(el\)/);
+  assert.match(app, /function devChatDropFile\(i\)/);
+  assert.match(html, /oninput="devChatGrow\(this\)"/);
+  // кнопка отправки есть у обоих хостов — иначе блокировка на время отправки
+  // работала бы только на экране
+  assert.match(html, /id="devchat-send"/);
+  assert.match(html, /id="devchat-drawer-send"/);
+  assert.match(app, /const btn = _devChatEl\('send'\)/);
+});
+
+test('шторка гасит фон и закрывается по Esc', () => {
+  assert.match(html, /id="devchat-backdrop"/);
+  assert.match(app, /backdrop\.classList\.add\('show'\)/);
+  assert.match(app, /if \(e\.key !== 'Escape'\) return;/);
+});
+
+test('фон шторки и пузырей задан переменными, которые объявлены', () => {
+  // --bg-primary/--bg-secondary раньше нигде не объявлялись: шторка выходила
+  // прозрачной поверх контента
+  const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
+  assert.match(css, /--bg-primary:\s*#/, '--bg-primary не объявлена');
+  assert.match(css, /--bg-secondary:\s*#/, '--bg-secondary не объявлена');
 });
