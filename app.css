@@ -23536,3 +23536,73 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .dchat-hint { display: none; }
   .dchat-jump { bottom: 100px; right: 8px; }
 }
+
+/* ============ v2.45.947: Клод — витринный лоск (append-only, поверх базы) ============ */
+/* Шапка экрана «Клод» — фирменный градиент-бар с аватаром-звездой */
+[data-screen="devchat"] .page-header{
+  background:linear-gradient(120deg,#22456a,#2D5F8B);
+  border-radius:16px;padding:13px 18px;margin-bottom:12px;color:#fff;
+  box-shadow:0 8px 24px rgba(27,59,92,.28);border:none;align-items:center;
+}
+[data-screen="devchat"] .page-header-title{gap:11px;color:#fff;}
+[data-screen="devchat"] .page-header-title h1{color:#fff;letter-spacing:.3px;}
+/* иконку-«назад» и код-иконку — в стеклянные плитки */
+[data-screen="devchat"] .page-header .back-btn{
+  width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);
+  color:#fff;border:none;
+}
+[data-screen="devchat"] .page-header .back-btn:hover{background:rgba(255,255,255,.24);}
+[data-screen="devchat"] .page-header-title > .ti-message-code{
+  width:36px;height:36px;border-radius:11px;display:inline-flex;align-items:center;
+  justify-content:center;font-size:18px;
+  background:linear-gradient(135deg,#8B7BF0,#5B49D6);
+  box-shadow:0 4px 12px rgba(91,73,214,.4);
+}
+/* строку состояния агента — на «фростнутую» пилюлю */
+[data-screen="devchat"] .dchat-status{
+  color:#fff;background:rgba(255,255,255,.14);padding:6px 13px;border-radius:99px;
+  font-weight:700;
+}
+[data-screen="devchat"] .dchat-status.is-ready .dot{background:#4ADE80;box-shadow:0 0 0 3px rgba(74,222,128,.22);}
+
+/* Лента — мягкое сияние сверху, чуть больше воздуха по бокам */
+.dchat-feed{
+  background:radial-gradient(900px 300px at 50% -8%,rgba(139,123,240,.07),transparent);
+  padding-left:6px;padding-right:6px;
+}
+/* Аватары — скруглённые плитки вместо кругов (как в макете) */
+.dchat-ava{border-radius:11px;}
+.dchat-row.is-mine .dchat-ava{
+  background:#DCE6F2;color:var(--brand);font-weight:800;font-size:12px;box-shadow:none;
+}
+/* Пузыри — чуть мягче радиус и тень поглубже */
+.dchat-bubble{border-radius:16px 16px 16px 5px;}
+.dchat-row.is-mine .dchat-bubble{border-radius:16px 16px 5px 16px;}
+.dchat-bubble:hover{box-shadow:0 2px 4px rgba(15,30,60,.05),0 10px 26px rgba(15,30,60,.09);}
+
+/* Блоки кода — тонкая цветная кромка сверху + «дыхание» слева, моно покрупнее */
+.dchat-text pre{
+  border-radius:12px;position:relative;padding-top:13px;
+  border:1px solid rgba(148,163,184,.14);
+  box-shadow:0 4px 16px rgba(2,6,20,.22);
+}
+.dchat-text pre::before{
+  content:'';position:absolute;left:12px;top:6px;width:34px;height:5px;border-radius:99px;
+  background:linear-gradient(90deg,#FF5F57,#FEBC2E 45%,#28C840);
+  opacity:.9;
+}
+.dchat-text pre code{font-size:12.5px;}
+
+/* Композер — крупнее скругление, мягкая подложка, тёплое свечение при фокусе */
+.dchat-box{border-radius:18px;background:#F6F9FC;}
+.dchat-box:focus-within{background:#fff;box-shadow:0 0 0 4px rgba(45,95,139,.10);}
+.dchat-send{border-radius:12px;background:linear-gradient(135deg,#2D5F8B,#234C71);}
+.dchat-attach{border-radius:10px;}
+
+/* Быстрые подсказки в пустой ленте — как «таблетки» с лёгким подъёмом */
+.dchat-quick button{box-shadow:0 1px 2px rgba(15,30,60,.05);}
+.dchat-quick button:hover{box-shadow:0 6px 16px rgba(45,95,139,.14);}
+
+@media (max-width:760px){
+  [data-screen="devchat"] .page-header{border-radius:0;margin-bottom:0;}
+}
