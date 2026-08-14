@@ -1,4 +1,4 @@
-// Мобильный комфорт чата «Клод» (v2.45.955): камера, чипы, терминал «вживую».
+// Мобильный комфорт чата «Клава» (v2.45.955): камера, чипы, терминал «вживую».
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

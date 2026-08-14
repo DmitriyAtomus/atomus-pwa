@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.957";
+const APP_VERSION = "v2.45.958";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1401,7 +1401,7 @@ function renderProfile() {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 
-  // Чат с Клодом — тоже только директору (на бэкенде лента сужена до владельца)
+  // Чат с Клавой — тоже только директору (на бэкенде лента сужена до владельца)
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
   const navDev = document.getElementById('sb-devchat');
   if (navDev) navDev.style.display = isDirector ? '' : 'none';
@@ -1871,7 +1871,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'sales-more') renderSalesMore();
   // Безопасность (камера офиса): запускаем опрос кадра, при уходе — останавливаем
   if (screenName === 'security') loadSecurity(); else stopSecurity();
-  // Чат с Клодом: лента опрашивается только на своём экране
+  // Чат с Клавой: лента опрашивается только на своём экране
   const devDrawer = document.getElementById('devchat-drawer');
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
   if (screenName === 'devchat') loadDevChat('screen');
@@ -1990,7 +1990,7 @@ function _devChatEl(name) {
 const _DEVCHAT_STATUS = {
   uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
-  running: { text: 'Клод работает…', cls: 'text-warning' },
+  running: { text: 'Клава работает…', cls: 'text-warning' },
   done:    { text: 'готово',         cls: 'text-success' },
   error:   { text: 'сбой',           cls: 'text-danger' },
 };
@@ -2001,13 +2001,13 @@ function _devChatOpen(status) {
   return status === 'uploading' || status === 'new' || status === 'running';
 }
 
-// Клод отвечает лёгким markdown (**жирный**, `код`, ```блоки```). Полноценный
+// Клава отвечает лёгким markdown (**жирный**, `код`, ```блоки```). Полноценный
 // парсер тут не нужен, а сырые звёздочки и решётки в ленте читаются плохо.
 // Блоки кода вынимаем ДО экранирования, чтобы внутри них ничего не подменилось,
 // и возвращаем на место уже экранированными.
 function _devChatFormat(text) {
   const blocks = [];
-  const MARK = String.fromCharCode(0);   // такого символа в тексте от Клода не бывает
+  const MARK = String.fromCharCode(0);   // такого символа в тексте от Клавы не бывает
   const src = String(text || '').replace(/```[a-zA-Z0-9+-]*\r?\n?([\s\S]*?)```/g, function (_, code) {
     blocks.push(code.replace(/\s+$/, ''));
     return MARK + 'B' + (blocks.length - 1) + MARK;
@@ -2029,7 +2029,7 @@ function _devChatFormat(text) {
   return html;
 }
 
-// v2.45.957: копирование куском — код из блока или весь ответ Клода.
+// v2.45.957: копирование куском — код из блока или весь ответ Клавы.
 // navigator.clipboard есть не везде (http, старый WebView), поэтому запасной
 // путь через скрытую textarea + execCommand.
 function _devChatCopy(text, btn) {
@@ -2111,7 +2111,7 @@ function _devChatRender(msg) {
   wrap.className = 'dchat-row' + (mine ? ' is-mine' : '');
   wrap.setAttribute('data-msg-id', msg.id);
 
-  // Ответ Клода подписан аватаром — в длинной ленте сразу видно, где чья реплика.
+  // Ответ Клавы подписан аватаром — в длинной ленте сразу видно, где чья реплика.
   if (!mine) {
     const ava = document.createElement('div');
     ava.className = 'dchat-ava';
@@ -2128,7 +2128,7 @@ function _devChatRender(msg) {
     '<span>' + _devChatTime(msg.ts) + '</span>' +
     (msg.meta && msg.meta.wall_sec ? '<span>· ' + Math.round(msg.meta.wall_sec) + 'с</span>' : '') +
     (st ? '<span class="dchat-chip is-' + msg.status + '" data-status>' + escapeHtml(st.text) + '</span>' : '') +
-    // v2.45.957: ответ Клода часто нужно перенести в задачу/письмо — копируем одним тапом
+    // v2.45.957: ответ Клавы часто нужно перенести в задачу/письмо — копируем одним тапом
     (mine ? '' : '<button class="dchat-act" type="button" onclick="devChatCopyMsg(this)" ' +
       'title="Скопировать ответ"><i class="ti ti-copy"></i></button>') +
     '</div>';
@@ -2173,8 +2173,8 @@ function _devChatDayRow(label) {
   return row;
 }
 
-// «Клод работает» — три точки в конце ленты, пока задача не закрыта.
-// v2.45.949: пока Клод работает, агент может слать строки активности
+// «Клава работает» — три точки в конце ленты, пока задача не закрыта.
+// v2.45.949: пока Клава работает, агент может слать строки активности
 // (/api/dev-chat/progress) — берём свежайший тикер из незакрытых задач.
 function _devChatProgLines() {
   const prog = window._devChatProg || {};
@@ -2195,7 +2195,7 @@ function _devChatTyping(feed, on) {
     el.innerHTML = '<div class="dchat-ava"><i class="ti ti-sparkles"></i></div>' +
                    '<div class="bubble"><i></i><i></i><i></i></div>';
   }
-  // Живой прогресс: вместо трёх точек — мини-терминал «что Клод делает сейчас»
+  // Живой прогресс: вместо трёх точек — мини-терминал «что Клава делает сейчас»
   const lines = _devChatProgLines();
   const bub = el.querySelector('.bubble');
   if (bub && lines) {
@@ -2216,7 +2216,7 @@ function _devChatEmptyHtml() {
   const quick = ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
   return '<div class="dchat-empty">' +
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
-    '<h3>Задача для Клода</h3>' +
+    '<h3>Задача для Клавы</h3>' +
     '<p>Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, ' +
     'запускает проверки и отвечает сюда же. Можно приложить фото или файл.</p>' +
     '<div class="dchat-quick">' +
@@ -2325,7 +2325,7 @@ async function _devChatRefreshStatuses() {
   // в шапке — последнее действие агента, если он его прислал
   const progLines = working ? _devChatProgLines() : null;
   _devChatSetStatus(
-    working ? (progLines ? progLines[progLines.length - 1] : 'Клод работает над задачей…')
+    working ? (progLines ? progLines[progLines.length - 1] : 'Клава работает над задачей…')
             : 'Готов к работе',
     working ? 'working' : 'ready');
   if (feed) _devChatTyping(feed, working);
@@ -2425,7 +2425,7 @@ function _devChatTermRender() {
         return '<div class="ln' + (i === items.length - 1 ? ' cur' : '') + '">' +
           '<span class="t">' + r.t + '</span>' + escapeHtml(r.ln) + '</div>';
       }).join('')
-    : '<div class="tf-empty">Пока тихо. Строки появятся, когда Клод возьмёт задачу.</div>';
+    : '<div class="tf-empty">Пока тихо. Строки появятся, когда Клава возьмёт задачу.</div>';
   log.scrollTop = log.scrollHeight;
   const working = _devChatPending.size > 0;
   if (foot) foot.className = 'tf-ft' + (working ? ' on' : '');
@@ -2583,7 +2583,7 @@ async function devChatSend(context) {
   try {
     const form = new FormData();
     form.append('text', text);
-    // Откуда написали — Клоду это подсказка: «раздел Атом Чиллер», «Почта и MAX»…
+    // Откуда написали — Клаве это подсказка: «раздел Атом Чиллер», «Почта и MAX»…
     const where = context || { screen: state.currentScreen || '' };
     form.append('context', JSON.stringify(where));
     _devChatFiles.forEach(function (f, i) { form.append('file' + (i + 1), f, f.name); });
@@ -2624,7 +2624,7 @@ function loadDevChat(host) {
     // v2.45.956: на телефоне подсказка про Ctrl+V бессмысленна
     // v2.45.957: длинная подсказка вставала в две строки и съедала пол-экрана
     const mob = document.querySelector('.app.mobile-layout');
-    if (mob) input.placeholder = 'Задача для Клода…';
+    if (mob) input.placeholder = 'Задача для Клавы…';
   }
   _devChatDrawFiles();
   _devChatBindPaste();
@@ -2635,7 +2635,7 @@ function loadDevChat(host) {
 
 // ---- «на всё окно» ----
 // Шелл CRM ограничен 1400px и центрирован, так что на широком мониторе чат
-// занимает узкую полосу. В этом режиме экран «Клод» становится overlay'ем на
+// занимает узкую полосу. В этом режиме экран «Клава» становится overlay'ем на
 // весь viewport поверх сайдбаров и верхней панели. Выбор запоминается.
 const DEVCHAT_FULL_KEY = 'atomus_devchat_full';
 

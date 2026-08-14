@@ -1,4 +1,4 @@
-// Чат с Клодом: раздел, шторка поверх любого экрана и правила доступа.
+// Чат с Клавой: раздел, шторка поверх любого экрана и правила доступа.
 // Проверяем то, что легко потерять при правках: пункт и кнопка видны только
 // директору, лента опрашивается лишь когда есть где её показывать, а вложения
 // тянутся с токеном (иначе картинки молча не грузятся).
@@ -13,7 +13,7 @@ const app = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const version = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8'));
 const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 
-test('раздел «Клод» и шторка есть в разметке', () => {
+test('раздел «Клава» и шторка есть в разметке', () => {
   assert.match(html, /id="sb-devchat"/, 'нет пункта меню');
   assert.match(html, /data-screen="devchat"/, 'нет экрана');
   assert.match(html, /id="devchat-feed"/, 'нет ленты экрана');
@@ -94,7 +94,7 @@ test('лента оформлена классами, а не инлайновы
   assert.doesNotMatch(render, /cssText/, 'стили переехали в app.css');
 });
 
-test('разделители дней, «Клод работает» и пустая лента с подсказками', () => {
+test('разделители дней, «Клава работает» и пустая лента с подсказками', () => {
   assert.match(app, /function _devChatDay\(ts\)/);
   assert.match(app, /label = 'Сегодня'/);
   assert.match(app, /function _devChatTyping\(feed, on\)/);
