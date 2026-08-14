@@ -23269,3 +23269,27 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .um-card { border-color: #DDD9F7; border-left-color: #4F46E5; box-shadow: 0 1px 3px rgba(79,70,229,.07); }
 .um-card:hover { box-shadow: 0 8px 22px rgba(79,70,229,.12); }
 .um-logo { background: #4F46E5; font-size: 15px; }
+
+/* ============ v2.45.942: Логистика — наведение лоска на карточки ============ */
+.lg-grid { gap: 14px; }
+.lgc { border-radius: 18px; box-shadow: 0 1px 2px rgba(15,30,60,.04), 0 6px 20px rgba(15,30,60,.05); transition: box-shadow .16s ease, transform .16s ease; }
+.lgc:hover { box-shadow: 0 2px 4px rgba(15,30,60,.06), 0 14px 34px rgba(15,30,60,.11); transform: translateY(-2px); }
+.lgc.empty { box-shadow: 0 1px 2px rgba(15,30,60,.03); }
+.lgc.empty:hover { transform: none; box-shadow: 0 1px 2px rgba(15,30,60,.03); }
+/* Шапка: иконку — во «фростнутую» плитку, ровный межбуквенный интервал */
+.lgc-hd { padding: 13px 16px; font-size: 14px; letter-spacing: .2px; }
+.lgc-hd > .ti:first-child { width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,.18); display: inline-flex; align-items: center; justify-content: center; font-size: 16px; flex: none; }
+.lgc-hd .cnt { font-weight: 700; letter-spacing: .3px; align-self: center; }
+/* Пустое состояние: иконка в мягком круге, больше воздуха */
+.lgc-empty { padding: 26px 16px; color: var(--text-light); }
+.lgc-empty .ti { width: 46px; height: 46px; border-radius: 50%; background: #F1F5F9; color: #94A3B8; display: flex; align-items: center; justify-content: center; font-size: 22px; margin: 0 auto 11px; }
+/* Подвал — на чуть тонированной подложке, ровные цифры */
+.lgc-ft { padding: 10px 16px; background: #FBFCFE; font-variant-numeric: tabular-nums; }
+/* Разводим совпавшие цвета: УТМ — насыщенный фиолет, Самовывоз — графит */
+.lgc-um .lgc-hd { background: linear-gradient(120deg, #7C3AED, #A855F7); }
+.um-card { border-left-color: #7C3AED; }
+.um-logo { background: #7C3AED; }
+.lgc-pk .lgc-hd { background: linear-gradient(120deg, #475569, #64748B); }
+@media (max-width: 900px) {
+  .lgc-hd > .ti:first-child { width: 26px; height: 26px; font-size: 14px; }
+}

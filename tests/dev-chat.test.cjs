@@ -59,7 +59,12 @@ test('статусы дозапрашиваются только пока ест
 });
 
 test('версия и кэш подняты вместе', () => {
-  assert.equal(version.version, 'v2.45.941');
-  assert.match(app, /const APP_VERSION = "v2\.45\.941"/);
-  assert.match(serviceWorker, /const CACHE_VERSION = 'atomus-v1\.8\.941'/);
+  // Не пиним конкретный номер (он растёт с каждым релизом) — проверяем,
+  // что app-1.js, sw.js и version.json согласованы между собой.
+  const appNum = (app.match(/const APP_VERSION = "v2\.45\.(\d+)"/) || [])[1];
+  const swNum = (serviceWorker.match(/const CACHE_VERSION = 'atomus-v1\.8\.(\d+)'/) || [])[1];
+  const verNum = (String(version.version).match(/v2\.45\.(\d+)/) || [])[1];
+  assert.ok(appNum, 'APP_VERSION не найден в app-1.js');
+  assert.equal(swNum, appNum, 'CACHE_VERSION в sw.js не совпадает с APP_VERSION');
+  assert.equal(verNum, appNum, 'version.json не совпадает с APP_VERSION');
 });
