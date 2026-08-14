@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.956";
+const APP_VERSION = "v2.45.957";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2019,10 +2019,54 @@ function _devChatFormat(text) {
     .replace(/^\s*[-*]\s+/gm, '• ')
     .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
   // пустые строки вокруг блока кода лишние — отступ даёт сам <pre>
+  // v2.45.957: блок кода с телефона не выделишь пальцем — рядом кнопка «копировать»
   html = html.replace(new RegExp('\\n*' + MARK + 'B(\\d+)' + MARK + '\\n*', 'g'), function (_, i) {
-    return '<pre><code>' + escapeHtml(blocks[Number(i)]) + '</code></pre>';
+    return '<div class="dchat-pre">' +
+      '<button class="dchat-copy" type="button" onclick="devChatCopyCode(this)" title="Скопировать код">' +
+        '<i class="ti ti-copy"></i></button>' +
+      '<pre><code>' + escapeHtml(blocks[Number(i)]) + '</code></pre></div>';
   });
   return html;
+}
+
+// v2.45.957: копирование куском — код из блока или весь ответ Клода.
+// navigator.clipboard есть не везде (http, старый WebView), поэтому запасной
+// путь через скрытую textarea + execCommand.
+function _devChatCopy(text, btn) {
+  const done = function () {
+    if (!btn) return;
+    const old = btn.innerHTML;
+    btn.classList.add('ok');
+    btn.innerHTML = '<i class="ti ti-check"></i>';
+    setTimeout(function () { btn.classList.remove('ok'); btn.innerHTML = old; }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function () { _devChatCopyFallback(text, done); });
+  } else {
+    _devChatCopyFallback(text, done);
+  }
+}
+
+function _devChatCopyFallback(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-1000px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { /* не вышло — молча */ }
+  ta.remove();
+}
+
+function devChatCopyCode(btn) {
+  const box = btn && btn.closest('.dchat-pre');
+  const code = box && box.querySelector('code');
+  if (code) _devChatCopy(code.textContent || '', btn);
+}
+
+function devChatCopyMsg(btn) {
+  const row = btn && btn.closest('.dchat-row');
+  const txt = row && row.querySelector('.dchat-text');
+  if (txt) _devChatCopy(txt.innerText || txt.textContent || '', btn);
 }
 
 function _devChatTime(ts) {
@@ -2084,12 +2128,17 @@ function _devChatRender(msg) {
     '<span>' + _devChatTime(msg.ts) + '</span>' +
     (msg.meta && msg.meta.wall_sec ? '<span>· ' + Math.round(msg.meta.wall_sec) + 'с</span>' : '') +
     (st ? '<span class="dchat-chip is-' + msg.status + '" data-status>' + escapeHtml(st.text) + '</span>' : '') +
+    // v2.45.957: ответ Клода часто нужно перенести в задачу/письмо — копируем одним тапом
+    (mine ? '' : '<button class="dchat-act" type="button" onclick="devChatCopyMsg(this)" ' +
+      'title="Скопировать ответ"><i class="ti ti-copy"></i></button>') +
     '</div>';
 
   (msg.files || []).forEach(function (f) {
     if ((f.content_type || '').indexOf('image/') === 0) {
       const img = document.createElement('img');
       img.className = 'dchat-img';
+      // v2.45.957: фото открывается на весь экран — на телефоне иначе не рассмотреть
+      img.onclick = function () { if (this.src) openPhotoLightbox(this.src); };
       bubble.appendChild(img);
       _devChatLoadImage(img, f.url);
     } else {
@@ -2105,6 +2154,15 @@ function _devChatRender(msg) {
 
   wrap.appendChild(bubble);
   return wrap;
+}
+
+// v2.45.957: подряд идущие реплики одного автора — одной группой: меньше отступ,
+// аватар только у первой. Длинная переписка перестаёт выглядеть лесенкой.
+function _devChatGroupRow(row) {
+  const prev = row.previousElementSibling;
+  if (!prev || !prev.classList.contains('dchat-row')) return;
+  if (prev.classList.contains('is-mine') !== row.classList.contains('is-mine')) return;
+  row.classList.add('is-cont');
 }
 
 // Разделитель дня вставляется перед первым сообщением новых суток.
@@ -2212,7 +2270,9 @@ async function _devChatTickInner(feed) {
         feed.appendChild(_devChatDayRow(day.label));
         _devChatDayKey = day.key;
       }
-      feed.appendChild(_devChatRender(m));
+      const row = _devChatRender(m);
+      feed.appendChild(row);
+      _devChatGroupRow(row);
     }
     if (m.id > _devChatSince) _devChatSince = m.id;
   });
@@ -2286,6 +2346,10 @@ function devChatGrow(el) {
   if (!el) return;
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 168) + 'px';
+  // v2.45.957: пока набирается текст, ряд быстрых чипов ни к чему — прячем его
+  // и отдаём высоту ленте (на телефоне это целая строка сообщений).
+  const chips = document.getElementById('devchat-chips');
+  if (chips) chips.classList.toggle('is-hidden', !!(el.value || '').trim());
 }
 
 function devChatJump() {
@@ -2308,7 +2372,7 @@ function devChatOnScroll() {
 function devChatQuick(btn) {
   const input = _devChatEl('input');
   if (!input || !btn) return;
-  input.value = btn.textContent + ' ';
+  input.value = (btn.getAttribute('data-q') || btn.textContent).trim() + ' ';
   devChatGrow(input);
   input.focus();
 }
@@ -2558,8 +2622,9 @@ function loadDevChat(host) {
   if (input) {
     devChatGrow(input);
     // v2.45.956: на телефоне подсказка про Ctrl+V бессмысленна
+    // v2.45.957: длинная подсказка вставала в две строки и съедала пол-экрана
     const mob = document.querySelector('.app.mobile-layout');
-    if (mob) input.placeholder = 'Что сделать? Можно приложить фото';
+    if (mob) input.placeholder = 'Задача для Клода…';
   }
   _devChatDrawFiles();
   _devChatBindPaste();

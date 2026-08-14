@@ -935,11 +935,12 @@
           </button>
           <div class="dchat-composer">
             <!-- v2.45.955: быстрые чипы — типовые запросы в один тап (важно на телефоне) -->
+            <!-- v2.45.957: эмодзи заменены иконками Tabler — чипы стали одного роста -->
             <div class="dchat-chips" id="devchat-chips">
-              <button class="acc" onclick="devChatCamera()">📸 Сфотографировать</button>
-              <button onclick="devChatQuick(this)">Что сейчас в работе?</button>
-              <button onclick="devChatQuick(this)">Проверь логи за сегодня</button>
-              <button onclick="devChatQuick(this)">Поправь дизайн раздела…</button>
+              <button class="acc" onclick="devChatCamera()"><i class="ti ti-camera"></i>Снять фото</button>
+              <button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>
+              <button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>
+              <button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Поправь дизайн раздела…</button>
             </div>
             <div id="devchat-files" class="dchat-files"></div>
             <div class="dchat-box">
