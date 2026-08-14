@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.955";
+const APP_VERSION = "v2.45.956";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -6231,6 +6231,46 @@ async function editWorkLabel(workId) {
   } catch (e) { showToast('Не удалось сохранить метку', 'error'); }
 }
 
+// Фактический выпуск может отличаться от плана договора. Меняем только факт:
+// плановое qty остаётся нетронутым и продолжает участвовать в планировании.
+async function editProductionOutputQty(workId, currentQty) {
+  const w = state._pkbDetailWork && state._pkbDetailWork.id === workId
+    ? state._pkbDetailWork : null;
+  if (!w || !hasPermission('production.manage')) return;
+  if (w.status === 'done' || w.status === 'cancelled') {
+    showToast('Сначала верните работу на упаковку', 'error');
+    return;
+  }
+  if (w.assembly_id || w.linked_assembly_id) {
+    showToast('Количество уже связано со складской сборкой', 'error');
+    return;
+  }
+
+  const raw = prompt(
+    'Сколько изделий фактически изготовлено?\n\n' +
+    'Именно это количество придёт на склад и спишет комплектующие.',
+    String(currentQty || w.qty || 1)
+  );
+  if (raw == null) return;
+  const qty = Number(String(raw).trim().replace(',', '.'));
+  if (!Number.isInteger(qty) || qty < 1) {
+    showToast('Укажите целое количество: 1, 2, 3…', 'error');
+    return;
+  }
+  if (qty === Number(w.output_qty || w.qty || 1)) return;
+
+  try {
+    const fresh = await apiPatch('/api/production/works/' + workId, { output_qty: qty });
+    state._pkbDetailWork = fresh;
+    cache.productionKanban = null;
+    renderProductionWorkDetail(fresh);
+    pwcLoad(workId);
+    showToast('Фактически изготовлено: ' + qty + ' шт.', 'success');
+  } catch (e) {
+    showToast('Не удалось сохранить количество: ' + (e.message || e), 'error');
+  }
+}
+
 function renderProductionWorkDetail(w) {
   const overlay = document.getElementById('pkb-detail-modal');
   if (!overlay) return;
@@ -6299,7 +6339,22 @@ function renderProductionWorkDetail(w) {
       escapeHtml(formatPkbDate(w.deadline_at)) +
       '<div class="pwd-fact-sub' + _dCls + '">' + escapeHtml(_dTxt) + '</div></div></div>';
   }
-  html += '<div class="pwd-fact"><div class="pwd-fact-l">Кол-во</div><div class="pwd-fact-v">' + (w.qty || 1) + ' шт.</div></div>';
+  const plannedQty = Number(w.qty || 1);
+  const outputQty = Number(w.output_qty || plannedQty);
+  const canEditOutputQty = !_isServiceDetail && hasPermission('production.manage') &&
+    w.status !== 'done' && w.status !== 'cancelled' && !w.assembly_id && !w.linked_assembly_id;
+  if (_isServiceDetail) {
+    html += '<div class="pwd-fact"><div class="pwd-fact-l">Кол-во</div><div class="pwd-fact-v">' + plannedQty + ' шт.</div></div>';
+  } else {
+    html += '<div class="pwd-fact' + (canEditOutputQty ? ' pwd-fact-link' : '') + '"' +
+      (canEditOutputQty
+        ? ' onclick="editProductionOutputQty(' + w.id + ', ' + outputQty + ')" title="Указать фактически изготовленное количество"'
+        : '') + '>' +
+      '<div class="pwd-fact-l">Изготовлено' + (canEditOutputQty ? ' <i class="ti ti-pencil"></i>' : '') + '</div>' +
+      '<div class="pwd-fact-v">' + outputQty + ' шт.' +
+        '<div class="pwd-fact-sub">план: ' + plannedQty + ' шт.' + (canEditOutputQty ? ' · изменить' : '') + '</div>' +
+      '</div></div>';
+  }
   if (w.estimated_hours != null || w.actual_hours != null) {
     const _hp = [];
     if (w.estimated_hours != null) _hp.push('план ' + w.estimated_hours + 'ч');
