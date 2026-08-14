@@ -22794,6 +22794,9 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .mo-hist .dt { color: var(--text-faint); font-size: 11px; flex: none; }
 .mo-hist .dl { color: #CBD5E1; cursor: pointer; flex: none; }
 .mo-hist .dl:hover { color: var(--brand); }
+.mo-resend { display: inline-flex; align-items: center; gap: 5px; flex: none; border: 1px solid #BFDBFE; border-radius: 8px; padding: 5px 9px; background: #EFF6FF; color: #1D4ED8; font: 700 10.5px/1.2 inherit; cursor: pointer; }
+.mo-resend:hover { border-color: #60A5FA; background: #DBEAFE; }
+.mo-resend:disabled { opacity: .6; cursor: wait; }
 .pdx-st.work { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
 
 /* ============ v2.45.865: комбо выбора поставщика в заказе ============ */
