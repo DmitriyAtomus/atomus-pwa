@@ -932,8 +932,9 @@
                 </button>
                 <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
                        style="display:none;" onchange="devChatPickFiles(this.files)">
-                <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать?"
-                          oninput="devChatGrow(this)" onkeydown="devChatKey(event)"></textarea>
+                <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот можно вставить через Ctrl+V"
+                          oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
+                          onpaste="devChatPaste(event)"></textarea>
                 <button class="dchat-send" id="devchat-send" onclick="devChatSend()" title="Отправить (Ctrl+Enter)">
                   <i class="ti ti-arrow-up"></i>
                 </button>
@@ -8902,8 +8903,9 @@ function _ccReset() {
         </button>
         <input type="file" id="devchat-drawer-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
                style="display:none;" onchange="devChatPickFiles(this.files)">
-        <textarea id="devchat-drawer-input" class="dchat-input" rows="1" placeholder="Что сделать?"
-                  oninput="devChatGrow(this)" onkeydown="devChatKey(event)"></textarea>
+        <textarea id="devchat-drawer-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот — Ctrl+V"
+                  oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
+                  onpaste="devChatPaste(event)"></textarea>
         <button class="dchat-send" id="devchat-drawer-send" onclick="devChatSend()" title="Отправить (Ctrl+Enter)">
           <i class="ti ti-arrow-up"></i>
         </button>
