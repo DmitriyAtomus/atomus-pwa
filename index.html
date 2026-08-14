@@ -267,6 +267,11 @@
         <button class="nav-item" id="sb-security" data-nav="security" onclick="selectSidebarItem('security')" style="display:none;">
           <i class="ti ti-shield-lock"></i><span>Безопасность</span>
         </button>
+        <!-- Чат с Клодом: задачи уходят агенту на сервер .30. Личный, показ в app-1.js. -->
+        <button class="nav-item" id="sb-devchat" data-nav="devchat" onclick="selectSidebarItem('devchat')" style="display:none;">
+          <i class="ti ti-message-code"></i><span>Клод</span>
+          <span class="nav-badge" id="devchat-badge" style="display:none;"></span>
+        </button>
       </div>
 
       <!-- Внешние сервисы -->
@@ -893,6 +898,41 @@
             <div class="text-muted" style="font-size:11px;margin-top:8px;">
               По распознаванию лиц (камера обходит офис ~каждую минуту, следит за дверью). Точность зависит от того, кто внесён в базу.
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ ЧАТ С КЛОДОМ ============ -->
+      <!-- Задача уходит в очередь на бэкенде, агент на сервере .30 забирает её
+           long-poll'ом, выполняет Claude Code и пишет ответ обратно в эту ленту. -->
+      <div class="screen" data-screen="devchat" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <i class="ti ti-message-code"></i>
+            <h1>Клод</h1>
+          </div>
+          <div id="devchat-status" class="text-muted" style="font-size:13px;">Связь с агентом…</div>
+        </div>
+        <div class="content-inner" style="max-width:900px;display:flex;flex-direction:column;height:calc(100vh - 190px);">
+          <div id="devchat-feed" style="flex:1;overflow-y:auto;padding:4px 2px 12px;">
+            <div class="loading-block">Загружаем переписку…</div>
+          </div>
+          <div id="devchat-files" style="display:none;flex-wrap:wrap;gap:8px;padding:8px 0;"></div>
+          <div style="display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--border);padding-top:10px;">
+            <button class="icon-btn" onclick="document.getElementById('devchat-file-input').click()" title="Прикрепить фото или файл">
+              <i class="ti ti-paperclip"></i>
+            </button>
+            <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+                   style="display:none;" onchange="devChatPickFiles(this.files)">
+            <textarea id="devchat-input" class="form-input" rows="2" placeholder="Что сделать?"
+                      style="flex:1;resize:vertical;min-height:44px;" onkeydown="devChatKey(event)"></textarea>
+            <button class="btn btn-primary" id="devchat-send" onclick="devChatSend()">
+              <i class="ti ti-send"></i> Отправить
+            </button>
+          </div>
+          <div class="text-muted" style="font-size:11px;padding-top:6px;">
+            Ctrl+Enter — отправить. Агент работает на офисном сервере и правит проекты сам.
           </div>
         </div>
       </div>
@@ -8820,6 +8860,41 @@ function _ccReset() {
   _ccRenderModal();
 }
 </script>
+
+<!-- ============ ШТОРКА «КЛОД» ============ -->
+<!-- Плавающая кнопка поверх любого раздела: и в «Атом Чиллере» (там 3D открыт в
+     iframe, поэтому шторка живёт в самой CRM), и в остальных экранах. Лента — та же,
+     что на экране «Клод», к сообщению добавляется, откуда его написали. -->
+<button id="devchat-fab" onclick="devChatToggleDrawer()" title="Спросить Клода"
+        style="display:none;position:fixed;right:18px;bottom:78px;z-index:900;width:52px;height:52px;border-radius:50%;
+               border:none;background:var(--brand);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;font-size:22px;">
+  <i class="ti ti-message-code"></i>
+</button>
+<div id="devchat-drawer"
+     style="display:none;position:fixed;right:0;top:0;bottom:0;width:min(420px,100vw);z-index:901;
+            background:var(--bg-primary);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.18);
+            flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);">
+    <i class="ti ti-message-code"></i>
+    <b>Клод</b>
+    <span id="devchat-drawer-context" class="text-muted" style="font-size:12px;"></span>
+    <button class="icon-btn" style="margin-left:auto;" onclick="devChatToggleDrawer()" title="Закрыть">
+      <i class="ti ti-x"></i>
+    </button>
+  </div>
+  <div id="devchat-drawer-feed" style="flex:1;overflow-y:auto;padding:10px 14px;"></div>
+  <div id="devchat-drawer-files" style="display:none;flex-wrap:wrap;gap:6px;padding:0 14px 6px;"></div>
+  <div style="display:flex;gap:6px;align-items:flex-end;padding:10px 14px;border-top:1px solid var(--border);">
+    <button class="icon-btn" onclick="document.getElementById('devchat-drawer-file-input').click()" title="Прикрепить">
+      <i class="ti ti-paperclip"></i>
+    </button>
+    <input type="file" id="devchat-drawer-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+           style="display:none;" onchange="devChatPickFiles(this.files)">
+    <textarea id="devchat-drawer-input" class="form-input" rows="2" placeholder="Что сделать?"
+              style="flex:1;resize:none;min-height:42px;" onkeydown="devChatKey(event)"></textarea>
+    <button class="btn btn-primary btn-small" onclick="devChatSend()"><i class="ti ti-send"></i></button>
+  </div>
+</div>
 
 </body>
 </html>
