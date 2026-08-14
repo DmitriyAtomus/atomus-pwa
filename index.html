@@ -263,9 +263,9 @@
         </a>
         <!-- v2.45.39: пункт «Калькулятор холода» убран с главного сайдбара
              (остался в Продажах). -->
-        <!-- Чат с Клодом: задачи уходят агенту на сервер .30. Личный, показ в app-1.js. -->
+        <!-- Чат с Клавой: задачи уходят агенту на сервер .30. Личный, показ в app-1.js. -->
         <button class="nav-item" id="sb-devchat" data-nav="devchat" onclick="selectSidebarItem('devchat')" style="display:none;">
-          <i class="ti ti-message-code"></i><span>Клод</span>
+          <i class="ti ti-message-code"></i><span>Клава</span>
           <span class="nav-badge" id="devchat-badge" style="display:none;"></span>
         </button>
         <!-- Безопасность: живой просмотр камеры офиса. Только директору (показ в app-1.js). -->
@@ -910,7 +910,7 @@
           <div class="page-header-title">
             <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
             <i class="ti ti-message-code"></i>
-            <h1>Клод</h1>
+            <h1>Клава</h1>
           </div>
           <div class="dchat-hd-right">
             <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->
@@ -8898,20 +8898,20 @@ function _ccReset() {
 <!-- ============ ШТОРКА «КЛОД» ============ -->
 <!-- Плавающая кнопка поверх любого раздела: и в «Атом Чиллере» (там 3D открыт в
      iframe, поэтому шторка живёт в самой CRM), и в остальных экранах. Лента — та же,
-     что на экране «Клод», к сообщению добавляется, откуда его написали. -->
-<button id="devchat-fab" onclick="devChatToggleDrawer()" title="Спросить Клода"
+     что на экране «Клава», к сообщению добавляется, откуда его написали. -->
+<button id="devchat-fab" onclick="devChatToggleDrawer()" title="Спросить Клаву"
         style="display:none;position:fixed;right:18px;bottom:78px;z-index:900;width:52px;height:52px;border-radius:50%;
                border:none;background:var(--brand);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;font-size:22px;">
   <i class="ti ti-message-code"></i>
 </button>
 <div id="devchat-backdrop" class="dchat-backdrop" onclick="devChatToggleDrawer()"></div>
 
-<!-- v2.45.955: полноэкранный терминал «работа Клода вживую» (тап по статусу) -->
+<!-- v2.45.955: полноэкранный терминал «работа Клавы вживую» (тап по статусу) -->
 <div id="devchat-term-full" class="dchat-term-full" onclick="if (event.target === this) devChatTermClose()">
   <div class="tf-card">
     <div class="tf-hd">
       <span class="tf-ava"><i class="ti ti-sparkles"></i></span>
-      <b>Клод — работа вживую</b>
+      <b>Клава — работа вживую</b>
       <button class="tf-x" onclick="devChatTermClose()"><i class="ti ti-x"></i></button>
     </div>
     <pre class="tf-log" id="devchat-term-log"></pre>
@@ -8923,7 +8923,7 @@ function _ccReset() {
             background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(12,22,40,.24);">
   <div class="dchat-drawer-head">
     <i class="ti ti-message-code" style="font-size:19px;"></i>
-    <b>Клод</b>
+    <b>Клава</b>
     <span id="devchat-drawer-context" class="ctx"></span>
     <button class="icon-btn" style="margin-left:auto;" onclick="devChatToggleDrawer()" title="Закрыть">
       <i class="ti ti-x"></i>

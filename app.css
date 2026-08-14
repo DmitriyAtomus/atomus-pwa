@@ -23320,7 +23320,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .lgc-hd > .ti:first-child { width: 26px; height: 26px; font-size: 14px; }
 }
 
-/* ============ v2.45.946: Чат с Клодом — лента, композер, шторка ============ */
+/* ============ v2.45.946: Чат с Клавой — лента, композер, шторка ============ */
 /* Обе переменные ниже нигде не объявлялись: фон шторки и чужих пузырей
    оставался прозрачным, поверх контента читалось плохо. */
 :root { --bg-primary: #FFFFFF; --bg-secondary: #F4F6FA; }
@@ -23424,7 +23424,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   color: var(--text-light); background: var(--bg); border: 1px solid var(--border);
 }
 
-/* ---- «Клод работает» ---- */
+/* ---- «Клава работает» ---- */
 .dchat-typing { display: flex; align-items: flex-end; gap: 9px; margin: 12px 0; }
 .dchat-typing .bubble {
   display: flex; gap: 4px; padding: 13px 14px; border-radius: 16px 16px 16px 6px;
@@ -23542,8 +23542,8 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .dchat-jump { bottom: 100px; right: 8px; }
 }
 
-/* ============ v2.45.947: Клод — витринный лоск (append-only, поверх базы) ============ */
-/* Шапка экрана «Клод» — фирменный градиент-бар с аватаром-звездой */
+/* ============ v2.45.947: Клава — витринный лоск (append-only, поверх базы) ============ */
+/* Шапка экрана «Клава» — фирменный градиент-бар с аватаром-звездой */
 [data-screen="devchat"] .page-header{
   background:linear-gradient(120deg,#22456a,#2D5F8B);
   border-radius:16px;padding:13px 18px;margin-bottom:12px;color:#fff;
@@ -23612,7 +23612,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   [data-screen="devchat"] .page-header{border-radius:0;margin-bottom:0;}
 }
 
-/* ============ v2.45.949: Клод — живой прогресс (мини-терминал) ============ */
+/* ============ v2.45.949: Клава — живой прогресс (мини-терминал) ============ */
 .dchat-typing .bubble.has-term { padding: 0; background: none; border: none; }
 .dchat-term {
   background: #0E1726; border-radius: 12px; padding: 10px 14px;
@@ -23638,9 +23638,9 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .dchat-status { max-width: 46vw; }
 #devchat-status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ============ v2.45.954: Клод — режим «на всё окно» ============ */
+/* ============ v2.45.954: Клава — режим «на всё окно» ============ */
 /* Шелл CRM ограничен 1400px и центрирован, поэтому на широком мониторе чат
-   жил узкой полосой. Кнопка в шапке кладёт экран «Клод» overlay'ем на весь
+   жил узкой полосой. Кнопка в шапке кладёт экран «Клава» overlay'ем на весь
    viewport поверх сайдбаров и верхней панели (класс на <body>). */
 .dchat-hd-right { display: flex; align-items: center; gap: 9px; margin-left: auto; }
 .dchat-full-btn {
@@ -23671,7 +23671,7 @@ body.dchat-fullscreen .dchat-bubble { max-width: min(82%, 1200px); }
 /* плавающую кнопку шторки прячем: она бы висела поверх ленты */
 body.dchat-fullscreen #devchat-fab { display: none !important; }
 
-/* ============ v2.45.955: Клод — мобильный комфорт + терминал «вживую» ============ */
+/* ============ v2.45.955: Клава — мобильный комфорт + терминал «вживую» ============ */
 /* Быстрые чипы над полем ввода: типовые запросы в один тап */
 .dchat-chips { display: flex; gap: 7px; padding: 0 2px 8px; overflow-x: auto; scrollbar-width: none; }
 .dchat-chips::-webkit-scrollbar { display: none; }
@@ -23720,7 +23720,7 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
   .tf-card { width: 100%; height: 100%; border-radius: 0; }
 }
 
-/* ============ v2.45.956: Клод на телефоне — доводка удобства ============ */
+/* ============ v2.45.956: Клава на телефоне — доводка удобства ============ */
 /* Лента + шапка должны умещаться в экран целиком: раньше внешняя страница
    скроллилась на высоту шапки, и «назад»/статус уезжали за край. */
 .app.mobile-layout [data-screen="devchat"] .dchat { height: calc(100dvh - 174px); }
@@ -23730,7 +23730,7 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
 .app.mobile-layout .dchat-box { padding: 6px; }
 .app.mobile-layout .dchat-input { font-size: 15px; }
 
-/* ============ v2.45.957: Клод — чат как мессенджер (append-only) ============ */
+/* ============ v2.45.957: Клава — чат как мессенджер (append-only) ============ */
 
 /* --- 1. Мобильный экран: чат занимает телефон целиком, как мессенджер ---
    Раньше высота ленты считалась вычитанием фиксированных 174px: под ней
@@ -23783,7 +23783,7 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
 .dchat-row.is-mine .dchat-meta { opacity: .78; }
 .dchat-chip { padding: 1px 7px; font-size: 10px; font-weight: 600; background: rgba(255,255,255,.18); }
 
-/* Кнопка «скопировать ответ» в мета-строке Клода */
+/* Кнопка «скопировать ответ» в мета-строке Клавы */
 .dchat-act {
   margin-left: 2px; width: 22px; height: 22px; border-radius: 7px; border: none; cursor: pointer;
   background: none; color: var(--text-faint); font-size: 13px;
