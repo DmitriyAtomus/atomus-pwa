@@ -935,12 +935,12 @@
                 <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот можно вставить через Ctrl+V"
                           oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
                           onpaste="devChatPaste(event)"></textarea>
-                <button class="dchat-send" id="devchat-send" onclick="devChatSend()" title="Отправить (Ctrl+Enter)">
+                <button class="dchat-send" id="devchat-send" onclick="devChatSend()" title="Отправить (Enter)">
                   <i class="ti ti-arrow-up"></i>
                 </button>
               </div>
             </div>
-            <div class="dchat-hint">Ctrl+Enter — отправить. Агент работает на офисном сервере и правит проекты сам.</div>
+            <div class="dchat-hint">Enter — отправить, Shift+Enter — новая строка. Агент работает на офисном сервере и правит проекты сам.</div>
           </div>
         </div>
       </div>
@@ -8906,7 +8906,7 @@ function _ccReset() {
         <textarea id="devchat-drawer-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот — Ctrl+V"
                   oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
                   onpaste="devChatPaste(event)"></textarea>
-        <button class="dchat-send" id="devchat-drawer-send" onclick="devChatSend()" title="Отправить (Ctrl+Enter)">
+        <button class="dchat-send" id="devchat-drawer-send" onclick="devChatSend()" title="Отправить (Enter)">
           <i class="ti ti-arrow-up"></i>
         </button>
       </div>
