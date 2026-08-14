@@ -68,3 +68,17 @@ test('версия и кэш подняты вместе', () => {
   assert.equal(swNum, appNum, 'CACHE_VERSION в sw.js не совпадает с APP_VERSION');
   assert.equal(verNum, appNum, 'version.json не совпадает с APP_VERSION');
 });
+
+test('лента не рисует сообщение дважды при одновременных тиках', () => {
+  // тик идёт и по таймеру, и сразу после отправки: без замка оба запроса уходят
+  // с одинаковым since_id и дорисовывают одно сообщение вторым пузырём
+  assert.match(app, /if \(_devChatTicking\) return;/);
+  assert.match(app, /feed\.querySelector\('\[data-msg-id="' \+ m\.id \+ '"\]'\)/);
+});
+
+test('ответ показывается оформленным, но текст экранируется', () => {
+  const fn = app.slice(app.indexOf('function _devChatFormat'), app.indexOf('function _devChatTime'));
+  assert.match(fn, /escapeHtml\(text \|\| ''\)/, 'экранирование должно идти первым');
+  assert.match(fn, /<code>\$1<\/code>/);
+  assert.match(fn, /<b>\$1<\/b>/);
+});

@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.945";
+const APP_VERSION = "v2.45.946";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1969,6 +1969,8 @@ let _devChatFiles = [];
 let _devChatBusy = false;
 let _devChatPending = new Set();   // свои сообщения, по которым агент ещё не отчитался
 let _devChatHost = 'screen';       // где сейчас показываем ленту: 'screen' | 'drawer'
+let _devChatTicking = false;       // тик уже идёт — второй дорисовал бы те же сообщения
+let _devChatDayKey = '';           // день последнего нарисованного сообщения — для разделителя
 
 // Одна и та же лента живёт в двух местах — на своём экране и в шторке поверх
 // любого раздела. Чтобы не плодить копии кода, все функции работают с активным хостом.
@@ -1984,10 +1986,50 @@ const _DEVCHAT_STATUS = {
   error:   { text: 'сбой',           cls: 'text-danger' },
 };
 
+// Клод отвечает лёгким markdown (**жирный**, `код`, ```блоки```). Полноценный
+// парсер тут не нужен, а сырые звёздочки и решётки в ленте читаются плохо.
+// Блоки кода вынимаем ДО экранирования, чтобы внутри них ничего не подменилось,
+// и возвращаем на место уже экранированными.
+function _devChatFormat(text) {
+  const blocks = [];
+  const MARK = String.fromCharCode(0);   // такого символа в тексте от Клода не бывает
+  const src = String(text || '').replace(/```[a-zA-Z0-9+-]*\r?\n?([\s\S]*?)```/g, function (_, code) {
+    blocks.push(code.replace(/\s+$/, ''));
+    return MARK + 'B' + (blocks.length - 1) + MARK;
+  });
+  let html = escapeHtml(src || '')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    .replace(/^#{1,6}\s*(.+)$/gm, '<b>$1</b>')
+    .replace(/^\s*[-*]\s+/gm, '• ')
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  // пустые строки вокруг блока кода лишние — отступ даёт сам <pre>
+  html = html.replace(new RegExp('\\n*' + MARK + 'B(\\d+)' + MARK + '\\n*', 'g'), function (_, i) {
+    return '<pre><code>' + escapeHtml(blocks[Number(i)]) + '</code></pre>';
+  });
+  return html;
+}
+
 function _devChatTime(ts) {
   try {
     return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   } catch (e) { return ''; }
+}
+
+// Ключ дня для разделителя в ленте: «Сегодня» / «Вчера» / «12 августа».
+function _devChatDay(ts) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return { key: '', label: '' };
+  const key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  const today = new Date();
+  const dayMs = 86400000;
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const diff = Math.round((midnight - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / dayMs);
+  let label;
+  if (diff === 0) label = 'Сегодня';
+  else if (diff === 1) label = 'Вчера';
+  else label = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  return { key: key, label: label };
 }
 
 // Вложение отдаётся под авторизацией, поэтому <img src> напрямую не годится:
@@ -2007,31 +2049,39 @@ async function _devChatLoadImage(el, url) {
 function _devChatRender(msg) {
   const mine = msg.author === 'user';
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;margin:10px 0;' + (mine ? 'justify-content:flex-end;' : '');
+  wrap.className = 'dchat-row' + (mine ? ' is-mine' : '');
   wrap.setAttribute('data-msg-id', msg.id);
+
+  // Ответ Клода подписан аватаром — в длинной ленте сразу видно, где чья реплика.
+  if (!mine) {
+    const ava = document.createElement('div');
+    ava.className = 'dchat-ava';
+    ava.innerHTML = '<i class="ti ti-sparkles"></i>';
+    wrap.appendChild(ava);
+  }
 
   const st = mine && msg.status ? (_DEVCHAT_STATUS[msg.status] || null) : null;
   const bubble = document.createElement('div');
-  bubble.style.cssText =
-    'max-width:78%;padding:10px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.45;' +
-    (mine ? 'background:var(--brand);color:#fff;' : 'background:var(--bg-secondary);border:1px solid var(--border);');
+  bubble.className = 'dchat-bubble';
   bubble.innerHTML =
-    escapeHtml(msg.text || '') +
-    '<div style="font-size:11px;opacity:.75;margin-top:6px;">' + _devChatTime(msg.ts) +
-    (st ? ' · <span data-status>' + escapeHtml(st.text) + '</span>' : '') +
-    (msg.meta && msg.meta.wall_sec ? ' · ' + Math.round(msg.meta.wall_sec) + 'с' : '') +
+    '<div class="dchat-text">' + _devChatFormat(msg.text) + '</div>' +
+    '<div class="dchat-meta">' +
+    '<span>' + _devChatTime(msg.ts) + '</span>' +
+    (msg.meta && msg.meta.wall_sec ? '<span>· ' + Math.round(msg.meta.wall_sec) + 'с</span>' : '') +
+    (st ? '<span class="dchat-chip is-' + msg.status + '" data-status>' + escapeHtml(st.text) + '</span>' : '') +
     '</div>';
 
   (msg.files || []).forEach(function (f) {
     if ((f.content_type || '').indexOf('image/') === 0) {
       const img = document.createElement('img');
-      img.style.cssText = 'display:none;max-width:100%;border-radius:8px;margin-top:8px;';
+      img.className = 'dchat-img';
       bubble.appendChild(img);
       _devChatLoadImage(img, f.url);
     } else {
       const note = document.createElement('div');
-      note.style.cssText = 'font-size:12px;margin-top:6px;opacity:.85;';
-      note.textContent = '📎 ' + (f.name || 'файл');
+      note.className = 'dchat-file';
+      note.innerHTML = '<i class="ti ti-paperclip"></i>';
+      note.appendChild(document.createTextNode(f.name || 'файл'));
       bubble.appendChild(note);
     }
   });
@@ -2042,18 +2092,64 @@ function _devChatRender(msg) {
   return wrap;
 }
 
+// Разделитель дня вставляется перед первым сообщением новых суток.
+function _devChatDayRow(label) {
+  const row = document.createElement('div');
+  row.className = 'dchat-day';
+  row.innerHTML = '<span>' + escapeHtml(label) + '</span>';
+  return row;
+}
+
+// «Клод работает» — три точки в конце ленты, пока задача не закрыта.
+function _devChatTyping(feed, on) {
+  let el = feed.querySelector('.dchat-typing');
+  if (!on) { if (el) el.remove(); return; }
+  if (el) { feed.appendChild(el); return; }   // держим последним элементом ленты
+  el = document.createElement('div');
+  el.className = 'dchat-typing';
+  el.innerHTML = '<div class="dchat-ava"><i class="ti ti-sparkles"></i></div>' +
+                 '<div class="bubble"><i></i><i></i><i></i></div>';
+  feed.appendChild(el);
+}
+
+// Пустая лента: не «пока пусто», а подсказка, что вообще можно попросить.
+function _devChatEmptyHtml() {
+  const quick = ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
+  return '<div class="dchat-empty">' +
+    '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
+    '<h3>Задача для Клода</h3>' +
+    '<p>Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, ' +
+    'запускает проверки и отвечает сюда же. Можно приложить фото или файл.</p>' +
+    '<div class="dchat-quick">' +
+    quick.map(function (q) {
+      return '<button onclick="devChatQuick(this)">' + escapeHtml(q) + '</button>';
+    }).join('') +
+    '</div></div>';
+}
+
 async function _devChatTick() {
   const feed = _devChatEl('feed');
   if (!feed) { stopDevChat(); return; }
+  // Тик приходит и по таймеру, и сразу после отправки. Без замка оба запроса
+  // уходят с одинаковым since_id и рисуют одно сообщение дважды.
+  if (_devChatTicking) return;
+  _devChatTicking = true;
+  try {
+    await _devChatTickInner(feed);
+  } finally {
+    _devChatTicking = false;
+  }
+}
+
+async function _devChatTickInner(feed) {
   let data;
   try {
     data = await apiGet('/api/dev-chat/messages?since_id=' + _devChatSince);
   } catch (e) {
     // 403 здесь означает «лента не твоя», а не обрыв связи — писать про связь
     // в этом случае значит отправить искать проблему не там
-    const st = document.getElementById('devchat-status');
     const denied = String(e && e.message || '').indexOf('403') >= 0;
-    if (st) st.textContent = denied ? 'Чат доступен только владельцу' : 'Нет связи с бэкендом';
+    _devChatSetStatus(denied ? 'Чат доступен только владельцу' : 'Нет связи с бэкендом', 'off');
     if (denied) {
       const feed2 = _devChatEl('feed');
       if (feed2) feed2.innerHTML = '<div class="text-muted">Этот чат привязан к учётке владельца.</div>';
@@ -2062,25 +2158,45 @@ async function _devChatTick() {
     return;
   }
   const msgs = (data && data.messages) || [];
-  if (_devChatSince === 0) feed.innerHTML = msgs.length ? '' : '<div class="text-muted">Пока пусто. Напишите задачу — я возьму её на сервере.</div>';
+  if (_devChatSince === 0) {
+    feed.innerHTML = msgs.length ? '' : _devChatEmptyHtml();
+    _devChatDayKey = '';
+  }
 
   const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
   msgs.forEach(function (m) {
-    feed.appendChild(_devChatRender(m));
+    if (!feed.querySelector('[data-msg-id="' + m.id + '"]')) {
+      const day = _devChatDay(m.ts);
+      if (day.key && day.key !== _devChatDayKey) {
+        feed.appendChild(_devChatDayRow(day.label));
+        _devChatDayKey = day.key;
+      }
+      feed.appendChild(_devChatRender(m));
+    }
     if (m.id > _devChatSince) _devChatSince = m.id;
   });
-  if (msgs.length && nearBottom) feed.scrollTop = feed.scrollHeight;
+  if (msgs.length && nearBottom) devChatJump();
 
   await _devChatRefreshStatuses();
+  devChatOnScroll();
+}
+
+// Строка статуса в шапке: текст + цветной кружок (серый → зелёный/жёлтый/красный).
+function _devChatSetStatus(text, mode) {
+  const box = document.getElementById('devchat-status');
+  const label = document.getElementById('devchat-status-text');
+  if (label) label.textContent = text; else if (box) box.textContent = text;
+  if (box) box.className = 'dchat-status is-' + (mode || 'ready');
 }
 
 // Статус своего сообщения меняется уже после отрисовки (в очереди → работает →
 // готово). Тянуть ради этого всю ленту каждые 3 секунды незачем: помним только
 // незакрытые сообщения и спрашиваем сервер, пока такие есть.
 async function _devChatRefreshStatuses() {
-  const status = document.getElementById('devchat-status');
+  const feed = _devChatEl('feed');
   if (!_devChatPending.size) {
-    if (status) status.textContent = 'Готов к работе';
+    _devChatSetStatus('Готов к работе', 'ready');
+    if (feed) _devChatTyping(feed, false);
     return;
   }
   let data;
@@ -2093,26 +2209,97 @@ async function _devChatRefreshStatuses() {
     if (!_devChatPending.has(m.id)) return;
     const span = document.querySelector('[data-msg-id="' + m.id + '"] [data-status]');
     const st = _DEVCHAT_STATUS[m.status];
-    if (span && st) span.textContent = st.text;
+    if (span && st) {
+      span.textContent = st.text;
+      span.className = 'dchat-chip is-' + m.status;
+    }
     if (m.status === 'new' || m.status === 'running') working = true;
     else _devChatPending.delete(m.id);
   });
-  if (status) status.textContent = working ? 'Клод работает над задачей…' : 'Готов к работе';
+  _devChatSetStatus(working ? 'Клод работает над задачей…' : 'Готов к работе', working ? 'working' : 'ready');
+  if (feed) _devChatTyping(feed, working);
 }
 
 function devChatKey(e) {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); devChatSend(); }
 }
 
+// Поле растёт под текст (до max-height из CSS) — многострочную задачу видно целиком.
+function devChatGrow(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 168) + 'px';
+}
+
+function devChatJump() {
+  const feed = _devChatEl('feed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+  devChatOnScroll();
+}
+
+// Кнопка «вниз» нужна, только когда лента отмотана от конца.
+function devChatOnScroll() {
+  const feed = _devChatEl('feed');
+  const btn = document.getElementById('devchat-jump');
+  if (!feed || !btn) return;
+  const away = feed.scrollHeight - feed.scrollTop - feed.clientHeight > 160;
+  btn.classList.toggle('show', away && _devChatHost === 'screen');
+}
+
+// Подсказка из пустой ленты подставляется в поле, а не отправляется сразу:
+// формулировку почти всегда хочется дополнить.
+function devChatQuick(btn) {
+  const input = _devChatEl('input');
+  if (!input || !btn) return;
+  input.value = btn.textContent + ' ';
+  devChatGrow(input);
+  input.focus();
+}
+
 function devChatPickFiles(files) {
   _devChatFiles = Array.prototype.slice.call(files || []).slice(0, 5);
+  _devChatDrawFiles();
+}
+
+// Вложения показываем плиткой: у картинок — миниатюра, у любого файла — крестик,
+// чтобы ошибочно выбранное не пришлось отменять вместе со всем набором.
+function _devChatDrawFiles() {
   const box = _devChatEl('files');
   if (!box) return;
-  if (!_devChatFiles.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  box.style.display = 'flex';
-  box.innerHTML = _devChatFiles.map(function (f) {
-    return '<span class="badge">📎 ' + escapeHtml(f.name) + '</span>';
-  }).join('');
+  box.innerHTML = '';
+  box.classList.toggle('show', _devChatFiles.length > 0);
+  _devChatFiles.forEach(function (f, i) {
+    const item = document.createElement('span');
+    item.className = 'dchat-att';
+    if ((f.type || '').indexOf('image/') === 0) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      item.appendChild(img);
+    } else {
+      const ico = document.createElement('i');
+      ico.className = 'ti ti-file';
+      item.appendChild(ico);
+    }
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = f.name;
+    item.appendChild(nm);
+    const rm = document.createElement('button');
+    rm.className = 'rm';
+    rm.title = 'Убрать';
+    rm.innerHTML = '<i class="ti ti-x"></i>';
+    rm.onclick = function () { devChatDropFile(i); };
+    item.appendChild(rm);
+    box.appendChild(item);
+  });
+}
+
+function devChatDropFile(i) {
+  _devChatFiles.splice(i, 1);
+  _devChatDrawFiles();
+  // input держит исходный набор: без сброса повторный выбор того же файла молчит
+  const fileInput = _devChatEl('file-input');
+  if (fileInput && !_devChatFiles.length) fileInput.value = '';
 }
 
 async function devChatSend(context) {
@@ -2122,7 +2309,7 @@ async function devChatSend(context) {
   if (!text && !_devChatFiles.length) return;
 
   _devChatBusy = true;
-  const btn = document.getElementById('devchat-send');
+  const btn = _devChatEl('send');
   if (btn) btn.disabled = true;
   try {
     const form = new FormData();
@@ -2142,11 +2329,12 @@ async function devChatSend(context) {
       showToast(err.message || 'Не отправилось', 'error');
       return;
     }
-    if (input) input.value = '';
+    if (input) { input.value = ''; devChatGrow(input); }
     devChatPickFiles([]);
     const fileInput = _devChatEl('file-input');
     if (fileInput) fileInput.value = '';
     await _devChatTick();
+    devChatJump();
   } finally {
     _devChatBusy = false;
     if (btn) btn.disabled = false;
@@ -2157,9 +2345,13 @@ function loadDevChat(host) {
   stopDevChat();
   _devChatHost = host || 'screen';
   _devChatSince = 0;
+  _devChatDayKey = '';
   _devChatPending = new Set();
   const feed = _devChatEl('feed');
   if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
+  const input = _devChatEl('input');
+  if (input) devChatGrow(input);
+  _devChatDrawFiles();
   _devChatTick();
   _devChatTimer = setInterval(_devChatTick, 3000);
 }
@@ -2168,9 +2360,11 @@ function loadDevChat(host) {
 function devChatToggleDrawer() {
   const drawer = document.getElementById('devchat-drawer');
   if (!drawer) return;
+  const backdrop = document.getElementById('devchat-backdrop');
   const opening = drawer.style.display === 'none' || !drawer.style.display;
   if (opening) {
     drawer.style.display = 'flex';
+    if (backdrop) backdrop.classList.add('show');
     const label = document.getElementById('devchat-drawer-context');
     if (label) label.textContent = state.currentScreen ? '· ' + state.currentScreen : '';
     loadDevChat('drawer');
@@ -2178,10 +2372,18 @@ function devChatToggleDrawer() {
     if (input) setTimeout(function () { input.focus(); }, 50);
   } else {
     drawer.style.display = 'none';
+    if (backdrop) backdrop.classList.remove('show');
     // на своём экране лента должна продолжать жить
     if (state.currentScreen === 'devchat') loadDevChat('screen'); else stopDevChat();
   }
 }
+
+// Esc закрывает шторку — на десктопе тянуться к крестику неудобно.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const drawer = document.getElementById('devchat-drawer');
+  if (drawer && drawer.style.display === 'flex') devChatToggleDrawer();
+});
 
 function stopDevChat() {
   if (_devChatTimer) { clearInterval(_devChatTimer); _devChatTimer = null; }
