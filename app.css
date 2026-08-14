@@ -23719,3 +23719,13 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
   .dchat-term-full { padding: 0; }
   .tf-card { width: 100%; height: 100%; border-radius: 0; }
 }
+
+/* ============ v2.45.956: Клод на телефоне — доводка удобства ============ */
+/* Лента + шапка должны умещаться в экран целиком: раньше внешняя страница
+   скроллилась на высоту шапки, и «назад»/статус уезжали за край. */
+.app.mobile-layout [data-screen="devchat"] .dchat { height: calc(100dvh - 174px); }
+/* Чипы на телефоне — чуть крупнее, под палец */
+.app.mobile-layout .dchat-chips button { padding: 9px 15px; font-size: 13px; }
+/* Композер: кнопки камеры и скрепки плотнее, поле дышит */
+.app.mobile-layout .dchat-box { padding: 6px; }
+.app.mobile-layout .dchat-input { font-size: 15px; }

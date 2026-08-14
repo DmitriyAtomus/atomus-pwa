@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.955";
+const APP_VERSION = "v2.45.956";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1876,6 +1876,13 @@ function runScreenLoader(screenName) {
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
   if (screenName === 'devchat') loadDevChat('screen');
   else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
+  // v2.45.956: на самом экране чата плавающая кнопка не нужна — она ложится
+  // ровно на поле ввода (особенно на телефоне)
+  const devFab2 = document.getElementById('devchat-fab');
+  if (devFab2) {
+    const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
+    devFab2.style.display = (screenName === 'devchat' || !isDir) ? 'none' : '';
+  }
 }
 
 // ============ БЕЗОПАСНОСТЬ: живой просмотр камеры офиса ============
@@ -2548,7 +2555,12 @@ function loadDevChat(host) {
   const feed = _devChatEl('feed');
   if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
   const input = _devChatEl('input');
-  if (input) devChatGrow(input);
+  if (input) {
+    devChatGrow(input);
+    // v2.45.956: на телефоне подсказка про Ctrl+V бессмысленна
+    const mob = document.querySelector('.app.mobile-layout');
+    if (mob) input.placeholder = 'Что сделать? Можно приложить фото';
+  }
   _devChatDrawFiles();
   _devChatBindPaste();
   _devChatTick();
