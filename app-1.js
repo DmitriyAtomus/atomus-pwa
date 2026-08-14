@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.954";
+const APP_VERSION = "v2.45.955";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1406,7 +1406,12 @@ function renderProfile() {
   const navDev = document.getElementById('sb-devchat');
   if (navDev) navDev.style.display = isDirector ? '' : 'none';
   const devFab = document.getElementById('devchat-fab');
-  if (devFab) devFab.style.display = isDirector ? '' : 'none';
+  if (devFab) {
+    // отметку читает switchScreen: кнопку прячем на самом экране чата,
+    // но только если она вообще положена этому пользователю
+    devFab.dataset.allowed = isDirector ? '1' : '0';
+    devFab.style.display = isDirector ? '' : 'none';
+  }
 
   // Прямой эфир окна CRM на офисном ТВ — только директору и не на самом ТВ.
   const tvCastBtn = document.getElementById('tv-cast-top-btn');
@@ -1876,6 +1881,13 @@ function runScreenLoader(screenName) {
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
   if (screenName === 'devchat') loadDevChat('screen');
   else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
+
+  // На самом экране чата круглая кнопка не нужна: она перекрывала ленту
+  // (на телефоне — прямо поверх последнего ответа).
+  const devFabBtn = document.getElementById('devchat-fab');
+  if (devFabBtn && devFabBtn.dataset.allowed === '1') {
+    devFabBtn.style.display = (screenName === 'devchat') ? 'none' : '';
+  }
 }
 
 // ============ БЕЗОПАСНОСТЬ: живой просмотр камеры офиса ============

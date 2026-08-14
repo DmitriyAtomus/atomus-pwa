@@ -12,6 +12,7 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const version = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8'));
 const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 
 test('раздел «Клод» и шторка есть в разметке', () => {
   assert.match(html, /id="sb-devchat"/, 'нет пункта меню');
@@ -158,4 +159,20 @@ test('чат разворачивается на всё окно и сворач
   assert.match(esc.slice(0, 400), /devChatToggleDrawer\(\); return; \}[\s\S]{0,160}devChatToggleFull\(\)/);
   // плавающая кнопка шторки в этом режиме висела бы поверх ленты
   assert.match(css, /body\.dchat-fullscreen #devchat-fab \{ display: none/);
+});
+
+test('на телефоне текст чата не разъезжается от авто-увеличения Android', () => {
+  // Chrome на Android сам увеличивает кегль в длинных текстовых блоках,
+  // и ответы Клода становились нечитаемо крупными
+  assert.match(css, /\.dchat-feed, \.dchat-bubble, \.dchat-text \{[^}]*text-size-adjust: 100%/s);
+});
+
+test('на телефоне поле ввода не уезжает под нижнюю панель', () => {
+  const rule = css.slice(css.indexOf('.app.mobile-layout [data-screen="devchat"] .dchat {'));
+  assert.match(rule.slice(0, 600), /height: calc\(100dvh - 210px - env\(safe-area-inset-bottom\)\)/);
+});
+
+test('на экране чата круглая кнопка прячется', () => {
+  assert.match(app, /devFabBtn\.dataset\.allowed === '1'/);
+  assert.match(app, /\(screenName === 'devchat'\) \? 'none' : ''/);
 });

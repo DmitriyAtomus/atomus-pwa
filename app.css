@@ -23341,8 +23341,19 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 }
 .app.mobile-layout [data-screen="devchat"] .page-header h1 { font-size: 18px; }
 .app.mobile-layout [data-screen="devchat"] .dchat {
-  height: calc(100dvh - 118px); padding: 8px 12px 0;
+  /* Сверху шапка приложения + полоса разделов + шапка чата, снизу — таб-бар с
+     безопасной зоной. Раньше вычитали 118px, и композер уезжал под таб-бар:
+     поле ввода было не достать. */
+  height: calc(100dvh - 210px - env(safe-area-inset-bottom));
+  padding: 8px 12px 0;
 }
+/* Android сам увеличивает шрифт в длинных текстовых блоках (font boosting), и
+   ответы Клода на телефоне разъезжались до нечитаемого кегля. Держим свой. */
+.dchat-feed, .dchat-bubble, .dchat-text {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.app.mobile-layout .dchat-bubble { max-width: 88%; font-size: 14.5px; }
 .dchat-feed {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: 6px 2px 12px; scroll-behavior: smooth;
