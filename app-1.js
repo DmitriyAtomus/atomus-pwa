@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.951";
+const APP_VERSION = "v2.45.952";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1980,11 +1980,18 @@ function _devChatEl(name) {
 }
 
 const _DEVCHAT_STATUS = {
+  uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
   running: { text: 'Клод работает…', cls: 'text-warning' },
   done:    { text: 'готово',         cls: 'text-success' },
   error:   { text: 'сбой',           cls: 'text-danger' },
 };
+
+// Задача ещё в работе, пока не done/error: за такими сообщениями нужно следить
+// (uploading — файлы ещё летят в хранилище, агент их пока не видит).
+function _devChatOpen(status) {
+  return status === 'uploading' || status === 'new' || status === 'running';
+}
 
 // Клод отвечает лёгким markdown (**жирный**, `код`, ```блоки```). Полноценный
 // парсер тут не нужен, а сырые звёздочки и решётки в ленте читаются плохо.
@@ -2086,7 +2093,7 @@ function _devChatRender(msg) {
     }
   });
 
-  if (st && (msg.status === 'new' || msg.status === 'running')) _devChatPending.add(msg.id);
+  if (st && _devChatOpen(msg.status)) _devChatPending.add(msg.id);
 
   wrap.appendChild(bubble);
   return wrap;
@@ -2240,7 +2247,7 @@ async function _devChatRefreshStatuses() {
       span.textContent = st.text;
       span.className = 'dchat-chip is-' + m.status;
     }
-    if (m.status === 'new' || m.status === 'running') working = true;
+    if (_devChatOpen(m.status)) working = true;
     else _devChatPending.delete(m.id);
   });
   // в шапке — последнее действие агента, если он его прислал
@@ -2252,8 +2259,14 @@ async function _devChatRefreshStatuses() {
   if (feed) _devChatTyping(feed, working);
 }
 
+// Enter отправляет — как в любом мессенджере. Перенос строки остаётся на
+// Shift+Enter (и Alt+Enter на телефоне). isComposing/keyCode 229 — это набор
+// через IME и Т9: там Enter подтверждает слово, отправлять на нём нельзя.
 function devChatKey(e) {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); devChatSend(); }
+  if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+  if (e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  devChatSend();
 }
 
 // Поле растёт под текст (до max-height из CSS) — многострочную задачу видно целиком.
