@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.941";
+const APP_VERSION = "v2.45.943";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1401,6 +1401,13 @@ function renderProfile() {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 
+  // Чат с Клодом — тоже только директору (на бэкенде лента сужена до владельца)
+  const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
+  const navDev = document.getElementById('sb-devchat');
+  if (navDev) navDev.style.display = isDirector ? '' : 'none';
+  const devFab = document.getElementById('devchat-fab');
+  if (devFab) devFab.style.display = isDirector ? '' : 'none';
+
   // Прямой эфир окна CRM на офисном ТВ — только директору и не на самом ТВ.
   const tvCastBtn = document.getElementById('tv-cast-top-btn');
   const canCastTv = !!(state.user.roles && state.user.roles.includes('director') && !window._tvMode);
@@ -1864,6 +1871,10 @@ function runScreenLoader(screenName) {
   if (screenName === 'sales-more') renderSalesMore();
   // Безопасность (камера офиса): запускаем опрос кадра, при уходе — останавливаем
   if (screenName === 'security') loadSecurity(); else stopSecurity();
+  // Чат с Клодом: лента опрашивается только на своём экране
+  const devDrawer = document.getElementById('devchat-drawer');
+  const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
+  if (screenName === 'devchat') loadDevChat('screen'); else if (!drawerOpen) stopDevChat();
 }
 
 // ============ БЕЗОПАСНОСТЬ: живой просмотр камеры офиса ============
@@ -1948,6 +1959,226 @@ function loadSecurity() {
   _securityLoadPresence();
   _securityPresenceTimer = setInterval(_securityLoadPresence, 20000);
 }
+// ============ ЧАТ С КЛОДОМ ============
+// Лента задач директора и ответов агента с сервера .30. Сообщение уходит в очередь
+// (POST /api/dev-chat/send), агент забирает его long-poll'ом и отвечает в ту же ленту.
+// Опрашиваем раз в 3 секунды: задача может выполняться минутами.
+let _devChatTimer = null;
+let _devChatSince = 0;
+let _devChatFiles = [];
+let _devChatBusy = false;
+let _devChatPending = new Set();   // свои сообщения, по которым агент ещё не отчитался
+let _devChatHost = 'screen';       // где сейчас показываем ленту: 'screen' | 'drawer'
+
+// Одна и та же лента живёт в двух местах — на своём экране и в шторке поверх
+// любого раздела. Чтобы не плодить копии кода, все функции работают с активным хостом.
+function _devChatEl(name) {
+  const prefix = _devChatHost === 'drawer' ? 'devchat-drawer-' : 'devchat-';
+  return document.getElementById(prefix + name);
+}
+
+const _DEVCHAT_STATUS = {
+  new:     { text: 'в очереди',      cls: 'text-muted' },
+  running: { text: 'Клод работает…', cls: 'text-warning' },
+  done:    { text: 'готово',         cls: 'text-success' },
+  error:   { text: 'сбой',           cls: 'text-danger' },
+};
+
+function _devChatTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return ''; }
+}
+
+// Вложение отдаётся под авторизацией, поэтому <img src> напрямую не годится:
+// тянем blob с токеном и подставляем объектную ссылку.
+async function _devChatLoadImage(el, url) {
+  try {
+    const r = await fetch(API_BASE + url, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) return;
+    const blob = await r.blob();
+    el.src = URL.createObjectURL(blob);
+    el.style.display = '';
+  } catch (e) { /* картинка не критична */ }
+}
+
+function _devChatRender(msg) {
+  const mine = msg.author === 'user';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;margin:10px 0;' + (mine ? 'justify-content:flex-end;' : '');
+  wrap.setAttribute('data-msg-id', msg.id);
+
+  const st = mine && msg.status ? (_DEVCHAT_STATUS[msg.status] || null) : null;
+  const bubble = document.createElement('div');
+  bubble.style.cssText =
+    'max-width:78%;padding:10px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.45;' +
+    (mine ? 'background:var(--brand);color:#fff;' : 'background:var(--bg-secondary);border:1px solid var(--border);');
+  bubble.innerHTML =
+    escapeHtml(msg.text || '') +
+    '<div style="font-size:11px;opacity:.75;margin-top:6px;">' + _devChatTime(msg.ts) +
+    (st ? ' · <span data-status>' + escapeHtml(st.text) + '</span>' : '') +
+    (msg.meta && msg.meta.wall_sec ? ' · ' + Math.round(msg.meta.wall_sec) + 'с' : '') +
+    '</div>';
+
+  (msg.files || []).forEach(function (f) {
+    if ((f.content_type || '').indexOf('image/') === 0) {
+      const img = document.createElement('img');
+      img.style.cssText = 'display:none;max-width:100%;border-radius:8px;margin-top:8px;';
+      bubble.appendChild(img);
+      _devChatLoadImage(img, f.url);
+    } else {
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;margin-top:6px;opacity:.85;';
+      note.textContent = '📎 ' + (f.name || 'файл');
+      bubble.appendChild(note);
+    }
+  });
+
+  if (st && (msg.status === 'new' || msg.status === 'running')) _devChatPending.add(msg.id);
+
+  wrap.appendChild(bubble);
+  return wrap;
+}
+
+async function _devChatTick() {
+  const feed = _devChatEl('feed');
+  if (!feed) { stopDevChat(); return; }
+  let data;
+  try {
+    data = await apiGet('/api/dev-chat/messages?since_id=' + _devChatSince);
+  } catch (e) {
+    const st = document.getElementById('devchat-status');
+    if (st) st.textContent = 'Нет связи с бэкендом';
+    return;
+  }
+  const msgs = (data && data.messages) || [];
+  if (_devChatSince === 0) feed.innerHTML = msgs.length ? '' : '<div class="text-muted">Пока пусто. Напишите задачу — я возьму её на сервере.</div>';
+
+  const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
+  msgs.forEach(function (m) {
+    feed.appendChild(_devChatRender(m));
+    if (m.id > _devChatSince) _devChatSince = m.id;
+  });
+  if (msgs.length && nearBottom) feed.scrollTop = feed.scrollHeight;
+
+  await _devChatRefreshStatuses();
+}
+
+// Статус своего сообщения меняется уже после отрисовки (в очереди → работает →
+// готово). Тянуть ради этого всю ленту каждые 3 секунды незачем: помним только
+// незакрытые сообщения и спрашиваем сервер, пока такие есть.
+async function _devChatRefreshStatuses() {
+  const status = document.getElementById('devchat-status');
+  if (!_devChatPending.size) {
+    if (status) status.textContent = 'Готов к работе';
+    return;
+  }
+  let data;
+  try {
+    data = await apiGet('/api/dev-chat/messages?since_id=' + (Math.min.apply(null, Array.from(_devChatPending)) - 1));
+  } catch (e) { return; }
+
+  let working = false;
+  ((data && data.messages) || []).forEach(function (m) {
+    if (!_devChatPending.has(m.id)) return;
+    const span = document.querySelector('[data-msg-id="' + m.id + '"] [data-status]');
+    const st = _DEVCHAT_STATUS[m.status];
+    if (span && st) span.textContent = st.text;
+    if (m.status === 'new' || m.status === 'running') working = true;
+    else _devChatPending.delete(m.id);
+  });
+  if (status) status.textContent = working ? 'Клод работает над задачей…' : 'Готов к работе';
+}
+
+function devChatKey(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); devChatSend(); }
+}
+
+function devChatPickFiles(files) {
+  _devChatFiles = Array.prototype.slice.call(files || []).slice(0, 5);
+  const box = _devChatEl('files');
+  if (!box) return;
+  if (!_devChatFiles.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'flex';
+  box.innerHTML = _devChatFiles.map(function (f) {
+    return '<span class="badge">📎 ' + escapeHtml(f.name) + '</span>';
+  }).join('');
+}
+
+async function devChatSend(context) {
+  if (_devChatBusy) return;
+  const input = _devChatEl('input');
+  const text = (input && input.value || '').trim();
+  if (!text && !_devChatFiles.length) return;
+
+  _devChatBusy = true;
+  const btn = document.getElementById('devchat-send');
+  if (btn) btn.disabled = true;
+  try {
+    const form = new FormData();
+    form.append('text', text);
+    // Откуда написали — Клоду это подсказка: «раздел Атом Чиллер», «Почта и MAX»…
+    const where = context || { screen: state.currentScreen || '' };
+    form.append('context', JSON.stringify(where));
+    _devChatFiles.forEach(function (f, i) { form.append('file' + (i + 1), f, f.name); });
+
+    const r = await fetch(API_BASE + '/api/dev-chat/send', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      body: form,
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(function () { return {}; });
+      showToast(err.message || 'Не отправилось', 'error');
+      return;
+    }
+    if (input) input.value = '';
+    devChatPickFiles([]);
+    const fileInput = _devChatEl('file-input');
+    if (fileInput) fileInput.value = '';
+    await _devChatTick();
+  } finally {
+    _devChatBusy = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+function loadDevChat(host) {
+  stopDevChat();
+  _devChatHost = host || 'screen';
+  _devChatSince = 0;
+  _devChatPending = new Set();
+  const feed = _devChatEl('feed');
+  if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
+  _devChatTick();
+  _devChatTimer = setInterval(_devChatTick, 3000);
+}
+
+// Шторка поверх текущего раздела — то же самое, но не уходя с экрана.
+function devChatToggleDrawer() {
+  const drawer = document.getElementById('devchat-drawer');
+  if (!drawer) return;
+  const opening = drawer.style.display === 'none' || !drawer.style.display;
+  if (opening) {
+    drawer.style.display = 'flex';
+    const label = document.getElementById('devchat-drawer-context');
+    if (label) label.textContent = state.currentScreen ? '· ' + state.currentScreen : '';
+    loadDevChat('drawer');
+    const input = document.getElementById('devchat-drawer-input');
+    if (input) setTimeout(function () { input.focus(); }, 50);
+  } else {
+    drawer.style.display = 'none';
+    // на своём экране лента должна продолжать жить
+    if (state.currentScreen === 'devchat') loadDevChat('screen'); else stopDevChat();
+  }
+}
+
+function stopDevChat() {
+  if (_devChatTimer) { clearInterval(_devChatTimer); _devChatTimer = null; }
+}
+
 function stopSecurity() {
   if (_securityTimer) { clearInterval(_securityTimer); _securityTimer = null; }
   if (_securityModeTimer) { clearInterval(_securityModeTimer); _securityModeTimer = null; }

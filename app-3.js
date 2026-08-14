@@ -8177,7 +8177,7 @@ async function loadLogisticsPickups() {
     let umCard = '';
     if (um) {
       const body = umActive.length ? umActive.map(_utmCardHtml).join('')
-        : '<div class="lgc-empty"><i class="ti ti-tools"></i>Готовых заказов нет.<br>Появятся сами, когда УТМ пришлёт «Заказ готов».</div>';
+        : '<div class="lgc-empty"><i class="ti ti-building-factory-2"></i>Готовых заказов нет.<br>Появятся сами, когда УТМ пришлёт «Заказ готов».</div>';
       umCard = _lgCardHtml('lgc-um', 'ti-building-factory-2', 'УТМ · корпуса',
         umActive.length ? umActive.length + ' готово' : 'пусто',
         '',
