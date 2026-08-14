@@ -6484,7 +6484,7 @@ function renderBomVariantEditor() {
       '<div class="bom-variant-editor-grid">' +
         '<div><label>Подпись для выбора</label><input data-vindex="' + i + '" data-vfield="label" value="' + escapeHtml(o.label || '') + '" placeholder="1,0 кВт / 220 В"></div>' +
         '<div><label>Кол-во</label><input type="number" min="0.01" step="0.01" data-vindex="' + i + '" data-vfield="qty_required" value="' + Number(o.qty_required || 1) + '"></div>' +
-        '<div><label>Мощность, кВт</label><input type="number" min="0" step="0.01" data-vindex="' + i + '" data-vfield="power_kw" value="' + (o.power_kw == null ? '' : Number(o.power_kw)) + '"></div>' +
+        '<div><label>Мощность группы, кВт</label><input type="number" min="0" step="0.01" data-vindex="' + i + '" data-vfield="power_kw" value="' + (o.power_kw == null ? '' : Number(o.power_kw)) + '"></div>' +
         '<div><label>Напряжение, В</label><input type="number" min="1" step="1" data-vindex="' + i + '" data-vfield="voltage_v" value="' + (o.voltage_v || '') + '"></div>' +
         '<div><label>Фазы</label><input type="number" min="1" max="3" step="1" data-vindex="' + i + '" data-vfield="phases" value="' + (o.phases || '') + '"></div>' +
       '</div>' +
@@ -6690,7 +6690,7 @@ function renderContractBomSelection() {
       (group.is_required ? '<span class="bom-config-required">выбор для заказа</span>' : '') + '</div><div class="bom-config-options">';
     (group.options || []).forEach(option => {
       const selected = Number(option.id) === selectedId;
-      if (selected && option.power_kw != null) totalPower += Number(option.power_kw || 0) * Number(option.qty_required || 0);
+      if (selected && option.power_kw != null) totalPower += Number(option.power_kw || 0);
       const facts = [];
       if (option.power_kw != null) facts.push('<span class="bco-fact">' + _fmtQty(option.power_kw) + ' кВт</span>');
       if (option.voltage_v) facts.push('<span class="bco-fact">' + option.voltage_v + ' В</span>');
@@ -8679,7 +8679,7 @@ function renderAssemblyBomConfiguration() {
       const selected = selectedId === option.id;
       if (selected) {
         selectedCount++;
-        if (option.power_kw != null) productPower += Number(option.power_kw || 0) * Number(option.qty_required || 0);
+        if (option.power_kw != null) productPower += Number(option.power_kw || 0);
       }
       const facts = [];
       if (option.power_kw != null) facts.push('<span class="bco-fact">' + _fmtQty(option.power_kw) + ' кВт</span>');
