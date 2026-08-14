@@ -912,27 +912,34 @@
             <i class="ti ti-message-code"></i>
             <h1>Клод</h1>
           </div>
-          <div id="devchat-status" class="text-muted" style="font-size:13px;">Связь с агентом…</div>
+          <div id="devchat-status" class="dchat-status">
+            <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span>
+          </div>
         </div>
-        <div class="content-inner" style="max-width:900px;display:flex;flex-direction:column;height:calc(100vh - 190px);">
-          <div id="devchat-feed" style="flex:1;overflow-y:auto;padding:4px 2px 12px;">
+        <div class="content-inner dchat" style="max-width:900px;height:calc(100dvh - 190px);">
+          <div id="devchat-feed" class="dchat-feed" onscroll="devChatOnScroll()">
             <div class="loading-block">Загружаем переписку…</div>
           </div>
-          <div id="devchat-files" style="display:none;flex-wrap:wrap;gap:8px;padding:8px 0;"></div>
-          <div style="display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--border);padding-top:10px;">
-            <button class="icon-btn" onclick="document.getElementById('devchat-file-input').click()" title="Прикрепить фото или файл">
-              <i class="ti ti-paperclip"></i>
-            </button>
-            <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
-                   style="display:none;" onchange="devChatPickFiles(this.files)">
-            <textarea id="devchat-input" class="form-input" rows="2" placeholder="Что сделать?"
-                      style="flex:1;resize:vertical;min-height:44px;" onkeydown="devChatKey(event)"></textarea>
-            <button class="btn btn-primary" id="devchat-send" onclick="devChatSend()">
-              <i class="ti ti-send"></i> Отправить
-            </button>
-          </div>
-          <div class="text-muted" style="font-size:11px;padding-top:6px;">
-            Ctrl+Enter — отправить. Агент работает на офисном сервере и правит проекты сам.
+          <button class="dchat-jump" id="devchat-jump" onclick="devChatJump()" title="В конец переписки">
+            <i class="ti ti-arrow-down"></i>
+          </button>
+          <div class="dchat-composer">
+            <div id="devchat-files" class="dchat-files"></div>
+            <div class="dchat-box">
+              <div class="dchat-input-row">
+                <button class="dchat-attach" onclick="document.getElementById('devchat-file-input').click()" title="Прикрепить фото или файл">
+                  <i class="ti ti-paperclip"></i>
+                </button>
+                <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+                       style="display:none;" onchange="devChatPickFiles(this.files)">
+                <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать?"
+                          oninput="devChatGrow(this)" onkeydown="devChatKey(event)"></textarea>
+                <button class="dchat-send" id="devchat-send" onclick="devChatSend()" title="Отправить (Ctrl+Enter)">
+                  <i class="ti ti-arrow-up"></i>
+                </button>
+              </div>
+            </div>
+            <div class="dchat-hint">Ctrl+Enter — отправить. Агент работает на офисном сервере и правит проекты сам.</div>
           </div>
         </div>
       </div>
@@ -8873,29 +8880,35 @@ function _ccReset() {
                border:none;background:var(--brand);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;font-size:22px;">
   <i class="ti ti-message-code"></i>
 </button>
-<div id="devchat-drawer"
+<div id="devchat-backdrop" class="dchat-backdrop" onclick="devChatToggleDrawer()"></div>
+<div id="devchat-drawer" class="dchat"
      style="display:none;position:fixed;right:0;top:0;bottom:0;width:min(420px,100vw);z-index:901;
-            background:var(--bg-primary);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.18);
-            flex-direction:column;">
-  <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);">
-    <i class="ti ti-message-code"></i>
+            background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(12,22,40,.24);">
+  <div class="dchat-drawer-head">
+    <i class="ti ti-message-code" style="font-size:19px;"></i>
     <b>Клод</b>
-    <span id="devchat-drawer-context" class="text-muted" style="font-size:12px;"></span>
+    <span id="devchat-drawer-context" class="ctx"></span>
     <button class="icon-btn" style="margin-left:auto;" onclick="devChatToggleDrawer()" title="Закрыть">
       <i class="ti ti-x"></i>
     </button>
   </div>
-  <div id="devchat-drawer-feed" style="flex:1;overflow-y:auto;padding:10px 14px;"></div>
-  <div id="devchat-drawer-files" style="display:none;flex-wrap:wrap;gap:6px;padding:0 14px 6px;"></div>
-  <div style="display:flex;gap:6px;align-items:flex-end;padding:10px 14px;border-top:1px solid var(--border);">
-    <button class="icon-btn" onclick="document.getElementById('devchat-drawer-file-input').click()" title="Прикрепить">
-      <i class="ti ti-paperclip"></i>
-    </button>
-    <input type="file" id="devchat-drawer-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
-           style="display:none;" onchange="devChatPickFiles(this.files)">
-    <textarea id="devchat-drawer-input" class="form-input" rows="2" placeholder="Что сделать?"
-              style="flex:1;resize:none;min-height:42px;" onkeydown="devChatKey(event)"></textarea>
-    <button class="btn btn-primary btn-small" onclick="devChatSend()"><i class="ti ti-send"></i></button>
+  <div id="devchat-drawer-feed" class="dchat-feed" style="padding:6px 14px 12px;" onscroll="devChatOnScroll()"></div>
+  <div class="dchat-composer" style="padding:0 12px 12px;">
+    <div id="devchat-drawer-files" class="dchat-files"></div>
+    <div class="dchat-box">
+      <div class="dchat-input-row">
+        <button class="dchat-attach" onclick="document.getElementById('devchat-drawer-file-input').click()" title="Прикрепить">
+          <i class="ti ti-paperclip"></i>
+        </button>
+        <input type="file" id="devchat-drawer-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+               style="display:none;" onchange="devChatPickFiles(this.files)">
+        <textarea id="devchat-drawer-input" class="dchat-input" rows="1" placeholder="Что сделать?"
+                  oninput="devChatGrow(this)" onkeydown="devChatKey(event)"></textarea>
+        <button class="dchat-send" id="devchat-drawer-send" onclick="devChatSend()" title="Отправить (Ctrl+Enter)">
+          <i class="ti ti-arrow-up"></i>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
