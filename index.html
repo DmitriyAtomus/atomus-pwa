@@ -912,8 +912,16 @@
             <i class="ti ti-message-code"></i>
             <h1>Клод</h1>
           </div>
-          <div id="devchat-status" class="dchat-status">
-            <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span>
+          <div class="dchat-hd-right">
+            <div id="devchat-status" class="dchat-status">
+              <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span>
+            </div>
+            <!-- Разворачивает ленту на всё окно: шелл CRM ограничен 1400px,
+                 на широком мониторе чат иначе живёт узкой колонкой. -->
+            <button class="dchat-full-btn" id="devchat-full-btn" onclick="devChatToggleFull()"
+                    title="Развернуть на всё окно (F11 не нужен, Esc — свернуть)">
+              <i class="ti ti-maximize"></i>
+            </button>
           </div>
         </div>
         <div class="content-inner dchat">

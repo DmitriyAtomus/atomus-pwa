@@ -23637,3 +23637,36 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 /* последняя строка активности в шапке может быть длинной — обрезаем */
 .dchat-status { max-width: 46vw; }
 #devchat-status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============ v2.45.954: Клод — режим «на всё окно» ============ */
+/* Шелл CRM ограничен 1400px и центрирован, поэтому на широком мониторе чат
+   жил узкой полосой. Кнопка в шапке кладёт экран «Клод» overlay'ем на весь
+   viewport поверх сайдбаров и верхней панели (класс на <body>). */
+.dchat-hd-right { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+.dchat-full-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 17px;
+  background: rgba(255,255,255,.14); color: #fff; flex: none;
+  transition: background .15s ease;
+}
+.dchat-full-btn:hover { background: rgba(255,255,255,.26); }
+/* на телефоне чат и так во весь экран — кнопка не нужна */
+.app.mobile-layout .dchat-full-btn { display: none; }
+
+body.dchat-fullscreen [data-screen="devchat"] {
+  position: fixed; inset: 0; z-index: 900; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--bg); padding: 10px 16px 0;
+}
+body.dchat-fullscreen [data-screen="devchat"] .page-header { flex: none; margin-bottom: 10px; }
+/* высота больше не считается от шапки CRM — её просто не видно */
+body.dchat-fullscreen.dchat-fullscreen .app.desktop-layout [data-screen="devchat"] .dchat {
+  height: auto; flex: 1; min-height: 0; padding: 0;
+}
+/* лента разворачивается, но текст не растягивается на весь ультраширокий
+   монитор — колонка держит читаемую ширину и центрируется */
+body.dchat-fullscreen .dchat-feed > * ,
+body.dchat-fullscreen .dchat-composer > * { max-width: 1700px; margin-left: auto; margin-right: auto; }
+body.dchat-fullscreen .dchat-bubble { max-width: min(82%, 1200px); }
+/* плавающую кнопку шторки прячем: она бы висела поверх ленты */
+body.dchat-fullscreen #devchat-fab { display: none !important; }
