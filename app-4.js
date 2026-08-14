@@ -8155,7 +8155,7 @@ function renderDefectAssemblyList() {
   }
   list.innerHTML = items.slice(0, 100).map(s => {
     const wt = s.work_type && s.work_type !== 'assembly';
-    const wtLabel = wt ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[s.work_type] || s.work_type) : '';
+    const wtLabel = wt ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',reconfiguration:'Перекомплектация',other:'Прочее'}[s.work_type] || s.work_type) : '';
     const title = s.model_name || (wtLabel || 'Запись #' + s.id);
     const meta  = [
       s.model_article || '',

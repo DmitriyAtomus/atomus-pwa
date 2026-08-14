@@ -4897,9 +4897,9 @@ function showAssemblyStockModal(d) {
     
     '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name || (a.work_type && a.work_type !== 'assembly' ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[a.work_type] || 'Работа') : 'Работа')) +
+        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name || (a.work_type && a.work_type !== 'assembly' ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',reconfiguration:'Перекомплектация',other:'Прочее'}[a.work_type] || 'Работа') : 'Работа')) +
           (a.work_type && a.work_type !== 'assembly'
-            ? ' <span class="work-type-badge wt-' + a.work_type + '" style="margin-left: 6px;">' + escapeHtml({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[a.work_type] || a.work_type) + '</span>'
+            ? ' <span class="work-type-badge wt-' + a.work_type + '" style="margin-left: 6px;">' + escapeHtml({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',reconfiguration:'Перекомплектация',other:'Прочее'}[a.work_type] || a.work_type) + '</span>'
             : '') +
         '</h3>' +
         '<div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">' +
