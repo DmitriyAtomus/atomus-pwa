@@ -7561,7 +7561,7 @@ function renderPlanerka() {
   const running = !!(m && m.started_at && !m.finished_at);
   const finished = !!(m && m.finished_at);
   const items = _pl.items || [];
-  const groups = { auto: [], q: [], carry: [] };
+  const groups = { auto: [], improvement: [], q: [], carry: [] };
   items.forEach(it => { (groups[it.grp] || groups.q).push(it); });
   // v2.45.723: «кто был» — из таблицы посещаемости (json — фолбэк для старых дней)
   let ppl = (_pl.attendance || []).map(a => a.name).filter(Boolean);
@@ -7628,6 +7628,7 @@ function renderPlanerka() {
   h += '<div class="pl-card">';
   const SEC = [
     ['auto', '🔥 CRM подсветила сама'],
+    ['improvement', '🛠 Доработки из MAX'],
     ['q', '💬 Вопросы от команды'],
     ['carry', '⏭ Перенесено с прошлых дней'],
   ];
@@ -7648,6 +7649,24 @@ function renderPlanerka() {
       if (g === 'carry' && it.carry_count > 1) sub.push('переносится ' + it.carry_count + '-й день');
       if (it.task_id) sub.push('✓ задача' + (it.task_assignee ? ': ' + escapeHtml(it.task_assignee) : '') +
         (it.task_status === 'done' ? ' (сделана)' : ''));
+      const details = String(it.details || '').trim();
+      const detailsHtml = details && details !== String(it.title || '').trim()
+        ? '<div class="pl-impr-text">' + escapeHtml(details).replace(/\n/g, '<br>') + '</div>' : '';
+      const filesHtml = (it.attachments || []).map(a => {
+        const url = escapeHtml(a.url || '');
+        const name = escapeHtml(a.name || 'вложение');
+        const ctype = String(a.content_type || '');
+        if (a.kind === 'image' || ctype.indexOf('image/') === 0) {
+          return '<a class="pl-impr-file image" href="' + url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
+            '<img src="' + url + '" alt="' + name + '" loading="lazy"></a>';
+        }
+        if (a.kind === 'audio' || ctype.indexOf('audio/') === 0) {
+          return '<div class="pl-impr-file audio" onclick="event.stopPropagation()"><i class="ti ti-microphone"></i>' +
+            '<audio controls preload="metadata" src="' + url + '"></audio></div>';
+        }
+        return '<a class="pl-impr-file doc" href="' + url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
+          '<i class="ti ti-paperclip"></i> ' + name + '</a>';
+      }).join('');
       const t1click = expandable ? ' onclick="plExpand(' + it.id + ',\'' + it.kind + '\')" style="cursor:pointer;"'
         : (openable ? ' onclick="openProductionWorkDetail(' + it.ref_id + ')" style="cursor:pointer;"' : '');
       h += '<div class="pl-item' + (done ? ' done' : '') + '" id="pl-item-' + it.id + '">' +
@@ -7656,6 +7675,7 @@ function renderPlanerka() {
           (expandable ? ' <span class="pl-more" id="pl-more-' + it.id + '">раскрыть ▾</span>' : '') +
           (openable ? ' <span class="pl-more">открыть ↗</span>' : '') + '</div>' +
         (sub.length ? '<div class="t2">' + sub.join(' · ') + '</div>' : '') +
+        detailsHtml + (filesHtml ? '<div class="pl-impr-files">' + filesHtml + '</div>' : '') +
         '<div class="pl-detail" id="pl-detail-' + it.id + '" style="display:none;"></div></div>' +
         (!done ? '<div class="pl-acts">' +
           (!it.task_id && _pl.can_manage ? '<button class="mini task" onclick="plTaskOpen(' + it.id + ')">→ Задача</button>' : '') +
