@@ -5286,7 +5286,7 @@ async function openSupplyAdminTools() {
                'openTextReplaceBulk()') +
           // v2.45.178: корректировка склада готовой продукции по инвентаризации
           tool('ti-clipboard-check', 'Инвентаризация ГП',
-               'Поправить склад готовой продукции по факту: добавить излишек (БЕЗ списания комплектующих) или убрать недостачу (со свободного остатка)',
+               'Поправить склад готовой продукции по факту: добавить излишек или убрать недостачу, в том числе из резерва с возвратом потребности в производство',
                'openFinishedInventory()') +
         '</div>' +
       '</div>' +
@@ -5310,7 +5310,7 @@ async function openFinishedInventory() {
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:16px 20px;">' +
         '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:12px;line-height:1.5;">' +
-          'Поправка склада по факту инвентаризации. <b>Излишек</b> добавляет изделия <b>без списания комплектующих</b>. <b>Недостача</b> убирает со <b>свободного</b> остатка (резерв под договоры не трогается).' +
+          'Поправка склада по факту инвентаризации. <b>Излишек</b> добавляет изделия <b>без списания комплектующих</b>. <b>Недостача</b> сначала убирает свободный остаток, затем резерв. Снятая из резерва единица автоматически возвращает потребность договора в производство.' +
         '</div>' +
         '<input id="fi-search" type="text" placeholder="Модель: название или артикул…" oninput="_fiSearch(this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;font-size:14px;">' +
         '<div id="fi-results" style="max-height:30vh;overflow:auto;margin-top:8px;"></div>' +
@@ -5392,14 +5392,17 @@ async function _fiApply(sign) {
   const delta = sign * qty;
   const word = sign > 0
     ? ('добавить ' + qty + ' шт (излишек, БЕЗ списания комплектующих)')
-    : ('убрать ' + qty + ' шт (недостача, со свободного остатка)');
+    : ('убрать ' + qty + ' шт (недостача; сначала свободные, затем резерв)');
   if (!confirm('Точно ' + word + ' по модели «' + sel.name + '»?')) return;
   try {
     const resp = await apiPost('/api/admin/inventory/finished-adjust', { model_id: sel.id, delta: delta, comment: comment });
     if (resp && resp.ok && resp.data && resp.data.ok) {
       const d = resp.data;
       let msg = 'Готово: ' + (d.applied > 0 ? ('+' + d.applied) : d.applied) + ' шт';
-      if (d.shortfall && d.shortfall > 0) msg += ' · не хватило ' + d.shortfall + ' свободных (убрано сколько было)';
+      if (d.reserved_removed && d.reserved_removed > 0) {
+        msg += ' · из резерва ' + d.reserved_removed + ' шт, потребность возвращена в производство';
+      }
+      if (d.shortfall && d.shortfall > 0) msg += ' · не хватило ' + d.shortfall + ' шт на складе (убрано сколько было)';
       showToast(msg, 'success');
       if (qtyEl) qtyEl.value = '1';
       await _fiRenderAdjust();

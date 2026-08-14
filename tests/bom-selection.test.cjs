@@ -60,3 +60,10 @@ test('перекомплектация готового изделия пока�
   assert.match(css, /\.wt-reconfiguration/);
   assert.match(css, /\.pwd-bom-config\.reconfiguration-from/);
 });
+
+test('мощность группы ТЭНов не умножается на количество повторно', () => {
+  assert.match(app2, /Мощность группы, кВт/);
+  assert.match(app2, /totalPower \+= Number\(option\.power_kw \|\| 0\);/);
+  assert.match(app2, /productPower \+= Number\(option\.power_kw \|\| 0\);/);
+  assert.doesNotMatch(app2, /power_kw \|\| 0\) \* Number\(option\.qty_required/);
+});

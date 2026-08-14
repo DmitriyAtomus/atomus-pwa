@@ -162,6 +162,33 @@ test('STEP перечитывает карточку и находит PDF КИ�
   assert.equal(pdf.id, 1075);
 });
 
+test('PDF гибки находится по названию детали при пустом обозначении', () => {
+  const context = {
+    _mfgDesignationKey: value => String(value || '').toUpperCase().replace(/[^A-ZА-ЯЁ0-9]/g, ''),
+  };
+  const partPdfCode = section('function _mfgPartPdf', 'function _mfgView');
+  vm.runInNewContext(partPdfCode + ';this.partPdf=_mfgPartPdf;', context);
+  const item = {
+    files: [
+      { id: 1, kind: 'pdf', file_name: 'Крышка.pdf' },
+      { id: 2, kind: 'pdf', file_name: 'Кронштейн двигателя.pdf' },
+    ],
+  };
+  const part = {
+    designation: '',
+    name: 'Кронштейн двигателя',
+    source_file: 'Кронштейн двигателя (лист 3мм).DXF',
+  };
+
+  assert.equal(context.partPdf(item, part).id, 2);
+});
+
+test('в истории заказа есть явная досылка исправленного архива', () => {
+  assert.match(source, /function mfgResendOrderFiles\(orderId\)/);
+  assert.ok(source.includes("apiPost('/api/mfg/orders/' + orderId + '/resend-files'"));
+  assert.match(source, /Дослать PDF/);
+});
+
 test('имя узла STEP сопоставляется с деталью AG и её PDF', () => {
   const helpers = section('function _mfg3dDecodeStepName', 'function _mfg3dGroup');
   const context = {

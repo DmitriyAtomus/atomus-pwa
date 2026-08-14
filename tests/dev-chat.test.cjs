@@ -59,7 +59,7 @@ test('статусы дозапрашиваются только пока ест
 });
 
 test('версия и кэш подняты вместе', () => {
-  assert.equal(version.version, 'v2.45.937');
-  assert.match(app, /const APP_VERSION = "v2\.45\.937"/);
-  assert.match(serviceWorker, /const CACHE_VERSION = 'atomus-v1\.8\.937'/);
+  assert.equal(version.version, 'v2.45.941');
+  assert.match(app, /const APP_VERSION = "v2\.45\.941"/);
+  assert.match(serviceWorker, /const CACHE_VERSION = 'atomus-v1\.8\.941'/);
 });

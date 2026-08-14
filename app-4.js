@@ -17190,6 +17190,7 @@ async function mfgOrdersJournal() {
 function _mfgJournalRender(filter) {
   const main = document.getElementById('mfg-main');
   if (!main) return;
+  state._mfgOrderScreen = 'journal';
   state._mfgJournalFilter = filter || state._mfgJournalFilter || 'all';
   const f = state._mfgJournalFilter;
   const all = state._mfgJournal || [];
@@ -17222,9 +17223,13 @@ function _mfgJournalRender(filter) {
         '<span class="pdx-st ' + st[0] + '" title="Нажми, чтобы сменить статус" ' +
           'onclick="mfgJournalStatus(' + o.id + ',\'' + o.status + '\')">' + st[1] + '</span>' +
         '<span class="dt">' + (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '') + '</span>' +
+        (o.can_resend ? '<button class="mo-resend" data-mfg-resend="' + o.id + '" ' +
+          'onclick="mfgResendOrderFiles(' + o.id + ')"><i class="ti ti-mail-forward"></i> Дослать PDF</button>' : '') +
         '<i class="ti ti-download dl" title="Скачать архив заказа" ' +
           'onclick="mfgJournalArchive(' + o.id + ',\'' +
           escapeHtml(String(o.zip_name || '').replace(/'/g, '')) + '\')"></i>' +
+        '<i class="ti ti-trash mo-delete" title="Удалить заказ из архива" ' +
+          'onclick="mfgDeleteOrder(' + o.id + ')"></i>' +
       '</div>';
     });
   }
@@ -17264,6 +17269,76 @@ async function mfgJournalArchive(orderId, name) {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
+async function mfgResendOrderFiles(orderId) {
+  const all = (state._mfgJournal || []).concat(
+    ((state.mfgCurrentItem || {}).orders || []));
+  const order = all.find(o => Number(o.id) === Number(orderId)) || {};
+  const number = order.doc_number || ('З-' + orderId);
+  if (!window.confirm('Дослать поставщику исправленный архив заказа ' + number +
+      ' с чертежами гибки PDF?')) return;
+  const buttons = Array.from(document.querySelectorAll('[data-mfg-resend="' + orderId + '"]'));
+  buttons.forEach(btn => {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…';
+  });
+  try {
+    const r = await apiPost('/api/mfg/orders/' + orderId + '/resend-files', {});
+    const j = (r && r.data) || {};
+    if (!(r && r.ok && j.ok)) {
+      showToast(j.message || 'Не удалось дослать файлы', 'error');
+      return;
+    }
+    showToast('✉ ' + (j.doc_number || number) + ': исправленный архив дослан, PDF — ' +
+      (j.pdf_count || 0), 'success');
+    if (j.missing && j.missing.length) {
+      showToast('В архиве остаются замечания: ' + j.missing.join('; '), 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    buttons.forEach(btn => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-mail-forward"></i> Дослать PDF';
+    });
+  }
+}
+
+async function mfgDeleteOrder(orderId) {
+  const all = (state._mfgJournal || []).concat(
+    ((state.mfgCurrentItem || {}).orders || []));
+  const order = all.find(o => Number(o.id) === Number(orderId)) || {};
+  const number = order.doc_number || ('З-' + orderId);
+  if (!window.confirm('Удалить заказ ' + number + ' из архива изготовления?\n\n' +
+      'Письмо поставщику и связанная закупка не отменятся.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/orders/' + orderId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    let j = {};
+    try { j = await r.json(); } catch (e) {}
+    if (!r.ok || !j.ok) {
+      showToast(j.message || 'Не удалось удалить заказ из архива', 'error');
+      return;
+    }
+    state._mfgJournal = (state._mfgJournal || []).filter(
+      o => Number(o.id) !== Number(orderId));
+    if (state.mfgCurrentItem) {
+      state.mfgCurrentItem.orders = (state.mfgCurrentItem.orders || []).filter(
+        o => Number(o.id) !== Number(orderId));
+    }
+    if (state._mfgOrderScreen === 'item' && state.mfgCurrentItem) {
+      renderMfgItem(state.mfgCurrentItem);
+    } else {
+      _mfgJournalRender();
+    }
+    showToast(number + ' удалён из архива изготовления', 'success');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
 async function openMfgItem(id) {
   const main = document.getElementById('mfg-main');
   if (main) main.innerHTML = '<div class="loading-block">Открываем изделие…</div>';
@@ -17292,15 +17367,37 @@ async function openMfgItem(id) {
   }
 }
 
-// PDF детали ищем по обозначению в имени файла (чертёж «AG-02.000.001 Кожух.pdf»)
+// PDF детали ищем по обозначению, названию или имени исходного DXF.
 function _mfgPartPdf(it, p) {
   // В CAD, ведомости и имени PDF одно обозначение часто записано по-разному:
   // КИД-10.000.001 / КИД10.000.001 / КИД 10-000-001. Сравнение исходных
   // строк давало ложное «чертёж не найден», хотя PDF лежал в той же карточке.
+  const pdfs = (it.files || []).filter(f => f.kind === 'pdf' &&
+    !String(f.file_name || '').toUpperCase().includes('СБ'));
   const d = _mfgDesignationKey(p.designation);
-  if (!d) return null;
-  return (it.files || []).find(f => f.kind === 'pdf' &&
-    _mfgDesignationKey(f.file_name).indexOf(d) >= 0) || null;
+  if (d) {
+    const byDesignation = pdfs.filter(f => _mfgDesignationKey(f.file_name).includes(d));
+    if (byDesignation.length === 1) return byDesignation[0];
+  }
+  const nameKey = value => String(value || '')
+    .replace(/\.[^.]+$/, '')
+    .replace(/\([^)]*(?:лист|мм|сталь|aisi|оцинк)[^)]*\)/gi, ' ')
+    .normalize('NFKC').toLowerCase().replace(/ё/g, 'е')
+    .replace(/[^0-9a-zа-я]+/g, '');
+  const keys = Array.from(new Set([nameKey(p.name), nameKey(p.source_file)]))
+    .filter(key => key.length >= 6);
+  const scored = pdfs.map(file => {
+    const fk = nameKey(file.file_name);
+    const score = keys.reduce((best, key) => Math.max(best,
+      fk === key ? 3 : ((fk.includes(key) || key.includes(fk)) ? 2 : 0)), 0);
+    return { file, score };
+  }).filter(x => x.score > 0);
+  if (scored.length) {
+    const best = Math.max(...scored.map(x => x.score));
+    const matched = scored.filter(x => x.score === best);
+    if (matched.length === 1) return matched[0].file;
+  }
+  return null;
 }
 function _mfgView() {
   try {
@@ -17786,6 +17883,7 @@ async function mfgSupAdd() {
 }
 
 function renderMfgItem(it) {
+  state._mfgOrderScreen = 'item';
   const main = document.getElementById('mfg-main');
   if (!main || !it) return;
   _mfgDisposeStepThumbs();
@@ -17931,8 +18029,12 @@ function renderMfgItem(it) {
         '<span class="pdx-st ' + st[0] + '" title="Нажми, чтобы сменить статус" ' +
           'onclick="mfgOrderStatus(' + o.id + ',\'' + o.status + '\')">' + st[1] + '</span>' +
         '<span class="dt">' + (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '') + '</span>' +
+        (o.can_resend ? '<button class="mo-resend" data-mfg-resend="' + o.id + '" ' +
+          'onclick="mfgResendOrderFiles(' + o.id + ')"><i class="ti ti-mail-forward"></i> Дослать PDF</button>' : '') +
         '<i class="ti ti-download dl" title="Скачать архив заказа" ' +
           'onclick="mfgOrderArchive(' + o.id + ',\'' + escapeHtml(String(o.zip_name || '').replace(/'/g, '')) + '\')"></i>' +
+        '<i class="ti ti-trash mo-delete" title="Удалить заказ из архива" ' +
+          'onclick="mfgDeleteOrder(' + o.id + ')"></i>' +
       '</div>';
     });
   }
