@@ -23326,6 +23326,18 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 :root { --bg-primary: #FFFFFF; --bg-secondary: #F4F6FA; }
 
 .dchat { display: flex; flex-direction: column; min-height: 0; position: relative; }
+/* Лента занимает экран целиком: композер всегда внизу, прокручивается только переписка */
+.app.desktop-layout [data-screen="devchat"] .dchat { height: calc(100dvh - 186px); }
+/* На телефоне page-header по умолчанию скрыт — для чата возвращаем его липкой
+   шапкой, иначе теряются и кнопка «назад», и строка состояния агента. */
+.app.mobile-layout [data-screen="devchat"] .page-header {
+  display: flex; padding: 10px 14px; gap: 10px; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 5;
+}
+.app.mobile-layout [data-screen="devchat"] .page-header h1 { font-size: 18px; }
+.app.mobile-layout [data-screen="devchat"] .dchat {
+  height: calc(100dvh - 118px); padding: 8px 12px 0;
+}
 .dchat-feed {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: 6px 2px 12px; scroll-behavior: smooth;
@@ -23375,7 +23387,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 }
 .dchat-row.is-mine .dchat-text code { background: rgba(255,255,255,.2); }
 .dchat-text pre {
-  margin: 8px 0 2px; background: #0F172A; color: #E2E8F0; border-radius: 10px;
+  margin: 9px 0; background: #0F172A; color: #E2E8F0; border-radius: 10px;
   padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px; line-height: 1.5; overflow-x: auto; white-space: pre;
 }
