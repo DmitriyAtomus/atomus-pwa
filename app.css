@@ -10408,6 +10408,7 @@
   }
   .work-type-badge i { font-size: 12px; }
   .work-type-badge.wt-repair        { background: #FFF4E6; color: #B25E00; }
+  .work-type-badge.wt-reconfiguration { background: #EDE9FE; color: #6D28D9; }
   .work-type-badge.wt-commissioning { background: #E8F5E9; color: #15803D; }
   .work-type-badge.wt-installation  { background: #FFEBEE; color: #DC2626; }
   .work-type-badge.wt-diagnostics   { background: #F3E8FF; color: #7C3AED; }
@@ -23159,6 +23160,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .bom-variant-editor-grid label { font-size:10.5px; color:var(--text-light); display:block; margin-bottom:3px; }
 .bom-variant-editor-grid input { width:100%; box-sizing:border-box; padding:7px 8px; border:1px solid var(--border); border-radius:7px; background:var(--card,#fff); color:var(--text); }
 .pwd-bom-config { margin:14px 0; border:1px solid #bcd7f3; background:#f4f9ff; border-radius:12px; padding:12px 14px; }
+.pwd-bom-config.reconfiguration-from { border-color:#d7dce3; background:#f8fafc; }
 .pwd-bom-config-title { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:#35658f; font-weight:800; margin-bottom:7px; }
 .pwd-bom-config-row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-top:1px solid rgba(53,101,143,.12); font-size:12.5px; }
 .pwd-bom-config-row:first-of-type { border-top:0; }

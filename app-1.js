@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.935";
+const APP_VERSION = "v2.45.936";
 const APP_VERSION_DATE = "13.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5050,7 +5050,7 @@ function renderPkbWorkCard(w, colKey) {
   }
 
   // Title — название модели или описание для не-сборок (v2.43.78)
-  const _wtLabels = {repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'};
+  const _wtLabels = {reconfiguration:'Перекомплектация',repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'};
   const isService = w.work_type && w.work_type !== 'assembly';
   const modelTitle = w.model_name || (isService
     ? (w.description || _wtLabels[w.work_type] || 'Работа')
@@ -5560,7 +5560,7 @@ function renderProductionWorkDetail(w) {
   const modal = overlay.querySelector('.modal');
 
   // v2.43.78: для не-сборок (Проектирование и т.д.) модели нет — берём описание.
-  const _wtLabelsDetail = {repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'};
+  const _wtLabelsDetail = {reconfiguration:'Перекомплектация',repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'};
   const _isServiceDetail = w.work_type && w.work_type !== 'assembly';
   const modelTitle = (w.model_name || (_isServiceDetail
     ? (w.description || _wtLabelsDetail[w.work_type] || 'Работа')
@@ -5642,9 +5642,27 @@ function renderProductionWorkDetail(w) {
   html += '</div>';
 
   // v2.45.912: зафиксированный при постановке в производство точный ТЭН/SKU.
+  const previousConfigGroups = ((w.reconfiguration_from || {}).groups || []);
+  if (w.work_type === 'reconfiguration' && previousConfigGroups.length) {
+    html += '<div class="pwd-bom-config reconfiguration-from"><div class="pwd-bom-config-title"><i class="ti ti-history"></i> Было на складе</div>';
+    previousConfigGroups.forEach(g => {
+      const facts = [];
+      if (g.power_kw != null) facts.push(_fmtQty(g.power_kw) + ' кВт');
+      if (g.voltage_v) facts.push(g.voltage_v + ' В');
+      if (g.phases) facts.push(g.phases + ' ф.');
+      if (Number(g.qty_required || 1) !== 1) facts.push(_fmtQty(g.qty_required) + ' шт.');
+      html += '<div class="pwd-bom-config-row"><span><b>' + escapeHtml(g.group_name || 'Вариант') + '</b><br>' +
+        escapeHtml(g.option_label || g.component_name || '—') +
+        (g.component_sku ? ' · <span class="comp-sku">' + escapeHtml(g.component_sku) + '</span>' : '') +
+        '</span><span style="text-align:right;white-space:nowrap;">' + escapeHtml(facts.join(' · ')) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
   const bomConfigGroups = ((w.bom_configuration || {}).groups || []);
   if (bomConfigGroups.length) {
-    html += '<div class="pwd-bom-config"><div class="pwd-bom-config-title"><i class="ti ti-adjustments-horizontal"></i> Комплектация изделия</div>';
+    const configTitle = w.work_type === 'reconfiguration' ? 'Нужно установить' : 'Комплектация изделия';
+    html += '<div class="pwd-bom-config"><div class="pwd-bom-config-title"><i class="ti ti-adjustments-horizontal"></i> ' + configTitle + '</div>';
     bomConfigGroups.forEach(g => {
       const facts = [];
       if (g.power_kw != null) facts.push(_fmtQty(g.power_kw) + ' кВт');

@@ -51,3 +51,12 @@ test('карточка работы показывает зафиксирова�
   assert.match(app1, /w\.bom_configuration/);
   assert.match(app1, /configured_power_kw/);
 });
+
+test('перекомплектация готового изделия показывает исходный и требуемый BOM', () => {
+  assert.match(app1, /reconfiguration:'Перекомплектация'/);
+  assert.match(app1, /w\.reconfiguration_from/);
+  assert.match(app1, /Было на складе/);
+  assert.match(app1, /Нужно установить/);
+  assert.match(css, /\.wt-reconfiguration/);
+  assert.match(css, /\.pwd-bom-config\.reconfiguration-from/);
+});
