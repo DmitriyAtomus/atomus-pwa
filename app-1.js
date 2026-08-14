@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.943";
+const APP_VERSION = "v2.45.944";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2049,8 +2049,16 @@ async function _devChatTick() {
   try {
     data = await apiGet('/api/dev-chat/messages?since_id=' + _devChatSince);
   } catch (e) {
+    // 403 здесь означает «лента не твоя», а не обрыв связи — писать про связь
+    // в этом случае значит отправить искать проблему не там
     const st = document.getElementById('devchat-status');
-    if (st) st.textContent = 'Нет связи с бэкендом';
+    const denied = String(e && e.message || '').indexOf('403') >= 0;
+    if (st) st.textContent = denied ? 'Чат доступен только владельцу' : 'Нет связи с бэкендом';
+    if (denied) {
+      const feed2 = _devChatEl('feed');
+      if (feed2) feed2.innerHTML = '<div class="text-muted">Этот чат привязан к учётке владельца.</div>';
+      stopDevChat();
+    }
     return;
   }
   const msgs = (data && data.messages) || [];
