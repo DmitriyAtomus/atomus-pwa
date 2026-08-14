@@ -141,3 +141,21 @@ test('фон шторки и пузырей задан переменными, �
   assert.match(css, /--bg-primary:\s*#/, '--bg-primary не объявлена');
   assert.match(css, /--bg-secondary:\s*#/, '--bg-secondary не объявлена');
 });
+
+test('чат разворачивается на всё окно и сворачивается при уходе с экрана', () => {
+  const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
+  assert.match(html, /id="devchat-full-btn"[\s\S]{0,80}onclick="devChatToggleFull\(\)"/,
+    'нет кнопки разворота в шапке');
+  // класс висит на body: скрыть надо и то, что снаружи экрана
+  assert.match(app, /document\.body\.classList\.toggle\('dchat-fullscreen', on\)/);
+  assert.match(css, /body\.dchat-fullscreen \[data-screen="devchat"\] \{[\s\S]{0,200}position: fixed/,
+    'экран не становится overlay на весь viewport');
+  // ушли в другой раздел — режим снимается, иначе следующий экран без шапки
+  assert.match(app, /devChatExitFull\(\); if \(!drawerOpen\) stopDevChat\(\);/);
+  assert.match(app, /function devChatExitFull[\s\S]{0,160}classList\.remove\('dchat-fullscreen'\)/);
+  // Esc: сначала шторка, и только потом выход из полноэкранного режима
+  const esc = app.slice(app.indexOf("if (e.key !== 'Escape') return;"));
+  assert.match(esc.slice(0, 400), /devChatToggleDrawer\(\); return; \}[\s\S]{0,160}devChatToggleFull\(\)/);
+  // плавающая кнопка шторки в этом режиме висела бы поверх ленты
+  assert.match(css, /body\.dchat-fullscreen #devchat-fab \{ display: none/);
+});

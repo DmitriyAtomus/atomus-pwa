@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.953";
+const APP_VERSION = "v2.45.954";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1874,7 +1874,8 @@ function runScreenLoader(screenName) {
   // Чат с Клодом: лента опрашивается только на своём экране
   const devDrawer = document.getElementById('devchat-drawer');
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
-  if (screenName === 'devchat') loadDevChat('screen'); else if (!drawerOpen) stopDevChat();
+  if (screenName === 'devchat') loadDevChat('screen');
+  else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
 }
 
 // ============ БЕЗОПАСНОСТЬ: живой просмотр камеры офиса ============
@@ -2469,6 +2470,41 @@ function loadDevChat(host) {
   _devChatBindPaste();
   _devChatTick();
   _devChatTimer = setInterval(_devChatTick, 3000);
+  _devChatApplyFull();
+}
+
+// ---- «на всё окно» ----
+// Шелл CRM ограничен 1400px и центрирован, так что на широком мониторе чат
+// занимает узкую полосу. В этом режиме экран «Клод» становится overlay'ем на
+// весь viewport поверх сайдбаров и верхней панели. Выбор запоминается.
+const DEVCHAT_FULL_KEY = 'atomus_devchat_full';
+
+function devChatIsFull() {
+  try { return localStorage.getItem(DEVCHAT_FULL_KEY) === '1'; } catch (e) { return false; }
+}
+
+// Класс висит на <body>, а не на самом экране: скрыть надо и то, что лежит
+// снаружи экрана (шапка, сайдбары, плавающая кнопка шторки).
+function _devChatApplyFull() {
+  const on = devChatIsFull() && state.currentScreen === 'devchat';
+  document.body.classList.toggle('dchat-fullscreen', on);
+  const btn = document.getElementById('devchat-full-btn');
+  if (btn) {
+    btn.innerHTML = '<i class="ti ti-' + (on ? 'minimize' : 'maximize') + '"></i>';
+    btn.title = on ? 'Свернуть (Esc)' : 'Развернуть на всё окно';
+  }
+}
+
+function devChatToggleFull() {
+  try { localStorage.setItem(DEVCHAT_FULL_KEY, devChatIsFull() ? '0' : '1'); } catch (e) {}
+  _devChatApplyFull();
+  // высота ленты поменялась — возвращаем взгляд к последнему сообщению
+  setTimeout(devChatJump, 60);
+}
+
+// Уходим с экрана — снимаем режим, иначе следующий раздел откроется без шапки.
+function devChatExitFull() {
+  document.body.classList.remove('dchat-fullscreen');
 }
 
 // Шторка поверх текущего раздела — то же самое, но не уходя с экрана.
@@ -2497,7 +2533,9 @@ function devChatToggleDrawer() {
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
   const drawer = document.getElementById('devchat-drawer');
-  if (drawer && drawer.style.display === 'flex') devChatToggleDrawer();
+  if (drawer && drawer.style.display === 'flex') { devChatToggleDrawer(); return; }
+  // на весь экран — тем же Esc обратно в обычный вид
+  if (document.body.classList.contains('dchat-fullscreen')) devChatToggleFull();
 });
 
 function stopDevChat() {
