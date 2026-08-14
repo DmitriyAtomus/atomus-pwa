@@ -913,7 +913,9 @@
             <h1>Клод</h1>
           </div>
           <div class="dchat-hd-right">
-            <div id="devchat-status" class="dchat-status">
+            <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->
+            <div id="devchat-status" class="dchat-status" onclick="devChatTermOpen()"
+                 title="Смотреть работу агента вживую">
               <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span>
             </div>
             <!-- Разворачивает ленту на всё окно: шелл CRM ограничен 1400px,
@@ -932,13 +934,25 @@
             <i class="ti ti-arrow-down"></i>
           </button>
           <div class="dchat-composer">
+            <!-- v2.45.955: быстрые чипы — типовые запросы в один тап (важно на телефоне) -->
+            <div class="dchat-chips" id="devchat-chips">
+              <button class="acc" onclick="devChatCamera()">📸 Сфотографировать</button>
+              <button onclick="devChatQuick(this)">Что сейчас в работе?</button>
+              <button onclick="devChatQuick(this)">Проверь логи за сегодня</button>
+              <button onclick="devChatQuick(this)">Поправь дизайн раздела…</button>
+            </div>
             <div id="devchat-files" class="dchat-files"></div>
             <div class="dchat-box">
               <div class="dchat-input-row">
+                <button class="dchat-attach dchat-cam" onclick="devChatCamera()" title="Снять фото камерой">
+                  <i class="ti ti-camera"></i>
+                </button>
                 <button class="dchat-attach" onclick="document.getElementById('devchat-file-input').click()" title="Прикрепить фото или файл">
                   <i class="ti ti-paperclip"></i>
                 </button>
                 <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+                       style="display:none;" onchange="devChatPickFiles(this.files)">
+                <input type="file" id="devchat-camera-input" accept="image/*" capture="environment"
                        style="display:none;" onchange="devChatPickFiles(this.files)">
                 <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот можно вставить через Ctrl+V"
                           oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
@@ -8890,6 +8904,19 @@ function _ccReset() {
   <i class="ti ti-message-code"></i>
 </button>
 <div id="devchat-backdrop" class="dchat-backdrop" onclick="devChatToggleDrawer()"></div>
+
+<!-- v2.45.955: полноэкранный терминал «работа Клода вживую» (тап по статусу) -->
+<div id="devchat-term-full" class="dchat-term-full" onclick="if (event.target === this) devChatTermClose()">
+  <div class="tf-card">
+    <div class="tf-hd">
+      <span class="tf-ava"><i class="ti ti-sparkles"></i></span>
+      <b>Клод — работа вживую</b>
+      <button class="tf-x" onclick="devChatTermClose()"><i class="ti ti-x"></i></button>
+    </div>
+    <pre class="tf-log" id="devchat-term-log"></pre>
+    <div class="tf-ft" id="devchat-term-ft"><span class="dot"></span><span id="devchat-term-ft-text">Агент свободен</span></div>
+  </div>
+</div>
 <div id="devchat-drawer" class="dchat"
      style="display:none;position:fixed;right:0;top:0;bottom:0;width:min(420px,100vw);z-index:901;
             background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(12,22,40,.24);">
