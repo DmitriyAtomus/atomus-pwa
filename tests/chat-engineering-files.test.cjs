@@ -39,6 +39,17 @@ test('чат расчёта показывает прикреплённые фа
   assert.match(app3.slice(start, end), /_renderTeamMessageFiles\(m\.files \|\| \[\]\)/);
 });
 
+test('в чат расчёта можно выбрать и перетащить файлы', () => {
+  assert.match(app3, /id="calc-chat-file-input"/);
+  assert.match(app3, /class="calc-attach-btn"/);
+  assert.match(app3, /function _wireCalcChatFileDrop\(pane\)/);
+  assert.match(app3, /addEventListener\('dragenter'/);
+  assert.match(app3, /addEventListener\('drop'/);
+  assert.match(app3, /_calcChatFilesSelected\(files\)/);
+  assert.match(app3, /new FormData\(\)/);
+  assert.match(css, /\.calcs-pane\.is-file-dragging \.calc-drop-overlay/);
+});
+
 test('в командный чат можно перетащить файлы мышью', () => {
   assert.match(html, /id="tchat-drop-zone"/);
   assert.match(html, /id="tchat-drop-overlay"/);

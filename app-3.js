@@ -7185,11 +7185,18 @@ function calcBack() {
 }
 
 // ---------- правая панель: мяч + чат ----------
+var _calcChatPendingFiles = [];
+var _calcChatPendingCalcId = null;
+
 async function renderCalcPane(calcId) {
   const pane = document.getElementById('calcs-pane');
   if (!pane) return;
   const c = (_calcs && _calcs.calcs || []).find(x => x.id === calcId);
   if (!c) { pane.innerHTML = '<div class="empty-block">Выбери расчёт слева</div>'; return; }
+  if (_calcChatPendingCalcId !== c.id) {
+    _calcChatPendingCalcId = c.id;
+    _calcChatPendingFiles = [];
+  }
   const days = Number(c.ball_days || 0);
   let ballbar;
   if (c.ball_mine) {
@@ -7208,7 +7215,15 @@ async function renderCalcPane(calcId) {
       '<div class="t"><b>Мяч ничей</b><span>назначь, чей сейчас ход</span></div>' +
       '<div class="calc-passwrap" id="calc-passwrap-' + c.id + '"><button class="calc-passbtn" onclick="calcPassOpen(' + c.id + ')">🏓 Назначить</button></div></div>';
   }
+  pane.dataset.calcChatId = c.chat_id || '';
+  pane.dataset.calcId = c.id;
+  pane.classList.remove('is-file-dragging');
   pane.innerHTML =
+    '<div class="calc-drop-overlay" aria-hidden="true">' +
+      '<i class="ti ti-file-upload"></i>' +
+      '<b>Отпустите файлы здесь</b>' +
+      '<span>Они добавятся к сообщению · до 5 файлов</span>' +
+    '</div>' +
     '<div class="calc-ph">' +
       '<div class="row1">' +
         '<button class="calc-back" onclick="calcBack()"><i class="ti ti-chevron-left"></i></button>' +
@@ -7220,11 +7235,20 @@ async function renderCalcPane(calcId) {
       ballbar +
     '</div>' +
     '<div class="calc-chat" id="calc-chat-' + c.id + '"><div class="loading-block">Чат…</div></div>' +
+    '<div class="calc-attach-preview cchat-attach-preview" id="calc-chat-attach-preview"></div>' +
     '<div class="calc-in">' +
+      '<input type="file" id="calc-chat-file-input" multiple ' +
+        'accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.dwg,.dxf,.step,.stp,.iges,.igs,.3dm" ' +
+        'style="display:none" onchange="_calcChatFilesSelected(this.files)">' +
+      '<button class="calc-attach-btn" type="button" ' +
+        'onclick="document.getElementById(\'calc-chat-file-input\').click()" title="Прикрепить файлы">' +
+        '<i class="ti ti-paperclip"></i></button>' +
       '<input id="calc-chat-inp" placeholder="Написать в чат расчёта…" ' +
         'onkeydown="if(event.key===\'Enter\')calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')">' +
-      '<button onclick="calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')"><i class="ti ti-send"></i></button>' +
+      '<button class="calc-send-btn" id="calc-chat-send-btn" onclick="calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')"><i class="ti ti-send"></i></button>' +
     '</div>';
+  _renderCalcChatAttachPreview();
+  _wireCalcChatFileDrop(pane);
   _calcChatLoad(c.id, c.chat_id);
   _calcStartPolling();
 }
@@ -7259,22 +7283,137 @@ async function _calcChatLoad(calcId, chatId) {
   }
 }
 
-async function calcChatSend(calcId, chatId) {
-  if (!chatId) return;
-  const inp = document.getElementById('calc-chat-inp');
-  const v = inp ? inp.value.trim() : '';
-  if (!v) return;
-  if (inp) inp.value = '';
-  try {
-    const r = await apiPost('/api/team-chats/' + chatId + '/messages', { text: v });
-    if (!(r && r.ok)) {
-      showToast(((r && r.data) || {}).message || 'Не отправилось', 'error');
-      if (inp) inp.value = v;
+function _calcChatFilesSelected(files) {
+  if (!files || !files.length) return;
+  for (let i = 0; i < files.length; i++) {
+    if (_calcChatPendingFiles.length >= 5) {
+      showToast('Не больше 5 файлов на сообщение', 'info');
+      break;
     }
-  } catch (e) { showToast('Ошибка соединения', 'error'); if (inp) inp.value = v; }
-  const boxEl = document.getElementById('calc-chat-' + calcId);
-  if (boxEl) boxEl.dataset.key = '';
-  _calcChatLoad(calcId, chatId);
+    const f = files[i];
+    const isVideo = (f.type || '').startsWith('video/');
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (f.size > maxSize) {
+      showToast('Файл "' + f.name + '" слишком большой', 'error');
+      continue;
+    }
+    _calcChatPendingFiles.push(f);
+  }
+  _renderCalcChatAttachPreview();
+  const input = document.getElementById('calc-chat-file-input');
+  if (input) input.value = '';
+}
+
+function _renderCalcChatAttachPreview() {
+  const wrap = document.getElementById('calc-chat-attach-preview');
+  if (!wrap) return;
+  if (!_calcChatPendingFiles.length) { wrap.innerHTML = ''; return; }
+  let html = '<div class="cchat-attach-row">';
+  _calcChatPendingFiles.forEach((f, i) => {
+    const isImg = (f.type || '').startsWith('image/');
+    const isVideo = (f.type || '').startsWith('video/');
+    let thumb;
+    if (isImg) thumb = '<img src="' + URL.createObjectURL(f) + '" alt="">';
+    else if (isVideo) thumb = '<div class="cchat-thumb-icon"><i class="ti ti-video"></i></div>';
+    else thumb = '<div class="cchat-thumb-icon"><i class="ti ti-file"></i></div>';
+    html += '<div class="cchat-attach-item">' + thumb +
+      '<div class="cchat-attach-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+      '<button class="cchat-attach-remove" onclick="_removeCalcChatAttachment(' + i + ')" title="Убрать">' +
+        '<i class="ti ti-x"></i></button></div>';
+  });
+  wrap.innerHTML = html + '</div>';
+}
+
+function _removeCalcChatAttachment(index) {
+  _calcChatPendingFiles.splice(index, 1);
+  _renderCalcChatAttachPreview();
+}
+
+function _wireCalcChatFileDrop(pane) {
+  if (!pane || pane.dataset.calcFileDropWired === '1') return;
+  pane.dataset.calcFileDropWired = '1';
+  let dragDepth = 0;
+  const isFileDrag = (event) => {
+    const types = event.dataTransfer && event.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+  };
+  const clearDragState = () => {
+    dragDepth = 0;
+    pane.classList.remove('is-file-dragging');
+  };
+  pane.addEventListener('dragenter', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth += 1;
+    pane.classList.add('is-file-dragging');
+  });
+  pane.addEventListener('dragover', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+  });
+  pane.addEventListener('dragleave', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) pane.classList.remove('is-file-dragging');
+  });
+  pane.addEventListener('drop', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearDragState();
+    const files = event.dataTransfer && event.dataTransfer.files;
+    if (!files || !files.length) return;
+    _calcChatFilesSelected(files);
+    showToast('Файлы добавлены — нажмите «Отправить»', 'success');
+  });
+}
+
+async function calcChatSend(calcId, chatId) {
+  if (!chatId) { showToast('У расчёта ещё нет чата', 'error'); return; }
+  const inp = document.getElementById('calc-chat-inp');
+  const btn = document.getElementById('calc-chat-send-btn');
+  const v = inp ? inp.value.trim() : '';
+  if (!v && !_calcChatPendingFiles.length) return;
+  if (btn) btn.disabled = true;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    let response;
+    if (_calcChatPendingFiles.length) {
+      const form = new FormData();
+      if (v) form.append('text', v);
+      _calcChatPendingFiles.forEach((file, i) => form.append('file_' + (i + 1), file, file.name));
+      response = await fetch(API_BASE + '/api/team-chats/' + chatId + '/messages', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: form,
+      });
+    } else {
+      response = await fetch(API_BASE + '/api/team-chats/' + chatId + '/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: v }),
+      });
+    }
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      showToast(err.message || err.error || 'Не отправилось', 'error');
+      return;
+    }
+    if (inp) inp.value = '';
+    _calcChatPendingFiles = [];
+    _renderCalcChatAttachPreview();
+    const boxEl = document.getElementById('calc-chat-' + calcId);
+    if (boxEl) boxEl.dataset.key = '';
+    await _calcChatLoad(calcId, chatId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (inp) inp.focus();
+  }
 }
 
 // ---------- передача мяча ----------
