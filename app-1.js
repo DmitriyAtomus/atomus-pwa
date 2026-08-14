@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.948";
+const APP_VERSION = "v2.45.949";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2101,15 +2101,41 @@ function _devChatDayRow(label) {
 }
 
 // «Клод работает» — три точки в конце ленты, пока задача не закрыта.
+// v2.45.949: пока Клод работает, агент может слать строки активности
+// (/api/dev-chat/progress) — берём свежайший тикер из незакрытых задач.
+function _devChatProgLines() {
+  const prog = window._devChatProg || {};
+  let best = null;
+  _devChatPending.forEach(function (id) {
+    const p = prog[String(id)];
+    if (p && p.lines && p.lines.length && (!best || String(p.at) > String(best.at))) best = p;
+  });
+  return best ? best.lines.slice(-6) : null;
+}
+
 function _devChatTyping(feed, on) {
   let el = feed.querySelector('.dchat-typing');
   if (!on) { if (el) el.remove(); return; }
-  if (el) { feed.appendChild(el); return; }   // держим последним элементом ленты
-  el = document.createElement('div');
-  el.className = 'dchat-typing';
-  el.innerHTML = '<div class="dchat-ava"><i class="ti ti-sparkles"></i></div>' +
-                 '<div class="bubble"><i></i><i></i><i></i></div>';
-  feed.appendChild(el);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'dchat-typing';
+    el.innerHTML = '<div class="dchat-ava"><i class="ti ti-sparkles"></i></div>' +
+                   '<div class="bubble"><i></i><i></i><i></i></div>';
+  }
+  // Живой прогресс: вместо трёх точек — мини-терминал «что Клод делает сейчас»
+  const lines = _devChatProgLines();
+  const bub = el.querySelector('.bubble');
+  if (bub && lines) {
+    bub.classList.add('has-term');
+    bub.innerHTML = '<div class="dchat-term">' + lines.map(function (ln, i) {
+      return '<div class="ln' + (i === lines.length - 1 ? ' cur' : '') + '">' +
+        escapeHtml(ln) + '</div>';
+    }).join('') + '</div>';
+  } else if (bub && bub.classList.contains('has-term')) {
+    bub.classList.remove('has-term');
+    bub.innerHTML = '<i></i><i></i><i></i>';
+  }
+  feed.appendChild(el);   // держим последним элементом ленты
 }
 
 // Пустая лента: не «пока пусто», а подсказка, что вообще можно попросить.
@@ -2203,6 +2229,7 @@ async function _devChatRefreshStatuses() {
   try {
     data = await apiGet('/api/dev-chat/messages?since_id=' + (Math.min.apply(null, Array.from(_devChatPending)) - 1));
   } catch (e) { return; }
+  window._devChatProg = (data && data.progress) || {};   // строки активности агента
 
   let working = false;
   ((data && data.messages) || []).forEach(function (m) {
@@ -2216,7 +2243,12 @@ async function _devChatRefreshStatuses() {
     if (m.status === 'new' || m.status === 'running') working = true;
     else _devChatPending.delete(m.id);
   });
-  _devChatSetStatus(working ? 'Клод работает над задачей…' : 'Готов к работе', working ? 'working' : 'ready');
+  // в шапке — последнее действие агента, если он его прислал
+  const progLines = working ? _devChatProgLines() : null;
+  _devChatSetStatus(
+    working ? (progLines ? progLines[progLines.length - 1] : 'Клод работает над задачей…')
+            : 'Готов к работе',
+    working ? 'working' : 'ready');
   if (feed) _devChatTyping(feed, working);
 }
 

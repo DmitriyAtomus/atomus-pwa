@@ -23606,3 +23606,29 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 @media (max-width:760px){
   [data-screen="devchat"] .page-header{border-radius:0;margin-bottom:0;}
 }
+
+/* ============ v2.45.949: Клод — живой прогресс (мини-терминал) ============ */
+.dchat-typing .bubble.has-term { padding: 0; background: none; border: none; }
+.dchat-term {
+  background: #0E1726; border-radius: 12px; padding: 10px 14px;
+  min-width: 260px; max-width: min(72vw, 480px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; line-height: 1.65; color: #8FA3BF;
+  border: 1px solid rgba(148,163,184,.14);
+  box-shadow: 0 4px 16px rgba(2,6,20,.24);
+  position: relative; padding-top: 16px;
+}
+.dchat-term::before {
+  content: ''; position: absolute; left: 12px; top: 7px;
+  width: 34px; height: 5px; border-radius: 99px;
+  background: linear-gradient(90deg, #FF5F57, #FEBC2E 45%, #28C840); opacity: .9;
+}
+.dchat-term .ln { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .55; }
+.dchat-term .ln.cur { color: #D6E2F2; opacity: 1; font-weight: 600; }
+.dchat-term .ln.cur::after {
+  content: '▌'; margin-left: 4px; color: #7CC4FF;
+  animation: dchatPulse 1s ease-in-out infinite;
+}
+/* последняя строка активности в шапке может быть длинной — обрезаем */
+.dchat-status { max-width: 46vw; }
+#devchat-status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
