@@ -8060,13 +8060,14 @@ async function loadLogisticsPickups() {
   box.innerHTML = _logiTabsHtml('pickups') + '<div class="loading-block">Загрузка…</div>';
   try {
     // Параллельно тянем самовывозы, почтовые статусы и транспортные компании.
-    const [d, oz, lu, cd, dl, ea] = await Promise.all([
+    const [d, oz, lu, cd, dl, ea, um] = await Promise.all([
       apiGet('/api/logistics/pickups'),
       apiGet('/api/logistics/ozon').catch(() => null),
       apiGet('/api/logistics/luch').catch(() => null),
       apiGet('/api/logistics/cdek').catch(() => null),
       apiGet('/api/logistics/dellin').catch(() => null),
       apiGet('/api/logistics/express').catch(() => null),
+      apiGet('/api/logistics/utm').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
     const ozList = (oz && oz.shipments) || [];
@@ -8083,6 +8084,9 @@ async function loadLogisticsPickups() {
     const eaList = (ea && ea.shipments) || [];
     const eaActive = eaList.filter(sh => !sh.manual_done);
     const eaDone = eaList.filter(sh => !!sh.manual_done);
+    const umList = (um && um.orders) || [];
+    const umActive = umList.filter(o => !o.manual_done);
+    const umDone = umList.filter(o => !!o.manual_done);
 
     // ---- 🔥 «горит»: истёкший Ozon и самовывоз с горящим сроком хранения
     let fireOz = 0, firePk = 0;
@@ -8147,6 +8151,20 @@ async function loadLogisticsPickups() {
         '<span>забрать <b>' + eaActive.length + '</b></span>' +
           (eaDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + eaDone.length + ' →</span>' : ''),
         !eaActive.length);
+    }
+
+    // ---- карточка УТМ (готовые корпуса к забору, v2.45.935)
+    let umCard = '';
+    if (um) {
+      const body = umActive.length ? umActive.map(_utmCardHtml).join('')
+        : '<div class="lgc-empty"><i class="ti ti-tools"></i>Готовых заказов нет.<br>Появятся сами, когда УТМ пришлёт «Заказ готов».</div>';
+      umCard = _lgCardHtml('lgc-um', 'ti-building-factory-2', 'УТМ · корпуса',
+        umActive.length ? umActive.length + ' готово' : 'пусто',
+        '',
+        body,
+        '<span>забрать <b>' + umActive.length + '</b></span>' +
+          (umDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + umDone.length + ' →</span>' : ''),
+        !umActive.length);
     }
 
     // ---- карточка Деловых линий
@@ -8251,14 +8269,15 @@ async function loadLogisticsPickups() {
     if (oz) cards.push({ hot: fireOz ? 1 : 0, act: ozActive.length ? 1 : 0, html: ozCard });
     if (lu) cards.push({ hot: 0, act: luActive.length ? 1 : 0, html: luCard });
     if (ea) cards.push({ hot: 0, act: eaActive.length ? 1 : 0, html: eaCard });
+    if (um) cards.push({ hot: 0, act: umActive.length ? 1 : 0, html: umCard });
     if (dl) cards.push({ hot: 0, act: dlActive.length ? 1 : 0, html: dlCard });
     if (cd) cards.push({ hot: 0, act: cdActive.length ? 1 : 0, html: cdCard });
     cards.push({ hot: firePk ? 1 : 0, act: (ready.length + transit.length) ? 1 : 0, html: pkCard });
     cards.sort((a, b) => (b.hot - a.hot) || (b.act - a.act));
 
     // ---- сводка и завершённые
-    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length + eaActive.length;
-    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length + eaDone.length;
+    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length + eaActive.length + umActive.length;
+    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length + eaDone.length + umDone.length;
     let html = _logiTabsHtml('pickups') + '<div class="lg-sum">' +
       (fire.length ? '<span class="hot">горит <b>' + fire.length + '</b></span>' : '') +
       '<span>активных <b>' + activeTotal + '</b></span>' +
@@ -8267,7 +8286,7 @@ async function loadLogisticsPickups() {
     if (fire.length) html += '<div class="lg-fire">' + fire.join('') + '</div>';
     html += '<div class="lg-grid">' + cards.map(c => c.html).join('') + '</div>';
 
-    if (done.length || ozDone.length || luDone.length || dlDone.length || eaDone.length) {
+    if (done.length || ozDone.length || luDone.length || dlDone.length || eaDone.length || umDone.length) {
       html += '<div class="lg-done-wrap" id="lg-done">' +
         '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Завершённые <span class="logi-cnt">' + doneTotal + '</span></div>' +
         done.map(_logiDoneRow).join('') +
@@ -8282,6 +8301,10 @@ async function loadLogisticsPickups() {
         (eaDone.length
           ? '<details class="ozon-archive"><summary><i class="ti ti-truck-loading"></i> Экспресс-Авто — забранные <span>' + eaDone.length + '</span></summary>' +
             '<div>' + eaDone.map(_expressCardHtml).join('') + '</div></details>'
+          : '') +
+        (umDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-building-factory-2"></i> УТМ — забранные <span>' + umDone.length + '</span></summary>' +
+            '<div>' + umDone.map(_utmCardHtml).join('') + '</div></details>'
           : '') +
         (dlDone.length
           ? '<details class="dl-archive"><summary><i class="ti ti-truck-delivery"></i> Деловые линии — завершённые <span>' + dlDone.length + '</span></summary>' +
@@ -26006,7 +26029,7 @@ async function ltTripSetStatus(st) {
 // ---------- Справочник точек ----------
 const _LT_KINDS = [
   ['ozon_pvz', 'ПВЗ Ozon'], ['luch_terminal', 'Терминал ТК-Луч'],
-  ['express_terminal', 'Склад Экспресс-Авто'],
+  ['express_terminal', 'Склад Экспресс-Авто'], ['utm_factory', 'Завод УТМ'],
   ['dl_terminal', 'Терминал Деловых линий'], ['vi_store', 'ВсеИнструменты'],
   ['supplier', 'Поставщик'], ['custom', 'Другое'],
 ];
@@ -26470,5 +26493,36 @@ async function expressRefresh() {
         (j.created ? ', новых: ' + j.created : ''), 'success');
       loadLogisticsPickups();
     } else showToast('Почта сейчас недоступна', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ============ v2.45.935: УТМ — готовые корпуса к забору ============
+function _utmCardHtml(o) {
+  const completed = !!o.manual_done;
+  const meta = [];
+  if (o.upd_number) meta.push('<span><i class="ti ti-file-text"></i> УПД № ' + escapeHtml(o.upd_number) + '</span>');
+  if (o.amount) meta.push('<span><i class="ti ti-cash"></i> ' + _logiSum(o.amount) + '</span>');
+  return '<div class="ozon-card um-card' + (completed ? ' done' : '') + '">' +
+    '<div class="ozon-top">' +
+      '<div class="ozon-logo um-logo">У</div>' +
+      '<div class="ozon-title"><b>Корпуса · счёт № ' + escapeHtml(o.invoice_number || o.order_key || '') + '</b>' +
+        '<small>изготовлены на заводе УТМ</small></div>' +
+      '<span class="ozon-status ' + (completed ? 'done' : 'ready') + '">' +
+        '<i class="ti ' + (completed ? 'ti-check' : 'ti-package-import') + '"></i> ' +
+        escapeHtml(o.status_label || 'Готов к забору') + '</span>' +
+    '</div>' +
+    (meta.length ? '<div class="ozon-meta">' + meta.join('') + '</div>' : '') +
+    '<div class="ozon-actions">' +
+      (!completed ? '<button class="btn btn-primary btn-small" onclick="utmMarkDone(' + Number(o.id) + ')"><i class="ti ti-check"></i> Забрали</button>'
+                  : '<button class="btn btn-secondary btn-small" onclick="utmMarkDone(' + Number(o.id) + ', true)"><i class="ti ti-rotate"></i> Вернуть</button>') +
+    '</div>' +
+  '</div>';
+}
+
+async function utmMarkDone(id, undo) {
+  try {
+    const r = await apiPost('/api/logistics/utm/' + id + '/done', { done: !undo });
+    if (r && r.ok) { showToast(undo ? 'Вернул в готовые' : 'Отмечено: забрали', 'success'); loadLogisticsPickups(); }
+    else showToast('Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }

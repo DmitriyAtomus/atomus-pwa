@@ -23256,3 +23256,9 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   #lt-map { height: 200px; }
   .lt-pt .ops .icon-btn { opacity: 1; }
 }
+
+/* ============ v2.45.935: УТМ — готовые корпуса ============ */
+.lgc-um .lgc-hd { background: linear-gradient(120deg, #4338CA, #6366F1); }
+.um-card { border-color: #DDD9F7; border-left-color: #4F46E5; box-shadow: 0 1px 3px rgba(79,70,229,.07); }
+.um-card:hover { box-shadow: 0 8px 22px rgba(79,70,229,.12); }
+.um-logo { background: #4F46E5; font-size: 15px; }
