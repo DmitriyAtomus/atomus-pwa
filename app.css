@@ -23442,7 +23442,11 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .dchat-chip.is-running::before { animation: dchatPulse 1.2s ease-in-out infinite; }
 .dchat-chip.is-error { background: rgba(255,255,255,.92); color: var(--danger); }
 
+/* Скрыт, пока пуст: картинку тянет фоном _devChatLoadImage (вложение под
+   авторизацией). Как только src появился — показываем, даже если старый
+   app-1.js остался в кэше service worker. */
 .dchat-img { display: none; max-width: 100%; border-radius: 10px; margin-top: 8px; cursor: zoom-in; }
+.dchat-img[src] { display: block; }
 .dchat-file {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 7px;
   padding: 5px 10px; border-radius: 9px; font-size: 12px;

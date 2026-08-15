@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.959";
+const APP_VERSION = "v2.45.960";
 const APP_VERSION_DATE = "15.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2101,7 +2101,10 @@ async function _devChatLoadImage(el, url) {
     if (!r.ok) return;
     const blob = await r.blob();
     el.src = URL.createObjectURL(blob);
-    el.style.display = '';
+    // v2.45.960: именно 'block', а не '': пустая строка стирает инлайн-стиль и
+    // снова побеждает `.dchat-img { display: none }` из app.css — картинка
+    // грузилась, но оставалась невидимой (скриншоты Клавы «не открывались»).
+    el.style.display = 'block';
   } catch (e) { /* картинка не критична */ }
 }
 
