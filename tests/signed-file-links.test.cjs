@@ -24,5 +24,7 @@ test('ссылки на файлы чатов берутся из поля url, 
 test('версия фронта поднята вместе с правкой', () => {
   const version = JSON.parse(read('version.json')).version;
   assert.equal(read('app-1.js').match(/const APP_VERSION = "([^"]+)"/)[1], version);
-  assert.match(read('sw.js'), /const CACHE_VERSION = 'atomus-v1\.8\.963';/);
+  // кэш service worker поднимается вместе с версией, иначе браузер отдаст старый файл
+  assert.equal(read('sw.js').match(/const CACHE_VERSION = 'atomus-v1\.8\.(\d+)';/)[1],
+               version.split('.').pop());
 });
