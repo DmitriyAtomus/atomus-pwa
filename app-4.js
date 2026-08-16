@@ -14283,7 +14283,7 @@ function _renderMontageChatMsgs(r) {
     var author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
     var filesHtml = '';
     (m.files || []).forEach(function (f) {
-      var url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      var url = API_BASE + (f.url || '/api/contracts/chat/files/' + f.id);
       if (f.kind === 'photo') {
         filesHtml += '<a href="' + url + '" target="_blank" class="imc-img"><img src="' + url + '" loading="lazy"></a>';
       } else if (f.kind === 'video') {
@@ -15207,7 +15207,7 @@ function _renderTeamMessageFiles(files) {
   if (!files || !files.length) return '';
   let html = '<div class="cchat-msg-files">';
   files.forEach(f => {
-    const url = API_BASE + '/api/team-chats/messages/files/' + f.id;
+    const url = API_BASE + (f.url || '/api/team-chats/messages/files/' + f.id);
     if (f.kind === 'photo') {
       html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt=""></a>';
     } else if (f.kind === 'video') {
