@@ -24113,8 +24113,11 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
 .dcp-form { border-top: 1px solid var(--border, #E2E8F0); padding-top: 12px; }
 .dcp-form h3 { font-size: 13px; margin: 0 0 10px; color: var(--text-dark, #0F172A); }
 .dcp-form label { display: block; font-size: 12px; color: var(--text-light, #64748B); margin-bottom: 10px; }
-.dcp-form label .form-control { margin-top: 4px; }
-.dcp-form input[type="color"] { height: 38px; padding: 3px; }
+/* .form-control по умолчанию инлайновый: без этого поля вставали в строку с
+   подписью и разъезжались по ширине (см. снимок первой сборки) */
+.dcp-form label .form-control { display: block; width: 100%; margin-top: 4px; }
+.dcp-form textarea.form-control { resize: vertical; min-height: 84px; }
+.dcp-form input[type="color"] { width: 72px; height: 38px; padding: 3px; }
 .dcp-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* На телефоне панель выезжает поверх ленты — места на две колонки нет */
