@@ -154,8 +154,9 @@ test('чат разворачивается на всё окно и сворач
   assert.match(app, /devChatExitFull\(\); if \(!drawerOpen\) stopDevChat\(\);/);
   assert.match(app, /function devChatExitFull[\s\S]{0,160}classList\.remove\('dchat-fullscreen'\)/);
   // Esc: сначала шторка, и только потом выход из полноэкранного режима
+  // окно чуть шире исходного: перед шторкой Esc теперь отменяет запись голоса
   const esc = app.slice(app.indexOf("if (e.key !== 'Escape') return;"));
-  assert.match(esc.slice(0, 400), /devChatToggleDrawer\(\); return; \}[\s\S]{0,160}devChatToggleFull\(\)/);
+  assert.match(esc.slice(0, 600), /devChatToggleDrawer\(\); return; \}[\s\S]{0,160}devChatToggleFull\(\)/);
   // плавающая кнопка шторки в этом режиме висела бы поверх ленты
   assert.match(css, /body\.dchat-fullscreen #devchat-fab \{ display: none/);
 });
