@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.962";
+const APP_VERSION = "v2.45.963";
 const APP_VERSION_DATE = "16.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2274,7 +2274,13 @@ function _devChatTyping(feed, on) {
         '</div>' +
       '</div>';
   }
+  // v2.45.962: карточку дорисовывает статус-тик — уже ПОСЛЕ того, как лента
+  // проскроллилась в конец. На телефоне она оказывалась под чипами и полем
+  // ввода: открыл чат — и не видно, что Клава вообще работает. Поэтому если
+  // человек стоял у конца ленты, доводим скролл после появления карточки.
+  const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 160;
   feed.appendChild(el);   // держим последним элементом ленты
+  if (atBottom) feed.scrollTop = feed.scrollHeight;
   _devChatWorkFill(el);
   _devChatWorkTick(true);
 }
@@ -2439,8 +2445,15 @@ async function _devChatRefreshStatuses() {
     }
     if (_devChatOpen(m.status)) working = true;
     else _devChatPending.delete(m.id);
-    // v2.45.955: засекаем момент «взял в работу» — для таймера в терминале
-    if (m.status === 'running' && !_devChatRunSince) _devChatRunSince = Date.now();
+    // v2.45.955: засекаем момент «взял в работу» — для таймера в терминале.
+    // v2.45.962: отсчёт от времени задачи, а не от момента, когда её увидела
+    // ЭТА вкладка. Иначе открыл чат с телефона через полчаса — а в карточке
+    // «0:04», будто Клава только начала. Поллер забирает задачу за секунды,
+    // так что ts сообщения — честное начало работы.
+    if (m.status === 'running' && !_devChatRunSince) {
+      const started = m.ts ? Date.parse(m.ts) : NaN;
+      _devChatRunSince = (!isNaN(started) && started <= Date.now()) ? started : Date.now();
+    }
   });
   if (!working) _devChatRunSince = null;
   // в шапке — последнее действие агента, если он его прислал
@@ -2585,7 +2598,12 @@ function devChatVoiceMove(e) {
   const away = _dcVoiceDownY && (y - _dcVoiceDownY) > 70;
   if (away !== _dcVoiceCancel) {
     _dcVoiceCancel = away;
-    _dcVoiceUi(true, away ? 'Отпустите — отмена' : 'Слушаю…');
+    // v2.45.962: подсказку меняем вместе с заголовком — иначе внизу остаётся
+    // «Отпустите — текст попадёт в поле», ровно противоположное правде.
+    _dcVoiceUi(true,
+      away ? 'Отпустите — отмена' : 'Слушаю…',
+      away ? 'Запись не сохранится. Верните палец вверх — продолжу слушать.'
+           : 'Отпустите — текст попадёт в поле. Смахните вниз — отмена.');
   }
 }
 
