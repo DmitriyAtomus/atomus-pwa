@@ -2311,11 +2311,11 @@ function _devChatWorkTick(on) {
 // Останавливаем ту задачу, которую сервер считает текущей, — фронт может
 // отстать на пару секунд, а номер знает БД.
 async function devChatStop() {
-  const ids = Array.from(_devChatPending);
-  const body = ids.length ? { msg_id: Math.min.apply(null, ids) } : {};
+  // номер не шлём: у фронта в «ожидающих» может висеть старая незакрытая
+  // задача, а остановить надо ту, что грызёт машину сейчас — это знает сервер
   let r;
   try {
-    r = await apiPost('/api/dev-chat/stop', body);
+    r = await apiPost('/api/dev-chat/stop', {});
   } catch (e) {
     showToast('Нет связи с сервером', 'error');
     return;
