@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.962";
+const APP_VERSION = "v2.45.963";
 const APP_VERSION_DATE = "16.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4202,7 +4202,8 @@ function _renderChatMessageFiles(files) {
   if (!files || !files.length) return '';
   let html = '<div class="cchat-msg-files">';
   files.forEach(f => {
-    const url = API_BASE + '/api/contracts/chat/files/' + f.id;
+    // Ссылку подписывает сервер (поле url) — без подписи файл не отдаётся.
+    const url = API_BASE + (f.url || '/api/contracts/chat/files/' + f.id);
     if (f.kind === 'photo') {
       html += '<a href="' + url + '" target="_blank" class="cchat-file-img">' +
         '<img src="' + url + '" alt="">' +
