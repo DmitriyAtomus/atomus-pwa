@@ -15,7 +15,8 @@ test('шапка чата — строка: аватар, имя и состоя
   assert.match(html, /class="dchat-hd-ava">К<i><\/i><\/div>/);
   // статус переехал под имя, а не висит отдельной пилюлей справа
   const id = html.slice(html.indexOf('dchat-hd-id'), html.indexOf('dchat-hd-right'));
-  assert.match(id, /<h1>Клава<\/h1>/);
+  // с v2.45.964 в заголовке имя текущего чата, поэтому у него есть id
+  assert.match(id, /<h1 id="devchat-title">Клава<\/h1>/);
   assert.match(id, /id="devchat-status"/);
   assert.match(css, /\[data-screen="devchat"\] \.dchat-topbar \.dchat-status \{[\s\S]{0,120}background: none/,
     'внутри шапки статус должен быть подписью, а не пилюлей');
