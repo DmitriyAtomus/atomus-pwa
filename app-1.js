@@ -29,8 +29,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.960";
-const APP_VERSION_DATE = "15.08.2026";
+const APP_VERSION = "v2.45.961";
+const APP_VERSION_DATE = "16.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1991,14 +1991,18 @@ const _DEVCHAT_STATUS = {
   uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
   running: { text: 'Клава работает…', cls: 'text-warning' },
+  stopping: { text: 'останавливаю…', cls: 'text-warning' },
+  stopped: { text: 'остановлено',    cls: 'text-muted' },
   done:    { text: 'готово',         cls: 'text-success' },
   error:   { text: 'сбой',           cls: 'text-danger' },
 };
 
 // Задача ещё в работе, пока не done/error: за такими сообщениями нужно следить
 // (uploading — файлы ещё летят в хранилище, агент их пока не видит).
+// stopping — «Стоп» нажат, но агент ещё не подтвердил: следить надо до конца.
 function _devChatOpen(status) {
-  return status === 'uploading' || status === 'new' || status === 'running';
+  return status === 'uploading' || status === 'new' ||
+         status === 'running' || status === 'stopping';
 }
 
 // Клава отвечает лёгким markdown (**жирный**, `код`, ```блоки```). Полноценный
@@ -2136,6 +2140,11 @@ function _devChatRender(msg) {
       'title="Скопировать ответ"><i class="ti ti-copy"></i></button>') +
     '</div>';
 
+  // v2.45.961: итог правки — карточкой, а не стеной текста: что тронуто,
+  // на сколько строк, и куда идти дальше (PR, повторить задачу).
+  const res = _devChatResultCard(msg);
+  if (res) bubble.insertBefore(res, bubble.querySelector('.dchat-meta'));
+
   (msg.files || []).forEach(function (f) {
     if ((f.content_type || '').indexOf('image/') === 0) {
       const img = document.createElement('img');
@@ -2157,6 +2166,56 @@ function _devChatRender(msg) {
 
   wrap.appendChild(bubble);
   return wrap;
+}
+
+// Итог работы Клавы: список тронутых файлов с +/− и кнопки «Открыть PR» и
+// «Повторить». Агент присылает это в meta вместе с ответом; если правок не
+// было (спросили и ответили) — карточки нет, лента остаётся лёгкой.
+function _devChatResultCard(msg) {
+  if (msg.author === 'user') return null;
+  const meta = msg.meta || {};
+  const edits = Array.isArray(meta.edits) ? meta.edits.filter(function (e) { return e && e.name; }) : [];
+  const pr = meta.pr && meta.pr.url ? meta.pr : null;
+  if (!edits.length && !pr) return null;
+
+  const box = document.createElement('div');
+  box.className = 'dchat-res';
+  let html = '';
+  if (edits.length) {
+    html += '<div class="rs-files">' + edits.map(function (e) {
+      return '<div class="rs-f"><span class="nm">' + escapeHtml(e.name) + '</span>' +
+        (e.add ? '<span class="pl">+' + e.add + '</span>' : '') +
+        (e.del ? '<span class="mn">−' + e.del + '</span>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
+  html += '<div class="rs-act">' +
+    (msg.reply_to ? '<button type="button" onclick="devChatRepeat(' + Number(msg.reply_to) + ')">Повторить</button>' : '') +
+    '</div>';
+  box.innerHTML = html;
+  // ссылку вешаем свойством, а не в разметку: escapeHtml не трогает кавычки,
+  // и чужой адрес в href стал бы дырой
+  if (pr && /^https:\/\/github\.com\//.test(pr.url)) {
+    const a = document.createElement('a');
+    a.className = 'pri';
+    a.href = pr.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'Открыть PR' + (pr.num ? ' #' + pr.num : '');
+    box.querySelector('.rs-act').insertBefore(a, box.querySelector('.rs-act').firstChild);
+  }
+  return box;
+}
+
+// «Повторить» — не отправляет заново молча, а возвращает исходную задачу в поле
+// ввода: почти всегда её хочется чуть переформулировать («то же, но…»).
+function devChatRepeat(srcId) {
+  const src = document.querySelector('[data-msg-id="' + srcId + '"] .dchat-text');
+  const input = _devChatEl('input');
+  if (!src || !input) return;
+  input.value = (src.innerText || src.textContent || '').trim();
+  devChatGrow(input);
+  input.focus();
+  showToast('Задача в поле — поправьте и отправьте', 'success');
 }
 
 // v2.45.957: подряд идущие реплики одного автора — одной группой: меньше отступ,
@@ -2189,29 +2248,85 @@ function _devChatProgLines() {
   return best ? best.lines.slice(-6) : null;
 }
 
+// v2.45.961: вместо трёх точек (и вместо стены терминала) — карточка работы:
+// одна строка «что делаю сейчас», таймер и две кнопки. Весь лог остаётся за
+// кнопкой «Смотреть вживую», чтобы лента не превращалась в консоль.
 function _devChatTyping(feed, on) {
   let el = feed.querySelector('.dchat-typing');
-  if (!on) { if (el) el.remove(); return; }
+  if (!on) {
+    if (el) el.remove();
+    _devChatWorkTick(false);
+    return;
+  }
   if (!el) {
     el = document.createElement('div');
     el.className = 'dchat-typing';
-    el.innerHTML = '<div class="dchat-ava"><i class="ti ti-sparkles"></i></div>' +
-                   '<div class="bubble"><i></i><i></i><i></i></div>';
-  }
-  // Живой прогресс: вместо трёх точек — мини-терминал «что Клава делает сейчас»
-  const lines = _devChatProgLines();
-  const bub = el.querySelector('.bubble');
-  if (bub && lines) {
-    bub.classList.add('has-term');
-    bub.innerHTML = '<div class="dchat-term">' + lines.map(function (ln, i) {
-      return '<div class="ln' + (i === lines.length - 1 ? ' cur' : '') + '">' +
-        escapeHtml(ln) + '</div>';
-    }).join('') + '</div>';
-  } else if (bub && bub.classList.contains('has-term')) {
-    bub.classList.remove('has-term');
-    bub.innerHTML = '<i></i><i></i><i></i>';
+    el.innerHTML =
+      '<div class="dchat-ava"><i class="ti ti-sparkles"></i></div>' +
+      '<div class="dchat-work">' +
+        '<div class="wk-hd"><span class="dot"></span><b>Работаю над задачей</b>' +
+          '<span class="tm" data-timer></span></div>' +
+        '<div class="wk-now" data-now>принял задачу…</div>' +
+        '<div class="wk-bar"><i></i></div>' +
+        '<div class="wk-act">' +
+          '<button type="button" class="pri" onclick="devChatTermOpen()">Смотреть вживую</button>' +
+          '<button type="button" onclick="devChatStop()">Остановить</button>' +
+        '</div>' +
+      '</div>';
   }
   feed.appendChild(el);   // держим последним элементом ленты
+  _devChatWorkFill(el);
+  _devChatWorkTick(true);
+}
+
+// Заполняет карточку: последняя строка активности и время с начала работы.
+function _devChatWorkFill(el) {
+  el = el || document.querySelector('.dchat-typing');
+  if (!el) return;
+  const lines = _devChatProgLines();
+  const now = el.querySelector('[data-now]');
+  if (now && lines && lines.length) now.textContent = lines[lines.length - 1];
+  const tm = el.querySelector('[data-timer]');
+  if (tm) {
+    const sec = _devChatRunSince ? Math.max(0, Math.round((Date.now() - _devChatRunSince) / 1000)) : 0;
+    tm.textContent = _devChatRunSince
+      ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0')
+      : 'в очереди';
+  }
+}
+
+// Секундная стрелка карточки: лента обновляется раз в 3 секунды, а таймер
+// должен идти ровно — иначе кажется, что всё зависло.
+let _devChatWorkTimer = null;
+function _devChatWorkTick(on) {
+  if (on && !_devChatWorkTimer) {
+    _devChatWorkTimer = setInterval(function () { _devChatWorkFill(); }, 1000);
+  } else if (!on && _devChatWorkTimer) {
+    clearInterval(_devChatWorkTimer);
+    _devChatWorkTimer = null;
+  }
+}
+
+// Кнопка «Стоп»: и красный квадрат в шапке, и кнопка в карточке работы.
+// Останавливаем ту задачу, которую сервер считает текущей, — фронт может
+// отстать на пару секунд, а номер знает БД.
+async function devChatStop() {
+  // номер не шлём: у фронта в «ожидающих» может висеть старая незакрытая
+  // задача, а остановить надо ту, что грызёт машину сейчас — это знает сервер
+  let r;
+  try {
+    r = await apiPost('/api/dev-chat/stop', {});
+  } catch (e) {
+    showToast('Нет связи с сервером', 'error');
+    return;
+  }
+  if (r && r.ok) {
+    showToast('Прошу Клаву остановиться', 'success');
+    _devChatSetStatus('останавливаю…', 'working');
+  } else {
+    showToast((r && r.data && r.data.message) || 'Не вышло остановить', 'error');
+  }
+  _devChatTick();
 }
 
 // Пустая лента: не «пока пусто», а подсказка, что вообще можно попросить.
@@ -2291,6 +2406,9 @@ function _devChatSetStatus(text, mode) {
   const label = document.getElementById('devchat-status-text');
   if (label) label.textContent = text; else if (box) box.textContent = text;
   if (box) box.className = 'dchat-status is-' + (mode || 'ready');
+  // красный квадрат в шапке живёт ровно столько, сколько есть что останавливать
+  const stop = document.getElementById('devchat-stop');
+  if (stop) stop.style.display = (mode === 'working') ? 'inline-flex' : 'none';
 }
 
 // Статус своего сообщения меняется уже после отрисовки (в очереди → работает →
@@ -2353,6 +2471,10 @@ function devChatGrow(el) {
   // и отдаём высоту ленте (на телефоне это целая строка сообщений).
   const chips = document.getElementById('devchat-chips');
   if (chips) chips.classList.toggle('is-hidden', !!(el.value || '').trim());
+  // v2.45.961: пусто — крупный микрофон (основной ввод в цеху), есть текст —
+  // обычная стрелка «отправить». Обе кнопки сразу заняли бы полполя.
+  const row = el.closest('.dchat-input-row');
+  if (row) row.classList.toggle('has-text', !!(el.value || '').trim());
 }
 
 function devChatJump() {
@@ -2384,6 +2506,181 @@ function devChatQuick(btn) {
 function devChatCamera() {
   const cam = document.getElementById('devchat-camera-input');
   if (cam) cam.click();
+}
+
+// ---- v2.45.961: задача голосом ----
+// В цеху набирать текст неудобно, а распознавание речи в браузере на Android
+// то есть, то нет. Поэтому пишем звук сами (MediaRecorder) и отправляем на
+// расшифровку в CRM — тем же Whisper, что разбирает голосовые в MAX. Текст
+// попадает В ПОЛЕ, а не сразу в отправку: почти всегда его хочется поправить.
+let _dcVoiceRec = null;        // MediaRecorder
+let _dcVoiceStream = null;     // микрофонный поток — не забыть отпустить
+let _dcVoiceChunks = [];
+let _dcVoiceCancel = false;    // смахнули вниз или отпустили слишком быстро
+let _dcVoiceLocked = false;    // короткий тап = «пишу, пока не нажмёшь ещё раз»
+let _dcVoiceStartedAt = 0;
+let _dcVoiceDownY = 0;
+
+const DCVOICE_MIN_MS = 400;    // случайный тык по кнопке — не запись
+
+function _dcVoiceMime() {
+  const want = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+  for (let i = 0; i < want.length; i++) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(want[i])) return want[i];
+  }
+  return '';
+}
+
+function _dcVoiceUi(on, title, hint) {
+  const box = document.getElementById('devchat-voice');
+  if (!box) return;
+  box.classList.toggle('show', !!on);
+  box.classList.toggle('is-cancel', !!_dcVoiceCancel);
+  box.classList.toggle('is-locked', !!_dcVoiceLocked);
+  const t = document.getElementById('devchat-voice-title');
+  const h = document.getElementById('devchat-voice-hint');
+  if (t && title) t.textContent = title;
+  if (h && hint) h.textContent = hint;
+}
+
+async function devChatVoiceStart(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (_dcVoiceRec) {                       // повторный тап в режиме «замок» — конец записи
+    if (_dcVoiceLocked) devChatVoiceEnd();
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    showToast('Браузер не умеет запись — наберите текстом', 'error');
+    return;
+  }
+  _dcVoiceCancel = false;
+  _dcVoiceLocked = false;
+  _dcVoiceDownY = (e && (e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY))) || 0;
+  try {
+    _dcVoiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    showToast('Нет доступа к микрофону', 'error');
+    return;
+  }
+  const mime = _dcVoiceMime();
+  try {
+    _dcVoiceRec = new MediaRecorder(_dcVoiceStream, mime ? { mimeType: mime } : undefined);
+  } catch (err) {
+    _dcVoiceRelease();
+    showToast('Запись недоступна на этом устройстве', 'error');
+    return;
+  }
+  _dcVoiceChunks = [];
+  _dcVoiceRec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _dcVoiceChunks.push(ev.data); };
+  _dcVoiceRec.onstop = _dcVoiceFinish;
+  _dcVoiceRec.start();
+  _dcVoiceStartedAt = Date.now();
+  _dcVoiceUi(true, 'Слушаю…', 'Отпустите — текст попадёт в поле. Смахните вниз — отмена.');
+}
+
+// Палец пополз вниз — как в мессенджерах, это отмена.
+function devChatVoiceMove(e) {
+  if (!_dcVoiceRec || _dcVoiceLocked) return;
+  const y = (e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY)) || 0;
+  const away = _dcVoiceDownY && (y - _dcVoiceDownY) > 70;
+  if (away !== _dcVoiceCancel) {
+    _dcVoiceCancel = away;
+    _dcVoiceUi(true, away ? 'Отпустите — отмена' : 'Слушаю…');
+  }
+}
+
+// Отпустили кнопку: короткое нажатие переводит запись в режим «замка»
+// (руки заняты — говори сколько нужно), длинное — заканчивает запись.
+function devChatVoiceUp(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!_dcVoiceRec || _dcVoiceLocked) return;
+  if (Date.now() - _dcVoiceStartedAt < DCVOICE_MIN_MS && !_dcVoiceCancel) {
+    _dcVoiceLocked = true;
+    _dcVoiceUi(true, 'Пишу…', 'Нажмите на микрофон, когда закончите');
+    return;
+  }
+  devChatVoiceEnd();
+}
+
+function devChatVoiceEnd() {
+  if (!_dcVoiceRec) return;
+  try { _dcVoiceRec.stop(); } catch (err) { _dcVoiceRelease(); }
+}
+
+function devChatVoiceCancel() {
+  if (!_dcVoiceRec) { _dcVoiceUi(false); return; }
+  _dcVoiceCancel = true;
+  devChatVoiceEnd();
+}
+
+function _dcVoiceRelease() {
+  if (_dcVoiceStream) {
+    try { _dcVoiceStream.getTracks().forEach(function (t) { t.stop(); }); } catch (err) {}
+  }
+  _dcVoiceStream = null;
+  _dcVoiceRec = null;
+  _dcVoiceLocked = false;
+}
+
+async function _dcVoiceFinish() {
+  const chunks = _dcVoiceChunks;
+  const type = (_dcVoiceRec && _dcVoiceRec.mimeType) || 'audio/webm';
+  const short = Date.now() - _dcVoiceStartedAt < DCVOICE_MIN_MS;
+  const cancelled = _dcVoiceCancel;
+  _dcVoiceChunks = [];
+  _dcVoiceRelease();
+  if (cancelled || short || !chunks.length) {
+    _dcVoiceUi(false);
+    if (short && !cancelled) showToast('Держите кнопку и говорите', 'error');
+    return;
+  }
+  _dcVoiceUi(true, 'Расшифровываю…', 'Секунду — верну текстом');
+  const ext = type.indexOf('mp4') >= 0 ? 'm4a' : (type.indexOf('ogg') >= 0 ? 'ogg' : 'webm');
+  const form = new FormData();
+  form.append('audio', new Blob(chunks, { type: type }), 'voice.' + ext);
+  let text = '';
+  try {
+    const r = await fetch(API_BASE + '/api/dev-chat/voice', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+      body: form,
+    });
+    const data = await r.json().catch(function () { return {}; });
+    if (!r.ok) throw new Error(data.message || 'Не разобрал запись');
+    text = (data.text || '').trim();
+  } catch (err) {
+    _dcVoiceUi(false);
+    showToast(String(err && err.message || 'Не разобрал запись'), 'error');
+    return;
+  }
+  _dcVoiceUi(false);
+  if (!text) { showToast('Тишина — ничего не разобрал', 'error'); return; }
+  const input = _devChatEl('input');
+  if (!input) return;
+  input.value = (input.value ? input.value.replace(/\s*$/, ' ') : '') + text;
+  devChatGrow(input);
+  input.focus();
+}
+
+// Кнопка микрофона есть и на экране, и в шторке — вешаем обработчики на обе.
+let _dcVoiceBound = false;
+function _devChatBindVoice() {
+  if (_dcVoiceBound) return;
+  _dcVoiceBound = true;
+  ['devchat-mic', 'devchat-drawer-mic', 'devchat-voice-mic'].forEach(function (id) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('pointerdown', devChatVoiceStart);
+    btn.addEventListener('pointermove', devChatVoiceMove);
+    btn.addEventListener('pointerup', devChatVoiceUp);
+    btn.addEventListener('pointercancel', devChatVoiceCancel);
+    // системное меню «копировать» поверх записи — лишнее
+    btn.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+  });
+  const box = document.getElementById('devchat-voice');
+  if (box) {
+    box.addEventListener('click', function (ev) { if (ev.target === box) devChatVoiceCancel(); });
+  }
 }
 
 // ---- v2.45.955: терминал «работа вживую» ----
@@ -2631,6 +2928,7 @@ function loadDevChat(host) {
   }
   _devChatDrawFiles();
   _devChatBindPaste();
+  _devChatBindVoice();
   _devChatTick();
   _devChatTimer = setInterval(_devChatTick, 3000);
   _devChatApplyFull();
@@ -2695,6 +2993,7 @@ function devChatToggleDrawer() {
 // Esc закрывает шторку — на десктопе тянуться к крестику неудобно.
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
+  if (_dcVoiceRec) { devChatVoiceCancel(); return; }   // запись важнее: сначала отменяем её
   const drawer = document.getElementById('devchat-drawer');
   if (drawer && drawer.style.display === 'flex') { devChatToggleDrawer(); return; }
   // на весь экран — тем же Esc обратно в обычный вид
@@ -2703,6 +3002,8 @@ document.addEventListener('keydown', function (e) {
 
 function stopDevChat() {
   if (_devChatTimer) { clearInterval(_devChatTimer); _devChatTimer = null; }
+  _devChatWorkTick(false);      // секундная стрелка карточки работы
+  if (_dcVoiceRec) devChatVoiceCancel();   // ушли с экрана — микрофон отпускаем
 }
 
 function stopSecurity() {
