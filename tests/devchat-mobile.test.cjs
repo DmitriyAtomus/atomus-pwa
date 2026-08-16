@@ -35,7 +35,18 @@ test('терминал «вживую»: открывается тапом по 
     'нет диффа скользящего окна — строки будут дублироваться');
 });
 
-test('таймер задачи: старт по running, сброс когда всё закрыто', () => {
-  assert.match(app, /_devChatRunSince = Date\.now\(\)/);
+test('таймер задачи: считает от времени задачи, сброс когда всё закрыто', () => {
+  // v2.45.962: отсчёт от ts сообщения, а не от момента, когда вкладка увидела
+  // задачу — иначе открыл чат позже и таймер начинается с нуля
+  assert.match(app, /Date\.parse\(m\.ts\)/, 'таймер не берёт время задачи с сервера');
+  assert.match(app, /_devChatRunSince = \(!isNaN\(started\)/, 'нет запасного Date.now()');
   assert.match(app, /if \(!working\) _devChatRunSince = null;/);
+});
+
+test('карточка работы: после дорисовки лента доводится до конца', () => {
+  // иначе на телефоне карточка встаёт под чипами и полем ввода — и кажется,
+  // что Клава ничего не делает
+  const fn = app.slice(app.indexOf('function _devChatTyping'));
+  assert.match(fn.slice(0, 1800), /const atBottom = feed\.scrollHeight/);
+  assert.match(fn.slice(0, 1800), /if \(atBottom\) feed\.scrollTop = feed\.scrollHeight;/);
 });
