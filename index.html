@@ -911,9 +911,14 @@
         <div class="page-header dchat-topbar">
           <div class="page-header-title">
             <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <!-- Список чатов: на широком экране панель видна всегда, на телефоне
+                 выезжает по этой кнопке. -->
+            <button class="back-btn dchat-list-btn" onclick="devChatToggleList()" title="Чаты и проекты">
+              <i class="ti ti-messages"></i>
+            </button>
             <div class="dchat-hd-ava">К<i></i></div>
             <div class="dchat-hd-id">
-              <h1>Клава</h1>
+              <h1 id="devchat-title">Клава</h1>
               <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->
               <div id="devchat-status" class="dchat-status" onclick="devChatTermOpen()"
                    title="Смотреть работу агента вживую">
@@ -939,6 +944,25 @@
           </div>
         </div>
         <div class="content-inner dchat">
+          <!-- Панель чатов: вкладки проектов, поиск по всем чатам, список бесед.
+               Каждый чат — своя сессия агента, поэтому темы не мешаются. -->
+          <aside class="dchat-list" id="devchat-list">
+            <div class="dcl-top">
+              <button class="dcl-new" onclick="devChatNewThread()"><i class="ti ti-plus"></i>Новый чат</button>
+              <button class="dcl-icon" onclick="devChatProjectsDialog()" title="Проекты"><i class="ti ti-folders"></i></button>
+              <button class="dcl-icon dcl-close" onclick="devChatToggleList()" title="Закрыть"><i class="ti ti-x"></i></button>
+            </div>
+            <div class="dcl-search">
+              <i class="ti ti-search"></i>
+              <input id="devchat-search" type="search" placeholder="Поиск по всем чатам"
+                     oninput="devChatSearchInput(this.value)">
+            </div>
+            <div class="dcl-tabs" id="devchat-proj-tabs"></div>
+            <div class="dcl-items" id="devchat-thread-list">
+              <div class="loading-block">Загружаем чаты…</div>
+            </div>
+          </aside>
+          <div class="dchat-main">
           <div id="devchat-feed" class="dchat-feed" onscroll="devChatOnScroll()">
             <div class="loading-block">Загружаем переписку…</div>
           </div>
@@ -982,6 +1006,7 @@
             </div>
             <div class="dchat-hint">Enter — отправить, Shift+Enter — новая строка. Агент работает на офисном сервере и правит проекты сам.</div>
           </div>
+          </div><!-- /dchat-main -->
         </div>
       </div>
 
