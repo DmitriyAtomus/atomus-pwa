@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.979";
+const APP_VERSION = "v2.45.980";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3473,6 +3473,25 @@ function _devChatTooBig() {
   return '';
 }
 
+// Браузер берёт файл с диска в момент ОТПРАВКИ, а не выбора. Перепаковал архив
+// тем же именем (или перенёс, или вынул флешку) после того, как прикрепил —
+// и XHR падает «сетевой ошибкой», хотя сеть ни при чём. Читаем по краю с обоих
+// концов: это мгновенно и отличает изменившийся файл от настоящего обрыва.
+async function _devChatUnreadable() {
+  for (let i = 0; i < _devChatFiles.length; i++) {
+    const f = _devChatFiles[i];
+    if (!f || !f.slice || !f.size) continue;
+    try {
+      await f.slice(0, 1).arrayBuffer();
+      await f.slice(f.size - 1, f.size).arrayBuffer();
+    } catch (e) {
+      return '«' + f.name + '» больше не читается с диска: файл изменили, перенесли или удалили '
+        + 'после того, как прикрепили. Убери его крестиком и прикрепи заново.';
+    }
+  }
+  return '';
+}
+
 async function devChatSend(context) {
   if (_devChatBusy) return;
   const input = _devChatEl('input');
@@ -3486,6 +3505,9 @@ async function devChatSend(context) {
   const btn = _devChatEl('send');
   if (btn) btn.disabled = true;
   try {
+    const unreadable = await _devChatUnreadable();
+    if (unreadable) { showToast(unreadable, 'error'); return; }
+
     const form = new FormData();
     form.append('text', text);
     if (_devChatThreadId) form.append('thread_id', String(_devChatThreadId));
@@ -3495,12 +3517,28 @@ async function devChatSend(context) {
     _devChatFiles.forEach(function (f, i) { form.append('file' + (i + 1), f, f.name); });
 
     let r;
+    let part = 0;                      // докуда доехало — покажем в сообщении об обрыве
+    const onProgress = function (p) {
+      part = p;
+      if (_devChatFiles.length) _devChatSendProgress(btn, p);
+    };
     try {
-      r = await _devChatPost(API_BASE + _devChatApi('/send'), form, function (part) {
-        if (_devChatFiles.length) _devChatSendProgress(btn, part);
-      });
+      // Обрыв на длинной загрузке бывает случайным: 40 МБ едут десятки секунд,
+      // и одного дрогнувшего Wi-Fi хватает. Молча пробуем второй раз.
+      for (let attempt = 1; ; attempt++) {
+        try {
+          r = await _devChatPost(API_BASE + _devChatApi('/send'), form, onProgress);
+          break;
+        } catch (e) {
+          if (attempt >= 2) throw e;
+          showToast('Связь оборвалась на ' + Math.round(part * 100) + '% — пробую ещё раз', '');
+          part = 0;
+        }
+      }
     } catch (e) {
-      showToast('Не ушло: связь оборвалась. Текст и файлы на месте — нажми ещё раз', 'error');
+      const gone = await _devChatUnreadable();
+      showToast(gone || ('Не ушло: связь оборвалась на ' + Math.round(part * 100)
+        + '%. Текст и файлы на месте — нажми ещё раз'), 'error');
       return;
     } finally {
       _devChatSendProgress(btn, null);
