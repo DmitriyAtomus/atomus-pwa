@@ -2131,6 +2131,75 @@ async function _devChatLoadImage(el, url) {
   } catch (e) { /* картинка не критична */ }
 }
 
+// v2.45.980: макет удобнее смотреть живым, а не скриншотом. html-вложение
+// Клавы открывается прямо в ленте — в песочнице (sandbox без same-origin),
+// поэтому чужой разметке не достанется ни токен из localStorage, ни API.
+function _devChatIsArtifact(f) {
+  const ct = ((f && f.content_type) || '').toLowerCase();
+  return ct.indexOf('text/html') === 0 || /\.html?$/i.test((f && f.name) || '');
+}
+
+function _devChatArtifactCard(f) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'dchat-art';
+  card.innerHTML = '<i class="ti ti-layout-2"></i><span class="nm"></span>' +
+    '<span class="go">Открыть</span>';
+  card.querySelector('.nm').textContent = f.name || 'макет.html';
+  card.onclick = function () { devChatOpenArtifact(f.url, f.name || 'Макет'); };
+  return card;
+}
+
+// Живой просмотр макета: на телефоне — во весь экран, на широком — панелью
+// справа, чтобы лента с обсуждением осталась на другой половине.
+async function devChatOpenArtifact(url, name) {
+  let html;
+  try {
+    const r = await fetch(API_BASE + url, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) throw new Error('http ' + r.status);
+    html = await r.text();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось открыть макет', 'error');
+    return;
+  }
+
+  devChatCloseArtifact();
+  const box = document.createElement('div');
+  box.className = 'dchat-artview';
+  box.id = 'dchat-artview';
+  box.innerHTML =
+    '<div class="dchat-artview-back"></div>' +
+    '<div class="dchat-artview-panel">' +
+      '<div class="dchat-artview-head">' +
+        '<i class="ti ti-layout-2"></i><span class="nm"></span>' +
+        '<button type="button" class="dchat-artview-x" aria-label="Закрыть">' +
+          '<i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<iframe class="dchat-artview-frame" ' +
+        'sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe>' +
+    '</div>';
+  box.querySelector('.nm').textContent = name;
+  box.querySelector('.dchat-artview-x').onclick = devChatCloseArtifact;
+  box.querySelector('.dchat-artview-back').onclick = devChatCloseArtifact;
+  document.body.appendChild(box);
+  // srcdoc свойством, а не атрибутом: макет бывает длинным, и кавычки внутри
+  // не должны рвать разметку
+  box.querySelector('.dchat-artview-frame').srcdoc = html;
+  document.addEventListener('keydown', _devChatArtifactEsc);
+}
+
+function devChatCloseArtifact() {
+  const box = document.getElementById('dchat-artview');
+  if (box) box.remove();
+  document.removeEventListener('keydown', _devChatArtifactEsc);
+}
+
+function _devChatArtifactEsc(e) {
+  if (e.key === 'Escape') devChatCloseArtifact();
+}
+
 function _devChatRender(msg) {
   const mine = msg.author === 'user';
   const wrap = document.createElement('div');
@@ -2172,6 +2241,8 @@ function _devChatRender(msg) {
       img.onclick = function () { if (this.src) openPhotoLightbox(this.src); };
       bubble.appendChild(img);
       _devChatLoadImage(img, f.url);
+    } else if (_devChatIsArtifact(f)) {
+      bubble.appendChild(_devChatArtifactCard(f));
     } else {
       const note = document.createElement('div');
       note.className = 'dchat-file';

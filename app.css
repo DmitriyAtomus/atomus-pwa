@@ -23459,6 +23459,44 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 }
 .dchat-row.is-mine .dchat-file { background: rgba(255,255,255,.18); }
 
+/* ---- живой макет: html-вложение открывается, а не лежит скрепкой ---- */
+.dchat-art {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 8px;
+  padding: 10px 12px; border-radius: 12px; font: inherit; font-size: 13px;
+  text-align: left; cursor: pointer; color: var(--text-dark);
+  background: var(--bg); border: 1px solid var(--border);
+}
+.dchat-art i { font-size: 17px; color: var(--brand); }
+.dchat-art .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dchat-art .go {
+  flex: none; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  color: #fff; background: var(--brand);
+}
+.dchat-artview { position: fixed; inset: 0; z-index: 1200; display: flex; }
+.dchat-artview-back { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+.dchat-artview-panel {
+  position: relative; display: flex; flex-direction: column;
+  width: 100%; height: 100%; background: var(--surface);
+}
+.dchat-artview-head {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding: 10px 12px; font-size: 13.5px; font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.dchat-artview-head i { color: var(--brand); }
+.dchat-artview-head .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dchat-artview-x {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dark); background: var(--bg); border: 1px solid var(--border);
+}
+.dchat-artview-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+/* на широком экране — панель справа: слева остаётся лента с обсуждением */
+@media (min-width: 900px) {
+  .dchat-artview { justify-content: flex-end; }
+  .dchat-artview-panel { width: 52%; min-width: 560px; box-shadow: -8px 0 30px rgba(0,0,0,.18); }
+}
+
 /* ---- разделитель дня ---- */
 .dchat-day { display: flex; align-items: center; justify-content: center; margin: 16px 0 4px; }
 .dchat-day span {
