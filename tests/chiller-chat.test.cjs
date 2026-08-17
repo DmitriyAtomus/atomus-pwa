@@ -176,13 +176,16 @@ test('из двух чатов проекта открывается тот, г�
   });
 });
 
-test('в шапке 3D-базы есть кнопка чата, и в полный экран она не тянет CRM', () => {
+// v2.45.975: лента переехала внутрь модуля — шторку CRM поверх полного экрана и
+// поверх карточки позиции всё равно было не видно. Кнопки две: в шапке базы и
+// круглая поверх модели; обе открывают свою панель, CRM для этого не нужна.
+// Подробности панели — в tests/chiller-viewer-chat.test.cjs.
+test('в 3D-базе чат открывается своей панелью, без обращения к CRM', () => {
   const shell = fs.readFileSync(path.join(root, 'chiller', 'index.html'), 'utf8');
   assert.match(shell, /id="chatBtn"/);
+  assert.match(shell, /id="chatFab"/);
   assert.match(shell, /onclick="openChat\(\)"/);
-  // сначала сворачиваем полный экран (иначе шторки CRM поверх модуля не видно),
-  // потом просим CRM открыть ленту — и только на своём origin
-  const fn = shell.slice(shell.indexOf('function openChat()'), shell.indexOf('function openChat()') + 400);
-  assert.match(fn, /exitFullscreen/);
-  assert.match(fn, /postMessage\(\{type:'atom-chiller-chat'\}, location\.origin\)/);
+  const fn = shell.slice(shell.indexOf('function openChat()'), shell.indexOf('function closeChat()'));
+  assert.match(fn, /classList\.add\('open'\)/);
+  assert.doesNotMatch(fn, /postMessage/);
 });
