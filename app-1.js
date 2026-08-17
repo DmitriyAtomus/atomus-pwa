@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.973";
+const APP_VERSION = "v2.45.974";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2385,6 +2385,8 @@ function _devChatWorkFill(el) {
   const lines = _devChatProgLines();
   const now = el.querySelector('[data-now]');
   if (now && lines && lines.length) now.textContent = lines[lines.length - 1];
+  // ждём своей очереди — так и пишем, а не показываем чужую строку активности
+  else if (now && !_devChatRunSince) now.textContent = 'жду очереди — Клава занята другой задачей';
   const tm = el.querySelector('[data-timer]');
   if (tm) {
     const sec = _devChatRunSince ? Math.max(0, Math.round((Date.now() - _devChatRunSince) / 1000)) : 0;
@@ -2532,6 +2534,7 @@ async function _devChatRefreshStatuses() {
   _devChatLogProgress();   // v2.45.955: копим журнал для терминала «вживую»
 
   let working = false;
+  let running = false;   // именно «грызёт сейчас», а не «стоит в очереди»
   ((data && data.messages) || []).forEach(function (m) {
     if (!_devChatPending.has(m.id)) return;
     const span = document.querySelector('[data-msg-id="' + m.id + '"] [data-status]');
@@ -2547,16 +2550,23 @@ async function _devChatRefreshStatuses() {
     // ЭТА вкладка. Иначе открыл чат с телефона через полчаса — а в карточке
     // «0:04», будто Клава только начала. Поллер забирает задачу за секунды,
     // так что ts сообщения — честное начало работы.
-    if (m.status === 'running' && !_devChatRunSince) {
-      const started = m.ts ? Date.parse(m.ts) : NaN;
-      _devChatRunSince = (!isNaN(started) && started <= Date.now()) ? started : Date.now();
+    if (m.status === 'running') {
+      running = true;
+      if (!_devChatRunSince) {
+        const started = m.ts ? Date.parse(m.ts) : NaN;
+        _devChatRunSince = (!isNaN(started) && started <= Date.now()) ? started : Date.now();
+      }
     }
   });
-  if (!working) _devChatRunSince = null;
+  // v2.45.974: таймер живёт ровно столько, сколько идёт РАБОТА в этом чате.
+  // Раньше он обнулялся только когда очередь пустела — задача, стоящая в
+  // очереди, показывала время чужой, уже бегущей задачи.
+  if (!running) _devChatRunSince = null;
   // в шапке — последнее действие агента, если он его прислал
   const progLines = working ? _devChatProgLines() : null;
   _devChatSetStatus(
-    working ? (progLines ? progLines[progLines.length - 1] : 'Клава работает над задачей…')
+    working ? (progLines ? progLines[progLines.length - 1]
+                         : (running ? 'Клава работает над задачей…' : 'Задача в очереди'))
             : 'Готов к работе',
     working ? 'working' : 'ready');
   if (feed) _devChatTyping(feed, working);
@@ -2865,16 +2875,30 @@ function _devChatBindVoice() {
 // Журнал строк прогресса с клиентскими таймстампами: бэкенд хранит скользящее
 // окно без времени, поэтому время проставляем в момент, когда строку увидели.
 window._devChatTermLog = [];     // [{t: 'ЧЧ:ММ:СС', ln: строка}]
-let _devChatTermLast = null;     // последняя учтённая строка (для диффа окна)
+let _devChatTermSeen = {};       // id задачи -> последняя учтённая строка (дифф окна)
 let _devChatRunSince = null;     // когда задача перешла в «работает» (для таймера)
+
+// v2.45.974: при смене чата живая часть (тикер, таймер, журнал терминала)
+// обнуляется — она принадлежит задаче, а задача принадлежит чату.
+function _devChatResetLive() {
+  window._devChatProg = {};
+  window._devChatTermLog = [];
+  _devChatTermSeen = {};
+  _devChatRunSince = null;
+}
 
 function _devChatLogProgress() {
   const prog = window._devChatProg || {};
   Object.keys(prog).forEach(function (id) {
+    // строки чужой задачи в этот журнал не пускаем: старый бэкенд отдаёт
+    // прогресс всех незакрытых задач сразу, и терминал показывал одну и ту же
+    // работу в любом открытом чате
+    if (!_devChatPending.has(Number(id))) return;
     const lines = (prog[id] && prog[id].lines) || [];
     if (!lines.length) return;
     // окно скользит: добавляем всё, что после последней учтённой строки
-    let start = _devChatTermLast ? lines.lastIndexOf(_devChatTermLast) + 1 : 0;
+    const last = _devChatTermSeen[id];
+    let start = last ? lines.lastIndexOf(last) + 1 : 0;
     if (start < 0) start = 0;
     for (let i = start; i < lines.length; i++) {
       const d = new Date();
@@ -2883,7 +2907,7 @@ function _devChatLogProgress() {
         String(d.getSeconds()).padStart(2, '0');
       window._devChatTermLog.push({ t: t, ln: lines[i] });
     }
-    if (lines.length) _devChatTermLast = lines[lines.length - 1];
+    _devChatTermSeen[id] = lines[lines.length - 1];
   });
   if (window._devChatTermLog.length > 400) {
     window._devChatTermLog = window._devChatTermLog.slice(-400);
@@ -3339,6 +3363,7 @@ function devChatOpenThread(id) {
   _devChatSince = 0;
   _devChatDayKey = '';
   _devChatPending = new Set();
+  _devChatResetLive();
   const feed = _devChatEl('feed');
   if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
   _devChatRenderThreads();
@@ -3571,6 +3596,7 @@ function loadDevChat(host) {
   _devChatSince = 0;
   _devChatDayKey = '';
   _devChatPending = new Set();
+  _devChatResetLive();
   const feed = _devChatEl('feed');
   if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
   const input = _devChatEl('input');
