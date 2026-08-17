@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.966";
+const APP_VERSION = "v2.45.967";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1770,6 +1770,12 @@ function runScreenLoader(screenName) {
   if (screenName === 'atom-chiller') {
     const _chf = document.getElementById('chiller-frame');
     if (_chf && !_chf.getAttribute('src') && _chf.dataset.src) _chf.setAttribute('src', _chf.dataset.src);
+    // v2.45.967: кнопка чата по чиллерам — лента Клавы доступна только владельцу
+    const _chb = document.getElementById('chiller-chat-btn');
+    if (_chb) {
+      const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
+      _chb.style.display = isDir ? '' : 'none';
+    }
   }
   if (screenName === 'home-dashboard') loadHomeDashboard();  // ЭТАП 16Б
   if (screenName === 'dashboard') loadDashboard();
@@ -3370,6 +3376,57 @@ function devChatToggleDrawer() {
     if (backdrop) backdrop.classList.remove('show');
     // на своём экране лента должна продолжать жить
     if (state.currentScreen === 'devchat') loadDevChat('screen'); else stopDevChat();
+  }
+}
+
+// ---- чат по чиллерам прямо в разделе «Атом Чиллер» ----
+// v2.45.967: работа по чиллерам ведётся отдельной лентой, чтобы не мешалась с
+// общим чатом. Отдельного хранилища не заводим: это обычный чат devchat в
+// проекте «Атом Чиллер», поэтому та же переписка видна и на экране «Клава».
+const CHILLER_PROJECT_NAME = 'Атом Чиллер';
+const CHILLER_PROJECT_MEMORY =
+  'Работаем по чиллерам целиком. 3D-база и генераторы моделей — ' +
+  'C:\\Users\\Пользователь\\projects\\atomus-3d-baza (RABOTA.md читать первым, ' +
+  'обновление базы в CRM: python make_pack.py затем python upload_pack.py). ' +
+  'Оболочка раздела — atomus-pwa/chiller/index.html, она СОБИРАЕТСЯ ' +
+  'make_viewer.py --deploy, руками в репозитории фронта её не править. ' +
+  'Проекты чиллеров — chiller/project.html + /api/chiller/projects, ' +
+  'модели и меши — /api/3d/* на воркере.';
+
+async function openChillerChat() {
+  let data;
+  try {
+    data = await apiGet('/api/dev-chat/threads');
+  } catch (e) {
+    showToast('Чат недоступен', 'error');
+    return;
+  }
+  const projects = (data && data.projects) || [];
+  const threads = (data && data.threads) || [];
+  let project = projects.find(function (p) { return p.name === CHILLER_PROJECT_NAME; });
+  try {
+    // Проект заводим при первом открытии — руками создавать папку не нужно.
+    // Рабочую папку не задаём: агент стартует из домашней, где лежат его заметки.
+    if (!project) {
+      project = (await apiPost('/api/dev-chat/projects',
+        { name: CHILLER_PROJECT_NAME, color: '#2D5F8B', memory: CHILLER_PROJECT_MEMORY })).project;
+    }
+    // берём самый свежий чат проекта, а если его нет — заводим
+    let thread = threads.find(function (t) { return t.project_id === project.id; });
+    if (!thread) {
+      thread = (await apiPost('/api/dev-chat/threads',
+        { project_id: project.id, title: 'Чиллеры' })).thread;
+    }
+    try { localStorage.setItem(DEVCHAT_THREAD_KEY, String(thread.id)); } catch (e) {}
+    const drawer = document.getElementById('devchat-drawer');
+    if (drawer && drawer.style.display === 'flex') {
+      devChatOpenThread(thread.id);
+      devChatLoadThreads(false);   // чат мог родиться только что — его нет в списке
+    } else {
+      devChatToggleDrawer();       // откроется на сохранённом чате — том самом
+    }
+  } catch (e) {
+    showToast('Не смог открыть чат по чиллерам', 'error');
   }
 }
 
