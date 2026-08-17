@@ -3689,7 +3689,10 @@ async function openChillerChat() {
     // перезагрузки шторка садилась на этот пустой и лента выглядела стёртой.
     // Теперь сначала подбираем уже существующий чат по названию и переносим
     // его в проект: переписка одна и там, и на экране «Клава».
-    let thread = threads.find(function (t) { return t.project_id === project.id; });
+    // Если в проекте уже несколько чатов, садимся на тот, где есть переписка:
+    // пустой дубль (наследство прежней версии) иначе выглядел бы стёртой лентой.
+    const mine = threads.filter(function (t) { return t.project_id === project.id; });
+    let thread = mine.find(function (t) { return (t.msg_count || 0) > 0; }) || mine[0];
     if (!thread) {
       const orphan = threads.find(function (t) {
         return !t.project_id && /^чиллер/i.test(String(t.title || '').trim());
