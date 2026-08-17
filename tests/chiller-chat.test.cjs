@@ -45,6 +45,9 @@ test('чат открывается в проекте «Атом Чиллер»,
 test('проект заводится один раз и помнит, где лежит база чиллеров', () => {
   const ctx = {
     calls: [],
+    state: { user: { roles: ['director'] } },
+    location: { origin: 'https://crm.local' },
+    window: { addEventListener(type, fn) { if (type === 'message') ctx.onMessage = fn; } },
     localStorage: { setItem() {}, getItem() { return null; } },
     document: { getElementById() { return null; } },
     showToast() {},
@@ -80,6 +83,29 @@ test('проект заводится один раз и помнит, где л
     };
     return ctx.openChillerChat().then(() => {
       assert.equal(ctx.calls.filter((c) => c[0] === 'POST').length, 0);
+
+      // из полноэкранной 3D-базы чат просит открыть сам модуль
+      ctx.calls = [];
+      ctx.onMessage({ origin: 'https://crm.local', data: { type: 'atom-chiller-chat' } });
+      assert.ok(ctx.calls.length, 'свой модуль должен открывать чат');
+      // чужая страница и не-директор — мимо
+      ctx.calls = [];
+      ctx.onMessage({ origin: 'https://evil.example', data: { type: 'atom-chiller-chat' } });
+      ctx.state.user.roles = ['manager'];
+      ctx.onMessage({ origin: 'https://crm.local', data: { type: 'atom-chiller-chat' } });
+      ctx.state.user.roles = ['director'];
+      assert.equal(ctx.calls.length, 0);
     });
   });
+});
+
+test('в шапке 3D-базы есть кнопка чата, и в полный экран она не тянет CRM', () => {
+  const shell = fs.readFileSync(path.join(root, 'chiller', 'index.html'), 'utf8');
+  assert.match(shell, /id="chatBtn"/);
+  assert.match(shell, /onclick="openChat\(\)"/);
+  // сначала сворачиваем полный экран (иначе шторки CRM поверх модуля не видно),
+  // потом просим CRM открыть ленту — и только на своём origin
+  const fn = shell.slice(shell.indexOf('function openChat()'), shell.indexOf('function openChat()') + 400);
+  assert.match(fn, /exitFullscreen/);
+  assert.match(fn, /postMessage\(\{type:'atom-chiller-chat'\}, location\.origin\)/);
 });
