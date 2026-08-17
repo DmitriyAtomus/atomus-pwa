@@ -236,6 +236,7 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
   .hcount{display:none}
   .fsbtn{margin-left:auto;padding:6px 9px}
   #fsTxt{display:none}
+  #chatTxt{display:none}
 }
 </style></head><body>
 
@@ -249,6 +250,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
       <input id="q" placeholder="Поиск по обозначению, производителю, хладагенту…">
     </div>
     <div class="hcount"><b id="cReady">0</b> моделей выпущено<br><span id="cAll">0</span> позиций в базе</div>
+    <button id="chatBtn" class="fsbtn" onclick="openChat()" style="display:none"
+            title="Чат по чиллерам">💬 <span id="chatTxt">Чат</span></button>
     <a class="fsbtn" href="project.html" style="text-decoration:none"
        title="Прототип конструктора: собери машину из моделей базы">⚙ <span>Проект</span></a>
     <button id="fsBtn" class="fsbtn" onclick="toggleFS()"
@@ -474,6 +477,17 @@ function toggleFS(){
     if(p && p.catch) p.catch(()=>{});
   }catch(e){}
 }
+/* Чат по чиллерам. Своей ленты у модуля нет — она в CRM, поэтому кнопка просто
+   просит родителя открыть шторку. В полном экране поверх нас CRM ничего не
+   покажет (фулскрин держит наш документ), так что сначала сворачиваемся.
+   Открыто отдельной вкладкой (без CRM вокруг) — кнопку не показываем. */
+const inCRM = window.parent !== window;
+function openChat(){
+  try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  try{ window.parent.postMessage({type:'atom-chiller-chat'}, location.origin); }catch(e){}
+}
+if(inCRM){ const cb = document.getElementById('chatBtn'); if(cb) cb.style.display=''; }
+
 document.addEventListener('fullscreenchange', ()=>{
   const on = !!document.fullscreenElement;
   const t = document.getElementById('fsTxt'), i = document.getElementById('fsIco');

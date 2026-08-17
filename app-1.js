@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.967";
+const APP_VERSION = "v2.45.968";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3429,6 +3429,17 @@ async function openChillerChat() {
     showToast('Не смог открыть чат по чиллерам', 'error');
   }
 }
+
+// v2.45.968: 3D-база разворачивается на весь экран своим документом, и тогда
+// ни шапки раздела, ни шторки CRM поверх неё не видно. Поэтому кнопка чата есть
+// и внутри модуля: он сворачивает полный экран и просит нас открыть ленту.
+window.addEventListener('message', function (e) {
+  if (e.origin !== location.origin) return;          // чужим страницам чат не открываем
+  if (!e.data || e.data.type !== 'atom-chiller-chat') return;
+  const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
+  if (!isDir) return;                                 // лента devchat — только владельцу
+  openChillerChat();
+});
 
 // Esc закрывает шторку — на десктопе тянуться к крестику неудобно.
 document.addEventListener('keydown', function (e) {
