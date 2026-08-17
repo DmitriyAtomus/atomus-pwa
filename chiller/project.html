@@ -318,7 +318,7 @@ function pickItem(e){
   const hits=ray.intersectObjects(placed.map(p=>p.obj));
   return hits.length?placed.find(p=>p.obj===hits[0].object):null;
 }
-/* v2.45.973: тащим деталь в плоскости её собственной отметки, а не по полу —
+/* v2.45.974: тащим деталь в плоскости её собственной отметки, а не по полу —
    иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
 function planePoint(e,z){toNDC(e);ray.setFromCamera(ndc,camera);
   floor.constant=-(z||0);
@@ -375,7 +375,7 @@ function bindCtl(cv){
   });
 }
 
-/* ═══ v2.45.973: функция детали и её место в машине ═══
+/* ═══ v2.45.974: функция детали и её место в машине ═══
    Роль берём из разделов базы (section/sub) — они и так описывают назначение.
    SLOT говорит, на каком ярусе деталь живёт, в какой точке площадки стоит
    и куда «размножаются» одинаковые детали, если их несколько. */
@@ -588,7 +588,7 @@ function applyTint(p){
 function checkCollisions(){
   collSet=new Set();
   // AABB с усадкой 4 мм: касание — не пересечение.
-  // v2.45.973: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
+  // v2.45.974: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
   const chk=placed.filter(p=>!NOCOLL.has(roleOf(p.d)));
   const boxes=chk.map(p=>new THREE.Box3().setFromObject(p.obj).expandByScalar(-4));
   for(let i=0;i<chk.length;i++)
@@ -681,7 +681,7 @@ async function capi(path,method,body){
   return r.json();
 }
 function projPayload(){
-  // v2.45.973: z сохраняем тоже — иначе поднятые детали падали бы на пол при открытии
+  // v2.45.974: z сохраняем тоже — иначе поднятые детали падали бы на пол при открытии
   return {items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,
                                 z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y})),
           schema:schemaData};

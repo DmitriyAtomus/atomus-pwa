@@ -140,6 +140,42 @@ test('живой чат переносится в проект, а не подм
   });
 });
 
+// Пустой дубль в проекте мог остаться от прежней версии. Садиться надо на тот
+// чат, где лежит переписка, иначе после перезагрузки лента выглядит стёртой.
+test('из двух чатов проекта открывается тот, где есть переписка', () => {
+  const ctx = {
+    calls: [],
+    state: { user: { roles: ['director'] } },
+    location: { origin: 'https://crm.local' },
+    window: { addEventListener() {} },
+    saved: null,
+    DEVCHAT_THREAD_KEY: 'atomus_devchat_thread',
+    localStorage: { setItem(k, v) { ctx.saved = v; }, getItem() { return null; } },
+    document: { getElementById() { return null; } },
+    showToast() {},
+    devChatOpenThread() {},
+    devChatLoadThreads() {},
+    devChatToggleDrawer() {},
+    async apiGet() {
+      return {
+        // пустой дубль свежее — в списке он идёт первым
+        threads: [{ id: 9, project_id: 2, title: 'Чиллеры', msg_count: 0 },
+                  { id: 5, project_id: 2, title: 'Чиллера', msg_count: 16 }],
+        projects: [{ id: 2, name: 'Атом Чиллер' }],
+      };
+    },
+    async apiPost(url, body) { ctx.calls.push(['POST', url, body]); return { thread: { id: 99 } }; },
+    async apiPatch(url, body) { ctx.calls.push(['PATCH', url, body]); return { thread: { id: 5 } }; },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(section('const CHILLER_PROJECT_NAME', '// Esc закрывает шторку'), ctx);
+
+  return ctx.openChillerChat().then(() => {
+    assert.equal(ctx.calls.length, 0, 'ничего создавать и переносить не нужно');
+    assert.equal(ctx.saved, '5', 'шторка должна сесть на чат с перепиской');
+  });
+});
+
 test('в шапке 3D-базы есть кнопка чата, и в полный экран она не тянет CRM', () => {
   const shell = fs.readFileSync(path.join(root, 'chiller', 'index.html'), 'utf8');
   assert.match(shell, /id="chatBtn"/);
