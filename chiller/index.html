@@ -252,6 +252,21 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
 .ch-cmp button{flex:none;width:38px;height:38px;padding:0;font-size:15px;border-radius:9px;
   background:var(--cyan);border-color:#4FBBEC;color:#04121F;font-weight:700}
 .ch-cmp button:hover{background:#37B0E4;color:#04121F}
+/* скрепка: та же кнопка, но не зовущая нажать — отправка остаётся главной */
+.ch-cmp button.att{background:rgba(255,255,255,.055);border-color:var(--line2);
+  color:var(--dim);font-weight:400;font-size:16px}
+.ch-cmp button.att:hover{background:rgba(255,255,255,.1);color:#fff}
+.ch-att{display:none;flex-wrap:wrap;gap:6px;padding:0 13px 8px}
+.ch-att.on{display:flex}
+.ch-att .a{display:flex;align-items:center;gap:6px;max-width:100%;padding:4px 7px;
+  font-size:10.5px;border:1px solid var(--line2);border-radius:8px;
+  background:rgba(255,255,255,.05);color:var(--dim2)}
+.ch-att .a img{width:28px;height:28px;object-fit:cover;border-radius:5px}
+.ch-att .a b{font-weight:400;color:#DCE6F2;max-width:150px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-att .a i{font-style:normal;cursor:pointer;padding:0 2px;color:var(--dim2)}
+.ch-att .a i:hover{color:#F1A0A0}
+#chat.drag{outline:2px dashed var(--cyan);outline-offset:-7px}
 .ch-ctx{padding:0 13px 8px;font-size:10.5px;color:var(--dim2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #chArt{position:fixed;inset:0;z-index:61;background:#061020;display:none;flex-direction:column}
@@ -424,10 +439,14 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
     <div class="wn" id="chNow">принял задачу…</div>
   </div>
   <div class="ch-ctx" id="chCtx"></div>
+  <div class="ch-att" id="chAtt"></div>
   <div class="ch-cmp">
     <textarea id="chIn" rows="1" placeholder="Задача по чиллерам… Enter — отправить"></textarea>
+    <button class="att" onclick="chAttPick()" title="Прикрепить файл (можно вставить снимок из буфера)">📎</button>
     <button onclick="chatSend()" title="Отправить">↑</button>
   </div>
+  <input type="file" id="chFile" multiple style="display:none"
+         accept="image/*,.pdf,.txt,.log,.json,.csv,.html,.step,.stp,.dxf,.zip">
 </div>
 
 <div id="chArt">
@@ -612,6 +631,7 @@ const CH_ST = {uploading:'загружаю файлы…', new:'в очеред�
                stopping:'останавливаю…', stopped:'остановлено', done:'готово', error:'сбой'};
 const ch = {tid:0, since:0, pend:new Set(), prog:{}, open:false, run:0,
             poll:null, tick:null, unread:0, busy:false, arm:false,
+            files:[],     /* прикреплённое, но ещё не отправленное */
             first:true,   /* первый проход только догоняет ленту, не звонит */
             full:false};  /* открыли шторку — тянем историю целиком */
 
@@ -892,17 +912,76 @@ function chBadge(){
   const n = chEl('chatFabN'); if(n) n.textContent = ch.unread > 9 ? '9+' : String(ch.unread);
 }
 
+/* ---- вложения: скрепка, вставка из буфера (Ctrl+V) и перетаскивание ------
+   Пределы те же, что у сервера: 5 файлов, 50 МБ на файл, 60 МБ за раз —
+   лучше сказать это здесь, чем получить 400 после долгой загрузки. */
+const CH_MAXF = 5, CH_MAXB = 50*1024*1024, CH_MAXT = 60*1024*1024;
+function chAttPick(){ const f = chEl('chFile'); if(f) f.click(); }
+function chAttAdd(list){
+  const add = Array.from(list||[]);
+  for(const f of add){
+    if(ch.files.length >= CH_MAXF){ chAttSay('не больше '+CH_MAXF+' файлов'); break; }
+    if(f.size > CH_MAXB){ chAttSay('«'+f.name+'» больше 50 МБ'); continue; }
+    if(ch.files.reduce((s,x)=>s+x.size,0) + f.size > CH_MAXT){
+      chAttSay('вложений больше 60 МБ за раз'); break; }
+    ch.files.push(f);
+  }
+  chAttDraw();
+}
+function chAttSay(t){ const st = chEl('chSt'); if(st) st.textContent = t; }
+function chAttDraw(){
+  const box = chEl('chAtt'); if(!box) return;
+  box.classList.toggle('on', ch.files.length > 0);
+  box.innerHTML = '';
+  ch.files.forEach((f,i)=>{
+    const a = document.createElement('div'); a.className = 'a';
+    if((f.type||'').indexOf('image/') === 0){
+      const im = document.createElement('img');
+      im.src = URL.createObjectURL(f);
+      im.onload = () => URL.revokeObjectURL(im.src);
+      a.appendChild(im);
+    }
+    const b = document.createElement('b'); b.textContent = f.name || 'снимок';
+    const s = document.createElement('span');
+    s.textContent = (f.size/1024 > 900 ? (f.size/1048576).toFixed(1)+' МБ'
+                                       : Math.max(1, Math.round(f.size/1024))+' КБ');
+    const x = document.createElement('i'); x.textContent = '×'; x.title = 'убрать';
+    x.onclick = () => { ch.files.splice(i,1); chAttDraw(); };
+    a.appendChild(b); a.appendChild(s); a.appendChild(x);
+    box.appendChild(a);
+  });
+}
+
 async function chatSend(){
   const inp = chEl('chIn'); if(!inp || !ch.tid) return;
-  const text = (inp.value||'').trim(); if(!text) return;
-  inp.value = ''; chGrow(inp);
+  const text = (inp.value||'').trim();
+  const files = ch.files.slice();
+  if(!text && !files.length) return;
+  inp.value = ''; chGrow(inp); ch.files = []; chAttDraw();
   try{
-    const d = await chPost('/send', {text:text, thread_id:ch.tid, context:chContext()});
+    let d;
+    if(files.length){
+      /* с файлами уходим multipart — на этот путь у сервера рождается
+         сообщение в статусе «загружаю файлы», и агент берёт его уже с ними */
+      const fd = new FormData();
+      fd.append('text', text);
+      fd.append('thread_id', String(ch.tid));
+      fd.append('context', JSON.stringify(chContext()));
+      files.forEach(f => fd.append('files', f, f.name || 'снимок.png'));
+      const r = await fetch(CHAT_API + '/send', {method:'POST', cache:'no-store',
+        headers:AUTH, body:fd});
+      if(!r.ok) throw Object.assign(new Error('HTTP '+r.status), {status:r.status});
+      d = await r.json();
+    }else{
+      d = await chPost('/send', {text:text, thread_id:ch.tid, context:chContext()});
+    }
     if(d && d.message){ chDraw(d.message); ch.pend.add(d.message.id); ch.since = Math.max(ch.since, d.message.id); }
     chWork(true);
     chWatch(true);
   }catch(e){
-    inp.value = text;       /* не потерять набранное: сеть моргнула — текст на месте */
+    /* не потерять набранное и приложенное: сеть моргнула — всё на месте */
+    inp.value = text; chGrow(inp);
+    ch.files = files.concat(ch.files).slice(0, CH_MAXF); chAttDraw();
     chEl('chSt').textContent = 'не отправилось';
   }
 }
@@ -917,6 +996,27 @@ function chGrow(el){
 (function chBind(){
   const inp = chEl('chIn'); if(!inp) return;
   inp.addEventListener('input', () => chGrow(inp));
+  const fi = chEl('chFile');
+  if(fi) fi.addEventListener('change', () => { chAttAdd(fi.files); fi.value = ''; });
+  /* снимок из буфера: Ctrl+V прямо в поле — самый частый способ показать экран */
+  inp.addEventListener('paste', e => {
+    const items = (e.clipboardData||{}).items || [];
+    const got = [];
+    for(const it of items){ if(it.kind === 'file'){ const f = it.getAsFile(); if(f) got.push(f); } }
+    if(got.length){ e.preventDefault(); chAttAdd(got); }
+  });
+  /* перетаскивание файла в шторку */
+  const box = chEl('chat');
+  if(box){
+    ['dragenter','dragover'].forEach(ev => box.addEventListener(ev, e => {
+      if(!(e.dataTransfer && Array.from(e.dataTransfer.types||[]).indexOf('Files') >= 0)) return;
+      e.preventDefault(); box.classList.add('drag'); }));
+    ['dragleave','dragend'].forEach(ev => box.addEventListener(ev, e => {
+      if(e.target === box) box.classList.remove('drag'); }));
+    box.addEventListener('drop', e => {
+      if(!(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length)) return;
+      e.preventDefault(); box.classList.remove('drag'); chAttAdd(e.dataTransfer.files); });
+  }
   inp.addEventListener('keydown', e => {
     /* Enter отправляет, Shift+Enter — перенос. isComposing и 229 — набор через
        Т9 и IME: там Enter подтверждает слово, отправлять на нём нельзя. */
@@ -969,9 +1069,12 @@ let theta=-0.95, phi=1.18, dist=1500, dMin=300, dMax=5000,
 const C_BODY=0x8d959d, C_DIS=0xd94f3d, C_SUC=0x3d8fd9, C_PPK=0xC9A227,
       C_EQ=0x4FBF8B;
 /* палитра покраски деталей: первый цвет - исходная сталь, он же «сброс» */
-const PAL=[0x8d959d,0x39424E,0xE8EDF2,0xD9534F,0xE2892F,0xE0BE38,0x4FA85B,
-           0x2FB6A8,0x1B9FD8,0x3B5BD9,0x8E5BD0,0xB4703A];
+const PAL=[0x8d959d,0x39424E,0x1A1D21,0xE8EDF2,0xD9534F,0xE2892F,0xE0BE38,
+           0x4FA85B,0x2FB6A8,0x1B9FD8,0x3B5BD9,0x8E5BD0,0xB4703A];
 const hx=c=>'#'+c.toString(16).padStart(6,'0');
+/* цвет детали из пакета: '#1A1D21' у крашеных, иначе исходная сталь */
+const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
+  return isNaN(c)?C_BODY:c;};
 
 function initGL(){
   if(renderer) return;
@@ -1039,8 +1142,13 @@ async function loadMesh(d){
      деталей нет, там группы прежние: корпус и зоны патрубков. */
   PARTS = MS.parts && MS.parts.length ? MS.parts : null;
   if(PARTS){
-    partMats = PARTS.map(()=>new THREE.MeshStandardMaterial(
-      {color:C_BODY,metalness:.55,roughness:.48,flatShading:true}));
+    /* col в детали — заводская окраска (решётка вентилятора чёрная); без него
+       деталь идёт сталью, как раньше. Красить руками это не мешает. */
+    /* крашеная деталь и блестит иначе: с металличностью стали чёрная решётка
+       под прямым светом выглядит серой, поэтому у неё матовая краска */
+    partMats = PARTS.map(p=>new THREE.MeshStandardMaterial(
+      {color:partCol(p), metalness:p.col?.15:.55, roughness:p.col?.74:.48,
+       flatShading:true}));
     PARTS.forEach((p,i)=>{ if(p.count>0) geo.addGroup(p.start,p.count,i); });
     mesh=new THREE.Mesh(geo,partMats);
   } else {
@@ -1171,7 +1279,7 @@ function buildParts(){
   const by=new Map();
   PARTS.forEach((p,i)=>{
     const k=p.des+'|'+p.name;
-    if(!by.has(k)) by.set(k,{des:p.des,name:p.name,idx:[]});
+    if(!by.has(k)) by.set(k,{des:p.des,name:p.name,col:partCol(p),idx:[]});
     by.get(k).idx.push(i);
   });
   const groups=[...by.values()];
@@ -1180,7 +1288,7 @@ function buildParts(){
     `<div class="prow" data-g="${i}"><span class="d">${g.des}</span>`+
     `<span class="n" title="${g.name}">${g.name}</span>`+
     `<span class="q">${g.idx.length>1?'×'+g.idx.length:''}</span>`+
-    `<button class="sw" title="цвет" style="background:${hx(PAL[0])}"></button>`+
+    `<button class="sw" title="цвет" style="background:${hx(g.col)}"></button>`+
     `<button class="b">скрыть</button></div><div class="pal" data-p="${i}">`+
     PAL.map(c=>`<i data-c="${c}" style="background:${hx(c)}"></i>`).join('')+
     `</div>`).join('');
@@ -1218,10 +1326,14 @@ function buildParts(){
       const b=r.querySelector('.b'); if(b) b.textContent='скрыть'; });
     $('#pAll').textContent='Показать все';
   };
+  /* сброс возвращает заводской цвет детали, а не общую сталь: решётка
+     вентилятора чёрная и после сброса должна остаться чёрной */
   $('#pClr').onclick=()=>{
-    groups.forEach(g=>paint(g,PAL[0]));
+    groups.forEach(g=>paint(g,g.col));
     $('#pList').querySelectorAll('.pal').forEach(p=>p.classList.remove('open'));
-    $('#pList').querySelectorAll('.sw').forEach(s=>s.style.background=hx(PAL[0]));
+    $('#pList').querySelectorAll('.prow').forEach(r=>{
+      const sw=r.querySelector('.sw');
+      if(sw) sw.style.background=hx(groups[+r.dataset.g].col); });
   };
 }
 

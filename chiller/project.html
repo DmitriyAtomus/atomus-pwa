@@ -271,6 +271,26 @@ async function geoOf(d){
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.setIndex(new THREE.BufferAttribute(i16,1));
   geo.computeVertexNormals();geo.computeBoundingBox();
+  /* Крашеные детали (решётка вентилятора — чёрная) приходят в меше со своим
+     цветом. Материал на каждую деталь тут не нужен — гасить их в компоновке
+     нечем; сводим к списку цветов: 0 — сталь, дальше по одному на краску. */
+  const parts=MS.parts&&MS.parts.length?MS.parts:null;
+  const cols=[C_BODY];
+  if(parts){
+    let split=false;
+    parts.forEach(p=>{
+      if(!p.count)return;
+      let mi=0;
+      if(p.col){
+        const c=parseInt(String(p.col).replace('#',''),16);
+        if(!isNaN(c)){ mi=cols.indexOf(c); if(mi<0){cols.push(c);mi=cols.length-1;} }
+      }
+      if(mi)split=true;
+      geo.addGroup(p.start,p.count,mi);
+    });
+    if(!split)geo.clearGroups();     // всё сталь — незачем дробить отрисовку
+  }
+  geo.userData.cols=cols.length>1?cols:null;
   GEO_CACHE.set(key,geo);return geo;
 }
 
@@ -533,7 +553,12 @@ async function addItem(d,at,rot,tilt){
   let geo;
   try{geo=await geoOf(d);}
   catch(err){toast('Модель не загрузилась: '+err.message);return null;}
-  const mat=new THREE.MeshStandardMaterial({color:C_BODY,metalness:.55,roughness:.48,flatShading:true});
+  /* краска матовая, сталь блестящая — иначе чёрная решётка под прямым светом
+     выглядит серой */
+  const mk=c=>new THREE.MeshStandardMaterial(
+    {color:c,metalness:c===C_BODY?.55:.15,roughness:c===C_BODY?.48:.74,
+     flatShading:true});
+  const mat=geo.userData.cols?geo.userData.cols.map(mk):mk(C_BODY);
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
   obj.position.z=-bb.min.z;                      // низ детали — на пол
@@ -580,10 +605,14 @@ function toFloor(){
 /* ═══ пересечения: детали, которые наезжают друг на друга, светятся красным ═══ */
 let collSet=new Set();
 function applyTint(p){
-  const m=p.obj.material;
-  if(collSet.has(p.uid)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.5;}
-  else if(sel===p){m.emissive.setHex(0x1B9FD8);m.emissiveIntensity=.33;}
-  else{m.emissive.setHex(0x000000);m.emissiveIntensity=0;}
+  /* у сборок с крашеными деталями материал не один, а список — подсветка
+     выделения и пересечения ложится на все */
+  const ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material];
+  ms.forEach(m=>{
+    if(collSet.has(p.uid)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.5;}
+    else if(sel===p){m.emissive.setHex(0x1B9FD8);m.emissiveIntensity=.33;}
+    else{m.emissive.setHex(0x000000);m.emissiveIntensity=0;}
+  });
 }
 function checkCollisions(){
   collSet=new Set();
