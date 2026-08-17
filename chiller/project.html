@@ -58,6 +58,7 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
   border-radius:10px;padding:7px 10px}
 #selbar.on{display:flex}
 #selbar .nm{font-size:12px;color:var(--ice);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#selbar .z{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap}
 #selbar button{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:7px;
   padding:5px 10px;font-size:11.5px;cursor:pointer}
 #selbar button:hover{border-color:var(--ice2)}
@@ -156,7 +157,8 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
       <div class="search"><span style="color:var(--faint)">⌕</span><input id="q" placeholder="компрессор, отвод, ПТО…"></div>
       <div class="chips" id="secs"></div>
       <div id="cat"></div>
-      <div class="note">Клик или «+» — деталь встаёт в сцену. Это те же модели, что в базе.</div>
+      <div class="note">Клик или «+» — деталь встаёт на своё место по функции: компрессор и ресивер на пол корпуса,
+        арматура на средний ярус, конденсатор с вентиляторами на крышу. Дальше её можно двигать руками.</div>
     </div>
 
     <div id="vwrap">
@@ -166,15 +168,20 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" data-v="top">Сверху</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
       </div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот · Del — убрать</div>
-      <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на пол.<br>Начни с корпуса или компрессора.</div></div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать</div>
+      <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <svg id="schSvg" viewBox="26 6 212 214"></svg>
         <div class="sch-note">Типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3). Клик по элементу — назначить модель из базы.
           Зелёным — назначено, жёлтым «назначить» — ждёт. Назначения хранятся в проекте.</div>
       </div>
       <div id="selbar"><span class="nm" id="selNm"></span>
+        <span class="z" id="selZ"></span>
         <button id="bRot" title="R">⟳ 90°</button>
+        <button id="bTilt" title="Положить набок / поднять">⤡ завал 90°</button>
+        <button id="bUp" title="PageUp">▲ 50</button>
+        <button id="bDown" title="PageDown">▼ 50</button>
+        <button id="bFloor" title="Поставить на пол">⤓ пол</button>
         <button id="bDup">⧉ Дублировать</button>
         <button id="bDel" class="del" title="Delete">✕ Убрать</button>
       </div>
@@ -184,6 +191,8 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
       <div class="ph">Спецификация <span class="m">сама из сцены</span></div>
       <div id="spec"></div>
       <div class="acts">
+        <div class="btn" id="bAuto">✦ Расставить по функциям</div>
+        <div class="btn" id="bFromSch">⤓ Собрать по схеме</div>
         <div class="btn pri" id="bBom">→ BOM · чертёж сборки</div>
         <div class="btn ghost" id="bClear">Очистить сцену</div>
       </div>
@@ -309,7 +318,10 @@ function pickItem(e){
   const hits=ray.intersectObjects(placed.map(p=>p.obj));
   return hits.length?placed.find(p=>p.obj===hits[0].object):null;
 }
-function floorPoint(e){toNDC(e);ray.setFromCamera(ndc,camera);
+/* v2.45.973: тащим деталь в плоскости её собственной отметки, а не по полу —
+   иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
+function planePoint(e,z){toNDC(e);ray.setFromCamera(ndc,camera);
+  floor.constant=-(z||0);
   const v=new THREE.Vector3();return ray.ray.intersectPlane(floor,v)?v:null;}
 const SNAP=10;
 const snap=v=>Math.round(v/SNAP)*SNAP;
@@ -326,7 +338,7 @@ function bindCtl(cv){
     if(e.button===2){mode='pan';return;}
     const hit=pickItem(e);
     if(hit){select(hit);mode='item';cv.classList.add('drag');
-      const fp=floorPoint(e);
+      const fp=planePoint(e,hit.obj.position.z);
       dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};}
     else{mode='orbit';}
   });
@@ -336,7 +348,7 @@ function bindCtl(cv){
     if(mode==='orbit'){theta-=dx*0.007;phi=Math.max(0.04,Math.min(Math.PI-0.04,phi-dy*0.007));}
     else if(mode==='pan'){pan(dx,dy);}
     else if(mode==='item'&&sel){
-      const fp=floorPoint(e);if(!fp)return;
+      const fp=planePoint(e,sel.obj.position.z);if(!fp)return;
       sel.obj.position.x=snap(fp.x+dragOff.x);
       sel.obj.position.y=snap(fp.y+dragOff.y);
       checkCollisions();save();
@@ -357,12 +369,167 @@ function bindCtl(cv){
     if(e.key==='Escape')select(null);
     if(!sel)return;
     if(e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')rotSel();
+    if(e.key==='PageUp'){e.preventDefault();lift(50);}
+    if(e.key==='PageDown'){e.preventDefault();lift(-50);}
     if(e.key==='Delete'||e.key==='Backspace')delSel();
   });
 }
 
+/* ═══ v2.45.973: функция детали и её место в машине ═══
+   Роль берём из разделов базы (section/sub) — они и так описывают назначение.
+   SLOT говорит, на каком ярусе деталь живёт, в какой точке площадки стоит
+   и куда «размножаются» одинаковые детали, если их несколько. */
+function roleOf(d){
+  const sec=d.section||'',sub=d.sub||'';
+  if(sec==='frames')return 'frame';           // корпус чиллера — площадка компоновки
+  if(sec==='compressors')return 'comp';
+  if(sub==='cond')return 'cond';
+  if(sub==='fan')return 'fan';
+  if(sub==='evap'||sub==='plate')return 'evap';
+  if(sub==='recv')return 'recv';
+  if(sub==='sep')return 'sep';
+  if(sec==='pumps')return 'pump';
+  if(sub==='vibro')return 'vibro';
+  if(sub==='panel')return 'panel';            // щит управления
+  if(sec==='automation')return 'instr';       // манометры, реле давления, контроллеры
+  if(sec==='valves'||sub==='filt')return 'line';  // арматура на линии
+  if(sec==='pipe')return 'pipe';
+  return 'floor';
+}
+const ROLE_NAME={frame:'корпус',comp:'компрессор',cond:'конденсатор',fan:'вентилятор',
+  evap:'испаритель',recv:'ресивер',sep:'отделитель',pump:'насос',vibro:'виброопора',
+  panel:'щит',instr:'приборы',line:'арматура',pipe:'трубы',floor:'на полу'};
+/* ax/ay — доля габарита площадки (0 — левый/передний край, 1 — правый/задний) */
+const SLOT={
+  frame:{lvl:'floor',ax:.50,ay:.50,dir:'x',rot:0},
+  vibro:{lvl:'floor',ax:.08,ay:.08,dir:'y',rot:0},
+  comp: {lvl:'floor',ax:.20,ay:.26,dir:'y',rot:0},
+  sep:  {lvl:'floor',ax:.20,ay:.80,dir:'x',rot:0},
+  recv: {lvl:'floor',ax:.52,ay:.86,dir:'x',rot:0,center:true},
+  evap: {lvl:'floor',ax:.80,ay:.26,dir:'y',rot:0},
+  pump: {lvl:'floor',ax:.80,ay:.74,dir:'y',rot:0},
+  line: {lvl:'mid',  ax:.90,ay:.14,dir:'y',rot:Math.PI/2},
+  instr:{lvl:'panel',ax:.14,ay:.04,dir:'x',rot:0},
+  panel:{lvl:'panel',ax:.55,ay:.04,dir:'x',rot:0},
+  cond: {lvl:'roof', ax:.50,ay:.50,dir:'y',rot:0,center:true},
+  // вентилятор в базе построен осью по X (посадка в стенку конденсатора) — на крыше кладём его осью вверх
+  fan:  {lvl:'cond', ax:.50,ay:.50,dir:'x',rot:0,tilt:Math.PI/2,center:true},
+  pipe: {lvl:'yard', ax:1.30,ay:.20,dir:'y',rot:0},
+  floor:{lvl:'floor',ax:.50,ay:.50,dir:'x',rot:0},
+};
+/* порядок арматуры по ходу жидкостной линии: кран → фильтр → стекло → соленоид → ТРВ */
+const LINE_ORDER=['кран','фильтр','стекл','соленоид','электромагнит','обратн','регулятор','трв'];
+function lineRank(d){
+  const t=((d.name||'')+' '+(d.kind||'')).toLowerCase();
+  for(let i=0;i<LINE_ORDER.length;i++)if(t.includes(LINE_ORDER[i]))return i;
+  return LINE_ORDER.length;
+}
+/* площадка: габарит корпуса, если он в сцене, иначе типовая рама 900 × 606 × 900 */
+const DEF_SITE={w:900,d:606,h:900};
+function site(){
+  const fr=placed.find(p=>roleOf(p.d)==='frame');
+  if(fr)return new THREE.Box3().setFromObject(fr.obj);
+  return new THREE.Box3(new THREE.Vector3(-DEF_SITE.w/2,-DEF_SITE.d/2,0),
+                        new THREE.Vector3( DEF_SITE.w/2, DEF_SITE.d/2,DEF_SITE.h));
+}
+function levelZ(lvl,s){
+  const H=s.max.z-s.min.z;
+  if(lvl==='roof')return s.max.z;                       // конденсатор — наверх
+  if(lvl==='mid') return s.min.z+H*0.50;                // арматура — средний ярус
+  if(lvl==='panel')return s.min.z+H*0.70;               // приборы — на виду сверху
+  if(lvl==='cond'){                                     // вентилятор — на конденсаторе
+    const c=placed.find(p=>roleOf(p.d)==='cond');
+    return c?new THREE.Box3().setFromObject(c.obj).max.z:s.max.z;}
+  return s.min.z;                                       // пол площадки
+}
+function slotPoint(sl,s){
+  return {x:s.min.x+(s.max.x-s.min.x)*sl.ax,
+          y:s.min.y+(s.max.y-s.min.y)*sl.ay};
+}
+/* поставить деталь: центр по X/Y в точку, низ — на отметку z; tilt — завал вокруг Y */
+function placeAt(it,x,y,z,rot,tilt){
+  const o=it.obj;
+  o.rotation.set(0,tilt||0,rot||0);o.position.set(0,0,0);o.updateMatrixWorld(true);
+  const b0=new THREE.Box3().setFromObject(o),c=new THREE.Vector3();b0.getCenter(c);
+  o.position.set(snap(x-c.x),snap(y-c.y),Math.round(z-b0.min.z));
+  o.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(o);
+}
+const NOCOLL=new Set(['frame','vibro','pipe']);   // корпус и опоры «обнимают» детали — это не пересечение
+function boxFree(box,skip){
+  return !placed.some(p=>p!==skip&&!NOCOLL.has(roleOf(p.d))&&
+    new THREE.Box3().setFromObject(p.obj).expandByScalar(-6).intersectsBox(box));
+}
+/* деталь встаёт в свой слот; место занято — шагает вдоль ряда, ряд кончился — берёт следующий */
+const GAP=70;
+function autoPlace(it){
+  const role=roleOf(it.d);
+  if(role==='frame'){placeAt(it,0,0,0,0,0);return;}   // корпус — в центр сцены, он и есть площадка
+  const s=site(),sl=SLOT[role]||SLOT.floor;
+  const z=levelZ(sl.lvl,s),pt=slotPoint(sl,s);
+  const byX=sl.dir==='x';
+  const lim=byX?s.max.x:s.max.y;                      // дальше площадки ряд не тянем
+  const inward=(byX?sl.ay:sl.ax)>0.5?-1:1;            // новый ряд уходит внутрь площадки
+  let cur=byX?pt.x:pt.y,side=byX?pt.y:pt.x,row=0;
+  for(let k=0;k<30;k++){
+    const box=placeAt(it,byX?cur:side,byX?side:cur,z,sl.rot,sl.tilt);
+    if(NOCOLL.has(role)||boxFree(box,it))return;
+    const sz=new THREE.Vector3();box.getSize(sz);
+    cur+=(byX?sz.x:sz.y)+GAP;
+    // ряды переносим только внутри корпуса; крышный ряд (конденсатор, вентиляторы) тянется дальше
+    if(!sl.center&&cur>lim&&row<3){row++;cur=byX?pt.x:pt.y;side+=inward*180;}
+  }
+}
+/* ряд, который должен стоять по центру площадки (конденсатор, вентиляторы, ресивер) */
+function centerRow(list,sl,s){
+  const bb=new THREE.Box3();list.forEach(p=>bb.expandByObject(p.obj));
+  const pt=slotPoint(sl,s),c=new THREE.Vector3();bb.getCenter(c);
+  const dx=sl.dir==='x'?snap(pt.x-c.x):0,dy=sl.dir==='y'?snap(pt.y-c.y):0;
+  list.forEach(p=>{p.obj.position.x+=dx;p.obj.position.y+=dy;p.obj.updateMatrixWorld(true);});
+}
+/* полная перекладка сцены по функциям */
+const LAY_ORDER=['frame','vibro','comp','sep','recv','evap','pump','line','instr','panel','cond','fan','pipe','floor'];
+function autoLayout(){
+  if(!placed.length){toast('Сцена пустая — добавь детали из базы слева');return;}
+  const groups=new Map();
+  placed.forEach(p=>{const r=roleOf(p.d);
+    if(!groups.has(r))groups.set(r,[]);groups.get(r).push(p);});
+  // корпус ставим первым — от него считается вся площадка; остальных уводим в сторону,
+  // чтобы старые места не мешали поиску свободного
+  placed.forEach(p=>{
+    if(roleOf(p.d)==='frame')autoPlace(p);
+    else{p.obj.position.set(1e6,1e6,0);p.obj.updateMatrixWorld(true);}});
+  const roles=[...groups.keys()].sort((a,b)=>LAY_ORDER.indexOf(a)-LAY_ORDER.indexOf(b));
+  roles.forEach(r=>{
+    const list=groups.get(r);
+    if(r==='line')list.sort((a,b)=>lineRank(a.d)-lineRank(b.d));
+    list.forEach(autoPlace);
+    const sl=SLOT[r];
+    if(sl&&sl.center&&list.length>1)centerRow(list,sl,site());
+  });
+  select(sel&&placed.includes(sel)?sel:null);
+  refresh();save();
+  toast('Расставлено по функциям: '+roles.map(r=>ROLE_NAME[r]||r).join(', '));
+}
+/* «Собрать по схеме»: всё, что назначено узлам контура, встаёт в сцену */
+async function buildFromSchema(){
+  const need=new Map();
+  SCH_NODES.forEach(n=>{const a=schemaData[n.k];
+    if(a&&a.id)need.set(a.id,(need.get(a.id)||0)+1);});
+  if(!need.size){toast('Сначала назначь модели узлам на вкладке «Схема»');return;}
+  let added=0;
+  for(const [id,n] of need){
+    const d=DATA.find(x=>x.id===id&&x.ready);
+    if(!d)continue;
+    const have=placed.filter(p=>p.id===id).length;
+    for(let i=have;i<n;i++){if(await addItem(d))added++;}
+  }
+  autoLayout();
+  toast(added?('Добавлено по схеме: '+added+' '+plural(added)):'Все назначенные модели уже в сцене');
+}
+
 /* ═══ детали ═══ */
-async function addItem(d,at,rot){
+async function addItem(d,at,rot,tilt){
   let geo;
   try{geo=await geoOf(d);}
   catch(err){toast('Модель не загрузилась: '+err.message);return null;}
@@ -370,15 +537,14 @@ async function addItem(d,at,rot){
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
   obj.position.z=-bb.min.z;                      // низ детали — на пол
-  if(at){obj.position.x=at.x;obj.position.y=at.y;}
-  else{ // свободное место правее уже стоящих
-    let x=0;placed.forEach(p=>{const pb=p.obj.geometry.boundingBox;
-      x=Math.max(x,p.obj.position.x+pb.max.x+220);});
-    obj.position.x=snap(x-Math.min(0,bb.min.x));obj.position.y=0;}
-  if(rot)obj.rotation.z=rot;
+  obj.rotation.set(0,tilt||0,rot||0);
   scene.add(obj);
   const it={uid:uidSeq++,id:d.id,obj,d};
-  placed.push(it);select(it);refresh();save();
+  placed.push(it);
+  if(at){obj.position.x=at.x;obj.position.y=at.y;
+    if(typeof at.z==='number')obj.position.z=at.z;}  // из проекта — как сохранили
+  else autoPlace(it);                                // новая деталь — на свой ярус
+  select(it);refresh();save();
   return it;
 }
 function select(it){
@@ -386,9 +552,29 @@ function select(it){
   sel=it;
   if(prev)applyTint(prev);
   if(sel){applyTint(sel);
-    $('#selNm').textContent=sel.d.brand+' '+sel.d.name;}
+    $('#selNm').textContent=sel.d.brand+' '+sel.d.name;
+    showSelZ();}
   $('#selbar').classList.toggle('on',!!sel);
   refreshSpecSel();
+}
+/* отметка низа выделенной детали — по ней и видно, что стоит на крыше */
+function showSelZ(){
+  if(!sel){$('#selZ').textContent='';return;}
+  const b=new THREE.Box3().setFromObject(sel.obj);
+  $('#selZ').textContent=(ROLE_NAME[roleOf(sel.d)]||'')+' · отм. '+Math.round(b.min.z)+' мм';
+}
+function lift(dz){
+  if(!sel)return;
+  sel.obj.position.z=Math.round(sel.obj.position.z+dz);
+  sel.obj.updateMatrixWorld(true);
+  checkCollisions();showSelZ();refresh();save();
+}
+function toFloor(){
+  if(!sel)return;
+  const s=site(),b=new THREE.Box3().setFromObject(sel.obj);
+  sel.obj.position.z+=s.min.z-b.min.z;
+  sel.obj.updateMatrixWorld(true);
+  checkCollisions();showSelZ();refresh();save();
 }
 
 /* ═══ пересечения: детали, которые наезжают друг на друга, светятся красным ═══ */
@@ -401,12 +587,14 @@ function applyTint(p){
 }
 function checkCollisions(){
   collSet=new Set();
-  // AABB с усадкой 4 мм: касание — не пересечение
-  const boxes=placed.map(p=>new THREE.Box3().setFromObject(p.obj).expandByScalar(-4));
-  for(let i=0;i<placed.length;i++)
-    for(let j=i+1;j<placed.length;j++)
+  // AABB с усадкой 4 мм: касание — не пересечение.
+  // v2.45.973: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
+  const chk=placed.filter(p=>!NOCOLL.has(roleOf(p.d)));
+  const boxes=chk.map(p=>new THREE.Box3().setFromObject(p.obj).expandByScalar(-4));
+  for(let i=0;i<chk.length;i++)
+    for(let j=i+1;j<chk.length;j++)
       if(boxes[i].intersectsBox(boxes[j])){
-        collSet.add(placed[i].uid);collSet.add(placed[j].uid);}
+        collSet.add(chk[i].uid);collSet.add(chk[j].uid);}
   placed.forEach(applyTint);
   const el=$('#fColl');
   if(!placed.length){el.textContent='';return;}
@@ -414,15 +602,33 @@ function checkCollisions(){
   el.textContent=n?('⚠ пересекаются: '+n+' дет.'):'✓ пересечений нет';
   el.style.color=n?'#f0a9a0':'var(--ok)';
 }
-function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;checkCollisions();save();}
+function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;
+  sel.obj.updateMatrixWorld(true);checkCollisions();showSelZ();save();}
+/* завал вокруг Y: положить конденсатор обдувом вверх, поднять вентилятор и т.п.
+   после завала деталь опускаем низом на прежнюю отметку, чтобы не проваливалась под пол */
+function tiltSel(){
+  if(!sel)return;
+  const z0=new THREE.Box3().setFromObject(sel.obj).min.z;
+  sel.obj.rotation.y=(Math.round(sel.obj.rotation.y/(Math.PI/2))+1)%4*(Math.PI/2);
+  sel.obj.updateMatrixWorld(true);
+  sel.obj.position.z+=z0-new THREE.Box3().setFromObject(sel.obj).min.z;
+  sel.obj.updateMatrixWorld(true);
+  checkCollisions();showSelZ();refresh();save();
+}
 function delSel(){if(!sel)return;
   scene.remove(sel.obj);placed.splice(placed.indexOf(sel),1);
   select(null);refresh();save();}
 $('#bRot').onclick=rotSel;
 $('#bDel').onclick=delSel;
+$('#bTilt').onclick=tiltSel;
+$('#bUp').onclick=()=>lift(50);
+$('#bDown').onclick=()=>lift(-50);
+$('#bFloor').onclick=toFloor;
+$('#bAuto').onclick=autoLayout;
+$('#bFromSch').onclick=buildFromSchema;
 $('#bDup').onclick=async()=>{if(!sel)return;
   const p=sel.obj.position,r=sel.obj.rotation.z;
-  await addItem(sel.d,{x:p.x+200,y:p.y+200},r);};
+  await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r,sel.obj.rotation.y);};
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
   placed.forEach(p=>scene.remove(p.obj));placed.length=0;select(null);refresh();save();};
@@ -475,7 +681,9 @@ async function capi(path,method,body){
   return r.json();
 }
 function projPayload(){
-  return {items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,r:p.obj.rotation.z})),
+  // v2.45.973: z сохраняем тоже — иначе поднятые детали падали бы на пол при открытии
+  return {items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,
+                                z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y})),
           schema:schemaData};
 }
 function save(){
@@ -507,7 +715,7 @@ async function loadProjectData(data){
   const arr=(data&&data.items)||[];
   for(const s of arr){
     const d=DATA.find(x=>x.id===s.id&&x.ready);
-    if(d)await addItem(d,{x:s.x,y:s.y},s.r);
+    if(d)await addItem(d,{x:s.x,y:s.y,z:s.z},s.r,s.t);  // z и наклона в старых проектах нет — деталь остаётся на полу
   }
   _loading=false;
   select(null);refresh();renderSchema();
@@ -578,7 +786,7 @@ async function restoreLegacy(){
   if(!Array.isArray(arr)||!arr.length)return;
   for(const s of arr){
     const d=DATA.find(x=>x.id===s.id&&x.ready);
-    if(d)await addItem(d,{x:s.x,y:s.y},s.r);
+    if(d)await addItem(d,{x:s.x,y:s.y,z:s.z},s.r,s.t);
   }
   select(null);
 }
