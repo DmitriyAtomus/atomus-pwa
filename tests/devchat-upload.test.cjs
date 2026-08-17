@@ -74,6 +74,8 @@ function sendContext(opts) {
     'let _devChatBusy = false;\nlet _devChatThreadId = 5;\n' +
     'let _devChatFiles = ' + JSON.stringify(o.files || []) + ';\n' +
     'function _devChatEl(name) { return name === "send" ? this.btn : (name === "input" ? this.input : null); }\n' +
+    'function _devChatApi(p) { return "/api/dev-chat" + p; }\n' +
+    'function _devChatDraftClear() {}\n' +
     'function devChatPickFiles(f) { _devChatFiles = f || []; }\n' +
     'function _devChatSendable() { this.row.classList.toggle("has-text", !!(this.input.value || "").trim() || _devChatFiles.length > 0); }\n' +
     code +
