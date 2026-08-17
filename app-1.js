@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.973";
+const APP_VERSION = "v2.45.974";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3664,7 +3664,10 @@ const CHILLER_PROJECT_MEMORY =
   'Проекты чиллеров — chiller/project.html + /api/chiller/projects, ' +
   'модели и меши — /api/3d/* на воркере.';
 
-async function openChillerChat() {
+// v2.45.974: prefill — текст, который надо отправить в чат сразу после открытия.
+// Так работает кнопка «Клод, расставь» в конструкторе проектов: компоновку считает
+// Клод, а заявка на неё — обычное сообщение в ту же ленту.
+async function openChillerChat(prefill) {
   let data;
   try {
     data = await apiGet('/api/dev-chat/threads');
@@ -3714,9 +3717,23 @@ async function openChillerChat() {
     } else {
       devChatToggleDrawer();       // откроется на сохранённом чате — том самом
     }
+    if (prefill) await _chillerChatAsk(prefill);
   } catch (e) {
     showToast('Не смог открыть чат по чиллерам', 'error');
   }
+}
+
+// Отправка заявки из конструктора: ждём, пока шторка отрисует композер, кладём
+// текст в поле и отправляем обычным путём — заявка ложится в ленту как сообщение.
+async function _chillerChatAsk(text) {
+  for (let i = 0; i < 20 && !_devChatEl('input'); i++) {
+    await new Promise(function (r) { setTimeout(r, 100); });
+  }
+  const input = _devChatEl('input');
+  if (!input) { showToast('Чат не открылся — заявку не отправил', 'error'); return; }
+  input.value = text;
+  devChatGrow(input);
+  await devChatSend({ screen: 'atom-chiller', what: 'расстановка проекта' });
 }
 
 // v2.45.968: 3D-база разворачивается на весь экран своим документом, и тогда
@@ -3724,10 +3741,10 @@ async function openChillerChat() {
 // и внутри модуля: он сворачивает полный экран и просит нас открыть ленту.
 window.addEventListener('message', function (e) {
   if (e.origin !== location.origin) return;          // чужим страницам чат не открываем
-  if (!e.data || e.data.type !== 'atom-chiller-chat') return;
+  if (!e.data || (e.data.type !== 'atom-chiller-chat' && e.data.type !== 'atom-chiller-layout')) return;
   const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
   if (!isDir) return;                                 // лента devchat — только владельцу
-  openChillerChat();
+  openChillerChat(e.data.type === 'atom-chiller-layout' ? String(e.data.text || '') : null);
 });
 
 // Esc закрывает шторку — на десктопе тянуться к крестику неудобно.
