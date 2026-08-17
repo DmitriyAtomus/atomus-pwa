@@ -33,9 +33,9 @@ test('«глаз» и красный «стоп» живут в шапке, ст
 
 test('«Стоп» уходит на сервер и не молчит при отказе', () => {
   const fn = app.slice(app.indexOf('async function devChatStop'));
-  assert.match(fn.slice(0, 900), /apiPost\('\/api\/dev-chat\/stop'/);
-  // номер задачи выбирает сервер: у фронта в «ожидающих» может висеть старая
-  assert.match(fn.slice(0, 900), /apiPost\('\/api\/dev-chat\/stop', \{\}\)/);
+  assert.match(fn.slice(0, 900), /apiPost\(_devChatApi\('\/stop'\)/);
+  // сервер выбирает текущую задачу, но только внутри открытого чата
+  assert.match(fn.slice(0, 900), /thread_id: _devChatThreadId \|\| 0/);
   assert.match(fn.slice(0, 900), /showToast\(/);
   // статусы «останавливаю»/«остановлено» должны быть известны ленте
   assert.match(app, /stopping: \{ text: 'останавливаю…'/);
