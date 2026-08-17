@@ -13859,6 +13859,21 @@ function payerEntityPill(pe, withName) {
     escapeHtml(label) + '</span>';
 }
 
+// v2.45.984: чип «Повторный» — бэкенд принял счёт, у которого ИНН + номер +
+// сумма совпали с уже принятым (ai_data.possible_duplicate). Раньше такой счёт
+// вообще не пускали в CRM, и перевыставленные счета (правка НДС) терялись.
+// Теперь он приходит как обычно, но с меткой: человек решает, платить ли.
+function dupWarnPill(ai, withHint) {
+  const d = (ai || {}).possible_duplicate;
+  if (!d) return '';
+  const when = String(d.received_at || '').replace('T', ' ').substring(0, 16);
+  const title = 'Такой счёт (номер и сумма) уже приходил' +
+    (when ? ' ' + when : '') + ' — письмо #' + d.inbox_id + '. Проверьте, чтобы не оплатить дважды.';
+  const label = withHint && d.inbox_id ? ('Повторный · был #' + d.inbox_id) : 'Повторный';
+  return '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;font-weight:700;" title="' +
+    escapeHtml(title) + '">⚠️ ' + escapeHtml(label) + '</span>';
+}
+
 // Заметный бейдж «MAX» для счетов, пришедших через мессенджер MAX (а не почту).
 // Источник бэкенд помечает from_addr="max:<id>" + folder="MAX" + ai_data.source="max".
 function isFromMax(m) {
@@ -13939,7 +13954,7 @@ async function openInboxInvoice(inboxId) {
   const vat = (tot.vat_sum != null) ? Number(tot.vat_sum) : null;
   const chip = (label, cp) => '<span onclick="_copyTxt(' + JSON.stringify(String(cp)).replace(/"/g, '&quot;') + ')" title="Нажми — скопируется" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:4px 10px;font-size:12.5px;">' + label + ' <i class="ti ti-copy" style="color:var(--text-light);font-size:13px;"></i></span>';
   const info = (t, bg, fg, bd) => '<span style="display:inline-flex;align-items:center;gap:5px;background:' + bg + ';border:1px solid ' + bd + ';color:' + fg + ';border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;">' + t + '</span>';
-  let chips = payerEntityPill(ai.payer_entity, true);
+  let chips = payerEntityPill(ai.payer_entity, true) + dupWarnPill(ai, true);
   if (num) chips += chip('№ ' + escapeHtml(num), num);
   if (dt) chips += chip(escapeHtml(dt), dt);
   if (withV != null) chips += chip('<b>' + _f2(withV) + ' ₽</b>', String(withV));
@@ -14086,7 +14101,7 @@ function _ibxInvoiceCard(m, isMatched) {
   } else if (m.detected_label) {
     tags += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
   }
-  tags += payerEntityPill((m.ai_data || {}).payer_entity, false);
+  tags += payerEntityPill((m.ai_data || {}).payer_entity, false) + dupWarnPill(m.ai_data, false);
 
   // v2.45.7xx: для читаемости показываем ПОСТАВЩИКА (главным) и СУММУ.
   // Раньше строка = тема + обрезанный отправитель, без суммы → «ничего не понятно».
@@ -14338,7 +14353,7 @@ function _renderInboxOldRows(items) {
     html += '<div class="sup-row">' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          maxSourcePill(m) + labelHtml + statusHtml + orderPayStatusPill(m) + payerEntityPill((m.ai_data || {}).payer_entity, false) +
+          maxSourcePill(m) + labelHtml + statusHtml + orderPayStatusPill(m) + payerEntityPill((m.ai_data || {}).payer_entity, false) + dupWarnPill(m.ai_data, false) +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -14450,7 +14465,7 @@ async function openInboxMessage(inboxId) {
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + orderPayStatusPill(msg) + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + orderPayStatusPill(msg) + payerEntityPill((msg.ai_data || {}).payer_entity, true) + dupWarnPill(msg.ai_data, true) + '</div>' +
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
           '<div style="color:var(--text-light);">От:</div><div>' + fromLine + '</div>' +
           '<div style="color:var(--text-light);">Получено:</div><div style="font-variant-numeric:tabular-nums;">' + escapeHtml(received) + '</div>' +
