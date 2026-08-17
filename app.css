@@ -23373,9 +23373,14 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   position: sticky; top: 0; z-index: 5;
 }
 .app.mobile-layout [data-screen="devchat"] .page-header h1 { font-size: 18px; }
-.app.mobile-layout [data-screen="devchat"] .dchat {
-  height: calc(100dvh - 118px); padding: 8px 12px 0;
+.app.mobile-layout [data-screen="devchat"] .dchat { padding: 8px 12px 0; }
+/* Android сам увеличивает шрифт в длинных текстовых блоках (font boosting), и
+   ответы Клода на телефоне разъезжались до нечитаемого кегля. Держим свой. */
+.dchat-feed, .dchat-bubble, .dchat-text {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
+.app.mobile-layout .dchat-bubble { max-width: 88%; font-size: 14.5px; }
 .dchat-feed {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: 6px 2px 12px; scroll-behavior: smooth;
@@ -23760,7 +23765,11 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
 /* ============ v2.45.956: Клава на телефоне — доводка удобства ============ */
 /* Лента + шапка должны умещаться в экран целиком: раньше внешняя страница
    скроллилась на высоту шапки, и «назад»/статус уезжали за край. */
-.app.mobile-layout [data-screen="devchat"] .dchat { height: calc(100dvh - 174px); }
+/* Высота под замер на телефоне; safe-area — чтобы поле ввода не пряталось
+   под жестовую полосу навигации */
+.app.mobile-layout [data-screen="devchat"] .dchat {
+  height: calc(100dvh - 174px - env(safe-area-inset-bottom));
+}
 /* Чипы на телефоне — чуть крупнее, под палец */
 .app.mobile-layout .dchat-chips button { padding: 9px 15px; font-size: 13px; }
 /* Композер: кнопки камеры и скрепки плотнее, поле дышит */
