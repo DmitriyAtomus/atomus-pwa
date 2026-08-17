@@ -7,11 +7,13 @@ const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 
-test('Codex добавлен отдельным пунктом и не заменяет Клаву', () => {
+test('Кодя добавлен отдельным пунктом и не заменяет Клаву', () => {
   assert.match(html, /id="sb-devchat"[\s\S]{0,180}<span>Клава<\/span>/);
   assert.match(html, /id="sb-codex"[^>]*data-nav="codex"[^>]*onclick="selectSidebarItem\('codex'\)"/);
-  assert.match(html, /id="sb-codex"[\s\S]{0,180}<span>Codex<\/span>/);
+  assert.match(html, /id="sb-codex"[\s\S]{0,180}<span>Кодя<\/span>/);
   assert.match(app, /const navCodex = document\.getElementById\('sb-codex'\)/);
+  assert.match(app, /_devChatAgent === 'codex' \? 'Кодя' : 'Клава'/);
+  assert.match(app, /_devChatAgent === 'codex' \? 'Ко' : 'К'/);
 });
 
 test('один интерфейс выбирает разные API и разную сохранённую беседу', () => {
