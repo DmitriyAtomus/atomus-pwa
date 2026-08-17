@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.976";
+const APP_VERSION = "v2.45.977";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2492,8 +2492,10 @@ function _devChatWorkFill(el) {
   const lines = _devChatProgLines();
   const now = el.querySelector('[data-now]');
   if (now && lines && lines.length) now.textContent = lines[lines.length - 1];
-  // ждём своей очереди — так и пишем, а не показываем чужую строку активности
-  else if (now && !_devChatRunSince) now.textContent = 'жду очереди — ' + _devChatAgentName() + ' занят другой задачей';
+  // ждём своей очереди — так и пишем, а не показываем чужую строку активности.
+  // Чаты идут параллельно, поэтому ждать можно только предыдущую задачу
+  // ЭТОЙ ленты: соседние разговоры больше не задерживают.
+  else if (now && !_devChatRunSince) now.textContent = 'жду очереди — ' + _devChatAgentName() + ' доделывает предыдущую задачу этого чата';
   const tm = el.querySelector('[data-timer]');
   if (tm) {
     const sec = _devChatRunSince ? Math.max(0, Math.round((Date.now() - _devChatRunSince) / 1000)) : 0;
