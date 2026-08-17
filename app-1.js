@@ -2707,8 +2707,7 @@ function devChatGrow(el) {
   _devChatChipsFade();
   // v2.45.961: пусто — крупный микрофон (основной ввод в цеху), есть текст —
   // обычная стрелка «отправить». Обе кнопки сразу заняли бы полполя.
-  const row = el.closest('.dchat-input-row');
-  if (row) row.classList.toggle('has-text', !!(el.value || '').trim());
+  _devChatSendable();
   // v2.45.976: каждый набранный символ сразу ложится в черновик ЭТОГО чата —
   // тогда переход в другую ленту (и обратно) ничего не теряет и не подсовывает
   if (_devChatThreadId) {
@@ -2717,6 +2716,16 @@ function devChatGrow(el) {
     else delete _devChatDrafts[_devChatThreadId];
     _devChatDraftsStore();
   }
+}
+
+// Стрелку «отправить» показывает класс has-text. Считать только текст было
+// ошибкой: прикрепил файл, ничего не написал — и отправлять нечем, кнопки нет
+// (микрофон вместо неё). Теперь вложение — такой же повод показать стрелку.
+function _devChatSendable() {
+  const input = _devChatEl('input');
+  const has = !!((input && input.value || '').trim()) || _devChatFiles.length > 0;
+  const row = input && input.closest('.dchat-input-row');
+  if (row) row.classList.toggle('has-text', has);
 }
 
 // v2.45.971: ряд чипов шире экрана — четвёртый просто обрезался краем и выглядел
@@ -3291,6 +3300,7 @@ function _devChatBindDrop() {
 // Вложения показываем плиткой: у картинок — миниатюра, у любого файла — крестик,
 // чтобы ошибочно выбранное не пришлось отменять вместе со всем набором.
 function _devChatDrawFiles() {
+  _devChatSendable();
   const box = _devChatEl('files');
   if (!box) return;
   box.innerHTML = '';
@@ -3309,7 +3319,8 @@ function _devChatDrawFiles() {
     }
     const nm = document.createElement('span');
     nm.className = 'nm';
-    nm.textContent = f.name;
+    // Размер у крупного вложения — сразу видно, почему отправка идёт долго
+    nm.textContent = f.name + (f.size > 1024 * 1024 ? ' · ' + _devChatMB(f.size) : '');
     item.appendChild(nm);
     const rm = document.createElement('button');
     rm.className = 'rm';
@@ -3329,11 +3340,79 @@ function devChatDropFile(i) {
   if (fileInput && !_devChatFiles.length) fileInput.value = '';
 }
 
+// Сколько принимает сервер (dev_chat.py: MAX_FILE_SIZE / MAX_TOTAL_SIZE).
+// Проверяем и здесь: незачем гнать 60 МБ архива, чтобы услышать отказ в конце.
+const DEVCHAT_MAX_FILE = 50 * 1024 * 1024;
+const DEVCHAT_MAX_TOTAL = 60 * 1024 * 1024;
+
+function _devChatMB(n) {
+  const mb = n / (1024 * 1024);
+  return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' МБ';
+}
+
+// Пока файл едет, на кнопке — проценты вместо стрелки. Архив от конструктора
+// уходит десятки секунд, и без этого отправка выглядела как «ничего не делает».
+function _devChatSendProgress(btn, part) {
+  if (!btn) return;
+  if (part === null) {
+    btn.classList.remove('upl');
+    btn.innerHTML = '<i class="ti ti-arrow-up"></i>';
+    return;
+  }
+  btn.classList.add('upl');
+  btn.textContent = Math.round(part * 100) + '%';
+}
+
+// fetch не показывает, сколько тела уже уехало, и обрыв связи в нём ронял
+// девчат молча (текст оставался в поле, ни ошибки, ни отправки). XHR даёт
+// прогресс и различает «сервер отказал» и «связь оборвалась».
+function _devChatPost(url, form, onProgress) {
+  return new Promise(function (resolve, reject) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''));
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+    }
+    xhr.onload = function () {
+      let body = {};
+      try { body = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, body: body });
+    };
+    xhr.onerror = function () { reject(new Error('network')); };
+    xhr.ontimeout = function () { reject(new Error('timeout')); };
+    xhr.onabort = function () { reject(new Error('abort')); };
+    xhr.send(form);
+  });
+}
+
+// Отказ по размеру называем ДО отправки: имя файла, его вес и предел.
+function _devChatTooBig() {
+  let total = 0;
+  for (let i = 0; i < _devChatFiles.length; i++) {
+    const f = _devChatFiles[i];
+    total += f.size || 0;
+    if (f.size > DEVCHAT_MAX_FILE) {
+      return '«' + f.name + '» — ' + _devChatMB(f.size) + ', а больше '
+        + _devChatMB(DEVCHAT_MAX_FILE) + ' одним файлом не отправить. Заархивируй по частям или положи на Диск.';
+    }
+  }
+  if (total > DEVCHAT_MAX_TOTAL) {
+    return 'Вложений на ' + _devChatMB(total) + ', предел за раз — ' + _devChatMB(DEVCHAT_MAX_TOTAL) + '.';
+  }
+  return '';
+}
+
 async function devChatSend(context) {
   if (_devChatBusy) return;
   const input = _devChatEl('input');
   const text = (input && input.value || '').trim();
   if (!text && !_devChatFiles.length) return;
+
+  const tooBig = _devChatTooBig();
+  if (tooBig) { showToast(tooBig, 'error'); return; }
 
   _devChatBusy = true;
   const btn = _devChatEl('send');
@@ -3347,14 +3426,19 @@ async function devChatSend(context) {
     form.append('context', JSON.stringify(where));
     _devChatFiles.forEach(function (f, i) { form.append('file' + (i + 1), f, f.name); });
 
-    const r = await fetch(API_BASE + _devChatApi('/send'), {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
-      body: form,
-    });
+    let r;
+    try {
+      r = await _devChatPost(API_BASE + _devChatApi('/send'), form, function (part) {
+        if (_devChatFiles.length) _devChatSendProgress(btn, part);
+      });
+    } catch (e) {
+      showToast('Не ушло: связь оборвалась. Текст и файлы на месте — нажми ещё раз', 'error');
+      return;
+    } finally {
+      _devChatSendProgress(btn, null);
+    }
     if (!r.ok) {
-      const err = await r.json().catch(function () { return {}; });
-      showToast(err.message || 'Не отправилось', 'error');
+      showToast(r.body.message || ('Не отправилось (ошибка ' + r.status + ')'), 'error');
       return;
     }
     if (input) { input.value = ''; devChatGrow(input); }

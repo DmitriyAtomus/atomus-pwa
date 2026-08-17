@@ -20,7 +20,8 @@ test('один интерфейс выбирает разные API и разн�
   assert.match(app, /const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread'/);
   assert.match(app, /screenName === 'devchat'\) _devChatUseAgent\('claude'\)/);
   assert.match(app, /screenName === 'codex'[\s\S]{0,100}_devChatUseAgent\('codex'\)/);
-  assert.match(app, /fetch\(API_BASE \+ _devChatApi\('\/send'\)/);
+  // отправка ушла с fetch на XHR (проценты загрузки), адрес по-прежнему по агенту
+  assert.match(app, /_devChatPost\(API_BASE \+ _devChatApi\('\/send'\)/);
 });
 
 test('плавающая шторка и чат чиллера остаются у Клавы', () => {

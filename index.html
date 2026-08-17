@@ -991,7 +991,9 @@
                 <button class="dchat-attach" onclick="devChatAttachMenu()" title="Прикрепить: фото, галерея, файл">
                   <i class="ti ti-plus"></i>
                 </button>
-                <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+                <!-- accept держал только картинки и текст: архив от конструктора
+                     (zip со STEP/DXF/чертежами) в диалоге выбора не показывался -->
+                <input type="file" id="devchat-file-input" multiple
                        style="display:none;" onchange="devChatPickFiles(this.files)">
                 <input type="file" id="devchat-camera-input" accept="image/*" capture="environment"
                        style="display:none;" onchange="devChatAddFiles(this.files)">
@@ -9002,7 +9004,7 @@ function _ccReset() {
         <button class="dchat-attach" onclick="devChatAttachMenu()" title="Прикрепить: фото, галерея, файл">
           <i class="ti ti-plus"></i>
         </button>
-        <input type="file" id="devchat-drawer-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
+        <input type="file" id="devchat-drawer-file-input" multiple
                style="display:none;" onchange="devChatPickFiles(this.files)">
         <input type="file" id="devchat-drawer-camera-input" accept="image/*" capture="environment"
                style="display:none;" onchange="devChatAddFiles(this.files)">
