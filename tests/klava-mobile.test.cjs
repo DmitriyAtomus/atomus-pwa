@@ -113,7 +113,11 @@ test('микрофон и «отправить» не толкаются в по
   assert.match(css, /\.dchat-input-row\.has-text \.dchat-send \{ display: inline-flex; \}/);
   assert.match(css, /\.dchat-input-row\.has-text \.dchat-mic \{ display: none; \}/);
   const grow = app.slice(app.indexOf('function devChatGrow'));
-  assert.match(grow.slice(0, 800), /classList\.toggle\('has-text'/);
+  assert.match(grow.slice(0, 800), /_devChatSendable\(\);/);
+  // считаем не только текст: вложение без подписи — тоже готовое сообщение
+  const sendable = app.slice(app.indexOf('function _devChatSendable'));
+  assert.match(sendable.slice(0, 500), /classList\.toggle\('has-text'/);
+  assert.match(sendable.slice(0, 500), /_devChatFiles\.length > 0/);
 });
 
 test('обработчики микрофона вешаются один раз и на обе ленты', () => {
