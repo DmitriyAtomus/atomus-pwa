@@ -179,6 +179,86 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
 #scrim.on{display:block}
 #cv{touch-action:none}
 
+/* ============== чат по чиллерам прямо в оболочке ==============
+   Лента живёт рядом с моделью, а не вместо неё: смотришь узел — тут же
+   пишешь замечание и видишь, чем занят Клод. Поэтому шторка не модальная
+   (скрима нет) и лежит выше карточки позиции и полного экрана. */
+#chatFab{position:fixed;right:16px;bottom:16px;z-index:44;width:46px;height:46px;padding:0;
+  border-radius:50%;font-size:18px;line-height:1;display:none;
+  background:rgba(8,20,36,.92);border:1px solid var(--line2);backdrop-filter:blur(8px);
+  box-shadow:0 8px 22px rgba(0,0,0,.5)}
+#chatFab.on{display:block}
+#chatFab.work{border-color:var(--gold);color:#fff;
+  animation:chpulse 1.6s ease-in-out infinite}
+@keyframes chpulse{
+  0%,100%{box-shadow:0 8px 22px rgba(0,0,0,.5),0 0 0 0 rgba(201,162,39,.42)}
+  50%    {box-shadow:0 8px 22px rgba(0,0,0,.5),0 0 0 7px rgba(201,162,39,0)}}
+#chatFab .n{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;
+  border-radius:10px;background:var(--cyan);color:#04121F;font-size:10.5px;font-weight:700;
+  line-height:19px;display:none}
+#chatFab.unread .n{display:block}
+#chatBtn.work{border-color:var(--gold);color:#fff}
+
+#chat{position:fixed;top:0;right:0;bottom:0;width:396px;max-width:100vw;z-index:60;display:none;
+  flex-direction:column;background:#08182D;border-left:1px solid var(--line2);
+  box-shadow:-20px 0 52px rgba(0,0,0,.55)}
+#chat.open{display:flex}
+.ch-hd{display:flex;align-items:center;gap:9px;padding:11px 13px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0B2142,#081A32)}
+.ch-hd b{font-size:13px;color:#fff;font-weight:600}
+.ch-hd .st{margin-left:auto;font-size:11px;color:var(--dim2);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.ch-hd .st.work{color:var(--gold)}
+.ch-hd button{width:29px;height:29px;padding:0;font-size:15px;line-height:1;border-radius:8px;flex:none}
+.ch-feed{flex:1;overflow-y:auto;padding:12px 13px 6px;display:flex;flex-direction:column;gap:9px}
+.ch-empty{color:var(--dim2);font-size:12px;line-height:1.6;text-align:center;padding:26px 12px}
+.ch-b{max-width:88%;align-self:flex-start;background:#102A4A;border:1px solid var(--line);
+  border-radius:11px 11px 11px 4px;padding:8px 11px;font-size:12.5px;line-height:1.5;
+  color:#DCE6F2;white-space:pre-wrap;word-break:break-word}
+.ch-b.me{align-self:flex-end;background:rgba(27,159,216,.16);border-color:rgba(27,159,216,.4);
+  border-radius:11px 11px 4px 11px}
+.ch-b code{background:rgba(255,255,255,.08);border-radius:4px;padding:0 4px;font-size:11.5px}
+.ch-b .mt{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:10.5px;color:var(--dim2)}
+.ch-b .chip{border-radius:4px;padding:1px 6px;background:rgba(255,255,255,.07)}
+.ch-b .chip.is-running,.ch-b .chip.is-stopping{background:rgba(201,162,39,.18);color:var(--gold)}
+.ch-b .chip.is-done{background:rgba(27,159,216,.18);color:#8FD3F4}
+.ch-b .chip.is-error{background:rgba(220,80,80,.18);color:#F1A0A0}
+.ch-b img{display:block;max-width:100%;border-radius:8px;margin-top:7px;cursor:pointer}
+.ch-b .art{display:flex;align-items:center;gap:7px;margin-top:7px;padding:7px 9px;
+  border:1px solid rgba(27,159,216,.4);background:rgba(27,159,216,.10);border-radius:8px;
+  font-size:11.5px;color:#BFE4F8;cursor:pointer}
+.ch-b .fl{margin-top:6px;font-size:11px;color:var(--dim)}
+.ch-work{margin:0 13px 9px;padding:9px 11px;border:1px solid rgba(201,162,39,.3);
+  background:rgba(201,162,39,.07);border-radius:9px;display:none}
+.ch-work.on{display:block}
+.ch-work .wh{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--gold)}
+.ch-work .wh b{font-weight:600}
+.ch-work .wh .tm{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--dim)}
+.ch-work .wh button{padding:3px 8px;font-size:10.5px}
+.ch-work .wn{margin-top:5px;font-size:11px;color:var(--dim);line-height:1.45;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-work .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex:none;
+  animation:chblink 1.1s ease-in-out infinite}
+@keyframes chblink{0%,100%{opacity:1}50%{opacity:.25}}
+.ch-cmp{display:flex;gap:8px;align-items:flex-end;padding:10px 13px 12px;
+  border-top:1px solid var(--line);background:#0A1C33}
+.ch-cmp textarea{flex:1;resize:none;max-height:132px;background:rgba(255,255,255,.055);
+  border:1px solid var(--line2);border-radius:9px;padding:9px 11px;color:var(--text);
+  font:inherit;font-size:12.5px;line-height:1.45;outline:none}
+.ch-cmp textarea:focus{border-color:var(--cyan);background:rgba(27,159,216,.07)}
+.ch-cmp button{flex:none;width:38px;height:38px;padding:0;font-size:15px;border-radius:9px;
+  background:var(--cyan);border-color:#4FBBEC;color:#04121F;font-weight:700}
+.ch-cmp button:hover{background:#37B0E4;color:#04121F}
+.ch-ctx{padding:0 13px 8px;font-size:10.5px;color:var(--dim2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chArt{position:fixed;inset:0;z-index:61;background:#061020;display:none;flex-direction:column}
+#chArt.open{display:flex}
+#chArt .ah{display:flex;align-items:center;gap:10px;padding:9px 13px;
+  border-bottom:1px solid var(--line);background:#0B2142}
+#chArt .ah b{font-size:12.5px;color:#fff;font-weight:600}
+#chArt .ah button{margin-left:auto;width:29px;height:29px;padding:0;font-size:15px;line-height:1}
+#chArt iframe{flex:1;width:100%;border:0;background:#fff}
+
 /* ======================= мобильная вёрстка ======================= */
 @media (max-width:860px){
   #app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
@@ -230,6 +310,13 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
   table.sel th{font-size:8.5px;padding-left:5px}
   table.sel td{padding-left:5px}
   .qbox{padding:34px 20px;font-size:12.5px}
+}
+@media (max-width:860px){
+  /* на телефоне шторка занимает экран целиком: ленту и модель рядом всё равно
+     не разглядеть, а узкая полоска чата не даёт писать */
+  #chat{width:100vw;border-left:none}
+  .ch-b{max-width:92%}
+  #chatFab{right:12px;bottom:12px}
 }
 @media (max-width:420px){
   .grid{grid-template-columns:repeat(2,1fr);gap:9px}
@@ -312,6 +399,34 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
     </div>
     <div class="dside" id="dside"></div>
   </div>
+</div>
+
+<!-- ===================== чат по чиллерам ===================== -->
+<button id="chatFab" onclick="openChat()" title="Чат по чиллерам">💬<span class="n" id="chatFabN"></span></button>
+
+<div id="chat">
+  <div class="ch-hd">
+    <b>Чат по чиллерам</b>
+    <span class="st" id="chSt">Готов к работе</span>
+    <button onclick="closeChat()" title="Закрыть (Esc)">×</button>
+  </div>
+  <div class="ch-feed" id="chFeed"></div>
+  <div class="ch-work" id="chWork">
+    <div class="wh"><span class="dot"></span><b>Работаю над задачей</b>
+      <span class="tm" id="chTm"></span>
+      <button onclick="chatStop()">Стоп</button></div>
+    <div class="wn" id="chNow">принял задачу…</div>
+  </div>
+  <div class="ch-ctx" id="chCtx"></div>
+  <div class="ch-cmp">
+    <textarea id="chIn" rows="1" placeholder="Задача по чиллерам… Enter — отправить"></textarea>
+    <button onclick="chatSend()" title="Отправить">↑</button>
+  </div>
+</div>
+
+<div id="chArt">
+  <div class="ah"><b id="chArtNm">Макет</b><button onclick="chatArtClose()">×</button></div>
+  <iframe id="chArtF" sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe>
 </div>
 
 <script>/**
@@ -477,16 +592,311 @@ function toggleFS(){
     if(p && p.catch) p.catch(()=>{});
   }catch(e){}
 }
-/* Чат по чиллерам. Своей ленты у модуля нет — она в CRM, поэтому кнопка просто
-   просит родителя открыть шторку. В полном экране поверх нас CRM ничего не
-   покажет (фулскрин держит наш документ), так что сначала сворачиваемся.
-   Открыто отдельной вкладкой (без CRM вокруг) — кнопку не показываем. */
-const inCRM = window.parent !== window;
-function openChat(){
-  try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
-  try{ window.parent.postMessage({type:'atom-chiller-chat'}, location.origin); }catch(e){}
+/* ===================== чат по чиллерам =====================
+   Раньше кнопка только просила CRM открыть свою шторку — а её не видно ни в
+   полном экране, ни поверх карточки позиции, ни в отдельной вкладке. Теперь
+   лента живёт в самой оболочке: /api/dev-chat/* доступен по тому же токену,
+   что и /api/3d/*, значит ходить в CRM за перепиской не нужно.
+   Хранилища своего не заводим: это тот же чат проекта «Атом Чиллер», что на
+   экране «Клод», — переписка одна и там, и тут. */
+const CHAT_API = API ? '/api/dev-chat' : null;   /* локально (с флешки) чата нет */
+const CH_TKEY = 'atomus_chiller_thread';
+const CH_OPEN = {uploading:1, new:1, running:1, stopping:1};
+const CH_ST = {uploading:'загружаю файлы…', new:'в очереди', running:'работает…',
+               stopping:'останавливаю…', stopped:'остановлено', done:'готово', error:'сбой'};
+const ch = {tid:0, since:0, pend:new Set(), prog:{}, open:false, run:0,
+            poll:null, tick:null, unread:0, busy:false, arm:false,
+            first:true,   /* первый проход только догоняет ленту, не звонит */
+            full:false};  /* открыли шторку — тянем историю целиком */
+
+const chEl = id => document.getElementById(id);
+async function chGet(path){
+  const r = await fetch(CHAT_API + path, {headers:AUTH, cache:'no-store'});
+  if(!r.ok) throw Object.assign(new Error('HTTP '+r.status), {status:r.status});
+  return r.json();
 }
-if(inCRM){ const cb = document.getElementById('chatBtn'); if(cb) cb.style.display=''; }
+async function chPost(path, body){
+  const r = await fetch(CHAT_API + path, {method:'POST', cache:'no-store',
+    headers:Object.assign({'Content-Type':'application/json'}, AUTH),
+    body:JSON.stringify(body||{})});
+  if(!r.ok) throw Object.assign(new Error('HTTP '+r.status), {status:r.status});
+  return r.json();
+}
+const chEsc = s => String(s==null?'':s).replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* Клод отвечает лёгким markdown: жирный, `код` и блоки. Парсер тут не нужен,
+   но сырые звёздочки в ленте читаются плохо. */
+function chFmt(t){
+  return chEsc(t).replace(/```([\s\S]*?)```/g, (m,c)=>'<code>'+c.trim()+'</code>')
+                 .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+                 .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+}
+const chTime = ts => { const d = new Date(ts);
+  return isNaN(d) ? '' : String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+
+/* Чат проекта ищем ровно так же, как CRM: сначала проект «Атом Чиллер» и самый
+   живой чат в нём, потом — заведённый руками чат «Чиллеры» без проекта.
+   Ничего не создаём: плодить пустые дубли из просмотрщика ни к чему, а завести
+   первый чат есть кому — кнопка в шапке раздела CRM. */
+async function chFindThread(){
+  const d = await chGet('/threads');
+  const proj = (d.projects||[]).find(p => p.name === 'Атом Чиллер');
+  const ths = d.threads || [];
+  let t = null;
+  if(proj){
+    const mine = ths.filter(x => x.project_id === proj.id);
+    t = mine.find(x => (x.msg_count||0) > 0) || mine[0] || null;
+  }
+  if(!t) t = ths.find(x => /^чиллер/i.test(String(x.title||'').trim())) || null;
+  return t ? t.id : 0;
+}
+
+/* Кнопку показываем только тому, кому чат вообще отвечает: маршруты dev-chat
+   разрешены владельцу, остальным прилетает 403 — им кнопки видеть незачем. */
+async function chatArm(){
+  if(!CHAT_API || !TOKEN) return;
+  try{
+    let tid = parseInt(localStorage.getItem(CH_TKEY)||'0', 10) || 0;
+    ch.tid = await chFindThread() || tid;
+    if(ch.tid) try{ localStorage.setItem(CH_TKEY, String(ch.tid)); }catch(e){}
+  }catch(e){ if(e.status === 403 || e.status === 401) return; }
+  ch.arm = true;
+  const fab = chEl('chatFab'); if(fab) fab.classList.add('on');
+  const cb = chEl('chatBtn'); if(cb) cb.style.display = '';
+  chWatch(true);            /* фоновый присмотр: горит ли работа, есть ли ответ */
+}
+
+function openChat(){
+  const box = chEl('chat'); if(!box || !ch.arm) return;
+  box.classList.add('open');
+  ch.open = true; ch.unread = 0; chBadge();
+  if(!ch.tid){
+    chEl('chFeed').innerHTML = '<div class="ch-empty">Чат проекта «Атом Чиллер» ещё не заведён.<br>' +
+      'Откройте его один раз из шапки раздела в CRM — дальше он будет здесь.</div>';
+  }else{
+    ch.since = 0; ch.full = true; chEl('chFeed').innerHTML =
+      '<div class="ch-empty">Открываю переписку…</div>';
+    chLoad();
+  }
+  chCtxLine();
+  chWatch(true);
+  const inp = chEl('chIn'); if(inp && !isMob()) setTimeout(()=>inp.focus(), 60);
+}
+function closeChat(){
+  const box = chEl('chat'); if(box) box.classList.remove('open');
+  ch.open = false;
+  chWatch(true);            /* закрыли — присмотр продолжается, только реже */
+}
+
+/* Что смотрим — уезжает вместе с задачей: агенту важно знать, к какой позиции
+   относится замечание, а нам не приходится это дописывать руками. */
+function chCtxLine(){
+  const el = chEl('chCtx'); if(!el) return;
+  el.textContent = cur && document.getElementById('det').classList.contains('open')
+    ? 'смотрю: ' + cur.name : '';
+}
+function chContext(){
+  const opened = document.getElementById('det').classList.contains('open');
+  const c = {screen: 'atom-chiller (база 3D)'};
+  if(opened && cur) c.item = cur.name + (cur.geom ? ' [' + cur.geom + ']' : '');
+  return c;
+}
+
+/* Опрос: открытая шторка — раз в 3 секунды, закрытая — раз в 20. Отдельный
+   тикер на секундную стрелку карточки работы, чтобы таймер шёл ровно. */
+function chWatch(on){
+  if(ch.poll){ clearInterval(ch.poll); ch.poll = null; }
+  if(!on || !ch.arm || !ch.tid) return;
+  ch.poll = setInterval(chLoad, ch.open ? 3000 : 20000);
+}
+function chTick(on){
+  if(on && !ch.tick) ch.tick = setInterval(chWorkFill, 1000);
+  else if(!on && ch.tick){ clearInterval(ch.tick); ch.tick = null; }
+}
+
+async function chLoad(){
+  if(!ch.arm || !ch.tid || ch.busy) return;
+  ch.busy = true;
+  try{
+    /* незакрытая задача меняет статус уже после отрисовки, а сервер отдаёт
+       только новые id — поэтому отступаем к самой старой незакрытой */
+    let from = ch.pend.size ? Math.min.apply(null, Array.from(ch.pend)) - 1 : ch.since;
+    if(ch.full){ from = 0; ch.full = false; }
+    const d = await chGet('/messages?since_id=' + from + '&thread_id=' + ch.tid);
+    ch.prog = d.progress || {};
+    const msgs = d.messages || [];
+    let work = false;
+    msgs.forEach(m => {
+      if(m.id > ch.since) ch.since = m.id;
+      if(m.author === 'user' && CH_OPEN[m.status]) ch.pend.add(m.id);
+      else if(m.author === 'user') ch.pend.delete(m.id);
+      if(CH_OPEN[m.status] && m.author === 'user') work = true;
+      if(m.status === 'running' && !ch.run){
+        const t = m.ts ? Date.parse(m.ts) : NaN;
+        ch.run = (!isNaN(t) && t <= Date.now()) ? t : Date.now();
+      }
+      if(ch.open) chDraw(m);
+      /* первый проход просто догоняет ленту: иначе, открыв модуль, сразу
+         получаешь счётчик со всей историей ответов */
+      else if(m.author !== 'user' && !ch.first){ ch.unread++; chBadge(); }
+    });
+    ch.first = false;
+    if(!work) ch.run = 0;
+    chWork(work);
+    const feed = chEl('chFeed');
+    if(ch.open && feed && !feed.querySelector('.ch-b'))
+      feed.innerHTML = '<div class="ch-empty">Переписки пока нет.<br>' +
+        'Напишите задачу — она уедет вместе с пометкой, что открыто в базе.</div>';
+  }catch(e){
+    if(e.status === 403 || e.status === 401){ ch.arm = false; chWatch(false); }
+  }finally{ ch.busy = false; }
+}
+
+/* Рисуем сообщение (или обновляем статус уже нарисованного). */
+function chDraw(m){
+  const feed = chEl('chFeed'); if(!feed) return;
+  const empty = feed.querySelector('.ch-empty'); if(empty) empty.remove();
+  const was = feed.querySelector('[data-mid="' + m.id + '"]');
+  if(was){
+    const chip = was.querySelector('[data-st]');
+    if(chip && CH_ST[m.status]){
+      chip.textContent = CH_ST[m.status];
+      chip.className = 'chip is-' + m.status;
+    }
+    return;
+  }
+  const near = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 140;
+  const mine = m.author === 'user';
+  const b = document.createElement('div');
+  b.className = 'ch-b' + (mine ? ' me' : '');
+  b.setAttribute('data-mid', m.id);
+  b.innerHTML = '<div>' + chFmt(m.text) + '</div><div class="mt"><span>' + chTime(m.ts) + '</span>' +
+    (mine && CH_ST[m.status] ? '<span class="chip is-' + m.status + '" data-st>' +
+      chEsc(CH_ST[m.status]) + '</span>' : '') + '</div>';
+  (m.files||[]).forEach(f => {
+    if((f.content_type||'').indexOf('image/') === 0){
+      const img = document.createElement('img');
+      img.alt = f.name || 'снимок';
+      img.onclick = () => { if(img.src) window.open(img.src, '_blank'); };
+      b.appendChild(img);
+      chImg(img, f.url);
+    }else if(/\.html?$/i.test(f.name||'') || (f.content_type||'').indexOf('text/html') === 0){
+      const card = document.createElement('div');
+      card.className = 'art';
+      card.textContent = '◱ ' + (f.name || 'макет') + ' — открыть';
+      card.onclick = () => chatArtOpen(f.url, f.name || 'Макет');
+      b.appendChild(card);
+    }else{
+      const fl = document.createElement('div');
+      fl.className = 'fl';
+      fl.textContent = '📎 ' + (f.name || 'файл');
+      b.appendChild(fl);
+    }
+  });
+  feed.appendChild(b);
+  if(near) feed.scrollTop = feed.scrollHeight;
+}
+
+/* Картинку в <img> с токеном не подставить — тянем сами и отдаём blob. */
+async function chImg(img, url){
+  try{
+    const r = await fetch(url, {headers:AUTH});
+    if(!r.ok) return;
+    img.src = URL.createObjectURL(await r.blob());
+    const feed = chEl('chFeed');
+    img.onload = () => { if(feed && feed.scrollHeight - feed.scrollTop - feed.clientHeight < 220)
+      feed.scrollTop = feed.scrollHeight; };
+  }catch(e){}
+}
+
+/* Макет (html от Клода) открываем в песочнице поверх модуля: srcdoc, а не src,
+   — иначе iframe пошёл бы за файлом без токена. */
+async function chatArtOpen(url, name){
+  const box = chEl('chArt');
+  chEl('chArtNm').textContent = name;
+  box.classList.add('open');
+  try{
+    const r = await fetch(url, {headers:AUTH});
+    chEl('chArtF').srcdoc = r.ok ? await r.text() : '<p>Не смог открыть макет</p>';
+  }catch(e){ chEl('chArtF').srcdoc = '<p>Нет связи</p>'; }
+}
+function chatArtClose(){
+  chEl('chArt').classList.remove('open');
+  chEl('chArtF').srcdoc = '';
+}
+
+/* Карточка работы: одна строка «что делаю сейчас» и таймер. Весь лог агента в
+   шторку не тянем — она узкая, а важна последняя строка. */
+function chWork(on){
+  const box = chEl('chWork'), st = chEl('chSt');
+  if(box) box.classList.toggle('on', !!on);
+  const fab = chEl('chatFab'), hb = chEl('chatBtn');
+  if(fab) fab.classList.toggle('work', !!on);
+  if(hb) hb.classList.toggle('work', !!on);
+  if(st){
+    const l = chProgLines();
+    st.textContent = on ? (l ? l[l.length-1] : 'работает над задачей…') : 'Готов к работе';
+    st.classList.toggle('work', !!on);
+  }
+  chTick(!!on);
+  if(on) chWorkFill();
+}
+function chProgLines(){
+  let best = null;
+  ch.pend.forEach(id => {
+    const p = ch.prog[String(id)];
+    if(p && p.lines && p.lines.length && (!best || String(p.at) > String(best.at))) best = p;
+  });
+  return best ? best.lines : null;
+}
+function chWorkFill(){
+  const l = chProgLines();
+  const now = chEl('chNow'), tm = chEl('chTm');
+  if(now && l && l.length) now.textContent = l[l.length-1];
+  if(tm){
+    const sec = ch.run ? Math.max(0, Math.round((Date.now() - ch.run)/1000)) : 0;
+    tm.textContent = ch.run ? Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0') : 'в очереди';
+  }
+}
+function chBadge(){
+  const fab = chEl('chatFab'); if(!fab) return;
+  fab.classList.toggle('unread', ch.unread > 0);
+  const n = chEl('chatFabN'); if(n) n.textContent = ch.unread > 9 ? '9+' : String(ch.unread);
+}
+
+async function chatSend(){
+  const inp = chEl('chIn'); if(!inp || !ch.tid) return;
+  const text = (inp.value||'').trim(); if(!text) return;
+  inp.value = ''; chGrow(inp);
+  try{
+    const d = await chPost('/send', {text:text, thread_id:ch.tid, context:chContext()});
+    if(d && d.message){ chDraw(d.message); ch.pend.add(d.message.id); ch.since = Math.max(ch.since, d.message.id); }
+    chWork(true);
+    chWatch(true);
+  }catch(e){
+    inp.value = text;       /* не потерять набранное: сеть моргнула — текст на месте */
+    chEl('chSt').textContent = 'не отправилось';
+  }
+}
+async function chatStop(){
+  try{ await chPost('/stop', {}); chEl('chNow').textContent = 'останавливаю…'; }catch(e){}
+}
+function chGrow(el){
+  if(!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 132) + 'px';
+}
+(function chBind(){
+  const inp = chEl('chIn'); if(!inp) return;
+  inp.addEventListener('input', () => chGrow(inp));
+  inp.addEventListener('keydown', e => {
+    /* Enter отправляет, Shift+Enter — перенос. isComposing и 229 — набор через
+       Т9 и IME: там Enter подтверждает слово, отправлять на нём нельзя. */
+    if(e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+    if(e.shiftKey || e.altKey) return;
+    e.preventDefault(); chatSend();
+  });
+})();
 
 document.addEventListener('fullscreenchange', ()=>{
   const on = !!document.fullscreenElement;
@@ -519,6 +929,7 @@ async function boot(){
   if(c) c.innerHTML = '<b>'+ix.count.ready+'</b> моделей выпущено<br>'+
                       ix.count.items+' позиций в базе<br>'+
                       '<span style="font-size:10px;opacity:.6">база от '+ix.built+'</span>';
+  chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
 }
 boot();
 
@@ -821,10 +1232,19 @@ function openDet(id){
   if(d.ready){initGL(); loadMesh(d); setSpin(true);}
   $('#dside').innerHTML = side(d);
   if(d.ready) $('#dlStep').onclick=()=>dlStep(d);
+  chCtxLine();     /* задача из чата поедет с пометкой, какая позиция открыта */
 }
 function closeDet(){$('#det').classList.remove('open');
-  labels.forEach(l=>l.el.style.display='none');}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDet();});
+  labels.forEach(l=>l.el.style.display='none'); chCtxLine();}
+/* Esc закрывает то, что открыто последним: макет → чат → карточку. Иначе один
+   Esc уносил бы из карточки позиции, оставив шторку чата висеть поверх пустого
+   каталога. */
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape') return;
+  if(document.getElementById('chArt').classList.contains('open')){ chatArtClose(); return; }
+  if(ch.open){ closeChat(); return; }
+  closeDet();
+});
 
 function selBlock(d){
   if(!d.sel) return '';

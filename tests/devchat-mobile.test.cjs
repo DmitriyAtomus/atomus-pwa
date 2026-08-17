@@ -33,8 +33,12 @@ test('терминал «вживую»: открывается тапом по 
   // журнал пишется в момент прихода строк — бэкенд времени не хранит
   assert.match(app, /_devChatLogProgress\(\);/, 'журнал не подключён к циклу опроса');
   const fn = app.slice(app.indexOf('function _devChatLogProgress'));
-  assert.match(fn.slice(0, 900), /lastIndexOf\(_devChatTermLast\)/,
+  // v2.45.974: журнал ведётся по каждой задаче отдельно (_devChatTermSeen[id]) —
+  // раньше одна общая метка мешала строки разных чатов
+  assert.match(fn.slice(0, 1200), /lastIndexOf\(last\)/,
     'нет диффа скользящего окна — строки будут дублироваться');
+  assert.match(fn.slice(0, 1200), /_devChatTermSeen\[id\]/,
+    'журнал должен вестись по задаче, а не одной общей меткой');
 });
 
 test('таймер задачи: считает от времени задачи, сброс когда всё закрыто', () => {
@@ -42,7 +46,7 @@ test('таймер задачи: считает от времени задачи
   // задачу — иначе открыл чат позже и таймер начинается с нуля
   assert.match(app, /Date\.parse\(m\.ts\)/, 'таймер не берёт время задачи с сервера');
   assert.match(app, /_devChatRunSince = \(!isNaN\(started\)/, 'нет запасного Date.now()');
-  assert.match(app, /if \(!working\) _devChatRunSince = null;/);
+  assert.match(app, /if \(!running\) _devChatRunSince = null;/);
 });
 
 test('карточка работы: после дорисовки лента доводится до конца', () => {
