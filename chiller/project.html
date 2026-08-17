@@ -75,6 +75,14 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 .sr .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sr .n{font-family:var(--mono);font-size:11.5px}
 .sr .u{font-size:10px;color:var(--faint)}
+/* v2.45.974: пояснение к компоновке — его пишет Клод, когда расставляет */
+#layNote{display:none;padding:9px 12px;border-top:1px solid var(--line);background:#0A1A2E;
+  font-size:11.5px;line-height:1.55;color:var(--dim);max-height:38%;overflow-y:auto}
+#layNote.on{display:block}
+#layNote b{color:var(--ice);font-weight:600}
+#layNote .w{color:#f0c98a}
+#layNote .apply{margin-top:7px;display:inline-block;padding:5px 10px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--ice2);color:#EAF6FD;background:linear-gradient(180deg,#1E5F86,#174A6B);font-weight:600}
 .acts{display:flex;flex-direction:column;gap:7px;padding:10px 12px;border-top:1px solid var(--line)}
 .btn{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px;border-radius:8px;
   font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--line2);color:var(--ink);background:var(--panel2)}
@@ -157,8 +165,8 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
       <div class="search"><span style="color:var(--faint)">⌕</span><input id="q" placeholder="компрессор, отвод, ПТО…"></div>
       <div class="chips" id="secs"></div>
       <div id="cat"></div>
-      <div class="note">Клик или «+» — деталь встаёт на своё место по функции: компрессор и ресивер на пол корпуса,
-        арматура на средний ярус, конденсатор с вентиляторами на крышу. Дальше её можно двигать руками.</div>
+      <div class="note">Клик или «+» — деталь ложится на выкладку перед корпусом. Набери состав и нажми
+        «Клод, расставь» — компоновку по ярусам считает Клод, потом можно двигать руками.</div>
     </div>
 
     <div id="vwrap">
@@ -169,7 +177,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" id="bGrid">Сетка 100 мм</div>
       </div>
       <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать</div>
-      <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
+      <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери детали слева — они лягут на выкладку.<br>Начни с корпуса: по нему Клод считает компоновку.<br>Потом «🧠 Клод, расставь».</div></div>
       <div id="swrap">
         <svg id="schSvg" viewBox="26 6 212 214"></svg>
         <div class="sch-note">Типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3). Клик по элементу — назначить модель из базы.
@@ -190,8 +198,9 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
     <div class="col" id="right">
       <div class="ph">Спецификация <span class="m">сама из сцены</span></div>
       <div id="spec"></div>
+      <div id="layNote"></div>
       <div class="acts">
-        <div class="btn" id="bAuto">✦ Расставить по функциям</div>
+        <div class="btn" id="bAsk">🧠 Клод, расставь</div>
         <div class="btn" id="bFromSch">⤓ Собрать по схеме</div>
         <div class="btn pri" id="bBom">→ BOM · чертёж сборки</div>
         <div class="btn ghost" id="bClear">Очистить сцену</div>
@@ -375,10 +384,10 @@ function bindCtl(cv){
   });
 }
 
-/* ═══ v2.45.974: функция детали и её место в машине ═══
-   Роль берём из разделов базы (section/sub) — они и так описывают назначение.
-   SLOT говорит, на каком ярусе деталь живёт, в какой точке площадки стоит
-   и куда «размножаются» одинаковые детали, если их несколько. */
+/* ═══ v2.45.974: кто где стоит — решает Клод, а не браузер ═══
+   Здесь остаётся только механика: площадка, постановка по координатам,
+   выкладка новой детали и заявка на компоновку. Саму компоновку (какой узел
+   на каком ярусе и в какой точке) считает Клод и пишет её в проект. */
 function roleOf(d){
   const sec=d.section||'',sub=d.sub||'';
   if(sec==='frames')return 'frame';           // корпус чиллера — площадка компоновки
@@ -399,31 +408,6 @@ function roleOf(d){
 const ROLE_NAME={frame:'корпус',comp:'компрессор',cond:'конденсатор',fan:'вентилятор',
   evap:'испаритель',recv:'ресивер',sep:'отделитель',pump:'насос',vibro:'виброопора',
   panel:'щит',instr:'приборы',line:'арматура',pipe:'трубы',floor:'на полу'};
-/* ax/ay — доля габарита площадки (0 — левый/передний край, 1 — правый/задний) */
-const SLOT={
-  frame:{lvl:'floor',ax:.50,ay:.50,dir:'x',rot:0},
-  vibro:{lvl:'floor',ax:.08,ay:.08,dir:'y',rot:0},
-  comp: {lvl:'floor',ax:.20,ay:.26,dir:'y',rot:0},
-  sep:  {lvl:'floor',ax:.20,ay:.80,dir:'x',rot:0},
-  recv: {lvl:'floor',ax:.52,ay:.86,dir:'x',rot:0,center:true},
-  evap: {lvl:'floor',ax:.80,ay:.26,dir:'y',rot:0},
-  pump: {lvl:'floor',ax:.80,ay:.74,dir:'y',rot:0},
-  line: {lvl:'mid',  ax:.90,ay:.14,dir:'y',rot:Math.PI/2},
-  instr:{lvl:'panel',ax:.14,ay:.04,dir:'x',rot:0},
-  panel:{lvl:'panel',ax:.55,ay:.04,dir:'x',rot:0},
-  cond: {lvl:'roof', ax:.50,ay:.50,dir:'y',rot:0,center:true},
-  // вентилятор в базе построен осью по X (посадка в стенку конденсатора) — на крыше кладём его осью вверх
-  fan:  {lvl:'cond', ax:.50,ay:.50,dir:'x',rot:0,tilt:Math.PI/2,center:true},
-  pipe: {lvl:'yard', ax:1.30,ay:.20,dir:'y',rot:0},
-  floor:{lvl:'floor',ax:.50,ay:.50,dir:'x',rot:0},
-};
-/* порядок арматуры по ходу жидкостной линии: кран → фильтр → стекло → соленоид → ТРВ */
-const LINE_ORDER=['кран','фильтр','стекл','соленоид','электромагнит','обратн','регулятор','трв'];
-function lineRank(d){
-  const t=((d.name||'')+' '+(d.kind||'')).toLowerCase();
-  for(let i=0;i<LINE_ORDER.length;i++)if(t.includes(LINE_ORDER[i]))return i;
-  return LINE_ORDER.length;
-}
 /* площадка: габарит корпуса, если он в сцене, иначе типовая рама 900 × 606 × 900 */
 const DEF_SITE={w:900,d:606,h:900};
 function site(){
@@ -431,20 +415,6 @@ function site(){
   if(fr)return new THREE.Box3().setFromObject(fr.obj);
   return new THREE.Box3(new THREE.Vector3(-DEF_SITE.w/2,-DEF_SITE.d/2,0),
                         new THREE.Vector3( DEF_SITE.w/2, DEF_SITE.d/2,DEF_SITE.h));
-}
-function levelZ(lvl,s){
-  const H=s.max.z-s.min.z;
-  if(lvl==='roof')return s.max.z;                       // конденсатор — наверх
-  if(lvl==='mid') return s.min.z+H*0.50;                // арматура — средний ярус
-  if(lvl==='panel')return s.min.z+H*0.70;               // приборы — на виду сверху
-  if(lvl==='cond'){                                     // вентилятор — на конденсаторе
-    const c=placed.find(p=>roleOf(p.d)==='cond');
-    return c?new THREE.Box3().setFromObject(c.obj).max.z:s.max.z;}
-  return s.min.z;                                       // пол площадки
-}
-function slotPoint(sl,s){
-  return {x:s.min.x+(s.max.x-s.min.x)*sl.ax,
-          y:s.min.y+(s.max.y-s.min.y)*sl.ay};
 }
 /* поставить деталь: центр по X/Y в точку, низ — на отметку z; tilt — завал вокруг Y */
 function placeAt(it,x,y,z,rot,tilt){
@@ -460,56 +430,85 @@ function boxFree(box,skip){
   return !placed.some(p=>p!==skip&&!NOCOLL.has(roleOf(p.d))&&
     new THREE.Box3().setFromObject(p.obj).expandByScalar(-6).intersectsBox(box));
 }
-/* деталь встаёт в свой слот; место занято — шагает вдоль ряда, ряд кончился — берёт следующий */
+/* Новая деталь кладётся на выкладку перед корпусом — не в машину.
+   Где ей стоять в машине, решает Клод («🧠 Клод, расставь»), а не браузер:
+   компоновка — это зазоры на обслуживание, ход трубы и доступ к вентилям,
+   правилами вида «ресивер в такую-то долю площадки» это не считается. */
 const GAP=70;
-function autoPlace(it){
+function parkItem(it){
   const role=roleOf(it.d);
   if(role==='frame'){placeAt(it,0,0,0,0,0);return;}   // корпус — в центр сцены, он и есть площадка
-  const s=site(),sl=SLOT[role]||SLOT.floor;
-  const z=levelZ(sl.lvl,s),pt=slotPoint(sl,s);
-  const byX=sl.dir==='x';
-  const lim=byX?s.max.x:s.max.y;                      // дальше площадки ряд не тянем
-  const inward=(byX?sl.ay:sl.ax)>0.5?-1:1;            // новый ряд уходит внутрь площадки
-  let cur=byX?pt.x:pt.y,side=byX?pt.y:pt.x,row=0;
-  for(let k=0;k<30;k++){
-    const box=placeAt(it,byX?cur:side,byX?side:cur,z,sl.rot,sl.tilt);
-    if(NOCOLL.has(role)||boxFree(box,it))return;
+  const s=site();
+  const y0=s.min.y-320,x0=s.min.x;                     // ряд выкладки перед фасадом
+  let x=x0,row=0;
+  for(let k=0;k<40;k++){
+    const box=placeAt(it,x,y0-row*260,s.min.z,0,0);
+    if(boxFree(box,it))return;
     const sz=new THREE.Vector3();box.getSize(sz);
-    cur+=(byX?sz.x:sz.y)+GAP;
-    // ряды переносим только внутри корпуса; крышный ряд (конденсатор, вентиляторы) тянется дальше
-    if(!sl.center&&cur>lim&&row<3){row++;cur=byX?pt.x:pt.y;side+=inward*180;}
+    x+=sz.x+GAP;
+    if(x>s.max.x+600){row++;x=x0;}
   }
 }
-/* ряд, который должен стоять по центру площадки (конденсатор, вентиляторы, ресивер) */
-function centerRow(list,sl,s){
-  const bb=new THREE.Box3();list.forEach(p=>bb.expandByObject(p.obj));
-  const pt=slotPoint(sl,s),c=new THREE.Vector3();bb.getCenter(c);
-  const dx=sl.dir==='x'?snap(pt.x-c.x):0,dy=sl.dir==='y'?snap(pt.y-c.y):0;
-  list.forEach(p=>{p.obj.position.x+=dx;p.obj.position.y+=dy;p.obj.updateMatrixWorld(true);});
+/* ═══ заявка Клоду: «расставь» ═══
+   Проект уже лежит в CRM, поэтому заявка — это сообщение в ленту с номером
+   проекта. Клод читает проект по API, считает компоновку и пишет её обратно
+   вместе с пояснением; страница подхватывает изменение сама (poll ниже). */
+let layoutNote=null;               // {by,at,note,warn} — пишет Клод, храним и отдаём назад при автосейве
+function askLayout(){
+  if(!placed.length){toast('Сцена пустая — сначала набери состав из базы слева');return;}
+  if(!PAPI||!PROJ.id){toast('Компоновку считает Клод по проекту в CRM — сначала создай проект');return;}
+  const list=[];
+  const cnt=new Map();
+  placed.forEach(p=>cnt.set(p.d,(cnt.get(p.d)||0)+1));
+  cnt.forEach((n,d)=>list.push((d.brand?d.brand+' ':'')+d.name+(n>1?' × '+n:'')));
+  const txt='Расставь проект «'+PROJ.name+'» (#'+PROJ.id+') в Атом Чиллере.\n'+
+            'Состав сцены: '+list.join('; ')+'.\n'+
+            'Компоновку запиши в проект (items с x/y/z/r/t) и поясни ярусы.';
+  // сохраняем состав до заявки, чтобы Клод читал то же, что на экране
+  clearTimeout(saveT);
+  capi(PAPI+'/'+PROJ.id,'PATCH',{data:projPayload()}).catch(()=>{});
+  if(parent===window){   // страница открыта сама по себе — ленты рядом нет, заявку не отправить
+    prompt('Открой конструктор внутри CRM — тогда заявка уйдёт сама. Пока скопируй текст в чат «Чиллеры»:',txt);
+    return;
+  }
+  try{parent.postMessage({type:'atom-chiller-layout',project:PROJ.id,name:PROJ.name,text:txt},location.origin);}
+  catch(e){}
+  showLayNote({by:'Заявка отправлена',at:'',
+    note:'Клод читает проект, считает компоновку и запишет её сюда. Сцена обновится сама — можно не ждать у экрана.'});
+  toast('Клод получил проект — расставит и вернёт с пояснением');
 }
-/* полная перекладка сцены по функциям */
-const LAY_ORDER=['frame','vibro','comp','sep','recv','evap','pump','line','instr','panel','cond','fan','pipe','floor'];
-function autoLayout(){
-  if(!placed.length){toast('Сцена пустая — добавь детали из базы слева');return;}
-  const groups=new Map();
-  placed.forEach(p=>{const r=roleOf(p.d);
-    if(!groups.has(r))groups.set(r,[]);groups.get(r).push(p);});
-  // корпус ставим первым — от него считается вся площадка; остальных уводим в сторону,
-  // чтобы старые места не мешали поиску свободного
-  placed.forEach(p=>{
-    if(roleOf(p.d)==='frame')autoPlace(p);
-    else{p.obj.position.set(1e6,1e6,0);p.obj.updateMatrixWorld(true);}});
-  const roles=[...groups.keys()].sort((a,b)=>LAY_ORDER.indexOf(a)-LAY_ORDER.indexOf(b));
-  roles.forEach(r=>{
-    const list=groups.get(r);
-    if(r==='line')list.sort((a,b)=>lineRank(a.d)-lineRank(b.d));
-    list.forEach(autoPlace);
-    const sl=SLOT[r];
-    if(sl&&sl.center&&list.length>1)centerRow(list,sl,site());
-  });
-  select(sel&&placed.includes(sel)?sel:null);
-  refresh();save();
-  toast('Расставлено по функциям: '+roles.map(r=>ROLE_NAME[r]||r).join(', '));
+function showLayNote(l,pending){
+  layoutNote=pending?layoutNote:(l||layoutNote);
+  const el=$('#layNote');
+  if(!l){el.classList.remove('on');el.innerHTML='';return;}
+  el.innerHTML='<b>'+esc(l.by||'Компоновка от Клода')+'</b>'+(l.at?' <span class="m">· '+esc(l.at)+'</span>':'')+
+    '<br>'+esc(l.note||'').replace(/\n/g,'<br>')+
+    (l.warn?'<br><span class="w">⚠ '+esc(l.warn)+'</span>':'')+
+    (pending?'<div class="apply" id="layApply">✦ Показать компоновку Клода</div>':'');
+  el.classList.add('on');
+  if(pending)$('#layApply').onclick=()=>openProject(PROJ.id);
+}
+/* Клод пишет проект со стороны сервера — ловим это и подхватываем сцену.
+   Свои правки не перетираем: пока рука на мыши, показываем кнопку. */
+let _seenUpd='',_touchedAt=0;
+function sceneSig(items){return JSON.stringify((items||[]).map(s=>[s.id,s.x,s.y,s.z,s.r,s.t]));}
+async function pollProject(){
+  if(!PAPI||!PROJ.id||document.hidden)return;
+  let p;
+  try{p=await capi(PAPI+'/'+PROJ.id);}catch(e){return;}
+  if(!p||!p.updated_at)return;
+  if(p.updated_at===_seenUpd)return;
+  _seenUpd=p.updated_at;
+  const mine=sceneSig(projPayload().items),theirs=sceneSig(p.data&&p.data.items);
+  if(mine===theirs){                                   // тот же расклад — только пояснение могло приехать
+    if(p.data&&p.data.layout)showLayNote(p.data.layout);
+    return;
+  }
+  const busy=Date.now()-_touchedAt<20000;              // только что двигали руками — не выдёргиваем из-под рук
+  if(busy){showLayNote(p.data&&p.data.layout,true);return;}
+  await loadProjectData(p.data);
+  showLayNote(p.data&&p.data.layout);
+  toast('Клод расставил — сцена обновлена');
 }
 /* «Собрать по схеме»: всё, что назначено узлам контура, встаёт в сцену */
 async function buildFromSchema(){
@@ -524,8 +523,8 @@ async function buildFromSchema(){
     const have=placed.filter(p=>p.id===id).length;
     for(let i=have;i<n;i++){if(await addItem(d))added++;}
   }
-  autoLayout();
-  toast(added?('Добавлено по схеме: '+added+' '+plural(added)):'Все назначенные модели уже в сцене');
+  toast(added?('Добавлено по схеме: '+added+' '+plural(added)+' — дальше «Клод, расставь»')
+             :'Все назначенные модели уже в сцене');
 }
 
 /* ═══ детали ═══ */
@@ -543,7 +542,7 @@ async function addItem(d,at,rot,tilt){
   placed.push(it);
   if(at){obj.position.x=at.x;obj.position.y=at.y;
     if(typeof at.z==='number')obj.position.z=at.z;}  // из проекта — как сохранили
-  else autoPlace(it);                                // новая деталь — на свой ярус
+  else parkItem(it);                                 // новая деталь — на выкладку перед корпусом
   select(it);refresh();save();
   return it;
 }
@@ -624,7 +623,7 @@ $('#bTilt').onclick=tiltSel;
 $('#bUp').onclick=()=>lift(50);
 $('#bDown').onclick=()=>lift(-50);
 $('#bFloor').onclick=toFloor;
-$('#bAuto').onclick=autoLayout;
+$('#bAsk').onclick=askLayout;
 $('#bFromSch').onclick=buildFromSchema;
 $('#bDup').onclick=async()=>{if(!sel)return;
   const p=sel.obj.position,r=sel.obj.rotation.z;
@@ -682,12 +681,15 @@ async function capi(path,method,body){
 }
 function projPayload(){
   // v2.45.974: z сохраняем тоже — иначе поднятые детали падали бы на пол при открытии
-  return {items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,
+  const d={items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,
                                 z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y})),
           schema:schemaData};
+  if(layoutNote)d.layout=layoutNote;    // пояснение к компоновке автосейв не должен терять
+  return d;
 }
 function save(){
   if(_loading)return;
+  _touchedAt=Date.now();          // правка руками: пока свежая — компоновку Клода не подставляем молча
   clearTimeout(saveT);
   saveT=setTimeout(async()=>{
     const stamp=()=>{$('#fSave').textContent='сохранено · '+new Date().toLocaleTimeString().slice(0,5);};
@@ -712,6 +714,8 @@ async function loadProjectData(data){
   _loading=true;
   clearScene();
   schemaData=(data&&data.schema)||{};
+  layoutNote=(data&&data.layout)||null;
+  showLayNote(layoutNote);
   const arr=(data&&data.items)||[];
   for(const s of arr){
     const d=DATA.find(x=>x.id===s.id&&x.ready);
@@ -723,7 +727,7 @@ async function loadProjectData(data){
 async function openProject(id){
   try{
     const p=await capi(PAPI+'/'+id);
-    PROJ.id=p.id;setProjName(p.name);
+    PROJ.id=p.id;setProjName(p.name);_seenUpd=p.updated_at||'';
     try{history.replaceState(null,'', '?p='+p.id);}catch(e){}
     await loadProjectData(p.data);
     closeProjects();
@@ -993,6 +997,9 @@ $('#q').addEventListener('input',e=>{fQ=e.target.value.trim().toLowerCase();draw
       if(items.length===1)await openProject(items[0].id);
       else await openProjectsOverlay();
     }
+    // компоновка приезжает со стороны сервера — раз в 15 с смотрим, не расставил ли Клод
+    setInterval(pollProject,15000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollProject();});
   }else{
     $('#fMode').textContent='без CRM: черновик в этом браузере';
     setProjName('Черновик');
