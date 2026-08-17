@@ -2131,8 +2131,8 @@ async function _devChatLoadImage(el, url) {
   } catch (e) { /* картинка не критична */ }
 }
 
-// v2.45.980: макет удобнее смотреть живым, а не скриншотом. html-вложение
-// Клавы открывается прямо в ленте — в песочнице (sandbox без same-origin),
+// v2.45.969: макет удобнее смотреть живым, а не скриншотом. html-вложение
+// открывается прямо в ленте — в песочнице (sandbox без allow-same-origin),
 // поэтому чужой разметке не достанется ни токен из localStorage, ни API.
 function _devChatIsArtifact(f) {
   const ct = ((f && f.content_type) || '').toLowerCase();
