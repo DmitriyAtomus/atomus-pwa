@@ -972,8 +972,9 @@
           <div class="dchat-composer">
             <!-- v2.45.955: быстрые чипы — типовые запросы в один тап (важно на телефоне) -->
             <!-- v2.45.957: эмодзи заменены иконками Tabler — чипы стали одного роста -->
-            <div class="dchat-chips" id="devchat-chips">
-              <button class="acc" onclick="devChatCamera()"><i class="ti ti-camera"></i>Снять фото</button>
+            <!-- v2.45.971: чип «Снять фото» убран — он дублировал кнопку слева и
+                 торчал из ряда чужим цветом; ряд скроллится с растушёвкой справа -->
+            <div class="dchat-chips" id="devchat-chips" onscroll="_devChatChipsFade()">
               <button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>
               <button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>
               <button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Поправь дизайн раздела…</button>
@@ -981,16 +982,17 @@
             <div id="devchat-files" class="dchat-files"></div>
             <div class="dchat-box">
               <div class="dchat-input-row">
-                <button class="dchat-attach dchat-cam" onclick="devChatCamera()" title="Снять фото камерой">
-                  <i class="ti ti-camera"></i>
-                </button>
-                <button class="dchat-attach" onclick="document.getElementById('devchat-file-input').click()" title="Прикрепить фото или файл">
-                  <i class="ti ti-paperclip"></i>
+                <!-- v2.45.971: вместо камеры и скрепки — одна кнопка «+» ростом с
+                     микрофон: ряд стал симметричным, источники съехали в шторку -->
+                <button class="dchat-attach" onclick="devChatAttachMenu()" title="Прикрепить: фото, галерея, файл">
+                  <i class="ti ti-plus"></i>
                 </button>
                 <input type="file" id="devchat-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
                        style="display:none;" onchange="devChatPickFiles(this.files)">
                 <input type="file" id="devchat-camera-input" accept="image/*" capture="environment"
-                       style="display:none;" onchange="devChatPickFiles(this.files)">
+                       style="display:none;" onchange="devChatAddFiles(this.files)">
+                <input type="file" id="devchat-gallery-input" multiple accept="image/*"
+                       style="display:none;" onchange="devChatAddFiles(this.files)">
                 <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот можно вставить через Ctrl+V"
                           oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
                           onpaste="devChatPaste(event)"></textarea>
@@ -8992,11 +8994,16 @@ function _ccReset() {
     <div id="devchat-drawer-files" class="dchat-files"></div>
     <div class="dchat-box">
       <div class="dchat-input-row">
-        <button class="dchat-attach" onclick="document.getElementById('devchat-drawer-file-input').click()" title="Прикрепить">
-          <i class="ti ti-paperclip"></i>
+        <!-- v2.45.971: та же кнопка «+», что и на экране (камера/галерея/файл) -->
+        <button class="dchat-attach" onclick="devChatAttachMenu()" title="Прикрепить: фото, галерея, файл">
+          <i class="ti ti-plus"></i>
         </button>
         <input type="file" id="devchat-drawer-file-input" multiple accept="image/*,.pdf,.txt,.log,.json,.csv"
                style="display:none;" onchange="devChatPickFiles(this.files)">
+        <input type="file" id="devchat-drawer-camera-input" accept="image/*" capture="environment"
+               style="display:none;" onchange="devChatAddFiles(this.files)">
+        <input type="file" id="devchat-drawer-gallery-input" multiple accept="image/*"
+               style="display:none;" onchange="devChatAddFiles(this.files)">
         <textarea id="devchat-drawer-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот — Ctrl+V"
                   oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
                   onpaste="devChatPaste(event)"></textarea>
