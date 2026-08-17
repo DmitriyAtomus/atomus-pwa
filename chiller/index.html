@@ -188,6 +188,9 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
   background:rgba(8,20,36,.92);border:1px solid var(--line2);backdrop-filter:blur(8px);
   box-shadow:0 8px 22px rgba(0,0,0,.5)}
 #chatFab.on{display:block}
+/* открытая шторка накрыла бы кнопку — отодвигаем её левее полосы чата, чтобы
+   тем же нажатием чат и закрыть */
+#chatFab.open{right:412px;font-size:23px;color:#fff;border-color:var(--cyan)}
 #chatFab.work{border-color:var(--gold);color:#fff;
   animation:chpulse 1.6s ease-in-out infinite}
 @keyframes chpulse{
@@ -317,6 +320,7 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
   #chat{width:100vw;border-left:none}
   .ch-b{max-width:92%}
   #chatFab{right:12px;bottom:12px}
+  #chatFab.open{display:none}   /* шторка во весь экран — прячем, закрываем крестиком */
 }
 @media (max-width:420px){
   .grid{grid-template-columns:repeat(2,1fr);gap:9px}
@@ -337,7 +341,7 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
       <input id="q" placeholder="Поиск по обозначению, производителю, хладагенту…">
     </div>
     <div class="hcount"><b id="cReady">0</b> моделей выпущено<br><span id="cAll">0</span> позиций в базе</div>
-    <button id="chatBtn" class="fsbtn" onclick="openChat()" style="display:none"
+    <button id="chatBtn" class="fsbtn" onclick="toggleChat()" style="display:none"
             title="Чат по чиллерам">💬 <span id="chatTxt">Чат</span></button>
     <a class="fsbtn" href="project.html" style="text-decoration:none"
        title="Прототип конструктора: собери машину из моделей базы">⚙ <span>Проект</span></a>
@@ -387,6 +391,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
         <button id="bWire">Каркас</button><button id="bBox">Габарит</button>
         <button id="bSpin" class="on">Вращение</button>
         <button id="bParts">Детали</button>
+        <button id="bChat" style="display:none" onclick="toggleChat()"
+                title="Чат по чиллерам (Esc — закрыть)">💬 Чат</button>
       </div>
       <div class="parts" id="partsBox">
         <div class="ph2"><b id="pTitle">Детали сборки</b><span id="pCount"></span>
@@ -402,7 +408,7 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
 </div>
 
 <!-- ===================== чат по чиллерам ===================== -->
-<button id="chatFab" onclick="openChat()" title="Чат по чиллерам">💬<span class="n" id="chatFabN"></span></button>
+<button id="chatFab" onclick="toggleChat()" title="Чат по чиллерам"><span id="chatFabI">💬</span><span class="n" id="chatFabN"></span></button>
 
 <div id="chat">
   <div class="ch-hd">
@@ -663,13 +669,35 @@ async function chatArm(){
   ch.arm = true;
   const fab = chEl('chatFab'); if(fab) fab.classList.add('on');
   const cb = chEl('chatBtn'); if(cb) cb.style.display = '';
+  /* карточку позиции открывают на весь экран, шапка под ней — поэтому вызов
+     чата дублируем в её же панели видов */
+  const vb = chEl('bChat'); if(vb) vb.style.display = '';
   chWatch(true);            /* фоновый присмотр: горит ли работа, есть ли ответ */
+}
+
+/* Одна и та же кнопка вызывает чат и убирает его: и кружок над моделью, и
+   кнопка в шапке, и кнопка в панели видов карточки работают на переключение —
+   иначе закрыть шторку можно было только крестиком внутри неё. */
+function toggleChat(){
+  if(!ch.arm) return;
+  ch.open ? closeChat() : openChat();
+}
+/* Подсветка всех трёх кнопок и крестик вместо «облачка» на кружке */
+function chBtns(){
+  const on = !!ch.open;
+  const fab = chEl('chatFab'); if(fab){
+    fab.classList.toggle('open', on);
+    fab.title = on ? 'Закрыть чат' : 'Чат по чиллерам';
+  }
+  const ic = chEl('chatFabI'); if(ic) ic.textContent = on ? '×' : '💬';
+  const hb = chEl('chatBtn'); if(hb) hb.classList.toggle('on', on);
+  const vb = chEl('bChat'); if(vb) vb.classList.toggle('on', on);
 }
 
 function openChat(){
   const box = chEl('chat'); if(!box || !ch.arm) return;
   box.classList.add('open');
-  ch.open = true; ch.unread = 0; chBadge();
+  ch.open = true; ch.unread = 0; chBadge(); chBtns();
   if(!ch.tid){
     chEl('chFeed').innerHTML = '<div class="ch-empty">Чат проекта «Атом Чиллер» ещё не заведён.<br>' +
       'Откройте его один раз из шапки раздела в CRM — дальше он будет здесь.</div>';
@@ -684,7 +712,7 @@ function openChat(){
 }
 function closeChat(){
   const box = chEl('chat'); if(box) box.classList.remove('open');
-  ch.open = false;
+  ch.open = false; chBtns();
   chWatch(true);            /* закрыли — присмотр продолжается, только реже */
 }
 
