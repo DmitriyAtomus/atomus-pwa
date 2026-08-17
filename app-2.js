@@ -11251,7 +11251,10 @@ function _renderReservationBadge(item) {
     } else {
       cls = 'r-none';
       icon = 'ti-circle-dashed';
-      txt = (item.model_id ? 'К сборке' : 'К закупке');
+      // v2.45.985: модель «заказываем на стороне» (purchase_only) мы не собираем —
+      // писать «К сборке» на монтажной балке было прямой дезинформацией цеха.
+      txt = (item.model_id && item.model_work_type !== 'purchase_only')
+        ? 'К сборке' : 'К закупке';
     }
     return ' <span class="spec-item-reservation ' + cls + '" title="' + escapeHtml(txt) + '">' +
       '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
