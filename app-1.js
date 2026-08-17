@@ -2688,6 +2688,13 @@ function _devChatSetStatus(text, mode) {
   const label = document.getElementById('devchat-status-text');
   if (label) label.textContent = text; else if (box) box.textContent = text;
   if (box) box.className = 'dchat-status is-' + (mode || 'ready');
+  // v2.45.984: состояние агента красит всю шапку — кольцо у аватара крутится,
+  // «вживую» разгорается тёплым. Класс на топбаре, чтобы это делал один CSS.
+  const bar = document.querySelector('[data-screen="devchat"] .dchat-topbar');
+  if (bar) {
+    bar.classList.toggle('is-working', mode === 'working');
+    bar.classList.toggle('is-off', mode === 'off');
+  }
   // красный квадрат в шапке живёт ровно столько, сколько есть что останавливать
   const stop = document.getElementById('devchat-stop');
   if (stop) stop.style.display = (mode === 'working') ? 'inline-flex' : 'none';
