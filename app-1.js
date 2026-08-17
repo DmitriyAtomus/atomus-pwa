@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.975";
+const APP_VERSION = "v2.45.976";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1405,6 +1405,8 @@ function renderProfile() {
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
   const navDev = document.getElementById('sb-devchat');
   if (navDev) navDev.style.display = isDirector ? '' : 'none';
+  const navCodex = document.getElementById('sb-codex');
+  if (navCodex) navCodex.style.display = isDirector ? '' : 'none';
   const devFab = document.getElementById('devchat-fab');
   if (devFab) devFab.style.display = isDirector ? '' : 'none';
 
@@ -1730,6 +1732,8 @@ function selectSidebarItem(screenName) {
     'warehouse-stock':       'warehouse-dashboard',
     'warehouse-components':  'warehouse-dashboard',
     'warehouse-movements':   'warehouse-dashboard',
+    // Codex использует тот же экран чата, но отдельную очередь и историю.
+    'codex':                  'devchat',
   };
   const targetScreen = SCREEN_ALIASES[screenName] || screenName;
 
@@ -1880,17 +1884,21 @@ function runScreenLoader(screenName) {
   // Чат с Клавой: лента опрашивается только на своём экране
   const devDrawer = document.getElementById('devchat-drawer');
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
+  if (screenName === 'devchat') _devChatUseAgent('claude');
   if (screenName === 'devchat') loadDevChat('screen');
-  else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
+  else if (screenName === 'codex') {
+    _devChatUseAgent('codex');
+    loadDevChat('screen');
+  } else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
   // v2.45.971: внутри чата прячем круглый «+» таб-бара — он выпирал над панелью
   // и отбирал у ленты полсантиметра, а по смыслу дублировал «+» композера
-  document.body.classList.toggle('dchat-screen', screenName === 'devchat');
+  document.body.classList.toggle('dchat-screen', screenName === 'devchat' || screenName === 'codex');
   // v2.45.956: на самом экране чата плавающая кнопка не нужна — она ложится
   // ровно на поле ввода (особенно на телефоне)
   const devFab2 = document.getElementById('devchat-fab');
   if (devFab2) {
     const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
-    devFab2.style.display = (screenName === 'devchat' || !isDir) ? 'none' : '';
+    devFab2.style.display = (screenName === 'devchat' || !isDir || screenName === 'codex') ? 'none' : '';
   }
 }
 
@@ -2001,6 +2009,46 @@ let _devChatListTimer = null;
 let _devChatSearchTimer = null;
 let _devChatSearchResults = null;  // не null — в панели показан результат поиска
 const DEVCHAT_THREAD_KEY = 'atomus_devchat_thread';
+const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread';
+let _devChatAgent = 'claude';      // claude | codex; данные двух агентов не смешиваются
+
+function _devChatAgentName() {
+  return _devChatAgent === 'codex' ? 'Codex' : 'Клава';
+}
+
+function _devChatApi(path) {
+  return (_devChatAgent === 'codex' ? '/api/codex-chat' : '/api/dev-chat') + (path || '');
+}
+
+function _devChatStorageKey() {
+  return _devChatAgent === 'codex' ? CODEXCHAT_THREAD_KEY : DEVCHAT_THREAD_KEY;
+}
+
+function _devChatApplyAgentUi() {
+  const name = _devChatAgentName();
+  const ava = document.querySelector('[data-screen="devchat"] .dchat-hd-ava');
+  if (ava) ava.innerHTML = (_devChatAgent === 'codex' ? 'C' : 'К') + '<i></i>';
+  const term = document.getElementById('devchat-term-title');
+  if (term) term.textContent = name + ' — работа вживую';
+  const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
+  if (hint) hint.textContent = 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
+    name + ' работает на офисном компьютере и правит проекты сам.';
+}
+
+function _devChatUseAgent(agent) {
+  const next = agent === 'codex' ? 'codex' : 'claude';
+  if (_devChatAgent !== next) {
+    stopDevChat();
+    _devChatThreadId = 0;
+    _devChatThreads = [];
+    _devChatProjects = [];
+    _devChatProjFilter = 0;
+    _devChatSearchResults = null;
+    _devChatFiles = [];
+  }
+  _devChatAgent = next;
+  _devChatApplyAgentUi();
+}
 
 // Одна и та же лента живёт в двух местах — на своём экране и в шторке поверх
 // любого раздела. Чтобы не плодить копии кода, все функции работают с активным хостом.
@@ -2012,12 +2060,20 @@ function _devChatEl(name) {
 const _DEVCHAT_STATUS = {
   uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
-  running: { text: 'Клава работает…', cls: 'text-warning' },
+  running: { text: 'агент работает…', cls: 'text-warning' },
   stopping: { text: 'останавливаю…', cls: 'text-warning' },
   stopped: { text: 'остановлено',    cls: 'text-muted' },
   done:    { text: 'готово',         cls: 'text-success' },
   error:   { text: 'сбой',           cls: 'text-danger' },
 };
+
+function _devChatStatus(status) {
+  const st = _DEVCHAT_STATUS[status];
+  if (!st) return null;
+  return status === 'running'
+    ? { text: _devChatAgentName() + ' работает…', cls: st.cls }
+    : st;
+}
 
 // Задача ещё в работе, пока не done/error: за такими сообщениями нужно следить
 // (uploading — файлы ещё летят в хранилище, агент их пока не видит).
@@ -2217,7 +2273,7 @@ function _devChatRender(msg) {
     wrap.appendChild(ava);
   }
 
-  const st = mine && msg.status ? (_DEVCHAT_STATUS[msg.status] || null) : null;
+  const st = mine && msg.status ? _devChatStatus(msg.status) : null;
   const bubble = document.createElement('div');
   bubble.className = 'dchat-bubble';
   bubble.innerHTML =
@@ -2386,7 +2442,7 @@ function _devChatWorkFill(el) {
   const now = el.querySelector('[data-now]');
   if (now && lines && lines.length) now.textContent = lines[lines.length - 1];
   // ждём своей очереди — так и пишем, а не показываем чужую строку активности
-  else if (now && !_devChatRunSince) now.textContent = 'жду очереди — Клава занята другой задачей';
+  else if (now && !_devChatRunSince) now.textContent = 'жду очереди — ' + _devChatAgentName() + ' занят другой задачей';
   const tm = el.querySelector('[data-timer]');
   if (tm) {
     const sec = _devChatRunSince ? Math.max(0, Math.round((Date.now() - _devChatRunSince) / 1000)) : 0;
@@ -2416,13 +2472,15 @@ async function devChatStop() {
   // задача, а остановить надо ту, что грызёт машину сейчас — это знает сервер
   let r;
   try {
-    r = await apiPost('/api/dev-chat/stop', {});
+    r = _devChatAgent === 'codex'
+      ? await apiPost('/api/codex-chat/stop', {})
+      : await apiPost('/api/dev-chat/stop', {});
   } catch (e) {
     showToast('Нет связи с сервером', 'error');
     return;
   }
   if (r && r.ok) {
-    showToast('Прошу Клаву остановиться', 'success');
+    showToast('Прошу ' + _devChatAgentName() + ' остановиться', 'success');
     _devChatSetStatus('останавливаю…', 'working');
   } else {
     showToast((r && r.data && r.data.message) || 'Не вышло остановить', 'error');
@@ -2432,10 +2490,11 @@ async function devChatStop() {
 
 // Пустая лента: не «пока пусто», а подсказка, что вообще можно попросить.
 function _devChatEmptyHtml() {
+  const name = _devChatAgentName();
   const quick = ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
   return '<div class="dchat-empty">' +
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
-    '<h3>Задача для Клавы</h3>' +
+    '<h3>Задача для ' + escapeHtml(name) + '</h3>' +
     '<p>Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, ' +
     'запускает проверки и отвечает сюда же. Можно приложить фото или файл.</p>' +
     '<div class="dchat-quick">' +
@@ -2463,7 +2522,7 @@ async function _devChatTickInner(feed) {
   let data;
   if (!_devChatThreadId) return;      // список чатов ещё не пришёл
   try {
-    data = await apiGet('/api/dev-chat/messages?since_id=' + _devChatSince +
+    data = await apiGet(_devChatApi('/messages') + '?since_id=' + _devChatSince +
                         '&thread_id=' + _devChatThreadId);
   } catch (e) {
     // 403 здесь означает «лента не твоя», а не обрыв связи — писать про связь
@@ -2526,7 +2585,7 @@ async function _devChatRefreshStatuses() {
   }
   let data;
   try {
-    data = await apiGet('/api/dev-chat/messages?since_id=' +
+    data = await apiGet(_devChatApi('/messages') + '?since_id=' +
       (Math.min.apply(null, Array.from(_devChatPending)) - 1) +
       '&thread_id=' + _devChatThreadId);
   } catch (e) { return; }
@@ -2538,7 +2597,7 @@ async function _devChatRefreshStatuses() {
   ((data && data.messages) || []).forEach(function (m) {
     if (!_devChatPending.has(m.id)) return;
     const span = document.querySelector('[data-msg-id="' + m.id + '"] [data-status]');
-    const st = _DEVCHAT_STATUS[m.status];
+    const st = _devChatStatus(m.status);
     if (span && st) {
       span.textContent = st.text;
       span.className = 'dchat-chip is-' + m.status;
@@ -2566,7 +2625,7 @@ async function _devChatRefreshStatuses() {
   const progLines = working ? _devChatProgLines() : null;
   _devChatSetStatus(
     working ? (progLines ? progLines[progLines.length - 1]
-                         : (running ? 'Клава работает над задачей…' : 'Задача в очереди'))
+                         : (running ? _devChatAgentName() + ' работает над задачей…' : 'Задача в очереди'))
             : 'Готов к работе',
     working ? 'working' : 'ready');
   if (feed) _devChatTyping(feed, working);
@@ -2828,7 +2887,8 @@ async function _dcVoiceFinish() {
   form.append('audio', new Blob(chunks, { type: type }), 'voice.' + ext);
   let text = '';
   try {
-    const r = await fetch(API_BASE + '/api/dev-chat/voice', {
+    const voiceApi = _devChatAgent === 'codex' ? '/api/codex-chat/voice' : '/api/dev-chat/voice';
+    const r = await fetch(API_BASE + voiceApi, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
       body: form,
@@ -2927,7 +2987,8 @@ function _devChatTermRender() {
         return '<div class="ln' + (i === items.length - 1 ? ' cur' : '') + '">' +
           '<span class="t">' + r.t + '</span>' + escapeHtml(r.ln) + '</div>';
       }).join('')
-    : '<div class="tf-empty">Пока тихо. Строки появятся, когда Клава возьмёт задачу.</div>';
+    : '<div class="tf-empty">Пока тихо. Строки появятся, когда ' +
+      escapeHtml(_devChatAgentName()) + ' возьмёт задачу.</div>';
   log.scrollTop = log.scrollHeight;
   const working = _devChatPending.size > 0;
   if (foot) foot.className = 'tf-ft' + (working ? ' on' : '');
@@ -3021,7 +3082,7 @@ function _devChatBindPaste() {
   document.addEventListener('paste', function (e) {
     const drawer = document.getElementById('devchat-drawer');
     const drawerOpen = drawer && drawer.style.display === 'flex';
-    if (!drawerOpen && state.currentScreen !== 'devchat') return;
+    if (!drawerOpen && state.currentScreen !== 'devchat' && state.currentScreen !== 'codex') return;
     const t = e.target;
     const tag = (t && t.tagName || '').toLowerCase();
     const id = t && t.id || '';
@@ -3045,7 +3106,7 @@ let _devChatDropWatch = null;
 function _devChatDropHost() {
   const drawer = document.getElementById('devchat-drawer');
   if (drawer && drawer.style.display === 'flex') return drawer;
-  if (state.currentScreen === 'devchat') {
+  if (state.currentScreen === 'devchat' || state.currentScreen === 'codex') {
     const screen = document.querySelector('.screen[data-screen="devchat"]');
     return screen && (screen.querySelector('.dchat-main') || screen);
   }
@@ -3070,7 +3131,8 @@ function _devChatDropOverlay() {
       '<span>Допишешь задачу — и отправишь сам</span></div>' +
     '<div class="dcd-zone dcd-go" data-dcd="send">' +
       '<i class="ti ti-send"></i><b>Отправить сразу</b>' +
-      '<span>Уйдёт Клаве вместе с тем, что уже набрано в поле</span></div>';
+      '<span>Уйдёт ' + escapeHtml(_devChatAgentName()) +
+      ' вместе с тем, что уже набрано в поле</span></div>';
   document.body.appendChild(el);
   Array.prototype.forEach.call(el.querySelectorAll('.dcd-zone'), function (z) {
     z.addEventListener('dragover', function (e) {
@@ -3223,7 +3285,7 @@ async function devChatSend(context) {
     form.append('context', JSON.stringify(where));
     _devChatFiles.forEach(function (f, i) { form.append('file' + (i + 1), f, f.name); });
 
-    const r = await fetch(API_BASE + '/api/dev-chat/send', {
+    const r = await fetch(API_BASE + _devChatApi('/send'), {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
       body: form,
@@ -3262,7 +3324,7 @@ function _devChatProject(id) {
 async function devChatLoadThreads(initial) {
   let data;
   try {
-    data = await apiGet('/api/dev-chat/threads');
+    data = await apiGet(_devChatApi('/threads'));
   } catch (e) {
     if (initial) {
       const box = document.getElementById('devchat-thread-list');
@@ -3275,7 +3337,7 @@ async function devChatLoadThreads(initial) {
   const known = _devChatThreads.some(function (t) { return t.id === _devChatThreadId; });
   if (initial || !known) {
     let saved = 0;
-    try { saved = parseInt(localStorage.getItem(DEVCHAT_THREAD_KEY) || '0', 10) || 0; } catch (e) {}
+    try { saved = parseInt(localStorage.getItem(_devChatStorageKey()) || '0', 10) || 0; } catch (e) {}
     const pick = _devChatThreads.find(function (t) { return t.id === saved; }) || _devChatThreads[0];
     _devChatThreadId = pick ? pick.id : ((data && data.default_thread_id) || 1);
   }
@@ -3289,7 +3351,7 @@ function _devChatRenderTitle() {
   const t = _devChatThread();
   const project = t && t.project_id ? _devChatProject(t.project_id) : null;
   h.textContent = (t && t.title) || 'Новый чат';
-  h.title = project ? ('Проект: ' + project.name) : 'Чат с Клавой';
+  h.title = project ? ('Проект: ' + project.name) : 'Чат с ' + _devChatAgentName();
 }
 
 function _devChatRenderThreads() {
@@ -3310,7 +3372,7 @@ function _devChatRenderThreads() {
   if (_devChatSearchResults) {
     box.innerHTML = _devChatSearchResults.length
       ? _devChatSearchResults.map(function (r) {
-          const who = r.author === 'claude' ? 'Клава' : 'Вы';
+          const who = r.author === _devChatAgent ? _devChatAgentName() : 'Вы';
           return '<button class="dcl-item dcl-found" onclick="devChatOpenThread(' + r.thread_id + ')">' +
             '<div class="t">' + escapeHtml(r.thread_title || 'Чат') + '</div>' +
             '<div class="p">' + escapeHtml(who) + ': ' + escapeHtml(r.snippet || '') + '</div>' +
@@ -3333,7 +3395,8 @@ function _devChatRenderThreads() {
     const bar = project && project.color
       ? '<i class="bar" style="background:' + escapeHtml(project.color) + '"></i>' : '';
     const marks =
-      (t.busy ? '<span class="dcl-busy" title="Клава работает"><i class="ti ti-loader-2"></i></span>' : '') +
+      (t.busy ? '<span class="dcl-busy" title="' + escapeHtml(_devChatAgentName()) +
+        ' работает"><i class="ti ti-loader-2"></i></span>' : '') +
       (t.pinned ? '<span class="dcl-pin"><i class="ti ti-pin-filled"></i></span>' : '');
     return '<div class="dcl-item' + on + '" onclick="devChatOpenThread(' + t.id + ')">' + bar +
       '<div class="dcl-item-main">' +
@@ -3358,7 +3421,10 @@ function devChatOpenThread(id) {
   if (!id) return;
   const same = id === _devChatThreadId;
   _devChatThreadId = id;
-  try { localStorage.setItem(DEVCHAT_THREAD_KEY, String(id)); } catch (e) {}
+  try {
+    if (_devChatAgent === 'codex') localStorage.setItem(CODEXCHAT_THREAD_KEY, String(id));
+    else localStorage.setItem(DEVCHAT_THREAD_KEY, String(id));
+  } catch (e) {}
   // Лента чужого чата — другая переписка целиком: обнуляем курсор и рисуем с нуля
   _devChatSince = 0;
   _devChatDayKey = '';
@@ -3375,7 +3441,7 @@ function devChatOpenThread(id) {
 async function devChatNewThread(projectId) {
   let thread;
   try {
-    thread = (await apiPost('/api/dev-chat/threads',
+    thread = (await apiPost(_devChatApi('/threads'),
       { project_id: projectId || _devChatProjFilter || null })).thread;
   } catch (e) {
     showToast('Не смог создать чат', 'error');
@@ -3424,7 +3490,7 @@ function devChatThreadMenu(id, btn) {
 
 async function _devChatPatchThread(id, body) {
   try {
-    await apiPatch('/api/dev-chat/threads/' + id, body);
+    await apiPatch(_devChatApi('/threads/' + id), body);
   } catch (e) {
     showToast('Не сохранилось', 'error');
     return false;
@@ -3468,7 +3534,7 @@ function devChatSearchInput(value) {
   }
   _devChatSearchTimer = setTimeout(async function () {
     try {
-      const data = await apiGet('/api/dev-chat/search?q=' + encodeURIComponent(q));
+      const data = await apiGet(_devChatApi('/search') + '?q=' + encodeURIComponent(q));
       _devChatSearchResults = (data && data.results) || [];
     } catch (e) {
       _devChatSearchResults = [];
@@ -3548,8 +3614,8 @@ async function devChatSaveProject() {
   };
   if (!body.name.trim()) { showToast('Как назовём проект?', 'error'); return; }
   try {
-    if (id) await apiPatch('/api/dev-chat/projects/' + id, body);
-    else await apiPost('/api/dev-chat/projects', body);
+    if (id) await apiPatch(_devChatApi('/projects/' + id), body);
+    else await apiPost(_devChatApi('/projects'), body);
   } catch (e) {
     showToast('Не сохранилось', 'error');
     return;
@@ -3562,7 +3628,7 @@ async function devChatSaveProject() {
 async function devChatArchiveProject(id) {
   if (!confirm('Убрать проект? Чаты останутся, просто без папки.')) return;
   try {
-    await apiPatch('/api/dev-chat/projects/' + id, { archived: true });
+    await apiPatch(_devChatApi('/projects/' + id), { archived: true });
   } catch (e) {
     showToast('Не получилось', 'error');
     return;
@@ -3605,7 +3671,7 @@ function loadDevChat(host) {
     // v2.45.956: на телефоне подсказка про Ctrl+V бессмысленна
     // v2.45.957: длинная подсказка вставала в две строки и съедала пол-экрана
     const mob = document.querySelector('.app.mobile-layout');
-    if (mob) input.placeholder = 'Задача для Клавы…';
+    if (mob) input.placeholder = 'Задача для ' + _devChatAgentName() + '…';
   }
   _devChatDrawFiles();
   _devChatChipsFade();
@@ -3633,7 +3699,8 @@ function devChatIsFull() {
 // Класс висит на <body>, а не на самом экране: скрыть надо и то, что лежит
 // снаружи экрана (шапка, сайдбары, плавающая кнопка шторки).
 function _devChatApplyFull() {
-  const on = devChatIsFull() && state.currentScreen === 'devchat';
+  const on = devChatIsFull() &&
+    (state.currentScreen === 'devchat' || state.currentScreen === 'codex');
   document.body.classList.toggle('dchat-fullscreen', on);
   const btn = document.getElementById('devchat-full-btn');
   if (btn) {
@@ -3661,6 +3728,8 @@ function devChatToggleDrawer() {
   const backdrop = document.getElementById('devchat-backdrop');
   const opening = drawer.style.display === 'none' || !drawer.style.display;
   if (opening) {
+    // Плавающая шторка остаётся Клавой. Codex открывается своим пунктом меню.
+    _devChatUseAgent('claude');
     drawer.style.display = 'flex';
     if (backdrop) backdrop.classList.add('show');
     const label = document.getElementById('devchat-drawer-context');
@@ -3672,7 +3741,10 @@ function devChatToggleDrawer() {
     drawer.style.display = 'none';
     if (backdrop) backdrop.classList.remove('show');
     // на своём экране лента должна продолжать жить
-    if (state.currentScreen === 'devchat') loadDevChat('screen'); else stopDevChat();
+    if (state.currentScreen === 'devchat' || state.currentScreen === 'codex') {
+      _devChatUseAgent(state.currentScreen === 'codex' ? 'codex' : 'claude');
+      loadDevChat('screen');
+    } else stopDevChat();
   }
 }
 
@@ -3691,6 +3763,7 @@ const CHILLER_PROJECT_MEMORY =
   'модели и меши — /api/3d/* на воркере.';
 
 async function openChillerChat() {
+  if (typeof _devChatUseAgent === 'function') _devChatUseAgent('claude');
   let data;
   try {
     data = await apiGet('/api/dev-chat/threads');

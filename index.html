@@ -268,6 +268,10 @@
           <i class="ti ti-message-code"></i><span>Клава</span>
           <span class="nav-badge" id="devchat-badge" style="display:none;"></span>
         </button>
+        <!-- Отдельный Codex: тот же удобный интерфейс, но другая очередь и история. -->
+        <button class="nav-item" id="sb-codex" data-nav="codex" onclick="selectSidebarItem('codex')" style="display:none;">
+          <i class="ti ti-terminal-2"></i><span>Codex</span>
+        </button>
         <!-- Безопасность: живой просмотр камеры офиса. Только директору (показ в app-1.js). -->
         <button class="nav-item" id="sb-security" data-nav="security" onclick="selectSidebarItem('security')" style="display:none;">
           <i class="ti ti-shield-lock"></i><span>Безопасность</span>
@@ -8957,7 +8961,7 @@ function _ccReset() {
   <div class="tf-card">
     <div class="tf-hd">
       <span class="tf-ava"><i class="ti ti-sparkles"></i></span>
-      <b>Клава — работа вживую</b>
+      <b id="devchat-term-title">Клава — работа вживую</b>
       <button class="tf-x" onclick="devChatTermClose()"><i class="ti ti-x"></i></button>
     </div>
     <pre class="tf-log" id="devchat-term-log"></pre>
