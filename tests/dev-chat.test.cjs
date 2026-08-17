@@ -1,4 +1,4 @@
-// Чат с Клодом: раздел, шторка поверх любого экрана и правила доступа.
+// Чат с Клавой: раздел, шторка поверх любого экрана и правила доступа.
 // Проверяем то, что легко потерять при правках: пункт и кнопка видны только
 // директору, лента опрашивается лишь когда есть где её показывать, а вложения
 // тянутся с токеном (иначе картинки молча не грузятся).
@@ -14,7 +14,7 @@ const version = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf
 const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 
-test('раздел «Клод» и шторка есть в разметке', () => {
+test('раздел «Клава» и шторка есть в разметке', () => {
   assert.match(html, /id="sb-devchat"/, 'нет пункта меню');
   assert.match(html, /data-screen="devchat"/, 'нет экрана');
   assert.match(html, /id="devchat-feed"/, 'нет ленты экрана');
@@ -95,7 +95,7 @@ test('лента оформлена классами, а не инлайновы
   assert.doesNotMatch(render, /cssText/, 'стили переехали в app.css');
 });
 
-test('разделители дней, «Клод работает» и пустая лента с подсказками', () => {
+test('разделители дней, «Клава работает» и пустая лента с подсказками', () => {
   assert.match(app, /function _devChatDay\(ts\)/);
   assert.match(app, /label = 'Сегодня'/);
   assert.match(app, /function _devChatTyping\(feed, on\)/);
@@ -155,8 +155,9 @@ test('чат разворачивается на всё окно и сворач
   assert.match(app, /devChatExitFull\(\); if \(!drawerOpen\) stopDevChat\(\);/);
   assert.match(app, /function devChatExitFull[\s\S]{0,160}classList\.remove\('dchat-fullscreen'\)/);
   // Esc: сначала шторка, и только потом выход из полноэкранного режима
+  // окно чуть шире исходного: перед шторкой Esc теперь отменяет запись голоса
   const esc = app.slice(app.indexOf("if (e.key !== 'Escape') return;"));
-  assert.match(esc.slice(0, 400), /devChatToggleDrawer\(\); return; \}[\s\S]{0,160}devChatToggleFull\(\)/);
+  assert.match(esc.slice(0, 600), /devChatToggleDrawer\(\); return; \}[\s\S]{0,160}devChatToggleFull\(\)/);
   // плавающая кнопка шторки в этом режиме висела бы поверх ленты
   assert.match(css, /body\.dchat-fullscreen #devchat-fab \{ display: none/);
 });

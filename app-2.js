@@ -10581,7 +10581,7 @@ function renderInstallFilesSection() {
     html += '<div class="install-files-grid">';
     files.forEach(x => {
       const f = x.f;
-      const url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      const url = API_BASE + (f.url || '/api/contracts/chat/files/' + f.id);
       const name = f.original_name || (f.kind === 'photo' ? 'Фото' : f.kind === 'video' ? 'Видео' : 'Файл #' + f.id);
       const sub = (f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '') + (x.author ? ' · ' + x.author : '');
       if (f.kind === 'photo') {
