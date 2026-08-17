@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.978";
+const APP_VERSION = "v2.45.979";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2013,7 +2013,7 @@ const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread';
 let _devChatAgent = 'claude';      // claude | codex; данные двух агентов не смешиваются
 
 function _devChatAgentName() {
-  return _devChatAgent === 'codex' ? 'Codex' : 'Клава';
+  return _devChatAgent === 'codex' ? 'Кодя' : 'Клава';
 }
 
 function _devChatApi(path) {
@@ -2027,7 +2027,7 @@ function _devChatStorageKey() {
 function _devChatApplyAgentUi() {
   const name = _devChatAgentName();
   const ava = document.querySelector('[data-screen="devchat"] .dchat-hd-ava');
-  if (ava) ava.innerHTML = (_devChatAgent === 'codex' ? 'C' : 'К') + '<i></i>';
+  if (ava) ava.innerHTML = (_devChatAgent === 'codex' ? 'Ко' : 'К') + '<i></i>';
   const term = document.getElementById('devchat-term-title');
   if (term) term.textContent = name + ' — работа вживую';
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
