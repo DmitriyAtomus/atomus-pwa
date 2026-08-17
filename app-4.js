@@ -6220,6 +6220,14 @@ function openQrManualEntry() {
   if (!input) return;
   const text = input.trim();
   if (!text) return;
+  // v2.45.909: в режиме отгрузки/сборки сканер НЕ закрываем. closeQrScanner()
+  // гасит state._qrContinuousMode, и ручной ввод уходил не в отгрузку, а в
+  // обычный лукап — открывалась карточка позиции. Из-за этого обход «камера не
+  // берёт наклейку → введи токен руками» при отгрузке не работал вообще.
+  if (state._qrContinuousMode) {
+    handleQrScanResult(text);
+    return;
+  }
   // ЭТАП 26.3: пускаем через общий обработчик — он сам разберёт URL/токен через /api/qr/lookup
   closeQrScanner();
   handleQrScanResult(text);
