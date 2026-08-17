@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.968";
+const APP_VERSION = "v2.45.970";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3482,8 +3482,23 @@ async function openChillerChat() {
       project = (await apiPost('/api/dev-chat/projects',
         { name: CHILLER_PROJECT_NAME, color: '#2D5F8B', memory: CHILLER_PROJECT_MEMORY })).project;
     }
-    // берём самый свежий чат проекта, а если его нет — заводим
+    // берём самый свежий чат проекта, а если его нет — заводим.
+    // v2.45.970: раньше на этом месте рождался пустой дубль. Чат «Чиллера»
+    // Дмитрий завёл руками, до появления проекта, поэтому project_id у него
+    // пустой — поиск его не видел и заводил второй, уже в проекте. После
+    // перезагрузки шторка садилась на этот пустой и лента выглядела стёртой.
+    // Теперь сначала подбираем уже существующий чат по названию и переносим
+    // его в проект: переписка одна и там, и на экране «Клава».
     let thread = threads.find(function (t) { return t.project_id === project.id; });
+    if (!thread) {
+      const orphan = threads.find(function (t) {
+        return !t.project_id && /^чиллер/i.test(String(t.title || '').trim());
+      });
+      if (orphan) {
+        thread = (await apiPatch('/api/dev-chat/threads/' + orphan.id,
+          { project_id: project.id })).thread || orphan;
+      }
+    }
     if (!thread) {
       thread = (await apiPost('/api/dev-chat/threads',
         { project_id: project.id, title: 'Чиллеры' })).thread;
