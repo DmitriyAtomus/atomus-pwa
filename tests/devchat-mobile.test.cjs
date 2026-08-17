@@ -54,5 +54,6 @@ test('карточка работы: после дорисовки лента д
   // что Клава ничего не делает
   const fn = app.slice(app.indexOf('function _devChatTyping'));
   assert.match(fn.slice(0, 1800), /const atBottom = feed\.scrollHeight/);
-  assert.match(fn.slice(0, 1800), /if \(atBottom\) feed\.scrollTop = feed\.scrollHeight;/);
+  // v2.45.978: доводим через _devChatToBottom — мгновенно, минуя CSS smooth
+  assert.match(fn.slice(0, 1800), /if \(atBottom\) _devChatToBottom\(feed, false\);/);
 });

@@ -50,8 +50,8 @@ test('задача уходит вместе с тем, откуда её нап
 
 test('вложения запрашиваются с токеном (иначе 401 и пустая картинка)', () => {
   const loader = app.slice(app.indexOf('async function _devChatLoadImage'));
-  assert.match(loader.slice(0, 600), /Authorization': 'Bearer '/);
-  assert.match(loader.slice(0, 600), /URL\.createObjectURL/);
+  assert.match(loader.slice(0, 1100), /Authorization': 'Bearer '/);
+  assert.match(loader.slice(0, 1100), /URL\.createObjectURL/);
 });
 
 test('статусы дозапрашиваются только пока есть незакрытые задачи', () => {

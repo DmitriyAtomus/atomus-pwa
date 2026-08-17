@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.978";
+const APP_VERSION = "v2.45.979";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2108,6 +2108,62 @@ function _devChatEl(name) {
   return document.getElementById(prefix + name);
 }
 
+// ---- v2.45.978: лента открывается на последнем сообщении ----
+// Открыл чат — и оказался где-то в середине переписки, конец приходилось
+// долистывать руками. Причин две, и обе про время:
+//   1) у .dchat-feed стоит scroll-behavior: smooth, поэтому `scrollTop = ...`
+//      запускал ПЛАВНУЮ прокрутку через всю ленту. Любое касание экрана или
+//      следующая перерисовка обрывали её на полпути — ровно «до середины».
+//   2) лента растёт уже после вставки: картинки едут отдельным запросом (blob
+//      под токеном), карточки правок и длинный текст верстаются позже. Низ
+//      уезжал вниз, а мы уже стояли «в конце» старой высоты.
+// Лечим обе: при открытии прыгаем мгновенно (behavior: 'auto' перебивает CSS)
+// и пару секунд держим низ «липким», пока лента дорисовывается.
+function _devChatToBottom(feed, smooth) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  // behavior в scrollTo сильнее, чем scroll-behavior из CSS — это и нужно
+  try { feed.scrollTo({ top: feed.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); }
+  catch (e) { feed.scrollTop = feed.scrollHeight; }
+}
+
+// Лента у конца? Порог с запасом: мелкие догрузки не считаются «отмотал вверх».
+function _devChatAtBottom(px) {
+  const feed = _devChatEl('feed');
+  if (!feed) return false;
+  return feed.scrollHeight - feed.scrollTop - feed.clientHeight < (px || 160);
+}
+
+let _devChatStickUntil = 0;
+let _devChatStickTimer = null;
+
+// Держим низ, пока лента дорисовывается. Первый же жест по ленте выключает
+// липучку — уехать в историю сразу после открытия она не мешает.
+function _devChatStickBottom(ms) {
+  const feed = _devChatEl('feed');
+  if (!feed) return;
+  _devChatStickUntil = Date.now() + (ms || 2000);
+  _devChatToBottom(feed, false);
+  if (!_devChatStickTimer) {
+    _devChatStickTimer = setInterval(function () {
+      const f = _devChatEl('feed');
+      if (!f || Date.now() > _devChatStickUntil) { _devChatStickStop(); devChatOnScroll(); return; }
+      if (f.scrollHeight - f.scrollTop - f.clientHeight > 1) _devChatToBottom(f, false);
+    }, 90);
+  }
+  if (!feed._dcStickBound) {
+    feed._dcStickBound = true;
+    ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach(function (ev) {
+      feed.addEventListener(ev, _devChatStickStop, { passive: true });
+    });
+  }
+}
+
+function _devChatStickStop() {
+  _devChatStickUntil = 0;
+  if (_devChatStickTimer) { clearInterval(_devChatStickTimer); _devChatStickTimer = null; }
+}
+
 const _DEVCHAT_STATUS = {
   uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
@@ -2233,6 +2289,11 @@ async function _devChatLoadImage(el, url) {
     });
     if (!r.ok) return;
     const blob = await r.blob();
+    // v2.45.978: картинка приезжает позже текста и толкает ленту вниз. Если мы
+    // стояли у конца (или ещё держим низ после открытия) — доводим скролл, когда
+    // высота уже известна. Иначе фото «выталкивало» последнее сообщение за экран.
+    const keep = _devChatAtBottom(220) || Date.now() < _devChatStickUntil;
+    if (keep) el.addEventListener('load', function () { _devChatToBottom(null, false); }, { once: true });
     el.src = URL.createObjectURL(blob);
     // v2.45.960: именно 'block', а не '': пустая строка стирает инлайн-стиль и
     // снова побеждает `.dchat-img { display: none }` из app.css — картинка
@@ -2480,7 +2541,7 @@ function _devChatTyping(feed, on) {
   // человек стоял у конца ленты, доводим скролл после появления карточки.
   const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 160;
   feed.appendChild(el);   // держим последним элементом ленты
-  if (atBottom) feed.scrollTop = feed.scrollHeight;
+  if (atBottom) _devChatToBottom(feed, false);
   _devChatWorkFill(el);
   _devChatWorkTick(true);
 }
@@ -2591,7 +2652,8 @@ async function _devChatTickInner(feed) {
     return;
   }
   const msgs = (data && data.messages) || [];
-  if (_devChatSince === 0) {
+  const first = _devChatSince === 0;   // переписка рисуется с нуля: открыли чат
+  if (first) {
     feed.innerHTML = msgs.length ? '' : _devChatEmptyHtml();
     _devChatDayKey = '';
   }
@@ -2610,7 +2672,11 @@ async function _devChatTickInner(feed) {
     }
     if (m.id > _devChatSince) _devChatSince = m.id;
   });
-  if (msgs.length && nearBottom) devChatJump();
+  // v2.45.978: открыли чат — прыгаем в конец мгновенно и придерживаем низ, пока
+  // едут картинки и доверстывается текст. Новое сообщение в открытой ленте —
+  // короткая липучка: плавная прокрутка тут успевала оборваться на полпути.
+  if (msgs.length && first) _devChatStickBottom(2500);
+  else if (msgs.length && nearBottom) _devChatStickBottom(900);
 
   await _devChatRefreshStatuses();
   devChatOnScroll();
@@ -2740,8 +2806,10 @@ function _devChatChipsFade() {
 window.addEventListener('resize', _devChatChipsFade);
 
 function devChatJump() {
-  const feed = _devChatEl('feed');
-  if (feed) feed.scrollTop = feed.scrollHeight;
+  // v2.45.978: прыжок мгновенный, а не плавный: плавная прокрутка длинной ленты
+  // идёт секунды и обрывается первым касанием — так и получалось «встал в
+  // середине». Короткая липучка добивает низ, если контент ещё дорисовывается.
+  _devChatStickBottom(700);
   devChatOnScroll();
 }
 
@@ -4034,6 +4102,7 @@ function stopDevChat() {
   if (_devChatTimer) { clearInterval(_devChatTimer); _devChatTimer = null; }
   if (_devChatListTimer) { clearInterval(_devChatListTimer); _devChatListTimer = null; }
   _devChatWorkTick(false);      // секундная стрелка карточки работы
+  _devChatStickStop();          // липучка низа ленты
   if (_dcVoiceRec) devChatVoiceCancel();   // ушли с экрана — микрофон отпускаем
 }
 
