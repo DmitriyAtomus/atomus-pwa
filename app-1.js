@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.970";
+const APP_VERSION = "v2.45.971";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1882,6 +1882,9 @@ function runScreenLoader(screenName) {
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
   if (screenName === 'devchat') loadDevChat('screen');
   else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
+  // v2.45.971: внутри чата прячем круглый «+» таб-бара — он выпирал над панелью
+  // и отбирал у ленты полсантиметра, а по смыслу дублировал «+» композера
+  document.body.classList.toggle('dchat-screen', screenName === 'devchat');
   // v2.45.956: на самом экране чата плавающая кнопка не нужна — она ложится
   // ровно на поле ввода (особенно на телефоне)
   const devFab2 = document.getElementById('devchat-fab');
@@ -2578,11 +2581,23 @@ function devChatGrow(el) {
   // и отдаём высоту ленте (на телефоне это целая строка сообщений).
   const chips = document.getElementById('devchat-chips');
   if (chips) chips.classList.toggle('is-hidden', !!(el.value || '').trim());
+  _devChatChipsFade();
   // v2.45.961: пусто — крупный микрофон (основной ввод в цеху), есть текст —
   // обычная стрелка «отправить». Обе кнопки сразу заняли бы полполя.
   const row = el.closest('.dchat-input-row');
   if (row) row.classList.toggle('has-text', !!(el.value || '').trim());
 }
+
+// v2.45.971: ряд чипов шире экрана — четвёртый просто обрезался краем и выглядел
+// сломанным. Пока справа есть что показать, включаем растушёвку: видно, что ряд
+// продолжается и его можно листать.
+function _devChatChipsFade() {
+  const chips = document.getElementById('devchat-chips');
+  if (!chips) return;
+  const more = chips.scrollWidth - chips.clientWidth - chips.scrollLeft > 8;
+  chips.classList.toggle('has-more', more);
+}
+window.addEventListener('resize', _devChatChipsFade);
 
 function devChatJump() {
   const feed = _devChatEl('feed');
@@ -2610,9 +2625,60 @@ function devChatQuick(btn) {
 }
 
 // v2.45.955: камера с телефона — сфотографировал экран/станок, сразу приложилось
+// v2.45.971: берём поле по хосту (_devChatEl), иначе из шторки жалась камера экрана
 function devChatCamera() {
-  const cam = document.getElementById('devchat-camera-input');
+  const cam = _devChatEl('camera-input');
   if (cam) cam.click();
+}
+
+// ---- v2.45.971: шторка вложений под кнопкой «+» ----
+// Камера и скрепка стояли в ряду ввода двумя мелкими иконками и перекашивали
+// его: слева две по 36 без фона, справа одна крупная с тенью. Теперь слева одна
+// кнопка ростом с микрофон, а источники (камера / галерея / файл) живут в
+// шторке. Шторка одна на оба композера — нужный input выбирает _devChatEl.
+function devChatAttachMenu() {
+  let sheet = document.getElementById('devchat-attach-sheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'devchat-attach-sheet';
+    sheet.className = 'dchat-sheet';
+    sheet.innerHTML =
+      '<div class="dcs-card" role="dialog" aria-label="Что приложить">' +
+        '<button class="dcs-it" data-kind="camera" onclick="devChatAttachPick(\'camera\')">' +
+          '<i class="ti ti-camera"></i><span>Снять фото</span></button>' +
+        '<button class="dcs-it" onclick="devChatAttachPick(\'gallery\')">' +
+          '<i class="ti ti-photo"></i><span>Галерея</span></button>' +
+        '<button class="dcs-it" onclick="devChatAttachPick(\'file\')">' +
+          '<i class="ti ti-paperclip"></i><span>Файл</span></button>' +
+        '<button class="dcs-cancel" onclick="devChatAttachClose()">Отмена</button>' +
+      '</div>';
+    // тап мимо карточки — закрыть (клик по самой карточке не всплывает сюда)
+    sheet.addEventListener('click', function (e) { if (e.target === sheet) devChatAttachClose(); });
+    document.body.appendChild(sheet);
+  }
+  // на компьютере камеры обычно нет — пункт прячем, остаются галерея и файл
+  const cam = sheet.querySelector('.dcs-it[data-kind="camera"]');
+  if (cam) cam.style.display = document.querySelector('.app.desktop-layout') ? 'none' : '';
+  sheet.classList.add('show');
+  document.addEventListener('keydown', _devChatSheetEsc);
+}
+
+function _devChatSheetEsc(e) { if (e.key === 'Escape') devChatAttachClose(); }
+
+function devChatAttachClose() {
+  const sheet = document.getElementById('devchat-attach-sheet');
+  if (sheet) sheet.classList.remove('show');
+  document.removeEventListener('keydown', _devChatSheetEsc);
+}
+
+// Камера и галерея ДОКЛАДЫВАЮТ к выбранному (как Ctrl+V): сфотографировал ещё
+// один узел — прошлый снимок не должен пропасть. «Файл» по-прежнему выбирает
+// набор заново — там мультивыбор в диалоге.
+function devChatAttachPick(kind) {
+  devChatAttachClose();
+  const name = kind === 'camera' ? 'camera-input' : (kind === 'gallery' ? 'gallery-input' : 'file-input');
+  const el = _devChatEl(name);
+  if (el) { el.value = ''; el.click(); }
 }
 
 // ---- v2.45.961: задача голосом ----
@@ -3384,6 +3450,7 @@ function loadDevChat(host) {
     if (mob) input.placeholder = 'Задача для Клавы…';
   }
   _devChatDrawFiles();
+  _devChatChipsFade();
   _devChatBindPaste();
   _devChatBindVoice();
   // Сначала список чатов: тик без выбранного чата тянул бы чужую переписку

@@ -24181,3 +24181,93 @@ body.dchat-fullscreen #devchat-fab { display: none !important; }
   .dchat-list.is-open { transform: none; }
   .dcl-close { display: inline-flex; }
 }
+
+/* ============ v2.45.971: Клава — ровный композер (append-only) ============ */
+/* Ряд ввода был перекошен: слева две мелкие иконки без фона (36 px), справа —
+   одна крупная с тенью (40). Теперь по краям две одинаковые кнопки 40×40 с
+   общим скруглением и одинаковым отступом от поля. */
+.dchat-input-row { gap: 8px; align-items: flex-end; }
+.dchat-attach {
+  width: 40px; height: 40px; border-radius: 12px; flex: none; cursor: pointer;
+  border: 1px solid var(--border-strong, #DDE5F0); background: var(--surface, #fff);
+  color: var(--text-mid, #43536b); font-size: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
+}
+.dchat-attach:hover { background: var(--bg); color: var(--brand); border-color: var(--brand); }
+.dchat-attach:active { transform: scale(.94); }
+.dchat-box, .app.mobile-layout .dchat-box { padding: 6px; }
+.dchat-input { padding: 8px 4px; }
+
+/* Микрофон и стрелка — один силуэт: при наборе текста кнопка меняет только
+   иконку, а не форму, и ряд не «прыгает». */
+.dchat-mic, .dchat-send {
+  width: 40px; height: 40px; border-radius: 12px; font-size: 19px;
+  box-shadow: 0 4px 12px rgba(45, 95, 139, .28);
+}
+.dchat-send:hover:not(:disabled) {
+  transform: none; filter: brightness(1.06); box-shadow: 0 4px 12px rgba(45, 95, 139, .28);
+}
+
+/* Чипы: пока справа есть что листать — растушёвка вместо обрезанного края;
+   при наборе текста ряд уезжает плавно, а не исчезает рывком. */
+.dchat-chips {
+  max-height: 60px; scroll-behavior: smooth;
+  transition: opacity .16s ease, max-height .2s ease, padding .2s ease;
+}
+.dchat-chips.has-more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent);
+}
+.dchat-chips.is-hidden {
+  display: flex; opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0;
+  overflow: hidden; pointer-events: none;
+}
+
+/* Подпись про Enter на телефоне не нужна: клавиша там другая, а строка съедает
+   высоту ленты (медиазапрос ловил только 760 px, а мобильная раскладка шире). */
+.app.mobile-layout .dchat-hint { display: none; }
+
+/* Внутри чата круглый «+» таб-бара выпирает прямо над полем ввода и дублирует
+   кнопку композера. Прячем, но место в сетке оставляем — пункты не должны
+   разъехаться. Освободившиеся 10 px отдаём ленте. */
+body.dchat-screen .app.mobile-layout .tab25.plus-tab25 { visibility: hidden; }
+body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
+  bottom: calc(64px + max(8px, env(safe-area-inset-bottom)));
+}
+
+/* Шторка источников под кнопкой «+»: снять фото / галерея / файл */
+.dchat-sheet {
+  display: none; position: fixed; inset: 0; z-index: 3300;
+  background: rgba(8, 14, 26, .46);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  align-items: flex-end; justify-content: center;
+}
+.dchat-sheet.show { display: flex; }
+.dcs-card {
+  width: min(460px, 100%); background: #fff; border-radius: 20px 20px 0 0;
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, .26); animation: dchatSlideUp .18s ease-out;
+}
+.dcs-it {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 11px 12px; border: none; background: none; border-radius: 14px; cursor: pointer;
+  font-size: 15px; font-weight: 600; color: var(--text-dark);
+}
+.dcs-it i {
+  width: 38px; height: 38px; border-radius: 12px; flex: none; font-size: 19px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--brand); background: #EEF3F9;
+}
+.dcs-it:hover { background: var(--bg); }
+.dcs-cancel {
+  width: 100%; margin-top: 6px; padding: 12px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--border-strong, #DDE5F0); background: #fff;
+  font-size: 14px; font-weight: 700; color: var(--text-mid);
+}
+.dcs-cancel:hover { background: var(--bg); }
+/* на большом экране шторка снизу выглядит чужеродно — та же карточка по центру */
+@media (min-width: 761px) {
+  .dchat-sheet { align-items: center; }
+  .dcs-card { width: min(320px, 100%); border-radius: 18px; padding: 10px; }
+}
