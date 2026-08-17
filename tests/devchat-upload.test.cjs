@@ -113,8 +113,8 @@ test('обрыв связи больше не молчит, а текст ост
 
   await ctx.send();
 
-  assert.equal(ctx.calls.length, 1, 'попытка отправки была');
-  assert.match(ctx.toasts[0].msg, /связь оборвалась/);
+  assert.equal(ctx.calls.length, 2, 'после обрыва пробуем ещё раз сами');
+  assert.match(ctx.toasts[ctx.toasts.length - 1].msg, /связь оборвалась/i);
   assert.equal(ctx.input.value, 'посмотри архив', 'написанное не теряется');
   assert.equal(ctx.files().length, 1, 'вложение тоже на месте');
   assert.equal(ctx.btn.disabled, false, 'кнопка снова доступна');
