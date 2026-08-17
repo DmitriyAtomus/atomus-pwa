@@ -59,8 +59,9 @@ test('вместо трёх точек — карточка работы с та
 
 test('карточка работы гаснет вместе с лентой', () => {
   const fn = app.slice(app.indexOf('function stopDevChat'));
-  assert.match(fn.slice(0, 300), /_devChatWorkTick\(false\)/);
-  assert.match(fn.slice(0, 300), /devChatVoiceCancel\(\)/, 'уходя с экрана, микрофон надо отпустить');
+  // срез с запасом: короткий (300) обрывался на середине последней строки
+  assert.match(fn.slice(0, 600), /_devChatWorkTick\(false\)/);
+  assert.match(fn.slice(0, 600), /devChatVoiceCancel\(\)/, 'уходя с экрана, микрофон надо отпустить');
 });
 
 test('итог правки — карточка с файлами и кнопками, а не стена текста', () => {

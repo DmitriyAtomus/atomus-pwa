@@ -99,6 +99,47 @@ test('проект заводится один раз и помнит, где л
   });
 });
 
+// Живая переписка «Чиллера» родилась раньше проекта, поэтому project_id у неё
+// пустой. Новый чат на её месте заводить нельзя: в разделе откроется пустой
+// дубль, и лента будет выглядеть стёртой.
+test('живой чат переносится в проект, а не подменяется пустым дублем', () => {
+  const ctx = {
+    calls: [],
+    state: { user: { roles: ['director'] } },
+    location: { origin: 'https://crm.local' },
+    window: { addEventListener() {} },
+    saved: null,
+    DEVCHAT_THREAD_KEY: 'atomus_devchat_thread',   // объявлен выше по файлу, в вырезку не попадает
+    localStorage: { setItem(k, v) { ctx.saved = v; }, getItem() { return null; } },
+    document: { getElementById() { return null; } },
+    showToast() {},
+    devChatOpenThread() {},
+    devChatLoadThreads() {},
+    devChatToggleDrawer() {},
+    async apiGet() {
+      return {
+        threads: [{ id: 5, project_id: null, title: 'Чиллера' }, { id: 1, project_id: null, title: 'Общий чат' }],
+        projects: [{ id: 2, name: 'Атом Чиллер' }],
+      };
+    },
+    async apiPost(url, body) { ctx.calls.push(['POST', url, body]); return { thread: { id: 99 } }; },
+    async apiPatch(url, body) {
+      ctx.calls.push(['PATCH', url, body]);
+      return { thread: { id: 5, project_id: body.project_id } };
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(section('const CHILLER_PROJECT_NAME', '// Esc закрывает шторку'), ctx);
+
+  return ctx.openChillerChat().then(() => {
+    assert.equal(ctx.calls.filter((c) => c[0] === 'POST').length, 0, 'дубль заводить нельзя');
+    assert.equal(ctx.calls[0][0], 'PATCH');
+    assert.equal(ctx.calls[0][1], '/api/dev-chat/threads/5');
+    assert.equal(ctx.calls[0][2].project_id, 2);
+    assert.equal(ctx.saved, '5', 'шторка должна сесть на живую переписку');
+  });
+});
+
 test('в шапке 3D-базы есть кнопка чата, и в полный экран она не тянет CRM', () => {
   const shell = fs.readFileSync(path.join(root, 'chiller', 'index.html'), 'utf8');
   assert.match(shell, /id="chatBtn"/);
