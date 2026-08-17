@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.975";
+const APP_VERSION = "v2.45.976";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2002,6 +2002,57 @@ let _devChatSearchTimer = null;
 let _devChatSearchResults = null;  // не null — в панели показан результат поиска
 const DEVCHAT_THREAD_KEY = 'atomus_devchat_thread';
 
+// v2.45.976: черновик принадлежит чату, а не полю ввода. Поле одно на всю
+// ленту, поэтому недописанная задача ехала за тобой: начал писать в одном
+// чате, перешёл в другой — а там уже висит чужой текст (и прикреплённые
+// файлы), и одно неосторожное «отправить» уводило его не в тот разговор.
+const DEVCHAT_DRAFT_KEY = 'atomus_devchat_drafts';
+let _devChatDrafts = {};       // id чата -> недописанный текст
+let _devChatDraftFiles = {};   // id чата -> прикреплённые, но не отправленные файлы
+let _devChatDraftsRead = false;
+
+function _devChatDraftsLoad() {
+  if (_devChatDraftsRead) return;
+  _devChatDraftsRead = true;
+  try { _devChatDrafts = JSON.parse(localStorage.getItem(DEVCHAT_DRAFT_KEY) || '{}') || {}; }
+  catch (e) { _devChatDrafts = {}; }
+}
+
+// В localStorage кладём только текст: File из хранилища не восстановить, да и
+// незачем — вложения живут до перезагрузки.
+function _devChatDraftsStore() {
+  try { localStorage.setItem(DEVCHAT_DRAFT_KEY, JSON.stringify(_devChatDrafts)); } catch (e) {}
+}
+
+// Снять то, что сейчас в поле, в черновик чата id (перед уходом из него).
+function _devChatDraftStash(id) {
+  if (!id) return;
+  const input = _devChatEl('input');
+  const text = (input && input.value || '').trim();
+  if (text) _devChatDrafts[id] = text; else delete _devChatDrafts[id];
+  if (_devChatFiles.length) _devChatDraftFiles[id] = _devChatFiles.slice();
+  else delete _devChatDraftFiles[id];
+  _devChatDraftsStore();
+}
+
+// Подставить черновик чата в поле — или оставить поле пустым, если его нет.
+function _devChatDraftApply() {
+  _devChatDraftsLoad();
+  const input = _devChatEl('input');
+  if (input) {
+    input.value = _devChatDrafts[_devChatThreadId] || '';
+    devChatGrow(input);
+  }
+  _devChatFiles = (_devChatDraftFiles[_devChatThreadId] || []).slice();
+  _devChatDrawFiles();
+}
+
+function _devChatDraftClear(id) {
+  delete _devChatDrafts[id || _devChatThreadId];
+  delete _devChatDraftFiles[id || _devChatThreadId];
+  _devChatDraftsStore();
+}
+
 // Одна и та же лента живёт в двух местах — на своём экране и в шторке поверх
 // любого раздела. Чтобы не плодить копии кода, все функции работают с активным хостом.
 function _devChatEl(name) {
@@ -2412,11 +2463,14 @@ function _devChatWorkTick(on) {
 // Останавливаем ту задачу, которую сервер считает текущей, — фронт может
 // отстать на пару секунд, а номер знает БД.
 async function devChatStop() {
-  // номер не шлём: у фронта в «ожидающих» может висеть старая незакрытая
-  // задача, а остановить надо ту, что грызёт машину сейчас — это знает сервер
+  // номер задачи не шлём: у фронта в «ожидающих» может висеть старая незакрытая
+  // задача, а остановить надо ту, что грызёт машину сейчас — это знает сервер.
+  // v2.45.976: но чат шлём обязательно. Без него сервер брал свою текущую
+  // задачу, чей бы чат её ни поставил: кнопка в ленте по чиллерам убивала
+  // правку фронта из другого разговора.
   let r;
   try {
-    r = await apiPost('/api/dev-chat/stop', {});
+    r = await apiPost('/api/dev-chat/stop', { thread_id: _devChatThreadId || 0 });
   } catch (e) {
     showToast('Нет связи с сервером', 'error');
     return;
@@ -2585,6 +2639,14 @@ function devChatKey(e) {
 // Поле растёт под текст (до max-height из CSS) — многострочную задачу видно целиком.
 function devChatGrow(el) {
   if (!el) return;
+  // v2.45.976: каждый набранный символ сразу ложится в черновик ЭТОГО чата —
+  // тогда переход в другую ленту (и обратно) ничего не теряет и не подсовывает
+  if (_devChatThreadId) {
+    const draft = (el.value || '').trim();
+    if (draft) _devChatDrafts[_devChatThreadId] = draft;
+    else delete _devChatDrafts[_devChatThreadId];
+    _devChatDraftsStore();
+  }
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 168) + 'px';
   // v2.45.957: пока набирается текст, ряд быстрых чипов ни к чему — прячем его
@@ -3234,6 +3296,7 @@ async function devChatSend(context) {
       return;
     }
     if (input) { input.value = ''; devChatGrow(input); }
+    _devChatDraftClear(_devChatThreadId);   // ушло — черновик этого чата больше не нужен
     devChatPickFiles([]);
     const fileInput = _devChatEl('file-input');
     if (fileInput) fileInput.value = '';
@@ -3357,7 +3420,11 @@ function devChatFilterProject(id) {
 function devChatOpenThread(id) {
   if (!id) return;
   const same = id === _devChatThreadId;
+  // недописанное остаётся в том чате, где его писали, а новый чат открывается
+  // со своим черновиком (чаще всего — с пустым полем)
+  if (!same) _devChatDraftStash(_devChatThreadId);
   _devChatThreadId = id;
+  if (!same) _devChatDraftApply();
   try { localStorage.setItem(DEVCHAT_THREAD_KEY, String(id)); } catch (e) {}
   // Лента чужого чата — другая переписка целиком: обнуляем курсор и рисуем с нуля
   _devChatSince = 0;
@@ -3601,19 +3668,19 @@ function loadDevChat(host) {
   if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
   const input = _devChatEl('input');
   if (input) {
-    devChatGrow(input);
     // v2.45.956: на телефоне подсказка про Ctrl+V бессмысленна
     // v2.45.957: длинная подсказка вставала в две строки и съедала пол-экрана
     const mob = document.querySelector('.app.mobile-layout');
     if (mob) input.placeholder = 'Задача для Клавы…';
   }
-  _devChatDrawFiles();
   _devChatChipsFade();
   _devChatBindPaste();
   _devChatBindDrop();
   _devChatBindVoice();
-  // Сначала список чатов: тик без выбранного чата тянул бы чужую переписку
-  devChatLoadThreads(true).then(function () { _devChatTick(); });
+  // Сначала список чатов: тик без выбранного чата тянул бы чужую переписку.
+  // v2.45.976: черновик подставляем ПОСЛЕ того, как известен чат — иначе поле
+  // пришлось бы наполнять наугад, а пустое затёрло бы недописанное.
+  devChatLoadThreads(true).then(function () { _devChatDraftApply(); _devChatTick(); });
   _devChatTimer = setInterval(_devChatTick, 3000);
   // список обновляем реже — там меняются только превью и значок «работает»
   _devChatListTimer = setInterval(function () { devChatLoadThreads(false); }, 15000);
@@ -3767,6 +3834,8 @@ document.addEventListener('keydown', function (e) {
 });
 
 function stopDevChat() {
+  // уходим с ленты — недописанное и прикреплённое остаётся за своим чатом
+  _devChatDraftStash(_devChatThreadId);
   if (_devChatTimer) { clearInterval(_devChatTimer); _devChatTimer = null; }
   if (_devChatListTimer) { clearInterval(_devChatListTimer); _devChatListTimer = null; }
   _devChatWorkTick(false);      // секундная стрелка карточки работы
