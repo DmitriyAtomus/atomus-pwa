@@ -24288,3 +24288,141 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
   .dchat-sheet { align-items: center; }
   .dcs-card { width: min(320px, 100%); border-radius: 18px; padding: 10px; }
 }
+
+/* ============ v2.45.984: Клава — шапка, в которую попадаешь пальцем ============
+   Кнопки в шапке были стеклянными плитками 30–34px почти в цвет фона: с телефона
+   они читались как выключенные и требовали прицела. Теперь это тап-цель 40×40
+   с видимой кромкой, откликом на нажатие и смыслом — «вживую» светится, пока
+   агент работает, а строка состояния показывает, что она кликабельна. */
+[data-screen="devchat"] .dchat-topbar .back-btn,
+[data-screen="devchat"] .dchat-topbar .dchat-eye,
+[data-screen="devchat"] .dchat-topbar .dchat-stopbtn,
+[data-screen="devchat"] .dchat-topbar .dchat-full-btn {
+  width: 40px; height: 40px; border-radius: 13px; font-size: 18px;
+  background: rgba(255,255,255,.17);
+  border: 1px solid rgba(255,255,255,.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 2px 8px rgba(9,26,48,.16);
+  transition: background .15s ease, transform .12s ease, box-shadow .15s ease;
+  position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent;
+}
+[data-screen="devchat"] .dchat-topbar .back-btn:hover,
+[data-screen="devchat"] .dchat-topbar .dchat-eye:hover,
+[data-screen="devchat"] .dchat-topbar .dchat-full-btn:hover {
+  background: rgba(255,255,255,.30); transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 6px 16px rgba(9,26,48,.24);
+}
+/* нажатие видно и без ховера (на телефоне его нет): плитка проседает,
+   из-под пальца расходится короткая волна */
+[data-screen="devchat"] .dchat-topbar .back-btn:active,
+[data-screen="devchat"] .dchat-topbar .dchat-eye:active,
+[data-screen="devchat"] .dchat-topbar .dchat-stopbtn:active,
+[data-screen="devchat"] .dchat-topbar .dchat-full-btn:active {
+  transform: scale(.9); background: rgba(255,255,255,.36);
+}
+[data-screen="devchat"] .dchat-topbar .back-btn::after,
+[data-screen="devchat"] .dchat-topbar .dchat-eye::after,
+[data-screen="devchat"] .dchat-topbar .dchat-stopbtn::after,
+[data-screen="devchat"] .dchat-topbar .dchat-full-btn::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.55), transparent 62%);
+}
+[data-screen="devchat"] .dchat-topbar .back-btn:active::after,
+[data-screen="devchat"] .dchat-topbar .dchat-eye:active::after,
+[data-screen="devchat"] .dchat-topbar .dchat-stopbtn:active::after,
+[data-screen="devchat"] .dchat-topbar .dchat-full-btn:active::after {
+  animation: dchatTap .45s ease-out;
+}
+@keyframes dchatTap {
+  from { opacity: .85; transform: scale(.35); }
+  to   { opacity: 0;   transform: scale(1.25); }
+}
+/* «Назад» и «Чаты» стояли двумя одинаковыми плитками — глазу не за что
+   зацепиться. Список чатов получает фирменную сиреневую заливку: это
+   не «ещё одна стрелка», а вход в другой чат. */
+[data-screen="devchat"] .dchat-topbar .dchat-list-btn {
+  background: linear-gradient(135deg, rgba(139,123,240,.95), rgba(91,73,214,.95));
+  border-color: rgba(255,255,255,.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 4px 12px rgba(91,73,214,.36);
+}
+[data-screen="devchat"] .dchat-topbar .dchat-list-btn:hover {
+  background: linear-gradient(135deg, #9D8FF5, #6B58E4);
+}
+/* Аватар: в покое — зелёная точка, в работе кольцо бежит по кругу.
+   Видно с одного взгляда, занят агент или ждёт задачу. */
+/* кольцо-рамка: маска вырезает середину, иначе слой закрыл бы букву аватара */
+.dchat-hd-ava::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 15px; opacity: 0; z-index: 1;
+  padding: 3px; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 62%, #FFCF6B 78%, #FF9F1C 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transition: opacity .2s ease;
+}
+.dchat-topbar.is-working .dchat-hd-ava::before { opacity: 1; animation: dchatRing 1.4s linear infinite; }
+@keyframes dchatRing { to { transform: rotate(360deg); } }
+.dchat-hd-ava i { z-index: 2; }
+.dchat-topbar.is-working .dchat-hd-ava i { background: #FFB020; animation: dchatPulse 1.2s ease-in-out infinite; }
+.dchat-topbar.is-off .dchat-hd-ava i { background: #F87171; }
+
+/* Строка состояния — не подпись, а кнопка: пунктир снизу и шеврон, тап
+   открывает работу вживую. Раньше по ней никто не жал — не было видно,
+   что она вообще нажимается. */
+/* строка состояния живёт внутри флекса — ширину ей задаёт свободное место,
+   а не проценты экрана: иначе длинная строка активности лезла под кнопки */
+[data-screen="devchat"] .dchat-topbar .page-header-title { flex: 1; min-width: 0; }
+[data-screen="devchat"] .dchat-topbar .dchat-status {
+  font-size: 12px; padding: 2px 0; gap: 6px; color: rgba(255,255,255,.88);
+  border-bottom: 1px dashed rgba(255,255,255,.34); width: fit-content;
+  max-width: 100%; -webkit-tap-highlight-color: transparent;
+}
+[data-screen="devchat"] .dchat-topbar .dchat-status:hover,
+[data-screen="devchat"] .dchat-topbar .dchat-status:active {
+  color: #fff; border-bottom-color: rgba(255,255,255,.7); text-decoration: none;
+}
+.dchat-status .dchat-st-arrow {
+  font-size: 13px; opacity: .7; flex: none; transition: transform .15s ease;
+}
+[data-screen="devchat"] .dchat-topbar .dchat-status:hover .dchat-st-arrow { transform: translateX(2px); opacity: 1; }
+.dchat-topbar.is-working .dchat-status { color: #FFE1A8; border-bottom-color: rgba(255,207,107,.5); }
+
+/* «Вживую» в работе — тёплая плитка с дышащим ореолом: пока агент что-то
+   делает, кнопка сама зовёт заглянуть в терминал */
+[data-screen="devchat"] .dchat-topbar.is-working .dchat-eye {
+  background: linear-gradient(135deg, #F5A524, #E0870F); border-color: rgba(255,255,255,.34);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 0 rgba(245,165,36,.55);
+  animation: dchatEyeGlow 1.8s ease-out infinite;
+}
+@keyframes dchatEyeGlow {
+  0%   { box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 0 rgba(245,165,36,.5); }
+  70%  { box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 10px rgba(245,165,36,0); }
+  100% { box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 0 rgba(245,165,36,0); }
+}
+/* «Стоп» въезжает, а не возникает — понятно, что кнопка новая */
+[data-screen="devchat"] .dchat-topbar .dchat-stopbtn {
+  background: linear-gradient(135deg, #F2564B, #DC2626); border-color: rgba(255,255,255,.3);
+  animation: dchatStopIn .22s ease-out;
+}
+[data-screen="devchat"] .dchat-topbar .dchat-stopbtn:hover { background: linear-gradient(135deg, #EF4444, #B91C1C); }
+@keyframes dchatStopIn {
+  from { opacity: 0; transform: scale(.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Телефон: плитки чуть уже, но всё ещё палец, а не пиксель.
+   Прежние правила ужимали их до 30–32px — перебиваем тем же весом. */
+.app.mobile-layout [data-screen="devchat"] .dchat-topbar .back-btn,
+.app.mobile-layout [data-screen="devchat"] .dchat-topbar .dchat-eye,
+.app.mobile-layout [data-screen="devchat"] .dchat-topbar .dchat-stopbtn {
+  width: 38px; height: 38px; border-radius: 12px; font-size: 17px;
+}
+.app.mobile-layout [data-screen="devchat"] .dchat-hd-right { gap: 7px; }
+.app.mobile-layout [data-screen="devchat"] .page-header-title { gap: 7px; }
+.app.mobile-layout [data-screen="devchat"] .dchat-topbar .dchat-status {
+  font-size: 11.5px;
+}
+@media (max-width: 760px) {
+  [data-screen="devchat"] .dchat-topbar .back-btn,
+  [data-screen="devchat"] .dchat-topbar .dchat-eye,
+  [data-screen="devchat"] .dchat-topbar .dchat-stopbtn { width: 38px; height: 38px; border-radius: 12px; }
+}

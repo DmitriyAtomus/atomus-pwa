@@ -917,16 +917,18 @@
             <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
             <!-- Список чатов: на широком экране панель видна всегда, на телефоне
                  выезжает по этой кнопке. -->
-            <button class="back-btn dchat-list-btn" onclick="devChatToggleList()" title="Чаты и проекты">
+            <button class="back-btn dchat-list-btn" onclick="devChatToggleList()"
+                    title="Чаты и проекты" aria-label="Чаты и проекты">
               <i class="ti ti-messages"></i>
             </button>
             <div class="dchat-hd-ava">К<i></i></div>
             <div class="dchat-hd-id">
               <h1 id="devchat-title">Клава</h1>
               <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->
+              <!-- v2.45.984: шеврон и пунктир — чтобы было видно, что строка нажимается -->
               <div id="devchat-status" class="dchat-status" onclick="devChatTermOpen()"
-                   title="Смотреть работу агента вживую">
-                <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span>
+                   role="button" tabindex="0" title="Смотреть работу агента вживую">
+                <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span><i class="ti ti-chevron-right dchat-st-arrow"></i>
               </div>
             </div>
           </div>
