@@ -22,7 +22,7 @@ function chatSection() {
 
 test('в оболочке есть шторка чата, кнопка и композер', () => {
   assert.match(shell, /<div id="chat">/);
-  assert.match(shell, /id="chatFab"[\s\S]*?onclick="openChat\(\)"/);
+  assert.match(shell, /id="chatFab"[\s\S]*?onclick="toggleChat\(\)"/);
   assert.match(shell, /id="chIn"/);
   assert.match(shell, /onclick="chatSend\(\)"/);
   assert.match(shell, /onclick="chatStop\(\)"/);      // работу можно остановить отсюда же
@@ -30,6 +30,20 @@ test('в оболочке есть шторка чата, кнопка и ком
   // макет — чужой html, поэтому только в песочнице и только через srcdoc
   assert.match(shell, /id="chArtF" sandbox="allow-scripts/);
   assert.match(chatSection(), /chArtF'\)\.srcdoc/);
+});
+
+test('чат вызывают и убирают одной кнопкой — в шапке, над моделью и в карточке', () => {
+  // карточку позиции открывают на весь экран, шапка под ней — без кнопки в
+  // панели видов чат из карточки не вызвать
+  assert.match(shell, /<div class="vbar" id="vbar">[\s\S]*?id="bChat"[\s\S]*?onclick="toggleChat\(\)"/);
+  assert.match(shell, /id="chatBtn"[\s\S]*?onclick="toggleChat\(\)"/);
+  const code = chatSection();
+  assert.match(code, /function toggleChat\(\)[\s\S]*?ch\.open \? closeChat\(\) : openChat\(\)/);
+  assert.match(code, /function closeChat\(\)[\s\S]*?chBtns\(\)/);
+  // кружок над моделью не должен уехать под открытую шторку
+  assert.match(shell, /#chatFab\.open\{right:412px/);
+  // на телефоне шторка во весь экран — кружок там лишний
+  assert.match(shell, /#chatFab\.open\{display:none\}/);
 });
 
 test('лента берётся из dev-chat, отдельного хранилища у модуля нет', () => {

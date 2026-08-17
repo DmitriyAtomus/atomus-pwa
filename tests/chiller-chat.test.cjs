@@ -184,7 +184,7 @@ test('в 3D-базе чат открывается своей панелью, б
   const shell = fs.readFileSync(path.join(root, 'chiller', 'index.html'), 'utf8');
   assert.match(shell, /id="chatBtn"/);
   assert.match(shell, /id="chatFab"/);
-  assert.match(shell, /onclick="openChat\(\)"/);
+  assert.match(shell, /onclick="toggleChat\(\)"/);   // одна кнопка и вызывает, и убирает
   const fn = shell.slice(shell.indexOf('function openChat()'), shell.indexOf('function closeChat()'));
   assert.match(fn, /classList\.add\('open'\)/);
   assert.doesNotMatch(fn, /postMessage/);
