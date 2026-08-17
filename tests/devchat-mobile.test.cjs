@@ -12,10 +12,12 @@ const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 test('камера: отдельный input с capture, кнопка и чип зовут его', () => {
   assert.match(html, /id="devchat-camera-input"[^>]*capture="environment"/,
     'нет input с capture — на телефоне не откроется камера');
-  assert.match(html, /onclick="devChatCamera\(\)"/);
+  // с v2.45.971 камеру зовёт не иконка в ряду ввода, а пункт шторки вложений
+  assert.match(html, /onclick="devChatAttachMenu\(\)"/);
+  assert.match(app, /devChatAttachPick\(\\'camera\\'\)/);
   assert.match(app, /function devChatCamera\(\)/);
-  // на десктопе камера ни к чему — прячется стилями
-  assert.match(css, /\.app\.desktop-layout .*\.dchat-cam \{ display: none; \}/);
+  // на компьютере камеры обычно нет — пункт прячется
+  assert.match(app, /cam\.style\.display = document\.querySelector\('\.app\.desktop-layout'\) \? 'none' : ''/);
 });
 
 test('быстрые чипы над полем ввода подставляют текст', () => {
