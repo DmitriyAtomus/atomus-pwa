@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.971";
+const APP_VERSION = "v2.45.972";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3008,6 +3008,138 @@ function _devChatBindPaste() {
   });
 }
 
+// ---- перетаскивание файлов прямо в чат (v2.45.972) ----
+// Скрепка и Ctrl+V закрывают не всё: чаще файл уже лежит в проводнике, и его
+// хочется просто бросить в ленту. Приёмник делится надвое, потому что исходов
+// ровно два: бросил и ушёл (файл говорит сам за себя) либо бросил и дописал,
+// что с ним делать. Гадать за человека нечестно — пусть выберет броском.
+let _devChatDropBound = false;
+let _devChatDropSeen = 0;        // время последнего dragover
+let _devChatDropWatch = null;
+
+// Куда рисуем приёмник: открытая шторка важнее экрана — она лежит поверх него.
+function _devChatDropHost() {
+  const drawer = document.getElementById('devchat-drawer');
+  if (drawer && drawer.style.display === 'flex') return drawer;
+  if (state.currentScreen === 'devchat') {
+    const screen = document.querySelector('.screen[data-screen="devchat"]');
+    return screen && (screen.querySelector('.dchat-main') || screen);
+  }
+  return null;
+}
+
+// Перетаскивать могут и выделенный текст, и ссылку — приёмник нужен только файлам.
+function _devChatDropIsFiles(e) {
+  const t = e && e.dataTransfer && e.dataTransfer.types;
+  return !!t && Array.prototype.indexOf.call(t, 'Files') !== -1;
+}
+
+function _devChatDropOverlay() {
+  let el = document.getElementById('devchat-drop');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'devchat-drop';
+  el.className = 'dchat-drop';
+  el.innerHTML =
+    '<div class="dcd-zone" data-dcd="attach">' +
+      '<i class="ti ti-paperclip"></i><b>Прикрепить к сообщению</b>' +
+      '<span>Допишешь задачу — и отправишь сам</span></div>' +
+    '<div class="dcd-zone dcd-go" data-dcd="send">' +
+      '<i class="ti ti-send"></i><b>Отправить сразу</b>' +
+      '<span>Уйдёт Клаве вместе с тем, что уже набрано в поле</span></div>';
+  document.body.appendChild(el);
+  Array.prototype.forEach.call(el.querySelectorAll('.dcd-zone'), function (z) {
+    z.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      _devChatDropSeen = Date.now();
+      z.classList.add('hot');
+    });
+    z.addEventListener('dragleave', function () { z.classList.remove('hot'); });
+    z.addEventListener('drop', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      _devChatDropHide();
+      _devChatDropTake(e.dataTransfer, z.getAttribute('data-dcd') === 'send');
+    });
+  });
+  return el;
+}
+
+function _devChatDropShow() {
+  const host = _devChatDropHost();
+  if (!host) return;
+  const el = _devChatDropOverlay();
+  const r = host.getBoundingClientRect();
+  el.style.left = r.left + 'px';
+  el.style.top = r.top + 'px';
+  el.style.width = r.width + 'px';
+  el.style.height = r.height + 'px';
+  el.classList.add('show');
+  // Уход курсора за пределы окна dragleave'ом не поймать (Chrome шлёт его же и
+  // при переходе на дочерний элемент), поэтому гасим приёмник по тишине.
+  if (!_devChatDropWatch) {
+    _devChatDropWatch = setInterval(function () {
+      if (Date.now() - _devChatDropSeen > 400) _devChatDropHide();
+    }, 150);
+  }
+}
+
+function _devChatDropHide() {
+  const el = document.getElementById('devchat-drop');
+  if (el) {
+    el.classList.remove('show');
+    Array.prototype.forEach.call(el.querySelectorAll('.dcd-zone'), function (z) {
+      z.classList.remove('hot');
+    });
+  }
+  clearInterval(_devChatDropWatch);
+  _devChatDropWatch = null;
+}
+
+function _devChatDropTake(dt, sendNow) {
+  const files = Array.prototype.slice.call((dt && dt.files) || []);
+  if (!files.length) {
+    showToast('Файлов в перетаскивании не оказалось — тащите из проводника', 'error');
+    return;
+  }
+  // Бросок мог прилететь мимо активного композера: кладём туда, где лента открыта,
+  // иначе файлы уедут в поле закрытой шторки и человек их не увидит.
+  const drawer = document.getElementById('devchat-drawer');
+  _devChatHost = (drawer && drawer.style.display === 'flex') ? 'drawer' : 'screen';
+  const before = _devChatFiles.length;
+  devChatAddFiles(files);
+  const added = _devChatFiles.length - before;
+  if (!added) return;            // лимит в 5 файлов devChatAddFiles уже объяснил
+  if (sendNow) { devChatSend(); return; }
+  const input = _devChatEl('input');
+  if (input) input.focus();
+  showToast(added === 1
+    ? 'Прикрепил «' + _devChatFiles[before].name + '»'
+    : 'Прикрепил ' + added + ' ' + plural(added, 'файл', 'файла', 'файлов'), 'success');
+}
+
+// Слушаем документ целиком, а не ленту: бросают и в шапку, и в список чатов, и
+// в поле ввода — везде это значит одно и то же. Пока чат закрыт, обработчик
+// молчит, иначе браузер перестал бы открывать файлы в других разделах.
+function _devChatBindDrop() {
+  if (_devChatDropBound) return;
+  _devChatDropBound = true;
+  document.addEventListener('dragover', function (e) {
+    if (!_devChatDropIsFiles(e) || !_devChatDropHost()) return;
+    e.preventDefault();          // без этого браузер откроет файл вместо приёма
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    _devChatDropSeen = Date.now();
+    _devChatDropShow();
+  });
+  document.addEventListener('drop', function (e) {
+    if (!_devChatDropIsFiles(e) || !_devChatDropHost()) return;
+    e.preventDefault();          // мимо зон (по краям приёмника) — просто прикрепляем
+    _devChatDropHide();
+    _devChatDropTake(e.dataTransfer, false);
+  });
+}
+
 // Вложения показываем плиткой: у картинок — миниатюра, у любого файла — крестик,
 // чтобы ошибочно выбранное не пришлось отменять вместе со всем набором.
 function _devChatDrawFiles() {
@@ -3452,6 +3584,7 @@ function loadDevChat(host) {
   _devChatDrawFiles();
   _devChatChipsFade();
   _devChatBindPaste();
+  _devChatBindDrop();
   _devChatBindVoice();
   // Сначала список чатов: тик без выбранного чата тянул бы чужую переписку
   devChatLoadThreads(true).then(function () { _devChatTick(); });
