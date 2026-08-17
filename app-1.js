@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.982";
+const APP_VERSION = "v2.45.983";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3434,7 +3434,7 @@ function _devChatSendProgress(btn, part) {
 // fetch не показывает, сколько тела уже уехало, и обрыв связи в нём ронял
 // девчат молча (текст оставался в поле, ни ошибки, ни отправки). XHR даёт
 // прогресс и различает «сервер отказал» и «связь оборвалась».
-function _devChatPost(url, form, onProgress) {
+function _devChatPostOnce(url, form, onProgress) {
   return new Promise(function (resolve, reject) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
@@ -3447,12 +3447,33 @@ function _devChatPost(url, form, onProgress) {
     xhr.onload = function () {
       let body = {};
       try { body = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
-      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, body: body });
+      const contentType = xhr.getResponseHeader
+        ? (xhr.getResponseHeader('Content-Type') || '') : '';
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        body: body,
+        contentType: contentType,
+      });
     };
     xhr.onerror = function () { reject(new Error('network')); };
     xhr.ontimeout = function () { reject(new Error('timeout')); };
     xhr.onabort = function () { reject(new Error('abort')); };
     xhr.send(form);
+  });
+}
+
+// XHR нужен ради процентов загрузки, но он не проходит через общий fetch-fallback
+// в начале файла. Если Vercel вместо API вернул свою HTML-страницу 403 (часто
+// при VPN), повторяем тот же multipart прямо в Railway. JSON-отказ backend не
+// повторяем: это настоящий ответ сервера, а не защитная страница Vercel.
+function _devChatPost(url, form, onProgress) {
+  return _devChatPostOnce(url, form, onProgress).then(function (result) {
+    const viaVercel = url.indexOf(API_BASE + '/api/') === 0;
+    const html403 = result.status === 403 &&
+      String(result.contentType || '').toLowerCase().indexOf('text/html') >= 0;
+    if (!viaVercel || !html403) return result;
+    return _devChatPostOnce(API_DIRECT_FALLBACK + url.slice(API_BASE.length), form, onProgress);
   });
 }
 

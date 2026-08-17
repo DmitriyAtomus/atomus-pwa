@@ -33,8 +33,15 @@ function xhrClass(ctx) {
     }
     open(method, url) { ctx.calls.push({ method, url }); }
     setRequestHeader(k, v) { ctx.headers[k] = v; }
+    getResponseHeader(name) {
+      return String(name).toLowerCase() === 'content-type'
+        ? (this.plan.contentType || 'application/json') : '';
+    }
     send() {
-      const plan = ctx.plan;
+      const plan = Array.isArray(ctx.plan)
+        ? (ctx.plan[Math.min(ctx.calls.length - 1, ctx.plan.length - 1)] || {})
+        : ctx.plan;
+      this.plan = plan;
       if (this.upload.onprogress) {
         this.upload.onprogress({ lengthComputable: true, loaded: 5, total: 10 });
       }
@@ -70,7 +77,8 @@ function sendContext(opts) {
   ctx.XMLHttpRequest = xhrClass(ctx);
   const code = section('// Сколько принимает сервер', '// ---------------- чаты (треды) и проекты');
   vm.runInNewContext(
-    'const API_BASE = "https://api";\nconst TOKEN_KEY = "t";\n' +
+    'const API_BASE = "https://api";\n' +
+    'const API_DIRECT_FALLBACK = "https://railway";\nconst TOKEN_KEY = "t";\n' +
     'let _devChatBusy = false;\nlet _devChatThreadId = 5;\n' +
     'let _devChatFiles = ' + JSON.stringify(o.files || []) + ';\n' +
     'function _devChatEl(name) { return name === "send" ? this.btn : (name === "input" ? this.input : null); }\n' +
@@ -153,6 +161,40 @@ test('успешная отправка уходит с токеном на ну
 
   assert.deepEqual(ctx.calls[0], { method: 'POST', url: 'https://api/api/dev-chat/send' });
   assert.equal(ctx.headers.Authorization, 'Bearer tok');
+});
+
+test('HTML 403 от Vercel повторяется напрямую в Railway', async () => {
+  const ctx = sendContext({
+    files: [{ name: 'скриншот.png', size: 2 * MB }],
+    plan: [
+      { status: 403, contentType: 'text/html; charset=utf-8', body: '<!doctype html>' },
+      { status: 201, contentType: 'application/json' },
+    ],
+  });
+
+  await ctx.send();
+
+  assert.deepEqual(ctx.calls, [
+    { method: 'POST', url: 'https://api/api/dev-chat/send' },
+    { method: 'POST', url: 'https://railway/api/dev-chat/send' },
+  ]);
+  assert.equal(ctx.ticks, 1, 'после прямого повтора сообщение появилось в ленте');
+  assert.equal(ctx.files().length, 0, 'вложение убралось только после успешной отправки');
+});
+
+test('JSON 403 backend не повторяется в обход сервера', async () => {
+  const ctx = sendContext({
+    plan: {
+      status: 403,
+      contentType: 'application/json',
+      body: '{"error":"forbidden","message":"Личный чат владельца"}',
+    },
+  });
+
+  await ctx.send();
+
+  assert.equal(ctx.calls.length, 1);
+  assert.match(ctx.toasts[0].msg, /Личный чат владельца/);
 });
 
 test('прикрепил файл без текста — кнопка отправки есть', () => {
