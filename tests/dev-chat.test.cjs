@@ -168,11 +168,11 @@ test('на телефоне текст чата не разъезжается о
 });
 
 test('на телефоне поле ввода не уезжает под нижнюю панель', () => {
-  const rule = css.slice(css.indexOf('.app.mobile-layout [data-screen="devchat"] .dchat {'));
-  assert.match(rule.slice(0, 600), /height: calc\(100dvh - 210px - env\(safe-area-inset-bottom\)\)/);
+  // высота считается от 100dvh с учётом безопасной зоны — иначе композер
+  // прячется под таб-баром и жестовой полосой
+  assert.match(css, /\.app\.mobile-layout \[data-screen="devchat"\] \.dchat \{[^}]*height: calc\(100dvh - \d+px - env\(safe-area-inset-bottom\)\)/s);
 });
 
 test('на экране чата круглая кнопка прячется', () => {
-  assert.match(app, /devFabBtn\.dataset\.allowed === '1'/);
-  assert.match(app, /\(screenName === 'devchat'\) \? 'none' : ''/);
+  assert.match(app, /screenName === 'devchat' \|\| !isDir/);
 });

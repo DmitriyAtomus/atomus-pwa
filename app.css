@@ -23340,13 +23340,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   position: sticky; top: 0; z-index: 5;
 }
 .app.mobile-layout [data-screen="devchat"] .page-header h1 { font-size: 18px; }
-.app.mobile-layout [data-screen="devchat"] .dchat {
-  /* Сверху шапка приложения + полоса разделов + шапка чата, снизу — таб-бар с
-     безопасной зоной. Раньше вычитали 118px, и композер уезжал под таб-бар:
-     поле ввода было не достать. */
-  height: calc(100dvh - 210px - env(safe-area-inset-bottom));
-  padding: 8px 12px 0;
-}
+.app.mobile-layout [data-screen="devchat"] .dchat { padding: 8px 12px 0; }
 /* Android сам увеличивает шрифт в длинных текстовых блоках (font boosting), и
    ответы Клода на телефоне разъезжались до нечитаемого кегля. Держим свой. */
 .dchat-feed, .dchat-bubble, .dchat-text {
@@ -23681,3 +23675,66 @@ body.dchat-fullscreen .dchat-composer > * { max-width: 1700px; margin-left: auto
 body.dchat-fullscreen .dchat-bubble { max-width: min(82%, 1200px); }
 /* плавающую кнопку шторки прячем: она бы висела поверх ленты */
 body.dchat-fullscreen #devchat-fab { display: none !important; }
+
+/* ============ v2.45.955: Клод — мобильный комфорт + терминал «вживую» ============ */
+/* Быстрые чипы над полем ввода: типовые запросы в один тап */
+.dchat-chips { display: flex; gap: 7px; padding: 0 2px 8px; overflow-x: auto; scrollbar-width: none; }
+.dchat-chips::-webkit-scrollbar { display: none; }
+.dchat-chips button {
+  flex: none; padding: 7px 13px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--surface, #fff); border: 1px solid var(--border-strong, #DDE5F0);
+  color: var(--text-mid, #43536b); cursor: pointer; box-shadow: 0 1px 2px rgba(15,30,60,.05);
+  transition: border-color .15s, color .15s, transform .15s;
+}
+.dchat-chips button:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-1px); }
+.dchat-chips button.acc { border-color: #C9BEF7; color: #6D5AE6; background: #F7F5FE; }
+/* На большом экране камера ни к чему — чип и кнопку показываем только на мобиле */
+.app.desktop-layout .dchat-chips button.acc, .app.desktop-layout .dchat-cam { display: none; }
+
+/* Статус в шапке — теперь кнопка: тап открывает терминал */
+.dchat-status { cursor: pointer; }
+.dchat-status:hover { filter: brightness(1.06); }
+
+/* Полноэкранный терминал «работа вживую» */
+.dchat-term-full {
+  display: none; position: fixed; inset: 0; z-index: 3000;
+  background: rgba(8, 14, 26, .55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  align-items: center; justify-content: center; padding: 18px;
+}
+.dchat-term-full.show { display: flex; }
+.tf-card {
+  width: min(680px, 100%); height: min(78vh, 640px); display: flex; flex-direction: column;
+  background: #0B1220; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5); border: 1px solid rgba(148,163,184,.16);
+}
+.tf-hd { display: flex; align-items: center; gap: 10px; padding: 13px 15px; background: #101A2C; color: #fff; flex: none; font-size: 14px; }
+.tf-ava { width: 30px; height: 30px; border-radius: 10px; background: linear-gradient(135deg, #8B7BF0, #5B49D6); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.tf-x { margin-left: auto; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,.1); border: none; color: #fff; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; }
+.tf-x:hover { background: rgba(255,255,255,.2); }
+.tf-log { flex: 1; overflow-y: auto; padding: 14px; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.85; color: #8FA3BF; white-space: pre-wrap; word-break: break-word; }
+.tf-log .ln { opacity: .6; }
+.tf-log .ln.cur { color: #D6E2F2; opacity: 1; font-weight: 600; }
+.tf-log .ln.cur::after { content: '▌'; color: #7CC4FF; margin-left: 4px; animation: dchatPulse 1s infinite; }
+.tf-log .t { color: #5B6E8C; font-size: 10.5px; margin-right: 9px; }
+.tf-empty { color: #5B6E8C; text-align: center; padding: 40px 16px; font-family: inherit; }
+.tf-ft { flex: none; display: flex; align-items: center; gap: 9px; padding: 11px 15px; border-top: 1px solid rgba(148,163,184,.12); color: #8FA3BF; font-size: 11.5px; }
+.tf-ft .dot { width: 7px; height: 7px; border-radius: 50%; background: #64748B; flex: none; }
+.tf-ft.on .dot { background: #FBBF24; animation: dchatPulse 1s infinite; }
+@media (max-width: 700px) {
+  .dchat-term-full { padding: 0; }
+  .tf-card { width: 100%; height: 100%; border-radius: 0; }
+}
+
+/* ============ v2.45.956: Клод на телефоне — доводка удобства ============ */
+/* Лента + шапка должны умещаться в экран целиком: раньше внешняя страница
+   скроллилась на высоту шапки, и «назад»/статус уезжали за край. */
+/* Высота под замер на телефоне; safe-area — чтобы поле ввода не пряталось
+   под жестовую полосу навигации */
+.app.mobile-layout [data-screen="devchat"] .dchat {
+  height: calc(100dvh - 174px - env(safe-area-inset-bottom));
+}
+/* Чипы на телефоне — чуть крупнее, под палец */
+.app.mobile-layout .dchat-chips button { padding: 9px 15px; font-size: 13px; }
+/* Композер: кнопки камеры и скрепки плотнее, поле дышит */
+.app.mobile-layout .dchat-box { padding: 6px; }
+.app.mobile-layout .dchat-input { font-size: 15px; }

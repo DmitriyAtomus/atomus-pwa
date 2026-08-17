@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.955";
+const APP_VERSION = "v2.45.957";
 const APP_VERSION_DATE = "14.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1406,12 +1406,7 @@ function renderProfile() {
   const navDev = document.getElementById('sb-devchat');
   if (navDev) navDev.style.display = isDirector ? '' : 'none';
   const devFab = document.getElementById('devchat-fab');
-  if (devFab) {
-    // отметку читает switchScreen: кнопку прячем на самом экране чата,
-    // но только если она вообще положена этому пользователю
-    devFab.dataset.allowed = isDirector ? '1' : '0';
-    devFab.style.display = isDirector ? '' : 'none';
-  }
+  if (devFab) devFab.style.display = isDirector ? '' : 'none';
 
   // Прямой эфир окна CRM на офисном ТВ — только директору и не на самом ТВ.
   const tvCastBtn = document.getElementById('tv-cast-top-btn');
@@ -1881,12 +1876,12 @@ function runScreenLoader(screenName) {
   const drawerOpen = devDrawer && devDrawer.style.display === 'flex';
   if (screenName === 'devchat') loadDevChat('screen');
   else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
-
-  // На самом экране чата круглая кнопка не нужна: она перекрывала ленту
-  // (на телефоне — прямо поверх последнего ответа).
-  const devFabBtn = document.getElementById('devchat-fab');
-  if (devFabBtn && devFabBtn.dataset.allowed === '1') {
-    devFabBtn.style.display = (screenName === 'devchat') ? 'none' : '';
+  // v2.45.956: на самом экране чата плавающая кнопка не нужна — она ложится
+  // ровно на поле ввода (особенно на телефоне)
+  const devFab2 = document.getElementById('devchat-fab');
+  if (devFab2) {
+    const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
+    devFab2.style.display = (screenName === 'devchat' || !isDir) ? 'none' : '';
   }
 }
 
@@ -2250,6 +2245,7 @@ async function _devChatRefreshStatuses() {
     data = await apiGet('/api/dev-chat/messages?since_id=' + (Math.min.apply(null, Array.from(_devChatPending)) - 1));
   } catch (e) { return; }
   window._devChatProg = (data && data.progress) || {};   // строки активности агента
+  _devChatLogProgress();   // v2.45.955: копим журнал для терминала «вживую»
 
   let working = false;
   ((data && data.messages) || []).forEach(function (m) {
@@ -2262,7 +2258,10 @@ async function _devChatRefreshStatuses() {
     }
     if (_devChatOpen(m.status)) working = true;
     else _devChatPending.delete(m.id);
+    // v2.45.955: засекаем момент «взял в работу» — для таймера в терминале
+    if (m.status === 'running' && !_devChatRunSince) _devChatRunSince = Date.now();
   });
+  if (!working) _devChatRunSince = null;
   // в шапке — последнее действие агента, если он его прислал
   const progLines = working ? _devChatProgLines() : null;
   _devChatSetStatus(
@@ -2312,6 +2311,85 @@ function devChatQuick(btn) {
   input.value = btn.textContent + ' ';
   devChatGrow(input);
   input.focus();
+}
+
+// v2.45.955: камера с телефона — сфотографировал экран/станок, сразу приложилось
+function devChatCamera() {
+  const cam = document.getElementById('devchat-camera-input');
+  if (cam) cam.click();
+}
+
+// ---- v2.45.955: терминал «работа вживую» ----
+// Журнал строк прогресса с клиентскими таймстампами: бэкенд хранит скользящее
+// окно без времени, поэтому время проставляем в момент, когда строку увидели.
+window._devChatTermLog = [];     // [{t: 'ЧЧ:ММ:СС', ln: строка}]
+let _devChatTermLast = null;     // последняя учтённая строка (для диффа окна)
+let _devChatRunSince = null;     // когда задача перешла в «работает» (для таймера)
+
+function _devChatLogProgress() {
+  const prog = window._devChatProg || {};
+  Object.keys(prog).forEach(function (id) {
+    const lines = (prog[id] && prog[id].lines) || [];
+    if (!lines.length) return;
+    // окно скользит: добавляем всё, что после последней учтённой строки
+    let start = _devChatTermLast ? lines.lastIndexOf(_devChatTermLast) + 1 : 0;
+    if (start < 0) start = 0;
+    for (let i = start; i < lines.length; i++) {
+      const d = new Date();
+      const t = String(d.getHours()).padStart(2, '0') + ':' +
+        String(d.getMinutes()).padStart(2, '0') + ':' +
+        String(d.getSeconds()).padStart(2, '0');
+      window._devChatTermLog.push({ t: t, ln: lines[i] });
+    }
+    if (lines.length) _devChatTermLast = lines[lines.length - 1];
+  });
+  if (window._devChatTermLog.length > 400) {
+    window._devChatTermLog = window._devChatTermLog.slice(-400);
+  }
+  const full = document.getElementById('devchat-term-full');
+  if (full && full.classList.contains('show')) _devChatTermRender();
+}
+
+function _devChatTermRender() {
+  const log = document.getElementById('devchat-term-log');
+  const ft = document.getElementById('devchat-term-ft-text');
+  const foot = document.getElementById('devchat-term-ft');
+  if (!log) return;
+  const items = window._devChatTermLog;
+  log.innerHTML = items.length
+    ? items.map(function (r, i) {
+        return '<div class="ln' + (i === items.length - 1 ? ' cur' : '') + '">' +
+          '<span class="t">' + r.t + '</span>' + escapeHtml(r.ln) + '</div>';
+      }).join('')
+    : '<div class="tf-empty">Пока тихо. Строки появятся, когда Клод возьмёт задачу.</div>';
+  log.scrollTop = log.scrollHeight;
+  const working = _devChatPending.size > 0;
+  if (foot) foot.className = 'tf-ft' + (working ? ' on' : '');
+  if (ft) {
+    if (working && _devChatRunSince) {
+      const sec = Math.max(0, Math.round((Date.now() - _devChatRunSince) / 1000));
+      const mm = Math.floor(sec / 60), ss = sec % 60;
+      ft.textContent = 'Работает ' + (mm ? mm + ' мин ' : '') + ss + ' сек · тап мимо окна — назад в чат';
+    } else {
+      ft.textContent = working ? 'Задача в очереди — агент вот-вот возьмёт' : 'Агент свободен';
+    }
+  }
+}
+
+let _devChatTermTimer = null;
+function devChatTermOpen() {
+  const full = document.getElementById('devchat-term-full');
+  if (!full) return;
+  full.classList.add('show');
+  _devChatTermRender();
+  clearInterval(_devChatTermTimer);
+  _devChatTermTimer = setInterval(_devChatTermRender, 1000);
+}
+function devChatTermClose() {
+  const full = document.getElementById('devchat-term-full');
+  if (full) full.classList.remove('show');
+  clearInterval(_devChatTermTimer);
+  _devChatTermTimer = null;
 }
 
 function devChatPickFiles(files) {
@@ -2477,7 +2555,12 @@ function loadDevChat(host) {
   const feed = _devChatEl('feed');
   if (feed) feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
   const input = _devChatEl('input');
-  if (input) devChatGrow(input);
+  if (input) {
+    devChatGrow(input);
+    // v2.45.956: на телефоне подсказка про Ctrl+V бессмысленна
+    const mob = document.querySelector('.app.mobile-layout');
+    if (mob) input.placeholder = 'Что сделать? Можно приложить фото';
+  }
   _devChatDrawFiles();
   _devChatBindPaste();
   _devChatTick();
