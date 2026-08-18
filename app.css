@@ -7067,6 +7067,31 @@
   }
   .modal-content .form-group textarea { resize: vertical; min-height: 60px; }
 
+  /* v2.45.990: чекбоксы/радио в старых модалках (.modal-content) получали
+     стили текстового поля — padding, border, width:100% — а глобальный
+     appearance:none прятал саму галочку: кликаешь, а отметки не видно
+     (случай «Забираем сами со склада» в карточке поставщика). */
+  .modal-content .form-group input[type="checkbox"],
+  .modal-content .form-group input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    accent-color: var(--brand);
+    flex-shrink: 0;
+    cursor: pointer;
+    appearance: auto;
+    -webkit-appearance: auto;
+    box-shadow: none;
+  }
+  .modal-content .form-group input[type="radio"] { border-radius: 50%; }
+  .modal-content .form-group input[type="checkbox"]:focus,
+  .modal-content .form-group input[type="radio"]:focus {
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+  }
+
   /* Те же стили формы применяем и к .modal-body (новые модалки) */
   .modal-body .form-group { margin-bottom: 14px; }
   .modal-body .form-group label {
