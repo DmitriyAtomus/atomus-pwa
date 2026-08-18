@@ -13155,6 +13155,7 @@ function renderSupplyOrders() {
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) +
             (_supOrdCardDate(o) ? ' · ' + _supOrdDate(_supOrdCardDate(o)) : '') + '</span>' +
           newPill +
+          orderDupPill(o) +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           (itemsCount ? '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' : '') +
           (o.expected_date ? '<span class="sup-ord-meta-num"><i class="ti ti-calendar"></i>' + escapeHtml(o.expected_date) + '</span>' : '') +
@@ -13872,6 +13873,18 @@ function dupWarnPill(ai, withHint) {
   const label = withHint && d.inbox_id ? ('Повторный · был #' + d.inbox_id) : 'Повторный';
   return '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;font-weight:700;" title="' +
     escapeHtml(title) + '">⚠️ ' + escapeHtml(label) + '</span>';
+}
+
+// v2.45.986: тот же чип, но для ЗАКАЗА поставщику. Бэкенд отдаёт
+// possible_duplicate/duplicate_of_inbox_id, если счёт-источник дедуп пометил как
+// повтор. Раньше пометка жила только во «Входящих», и в «На оплату» дубль
+// выглядел обычным счётом (18.08.2026: ORD-281, повтор счёта №84 на 4800 ₽).
+function orderDupPill(o) {
+  if (!o || !o.possible_duplicate) return '';
+  const src = o.duplicate_of_inbox_id;
+  return '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;font-weight:700;" ' +
+    'title="Такой счёт (номер и сумма) уже приходил' + (src ? ' — письмо #' + src : '') +
+    '. Проверьте, чтобы не оплатить дважды.">⚠️ Повторный</span>';
 }
 
 // Заметный бейдж «MAX» для счетов, пришедших через мессенджер MAX (а не почту).
@@ -15822,6 +15835,7 @@ function renderSupplyOrderDetail(o) {
       '<i class="ti ti-file-invoice"></i>' +
       '<h1>Заказ #' + o.id + '</h1>' +
       '<span class="sup-status-pill ord-' + o.status + '" style="margin-left: 8px;">' + escapeHtml(o.status_label) + '</span>' +
+      orderDupPill(o) +
     '</div>' +
     '</div>';
 
@@ -15850,6 +15864,13 @@ function renderSupplyOrderDetail(o) {
     (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
     // v2.45.665: внешний статус поставки (из ЛК Всеинструментов)
     (o.ext_status ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#E7EEFB;border:1px solid #B9CCEF;color:#2749A0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-truck-delivery" style="font-size:16px;"></i> Поставка: ' + escapeHtml(o.ext_status) + (o.expected_date ? ' · придёт ' + escapeHtml(o.expected_date) : '') + '</div>' : '') +
+    // Возможный повтор счёта — самое важное для бухгалтера, показываем полосой
+    (o.possible_duplicate
+      ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:700;">' +
+        '<i class="ti ti-alert-triangle" style="font-size:16px;"></i> Похоже на ПОВТОРНЫЙ счёт: такой номер и сумма уже приходили' +
+        (o.duplicate_of_inbox_id ? ' (письмо #' + o.duplicate_of_inbox_id + ')' : '') +
+        '. Проверьте, чтобы не оплатить дважды.</div>'
+      : '') +
     (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
     '</div>';
 
@@ -18236,6 +18257,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.986',
+    date: '18.08.2026',
+    title: 'Повторный счёт виден и в заказе, а не только во «Входящих»',
+    features: [
+      'Если счёт с тем же номером и суммой уже приходил, чип <b>«⚠️ Повторный»</b> теперь стоит и на заказе — в списке «На оплату» и в его карточке, с номером письма-оригинала',
+      'Счёт, отправленный в оплату сразу после приёма, больше не уходит пустым: заказ дожидается распознавания и получает № счёта, сумму и юрлицо-плательщика',
+      'Письмо после распознавания не отваливается от заказа — раньше такой счёт оставался висеть во «Входящих», хотя заказ уже создан',
+    ],
+  },
   {
     version: 'v2.45.980',
     date: '17.08.2026',
