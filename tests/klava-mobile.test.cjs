@@ -28,7 +28,10 @@ test('«глаз» и красный «стоп» живут в шапке, ст
   assert.match(html, /id="devchat-stop"[\s\S]{0,120}style="display:none;"/,
     'кнопка «стоп» не должна висеть, когда останавливать нечего');
   const fn = app.slice(app.indexOf('function _devChatSetStatus'));
-  assert.match(fn.slice(0, 700), /devchat-stop[\s\S]{0,200}mode === 'working'/);
+  // срез с запасом: блок подсветки шапки (v2.45.984) сдвинул «стоп» ниже,
+  // и жёсткие 700 символов его потеряли — проверяем всё тело функции
+  const body = fn.slice(0, fn.indexOf('\n}') + 2);
+  assert.match(body, /devchat-stop[\s\S]{0,200}mode === 'working'/);
 });
 
 test('«Стоп» уходит на сервер и не молчит при отказе', () => {

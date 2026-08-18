@@ -136,6 +136,8 @@ svg .sg2{stroke:#8FD3F4;stroke-width:.8;fill:none}
 svg .st{font:600 3.6px 'Segoe UI',sans-serif;fill:#D9E5F2}
 svg .sa{font:3.2px 'Segoe UI',sans-serif;fill:#4FBF8B}
 svg .su{font:3.2px 'Segoe UI',sans-serif;fill:#C9A227}
+/* v2.45.980: гало — тёмная подложка под текстом, линии не режут буквы */
+svg .st,svg .sa,svg .su{paint-order:stroke;stroke:#081426;stroke-width:1.1px;stroke-linejoin:round}
 svg g.sn{cursor:pointer}
 svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 /* модалка назначения модели узлу */
@@ -356,7 +358,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
       <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
-        <svg id="schSvg" viewBox="26 6 212 214"></svg>
+        <svg id="schSvg" viewBox="20 4 226 220"></svg>
         <div class="sch-note">Типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3). Клик по элементу — назначить модель из базы.
           Зелёным — назначено, жёлтым «назначить» — ждёт. Назначения хранятся в проекте.</div>
       </div>
@@ -1500,30 +1502,34 @@ async function restoreLegacy(){
 
 /* ═══ вкладка «Схема»: типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3) ═══ */
 // Узлы: k — ключ назначения, глиф по kind, hint — подсказка поиска по базе
+/* v2.45.980: lp — куда ставить подпись, чтобы не пересекалась с линиями и
+   соседями: 'l'/'r' — сбоку от символа, 't' — над ним; без lp — под ним.
+   Боковые подписи получили тесные кластеры приборов (РД1/МН1/УА2/КО1,
+   РД2/МН2) и вертикальная цепочка ВН1→Ф1→СИ1→УА1; И1 — сверху, снизу вода. */
 const SCH_NODES=[
- {k:'KM1', t:'КМ1', n:'Компрессор',        kind:'comp',  x:58, y:176, hint:'компрессор'},
+ {k:'KM1', t:'КМ1', n:'Компрессор',        kind:'comp',  x:58, y:176, hint:'компрессор', lp:'l'},
  {k:'EK1', t:'ЕК1', n:'Нагреватель картера',kind:'heat', x:58, y:191, hint:'нагревател'},
- {k:'KO1', t:'КО1', n:'Обратный клапан',   kind:'check', x:76, y:110, hint:'обратный'},
+ {k:'KO1', t:'КО1', n:'Обратный клапан',   kind:'check', x:76, y:110, hint:'обратный', lp:'r'},
  {k:'AVO1',t:'АВО1',n:'Конденсатор',       kind:'cond',  x:120,y:38,  hint:'конденсатор'},
  {k:'M1',  t:'М1',  n:'Вентилятор',        kind:'fan',   x:139,y:38,  hint:'вентилятор'},
- {k:'RD3', t:'РД3', n:'Реле давл. (вент.)',kind:'psw',   x:160,y:22,  hint:'реле давления'},
+ {k:'RD3', t:'РД3', n:'Реле давл. (вент.)',kind:'psw',   x:160,y:22,  hint:'реле давления', lp:'r'},
  {k:'KD1', t:'КД1', n:'Клапан NRD',        kind:'spring',x:146,y:62,  hint:'nrd'},
- {k:'KR1', t:'КР1', n:'Регулятор KVR',     kind:'spring',x:186,y:56,  hint:'kvr'},
+ {k:'KR1', t:'КР1', n:'Регулятор KVR',     kind:'spring',x:186,y:56,  hint:'kvr', lp:'r'},
  {k:'RS1', t:'РС1', n:'Ресивер',           kind:'recv',  x:186,y:85,  hint:'ресивер'},
- {k:'VN1', t:'ВН1', n:'Запорный клапан',   kind:'valve', x:214,y:118, hint:'запорный'},
- {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель',  kind:'filt',  x:214,y:134, hint:'фильтр'},
- {k:'SI1', t:'СИ1', n:'Смотровое стекло',  kind:'sight', x:214,y:148, hint:'стекло'},
- {k:'UA1', t:'УА1', n:'Соленоид жидк.',    kind:'sol',   x:214,y:162, hint:'соленоид'},
+ {k:'VN1', t:'ВН1', n:'Запорный клапан',   kind:'valve', x:214,y:118, hint:'запорный', lp:'r'},
+ {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель',  kind:'filt',  x:214,y:134, hint:'фильтр', lp:'r'},
+ {k:'SI1', t:'СИ1', n:'Смотровое стекло',  kind:'sight', x:214,y:148, hint:'стекло', lp:'r'},
+ {k:'UA1', t:'УА1', n:'Соленоид жидк.',    kind:'sol',   x:214,y:162, hint:'соленоид', lp:'r'},
  {k:'TRV1',t:'ТРВ1',n:'ТРВ',               kind:'trv',   x:152,y:184, hint:'трв'},
- {k:'I1',  t:'И1',  n:'Испаритель ПТО',    kind:'evap',  x:120,y:184, hint:'теплообменник'},
- {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.',  kind:'accum', x:84, y:152, hint:'отделитель'},
- {k:'UA2', t:'УА2', n:'Соленоид байпаса',  kind:'sol',   x:46, y:118, hint:'соленоид'},
- {k:'KO2', t:'КО2', n:'Обратный клапан',   kind:'check', x:46, y:156, hint:'обратный'},
- {k:'RD1', t:'РД1', n:'Реле давления НД',  kind:'psw',   x:62, y:112, hint:'реле давления'},
- {k:'MN1', t:'МН1', n:'Манометр НД',       kind:'gauge', x:70, y:122, hint:'манометр'},
- {k:'RD2', t:'РД2', n:'Реле давления ВД',  kind:'psw',   x:93, y:94,  hint:'реле давления'},
- {k:'MN2', t:'МН2', n:'Манометр ВД',       kind:'gauge', x:93, y:78,  hint:'манометр'},
- {k:'N1',  t:'Н1',  n:'Насос',             kind:'pump',  x:188,y:200, hint:'насос'},
+ {k:'I1',  t:'И1',  n:'Испаритель ПТО',    kind:'evap',  x:120,y:184, hint:'теплообменник', lp:'t'},
+ {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.',  kind:'accum', x:84, y:152, hint:'отделитель', lp:'l'},
+ {k:'UA2', t:'УА2', n:'Соленоид байпаса',  kind:'sol',   x:46, y:118, hint:'соленоид', lp:'l'},
+ {k:'KO2', t:'КО2', n:'Обратный клапан',   kind:'check', x:46, y:156, hint:'обратный', lp:'l'},
+ {k:'RD1', t:'РД1', n:'Реле давления НД',  kind:'psw',   x:62, y:112, hint:'реле давления', lp:'l'},
+ {k:'MN1', t:'МН1', n:'Манометр НД',       kind:'gauge', x:70, y:122, hint:'манометр', lp:'r'},
+ {k:'RD2', t:'РД2', n:'Реле давления ВД',  kind:'psw',   x:93, y:94,  hint:'реле давления', lp:'r'},
+ {k:'MN2', t:'МН2', n:'Манометр ВД',       kind:'gauge', x:93, y:78,  hint:'манометр', lp:'r'},
+ {k:'N1',  t:'Н1',  n:'Насос',             kind:'pump',  x:188,y:200, hint:'насос', lp:'t'},
  {k:'RP1', t:'РП1', n:'Реле потока',       kind:'fsw',   x:154,y:208, hint:'реле потока'},
 ];
 /* Что узел делает в контуре — видно в шапке подбора модели (v2.45.997):
@@ -1603,14 +1609,32 @@ function renderSchema(){
   SCH_LINES.forEach(l=>{
     h+='<polyline class="'+l.c+'" points="'+l.p.map(p=>p.join(',')).join(' ')+'"/>';
   });
+  // v2.45.980: подписи не пересекаются — размещение по lp ('l'/'r'/'t'/низ).
+  // Боковой отступ = полуширина символа + зазор; боковые подписи короче,
+  // чтобы не выехать за viewBox.
+  const SIDE_OFF={comp:11,cond:18,evap:16,recv:15,accum:7,pump:7.5,fan:7,
+    filt:5,sight:5,psw:5.4,fsw:5.4,gauge:5.4,heat:7};
+  const TOP_OFF={cond:14,evap:15,recv:8,comp:11,pump:7.5,fan:7};
   SCH_NODES.forEach(nd=>{
     const asg=schemaData[nd.k];
     h+='<g class="sn" data-k="'+nd.k+'">'+_g(nd.kind,nd.x,nd.y);
-    const ly=nd.y+(nd.kind==='cond'||nd.kind==='evap'?16:(nd.kind==='comp'?13:(nd.kind==='recv'?10:8)));
-    h+='<text class="st" x="'+nd.x+'" y="'+ly+'" text-anchor="middle">'+nd.t+'</text>';
-    h+=asg
-      ?'<text class="sa" x="'+nd.x+'" y="'+(ly+4)+'" text-anchor="middle">'+esc(String(asg.name).slice(0,22))+'</text>'
-      :'<text class="su" x="'+nd.x+'" y="'+(ly+4)+'" text-anchor="middle">назначить</text>';
+    const second=asg?esc(String(asg.name).slice(0,nd.lp==='l'||nd.lp==='r'?13:22)):'назначить';
+    const cls=asg?'sa':'su';
+    if(nd.lp==='l'||nd.lp==='r'){
+      const off=SIDE_OFF[nd.kind]!=null?SIDE_OFF[nd.kind]:6;
+      const tx=nd.lp==='r'?nd.x+off:nd.x-off;
+      const anc=nd.lp==='r'?'start':'end';
+      h+='<text class="st" x="'+tx+'" y="'+(nd.y+0.6)+'" text-anchor="'+anc+'">'+nd.t+'</text>';
+      h+='<text class="'+cls+'" x="'+tx+'" y="'+(nd.y+5)+'" text-anchor="'+anc+'">'+second+'</text>';
+    }else if(nd.lp==='t'){
+      const off=TOP_OFF[nd.kind]!=null?TOP_OFF[nd.kind]:10;
+      h+='<text class="'+cls+'" x="'+nd.x+'" y="'+(nd.y-off-6.4)+'" text-anchor="middle">'+second+'</text>';
+      h+='<text class="st" x="'+nd.x+'" y="'+(nd.y-off-2)+'" text-anchor="middle">'+nd.t+'</text>';
+    }else{
+      const ly=nd.y+(nd.kind==='cond'||nd.kind==='evap'?16:(nd.kind==='comp'?13:(nd.kind==='recv'?10:8)));
+      h+='<text class="st" x="'+nd.x+'" y="'+ly+'" text-anchor="middle">'+nd.t+'</text>';
+      h+='<text class="'+cls+'" x="'+nd.x+'" y="'+(ly+4)+'" text-anchor="middle">'+second+'</text>';
+    }
     h+='</g>';
   });
   const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
