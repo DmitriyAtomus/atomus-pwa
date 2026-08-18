@@ -43,7 +43,8 @@ function xhrClass(ctx) {
         : ctx.plan;
       this.plan = plan;
       if (this.upload.onprogress) {
-        this.upload.onprogress({ lengthComputable: true, loaded: 5, total: 10 });
+        const part = plan.progress === undefined ? 0.5 : plan.progress;
+        this.upload.onprogress({ lengthComputable: true, loaded: part * 10, total: 10 });
       }
       if (plan.fail) { this.onerror(); return; }
       this.status = plan.status;
@@ -217,4 +218,62 @@ test('предел на клиенте совпадает с серверным'
   assert.equal(ctx.mb(50 * MB), '50 МБ');
   assert.match(source, /const DEVCHAT_MAX_FILE = 50 \* 1024 \* 1024;/);
   assert.match(source, /const DEVCHAT_MAX_TOTAL = 60 \* 1024 \* 1024;/);
+});
+
+// Проверка Vercel под VPN обычно не отвечает 403, а рвёт соединение, пока тело
+// ещё едет: браузер видит сетевую ошибку на 0%. Раньше такой отказ дважды бился
+// в тот же адрес и заканчивался «связь оборвалась» при живом интернете.
+test('соединение закрыли на старте — повторяем сразу в Railway', async () => {
+  const ctx = sendContext({
+    files: [{ name: 'скриншот.jpg', size: 2 * MB }],
+    plan: [
+      { fail: true, progress: 0 },
+      { status: 201, contentType: 'application/json' },
+    ],
+  });
+
+  await ctx.send();
+
+  assert.deepEqual(ctx.calls, [
+    { method: 'POST', url: 'https://api/api/dev-chat/send' },
+    { method: 'POST', url: 'https://railway/api/dev-chat/send' },
+  ]);
+  assert.equal(ctx.ticks, 1, 'сообщение всё-таки ушло');
+  assert.equal(ctx.files().length, 0);
+});
+
+test('обрыв посреди загрузки не гонят вторым адресом', async () => {
+  // 40 МБ дошли до половины и связь дрогнула — это не отказ края, второй адрес
+  // тут только удвоит трафик. Повтор идёт в тот же самый.
+  const ctx = sendContext({
+    files: [{ name: 'kd.zip', size: 40 * MB }],
+    plan: [
+      { fail: true, progress: 0.5 },
+      { status: 201, contentType: 'application/json' },
+    ],
+  });
+
+  await ctx.send();
+
+  assert.deepEqual(ctx.calls.map((c) => c.url), [
+    'https://api/api/dev-chat/send',
+    'https://api/api/dev-chat/send',
+  ]);
+});
+
+test('если и обход не прошёл — говорим про VPN, а не про связь', async () => {
+  const ctx = sendContext({
+    files: [{ name: 'скриншот.jpg', size: 2 * MB }],
+    plan: { fail: true, progress: 0 },
+  });
+
+  await ctx.send();
+
+  assert.equal(ctx.calls.length, 4, 'два захода, в каждом — прокси и прямой адрес');
+  const last = ctx.toasts[ctx.toasts.length - 1];
+  assert.match(last.msg, /VPN/);
+  assert.doesNotMatch(last.msg, /связь оборвалась/i);
+  assert.equal(last.type, 'error');
+  assert.equal(ctx.input.value, 'посмотри архив', 'написанное не теряется');
+  assert.equal(ctx.files().length, 1, 'вложение на месте');
 });

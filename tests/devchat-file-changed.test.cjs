@@ -76,7 +76,8 @@ function sendContext(opts) {
   ctx.__files = files;
   const code = section('// Сколько принимает сервер', '// ---------------- чаты (треды) и проекты');
   vm.runInNewContext(
-    'const API_BASE = "https://api";\nconst TOKEN_KEY = "t";\n' +
+    'const API_BASE = "https://api";\nconst API_DIRECT_FALLBACK = "https://railway";\n' +
+    'const TOKEN_KEY = "t";\n' +
     'let _devChatBusy = false;\nlet _devChatThreadId = 5;\n' +
     'let _devChatFiles = this.__files;\n' +
     'function _devChatEl(name) { return name === "send" ? this.btn : (name === "input" ? this.input : null); }\n' +
