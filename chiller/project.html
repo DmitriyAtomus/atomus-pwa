@@ -148,6 +148,29 @@ svg .sa{font:3.2px 'Segoe UI',sans-serif;fill:#4FBF8B}
 svg .su{font:3.2px 'Segoe UI',sans-serif;fill:#C9A227}
 /* v2.45.980: гало — тёмная подложка под текстом, линии не режут буквы */
 svg .st,svg .sa,svg .su{paint-order:stroke;stroke:#081426;stroke-width:1.1px;stroke-linejoin:round}
+/* v2.45.999: схема v3 — фазы фреона цветом, зоны, стыки, «следующий» */
+svg .sl-hot{stroke:#D98A6B;stroke-width:1.2;fill:none}
+svg .sl-liq{stroke:#7FB4D8;stroke-width:1.2;fill:none}
+svg .sl-suc{stroke:#9BDCF9;stroke-width:1.2;fill:none}
+svg .arr{fill:#7FB4D8}svg .arrh{fill:#D98A6B}svg .arrs{fill:#9BDCF9}svg .arrw{fill:#4bb583}
+svg .jn{fill:#8FD3F4;stroke:#081426;stroke-width:.4}
+svg .zone-t{font:700 3.4px 'Segoe UI',sans-serif;letter-spacing:.45px;opacity:.85}
+svg .stamp{font:2.9px 'Cascadia Mono',Consolas,monospace;fill:#5D7390}
+svg .sch-pulse{animation:schPl 1.6s ease-in-out infinite}
+@keyframes schPl{0%,100%{opacity:.9}50%{opacity:.2}}
+svg g.sn.dim{opacity:.22}
+.sch-chips{display:flex;gap:6px;flex-wrap:wrap;padding:9px 14px 3px;max-width:1080px;margin:0 auto}
+.sch-chips span{font-size:10.5px;border-radius:12px;padding:2px 10px;cursor:pointer;user-select:none;border:1px solid var(--line2);color:var(--dim)}
+.sch-chips span.done{border-color:#22513c;color:#4FBF8B}
+.sch-chips span.wait{border-color:#5c4a1a;color:#C9A227}
+.sch-chips span.on{background:rgba(27,159,216,.14);border-color:var(--ice2);color:var(--ice)}
+#schTip{position:fixed;z-index:60;display:none;max-width:250px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;box-shadow:0 14px 34px rgba(0,0,0,.55);pointer-events:none}
+#schTip .t{font-size:13px;font-weight:700;color:var(--ice)}
+#schTip .st2{font-size:10.5px;margin:3px 0 6px;display:inline-block;border-radius:9px;padding:1px 8px}
+#schTip .st2.ok{color:#4FBF8B;border:1px solid #22513c}
+#schTip .st2.wt{color:#C9A227;border:1px solid #5c4a1a}
+#schTip .d{font-size:11.5px;color:var(--dim);line-height:1.5}
+#schTip .h{font-size:10px;color:var(--faint);margin-top:6px;border-top:1px solid var(--line);padding-top:5px}
 svg g.sn{cursor:pointer}
 svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 /* модалка назначения модели узлу */
@@ -374,7 +397,9 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
       <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
-        <svg id="schSvg" viewBox="20 4 226 220"></svg>
+        <div id="schChips" class="sch-chips"></div>
+        <svg id="schSvg" viewBox="0 0 320 218"></svg>
+        <div id="schTip"></div>
         <div class="sch-note">Типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3). Клик по элементу — назначить модель из базы.
           Зелёным — назначено, жёлтым «назначить» — ждёт. Назначения хранятся в проекте.</div>
       </div>
@@ -1727,35 +1752,59 @@ async function restoreLegacy(){
 
 /* ═══ вкладка «Схема»: типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3) ═══ */
 // Узлы: k — ключ назначения, глиф по kind, hint — подсказка поиска по базе
-/* v2.45.980: lp — куда ставить подпись, чтобы не пересекалась с линиями и
-   соседями: 'l'/'r' — сбоку от символа, 't' — над ним; без lp — под ним.
-   Боковые подписи получили тесные кластеры приборов (РД1/МН1/УА2/КО1,
-   РД2/МН2) и вертикальная цепочка ВН1→Ф1→СИ1→УА1; И1 — сверху, снизу вода. */
+/* v2.45.999: схема v3 — цикл по часовой стрелке. lab — точное место подписи
+   (x, y — первая строка, y2 — вторая, a — анкор); проверено геометрически,
+   тест chiller-schema-geometry следит, чтобы ничего не пересекалось.
+   d — «что это» для тултипа, grp — группа для чипов прогресса. */
 const SCH_NODES=[
- {k:'KM1', t:'КМ1', n:'Компрессор',        kind:'comp',  x:58, y:176, hint:'компрессор', lp:'l'},
- {k:'EK1', t:'ЕК1', n:'Нагреватель картера',kind:'heat', x:58, y:191, hint:'нагревател'},
- {k:'KO1', t:'КО1', n:'Обратный клапан',   kind:'check', x:76, y:110, hint:'обратный', lp:'r'},
- {k:'AVO1',t:'АВО1',n:'Конденсатор',       kind:'cond',  x:120,y:38,  hint:'конденсатор'},
- {k:'M1',  t:'М1',  n:'Вентилятор',        kind:'fan',   x:139,y:38,  hint:'вентилятор'},
- {k:'RD3', t:'РД3', n:'Реле давл. (вент.)',kind:'psw',   x:160,y:22,  hint:'реле давления', lp:'r'},
- {k:'KD1', t:'КД1', n:'Клапан NRD',        kind:'spring',x:146,y:62,  hint:'nrd'},
- {k:'KR1', t:'КР1', n:'Регулятор KVR',     kind:'spring',x:186,y:56,  hint:'kvr', lp:'r'},
- {k:'RS1', t:'РС1', n:'Ресивер',           kind:'recv',  x:186,y:85,  hint:'ресивер'},
- {k:'VN1', t:'ВН1', n:'Запорный клапан',   kind:'valve', x:214,y:118, hint:'запорный', lp:'r'},
- {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель',  kind:'filt',  x:214,y:134, hint:'фильтр', lp:'r'},
- {k:'SI1', t:'СИ1', n:'Смотровое стекло',  kind:'sight', x:214,y:148, hint:'стекло', lp:'r'},
- {k:'UA1', t:'УА1', n:'Соленоид жидк.',    kind:'sol',   x:214,y:162, hint:'соленоид', lp:'r'},
- {k:'TRV1',t:'ТРВ1',n:'ТРВ',               kind:'trv',   x:152,y:184, hint:'трв'},
- {k:'I1',  t:'И1',  n:'Испаритель ПТО',    kind:'evap',  x:120,y:184, hint:'теплообменник', lp:'t'},
- {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.',  kind:'accum', x:84, y:152, hint:'отделитель', lp:'l'},
- {k:'UA2', t:'УА2', n:'Соленоид байпаса',  kind:'sol',   x:46, y:118, hint:'соленоид', lp:'l'},
- {k:'KO2', t:'КО2', n:'Обратный клапан',   kind:'check', x:46, y:156, hint:'обратный', lp:'l'},
- {k:'RD1', t:'РД1', n:'Реле давления НД',  kind:'psw',   x:62, y:112, hint:'реле давления', lp:'l'},
- {k:'MN1', t:'МН1', n:'Манометр НД',       kind:'gauge', x:70, y:122, hint:'манометр', lp:'r'},
- {k:'RD2', t:'РД2', n:'Реле давления ВД',  kind:'psw',   x:93, y:94,  hint:'реле давления', lp:'r'},
- {k:'MN2', t:'МН2', n:'Манометр ВД',       kind:'gauge', x:93, y:78,  hint:'манометр', lp:'r'},
- {k:'N1',  t:'Н1',  n:'Насос',             kind:'pump',  x:188,y:200, hint:'насос', lp:'t'},
- {k:'RP1', t:'РП1', n:'Реле потока',       kind:'fsw',   x:154,y:208, hint:'реле потока'},
+ {k:'KM1', t:'КМ1', n:'Компрессор', kind:'comp', x:72, y:158, hint:'компрессор', grp:'comp',
+  lab:{x:59,y:164.6,y2:169,a:'end'}, d:'Сжимает пары фреона — сердце машины. От него считается вся холодопроизводительность.'},
+ {k:'EK1', t:'ЕК1', n:'Нагреватель картера', kind:'heat', x:72, y:172, hint:'нагреватель', grp:'el',
+  lab:{x:72,y:180,y2:184,a:'middle'}, d:'Греет масло компрессора на стоянке, чтобы фреон не растворялся в масле и не было гидроудара при пуске.'},
+ {k:'KO1', t:'КО1', n:'Обратный клапан', kind:'check', x:72, y:72, hint:'обратный', grp:'arm',
+  lab:{x:83,y:72.6,y2:77,a:'start'}, d:'Не даёт горячему газу пойти назад в компрессор после остановки.'},
+ {k:'AVO1',t:'АВО1',n:'Конденсатор', kind:'cond', x:130,y:40, hint:'конденсатор', grp:'to',
+  lab:{x:130,y:68,y2:72,a:'middle'}, d:'Горячий газ отдаёт тепло воздуху и превращается в жидкость.'},
+ {k:'M1',  t:'М1',  n:'Вентилятор', kind:'fan', x:130,y:20, hint:'вентилятор', grp:'el',
+  lab:{x:138,y:20.6,y2:25,a:'start'}, d:'Продувает конденсатор. Обороты — по давлению конденсации.'},
+ {k:'RD3', t:'РД3', n:'Реле давл. (вент.)', kind:'psw', x:104,y:20, hint:'реле давления', grp:'auto',
+  lab:{x:97,y:20.6,y2:25,a:'end'}, d:'Включает вентилятор, когда давление конденсации растёт.'},
+ {k:'KD1', t:'КД1', n:'Клапан NRD', kind:'spring', x:130,y:56, hint:'nrd', grp:'arm',
+  lab:{x:138,y:62.6,y2:67,a:'start'}, d:'Держит давление конденсации зимой — без него машина «раскисает» в холода.'},
+ {k:'KR1', t:'КР1', n:'Регулятор KVR', kind:'spring', x:186,y:40, hint:'kvr', grp:'arm',
+  lab:{x:186,y:28,y2:32.4,a:'middle'}, d:'Поддерживает минимальное давление в ресивере при низкой уличной температуре.'},
+ {k:'RS1', t:'РС1', n:'Ресивер', kind:'recv', x:230,y:66, hint:'ресивер', grp:'app',
+  lab:{x:248,y:65,y2:69.4,a:'start'}, d:'Запас жидкого фреона; сглаживает колебания заправки.'},
+ {k:'MN2', t:'МН2', n:'Манометр ВД', kind:'gauge', x:48, y:84, hint:'манометр', grp:'auto',
+  lab:{x:41,y:84.6,y2:89,a:'end'}, d:'Показывает давление нагнетания (высокая сторона).'},
+ {k:'RD2', t:'РД2', n:'Реле давления ВД', kind:'psw', x:96, y:60, hint:'реле давления', grp:'auto',
+  lab:{x:103,y:60.6,y2:65,a:'start'}, d:'Защита: давление нагнетания выросло — аварийный стоп.'},
+ {k:'VN1', t:'ВН1', n:'Запорный клапан', kind:'valve', x:230,y:88, hint:'запорный', grp:'arm',
+  lab:{x:238,y:88.6,y2:93,a:'start'}, d:'Перекрыть жидкостную линию на время сервиса.'},
+ {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель', kind:'filt', x:230,y:106, hint:'фильтр', grp:'arm',
+  lab:{x:238,y:106.6,y2:111,a:'start'}, d:'Ловит влагу и грязь из фреона — защита ТРВ и компрессора.'},
+ {k:'SI1', t:'СИ1', n:'Смотровое стекло', kind:'sight', x:230,y:122, hint:'стекло', grp:'arm',
+  lab:{x:238,y:122.6,y2:127,a:'start'}, d:'Индикатор влаги и недозаправки: пузыри — мало фреона.'},
+ {k:'UA1', t:'УА1', n:'Соленоид жидк.', kind:'sol', x:230,y:140, hint:'соленоид', grp:'arm',
+  lab:{x:238,y:140.6,y2:145,a:'start'}, d:'Отсекает жидкий фреон при остановке — испаритель не заливает.'},
+ {k:'TRV1',t:'ТРВ1',n:'ТРВ', kind:'trv', x:188,y:160, hint:'трв', grp:'arm',
+  lab:{x:188,y:169,y2:173.4,a:'middle'}, d:'Дросселирует жидкость и впрыскивает её в испаритель ровно столько, сколько испарится.'},
+ {k:'I1',  t:'И1',  n:'Испаритель ПТО', kind:'evap', x:146,y:160, hint:'теплообменник', grp:'to',
+  lab:{x:146,y:139.4,y2:135,a:'middle'}, d:'Фреон кипит и забирает тепло у воды — здесь и рождается холод.'},
+ {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.', kind:'accum', x:108,y:126, hint:'отделитель', grp:'app',
+  lab:{x:99,y:125.6,y2:130,a:'end'}, d:'Не пускает жидкий фреон в компрессор — защита от гидроудара.'},
+ {k:'UA2', t:'УА2', n:'Соленоид байпаса', kind:'sol', x:48, y:132, hint:'соленоид', grp:'arm',
+  lab:{x:48,y:118,y2:113.6,a:'middle',max:12}, d:'Пускает горячий газ в обход — разгрузка при пуске и оттайка.'},
+ {k:'KO2', t:'КО2', n:'Обратный клапан', kind:'check', x:30, y:141, hint:'обратный', grp:'arm', rot:90,
+  lab:{x:24,y:141.6,y2:146,a:'end'}, d:'Держит направление потока в линии байпаса.'},
+ {k:'RD1', t:'РД1', n:'Реле давления НД', kind:'psw', x:58, y:90, hint:'реле давления', grp:'auto',
+  lab:{x:58,y:82,y2:77.6,a:'middle',max:13}, d:'Защита: давление всаса упало — машина останавливается.'},
+ {k:'MN1', t:'МН1', n:'Манометр НД', kind:'gauge', x:80, y:90, hint:'манометр', grp:'auto',
+  lab:{x:87,y:88,y2:92.4,a:'start'}, d:'Показывает давление всаса (низкая сторона).'},
+ {k:'N1',  t:'Н1',  n:'Насос', kind:'pump', x:230,y:192, hint:'насос', grp:'pump',
+  lab:{x:230,y:175.8,y2:171.4,a:'middle'}, d:'Гонит воду или гликоль через испаритель к потребителю.'},
+ {k:'RP1', t:'РП1', n:'Реле потока', kind:'fsw', x:126,y:200, hint:'реле потока', grp:'auto',
+  lab:{x:126,y:210,y2:214.4,a:'middle'}, d:'Нет протока воды — стоп машина, иначе испаритель замёрзнет.'},
 ];
 /* Что узел делает в контуре — видно в шапке подбора модели (v2.45.997):
    выбирать позицию проще, когда написано, зачем она здесь стоит. */
@@ -1786,23 +1835,47 @@ const SCH_DESC={
  RP1:'Реле потока не даёт запустить холод без протока воды через испаритель.',
 };
 const SCH_LINES=[
- {c:'sl',p:[[68,176],[76,176],[76,40],[104,40]]},          // нагнетание
- {c:'sl',p:[[136,40],[186,40],[186,74]]},                  // конденсатор → КР1 → ресивер
- {c:'sl',p:[[76,62],[186,62]]},                            // НРД: нагнетание → ресивер
- {c:'sl',p:[[192,92],[198,92],[198,104],[214,104],[214,178],[168,178]]}, // жидкостная
- {c:'sl',p:[[136,178],[104,178]]},                         // ТРВ → И1 (внутри ряда)
- {c:'sl',p:[[104,180],[84,180],[84,163]]},                 // всас И1 → ОЖ1
- {c:'sl',p:[[84,141],[84,128],[58,128],[58,166]]},         // ОЖ1 → КМ1
- {c:'sl',p:[[76,74],[46,74],[46,196],[84,196],[84,180]]},  // байпас
- {c:'si',p:[[76,94],[89,94]]},{c:'si',p:[[76,78],[89,78]]},// импульсники ВД
- {c:'si',p:[[62,128],[62,116]]},{c:'si',p:[[70,128],[70,126]]},
- {c:'si',p:[[152,180],[152,171],[96,171],[96,127],[90,127]]}, // капилляр ТРВ
- {c:'si',p:[[160,26],[160,40]]},                           // РД3 → вентилятор
- {c:'sw',p:[[182,200],[128,200],[128,192]]},               // вода: насос → И1
- {c:'sw',p:[[194,200],[210,200]]},
- {c:'sw',p:[[114,192],[114,208],[148,208]]},               // И1 → РП1 → потребителю
- {c:'sw',p:[[160,208],[210,208]]},
+ // нагнетание — горячий газ
+ {c:'sl-hot',p:[[72,149],[72,40]]},
+ {c:'sl-hot',p:[[72,40],[114,40]]},
+ {c:'sl-hot',p:[[72,56],[114,56]]},               // перемычка НРД
+ {c:'sl-hot',p:[[72,132],[30,132]]},              // байпас
+ {c:'sl-hot',p:[[30,132],[30,150],[38,150]]},
+ // жидкость
+ {c:'sl-liq',p:[[146,40],[230,40],[230,60]]},
+ {c:'sl-liq',p:[[146,56],[230,56]]},
+ {c:'sl-liq',p:[[230,72],[230,160],[196,160]]},
+ {c:'sl-liq',p:[[182,160],[160,160]]},
+ // всас
+ {c:'sl-suc',p:[[132,160],[108,160],[108,137]]},
+ {c:'sl-suc',p:[[108,115],[108,104],[38,104],[38,158],[63,158]]},
+ // импульсные
+ {c:'si',p:[[52,84],[72,84]]},
+ {c:'si',p:[[72,60],[92,60]]},
+ {c:'si',p:[[58,93],[58,104]]},
+ {c:'si',p:[[80,93],[80,104]]},
+ {c:'si',p:[[188,150],[188,142],[114,142],[114,160]]},  // капилляр ТРВ
+ {c:'si',p:[[109,20],[122,20]]},
+ // вода
+ {c:'sw',p:[[258,192],[239,192]]},
+ {c:'sw',p:[[221,192],[152,192],[152,171]]},
+ {c:'sw',p:[[140,171],[140,200],[133,200]]},
+ {c:'sw',p:[[119,200],[96,200]]},
 ];
+// стрелки направления и точки Т-соединений (v2.45.999)
+const SCH_ARROWS=[
+ ['arrh','72,92 70,97 74,97'],['arrh','96,40 91,38 91,42'],['arrh','38,132 40,127 36,127'],
+ ['arr','196,40 191,38 191,42'],['arr','230,110 228,105 232,105'],['arr','230,146 228,141 232,141'],['arr','170,160 175,158 175,162'],
+ ['arrs','118,160 123,158 123,162'],['arrs','108,124 106,129 110,129'],['arrs','66,104 71,102 71,106'],
+ ['arrw','180,192 185,190 185,194'],['arrw','104,200 109,198 109,202'],
+];
+const SCH_JN=[[72,56],[230,56],[72,84],[72,60],[72,132],[38,150],[58,104],[80,104],[114,160]];
+const SCH_GROUPS=[
+ ['comp','Компрессоры'],['to','Теплообменники'],['app','Аппараты'],
+ ['arm','Арматура'],['auto','Автоматика'],['pump','Насосы'],['el','Электро'],
+];
+let schGrpSel=null;
+function schGrpToggle(g){schGrpSel=schGrpSel===g?null:g;renderSchema();}
 function _g(kind,x,y){  // глиф узла, ~8×8 в координатах схемы
   const P=(d)=>'<path class="sg2" d="'+d+'"/>';
   switch(kind){
@@ -1831,41 +1904,86 @@ function renderSchema(){
   const svg=$('#schSvg');
   if(!svg)return;
   let h='';
+  // зоны давления и воды — сразу видно горячую, холодную и водяную части
+  h+='<rect x="56" y="8" width="200" height="66" rx="4" fill="rgba(217,110,61,.055)" stroke="rgba(217,110,61,.25)" stroke-width="0.4" stroke-dasharray="2 2"/>';
+  h+='<text class="zone-t" x="60" y="14.5" fill="#D98A6B">ВЫСОКОЕ ДАВЛЕНИЕ · ГОРЯЧАЯ СТОРОНА</text>';
+  h+='<rect x="14" y="92" width="242" height="86" rx="4" fill="rgba(27,159,216,.05)" stroke="rgba(27,159,216,.22)" stroke-width="0.4" stroke-dasharray="2 2"/>';
+  h+='<text class="zone-t" x="18" y="98.5" fill="#5BAAD6">НИЗКОЕ ДАВЛЕНИЕ · ХОЛОДНАЯ СТОРОНА</text>';
+  h+='<rect x="88" y="181" width="182" height="30" rx="4" fill="rgba(75,181,131,.05)" stroke="rgba(75,181,131,.22)" stroke-width="0.4" stroke-dasharray="2 2"/>';
+  h+='<text class="zone-t" x="92" y="187.5" fill="#4bb583">КОНТУР ВОДЫ</text>';
   SCH_LINES.forEach(l=>{
     h+='<polyline class="'+l.c+'" points="'+l.p.map(p=>p.join(',')).join(' ')+'"/>';
   });
-  // v2.45.980: подписи не пересекаются — размещение по lp ('l'/'r'/'t'/низ).
-  // Боковой отступ = полуширина символа + зазор; боковые подписи короче,
-  // чтобы не выехать за viewBox.
-  const SIDE_OFF={comp:11,cond:18,evap:16,recv:15,accum:7,pump:7.5,fan:7,
-    filt:5,sight:5,psw:5.4,fsw:5.4,gauge:5.4,heat:7};
-  const TOP_OFF={cond:14,evap:15,recv:8,comp:11,pump:7.5,fan:7};
+  SCH_ARROWS.forEach(a=>{h+='<polygon class="'+a[0]+'" points="'+a[1]+'"/>';});
+  SCH_JN.forEach(p=>{h+='<circle class="jn" cx="'+p[0]+'" cy="'+p[1]+'" r="1.2"/>';});
+  // пульс-кольцо «следующий к назначению»
+  const next=SCH_NODES.find(n=>!schemaData[n.k]);
+  if(next){
+    const R={comp:13,cond:20,evap:18,recv:17,accum:9,pump:8}[next.kind]||8;
+    h+='<circle class="sch-pulse" cx="'+next.x+'" cy="'+next.y+'" r="'+R+'" stroke="#C9A227" stroke-width="0.7" fill="none" stroke-dasharray="2.4 1.6"/>';
+  }
   SCH_NODES.forEach(nd=>{
     const asg=schemaData[nd.k];
-    h+='<g class="sn" data-k="'+nd.k+'">'+_g(nd.kind,nd.x,nd.y);
-    const second=asg?esc(String(asg.name).slice(0,nd.lp==='l'||nd.lp==='r'?13:22)):'назначить';
-    const cls=asg?'sa':'su';
-    if(nd.lp==='l'||nd.lp==='r'){
-      const off=SIDE_OFF[nd.kind]!=null?SIDE_OFF[nd.kind]:6;
-      const tx=nd.lp==='r'?nd.x+off:nd.x-off;
-      const anc=nd.lp==='r'?'start':'end';
-      h+='<text class="st" x="'+tx+'" y="'+(nd.y+0.6)+'" text-anchor="'+anc+'">'+nd.t+'</text>';
-      h+='<text class="'+cls+'" x="'+tx+'" y="'+(nd.y+5)+'" text-anchor="'+anc+'">'+second+'</text>';
-    }else if(nd.lp==='t'){
-      const off=TOP_OFF[nd.kind]!=null?TOP_OFF[nd.kind]:10;
-      h+='<text class="'+cls+'" x="'+nd.x+'" y="'+(nd.y-off-6.4)+'" text-anchor="middle">'+second+'</text>';
-      h+='<text class="st" x="'+nd.x+'" y="'+(nd.y-off-2)+'" text-anchor="middle">'+nd.t+'</text>';
-    }else{
-      const ly=nd.y+(nd.kind==='cond'||nd.kind==='evap'?16:(nd.kind==='comp'?13:(nd.kind==='recv'?10:8)));
-      h+='<text class="st" x="'+nd.x+'" y="'+ly+'" text-anchor="middle">'+nd.t+'</text>';
-      h+='<text class="'+cls+'" x="'+nd.x+'" y="'+(ly+4)+'" text-anchor="middle">'+second+'</text>';
-    }
+    const dim=schGrpSel&&nd.grp!==schGrpSel?' dim':'';
+    h+='<g class="sn'+dim+'" data-k="'+nd.k+'">';
+    h+=nd.rot?'<g transform="rotate('+nd.rot+' '+nd.x+' '+nd.y+')">'+_g(nd.kind,nd.x,nd.y)+'</g>':_g(nd.kind,nd.x,nd.y);
+    // подписи — точные координаты (lab), выверенные тестом геометрии
+    const L=nd.lab, side=L.a!=='middle';
+    const second=asg?esc(String(asg.name).slice(0,side?13:(L.max||22))):'назначить';
+    h+='<text class="st" x="'+L.x+'" y="'+L.y+'" text-anchor="'+L.a+'">'+nd.t+'</text>';
+    h+='<text class="'+(asg?'sa':'su')+'" x="'+L.x+'" y="'+L.y2+'" text-anchor="'+L.a+'">'+second+'</text>';
     h+='</g>';
   });
   const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
-  h+='<text class="st" x="30" y="12">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
+  h+='<text class="st" x="8" y="14">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
+  // легенда линий и штамп листа
+  h+='<g><rect x="8" y="186" width="72" height="26" rx="2.5" fill="rgba(8,20,38,.85)" stroke="#1B2B3D" stroke-width="0.5"/>'
+    +'<line x1="12" y1="191.5" x2="24" y2="191.5" stroke="#D98A6B" stroke-width="1.2"/><text class="stamp" x="27" y="192.6" style="fill:#8FA8C2">горячий газ</text>'
+    +'<line x1="12" y1="196.5" x2="24" y2="196.5" stroke="#7FB4D8" stroke-width="1.2"/><text class="stamp" x="27" y="197.6" style="fill:#8FA8C2">жидкость</text>'
+    +'<line x1="12" y1="201.5" x2="24" y2="201.5" stroke="#9BDCF9" stroke-width="1.2"/><text class="stamp" x="27" y="202.6" style="fill:#8FA8C2">всас</text>'
+    +'<line x1="12" y1="206.5" x2="24" y2="206.5" stroke="#4bb583" stroke-width="1" stroke-dasharray="3 2"/><text class="stamp" x="27" y="207.6" style="fill:#8FA8C2">вода</text></g>';
+  h+='<g><rect x="258" y="200" width="58" height="14" rx="1.5" fill="#0B1728" stroke="#1B2B3D" stroke-width="0.5"/>'
+    +'<text class="stamp" x="261" y="205.5">АГ.ЧИЛ-104 Г3</text>'
+    +'<text class="stamp" x="261" y="210.5">Контур типовой · АТОМУС</text></g>';
+  // подписи воды
+  h+='<text class="sa" x="262" y="193" text-anchor="start" style="fill:#4bb583">от потребителя</text>';
+  h+='<text class="sa" x="118" y="206.2" text-anchor="end" style="fill:#4bb583">к потребителю</text>';
   svg.innerHTML=h;
-  svg.querySelectorAll('g.sn').forEach(g=>g.onclick=()=>openAssign(g.dataset.k));
+  schRenderChips();
+  const tip=document.getElementById('schTip');
+  svg.querySelectorAll('g.sn').forEach(g=>{
+    g.onclick=()=>openAssign(g.dataset.k);
+    if(!tip)return;
+    g.onmousemove=(e)=>{
+      const nd=SCH_NODES.find(n=>n.k===g.dataset.k);
+      if(!nd)return;
+      const asg=schemaData[nd.k];
+      tip.innerHTML='<div class="t">'+esc(nd.t)+' · '+esc(nd.n)+'</div>'
+        +(asg?'<span class="st2 ok">назначено: '+esc(String(asg.name).slice(0,26))+'</span>'
+             :'<span class="st2 wt">ждёт модель</span>')
+        +'<div class="d">'+esc(nd.d||'')+'</div>'
+        +'<div class="h">Клик — '+(asg?'сменить модель':'назначить модель из базы')+'</div>';
+      tip.style.display='block';
+      const w=tip.offsetWidth,ht=tip.offsetHeight;
+      let x=e.clientX+14,y=e.clientY+14;
+      if(x+w>innerWidth-8)x=e.clientX-w-14;
+      if(y+ht>innerHeight-8)y=e.clientY-ht-14;
+      tip.style.left=x+'px';tip.style.top=y+'px';
+    };
+    g.onmouseleave=()=>{if(tip)tip.style.display='none';};
+  });
+}
+// чипы групп: прогресс по типам позиций, клик подсвечивает группу на схеме
+function schRenderChips(){
+  const box=document.getElementById('schChips');
+  if(!box)return;
+  box.innerHTML=SCH_GROUPS.map(g=>{
+    const ids=SCH_NODES.filter(n=>n.grp===g[0]);
+    const done=ids.filter(n=>schemaData[n.k]).length;
+    const cls=(schGrpSel===g[0]?'on':(done===ids.length?'done':'wait'));
+    return '<span class="'+cls+'" data-g="'+g[0]+'">'+g[1]+' '+done+'/'+ids.length+'</span>';
+  }).join('');
+  box.querySelectorAll('span').forEach(el=>el.onclick=()=>schGrpToggle(el.dataset.g));
 }
 /* ═══ описание позиции базы (v2.45.997) ═══
    У каждой позиции в базе есть заводское наименование, характеристики и
