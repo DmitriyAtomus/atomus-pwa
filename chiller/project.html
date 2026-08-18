@@ -62,6 +62,16 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 /* v2.45.996: отмена/возврат — пока нечего отменять, кнопка гаснет */
 .vb.off{opacity:.32;cursor:default}
 .vb.hist{color:var(--ice)}
+/* v2.45.999: легенда сред — что за цвет на патрубке */
+#plegend{position:absolute;left:12px;top:44px;z-index:3;display:none;gap:10px;
+  align-items:center;font-size:10.5px;color:var(--dim);background:rgba(6,16,32,.8);
+  border:1px solid var(--line2);border-radius:8px;padding:5px 9px;pointer-events:none}
+#plegend.on{display:flex}
+#plegend b{color:var(--faint);font-weight:600}
+#plegend span{display:flex;align-items:center;gap:4px;white-space:nowrap}
+#plegend i{width:8px;height:8px;border-radius:50%;display:inline-block}
+/* на узком экране легенда лезет на подсказку справа — прячем */
+@media(max-width:1180px){#plegend{display:none!important}}
 #selbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;display:none;
   align-items:center;gap:8px;background:rgba(6,16,32,.85);border:1px solid var(--ice2);
   border-radius:10px;padding:7px 10px}
@@ -352,9 +362,15 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" data-v="top">Сверху</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
         <div class="vb" id="bParts" style="display:none">Детали</div>
+        <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
+      <div id="plegend"><b>Патрубки:</b>
+        <span><i style="background:#e8705f"></i>нагнетание, вход газа</span>
+        <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
+        <span><i style="background:#d9b64a"></i>ППК</span>
+        <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
       <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
@@ -503,7 +519,7 @@ async function meshOf(G){
   }
   return G._mesh;
 }
-/* геометрия из квантованного меша — как loadMesh в базе, но без зон/лап */
+/* геометрия из квантованного меша — как loadMesh в базе, но без лап */
 const GEO_CACHE=new Map();
 async function geoOf(d){
   const key=d.g;
@@ -528,12 +544,31 @@ async function geoOf(d){
     parts.forEach((p,i)=>geo.addGroup(p.start,p.count,i));
     geo.userData.parts=parts.map(p=>({des:p.des||'—',name:p.name||'деталь',
       col:partCol(p)}));
-  }else geo.userData.parts=null;
+    geo.userData.zoneMats=false;
+  }else{
+    /* v2.45.999: у покупной позиции меш уже разложен на группы —
+       корпус, нагнетание, всасывание, ППК, уравнивание. В компоновке они
+       красились одной сталью, и на сцене нельзя было отличить, куда идёт
+       газ, а куда жидкость. Оставляем группы: цвет патрубка = среда. */
+    geo.userData.parts=null;
+    (MS.groups||[]).forEach((g,i)=>{if(g[1]>0)geo.addGroup(g[0],g[1],i);});
+    geo.userData.zoneMats=geo.groups.length>1;
+    if(geo.groups.length===1)geo.clearGroups();   // зон нет — материал один
+  }
+  /* точки патрубков в системе координат модели: kind (dis/suc/ppk/eq),
+     заводское имя («ВХОД ГАЗА», «ПАТРУБОК 5/8" ODF») и диаметр */
+  geo.userData.zones=(MS.zones||[]).filter(z=>z&&z.tip);
   GEO_CACHE.set(key,geo);return geo;
 }
 
 /* ═══ сцена: z вверх, как в базе ═══ */
 const C_BODY=0x8d959d;
+/* цвета патрубков — те же, что в базе 3D: нагнетание красное, всасывание
+   голубое, порт предохранительного клапана золотой, уравнивание зелёное */
+const C_DIS=0xd94f3d,C_SUC=0x3d8fd9,C_PPK=0xC9A227,C_EQ=0x4FBF8B;
+const ZONE_COL=[C_BODY,C_DIS,C_SUC,C_PPK,C_EQ];
+const ZONE_CSS={dis:'#e8705f',suc:'#6cb4ec',ppk:'#d9b64a',eq:'#6fd3a5'};
+const ZONE_SHORT={dis:'нагнетание',suc:'всасывание',ppk:'ППК',eq:'уравнивание'};
 /* цвет детали из пакета: '#1A1D21' у крашеных, иначе исходная сталь */
 const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
   return isNaN(c)?C_BODY:c;};
@@ -556,6 +591,7 @@ function initGL(){
   const b=new THREE.DirectionalLight(0x9fbcd8,.30);b.position.set(-800,500,300);scene.add(b);
   const c=new THREE.DirectionalLight(0xffffff,.22);c.position.set(300,900,-500);scene.add(c);
   grid=new THREE.GridHelper(6000,60,0x2c4058,0x16263a);grid.rotation.x=Math.PI/2;scene.add(grid);
+  scene.add(portGrp);portsBtn();
   bindCtl(cv);tick();
 }
 function tick(){
@@ -567,6 +603,7 @@ function tick(){
                       target.y+dist*Math.sin(phi)*Math.sin(theta),
                       target.z+dist*Math.cos(phi));
   camera.lookAt(target);
+  portsSync();
   renderer.render(scene,camera);
 }
 
@@ -838,20 +875,24 @@ async function addItem(d,at,rot,tilt,roll){
   catch(err){toast('Модель не загрузилась: '+err.message);return null;}
   /* краска матовая, сталь блестящая — иначе чёрная решётка под прямым светом
      выглядит серой */
-  const mk=c=>new THREE.MeshStandardMaterial(
-    {color:c,metalness:c===C_BODY?.55:.15,roughness:c===C_BODY?.48:.74,
-     flatShading:true});
+  const mk=(c,steel)=>new THREE.MeshStandardMaterial(
+    {color:c,metalness:(steel||c===C_BODY)?.55:.15,
+     roughness:(steel||c===C_BODY)?.48:.74,flatShading:true});
   /* материалы у каждой детали в сцене свои: гасим стойку в одном корпусе —
      второй такой же корпус остаётся целым */
   const PT=geo.userData.parts;
-  const mat=PT?PT.map(x=>mk(x.col)):mk(C_BODY);
+  /* v2.45.999: у позиции с размеченными патрубками материалов пять — корпус
+     и четыре среды; гасить их нельзя, поэтому список деталей узла не трогаем */
+  const mat=PT?PT.map(x=>mk(x.col))
+             :(geo.userData.zoneMats?ZONE_COL.map(c=>mk(c,true)):mk(C_BODY));
   pushHist('добавление детали');           // v2.45.996: шаг истории — до появления детали
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
   obj.position.z=-bb.min.z;                      // низ детали — на пол
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
-  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[]};
+  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[],
+    zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
   placed.push(it);
   if(at){obj.position.x=at.x;obj.position.y=at.y;
     if(typeof at.z==='number')obj.position.z=at.z;}  // из проекта — как сохранили
@@ -1111,6 +1152,7 @@ $('#pAll').onclick=()=>{
   pushHist('показ всех деталей узла');
   sel.off=[];applyOff(sel);buildParts();save();
 };
+$('#bPorts').onclick=portsToggle;
 $('#bParts').onclick=()=>{
   const on=!$('#partsBox').classList.contains('on');
   $('#partsBox').classList.toggle('on',on);$('#bParts').classList.toggle('on',on);
@@ -1137,7 +1179,7 @@ function select(it){
     $('#selNm').textContent=sel.d.brand+' '+sel.d.name;
     showSelZ();}
   $('#selbar').classList.toggle('on',!!sel);
-  hideMnt();selBtns();buildParts();
+  hideMnt();selBtns();buildParts();portsRebuild();
   refreshSpecSel();
 }
 /* отметка низа выделенной детали — по ней и видно, что стоит на крыше */
@@ -1171,6 +1213,188 @@ function applyTint(p){
     else if(sel===p){m.emissive.setHex(0x1B9FD8);m.emissiveIntensity=.33;}
     else{m.emissive.setHex(0x000000);m.emissiveIntensity=0;}
   });
+}
+/* ═══ патрубки: где всас, где нагнетание ═══
+   Меш покупной позиции приходит из базы 3D уже размеченным: треугольники
+   разложены по средам (нагнетание, всасывание, ППК, уравнивание), а к ним
+   приложены точки патрубков с заводскими именами — «ВХОД ГАЗА»,
+   «ПАТРУБОК 5/8" ODF». В компоновке это не показывалось: вся деталь шла одной
+   сталью, и по сцене нельзя было понять, какой штуцер куда. Теперь патрубок
+   красится по среде, а рядом висит подпись. Подпись — спрайт в сцене, а не
+   html поверх канваса: тогда она попадает и в снимок вида, который уходит
+   в чат по чиллерам. */
+const PORT_KEY='atomus_chiller_ports';
+const PORT_MODE=['выкл','у выделенной','у всех'];
+/* по умолчанию — подписи у выделенной детали: пустая строка в хранилище это
+   «ещё не выбирали», а не «выключено» */
+let PORTS=(()=>{try{const v=localStorage.getItem(PORT_KEY);
+  return (v==='0'||v==='1'||v==='2')?+v:1;}catch(e){return 1;}})();
+const portGrp=new THREE.Group();
+let portTags=[],portLine=null;         // {it,loc,spr,dot,w2h} + выноски
+const PORT_TEX=new Map();
+const PORT_PX=17;                      // экранная высота подписи, пикселей
+function portTex(text,col){
+  const k=col+'|'+text;
+  if(PORT_TEX.has(k))return PORT_TEX.get(k);
+  const S=2,fs=22*S,pad=11*S,r=8*S;
+  const cv=document.createElement('canvas');
+  let g=cv.getContext('2d');
+  const font='600 '+fs+'px system-ui,-apple-system,Segoe UI,sans-serif';
+  g.font=font;
+  const w=Math.ceil(g.measureText(text).width)+pad*2,h=Math.round(fs+pad*1.3);
+  cv.width=w;cv.height=h;g=cv.getContext('2d');g.font=font;
+  g.beginPath();
+  g.moveTo(r,0);g.arcTo(w,0,w,h,r);g.arcTo(w,h,0,h,r);
+  g.arcTo(0,h,0,0,r);g.arcTo(0,0,w,0,r);g.closePath();
+  g.fillStyle='rgba(6,16,32,.86)';g.fill();
+  g.lineWidth=2*S;g.strokeStyle=col+'aa';g.stroke();
+  g.fillStyle=col;g.textBaseline='middle';g.fillText(text,pad,h/2+1);
+  const t=new THREE.CanvasTexture(cv);
+  t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;
+  const rec={tex:t,w2h:w/h};PORT_TEX.set(k,rec);return rec;
+}
+function portDotTex(col){
+  const k='dot|'+col;
+  if(PORT_TEX.has(k))return PORT_TEX.get(k);
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const g=cv.getContext('2d');
+  g.beginPath();g.arc(32,32,20,0,Math.PI*2);
+  g.fillStyle=col;g.fill();
+  g.lineWidth=6;g.strokeStyle='rgba(6,16,32,.9)';g.stroke();
+  const t=new THREE.CanvasTexture(cv);
+  const rec={tex:t,w2h:1};PORT_TEX.set(k,rec);return rec;
+}
+/* Подпись — заводское имя патрубка из базы, у выделенной детали ещё и
+   диаметр. Имя важнее вида среды: у ресивера тот же красный порт называется
+   «ВХОД», а не «нагнетание», и подписывать его нагнетанием было бы враньём. */
+function portText(z,full){
+  const nm=(z.name||ZONE_SHORT[z.kind]||'патрубок').replace(/\s+/g,' ').trim();
+  if(!full)return nm.length>22?(nm.slice(0,21)+'…'):nm;
+  return z.od?(nm+' · Ø'+String(Math.round(z.od*10)/10).replace('.',',')):nm;
+}
+function mkSprite(rec){
+  const m=new THREE.SpriteMaterial({map:rec.tex,transparent:true,
+    depthTest:false,depthWrite:false});
+  const sp=new THREE.Sprite(m);sp.renderOrder=10;return sp;
+}
+function portsClear(){
+  portTags.forEach(t=>{portGrp.remove(t.spr);portGrp.remove(t.dot);
+    t.spr.material.dispose();t.dot.material.dispose();});
+  portTags=[];
+  if(portLine){portGrp.remove(portLine);portLine.geometry.dispose();
+    portLine.material.dispose();portLine=null;}
+}
+/* выноска от патрубка к подписи: без неё поднятая подпись повисает в воздухе
+   и непонятно, к какому штуцеру она относится */
+function portLines(){
+  const n=portTags.length;
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*6),3));
+  const col=new Float32Array(n*6),c=new THREE.Color();
+  portTags.forEach((t,i)=>{
+    c.set(ZONE_CSS[t.kind]||'#8FD3F4');
+    for(const k of [0,1])col.set([c.r,c.g,c.b],i*6+k*3);
+  });
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  portLine=new THREE.LineSegments(g,new THREE.LineBasicMaterial(
+    {vertexColors:true,transparent:true,opacity:.72,depthTest:false}));
+  /* координаты линий пересчитываются каждый кадр, границы геометрии остаются
+     нулевыми — без этого весь пучок выносок выпадает из отсечения и не виден */
+  portLine.frustumCulled=false;
+  portLine.renderOrder=9;portGrp.add(portLine);
+}
+function portsRebuild(){
+  portsClear();
+  if(!PORTS)return;
+  const list=PORTS===2?placed:(sel?[sel]:[]);
+  let zones=0;
+  list.forEach(it=>zones+=(it.zn||[]).length);
+  // много деталей — оставляем только газовые линии, иначе сцена в подписях
+  const only=(PORTS===2&&zones>60);
+  list.forEach(it=>{
+    (it.zn||[]).forEach(z=>{
+      if(only&&z.kind!=='dis'&&z.kind!=='suc')return;
+      const col=ZONE_CSS[z.kind]||'#8FD3F4';
+      const rec=portTex(portText(z,it===sel),col);
+      const spr=mkSprite(rec);spr.center.set(.5,-.28);
+      const dot=mkSprite(portDotTex(col));
+      portGrp.add(spr);portGrp.add(dot);
+      portTags.push({it:it,loc:new THREE.Vector3(z.tip[0],z.tip[1],z.tip[2]),
+        spr:spr,dot:dot,w2h:rec.w2h,kind:z.kind});
+    });
+  });
+  if(portTags.length)portLines();
+}
+/* Каждый кадр: подпись едет за деталью, держит постоянный размер на экране и
+   уступает место соседям. Патрубки в сцене стоят кучно, и с иного ракурса
+   подписи наезжали друг на друга — поэтому те, что не влезли, поднимаются
+   ступенькой выше своей точки. */
+const _pv=new THREE.Vector3(),_pu=new THREE.Vector3();
+function portsSync(){
+  if(!portTags.length)return;
+  scene.updateMatrixWorld(true);      // деталь тащат мышью — берём свежее место
+  const cv=$('#cv'),W=cv.clientWidth||1280,H=cv.clientHeight||720;
+  const hw=2*dist*Math.tan(camera.fov*Math.PI/360)*PORT_PX/H;
+  const box=[];
+  const scr=portTags.map((t,i)=>{
+    _pv.copy(t.loc).applyMatrix4(t.it.obj.matrixWorld);
+    t.spr.position.copy(_pv);t.dot.position.copy(_pv);
+    t.spr.scale.set(hw*t.w2h,hw,1);
+    t.dot.scale.set(hw*.42,hw*.42,1);
+    _pv.project(camera);
+    return {i:i,vis:_pv.z<1,x:(_pv.x*.5+.5)*W,y:(-_pv.y*.5+.5)*H,w:PORT_PX*t.w2h};
+  }).filter(p=>p.vis).sort((a,b)=>a.y-b.y);
+  const up=_pu.set(0,1,0).applyQuaternion(camera.quaternion);
+  const lp=portLine&&portLine.geometry.attributes.position;
+  scr.forEach(p=>{
+    const t=portTags[p.i];
+    let c=.28;
+    for(let k=0;k<9;k++){
+      const y=p.y-c*PORT_PX,x0=p.x-p.w/2,x1=p.x+p.w/2;
+      const hit=box.some(b=>x0<b.x1+4&&x1>b.x0-4&&
+        y<b.y+PORT_PX+2&&y>b.y-PORT_PX-2);
+      if(!hit){box.push({x0:x0,x1:x1,y:y});break;}
+      c+=1.2;
+    }
+    t.spr.center.set(.5,-c);
+    t.spr.visible=true;t.dot.visible=true;
+    if(lp){
+      const q=t.spr.position;
+      lp.setXYZ(p.i*2,q.x,q.y,q.z);
+      lp.setXYZ(p.i*2+1,q.x+up.x*c*hw*.82,q.y+up.y*c*hw*.82,q.z+up.z*c*hw*.82);
+    }
+  });
+  const shown=new Set(scr.map(p=>p.i));
+  portTags.forEach((t,i)=>{
+    if(shown.has(i))return;
+    t.spr.visible=false;t.dot.visible=false;
+    if(lp){lp.setXYZ(i*2,0,0,0);lp.setXYZ(i*2+1,0,0,0);}
+  });
+  if(lp)lp.needsUpdate=true;
+}
+/* краска патрубков по средам; выключили подписи — гаснет и краска */
+function portsPaint(){
+  placed.forEach(p=>{
+    if(!p.zm||!Array.isArray(p.obj.material))return;
+    p.obj.material.forEach((m,i)=>{
+      if(i>0)m.color.setHex(PORTS?ZONE_COL[i]:C_BODY);});
+  });
+}
+function portsOn(){portsPaint();portsRebuild();}
+function portsBtn(){
+  const b=$('#bPorts');if(!b)return;
+  // на телефоне ряд кнопок и так уезжает вбок — там только слово
+  b.textContent=(PORTS&&innerWidth>900)?('Патрубки · '+PORT_MODE[PORTS]):'Патрубки';
+  b.classList.toggle('on',!!PORTS);
+  $('#plegend').classList.toggle('on',!!PORTS);
+}
+function portsToggle(){
+  PORTS=(PORTS+1)%3;
+  try{localStorage.setItem(PORT_KEY,String(PORTS));}catch(e){}
+  portsBtn();portsOn();
+  toast(PORTS===0?'Патрубки не подписаны'
+       :PORTS===1?'Патрубки выделенной детали подписаны'
+       :'Патрубки подписаны у всех деталей сцены');
 }
 function checkCollisions(){
   collSet=new Set();
@@ -1267,6 +1491,7 @@ function refresh(){
     $('#fDims').textContent='габарит '+Math.round(s.x)+' × '+Math.round(s.y)+' × '+Math.round(s.z)+' мм';
   } else $('#fDims').textContent='';
   $('#empty').style.display=placed.length?'none':'flex';
+  portsPaint();portsRebuild();      // деталь ушла или приехала — подписи следом
   checkCollisions();
   refreshSpecSel();
   if(typeof chCtxLine==='function')chCtxLine();
