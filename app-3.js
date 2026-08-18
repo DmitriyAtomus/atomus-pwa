@@ -8467,7 +8467,11 @@ async function loadLogisticsPickups() {
               // v2.45.987: счета старше месяца почти наверняка уже забрали, просто
               // не отметили — не пугаем ими, но и не прячем совсем
               (g.stale.length
-                ? '<details class="sp-stale"><summary><i class="ti ti-clock-question"></i> Оплачены давно — похоже, уже забрали <span>' + g.stale.length + '</span></summary>' +
+                ? '<details class="sp-stale"><summary><i class="ti ti-clock-question"></i> ' +
+                  (g.stale.every(x => x.stale_reason === 'dup')
+                    ? 'Дубли счетов — уже закрыты'
+                    : 'Оплачены давно или задвоились — похоже, уже забрали') +
+                  ' <span>' + g.stale.length + '</span></summary>' +
                   '<div>' + g.stale.map(_selfPickupCard).join('') + '</div></details>'
                 : '')
             )
@@ -9594,8 +9598,11 @@ function _selfPickupGroups(list) {
     if (!map.has(key)) map.set(key, { key: key, name: it.supplier_name || 'Поставщик', items: [], fresh: [], stale: [] });
     const g = map.get(key);
     g.items.push(it);
+    // v2.45.991: «давний»/дубль считает бэкенд (он же прячет их от рейсов);
+    // старый расчёт по дате оставлен на случай ответа без флага
     const days = _spDaysSince(it.paid_at);
-    (days !== null && days > 30 ? g.stale : g.fresh).push(it);
+    const isStale = (typeof it.stale === 'boolean') ? it.stale : (days !== null && days > 30);
+    (isStale ? g.stale : g.fresh).push(it);
   });
   return Array.from(map.values());
 }
@@ -9633,8 +9640,11 @@ function _selfPickupCard(it) {
       (sum ? '<div class="logi-sum"><div class="rub">' + sum + '</div></div>' : '') +
     '</div>' +
     '<div class="logi-body">' +
-      '<div class="sp-hint"><i class="ti ti-info-circle"></i>На складе называем <b>наш счёт № ' + escapeHtml(num) + '</b>' +
-        (it.supplier_contact ? ' · ' + escapeHtml(it.supplier_contact) : '') + '</div>' +
+      (it.stale_reason === 'dup'
+        ? '<div class="sp-hint dup"><i class="ti ti-copy"></i>Похоже, дубль: этот же счёт уже закрыт заказом ' +
+          escapeHtml('ORD-' + (it.twin_order_id || '')) + ' — забирать нечего</div>'
+        : '<div class="sp-hint"><i class="ti ti-info-circle"></i>На складе называем <b>наш счёт № ' + escapeHtml(num) + '</b>' +
+          (it.supplier_contact ? ' · ' + escapeHtml(it.supplier_contact) : '') + '</div>') +
       (it.pickup_place
         ? '<div class="logi-place"><i class="ti ti-map-pin"></i><span>' + escapeHtml(it.pickup_place) + '</span></div>'
         : '<div class="logi-place sp-noaddr"><i class="ti ti-map-pin"></i><span>Адрес склада не заполнен — впишите его в карточке поставщика, тогда точка встанет и в «Рейсы»</span></div>') +
