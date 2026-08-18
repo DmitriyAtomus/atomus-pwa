@@ -138,7 +138,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 .asg-unset{margin:0 8px 10px;padding:9px;border:1px solid #6b3a34;color:#f0a9a0;border-radius:8px;
   text-align:center;cursor:pointer;font-size:12.5px}
 
-/* ═══ панель деталей: гасим стойки и панели, как в базе 3D (v2.45.993) ═══ */
+/* ═══ панель деталей: гасим стойки и панели, как в базе 3D (v2.45.994) ═══ */
 #partsBox{position:absolute;left:10px;top:44px;width:296px;max-height:calc(100% - 130px);z-index:5;
   display:none;flex-direction:column;background:rgba(8,20,36,.94);border:1px solid var(--line2);
   border-radius:11px;box-shadow:0 14px 34px rgba(0,0,0,.5);backdrop-filter:blur(7px)}
@@ -171,7 +171,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 #mnt .o small{color:var(--faint);font-size:10.5px}
 #selbar button.on{color:var(--warn);border-color:#6b5a1a}
 
-/* ═══ чат по чиллерам прямо в компоновке (v2.45.993) ═══
+/* ═══ чат по чиллерам прямо в компоновке (v2.45.994) ═══
    Лента рядом со сценой: поставил узел — тут же пишешь замечание, и Клод
    видит, что стоит в проекте. Шторка не модальная, разворачивается на весь
    экран кнопкой ⤢ — с телефона узкой полосой не почитать. */
@@ -470,7 +470,7 @@ async function geoOf(d){
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.setIndex(new THREE.BufferAttribute(i16,1));
   geo.computeVertexNormals();geo.computeBoundingBox();
-  /* v2.45.993: сборка режется на детали — по одной группе на деталь, как в
+  /* v2.45.994: сборка режется на детали — по одной группе на деталь, как в
      базе 3D. Тогда стойку или панель можно погасить прямо в компоновке, а
      заводская краска (чёрная решётка вентилятора) остаётся своей. */
   const parts=(MS.parts||[]).filter(p=>p.count>0);
@@ -581,7 +581,7 @@ function bindCtl(cv){
     $('#bGrid').classList.toggle('on',grid.visible);};
   $('#bGrid').classList.add('on');
   addEventListener('keydown',e=>{
-    // v2.45.993: в поле ввода буквы — это текст, а не команды сцены
+    // v2.45.994: в поле ввода буквы — это текст, а не команды сцены
     const t=e.target&&e.target.tagName;
     if(t==='INPUT'||t==='TEXTAREA'){
       if(e.key==='Escape'&&ch.open&&!ch.full)closeChat();
@@ -723,7 +723,7 @@ function autoLayout(){
   // корпус ставим первым — от него считается вся площадка; остальных уводим в сторону,
   // чтобы старые места не мешали поиску свободного
   placed.forEach(p=>{
-    if(p.pin)return;                                  // v2.45.993: закреплённое остаётся на месте
+    if(p.pin)return;                                  // v2.45.994: закреплённое остаётся на месте
     if(roleOf(p.d)==='frame')autoPlace(p);
     else{p.obj.position.set(1e6,1e6,0);p.obj.updateMatrixWorld(true);}});
   const roles=[...groups.keys()].sort((a,b)=>LAY_ORDER.indexOf(a)-LAY_ORDER.indexOf(b));
@@ -792,7 +792,7 @@ async function addItem(d,at,rot,tilt){
   return it;
 }
 
-/* ═══ v2.45.993: закрепление, посадка на корпус и гашение деталей ═══ */
+/* ═══ v2.45.994: закрепление, посадка на корпус и гашение деталей ═══ */
 
 /* Сдвиг детали вместе с тем, что на ней сидит: подвинул корпус — компрессор
    и щит поехали с ним, потому что они на него посажены. */
@@ -1081,7 +1081,7 @@ function refresh(){
     `<div class="sr" data-id="${r.d.id}"><span class="nm">${r.d.brand} ${r.d.name}</span>`+
     `<span class="n">${r.n}</span><span class="u">шт</span></div>`).join('')
     :'<div style="padding:14px 12px;font-size:12px;color:var(--faint)">Пока пусто — добавь детали из базы слева.</div>';
-  // v2.45.993: крепёж посадки на корпус — отдельными строками, по 4 болта на узел
+  // v2.45.994: крепёж посадки на корпус — отдельными строками, по 4 болта на узел
   const hw=new Map();
   placed.forEach(p=>{
     const m=p.link?MOUNT[p.link.mount]:null;
@@ -1128,7 +1128,7 @@ async function capi(path,method,body){
 }
 function projPayload(){
   // v2.45.974: z сохраняем тоже — иначе поднятые детали падали бы на пол при открытии
-  // v2.45.993: uid, закрепление, посадка на корпус и погашенные детали — тоже в проект
+  // v2.45.994: uid, закрепление, посадка на корпус и погашенные детали — тоже в проект
   return {items:placed.map(p=>({uid:p.uid,id:p.id,x:p.obj.position.x,y:p.obj.position.y,
                                 z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y,
                                 pin:p.pin?1:0,
@@ -1420,7 +1420,7 @@ async function fillThumbsIn(sel){
 $('#q').addEventListener('input',e=>{fQ=e.target.value.trim().toLowerCase();drawCat();});
 
 
-/* ═══ во весь экран (v2.45.993) ═══
+/* ═══ во весь экран (v2.45.994) ═══
    Компоновку смотрят в iframe раздела CRM, он отдан с allow="fullscreen", —
    разворачиваем документ модуля целиком, как в «Атом Электрика». */
 function toggleFS(){
@@ -1437,7 +1437,7 @@ document.addEventListener('fullscreenchange',()=>{
 });
 addEventListener('keydown',e=>{if(e.key==='F11'){e.preventDefault();toggleFS();}});
 
-/* ═══ чат по чиллерам прямо в компоновке (v2.45.993) ═══
+/* ═══ чат по чиллерам прямо в компоновке (v2.45.994) ═══
    Лента та же, что в проекте «Атом Чиллер» на экране «Клод»: ходим в
    /api/dev-chat/* тем же токеном, что и в /api/3d/*. Своих чатов не заводим —
    только находим живой, иначе плодились бы пустые дубли.
