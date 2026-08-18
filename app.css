@@ -32,7 +32,14 @@
   }
   button, input, select, textarea { font-family: inherit; font-size: inherit; }
   a { color: inherit; text-decoration: none; }
-  input, textarea { -webkit-appearance: none; appearance: none; }
+  /* v2.45.991: appearance:none снимаем только с текстовых полей. Раньше он
+     бил и по чекбоксам/радио — отметка не рисовалась вовсе (галочки в модалке
+     «Новый рейс», выбор строк склада), и каждый такой случай приходилось
+     чинить отдельным правилом. Свои, нарисованные вручную чекбоксы прячут
+     нативный input сами (opacity:0 / display:none) — их это не трогает. */
+  input:not([type="checkbox"]):not([type="radio"]), textarea {
+    -webkit-appearance: none; appearance: none;
+  }
   /* v2.45.230: галочки BOM — глобальный appearance:none прятал нативные
      чекбоксы (рисовались пустыми/невидимыми). Возвращаем вид. */
   .bom-check, #bom-check-all, .cp-check, .edo-cb, #edo-selall-cb, .ibx-cb, #ibx-selall-cb {
@@ -24506,6 +24513,8 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
   padding: 8px 10px; margin-bottom: 8px; }
 .sp-hint i { margin-top: 1px; flex: none; }
 .sp-hint b { color: #115E59; }
+/* v2.45.991: счёт-дубль — не бирюзовая подсказка «назови счёт», а серая пометка */
+.sp-hint.dup { color: var(--text-mid); background: var(--surface-2, #F5F7FA); border-color: var(--border); }
 .sp-noaddr i { color: var(--warning, #D97706); }
 .sp-noaddr span { color: var(--text-light); }
 .logi-open { display: inline-flex; align-items: center; gap: 6px; background: var(--surface);
