@@ -45,6 +45,12 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 .ci b{display:block;font-size:11.5px;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ci span{font-size:10px;color:var(--faint)}
 .ci .add{margin-left:auto;color:var(--ice);font-size:16px;flex-shrink:0;padding:0 4px}
+/* v2.45.997: строка базы открывается с описанием — что это за позиция */
+.ci .k{font-size:10px;color:var(--dim);line-height:1.35;margin-top:2px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ci .k.tg{color:var(--faint)}
+.ci .info{margin-left:auto;flex-shrink:0;color:var(--dim);font-size:13px;padding:2px 5px;border-radius:6px}
+.ci .info:hover{color:var(--ice);background:#12294a}
 .note{padding:8px 12px;font-size:10.5px;color:var(--faint);border-top:1px solid var(--line);line-height:1.5}
 #vwrap{position:relative;min-width:0;background:#061020}
 #cv{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
@@ -142,6 +148,29 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 .asg-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:6px}
 .asg-unset{margin:0 8px 10px;padding:9px;border:1px solid #6b3a34;color:#f0a9a0;border-radius:8px;
   text-align:center;cursor:pointer;font-size:12.5px}
+.asg-sub{padding:9px 14px 0;font-size:11.5px;line-height:1.5;color:var(--dim)}
+/* карточка позиции: описание, характеристики, посадка (v2.45.997) */
+#mdz{position:fixed;inset:0;background:rgba(3,8,16,.78);z-index:22;display:none;align-items:center;justify-content:center}
+#mdz.on{display:flex}
+.mdz-card{width:min(560px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel);
+  border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+.mdz-body{flex:1;overflow-y:auto;padding:12px 16px 14px}
+.mdz-top{display:flex;gap:12px;align-items:flex-start}
+.mdz-top img{width:120px;height:92px;object-fit:contain;background:#0D1B30;border:1px solid var(--line);
+  border-radius:8px;flex-shrink:0}
+.mdz-k{font-size:12.5px;line-height:1.5;color:var(--ink)}
+.mdz-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.mdz-tags i{font-style:normal;font-size:10.5px;color:var(--ice);background:#12294a;
+  border:1px solid var(--line2);border-radius:20px;padding:2px 8px}
+.mdz-h{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:14px 0 5px}
+.mdz-t{width:100%;border-collapse:collapse;font-size:12px}
+.mdz-t td{padding:4px 0;vertical-align:top;border-bottom:1px solid var(--line)}
+.mdz-t td:first-child{color:var(--dim);width:48%;padding-right:10px}
+.mdz-t td:last-child{font-family:var(--mono);font-size:11.5px}
+.mdz-note{font-size:11px;color:var(--faint);line-height:1.55;margin-top:9px}
+.mdz-note a{color:var(--ice)}
+.mdz-act{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+.mdz-act .btn{flex:1}
 
 /* ═══ панель деталей: гасим стойки и панели, как в базе 3D (v2.45.994) ═══ */
 #partsBox{position:absolute;left:10px;top:44px;width:296px;max-height:calc(100% - 130px);z-index:5;
@@ -353,6 +382,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
       </div>
       <div id="selbar"><span class="nm" id="selNm"></span>
         <span class="z" id="selZ"></span>
+        <button id="bInfo" title="Описание позиции из базы">ⓘ Описание</button>
         <button id="bPin" title="Закрепить на этом месте (P)">📌 Закрепить</button>
         <button id="bLink" title="Поставить на дно или надеть на крышку корпуса">⛓ Соединить с корпусом</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -428,9 +458,15 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 </div></div>
 <div id="asg"><div class="asg-card">
   <div class="pov-h" id="asgTitle">Назначить модель <span class="x" id="asgX">✕</span></div>
+  <div class="asg-sub" id="asgSub"></div>
   <div class="search" style="margin:10px 10px 6px"><span style="color:var(--faint)">⌕</span><input id="asgQ" placeholder="поиск по базе…"></div>
   <div class="asg-unset" id="asgUnset" style="display:none">✕ Убрать назначение</div>
   <div class="asg-list" id="asgList"></div>
+</div></div>
+<div id="mdz"><div class="mdz-card">
+  <div class="pov-h" id="mdzT">Описание позиции <span class="x" id="mdzX">✕</span></div>
+  <div class="mdz-body" id="mdzB"></div>
+  <div class="mdz-act" id="mdzA"></div>
 </div></div>
 
 <script src="three.min.js"></script>
@@ -611,6 +647,8 @@ function bindCtl(cv){
       if(kz||ky){e.preventDefault();(kz&&!e.shiftKey)?undoAct():redoAct();return;}
     }
     if(e.key==='Escape'){
+      if($('#mdz').classList.contains('on')){closeDesc();return;}
+      if($('#asg').classList.contains('on')){$('#asg').classList.remove('on');return;}
       if($('#chArt').classList.contains('open')){chatArtClose();return;}
       if(ch.open){closeChat();return;}
       hideMnt();select(null);
@@ -1470,7 +1508,7 @@ async function restoreLegacy(){
    РД2/МН2) и вертикальная цепочка ВН1→Ф1→СИ1→УА1; И1 — сверху, снизу вода. */
 const SCH_NODES=[
  {k:'KM1', t:'КМ1', n:'Компрессор',        kind:'comp',  x:58, y:176, hint:'компрессор', lp:'l'},
- {k:'EK1', t:'ЕК1', n:'Нагреватель картера',kind:'heat', x:58, y:191, hint:'нагреватель'},
+ {k:'EK1', t:'ЕК1', n:'Нагреватель картера',kind:'heat', x:58, y:191, hint:'нагревател'},
  {k:'KO1', t:'КО1', n:'Обратный клапан',   kind:'check', x:76, y:110, hint:'обратный', lp:'r'},
  {k:'AVO1',t:'АВО1',n:'Конденсатор',       kind:'cond',  x:120,y:38,  hint:'конденсатор'},
  {k:'M1',  t:'М1',  n:'Вентилятор',        kind:'fan',   x:139,y:38,  hint:'вентилятор'},
@@ -1494,6 +1532,34 @@ const SCH_NODES=[
  {k:'N1',  t:'Н1',  n:'Насос',             kind:'pump',  x:188,y:200, hint:'насос', lp:'t'},
  {k:'RP1', t:'РП1', n:'Реле потока',       kind:'fsw',   x:154,y:208, hint:'реле потока'},
 ];
+/* Что узел делает в контуре — видно в шапке подбора модели (v2.45.997):
+   выбирать позицию проще, когда написано, зачем она здесь стоит. */
+const SCH_DESC={
+ KM1:'Сжимает пар хладагента и гонит контур — по нему считается холодопроизводительность машины.',
+ EK1:'Подогревает масло в картере на стоянке, чтобы в нём не растворялся хладагент.',
+ KO1:'Пропускает нагнетание только от компрессора: после остановки хладагент не течёт назад.',
+ AVO1:'Воздушный конденсатор — сбрасывает тепло в воздух, пар превращается в жидкость.',
+ M1:'Продувает конденсатор; число и типоразмер вентиляторов задают воздушный расход.',
+ RD3:'Включает вентиляторы по давлению конденсации — держит напор летом и зимой.',
+ KD1:'Дифференциальный клапан NRD: зимой перепускает нагнетание в ресивер мимо конденсатора.',
+ KR1:'Регулятор KVR поджимает выход конденсатора и держит давление конденсации.',
+ RS1:'Ресивер — запас жидкого хладагента, компенсирует переменную заправку контура.',
+ VN1:'Запорный клапан отсекает жидкостную линию на обслуживании.',
+ F1:'Фильтр-осушитель ловит влагу и механические частицы перед ТРВ.',
+ SI1:'Смотровое стекло — видно заправку и цвет индикатора влажности.',
+ UA1:'Соленоид на жидкости: перекрывает линию при остановке (откачка контура).',
+ TRV1:'ТРВ дозирует жидкость в испаритель по перегреву на всасывании.',
+ I1:'Пластинчатый испаритель: хладагент кипит, вода отдаёт тепло и уходит к потребителю.',
+ OZH1:'Отделитель жидкости защищает компрессор от влажного хода и гидроудара.',
+ UA2:'Соленоид байпаса — горячий газ на малой нагрузке, чтобы компрессор не тактовал.',
+ KO2:'Держит направление в байпасной линии — обратно поток не пойдёт.',
+ RD1:'Реле низкого давления останавливает машину при падении давления всасывания.',
+ MN1:'Манометр низкого давления — контроль всасывания.',
+ RD2:'Реле высокого давления: аварийный останов по давлению нагнетания.',
+ MN2:'Манометр высокого давления — контроль нагнетания.',
+ N1:'Насос гоняет воду через испаритель к потребителю.',
+ RP1:'Реле потока не даёт запустить холод без протока воды через испаритель.',
+};
 const SCH_LINES=[
  {c:'sl',p:[[68,176],[76,176],[76,40],[104,40]]},          // нагнетание
  {c:'sl',p:[[136,40],[186,40],[186,74]]},                  // конденсатор → КР1 → ресивер
@@ -1576,12 +1642,95 @@ function renderSchema(){
   svg.innerHTML=h;
   svg.querySelectorAll('g.sn').forEach(g=>g.onclick=()=>openAssign(g.dataset.k));
 }
+/* ═══ описание позиции базы (v2.45.997) ═══
+   У каждой позиции в базе есть заводское наименование, характеристики и
+   разбор геометрии, но в компоновке ничего этого видно не было: в списке
+   стоял голый артикул. Теперь строка открывается с описанием, а по «ⓘ»
+   разворачивается вся карточка — с посадкой и ссылкой на файл завода. */
+function tagLine(d){return (d.tags||[]).slice(0,4).join(' · ');}
+/* поиск по базе: в позиции слова «компрессор» нет — оно в названии раздела,
+   поэтому раздел и подраздел кладём в ту же строку (v2.45.997) */
+let SECNAME={};
+function secNames(){
+  SECNAME={};
+  (SECTIONS||[]).forEach(s=>{SECNAME[s[0]]=s[1];(s[2]||[]).forEach(b=>SECNAME[s[0]+'/'+b[0]]=b[1]);});
+}
+function hay(d){
+  return (d.brand+' '+d.name+' '+(d.kind||'')+' '+(d.tags||[]).join(' ')+' '+
+    (SECNAME[d.section]||'')+' '+(SECNAME[d.section+'/'+d.sub]||'')).toLowerCase();
+}
+function descHtml(d,thumb){
+  const g=d.geom||{},rows=t=>t.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('');
+  // ссылку на файл завода в примечании делаем кликабельной, остальное — текст
+  const lnk=t=>esc(t).replace(/https?:\/\/[^\s<]+/g,u=>'<a href="'+u+'" target="_blank" rel="noopener">файл завода</a>');
+  let h='<div class="mdz-top">'+
+    (thumb?'<img loading="lazy" data-th="'+esc(thumb)+'">':'')+
+    '<div><div class="mdz-k">'+esc(d.kind||d.name)+'</div>'+
+    ((d.tags||[]).length?'<div class="mdz-tags">'+d.tags.map(t=>'<i>'+esc(t)+'</i>').join('')+'</div>':'')+
+    '</div></div>';
+  // «Наименование завода» уже стоит описанием в шапке — второй раз не повторяем
+  const sp=(d.specs||[]).filter(r=>r[0]!=='Наименование завода');
+  const has=k=>sp.some(r=>r[0]===k);
+  if(sp.length)h+='<div class="mdz-h">Характеристики</div><table class="mdz-t">'+rows(sp)+'</table>';
+  const mnt=[];
+  if(g.conn&&g.conn!==d.kind&&!has('Присоединения'))mnt.push(['Присоединения',g.conn]);
+  if((g.ports||[]).length)mnt.push(['Патрубки',g.ports.join(', ')]);
+  if(g.bolt&&(g.bolt[0]||g.bolt[1])&&!(g.rows||[]).some(r=>/^Пятно/.test(r[0])))
+    mnt.push(['Пятно крепления',g.bolt[0]+' × '+g.bolt[1]+' мм']);
+  const gr=(g.rows||[]).concat(mnt);
+  if(gr.length)h+='<div class="mdz-h">Модель и посадка</div><table class="mdz-t">'+rows(gr)+'</table>';
+  if(g.lod)h+='<div class="mdz-note">'+lnk(g.lod)+'</div>';
+  if(d.dl)h+='<div class="mdz-note"><a href="'+esc(d.dl)+'" target="_blank" rel="noopener">Страница позиции у завода</a></div>';
+  return h;
+}
+function openDesc(d,acts){
+  if(!d)return;
+  $('#mdzT').innerHTML=esc((d.brand?d.brand+' ':'')+d.name)+' <span class="x" id="mdzX">✕</span>';
+  $('#mdzT').querySelector('#mdzX').onclick=closeDesc;
+  $('#mdzB').innerHTML=descHtml(d,GEOMS[d.g]&&GEOMS[d.g].f);
+  $('#mdzB').scrollTop=0;
+  const a=$('#mdzA');a.innerHTML='';
+  (acts||[]).forEach(b=>{
+    const el=document.createElement('div');
+    el.className='btn'+(b.pri?' pri':'');el.textContent=b.t;
+    el.onclick=()=>{closeDesc();b.go();};
+    a.appendChild(el);
+  });
+  const cl=document.createElement('div');
+  cl.className='btn ghost';cl.textContent='Закрыть';cl.onclick=closeDesc;a.appendChild(cl);
+  $('#mdz').classList.add('on');
+  fillThumbsIn('#mdzB');
+}
+function closeDesc(){$('#mdz').classList.remove('on');}
+$('#mdz').onclick=e=>{if(e.target.id==='mdz')closeDesc();};
+$('#bInfo').onclick=()=>sel&&openDesc(sel.d);
+/* строка списка базы: артикул, бренд, заводское описание и характеристики */
+function catRow(d,add){
+  return '<div class="ci" data-id="'+esc(d.id)+'">'+
+    '<img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">'+
+    '<div class="t"><b>'+esc(d.name)+'</b>'+
+    '<span>'+esc(d.brand)+(d.lod?' · LOD '+d.lod:'')+'</span>'+
+    (d.kind?'<span class="k">'+esc(d.kind)+'</span>':'')+
+    (tagLine(d)?'<span class="k tg">'+esc(tagLine(d))+'</span>':'')+
+    '</div>'+
+    '<span class="info" title="Описание позиции">ⓘ</span>'+
+    '<span class="add">'+add+'</span></div>';
+}
+function bindInfo(box,acts){
+  document.querySelectorAll(box+' .ci .info').forEach(el=>el.onclick=e=>{
+    e.stopPropagation();
+    const d=DATA.find(x=>x.id===el.parentNode.dataset.id);
+    if(d)openDesc(d,acts(d));
+  });
+}
+
 let asgKey=null;
 function openAssign(key){
   asgKey=key;
   const nd=SCH_NODES.find(n=>n.k===key);
   $('#asgTitle').innerHTML=esc(nd.t+' · '+nd.n)+' <span class="x" id="asgX">✕</span>';
   $('#asgTitle').querySelector('#asgX').onclick=()=>$('#asg').classList.remove('on');
+  $('#asgSub').textContent=SCH_DESC[key]||'';
   $('#asgQ').value=nd.hint||'';
   $('#asgUnset').style.display=schemaData[key]?'block':'none';
   $('#asgUnset').onclick=()=>{pushHist('снятие назначения на схеме');delete schemaData[key];$('#asg').classList.remove('on');renderSchema();save();};
@@ -1589,25 +1738,24 @@ function openAssign(key){
   $('#asg').classList.add('on');
   setTimeout(()=>$('#asgQ').focus(),50);
 }
+function assignTo(d){
+  pushHist('назначение модели на схеме');
+  schemaData[asgKey]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
+  $('#asg').classList.remove('on');
+  renderSchema();save();
+  toast('Назначено: '+d.name+' → '+SCH_NODES.find(n=>n.k===asgKey).t);
+}
 function drawAsgList(){
   const q=($('#asgQ').value||'').trim().toLowerCase();
-  const list=DATA.filter(d=>d.ready)
-    .filter(d=>!q||(d.brand+' '+d.name+' '+(d.kind||'')).toLowerCase().includes(q))
-    .slice(0,40);
-  $('#asgList').innerHTML=list.map(d=>
-    '<div class="ci" data-id="'+d.id+'">'+
-    '<img loading="lazy" data-th="'+GEOMS[d.g].f+'">'+
-    '<div class="t"><b>'+esc(d.name)+'</b><span>'+esc(d.brand)+'</span></div>'+
-    '<span class="add">→</span></div>').join('')||
-    '<div class="pov-empty">Ничего не нашлось — измени запрос.</div>';
+  const list=DATA.filter(d=>d.ready).filter(d=>!q||hay(d).includes(q)).slice(0,40);
+  $('#asgList').innerHTML=list.map(d=>catRow(d,'→')).join('')||
+    '<div class="pov-empty">По этому запросу в базе ничего нет.<br>'+
+    'Очисти поиск — покажу всю базу, или добавь позицию в базу 3D.</div>';
   $('#asgList').querySelectorAll('.ci').forEach(el=>el.onclick=()=>{
     const d=DATA.find(x=>x.id===el.dataset.id);
-    pushHist('назначение модели на схеме');
-    schemaData[asgKey]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
-    $('#asg').classList.remove('on');
-    renderSchema();save();
-    toast('Назначено: '+d.name+' → '+SCH_NODES.find(n=>n.k===asgKey).t);
+    if(d)assignTo(d);
   });
+  bindInfo('#asgList',d=>[{t:'✓ Назначить сюда',pri:true,go:()=>assignTo(d)}]);
   fillThumbsIn('#asgList');
 }
 $('#asgQ')&&$('#asgQ').addEventListener('input',drawAsgList);
@@ -1627,18 +1775,15 @@ let fSec=null,fQ='';
 function drawCat(){
   const list=DATA.filter(d=>d.ready)
     .filter(d=>!fSec||d.section===fSec)
-    .filter(d=>!fQ||(d.brand+' '+d.name+' '+(d.kind||'')).toLowerCase().includes(fQ));
+    .filter(d=>!fQ||hay(d).includes(fQ));
   $('#catCnt').textContent=list.length;
-  $('#cat').innerHTML=list.slice(0,80).map(d=>
-    `<div class="ci" data-id="${d.id}">`+
-    `<img loading="lazy" data-th="${GEOMS[d.g].f}">`+
-    `<div class="t"><b>${d.name}</b><span>${d.brand}${d.kind?' · '+d.kind:''}</span></div>`+
-    `<span class="add">+</span></div>`).join('')+
+  $('#cat').innerHTML=list.slice(0,80).map(d=>catRow(d,'+')).join('')+
     (list.length>80?`<div style="font-size:11px;color:var(--faint);text-align:center;padding:6px">…и ещё ${list.length-80} — уточни поиск</div>`:'');
   $('#cat').querySelectorAll('.ci').forEach(el=>el.onclick=()=>{
     const d=DATA.find(x=>x.id===el.dataset.id);
     if(d)addItem(d);
   });
+  bindInfo('#cat',d=>[{t:'+ Добавить в сцену',pri:true,go:()=>addItem(d)}]);
   fillThumbs();
 }
 const THUMBS=new Map();
@@ -2096,7 +2241,7 @@ function chGrow(el){
     $('#cat').innerHTML='<div style="padding:14px 6px;font-size:12px;color:var(--bad)">База не отдалась ('+e.message+').<br>Открой прототип из CRM (Производство → Атом Чиллер), чтобы был токен.</div>';
     return;
   }
-  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;
+  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();
   VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
   $('#secs').innerHTML='<div class="chip on" data-s="">Все</div>'+
     SECTIONS.map(s=>`<div class="chip" data-s="${s[0]}">${s[1]}</div>`).join('');
