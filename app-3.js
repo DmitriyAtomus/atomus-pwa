@@ -5600,6 +5600,13 @@ function showSupplierModal(s) {
         // если синк ЛК не прислал адрес конкретного заказа
         '<div class="form-group"><label>Адрес самовывоза <span style="text-transform:none;font-weight:400;color:var(--text-light);">— где забирать заказы (виден в Логистике)</span></label>' +
           '<input type="text" id="sm-address" value="' + escapeHtml(isEdit ? (s.address || '') : '') + '" placeholder="напр. ул. Богдана Хмельницкого, д. 4Б, ТЦ «Домострой»" ' + (canManage ? '' : 'disabled') + '></div>' +
+        // v2.45.987: «забираем сами» — оплаченный счёт такого поставщика сам
+        // встаёт в Логистику отдельной карточкой «Забрать по нашему счёту»
+        '<div class="form-group"><label style="display:flex;align-items:center;gap:9px;text-transform:none;font-weight:600;cursor:pointer;">' +
+          '<input type="checkbox" id="sm-selfpickup" style="width:18px;height:18px;margin:0;" ' +
+            ((isEdit && s.self_pickup) ? 'checked ' : '') + (canManage ? '' : 'disabled') + '>' +
+          '<span>Забираем сами со склада <span style="font-weight:400;color:var(--text-light);">— оплаченный счёт сам появится в «Логистике → Забрать»</span></span>' +
+        '</label></div>' +
         '<div class="form-group"><label>Комментарий</label><textarea id="sm-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? s.comment : '') + '</textarea></div>' +
         // v2.45.239: прайс поставщика — его номенклатура для сопоставления в заявках
         (isEdit && canManage ?
@@ -6334,6 +6341,7 @@ async function saveSupplier(supplierId) {
     email:          document.getElementById('sm-email').value.trim(),
     address:        (document.getElementById('sm-address') || { value: '' }).value.trim(),
     comment:        document.getElementById('sm-comment').value.trim(),
+    self_pickup:    !!(document.getElementById('sm-selfpickup') || {}).checked,
   };
   if (!payload.name) { showToast('Укажите название', 'error'); return; }
   try {
@@ -8229,6 +8237,10 @@ async function loadLogisticsPickups() {
       apiGet('/api/logistics/utm').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
+    // v2.45.987: «забираем сами» — оплаченные счета поставщиков с этим флагом
+    const sp = (d && d.self_pickup) || {};
+    const spReady = sp.ready || [], spDone = sp.done || [];
+    const spGroups = _selfPickupGroups(spReady);
     const ozList = (oz && oz.shipments) || [];
     const ozActive = ozList.filter(sh => !_ozonIsCompleted(sh));
     const ozDone = ozList.filter(_ozonIsCompleted);
@@ -8257,6 +8269,18 @@ async function loadLogisticsPickups() {
         '<div class="t">Ozon: заказ ' + escapeHtml(sh.order_number || '') + ' ждёт в пункте выдачи — срок истёк' +
         '<small>ещё день-два — и отправят обратно. Кто едет мимо — пусть заберёт.</small></div>' +
         '<button class="lg-fire-btn" onclick="ozonMarkDone(' + Number(sh.id) + ')">✓ Забрали</button></div>');
+    });
+    let fireSp = 0;
+    spReady.forEach(it => {
+      const days = _spDaysSince(it.paid_at);
+      if (days === null || days < 3 || days > 30) return;
+      fireSp++;
+      fire.push('<div class="lg-fire-i"><span class="ic">🔥</span>' +
+        '<div class="t">Забрать у ' + escapeHtml(it.supplier_name || 'поставщика') +
+        ' — счёт оплачен ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней') + ' назад' +
+        '<small>№ ' + escapeHtml(String(it.invoice_number || it.order_label || it.order_id)) +
+        ' · товар ждёт на складе, выдают по нашему счёту</small></div>' +
+        '<button class="lg-fire-btn" onclick="logiPickupDone(' + it.order_id + ')">✓ Забрал</button></div>');
     });
     ready.forEach(it => {
       const days = _logiDaysFromToday(it.reserve);
@@ -8423,8 +8447,40 @@ async function loadLogisticsPickups() {
         (pkDoneN ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + pkDoneN + ' →</span>' : ''),
       !ready.length && !transit.length);
 
+    // ---- карточки «забираем сами» — по одной на поставщика (ТД Электрика и т.п.)
+    const spCards = spGroups.map(g => {
+      const n = g.items.length;
+      const lateN = g.fresh.filter(x => { const dd = _spDaysSince(x.paid_at); return dd !== null && dd >= 3; }).length;
+      const sum = g.fresh.reduce((a, x) => a + (Number(x.invoice_total) || 0), 0);
+      return {
+        hot: lateN ? 1 : 0, act: g.fresh.length ? 1 : 0,
+        html: _lgCardHtml('lgc-sp', 'ti-receipt', escapeHtml(g.name),
+          g.fresh.length ? g.fresh.length + ' ' + _logiPlural(g.fresh.length, 'счёт', 'счёта', 'счетов')
+            : (g.stale.length ? 'только старые' : 'пусто'),
+          '',
+          n ? (
+              (g.fresh.length
+                ? '<div class="lgc-sub g"><i class="ti ti-package-import"></i> Забрать по нашему счёту <span>' + g.fresh.length + '</span></div>' +
+                  g.fresh.map(_selfPickupCard).join('')
+                : '') +
+              // v2.45.987: счета старше месяца почти наверняка уже забрали, просто
+              // не отметили — не пугаем ими, но и не прячем совсем
+              (g.stale.length
+                ? '<details class="sp-stale"><summary><i class="ti ti-clock-question"></i> Оплачены давно — похоже, уже забрали <span>' + g.stale.length + '</span></summary>' +
+                  '<div>' + g.stale.map(_selfPickupCard).join('') + '</div></details>'
+                : '')
+            )
+            : '<div class="lgc-empty"><i class="ti ti-circle-check" style="color:var(--success);"></i>Всё забрали.<br>Счёт появится здесь, как только его оплатят.</div>',
+          '<span>забрать <b>' + g.fresh.length + '</b></span>' +
+            (sum > 0 ? '<span>на сумму <b>' + _logiSum(sum) + '</b></span>' : '') +
+            (spDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + spDone.length + ' →</span>' : ''),
+          !g.fresh.length),
+      };
+    });
+
     // ---- порядок карточек: сначала «горящие», потом с активными, пустые в конце
     const cards = [];
+    spCards.forEach(c => cards.push(c));
     if (oz) cards.push({ hot: fireOz ? 1 : 0, act: ozActive.length ? 1 : 0, html: ozCard });
     if (lu) cards.push({ hot: 0, act: luActive.length ? 1 : 0, html: luCard });
     if (ea) cards.push({ hot: 0, act: eaActive.length ? 1 : 0, html: eaCard });
@@ -8435,8 +8491,8 @@ async function loadLogisticsPickups() {
     cards.sort((a, b) => (b.hot - a.hot) || (b.act - a.act));
 
     // ---- сводка и завершённые
-    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length + eaActive.length + umActive.length;
-    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length + eaDone.length + umDone.length;
+    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length + eaActive.length + umActive.length + spGroups.reduce((a, g) => a + g.fresh.length, 0);
+    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length + eaDone.length + umDone.length + spDone.length;
     let html = _logiTabsHtml('pickups') + '<div class="lg-sum">' +
       (fire.length ? '<span class="hot">горит <b>' + fire.length + '</b></span>' : '') +
       '<span>активных <b>' + activeTotal + '</b></span>' +
@@ -8445,7 +8501,7 @@ async function loadLogisticsPickups() {
     if (fire.length) html += '<div class="lg-fire">' + fire.join('') + '</div>';
     html += '<div class="lg-grid">' + cards.map(c => c.html).join('') + '</div>';
 
-    if (done.length || ozDone.length || luDone.length || dlDone.length || eaDone.length || umDone.length) {
+    if (done.length || ozDone.length || luDone.length || dlDone.length || eaDone.length || umDone.length || spDone.length) {
       html += '<div class="lg-done-wrap" id="lg-done">' +
         '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Завершённые <span class="logi-cnt">' + doneTotal + '</span></div>' +
         done.map(_logiDoneRow).join('') +
@@ -8464,6 +8520,10 @@ async function loadLogisticsPickups() {
         (umDone.length
           ? '<details class="ozon-archive"><summary><i class="ti ti-building-factory-2"></i> УТМ — забранные <span>' + umDone.length + '</span></summary>' +
             '<div>' + umDone.map(_utmCardHtml).join('') + '</div></details>'
+          : '') +
+        (spDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-receipt"></i> Забрали сами — по счетам <span>' + spDone.length + '</span></summary>' +
+            '<div>' + spDone.map(_logiDoneRow).join('') + '</div></details>'
           : '') +
         (dlDone.length
           ? '<details class="dl-archive"><summary><i class="ti ti-truck-delivery"></i> Деловые линии — завершённые <span>' + dlDone.length + '</span></summary>' +
@@ -9511,6 +9571,70 @@ function _logiDoneRow(it) {
     '</div>' +
   '</div>';
 }
+// ============ v2.45.987: «Забираем сами» — оплаченные счета поставщиков ============
+// У таких поставщиков (ТД Электрика и т.п.) статусов из личного кабинета нет:
+// товар выдают со склада по номеру НАШЕГО счёта, а сигнал «пора ехать» — оплата.
+function _selfPickupGroups(list) {
+  const map = new Map();
+  (list || []).forEach(it => {
+    const key = it.supplier_id || it.supplier_name || 0;
+    if (!map.has(key)) map.set(key, { name: it.supplier_name || 'Поставщик', items: [], fresh: [], stale: [] });
+    const g = map.get(key);
+    g.items.push(it);
+    const days = _spDaysSince(it.paid_at);
+    (days !== null && days > 30 ? g.stale : g.fresh).push(it);
+  });
+  return Array.from(map.values());
+}
+// Сколько дней прошло с оплаты (null — даты нет)
+function _spDaysSince(ts) {
+  const m = String(ts || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(m[1] + '-' + m[2] + '-' + m[3] + 'T00:00:00+05:00');
+  if (isNaN(d.getTime())) return null;
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days < 0 ? 0 : days;
+}
+function _spPaidTxt(it) {
+  const days = _spDaysSince(it.paid_at);
+  if (days === null) return 'оплачен';
+  if (days === 0) return 'оплачен сегодня';
+  if (days === 1) return 'оплачен вчера';
+  return 'оплачен ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней') + ' назад';
+}
+function _selfPickupCard(it) {
+  const num = String(it.invoice_number || it.order_label || ('#' + it.order_id));
+  const days = _spDaysSince(it.paid_at);
+  const late = days !== null && days >= 3;
+  const sum = _logiSum(it.invoice_total);
+  const phone = String(it.supplier_phone || '').replace(/[^0-9+]/g, '');
+  return '<div class="logi-card ready sp-card' + (late ? ' late' : '') + '">' +
+    '<div class="logi-head">' +
+      '<div class="logi-ava sp-ava"><i class="ti ti-receipt"></i></div>' +
+      '<div class="logi-t">' +
+        '<div class="logi-sup">Счёт № ' + escapeHtml(num) + '</div>' +
+        '<div class="logi-num">' + escapeHtml(_spPaidTxt(it)) +
+          (it.status === 'partial' ? ' · забрали не всё' : '') +
+          ' · ' + escapeHtml(it.order_label || ('ORD-' + it.order_id)) + '</div>' +
+      '</div>' +
+      (sum ? '<div class="logi-sum"><div class="rub">' + sum + '</div></div>' : '') +
+    '</div>' +
+    '<div class="logi-body">' +
+      '<div class="sp-hint"><i class="ti ti-info-circle"></i>На складе называем <b>наш счёт № ' + escapeHtml(num) + '</b>' +
+        (it.supplier_contact ? ' · ' + escapeHtml(it.supplier_contact) : '') + '</div>' +
+      (it.pickup_place
+        ? '<div class="logi-place"><i class="ti ti-map-pin"></i><span>' + escapeHtml(it.pickup_place) + '</span></div>'
+        : '<div class="logi-place sp-noaddr"><i class="ti ti-map-pin"></i><span>Адрес склада не заполнен — впишите его в карточке поставщика, тогда точка встанет и в «Рейсы»</span></div>') +
+      _logiItemsBlock(it, 'Что забирать') +
+    '</div>' +
+    '<div class="logi-foot">' +
+      '<button type="button" class="logi-take" onclick="logiPickupDone(' + it.order_id + ')"><i class="ti ti-check"></i> Забрал</button>' +
+      '<button type="button" class="logi-open" onclick="openSupplyOrder(' + it.order_id + ')"><i class="ti ti-file-invoice"></i> Счёт</button>' +
+      (phone ? '<a class="logi-call" href="tel:' + escapeHtml(phone) + '"><i class="ti ti-phone"></i> ' + escapeHtml(it.supplier_phone) + '</a>' : '') +
+    '</div>' +
+  '</div>';
+}
+
 async function logiPickupDone(orderId, fromDone) {
   const msg = fromDone
     ? 'Скрыть этот заказ из логистики? Он уже выдан/завершён.'
