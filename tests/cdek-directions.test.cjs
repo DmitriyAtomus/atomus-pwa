@@ -44,6 +44,7 @@ test('СДЭК разделён на входящие и исходящие от
         direction: 'incoming',
         sender_name: 'ООО Поставщик',
         recipient_name: 'ООО Атомус',
+        sync_error: 'Entity is forbidden abc-123',
       },
       {
         id: 2,
@@ -61,6 +62,9 @@ test('СДЭК разделён на входящие и исходящие от
   assert.match(html, /cdek-card outgoing/);
   assert.match(html, /ООО Поставщик/);
   assert.match(html, /ООО Клиент/);
+  assert.match(html, /tracking\?trackingNumber=11111111111/);
+  assert.match(html, /Накладная поставщика/);
+  assert.doesNotMatch(html, /Entity is forbidden/);
 });
 
 test('ручное добавление передаёт выбранное направление', () => {

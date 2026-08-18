@@ -8759,6 +8759,16 @@ function _cdekStatusChip(sh) {
   if (code === 'NOT_DELIVERED') return '<span class="cdek-st bad">⚠ Не вручён</span>';
   return '<span class="cdek-st run">' + escapeHtml(sh.status_name || code) + '</span>';
 }
+function _cdekFriendlyError(value) {
+  const text = String(value || '');
+  if (/entity is forbidden|forbidden/i.test(text)) {
+    return 'Накладная поставщика — подробности доступны по кнопке «Отследить»';
+  }
+  return text;
+}
+function _cdekTrackingUrl(sh) {
+  return 'https://ff.cdek.ru/tracking?trackingNumber=' + encodeURIComponent(sh.cdek_number || '');
+}
 function _cdekDirection(sh) {
   return ['incoming', 'outgoing'].includes(sh.direction) ? sh.direction : 'unknown';
 }
@@ -8794,10 +8804,11 @@ function _cdekCardHtml(sh) {
         (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
         (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
         (proj ? ' · ' + escapeHtml(proj) : '') +
-        (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+        (sh.sync_error ? ' · <span style="color:var(--text-light);">' + escapeHtml(_cdekFriendlyError(sh.sync_error)) + '</span>' : '') +
       '</div>' +
     '</div>' +
     (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+    '<a class="cdek-track" href="' + _cdekTrackingUrl(sh) + '" target="_blank" rel="noopener" title="Открыть официальное отслеживание СДЭК"><i class="ti ti-map-pin-search"></i> Отследить</a>' +
     '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
   '</div>';
 }

@@ -662,7 +662,7 @@ function toNDC(e){const r=$('#cv').getBoundingClientRect();
 function pickItem(e){
   toNDC(e);ray.setFromCamera(ndc,camera);
   const hits=ray.intersectObjects(placed.map(p=>p.obj));
-  /* v2.45.1001: погашённая деталь узла курсор не ловит — её и гасят затем,
+  /* v2.45.1002: погашённая деталь узла курсор не ловит — её и гасят затем,
      чтобы дотянуться до того, что за ней (луч сквозь невидимую панель) */
   const h=hits.find(x=>{
     const ms=Array.isArray(x.object.material)?x.object.material:[x.object.material];
