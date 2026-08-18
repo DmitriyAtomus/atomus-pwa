@@ -23523,7 +23523,7 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   background: rgba(255,255,255,.22); color: #fff;
 }
 .dchat-chip::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.dchat-chip.is-running::before { animation: dchatPulse 1.2s ease-in-out infinite; }
+.dchat-chip.is-running::before, .dchat-chip.is-talking::before { animation: dchatPulse 1.2s ease-in-out infinite; }
 .dchat-chip.is-error { background: rgba(255,255,255,.92); color: var(--danger); }
 
 /* Скрыт, пока пуст: картинку тянет фоном _devChatLoadImage (вложение под
