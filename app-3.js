@@ -26298,7 +26298,8 @@ async function logiTripCreate() {
     if (r && r.ok) {
       const mm = document.getElementById('lt-new-modal');
       if (mm) mm.remove();
-      showToast('Рейс ' + (j.doc_number || '') + ' собран', 'success');
+      showToast('Рейс ' + (j.doc_number || '') + ' собран' +
+        (j.task_id ? ' · задача в «Заданиях»' : ''), 'success');
       state._logiView = 'trips';
       loadLogisticsPickups();
       logiTripOpen(j.id);
@@ -26380,6 +26381,15 @@ function _ltTripRender(trip) {
     '</div>';
   }).join('') + '</div>';
   if (!pts.length) html += '<div class="lgc-empty" style="padding:14px;">Точек нет.</div>';
+  // v2.45.992: рейс держит задачу в «Заданиях» — видно, что она висит, и можно открыть
+  if (trip.task_id) {
+    html += '<div class="lt-task"><i class="ti ti-clipboard-check"></i>' +
+      '<span>Задача в «Заданиях»' +
+        (activeSt ? ' — висит на исполнителе, закроется сама, когда заберут всё'
+                  : ' — закрыта вместе с рейсом') + '</span>' +
+      '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'lt-trip-modal\').remove();openTaskDetail(' +
+        trip.task_id + ')">Открыть</button></div>';
+  }
   if (activeSt) {
     html += '<div class="lt-trip-btns">' +
       '<button class="btn btn-primary" onclick="ltTripSend()"><i class="ti ti-send"></i> ' +
