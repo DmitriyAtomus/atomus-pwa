@@ -137,6 +137,152 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 .asg-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:6px}
 .asg-unset{margin:0 8px 10px;padding:9px;border:1px solid #6b3a34;color:#f0a9a0;border-radius:8px;
   text-align:center;cursor:pointer;font-size:12.5px}
+
+/* ═══ панель деталей: гасим стойки и панели, как в базе 3D (v2.45.993) ═══ */
+#partsBox{position:absolute;left:10px;top:44px;width:296px;max-height:calc(100% - 130px);z-index:5;
+  display:none;flex-direction:column;background:rgba(8,20,36,.94);border:1px solid var(--line2);
+  border-radius:11px;box-shadow:0 14px 34px rgba(0,0,0,.5);backdrop-filter:blur(7px)}
+#partsBox.on{display:flex}
+#partsBox .ph2{display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;padding:8px 10px;
+  border-bottom:1px solid var(--line)}
+#partsBox .ph2 b{font-size:12px;color:#fff;font-weight:600;max-width:150px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#partsBox .ph2 span{font-size:10.5px;color:var(--faint)}
+#partsBox .ph2 button{margin-left:auto;font-size:10.5px;padding:3px 8px;border-radius:6px;
+  background:var(--panel2);border:1px solid var(--line2);color:var(--dim);cursor:pointer}
+#partsBox .list{overflow-y:auto;padding:4px 0}
+.prow{display:flex;align-items:center;gap:7px;padding:5px 10px;font-size:11.5px}
+.prow:hover{background:var(--panel2)}
+.prow .d{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:none}
+.prow .n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .q{font-size:10px;color:var(--faint);flex:none}
+.prow .b{flex:none;font-size:10px;padding:2px 7px;border-radius:6px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line2);color:var(--dim)}
+.prow.off{opacity:.45}
+.prow.off .b{color:var(--ice);border-color:var(--ice2)}
+/* ═══ меню крепления: чем узел держится за корпус ═══ */
+#mnt{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:6;display:none;
+  flex-direction:column;gap:4px;background:rgba(8,20,36,.96);border:1px solid var(--line2);
+  border-radius:10px;padding:7px;min-width:250px;box-shadow:0 14px 34px rgba(0,0,0,.5)}
+#mnt.on{display:flex}
+#mnt .t{font-size:10.5px;color:var(--faint);padding:1px 4px 3px}
+#mnt .o{font-size:12px;padding:6px 9px;border-radius:7px;cursor:pointer;color:var(--ink)}
+#mnt .o:hover{background:var(--panel2);color:var(--ice)}
+#mnt .o small{color:var(--faint);font-size:10.5px}
+#selbar button.on{color:var(--warn);border-color:#6b5a1a}
+
+/* ═══ чат по чиллерам прямо в компоновке (v2.45.993) ═══
+   Лента рядом со сценой: поставил узел — тут же пишешь замечание, и Клод
+   видит, что стоит в проекте. Шторка не модальная, разворачивается на весь
+   экран кнопкой ⤢ — с телефона узкой полосой не почитать. */
+#chatFab{position:fixed;right:16px;bottom:16px;z-index:44;width:46px;height:46px;padding:0;
+  border-radius:50%;font-size:18px;line-height:1;display:none;cursor:pointer;color:var(--ink);
+  background:rgba(8,20,36,.92);border:1px solid var(--line2);backdrop-filter:blur(8px);
+  box-shadow:0 8px 22px rgba(0,0,0,.5)}
+#chatFab.on{display:block}
+#chatFab.open{right:412px;font-size:23px;color:#fff;border-color:var(--ice2)}
+#chatFab.work{border-color:var(--warn);color:#fff;animation:chpulse 1.6s ease-in-out infinite}
+@keyframes chpulse{
+  0%,100%{box-shadow:0 8px 22px rgba(0,0,0,.5),0 0 0 0 rgba(201,162,39,.42)}
+  50%    {box-shadow:0 8px 22px rgba(0,0,0,.5),0 0 0 7px rgba(201,162,39,0)}}
+#chatFab .n{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;
+  border-radius:10px;background:var(--ice2);color:#04121F;font-size:10.5px;font-weight:700;
+  line-height:19px;display:none}
+#chatFab.unread .n{display:block}
+#chatBtn.work{border-color:var(--warn);color:#fff}
+#chatBtn.on{color:var(--ice);border-color:var(--ice2)}
+#chat{position:fixed;top:0;right:0;bottom:0;width:396px;max-width:100vw;z-index:60;display:none;
+  flex-direction:column;background:#08182D;border-left:1px solid var(--line2);
+  box-shadow:-20px 0 52px rgba(0,0,0,.55)}
+#chat.open{display:flex}
+/* во весь экран: лента шире, переписка читается как на большом экране */
+#chat.full{width:100vw;border-left:none}
+#chat.full .ch-b{max-width:min(760px,92%)}
+#chat.full .ch-feed{padding:16px max(13px,calc(50vw - 420px)) 8px}
+.ch-hd{display:flex;align-items:center;gap:9px;padding:11px 13px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0B2142,#081A32)}
+.ch-hd b{font-size:13px;color:#fff;font-weight:600}
+.ch-hd .st{margin-left:auto;font-size:11px;color:var(--dim);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.ch-hd .st.work{color:var(--warn)}
+.ch-hd button{width:29px;height:29px;padding:0;font-size:15px;line-height:1;flex:none;cursor:pointer;
+  border-radius:8px;background:var(--panel2);border:1px solid var(--line2);color:var(--ink)}
+.ch-hd button:hover{border-color:var(--ice2);color:var(--ice)}
+.ch-feed{flex:1;overflow-y:auto;padding:12px 13px 6px;display:flex;flex-direction:column;gap:9px}
+.ch-empty{color:var(--dim);font-size:12px;line-height:1.6;text-align:center;padding:26px 12px}
+.ch-b{max-width:88%;align-self:flex-start;background:#102A4A;border:1px solid var(--line);
+  border-radius:11px 11px 11px 4px;padding:8px 11px;font-size:12.5px;line-height:1.5;
+  color:#DCE6F2;white-space:pre-wrap;word-break:break-word}
+.ch-b.me{align-self:flex-end;background:rgba(27,159,216,.16);border-color:rgba(27,159,216,.4);
+  border-radius:11px 11px 4px 11px}
+.ch-b code{background:rgba(255,255,255,.08);border-radius:4px;padding:0 4px;font-size:11.5px}
+.ch-b .mt{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:10.5px;color:var(--dim)}
+.ch-b .chip2{border-radius:4px;padding:1px 6px;background:rgba(255,255,255,.07)}
+.ch-b .chip2.is-running,.ch-b .chip2.is-stopping{background:rgba(201,162,39,.18);color:var(--warn)}
+.ch-b .chip2.is-done{background:rgba(27,159,216,.18);color:#8FD3F4}
+.ch-b .chip2.is-error{background:rgba(220,80,80,.18);color:#F1A0A0}
+.ch-b img{display:block;max-width:100%;border-radius:8px;margin-top:7px;cursor:pointer}
+.ch-b .art{display:flex;align-items:center;gap:7px;margin-top:7px;padding:7px 9px;
+  border:1px solid rgba(27,159,216,.4);background:rgba(27,159,216,.10);border-radius:8px;
+  font-size:11.5px;color:#BFE4F8;cursor:pointer}
+.ch-b .fl{margin-top:6px;font-size:11px;color:var(--dim)}
+.ch-work{margin:0 13px 9px;padding:9px 11px;border:1px solid rgba(201,162,39,.3);
+  background:rgba(201,162,39,.07);border-radius:9px;display:none}
+.ch-work.on{display:block}
+.ch-work .wh{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--warn)}
+.ch-work .wh b{font-weight:600}
+.ch-work .wh .tm{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--dim)}
+.ch-work .wh button{padding:3px 8px;font-size:10.5px;border-radius:6px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line2);color:var(--ink)}
+.ch-work .wn{margin-top:5px;font-size:11px;color:var(--dim);line-height:1.45;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-work .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none;
+  animation:chblink 1.1s ease-in-out infinite}
+@keyframes chblink{0%,100%{opacity:1}50%{opacity:.25}}
+.ch-cmp{display:flex;gap:8px;align-items:flex-end;padding:10px 13px 12px;
+  border-top:1px solid var(--line);background:#0A1C33}
+.ch-cmp textarea{flex:1;resize:none;max-height:132px;background:rgba(255,255,255,.055);
+  border:1px solid var(--line2);border-radius:9px;padding:9px 11px;color:var(--ink);
+  font:inherit;font-size:12.5px;line-height:1.45;outline:none}
+.ch-cmp textarea:focus{border-color:var(--ice2);background:rgba(27,159,216,.07)}
+.ch-cmp button{flex:none;width:38px;height:38px;padding:0;font-size:15px;border-radius:9px;
+  background:var(--ice2);border:1px solid #4FBBEC;color:#04121F;font-weight:700;cursor:pointer}
+.ch-cmp button:hover{background:#37B0E4}
+.ch-cmp button.att{background:rgba(255,255,255,.055);border-color:var(--line2);
+  color:var(--dim);font-weight:400;font-size:16px}
+.ch-cmp button.att:hover{background:rgba(255,255,255,.1);color:#fff}
+.ch-att{display:none;flex-wrap:wrap;gap:6px;padding:0 13px 8px}
+.ch-att.on{display:flex}
+.ch-att .a{display:flex;align-items:center;gap:6px;max-width:100%;padding:4px 7px;
+  font-size:10.5px;border:1px solid var(--line2);border-radius:8px;
+  background:rgba(255,255,255,.05);color:var(--dim)}
+.ch-att .a img{width:28px;height:28px;object-fit:cover;border-radius:5px}
+.ch-att .a b{font-weight:400;color:#DCE6F2;max-width:150px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-att .a i{font-style:normal;cursor:pointer;padding:0 2px;color:var(--dim)}
+.ch-att .a i:hover{color:#F1A0A0}
+#chat.drag{outline:2px dashed var(--ice2);outline-offset:-7px}
+.ch-ctx{display:flex;align-items:center;gap:8px;padding:0 13px 8px;font-size:10.5px;color:var(--dim)}
+.ch-ctx .l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* «вид» — снимок сцены уезжает вместе с задачей: Клод видит ровно то же, что и ты */
+.ch-ctx .shot{flex:none;cursor:pointer;border:1px solid var(--line2);border-radius:12px;
+  padding:2px 8px;color:var(--faint);user-select:none}
+.ch-ctx .shot.on{color:var(--ice);border-color:var(--ice2);background:rgba(27,159,216,.10)}
+#chArt{position:fixed;inset:0;z-index:61;background:#061020;display:none;flex-direction:column}
+#chArt.open{display:flex}
+#chArt .ah{display:flex;align-items:center;gap:10px;padding:9px 13px;
+  border-bottom:1px solid var(--line);background:#0B2142}
+#chArt .ah b{font-size:12.5px;color:#fff;font-weight:600}
+#chArt .ah button{margin-left:auto;width:29px;height:29px;padding:0;font-size:15px;line-height:1;
+  border-radius:8px;background:var(--panel2);border:1px solid var(--line2);color:var(--ink);cursor:pointer}
+#chArt iframe{flex:1;width:100%;border:0;background:#fff}
+@media(max-width:900px){
+  #chat{width:100vw;border-left:none}
+  .ch-b{max-width:92%}
+  #chatFab{right:12px;bottom:12px}
+  #chatFab.open{display:none}
+  #partsBox{width:min(92vw,296px)}
+}
 </style></head><body>
 <div id="app">
   <header>
@@ -147,7 +293,10 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
     </div>
     <div class="pname" id="projName" title="Переименовать проект"><b>…</b></div>
     <div class="pname">· <b id="hCnt">0 деталей</b></div>
-    <button class="back" id="bProjects" style="margin-left:auto">⛁ Проекты</button>
+    <button class="back" id="bFS" style="margin-left:auto" title="Во весь экран (F11)">⛶ <span id="fsTxt">Во весь экран</span></button>
+    <button class="back" id="chatBtn" onclick="toggleChat()" style="display:none;margin-left:8px"
+            title="Чат по чиллерам">💬 Чат</button>
+    <button class="back" id="bProjects" style="margin-left:8px">⛁ Проекты</button>
     <a class="back" href="index.html" style="margin-left:8px">← База 3D</a>
   </header>
 
@@ -167,16 +316,32 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" data-v="iso">Изометрия</div><div class="vb" data-v="front">Спереди</div>
         <div class="vb" data-v="top">Сверху</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
+        <div class="vb" id="bParts" style="display:none">Детали</div>
       </div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать</div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать<br>P — закрепить · «Детали» — гасить стойки и панели</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <svg id="schSvg" viewBox="26 6 212 214"></svg>
         <div class="sch-note">Типовой контур Атомус (по листу АГ.ЧИЛ-104 Г3). Клик по элементу — назначить модель из базы.
           Зелёным — назначено, жёлтым «назначить» — ждёт. Назначения хранятся в проекте.</div>
       </div>
+      <div id="partsBox">
+        <div class="ph2"><b id="pTitle">Детали узла</b><span id="pCount"></span>
+          <button id="pAll">Показать все</button></div>
+        <div class="list" id="pList"></div>
+      </div>
+      <div id="mnt">
+        <div class="t">Чем держится на корпусе:</div>
+        <div class="o" data-m="bolt8">Болты М8 <small>· 4 шт, на дно корпуса</small></div>
+        <div class="o" data-m="bolt10">Болты М10 <small>· 4 шт, на дно корпуса</small></div>
+        <div class="o" data-m="weld">Сварка <small>· приварить к дну</small></div>
+        <div class="o" data-m="free">Просто поставить <small>· без крепежа</small></div>
+        <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
+      </div>
       <div id="selbar"><span class="nm" id="selNm"></span>
         <span class="z" id="selZ"></span>
+        <button id="bPin" title="Закрепить на этом месте (P)">📌 Закрепить</button>
+        <button id="bLink" title="Поставить на дно корпуса и закрепить">⛓ Соединить с корпусом</button>
         <button id="bRot" title="R">⟳ 90°</button>
         <button id="bTilt" title="Положить набок / поднять">⤡ завал 90°</button>
         <button id="bUp" title="PageUp">▲ 50</button>
@@ -208,6 +373,40 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
   </footer>
 </div>
 <div id="toast"></div>
+
+<!-- ===================== чат по чиллерам ===================== -->
+<button id="chatFab" onclick="toggleChat()" title="Чат по чиллерам"><span id="chatFabI">💬</span><span class="n" id="chatFabN"></span></button>
+
+<div id="chat">
+  <div class="ch-hd">
+    <b>Чат по чиллерам</b>
+    <span class="st" id="chSt">Готов к работе</span>
+    <button onclick="chatFull()" id="chFullB" title="Развернуть на весь экран">⤢</button>
+    <button onclick="closeChat()" title="Закрыть (Esc)">×</button>
+  </div>
+  <div class="ch-feed" id="chFeed"></div>
+  <div class="ch-work" id="chWork">
+    <div class="wh"><span class="dot"></span><b>Работаю над задачей</b>
+      <span class="tm" id="chTm"></span>
+      <button onclick="chatStop()">Стоп</button></div>
+    <div class="wn" id="chNow">принял задачу…</div>
+  </div>
+  <div class="ch-ctx"><span class="l" id="chCtx"></span>
+    <span class="shot on" id="chShot" title="Приложить снимок сцены к сообщению">📷 вид</span></div>
+  <div class="ch-att" id="chAtt"></div>
+  <div class="ch-cmp">
+    <textarea id="chIn" rows="1" placeholder="Задача по чиллерам… Enter — отправить"></textarea>
+    <button class="att" onclick="chAttPick()" title="Прикрепить файл (можно вставить снимок из буфера)">📎</button>
+    <button onclick="chatSend()" title="Отправить">↑</button>
+  </div>
+  <input type="file" id="chFile" multiple style="display:none"
+         accept="image/*,.pdf,.txt,.log,.json,.csv,.html,.step,.stp,.dxf,.zip">
+</div>
+
+<div id="chArt">
+  <div class="ah"><b id="chArtNm">Макет</b><button onclick="chatArtClose()">×</button></div>
+  <iframe id="chArtF" sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe>
+</div>
 <div id="pov"><div class="pov-card">
   <div class="pov-h">⛁ Проекты Атом Чиллер <span class="x" id="povX">✕</span></div>
   <div class="pov-list" id="povList"></div>
@@ -271,31 +470,23 @@ async function geoOf(d){
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.setIndex(new THREE.BufferAttribute(i16,1));
   geo.computeVertexNormals();geo.computeBoundingBox();
-  /* Крашеные детали (решётка вентилятора — чёрная) приходят в меше со своим
-     цветом. Материал на каждую деталь тут не нужен — гасить их в компоновке
-     нечем; сводим к списку цветов: 0 — сталь, дальше по одному на краску. */
-  const parts=MS.parts&&MS.parts.length?MS.parts:null;
-  const cols=[C_BODY];
-  if(parts){
-    let split=false;
-    parts.forEach(p=>{
-      if(!p.count)return;
-      let mi=0;
-      if(p.col){
-        const c=parseInt(String(p.col).replace('#',''),16);
-        if(!isNaN(c)){ mi=cols.indexOf(c); if(mi<0){cols.push(c);mi=cols.length-1;} }
-      }
-      if(mi)split=true;
-      geo.addGroup(p.start,p.count,mi);
-    });
-    if(!split)geo.clearGroups();     // всё сталь — незачем дробить отрисовку
-  }
-  geo.userData.cols=cols.length>1?cols:null;
+  /* v2.45.993: сборка режется на детали — по одной группе на деталь, как в
+     базе 3D. Тогда стойку или панель можно погасить прямо в компоновке, а
+     заводская краска (чёрная решётка вентилятора) остаётся своей. */
+  const parts=(MS.parts||[]).filter(p=>p.count>0);
+  if(parts.length){
+    parts.forEach((p,i)=>geo.addGroup(p.start,p.count,i));
+    geo.userData.parts=parts.map(p=>({des:p.des||'—',name:p.name||'деталь',
+      col:partCol(p)}));
+  }else geo.userData.parts=null;
   GEO_CACHE.set(key,geo);return geo;
 }
 
 /* ═══ сцена: z вверх, как в базе ═══ */
 const C_BODY=0x8d959d;
+/* цвет детали из пакета: '#1A1D21' у крашеных, иначе исходная сталь */
+const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
+  return isNaN(c)?C_BODY:c;};
 let renderer,scene,camera,grid;
 let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=400,dMax=12000;
 const placed=[];   // {uid,id,obj,d}
@@ -303,7 +494,8 @@ let sel=null,uidSeq=1;
 
 function initGL(){
   const cv=$('#cv');
-  renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+  // preserveDrawingBuffer — чтобы снимок сцены для чата не выходил пустым
+  renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,preserveDrawingBuffer:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   renderer.outputEncoding=THREE.sRGBEncoding;
   scene=new THREE.Scene();scene.background=new THREE.Color(0x061020);
@@ -357,7 +549,10 @@ function bindCtl(cv){
     cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
     if(e.button===2){mode='pan';return;}
     const hit=pickItem(e);
-    if(hit){select(hit);mode='item';cv.classList.add('drag');
+    if(hit){select(hit);
+      // закреплённую деталь мышью не сдвинуть — для того и закрепляли
+      if(hit.pin){mode='orbit';toast('Деталь закреплена — сними закрепление, чтобы двигать');return;}
+      mode='item';cv.classList.add('drag');
       const fp=planePoint(e,hit.obj.position.z);
       dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};}
     else{mode='orbit';}
@@ -369,8 +564,8 @@ function bindCtl(cv){
     else if(mode==='pan'){pan(dx,dy);}
     else if(mode==='item'&&sel){
       const fp=planePoint(e,sel.obj.position.z);if(!fp)return;
-      sel.obj.position.x=snap(fp.x+dragOff.x);
-      sel.obj.position.y=snap(fp.y+dragOff.y);
+      const nx=snap(fp.x+dragOff.x),ny=snap(fp.y+dragOff.y);
+      moveItem(sel,nx-sel.obj.position.x,ny-sel.obj.position.y,0);  // с ним едут и посаженные на него узлы
       checkCollisions();save();
     }
   });
@@ -386,7 +581,18 @@ function bindCtl(cv){
     $('#bGrid').classList.toggle('on',grid.visible);};
   $('#bGrid').classList.add('on');
   addEventListener('keydown',e=>{
-    if(e.key==='Escape')select(null);
+    // v2.45.993: в поле ввода буквы — это текст, а не команды сцены
+    const t=e.target&&e.target.tagName;
+    if(t==='INPUT'||t==='TEXTAREA'){
+      if(e.key==='Escape'&&ch.open&&!ch.full)closeChat();
+      return;
+    }
+    if(e.key==='Escape'){
+      if($('#chArt').classList.contains('open')){chatArtClose();return;}
+      if(ch.open){closeChat();return;}
+      hideMnt();select(null);
+    }
+    if(e.key==='p'||e.key==='P'||e.key==='з'||e.key==='З')togglePin();
     if(!sel)return;
     if(e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')rotSel();
     if(e.key==='PageUp'){e.preventDefault();lift(50);}
@@ -517,16 +723,20 @@ function autoLayout(){
   // корпус ставим первым — от него считается вся площадка; остальных уводим в сторону,
   // чтобы старые места не мешали поиску свободного
   placed.forEach(p=>{
+    if(p.pin)return;                                  // v2.45.993: закреплённое остаётся на месте
     if(roleOf(p.d)==='frame')autoPlace(p);
     else{p.obj.position.set(1e6,1e6,0);p.obj.updateMatrixWorld(true);}});
   const roles=[...groups.keys()].sort((a,b)=>LAY_ORDER.indexOf(a)-LAY_ORDER.indexOf(b));
   roles.forEach(r=>{
-    const list=groups.get(r);
+    const list=groups.get(r).filter(p=>!p.pin);
+    if(!list.length)return;
     if(r==='line')list.sort((a,b)=>lineRank(a.d)-lineRank(b.d));
     list.forEach(autoPlace);
     const sl=SLOT[r];
     if(sl&&sl.center&&list.length>1)centerRow(list,sl,site());
   });
+  placed.forEach(p=>{if(p.link)reseatLink(p);});   // посаженное на корпус остаётся на дне
+  placed.forEach(p=>{if(p._pinBox)p._pinBox.update();});
   select(sel&&placed.includes(sel)?sel:null);
   refresh();save();
   toast('Расставлено по функциям: '+roles.map(r=>ROLE_NAME[r]||r).join(', '));
@@ -558,19 +768,214 @@ async function addItem(d,at,rot,tilt){
   const mk=c=>new THREE.MeshStandardMaterial(
     {color:c,metalness:c===C_BODY?.55:.15,roughness:c===C_BODY?.48:.74,
      flatShading:true});
-  const mat=geo.userData.cols?geo.userData.cols.map(mk):mk(C_BODY);
+  /* материалы у каждой детали в сцене свои: гасим стойку в одном корпусе —
+     второй такой же корпус остаётся целым */
+  const PT=geo.userData.parts;
+  const mat=PT?PT.map(x=>mk(x.col)):mk(C_BODY);
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
   obj.position.z=-bb.min.z;                      // низ детали — на пол
   obj.rotation.set(0,tilt||0,rot||0);
   scene.add(obj);
-  const it={uid:uidSeq++,id:d.id,obj,d};
+  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[]};
   placed.push(it);
   if(at){obj.position.x=at.x;obj.position.y=at.y;
     if(typeof at.z==='number')obj.position.z=at.z;}  // из проекта — как сохранили
   else autoPlace(it);                                // новая деталь — на свой ярус
+  if(at&&at.state){                                  // закрепление, связь и погашенные детали
+    it.pin=!!at.state.pin;
+    it.link=at.state.link||null;
+    it.off=Array.isArray(at.state.off)?at.state.off.slice():[];
+    applyOff(it);pinMark(it);
+  }
   select(it);refresh();save();
   return it;
+}
+
+/* ═══ v2.45.993: закрепление, посадка на корпус и гашение деталей ═══ */
+
+/* Сдвиг детали вместе с тем, что на ней сидит: подвинул корпус — компрессор
+   и щит поехали с ним, потому что они на него посажены. */
+function moveItem(it,dx,dy,dz,seen){
+  if(!dx&&!dy&&!dz)return;
+  seen=seen||new Set();
+  if(seen.has(it.uid))return;                    // связь по кругу не зациклит сцену
+  seen.add(it.uid);
+  it.obj.position.x+=dx;it.obj.position.y+=dy;it.obj.position.z+=dz;
+  it.obj.updateMatrixWorld(true);
+  if(it._pinBox)it._pinBox.update();
+  placed.forEach(p=>{if(p.link&&p.link.to===it.uid)moveItem(p,dx,dy,dz,seen);});
+}
+
+/* Закрепление: жёлтая рамка вокруг детали и запрет тащить мышью. */
+function pinMark(it){
+  if(it.pin&&!it._pinBox){
+    const h=new THREE.BoxHelper(it.obj,0xC9A227);
+    h.material.transparent=true;h.material.opacity=.85;
+    scene.add(h);it._pinBox=h;
+  }else if(!it.pin&&it._pinBox){
+    scene.remove(it._pinBox);it._pinBox=null;
+  }
+  if(it._pinBox)it._pinBox.update();
+}
+function togglePin(){
+  if(!sel)return;
+  sel.pin=!sel.pin;pinMark(sel);selBtns();save();
+  toast(sel.pin?'Закреплено на этом месте':'Закрепление снято');
+}
+
+/* Крепление к корпусу: чем узел держится за дно. */
+const MOUNT={
+  bolt8: {t:'болты М8',  hw:'Болт М8×25 с гайкой и шайбой',  n:4},
+  bolt10:{t:'болты М10', hw:'Болт М10×30 с гайкой и шайбой', n:4},
+  weld:  {t:'сварка',    hw:null, n:0},
+  free:  {t:'без крепежа',hw:null, n:0},
+};
+/* Верх дна корпуса: в меше сборки дно — такая же именованная деталь, берём её
+   треугольники и считаем по ним отметку и площадку. Дна нет (голая рама) —
+   опираемся на низ корпуса. */
+function panTop(fr){
+  const geo=fr.obj.geometry,PT=geo.userData.parts;
+  const idx=PT?PT.findIndex(x=>/дно|поддон/i.test(x.name)||/00\.000\.017/.test(x.des)):-1;
+  const b=new THREE.Box3().setFromObject(fr.obj);
+  if(idx<0)return {z:b.min.z,box:b,part:null};
+  const g=geo.groups[idx],pos=geo.attributes.position,ix=geo.index;
+  const v=new THREE.Vector3(),bb=new THREE.Box3();
+  fr.obj.updateMatrixWorld(true);
+  for(let i=g.start;i<g.start+g.count;i++){
+    v.fromBufferAttribute(pos,ix.getX(i)).applyMatrix4(fr.obj.matrixWorld);
+    bb.expandByPoint(v);
+  }
+  return {z:bb.max.z,box:bb,part:PT[idx]};
+}
+/* Найти корпус, к которому сажаем: сначала тот, над которым деталь стоит,
+   иначе единственный (или ближайший) в сцене. */
+function frameFor(it){
+  const frames=placed.filter(p=>p!==it&&roleOf(p.d)==='frame');
+  if(!frames.length)return null;
+  const c=new THREE.Box3().setFromObject(it.obj).getCenter(new THREE.Vector3());
+  const inside=frames.find(f=>{const b=new THREE.Box3().setFromObject(f.obj);
+    return c.x>=b.min.x&&c.x<=b.max.x&&c.y>=b.min.y&&c.y<=b.max.y;});
+  if(inside)return inside;
+  let best=frames[0],bd=Infinity;
+  frames.forEach(f=>{const b=new THREE.Box3().setFromObject(f.obj).getCenter(new THREE.Vector3());
+    const dd=(b.x-c.x)*(b.x-c.x)+(b.y-c.y)*(b.y-c.y);
+    if(dd<bd){bd=dd;best=f;}});
+  return best;
+}
+/* Вернуть посаженную деталь на дно её корпуса (после перекладки по функциям). */
+function reseatLink(it){
+  if(!it.link)return;
+  const fr=placed.find(x=>x.uid===it.link.to);
+  if(!fr){it.link=null;return;}
+  const pan=panTop(fr),b=new THREE.Box3().setFromObject(it.obj);
+  moveItem(it,0,0,Math.round(pan.z-b.min.z));
+}
+/* Посадить выделенную деталь на дно корпуса и запомнить крепление. */
+function linkSel(mount){
+  if(!sel)return;
+  if(mount==='off'){
+    sel.link=null;selBtns();refresh();save();toast('Отсоединено от корпуса');return;
+  }
+  const fr=frameFor(sel);
+  if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
+  const pan=panTop(fr);
+  const b=new THREE.Box3().setFromObject(sel.obj);
+  const sz=new THREE.Vector3();b.getSize(sz);
+  // держим деталь в границах дна: край в край не ставим, оставляем 20 мм
+  const M=20;
+  const cx=Math.min(Math.max(b.getCenter(new THREE.Vector3()).x,pan.box.min.x+sz.x/2+M),
+                    Math.max(pan.box.min.x+sz.x/2+M,pan.box.max.x-sz.x/2-M));
+  const cy=Math.min(Math.max(b.getCenter(new THREE.Vector3()).y,pan.box.min.y+sz.y/2+M),
+                    Math.max(pan.box.min.y+sz.y/2+M,pan.box.max.y-sz.y/2-M));
+  moveItem(sel,snap(cx-b.getCenter(new THREE.Vector3()).x),
+               snap(cy-b.getCenter(new THREE.Vector3()).y),
+               Math.round(pan.z-b.min.z));
+  sel.link={to:fr.uid,mount:mount};
+  /* закрепление отдельной кнопкой: посаженную деталь можно ещё подвинуть по дну,
+     а поедет она вместе с корпусом в любом случае */
+  pinMark(sel);selBtns();checkCollisions();showSelZ();refresh();save();
+  const m=MOUNT[mount]||MOUNT.free;
+  toast(pan.part
+    ? ('Поставлено на дно ' + pan.part.des + ', отм. ' + Math.round(pan.z) + ' мм · ' + m.t)
+    : ('Поставлено на низ корпуса, отм. ' + Math.round(pan.z) + ' мм · ' + m.t));
+}
+function showMnt(){
+  const box=$('#mnt');
+  $('#mntOff').style.display=(sel&&sel.link)?'block':'none';
+  box.classList.add('on');
+}
+function hideMnt(){$('#mnt').classList.remove('on');}
+
+/* Панель деталей узла: одинаковые детали одной строкой, гасятся вместе. */
+function partGroups(it){
+  const PT=it.obj.geometry.userData.parts;
+  if(!PT)return null;
+  const by=new Map();
+  PT.forEach((x,i)=>{
+    const k=x.des+'|'+x.name;
+    if(!by.has(k))by.set(k,{k:k,des:x.des,name:x.name,idx:[]});
+    by.get(k).idx.push(i);
+  });
+  return [...by.values()];
+}
+function applyOff(it){
+  const gs=partGroups(it);if(!gs)return;
+  const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
+  ms.forEach(m=>m.visible=true);
+  (it.off||[]).forEach(k=>{
+    const g=gs.find(x=>x.k===k);
+    if(g)g.idx.forEach(i=>{if(ms[i])ms[i].visible=false;});
+  });
+}
+function buildParts(){
+  const box=$('#partsBox'),btn=$('#bParts');
+  const gs=sel?partGroups(sel):null;
+  if(!gs){box.classList.remove('on');btn.style.display='none';btn.classList.remove('on');return;}
+  btn.style.display='';
+  const PT=sel.obj.geometry.userData.parts;
+  $('#pTitle').textContent=sel.d.name;
+  $('#pCount').textContent=PT.length+' дет. · '+gs.length+' наим.';
+  $('#pList').innerHTML=gs.map((g,i)=>
+    '<div class="prow'+((sel.off||[]).indexOf(g.k)>=0?' off':'')+'" data-g="'+i+'">'+
+    '<span class="d">'+esc(g.des)+'</span><span class="n" title="'+esc(g.name)+'">'+esc(g.name)+'</span>'+
+    '<span class="q">'+(g.idx.length>1?'×'+g.idx.length:'')+'</span>'+
+    '<button class="b">'+((sel.off||[]).indexOf(g.k)>=0?'показать':'скрыть')+'</button></div>').join('');
+  $('#pList').querySelectorAll('.prow').forEach(row=>{
+    row.querySelector('.b').onclick=()=>{
+      const g=gs[+row.dataset.g],off=(sel.off||[]).indexOf(g.k)<0;
+      if(off)sel.off.push(g.k); else sel.off=sel.off.filter(k=>k!==g.k);
+      row.classList.toggle('off',off);
+      row.querySelector('.b').textContent=off?'показать':'скрыть';
+      applyOff(sel);pAllLabel();save();
+    };
+  });
+  pAllLabel();
+}
+function pAllLabel(){
+  const n=sel&&sel.off?sel.off.length:0;
+  $('#pAll').textContent=n?('Показать все ('+n+')'):'Показать все';
+}
+$('#pAll').onclick=()=>{
+  if(!sel)return;
+  sel.off=[];applyOff(sel);buildParts();save();
+};
+$('#bParts').onclick=()=>{
+  const on=!$('#partsBox').classList.contains('on');
+  $('#partsBox').classList.toggle('on',on);$('#bParts').classList.toggle('on',on);
+  if(on)buildParts();
+};
+$('#bPin').onclick=togglePin;
+$('#bLink').onclick=()=>{$('#mnt').classList.contains('on')?hideMnt():showMnt();};
+$('#mnt').querySelectorAll('.o').forEach(o=>o.onclick=()=>{hideMnt();linkSel(o.dataset.m);});
+/* подписи кнопок под выделенную деталь */
+function selBtns(){
+  const pin=!!(sel&&sel.pin);
+  $('#bPin').textContent=pin?'📌 Открепить':'📌 Закрепить';
+  $('#bPin').classList.toggle('on',pin);
+  const lk=sel&&sel.link?MOUNT[sel.link.mount]:null;
+  $('#bLink').textContent=lk?('⛓ на корпусе · '+lk.t):'⛓ Соединить с корпусом';
+  $('#bLink').classList.toggle('on',!!lk);
 }
 function select(it){
   const prev=sel;
@@ -580,6 +985,7 @@ function select(it){
     $('#selNm').textContent=sel.d.brand+' '+sel.d.name;
     showSelZ();}
   $('#selbar').classList.toggle('on',!!sel);
+  hideMnt();selBtns();buildParts();
   refreshSpecSel();
 }
 /* отметка низа выделенной детали — по ней и видно, что стоит на крыше */
@@ -590,15 +996,13 @@ function showSelZ(){
 }
 function lift(dz){
   if(!sel)return;
-  sel.obj.position.z=Math.round(sel.obj.position.z+dz);
-  sel.obj.updateMatrixWorld(true);
+  moveItem(sel,0,0,Math.round(dz));
   checkCollisions();showSelZ();refresh();save();
 }
 function toFloor(){
   if(!sel)return;
   const s=site(),b=new THREE.Box3().setFromObject(sel.obj);
-  sel.obj.position.z+=s.min.z-b.min.z;
-  sel.obj.updateMatrixWorld(true);
+  moveItem(sel,0,0,Math.round(s.min.z-b.min.z));
   checkCollisions();showSelZ();refresh();save();
 }
 
@@ -632,7 +1036,8 @@ function checkCollisions(){
   el.style.color=n?'#f0a9a0':'var(--ok)';
 }
 function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;
-  sel.obj.updateMatrixWorld(true);checkCollisions();showSelZ();save();}
+  sel.obj.updateMatrixWorld(true);if(sel._pinBox)sel._pinBox.update();
+  checkCollisions();showSelZ();save();}
 /* завал вокруг Y: положить конденсатор обдувом вверх, поднять вентилятор и т.п.
    после завала деталь опускаем низом на прежнюю отметку, чтобы не проваливалась под пол */
 function tiltSel(){
@@ -641,10 +1046,12 @@ function tiltSel(){
   sel.obj.rotation.y=(Math.round(sel.obj.rotation.y/(Math.PI/2))+1)%4*(Math.PI/2);
   sel.obj.updateMatrixWorld(true);
   sel.obj.position.z+=z0-new THREE.Box3().setFromObject(sel.obj).min.z;
-  sel.obj.updateMatrixWorld(true);
+  sel.obj.updateMatrixWorld(true);if(sel._pinBox)sel._pinBox.update();
   checkCollisions();showSelZ();refresh();save();
 }
 function delSel(){if(!sel)return;
+  if(sel._pinBox){scene.remove(sel._pinBox);sel._pinBox=null;}
+  placed.forEach(p=>{if(p.link&&p.link.to===sel.uid)p.link=null;});
   scene.remove(sel.obj);placed.splice(placed.indexOf(sel),1);
   select(null);refresh();save();}
 $('#bRot').onclick=rotSel;
@@ -660,7 +1067,8 @@ $('#bDup').onclick=async()=>{if(!sel)return;
   await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r,sel.obj.rotation.y);};
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
-  placed.forEach(p=>scene.remove(p.obj));placed.length=0;select(null);refresh();save();};
+  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);});
+  placed.length=0;select(null);refresh();save();};
 $('#bBom').onclick=()=>toast('Следующий шаг: спецификация → BOM модели ЧИЛ и чертёж сборки');
 
 /* ═══ спецификация + габарит ═══ */
@@ -673,7 +1081,15 @@ function refresh(){
     `<div class="sr" data-id="${r.d.id}"><span class="nm">${r.d.brand} ${r.d.name}</span>`+
     `<span class="n">${r.n}</span><span class="u">шт</span></div>`).join('')
     :'<div style="padding:14px 12px;font-size:12px;color:var(--faint)">Пока пусто — добавь детали из базы слева.</div>';
-  $('#spec').querySelectorAll('.sr').forEach(row=>row.onclick=()=>{
+  // v2.45.993: крепёж посадки на корпус — отдельными строками, по 4 болта на узел
+  const hw=new Map();
+  placed.forEach(p=>{
+    const m=p.link?MOUNT[p.link.mount]:null;
+    if(m&&m.hw)hw.set(m.hw,(hw.get(m.hw)||0)+m.n);});
+  if(hw.size)$('#spec').innerHTML+=[...hw.entries()].map(([t,n])=>
+    `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
+    `<span class="n">${n}</span><span class="u">компл</span></div>`).join('');
+  $('#spec').querySelectorAll('.sr[data-id]').forEach(row=>row.onclick=()=>{
     const it=placed.find(p=>p.id===row.dataset.id&&p!==sel)||placed.find(p=>p.id===row.dataset.id);
     if(it)select(it);});
   $('#hCnt').textContent=placed.length+' '+plural(placed.length);
@@ -687,9 +1103,10 @@ function refresh(){
   $('#empty').style.display=placed.length?'none':'flex';
   checkCollisions();
   refreshSpecSel();
+  if(typeof chCtxLine==='function')chCtxLine();
 }
 function refreshSpecSel(){
-  $('#spec').querySelectorAll('.sr').forEach(r=>
+  $('#spec').querySelectorAll('.sr[data-id]').forEach(r=>
     r.classList.toggle('on',!!sel&&r.dataset.id===sel.id));
 }
 const plural=n=>{const m=n%10,h=n%100;
@@ -711,8 +1128,12 @@ async function capi(path,method,body){
 }
 function projPayload(){
   // v2.45.974: z сохраняем тоже — иначе поднятые детали падали бы на пол при открытии
-  return {items:placed.map(p=>({id:p.id,x:p.obj.position.x,y:p.obj.position.y,
-                                z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y})),
+  // v2.45.993: uid, закрепление, посадка на корпус и погашенные детали — тоже в проект
+  return {items:placed.map(p=>({uid:p.uid,id:p.id,x:p.obj.position.x,y:p.obj.position.y,
+                                z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y,
+                                pin:p.pin?1:0,
+                                link:p.link?{to:p.link.to,mount:p.link.mount}:null,
+                                off:(p.off&&p.off.length)?p.off:undefined})),
           schema:schemaData};
 }
 function save(){
@@ -735,17 +1156,24 @@ function setProjName(n){
 }
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function clearScene(){
-  placed.forEach(p=>scene.remove(p.obj));placed.length=0;select(null);
+  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);});
+  placed.length=0;select(null);
 }
 async function loadProjectData(data){
   _loading=true;
   clearScene();
   schemaData=(data&&data.schema)||{};
   const arr=(data&&data.items)||[];
+  const map={};                    // старый uid из проекта → новый в сцене
   for(const s of arr){
     const d=DATA.find(x=>x.id===s.id&&x.ready);
-    if(d)await addItem(d,{x:s.x,y:s.y,z:s.z},s.r,s.t);  // z и наклона в старых проектах нет — деталь остаётся на полу
+    if(!d)continue;
+    // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
+    const it=await addItem(d,{x:s.x,y:s.y,z:s.z,state:{pin:s.pin,off:s.off,link:s.link}},s.r,s.t);
+    if(it&&s.uid)map[s.uid]=it.uid;
   }
+  placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount};
+                     else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
   _loading=false;
   select(null);refresh();renderSchema();
 }
@@ -991,6 +1419,430 @@ async function fillThumbsIn(sel){
 }
 $('#q').addEventListener('input',e=>{fQ=e.target.value.trim().toLowerCase();drawCat();});
 
+
+/* ═══ во весь экран (v2.45.993) ═══
+   Компоновку смотрят в iframe раздела CRM, он отдан с allow="fullscreen", —
+   разворачиваем документ модуля целиком, как в «Атом Электрика». */
+function toggleFS(){
+  try{
+    if(document.fullscreenElement){document.exitFullscreen();return;}
+    const p=document.documentElement.requestFullscreen();
+    if(p&&p.catch)p.catch(()=>{});
+  }catch(e){}
+}
+$('#bFS').onclick=toggleFS;
+document.addEventListener('fullscreenchange',()=>{
+  const on=!!document.fullscreenElement;
+  const t=$('#fsTxt');if(t)t.textContent=on?'Свернуть':'Во весь экран';
+});
+addEventListener('keydown',e=>{if(e.key==='F11'){e.preventDefault();toggleFS();}});
+
+/* ═══ чат по чиллерам прямо в компоновке (v2.45.993) ═══
+   Лента та же, что в проекте «Атом Чиллер» на экране «Клод»: ходим в
+   /api/dev-chat/* тем же токеном, что и в /api/3d/*. Своих чатов не заводим —
+   только находим живой, иначе плодились бы пустые дубли.
+   Главное отличие от базы 3D: вместе с задачей уезжает вся сцена — что стоит,
+   на какой отметке, что закреплено и что на корпусе, — плюс снимок вида. */
+const CHAT_API=API?'/api/dev-chat':null;
+const CH_TKEY='atomus_chiller_thread';
+const CH_OPEN={uploading:1,new:1,running:1,stopping:1};
+const CH_ST={uploading:'загружаю файлы…',new:'в очереди',running:'работает…',
+             stopping:'останавливаю…',stopped:'остановлено',done:'готово',error:'сбой'};
+const ch={tid:0,since:0,pend:new Set(),prog:{},open:false,full:false,run:0,
+          poll:null,tick:null,unread:0,busy:false,arm:false,
+          files:[],first:true,hist:false,shot:true};
+
+const chEl=id=>document.getElementById(id);
+async function chGet(path){
+  const r=await fetch(CHAT_API+path,{headers:AUTH,cache:'no-store'});
+  if(!r.ok)throw Object.assign(new Error('HTTP '+r.status),{status:r.status});
+  return r.json();
+}
+async function chPost(path,body){
+  const r=await fetch(CHAT_API+path,{method:'POST',cache:'no-store',
+    headers:Object.assign({'Content-Type':'application/json'},AUTH),
+    body:JSON.stringify(body||{})});
+  if(!r.ok)throw Object.assign(new Error('HTTP '+r.status),{status:r.status});
+  return r.json();
+}
+function chFmt(t){
+  return esc(t).replace(/```([\s\S]*?)```/g,(m,c)=>'<code>'+c.trim()+'</code>')
+               .replace(/`([^`\n]+)`/g,'<code>$1</code>')
+               .replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>');
+}
+const chTime=ts=>{const d=new Date(ts);
+  return isNaN(d)?'':String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
+
+async function chFindThread(){
+  const d=await chGet('/threads');
+  const proj=(d.projects||[]).find(x=>x.name==='Атом Чиллер');
+  const ths=d.threads||[];
+  let t=null;
+  if(proj){
+    const mine=ths.filter(x=>x.project_id===proj.id);
+    t=mine.find(x=>(x.msg_count||0)>0)||mine[0]||null;
+  }
+  if(!t)t=ths.find(x=>/^чиллер/i.test(String(x.title||'').trim()))||null;
+  return t?t.id:0;
+}
+/* Кнопку показываем только тому, кому чат отвечает: dev-chat разрешён
+   владельцу, остальным прилетает 403 — им кнопки видеть незачем. */
+async function chatArm(){
+  if(!CHAT_API||!TOKEN)return;
+  try{
+    let tid=parseInt(localStorage.getItem(CH_TKEY)||'0',10)||0;
+    ch.tid=await chFindThread()||tid;
+    if(ch.tid)try{localStorage.setItem(CH_TKEY,String(ch.tid));}catch(e){}
+  }catch(e){if(e.status===403||e.status===401)return;}
+  ch.arm=true;
+  chEl('chatFab').classList.add('on');
+  chEl('chatBtn').style.display='';
+  chWatch(true);
+}
+function toggleChat(){if(!ch.arm)return;ch.open?closeChat():openChat();}
+function chBtns(){
+  const on=!!ch.open;
+  const fab=chEl('chatFab');
+  fab.classList.toggle('open',on&&!ch.full);
+  fab.title=on?'Закрыть чат':'Чат по чиллерам';
+  chEl('chatFabI').textContent=on?'×':'💬';
+  chEl('chatBtn').classList.toggle('on',on);
+}
+function openChat(){
+  const box=chEl('chat');if(!box||!ch.arm)return;
+  box.classList.add('open');
+  ch.open=true;ch.unread=0;chBadge();chBtns();
+  if(!ch.tid){
+    chEl('chFeed').innerHTML='<div class="ch-empty">Чат проекта «Атом Чиллер» ещё не заведён.<br>'+
+      'Откройте его один раз из шапки раздела в CRM — дальше он будет здесь.</div>';
+  }else{
+    ch.since=0;ch.hist=true;
+    chEl('chFeed').innerHTML='<div class="ch-empty">Открываю переписку…</div>';
+    chLoad();
+  }
+  chCtxLine();chWatch(true);
+  const inp=chEl('chIn');if(inp&&innerWidth>900)setTimeout(()=>inp.focus(),60);
+}
+function closeChat(){
+  chEl('chat').classList.remove('open');
+  ch.open=false;chBtns();chWatch(true);
+}
+/* Разворот шторки: узкая полоса хороша рядом с моделью, но читать длинный
+   ответ в ней неудобно — ⤢ растягивает ленту на весь экран и обратно. */
+function chatFull(){
+  ch.full=!ch.full;
+  chEl('chat').classList.toggle('full',ch.full);
+  chEl('chFullB').textContent=ch.full?'⤡':'⤢';
+  chEl('chFullB').title=ch.full?'Свернуть шторку':'Развернуть на весь экран';
+  chBtns();
+  const f=chEl('chFeed');if(f)f.scrollTop=f.scrollHeight;
+}
+
+/* ═══ что уезжает вместе с задачей ═══
+   Клод должен видеть сцену: какой это проект, что в нём стоит, на какой
+   отметке, что закреплено и что посажено на корпус. Плюс снимок вида —
+   тогда он смотрит ровно на то же, что и ты. */
+function chCtxLine(){
+  const el=chEl('chCtx');if(!el)return;
+  const parts=[(PROJ.name||'черновик'),placed.length+' '+plural(placed.length)];
+  if(sel)parts.push('выделено: '+sel.d.name);
+  el.textContent='вижу: '+parts.join(' · ');
+}
+function itemInfo(p){
+  const b=new THREE.Box3().setFromObject(p.obj);
+  const o={uid:p.uid,name:(p.d.brand?p.d.brand+' ':'')+p.d.name,
+    role:ROLE_NAME[roleOf(p.d)]||'',
+    x:Math.round(p.obj.position.x),y:Math.round(p.obj.position.y),
+    z:Math.round(b.min.z),
+    поворот:Math.round(p.obj.rotation.z*180/Math.PI)%360};
+  if(p.pin)o.закреплена=true;
+  if(p.link){
+    const fr=placed.find(x=>x.uid===p.link.to);
+    o.на_корпусе=(fr?fr.d.name:'корпус')+' · '+((MOUNT[p.link.mount]||{}).t||p.link.mount);
+  }
+  if(p.off&&p.off.length)o.погашено=p.off.map(k=>k.replace('|',' '));
+  return o;
+}
+function chContext(){
+  const c={screen:'atom-chiller (компоновка проекта)',
+    режим:$('#swrap').classList.contains('on')?'схема':'компоновка',
+    проект:PROJ.name||'черновик'};
+  if(PROJ.id)c.project_id=PROJ.id;
+  if(placed.length){
+    const bb=new THREE.Box3();placed.forEach(x=>bb.expandByObject(x.obj));
+    const sz=new THREE.Vector3();bb.getSize(sz);
+    c.габарит=Math.round(sz.x)+'×'+Math.round(sz.y)+'×'+Math.round(sz.z)+' мм';
+    c.сцена=placed.slice(0,60).map(itemInfo);
+    if(placed.length>60)c.ещё_деталей=placed.length-60;
+  }else c.сцена=[];
+  if(sel)c.выделено=itemInfo(sel);
+  if(collSet.size)c.пересечения=placed.filter(x=>collSet.has(x.uid)).map(x=>x.d.name);
+  const asg=Object.keys(schemaData||{});
+  if(asg.length)c.назначено_на_схеме=asg.length+' узл. из '+SCH_NODES.length;
+  return c;
+}
+/* Снимок сцены: то же изображение, что на экране, — уходит вложением. */
+function sceneShot(){
+  return new Promise(res=>{
+    try{
+      if(!renderer||!placed.length)return res(null);
+      renderer.render(scene,camera);
+      renderer.domElement.toBlob(b=>{
+        try{res(b?new File([b],'scene.png',{type:'image/png'}):null);}catch(e){res(null);}
+      },'image/png');
+    }catch(e){res(null);}
+  });
+}
+
+function chWatch(on){
+  if(ch.poll){clearInterval(ch.poll);ch.poll=null;}
+  if(!on||!ch.arm||!ch.tid)return;
+  ch.poll=setInterval(chLoad,ch.open?3000:20000);
+}
+function chTick(on){
+  if(on&&!ch.tick)ch.tick=setInterval(chWorkFill,1000);
+  else if(!on&&ch.tick){clearInterval(ch.tick);ch.tick=null;}
+}
+async function chLoad(){
+  if(!ch.arm||!ch.tid||ch.busy)return;
+  ch.busy=true;
+  try{
+    /* незакрытая задача меняет статус уже после отрисовки, а сервер отдаёт
+       только новые id — поэтому отступаем к самой старой незакрытой */
+    let from=ch.pend.size?Math.min.apply(null,Array.from(ch.pend))-1:ch.since;
+    if(ch.hist){from=0;ch.hist=false;}
+    const d=await chGet('/messages?since_id='+from+'&thread_id='+ch.tid);
+    ch.prog=d.progress||{};
+    const msgs=d.messages||[];
+    let work=false;
+    msgs.forEach(m=>{
+      if(m.id>ch.since)ch.since=m.id;
+      if(m.author==='user'&&CH_OPEN[m.status])ch.pend.add(m.id);
+      else if(m.author==='user')ch.pend.delete(m.id);
+      if(CH_OPEN[m.status]&&m.author==='user')work=true;
+      if(m.status==='running'&&!ch.run){
+        const t=m.ts?Date.parse(m.ts):NaN;
+        ch.run=(!isNaN(t)&&t<=Date.now())?t:Date.now();
+      }
+      if(ch.open)chDraw(m);
+      else if(m.author!=='user'&&!ch.first){ch.unread++;chBadge();}
+    });
+    ch.first=false;
+    if(!work)ch.run=0;
+    chWork(work);
+    const feed=chEl('chFeed');
+    if(ch.open&&feed&&!feed.querySelector('.ch-b'))
+      feed.innerHTML='<div class="ch-empty">Переписки пока нет.<br>'+
+        'Напишите задачу — она уедет вместе со сценой проекта.</div>';
+  }catch(e){
+    if(e.status===403||e.status===401){ch.arm=false;chWatch(false);}
+  }finally{ch.busy=false;}
+}
+function chDraw(m){
+  const feed=chEl('chFeed');if(!feed)return;
+  const empty=feed.querySelector('.ch-empty');if(empty)empty.remove();
+  const was=feed.querySelector('[data-mid="'+m.id+'"]');
+  if(was){
+    const chip=was.querySelector('[data-st]');
+    if(chip&&CH_ST[m.status]){chip.textContent=CH_ST[m.status];chip.className='chip2 is-'+m.status;}
+    return;
+  }
+  const near=feed.scrollHeight-feed.scrollTop-feed.clientHeight<140;
+  const mine=m.author==='user';
+  const b=document.createElement('div');
+  b.className='ch-b'+(mine?' me':'');
+  b.setAttribute('data-mid',m.id);
+  b.innerHTML='<div>'+chFmt(m.text)+'</div><div class="mt"><span>'+chTime(m.ts)+'</span>'+
+    (mine&&CH_ST[m.status]?'<span class="chip2 is-'+m.status+'" data-st>'+esc(CH_ST[m.status])+'</span>':'')+'</div>';
+  (m.files||[]).forEach(f=>{
+    if((f.content_type||'').indexOf('image/')===0){
+      const img=document.createElement('img');
+      img.alt=f.name||'снимок';
+      img.onclick=()=>{if(img.src)window.open(img.src,'_blank');};
+      b.appendChild(img);chImg(img,f.url);
+    }else if(/\.html?$/i.test(f.name||'')||(f.content_type||'').indexOf('text/html')===0){
+      const card=document.createElement('div');
+      card.className='art';
+      card.textContent='◱ '+(f.name||'макет')+' — открыть';
+      card.onclick=()=>chatArtOpen(f.url,f.name||'Макет');
+      b.appendChild(card);
+    }else{
+      const fl=document.createElement('div');
+      fl.className='fl';fl.textContent='📎 '+(f.name||'файл');
+      b.appendChild(fl);
+    }
+  });
+  feed.appendChild(b);
+  if(near)feed.scrollTop=feed.scrollHeight;
+}
+/* Картинку в <img> с токеном не подставить — тянем сами и отдаём blob. */
+async function chImg(img,url){
+  try{
+    const r=await fetch(url,{headers:AUTH});
+    if(!r.ok)return;
+    img.src=URL.createObjectURL(await r.blob());
+    const feed=chEl('chFeed');
+    img.onload=()=>{if(feed&&feed.scrollHeight-feed.scrollTop-feed.clientHeight<220)
+      feed.scrollTop=feed.scrollHeight;};
+  }catch(e){}
+}
+/* Макет (html от Клода) открываем в песочнице: srcdoc, а не src, — иначе
+   iframe пошёл бы за файлом без токена. */
+async function chatArtOpen(url,name){
+  chEl('chArtNm').textContent=name;
+  chEl('chArt').classList.add('open');
+  try{
+    const r=await fetch(url,{headers:AUTH});
+    chEl('chArtF').srcdoc=r.ok?await r.text():'<p>Не смог открыть макет</p>';
+  }catch(e){chEl('chArtF').srcdoc='<p>Нет связи</p>';}
+}
+function chatArtClose(){
+  chEl('chArt').classList.remove('open');
+  chEl('chArtF').srcdoc='';
+}
+function chWork(on){
+  chEl('chWork').classList.toggle('on',!!on);
+  chEl('chatFab').classList.toggle('work',!!on);
+  chEl('chatBtn').classList.toggle('work',!!on);
+  const st=chEl('chSt'),l=chProgLines();
+  st.textContent=on?(l?l[l.length-1]:'работает над задачей…'):'Готов к работе';
+  st.classList.toggle('work',!!on);
+  chTick(!!on);
+  if(on)chWorkFill();
+}
+function chProgLines(){
+  let best=null;
+  ch.pend.forEach(id=>{
+    const p=ch.prog[String(id)];
+    if(p&&p.lines&&p.lines.length&&(!best||String(p.at)>String(best.at)))best=p;
+  });
+  return best?best.lines:null;
+}
+function chWorkFill(){
+  const l=chProgLines();
+  if(l&&l.length)chEl('chNow').textContent=l[l.length-1];
+  const sec=ch.run?Math.max(0,Math.round((Date.now()-ch.run)/1000)):0;
+  chEl('chTm').textContent=ch.run?Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'в очереди';
+}
+function chBadge(){
+  const fab=chEl('chatFab');if(!fab)return;
+  fab.classList.toggle('unread',ch.unread>0);
+  chEl('chatFabN').textContent=ch.unread>9?'9+':String(ch.unread);
+}
+
+/* ---- вложения: скрепка, Ctrl+V и перетаскивание. Пределы те же, что у
+   сервера: 5 файлов, 50 МБ на файл, 60 МБ за раз. ---- */
+const CH_MAXF=5,CH_MAXB=50*1024*1024,CH_MAXT=60*1024*1024;
+function chAttPick(){chEl('chFile').click();}
+function chAttAdd(list){
+  for(const f of Array.from(list||[])){
+    if(ch.files.length>=CH_MAXF){chAttSay('не больше '+CH_MAXF+' файлов');break;}
+    if(f.size>CH_MAXB){chAttSay('«'+f.name+'» больше 50 МБ');continue;}
+    if(ch.files.reduce((s,x)=>s+x.size,0)+f.size>CH_MAXT){chAttSay('вложений больше 60 МБ за раз');break;}
+    ch.files.push(f);
+  }
+  chAttDraw();
+}
+function chAttSay(t){chEl('chSt').textContent=t;}
+function chAttDraw(){
+  const box=chEl('chAtt');
+  box.classList.toggle('on',ch.files.length>0);
+  box.innerHTML='';
+  ch.files.forEach((f,i)=>{
+    const a=document.createElement('div');a.className='a';
+    if((f.type||'').indexOf('image/')===0){
+      const im=document.createElement('img');
+      im.src=URL.createObjectURL(f);
+      im.onload=()=>URL.revokeObjectURL(im.src);
+      a.appendChild(im);
+    }
+    const b=document.createElement('b');b.textContent=f.name||'снимок';
+    const sp=document.createElement('span');
+    sp.textContent=(f.size/1024>900?(f.size/1048576).toFixed(1)+' МБ':Math.max(1,Math.round(f.size/1024))+' КБ');
+    const x=document.createElement('i');x.textContent='×';x.title='убрать';
+    x.onclick=()=>{ch.files.splice(i,1);chAttDraw();};
+    a.appendChild(b);a.appendChild(sp);a.appendChild(x);
+    box.appendChild(a);
+  });
+}
+async function chatSend(){
+  const inp=chEl('chIn');if(!inp||!ch.tid)return;
+  const text=(inp.value||'').trim();
+  const files=ch.files.slice();
+  if(!text&&!files.length)return;
+  inp.value='';chGrow(inp);ch.files=[];chAttDraw();
+  try{
+    /* снимок сцены прикладываем сами: Клод должен видеть то же, что и ты */
+    if(ch.shot&&files.length<CH_MAXF){
+      const shot=await sceneShot();
+      if(shot)files.unshift(shot);
+    }
+    let d;
+    if(files.length){
+      const fd=new FormData();
+      fd.append('text',text);
+      fd.append('thread_id',String(ch.tid));
+      fd.append('context',JSON.stringify(chContext()));
+      files.forEach(f=>fd.append('files',f,f.name||'снимок.png'));
+      const r=await fetch(CHAT_API+'/send',{method:'POST',cache:'no-store',headers:AUTH,body:fd});
+      if(!r.ok)throw Object.assign(new Error('HTTP '+r.status),{status:r.status});
+      d=await r.json();
+    }else{
+      d=await chPost('/send',{text:text,thread_id:ch.tid,context:chContext()});
+    }
+    if(d&&d.message){chDraw(d.message);ch.pend.add(d.message.id);ch.since=Math.max(ch.since,d.message.id);}
+    chWork(true);chWatch(true);
+  }catch(e){
+    /* не потерять набранное: сеть моргнула — текст и вложения на месте */
+    inp.value=text;chGrow(inp);
+    ch.files=files.filter(f=>f.name!=='scene.png').concat(ch.files).slice(0,CH_MAXF);
+    chAttDraw();
+    chEl('chSt').textContent='не отправилось';
+  }
+}
+async function chatStop(){
+  try{await chPost('/stop',{});chEl('chNow').textContent='останавливаю…';}catch(e){}
+}
+function chGrow(el){
+  if(!el)return;
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,132)+'px';
+}
+(function chBind(){
+  const inp=chEl('chIn');if(!inp)return;
+  inp.addEventListener('input',()=>{chGrow(inp);chCtxLine();});
+  const fi=chEl('chFile');
+  fi.addEventListener('change',()=>{chAttAdd(fi.files);fi.value='';});
+  chEl('chShot').onclick=()=>{
+    ch.shot=!ch.shot;
+    chEl('chShot').classList.toggle('on',ch.shot);
+    chEl('chShot').title=ch.shot?'Снимок сцены уедет с сообщением':'Снимок сцены не прикладывать';
+  };
+  /* снимок из буфера: Ctrl+V прямо в поле */
+  inp.addEventListener('paste',e=>{
+    const items=(e.clipboardData||{}).items||[];
+    const got=[];
+    for(const it of items){if(it.kind==='file'){const f=it.getAsFile();if(f)got.push(f);}}
+    if(got.length){e.preventDefault();chAttAdd(got);}
+  });
+  const box=chEl('chat');
+  ['dragenter','dragover'].forEach(ev=>box.addEventListener(ev,e=>{
+    if(!(e.dataTransfer&&Array.from(e.dataTransfer.types||[]).indexOf('Files')>=0))return;
+    e.preventDefault();box.classList.add('drag');}));
+  ['dragleave','dragend'].forEach(ev=>box.addEventListener(ev,e=>{
+    if(e.target===box)box.classList.remove('drag');}));
+  box.addEventListener('drop',e=>{
+    if(!(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length))return;
+    e.preventDefault();box.classList.remove('drag');chAttAdd(e.dataTransfer.files);});
+  inp.addEventListener('keydown',e=>{
+    /* Enter отправляет, Shift+Enter — перенос. isComposing и 229 — набор через
+       Т9 и IME: там Enter подтверждает слово, отправлять на нём нельзя. */
+    if(e.key!=='Enter'||e.isComposing||e.keyCode===229)return;
+    if(e.shiftKey||e.altKey)return;
+    e.preventDefault();chatSend();
+  });
+})();
+
 /* ═══ старт ═══ */
 (async function(){
   initGL();
@@ -1028,5 +1880,6 @@ $('#q').addEventListener('input',e=>{fQ=e.target.value.trim().toLowerCase();draw
     await restoreLegacy();
   }
   refresh();
+  chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
 })();
 </script></body></html>
