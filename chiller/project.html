@@ -53,6 +53,9 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 .vb{font-size:11px;color:var(--dim);background:rgba(6,16,32,.8);border:1px solid var(--line2);
   padding:4px 10px;border-radius:7px;cursor:pointer;user-select:none}
 .vb.on{color:var(--ice);border-color:var(--ice2)}
+/* v2.45.996: отмена/возврат — пока нечего отменять, кнопка гаснет */
+.vb.off{opacity:.32;cursor:default}
+.vb.hist{color:var(--ice)}
 #selbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;display:none;
   align-items:center;gap:8px;background:rgba(6,16,32,.85);border:1px solid var(--ice2);
   border-radius:10px;padding:7px 10px}
@@ -318,8 +321,10 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" data-v="top">Сверху</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
         <div class="vb" id="bParts" style="display:none">Детали</div>
+        <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
+        <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать<br>P — закрепить · «Детали» — гасить стойки и панели</div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ — панорама · колесо — зум · R — поворот<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <svg id="schSvg" viewBox="26 6 212 214"></svg>
@@ -551,7 +556,7 @@ function pan(dx,dy){
   target.addScaledVector(rt,-dx*dist*0.0012).addScaledVector(up,-dy*dist*0.0012);
 }
 function bindCtl(cv){
-  let mode=null,last=null,dragOff=null;
+  let mode=null,last=null,dragOff=null,dragSnap=null;   // dragSnap — снимок до перетаскивания
   cv.addEventListener('pointerdown',e=>{
     cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
     if(e.button===2){mode='pan';return;}
@@ -561,7 +566,9 @@ function bindCtl(cv){
       if(hit.pin){mode='orbit';toast('Деталь закреплена — сними закрепление, чтобы двигать');return;}
       mode='item';cv.classList.add('drag');
       const fp=planePoint(e,hit.obj.position.z);
-      dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};}
+      dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};
+      // v2.45.996: шаг истории пишем не на клик, а на первый реальный сдвиг
+      dragSnap={s:histSnap(),t:'перемещение детали'};}
     else{mode='orbit';}
   });
   cv.addEventListener('pointermove',e=>{
@@ -572,11 +579,13 @@ function bindCtl(cv){
     else if(mode==='item'&&sel){
       const fp=planePoint(e,sel.obj.position.z);if(!fp)return;
       const nx=snap(fp.x+dragOff.x),ny=snap(fp.y+dragOff.y);
+      if(nx===sel.obj.position.x&&ny===sel.obj.position.y)return;
+      if(dragSnap){pushHistRaw(dragSnap);dragSnap=null;}
       moveItem(sel,nx-sel.obj.position.x,ny-sel.obj.position.y,0);  // с ним едут и посаженные на него узлы
       checkCollisions();save();
     }
   });
-  const off=()=>{mode=null;cv.classList.remove('drag');};
+  const off=()=>{mode=null;dragSnap=null;cv.classList.remove('drag');};
   cv.addEventListener('pointerup',off);cv.addEventListener('pointercancel',off);
   cv.addEventListener('contextmenu',e=>e.preventDefault());
   cv.addEventListener('wheel',e=>{e.preventDefault();
@@ -593,6 +602,11 @@ function bindCtl(cv){
     if(t==='INPUT'||t==='TEXTAREA'){
       if(e.key==='Escape'&&ch.open&&!ch.full)closeChat();
       return;
+    }
+    // v2.45.996: Ctrl+Z — отменить, Ctrl+Y или Ctrl+Shift+Z — вернуть
+    if(e.ctrlKey||e.metaKey){
+      const kz=/^[zZяЯ]$/.test(e.key),ky=/^[yYнН]$/.test(e.key);
+      if(kz||ky){e.preventDefault();(kz&&!e.shiftKey)?undoAct():redoAct();return;}
     }
     if(e.key==='Escape'){
       if($('#chArt').classList.contains('open')){chatArtClose();return;}
@@ -730,6 +744,8 @@ function centerRow(list,sl,s){
 const LAY_ORDER=['frame','vibro','comp','sep','recv','evap','pump','line','instr','panel','cond','fan','pipe','floor'];
 function autoLayout(){
   if(!placed.length){toast('Сцена пустая — добавь детали из базы слева');return;}
+  const h=histBegin('расстановку по функциям');
+  try{
   const groups=new Map();
   placed.forEach(p=>{const r=roleOf(p.d);
     if(!groups.has(r))groups.set(r,[]);groups.get(r).push(p);});
@@ -753,6 +769,7 @@ function autoLayout(){
   select(sel&&placed.includes(sel)?sel:null);
   refresh();save();
   toast('Расставлено по функциям: '+roles.map(r=>ROLE_NAME[r]||r).join(', '));
+  }finally{histEnd(h);}
 }
 /* «Собрать по схеме»: всё, что назначено узлам контура, встаёт в сцену */
 async function buildFromSchema(){
@@ -760,6 +777,8 @@ async function buildFromSchema(){
   SCH_NODES.forEach(n=>{const a=schemaData[n.k];
     if(a&&a.id)need.set(a.id,(need.get(a.id)||0)+1);});
   if(!need.size){toast('Сначала назначь модели узлам на вкладке «Схема»');return;}
+  const h=histBegin('сборку по схеме');
+  try{
   let added=0;
   for(const [id,n] of need){
     const d=DATA.find(x=>x.id===id&&x.ready);
@@ -769,6 +788,7 @@ async function buildFromSchema(){
   }
   autoLayout();
   toast(added?('Добавлено по схеме: '+added+' '+plural(added)):'Все назначенные модели уже в сцене');
+  }finally{histEnd(h);}
 }
 
 /* ═══ детали ═══ */
@@ -785,6 +805,7 @@ async function addItem(d,at,rot,tilt,roll){
      второй такой же корпус остаётся целым */
   const PT=geo.userData.parts;
   const mat=PT?PT.map(x=>mk(x.col)):mk(C_BODY);
+  pushHist('добавление детали');           // v2.45.996: шаг истории — до появления детали
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
   obj.position.z=-bb.min.z;                      // низ детали — на пол
@@ -833,6 +854,7 @@ function pinMark(it){
 }
 function togglePin(){
   if(!sel)return;
+  pushHist(sel.pin?'снятие закрепления':'закрепление детали');
   sel.pin=!sel.pin;pinMark(sel);selBtns();save();
   toast(sel.pin?'Закреплено на этом месте':'Закрепление снято');
 }
@@ -954,10 +976,12 @@ function reseatLink(it){
 function linkSel(mount,face){
   if(!sel)return;
   if(mount==='off'){
+    pushHist('отсоединение от корпуса');
     sel.link=null;selBtns();refresh();save();toast('Отсоединено от корпуса');return;
   }
   const fr=frameFor(sel);
   if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
+  pushHist('посадку на корпус');
   face=face==='cap'?'cap':'pan';
   const st=seatOf(fr,face,face==='cap');
   const b=new THREE.Box3().setFromObject(sel.obj);
@@ -1029,6 +1053,7 @@ function buildParts(){
   $('#pList').querySelectorAll('.prow').forEach(row=>{
     row.querySelector('.b').onclick=()=>{
       const g=gs[+row.dataset.g],off=(sel.off||[]).indexOf(g.k)<0;
+      pushHist(off?'гашение детали узла':'показ детали узла');
       if(off)sel.off.push(g.k); else sel.off=sel.off.filter(k=>k!==g.k);
       row.classList.toggle('off',off);
       row.querySelector('.b').textContent=off?'показать':'скрыть';
@@ -1043,6 +1068,7 @@ function pAllLabel(){
 }
 $('#pAll').onclick=()=>{
   if(!sel)return;
+  pushHist('показ всех деталей узла');
   sel.off=[];applyOff(sel);buildParts();save();
 };
 $('#bParts').onclick=()=>{
@@ -1082,11 +1108,13 @@ function showSelZ(){
 }
 function lift(dz){
   if(!sel)return;
+  pushHist(dz>0?'подъём детали':'опускание детали');
   moveItem(sel,0,0,Math.round(dz));
   checkCollisions();showSelZ();refresh();save();
 }
 function toFloor(){
   if(!sel)return;
+  pushHist('посадку на пол');
   const s=site(),b=new THREE.Box3().setFromObject(sel.obj);
   moveItem(sel,0,0,Math.round(s.min.z-b.min.z));
   checkCollisions();showSelZ();refresh();save();
@@ -1128,6 +1156,7 @@ function checkCollisions(){
    плоскость (дно или крышку). */
 function spinSel(ax){
   if(!sel)return;
+  pushHist('поворот детали');
   const r=sel.obj.rotation,z0=new THREE.Box3().setFromObject(sel.obj).min.z;
   r[ax]=(Math.round(r[ax]/(Math.PI/2))+1)%4*(Math.PI/2);
   sel.obj.updateMatrixWorld(true);
@@ -1143,6 +1172,7 @@ const rotSel =()=>spinSel('z');
 const tiltSel=()=>spinSel('y');
 const rollSel=()=>spinSel('x');
 function delSel(){if(!sel)return;
+  pushHist('удаление детали');
   if(sel._pinBox){scene.remove(sel._pinBox);sel._pinBox=null;}
   placed.forEach(p=>{if(p.link&&p.link.to===sel.uid)p.link=null;});
   scene.remove(sel.obj);placed.splice(placed.indexOf(sel),1);
@@ -1158,9 +1188,11 @@ $('#bAuto').onclick=autoLayout;
 $('#bFromSch').onclick=buildFromSchema;
 $('#bDup').onclick=async()=>{if(!sel)return;
   const p=sel.obj.position,r=sel.obj.rotation;
-  await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r.z,r.y,r.x);};
+  const h=histBegin('дублирование детали');
+  try{await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r.z,r.y,r.x);}finally{histEnd(h);}};
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
+  pushHist('очистку сцены');
   placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);});
   placed.length=0;select(null);refresh();save();};
 $('#bBom').onclick=()=>toast('Следующий шаг: спецификация → BOM модели ЧИЛ и чертёж сборки');
@@ -1245,6 +1277,85 @@ function save(){
     }
   },500);
 }
+/* ═══ v2.45.996: отмена действия (Ctrl+Z) ═══
+   Снимок — тот же payload, что уходит в CRM: детали с местами, закреплением,
+   посадками и назначениями схемы. Перед каждой правкой кладём снимок в стек
+   «отменить»; при отмене текущее состояние уходит в стек «вернуть». */
+const HIST={un:[],re:[],max:60,hold:false,busy:false};
+const histSnap=()=>JSON.stringify(projPayload());
+function pushHistRaw(rec){
+  if(_loading||HIST.hold||HIST.busy)return;
+  HIST.un.push(rec);
+  if(HIST.un.length>HIST.max)HIST.un.shift();
+  HIST.re.length=0;
+  histBtns();
+}
+function pushHist(label){pushHistRaw({s:histSnap(),t:label||'изменение'});}
+/* составное действие (расстановка, сборка по схеме) — один шаг истории */
+function histBegin(label){const was=HIST.hold;pushHist(label);HIST.hold=true;return was;}
+function histEnd(was){HIST.hold=!!was;}
+function histReset(){HIST.un.length=0;HIST.re.length=0;histBtns();}
+function histBtns(){
+  const u=$('#bUndo'),r=$('#bRedo');if(!u||!r)return;
+  u.classList.toggle('off',!HIST.un.length);
+  r.classList.toggle('off',!HIST.re.length);
+  u.title=HIST.un.length?('Отменить '+HIST.un[HIST.un.length-1].t+' · Ctrl+Z'):'Отменять нечего';
+  r.title=HIST.re.length?('Вернуть '+HIST.re[HIST.re.length-1].t+' · Ctrl+Y'):'Возвращать нечего';
+}
+/* Применяем снимок, не пересобирая то, что и так стоит на месте: деталь с тем
+   же uid просто переставляем, лишние убираем, недостающие поднимаем заново
+   (геометрия уже в кэше — это быстро) и возвращаем ей прежний uid, иначе
+   развалятся посадки на корпус. */
+async function histApply(snapshot){
+  const data=JSON.parse(snapshot),items=data.items||[];
+  const keep=new Set(items.map(x=>x.uid));
+  _loading=true;
+  try{
+    placed.slice().forEach(p=>{
+      if(keep.has(p.uid))return;
+      if(p._pinBox){scene.remove(p._pinBox);p._pinBox=null;}
+      scene.remove(p.obj);placed.splice(placed.indexOf(p),1);
+      if(sel===p)sel=null;
+    });
+    for(const it of items){
+      let p=placed.find(x=>x.uid===it.uid);
+      if(!p){
+        const d=DATA.find(x=>x.id===it.id&&x.ready);
+        if(!d)continue;
+        p=await addItem(d,{x:it.x,y:it.y,z:it.z},it.r,it.t,it.k);
+        if(!p)continue;
+        p.uid=it.uid;
+        uidSeq=Math.max(uidSeq,it.uid+1);
+      }
+      p.obj.position.set(it.x,it.y,it.z);
+      p.obj.rotation.set(it.k||0,it.t||0,it.r||0);
+      p.obj.updateMatrixWorld(true);
+      p.pin=!!it.pin;
+      p.link=it.link?{to:it.link.to,mount:it.link.mount,face:it.link.face||'pan'}:null;
+      p.off=Array.isArray(it.off)?it.off.slice():[];
+      applyOff(p);pinMark(p);
+    }
+    schemaData=data.schema||{};
+  }finally{_loading=false;}
+  if(sel&&!placed.includes(sel))sel=null;
+  select(sel);refresh();renderSchema();save();
+}
+async function histGo(back){
+  const from=back?HIST.un:HIST.re,to=back?HIST.re:HIST.un;
+  if(!from.length){toast(back?'Отменять нечего':'Возвращать нечего');return;}
+  if(HIST.busy)return;
+  HIST.busy=true;
+  const rec=from.pop();
+  to.push({s:histSnap(),t:rec.t});
+  try{await histApply(rec.s);}
+  catch(e){toast('Не получилось: '+(e.message||e));}
+  HIST.busy=false;histBtns();
+  toast((back?'Отменено: ':'Возвращено: ')+rec.t);
+}
+const undoAct=()=>histGo(true),redoAct=()=>histGo(false);
+$('#bUndo').onclick=undoAct;
+$('#bRedo').onclick=redoAct;
+
 function setProjName(n){
   PROJ.name=n||'Без названия';
   $('#projName').innerHTML='<b>'+esc(PROJ.name)+'</b>';
@@ -1272,6 +1383,7 @@ async function loadProjectData(data){
                                                        face:p.link.face||'pan'};
                      else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
   _loading=false;
+  histReset();                      // v2.45.996: у каждого проекта своя история
   select(null);refresh();renderSchema();
 }
 async function openProject(id){
@@ -1338,10 +1450,13 @@ async function restoreLegacy(){
   let arr=null;
   try{arr=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
   if(!Array.isArray(arr)||!arr.length)return;
-  for(const s of arr){
-    const d=DATA.find(x=>x.id===s.id&&x.ready);
-    if(d)await addItem(d,{x:s.x,y:s.y,z:s.z},s.r,s.t);
-  }
+  const h=histBegin('черновой проект из браузера');   // v2.45.996: старт — не шаг истории
+  try{
+    for(const s of arr){
+      const d=DATA.find(x=>x.id===s.id&&x.ready);
+      if(d)await addItem(d,{x:s.x,y:s.y,z:s.z},s.r,s.t);
+    }
+  }finally{histEnd(h);histReset();}
   select(null);
 }
 
@@ -1445,7 +1560,7 @@ function openAssign(key){
   $('#asgTitle').querySelector('#asgX').onclick=()=>$('#asg').classList.remove('on');
   $('#asgQ').value=nd.hint||'';
   $('#asgUnset').style.display=schemaData[key]?'block':'none';
-  $('#asgUnset').onclick=()=>{delete schemaData[key];$('#asg').classList.remove('on');renderSchema();save();};
+  $('#asgUnset').onclick=()=>{pushHist('снятие назначения на схеме');delete schemaData[key];$('#asg').classList.remove('on');renderSchema();save();};
   drawAsgList();
   $('#asg').classList.add('on');
   setTimeout(()=>$('#asgQ').focus(),50);
@@ -1463,6 +1578,7 @@ function drawAsgList(){
     '<div class="pov-empty">Ничего не нашлось — измени запрос.</div>';
   $('#asgList').querySelectorAll('.ci').forEach(el=>el.onclick=()=>{
     const d=DATA.find(x=>x.id===el.dataset.id);
+    pushHist('назначение модели на схеме');
     schemaData[asgKey]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
     $('#asg').classList.remove('on');
     renderSchema();save();
