@@ -2168,6 +2168,7 @@ const _DEVCHAT_STATUS = {
   uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
   running: { text: 'агент работает…', cls: 'text-warning' },
+  talking: { text: 'отвечает на ходу…', cls: 'text-warning' },
   stopping: { text: 'останавливаю…', cls: 'text-warning' },
   stopped: { text: 'остановлено',    cls: 'text-muted' },
   done:    { text: 'готово',         cls: 'text-success' },
@@ -2177,9 +2178,10 @@ const _DEVCHAT_STATUS = {
 function _devChatStatus(status) {
   const st = _DEVCHAT_STATUS[status];
   if (!st) return null;
-  return status === 'running'
-    ? { text: _devChatAgentName() + ' работает…', cls: st.cls }
-    : st;
+  if (status === 'running') return { text: _devChatAgentName() + ' работает…', cls: st.cls };
+  // написали в занятый чат: работа не прервалась, отвечает второй голос
+  if (status === 'talking') return { text: _devChatAgentName() + ' отвечает на ходу…', cls: st.cls };
+  return st;
 }
 
 // Задача ещё в работе, пока не done/error: за такими сообщениями нужно следить
@@ -2187,7 +2189,8 @@ function _devChatStatus(status) {
 // stopping — «Стоп» нажат, но агент ещё не подтвердил: следить надо до конца.
 function _devChatOpen(status) {
   return status === 'uploading' || status === 'new' ||
-         status === 'running' || status === 'stopping';
+         status === 'running' || status === 'stopping' ||
+         status === 'talking';
 }
 
 // Клава отвечает лёгким markdown (**жирный**, `код`, ```блоки```). Полноценный
