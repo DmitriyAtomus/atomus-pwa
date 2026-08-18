@@ -13113,6 +13113,7 @@ function renderSupplyOrders() {
     const hasInvoice = !!o.invoice_file_key;
     const isSel = state.supplyOrdersSelected.has(o.id);
     const entColor = _entityBorderColor(o.invoice_payer_tag);
+    const dupO = supOrdDup(o);   // v2.45.986: похоже на повтор — видно из списка
     let rowStyle = '';
     if (isSel) {
       rowStyle = 'style="border-color:#2563EB;background:rgba(37,99,235,0.05);"';
@@ -13133,7 +13134,8 @@ function renderSupplyOrders() {
     // распознанные позиции счёта → показываем их количество как фолбэк.
     const itemsCount = o.items_count || ((o.invoice_items && o.invoice_items.length) || 0);
     const itemsWord = (typeof _plural === 'function') ? _plural(itemsCount, ['позиция', 'позиции', 'позиций']) : 'позиций';
-    html += '<div class="sup-row sup-ord-card" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
+    html += '<div class="sup-row sup-ord-card' + (dupO ? ' is-dup' : '') + '" ' + rowStyle +
+      ' onclick="openSupplyOrder(' + o.id + ')">';
     if (canDelete) {
       html += '<label class="sup-check-wrap" onclick="event.stopPropagation();">' +
         '<input type="checkbox" ' + (isSel ? 'checked' : '') +
@@ -13154,6 +13156,7 @@ function renderSupplyOrders() {
           // Оплачены→оплата, Получены→поставка, иначе→создание (fallback на оплату).
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) +
             (_supOrdCardDate(o) ? ' · ' + _supOrdDate(_supOrdCardDate(o)) : '') + '</span>' +
+          dupOrderPill(o) +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           (itemsCount ? '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' : '') +
@@ -15822,8 +15825,26 @@ function renderSupplyOrderDetail(o) {
       '<i class="ti ti-file-invoice"></i>' +
       '<h1>Заказ #' + o.id + '</h1>' +
       '<span class="sup-status-pill ord-' + o.status + '" style="margin-left: 8px;">' + escapeHtml(o.status_label) + '</span>' +
+      dupOrderPill(o) +
     '</div>' +
     '</div>';
+
+  // v2.45.986: «возможный ПОВТОР» — красной плашкой первым делом, а не серым
+  // хвостом комментария: этот счёт уже может оплачиваться другим заказом.
+  const dupO = supOrdDup(o);
+  if (dupO) {
+    html += '<div class="dup-alert">' +
+      '<i class="ti ti-alert-triangle"></i>' +
+      '<div class="dup-alert-body">' +
+        '<div class="dup-alert-title">Возможный повтор счёта</div>' +
+        '<div class="dup-alert-text">' + escapeHtml(dupO.note || 'Такой счёт (номер и сумма) уже приходил — проверьте, чтобы не оплатить дважды') + '</div>' +
+      '</div>' +
+      (dupO.orderId
+        ? '<button class="btn btn-secondary" onclick="openSupplyOrder(' + dupO.orderId + ')">' +
+            '<i class="ti ti-external-link"></i> Открыть ' + escapeHtml(dupO.orderLabel || ('#' + dupO.orderId)) + '</button>'
+        : '') +
+    '</div>';
+  }
 
   // Сведения о поставщике
   html += '<div class="detail-block">' +
@@ -15850,7 +15871,8 @@ function renderSupplyOrderDetail(o) {
     (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
     // v2.45.665: внешний статус поставки (из ЛК Всеинструментов)
     (o.ext_status ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#E7EEFB;border:1px solid #B9CCEF;color:#2749A0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-truck-delivery" style="font-size:16px;"></i> Поставка: ' + escapeHtml(o.ext_status) + (o.expected_date ? ' · придёт ' + escapeHtml(o.expected_date) : '') + '</div>' : '') +
-    (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
+    // пометку повтора из комментария вырезали — она уже наверху красным
+    ((dupO ? dupO.comment : o.comment) ? '<div class="detail-comment">' + escapeHtml(dupO ? dupO.comment : o.comment) + '</div>' : '') +
     '</div>';
 
   // История переходов (только если есть хоть один таймстамп лайфцикла)
@@ -16214,7 +16236,12 @@ async function sendOrder(orderId) {
 // ========== ЭТАП 52.2: FSM-переходы статусов и счёт от поставщика ==========
 
 async function transitionSupplyOrder(orderId, newStatus, confirmText) {
-  if (confirmText && !confirm(confirmText)) return;
+  // v2.45.986: платить по счёту-повтору — отдельный вопрос, с текстом совпадения
+  const _cur = (cache.currentSupplyOrder && cache.currentSupplyOrder.id === orderId)
+    ? cache.currentSupplyOrder : null;
+  if (['to_pay', 'paid'].includes(newStatus) && !dupPayConfirmed(_cur)) return;
+  const _dupSkip = ['to_pay', 'paid'].includes(newStatus) && !!supOrdDup(_cur);
+  if (confirmText && !_dupSkip && !confirm(confirmText)) return;
   try {
     // v2.45.309: для 'paid' бэкенд требует подтверждение личным паролём —
     // общий помощник (из app-1.js) спросит пароль и повторит при необходимости.
