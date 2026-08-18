@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.985";
+const APP_VERSION = "v2.45.986";
 const APP_VERSION_DATE = "17.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4649,6 +4649,57 @@ async function _fillPayDueBlock() {
   } catch (e) { box.innerHTML = ''; }
 }
 
+// Заказы, показанные в блоке «На оплате» на главной — кнопкам нужен сам заказ
+// (проверить пометку повтора), а на руках только его id.
+const _payDueById = {};
+function _payDueOrder(id) { return _payDueById[id] || null; }
+
+// v2.45.986: пометка «возможный ПОВТОР» у заказа. Бэкенд отдаёт её структурно
+// (o.duplicate — письмо, номер, сумма, заказ-оригинал); у заказов, оформленных
+// до этой версии, тот же текст лежит хвостом в комментарии — разбираем и его,
+// иначе старые счета остались бы без предупреждения.
+function supOrdDup(o) {
+  o = o || {};
+  const d = o.duplicate;
+  const comment = String(o.comment || '');
+  const at = comment.search(/⚠️?\s*возможный\s+ПОВТОР/i);
+  if (!d && at < 0) return null;
+  const tail = at >= 0 ? comment.slice(at).replace(/^⚠️?\s*/, '').trim() : '';
+  const ordFromText = tail.match(/ORD-(\d+)/i);
+  const ibFromText = tail.match(/письмо\s*#(\d+)/i);
+  // «⚠️ возможный ПОВТОР (письмо #362): счёт № 84 …» → «счёт № 84 … (письмо #362)»
+  let note = String((d && d.note) || tail).replace(/^⚠️?\s*/, '')
+    .replace(/^возможный ПОВТОР\s*/i, '');
+  const moved = note.match(/^\((письмо\s*#\d+)\):\s*/i);
+  if (moved) note = note.slice(moved[0].length) + ' (' + moved[1] + ')';
+  note = note.replace(/^[:·\s]+/, '');
+  return {
+    note: note,
+    orderId: (d && d.order_id) || (ordFromText ? Number(ordFromText[1]) : null),
+    orderLabel: (d && d.order_label) || (ordFromText ? ('ORD-' + ordFromText[1]) : ''),
+    inboxId: (d && d.inbox_id) || (ibFromText ? Number(ibFromText[1]) : null),
+    // комментарий без хвоста-пометки: она уедет в красную плашку
+    comment: at >= 0 ? comment.slice(0, at).replace(/[·\s]+$/, '') : comment,
+  };
+}
+
+// Красная пилюля «ПОВТОР» — рядом со статусом (список, шапка заказа, главная).
+function dupOrderPill(o) {
+  const d = supOrdDup(o);
+  if (!d) return '';
+  return '<span class="sup-status-pill dup-pill" title="' +
+    escapeHtml('Похоже на повтор: ' + (d.note || 'такой счёт уже приходил')) +
+    '">⚠️ ПОВТОР</span>';
+}
+
+// Спросить перед оплатой заказа, помеченного повтором. true — можно платить.
+function dupPayConfirmed(o) {
+  const d = supOrdDup(o);
+  if (!d) return true;
+  return confirm('ВНИМАНИЕ: похоже на ПОВТОР.\n\n' + (d.note || 'Такой счёт уже приходил') +
+                 '\n\nВсё равно провести оплату?');
+}
+
 // v2.45.310: HTML одного блока главного экрана «список заказов + кнопка действия».
 function _payBlockHtml(list, title, color, icon, btnFactory) {
   if (!list || !list.length) return '';
@@ -4657,22 +4708,28 @@ function _payBlockHtml(list, title, color, icon, btnFactory) {
       '<a style="cursor:pointer;color:var(--brand);font-size:13px;" onclick="selectSidebarItem(\'supply-orders\')">все заказы →</a></h3>' +
     '<div class="card" style="padding:4px 12px;">';
   list.forEach(o => {
+    _payDueById[o.id] = o;
     const sum = o.invoice_total
       ? Number(o.invoice_total).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽'
       : (o.total_amount ? Math.round(o.total_amount).toLocaleString('ru-RU') + ' ₽' : '');
     const inv = o.invoice_number ? 'Счёт № ' + o.invoice_number : (o.invoice_filename || '');
     const dog = o.contract_number ? ('дог. №' + o.contract_number) : '';
     const meta2 = [inv, dog].filter(Boolean).join(' · ');
-    h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);">' +
+    const dupO = supOrdDup(o);
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);' +
+      (dupO ? 'background:rgba(220,38,38,0.07);border-left:4px solid #DC2626;padding-left:8px;' : '') + '">' +
       '<div style="flex:1;min-width:0;cursor:pointer;" onclick="state.currentSupplyOrderId=' + o.id + ';selectSidebarItem(\'supply-order-detail\');" title="Открыть заказ">' +
         '<div style="font-size:13.5px;font-weight:600;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-          escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') + '</div>' +
+          escapeHtml(o.order_label || ('#' + o.id)) + ' · ' + escapeHtml(o.supplier_name || '—') +
+          (dupO ? ' <span class="sup-status-pill dup-pill">⚠️ ПОВТОР</span>' : '') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(meta2) +
           (sum ? (meta2 ? ' · ' : '') + '<b style="color:' + color + ';">' + sum + '</b>' : '') + '</div>' +
         // v2.45.x: срок поставки — заметно, чтобы видеть ДО оплаты
         (o.invoice_delivery_term ? '<div style="font-size:11.5px;font-weight:700;color:#9A3412;margin-top:2px;"><i class="ti ti-truck-delivery" style="font-size:12px;vertical-align:-1px;"></i> Срок поставки: ' + escapeHtml(o.invoice_delivery_term) + '</div>' : '') +
         // v2.45.773: назначение счёта — бухгалтер видит, за что платим
         (o.purpose ? '<div style="font-size:11.5px;font-weight:700;color:#92400E;margin-top:2px;"><i class="ti ti-tag" style="font-size:12px;vertical-align:-1px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
+        // v2.45.986: повтор счёта — красным, до того как нажмут «Оплатил»
+        (dupO ? '<div class="dup-line"><i class="ti ti-alert-triangle" style="font-size:13px;vertical-align:-2px;"></i> ПОВТОР · ' + escapeHtml(dupO.note || 'такой счёт уже приходил') + '</div>' : '') +
       '</div>' +
       btnFactory(o) +
     '</div>';
@@ -4683,7 +4740,9 @@ function _payBlockHtml(list, title, color, icon, btnFactory) {
 
 // v2.45.310: бухгалтер передаёт «счёт получен» → «на оплате»
 async function payQueueToPay(orderId, btn) {
-  if (!confirm('Передать на оплату?')) return;
+  // v2.45.986: у помеченного повтором счёта спрашиваем отдельно и по-другому
+  if (!dupPayConfirmed(_payDueOrder(orderId))) return;
+  if (!supOrdDup(_payDueOrder(orderId)) && !confirm('Передать на оплату?')) return;
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
   try {
     const res = await supplyOrderTransitionConfirmed(orderId, 'to_pay');
@@ -4741,7 +4800,8 @@ async function supplyOrderTransitionConfirmed(orderId, newStatus) {
 }
 
 async function payDueMarkPaid(orderId, btn) {
-  if (!confirm('Отметить заказ оплаченным?')) return;
+  if (!dupPayConfirmed(_payDueOrder(orderId))) return;
+  if (!supOrdDup(_payDueOrder(orderId)) && !confirm('Отметить заказ оплаченным?')) return;
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
   try {
     const res = await supplyOrderTransitionConfirmed(orderId, 'paid');
