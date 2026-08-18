@@ -166,6 +166,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
   border-radius:10px;padding:7px;min-width:250px;box-shadow:0 14px 34px rgba(0,0,0,.5)}
 #mnt.on{display:flex}
 #mnt .t{font-size:10.5px;color:var(--faint);padding:1px 4px 3px}
+#mnt .t2{margin-top:4px;border-top:1px solid var(--line2);padding-top:6px}
 #mnt .o{font-size:12px;padding:6px 9px;border-radius:7px;cursor:pointer;color:var(--ink)}
 #mnt .o:hover{background:var(--panel2);color:var(--ice)}
 #mnt .o small{color:var(--faint);font-size:10.5px}
@@ -331,19 +332,25 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="list" id="pList"></div>
       </div>
       <div id="mnt">
-        <div class="t">Чем держится на корпусе:</div>
-        <div class="o" data-m="bolt8">Болты М8 <small>· 4 шт, на дно корпуса</small></div>
-        <div class="o" data-m="bolt10">Болты М10 <small>· 4 шт, на дно корпуса</small></div>
-        <div class="o" data-m="weld">Сварка <small>· приварить к дну</small></div>
-        <div class="o" data-m="free">Просто поставить <small>· без крепежа</small></div>
+        <div class="t">Внутрь, на дно корпуса:</div>
+        <div class="o" data-m="bolt8" data-f="pan">Болты М8 <small>· 4 шт, на дно корпуса</small></div>
+        <div class="o" data-m="bolt10" data-f="pan">Болты М10 <small>· 4 шт, на дно корпуса</small></div>
+        <div class="o" data-m="weld" data-f="pan">Сварка <small>· приварить к дну</small></div>
+        <div class="o" data-m="free" data-f="pan">Просто поставить <small>· без крепежа</small></div>
+        <div class="t t2">Сверху, на крышку:</div>
+        <div class="o" data-m="bolt8" data-f="cap">Болты М8 <small>· 4 шт, к крышке</small></div>
+        <div class="o" data-m="bolt10" data-f="cap">Болты М10 <small>· 4 шт, к крышке</small></div>
+        <div class="o" data-m="weld" data-f="cap">Сварка <small>· приварить к крышке</small></div>
+        <div class="o" data-m="free" data-f="cap">Просто надеть <small>· по проёму, без крепежа</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
       <div id="selbar"><span class="nm" id="selNm"></span>
         <span class="z" id="selZ"></span>
         <button id="bPin" title="Закрепить на этом месте (P)">📌 Закрепить</button>
-        <button id="bLink" title="Поставить на дно корпуса и закрепить">⛓ Соединить с корпусом</button>
-        <button id="bRot" title="R">⟳ 90°</button>
-        <button id="bTilt" title="Положить набок / поднять">⤡ завал 90°</button>
+        <button id="bLink" title="Поставить на дно или надеть на крышку корпуса">⛓ Соединить с корпусом</button>
+        <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
+        <button id="bTilt" title="Завалить вперёд-назад, вокруг оси Y (T)">⤡ завал 90°</button>
+        <button id="bRoll" title="Завалить вбок, вокруг оси X (Y)">⤾ крен 90°</button>
         <button id="bUp" title="PageUp">▲ 50</button>
         <button id="bDown" title="PageDown">▼ 50</button>
         <button id="bFloor" title="Поставить на пол">⤓ пол</button>
@@ -595,6 +602,8 @@ function bindCtl(cv){
     if(e.key==='p'||e.key==='P'||e.key==='з'||e.key==='З')togglePin();
     if(!sel)return;
     if(e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')rotSel();
+    if(e.key==='t'||e.key==='T'||e.key==='е'||e.key==='Е')tiltSel();
+    if(e.key==='y'||e.key==='Y'||e.key==='н'||e.key==='Н')rollSel();
     if(e.key==='PageUp'){e.preventDefault();lift(50);}
     if(e.key==='PageDown'){e.preventDefault();lift(-50);}
     if(e.key==='Delete'||e.key==='Backspace')delSel();
@@ -660,7 +669,9 @@ function site(){
 }
 function levelZ(lvl,s){
   const H=s.max.z-s.min.z;
-  if(lvl==='roof')return s.max.z;                       // конденсатор — наверх
+  if(lvl==='roof'){                                     // конденсатор — сверху, на крышку
+    const fr=placed.find(p=>roleOf(p.d)==='frame');
+    return fr?capTop(fr).z:s.max.z;}
   if(lvl==='mid') return s.min.z+H*0.50;                // арматура — средний ярус
   if(lvl==='panel')return s.min.z+H*0.70;               // приборы — на виду сверху
   if(lvl==='cond'){                                     // вентилятор — на конденсаторе
@@ -672,10 +683,12 @@ function slotPoint(sl,s){
   return {x:s.min.x+(s.max.x-s.min.x)*sl.ax,
           y:s.min.y+(s.max.y-s.min.y)*sl.ay};
 }
-/* поставить деталь: центр по X/Y в точку, низ — на отметку z; tilt — завал вокруг Y */
+/* поставить деталь: центр по X/Y в точку, низ — на отметку z; tilt — завал вокруг Y.
+   v2.45.995: крен вокруг X слот не задаёт — он ручной, и перекладка по функциям
+   его не откручивает: развернул конденсатор как надо — так он и останется */
 function placeAt(it,x,y,z,rot,tilt){
   const o=it.obj;
-  o.rotation.set(0,tilt||0,rot||0);o.position.set(0,0,0);o.updateMatrixWorld(true);
+  o.rotation.set(o.rotation.x,tilt||0,rot||0);o.position.set(0,0,0);o.updateMatrixWorld(true);
   const b0=new THREE.Box3().setFromObject(o),c=new THREE.Vector3();b0.getCenter(c);
   o.position.set(snap(x-c.x),snap(y-c.y),Math.round(z-b0.min.z));
   o.updateMatrixWorld(true);
@@ -759,7 +772,7 @@ async function buildFromSchema(){
 }
 
 /* ═══ детали ═══ */
-async function addItem(d,at,rot,tilt){
+async function addItem(d,at,rot,tilt,roll){
   let geo;
   try{geo=await geoOf(d);}
   catch(err){toast('Модель не загрузилась: '+err.message);return null;}
@@ -775,7 +788,7 @@ async function addItem(d,at,rot,tilt){
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
   obj.position.z=-bb.min.z;                      // низ детали — на пол
-  obj.rotation.set(0,tilt||0,rot||0);
+  obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
   const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[]};
   placed.push(it);
@@ -848,6 +861,66 @@ function panTop(fr){
   }
   return {z:bb.max.z,box:bb,part:PT[idx]};
 }
+/* Верх крышки корпуса (деталь 00.000.003 «Крышка»). В нашей версии
+   конденсатор не ставится внутрь, а надевается сверху — на крышку, по её
+   монтажному проёму. Крышки в модели нет — берём верх корпуса. */
+function capTop(fr,wantHole){
+  const geo=fr.obj.geometry,PT=geo.userData.parts;
+  const idx=PT?PT.findIndex(x=>/крышк/i.test(x.name)||/00\.000\.003/.test(x.des)):-1;
+  const b=new THREE.Box3().setFromObject(fr.obj);
+  if(idx<0)return {z:b.max.z,box:b,part:null,hole:null};
+  const g=geo.groups[idx],pos=geo.attributes.position,ix=geo.index;
+  const v=new THREE.Vector3(),bb=new THREE.Box3();
+  fr.obj.updateMatrixWorld(true);
+  for(let i=g.start;i<g.start+g.count;i++){
+    v.fromBufferAttribute(pos,ix.getX(i)).applyMatrix4(fr.obj.matrixWorld);
+    bb.expandByPoint(v);
+  }
+  return {z:bb.max.z,box:bb,part:PT[idx],hole:wantHole?capHole(fr,bb):null};
+}
+/* Центр монтажного проёма крышки: сеткой лучей сверху вниз ищем, где металла
+   нет. Крайние клетки сетки отбрасываем — там просто край листа, а не проём.
+   Проёма нет (глухая крышка) — вернём null, тогда деталь садится там, где
+   стояла, только прижатая к границам крышки. */
+function capHole(fr,bb){
+  const N=26,step=6,ray=new THREE.Raycaster();
+  ray.far=12;                       // только верхний лист, ниже не смотрим
+  const dir=new THREE.Vector3(0,0,-1),o=new THREE.Vector3();
+  const w=bb.max.x-bb.min.x,d=bb.max.y-bb.min.y;
+  if(w<step*4||d<step*4)return null;
+  const empty=[];
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+    const x=bb.min.x+w*(i+.5)/N,y=bb.min.y+d*(j+.5)/N;
+    o.set(x,y,bb.max.z+5);ray.set(o,dir);
+    const hit=ray.intersectObject(fr.obj,false);
+    if(!hit.length)empty.push([i,j,x,y]);
+  }
+  // оставляем только «внутренние» пустоты: клетка не на кромке сетки
+  const in_=empty.filter(([i,j])=>i>0&&j>0&&i<N-1&&j<N-1);
+  if(in_.length<4)return null;
+  const key=(i,j)=>i+'_'+j,set=new Set(in_.map(([i,j])=>key(i,j)));
+  const seen=new Set();let best=null;
+  in_.forEach(c=>{                              // самый большой связный проём
+    if(seen.has(key(c[0],c[1])))return;
+    const q=[c],cl=[];seen.add(key(c[0],c[1]));
+    while(q.length){
+      const [i,j,x,y]=q.pop();cl.push([x,y]);
+      [[1,0],[-1,0],[0,1],[0,-1]].forEach(([di,dj])=>{
+        const nb=in_.find(z=>z[0]===i+di&&z[1]===j+dj);
+        if(nb&&set.has(key(nb[0],nb[1]))&&!seen.has(key(nb[0],nb[1]))){
+          seen.add(key(nb[0],nb[1]));q.push(nb);}
+      });
+    }
+    if(!best||cl.length>best.length)best=cl;
+  });
+  if(!best||best.length<4)return null;
+  const sx=best.reduce((a,p)=>a+p[0],0)/best.length,
+        sy=best.reduce((a,p)=>a+p[1],0)/best.length;
+  // грубый диаметр проёма — по разбросу пустых клеток
+  const xs=best.map(p=>p[0]),ys=best.map(p=>p[1]);
+  return {x:sx,y:sy,w:Math.max(...xs)-Math.min(...xs)+w/N,
+                    d:Math.max(...ys)-Math.min(...ys)+d/N};
+}
 /* Найти корпус, к которому сажаем: сначала тот, над которым деталь стоит,
    иначе единственный (или ближайший) в сцене. */
 function frameFor(it){
@@ -863,42 +936,54 @@ function frameFor(it){
     if(dd<bd){bd=dd;best=f;}});
   return best;
 }
-/* Вернуть посаженную деталь на дно её корпуса (после перекладки по функциям). */
+/* Плоскость посадки: дно внутри корпуса или крышка сверху. */
+function seatOf(fr,face,wantHole){
+  return face==='cap'?capTop(fr,wantHole):panTop(fr);
+}
+/* Вернуть посаженную деталь на её плоскость (после перекладки или поворота). */
 function reseatLink(it){
   if(!it.link)return;
   const fr=placed.find(x=>x.uid===it.link.to);
   if(!fr){it.link=null;return;}
-  const pan=panTop(fr),b=new THREE.Box3().setFromObject(it.obj);
-  moveItem(it,0,0,Math.round(pan.z-b.min.z));
+  const st=seatOf(fr,it.link.face),b=new THREE.Box3().setFromObject(it.obj);
+  moveItem(it,0,0,Math.round(st.z-b.min.z));
 }
-/* Посадить выделенную деталь на дно корпуса и запомнить крепление. */
-function linkSel(mount){
+/* Посадить выделенную деталь на корпус и запомнить крепление.
+   face='pan' — внутрь, на дно; face='cap' — сверху, на крышку (так у нас
+   надевается конденсатор: низом на крышку, по центру монтажного проёма). */
+function linkSel(mount,face){
   if(!sel)return;
   if(mount==='off'){
     sel.link=null;selBtns();refresh();save();toast('Отсоединено от корпуса');return;
   }
   const fr=frameFor(sel);
   if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
-  const pan=panTop(fr);
+  face=face==='cap'?'cap':'pan';
+  const st=seatOf(fr,face,face==='cap');
   const b=new THREE.Box3().setFromObject(sel.obj);
   const sz=new THREE.Vector3();b.getSize(sz);
-  // держим деталь в границах дна: край в край не ставим, оставляем 20 мм
-  const M=20;
-  const cx=Math.min(Math.max(b.getCenter(new THREE.Vector3()).x,pan.box.min.x+sz.x/2+M),
-                    Math.max(pan.box.min.x+sz.x/2+M,pan.box.max.x-sz.x/2-M));
-  const cy=Math.min(Math.max(b.getCenter(new THREE.Vector3()).y,pan.box.min.y+sz.y/2+M),
-                    Math.max(pan.box.min.y+sz.y/2+M,pan.box.max.y-sz.y/2-M));
-  moveItem(sel,snap(cx-b.getCenter(new THREE.Vector3()).x),
-               snap(cy-b.getCenter(new THREE.Vector3()).y),
-               Math.round(pan.z-b.min.z));
-  sel.link={to:fr.uid,mount:mount};
-  /* закрепление отдельной кнопкой: посаженную деталь можно ещё подвинуть по дну,
-     а поедет она вместе с корпусом в любом случае */
+  const c=b.getCenter(new THREE.Vector3());
+  let cx,cy;
+  if(face==='cap'&&st.hole){
+    cx=st.hole.x;cy=st.hole.y;          // надеваем ровно на проём обдува
+  }else{
+    // держим деталь в границах площадки: край в край не ставим, оставляем 20 мм
+    const M=20;
+    cx=Math.min(Math.max(c.x,st.box.min.x+sz.x/2+M),
+                Math.max(st.box.min.x+sz.x/2+M,st.box.max.x-sz.x/2-M));
+    cy=Math.min(Math.max(c.y,st.box.min.y+sz.y/2+M),
+                Math.max(st.box.min.y+sz.y/2+M,st.box.max.y-sz.y/2-M));
+  }
+  moveItem(sel,snap(cx-c.x),snap(cy-c.y),Math.round(st.z-b.min.z));
+  sel.link={to:fr.uid,mount:mount,face:face};
+  /* закрепление отдельной кнопкой: посаженную деталь можно ещё подвинуть по
+     площадке, а поедет она вместе с корпусом в любом случае */
   pinMark(sel);selBtns();checkCollisions();showSelZ();refresh();save();
   const m=MOUNT[mount]||MOUNT.free;
-  toast(pan.part
-    ? ('Поставлено на дно ' + pan.part.des + ', отм. ' + Math.round(pan.z) + ' мм · ' + m.t)
-    : ('Поставлено на низ корпуса, отм. ' + Math.round(pan.z) + ' мм · ' + m.t));
+  const z=' отм. '+Math.round(st.z)+' мм · '+m.t;
+  if(face==='cap')toast((st.part?'Надето на крышку '+st.part.des:'Поставлено на верх корпуса')
+    +(st.hole?' по проёму Ø'+Math.round((st.hole.w+st.hole.d)/2)+' мм,':',')+z);
+  else toast((st.part?'Поставлено на дно '+st.part.des+',':'Поставлено на низ корпуса,')+z);
 }
 function showMnt(){
   const box=$('#mnt');
@@ -967,14 +1052,15 @@ $('#bParts').onclick=()=>{
 };
 $('#bPin').onclick=togglePin;
 $('#bLink').onclick=()=>{$('#mnt').classList.contains('on')?hideMnt():showMnt();};
-$('#mnt').querySelectorAll('.o').forEach(o=>o.onclick=()=>{hideMnt();linkSel(o.dataset.m);});
+$('#mnt').querySelectorAll('.o').forEach(o=>o.onclick=()=>{hideMnt();linkSel(o.dataset.m,o.dataset.f);});
 /* подписи кнопок под выделенную деталь */
 function selBtns(){
   const pin=!!(sel&&sel.pin);
   $('#bPin').textContent=pin?'📌 Открепить':'📌 Закрепить';
   $('#bPin').classList.toggle('on',pin);
   const lk=sel&&sel.link?MOUNT[sel.link.mount]:null;
-  $('#bLink').textContent=lk?('⛓ на корпусе · '+lk.t):'⛓ Соединить с корпусом';
+  $('#bLink').textContent=lk?('⛓ '+(sel.link.face==='cap'?'на крышке':'на дне')+' · '+lk.t)
+                           :'⛓ Соединить с корпусом';
   $('#bLink').classList.toggle('on',!!lk);
 }
 function select(it){
@@ -1035,20 +1121,27 @@ function checkCollisions(){
   el.textContent=n?('⚠ пересекаются: '+n+' дет.'):'✓ пересечений нет';
   el.style.color=n?'#f0a9a0':'var(--ok)';
 }
-function rotSel(){if(!sel)return;sel.obj.rotation.z+=Math.PI/2;
-  sel.obj.updateMatrixWorld(true);if(sel._pinBox)sel._pinBox.update();
-  checkCollisions();showSelZ();save();}
-/* завал вокруг Y: положить конденсатор обдувом вверх, поднять вентилятор и т.п.
-   после завала деталь опускаем низом на прежнюю отметку, чтобы не проваливалась под пол */
-function tiltSel(){
+/* ═══ v2.45.995: поворот по всем трём осям ═══
+   z — вокруг вертикали, y — завал вперёд-назад, x — крен вбок.
+   Деталь после завала и крена опускаем низом на прежнюю отметку, чтобы она
+   не проваливалась под пол; посаженную на корпус — заново сажаем на её
+   плоскость (дно или крышку). */
+function spinSel(ax){
   if(!sel)return;
-  const z0=new THREE.Box3().setFromObject(sel.obj).min.z;
-  sel.obj.rotation.y=(Math.round(sel.obj.rotation.y/(Math.PI/2))+1)%4*(Math.PI/2);
+  const r=sel.obj.rotation,z0=new THREE.Box3().setFromObject(sel.obj).min.z;
+  r[ax]=(Math.round(r[ax]/(Math.PI/2))+1)%4*(Math.PI/2);
   sel.obj.updateMatrixWorld(true);
-  sel.obj.position.z+=z0-new THREE.Box3().setFromObject(sel.obj).min.z;
-  sel.obj.updateMatrixWorld(true);if(sel._pinBox)sel._pinBox.update();
+  if(ax!=='z'){
+    sel.obj.position.z+=z0-new THREE.Box3().setFromObject(sel.obj).min.z;
+    sel.obj.updateMatrixWorld(true);
+  }
+  if(sel.link)reseatLink(sel);
+  if(sel._pinBox)sel._pinBox.update();
   checkCollisions();showSelZ();refresh();save();
 }
+const rotSel =()=>spinSel('z');
+const tiltSel=()=>spinSel('y');
+const rollSel=()=>spinSel('x');
 function delSel(){if(!sel)return;
   if(sel._pinBox){scene.remove(sel._pinBox);sel._pinBox=null;}
   placed.forEach(p=>{if(p.link&&p.link.to===sel.uid)p.link=null;});
@@ -1057,14 +1150,15 @@ function delSel(){if(!sel)return;
 $('#bRot').onclick=rotSel;
 $('#bDel').onclick=delSel;
 $('#bTilt').onclick=tiltSel;
+$('#bRoll').onclick=rollSel;
 $('#bUp').onclick=()=>lift(50);
 $('#bDown').onclick=()=>lift(-50);
 $('#bFloor').onclick=toFloor;
 $('#bAuto').onclick=autoLayout;
 $('#bFromSch').onclick=buildFromSchema;
 $('#bDup').onclick=async()=>{if(!sel)return;
-  const p=sel.obj.position,r=sel.obj.rotation.z;
-  await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r,sel.obj.rotation.y);};
+  const p=sel.obj.position,r=sel.obj.rotation;
+  await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r.z,r.y,r.x);};
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
   placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);});
@@ -1131,8 +1225,10 @@ function projPayload(){
   // v2.45.994: uid, закрепление, посадка на корпус и погашенные детали — тоже в проект
   return {items:placed.map(p=>({uid:p.uid,id:p.id,x:p.obj.position.x,y:p.obj.position.y,
                                 z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y,
+                                k:p.obj.rotation.x,        // v2.45.995: крен вокруг X
                                 pin:p.pin?1:0,
-                                link:p.link?{to:p.link.to,mount:p.link.mount}:null,
+                                link:p.link?{to:p.link.to,mount:p.link.mount,
+                                             face:p.link.face||'pan'}:null,
                                 off:(p.off&&p.off.length)?p.off:undefined})),
           schema:schemaData};
 }
@@ -1169,10 +1265,11 @@ async function loadProjectData(data){
     const d=DATA.find(x=>x.id===s.id&&x.ready);
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
-    const it=await addItem(d,{x:s.x,y:s.y,z:s.z,state:{pin:s.pin,off:s.off,link:s.link}},s.r,s.t);
+    const it=await addItem(d,{x:s.x,y:s.y,z:s.z,state:{pin:s.pin,off:s.off,link:s.link}},s.r,s.t,s.k);
     if(it&&s.uid)map[s.uid]=it.uid;
   }
-  placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount};
+  placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
+                                                       face:p.link.face||'pan'};
                      else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
   _loading=false;
   select(null);refresh();renderSchema();
@@ -1555,10 +1652,14 @@ function itemInfo(p){
     x:Math.round(p.obj.position.x),y:Math.round(p.obj.position.y),
     z:Math.round(b.min.z),
     поворот:Math.round(p.obj.rotation.z*180/Math.PI)%360};
+  const gr=a=>Math.round(p.obj.rotation[a]*180/Math.PI)%360;
+  if(gr('y'))o.завал=gr('y');
+  if(gr('x'))o.крен=gr('x');
   if(p.pin)o.закреплена=true;
   if(p.link){
     const fr=placed.find(x=>x.uid===p.link.to);
-    o.на_корпусе=(fr?fr.d.name:'корпус')+' · '+((MOUNT[p.link.mount]||{}).t||p.link.mount);
+    o[p.link.face==='cap'?'на_крышке':'на_дне']=
+      (fr?fr.d.name:'корпус')+' · '+((MOUNT[p.link.mount]||{}).t||p.link.mount);
   }
   if(p.off&&p.off.length)o.погашено=p.off.map(k=>k.replace('|',' '));
   return o;
