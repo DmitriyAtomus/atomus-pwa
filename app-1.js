@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.987";
+const APP_VERSION = "v2.45.988";
 const APP_VERSION_DATE = "18.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3444,13 +3444,21 @@ function _devChatSendProgress(btn, part) {
 function _devChatPostOnce(url, form, onProgress) {
   return new Promise(function (resolve, reject) {
     const xhr = new XMLHttpRequest();
+    let sent = 0;                       // докуда доехало тело — нужно при обрыве
     xhr.open('POST', url);
     xhr.setRequestHeader('Authorization', 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''));
-    if (xhr.upload && onProgress) {
+    if (xhr.upload) {
       xhr.upload.onprogress = function (e) {
-        if (e.lengthComputable) onProgress(e.loaded / e.total);
+        if (!e.lengthComputable) return;
+        sent = e.loaded / e.total;
+        if (onProgress) onProgress(sent);
       };
     }
+    const die = function (kind) {
+      const err = new Error(kind);
+      err.sent = sent;
+      reject(err);
+    };
     xhr.onload = function () {
       let body = {};
       try { body = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
@@ -3463,9 +3471,9 @@ function _devChatPostOnce(url, form, onProgress) {
         contentType: contentType,
       });
     };
-    xhr.onerror = function () { reject(new Error('network')); };
-    xhr.ontimeout = function () { reject(new Error('timeout')); };
-    xhr.onabort = function () { reject(new Error('abort')); };
+    xhr.onerror = function () { die('network'); };
+    xhr.ontimeout = function () { die('timeout'); };
+    xhr.onabort = function () { die('abort'); };
     xhr.send(form);
   });
 }
@@ -3474,13 +3482,26 @@ function _devChatPostOnce(url, form, onProgress) {
 // в начале файла. Если Vercel вместо API вернул свою HTML-страницу 403 (часто
 // при VPN), повторяем тот же multipart прямо в Railway. JSON-отказ backend не
 // повторяем: это настоящий ответ сервера, а не защитная страница Vercel.
+//
+// ⚠️ v2.45.988: проверка Vercel чаще НЕ доезжает до браузера ответом. Она рвёт
+// соединение, пока тело ещё едет, — и XHR получает не 403, а сетевую ошибку на
+// 0%. Отличить её от настоящего обрыва можно по тому, сколько успело уехать:
+// упало в самом начале — это отказ края, повторяем прямо в Railway. Обрыв
+// посреди длинной загрузки не переносим: у него свой повтор в devChatSend, и
+// гнать 40 МБ вторым адресом впустую незачем.
+const DEVCHAT_EDGE_REJECT = 0.05;
+
 function _devChatPost(url, form, onProgress) {
+  const viaVercel = url.indexOf(API_BASE + '/api/') === 0;
+  const direct = viaVercel ? API_DIRECT_FALLBACK + url.slice(API_BASE.length) : '';
   return _devChatPostOnce(url, form, onProgress).then(function (result) {
-    const viaVercel = url.indexOf(API_BASE + '/api/') === 0;
     const html403 = result.status === 403 &&
       String(result.contentType || '').toLowerCase().indexOf('text/html') >= 0;
-    if (!viaVercel || !html403) return result;
-    return _devChatPostOnce(API_DIRECT_FALLBACK + url.slice(API_BASE.length), form, onProgress);
+    if (!direct || !html403) return result;
+    return _devChatPostOnce(direct, form, onProgress);
+  }, function (err) {
+    if (!direct || (err && err.sent > DEVCHAT_EDGE_REJECT)) throw err;
+    return _devChatPostOnce(direct, form, onProgress);
   });
 }
 
@@ -3565,8 +3586,14 @@ async function devChatSend(context) {
       }
     } catch (e) {
       const gone = await _devChatUnreadable();
-      showToast(gone || ('Не ушло: связь оборвалась на ' + Math.round(part * 100)
-        + '%. Текст и файлы на месте — нажми ещё раз'), 'error');
+      // Падение на самом старте — это не «плохой интернет»: соединение закрыли
+      // до того, как поехало тело. Так ведёт себя проверка Vercel под VPN, и
+      // обход в Railway (см. _devChatPost) к этому моменту уже не помог.
+      const early = 'Не ушло: соединение закрылось сразу, файл даже не начал грузиться '
+        + '(пробовал и в обход). Чаще всего мешает включённый VPN — выключи его и нажми ещё раз.';
+      showToast(gone || (part <= DEVCHAT_EDGE_REJECT ? early
+        : 'Не ушло: связь оборвалась на ' + Math.round(part * 100)
+          + '%. Текст и файлы на месте — нажми ещё раз'), 'error');
       return;
     } finally {
       _devChatSendProgress(btn, null);
