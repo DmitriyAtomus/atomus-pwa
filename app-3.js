@@ -8452,6 +8452,7 @@ async function loadLogisticsPickups() {
       const n = g.items.length;
       const lateN = g.fresh.filter(x => { const dd = _spDaysSince(x.paid_at); return dd !== null && dd >= 3; }).length;
       const sum = g.fresh.reduce((a, x) => a + (Number(x.invoice_total) || 0), 0);
+      const gDone = spDone.filter(x => (x.supplier_key || _spKey(x.supplier_name)) === g.key).length;
       return {
         hot: lateN ? 1 : 0, act: g.fresh.length ? 1 : 0,
         html: _lgCardHtml('lgc-sp', 'ti-receipt', escapeHtml(g.name),
@@ -8473,7 +8474,8 @@ async function loadLogisticsPickups() {
             : '<div class="lgc-empty"><i class="ti ti-circle-check" style="color:var(--success);"></i>Всё забрали.<br>Счёт появится здесь, как только его оплатят.</div>',
           '<span>забрать <b>' + g.fresh.length + '</b></span>' +
             (sum > 0 ? '<span>на сумму <b>' + _logiSum(sum) + '</b></span>' : '') +
-            (spDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + spDone.length + ' →</span>' : ''),
+            // v2.45.989: «забрали» считаем по своему поставщику, а не по всем
+            (gDone ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + gDone + ' →</span>' : ''),
           !g.fresh.length),
       };
     });
@@ -9574,11 +9576,22 @@ function _logiDoneRow(it) {
 // ============ v2.45.987: «Забираем сами» — оплаченные счета поставщиков ============
 // У таких поставщиков (ТД Электрика и т.п.) статусов из личного кабинета нет:
 // товар выдают со склада по номеру НАШЕГО счёта, а сигнал «пора ехать» — оплата.
+// v2.45.989: имя поставщика → ключ склейки (без кавычек и правовой формы).
+// В JS граница слова // не видит кириллицу, поэтому разбираем на слова.
+function _spKey(name) {
+  return String(name || '').toLowerCase().replace(/ё/g, 'е')
+    .split(/[^0-9a-zа-я]+/)
+    .filter(w => w && !/^(ооо|оао|зао|пао|ао|ип|чп|нао)$/.test(w))
+    .join('');
+}
 function _selfPickupGroups(list) {
   const map = new Map();
   (list || []).forEach(it => {
-    const key = it.supplier_id || it.supplier_name || 0;
-    if (!map.has(key)) map.set(key, { name: it.supplier_name || 'Поставщик', items: [], fresh: [], stale: [] });
+    // v2.45.989: у поставщика бывает несколько записей в справочнике (старые
+    // удаляли, счета на них остались) — группируем по ключу имени, иначе
+    // в Логистике вырастал веер одинаковых карточек «ТД Электрика»
+    const key = it.supplier_key || _spKey(it.supplier_name) || it.supplier_id || 0;
+    if (!map.has(key)) map.set(key, { key: key, name: it.supplier_name || 'Поставщик', items: [], fresh: [], stale: [] });
     const g = map.get(key);
     g.items.push(it);
     const days = _spDaysSince(it.paid_at);
