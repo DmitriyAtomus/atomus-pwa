@@ -1464,7 +1464,9 @@ function portDotTex(col){
 function portText(z,full){
   const nm=(z.name||ZONE_SHORT[z.kind]||'патрубок').replace(/\s+/g,' ').trim();
   if(!full)return nm.length>22?(nm.slice(0,21)+'…'):nm;
-  if(z.conn)return nm+' · '+z.conn;
+  /* у вентиля имя патрубка и есть присоединение («РОТОЛОК 1"-14 UNS») —
+     второй раз его писать незачем */
+  if(z.conn)return nm.toLowerCase().indexOf(z.conn.toLowerCase())<0?(nm+' · '+z.conn):nm;
   return z.od?(nm+' · Ø'+String(Math.round(z.od*10)/10).replace('.',',')):nm;
 }
 function mkSprite(rec){
