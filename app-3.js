@@ -8792,7 +8792,8 @@ function _cdekRoute(sh) {
   return '';
 }
 function _cdekCardHtml(sh) {
-  const delivered = !!sh.delivered_at;
+  // забрали своим рейсом — статуса «вручён» у чужой накладной может не быть
+  const delivered = !!sh.delivered_at || !!sh.pickup_done_at;
   const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
   return '<div class="cdek-card ' + _cdekDirection(sh) + (delivered ? ' done' : '') + '">' +
     '<div class="cdek-main">' +
@@ -8801,6 +8802,7 @@ function _cdekCardHtml(sh) {
         (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
       _cdekRoute(sh) +
       '<div class="cdek-sub">' + _cdekStatusChip(sh) +
+        (sh.pickup_done_at ? ' <span class="cdek-st done">✓ Забрали</span>' : '') +
         (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
         (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
         (proj ? ' · ' + escapeHtml(proj) : '') +
@@ -26492,7 +26494,8 @@ async function ltTripSetStatus(st) {
 const _LT_KINDS = [
   ['ozon_pvz', 'ПВЗ Ozon'], ['luch_terminal', 'Терминал ТК-Луч'],
   ['express_terminal', 'Склад Экспресс-Авто'], ['utm_factory', 'Завод УТМ'],
-  ['dl_terminal', 'Терминал Деловых линий'], ['vi_store', 'ВсеИнструменты'],
+  ['dl_terminal', 'Терминал Деловых линий'], ['cdek_pvz', 'ПВЗ СДЭК'],
+  ['vi_store', 'ВсеИнструменты'],
   ['supplier', 'Поставщик'], ['custom', 'Другое'],
 ];
 function _ltKindName(k) {
