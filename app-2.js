@@ -6022,10 +6022,8 @@ async function exportNomenclatureXlsx() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // Имя файла — из заголовка Content-Disposition либо дефолтное
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="?([^"]+)"?/);
-    a.download = match ? match[1] : 'atom-crm-nomenclature.xlsx';
+    a.download = filenameFromCD(cd, 'atom-crm-nomenclature.xlsx');
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -6056,8 +6054,7 @@ async function exportBomReconciliationXlsx() {
     const a = document.createElement('a');
     a.href = url;
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="?([^"]+)"?/);
-    a.download = match ? match[1] : 'bom-reconciliation.xlsx';
+    a.download = filenameFromCD(cd, 'bom-reconciliation.xlsx');
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
@@ -12444,8 +12441,7 @@ async function downloadContractSpecDocx(contractId) {
     const a = document.createElement('a');
     a.href = url;
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="([^"]+)"/);
-    a.download = match ? match[1] : 'Спецификация.docx';
+    a.download = filenameFromCD(cd, 'Спецификация.docx');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

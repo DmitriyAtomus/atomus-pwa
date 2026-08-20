@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1008";
+const APP_VERSION = "v2.45.1009";
 const APP_VERSION_DATE = "20.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -161,6 +161,26 @@ window.addEventListener('resize', detectLayout);
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Имя скачиваемого файла из заголовка Content-Disposition.
+// Сначала filename*=UTF-8'' (RFC 5987) — там кириллица живёт в процентах и
+// доходит целой. Простой filename= читается как latin-1, и «УПД_статус» в нём
+// превращается в «Ð£Ð_Ð__Ñ_Ñ_Ð°...», поэтому берём его только как запасной.
+function filenameFromCD(cd, fallback) {
+  cd = cd || '';
+  var star = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (star) {
+    try { return decodeURIComponent(star[1].trim()); } catch (e) { /* битый percent-encoding */ }
+  }
+  var plain = cd.match(/filename\s*=\s*"?([^";]+)"?/i);
+  if (plain) {
+    var name = plain[1].trim();
+    // Из ascii-фолбэка кириллица вырезана: «___1_1144_.pdf». Если до точки не
+    // осталось ни буквы, ни цифры — подсказка вызывающего понятнее.
+    if (name && /[0-9a-zA-Zа-яА-ЯёЁ]/.test(name.replace(/\.[^.]*$/, ''))) return name;
+  }
+  return fallback || 'file';
 }
 
 // v2.45.380: русские названия ролей (legacy-коды приходят на английском:
@@ -15097,10 +15117,8 @@ async function downloadOfferDocx() {
     // Word всегда скачиваем (не открываем в браузере)
     const a = document.createElement('a');
     a.href = url;
-    // Имя из Content-Disposition или дефолт
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="([^"]+)"/);
-    a.download = match ? match[1] : 'КП.docx';
+    a.download = filenameFromCD(cd, 'КП.docx');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
