@@ -24692,3 +24692,14 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .pkb-bom-note .ti { font-size: 13px; flex: none; margin-top: 1px; }
 .pkb-bom-hint { margin-top: 8px; padding-top: 7px; border-top: 1px dashed rgba(0,0,0,0.1); font-size: 11px; line-height: 1.4; color: var(--text-light); }
 .pkb-bom-block.have-stock { background: rgba(154,95,18,0.07); border-color: rgba(154,95,18,0.25); }
+
+/* ---- v2.45.1018: чат открывается сразу на последнем сообщении ---- */
+/* Пока лента «усаживается» (рисуется хвост, едут картинки), она невидима —
+   иначе видно, как сообщения ложатся сверху вниз, а потом всё скачет в конец.
+   Показываем уже готовую и стоящую внизу, как терминал в VS Code. */
+.dchat-feed { transition: opacity .09s linear; }
+.dchat-feed.is-settling { opacity: 0; }
+/* внутри невидимой ленты гасим и въезд пузырей, и плавную прокрутку:
+   любая анимация там — это лишние кадры до показа */
+.dchat-feed.is-settling { scroll-behavior: auto; }
+.dchat-feed.is-settling * { animation: none !important; transition: none !important; }
