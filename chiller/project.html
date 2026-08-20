@@ -1083,7 +1083,27 @@ function levelZ(lvl,s){
   if(lvl==='cond'){                                     // вентилятор — на конденсаторе
     const c=placed.find(p=>roleOf(p.d)==='cond');
     return c?new THREE.Box3().setFromObject(c.obj).max.z:s.max.z;}
-  return s.min.z;                                       // пол площадки
+  return floorZ();                                      // пол площадки — верх дна корпуса
+}
+/* v2.45.1010: отметка, с которой узел стоит внутри корпуса. Раньше «полом»
+   был самый низ корпуса — низ рамы и ножек, а дно лежит на 33…35 мм выше,
+   поэтому каждый автоматически поставленный узел уходил в дно на всю его
+   толщину. На глаз незаметно, а по-честному это упор в корпус. */
+function floorZ(fr){
+  const s=site();
+  fr=fr||placed.find(p=>roleOf(p.d)==='frame');
+  if(!fr)return s.min.z;
+  const pt=panTop(fr);
+  if(pt.part)return pt.z;                              // дно есть — встаём на его верх
+  const boxes=framePartBoxes(fr),PT=fr.obj.geometry.userData.parts;
+  if(!boxes)return s.min.z;
+  const lim=s.min.z+(s.max.z-s.min.z)*0.25;            // балки ищем только внизу
+  let z=s.min.z;
+  boxes.forEach((b,i)=>{
+    const nm=(PT[i]&&PT[i].name)||'';
+    if(/балк|поддон|дно/i.test(nm)&&b.max.z<lim&&b.max.z>z)z=b.max.z;
+  });
+  return z;
 }
 function slotPoint(sl,s){
   return {x:s.min.x+(s.max.x-s.min.x)*sl.ax,
@@ -1105,6 +1125,21 @@ function boxFree(box,skip){
   return !placed.some(p=>p!==skip&&!NOCOLL.has(roleOf(p.d))&&
     new THREE.Box3().setFromObject(p.obj).expandByScalar(-6).intersectsBox(box));
 }
+/* v2.45.1010: место свободно и от металла корпуса. Раньше автораскладка знала
+   только про соседние узлы, поэтому компрессор садилась в угловую стойку,
+   а ресивер — в отсек электрощита: на экране красиво, а в цеху не влезет */
+function frameFree(box,it){
+  const b=box.clone().expandByScalar(-HIT_TOL);
+  if(b.isEmpty())return true;
+  return !placed.some(fr=>{
+    if(roleOf(fr.d)!=='frame')return false;
+    const boxes=framePartBoxes(fr);if(!boxes)return false;
+    const PT=fr.obj.geometry.userData.parts;
+    const ms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
+    return boxes.some((fb,i)=>!(ms[i]&&ms[i].visible===false)&&
+      !seatPart(it,(PT[i]&&PT[i].name)||'')&&fb.intersectsBox(b));
+  });
+}
 /* деталь встаёт в свой слот; место занято — шагает вдоль ряда, ряд кончился — берёт следующий */
 const GAP=70;
 function autoPlace(it){
@@ -1122,7 +1157,7 @@ function autoPlace(it){
   for(let k=0;k<30;k++){
     let box=placeAt(it,byX?cur:side,byX?side:cur,z,sl.rot,sl.tilt);
     if(inner)box=clampInside(it,box,zone);
-    if(NOCOLL.has(role)||boxFree(box,it))return;
+    if(NOCOLL.has(role)||(boxFree(box,it)&&frameFree(box,it)))return;
     const sz=new THREE.Vector3();box.getSize(sz);
     cur+=(byX?sz.x:sz.y)+GAP;
     // ряды переносим только внутри корпуса; крышный ряд (конденсатор, вентиляторы) тянется дальше
@@ -1472,7 +1507,8 @@ function ctxItems(it){
     {ic:'▼',t:'Ниже на 50',s:'PgDn',go:()=>lift(-50)},
     {ic:'⤓',t:'Поставить на пол',go:toFloor});
   if(INSIDE.has(roleOf(it.d))&&placed.some(p=>roleOf(p.d)==='frame'))
-    L.push({ic:'⇱',t:'Убрать в корпус',s:outSet.has(it.uid)?'торчит наружу':'',
+    L.push({ic:'⇱',t:'Убрать в корпус',
+            s:outSet.has(it.uid)?'торчит наружу':(hitSet.has(it.uid)?'упор в корпус':''),
             go:()=>{select(it);fitInside();}});
   L.push(
     {sep:1},
@@ -1486,7 +1522,8 @@ function ctxOpen(it,x,y){
   box.innerHTML='<div class="hd"><b></b><span></span></div>';
   box.querySelector('b').textContent=it.d.brand+' '+it.d.name;
   box.querySelector('span').textContent=(ROLE_NAME[roleOf(it.d)]||'деталь')+
-    ' · отм. '+Math.round(b.min.z)+' мм'+(it.pin?' · закреплена':'');
+    ' · отм. '+Math.round(b.min.z)+' мм'+(it.pin?' · закреплена':'')+
+    (hitSet.has(it.uid)?(' · упор в '+hitNames(it.uid)):'');
   ctxItems(it).forEach(r=>{
     if(r.sep){const d=document.createElement('div');d.className='sep';box.appendChild(d);return;}
     const el=document.createElement('div');
@@ -1610,7 +1647,9 @@ function select(it){
 function showSelZ(){
   if(!sel){$('#selZ').textContent='';return;}
   const b=new THREE.Box3().setFromObject(sel.obj);
-  $('#selZ').textContent=(ROLE_NAME[roleOf(sel.d)]||'')+' · отм. '+Math.round(b.min.z)+' мм';
+  /* v2.45.1010: раз деталь горит красным — рядом сказано, во что она упёрлась */
+  $('#selZ').textContent=(ROLE_NAME[roleOf(sel.d)]||'')+' · отм. '+Math.round(b.min.z)+' мм'+
+    (hitSet.has(sel.uid)?(' · упор в '+hitNames(sel.uid)):'');
   posFill();                        // v2.46.001: в панели координат те же числа
 }
 function lift(dz){
@@ -1626,8 +1665,9 @@ function toFloor(){
   if(sel.link&&sel.link.mount==='rot'){
     toast('Вентиль сидит на штуцере — сними с патрубка, чтобы двигать');return;}
   pushHist('посадку на пол');
-  const s=site(),b=new THREE.Box3().setFromObject(sel.obj);
-  moveItem(sel,0,0,Math.round(s.min.z-b.min.z));
+  const b=new THREE.Box3().setFromObject(sel.obj);
+  const fz=INSIDE.has(roleOf(sel.d))?floorZ():site().min.z;
+  moveItem(sel,0,0,Math.round(fz-b.min.z));
   checkCollisions();showSelZ();refresh();save();
 }
 
@@ -1637,8 +1677,12 @@ function applyTint(p){
   /* у сборок с крашеными деталями материал не один, а список — подсветка
      выделения и пересечения ложится на все */
   const ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material];
-  ms.forEach(m=>{
-    if(collSet.has(p.uid)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.5;}
+  /* v2.45.1010: у корпуса красим не всю раму, а те его детали, в которые
+     упёрся узел, — видно, какая именно балка или панель мешает */
+  const hp=p._hit;
+  ms.forEach((m,i)=>{
+    if(hp&&hp.has(i)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.55;return;}
+    if(collSet.has(p.uid)||hitSet.has(p.uid)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.5;}
     /* v2.45.1008: деталь торчит сквозь панель корпуса — янтарём.
        Раньше это молчало: корпус в расчёт пересечений не берётся,
        и компрессор, упёршийся в стенку, шёл под «✓ пересечений нет» */
@@ -1659,6 +1703,70 @@ function checkOutside(){
        b.min.y<z.min.y-6||b.max.y>z.max.y+6||b.max.z>z.max.z+6)outSet.add(p.uid);
   });
 }
+/* ═══ v2.45.1010: упор в корпус — светится, как наезд на соседний узел ═══
+   Наезд узла на узел красится красным, а корпус из этого расчёта выкинут:
+   иначе всё, что стоит внутри рамы, горело бы постоянно. Из-за этого узел,
+   влезший в стойку, в балку или в панель обшивки, выглядел нормально —
+   строка честно писала «пересечений нет». Считаем корпус по-детально: в его
+   меше каждая балка, косынка и панель — своя группа со своим габаритом.
+   Залез узел в металл — красным светятся оба, и узел, и та самая деталь
+   корпуса. Касание не в счёт: узел, стоящий низом на балке, не горит. */
+const HIT_TOL=5;                                   // мм: касание — ещё не упор
+const HIT_SKIP=new Set(['frame','vibro','pipe']);  // опоры прикручены к раме, трубы уходят наружу
+let hitSet=new Set(),hitWho=new Map();             // uid узла → имена деталей корпуса
+/* габариты деталей корпуса в координатах сцены. Считаем один раз и держим,
+   пока корпус не подвинули и не погасили в нём деталь: перебор 100 с лишним
+   групп на каждый сдвиг мыши сцену бы застопорил */
+function framePartBoxes(fr){
+  const geo=fr.obj.geometry,PT=geo.userData.parts;
+  if(!PT||!geo.groups.length)return null;
+  const key=fr.obj.matrixWorld.elements.join(',')+'|'+(fr.off||[]).join(',');
+  if(fr._fpKey===key)return fr._fpBox;
+  fr.obj.updateMatrixWorld(true);
+  const pos=geo.attributes.position,ix=geo.index,v=new THREE.Vector3();
+  const boxes=geo.groups.map(()=>new THREE.Box3());
+  geo.groups.forEach((g,gi)=>{
+    const bb=boxes[gi];
+    for(let i=g.start;i<g.start+g.count;i++)
+      bb.expandByPoint(v.fromBufferAttribute(pos,ix.getX(i)).applyMatrix4(fr.obj.matrixWorld));
+  });
+  fr._fpKey=key;fr._fpBox=boxes;return boxes;
+}
+/* деталь корпуса, на которую узел надет сверху, — это посадка, а не упор:
+   конденсатор и вентилятор садятся на крышку и лезут в её монтажный проём */
+function seatPart(it,nm){
+  if(!/крышк/i.test(nm))return false;
+  const r=roleOf(it.d);
+  return r==='cond'||r==='fan'||!!(it.link&&it.link.face==='cap');
+}
+function checkHits(){
+  hitSet=new Set();hitWho=new Map();
+  const frames=placed.filter(p=>roleOf(p.d)==='frame');
+  frames.forEach(f=>f._hit=new Set());
+  if(!frames.length)return;
+  const chk=placed.filter(p=>!HIT_SKIP.has(roleOf(p.d)));
+  if(!chk.length)return;
+  frames.forEach(fr=>{
+    const boxes=framePartBoxes(fr);if(!boxes)return;
+    const PT=fr.obj.geometry.userData.parts;
+    const ms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
+    chk.forEach(p=>{
+      /* усадка 5 мм — у узла, а деталь корпуса берём как есть: панель
+         толщиной 2 мм от такой усадки схлопнулась бы и не ловилась вовсе */
+      const b=new THREE.Box3().setFromObject(p.obj).expandByScalar(-HIT_TOL);
+      if(b.isEmpty())return;
+      boxes.forEach((fb,i)=>{
+        if(ms[i]&&ms[i].visible===false)return;      // погашенную деталь не считаем
+        const nm=(PT[i]&&PT[i].name)||'деталь корпуса';
+        if(seatPart(p,nm)||!fb.intersectsBox(b))return;
+        fr._hit.add(i);hitSet.add(p.uid);
+        if(!hitWho.has(p.uid))hitWho.set(p.uid,new Set());
+        hitWho.get(p.uid).add(nm);
+      });
+    });
+  });
+}
+const hitNames=uid=>[...(hitWho.get(uid)||[])].slice(0,3).join(', ');
 /* ═══ патрубки: где всас, где нагнетание ═══
    Меш покупной позиции приходит из базы 3D уже размеченным: треугольники
    разложены по средам (нагнетание, всасывание, ППК, уравнивание), а к ним
@@ -2096,7 +2204,7 @@ function rotOff(it){
 $('#bRl').onclick=rotToggle;
 
 function checkCollisions(){
-  collSet=new Set();checkOutside();
+  collSet=new Set();checkOutside();checkHits();
   // AABB с усадкой 4 мм: касание — не пересечение.
   // v2.45.974: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
   const chk=placed.filter(p=>!NOCOLL.has(roleOf(p.d)));
@@ -2112,34 +2220,41 @@ function checkCollisions(){
   placed.forEach(applyTint);
   const el=$('#fColl');
   if(!placed.length){el.textContent='';el.onclick=null;el.style.cursor='';el.title='';return;}
-  const n=collSet.size,o=outSet.size;
+  const n=collSet.size,o=outSet.size,h=hitSet.size;
   const txt=[];
   if(n)txt.push('⚠ пересекаются: '+n+' дет.');
+  if(h)txt.push('⚠ упор в корпус: '+h+' дет.');
   if(o)txt.push('⚠ вне корпуса: '+o+' дет.');
   el.textContent=txt.length?txt.join(' · '):'✓ пересечений нет, всё в корпусе';
-  el.style.color=n?'#f0a9a0':(o?'#e8c85a':'var(--ok)');
-  // строка «вне корпуса» — сразу и кнопка: нажал, и всё торчащее уехало внутрь
-  el.style.cursor=o?'pointer':'';
-  el.title=o?'Нажми — уберу все торчащие детали внутрь корпуса':'';
-  el.onclick=o?fitAllInside:null;
+  el.style.color=(n||h)?'#f0a9a0':(o?'#e8c85a':'var(--ok)');
+  // строка — сразу и кнопка: торчащее убираем внутрь, упор показываем на сцене
+  el.style.cursor=(o||h)?'pointer':'';
+  el.title=(o||h)?'Нажми — уберу детали внутрь корпуса и поставлю на дно':'';
+  el.onclick=(o||h)?fitAllInside:null;
 }
 /* вернуть внутрь всё, что торчит наружу */
 function fitAllInside(){
-  const list=placed.filter(p=>outSet.has(p.uid)&&!p.pin);
+  /* v2.45.1010: заодно чиним упор — узел, влезший в панель или утонувший
+     в дне, сдвигаем в полость и ставим низом на дно */
+  const list=placed.filter(p=>(outSet.has(p.uid)||hitSet.has(p.uid))&&
+                              !p.pin&&INSIDE.has(roleOf(p.d)));
   if(!list.length){toast('Наружу ничего не торчит');return;}
   const h=histBegin('возврат деталей в корпус');
   try{
-    const z=siteIn();
+    const z=siteIn(),fz=floorZ();
     list.forEach(p=>{
       const o=p.obj,b=new THREE.Box3().setFromObject(o);
       const bx=o.position.x,by=o.position.y;
       clampInside(p,b,z);
       const dx=o.position.x-bx,dy=o.position.y-by;
       o.position.x=bx;o.position.y=by;o.updateMatrixWorld(true);
-      if(dx||dy)moveItem(p,dx,dy,0);          // с деталью едут посаженные на неё узлы
+      const dz=b.min.z<fz-1?Math.round(fz-b.min.z):0;
+      if(dx||dy||dz)moveItem(p,dx,dy,dz);     // с деталью едут посаженные на неё узлы
     });
     checkCollisions();refresh();save();
-    toast('Убрал в корпус: '+list.length+' '+plural(list.length));
+    const left=hitSet.size;
+    toast('Убрал в корпус: '+list.length+' '+plural(list.length)+
+      (left?(' · упор остался у '+left+' — подвинь по месту'):''));
   }finally{histEnd(h);}
 }
 /* «Убрать в корпус» — вернуть выделенную деталь внутрь полости */
@@ -2148,14 +2263,15 @@ function fitInside(){
   if(!placed.some(p=>roleOf(p.d)==='frame')){toast('В сцене нет корпуса');return;}
   if(!INSIDE.has(roleOf(sel.d))){toast('Эта деталь стоит не внутри корпуса');return;}
   const b0=new THREE.Box3().setFromObject(sel.obj);
-  const z=siteIn(),o=sel.obj;
+  const z=siteIn(),o=sel.obj,fz=floorZ();
   const before={x:o.position.x,y:o.position.y};
   clampInside(sel,b0,z);
   const dx=o.position.x-before.x,dy=o.position.y-before.y;
-  if(!dx&&!dy){toast('Деталь и так внутри корпуса');return;}
+  const dz=b0.min.z<fz-1?Math.round(fz-b0.min.z):0;     // утонул в дне — на дно
+  if(!dx&&!dy&&!dz){toast('Деталь и так внутри корпуса');return;}
   o.position.x=before.x;o.position.y=before.y;o.updateMatrixWorld(true);
   pushHist('возврат детали в корпус');
-  moveItem(sel,dx,dy,0);
+  moveItem(sel,dx,dy,dz);
   checkCollisions();showSelZ();refresh();save();
   toast('Убрал в корпус');
 }
@@ -3314,6 +3430,8 @@ function chContext(){
   }else c.сцена=[];
   if(sel)c.выделено=itemInfo(sel);
   if(collSet.size)c.пересечения=placed.filter(x=>collSet.has(x.uid)).map(x=>x.d.name);
+  if(hitSet.size)c.упор_в_корпус=placed.filter(x=>hitSet.has(x.uid))
+    .map(x=>x.d.name+' → '+hitNames(x.uid));
   const asg=Object.keys(schemaData||{});
   if(asg.length)c.назначено_на_схеме=asg.length+' узл. из '+SCH_NODES.length;
   return c;
