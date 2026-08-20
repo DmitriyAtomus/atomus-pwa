@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1017";
+const APP_VERSION = "v2.45.1018";
 const APP_VERSION_DATE = "20.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2202,6 +2202,64 @@ function _devChatStickStop() {
   if (_devChatStickTimer) { clearInterval(_devChatStickTimer); _devChatStickTimer = null; }
 }
 
+// ---- v2.45.1018: чат открывается уже в конце, без пролистывания ----
+// Даже с мгновенным прыжком открытие выглядело как прокрутка: сорок пузырей
+// сначала рисовались видимыми сверху вниз, потом лента скакала в конец, а
+// следом её дёргали дорисовка текста и картинки. Делаем как терминал в VS Code:
+// пока лента «усаживается», она невидима — показываем её уже стоящей внизу.
+let _devChatSettleTimer = null;
+
+function _devChatSettleStart(feed) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  feed.classList.add('is-settling');
+  // страховка: что бы ни случилось дальше, лента не останется невидимой
+  if (_devChatSettleTimer) clearTimeout(_devChatSettleTimer);
+  _devChatSettleTimer = setTimeout(function () { _devChatSettleShow(feed); }, 1200);
+}
+
+function _devChatSettleShow(feed) {
+  if (_devChatSettleTimer) { clearTimeout(_devChatSettleTimer); _devChatSettleTimer = null; }
+  feed = feed || _devChatEl('feed');
+  if (feed) feed.classList.remove('is-settling');
+}
+
+// Ждём, пока лента дорастёт до финальной высоты: кадр вёрстки, затем картинки
+// (они едут отдельным запросом под токеном). Дольше 700 мс не ждём — лучше
+// показать чат и доскроллить липучкой, чем держать пустой экран.
+function _devChatSettleEnd(feed) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  const done = function () {
+    const f = _devChatEl('feed');
+    if (!f) return;
+    _devChatToBottom(f, false);
+    _devChatSettleShow(f);
+  };
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      const f = _devChatEl('feed');
+      if (!f) { _devChatSettleShow(feed); return; }
+      _devChatToBottom(f, false);
+      const imgs = Array.prototype.slice.call(f.querySelectorAll('img')).filter(function (im) {
+        return !im.complete;
+      });
+      if (!imgs.length) { done(); return; }
+      let left = imgs.length, fired = false;
+      const tick = function () {
+        if (fired) return;
+        if (--left > 0) return;
+        fired = true; done();
+      };
+      imgs.forEach(function (im) {
+        im.addEventListener('load', tick, { once: true });
+        im.addEventListener('error', tick, { once: true });
+      });
+      setTimeout(function () { if (!fired) { fired = true; done(); } }, 700);
+    });
+  });
+}
+
 const _DEVCHAT_STATUS = {
   uploading: { text: 'загружаю файлы…', cls: 'text-muted' },
   new:     { text: 'в очереди',      cls: 'text-muted' },
@@ -2706,6 +2764,7 @@ async function _devChatTickInner(feed) {
   } catch (e) {
     // 403 здесь означает «лента не твоя», а не обрыв связи — писать про связь
     // в этом случае значит отправить искать проблему не там
+    _devChatSettleShow(feed);
     const denied = String(e && e.message || '').indexOf('403') >= 0;
     _devChatSetStatus(denied ? 'Чат доступен только владельцу' : 'Нет связи с бэкендом', 'off');
     if (denied) {
@@ -2717,6 +2776,9 @@ async function _devChatTickInner(feed) {
   }
   const msgs = (data && data.messages) || [];
   if (first) {
+    // v2.45.1018: пока рисуем хвост переписки — лента невидима, показываем её
+    // уже стоящей на последнем сообщении (см. _devChatSettleEnd)
+    if (msgs.length) _devChatSettleStart(feed);
     feed.innerHTML = msgs.length ? '' : _devChatEmptyHtml();
     _devChatDayKey = '';
     _devChatOldest = msgs.length ? msgs[0].id : 0;
@@ -2742,7 +2804,7 @@ async function _devChatTickInner(feed) {
   // v2.45.978: открыли чат — прыгаем в конец мгновенно и придерживаем низ, пока
   // едут картинки и доверстывается текст. Новое сообщение в открытой ленте —
   // короткая липучка: плавная прокрутка тут успевала оборваться на полпути.
-  if (msgs.length && first) _devChatStickBottom(2500);
+  if (msgs.length && first) { _devChatStickBottom(2500); _devChatSettleEnd(feed); }
   else if (msgs.length && nearBottom) _devChatStickBottom(900);
 
   await _devChatRefreshStatuses();
