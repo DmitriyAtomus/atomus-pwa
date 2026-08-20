@@ -1846,6 +1846,7 @@ function _radioState() {
       playing: false,
       loading: false,
       volume: 0.7,
+      speakerVolume: 0.1,
       target: 'local',          // 'local' — здесь, 'speaker' — рабочая колонка
       speakerStationId: null,   // выбранная станция для рабочей колонки
       speakerPlaying: false,
@@ -1855,6 +1856,9 @@ function _radioState() {
       if (saved && saved.stationId) window._radio.stationId = saved.stationId;
       if (saved && typeof saved.volume === 'number') {
         window._radio.volume = Math.max(0, Math.min(1, saved.volume));
+      }
+      if (saved && typeof saved.speakerVolume === 'number') {
+        window._radio.speakerVolume = Math.max(0, Math.min(1, saved.speakerVolume));
       }
       if (saved && saved.target === 'speaker') window._radio.target = 'speaker';
       if (saved && saved.speakerStationId) window._radio.speakerStationId = saved.speakerStationId;
@@ -1876,6 +1880,7 @@ function _radioSave() {
     localStorage.setItem(RADIO_STORAGE_KEY, JSON.stringify({
       stationId:  s.stationId,
       volume:     s.volume,
+      speakerVolume: s.speakerVolume,
       wasPlaying: !!s.playing, // v2.43.77: для автозапуска после F5
       target:     s.target,
       speakerStationId: s.speakerStationId,
@@ -1911,7 +1916,8 @@ function _renderRadioModalBody() {
   const labelHtml = isPlaying
     ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>' + (isSpeaker ? 'На рабочей колонке' : 'В эфире')
     : '<i class="ti ti-radio"></i>Радио';
-  const volPct = Math.round((s.volume || 0) * 100);
+  const activeVolume = isSpeaker ? s.speakerVolume : s.volume;
+  const volPct = Math.round(Math.max(0, Math.min(1, Number(activeVolume) || 0)) * 100);
   const volIcon = volPct === 0 ? 'ti-volume-off' : (volPct < 40 ? 'ti-volume-2' : 'ti-volume');
 
   let items = '';
@@ -1925,13 +1931,11 @@ function _renderRadioModalBody() {
              '</div>';
   });
 
-  const volumeHtml = isSpeaker
-    ? '<div class="hr-volume hr-volume-note"><i class="ti ti-volume"></i>&nbsp;Громкость регулируется на колонке</div>'
-    : '<div class="hr-volume">' +
-        '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
-        '<input type="range" min="0" max="100" value="' + volPct + '" oninput="setRadioVolume(this.value)">' +
-        '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
-      '</div>';
+  const volumeHtml = '<div class="hr-volume">' +
+      '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
+      '<input type="range" min="0" max="100" value="' + volPct + '" aria-label="Громкость" oninput="setRadioVolume(this.value)">' +
+      '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
+    '</div>';
 
   return (
     '<div class="radio-modal-top' + (isLoading ? ' hr-loading' : '') + '">' +
@@ -1985,8 +1989,13 @@ function _radioEnsureAudio() {
 function setRadioVolume(v) {
   const s = _radioState();
   const pct = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
-  s.volume = pct / 100;
-  if (s.audio) s.audio.volume = s.volume;
+  if (s.target === 'speaker') {
+    s.speakerVolume = pct / 100;
+    _queueSpeakerVolumeCommand();
+  } else {
+    s.volume = pct / 100;
+    if (s.audio) s.audio.volume = s.volume;
+  }
   _radioSave();
   // Обновляем только подпись и иконку, без полного перерендера — чтобы ползунок
   // не «прыгал» во время перетаскивания.
@@ -1997,6 +2006,15 @@ function setRadioVolume(v) {
     const cls = pct === 0 ? 'ti-volume-off' : (pct < 40 ? 'ti-volume-2' : 'ti-volume');
     iconEl.className = 'ti ' + cls;
   }
+}
+
+let _speakerVolumeTimer = null;
+function _queueSpeakerVolumeCommand() {
+  if (_speakerVolumeTimer) clearTimeout(_speakerVolumeTimer);
+  _speakerVolumeTimer = setTimeout(() => {
+    _speakerVolumeTimer = null;
+    _radioRemoteCommand('speaker', 'volume', null);
+  }, 180);
 }
 
 function toggleRadioPlay() {
@@ -2096,12 +2114,16 @@ function setRadioTarget(t) {
 // Отправить команду локальному офисному поллеру с явным выходом звука.
 async function _radioRemoteCommand(target, action, station) {
   try {
+    const state = _radioState();
     await apiPost('/api/tv/radio', {
       target:     target,
       action:     action,
       station_id: station ? station.id : null,
       name:       station ? station.name : '',
       url:        station ? station.url : '',
+      volume:     target === 'speaker'
+        ? Math.round(Math.max(0, Math.min(1, Number(state.speakerVolume) || 0)) * 100)
+        : null,
     });
   } catch (e) {
     showToast('Не удалось отправить команду на рабочую колонку', 'error');
