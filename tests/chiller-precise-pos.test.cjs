@@ -155,17 +155,17 @@ test('поворот встаёт на любой угол, а завал не �
   assert.equal(it.obj.position.z, 300, 'после завала низ остался на прежней отметке');
 });
 
-test('вентиль на штуцере: место не трогаем, вокруг оси крутим на любой угол', () => {
+test('деталь на патрубке: место не трогаем, вокруг оси крутим на любой угол', () => {
   const s = stand();
   const it = s.put(0, 0, 500, 100, 100, 200);
   it.link = { to: 3, mount: 'rot', zi: 1, roll: 0 };
   s.peek('posMove("x", 900)');
-  assert.equal(it.obj.position.x, 0, 'вентиль остался на патрубке');
-  assert.ok(s.toasts.some(t => /сними с патрубка/.test(t)));
+  assert.equal(it.obj.position.x, 0, 'деталь осталась на патрубке');
+  assert.ok(s.toasts.some(t => /сними её, чтобы двигать/.test(t)));
   s.peek('posSpin("z", 30)');
   assert.ok(Math.abs(it.link.roll - 30 * Math.PI / 180) < 1e-9, 'повернулся на 30° вокруг оси');
-  assert.equal(s.mated, 1, 'после поворота вентиль заново садится на штуцер');
-  assert.deepEqual(s.hist, ['поворот вентиля на штуцере']);
+  assert.equal(s.mated, 1, 'после поворота деталь заново садится на патрубок');
+  assert.deepEqual(s.hist, ['поворот детали на патрубке']);
 });
 
 test('закреплённую деталь точный ввод двигает, но говорит об этом', () => {
@@ -177,7 +177,7 @@ test('закреплённую деталь точный ввод двигает
   assert.ok(s.toasts.some(t => /закреплена/.test(t)));
 });
 
-test('поля отключаются для вентиля на штуцере и показывают габарит', () => {
+test('поля отключаются для детали на патрубке и показывают габарит', () => {
   const s = stand();
   const it = s.put(0, 0, 0, 800, 600, 1200);
   s.peek('posFill()');
@@ -186,8 +186,8 @@ test('поля отключаются для вентиля на штуцере 
   assert.match(s.el('#posDim').textContent, /габарит 800 × 600 × 1200 мм/);
   it.link = { to: 2, mount: 'rot', zi: 0, roll: Math.PI / 2 };
   s.peek('posFill()');
-  assert.equal(s.el('#pX').disabled, true, 'место вентиля задаёт патрубок');
-  assert.equal(s.el('#pRZ').disabled, false, 'а вокруг оси штуцера крутить можно');
+  assert.equal(s.el('#pX').disabled, true, 'место детали задаёт патрубок');
+  assert.equal(s.el('#pRZ').disabled, false, 'а вокруг оси патрубка крутить можно');
   assert.equal(s.el('#pRZ').value, 90);
   assert.equal(s.el('#posRot').style.display, 'block');
 });
