@@ -446,6 +446,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" id="bParts" style="display:none">Детали</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb" id="bRl" title="Показывать свободные штуцеры ротолока">Ротолоки</div>
+        <div class="vb" id="bFrm" title="Корпус не ловит курсор — мышь берёт деталь за его панелью. Выключишь — корпус снова выделяется кликом">Корпус сквозной</div>
         <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
@@ -454,7 +455,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>золотая метка «+» на штуцере — свободный ротолок, жми и выбирай вентиль</div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; сам корпус: ПКМ или строка спецификации<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>золотая метка «+» на штуцере — свободный ротолок, жми и выбирай вентиль</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <div id="schChips" class="sch-chips"></div>
@@ -707,17 +708,30 @@ const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),
       floor=new THREE.Plane(new THREE.Vector3(0,0,1),0);
 function toNDC(e){const r=$('#cv').getBoundingClientRect();
   ndc.x=((e.clientX-r.left)/r.width)*2-1;ndc.y=-((e.clientY-r.top)/r.height)*2+1;}
-function pickItem(e){
+/* v2.45.1006: корпус «сквозной» для курсора — он охватывает всю сцену, и клик по любой
+   точке вида упирался в его панель — выделялся корпус, а не то, что внутри.
+   Теперь мышь ловит деталь за панелью, а сам корпус берётся правой кнопкой,
+   строкой спецификации или кликом, когда он уже выделен (чтобы двигать). */
+const FRM_KEY='atomus_chiller_framethru';
+let FRMTHRU=(()=>{try{return localStorage.getItem(FRM_KEY)!=='0';}catch(e){return true;}})();
+function pickItem(e,any){
   toNDC(e);ray.setFromCamera(ndc,camera);
   const hits=ray.intersectObjects(placed.map(p=>p.obj));
   /* v2.45.1002: погашённая деталь узла курсор не ловит — её и гасят затем,
      чтобы дотянуться до того, что за ней (луч сквозь невидимую панель) */
-  const h=hits.find(x=>{
+  const list=[];
+  hits.forEach(x=>{
     const ms=Array.isArray(x.object.material)?x.object.material:[x.object.material];
     const m=ms[x.face?x.face.materialIndex:0];
-    return !m||m.visible!==false;
+    if(m&&m.visible===false)return;
+    const p=placed.find(q=>q.obj===x.object);
+    if(p&&list.indexOf(p)<0)list.push(p);
   });
-  return h?placed.find(p=>p.obj===h.object):null;
+  if(any||!FRMTHRU)return list[0]||null;
+  const inner=list.find(p=>roleOf(p.d)!=='frame');
+  if(inner)return inner;
+  const fr=list[0];
+  return fr&&sel===fr?fr:null;      // под курсором только корпус: выделенный тащим, чужой пропускаем в панораму
 }
 /* v2.45.974: тащим деталь в плоскости её собственной отметки, а не по полу —
    иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
@@ -740,11 +754,13 @@ function bindCtl(cv){
     cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
     if(e.button===2){mode='pan';rmb={x:e.clientX,y:e.clientY};return;}
     const hit=pickItem(e);
-    /* с телефона правой кнопки нет — то же меню даёт долгое касание детали */
-    if(e.pointerType==='touch'&&hit){lpOff();
+    /* с телефона правой кнопки нет — то же меню даёт долгое касание детали.
+       Корпус курсор не ловит, но меню по долгому касанию отдаёт */
+    const lph=e.pointerType==='touch'?(hit||pickItem(e,true)):null;
+    if(lph){lpOff();
       const x=e.clientX,y=e.clientY;
       lpT=setTimeout(()=>{lpT=null;mode=null;dragSnap=null;cv.classList.remove('drag');
-        select(hit);ctxOpen(hit,x,y);},550);}
+        select(lph);ctxOpen(lph,x,y);},550);}
     if(hit){select(hit);
       // закреплённую деталь мышью не сдвинуть — для того и закрепляли
       if(hit.pin){mode='orbit';toast('Деталь закреплена — сними закрепление, чтобы двигать');return;}
@@ -780,7 +796,7 @@ function bindCtl(cv){
     // правый «протяг» — это панорама, на него меню не вешаем
     if(rmb&&(Math.abs(e.clientX-rmb.x)>4||Math.abs(e.clientY-rmb.y)>4)){rmb=null;return;}
     rmb=null;
-    const hit=pickItem(e);
+    const hit=pickItem(e,true);           // правой кнопкой берётся и корпус
     if(!hit){ctxClose();return;}          // по фону — только панорама, меню не нужно
     select(hit);ctxOpen(hit,e.clientX,e.clientY);
   });
@@ -792,6 +808,13 @@ function bindCtl(cv){
   $('#bGrid').onclick=()=>{grid.visible=!grid.visible;
     $('#bGrid').classList.toggle('on',grid.visible);};
   $('#bGrid').classList.add('on');
+  $('#bFrm').onclick=()=>{
+    FRMTHRU=!FRMTHRU;
+    try{localStorage.setItem(FRM_KEY,FRMTHRU?'1':'0');}catch(e){}
+    $('#bFrm').classList.toggle('on',FRMTHRU);
+    toast(FRMTHRU?'Корпус сквозной — курсор берёт то, что внутри'
+                 :'Корпус ловит курсор, как обычная деталь');};
+  $('#bFrm').classList.toggle('on',FRMTHRU);
   addEventListener('keydown',e=>{
     // v2.45.994: в поле ввода буквы — это текст, а не команды сцены
     const t=e.target&&e.target.tagName;
