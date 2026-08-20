@@ -23616,6 +23616,22 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .dchat-row { display: flex; align-items: flex-end; gap: 9px; margin: 12px 0; animation: dchatIn .18s ease-out; }
 .dchat-row.is-mine { justify-content: flex-end; }
 @keyframes dchatIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* Пачка, нарисованная разом (открытие чата, догрузка истории), не «въезжает»:
+   сорок пузырей с анимацией сразу — это рябь, а не появление сообщения. */
+.dchat-row.no-anim { animation: none; }
+
+/* Шапка ленты: «показать раньше» — история подтягивается страницами вверх */
+.dchat-older {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 2px auto 10px; padding: 6px 14px; border: 0; cursor: pointer;
+  background: rgba(15,30,60,.05); color: var(--text-light);
+  border-radius: 99px; font-size: 12.5px; font-weight: 600;
+}
+.dchat-older:hover { background: rgba(15,30,60,.09); }
+.dchat-older:disabled { cursor: default; opacity: .7; }
+.dchat-older i { font-size: 14px; }
+.dchat-older:disabled i { animation: dchatSpin 1s linear infinite; }
+@keyframes dchatSpin { to { transform: rotate(360deg); } }
 
 .dchat-ava {
   width: 30px; height: 30px; border-radius: 50%; flex: none; margin-bottom: 2px;
