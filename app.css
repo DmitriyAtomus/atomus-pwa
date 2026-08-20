@@ -18060,6 +18060,104 @@
     line-height: 1.5;
   }
 
+  /* --- Сверка приёмки с заказами (v2.45.1013) --- */
+  .si-recon {
+    border: 1px solid rgba(226,75,74,0.30);
+    background: rgba(226,75,74,0.05);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+  .si-recon.ok {
+    border-color: rgba(29,158,117,0.30);
+    background: rgba(29,158,117,0.05);
+  }
+  .si-recon-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .si-recon-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; color: #8C2A2A;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    flex: 1; min-width: 0;
+  }
+  .si-recon.ok .si-recon-title { color: #14664B; }
+  .si-recon-sum {
+    font-size: 12.5px; color: var(--text-dark);
+    line-height: 1.5; margin-bottom: 8px;
+  }
+  .si-recon-group {
+    border-top: 1px solid var(--border);
+    padding-top: 8px; margin-top: 8px;
+  }
+  .si-recon-group-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-light); margin-bottom: 6px;
+  }
+  .si-recon-group.bad  .si-recon-group-title { color: #8C2A2A; }
+  .si-recon-group.warn .si-recon-group-title { color: #854F0B; }
+  .si-recon-group.good .si-recon-group-title { color: #14664B; }
+  .si-recon-toggle {
+    margin-left: auto; font-weight: 500; text-transform: none;
+    letter-spacing: 0; color: var(--text-faint); text-decoration: underline;
+  }
+  .si-recon-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .si-recon-row:last-child { border-bottom: none; }
+  .si-recon-row-main { flex: 1; min-width: 0; }
+  .si-recon-name {
+    font-size: 13px; color: var(--text-dark); font-weight: 500;
+    line-height: 1.3; word-break: break-word;
+  }
+  .si-recon-meta {
+    font-size: 11.5px; color: var(--text-light);
+    line-height: 1.4; margin-top: 2px; word-break: break-word;
+  }
+  .si-recon-ord {
+    display: inline-block;
+    background: var(--bg); border: 1px solid var(--border-strong);
+    border-radius: 5px; padding: 0 5px;
+    font-size: 11px; font-weight: 600; color: var(--text-dark);
+  }
+  .si-recon-qty {
+    font-size: 13px; font-weight: 600; color: var(--text-dark);
+    white-space: nowrap; padding-top: 1px;
+  }
+  .si-recon-qty.short { color: #8C2A2A; }
+  /* Кандидаты «куда разнести» */
+  .si-recon-cands {
+    padding: 4px 0 8px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .si-recon-cands-empty {
+    font-size: 12px; color: var(--text-light); padding: 4px 0 6px;
+  }
+  .si-recon-cand {
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    width: 100%; text-align: left;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 9px; cursor: pointer;
+    font-size: 12.5px; color: var(--text-dark);
+  }
+  .si-recon-cand:hover { border-color: var(--border-strong); background: var(--bg); }
+  .si-recon-cand.likely { border-color: rgba(29,158,117,0.45); }
+  .si-recon-cand-name { flex: 1; min-width: 0; word-break: break-word; }
+  .si-recon-cand-left { font-size: 11.5px; color: var(--text-light); white-space: nowrap; }
+  .si-recon-cand-hit {
+    font-size: 10.5px; font-weight: 600; color: #14664B;
+    background: rgba(29,158,117,0.12); border-radius: 5px; padding: 1px 6px;
+  }
+  @media (max-width: 720px) {
+    .si-recon-row { flex-wrap: wrap; }
+    .si-recon-qty { padding-top: 0; }
+  }
+
   /* --- Плитки сводки по местам --- */
   .si-dest-tiles {
     display: grid;

@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1012";
+const APP_VERSION = "v2.45.1013";
 const APP_VERSION_DATE = "20.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -833,6 +833,7 @@ function renderNotifModal() {
                    : n.type === 'supply_invoice_received' ? 't-contract'
                    : n.type === 'supply_invoice_uploaded' ? 't-contract'
                    : n.type === 'supply_order_paid' ? 't-assembly'
+                   : n.type === 'supply_receipt_mismatch' ? 't-contract'
                    : n.type === 'edo_upd_received' ? 't-contract'
                    : (n.type === 'dev_guest_message' || n.type === 'dev_guest_file') ? 't-development'
                    : '';
@@ -841,6 +842,7 @@ function renderNotifModal() {
                 : n.type === 'supply_invoice_received' ? 'ti-receipt'
                 : n.type === 'supply_invoice_uploaded' ? 'ti-receipt'
                 : n.type === 'supply_order_paid' ? 'ti-cash'
+                : n.type === 'supply_receipt_mismatch' ? 'ti-scale'
                 : n.type === 'edo_upd_received' ? 'ti-cloud-download'
                 : n.type === 'dev_guest_message' ? 'ti-message-circle'
                 : n.type === 'dev_guest_file' ? 'ti-paperclip'
@@ -946,6 +948,10 @@ function onNotifClick(notifId, entityType, entityId, notifType) {
     // v2.45.140: Фото УПД → Приёмка УПД
     closeNotifModalForced();
     selectSidebarItem('supply-invoice-intake');
+    // v2.45.1013: сверка приёмки — сразу открываем нужную накладную
+    if (entityId && notifType === 'supply_receipt_mismatch' && typeof loadSupplyInvoiceDetail === 'function') {
+      setTimeout(() => loadSupplyInvoiceDetail(entityId), 300);
+    }
   } else if (entityType === 'supply_order') {
     // v2.45.140: счёт привязан к заказу → Заказы
     closeNotifModalForced();
@@ -5026,6 +5032,9 @@ function _renderNotifPanel(r) {
       } else if (n.type === 'contract_shipped') {
         icon = 'ti-truck-delivery';
         actionTitle = 'Открыть договор';
+      } else if (n.type === 'supply_receipt_mismatch') {
+        icon = 'ti-scale';   // v2.45.1013: сверка приёмки с заказами
+        actionTitle = 'Открыть приёмку';
       }
       const onClick = n.entity_type === 'defect'
         ? 'onNotifGlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'

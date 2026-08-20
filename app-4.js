@@ -9107,6 +9107,7 @@ function _renderNotifications25(r) {
       else if (n.type === 'contract_published')   icon = 'ti-file-text';
       else if (n.type === 'assembly_created')     icon = 'ti-tool';
       else if (n.type === 'contract_shipped')     icon = 'ti-truck-delivery';
+      else if (n.type === 'supply_receipt_mismatch') icon = 'ti-scale';   // v2.45.1013
       const onClick = n.entity_type === 'defect'
         ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
         : (n.entity_type === 'contract'
@@ -11899,6 +11900,9 @@ function renderSupplyInvoiceDetail(data) {
   const warnings = siParseWarnings(inv.ai_warnings);
   if (warnings.length) html += renderSiWarnings(warnings);
 
+  // v2.45.1013: сверка с заказами — только у оприходованной УПД
+  if (data.reconciliation) html += renderSiRecon(data.reconciliation, inv.id);
+
   // Сводка по местам назначения
   html += renderSiDestTiles(items);
 
@@ -11983,6 +11987,203 @@ function renderSiWarnings(warnings) {
   });
   html += '</div>';
   return html;
+}
+
+// ==== СВЕРКА ПРИЁМКИ С ЗАКАЗАМИ (v2.45.1013) ====
+// После оприходования УПД бэкенд отдаёт отчёт «заказ ↔ УПД ↔ что отметилось».
+// Раньше его половина (receipt_unmatched) приезжала в ответе confirm и молча
+// терялась: заказ мог остаться «получено частично», а узнавали случайно.
+// Карточка живёт прямо в приёмке; спорные строки разносятся кнопкой в ORD-N.
+
+function siFmtQty(n) {
+  const v = parseFloat(n);
+  if (!isFinite(v)) return '0';
+  return (Math.round(v * 1000) / 1000).toString().replace('.', ',');
+}
+
+function renderSiRecon(recon, invId) {
+  if (!recon || !recon.counts) return '';
+  const c = recon.counts || {};
+  const unmatched = recon.unmatched || [];
+  const short = recon.short || [];
+  const matched = recon.matched || [];
+  const partial = matched.filter(m => m.partial);
+  const okAll = !!recon.ok;
+
+  let html = '<div class="si-recon' + (okAll ? ' ok' : '') + '" id="si-recon-card">';
+
+  // Шапка: итог одной строкой
+  html += '<div class="si-recon-head">';
+  html +=   '<div class="si-recon-title">';
+  html +=     '<i class="ti ' + (okAll ? 'ti-checks' : 'ti-alert-triangle') + '"></i>';
+  html +=     'Сверка с заказами';
+  html +=   '</div>';
+  html +=   '<button class="pkb-btn" style="padding:4px 10px;font-size:12px;" onclick="reloadSiRecon(' + invId + ')"><i class="ti ti-refresh"></i>Пересчитать</button>';
+  html += '</div>';
+
+  const orders = (recon.orders || []).map(o => o.order_label).join(', ');
+  html += '<div class="si-recon-sum">';
+  if (okAll) {
+    html += 'Всё сошлось: ' + (c.matched || 0) + ' из ' + (c.accepted_lines || 0) + ' строк разнесено' +
+            (orders ? (' по ' + escapeHtml(orders)) : '') + ', заказ закрыт полностью.';
+  } else {
+    const bits = [];
+    if (c.matched)   bits.push('разнесено ' + c.matched + ' из ' + (c.accepted_lines || 0));
+    if (c.unmatched) bits.push('<b>не разнесено ' + c.unmatched + '</b>');
+    if (partial.length) bits.push('<b>частично ' + partial.length + '</b>');
+    if (c.short)     bits.push('<b>заказ ждёт ещё ' + c.short + '</b>');
+    html += bits.join(' · ') + (orders ? (' · ' + escapeHtml(orders)) : '');
+  }
+  html += '</div>';
+
+  // --- Не разнесено: строка УПД никуда не легла ---
+  if (unmatched.length) {
+    html += '<div class="si-recon-group bad">';
+    html +=   '<div class="si-recon-group-title"><i class="ti ti-arrow-move-right"></i>Не разнесено по заказам · ' + unmatched.length + '</div>';
+    unmatched.forEach(u => html += siReconLineRow(invId, u, true));
+    html += '</div>';
+  }
+
+  // --- Разнесено частично ---
+  if (partial.length) {
+    html += '<div class="si-recon-group warn">';
+    html +=   '<div class="si-recon-group-title"><i class="ti ti-progress"></i>Разнесено частично · ' + partial.length + '</div>';
+    partial.forEach(m => html += siReconLineRow(invId, m, true));
+    html += '</div>';
+  }
+
+  // --- Заказ ждёт ещё (недобор по позициям затронутых заказов) ---
+  if (short.length) {
+    html += '<div class="si-recon-group warn">';
+    html +=   '<div class="si-recon-group-title"><i class="ti ti-hourglass"></i>Заказ ждёт ещё · ' + short.length + '</div>';
+    short.forEach(s => {
+      html += '<div class="si-recon-row">';
+      html +=   '<div class="si-recon-row-main">';
+      html +=     '<div class="si-recon-name">' + escapeHtml(s.si_name || '—') + '</div>';
+      html +=     '<div class="si-recon-meta"><span class="si-recon-ord">' + escapeHtml(s.order_label || '') + '</span> · заказано ' +
+                    siFmtQty(s.qty) + ', получено ' + siFmtQty(s.received) + '</div>';
+      html +=   '</div>';
+      html +=   '<div class="si-recon-qty short">−' + siFmtQty(s.remaining) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // --- Разнесено (свёрнуто) ---
+  const okLines = matched.filter(m => !m.partial);
+  if (okLines.length) {
+    html += '<div class="si-recon-group good">';
+    html +=   '<div class="si-recon-group-title" onclick="siReconToggle(\'si-recon-ok\')" style="cursor:pointer;">' +
+                '<i class="ti ti-check"></i>Разнесено по заказам · ' + okLines.length +
+                '<span class="si-recon-toggle" id="si-recon-ok-toggle">показать</span></div>';
+    html +=   '<div id="si-recon-ok" style="display:none;">';
+    okLines.forEach(m => {
+      const tgt = (m.targets || []).map(t => t.order_label + ' · ' + (t.si_name || '') + ' ×' + siFmtQty(t.qty)).join('; ');
+      html += '<div class="si-recon-row">';
+      html +=   '<div class="si-recon-row-main">';
+      html +=     '<div class="si-recon-name">' + escapeHtml(m.name || m.name_raw || '—') + '</div>';
+      html +=     '<div class="si-recon-meta">→ ' + escapeHtml(tgt || '—') + '</div>';
+      html +=   '</div>';
+      html +=   '<div class="si-recon-qty">' + siFmtQty(m.qty) + '</div>';
+      html += '</div>';
+    });
+    html +=   '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// Строка УПД, которую надо (до)разнести: имя, сколько осталось и кнопка выбора заказа
+function siReconLineRow(invId, line, withAssign) {
+  const left = (line.remaining !== undefined) ? line.remaining : line.qty;
+  const boxId = 'si-recon-cands-' + line.invoice_item_id;
+  let html = '<div class="si-recon-row">';
+  html +=   '<div class="si-recon-row-main">';
+  html +=     '<div class="si-recon-name">' + escapeHtml(line.name || line.name_raw || '—') + '</div>';
+  html +=     '<div class="si-recon-meta">в накладной ' + siFmtQty(line.qty) + ' ' + escapeHtml(line.unit || 'шт') +
+                (line.allocated ? (' · разнесено ' + siFmtQty(line.allocated)) : '') +
+                ' · <b>осталось ' + siFmtQty(left) + '</b></div>';
+  html +=   '</div>';
+  if (withAssign) {
+    html += '<button class="pkb-btn" style="padding:5px 10px;font-size:12px;white-space:nowrap;" ' +
+            'onclick="siReconToggle(\'' + boxId + '\')"><i class="ti ti-arrow-move-right"></i>Разнести</button>';
+  }
+  html += '</div>';
+
+  if (withAssign) {
+    const cands = line.candidates || [];
+    html += '<div class="si-recon-cands" id="' + boxId + '" style="display:none;">';
+    if (!cands.length) {
+      html += '<div class="si-recon-cands-empty">Открытых позиций заказов у этого поставщика нет. ' +
+              'Заведите позицию в заказе — или строка просто пришла сверх заказа.</div>';
+    } else {
+      cands.forEach(cd => {
+        html += '<button class="si-recon-cand' + (cd.likely ? ' likely' : '') + '" ' +
+                'onclick="siReconAssign(' + invId + ',' + line.invoice_item_id + ',' + cd.order_item_id + ')">' +
+                '<span class="si-recon-ord">' + escapeHtml(cd.order_label || '') + '</span>' +
+                '<span class="si-recon-cand-name">' + escapeHtml(cd.si_name || '') + '</span>' +
+                '<span class="si-recon-cand-left">ждёт ' + siFmtQty(cd.remaining) + '</span>' +
+                (cd.likely ? '<span class="si-recon-cand-hit">похоже</span>' : '') +
+                '</button>';
+      });
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function siReconToggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  const t = document.getElementById(id + '-toggle');
+  if (t) t.textContent = open ? 'показать' : 'скрыть';
+}
+
+// «Разнести в ORD-N»: закрываем позицию заказа этой строкой УПД
+async function siReconAssign(invId, invoiceItemId, orderItemId) {
+  try {
+    const r = await apiPost('/api/supply/invoices/' + invId + '/reconcile/assign', {
+      invoice_item_id: invoiceItemId,
+      order_item_id: orderItemId,
+    });
+    if (!r.ok) {
+      showToast('Не разнеслось: ' + ((r.data && r.data.message) || ('HTTP ' + r.status)), 'error');
+      return;
+    }
+    const a = (r.data && r.data.assigned) || {};
+    showToast('Разнесено в ' + (a.order_label || 'заказ') + ' · ' + siFmtQty(a.qty) + ' шт', 'success');
+    siApplyRecon(invId, r.data && r.data.reconciliation);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+async function reloadSiRecon(invId) {
+  try {
+    const r = await apiGet('/api/supply/invoices/' + invId + '/reconciliation');
+    siApplyRecon(invId, r && r.reconciliation);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// Перерисовать только карточку сверки, не трогая таблицу позиций
+function siApplyRecon(invId, recon) {
+  if (!recon) return;
+  if (siState.currentData) siState.currentData.reconciliation = recon;
+  const card = document.getElementById('si-recon-card');
+  if (!card) {
+    if (siState.currentInvoiceId === invId) loadSupplyInvoiceDetail(invId);
+    return;
+  }
+  const wrap = document.createElement('div');
+  wrap.innerHTML = renderSiRecon(recon, invId);
+  const fresh = wrap.firstElementChild;
+  if (fresh) card.replaceWith(fresh);
 }
 
 function renderSiDestTiles(items) {
@@ -12717,7 +12918,17 @@ async function confirmSupplyInvoice(invoiceId) {
     if (rep.refused)      parts.push('отказов: ' + rep.refused);
     if (rep.expense)      parts.push('списано: ' + rep.expense);
     if (rep.no_match)     parts.push('без оприходования: ' + rep.no_match);
-    showToast('Накладная оприходована' + (parts.length ? ' · ' + parts.join(', ') : ''), 'success');
+    // v2.45.1013: сверка с заказами — если что-то не сошлось, говорим сразу
+    const recon = (r.data && r.data.reconciliation) || null;
+    if (recon && !recon.ok) {
+      const rc = recon.counts || {};
+      const rb = [];
+      if (rc.unmatched) rb.push('не разнесено ' + rc.unmatched);
+      if (rc.short)     rb.push('заказ ждёт ещё ' + rc.short);
+      showToast('Оприходована, но сверка не сошлась: ' + rb.join(', ') + ' — смотри карточку сверки', 'error');
+    } else {
+      showToast('Накладная оприходована' + (parts.length ? ' · ' + parts.join(', ') : ''), 'success');
+    }
     loadSupplyInvoiceDetail(invoiceId);  // покажет финальный статус
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
