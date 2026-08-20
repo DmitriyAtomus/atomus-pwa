@@ -3412,9 +3412,7 @@ async function downloadInventoryXlsx() {
     }
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
-    let filename = 'inventory.xlsx';
-    const mm = cd.match(/filename="?([^";]+)"?/i);
-    if (mm) filename = mm[1];
+    const filename = filenameFromCD(cd, 'inventory.xlsx');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
@@ -9245,11 +9243,7 @@ async function dellinDocDownload(id, mode) {
       return;
     }
     const cd = r.headers.get('Content-Disposition') || '';
-    let filename = 'dellin_' + mode + '_' + id + '.pdf';
-    const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
-    const plain = cd.match(/filename="?([^";]+)"?/i);
-    if (star) { try { filename = decodeURIComponent(star[1]); } catch (e) {} }
-    else if (plain) filename = plain[1];
+    const filename = filenameFromCD(cd, 'dellin_' + mode + '_' + id + '.pdf');
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -11819,8 +11813,7 @@ async function downloadSupplierPriceFile(fileId) {
     const a = document.createElement('a');
     a.href = url;
     const cd = r.headers.get('Content-Disposition') || '';
-    const mm = cd.match(/filename="?([^";]+)"?/);
-    a.download = mm ? mm[1] : 'price.xlsx';
+    a.download = filenameFromCD(cd, 'price.xlsx');
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -13775,8 +13768,7 @@ async function downloadEdoUpdFile(updId, idx) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const cd = r.headers.get('Content-Disposition') || '';
-    const mm = cd.match(/filename="?([^";]+)"?/);
-    a.href = url; a.download = mm ? mm[1] : 'upd.bin';
+    a.href = url; a.download = filenameFromCD(cd, 'upd.bin');
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (e) { showToast('Сеть: ' + (e.message || e), 'error'); }
@@ -15205,10 +15197,8 @@ async function downloadInboxAttachmentDirect(inboxId, idx, suggestedName) {
       return;
     }
     // Имя из Content-Disposition или из подсказки
-    let filename = suggestedName || 'attachment';
     const cd = r.headers.get('Content-Disposition') || '';
-    const m = cd.match(/filename="?([^";]+)"?/i);
-    if (m) filename = m[1];
+    const filename = filenameFromCD(cd, suggestedName || 'attachment');
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -16635,9 +16625,7 @@ async function downloadSupplyOrderInvoice(orderId) {
     }
     // Получаем имя из Content-Disposition
     const cd = r.headers.get('Content-Disposition') || '';
-    let filename = 'invoice_' + orderId;
-    const m = cd.match(/filename="?([^";]+)"?/i);
-    if (m) filename = m[1];
+    const filename = filenameFromCD(cd, 'invoice_' + orderId);
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -18423,6 +18411,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.45.1009',
+    date: '20.08.2026',
+    title: 'Скачанные файлы снова с русскими именами',
+    features: [
+      'Вложение из «Почты и MAX» сохранялось как <b>Ð£Ð_Ð__Ñ_Ñ_Ð°Ñ_Ñ_Ñ_.pdf</b> — теперь это снова «УПД_статус_1_1144_от_20_августа_2026_г.pdf»',
+      'То же выправлено у счёта заказа, файла УПД из ЭДО, прайса поставщика, спецификации договора, КП и файлов из чатов',
+    ],
+  },
   {
     version: 'v2.45.980',
     date: '17.08.2026',
