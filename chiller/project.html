@@ -201,6 +201,17 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 .mdz-t td:first-child{color:var(--dim);width:48%;padding-right:10px}
 .mdz-t td:last-child{font-family:var(--mono);font-size:11.5px}
 .mdz-note{font-size:11px;color:var(--faint);line-height:1.55;margin-top:9px}
+/* Сетка «холодопроизводительность по температурам» шире карточки — крутится
+   вбок, первый столбец остаётся на месте. */
+.mdz-tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mdz-g{white-space:nowrap;min-width:100%}
+.mdz-g th{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
+  font-weight:500;text-align:right;padding:0 0 5px 9px;border-bottom:1px solid var(--line)}
+.mdz-g td{text-align:right;padding:4px 0 4px 9px;font-family:var(--mono);font-size:11.5px;
+  width:auto}
+.mdz-g th:first-child,.mdz-g td:first-child{position:sticky;left:0;background:var(--panel);
+  text-align:left;width:auto;padding-left:0;padding-right:9px;font-family:inherit;
+  font-size:12px;color:var(--dim)}
 .mdz-note a{color:var(--ice)}
 .mdz-act{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
 .mdz-act .btn{flex:1}
@@ -2400,6 +2411,16 @@ function descHtml(d,thumb){
   if((g.ports||[]).length)mnt.push(['Патрубки',g.ports.join(', ')]);
   if(g.bolt&&(g.bolt[0]||g.bolt[1])&&!(g.rows||[]).some(r=>/^Пятно/.test(r[0])))
     mnt.push(['Пятно крепления',g.bolt[0]+' × '+g.bolt[1]+' мм']);
+  // таблицы позиции: холодопроизводительность компрессора по температурам,
+  // киловатты фильтра и соленоида по хладагентам, ведомость деталей сборки
+  (d.tbls||[]).forEach(t=>{
+    h+='<div class="mdz-h">'+esc(t.title)+'</div><div class="mdz-tw">'+
+      '<table class="mdz-t mdz-g"><tr>'+
+      (t.head||[]).map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+
+      (t.rows||[]).map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+
+      '</table></div>';
+    if(t.note)h+='<div class="mdz-note">'+esc(t.note)+'</div>';
+  });
   const gr=(g.rows||[]).concat(mnt);
   if(gr.length)h+='<div class="mdz-h">Модель и посадка</div><table class="mdz-t">'+rows(gr)+'</table>';
   if(g.lod)h+='<div class="mdz-note">'+lnk(g.lod)+'</div>';
