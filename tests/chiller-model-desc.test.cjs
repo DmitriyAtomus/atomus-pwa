@@ -85,8 +85,8 @@ test('данные позиции в карточке экранируются',
 
 test('строка списка базы открывается с описанием и кнопкой ⓘ', () => {
   const row = section('function catRow(d,add)', 'function bindInfo(box,acts)');
-  assert.match(row, /class="k">'\+esc\(d\.kind\)/);          // заводское наименование
-  assert.match(row, /class="k tg">'\+esc\(tagLine\(d\)\)/);  // ключевые характеристики
+  assert.match(row, /class="k'\+\(filt\?' one':''\)\+'">'\+esc\(kind\)/);        // заводское наименование
+  assert.match(row, /class="k tg'\+\(filt\?' full':''\)\+'">'\+esc\(tagLine\(d\)\)/);  // характеристики
   assert.match(row, /class="info" title="Описание позиции">ⓘ/);
   // один и тот же ряд и в подборе на схеме, и в базе компоновки
   assert.match(page, /\$\('#asgList'\)\.innerHTML=list\.map\(d=>catRow\(d,'→'\)\)/);
