@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1014";
+const APP_VERSION = "v2.45.1015";
 const APP_VERSION_DATE = "20.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9536,6 +9536,78 @@ async function setProductionWorkKitStatus(workId, kitStatus) {
 
 // ============ v2.24.0 (Stage 30.0): BOM-блок в модалке деталей ============
 
+// v2.45.1015: блок «дефицита нет» — человеческим языком, с цифрами склада.
+// Разводим четыре разных ситуации, которые раньше показывались одной фразой.
+function renderPkbBomReadyBlock(w) {
+  const qty       = Number(w.qty || 1);
+  const model     = escapeHtml(w.model_name || 'изделие');
+  const bomTotal  = Number(w.bom_total || 0);
+  const fs        = w.finished_stock || null;
+  const free      = fs ? Number(fs.free || 0) : null;
+  const reserved  = fs ? Number(fs.reserved || 0) : null;
+  const total     = fs ? Number(fs.total || 0) : null;
+  const forWhom   = w.contract_number
+    ? ' под договор ' + escapeHtml(String(w.contract_number))
+    : ' (без договора, на склад)';
+
+  const ok   = (t) => '<div class="pkb-bom-note"><i class="ti ti-circle-check" style="color:#0A5B41;"></i> ' + t + '</div>';
+  const info = (t) => '<div class="pkb-bom-note"><i class="ti ti-info-circle"></i> ' + t + '</div>';
+  const wrap = (cls, color, icon, title, body) =>
+    '<div class="pkb-bom-block ' + cls + '">' +
+      '<div class="pkb-bom-title plain" style="color:' + color + ';"><i class="ti ' + icon + '"></i>' + title + '</div>' +
+      body +
+    '</div>';
+
+  // Комплектующие: если сборка уже сделана — они не «лежат на складе», а списаны в неё.
+  const partsLine = w.assembly_built
+    ? info('Комплектующие по техкарте уже списаны на эту сборку — второй раз их брать не нужно.')
+    : ok('Комплектующие по техкарте на складе есть' +
+         (bomTotal ? ': все ' + bomTotal + ' ' + plural(bomTotal, 'позиция', 'позиции', 'позиций') + ' в наличии' : '') +
+         ', дефицита нет.');
+
+  // 1. Сборка по этой работе уже собрана — изготавливать нечего.
+  if (w.assembly_built) {
+    return wrap('no-deficit built', '#0A5B41', 'ti-package-check',
+      'Изделие по этой работе уже собрано',
+      info('Готовая сборка числится на складе' + (w.contract_number ? ' в резерве по договору ' + escapeHtml(String(w.contract_number)) : '') + '. Изготавливать заново не нужно.') +
+      partsLine);
+  }
+
+  // 2. Перекомплектация: корпус уже существует, меняем начинку.
+  if (w.work_type === 'reconfiguration') {
+    return wrap('no-deficit', '#1D5A8A', 'ti-refresh',
+      'Перекомплектация — изделие уже есть, меняем комплектацию',
+      info('Новый корпус не изготавливается: берём готовое изделие и переставляем комплектующие по новой конфигурации.') +
+      ok('Детали для замены на складе есть, дефицита нет.'));
+  }
+
+  // 3. На складе лежат свободные готовые такие же — возможно, собирать не нужно.
+  if (free !== null && free > 0) {
+    return wrap('no-deficit have-stock', '#9A5F12', 'ti-alert-circle',
+      'На складе уже есть готовые ' + model + ' — ' + free + ' шт. свободных',
+      info('По этой работе нужно собрать ' + qty + ' шт.' + forWhom +
+           '. Но свободных готовых на складе ' + free + ' шт.' +
+           (reserved ? ' (ещё ' + reserved + ' шт. в резерве под другие договоры)' : '') +
+           ' — проверьте, не проще ли закрыть потребность складом, а работу отменить.') +
+      partsLine);
+  }
+
+  // 4. Обычный случай: готовых нет, детали есть — работа именно на изготовление.
+  let stockLine;
+  if (fs && total > 0) {
+    stockLine = 'Готовые ' + model + ' на складе есть (' + total + ' шт.), но все они в резерве под другие договоры — свободных 0 шт.';
+  } else if (fs) {
+    stockLine = 'Готовых ' + model + ' на складе нет: 0 шт. — ни свободных, ни в резерве.';
+  } else {
+    stockLine = 'Готового ' + model + ' на складе под эту потребность нет.';
+  }
+  return wrap('no-deficit', '#9A5F12', 'ti-building-factory-2',
+    'Это работа на изготовление: собираем ' + qty + ' шт.',
+    info(stockLine + ' Взять со склада нечего, поэтому изделие собираем' + forWhom + '.') +
+    partsLine +
+    '<div class="pkb-bom-hint">«Изделия нет» — это про готовое изделие на складе, а не про детали: детали в наличии, работу можно начинать.</div>');
+}
+
 function renderPkbBomBlock(w) {
   const missing = w.missing_components || [];
   const mfgMatches = w.mfg_matches || [];
@@ -9549,14 +9621,12 @@ function renderPkbBomBlock(w) {
            '</div>';
   }
 
-  // BOM есть и нет дефицита. Это означает только наличие внесённых в техкарту
-  // деталей, а не наличие самого готового изделия: активная карточка работы как
-  // раз и появилась потому, что готовой сборкой потребность не закрыта.
+  // v2.45.1015: короткое «Готового изделия на складе нет — нужно изготовить»
+  // читалось в цеху как «на складе пусто, работать нечем». Теперь блок отвечает
+  // тремя фактами: что делаем по этой работе, сколько готовых изделий реально
+  // лежит на складе и хватает ли комплектующих по техкарте.
   if (missing.length === 0) {
-    return '<div class="pkb-bom-block no-deficit">' +
-             '<div class="pkb-bom-title" style="color:#9A5F12;"><i class="ti ti-building-factory-2"></i>Готового изделия на складе нет — нужно изготовить</div>' +
-             '<div style="font-size:11.5px;color:var(--text-light);margin-top:5px;"><i class="ti ti-circle-check" style="color:#0A5B41;"></i> Детали по внесённой техкарте есть на складе.</div>' +
-           '</div>';
+    return renderPkbBomReadyBlock(w);
   }
 
   // Есть дефицит — выводим список
