@@ -25,3 +25,10 @@ test('команда на колонку передаёт серверу явн�
   assert.match(app, /_radioRemoteCommand\('speaker', 'play', station\)/);
   assert.match(app, /apiPost\('\/api\/tv\/radio',\s*\{\s*target:\s*target,/s);
 });
+
+test('громкость рабочей колонки регулируется отдельным ползунком', () => {
+  assert.match(app, /speakerVolume:\s*0\.1/);
+  assert.match(app, /s\.target === 'speaker'[\s\S]*s\.speakerVolume = pct \/ 100/);
+  assert.match(app, /_radioRemoteCommand\('speaker', 'volume', null\)/);
+  assert.match(app, /volume:\s+target === 'speaker'/);
+});
