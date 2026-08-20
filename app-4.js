@@ -9107,7 +9107,7 @@ function _renderNotifications25(r) {
       else if (n.type === 'contract_published')   icon = 'ti-file-text';
       else if (n.type === 'assembly_created')     icon = 'ti-tool';
       else if (n.type === 'contract_shipped')     icon = 'ti-truck-delivery';
-      else if (n.type === 'supply_receipt_mismatch') icon = 'ti-scale';   // v2.45.1012
+      else if (n.type === 'supply_receipt_mismatch') icon = 'ti-scale';   // v2.45.1013
       const onClick = n.entity_type === 'defect'
         ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
         : (n.entity_type === 'contract'
@@ -11900,7 +11900,7 @@ function renderSupplyInvoiceDetail(data) {
   const warnings = siParseWarnings(inv.ai_warnings);
   if (warnings.length) html += renderSiWarnings(warnings);
 
-  // v2.45.1012: сверка с заказами — только у оприходованной УПД
+  // v2.45.1013: сверка с заказами — только у оприходованной УПД
   if (data.reconciliation) html += renderSiRecon(data.reconciliation, inv.id);
 
   // Сводка по местам назначения
@@ -11989,7 +11989,7 @@ function renderSiWarnings(warnings) {
   return html;
 }
 
-// ==== СВЕРКА ПРИЁМКИ С ЗАКАЗАМИ (v2.45.1012) ====
+// ==== СВЕРКА ПРИЁМКИ С ЗАКАЗАМИ (v2.45.1013) ====
 // После оприходования УПД бэкенд отдаёт отчёт «заказ ↔ УПД ↔ что отметилось».
 // Раньше его половина (receipt_unmatched) приезжала в ответе confirm и молча
 // терялась: заказ мог остаться «получено частично», а узнавали случайно.
@@ -12918,7 +12918,7 @@ async function confirmSupplyInvoice(invoiceId) {
     if (rep.refused)      parts.push('отказов: ' + rep.refused);
     if (rep.expense)      parts.push('списано: ' + rep.expense);
     if (rep.no_match)     parts.push('без оприходования: ' + rep.no_match);
-    // v2.45.1012: сверка с заказами — если что-то не сошлось, говорим сразу
+    // v2.45.1013: сверка с заказами — если что-то не сошлось, говорим сразу
     const recon = (r.data && r.data.reconciliation) || null;
     if (recon && !recon.ok) {
       const rc = recon.counts || {};

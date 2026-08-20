@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1011";
+const APP_VERSION = "v2.45.1013";
 const APP_VERSION_DATE = "20.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -948,7 +948,7 @@ function onNotifClick(notifId, entityType, entityId, notifType) {
     // v2.45.140: Фото УПД → Приёмка УПД
     closeNotifModalForced();
     selectSidebarItem('supply-invoice-intake');
-    // v2.45.1012: сверка приёмки — сразу открываем нужную накладную
+    // v2.45.1013: сверка приёмки — сразу открываем нужную накладную
     if (entityId && notifType === 'supply_receipt_mismatch' && typeof loadSupplyInvoiceDetail === 'function') {
       setTimeout(() => loadSupplyInvoiceDetail(entityId), 300);
     }
@@ -5033,7 +5033,7 @@ function _renderNotifPanel(r) {
         icon = 'ti-truck-delivery';
         actionTitle = 'Открыть договор';
       } else if (n.type === 'supply_receipt_mismatch') {
-        icon = 'ti-scale';   // v2.45.1012: сверка приёмки с заказами
+        icon = 'ti-scale';   // v2.45.1013: сверка приёмки с заказами
         actionTitle = 'Открыть приёмку';
       }
       const onClick = n.entity_type === 'defect'
