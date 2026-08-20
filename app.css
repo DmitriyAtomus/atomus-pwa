@@ -4543,6 +4543,37 @@
     flex-direction: column;
     gap: 14px;
   }
+  .radio-modal-top .hr-output {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.18);
+  }
+  .radio-modal-top .hr-output-btn {
+    min-height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.68);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .radio-modal-top .hr-output-btn:hover { color: white; }
+  .radio-modal-top .hr-output-btn.active {
+    background: rgba(255, 255, 255, 0.17);
+    color: white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  }
+  .radio-modal-top .hr-output-btn i { font-size: 17px; }
   .radio-modal-top .hr-top {
     display: flex;
     align-items: center;
@@ -4606,6 +4637,11 @@
     font-size: 16px;
     color: rgba(255, 255, 255, 0.55);
     flex-shrink: 0;
+  }
+  .radio-modal-top .hr-volume-note {
+    min-height: 22px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
   }
   .radio-modal-top .hr-volume input[type="range"] {
     flex: 1;

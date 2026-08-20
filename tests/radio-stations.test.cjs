@@ -13,3 +13,15 @@ test('Ретро FM доступно в радио через совместим
     /url:\s*'https:\/\/retro\.hostingradio\.ru:8014\/retro320\.mp3'/,
   );
 });
+
+test('в модальном окне есть отдельный выход на рабочую колонку', () => {
+  assert.match(app, /> Здесь<\/button>/);
+  assert.match(app, /> На колонку<\/button>/);
+  assert.match(app, /setRadioTarget\(\\'speaker\\'\)/);
+  assert.match(app, /s\.target === 'speaker'/);
+});
+
+test('команда на колонку передаёт серверу явную цель воспроизведения', () => {
+  assert.match(app, /_radioRemoteCommand\('speaker', 'play', station\)/);
+  assert.match(app, /apiPost\('\/api\/tv\/radio',\s*\{\s*target:\s*target,/s);
+});
