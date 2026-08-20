@@ -113,7 +113,7 @@ test('подбор модели открывается с описанием у�
   // описание есть у каждого узла схемы, иначе шапка окажется пустой
   const nodes = section('const SCH_NODES=[', 'const SCH_DESC=')
     .match(/\{k:'([A-Z0-9]+)'/g).map(m => m.slice(4, -1));
-  const desc = section('const SCH_DESC={', 'const SCH_LINES=[');
+  const desc = section('const SCH_DESC={', 'const SCH_SHEET=');
   assert.equal(nodes.length, 24);
   for (const k of nodes) assert.ok(new RegExp('\\n ' + k + ":'").test(desc), 'нет описания узла ' + k);
 });
