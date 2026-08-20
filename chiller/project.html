@@ -461,7 +461,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
   #chatFab.open{display:none}
   #partsBox{width:min(92vw,296px)}
 }
-/* ═══ подбор фильтра-осушителя (v2.46.002) ═══
+/* ═══ подбор фильтра-осушителя (v2.45.1008) ═══
    Тот же подбор, что в базе, но здесь выбранная позиция сразу встаёт в сцену. */
 #flt{position:fixed;inset:0;background:rgba(3,8,16,.78);z-index:21;display:none;
   align-items:center;justify-content:center}
@@ -530,7 +530,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" id="bParts" style="display:none">Детали</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb" id="bRl" title="Показывать свободные штуцеры ротолока">Ротолоки</div>
-        <div class="vb" id="bFrm" title="Корпус не ловит курсор — мышь берёт деталь за его панелью. Выключишь — корпус снова выделяется кликом">Корпус сквозной</div>
+        <div class="vb" id="bFrm" title="Мышь берёт деталь за панелью корпуса. Сам корпус подсвечивается кликом по пустой панели, а тащится вторым нажатием">Корпус сквозной</div>
         <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
@@ -539,7 +539,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; сам корпус: ПКМ или строка спецификации<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>золотая метка «+» на штуцере — свободный ротолок, жми и выбирай вентиль</div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>золотая метка «+» на штуцере — свободный ротолок, жми и выбирай вентиль</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <div id="schChips" class="sch-chips"></div>
@@ -854,9 +854,7 @@ function pickItem(e,any){
   });
   if(any||!FRMTHRU)return list[0]||null;
   const inner=list.find(p=>roleOf(p.d)!=='frame');
-  if(inner)return inner;
-  const fr=list[0];
-  return fr&&sel===fr?fr:null;      // под курсором только корпус: выделенный тащим, чужой пропускаем в панораму
+  return inner||list[0]||null;      // за панелью деталь — берём её, иначе сам корпус
 }
 /* v2.45.974: тащим деталь в плоскости её собственной отметки, а не по полу —
    иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
@@ -886,7 +884,13 @@ function bindCtl(cv){
       const x=e.clientX,y=e.clientY;
       lpT=setTimeout(()=>{lpT=null;mode=null;dragSnap=null;cv.classList.remove('drag');
         select(lph);ctxOpen(lph,x,y);},550);}
-    if(hit){select(hit);
+    if(hit){
+      /* v2.45.1008: корпус — площадка, а не деталь, которую таскают каждым движением.
+         Первый клик по нему только подсвечивает (раньше не подсвечивал вообще —
+         клик молча уходил во вращение), тащить корпус можно вторым нажатием */
+      const frameFirst=FRMTHRU&&roleOf(hit.d)==='frame'&&sel!==hit;
+      select(hit);
+      if(frameFirst){mode='orbit';return;}
       // закреплённую деталь мышью не сдвинуть — для того и закрепляли
       if(hit.pin){mode='orbit';toast('Деталь закреплена — сними закрепление, чтобы двигать');return;}
       // вентиль сидит на резьбе штуцера: тащить его отдельно от аппарата незачем
@@ -938,7 +942,7 @@ function bindCtl(cv){
     try{localStorage.setItem(FRM_KEY,FRMTHRU?'1':'0');}catch(e){}
     $('#bFrm').classList.toggle('on',FRMTHRU);
     toast(FRMTHRU?'Корпус сквозной — курсор берёт то, что внутри'
-                 :'Корпус ловит курсор, как обычная деталь');};
+                 :'Корпус ловит курсор, как обычная деталь — тащится с первого нажатия');};
   $('#bFrm').classList.toggle('on',FRMTHRU);
   addEventListener('keydown',e=>{
     // v2.45.994: в поле ввода буквы — это текст, а не команды сцены
@@ -1034,6 +1038,41 @@ function site(){
   return new THREE.Box3(new THREE.Vector3(-DEF_SITE.w/2,-DEF_SITE.d/2,0),
                         new THREE.Vector3( DEF_SITE.w/2, DEF_SITE.d/2,DEF_SITE.h));
 }
+/* v2.45.1008: внутренняя полость корпуса. site() — габарит по наружным панелям,
+   и деталь, посаженная «в долю габарита», ложилась серединой на стенку: компрессор
+   упирался в панель, ресивер вылезал наружу. Считаем зону, где деталь реально
+   стоит на дне: от панелей отступ на толщину листа со стойкой, сверху — крышка. */
+const WALL=30;                                   // отступ от панели, мм
+function siteIn(){
+  const s=site(),fr=placed.find(p=>roleOf(p.d)==='frame');
+  const top=fr?capTop(fr).z:s.max.z;
+  return new THREE.Box3(
+    new THREE.Vector3(s.min.x+WALL,s.min.y+WALL,s.min.z),
+    new THREE.Vector3(s.max.x-WALL,s.max.y-WALL,top));
+}
+/* роли, которые живут внутри корпуса: их и держим в полости.
+   Конденсатор с вентиляторами сидят на крыше, трубы — на дворе, опоры — под дном */
+const INSIDE=new Set(['comp','recv','sep','evap','pump','line','instr','panel','floor']);
+/* сдвинуть деталь так, чтобы её габарит лёг внутрь полости.
+   Деталь шире полости — ставим по центру: сквозь стенку она всё равно торчит,
+   но хотя бы одинаково с двух сторон, и это видно в строке состояния */
+function clampInside(it,box,zone){
+  const z=zone||siteIn(),o=it.obj;let dx=0,dy=0;
+  ['x','y'].forEach(a=>{
+    const sz=box.max[a]-box.min[a],free=z.max[a]-z.min[a];
+    let d=0;
+    /* шаг сетки 10 мм: округляем не «к ближайшему», а от стенки внутрь —
+       иначе сдвиг на 4 мм пропадал и деталь оставалась в панели */
+    const away=v=>v>0?Math.ceil(v/SNAP)*SNAP:-Math.ceil(-v/SNAP)*SNAP;
+    if(sz>=free)d=snap((z.min[a]+z.max[a])/2-(box.min[a]+box.max[a])/2);
+    else if(box.min[a]<z.min[a])d=away(z.min[a]-box.min[a]);
+    else if(box.max[a]>z.max[a])d=away(z.max[a]-box.max[a]);
+    if(a==='x')dx=d;else dy=d;
+  });
+  if(!dx&&!dy)return box;
+  o.position.x+=dx;o.position.y+=dy;o.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(o);
+}
 function levelZ(lvl,s){
   const H=s.max.z-s.min.z;
   if(lvl==='roof'){                                     // конденсатор — сверху, на крышку
@@ -1074,17 +1113,43 @@ function autoPlace(it){
   const s=site(),sl=SLOT[role]||SLOT.floor;
   const z=levelZ(sl.lvl,s),pt=slotPoint(sl,s);
   const byX=sl.dir==='x';
-  const lim=byX?s.max.x:s.max.y;                      // дальше площадки ряд не тянем
+  // v2.45.1008: ряд шагает по внутренней полости, а не по наружному габариту —
+  // иначе последняя деталь ряда наполовину уезжала сквозь боковую панель
+  const inner=INSIDE.has(role),zone=inner?siteIn():null;
+  const lim=inner?(byX?zone.max.x:zone.max.y):(byX?s.max.x:s.max.y);
   const inward=(byX?sl.ay:sl.ax)>0.5?-1:1;            // новый ряд уходит внутрь площадки
   let cur=byX?pt.x:pt.y,side=byX?pt.y:pt.x,row=0;
   for(let k=0;k<30;k++){
-    const box=placeAt(it,byX?cur:side,byX?side:cur,z,sl.rot,sl.tilt);
+    let box=placeAt(it,byX?cur:side,byX?side:cur,z,sl.rot,sl.tilt);
+    if(inner)box=clampInside(it,box,zone);
     if(NOCOLL.has(role)||boxFree(box,it))return;
     const sz=new THREE.Vector3();box.getSize(sz);
     cur+=(byX?sz.x:sz.y)+GAP;
     // ряды переносим только внутри корпуса; крышный ряд (конденсатор, вентиляторы) тянется дальше
     if(!sl.center&&cur>lim&&row<3){row++;cur=byX?pt.x:pt.y;side+=inward*180;}
   }
+  // ряд кончился, свободного места в нём нет — обходим всю полость сеткой.
+  // Раньше деталь просто оставалась там, где её бросил шаг ряда, — то есть
+  // наполовину снаружи или в куче с соседом
+  if(inner&&gridPlace(it,z,sl,zone))return;
+  if(inner)clampInside(it,new THREE.Box3().setFromObject(it.obj),zone);
+}
+/* обход полости сеткой: ближайшее к слоту свободное место на той же отметке */
+const GRID=40;
+function gridPlace(it,z,sl,zone){
+  const pt=slotPoint(sl,site());
+  const cand=[];
+  for(let x=zone.min.x;x<=zone.max.x;x+=GRID)
+    for(let y=zone.min.y;y<=zone.max.y;y+=GRID)
+      cand.push([x,y,(x-pt.x)*(x-pt.x)+(y-pt.y)*(y-pt.y)]);
+  cand.sort((a,b)=>a[2]-b[2]);
+  for(const c of cand){
+    const box=clampInside(it,placeAt(it,c[0],c[1],z,sl.rot,sl.tilt),zone);
+    if(box.min.x<zone.min.x-1||box.max.x>zone.max.x+1||
+       box.min.y<zone.min.y-1||box.max.y>zone.max.y+1)continue;   // деталь шире полости
+    if(boxFree(box,it))return true;
+  }
+  return false;
 }
 /* ряд, который должен стоять по центру площадки (конденсатор, вентиляторы, ресивер) */
 function centerRow(list,sl,s){
@@ -1092,6 +1157,10 @@ function centerRow(list,sl,s){
   const pt=slotPoint(sl,s),c=new THREE.Vector3();bb.getCenter(c);
   const dx=sl.dir==='x'?snap(pt.x-c.x):0,dy=sl.dir==='y'?snap(pt.y-c.y):0;
   list.forEach(p=>{p.obj.position.x+=dx;p.obj.position.y+=dy;p.obj.updateMatrixWorld(true);});
+  // ряд по центру площадки — но не наружу: ресивер центруется по X и остаётся в полости
+  const zone=siteIn();
+  list.forEach(p=>{if(INSIDE.has(roleOf(p.d)))
+    clampInside(p,new THREE.Box3().setFromObject(p.obj),zone);});
 }
 /* полная перекладка сцены по функциям */
 const LAY_ORDER=['frame','vibro','comp','sep','recv','evap','pump','line','instr','panel','cond','fan','pipe','floor'];
@@ -1401,7 +1470,11 @@ function ctxItems(it){
     {sep:1},
     {ic:'▲',t:'Выше на 50',s:'PgUp',go:()=>lift(50)},
     {ic:'▼',t:'Ниже на 50',s:'PgDn',go:()=>lift(-50)},
-    {ic:'⤓',t:'Поставить на пол',go:toFloor},
+    {ic:'⤓',t:'Поставить на пол',go:toFloor});
+  if(INSIDE.has(roleOf(it.d))&&placed.some(p=>roleOf(p.d)==='frame'))
+    L.push({ic:'⇱',t:'Убрать в корпус',s:outSet.has(it.uid)?'торчит наружу':'',
+            go:()=>{select(it);fitInside();}});
+  L.push(
     {sep:1},
     {ic:'⧉',t:'Дублировать',go:dupSel},
     {ic:'✕',t:'Убрать со сцены',s:'Del',del:1,go:delSel});
@@ -1559,15 +1632,31 @@ function toFloor(){
 }
 
 /* ═══ пересечения: детали, которые наезжают друг на друга, светятся красным ═══ */
-let collSet=new Set();
+let collSet=new Set(),outSet=new Set();
 function applyTint(p){
   /* у сборок с крашеными деталями материал не один, а список — подсветка
      выделения и пересечения ложится на все */
   const ms=Array.isArray(p.obj.material)?p.obj.material:[p.obj.material];
   ms.forEach(m=>{
     if(collSet.has(p.uid)){m.emissive.setHex(0xd94f3d);m.emissiveIntensity=.5;}
+    /* v2.45.1008: деталь торчит сквозь панель корпуса — янтарём.
+       Раньше это молчало: корпус в расчёт пересечений не берётся,
+       и компрессор, упёршийся в стенку, шёл под «✓ пересечений нет» */
+    else if(outSet.has(p.uid)){m.emissive.setHex(0xC9A227);m.emissiveIntensity=.42;}
     else if(sel===p){m.emissive.setHex(0x1B9FD8);m.emissiveIntensity=.33;}
     else{m.emissive.setHex(0x000000);m.emissiveIntensity=0;}
+  });
+}
+/* сколько деталей вышло за корпус: считаем только тех, кто должен стоять внутри */
+function checkOutside(){
+  outSet=new Set();
+  if(!placed.some(p=>roleOf(p.d)==='frame'))return;
+  const z=siteIn();
+  placed.forEach(p=>{
+    if(!INSIDE.has(roleOf(p.d)))return;
+    const b=new THREE.Box3().setFromObject(p.obj);
+    if(b.min.x<z.min.x-6||b.max.x>z.max.x+6||
+       b.min.y<z.min.y-6||b.max.y>z.max.y+6||b.max.z>z.max.z+6)outSet.add(p.uid);
   });
 }
 /* ═══ патрубки: где всас, где нагнетание ═══
@@ -2007,7 +2096,7 @@ function rotOff(it){
 $('#bRl').onclick=rotToggle;
 
 function checkCollisions(){
-  collSet=new Set();
+  collSet=new Set();checkOutside();
   // AABB с усадкой 4 мм: касание — не пересечение.
   // v2.45.974: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
   const chk=placed.filter(p=>!NOCOLL.has(roleOf(p.d)));
@@ -2022,10 +2111,53 @@ function checkCollisions(){
         collSet.add(chk[i].uid);collSet.add(chk[j].uid);}
   placed.forEach(applyTint);
   const el=$('#fColl');
-  if(!placed.length){el.textContent='';return;}
-  const n=collSet.size;
-  el.textContent=n?('⚠ пересекаются: '+n+' дет.'):'✓ пересечений нет';
-  el.style.color=n?'#f0a9a0':'var(--ok)';
+  if(!placed.length){el.textContent='';el.onclick=null;el.style.cursor='';el.title='';return;}
+  const n=collSet.size,o=outSet.size;
+  const txt=[];
+  if(n)txt.push('⚠ пересекаются: '+n+' дет.');
+  if(o)txt.push('⚠ вне корпуса: '+o+' дет.');
+  el.textContent=txt.length?txt.join(' · '):'✓ пересечений нет, всё в корпусе';
+  el.style.color=n?'#f0a9a0':(o?'#e8c85a':'var(--ok)');
+  // строка «вне корпуса» — сразу и кнопка: нажал, и всё торчащее уехало внутрь
+  el.style.cursor=o?'pointer':'';
+  el.title=o?'Нажми — уберу все торчащие детали внутрь корпуса':'';
+  el.onclick=o?fitAllInside:null;
+}
+/* вернуть внутрь всё, что торчит наружу */
+function fitAllInside(){
+  const list=placed.filter(p=>outSet.has(p.uid)&&!p.pin);
+  if(!list.length){toast('Наружу ничего не торчит');return;}
+  const h=histBegin('возврат деталей в корпус');
+  try{
+    const z=siteIn();
+    list.forEach(p=>{
+      const o=p.obj,b=new THREE.Box3().setFromObject(o);
+      const bx=o.position.x,by=o.position.y;
+      clampInside(p,b,z);
+      const dx=o.position.x-bx,dy=o.position.y-by;
+      o.position.x=bx;o.position.y=by;o.updateMatrixWorld(true);
+      if(dx||dy)moveItem(p,dx,dy,0);          // с деталью едут посаженные на неё узлы
+    });
+    checkCollisions();refresh();save();
+    toast('Убрал в корпус: '+list.length+' '+plural(list.length));
+  }finally{histEnd(h);}
+}
+/* «Убрать в корпус» — вернуть выделенную деталь внутрь полости */
+function fitInside(){
+  if(!sel)return;
+  if(!placed.some(p=>roleOf(p.d)==='frame')){toast('В сцене нет корпуса');return;}
+  if(!INSIDE.has(roleOf(sel.d))){toast('Эта деталь стоит не внутри корпуса');return;}
+  const b0=new THREE.Box3().setFromObject(sel.obj);
+  const z=siteIn(),o=sel.obj;
+  const before={x:o.position.x,y:o.position.y};
+  clampInside(sel,b0,z);
+  const dx=o.position.x-before.x,dy=o.position.y-before.y;
+  if(!dx&&!dy){toast('Деталь и так внутри корпуса');return;}
+  o.position.x=before.x;o.position.y=before.y;o.updateMatrixWorld(true);
+  pushHist('возврат детали в корпус');
+  moveItem(sel,dx,dy,0);
+  checkCollisions();showSelZ();refresh();save();
+  toast('Убрал в корпус');
 }
 /* ═══ v2.46.001: точное позиционирование ═══
    Кнопки ставят деталь «на 90° и на 50 мм», а по месту нужно и 7°, и отметка
@@ -2875,7 +3007,7 @@ function setMode(m){
 $('#tab3d').onclick=()=>setMode('3d');
 $('#tabSch').onclick=()=>setMode('sch');
 
-/* ═══ подбор фильтра-осушителя (v2.46.002) ═══
+/* ═══ подбор фильтра-осушителя (v2.45.1008) ═══
    Подбор жил в витрине базы, а фильтр ставят в проекте: приходилось уходить
    в базу, запоминать артикул и возвращаться. Здесь подобранная позиция сразу
    встаёт в сцену, а мощность берётся с компрессора, который уже стоит в
