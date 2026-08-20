@@ -1,4 +1,4 @@
-// Карточка работы: блок «дефицита нет» (v2.45.1015).
+// Карточка работы: блок «дефицита нет» (v2.45.1016).
 // 20.08.2026: цех читал «Готового изделия на складе нет — нужно изготовить» как
 // «на складе пусто, работать нечем». Блок обязан разделять четыре ситуации и
 // называть цифру склада, а не общие слова.
@@ -11,7 +11,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'app-1.js'), 'utf8');
 
 function readyContext() {
-  const start = source.indexOf('// v2.45.1015: блок «дефицита нет»');
+  const start = source.indexOf('// v2.45.1016: блок «дефицита нет»');
   const end = source.indexOf('function renderPkbBomBlock(w) {');
   const code = source.slice(start, end);
   assert.ok(code.length > 100, 'блок renderPkbBomReadyBlock не найден в app-1.js');

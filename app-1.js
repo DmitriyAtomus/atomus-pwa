@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1015";
+const APP_VERSION = "v2.45.1016";
 const APP_VERSION_DATE = "20.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2023,6 +2023,18 @@ let _devChatHost = 'screen';       // где сейчас показываем �
 let _devChatTicking = false;       // тик уже идёт — второй дорисовал бы те же сообщения
 let _devChatDayKey = '';           // день последнего нарисованного сообщения — для разделителя
 
+// ---- v2.45.1015: чат открывается на последних репликах ----
+// Раньше лента запрашивалась «всё, что новее нуля», а сервер отдавал первые 200
+// сообщений. В чате «Чиллера» их 369: открывался кусок недельной давности, через
+// три секунды следующий тик дорисовывал хвост и прыгал вниз — лента на глазах
+// перелистывалась. Теперь при открытии берём ХВОСТ (tail), а история догружается
+// вверх, когда до неё домотали.
+const DEVCHAT_TAIL = 40;           // сколько реплик показываем при открытии
+const DEVCHAT_PAGE = 40;           // сколько добираем за одну догрузку вверх
+let _devChatOldest = 0;            // id самой верхней нарисованной реплики
+let _devChatHasOlder = false;      // выше есть история
+let _devChatOlderBusy = false;     // догрузка уже идёт
+
 // ---- чаты и проекты ----
 // Раньше лента была одна на всё, и темы мешались: разговор про цех продолжался
 // в сессии, где только что правили фронт. Теперь у каждого чата своя сессия
@@ -2405,6 +2417,9 @@ function _devChatRender(msg) {
   const wrap = document.createElement('div');
   wrap.className = 'dchat-row' + (mine ? ' is-mine' : '');
   wrap.setAttribute('data-msg-id', msg.id);
+  // по времени пересобираются разделители дней: сообщения приезжают и сверху
+  // (догрузка истории), и снизу, одним курсором дня уже не обойтись
+  wrap.setAttribute('data-ts', msg.ts || '');
 
   // Ответ Клавы подписан аватаром — в длинной ленте сразу видно, где чья реплика.
   if (!mine) {
@@ -2515,6 +2530,23 @@ function _devChatGroupRow(row) {
   if (!prev || !prev.classList.contains('dchat-row')) return;
   if (prev.classList.contains('is-mine') !== row.classList.contains('is-mine')) return;
   row.classList.add('is-cont');
+}
+
+// Разделители дней пересобираем по всей ленте: догрузка истории вставляет
+// сообщения ВЫШЕ уже нарисованных, и вести один курсор дня стало нечестно —
+// в середине ленты появлялось второе «Сегодня».
+function _devChatSyncDays(feed) {
+  if (!feed) return;
+  feed.querySelectorAll('.dchat-day').forEach(function (el) { el.remove(); });
+  let key = '';
+  feed.querySelectorAll('.dchat-row[data-ts]').forEach(function (row) {
+    const day = _devChatDay(row.getAttribute('data-ts'));
+    if (day.key && day.key !== key) {
+      feed.insertBefore(_devChatDayRow(day.label), row);
+      key = day.key;
+    }
+  });
+  _devChatDayKey = key;
 }
 
 // Разделитель дня вставляется перед первым сообщением новых суток.
@@ -2665,9 +2697,12 @@ async function _devChatTick() {
 async function _devChatTickInner(feed) {
   let data;
   if (!_devChatThreadId) return;      // список чатов ещё не пришёл
+  const first = _devChatSince === 0;   // переписка рисуется с нуля: открыли чат
   try {
     data = await apiGet(_devChatApi('/messages') + '?since_id=' + _devChatSince +
-                        '&thread_id=' + _devChatThreadId);
+                        '&thread_id=' + _devChatThreadId +
+                        // открытие — только хвост ленты, история догрузится вверх
+                        (first ? '&tail=' + DEVCHAT_TAIL : ''));
   } catch (e) {
     // 403 здесь означает «лента не твоя», а не обрыв связи — писать про связь
     // в этом случае значит отправить искать проблему не там
@@ -2681,26 +2716,29 @@ async function _devChatTickInner(feed) {
     return;
   }
   const msgs = (data && data.messages) || [];
-  const first = _devChatSince === 0;   // переписка рисуется с нуля: открыли чат
   if (first) {
     feed.innerHTML = msgs.length ? '' : _devChatEmptyHtml();
     _devChatDayKey = '';
+    _devChatOldest = msgs.length ? msgs[0].id : 0;
+    _devChatHasOlder = !!(data && data.has_older);
   }
 
   const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
+  let added = 0;
   msgs.forEach(function (m) {
     if (!feed.querySelector('[data-msg-id="' + m.id + '"]')) {
-      const day = _devChatDay(m.ts);
-      if (day.key && day.key !== _devChatDayKey) {
-        feed.appendChild(_devChatDayRow(day.label));
-        _devChatDayKey = day.key;
-      }
       const row = _devChatRender(m);
+      // первая пачка появляется вся разом — гасим анимацию въезда, иначе
+      // открытие чата выглядит как рябь из сорока прилетающих пузырей
+      if (first) row.classList.add('no-anim');
       feed.appendChild(row);
       _devChatGroupRow(row);
+      added++;
     }
     if (m.id > _devChatSince) _devChatSince = m.id;
   });
+  if (added) _devChatSyncDays(feed);
+  if (first) _devChatOlderBtn(feed);
   // v2.45.978: открыли чат — прыгаем в конец мгновенно и придерживаем низ, пока
   // едут картинки и доверстывается текст. Новое сообщение в открытой ленте —
   // короткая липучка: плавная прокрутка тут успевала оборваться на полпути.
@@ -2849,10 +2887,86 @@ function devChatJump() {
   devChatOnScroll();
 }
 
+// Шапка ленты: «показать раньше». Появляется, только если выше правда есть
+// история — в коротком чате наверху ничего лишнего не висит.
+function _devChatOlderBtn(feed) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  let btn = feed.querySelector('.dchat-older');
+  if (!_devChatHasOlder) { if (btn) btn.remove(); return; }
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dchat-older';
+    btn.onclick = function () { devChatLoadOlder(); };
+  }
+  btn.innerHTML = _devChatOlderBusy
+    ? '<i class="ti ti-loader-2"></i>Загружаю…'
+    : '<i class="ti ti-arrow-up"></i>Показать раньше';
+  btn.disabled = _devChatOlderBusy;
+  if (feed.firstChild !== btn) feed.insertBefore(btn, feed.firstChild);
+}
+
+// Догрузка истории вверх. Главное здесь — не сдвинуть картинку под руками:
+// запоминаем высоту до вставки и возвращаем ту же точку просмотра.
+async function devChatLoadOlder() {
+  const feed = _devChatEl('feed');
+  if (!feed || !_devChatHasOlder || _devChatOlderBusy || !_devChatOldest) return;
+  _devChatOlderBusy = true;
+  _devChatOlderBtn(feed);
+  let data;
+  try {
+    data = await apiGet(_devChatApi('/messages') + '?before_id=' + _devChatOldest +
+                        '&limit=' + DEVCHAT_PAGE + '&thread_id=' + _devChatThreadId);
+  } catch (e) {
+    _devChatOlderBusy = false;
+    _devChatOlderBtn(feed);
+    return;
+  }
+  const msgs = (data && data.messages) || [];
+  const anchorH = feed.scrollHeight;
+  const anchorTop = feed.scrollTop;
+  const frag = document.createDocumentFragment();
+  const rows = [];
+  msgs.forEach(function (m) {
+    if (feed.querySelector('[data-msg-id="' + m.id + '"]')) return;
+    const row = _devChatRender(m);
+    row.classList.add('no-anim');   // история не должна «въезжать»
+    frag.appendChild(row);
+    rows.push(row);
+  });
+  const btn = feed.querySelector('.dchat-older');
+  feed.insertBefore(frag, btn ? btn.nextSibling : feed.firstChild);
+  rows.forEach(_devChatGroupRow);
+  // граница пачки: у первой старой строки соседство сверху изменилось
+  const next = rows.length ? rows[rows.length - 1].nextElementSibling : null;
+  if (next && next.classList.contains('dchat-row')) {
+    next.classList.remove('is-cont');
+    _devChatGroupRow(next);
+  }
+  _devChatSyncDays(feed);
+  if (msgs.length) _devChatOldest = msgs[0].id;
+  _devChatHasOlder = !!(data && data.has_older);
+  _devChatOlderBusy = false;
+  _devChatOlderBtn(feed);
+  // тот же кусок переписки остаётся под курсором: прокручиваем ровно на
+  // высоту вставленного (behavior перебивает scroll-behavior: smooth из CSS)
+  const grew = feed.scrollHeight - anchorH;
+  try { feed.scrollTo({ top: anchorTop + grew, behavior: 'auto' }); }
+  catch (e) { feed.scrollTop = anchorTop + grew; }
+}
+
 // Кнопка «вниз» нужна, только когда лента отмотана от конца.
 function devChatOnScroll() {
   const feed = _devChatEl('feed');
   const btn = document.getElementById('devchat-jump');
+  // домотал до верха — подтягиваем предыдущую страницу истории сам.
+  // Условие «лента вообще прокручивается» важно: пока сообщений меньше экрана,
+  // scrollTop всегда 0, и без него история грузилась бы страница за страницей.
+  if (feed && _devChatHasOlder && !_devChatOlderBusy && feed.scrollTop < 120 &&
+      feed.scrollHeight > feed.clientHeight + 40) {
+    devChatLoadOlder();
+  }
   if (!feed || !btn) return;
   const away = feed.scrollHeight - feed.scrollTop - feed.clientHeight > 160;
   btn.classList.toggle('show', away && _devChatHost === 'screen');
@@ -3769,6 +3883,9 @@ function devChatOpenThread(id) {
   // Лента чужого чата — другая переписка целиком: обнуляем курсор и рисуем с нуля
   _devChatSince = 0;
   _devChatDayKey = '';
+  _devChatOldest = 0;
+  _devChatHasOlder = false;
+  _devChatOlderBusy = false;
   _devChatPending = new Set();
   _devChatResetLive();
   const feed = _devChatEl('feed');
@@ -4002,6 +4119,9 @@ function loadDevChat(host) {
   _devChatHost = host || 'screen';
   _devChatSince = 0;
   _devChatDayKey = '';
+  _devChatOldest = 0;
+  _devChatHasOlder = false;
+  _devChatOlderBusy = false;
   _devChatPending = new Set();
   _devChatResetLive();
   const feed = _devChatEl('feed');
@@ -9536,7 +9656,7 @@ async function setProductionWorkKitStatus(workId, kitStatus) {
 
 // ============ v2.24.0 (Stage 30.0): BOM-блок в модалке деталей ============
 
-// v2.45.1015: блок «дефицита нет» — человеческим языком, с цифрами склада.
+// v2.45.1016: блок «дефицита нет» — человеческим языком, с цифрами склада.
 // Разводим четыре разных ситуации, которые раньше показывались одной фразой.
 function renderPkbBomReadyBlock(w) {
   const qty       = Number(w.qty || 1);
@@ -9621,7 +9741,7 @@ function renderPkbBomBlock(w) {
            '</div>';
   }
 
-  // v2.45.1015: короткое «Готового изделия на складе нет — нужно изготовить»
+  // v2.45.1016: короткое «Готового изделия на складе нет — нужно изготовить»
   // читалось в цеху как «на складе пусто, работать нечем». Теперь блок отвечает
   // тремя фактами: что делаем по этой работе, сколько готовых изделий реально
   // лежит на складе и хватает ли комплектующих по техкарте.
